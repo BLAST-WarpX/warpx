@@ -19,7 +19,7 @@ from Tools.RunPlanning.memory_calculator import MemoryCalculator as MC
 This file contains a usage example of the ``MemoryCalculator`` class for WarpX'
 :ref:`laser-ion acceleration example <usage-examples>`.
 
-It assume a single box within the whole simulation domain. Naturally, for a 
+It assume a single box within the whole simulation domain. Naturally, for a
 production scale simulation, multiple MPI ranks would be assigned to subdomains
 and the complex plasma dynamics make accurate estimations of later memory load
 very difficult.
@@ -80,8 +80,3 @@ print(r"---------")
 print(r"Total sum")
 mem_sum = species_e_mem + species_H_mem + field_mem + rng_mem
 print(r" {:.2f} MB".format(mem_sum / megabyte))
-
-
-
-
-

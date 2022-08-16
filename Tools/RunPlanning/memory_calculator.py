@@ -16,7 +16,7 @@ class MemoryCalculator:
     Memory requirement calculation tool for WarpX
 
     Contains calculation for fields, particles and random number generation.
-    
+
     @TODO add memory complexity of diagnostics
     """
 
@@ -212,7 +212,7 @@ class MemoryCalculator:
         pml_ncell : int
             number of PML cells in each direction
             Set to 0 if boundaries have no PMLs.
-        
+
 
         Returns
         -------
@@ -306,8 +306,8 @@ class MemoryCalculator:
         IMPORTANT NOTE
         --------------
         Do not forget to set <species>.xmin/xmax/... etc. because especially
-        simulations of overdense localized targets could otherwise crash on 
-        initialization. Particles will be created in parallel first and then 
+        simulations of overdense localized targets could otherwise crash on
+        initialization. Particles will be created in parallel first and then
         set to be invalid for regions outside of density thresholds.
 
         Parameters
@@ -320,9 +320,9 @@ class MemoryCalculator:
         target_n_z : int
             number of cells in z direction containing the target
         num_additional_ints : int
-            number of additional int attributes 
+            number of additional int attributes
         num_additional_reals : int
-            number of additional real attributes 
+            number of additional real attributes
         particles_per_cell : int
             number of particles of the species per cell
 
@@ -344,7 +344,7 @@ class MemoryCalculator:
         standard_attribute_mem = np.array([
             3 * self.value_size,  # momentum
             self.sim_dim * self.value_size,  # position
-            1 * np.int32().itemsize,  # particle id 
+            1 * np.int32().itemsize,  # particle id
             1 * np.int32().itemsize,  # cpu id
             1 * self.value_size  # weighting
         ])
