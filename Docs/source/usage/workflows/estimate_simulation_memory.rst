@@ -2,8 +2,8 @@ Estimate memory cost for a simulation
 =====================================
 
 Aside from the detailed compute load and memory cost information that WarpX provides
-via the :ref:`LoadBalanceCosts <running-cpp-parameters-diagnostics>`
-:ref:`reduced diagnostic <dataanalysis-reduced-diagnostics>` option it is useful to make
+via the :ref:`ReducedDiagnostic <dataanalysis-reduced-diagnostics>` option :ref:`LoadBalanceCosts <running-cpp-parameters-diagnostics>`
+ it is useful to make
 good initial estimates on how much memory a simulation will take up before actually running it.
 Especially when running on multiple hardware accelerators (e.g. GPUs), the available memory is limited
 and running out of memory on only a single device can cause a crash.
