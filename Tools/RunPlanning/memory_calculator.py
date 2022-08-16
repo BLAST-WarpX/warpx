@@ -6,7 +6,7 @@
 # License: BSD-3-Clause-LBNL
 
 # requirements:
-# - python3
+# - python
 
 import numpy as np
 
@@ -83,7 +83,7 @@ class MemoryCalculator:
                 "The build option WarpX_PRECISION can either be SINGLE or DOUBLE (default)"
             )
 
-    def get_double_buffer_cells(self,
+    def get_guard_cells_per_box(self,
                                 guard_cells_per_dim=[]):
         """
         Get the number of guard cells around the box.
@@ -93,13 +93,14 @@ class MemoryCalculator:
 
         guard_cells_per_dim : list
             only needs to be set explicitly when using the PSATD solver
-            (see e.g. psatd.nx_guard)
+            (see e.g. psatd.nx_guard) and is otherwise derived
+            from the particle shape
+
 
         Returns
         -------
 
-        double_buffer_cells : int
-
+        guard_cells_per_box : int
         """
         if self.sim_dim == len(guard_cells_per_dim):
             pass
@@ -120,28 +121,39 @@ class MemoryCalculator:
 
         if self.sim_dim == 1:
             local_cells = (self.n_x + 2 * guard_cells_per_dim[0])
-            double_buffer_cells = local_cells - self.n_x
+            guard_cells_per_box = local_cells - self.n_x
 
 
         elif self.sim_dim == 2:
 
             local_cells = (self.n_x + 2 * guard_cells_per_dim[0]) \
                           * (self.n_y + 2 * guard_cells_per_dim[1])
-            double_buffer_cells = local_cells - self.n_x * self.n_y
+            guard_cells_per_box = local_cells - self.n_x * self.n_y
 
         elif self.sim_dim == 3:
 
             local_cells = (self.n_x + 2 * guard_cells_per_dim[0]) \
                           * (self.n_y + 2 * guard_cells_per_dim[1]) \
                           * (self.n_z + 2 * guard_cells_per_dim[2])
-            double_buffer_cells = local_cells - (self.n_x * self.n_y * self.n_z)
+            guard_cells_per_box = local_cells - (self.n_x * self.n_y * self.n_z)
 
-        return double_buffer_cells
+        return guard_cells_per_box
 
     def get_local_pml_cells(self,
                             pml_cells_per_dim=[]):
         """
         Get number of PML cells, assuming PMLs are around the whole box.
+
+        Parameters
+        ----------
+
+        pml_cells_per_dim : list
+            number of PML cells per dimension
+
+        Returns
+        -------
+
+        local_pml_cells : int
         """
         if self.sim_dim == len(pml_cells_per_dim):
             pass
@@ -178,7 +190,7 @@ class MemoryCalculator:
         """
         Memory reserved for fields on each device
 
-        @TODO handle embedded boundaries
+        @TODO handle embedded boundaries?
 
         Parameters
         ----------
@@ -215,8 +227,7 @@ class MemoryCalculator:
             n_y = self.n_y
         if n_z is None:
             n_z = self.n_z
-        # PML size cannot exceed the local grid size
-        # @TODO is that true for WarpX?
+
 
         pml_cell_mem = 0
 
@@ -224,13 +235,29 @@ class MemoryCalculator:
             pass
 
         else:
+            # PML size cannot exceed the local grid size
+            # @TODO is that true for WarpX?
             pml_n_x = min(pml_ncell, n_x)
             pml_n_y = min(pml_ncell, n_y)
             pml_n_z = min(pml_ncell, n_z)
 
-            local_pml_cells = self.get_local_pml_cells(
-                pml_cells_per_dim=[pml_n_x, pml_n_y, pml_n_z]
-            )
+            if self.sim_dim == 1:
+                local_pml_cells = self.get_local_pml_cells(
+                    pml_cells_per_dim=[pml_n_z]
+                )
+            elif self.sim_dim == 2:
+                local_pml_cells = self.get_local_pml_cells(
+                    pml_cells_per_dim=[pml_n_x, pml_n_z]
+                )
+            elif self.sim_dim == 3:
+                local_pml_cells = self.get_local_pml_cells(
+                    pml_cells_per_dim=[pml_n_x, pml_n_y, pml_n_z]
+                )
+            else:
+                raise ValueError(
+                    "Invalid number of dimensions: ",
+                    self.sim_dim
+                )
             # number of additional PML field components
             # @TODO figure out how many fields for each PML configuration
             # see Source/BoundaryConditions/PML.H#L214-233
@@ -246,7 +273,7 @@ class MemoryCalculator:
 
             pml_cell_mem = self.value_size * num_pml_field_values * local_pml_cells
 
-        double_buffer_cells = self.get_double_buffer_cells(
+        double_buffer_cells = self.get_guard_cells_per_box(
             guard_cells_per_dim=guard_cells_per_dim
         )
 
@@ -385,7 +412,8 @@ class MemoryCalculator:
 
         generator_method = generator_method_d[warpx_compute]
 
-        MultProc_num_and_maxThreads_d = {
+        # @TODO perhaps let the user
+        multProc_num_and_maxThreads_d = {
             "A100": [108, 2048]
         }
 
@@ -394,7 +422,7 @@ class MemoryCalculator:
             # state size: N * sizeof(randstate_t)
             # N = 4 * numMultiProcessors() * maxThreadsPerMultiProcessors()
             # Perlmutter A100:  108 * 2048
-            num_states = np.prod(MultProc_num_and_maxThreads_d[gpu_model])
+            num_states = np.prod(multProc_num_and_maxThreads_d[gpu_model])
             state_size = 6 * 8  # bytes
             req_mem = state_size * num_states
         elif generator_method == "mt19937":
@@ -408,7 +436,7 @@ class MemoryCalculator:
                 pass
         elif generator_method == "Philox4x32x10":
             # 128 Bit counter + 2 * 32 Bit Keys
-            num_states = np.prod(MultProc_num_and_maxThreads_d[gpu_model])
+            num_states = np.prod(multProc_num_and_maxThreads_d[gpu_model])
             state_size_per_engine = 16 + 2 * 4  # bytes
             req_mem = state_size_per_engine * num_states
         else:
