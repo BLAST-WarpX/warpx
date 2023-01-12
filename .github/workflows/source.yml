@@ -33,5 +33,6 @@ jobs:
       run: .github/workflows/source/check_inputs.py
     - name: Doxygen
       run: |
-        sudo apt-get install -y --no-install-recommends doxygen
+        sudo apt update
+        sudo apt install -y doxygen texlive-latex-base
         .github/workflows/source/doxygen
