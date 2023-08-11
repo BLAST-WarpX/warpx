@@ -377,7 +377,6 @@ Setting up the field mesh
     When using mesh refinement, the number of refinement levels that will be used.
 
     Use 0 in order to disable mesh refinement.
-    Note: currently, ``0`` and ``1`` are supported.
 
 * ``amr.ref_ratio`` (`integer` per refined level, default: ``2``)
     When using mesh refinement, this is the refinement ratio per level.
