@@ -892,6 +892,7 @@ public:
         amrex::Vector<amrex::Geometry>& output_geom ) const;
 
     static std::array<amrex::Real,3> CellSize (int lev);
+    static amrex::XDim3 InvCellSize (int lev);
     static amrex::RealBox getRealBox(const amrex::Box& bx, int lev);
 
     /**
@@ -902,7 +903,7 @@ public:
      *                         (when v_galilean is not zero)
      * \return An array of the position coordinates
      */
-    static std::array<amrex::Real,3> LowerCorner (const amrex::Box& bx, int lev, amrex::Real time_shift_delta);
+    static amrex::XDim3 LowerCorner (const amrex::Box& bx, int lev, amrex::Real time_shift_delta);
     /**
      * \brief Return the upper corner of the box in real units.
      * \param bx The box
@@ -911,7 +912,7 @@ public:
      *                         (when v_galilean is not zero)
      * \return An array of the position coordinates
      */
-    static std::array<amrex::Real,3> UpperCorner (const amrex::Box& bx, int lev, amrex::Real time_shift_delta);
+    static amrex::XDim3 UpperCorner (const amrex::Box& bx, int lev, amrex::Real time_shift_delta);
 
     static amrex::IntVect RefRatio (int lev);
 

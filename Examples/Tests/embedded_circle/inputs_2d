@@ -5,7 +5,7 @@
 max_step = 11
 warpx.const_dt = 3.99e-13
 warpx.do_electrostatic = labframe
-warpx.self_fields_required_precision = 1e-06
+warpx.self_fields_required_precision = 2e-06
 warpx.eb_implicit_function = -((x-0.00005)**2+(z-0.00005)**2-1e-05**2)
 warpx.eb_potential(x,y,z,t) = -10
 warpx.self_fields_absolute_tolerance = 0.02

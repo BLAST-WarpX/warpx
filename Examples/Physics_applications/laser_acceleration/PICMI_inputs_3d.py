@@ -55,7 +55,9 @@ uniform_distribution = picmi.UniformDistribution(
 electrons = picmi.Species(
     particle_type = 'electron',
     name = 'electrons',
-    initial_distribution = uniform_distribution)
+    initial_distribution = uniform_distribution,
+    warpx_add_int_attributes = {'regionofinterest': "(z>12.0e-6) * (z<13.0e-6)"},
+    warpx_add_real_attributes = {'initialenergy': "ux*ux + uy*uy + uz*uz"})
 
 # Particles: beam electrons
 q_tot = 1e-12

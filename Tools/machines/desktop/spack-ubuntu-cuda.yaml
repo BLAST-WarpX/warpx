@@ -25,6 +25,7 @@ spack:
   - cuda
   - fftw
   - hdf5
+  - heffte
   - lapackpp
   - mpi
   - pkgconfig

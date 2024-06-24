@@ -234,9 +234,12 @@ BackgroundMCCCollision::doCollisions (amrex::Real cur_time, amrex::Real dt, Mult
         // dt has to be small enough that a linear expansion of the collision
         // probability is sufficiently accurately, otherwise the MCC results
         // will be very heavily affected by small changes in the timestep
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(coll_n < 0.1_prt,
-            "dt is too large to ensure accurate MCC results"
-        );
+        if (coll_n > 0.1_prt) {
+            ablastr::warn_manager::WMRecordWarning("BackgroundMCC Collisions",
+                     "dt is too large to ensure accurate MCC results , coll_n: " +
+                      std::to_string(coll_n) + " is > 0.1 and collision probability is = " +
+                      std::to_string(m_total_collision_prob) + "\n");
+        }
 
         if (ionization_flag) {
             // calculate maximum collision frequency for ionization
@@ -246,9 +249,12 @@ BackgroundMCCCollision::doCollisions (amrex::Real cur_time, amrex::Real dt, Mult
             auto coll_n_ioniz = m_nu_max_ioniz * dt;
             m_total_collision_prob_ioniz = 1.0_prt - std::exp(-coll_n_ioniz);
 
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(coll_n_ioniz < 0.1_prt,
-                "dt is too large to ensure accurate MCC results"
-            );
+            if (coll_n_ioniz > 0.1_prt) {
+                ablastr::warn_manager::WMRecordWarning("BackgroundMCC Collisions",
+                         "dt is too large to ensure accurate MCC ionization , coll_n_ionization: " +
+                          std::to_string(coll_n_ioniz) + " is > 0.1 and ionization probability is = " +
+                          std::to_string(m_total_collision_prob_ioniz) + "\n");
+            }
 
             // if an ionization process is included the secondary species mass
             // is taken as the background mass

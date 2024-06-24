@@ -23,11 +23,13 @@ export CMAKE_PREFIX_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/c-blosc-1.2
 export CMAKE_PREFIX_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/adios2-2.8.3:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/blaspp-master:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/lapackpp-master:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/heffte-2.4.0:$CMAKE_PREFIX_PATH
 
 export LD_LIBRARY_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/c-blosc-1.21.1/lib64:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/adios2-2.8.3/lib64:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/blaspp-master/lib64:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/lapackpp-master/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/heffte-2.4.0/lib64:$LD_LIBRARY_PATH
 
 export PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/adios2-2.8.3/bin:${PATH}
 

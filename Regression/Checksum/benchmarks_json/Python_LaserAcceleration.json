@@ -21,12 +21,14 @@
     "particle_weight": 6241509.074460764
   },
   "electrons": {
+    "particle_initialenergy": 0.0,
     "particle_momentum_x": 1.7921232210868553e-20,
     "particle_momentum_y": 7.225819896136567e-20,
     "particle_momentum_z": 4.2317254599358777e-20,
     "particle_position_x": 0.713912262116188,
     "particle_position_y": 0.7150340887578024,
     "particle_position_z": 1.31757706006908,
+    "particle_regionofinterest": 1936.0,
     "particle_weight": 12926557617.187498
   }
 }

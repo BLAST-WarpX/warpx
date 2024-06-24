@@ -55,7 +55,7 @@ electrons.do_continuous_injection = 1
 electrons.addIntegerAttributes = regionofinterest
 electrons.attribute.regionofinterest(x,y,z,ux,uy,uz,t) = "(z>12.0e-6) * (z<13.0e-6)"
 electrons.addRealAttributes = initialenergy
-electrons.attribute.initialenergy(x,y,z,ux,uy,uz,t) = " ux*ux + uy*uy + uz*uz"
+electrons.attribute.initialenergy(x,y,z,ux,uy,uz,t) = "ux*ux + uy*uy + uz*uz"
 
 #################################
 ############ LASER  #############

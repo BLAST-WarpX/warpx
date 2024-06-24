@@ -52,7 +52,7 @@ public:
      */
     void Init(
         amrex::Real dt,
-        amrex::RealVect dx,
+        const amrex::Real * dx,
         bool do_subcycling,
         bool do_fdtd_nci_corr,
         short grid_type,

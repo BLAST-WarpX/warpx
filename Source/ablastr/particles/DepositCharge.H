@@ -34,7 +34,7 @@ namespace ablastr::particles
  * \param rho MultiFab of the charge density
  * \param local_rho temporary FArrayBox for deposition with OpenMP
  * \param particle_shape shape factor in each direction
- * \param dx cell spacing at level lev
+ * \param dinv cell spacing inverses at level lev
  * \param xyzmin lo corner of the current tile in physical coordinates.
  * \param n_rz_azimuthal_modes number of azimuthal modes in use, irrelevant outside RZ geometry (default: 0)
  * \param num_rho_deposition_guards number of ghost cells to use for rho (default: rho.nGrowVect())
@@ -54,8 +54,8 @@ deposit_charge (typename T_PC::ParIterType& pti,
                 amrex::MultiFab* rho,
                 amrex::FArrayBox& local_rho,
                 int const particle_shape,
-                std::array<amrex::Real, 3> const & dx,
-                std::array<amrex::Real, 3> const & xyzmin,
+                const amrex::XDim3 dinv,
+                const amrex::XDim3 xyzmin,
                 int const n_rz_azimuthal_modes = 0,
                 std::optional<amrex::IntVect> num_rho_deposition_guards = std::nullopt,
                 std::optional<int> depos_lev = std::nullopt,
@@ -175,19 +175,19 @@ deposit_charge (typename T_PC::ParIterType& pti,
 
     if        (nox == 1){
         doChargeDepositionShapeN<1>(GetPosition, wp.dataPtr()+offset, ion_lev,
-                                    rho_fab, np_to_deposit.value(), dx, xyzmin, lo, charge,
+                                    rho_fab, np_to_deposit.value(), dinv, xyzmin, lo, charge,
                                     n_rz_azimuthal_modes);
     } else if (nox == 2){
         doChargeDepositionShapeN<2>(GetPosition, wp.dataPtr()+offset, ion_lev,
-                                    rho_fab, np_to_deposit.value(), dx, xyzmin, lo, charge,
+                                    rho_fab, np_to_deposit.value(), dinv, xyzmin, lo, charge,
                                     n_rz_azimuthal_modes);
     } else if (nox == 3){
         doChargeDepositionShapeN<3>(GetPosition, wp.dataPtr()+offset, ion_lev,
-                                    rho_fab, np_to_deposit.value(), dx, xyzmin, lo, charge,
+                                    rho_fab, np_to_deposit.value(), dinv, xyzmin, lo, charge,
                                     n_rz_azimuthal_modes);
     } else if (nox == 4){
         doChargeDepositionShapeN<4>(GetPosition, wp.dataPtr()+offset, ion_lev,
-                                    rho_fab, np_to_deposit.value(), dx, xyzmin, lo, charge,
+                                    rho_fab, np_to_deposit.value(), dinv, xyzmin, lo, charge,
                                     n_rz_azimuthal_modes);
     }
     ABLASTR_PROFILE_VAR_STOP(blp_ppc_chd);

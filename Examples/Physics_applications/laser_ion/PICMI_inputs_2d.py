@@ -91,18 +91,17 @@ slab_with_ramp_dist_electrons = picmi.AnalyticDistribution(
     rms_velocity=[c*ux_th, 0., c*uz_th]  # thermal velocity spread in m/s
 )
 
-# TODO: add additional attributes orig_x and orig_z
 electrons = picmi.Species(
     particle_type='electron',
     name='electrons',
     initial_distribution=slab_with_ramp_dist_electrons,
 )
 
-# TODO: add additional attributes orig_x and orig_z
 hydrogen = picmi.Species(
     particle_type='proton',
     name='hydrogen',
-    initial_distribution=slab_with_ramp_dist_hydrogen
+    initial_distribution=slab_with_ramp_dist_hydrogen,
+    warpx_add_real_attributes = {"orig_x": "x", "orig_z": "z"}
 )
 
 # Laser

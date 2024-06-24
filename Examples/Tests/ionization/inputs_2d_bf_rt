@@ -48,7 +48,7 @@ electrons.zmax =  50.e-6
 electrons.profile = constant
 electrons.density = 2.
 electrons.momentum_distribution_type = at_rest
-electrons.do_continuous_injection=1
+electrons.do_continuous_injection = 1
 
 lasers.names        = laser1
 laser1.profile      = Gaussian

@@ -8,25 +8,16 @@
  */
 #include "WarpX.H"
 
-#include "Initialization/WarpXAMReXInit.H"
+#include "Initialization/WarpXInit.H"
 #include "Utils/WarpXProfilerWrapper.H"
 
-#include <ablastr/math/fft/AnyFFT.H>
-#include <ablastr/parallelization/MPIInitHelpers.H>
 #include <ablastr/utils/timer/Timer.H>
-#include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX_Print.H>
 
-
 int main(int argc, char* argv[])
 {
-    ablastr::parallelization::mpi_init(argc, argv);
-
-    warpx::initialization::amrex_init(argc, argv);
-
-    ablastr::math::anyfft::setup();
-
+    warpx::initialization::initialize_external_libraries(argc, argv);
     {
         WARPX_PROFILE_VAR("main()", pmain);
 
@@ -34,29 +25,18 @@ int main(int argc, char* argv[])
         timer.record_start_time();
 
         auto& warpx = WarpX::GetInstance();
-
         warpx.InitData();
-
         warpx.Evolve();
-
-        amrex::Print() <<
-            ablastr::warn_manager::GetWMInstance().PrintGlobalWarnings("THE END");
+        const auto is_warpx_verbose = warpx.Verbose();
+        WarpX::Finalize();
 
         timer.record_stop_time();
-        if (warpx.Verbose())
-        {
+        if (is_warpx_verbose){
             amrex::Print() << "Total Time                     : "
                            << timer.get_global_duration() << '\n';
         }
 
         WARPX_PROFILE_VAR_STOP(pmain);
-
-        WarpX::Finalize();
     }
-
-    ablastr::math::anyfft::cleanup();
-
-    amrex::Finalize();
-
-    ablastr::parallelization::mpi_finalize ();
+    warpx::initialization::finalize_external_libraries();
 }

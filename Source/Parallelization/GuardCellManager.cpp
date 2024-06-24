@@ -33,7 +33,7 @@ using namespace amrex;
 void
 guardCellManager::Init (
     const amrex::Real dt,
-    const amrex::RealVect dx,
+    const amrex::Real *dx,
     const bool do_subcycling,
     const bool do_fdtd_nci_corr,
     const short grid_type,

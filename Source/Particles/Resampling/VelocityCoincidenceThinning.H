@@ -200,5 +200,6 @@ private:
     int m_ntheta, m_nphi;
     amrex::ParticleReal m_delta_ur;
     amrex::Vector<amrex::ParticleReal> m_delta_u;
+    amrex::ParticleReal m_cluster_weight = std::numeric_limits<amrex::ParticleReal>::max();
 };
 #endif // WARPX_VELOCITY_COINCIDENCE_THINNING_H_

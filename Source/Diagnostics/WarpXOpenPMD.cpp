@@ -912,33 +912,34 @@ WarpXOpenPMDPlot::SaveRealProperty (ParticleIter& pti,
     {
         auto const real_counter = std::min(write_real_comp.size(), real_comp_names.size());
 
+#if defined(WARPX_DIM_RZ)
         // reconstruct Cartesian positions for RZ simulations
         // r,z,theta -> x,y,z
-#if defined(WARPX_DIM_RZ)
-        auto const * const r = soa.GetRealData(PIdx::x).data();
-        auto const * const theta = soa.GetRealData(PIdx::theta).data();
+        // If each comp is being written, create a temporary array, otherwise create an empty array.
+        std::shared_ptr<amrex::ParticleReal> const x(
+            new amrex::ParticleReal[(write_real_comp[0] ? numParticleOnTile : 0)],
+            [](amrex::ParticleReal const *p) { delete[] p; }
+        );
+        std::shared_ptr<amrex::ParticleReal> const y(
+            new amrex::ParticleReal[(write_real_comp[1] ? numParticleOnTile : 0)],
+            [](amrex::ParticleReal const *p) { delete[] p; }
+        );
 
+        const auto& tile = pti.GetParticleTile();
+        const auto& ptd = tile.getConstParticleTileData();
+
+        for (int i = 0; i < numParticleOnTile; ++i) {
+            const auto& p = ptd.getSuperParticle(i);
+            amrex::ParticleReal xp, yp, zp;
+            get_particle_position(p, xp, yp, zp);
+            if (write_real_comp[0]) { x.get()[i] = xp; }
+            if (write_real_comp[1]) { y.get()[i] = yp; }
+        }
         if (write_real_comp[0]) {
-            std::shared_ptr<amrex::ParticleReal> const x(
-                new amrex::ParticleReal[numParticleOnTile],
-                [](amrex::ParticleReal const *p) { delete[] p; }
-            );
-            for (int i = 0; i < numParticleOnTile; ++i) {
-                x.get()[i] = r[i] * std::cos(theta[i]);
-            }
-            getComponentRecord(real_comp_names[0]).storeChunk(
-                x, {offset}, {numParticleOnTile64});
+            getComponentRecord(real_comp_names[0]).storeChunk(x, {offset}, {numParticleOnTile64});
         }
         if (write_real_comp[1]) {
-            std::shared_ptr<amrex::ParticleReal> const y(
-                new amrex::ParticleReal[numParticleOnTile],
-                [](amrex::ParticleReal const *p) { delete[] p; }
-            );
-            for (int i = 0; i < numParticleOnTile; ++i) {
-                y.get()[i] = r[i] * std::sin(theta[i]);
-            }
-            getComponentRecord(real_comp_names[1]).storeChunk(
-                y, {offset}, {numParticleOnTile64});
+            getComponentRecord(real_comp_names[1]).storeChunk(y, {offset}, {numParticleOnTile64});
         }
 #endif
 

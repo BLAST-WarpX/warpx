@@ -47,12 +47,14 @@ uniform_distribution = picmi.UniformDistribution(
     fill_in = True)
 electrons = picmi.Species(
     particle_type = 'electron',
-    name = 'electrons')
+    name = 'electrons',
+    warpx_add_real_attributes = {'orig_z': 'z'})
 ions = picmi.Species(
     particle_type = 'N',
     name = 'ions',
     charge_state = 2,
-    initial_distribution = uniform_distribution)
+    initial_distribution = uniform_distribution,
+    warpx_add_real_attributes = {'orig_z': 'z'})
 
 # Field ionization
 nitrogen_ionization = picmi.FieldIonization(
@@ -88,7 +90,7 @@ particle_diag = picmi.ParticleDiagnostic(
     name = 'diag1',
     period = 10000,
     species = [electrons, ions],
-    data_list = ['ux', 'uy', 'uz', 'x', 'z', 'weighting'],
+    data_list = ['ux', 'uy', 'uz', 'x', 'z', 'weighting', 'orig_z'],
     write_dir = '.',
     warpx_file_prefix = 'Python_ionization_plt')
 field_diag = picmi.FieldDiagnostic(

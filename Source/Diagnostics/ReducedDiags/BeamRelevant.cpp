@@ -175,15 +175,6 @@ void BeamRelevant::ComputeDiags (int step)
     // inverse of speed of light squared
     Real constexpr inv_c2 = 1.0_rt / (PhysConst::c * PhysConst::c);
 
-    // If 2D-XZ, p.pos(1) is z, rather than p.pos(2).
-#if (defined WARPX_DIM_3D)
-    int const index_z = 2;
-#elif (defined WARPX_DIM_XZ || defined WARPX_DIM_RZ)
-    int const index_z = 1;
-#elif (defined WARPX_DIM_1D_Z)
-    int const index_z = 0;
-#endif
-
     // loop over species
     for (int i_s = 0; i_s < nSpecies; ++i_s)
     {
@@ -212,26 +203,14 @@ void BeamRelevant::ComputeDiags (int step)
                 const ParticleReal p_uy = p.rdata(PIdx::uy);
                 const ParticleReal p_uz = p.rdata(PIdx::uz);
                 const ParticleReal p_us = p_ux*p_ux + p_uy*p_uy + p_uz*p_uz;
-                const ParticleReal p_pos0 = p.pos(0);
                 const ParticleReal p_w = p.rdata(PIdx::w);
 
-#if defined(WARPX_DIM_3D)
-                const ParticleReal p_pos1 = p.pos(1);
-                const ParticleReal p_x_mean = p_pos0*p_w;
-                const ParticleReal p_y_mean = p_pos1*p_w;
-#elif defined(WARPX_DIM_RZ)
-                const ParticleReal p_theta = p.rdata(PIdx::theta);
-                const ParticleReal p_x_mean = p_pos0*std::cos(p_theta)*p_w;
-                const ParticleReal p_y_mean = p_pos0*std::sin(p_theta)*p_w;
-#elif defined(WARPX_DIM_XZ)
-                const ParticleReal p_x_mean = p_pos0*p_w;
-                const ParticleReal p_y_mean = 0;
-#elif defined(WARPX_DIM_1D_Z)
-                amrex::ignore_unused(p_pos0);
-                const ParticleReal p_x_mean = 0;
-                const ParticleReal p_y_mean = 0;
-#endif
-                const ParticleReal p_z_mean = p.pos(index_z)*p_w;
+                ParticleReal p_x, p_y, p_z;
+                get_particle_position(p, p_x, p_y, p_z);
+
+                const ParticleReal p_x_mean = p_x*p_w;
+                const ParticleReal p_y_mean = p_y*p_w;
+                const ParticleReal p_z_mean = p_z*p_w;
 
                 const ParticleReal p_ux_mean = p_ux*p_w;
                 const ParticleReal p_uy_mean = p_uy*p_w;
@@ -292,25 +271,8 @@ void BeamRelevant::ComputeDiags (int step)
                 const ParticleReal p_gm = std::sqrt(1.0_rt+p_us*inv_c2);
                 const ParticleReal p_w = p.rdata(PIdx::w);
 
-#if (defined WARPX_DIM_1D_Z)
-                const ParticleReal p_x = 0.0;
-                const ParticleReal p_y = 0.0;
-#elif (defined WARPX_DIM_RZ)
-                const ParticleReal p_pos0 = p.pos(0);
-                const ParticleReal p_theta = p.rdata(PIdx::theta);
-                const ParticleReal p_x = p_pos0*std::cos(p_theta);
-                const ParticleReal p_y = p_pos0*std::sin(p_theta);
-#elif (defined WARPX_DIM_XZ)
-                const ParticleReal p_pos0 = p.pos(0);
-                const ParticleReal p_x = p_pos0;
-                const ParticleReal p_y = 0.0;
-#else
-                const ParticleReal p_pos0 = p.pos(0);
-                const ParticleReal p_pos1 = p.pos(1);
-                const ParticleReal p_x = p_pos0;
-                const ParticleReal p_y = p_pos1;
-#endif
-                const ParticleReal p_z = p.pos(index_z);
+                ParticleReal p_x, p_y, p_z;
+                get_particle_position(p, p_x, p_y, p_z);
 
                 const ParticleReal p_x_ms = (p_x-x_mean)*(p_x-x_mean)*p_w;
                 const ParticleReal p_y_ms = (p_y-y_mean)*(p_y-y_mean)*p_w;

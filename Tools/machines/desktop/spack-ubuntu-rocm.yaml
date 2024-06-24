@@ -21,6 +21,7 @@ spack:
   - cmake
   - ecp-data-vis-sdk +adios2 +ascent +hdf5 +sensei
   - hdf5
+  - heffte
   - hip
   - lapackpp
   - llvm-amdgpu

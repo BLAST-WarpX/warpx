@@ -44,7 +44,7 @@ jobs:
     - name: CCache Cache
       uses: actions/cache@v4
       with:
-        path: /Users/runner/Library/Caches/ccache
+        path: ~/Library/Caches/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
@@ -53,7 +53,7 @@ jobs:
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
         export CCACHE_MAXSIZE=100M
-        export CCACHE_DEPEND=1
+        export CCACHE_SLOPPINESS=time_macros
         ccache -z
 
         source py-venv/bin/activate
@@ -76,6 +76,7 @@ jobs:
         cmake --build build_sp -j 3
         cmake --build build_sp --target pip_install
 
+        du -hs ~/Library/Caches/ccache
         ccache -s
 
     - name: run pywarpx

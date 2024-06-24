@@ -98,15 +98,9 @@ void FieldEnergy::ComputeDiags (int step)
         const MultiFab & By = warpx.getField(FieldType::Bfield_aux, lev,1);
         const MultiFab & Bz = warpx.getField(FieldType::Bfield_aux, lev,2);
 
-        // get cell size
-        Geometry const & geom = warpx.Geom(lev);
-#if defined(WARPX_DIM_1D_Z)
-        auto dV = geom.CellSize(0);
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-        auto dV = geom.CellSize(0) * geom.CellSize(1);
-#elif defined(WARPX_DIM_3D)
-        auto dV = geom.CellSize(0) * geom.CellSize(1) * geom.CellSize(2);
-#endif
+        // get cell volume
+        const std::array<Real, 3> &dx = WarpX::CellSize(lev);
+        const amrex::Real dV = dx[0]*dx[1]*dx[2];
 
 #if defined(WARPX_DIM_RZ)
         amrex::Real const tmpEx = ComputeNorm2RZ(Ex, lev);
@@ -119,6 +113,8 @@ void FieldEnergy::ComputeDiags (int step)
         amrex::Real const tmpBz = ComputeNorm2RZ(Bz, lev);
         amrex::Real const Bs = tmpBx + tmpBy + tmpBz;
 #else
+        Geometry const & geom = warpx.Geom(lev);
+
         // compute E squared
         Real const tmpEx = Ex.norm2(0,geom.periodicity());
         Real const tmpEy = Ey.norm2(0,geom.periodicity());
@@ -182,10 +178,10 @@ FieldEnergy::ComputeNorm2RZ(const amrex::MultiFab& field, const int lev)
         amrex::Box tb = convert(tilebox, field.ixType().toIntVect());
 
         // Lower corner of tile box physical domain
-        const std::array<amrex::Real, 3>& xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
+        const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
         const Dim3 lo = lbound(tilebox);
         const Dim3 hi = ubound(tilebox);
-        const Real rmin = xyzmin[0] + (tb.ixType().nodeCentered(0) ? 0._rt : 0.5_rt*dr);
+        const Real rmin = xyzmin.x + (tb.ixType().nodeCentered(0) ? 0._rt : 0.5_rt*dr);
         const int irmin = lo.x;
         const int irmax = hi.x;
 

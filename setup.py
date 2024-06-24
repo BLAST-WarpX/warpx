@@ -97,6 +97,7 @@ class CMakeBuild(build_ext):
             '-DWarpX_PRECISION=' + WARPX_PRECISION,
             '-DWarpX_PARTICLE_PRECISION=' + WARPX_PARTICLE_PRECISION,
             '-DWarpX_FFT:BOOL=' + WARPX_FFT,
+            '-DWarpX_HEFFTE:BOOL=' + WARPX_HEFFTE,
             '-DWarpX_PYTHON:BOOL=ON',
             '-DWarpX_PYTHON_IPO:BOOL=' + WARPX_PYTHON_IPO,
             '-DWarpX_QED:BOOL=' + WARPX_QED,
@@ -206,6 +207,7 @@ WARPX_OPENPMD = env.pop('WARPX_OPENPMD', 'ON')
 WARPX_PRECISION = env.pop('WARPX_PRECISION', 'DOUBLE')
 WARPX_PARTICLE_PRECISION = env.pop('WARPX_PARTICLE_PRECISION', WARPX_PRECISION)
 WARPX_FFT = env.pop('WARPX_FFT', 'OFF')
+WARPX_HEFFTE = env.pop('WARPX_HEFFTE', 'OFF')
 WARPX_QED = env.pop('WARPX_QED', 'ON')
 WARPX_QED_TABLE_GEN = env.pop('WARPX_QED_TABLE_GEN', 'OFF')
 WARPX_DIMS = env.pop('WARPX_DIMS', '1;2;RZ;3')
@@ -278,7 +280,7 @@ with open('./requirements.txt') as f:
 setup(
     name='pywarpx',
     # note PEP-440 syntax: x.y.zaN but x.y.z.devN
-    version = '24.05',
+    version = '24.06',
     packages = ['pywarpx'],
     package_dir = {'pywarpx': 'Python/pywarpx'},
     author='Jean-Luc Vay, David P. Grote, Maxence Thévenet, Rémi Lehe, Andrew Myers, Weiqun Zhang, Axel Huebl, et al.',

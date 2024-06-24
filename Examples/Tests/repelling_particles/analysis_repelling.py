@@ -36,7 +36,7 @@ yt.funcs.mylog.setLevel(0)
 
 # Check plotfile name specified in command line
 last_filename = sys.argv[1]
-filename_radical = re.findall('(.*?)\d+/*$', last_filename)[0]
+filename_radical = re.findall(r'(.*?)\d+/*$', last_filename)[0]
 
 # Loop through files, and extract the position and velocity of both particles
 x1 = []
@@ -48,10 +48,10 @@ for filename in sorted(glob.glob(filename_radical + '*')):
     ds = yt.load(filename)
     ad = ds.all_data()
 
-    x1.append( float(ad[('electron1','particle_position_x')]) )
-    x2.append( float(ad[('electron2','particle_position_x')]) )
-    beta1.append( float(ad[('electron1','particle_momentum_x')])/(m_e*c) )
-    beta2.append( float(ad[('electron2','particle_momentum_x')])/(m_e*c) )
+    x1.append( float(ad[('electron1','particle_position_x')][0]) )
+    x2.append( float(ad[('electron2','particle_position_x')][0]) )
+    beta1.append( float(ad[('electron1','particle_momentum_x')][0])/(m_e*c) )
+    beta2.append( float(ad[('electron2','particle_momentum_x')][0])/(m_e*c) )
 
 # Convert to numpy array
 x1 = np.array(x1)

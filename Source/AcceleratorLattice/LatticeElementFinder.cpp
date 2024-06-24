@@ -60,7 +60,7 @@ LatticeElementFinder::UpdateIndices (int const lev, amrex::MFIter const& a_mfi,
     // Note that the current box is used since the box may have been updated since
     // the initialization in InitElementFinder.
     const amrex::Box box = a_mfi.tilebox();
-    m_zmin = WarpX::LowerCorner(box, lev, 0._rt)[2];
+    m_zmin = WarpX::LowerCorner(box, lev, 0._rt).z;
     m_time = warpx.gett_new(lev);
 
     if (accelerator_lattice.h_quad.nelements > 0) {

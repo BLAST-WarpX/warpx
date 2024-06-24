@@ -14,7 +14,17 @@ Plasma-Based Acceleration
 
 Scientific works in laser-plasma and beam-plasma acceleration.
 
-#. Peng, H. and Huang, T. W. and Jiang, K. and Li, R. and Wu, C. N. and Yu, M. Y. and Riconda, C. and Weber, S. and Zhou, C. T. and Ruan, S. C.
+#. Ross AJ, Chappell J, van de Wetering JJ, Cowley J, Archer E, Bourgeois N, Corner L, Emerson DR, Feder L, Gu XJ, Jakobsson O, Jones H, Picksley A, Reid L, Wang W, Walczak R, Hooker SM.
+   **Resonant excitation of plasma waves in a plasma channel**.
+   Phys. Rev. Research **6**, L022001, 2024
+   `DOI:10.1103/PhysRevResearch.6.L022001 <https://doi.org/10.1103/PhysRevResearch.6.L022001>`__
+
+#. Sandberg R T, Lehe R, Mitchell C E, Garten M, Myers A, Qiang J, Vay J-L and Huebl A.
+   **Synthesizing Particle-in-Cell Simulations Through Learning and GPU Computing for Hybrid Particle Accelerator Beamlines**.
+   Proc. of Platform for Advanced Scientific Computing (PASC'24), *PASC24 Best Paper Award*, 2024.
+   `DOI:10.1145/3659914.3659937 <https://doi.org/10.1145/3659914.3659937>`__
+
+#. Peng H, Huang TW, Jiang K, Li R, Wu CN, Yu MY, Riconda C, Weber S, Zhou CT, Ruan SC.
    **Coherent Subcycle Optical Shock from a Superluminal Plasma Wake**.
    Phys. Rev. Lett. **131**, 145003, 2023
    `DOI:10.1103/PhysRevLett.131.145003 <https://doi.org/10.1103/PhysRevLett.131.145003>`__
@@ -23,11 +33,6 @@ Scientific works in laser-plasma and beam-plasma acceleration.
    **Demonstration of tunability of HOFI waveguides via start-to-end simulations**.
    Phys. Rev. Research **5**, 033112, 2023
    `DOI:10.1103/PhysRevResearch.5.033112 <https://doi.org/10.1103/PhysRevResearch.5.033112>`__
-
-#. Sandberg R T, Lehe R, Mitchell C E, Garten M, Myers A, Qiang J, Vay J-L and Huebl A.
-   **Synthesizing Particle-in-Cell Simulations Through Learning and GPU Computing for Hybrid Particle Accelerator Beamlines**.
-   Proc. of Platform for Advanced Scientific Computing (PASC'24), *submitted*, 2024.
-   `preprint <http://arxiv.org/abs/2402.17248>`__
 
 #. Sandberg R T, Lehe R, Mitchell C E, Garten M, Qiang J, Vay J-L and Huebl A.
    **Hybrid Beamline Element ML-Training for Surrogates in the ImpactX Beam-Dynamics Code**.
@@ -103,14 +108,20 @@ Scientific works in particle and beam modeling.
 
 #. Sandberg R T, Lehe R, Mitchell C E, Garten M, Myers A, Qiang J, Vay J-L and Huebl A.
    **Synthesizing Particle-in-Cell Simulations Through Learning and GPU Computing for Hybrid Particle Accelerator Beamlines**.
-   Proc. of Platform for Advanced Scientific Computing (PASC'24), *submitted*, 2024.
-   `preprint <http://arxiv.org/abs/2402.17248>`__
+   Proc. of Platform for Advanced Scientific Computing (PASC'24), *PASC24 Best Paper Award*, 2024.
+   `DOI:10.1145/3659914.3659937 <https://doi.org/10.1145/3659914.3659937>`__
+
+#. Nguyen B, Formenti A, Lehe R, Vay J-L, Gessner S, and Fedeli L.
+   **Comparison of WarpX and GUINEA-PIG for electron positron collisions**.
+   15th International Particle Accelerator Conference (IPAC'24), WEPC84, 2024.
+   `preprint <https://arxiv.org/abs/2405.09583>`__,
+   `DOI:10.18429/JACoW-IPAC2024-WEPC84 <https://doi.org/10.18429/JACoW-IPAC2024-WEPC84>`__
 
 #. Sandberg R T, Lehe R, Mitchell C E, Garten M, Qiang J, Vay J-L, Huebl A.
    **Hybrid Beamline Element ML-Training for Surrogates in the ImpactX Beam-Dynamics Code**.
-   14th International Particle Accelerator Conference (IPAC'23), WEPA101, *in print*, 2023.
+   14th International Particle Accelerator Conference (IPAC'23), WEPA101, 2023.
    `preprint <https://www.ipac23.org/preproc/pdf/WEPA101.pdf>`__,
-   `DOI:10.18429/JACoW-IPAC-23-WEPA101 <https://doi.org/10.18429/JACoW-IPAC-23-WEPA101>`__
+   `DOI:10.18429/JACoW-IPAC2023-WEPA101 <https://doi.org/10.18429/JACoW-IPAC2023-WEPA101>`__
 
 #. Tan W H, Piot P, Myers A, Zhang W, Rheaume T, Jambunathan R, Huebl A, Lehe R, Vay J-L.
    **Simulation studies of drive-beam instability in a dielectric wakefield accelerator**.

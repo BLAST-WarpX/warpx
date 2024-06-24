@@ -23,6 +23,7 @@ spack:
   - conduit ~fortran
   - fftw
   - hdf5 ~fortran
+  - heffte ~cuda +fftw
   - lapackpp ~cuda ~rocm ^blaspp ~cuda +openmp ~rocm
   - mpi
   - llvm-openmp

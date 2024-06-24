@@ -441,8 +441,7 @@ void ColliderRelevant::ComputeDiags (int step)
             const int lev = 0;
 
             // define variables in preparation for field gathering
-            const std::array<amrex::Real,3>& dx = WarpX::CellSize(std::max(lev, 0));
-            const amrex::GpuArray<amrex::Real, 3> dx_arr = {dx[0], dx[1], dx[2]};
+            const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(lev, 0));
             const amrex::MultiFab & Ex = warpx.getField(FieldType::Efield_aux, lev,0);
             const amrex::MultiFab & Ey = warpx.getField(FieldType::Efield_aux, lev,1);
             const amrex::MultiFab & Ez = warpx.getField(FieldType::Efield_aux, lev,2);
@@ -478,8 +477,7 @@ void ColliderRelevant::ComputeDiags (int step)
                 amrex::Box box = pti.tilebox();
                 box.grow(ngEB);
                 const amrex::Dim3 lo = amrex::lbound(box);
-                const std::array<amrex::Real, 3>& xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
-                const amrex::GpuArray<amrex::Real, 3> xyzmin_arr = {xyzmin[0], xyzmin[1], xyzmin[2]};
+                const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
                 const amrex::Array4<const amrex::Real> & ex_arr = Ex[pti].array();
                 const amrex::Array4<const amrex::Real> & ey_arr = Ey[pti].array();
                 const amrex::Array4<const amrex::Real> & ez_arr = Ez[pti].array();
@@ -515,7 +513,7 @@ void ColliderRelevant::ComputeDiags (int step)
                         ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                         ex_type, ey_type, ez_type,
                         bx_type, by_type, bz_type,
-                        dx_arr, xyzmin_arr, lo,
+                        dinv, xyzmin, lo,
                         n_rz_azimuthal_modes, nox, galerkin_interpolation);
                     // compute chi
                     amrex::Real chi = 0.0_rt;

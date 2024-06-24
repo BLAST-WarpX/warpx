@@ -137,6 +137,9 @@ class Species(picmistandard.PICMI_Species):
         Cells with fewer particles than this number will be
         skipped during resampling.
 
+    warpx_resampling_algorithm_target_weight: float
+        Weight that the product particles from resampling will not exceed.
+
     warpx_resampling_trigger_intervals: bool, default=0
         Timesteps at which to resample
 
@@ -168,6 +171,14 @@ class Species(picmistandard.PICMI_Species):
         during grid-based merging, with `velocity_grid_type == "cartesian"`. If
         a single number is given the same du value will be used in all three
         directions.
+
+    warpx_add_int_attributes: dict
+        Dictionary of extra integer particle attributes initialized from an
+        expression that is a function of the variables (x, y, z, ux, uy, uz, t).
+
+    warpx_add_real_attributes: dict
+        Dictionary of extra real particle attributes initialized from an
+        expression that is a function of the variables (x, y, z, ux, uy, uz, t).
     """
     def init(self, kw):
 
@@ -249,6 +260,7 @@ class Species(picmistandard.PICMI_Species):
         self.resampling_min_ppc = kw.pop('warpx_resampling_min_ppc', None)
         self.resampling_trigger_intervals = kw.pop('warpx_resampling_trigger_intervals', None)
         self.resampling_triggering_max_avg_ppc = kw.pop('warpx_resampling_trigger_max_avg_ppc', None)
+        self.resampling_algorithm_target_weight = kw.pop('warpx_resampling_algorithm_target_weight', None)
         self.resampling_algorithm_velocity_grid_type = kw.pop('warpx_resampling_algorithm_velocity_grid_type', None)
         self.resampling_algorithm_delta_ur = kw.pop('warpx_resampling_algorithm_delta_ur', None)
         self.resampling_algorithm_n_theta = kw.pop('warpx_resampling_algorithm_n_theta', None)
@@ -256,6 +268,10 @@ class Species(picmistandard.PICMI_Species):
         self.resampling_algorithm_delta_u = kw.pop('warpx_resampling_algorithm_delta_u', None)
         if self.resampling_algorithm_delta_u is not None and np.size(self.resampling_algorithm_delta_u) == 1:
             self.resampling_algorithm_delta_u = [self.resampling_algorithm_delta_u]*3
+
+        # extra particle attributes
+        self.extra_int_attributes = kw.pop('warpx_add_int_attributes', None)
+        self.extra_real_attributes = kw.pop('warpx_add_real_attributes', None)
 
     def species_initialize_inputs(self, layout,
                                   initialize_self_fields = False,
@@ -298,6 +314,7 @@ class Species(picmistandard.PICMI_Species):
                                              resampling_min_ppc=self.resampling_min_ppc,
                                              resampling_trigger_intervals=self.resampling_trigger_intervals,
                                              resampling_trigger_max_avg_ppc=self.resampling_triggering_max_avg_ppc,
+                                             resampling_algorithm_target_weight=self.resampling_algorithm_target_weight,
                                              resampling_algorithm_velocity_grid_type=self.resampling_algorithm_velocity_grid_type,
                                              resampling_algorithm_delta_ur=self.resampling_algorithm_delta_ur,
                                              resampling_algorithm_n_theta=self.resampling_algorithm_n_theta,
@@ -312,6 +329,16 @@ class Species(picmistandard.PICMI_Species):
         self.species.add_new_attr("reflection_model_zlo(E)", self.reflection_model_zlo)
         self.species.add_new_attr("reflection_model_zhi(E)", self.reflection_model_zhi)
         # self.species.add_new_attr("reflection_model_eb(E)", self.reflection_model_eb)
+
+        # extra particle attributes
+        if self.extra_int_attributes is not None:
+            self.species.addIntegerAttributes = self.extra_int_attributes.keys()
+            for attr, function in self.extra_int_attributes.items():
+                self.species.add_new_attr('attribute.'+attr+'(x,y,z,ux,uy,uz,t)', function)
+        if self.extra_real_attributes is not None:
+            self.species.addRealAttributes = self.extra_real_attributes.keys()
+            for attr, function in self.extra_real_attributes.items():
+                self.species.add_new_attr('attribute.'+attr+'(x,y,z,ux,uy,uz,t)', function)
 
         pywarpx.Particles.particles_list.append(self.species)
 
@@ -2384,6 +2411,9 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                 elif dataname.startswith('rho_'):
                     # Adds rho_species diagnostic
                     fields_to_plot.add(dataname)
+                elif dataname.startswith('T_'):
+                    # Adds T_species diagnostic
+                    fields_to_plot.add(dataname)
                 elif dataname == 'dive':
                     fields_to_plot.add('divE')
                 elif dataname == 'divb':
@@ -2591,6 +2621,9 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic, WarpXDiagnostic
                         )
                     else:
                         variables.add(dataname)
+                else:
+                    # possibly add user defined attributes
+                    variables.add(dataname)
 
             # --- Convert the set to a sorted list so that the order
             # --- is the same on all processors.

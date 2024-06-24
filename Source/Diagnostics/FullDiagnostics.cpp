@@ -8,6 +8,7 @@
 #include "ComputeDiagFunctors/PartPerCellFunctor.H"
 #include "ComputeDiagFunctors/PartPerGridFunctor.H"
 #include "ComputeDiagFunctors/ParticleReductionFunctor.H"
+#include "ComputeDiagFunctors/TemperatureFunctor.H"
 #include "ComputeDiagFunctors/RhoFunctor.H"
 #include "Diagnostics/Diagnostics.H"
 #include "Diagnostics/ParticleDiag/ParticleDiag.H"
@@ -186,6 +187,8 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
 
     // Species index to loop over species that dump rho per species
     int i = 0;
+    // Species index to loop over species that dump temperature per species
+    int i_T_species = 0;
     const int ncomp = ncomp_multimodefab;
     // This function is called multiple times, for different values of `lev`
     // but the `varnames` need only be updated once.
@@ -303,6 +306,13 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                 AddRZModesToOutputNames(std::string("rho_") + m_all_species_names[m_rho_per_species_index[i]], ncomp);
             }
             i++;
+        } else if ( m_varnames_fields[comp].rfind("T_", 0) == 0 ){
+            // Initialize temperature functor to dump temperature per species
+            m_all_field_functors[lev][comp] = std::make_unique<TemperatureFunctor>(lev, m_crse_ratio, m_T_per_species_index[i_T_species]);
+            if (update_varnames) {
+                AddRZModesToOutputNames(std::string("T_") + m_all_species_names[m_T_per_species_index[i_T_species]], ncomp);
+            }
+            i_T_species++;
         } else if ( m_varnames_fields[comp] == "F" ){
             m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.getFieldPointer(FieldType::F_fp, lev), lev, m_crse_ratio,
                                                         false, ncomp);
@@ -637,6 +647,9 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
     // Species index to loop over species that dump rho per species
     int i = 0;
 
+    // Species index to loop over species that dump temperature per species
+    int i_T_species = 0;
+
     const auto nvar = static_cast<int>(m_varnames_fields.size());
     const auto nspec = static_cast<int>(m_pfield_species.size());
     const auto ntot = static_cast<int>(nvar + m_pfield_varnames.size() * nspec);
@@ -666,6 +679,10 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
             // Initialize rho functor to dump rho per species
             m_all_field_functors[lev][comp] = std::make_unique<RhoFunctor>(lev, m_crse_ratio, true, m_rho_per_species_index[i]);
             i++;
+        } else if ( m_varnames[comp].rfind("T_", 0) == 0 ){
+            // Initialize temperature functor to dump temperature per species
+            m_all_field_functors[lev][comp] = std::make_unique<TemperatureFunctor>(lev, m_crse_ratio, m_T_per_species_index[i_T_species]);
+            i_T_species++;
         } else if ( m_varnames[comp] == "F" ){
             m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.getFieldPointer(FieldType::F_fp, lev), lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "G" ){

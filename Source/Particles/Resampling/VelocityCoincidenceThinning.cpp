@@ -24,6 +24,14 @@ VelocityCoincidenceThinning::VelocityCoincidenceThinning (const std::string& spe
         "Resampling min_ppc should be greater than or equal to 1"
     );
 
+    amrex::ParticleReal target_weight = 0;
+    if (utils::parser::queryWithParser(
+        pp_species_name, "resampling_algorithm_target_weight", target_weight
+    )) {
+        // factor of 2 since each cluster is reduced to 2 particles
+        m_cluster_weight = target_weight * 2.0_prt;
+    }
+
     std::string velocity_grid_type_str = "spherical";
     pp_species_name.query(
         "resampling_algorithm_velocity_grid_type", velocity_grid_type_str
@@ -84,7 +92,7 @@ void VelocityCoincidenceThinning::operator() (WarpXParIter& pti, const int lev,
     auto *const cell_offsets = bins.offsetsPtr();
 
     const auto min_ppc = m_min_ppc;
-
+    const auto cluster_weight = m_cluster_weight;
     const auto mass = pc->getMass();
 
     // check if species mass > 0
@@ -207,10 +215,13 @@ void VelocityCoincidenceThinning::operator() (WarpXParIter& pti, const int lev,
                     ux[part_idx], uy[part_idx], uz[part_idx], mass
                 );
 
-                // check if this is the last particle in the current momentum bin
+                // check if this is the last particle in the current momentum bin,
+                // or if the next particle would push the current cluster weight
+                // to exceed the maximum specified cluster weight
                 if (
                     (i == cell_stop - 1)
                     || (momentum_bin_number_data[sorted_indices_data[i]] != momentum_bin_number_data[sorted_indices_data[i + 1]])
+                    || (total_weight + w[indices[sorted_indices_data[i+1]]] > cluster_weight)
                 ) {
                     // check if the bin has more than 2 particles in it
                     if ( particles_in_bin > 2 && total_weight > std::numeric_limits<amrex::ParticleReal>::min() ){

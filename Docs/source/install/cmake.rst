@@ -97,6 +97,7 @@ CMake Option                  Default & Values                             Descr
 ``WarpX_PRECISION``           SINGLE/**DOUBLE**                            Floating point precision (single/double)
 ``WarpX_PARTICLE_PRECISION``  SINGLE/**DOUBLE**                            Particle floating point precision (single/double), defaults to WarpX_PRECISION value if not set
 ``WarpX_FFT``                 ON/**OFF**                                   FFT-based solvers
+``WarpX_HEFFTE``              ON/**OFF**                                   Multi-Node FFT-based solvers
 ``WarpX_PYTHON``              ON/**OFF**                                   Python bindings
 ``WarpX_QED``                 **ON**/OFF                                   QED support (requires PICSAR)
 ``WarpX_QED_TABLE_GEN``       ON/**OFF**                                   QED table generation support (requires PICSAR and Boost)
@@ -271,6 +272,7 @@ Environment Variable          Default & Values                             Descr
 ``WARPX_PRECISION``           SINGLE/**DOUBLE**                            Floating point precision (single/double)
 ``WARPX_PARTICLE_PRECISION``  SINGLE/**DOUBLE**                            Particle floating point precision (single/double), defaults to WarpX_PRECISION value if not set
 ``WARPX_FFT``                 ON/**OFF**                                   FFT-based solvers
+``WARPX_HEFFTE``              ON/**OFF**                                   Multi-Node FFT-based solvers
 ``WARPX_QED``                 **ON**/OFF                                   PICSAR QED (requires PICSAR)
 ``WARPX_QED_TABLE_GEN``       ON/**OFF**                                   QED table generation (requires PICSAR and Boost)
 ``BUILD_PARALLEL``            ``2``                                        Number of threads to use for parallel builds

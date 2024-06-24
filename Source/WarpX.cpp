@@ -2120,13 +2120,7 @@ WarpX::AllocLevelData (int lev, const BoxArray& ba, const DistributionMapping& d
 {
     const bool aux_is_nodal = (field_gathering_algo == GatheringAlgo::MomentumConserving);
 
-#if   defined(WARPX_DIM_1D_Z)
-    const amrex::RealVect dx(WarpX::CellSize(lev)[2]);
-#elif   defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-    const amrex::RealVect dx = {WarpX::CellSize(lev)[0], WarpX::CellSize(lev)[2]};
-#elif defined(WARPX_DIM_3D)
-    const amrex::RealVect dx = {WarpX::CellSize(lev)[0], WarpX::CellSize(lev)[1], WarpX::CellSize(lev)[2]};
-#endif
+    const Real* dx = Geom(lev).CellSize();
 
     // Initialize filter before guard cells manager
     // (needs info on length of filter's stencil)
@@ -2852,6 +2846,13 @@ WarpX::CellSize (int lev)
 #endif
 }
 
+amrex::XDim3
+WarpX::InvCellSize (int lev)
+{
+    std::array<Real,3> dx = WarpX::CellSize(lev);
+    return {1._rt/dx[0], 1._rt/dx[1], 1._rt/dx[2]};
+}
+
 amrex::RealBox
 WarpX::getRealBox(const Box& bx, int lev)
 {
@@ -2860,13 +2861,13 @@ WarpX::getRealBox(const Box& bx, int lev)
     return( grid_box );
 }
 
-std::array<Real,3>
+amrex::XDim3
 WarpX::LowerCorner(const Box& bx, const int lev, const amrex::Real time_shift_delta)
 {
     auto & warpx = GetInstance();
     const RealBox grid_box = getRealBox( bx, lev );
 
-    const Real* xyzmin = grid_box.lo();
+    const Real* grid_min = grid_box.lo();
 
     const amrex::Real cur_time = warpx.gett_new(lev);
     const amrex::Real time_shift = (cur_time + time_shift_delta - warpx.time_of_last_gal_shift);
@@ -2875,23 +2876,23 @@ WarpX::LowerCorner(const Box& bx, const int lev, const amrex::Real time_shift_de
                                                    warpx.m_v_galilean[2]*time_shift };
 
 #if defined(WARPX_DIM_3D)
-    return { xyzmin[0] + galilean_shift[0], xyzmin[1] + galilean_shift[1], xyzmin[2] + galilean_shift[2] };
+    return { grid_min[0] + galilean_shift[0], grid_min[1] + galilean_shift[1], grid_min[2] + galilean_shift[2] };
 
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-    return { xyzmin[0] + galilean_shift[0], std::numeric_limits<Real>::lowest(), xyzmin[1] + galilean_shift[2] };
+    return { grid_min[0] + galilean_shift[0], std::numeric_limits<Real>::lowest(), grid_min[1] + galilean_shift[2] };
 
 #elif defined(WARPX_DIM_1D_Z)
-    return { std::numeric_limits<Real>::lowest(), std::numeric_limits<Real>::lowest(), xyzmin[0] + galilean_shift[2] };
+    return { std::numeric_limits<Real>::lowest(), std::numeric_limits<Real>::lowest(), grid_min[0] + galilean_shift[2] };
 #endif
 }
 
-std::array<Real,3>
+amrex::XDim3
 WarpX::UpperCorner(const Box& bx, const int lev, const amrex::Real time_shift_delta)
 {
     auto & warpx = GetInstance();
     const RealBox grid_box = getRealBox( bx, lev );
 
-    const Real* xyzmax = grid_box.hi();
+    const Real* grid_max = grid_box.hi();
 
     const amrex::Real cur_time = warpx.gett_new(lev);
     const amrex::Real time_shift = (cur_time + time_shift_delta - warpx.time_of_last_gal_shift);
@@ -2900,13 +2901,13 @@ WarpX::UpperCorner(const Box& bx, const int lev, const amrex::Real time_shift_de
                                                    warpx.m_v_galilean[2]*time_shift };
 
 #if defined(WARPX_DIM_3D)
-    return { xyzmax[0] + galilean_shift[0], xyzmax[1] + galilean_shift[1], xyzmax[2] + galilean_shift[2] };
+    return { grid_max[0] + galilean_shift[0], grid_max[1] + galilean_shift[1], grid_max[2] + galilean_shift[2] };
 
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-    return { xyzmax[0] + galilean_shift[0], std::numeric_limits<Real>::max(), xyzmax[1] + galilean_shift[1] };
+    return { grid_max[0] + galilean_shift[0], std::numeric_limits<Real>::max(), grid_max[1] + galilean_shift[1] };
 
 #elif defined(WARPX_DIM_1D_Z)
-    return { std::numeric_limits<Real>::max(), std::numeric_limits<Real>::max(), xyzmax[0] + galilean_shift[0] };
+    return { std::numeric_limits<Real>::max(), std::numeric_limits<Real>::max(), grid_max[0] + galilean_shift[0] };
 #endif
 }
 

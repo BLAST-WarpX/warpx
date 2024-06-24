@@ -2558,7 +2558,7 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
 
     if (do_not_push) { return; }
 
-    const std::array<amrex::Real,3>& dx = WarpX::CellSize(std::max(lev,0));
+    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(lev,0));
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel
@@ -2590,16 +2590,13 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
             const amrex::ParticleReal By_external_particle = m_B_external_particle[1];
             const amrex::ParticleReal Bz_external_particle = m_B_external_particle[2];
 
-            const std::array<amrex::Real,3>& xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+            const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
 
             const Dim3 lo = lbound(box);
 
             const bool galerkin_interpolation = WarpX::galerkin_interpolation;
             const int nox = WarpX::nox;
             const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
-
-            const amrex::GpuArray<amrex::Real, 3> dx_arr = {dx[0], dx[1], dx[2]};
-            const amrex::GpuArray<amrex::Real, 3> xyzmin_arr = {xyzmin[0], xyzmin[1], xyzmin[2]};
 
             amrex::Array4<const amrex::Real> const& ex_arr = exfab.array();
             amrex::Array4<const amrex::Real> const& ey_arr = eyfab.array();
@@ -2657,7 +2654,7 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
                     doGatherShapeN(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                    ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                    ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                   dx_arr, xyzmin_arr, lo, n_rz_azimuthal_modes,
+                                   dinv, xyzmin, lo, n_rz_azimuthal_modes,
                                    nox, galerkin_interpolation);
                 }
 
@@ -2755,7 +2752,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     if (np_to_push == 0) { return; }
 
     // Get cell size on gather_lev
-    const std::array<Real,3>& dx = WarpX::CellSize(std::max(gather_lev,0));
+    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));
 
     // Get box from which field is gathered.
     // If not gathering from the finest level, the box is coarsened.
@@ -2783,16 +2780,13 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     const amrex::ParticleReal Bz_external_particle = m_B_external_particle[2];
 
     // Lower corner of tile box physical domain (take into account Galilean shift)
-    const std::array<amrex::Real, 3>& xyzmin = WarpX::LowerCorner(box, gather_lev, 0._rt);
+    const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, gather_lev, 0._rt);
 
     const Dim3 lo = lbound(box);
 
     const bool galerkin_interpolation = WarpX::galerkin_interpolation;
     const int nox = WarpX::nox;
     const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
-
-    const amrex::GpuArray<amrex::Real, 3> dx_arr = {dx[0], dx[1], dx[2]};
-    const amrex::GpuArray<amrex::Real, 3> xyzmin_arr = {xyzmin[0], xyzmin[1], xyzmin[2]};
 
     amrex::Array4<const amrex::Real> const& ex_arr = exfab->array();
     amrex::Array4<const amrex::Real> const& ey_arr = eyfab->array();
@@ -2908,7 +2902,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
             doGatherShapeN(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                            ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                            ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                           dx_arr, xyzmin_arr, lo, n_rz_azimuthal_modes,
+                           dinv, xyzmin, lo, n_rz_azimuthal_modes,
                            nox, galerkin_interpolation);
         }
 
@@ -3008,7 +3002,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
     if (np_to_push == 0) { return; }
 
     // Get cell size on gather_lev
-    const std::array<Real,3>& dx = WarpX::CellSize(std::max(gather_lev,0));
+    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));
 
     // Get box from which field is gathered.
     // If not gathering from the finest level, the box is coarsened.
@@ -3035,16 +3029,13 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
     const amrex::ParticleReal Bz_external_particle = m_B_external_particle[2];
 
     // Lower corner of tile box physical domain (take into account Galilean shift)
-    const std::array<amrex::Real, 3>& xyzmin = WarpX::LowerCorner(box, gather_lev, 0._rt);
+    const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, gather_lev, 0._rt);
 
     const Dim3 lo = lbound(box);
 
     const int depos_type = WarpX::current_deposition_algo;
     const int nox = WarpX::nox;
     const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
-
-    const amrex::GpuArray<amrex::Real, 3> dx_arr = {dx[0], dx[1], dx[2]};
-    const amrex::GpuArray<amrex::Real, 3> xyzmin_arr = {xyzmin[0], xyzmin[1], xyzmin[2]};
 
     amrex::Array4<const amrex::Real> const& ex_arr = exfab->array();
     amrex::Array4<const amrex::Real> const& ey_arr = eyfab->array();
@@ -3157,9 +3148,9 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
         amrex::ParticleReal dxp, dxp_save;
         amrex::ParticleReal dyp, dyp_save;
         amrex::ParticleReal dzp, dzp_save;
-        auto idxg2 = static_cast<amrex::ParticleReal>(1._rt/(dx[0]*dx[0]));
-        auto idyg2 = static_cast<amrex::ParticleReal>(1._rt/(dx[1]*dx[1]));
-        auto idzg2 = static_cast<amrex::ParticleReal>(1._rt/(dx[2]*dx[2]));
+        auto idxg2 = static_cast<amrex::ParticleReal>(dinv.x*dinv.x);
+        auto idyg2 = static_cast<amrex::ParticleReal>(dinv.y*dinv.y);
+        auto idzg2 = static_cast<amrex::ParticleReal>(dinv.z*dinv.z);
 
         amrex::ParticleReal step_norm = 1._prt;
         for (int iter=0; iter<max_iterations;) {
@@ -3193,7 +3184,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
                 doGatherShapeNImplicit(xp_n, yp_n, zp_n, xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                        ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                        ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                       dx_arr, xyzmin_arr, lo, n_rz_azimuthal_modes, nox,
+                                       dinv, xyzmin, lo, n_rz_azimuthal_modes, nox,
                                        depos_type );
             }
 

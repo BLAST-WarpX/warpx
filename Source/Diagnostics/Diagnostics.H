@@ -304,6 +304,8 @@ protected:
     int m_num_buffers;
     /** Array of species indices that dump rho per species */
     amrex::Vector<int> m_rho_per_species_index;
+    /** Array of species indices that dump temperature per species */
+    amrex::Vector<int> m_T_per_species_index;
     /** Vector of particle buffer vectors for each snapshot */
     amrex::Vector< amrex::Vector<std::unique_ptr<PinnedMemoryParticleContainer> > > m_particles_buffer;
     /** Vector of pointers to functors to compute particle output per species*/

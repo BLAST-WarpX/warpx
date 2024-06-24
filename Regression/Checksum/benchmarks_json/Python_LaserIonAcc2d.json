@@ -23,6 +23,8 @@
     "particle_weight": 2.6507336926909222e+17
   },
   "hydrogen": {
+    "particle_origX": 0.008198291015625001,
+    "particle_origZ": 0.0365664599609375,
     "particle_position_x": 0.008197892199782453,
     "particle_position_y": 0.0,
     "particle_position_z": 0.0365646600930625,
