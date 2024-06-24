@@ -47,7 +47,6 @@ class RigidInjectedParticleContainer
 {
 public:
     RigidInjectedParticleContainer (amrex::AmrCore* amr_core,
-                                    int ispecies,
                                     const std::string& name);
     ~RigidInjectedParticleContainer () override = default;
 

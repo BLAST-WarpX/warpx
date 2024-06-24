@@ -123,7 +123,7 @@ public:
     // DiagnosticParticleData (see above) on this tile.
     using DiagnosticParticles = amrex::Vector<std::map<std::pair<int, int>, DiagnosticParticleData> >;
 
-    WarpXParticleContainer (amrex::AmrCore* amr_core, int ispecies);
+    WarpXParticleContainer (amrex::AmrCore* amr_core);
     ~WarpXParticleContainer() override = default;
 
     // Move and copy operations
@@ -269,8 +269,6 @@ public:
 
     // Inject a continuous flux of particles from a defined plane
     virtual void ContinuousFluxInjection(amrex::Real /*t*/, amrex::Real /*dt*/) {}
-
-    int getSpeciesId() const {return species_id;}
 
     ///
     /// This returns the total charge for all the particles in this ParticleContainer.
@@ -426,8 +424,6 @@ public:
     void setDoNotPush (bool flag) { do_not_push = flag; }
 
 protected:
-    int species_id;
-
     amrex::ParticleReal charge;
     amrex::ParticleReal mass;
     PhysicalSpecies physical_species = PhysicalSpecies::unspecified;

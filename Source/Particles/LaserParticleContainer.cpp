@@ -81,8 +81,8 @@ namespace
     }
 }
 
-LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies, const std::string& name)
-    : WarpXParticleContainer(amr_core, ispecies),
+LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, const std::string& name)
+    : WarpXParticleContainer(amr_core),
       m_laser_name{name}
 {
     charge = 1.0;

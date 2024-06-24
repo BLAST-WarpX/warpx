@@ -46,7 +46,7 @@ public:
     /** Default constructor*/
     PlasmaInjector () = default;
 
-    PlasmaInjector (int ispecies, const std::string& name, const amrex::Geometry& geom,
+    PlasmaInjector (const std::string& name, const amrex::Geometry& geom,
                     const std::string& src_name="");
 
     // Default move and copy operations

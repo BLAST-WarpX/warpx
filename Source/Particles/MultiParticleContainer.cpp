@@ -103,20 +103,20 @@ MultiParticleContainer::MultiParticleContainer (AmrCore* amr_core)
     allcontainers.resize(nspecies + nlasers);
     for (int i = 0; i < nspecies; ++i) {
         if (species_types[i] == PCTypes::Physical) {
-            allcontainers[i] = std::make_unique<PhysicalParticleContainer>(amr_core, i, species_names[i]);
+            allcontainers[i] = std::make_unique<PhysicalParticleContainer>(amr_core, species_names[i]);
         }
         else if (species_types[i] == PCTypes::RigidInjected) {
-            allcontainers[i] = std::make_unique<RigidInjectedParticleContainer>(amr_core, i, species_names[i]);
+            allcontainers[i] = std::make_unique<RigidInjectedParticleContainer>(amr_core, species_names[i]);
         }
         else if (species_types[i] == PCTypes::Photon) {
-            allcontainers[i] = std::make_unique<PhotonParticleContainer>(amr_core, i, species_names[i]);
+            allcontainers[i] = std::make_unique<PhotonParticleContainer>(amr_core, species_names[i]);
         }
         allcontainers[i]->m_deposit_on_main_grid = m_deposit_on_main_grid[i];
         allcontainers[i]->m_gather_from_main_grid = m_gather_from_main_grid[i];
     }
 
     for (int i = nspecies; i < nspecies+nlasers; ++i) {
-        allcontainers[i] = std::make_unique<LaserParticleContainer>(amr_core, i, lasers_names[i-nspecies]);
+        allcontainers[i] = std::make_unique<LaserParticleContainer>(amr_core, lasers_names[i-nspecies]);
         allcontainers[i]->m_deposit_on_main_grid = m_laser_deposit_on_main_grid[i-nspecies];
     }
 

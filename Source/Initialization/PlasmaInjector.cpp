@@ -46,9 +46,9 @@
 
 using namespace amrex::literals;
 
-PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
+PlasmaInjector::PlasmaInjector (const std::string& name,
     const amrex::Geometry& geom, const std::string& src_name):
-    species_id{ispecies}, species_name{name}, source_name{src_name}
+    species_name{name}, source_name{src_name}
 {
 
 #ifdef AMREX_USE_GPU

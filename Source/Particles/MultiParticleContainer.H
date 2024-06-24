@@ -496,8 +496,10 @@ private:
 
     // physical particles (+ laser)
     amrex::Vector<std::unique_ptr<WarpXParticleContainer>> allcontainers;
+
     // Temporary particle container, used e.g. for particle splitting.
     std::unique_ptr<PhysicalParticleContainer> pc_tmp;
+
 
     void ReadParameters ();
 

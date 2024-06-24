@@ -42,7 +42,7 @@ class LaserParticleContainer
     : public WarpXParticleContainer
 {
 public:
-    LaserParticleContainer (amrex::AmrCore* amr_core, int ispecies, const std::string& name);
+    LaserParticleContainer (amrex::AmrCore* amr_core, const std::string& name);
     ~LaserParticleContainer () override = default;
 
     LaserParticleContainer ( LaserParticleContainer const &)             = delete;

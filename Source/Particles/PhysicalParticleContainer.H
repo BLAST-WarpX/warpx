@@ -48,7 +48,6 @@ class PhysicalParticleContainer
 public:
 
     PhysicalParticleContainer (amrex::AmrCore* amr_core,
-                               int ispecies,
                                const std::string& name);
 
     PhysicalParticleContainer (amrex::AmrCore* amr_core);

@@ -56,9 +56,9 @@
 
 using namespace amrex;
 
-RigidInjectedParticleContainer::RigidInjectedParticleContainer (AmrCore* amr_core, int ispecies,
+RigidInjectedParticleContainer::RigidInjectedParticleContainer (AmrCore* amr_core,
                                                                 const std::string& name)
-    : PhysicalParticleContainer(amr_core, ispecies, name)
+    : PhysicalParticleContainer(amr_core, name)
 {
 
     const ParmParse pp_species_name(species_name);
