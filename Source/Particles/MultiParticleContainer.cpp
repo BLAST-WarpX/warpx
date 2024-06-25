@@ -419,19 +419,18 @@ MultiParticleContainer::AllocData ()
 void
 MultiParticleContainer::InitData ()
 {
-    InitMultiPhysicsModules();
-
     for (auto& pc : allcontainers) {
         pc->InitData();
     }
     pc_tmp->InitData();
 
+    InitMultiPhysicsModules();
 }
 
 void
 MultiParticleContainer::PostRestart ()
 {
-    InitMultiPhysicsModules();
+    InitMultiPhysicsModules(); // TODO: move down?
 
     for (auto& pc : allcontainers) {
         pc->PostRestart();
@@ -1655,7 +1654,7 @@ void MultiParticleContainer::doQedQuantumSync (int lev,
     }
 }
 
-void MultiParticleContainer::CheckQEDProductSpecies()
+void MultiParticleContainer::CheckQEDProductSpecies ()
 {
     auto const nspecies = static_cast<int>(species_names.size());
     for (int i=0; i<nspecies; i++){

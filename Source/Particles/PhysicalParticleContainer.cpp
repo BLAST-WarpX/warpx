@@ -222,7 +222,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core,
 }
 
 PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core)
-        : WarpXParticleContainer(amr_core)
+    : WarpXParticleContainer(amr_core)
 {
 }
 
