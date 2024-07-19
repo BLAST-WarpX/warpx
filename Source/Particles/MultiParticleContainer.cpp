@@ -430,12 +430,12 @@ MultiParticleContainer::InitData ()
 void
 MultiParticleContainer::PostRestart ()
 {
-    InitMultiPhysicsModules(); // TODO: move down?
-
     for (auto& pc : allcontainers) {
         pc->PostRestart();
     }
     pc_tmp->PostRestart();
+
+    InitMultiPhysicsModules();
 }
 
 void
@@ -451,8 +451,8 @@ MultiParticleContainer::InitMultiPhysicsModules ()
     mapSpeciesProduct();
     CheckIonizationProductSpecies();
 #ifdef WARPX_QED
-    CheckQEDProductSpecies();
     InitQED();
+    CheckQEDProductSpecies();
 #endif
 }
 

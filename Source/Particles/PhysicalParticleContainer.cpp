@@ -374,14 +374,9 @@ void PhysicalParticleContainer::InitData ()
         NewRealComp("opticalDepthQSR");
     }
 
-    pp_species_name.query("do_qed_breit_wheeler", m_do_qed_breit_wheeler);
-    if (m_do_qed_breit_wheeler) {
-        NewRealComp("opticalDepthBW");
-    }
-
-    if(m_do_qed_quantum_sync){
+    if (m_do_qed_quantum_sync){
         pp_species_name.get("qed_quantum_sync_phot_product_species",
-            m_qed_quantum_sync_phot_product_name);
+                            m_qed_quantum_sync_phot_product_name);
     }
 #endif
 
