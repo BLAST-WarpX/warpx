@@ -8,6 +8,7 @@
 #include "Initialization/WarpXAMReXInit.H"
 
 #include "Utils/TextMsg.H"
+#include "Utils/WarpXConst.H"
 
 #include <AMReX.H>
 #include <AMReX_ccse-mpi.H>
@@ -91,6 +92,21 @@ namespace {
         pp_particles.queryAdd("do_tiling", do_tiling);
     }
 
+    void add_constants ()
+    {
+        amrex::ParmParse::SetParserPrefix("my_constants");
+        amrex::ParmParse pp_constants("my_constants");
+        pp_constants.add("clight", PhysConst::c);
+        pp_constants.add("epsilon0", PhysConst::ep0);
+        pp_constants.add("mu0", PhysConst::mu0);
+        pp_constants.add("q_e", PhysConst::q_e);
+        pp_constants.add("m_e", PhysConst::m_e);
+        pp_constants.add("m_p", PhysConst::m_p);
+        pp_constants.add("m_u", PhysConst::m_u);
+        pp_constants.add("kb", PhysConst::kb);
+        pp_constants.add("pi", MathConst::pi);
+    }
+
     /** Overwrite defaults in AMReX Inputs
      *
      * This overwrites defaults in amrex::ParmParse for inputs.
@@ -104,6 +120,7 @@ namespace {
         apply_workaround_for_warpx_numprocs();
         set_device_synchronization();
         override_default_tiling_option_for_particles();
+        add_constants();
     }
 }
 
