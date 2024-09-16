@@ -21,13 +21,13 @@ class MemoryCalculator:
     """
 
     def __init__(
-            self,
-            n_x,
-            n_y,
-            n_z,
-            build_dim,
-            particle_shape_order=3,
-            precision="double",
+        self,
+        n_x,
+        n_y,
+        n_z,
+        build_dim,
+        particle_shape_order=3,
+        precision="double",
     ):
         """
         Class constructor
@@ -66,16 +66,17 @@ class MemoryCalculator:
             raise ValueError(
                 "Please choose a value from [1,2,3,'RZ']. ",
                 build_dim,
-                " is not a supported choice.")
+                " is not a supported choice.",
+            )
 
         self.build_dim = build_dim
         self.particle_shape_order = particle_shape_order
         self.precision = precision
 
-        if self.precision == 'single':
+        if self.precision == "single":
             # value size in bytes
             self.value_size = np.float32().itemsize
-        elif self.precision == 'double':
+        elif self.precision == "double":
             # value size in bytes
             self.value_size = np.float64().itemsize
         else:
@@ -83,8 +84,7 @@ class MemoryCalculator:
                 "The build option WarpX_PRECISION can either be SINGLE or DOUBLE (default)"
             )
 
-    def get_guard_cells_per_box(self,
-                                guard_cells_per_dim=[]):
+    def get_guard_cells_per_box(self, guard_cells_per_dim=[]):
         """
         Get the number of guard cells around the box.
 
@@ -120,27 +120,26 @@ class MemoryCalculator:
             guard_cells_per_dim = np.array([guard_cells_per_dim])
 
         if self.sim_dim == 1:
-            local_cells = (self.n_x + 2 * guard_cells_per_dim[0])
+            local_cells = self.n_x + 2 * guard_cells_per_dim[0]
             guard_cells_per_box = local_cells - self.n_x
 
-
         elif self.sim_dim == 2:
-
-            local_cells = (self.n_x + 2 * guard_cells_per_dim[0]) \
-                          * (self.n_y + 2 * guard_cells_per_dim[1])
+            local_cells = (self.n_x + 2 * guard_cells_per_dim[0]) * (
+                self.n_y + 2 * guard_cells_per_dim[1]
+            )
             guard_cells_per_box = local_cells - self.n_x * self.n_y
 
         elif self.sim_dim == 3:
-
-            local_cells = (self.n_x + 2 * guard_cells_per_dim[0]) \
-                          * (self.n_y + 2 * guard_cells_per_dim[1]) \
-                          * (self.n_z + 2 * guard_cells_per_dim[2])
+            local_cells = (
+                (self.n_x + 2 * guard_cells_per_dim[0])
+                * (self.n_y + 2 * guard_cells_per_dim[1])
+                * (self.n_z + 2 * guard_cells_per_dim[2])
+            )
             guard_cells_per_box = local_cells - (self.n_x * self.n_y * self.n_z)
 
         return guard_cells_per_box
 
-    def get_local_pml_cells(self,
-                            pml_cells_per_dim=[]):
+    def get_local_pml_cells(self, pml_cells_per_dim=[]):
         """
         Get number of PML cells, assuming PMLs are around the whole box.
 
@@ -168,24 +167,27 @@ class MemoryCalculator:
 
         elif self.sim_dim == 2:
             pml_n_x, pml_n_y = pml_cells_per_dim
-            local_pml_cells = self.n_x * self.n_y - (self.n_x - pml_n_x) * (self.n_y - pml_n_y)
+            local_pml_cells = self.n_x * self.n_y - (self.n_x - pml_n_x) * (
+                self.n_y - pml_n_y
+            )
 
         elif self.sim_dim == 3:
             pml_n_x, pml_n_y, pml_n_z = pml_cells_per_dim
-            local_pml_cells = self.n_x * self.n_y * self.n_z \
-                              - (self.n_x - pml_n_x) * (self.n_y - pml_n_y) * (self.n_z - pml_n_z)
+            local_pml_cells = self.n_x * self.n_y * self.n_z - (self.n_x - pml_n_x) * (
+                self.n_y - pml_n_y
+            ) * (self.n_z - pml_n_z)
 
         return local_pml_cells
 
     def mem_req_by_fields(
-            self,
-            n_x=None,
-            n_y=None,
-            n_z=None,
-            dive_cleaning=True,
-            divb_cleaning=True,
-            pml_ncell=10,
-            guard_cells_per_dim=[]
+        self,
+        n_x=None,
+        n_y=None,
+        n_z=None,
+        dive_cleaning=True,
+        divb_cleaning=True,
+        pml_ncell=10,
+        guard_cells_per_dim=[],
     ):
         """
         Memory reserved for fields on each device
@@ -228,7 +230,6 @@ class MemoryCalculator:
         if n_z is None:
             n_z = self.n_z
 
-
         pml_cell_mem = 0
 
         if pml_ncell == 0:
@@ -242,9 +243,7 @@ class MemoryCalculator:
             pml_n_z = min(pml_ncell, n_z)
 
             if self.sim_dim == 1:
-                local_pml_cells = self.get_local_pml_cells(
-                    pml_cells_per_dim=[pml_n_z]
-                )
+                local_pml_cells = self.get_local_pml_cells(pml_cells_per_dim=[pml_n_z])
             elif self.sim_dim == 2:
                 local_pml_cells = self.get_local_pml_cells(
                     pml_cells_per_dim=[pml_n_x, pml_n_z]
@@ -254,10 +253,7 @@ class MemoryCalculator:
                     pml_cells_per_dim=[pml_n_x, pml_n_y, pml_n_z]
                 )
             else:
-                raise ValueError(
-                    "Invalid number of dimensions: ",
-                    self.sim_dim
-                )
+                raise ValueError("Invalid number of dimensions: ", self.sim_dim)
             # number of additional PML field components
             # @TODO figure out how many fields for each PML configuration
             # see Source/BoundaryConditions/PML.H#L214-233
@@ -284,20 +280,22 @@ class MemoryCalculator:
         # double buffer memory
         double_buffer_mem = double_buffer_cells * num_fields * self.value_size
 
-        req_mem = self.value_size * num_fields * self.local_cells \
-                  + double_buffer_mem \
-                  + pml_cell_mem
+        req_mem = (
+            self.value_size * num_fields * self.local_cells
+            + double_buffer_mem
+            + pml_cell_mem
+        )
 
         return req_mem
 
     def mem_req_by_species(
-            self,
-            target_n_x=None,
-            target_n_y=None,
-            target_n_z=None,
-            num_additional_ints=0,
-            num_additional_reals=0,
-            particles_per_cell=2
+        self,
+        target_n_x=None,
+        target_n_y=None,
+        target_n_z=None,
+        num_additional_ints=0,
+        num_additional_reals=0,
+        particles_per_cell=2,
     ):
         """
         Memory reserved for all particles of a species on a device.
@@ -341,13 +339,15 @@ class MemoryCalculator:
             target_n_z = self.n_z
 
         # memory required by the standard particle attributes
-        standard_attribute_mem = np.array([
-            3 * self.value_size,  # momentum
-            self.sim_dim * self.value_size,  # position
-            1 * np.int32().itemsize,  # particle id
-            1 * np.int32().itemsize,  # cpu id
-            1 * self.value_size  # weighting
-        ])
+        standard_attribute_mem = np.array(
+            [
+                3 * self.value_size,  # momentum
+                self.sim_dim * self.value_size,  # position
+                1 * np.int32().itemsize,  # particle id
+                1 * np.int32().itemsize,  # cpu id
+                1 * self.value_size,  # weighting
+            ]
+        )
 
         # memory per particle for additional attributes {unit: byte}
         additional_int_mem = num_additional_ints * np.int32().itemsize
@@ -356,17 +356,15 @@ class MemoryCalculator:
 
         target_cells = target_n_x * target_n_y * target_n_z
 
-        req_mem = target_cells * particles_per_cell \
-                  * (np.sum(standard_attribute_mem) + additional_mem)
+        req_mem = (
+            target_cells
+            * particles_per_cell
+            * (np.sum(standard_attribute_mem) + additional_mem)
+        )
 
         return req_mem
 
-    def mem_req_by_rng(
-            self,
-            warpx_compute="CUDA",
-            gpu_model="A100",
-            omp_num_threads=1
-    ):
+    def mem_req_by_rng(self, warpx_compute="CUDA", gpu_model="A100", omp_num_threads=1):
         """
         Memory reserved for the random number generator.
 
@@ -390,14 +388,15 @@ class MemoryCalculator:
             :param gpu_model:
         """
 
-        warpx_compute_list = ['CUDA', 'HIP', 'OMP', 'SYCL', 'NOACC']
+        warpx_compute_list = ["CUDA", "HIP", "OMP", "SYCL", "NOACC"]
 
         if warpx_compute not in warpx_compute_list:
             raise ValueError(
                 "{} is not an available option for WarpX_COMPUTE.".format(
                     warpx_compute
-                ), "Please choose one of the following: ",
-                warpx_compute_list
+                ),
+                "Please choose one of the following: ",
+                warpx_compute_list,
             )
         else:
             pass
@@ -407,15 +406,13 @@ class MemoryCalculator:
             "HIP": "XORWOW",  # hiprand
             "OMP": "mt19937",
             "SYCL": "Philox4x32x10",  # oneapi math kernel library
-            "NOACC": "mt19937"
+            "NOACC": "mt19937",
         }
 
         generator_method = generator_method_d[warpx_compute]
 
         # @TODO perhaps let the user
-        multProc_num_and_maxThreads_d = {
-            "A100": [108, 2048]
-        }
+        multProc_num_and_maxThreads_d = {"A100": [108, 2048]}
 
         req_mem = 0
         if generator_method == "XORWOW":
@@ -444,7 +441,7 @@ class MemoryCalculator:
                 "The chosen random number generator method",
                 generator_method,
                 "is not available. Please choose one from this list:",
-                list(generator_method_d.keys())
+                list(generator_method_d.keys()),
             )
 
         return req_mem

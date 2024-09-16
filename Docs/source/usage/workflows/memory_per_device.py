@@ -28,13 +28,13 @@ very difficult.
 # simulation dimension
 sim_dim = 2
 # density cut-off, where the target is centered around z = 0
-L_cut = 2.e-6
-prob_lo = np.array([-7.5, -5.]) * 1e-6  # simulation box: lower bounds
-prob_hi = np.array([7.5, 25.]) * 1e-6   # simulation box: upper bounds
+L_cut = 2.0e-6
+prob_lo = np.array([-7.5, -5.0]) * 1e-6  # simulation box: lower bounds
+prob_hi = np.array([7.5, 25.0]) * 1e-6  # simulation box: upper bounds
 
 Nx, Ny, Nz = 2688, 1, 3712  # box size in cells
 
-cell_size_z = (prob_hi[1]-prob_lo[1]) / Nz
+cell_size_z = (prob_hi[1] - prob_lo[1]) / Nz
 
 # extent of the target in cells
 target_x = Nx
@@ -45,9 +45,12 @@ mc = MC(Nx, Ny, Nz, build_dim=sim_dim)
 
 # memory allocated for electromagnetic and helper fields
 field_mem = mc.mem_req_by_fields(
-    Nx, Ny, Nz,
-    divb_cleaning=True, dive_cleaning=True,
-    pml_ncell=10  # PML boundary conditions are active in this example
+    Nx,
+    Ny,
+    Nz,
+    divb_cleaning=True,
+    dive_cleaning=True,
+    pml_ncell=10,  # PML boundary conditions are active in this example
 )
 
 # particles per cell
@@ -55,13 +58,14 @@ species_e_ppc = 2 * 2 * 4
 species_H_ppc = species_e_ppc
 # memory allocated per particle species
 species_e_mem = mc.mem_req_by_species(
-    target_x, target_y, target_z,
-    particles_per_cell=species_e_ppc
+    target_x, target_y, target_z, particles_per_cell=species_e_ppc
 )
 species_H_mem = mc.mem_req_by_species(
-    target_x, target_y, target_z,
+    target_x,
+    target_y,
+    target_z,
     particles_per_cell=species_H_ppc,
-    num_additional_ints=1               # ionization state
+    num_additional_ints=1,  # ionization state
 )
 # memory allocated mainly for the states of RNGs
 rng_mem = mc.mem_req_by_rng(warpx_compute="CUDA", gpu_model="A100")
