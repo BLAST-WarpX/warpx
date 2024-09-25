@@ -127,7 +127,15 @@ void init_WarpX (py::module& m)
                      throw std::runtime_error("MultiFab '" + internal_name + "' is unknown or is not allocated!");
                  }
              },
-             py::arg("internal_name")
+             py::arg("internal_name"),
+             py::return_value_policy::reference_internal,
+             R"doc(Return a MultiFab by its internal name (deprecated).
+
+The multifab('internal_name') signature is deprecated.
+Please use:
+- multifab('prefix', level=...) for scalar fields
+- multifab('prefix', dir=..., level=...) for vector field components
+where 'prefix' is the part of 'internal_name';'  before the [])doc"
         )
         .def("multifab",
             [](WarpX & wx, std::string scalar_name, int level) {
