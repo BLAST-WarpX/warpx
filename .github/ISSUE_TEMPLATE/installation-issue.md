@@ -1,9 +1,7 @@
 ---
 name: Installation issue
-about: Cannot install WarpX? Let us know.
-title: ''
-labels: [install, question]
-assignees: ''
+about: Report an issue with installing or setting up WarpX
+labels: [install]
 ---
 
 **Where are you trying to install WarpX?**
