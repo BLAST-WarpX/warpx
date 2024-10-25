@@ -1,9 +1,7 @@
 ---
 name: Feature request
-about: Request a new feature
-title: ''
+about: Suggest a new feature or enhancement.
 labels: [enhancement]
-assignees: ''
 ---
 
 **What is the context that is prompting you to request a new feature?**
