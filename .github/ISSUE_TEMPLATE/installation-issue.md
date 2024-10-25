@@ -4,6 +4,8 @@ about: Report an issue with installing or setting up WarpX
 labels: [install]
 ---
 
+_Please remove any sensitive information (e.g., passwords, API keys) from your submission. Thank you for taking the time to report this issue. We will respond as soon as possible._
+
 **Where are you trying to install WarpX?**
 A clear and concise description of where you want to install WarpX.
 
