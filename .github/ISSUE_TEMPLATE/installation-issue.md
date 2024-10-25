@@ -4,7 +4,11 @@ about: Report an issue with installing or setting up WarpX
 labels: [install]
 ---
 
-_Please remove any sensitive information (e.g., passwords, API keys) from your submission. Thank you for taking the time to report this issue. We will respond as soon as possible._
+_Please remove any sensitive information (e.g., passwords, API keys) from your submission._
+
+_Please check the relevant boxes and fill in the specific versions or details for the relevant items._
+
+_Thank you for taking the time to report this issue. We will respond as soon as possible._
 
 ## Description
 A clear and concise description of the issue.
@@ -23,6 +27,9 @@ A clear and concise description of the issue.
   - [ ] From source with CMake
   - [ ] Module system on an HPC cluster
 - Other dependencies: yes/no, describe
+- Computational resources:
+  - [ ] CPU
+  - [ ] GPU: e.g., NVIDIA, AMD, etc.
 
 If you encountered the issue on an HPC cluster, please check our [HPC documentation](https://warpx.readthedocs.io/en/latest/install/hpc.html) to see if your HPC cluster is already supported.
 
