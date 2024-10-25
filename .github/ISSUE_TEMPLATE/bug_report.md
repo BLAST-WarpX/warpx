@@ -23,9 +23,6 @@ If you are unable to provide certain files or scripts, please describe the steps
 Please minimize your inputs/scripts to be concise and focused on the issue.
 For instance, make the simulation scripts as small and fast to run as possible.
 
-## Error messages
-Please paste any relevant error messages or console output.
-
 ## System information
 Please check all relevant boxes and provide details.
 
@@ -54,7 +51,6 @@ If you encountered the issue on an HPC cluster, please check our [HPC documentat
 What troubleshooting steps have you taken so far, and what were the results?
 
 Have you tried compiling and running in debug mode, following the instructions in our [debugging documentation](https://warpx.readthedocs.io/en/latest/usage/workflows/debugging.html)?
-Please specify any relevant compiler flags or environment variables that were used.
 
 ## Additional information
-If applicable, please add any additional information that may help explain the issue, such as screenshots, diagrams, or other relevant details.
+If applicable, please add any additional information that may help explain the issue, such as log files (e.g., build logs, error logs, etc.), error messages (e.g., compiler errors, runtime errors, etc.), screenshots, or other relevant details.
