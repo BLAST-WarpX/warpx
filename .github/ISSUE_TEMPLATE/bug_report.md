@@ -29,7 +29,7 @@ Please paste any relevant error messages or console output.
 ## System information
 Please check all relevant boxes and provide details.
 
-- Operating System (name and version):
+- Operating system (name and version):
   - [ ] Linux: e.g., Ubuntu 22.04 LTS
   - [ ] macOS: e.g., macOS Monterey 12.4
   - [ ] Windows: e.g., Windows 11 Pro
