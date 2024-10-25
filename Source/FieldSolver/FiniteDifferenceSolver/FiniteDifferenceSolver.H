@@ -149,7 +149,6 @@ class FiniteDifferenceSolver
           * \param[in] Bfield   vector of magnetic field MultiFabs at a given level
           * \param[in] rhofield scalar ion charge density Multifab at a given level
           * \param[in] Pefield  scalar electron pressure MultiFab at a given level
-          * \param[in] edge_lengths length of edges along embedded boundaries
           * \param[in] lev  level number for the calculation
           * \param[in] hybrid_model instance of the hybrid-PIC model
           * \param[in] solve_for_Faraday boolean flag for whether the E-field is solved to be used in Faraday's equation
@@ -161,7 +160,6 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField const& Bfield,
             amrex::MultiFab const& rhofield,
             amrex::MultiFab const& Pefield,
-            ablastr::fields::VectorField const& edge_lengths,
             int lev, HybridPICModel const* hybrid_model,
             bool solve_for_Faraday );
 
@@ -177,7 +175,6 @@ class FiniteDifferenceSolver
         void CalculateCurrentAmpere (
             ablastr::fields::VectorField& Jfield,
             ablastr::fields::VectorField const& Bfield,
-            ablastr::fields::VectorField const& edge_lengths,
             int lev );
 
         /**
@@ -192,7 +189,6 @@ class FiniteDifferenceSolver
         void ComputeCurlA (
             ablastr::fields::VectorField& Bfield,
             ablastr::fields::VectorField const& Afield,
-            ablastr::fields::VectorField const& edge_lengths,
             int lev );
 
     private:
@@ -261,7 +257,6 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField const& Bfield,
             amrex::MultiFab const& rhofield,
             amrex::MultiFab const& Pefield,
-            ablastr::fields::VectorField const& edge_lengths,
             int lev, HybridPICModel const* hybrid_model,
             bool solve_for_Faraday );
 
@@ -269,7 +264,6 @@ class FiniteDifferenceSolver
         void CalculateCurrentAmpereCylindrical (
             ablastr::fields::VectorField& Jfield,
             ablastr::fields::VectorField const& Bfield,
-            ablastr::fields::VectorField const& edge_lengths,
             int lev
         );
 
@@ -277,7 +271,6 @@ class FiniteDifferenceSolver
         void ComputeCurlACylindrical (
             ablastr::fields::VectorField& Bfield,
             ablastr::fields::VectorField const& Afield,
-            ablastr::fields::VectorField const& edge_lengths,
             int lev
         );
 
@@ -373,7 +366,6 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField const& Bfield,
             amrex::MultiFab const& rhofield,
             amrex::MultiFab const& Pefield,
-            ablastr::fields::VectorField const& edge_lengths,
             int lev, HybridPICModel const* hybrid_model,
             bool solve_for_Faraday );
 
@@ -381,7 +373,6 @@ class FiniteDifferenceSolver
         void CalculateCurrentAmpereCartesian (
             ablastr::fields::VectorField& Jfield,
             ablastr::fields::VectorField const& Bfield,
-            ablastr::fields::VectorField const& edge_lengths,
             int lev
         );
 
@@ -389,7 +380,6 @@ class FiniteDifferenceSolver
         void ComputeCurlACartesian (
             ablastr::fields::VectorField & Bfield,
             ablastr::fields::VectorField const& Afield,
-            ablastr::fields::VectorField const& edge_lengths,
             int lev
         );
 #endif

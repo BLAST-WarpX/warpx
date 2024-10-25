@@ -37,6 +37,7 @@
 #   endif
 #endif
 #include "AcceleratorLattice/AcceleratorLattice.H"
+#include "EmbeddedBoundary/Covered.H"
 #include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
 #include "Fields.H"
@@ -926,9 +927,7 @@ public:
         amrex::ParserExecutor<4> const& fx_parser,
         amrex::ParserExecutor<4> const& fy_parser,
         amrex::ParserExecutor<4> const& fz_parser,
-        int lev, PatchType patch_type, [[maybe_unused]] char topology,
-        std::optional<ablastr::fields::VectorField> const& edge_lengths = std::nullopt,
-        std::optional<ablastr::fields::VectorField> const& face_areas = std::nullopt);
+        int lev, PatchType patch_type, EB::CoverTopology topology);
 
     /**
      * \brief Load field values from a user-specified openPMD file,

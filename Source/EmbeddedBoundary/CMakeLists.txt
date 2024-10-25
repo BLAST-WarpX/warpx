@@ -7,5 +7,6 @@ foreach(D IN LISTS WarpX_DIMS)
         WarpXFaceExtensions.cpp
         WarpXFaceInfoBox.H
         Enabled.cpp
+        Covered.cpp
     )
 endforeach()

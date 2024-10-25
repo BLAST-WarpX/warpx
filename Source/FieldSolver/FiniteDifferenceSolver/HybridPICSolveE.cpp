@@ -28,7 +28,6 @@ using warpx::fields::FieldType;
 void FiniteDifferenceSolver::CalculateCurrentAmpere (
     ablastr::fields::VectorField & Jfield,
     ablastr::fields::VectorField const& Bfield,
-    ablastr::fields::VectorField const& edge_lengths,
     int lev )
 {
     // Select algorithm (The choice of algorithm is a runtime option,
@@ -36,12 +35,12 @@ void FiniteDifferenceSolver::CalculateCurrentAmpere (
     if (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC) {
 #ifdef WARPX_DIM_RZ
         CalculateCurrentAmpereCylindrical <CylindricalYeeAlgorithm> (
-            Jfield, Bfield, edge_lengths, lev
+            Jfield, Bfield, lev
         );
 
 #else
         CalculateCurrentAmpereCartesian <CartesianYeeAlgorithm> (
-            Jfield, Bfield, edge_lengths, lev
+            Jfield, Bfield, lev
         );
 
 #endif
@@ -63,7 +62,6 @@ template<typename T_Algo>
 void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
     ablastr::fields::VectorField& Jfield,
     ablastr::fields::VectorField const& Bfield,
-    ablastr::fields::VectorField const& edge_lengths,
     int lev
 )
 {
@@ -94,13 +92,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
         Array4<Real> const& Bt = Bfield[1]->array(mfi);
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
 
-        amrex::Array4<amrex::Real> lr, lt, lz;
-
-        if (EB::enabled()) {
-            lr = edge_lengths[0]->array(mfi);
-            lt = edge_lengths[1]->array(mfi);
-            lz = edge_lengths[2]->array(mfi);
-        }
+        EB::Covered const& cov_ptr = EB::Covered(mfi, lev);
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
@@ -126,8 +118,8 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
 
             // Jr calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                // Skip if this cell is fully covered by embedded boundaries
-                if (lr && lr(i, j, 0) <= 0) { return; }
+                if (cov_ptr.isCovered(0, EB::CoverTopology::edge, i, j, 0)) { return; }
+
                 // Mode m=0
                 Jr(i, j, 0, 0) = one_over_mu0 * (
                     - T_Algo::DownwardDz(Bt, coefs_z, n_coefs_z, i, j, 0, 0)
@@ -150,8 +142,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
 
             // Jt calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                // In RZ Jt is associated with a mesh node, so we need to check if the mesh node is covered
-                if (lr && (lr(i, j, 0)<=0 || lr(i-1, j, 0)<=0 || lz(i, j-1, 0)<=0 || lz(i, j, 0)<=0)) { return; }
+                if (cov_ptr.isCovered(1, EB::CoverTopology::edge, i, j, 0)) { return; }
 
                 // r on a nodal point (Jt is nodal in r)
                 Real const r = rmin + i*dr;
@@ -196,8 +187,8 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
 
             // Jz calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                // Skip if this cell is fully covered by embedded boundaries
-                if (lz && lz(i, j, 0) <= 0) { return; }
+                if (cov_ptr.isCovered(2, EB::CoverTopology::edge, i, j, 0)) { return; }
+
                 // r on a nodal point (Jz is nodal in r)
                 Real const r = rmin + i*dr;
                 // Off-axis, regular curl
@@ -246,7 +237,6 @@ template<typename T_Algo>
 void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
     ablastr::fields::VectorField& Jfield,
     ablastr::fields::VectorField const& Bfield,
-    ablastr::fields::VectorField const& edge_lengths,
     int lev
 )
 {
@@ -276,12 +266,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
         Array4<Real const> const &By = Bfield[1]->const_array(mfi);
         Array4<Real const> const &Bz = Bfield[2]->const_array(mfi);
 
-        amrex::Array4<amrex::Real> lx, ly, lz;
-        if (EB::enabled()) {
-            lx = edge_lengths[0]->array(mfi);
-            ly = edge_lengths[1]->array(mfi);
-            lz = edge_lengths[2]->array(mfi);
-        }
+        EB::Covered const& cov_ptr = EB::Covered(mfi, lev);
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
@@ -304,8 +289,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
 
             // Jx calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                // Skip if this cell is fully covered by embedded boundaries
-                if (lx && lx(i, j, k) <= 0) { return; }
+                if (cov_ptr.isCovered(0, EB::CoverTopology::edge, i, j, k)) { return; }
 
                 Jx(i, j, k) = one_over_mu0 * (
                     - T_Algo::DownwardDz(By, coefs_z, n_coefs_z, i, j, k)
@@ -315,14 +299,8 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
 
             // Jy calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                // Skip if this cell is fully covered by embedded boundaries
-#ifdef WARPX_DIM_3D
-                if (ly && ly(i,j,k) <= 0) { return; }
-#elif defined(WARPX_DIM_XZ)
-                // In XZ Jy is associated with a mesh node, so we need to check if the mesh node is covered
-                amrex::ignore_unused(ly);
-                if (lx && (lx(i, j, k)<=0 || lx(i-1, j, k)<=0 || lz(i, j-1, k)<=0 || lz(i, j, k)<=0)) { return; }
-#endif
+                if (cov_ptr.isCovered(1, EB::CoverTopology::edge, i, j, k)) { return; }
+
                 Jy(i, j, k) = one_over_mu0 * (
                     - T_Algo::DownwardDx(Bz, coefs_x, n_coefs_x, i, j, k)
                     + T_Algo::DownwardDz(Bx, coefs_z, n_coefs_z, i, j, k)
@@ -331,8 +309,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
 
             // Jz calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                // Skip if this cell is fully covered by embedded boundaries
-                if (lz && lz(i,j,k) <= 0) { return; }
+                if (cov_ptr.isCovered(2, EB::CoverTopology::edge, i, j, k)) { return; }
 
                 Jz(i, j, k) = one_over_mu0 * (
                     - T_Algo::DownwardDy(Bx, coefs_y, n_coefs_y, i, j, k)
@@ -359,7 +336,6 @@ void FiniteDifferenceSolver::HybridPICSolveE (
     ablastr::fields::VectorField const& Bfield,
     amrex::MultiFab const& rhofield,
     amrex::MultiFab const& Pefield,
-    ablastr::fields::VectorField const& edge_lengths,
     int lev, HybridPICModel const* hybrid_model,
     const bool solve_for_Faraday)
 {
@@ -370,14 +346,14 @@ void FiniteDifferenceSolver::HybridPICSolveE (
 
         HybridPICSolveECylindrical <CylindricalYeeAlgorithm> (
             Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
-            edge_lengths, lev, hybrid_model, solve_for_Faraday
+            lev, hybrid_model, solve_for_Faraday
         );
 
 #else
 
         HybridPICSolveECartesian <CartesianYeeAlgorithm> (
             Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
-            edge_lengths, lev, hybrid_model, solve_for_Faraday
+            lev, hybrid_model, solve_for_Faraday
         );
 
 #endif
@@ -398,7 +374,6 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     ablastr::fields::VectorField const& Bfield,
     amrex::MultiFab const& rhofield,
     amrex::MultiFab const& Pefield,
-    ablastr::fields::VectorField const& edge_lengths,
     int lev, HybridPICModel const* hybrid_model,
     const bool solve_for_Faraday )
 {
@@ -559,12 +534,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<const Real> const& Et_ext = Efield_external[1]->const_array(mfi);
         Array4<const Real> const& Ez_ext = Efield_external[2]->const_array(mfi);
 
-        amrex::Array4<amrex::Real> lr, lz;
-        if (EB::enabled()) {
-            lr = edge_lengths[0]->array(mfi);
-            //   edge_lengths[1] is `lt` and is not needed
-            lz = edge_lengths[2]->array(mfi);
-        }
+        EB::Covered const& cov_ptr = EB::Covered(mfi, lev);
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
@@ -585,8 +555,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
             // Er calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                // Skip if this cell is fully covered by embedded boundaries
-                if (lr && lr(i, j, 0) <= 0) { return; }
+                if (cov_ptr.isCovered(0, EB::CoverTopology::edge, i, j, 0)) { return; }
 
                 // Interpolate to get the appropriate charge density in space
                 Real rho_val = Interp(rho, nodal, Er_stag, coarsen, i, j, 0, 0);
@@ -631,8 +600,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
             // Et calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                // In RZ Et is associated with a mesh node, so we need to check if the mesh node is covered
-                if (lr && (lr(i, j, 0)<=0 || lr(i-1, j, 0)<=0 || lz(i, j-1, 0)<=0 || lz(i, j, 0)<=0)) { return; }
+                if (cov_ptr.isCovered(1, EB::CoverTopology::edge, i, j, 0)) { return; }
 
                 // r on a nodal grid (Et is nodal in r)
                 Real const r = rmin + i*dr;
@@ -678,8 +646,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
             // Ez calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                // Skip field solve if this cell is fully covered by embedded boundaries
-                if (lz && lz(i,j,0) <= 0) { return; }
+                if (cov_ptr.isCovered(2, EB::CoverTopology::edge, i, j, 0)) { return; }
 
                 // Interpolate to get the appropriate charge density in space
                 Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, 0, 0);
@@ -739,7 +706,6 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     ablastr::fields::VectorField const& Bfield,
     amrex::MultiFab const& rhofield,
     amrex::MultiFab const& Pefield,
-    ablastr::fields::VectorField const& edge_lengths,
     int lev, HybridPICModel const* hybrid_model,
     const bool solve_for_Faraday )
 {
@@ -902,12 +868,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Ez_ext = Efield_external[2]->array(mfi);
         }
 
-        amrex::Array4<amrex::Real> lx, ly, lz;
-        if (EB::enabled()) {
-            lx = edge_lengths[0]->array(mfi);
-            ly = edge_lengths[1]->array(mfi);
-            lz = edge_lengths[2]->array(mfi);
-        }
+        EB::Covered const& cov_ptr = EB::Covered(mfi, lev);
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
@@ -927,7 +888,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             // Ex calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
                 // Skip if this cell is fully covered by embedded boundaries
-                if (lx && lx(i, j, k) <= 0) { return; }
+                if (cov_ptr.isCovered(0, EB::CoverTopology::edge, i, j, k)) { return; }
 
                 // Interpolate to get the appropriate charge density in space
                 Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, k, 0);
@@ -969,14 +930,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
             // Ey calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                // Skip field solve if this cell is fully covered by embedded boundaries
-#ifdef WARPX_DIM_3D
-                if (ly && ly(i,j,k) <= 0) { return; }
-#elif defined(WARPX_DIM_XZ)
-                //In XZ Ey is associated with a mesh node, so we need to check if the mesh node is covered
-                amrex::ignore_unused(ly);
-                if (lx && (lx(i, j, k)<=0 || lx(i-1, j, k)<=0 || lz(i, j-1, k)<=0 || lz(i, j, k)<=0)) { return; }
-#endif
+                if (cov_ptr.isCovered(1, EB::CoverTopology::edge, i, j, k)) { return; }
+
                 // Interpolate to get the appropriate charge density in space
                 Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, k, 0);
 
@@ -1017,10 +972,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
             // Ez calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-#ifdef AMREX_USE_EB
-                // Skip field solve if this cell is fully covered by embedded boundaries
-                if (lz && lz(i,j,k) <= 0) { return; }
-#endif
+                if (cov_ptr.isCovered(2, EB::CoverTopology::edge, i, j, k)) { return; }
+
                 // Interpolate to get the appropriate charge density in space
                 Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
 

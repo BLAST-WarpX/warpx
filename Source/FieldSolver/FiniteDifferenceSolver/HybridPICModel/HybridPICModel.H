@@ -87,12 +87,10 @@ public:
      * \param[in] edge_lengths Length of cell edges taking embedded boundaries into account
      */
     void CalculatePlasmaCurrent (
-        ablastr::fields::MultiLevelVectorField const& Bfield,
-        ablastr::fields::MultiLevelVectorField const& edge_lengths
+        ablastr::fields::MultiLevelVectorField const& Bfield
     );
     void CalculatePlasmaCurrent (
         ablastr::fields::VectorField const& Bfield,
-        ablastr::fields::VectorField const& edge_lengths,
         int lev
     );
 
@@ -105,7 +103,6 @@ public:
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelVectorField const& Bfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
-        ablastr::fields::MultiLevelVectorField const& edge_lengths,
         bool solve_for_Faraday) const;
 
     void HybridPICSolveE (
@@ -113,7 +110,6 @@ public:
         ablastr::fields::VectorField const& Jfield,
         ablastr::fields::VectorField const& Bfield,
         amrex::MultiFab const& rhofield,
-        ablastr::fields::VectorField const& edge_lengths,
         int lev, bool solve_for_Faraday) const;
 
     void HybridPICSolveE (
@@ -121,7 +117,6 @@ public:
         ablastr::fields::VectorField const& Jfield,
         ablastr::fields::VectorField const& Bfield,
         amrex::MultiFab const& rhofield,
-        ablastr::fields::VectorField const& edge_lengths,
         int lev, PatchType patch_type, bool solve_for_Faraday) const;
 
     void BfieldEvolveRK (
@@ -129,7 +124,6 @@ public:
         ablastr::fields::MultiLevelVectorField const& Efield,
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
-        ablastr::fields::MultiLevelVectorField const& edge_lengths,
         amrex::Real dt, DtType a_dt_type,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
@@ -138,7 +132,6 @@ public:
         ablastr::fields::MultiLevelVectorField const& Efield,
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
-        ablastr::fields::MultiLevelVectorField const& edge_lengths,
         amrex::Real dt, int lev, DtType dt_type,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
@@ -147,7 +140,6 @@ public:
         ablastr::fields::MultiLevelVectorField const& Efield,
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
-        ablastr::fields::MultiLevelVectorField const& edge_lengths,
         amrex::Real dt, DtType dt_type,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
