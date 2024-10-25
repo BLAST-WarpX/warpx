@@ -4,6 +4,8 @@ about: Suggest a new feature or enhancement.
 labels: [enhancement]
 ---
 
+_Please remove any sensitive information (e.g., passwords, API keys) from your submission. Thank you for taking the time to report this issue. We will respond as soon as possible._
+
 **What is the context that is prompting you to request a new feature?**
 A clear and concise description of the context.
 
