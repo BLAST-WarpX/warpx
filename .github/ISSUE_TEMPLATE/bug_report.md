@@ -1,35 +1,60 @@
 ---
 name: Bug report
-about: Found a bug? Let us know.
-title: ''
+about: Report a bug or unexpected behavior.
 labels: [bug]
-assignees: ''
 ---
 
-**What bug did you find?**
+_Please remove any sensitive information (e.g., passwords, API keys) from your submission. Thank you for taking the time to report this issue. We will respond as soon as possible._
+
+## Description
 A clear and concise description of the bug.
 
-**How to reproduce the bug**
+## Expected behavior
+What did you expect to happen when you encountered the issue?
+
+## How to reproduce
 Please provide (if available):
 - WarpX inputs files
 - PICMI Python files
 - Python post-processing scripts
 
+If you are unable to provide certain files or scripts, please describe the steps you took to encounter the issue.
+
 Please minimize your inputs/scripts to be concise and focused on the issue.
 For instance, make the simulation scripts as small and fast to run as possible.
 
-**What behavior did you expect?**
-A clear and concise description of what you expected to happen.
+## Error messages
+Please paste any relevant error messages or console output.
 
-**Tell us about your software environment**
-- operating system: [name and version]
-- version of WarpX: [e.g., latest, 24.09, etc.]
-- installed WarpX via: [e.g., conda-forge, spack, pip, brew, from source, module system, etc.]
-- HPC machine: [Are you running on an HPC cluster? We might support it already: https://warpx.readthedocs.io/en/latest/install/hpc.html]
-- other relevant dependency names and versions
+## System information
+Please check all relevant boxes and provide details.
 
-**Additional information**
-If applicable, please add other info to help explain the issue.
+- Operating System (name and version):
+  - [ ] Linux: e.g., Ubuntu 22.04 LTS
+  - [ ] macOS: e.g., macOS Monterey 12.4
+  - [ ] Windows: e.g., Windows 11 Pro
+- Version of WarpX: e.g., latest, 24.10, etc.
+- Installation method:
+  - [ ] Conda
+  - [ ] Spack
+  - [ ] PyPI
+  - [ ] Brew
+  - [ ] From source with CMake
+  - [ ] Module system on an HPC cluster
+- Other dependencies: yes/no, describe
+- Computational resources:
+  - [ ] MPI: e.g., 2 MPI processes
+  - [ ] OpenMP: e.g., 2 OpenMP threads
+  - [ ] CPU: e.g., 2 CPUs
+  - [ ] GPU: e.g., 2 GPUs (NVIDIA, AMD, etc.)
 
-**Screenshots**
-If applicable, please add screenshots to help explain the issue.
+If you encountered the issue on an HPC cluster, please check our [HPC documentation](https://warpx.readthedocs.io/en/latest/install/hpc.html) to see if your HPC cluster is already supported.
+
+## Steps taken so far
+What troubleshooting steps have you taken so far, and what were the results?
+
+Have you tried compiling and running in debug mode, following the instructions in our [debugging documentation](https://warpx.readthedocs.io/en/latest/usage/workflows/debugging.html)?
+Please specify any relevant compiler flags or environment variables that were used.
+
+## Additional information
+If applicable, please add any additional information that may help explain the issue, such as screenshots, diagrams, or other relevant details.
