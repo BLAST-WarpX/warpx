@@ -39,9 +39,9 @@ ExternalVectorPotential::ReadParameters ()
     }
 
     pp_ext_A.query("A_time_external_function(t)", m_A_ext_time_function);
-} 
+}
 
-void 
+void
 ExternalVectorPotential::AllocateLevelMFs (
     ablastr::fields::MultiFabRegister & fields,
     int lev, const BoxArray& ba, const DistributionMapping& dm,
@@ -84,7 +84,7 @@ ExternalVectorPotential::AllocateLevelMFs (
         dm, ncomps, ngEB, 0.0_rt);
 }
 
-void 
+void
 ExternalVectorPotential::InitData ()
 {
     using ablastr::fields::Direction;
@@ -130,7 +130,7 @@ ExternalVectorPotential::InitData ()
         // check if the external current parsers depend on time
         for (int i=0; i<3; i++) {
             const std::set<std::string> A_ext_symbols = m_A_external_parser[i]->symbols();
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(A_ext_symbols.count("t") == 0, 
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(A_ext_symbols.count("t") == 0,
                 "Externally Applied Vector potential time variation must be set with A_time_external_function(t)");
         }
 
@@ -214,11 +214,11 @@ ExternalVectorPotential::UpdateHybridExternalFields (const amrex::Real t, const 
     amrex::Real sf_r = m_A_time_scale(t+0.5_rt*dt);
     amrex::Real scale_factor_E = -(sf_r - sf_l)/dt;
 
-    ablastr::fields::MultiLevelVectorField A_ext = 
+    ablastr::fields::MultiLevelVectorField A_ext =
         warpx.m_fields.get_mr_levels_alldirs(FieldType::hybrid_A_fp_external, warpx.finestLevel());
-    ablastr::fields::MultiLevelVectorField B_ext = 
+    ablastr::fields::MultiLevelVectorField B_ext =
         warpx.m_fields.get_mr_levels_alldirs(FieldType::hybrid_B_fp_external, warpx.finestLevel());
-    ablastr::fields::MultiLevelVectorField E_ext = 
+    ablastr::fields::MultiLevelVectorField E_ext =
         warpx.m_fields.get_mr_levels_alldirs(FieldType::hybrid_E_fp_external, warpx.finestLevel());
 
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {

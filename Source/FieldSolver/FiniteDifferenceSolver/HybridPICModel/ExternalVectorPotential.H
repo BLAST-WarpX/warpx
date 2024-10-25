@@ -37,10 +37,10 @@ using namespace amrex;
  * time varying external vector potential, leading to external E/B
  * fields to be applied in Hybrid Solver. This class is used to break up
  * the passed in fields into a spatial and time dependent solution.
- * 
- * Eventually this can be used in a list to control independent external 
+ *
+ * Eventually this can be used in a list to control independent external
  * fields with different time profiles.
- * 
+ *
  */
 class ExternalVectorPotential
 {
@@ -56,7 +56,7 @@ protected:
     amrex::ParserExecutor<1> m_A_time_scale;
 
     bool m_read_A_from_file = false;
-    std::string m_external_file_path = ""; 
+    std::string m_external_file_path = "";
 
 public:
 
@@ -64,7 +64,7 @@ public:
     // Default Constructor
     ExternalVectorPotential ();
 
-    void ReadParameters (); 
+    void ReadParameters ();
 
     void AllocateLevelMFs (
         ablastr::fields::MultiFabRegister & fields,

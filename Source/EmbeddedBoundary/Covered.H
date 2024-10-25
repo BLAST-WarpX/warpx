@@ -94,12 +94,12 @@ public:
                             || lz(std::min(i  , lz_hi.x), std::min(j  , lz_hi.y), k)<=0
                             || lz(std::min(i  , lz_hi.x), std::max(j-1, lz_lo.y), k)<=0)) or
                 (topology==CoverTopology::face and Sy(i,j,k)<=0))
-            { 
+            {
                 is_covered = true;
             }
 #endif
             break;
-        
+
         case 2:
 #ifdef WARPX_DIM_3D
             if((topology==CoverTopology::edge and lz(i, j, k)<=0) or (topology==CoverTopology::face and Sz(i, j, k)<=0))

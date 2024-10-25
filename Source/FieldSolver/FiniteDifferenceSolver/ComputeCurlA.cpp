@@ -54,7 +54,7 @@ void FiniteDifferenceSolver::ComputeCurlA (
 //   * \brief Calculate B from the curl of A
 //   * i.e. B = curl(A) output field on B field mesh staggering
 //   *
-//   * \param[out] curlField  output of curl operation 
+//   * \param[out] curlField  output of curl operation
 //   * \param[in] field   input staggered field, should be on E/J/A mesh staggering
 //   */
 #ifdef WARPX_DIM_RZ
@@ -116,7 +116,7 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
             // Br calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
                 if (cov_ptr.isCovered(0, EB::CoverTopology::face, i, j, 0)) { return; }
-                
+
                 Real const r = rmin + i*dr; // r on nodal point (Br is nodal in r)
                 if (r != 0) { // Off-axis, regular Maxwell equations
                     Br(i, j, 0, 0) = - T_Algo::UpwardDz(At, coefs_z, n_coefs_z, i, j, 0, 0); // Mode m=0
@@ -169,7 +169,7 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
             // Jz calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
                 if (cov_ptr.isCovered(2, EB::CoverTopology::face, i, j, 0)) { return; }
-                
+
                 Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bz is cell-centered in r)
                 Bz(i, j, 0, 0) = - ( - T_Algo::UpwardDrr_over_r(At, r, dr, coefs_r, n_coefs_r, i, j, 0, 0));
                 for (int m=1 ; m<nmodes ; m++) { // Higher-order modes
@@ -260,7 +260,7 @@ void FiniteDifferenceSolver::ComputeCurlACartesian (
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
                 // Skip if this cell is fully covered by embedded boundaries
                 if (cov_ptr.isCovered(1, EB::CoverTopology::face, i, j, k)) { return; }
-                
+
                 By(i, j, k) = (
                     - T_Algo::UpwardDx(Az, coefs_x, n_coefs_x, i, j, k)
                     + T_Algo::UpwardDz(Ax, coefs_z, n_coefs_z, i, j, k)
@@ -287,4 +287,3 @@ void FiniteDifferenceSolver::ComputeCurlACartesian (
     }
 }
 #endif
-
