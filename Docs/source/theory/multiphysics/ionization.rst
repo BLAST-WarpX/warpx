@@ -56,18 +56,18 @@ where :math:`\mathrm{d}\tau` is the simulation timestep, which is divided by the
 Empirical Extension to Over-the-Barrier Regime for Hydrogen
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For hydrogen, WarpX offers the modified empirical ADK extension to the Over-the-Barrier (OTB) published in :cite:t:`mpion-zhang_empirical_2014` Eq. (8).
+For hydrogen, WarpX offers the modified empirical ADK extension to the Over-the-Barrier (OTB) published in :cite:t:`mpion-zhang_empirical_2014` Eq. (8) (note there is a typo in the paper and there should not be a minus sign in Eq. 8).
 
 .. math::
 
-    W_\mathrm{M} = \exp\left[ -\left( a_1 \frac{E^2}{E_\mathrm{b}} + a_2 \frac{E}{E_\mathrm{b}} + a_3  \right) \right] W_\mathrm{ADK}
+    W_\mathrm{M} = \exp\left[ a_1 \frac{E^2}{E_\mathrm{b}} + a_2 \frac{E}{E_\mathrm{b}} + a_3 \right] W_\mathrm{ADK}
 
 The parameters :math:`a_1` through :math:`a_3` are independent of :math:`E` and can be found in the same reference. :math:`E_\mathrm{b}` is the classical Barrier Suppresion Ionization (BSI) field strength :math:`E_\mathrm{b} = U_\mathrm{ion}^2 / (4 Z)` given here in atomic units (AU). For a detailed description of conversion between unit systems consider the book by :cite:t:`mpion-Mulser2010`.
 
 Testing
 ^^^^^^^
 
-* `Testing the field ionization module <../../../../Examples/Tests/field_ionization/README.rst>`_.
+* `Testing the field ionization module <../../../../en/latest/usage/examples/field_ionization/README.html>`_.
 
 .. bibliography::
     :keyprefix: mpion-

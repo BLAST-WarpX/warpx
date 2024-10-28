@@ -7,6 +7,7 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "Evolve/WarpXDtType.H"
+#include "Fields.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/TextMsg.H"
@@ -15,10 +16,16 @@
 #include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
+
+
 using namespace amrex;
 
 void WarpX::HybridPICEvolveFields ()
 {
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
     WARPX_PROFILE("WarpX::HybridPICEvolveFields()");
 
     // The below deposition is hard coded for a single level simulation
@@ -28,15 +35,19 @@ void WarpX::HybridPICEvolveFields ()
 
     // The particles have now been pushed to their t_{n+1} positions.
     // Perform charge deposition in component 0 of rho_fp at t_{n+1}.
-    mypc->DepositCharge(rho_fp, 0._rt);
+    mypc->DepositCharge(m_fields.get_mr_levels(FieldType::rho_fp, finest_level), 0._rt);
     // Perform current deposition at t_{n+1/2}.
-    mypc->DepositCurrent(current_fp, dt[0], -0.5_rt * dt[0]);
+    mypc->DepositCurrent(m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), dt[0], -0.5_rt * dt[0]);
 
     // Deposit cold-relativistic fluid charge and current
     if (do_fluid_species) {
         int const lev = 0;
-        myfl->DepositCharge(lev, *rho_fp[lev]);
-        myfl->DepositCurrent(lev, *current_fp[lev][0], *current_fp[lev][1], *current_fp[lev][2]);
+        myfl->DepositCharge(m_fields, *m_fields.get(FieldType::rho_fp, lev), lev);
+        myfl->DepositCurrent(m_fields,
+            *m_fields.get(FieldType::current_fp, Direction{0}, lev),
+            *m_fields.get(FieldType::current_fp, Direction{1}, lev),
+            *m_fields.get(FieldType::current_fp, Direction{2}, lev),
+            lev);
     }
 
     // Synchronize J and rho:
@@ -49,7 +60,7 @@ void WarpX::HybridPICEvolveFields ()
     // a nodal grid
     for (int lev = 0; lev <= finest_level; ++lev) {
         for (int idim = 0; idim < 3; ++idim) {
-            current_fp[lev][idim]->FillBoundary(Geom(lev).periodicity());
+            m_fields.get(FieldType::current_fp, Direction{idim}, lev)->FillBoundary(Geom(lev).periodicity());
         }
     }
 
@@ -57,11 +68,11 @@ void WarpX::HybridPICEvolveFields ()
     const int sub_steps = m_hybrid_pic_model->m_substeps;
 
     // Get the external current
-    m_hybrid_pic_model->GetCurrentExternal(m_edge_lengths);
+    m_hybrid_pic_model->GetCurrentExternal();
 
     // Reference hybrid-PIC multifabs
-    auto& rho_fp_temp = m_hybrid_pic_model->rho_fp_temp;
-    auto& current_fp_temp = m_hybrid_pic_model->current_fp_temp;
+    ablastr::fields::MultiLevelScalarField rho_fp_temp = m_fields.get_mr_levels(FieldType::hybrid_rho_fp_temp, finest_level);
+    ablastr::fields::MultiLevelVectorField current_fp_temp = m_fields.get_mr_levels_alldirs(FieldType::hybrid_current_fp_temp, finest_level);
 
     // During the above deposition the charge and current density were updated
     // so that, at this time, we have rho^{n} in rho_fp_temp, rho{n+1} in the
@@ -82,7 +93,7 @@ void WarpX::HybridPICEvolveFields ()
             MultiFab::LinComb(
                 *current_fp_temp[lev][idim],
                 0.5_rt, *current_fp_temp[lev][idim], 0,
-                0.5_rt, *current_fp[lev][idim], 0,
+                0.5_rt, *m_fields.get(FieldType::current_fp, Direction{idim}, lev), 0,
                 0, 1, current_fp_temp[lev][idim]->nGrowVect()
             );
         }
@@ -94,8 +105,11 @@ void WarpX::HybridPICEvolveFields ()
     for (int sub_step = 0; sub_step < sub_steps; sub_step++)
     {
         m_hybrid_pic_model->BfieldEvolveRK(
-            Bfield_fp, Efield_fp, current_fp_temp, rho_fp_temp,
-            m_edge_lengths, 0.5_rt/sub_steps*dt[0],
+            m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
+            m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
+            current_fp_temp, rho_fp_temp,
+            m_fields.get_mr_levels_alldirs(FieldType::edge_lengths, finest_level),
+            0.5_rt/sub_steps*dt[0],
             DtType::FirstHalf, guard_cells.ng_FieldSolver,
             WarpX::sync_nodal_points
         );
@@ -109,7 +123,7 @@ void WarpX::HybridPICEvolveFields ()
         // the result into the 0'th index of `rho_fp_temp[lev]`
         MultiFab::LinComb(
             *rho_fp_temp[lev], 0.5_rt, *rho_fp_temp[lev], 0,
-            0.5_rt, *rho_fp[lev], 0, 0, 1, rho_fp_temp[lev]->nGrowVect()
+            0.5_rt, *m_fields.get(FieldType::rho_fp, lev), 0, 0, 1, rho_fp_temp[lev]->nGrowVect()
         );
     }
 
@@ -117,8 +131,12 @@ void WarpX::HybridPICEvolveFields ()
     for (int sub_step = 0; sub_step < sub_steps; sub_step++)
     {
         m_hybrid_pic_model->BfieldEvolveRK(
-            Bfield_fp, Efield_fp, current_fp, rho_fp_temp,
-            m_edge_lengths, 0.5_rt/sub_steps*dt[0],
+            m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
+            m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
+            m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
+            rho_fp_temp,
+            m_fields.get_mr_levels_alldirs(FieldType::edge_lengths, finest_level),
+            0.5_rt/sub_steps*dt[0],
             DtType::SecondHalf, guard_cells.ng_FieldSolver,
             WarpX::sync_nodal_points
         );
@@ -136,7 +154,7 @@ void WarpX::HybridPICEvolveFields ()
             MultiFab::LinComb(
                 *current_fp_temp[lev][idim],
                 -1._rt, *current_fp_temp[lev][idim], 0,
-                2._rt, *current_fp[lev][idim], 0,
+                2._rt, *m_fields.get(FieldType::current_fp, Direction{idim}, lev), 0,
                 0, 1, current_fp_temp[lev][idim]->nGrowVect()
             );
         }
@@ -146,9 +164,15 @@ void WarpX::HybridPICEvolveFields ()
     m_hybrid_pic_model->CalculateElectronPressure();
 
     // Update the E field to t=n+1 using the extrapolated J_i^n+1 value
-    m_hybrid_pic_model->CalculateCurrentAmpere(Bfield_fp, m_edge_lengths);
+    m_hybrid_pic_model->CalculatePlasmaCurrent(
+        m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
+        m_fields.get_mr_levels_alldirs(FieldType::edge_lengths, finest_level));
     m_hybrid_pic_model->HybridPICSolveE(
-        Efield_fp, current_fp_temp, Bfield_fp, rho_fp, m_edge_lengths, false
+        m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
+        current_fp_temp,
+        m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
+        m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
+        m_fields.get_mr_levels_alldirs(FieldType::edge_lengths, finest_level), false
     );
     FillBoundaryE(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
@@ -158,10 +182,10 @@ void WarpX::HybridPICEvolveFields ()
     for (int lev = 0; lev <= finest_level; ++lev)
     {
         // copy 1 component value starting at index 0 to index 0
-        MultiFab::Copy(*rho_fp_temp[lev], *rho_fp[lev],
+        MultiFab::Copy(*rho_fp_temp[lev], *m_fields.get(FieldType::rho_fp, lev),
                         0, 0, 1, rho_fp_temp[lev]->nGrowVect());
         for (int idim = 0; idim < 3; ++idim) {
-            MultiFab::Copy(*current_fp_temp[lev][idim], *current_fp[lev][idim],
+            MultiFab::Copy(*current_fp_temp[lev][idim], *m_fields.get(FieldType::current_fp, Direction{idim}, lev),
                            0, 0, 1, current_fp_temp[lev][idim]->nGrowVect());
         }
     }
@@ -169,12 +193,14 @@ void WarpX::HybridPICEvolveFields ()
 
 void WarpX::HybridPICDepositInitialRhoAndJ ()
 {
-    auto& rho_fp_temp = m_hybrid_pic_model->rho_fp_temp;
-    auto& current_fp_temp = m_hybrid_pic_model->current_fp_temp;
+    using warpx::fields::FieldType;
+
+    ablastr::fields::MultiLevelScalarField rho_fp_temp = m_fields.get_mr_levels(FieldType::hybrid_rho_fp_temp, finest_level);
+    ablastr::fields::MultiLevelVectorField current_fp_temp = m_fields.get_mr_levels_alldirs(FieldType::hybrid_current_fp_temp, finest_level);
     mypc->DepositCharge(rho_fp_temp, 0._rt);
     mypc->DepositCurrent(current_fp_temp, dt[0], 0._rt);
-    SyncRho(rho_fp_temp, rho_cp, charge_buf);
-    SyncCurrent(current_fp_temp, current_cp, current_buf);
+    SyncRho(rho_fp_temp, m_fields.get_mr_levels(FieldType::rho_cp, finest_level), m_fields.get_mr_levels(FieldType::rho_buf, finest_level));
+    SyncCurrent("hybrid_current_fp_temp");
     for (int lev=0; lev <= finest_level; ++lev) {
         // SyncCurrent does not include a call to FillBoundary, but it is needed
         // for the hybrid-PIC solver since current values are interpolated to
@@ -183,12 +209,12 @@ void WarpX::HybridPICDepositInitialRhoAndJ ()
         current_fp_temp[lev][1]->FillBoundary(Geom(lev).periodicity());
         current_fp_temp[lev][2]->FillBoundary(Geom(lev).periodicity());
 
-        ApplyRhofieldBoundary(lev, rho_fp_temp[lev].get(), PatchType::fine);
+        ApplyRhofieldBoundary(lev, rho_fp_temp[lev], PatchType::fine);
         // Set current density at PEC boundaries, if needed.
         ApplyJfieldBoundary(
-            lev, current_fp_temp[lev][0].get(),
-            current_fp_temp[lev][1].get(),
-            current_fp_temp[lev][2].get(),
+            lev, current_fp_temp[lev][0],
+            current_fp_temp[lev][1],
+            current_fp_temp[lev][2],
             PatchType::fine
         );
     }

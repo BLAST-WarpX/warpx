@@ -21,7 +21,7 @@ from scipy.constants import epsilon_0 as eps0
 from scipy.constants import mu_0 as mu0
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 # gamma threshold to switch between the relativistic expression of
 # the kinetic energy and its Taylor expansion.
@@ -376,7 +376,9 @@ def do_analysis(single_precision=False):
         assert error[k] < tol
         print()
 
-    test_name = os.path.split(os.getcwd())[1]
-
-    checksum_rtol = 2e-9 if single_precision else 1e-9
-    checksumAPI.evaluate_checksum(test_name, fn, rtol=checksum_rtol)
+    # compare checksums
+    evaluate_checksum(
+        test_name=os.path.split(os.getcwd())[1],
+        output_file=sys.argv[1],
+        rtol=1e-9,
+    )

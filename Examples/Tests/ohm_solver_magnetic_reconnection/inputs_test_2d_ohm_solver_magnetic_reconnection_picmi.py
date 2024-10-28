@@ -303,7 +303,7 @@ class ForceFreeSheetReconnection(object):
 
         rho = fields.RhoFPWrapper(include_ghosts=False)[:, :]
         Jiy = fields.JyFPWrapper(include_ghosts=False)[...] / self.J0
-        Jy = fields.JyFPAmpereWrapper(include_ghosts=False)[...] / self.J0
+        Jy = fields.JyFPPlasmaWrapper(include_ghosts=False)[...] / self.J0
         Bx = fields.BxFPWrapper(include_ghosts=False)[...] / self.B0
         By = fields.ByFPWrapper(include_ghosts=False)[...] / self.B0
         Bz = fields.BzFPWrapper(include_ghosts=False)[...] / self.B0

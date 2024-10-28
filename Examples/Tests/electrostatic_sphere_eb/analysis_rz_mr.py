@@ -19,7 +19,7 @@ import numpy as np
 from openpmd_viewer import OpenPMDTimeSeries
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 tolerance = 0.004
 print(f"tolerance = {tolerance}")
@@ -110,5 +110,9 @@ nlevels = 0 if level_fields == [] else int(level_fields[-1][-1])
 for level in range(nlevels + 1):
     get_error_per_lev(ts, level)
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn, output_format="openpmd")
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+    output_format="openpmd",
+)

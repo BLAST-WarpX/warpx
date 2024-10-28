@@ -11,7 +11,7 @@
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
-#include "FieldSolver/Fields.H"
+#include "Fields.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "Parallelization/GuardCellManager.H"
 #include "Particles/MultiParticleContainer.H"
@@ -73,7 +73,10 @@ WarpX::SetElectricFieldAndApplyBCs ( const WarpXSolverVec&  a_E )
         a_E.getArrayVecType()==warpx::fields::FieldType::Efield_fp,
         "WarpX::SetElectricFieldAndApplyBCs() must be called with Efield_fp type");
 
-    const amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > >& Evec = a_E.getArrayVec();
+    using warpx::fields::FieldType;
+
+    ablastr::fields::MultiLevelVectorField Efield_fp = m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level);
+    const ablastr::fields::MultiLevelVectorField& Evec = a_E.getArrayVec();
     amrex::MultiFab::Copy(*Efield_fp[0][0], *Evec[0][0], 0, 0, ncomps, Evec[0][0]->nGrowVect());
     amrex::MultiFab::Copy(*Efield_fp[0][1], *Evec[0][1], 0, 0, ncomps, Evec[0][1]->nGrowVect());
     amrex::MultiFab::Copy(*Efield_fp[0][2], *Evec[0][2], 0, 0, ncomps, Evec[0][2]->nGrowVect());
@@ -82,21 +85,29 @@ WarpX::SetElectricFieldAndApplyBCs ( const WarpXSolverVec&  a_E )
 }
 
 void
-WarpX::UpdateMagneticFieldAndApplyBCs( const amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > >&  a_Bn,
-                            amrex::Real                                                         a_thetadt )
+WarpX::UpdateMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField const&  a_Bn,
+                                       amrex::Real                                    a_thetadt )
 {
-    amrex::MultiFab::Copy(*Bfield_fp[0][0], *a_Bn[0][0], 0, 0, ncomps, a_Bn[0][0]->nGrowVect());
-    amrex::MultiFab::Copy(*Bfield_fp[0][1], *a_Bn[0][1], 0, 0, ncomps, a_Bn[0][1]->nGrowVect());
-    amrex::MultiFab::Copy(*Bfield_fp[0][2], *a_Bn[0][2], 0, 0, ncomps, a_Bn[0][2]->nGrowVect());
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        ablastr::fields::VectorField Bfp = m_fields.get_alldirs(FieldType::Bfield_fp, lev);
+        amrex::MultiFab::Copy(*Bfp[0], *a_Bn[lev][0], 0, 0, ncomps, a_Bn[lev][0]->nGrowVect());
+        amrex::MultiFab::Copy(*Bfp[1], *a_Bn[lev][1], 0, 0, ncomps, a_Bn[lev][1]->nGrowVect());
+        amrex::MultiFab::Copy(*Bfp[2], *a_Bn[lev][2], 0, 0, ncomps, a_Bn[lev][2]->nGrowVect());
+    }
     EvolveB(a_thetadt, DtType::Full);
     ApplyMagneticFieldBCs();
 }
 
 void
-WarpX::FinishMagneticFieldAndApplyBCs( const amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > >&  a_Bn,
-                            amrex::Real                                                         a_theta )
+WarpX::FinishMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField const&  a_Bn,
+                                       amrex::Real                                    a_theta )
 {
-    FinishImplicitField(Bfield_fp, a_Bn, a_theta);
+    using warpx::fields::FieldType;
+
+    FinishImplicitField(m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, 0), a_Bn, a_theta);
     ApplyMagneticFieldBCs();
 }
 
@@ -248,9 +259,9 @@ WarpX::FinishImplicitParticleUpdate ()
 }
 
 void
-WarpX::FinishImplicitField( amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > >& Field_fp,
-                      const amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > >& Field_n,
-                      amrex::Real theta )
+WarpX::FinishImplicitField( ablastr::fields::MultiLevelVectorField const&  Field_fp,
+                            ablastr::fields::MultiLevelVectorField const&  Field_n,
+                            amrex::Real  theta )
 {
     using namespace amrex::literals;
 
@@ -335,15 +346,17 @@ WarpX::ImplicitComputeRHSE (int lev, PatchType patch_type, amrex::Real a_dt, War
     // a_Erhs_vec storing only the RHS of the update equation. I.e.,
     // c^2*dt*(curl(B^{n+theta} - mu0*J^{n+1/2})
     if (patch_type == PatchType::fine) {
-        m_fdtd_solver_fp[lev]->EvolveE( a_Erhs_vec.getArrayVec()[lev], Bfield_fp[lev],
-                                        current_fp[lev], m_edge_lengths[lev],
-                                        m_face_areas[lev], ECTRhofield[lev],
-                                        F_fp[lev], lev, a_dt );
+        m_fdtd_solver_fp[lev]->EvolveE( m_fields,
+                                        lev,
+                                        patch_type,
+                                        a_Erhs_vec.getArrayVec()[lev],
+                                        a_dt );
     } else {
-        m_fdtd_solver_cp[lev]->EvolveE( a_Erhs_vec.getArrayVec()[lev], Bfield_cp[lev],
-                                        current_cp[lev], m_edge_lengths[lev],
-                                        m_face_areas[lev], ECTRhofield[lev],
-                                        F_cp[lev], lev, a_dt );
+        m_fdtd_solver_cp[lev]->EvolveE( m_fields,
+                                        lev,
+                                        patch_type,
+                                        a_Erhs_vec.getArrayVec()[lev],
+                                        a_dt );
     }
 
     // Compute Efield_rhs in PML cells by calling EvolveEPML

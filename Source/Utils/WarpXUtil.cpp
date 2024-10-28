@@ -14,6 +14,7 @@
 #include "WarpXProfilerWrapper.H"
 #include "WarpXUtil.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX.H>
@@ -139,6 +140,43 @@ void ReadBoostedFrameParameters(Real& gamma_boost, Real& beta_boost,
     }
 }
 
+void ReadMovingWindowParameters(
+    int& do_moving_window, int& start_moving_window_step, int& end_moving_window_step,
+    int& moving_window_dir, amrex::Real& moving_window_v)
+{
+    const ParmParse pp_warpx("warpx");
+    pp_warpx.query("do_moving_window", do_moving_window);
+    if (do_moving_window) {
+        utils::parser::queryWithParser(
+            pp_warpx, "start_moving_window_step", start_moving_window_step);
+        utils::parser::queryWithParser(
+            pp_warpx, "end_moving_window_step", end_moving_window_step);
+        std::string s;
+        pp_warpx.get("moving_window_dir", s);
+
+        if (s == "z" || s == "Z") {
+            moving_window_dir = WARPX_ZINDEX;
+        }
+#if defined(WARPX_DIM_3D)
+        else if (s == "y" || s == "Y") {
+            moving_window_dir = 1;
+        }
+#endif
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_3D)
+        else if (s == "x" || s == "X") {
+            moving_window_dir = 0;
+        }
+#endif
+        else {
+            WARPX_ABORT_WITH_MESSAGE("Unknown moving_window_dir: "+s);
+        }
+
+        utils::parser::getWithParser(
+            pp_warpx, "moving_window_v", moving_window_v);
+        moving_window_v *= PhysConst::c;
+    }
+}
+
 void ConvertLabParamsToBoost()
 {
     Real gamma_boost = 1., beta_boost = 0.;
@@ -195,8 +233,11 @@ void ConvertLabParamsToBoost()
     {
         if (boost_direction[dim_map[idim]]) {
             amrex::Real convert_factor;
-            // Assume that the window travels with speed +c
-            convert_factor = 1._rt/( gamma_boost * ( 1 - beta_boost ) );
+            amrex::Real beta_window = beta_boost;
+            if (WarpX::do_moving_window && idim == WarpX::moving_window_dir) {
+                beta_window = WarpX::moving_window_v / PhysConst::c;
+            }
+            convert_factor = 1._rt/( gamma_boost * ( 1 - beta_boost * beta_window ) );
             prob_lo[idim] *= convert_factor;
             prob_hi[idim] *= convert_factor;
             if (max_level > 0){
@@ -221,16 +262,18 @@ void ConvertLabParamsToBoost()
 
 }
 
-/* \brief Function that sets the value of MultiFab MF to zero for z between
- * zmin and zmax.
- */
-void NullifyMF(amrex::MultiFab& mf, int lev, amrex::Real zmin, amrex::Real zmax){
-    WARPX_PROFILE("WarpXUtil::NullifyMF()");
-    int const ncomp = mf.nComp();
+void NullifyMFinstance (
+    amrex::MultiFab *mf,
+    int lev,
+    amrex::Real zmin,
+    amrex::Real zmax
+)
+{
+    int const ncomp = mf->nComp();
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-    for(amrex::MFIter mfi(mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi){
+    for(amrex::MFIter mfi(*mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi){
         const amrex::Box& bx = mfi.tilebox();
         // Get box lower and upper physical z bound, and dz
         const amrex::Real zmin_box = WarpX::LowerCorner(bx, lev, 0._rt).z;
@@ -246,7 +289,7 @@ void NullifyMF(amrex::MultiFab& mf, int lev, amrex::Real zmin, amrex::Real zmax)
 #endif
         // Check if box intersect with [zmin, zmax]
         if ( (zmax>zmin_box && zmin<=zmax_box) ){
-            const Array4<Real> arr = mf[mfi].array();
+            const Array4<Real> arr = (*mf)[mfi].array();
             // Set field to 0 between zmin and zmax
             ParallelFor(bx, ncomp,
                 [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept{
@@ -264,6 +307,39 @@ void NullifyMF(amrex::MultiFab& mf, int lev, amrex::Real zmin, amrex::Real zmax)
             );
         }
     }
+}
+
+void NullifyMF (
+    ablastr::fields::MultiFabRegister& multifab_map,
+    std::string const& mf_name,
+    int lev,
+    amrex::Real zmin,
+    amrex::Real zmax
+)
+{
+    WARPX_PROFILE("WarpXUtil::NullifyMF()");
+    if (!multifab_map.has(mf_name, lev)) { return; }
+
+    auto * mf = multifab_map.get(mf_name, lev);
+
+    NullifyMFinstance ( mf, lev, zmin, zmax);
+}
+
+void NullifyMF (
+    ablastr::fields::MultiFabRegister& multifab_map,
+    std::string const& mf_name,
+    ablastr::fields::Direction dir,
+    int lev,
+    amrex::Real zmin,
+    amrex::Real zmax
+)
+{
+    WARPX_PROFILE("WarpXUtil::NullifyMF()");
+    if (!multifab_map.has(mf_name, dir, lev)) { return; }
+
+    auto * mf = multifab_map.get(mf_name, dir, lev);
+
+    NullifyMFinstance ( mf, lev, zmin, zmax);
 }
 
 namespace WarpXUtilIO{

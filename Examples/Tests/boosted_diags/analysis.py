@@ -27,7 +27,7 @@ from openpmd_viewer import OpenPMDTimeSeries
 yt.funcs.mylog.setLevel(0)
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 filename = sys.argv[1]
 
@@ -56,5 +56,8 @@ ts = OpenPMDTimeSeries("./diags/diag2/")
 (w,) = ts.get_particle(["w"], species="beam", iteration=3)
 assert (400 < len(w)) & (len(w) < 600)
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

@@ -6,7 +6,7 @@ export MY_PROFILE=$(cd $(dirname $BASH_SOURCE) && pwd)"/"$(basename $BASH_SOURCE
 if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your $MY_PROFILE file! Please edit its line 2 to continue!"; return; fi
 
 # required dependencies
-module load cmake/3.22.1  # we need 3.24+ - installing via pipx until module is available
+module load cmake/3.30.2
 module load gcc/11.2.0
 module load cuda/11.7.1
 module load openmpi/4.1.2/gcc.11.2.0

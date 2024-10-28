@@ -259,7 +259,7 @@ if __name__ == "__main__":
         "-d",
         "--diag_dir",
         type=str,
-        default="./diags/diag1",
+        default="./diags/diagInst",
         help="Directory containing density and field diagnostics",
     )
     parser.add_argument(

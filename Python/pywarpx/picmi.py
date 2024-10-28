@@ -1522,8 +1522,7 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
         # --- Same method names are used, though mapped to lower case.
         pywarpx.algo.maxwell_solver = self.method
 
-        if self.cfl is not None:
-            pywarpx.warpx.cfl = self.cfl
+        pywarpx.warpx.cfl = self.cfl
 
         if self.source_smoother is not None:
             self.source_smoother.smoother_initialize_inputs(self)
@@ -1880,6 +1879,16 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
 
     warpx_self_fields_verbosity: integer, default=2
         Level of verbosity for the lab frame solver
+
+    warpx_dt_update_interval: string, optional (default = -1)
+        How frequently the timestep is updated. Adaptive timestepping is disabled when this is <= 0.
+
+    warpx_cfl: float, optional
+        Fraction of the CFL condition for particle velocity vs grid size, used to set the timestep when `dt_update_interval > 0`.
+
+    warpx_max_dt: float, optional
+        The maximum allowable timestep when `dt_update_interval > 0`.
+
     """
 
     def init(self, kw):
@@ -1887,12 +1896,20 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         self.absolute_tolerance = kw.pop("warpx_absolute_tolerance", None)
         self.self_fields_verbosity = kw.pop("warpx_self_fields_verbosity", None)
         self.magnetostatic = kw.pop("warpx_magnetostatic", False)
+        self.cfl = kw.pop("warpx_cfl", None)
+        self.dt_update_interval = kw.pop("dt_update_interval", None)
+        self.max_dt = kw.pop("warpx_max_dt", None)
 
     def solver_initialize_inputs(self):
         # Open BC means FieldBoundaryType::Open for electrostatic sims, rather than perfectly-matched layer
         BC_map["open"] = "open"
 
         self.grid.grid_initialize_inputs()
+
+        # set adaptive timestepping parameters
+        pywarpx.warpx.cfl = self.cfl
+        pywarpx.warpx.dt_update_interval = self.dt_update_interval
+        pywarpx.warpx.max_dt = self.max_dt
 
         if self.relativistic:
             pywarpx.warpx.do_electrostatic = "relativistic"
@@ -3254,6 +3271,57 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
 ElectrostaticFieldDiagnostic = FieldDiagnostic
 
 
+class TimeAveragedFieldDiagnostic(FieldDiagnostic):
+    """
+    See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
+
+    Parameters
+    ----------
+    warpx_time_average_mode: str
+        Type of time averaging diagnostic
+        Supported values include ``"none"``, ``"fixed_start"``, and ``"dynamic_start"``
+
+            * ``"none"`` for no averaging (instantaneous fields)
+            * ``"fixed_start"`` for a diagnostic that averages all fields between the current output step and a fixed point in time
+            * ``"dynamic_start"`` for a constant averaging period and output at different points in time (non-overlapping)
+
+    warpx_average_period_steps: int, optional
+        Configures the number of time steps in an averaging period.
+        Set this only in the ``"dynamic_start"`` mode and only if ``warpx_average_period_time`` has not already been set.
+        Will be ignored in the ``"fixed_start"`` mode (with warning).
+
+    warpx_average_period_time: float, optional
+        Configures the time (SI units) in an averaging period.
+        Set this only in the ``"dynamic_start"`` mode and only if ``average_period_steps`` has not already been set.
+        Will be ignored in the ``"fixed_start"`` mode (with warning).
+
+    warpx_average_start_steps: int, optional
+        Configures the time step at which time-averaging begins.
+        Set this only in the ``"fixed_start"`` mode.
+        Will be ignored in the ``"dynamic_start"`` mode (with warning).
+    """
+
+    def init(self, kw):
+        super().init(kw)
+        self.time_average_mode = kw.pop("warpx_time_average_mode", None)
+        self.average_period_steps = kw.pop("warpx_average_period_steps", None)
+        self.average_period_time = kw.pop("warpx_average_period_time", None)
+        self.average_start_step = kw.pop("warpx_average_start_step", None)
+
+    def diagnostic_initialize_inputs(self):
+        super().diagnostic_initialize_inputs()
+
+        self.diagnostic.set_or_replace_attr("diag_type", "TimeAveraged")
+
+        if "write_species" not in self.diagnostic.argvattrs:
+            self.diagnostic.write_species = False
+
+        self.diagnostic.time_average_mode = self.time_average_mode
+        self.diagnostic.average_period_steps = self.average_period_steps
+        self.diagnostic.average_period_time = self.average_period_time
+        self.diagnostic.average_start_step = self.average_start_step
+
+
 class Checkpoint(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
     """
     Sets up checkpointing of the simulation, allowing for later restarts
@@ -3890,6 +3958,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
             "ParticleNumber",
             "LoadBalanceCosts",
             "LoadBalanceEfficiency",
+            "Timestep",
         ]
         # The species diagnostics require a species to be provided
         self._species_reduced_diagnostics = [

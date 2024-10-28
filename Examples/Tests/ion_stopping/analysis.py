@@ -19,7 +19,7 @@ import yt
 from scipy.constants import e, epsilon_0, k, m_e, m_p
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 # Define constants using the WarpX names for the evals below
 q_e = e
@@ -194,5 +194,8 @@ assert np.all(error2 < tolerance)
 assert np.all(error3 < tolerance)
 assert np.all(error4 < tolerance)
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, last_filename)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

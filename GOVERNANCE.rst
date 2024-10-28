@@ -16,7 +16,7 @@ Current Roster
 - Remi Lehe
 - Axel Huebl
 
-See: `GitHub team <https://github.com/orgs/ECP-WarpX/teams/warpx-admins>`__
+See: `GitHub team <https://github.com/orgs/ECP-WarpX/teams/warpx-steering-committee>`__
 
 Role
 ^^^^
@@ -66,7 +66,7 @@ Current Roster
 - Weiqun Zhang
 - Edoardo Zoni
 
-See: `GitHub team <https://github.com/orgs/ECP-WarpX/teams/warpx-push-merge-write>`__
+See: `GitHub team <https://github.com/orgs/ECP-WarpX/teams/warpx-technical-committee>`__
 
 Role
 ^^^^

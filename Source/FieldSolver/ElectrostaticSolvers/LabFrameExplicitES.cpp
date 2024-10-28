@@ -9,6 +9,7 @@
 #include "LabFrameExplicitES.H"
 #include "Fluids/MultiFluidContainer_fwd.H"
 #include "EmbeddedBoundary/Enabled.H"
+#include "Fields.H"
 #include "Particles/MultiParticleContainer_fwd.H"
 #include "Python/callbacks.H"
 #include "WarpX.H"
@@ -21,35 +22,35 @@ void LabFrameExplicitES::InitData() {
 }
 
 void LabFrameExplicitES::ComputeSpaceChargeField (
-    amrex::Vector< std::unique_ptr<amrex::MultiFab> >& rho_fp,
-    amrex::Vector< std::unique_ptr<amrex::MultiFab> >& rho_cp,
-    amrex::Vector< std::unique_ptr<amrex::MultiFab> >& charge_buf,
-    amrex::Vector< std::unique_ptr<amrex::MultiFab> >& phi_fp,
+    ablastr::fields::MultiFabRegister& fields,
     MultiParticleContainer& mpc,
     MultiFluidContainer* mfl,
-    amrex::Vector< std::array< std::unique_ptr<amrex::MultiFab>, 3> >& Efield_fp,
-    amrex::Vector< std::array< std::unique_ptr<amrex::MultiFab>, 3> >& /*Bfield_fp*/
-) {
+    int max_level)
+{
+    using ablastr::fields::MultiLevelScalarField;
+    using ablastr::fields::MultiLevelVectorField;
+    using warpx::fields::FieldType;
+
+    const MultiLevelScalarField rho_fp = fields.get_mr_levels(FieldType::rho_fp, max_level);
+    const MultiLevelScalarField rho_cp = fields.get_mr_levels(FieldType::rho_cp, max_level);
+    const MultiLevelScalarField phi_fp = fields.get_mr_levels(FieldType::phi_fp, max_level);
+    const MultiLevelVectorField Efield_fp = fields.get_mr_levels_alldirs(FieldType::Efield_fp, max_level);
+
     mpc.DepositCharge(rho_fp, 0.0_rt);
     if (mfl) {
         const int lev = 0;
-        mfl->DepositCharge(lev, *rho_fp[lev]);
+        mfl->DepositCharge(fields, *rho_fp[lev], lev);
     }
 
+    // Apply filter, perform MPI exchange, interpolate across levels
+    const Vector<std::unique_ptr<MultiFab> > rho_buf(num_levels);
     auto & warpx = WarpX::GetInstance();
-    for (int lev = 0; lev < num_levels; lev++) {
-        if (lev > 0) {
-            if (charge_buf[lev]) {
-                charge_buf[lev]->setVal(0.);
-            }
-        }
-    }
-    warpx.SyncRho(rho_fp, rho_cp, charge_buf); // Apply filter, perform MPI exchange, interpolate across levels
+    warpx.SyncRho( rho_fp, rho_cp, amrex::GetVecOfPtrs(rho_buf) );
 
 #ifndef WARPX_DIM_RZ
     for (int lev = 0; lev < num_levels; lev++) {
         // Reflect density over PEC boundaries, if needed.
-        warpx.ApplyRhofieldBoundary(lev, rho_fp[lev].get(), PatchType::fine);
+        warpx.ApplyRhofieldBoundary(lev, rho_fp[lev], PatchType::fine);
     }
 #endif
     // beta is zero in lab frame
@@ -94,8 +95,8 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
    \param[out] phi The potential to be computed by this function
 */
 void LabFrameExplicitES::computePhiTriDiagonal (
-    const amrex::Vector<std::unique_ptr<amrex::MultiFab> >& rho,
-    amrex::Vector<std::unique_ptr<amrex::MultiFab> >& phi)
+    const ablastr::fields::MultiLevelScalarField& rho,
+    const ablastr::fields::MultiLevelScalarField& phi)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(num_levels == 1,
     "The tridiagonal solver cannot be used with mesh refinement");

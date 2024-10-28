@@ -30,7 +30,7 @@ import post_processing_utils
 from scipy.constants import c, e, epsilon_0, m_e
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 # this will be the name of the plot file
 fn = sys.argv[1]
@@ -183,4 +183,8 @@ post_processing_utils.check_random_filter(
     fn, random_filter_fn, random_fraction, dim, species_name
 )
 
-checksumAPI.evaluate_checksum(test_name, fn)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

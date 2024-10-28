@@ -12,9 +12,9 @@ import sys
 import yt
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
 import numpy as np
 import scipy.constants as scc
+from checksumAPI import evaluate_checksum
 
 ## This script performs various checks for the fusion module. The simulation
 ## that we check is made of 2 different tests, each with different reactant and product species.
@@ -555,8 +555,11 @@ def main():
     rho_end = field_data_end["rho"].to_ndarray()
     check_charge_conservation(rho_start, rho_end)
 
-    test_name = os.path.split(os.getcwd())[1]
-    checksumAPI.evaluate_checksum(test_name, filename_end)
+    # compare checksums
+    evaluate_checksum(
+        test_name=os.path.split(os.getcwd())[1],
+        output_file=sys.argv[1],
+    )
 
 
 if __name__ == "__main__":

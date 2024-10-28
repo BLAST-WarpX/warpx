@@ -8,10 +8,9 @@ import os
 import sys
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
-
 # Check reduced diagnostics for charge on EB
 import numpy as np
+from checksumAPI import evaluate_checksum
 from scipy.constants import epsilon_0
 
 # Theoretical charge on the embedded boundary, for sphere at potential phi_0
@@ -29,6 +28,8 @@ data_eighth = np.loadtxt("diags/reducedfiles/eb_charge_one_eighth.txt")
 q_sim_eighth = data_eighth[1, 2]
 assert abs((q_sim_eighth - q_th / 8) / (q_th / 8)) < 0.06
 
-filename = sys.argv[1]
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

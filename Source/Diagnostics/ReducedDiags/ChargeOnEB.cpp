@@ -9,7 +9,7 @@
 
 #include "Diagnostics/ReducedDiags/ReducedDiags.H"
 #include "EmbeddedBoundary/Enabled.H"
-#include "FieldSolver/Fields.H"
+#include "Fields.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/Parser/ParserUtils.H"
@@ -29,7 +29,6 @@
 #include <vector>
 
 using namespace amrex;
-using namespace warpx::fields;
 
 
 // constructor
@@ -97,6 +96,8 @@ void ChargeOnEB::ComputeDiags (const int step)
         throw std::runtime_error("ChargeOnEB::ComputeDiags only works when EBs are enabled at runtime");
     }
 #if ((defined WARPX_DIM_3D) && (defined AMREX_USE_EB))
+    using ablastr::fields::Direction;
+
     // get a reference to WarpX instance
     auto & warpx = WarpX::GetInstance();
 
@@ -104,9 +105,10 @@ void ChargeOnEB::ComputeDiags (const int step)
     int const lev = 0;
 
     // get MultiFab data at lev
-    const amrex::MultiFab & Ex = warpx.getField(FieldType::Efield_fp, lev,0);
-    const amrex::MultiFab & Ey = warpx.getField(FieldType::Efield_fp, lev,1);
-    const amrex::MultiFab & Ez = warpx.getField(FieldType::Efield_fp, lev,2);
+    using warpx::fields::FieldType;
+    const amrex::MultiFab & Ex = *warpx.m_fields.get(FieldType::Efield_fp, Direction{0}, lev);
+    const amrex::MultiFab & Ey = *warpx.m_fields.get(FieldType::Efield_fp, Direction{1}, lev);
+    const amrex::MultiFab & Ez = *warpx.m_fields.get(FieldType::Efield_fp, Direction{2}, lev);
 
     // get EB structures
     amrex::EBFArrayBoxFactory const& eb_box_factory = warpx.fieldEBFactory(lev);

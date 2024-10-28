@@ -142,8 +142,10 @@ SpectralSolverRZ::pushSpectralFields (const bool doing_pml) {
   */
 void
 SpectralSolverRZ::ComputeSpectralDivE (const int lev,
-                                       const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
-                                       amrex::MultiFab& divE) {
+                                       ablastr::fields::VectorField const & Efield,
+                                       amrex::MultiFab& divE
+)
+{
     algorithm->ComputeSpectralDivE(lev, field_data, Efield, divE);
 }
 

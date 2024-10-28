@@ -9,6 +9,7 @@
  */
 #include "PlasmaInjector.H"
 
+#include "EmbeddedBoundary/Enabled.H"
 #include "Initialization/GetTemperature.H"
 #include "Initialization/GetVelocity.H"
 #include "Initialization/InjectorDensity.H"
@@ -303,50 +304,65 @@ void PlasmaInjector::setupNFluxPerCell (amrex::ParmParse const& pp_species)
         "(Please visit PR#765 for more information.)");
     }
 #endif
-    utils::parser::getWithParser(pp_species, source_name, "surface_flux_pos", surface_flux_pos);
-    utils::parser::queryWithParser(pp_species, source_name, "flux_tmin", flux_tmin);
-    utils::parser::queryWithParser(pp_species, source_name, "flux_tmax", flux_tmax);
-    std::string flux_normal_axis_string;
-    utils::parser::get(pp_species, source_name, "flux_normal_axis", flux_normal_axis_string);
-    flux_normal_axis = -1;
+
+    // Check whether injection from the embedded boundary is requested
+    utils::parser::queryWithParser(pp_species, source_name, "inject_from_embedded_boundary", m_inject_from_eb);
+    if (m_inject_from_eb) {
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE( EB::enabled(),
+            "Error: Embedded boundary injection is only available when "
+            "embedded boundaries are enabled.");
+        flux_normal_axis = 2; // Interpret z as the normal direction to the EB
+        flux_direction = 1;
+    } else {
+        // Injection is through a plane in this case.
+        // Parse the parameters of the plane (position, normal direction, etc.)
+
+        utils::parser::getWithParser(pp_species, source_name, "surface_flux_pos", surface_flux_pos);
+        utils::parser::queryWithParser(pp_species, source_name, "flux_tmin", flux_tmin);
+        utils::parser::queryWithParser(pp_species, source_name, "flux_tmax", flux_tmax);
+        std::string flux_normal_axis_string;
+        utils::parser::get(pp_species, source_name, "flux_normal_axis", flux_normal_axis_string);
+        flux_normal_axis = -1;
 #ifdef WARPX_DIM_RZ
-    if      (flux_normal_axis_string == "r" || flux_normal_axis_string == "R") {
-        flux_normal_axis = 0;
-    }
-    if      (flux_normal_axis_string == "t" || flux_normal_axis_string == "T") {
-        flux_normal_axis = 1;
-    }
+        if      (flux_normal_axis_string == "r" || flux_normal_axis_string == "R") {
+            flux_normal_axis = 0;
+        }
+        if      (flux_normal_axis_string == "t" || flux_normal_axis_string == "T") {
+            flux_normal_axis = 1;
+        }
 #else
 #    ifndef WARPX_DIM_1D_Z
-    if      (flux_normal_axis_string == "x" || flux_normal_axis_string == "X") {
-        flux_normal_axis = 0;
-    }
+        if      (flux_normal_axis_string == "x" || flux_normal_axis_string == "X") {
+            flux_normal_axis = 0;
+        }
 #    endif
 #endif
 #ifdef WARPX_DIM_3D
-    if (flux_normal_axis_string == "y" || flux_normal_axis_string == "Y") {
-        flux_normal_axis = 1;
-    }
+        if (flux_normal_axis_string == "y" || flux_normal_axis_string == "Y") {
+            flux_normal_axis = 1;
+        }
 #endif
-    if (flux_normal_axis_string == "z" || flux_normal_axis_string == "Z") {
-        flux_normal_axis = 2;
-    }
+        if (flux_normal_axis_string == "z" || flux_normal_axis_string == "Z") {
+            flux_normal_axis = 2;
+        }
 #ifdef WARPX_DIM_3D
-    const std::string flux_normal_axis_help = "'x', 'y', or 'z'.";
+        const std::string flux_normal_axis_help = "'x', 'y', or 'z'.";
 #else
 #    ifdef WARPX_DIM_RZ
-    const std::string flux_normal_axis_help = "'r' or 'z'.";
+        const std::string flux_normal_axis_help = "'r' or 'z'.";
 #    elif WARPX_DIM_XZ
-    const std::string flux_normal_axis_help = "'x' or 'z'.";
+        const std::string flux_normal_axis_help = "'x' or 'z'.";
 #    else
-    const std::string flux_normal_axis_help = "'z'.";
+        const std::string flux_normal_axis_help = "'z'.";
 #    endif
-#endif
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(flux_normal_axis >= 0,
-        "Error: Invalid value for flux_normal_axis. It must be " + flux_normal_axis_help);
-    utils::parser::getWithParser(pp_species, source_name, "flux_direction", flux_direction);
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(flux_direction == +1 || flux_direction == -1,
-        "Error: flux_direction must be -1 or +1.");
+    #endif
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(flux_normal_axis >= 0,
+            "Error: Invalid value for flux_normal_axis. It must be " + flux_normal_axis_help);
+        utils::parser::getWithParser(pp_species, source_name, "flux_direction", flux_direction);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(flux_direction == +1 || flux_direction == -1,
+            "Error: flux_direction must be -1 or +1.");
+    }
+
     // Construct InjectorPosition with InjectorPositionRandom.
     h_flux_pos = std::make_unique<InjectorPosition>(
         (InjectorPositionRandomPlane*)nullptr,

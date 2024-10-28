@@ -23,7 +23,7 @@ import numpy as np
 import yt
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 tolerance = 1.0e-8
 r0 = 0.12402005
@@ -41,5 +41,8 @@ print("error = ", error)
 print("tolerance = ", tolerance)
 assert error < tolerance
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

@@ -28,7 +28,7 @@ import yt
 from openpmd_viewer import OpenPMDTimeSeries
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 tolerance = 0
 
@@ -83,6 +83,9 @@ assert np.all(
     np.sort(id_initial) == np.sort(id_final)
 )  # Sort because particles may not be in the same order
 
-# Checksum test
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn, do_particles=False)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+    do_particles=False,
+)

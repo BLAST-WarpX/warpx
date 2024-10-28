@@ -56,15 +56,14 @@ First, make sure you are in the root directory of WarpX's source and install the
 
 .. code-block:: sh
 
-    python3 -m pip install -r Docs/requirements.txt
+    cd Docs/
+    python3 -m pip install -r requirements.txt
 
 You will also need Doxygen (macOS: ``brew install doxygen``; Ubuntu: ``sudo apt install doxygen``).
 
-Then, to compile the documentation, use
+Still in the ``Docs/`` directory, compile the documentation via
 
 .. code-block:: sh
-
-    cd Docs/
 
     make html
     # This will first compile the Doxygen documentation (execute doxygen)

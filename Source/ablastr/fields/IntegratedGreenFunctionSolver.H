@@ -7,6 +7,8 @@
 #ifndef ABLASTR_IGF_SOLVER_H
 #define ABLASTR_IGF_SOLVER_H
 
+#include <ablastr/constant.H>
+
 #include <AMReX_BoxArray.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_MultiFab.H>
@@ -45,6 +47,35 @@ namespace ablastr::fields
             + x*z*std::asinh( y/std::sqrt(x*x + z*z) )
             + x*y*std::asinh( z/std::sqrt(x*x + y*y) );
         return G;
+    }
+
+    /** @brief add
+     *
+     * @param[in] x x-coordinate of given location
+     * @param[in] y y-coordinate of given location
+     * @param[in] z z-coordinate of given location
+     *
+     * @return the sum of integrated Green function G
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    amrex::Real
+    SumOfIntegratedPotential (amrex::Real x, amrex::Real y, amrex::Real z, amrex::Real dx, amrex::Real dy, amrex::Real dz)
+    {
+        using namespace amrex::literals;
+
+
+        amrex::Real const G_value = 1._rt/(4._rt*ablastr::constant::math::pi*ablastr::constant::SI::ep0) * (
+            IntegratedPotential( x+0.5_rt*dx, y+0.5_rt*dy, z+0.5_rt*dz )
+          - IntegratedPotential( x-0.5_rt*dx, y+0.5_rt*dy, z+0.5_rt*dz )
+          - IntegratedPotential( x+0.5_rt*dx, y-0.5_rt*dy, z+0.5_rt*dz )
+          + IntegratedPotential( x-0.5_rt*dx, y-0.5_rt*dy, z+0.5_rt*dz )
+          - IntegratedPotential( x+0.5_rt*dx, y+0.5_rt*dy, z-0.5_rt*dz )
+          + IntegratedPotential( x-0.5_rt*dx, y+0.5_rt*dy, z-0.5_rt*dz )
+          + IntegratedPotential( x+0.5_rt*dx, y-0.5_rt*dy, z-0.5_rt*dz )
+          - IntegratedPotential( x-0.5_rt*dx, y-0.5_rt*dy, z-0.5_rt*dz )
+        );
+
+        return G_value;
     }
 
     /** @brief Compute the electrostatic potential using the Integrated Green Function method

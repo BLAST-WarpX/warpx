@@ -19,7 +19,7 @@ import scipy.constants as sc
 import yt
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 e = sc.e
 pi = sc.pi
@@ -64,5 +64,8 @@ print(f"error = {error}")
 print(f"tolerance = {tolerance}")
 assert error < tolerance
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

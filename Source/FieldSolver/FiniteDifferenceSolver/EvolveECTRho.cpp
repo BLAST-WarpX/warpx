@@ -42,15 +42,16 @@
 #include <memory>
 
 using namespace amrex;
+using namespace ablastr::fields;
 
 /**
  * \brief Update the B field, over one timestep
  */
 void FiniteDifferenceSolver::EvolveECTRho (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Efield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& face_areas,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& ECTRhofield,
+    ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField const& edge_lengths,
+    ablastr::fields::VectorField const& face_areas,
+    ablastr::fields::VectorField const& ECTRhofield,
     const int lev) {
 
 #if !defined(WARPX_DIM_RZ) and defined(AMREX_USE_EB)
@@ -67,10 +68,10 @@ void FiniteDifferenceSolver::EvolveECTRho (
 // If we implement ECT in 1D we will need to take care of this #ifndef differently
 #ifndef WARPX_DIM_RZ
 void FiniteDifferenceSolver::EvolveRhoCartesianECT (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Efield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& face_areas,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& ECTRhofield, const int lev ) {
+    ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField const& edge_lengths,
+    ablastr::fields::VectorField const& face_areas,
+    ablastr::fields::VectorField const& ECTRhofield, const int lev ) {
 #ifdef AMREX_USE_EB
 
 #if !(defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ))

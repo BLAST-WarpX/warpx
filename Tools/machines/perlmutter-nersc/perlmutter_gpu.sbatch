@@ -17,6 +17,7 @@
 # A100 80GB (256 nodes)
 #S BATCH -C gpu&hbm80g
 #SBATCH --exclusive
+#SBATCH --cpus-per-task=16
 # ideally single:1, but NERSC cgroups issue
 #SBATCH --gpu-bind=none
 #SBATCH --ntasks-per-node=4
@@ -33,8 +34,7 @@ export MPICH_OFI_NIC_POLICY=GPU
 
 # threads for OpenMP and threaded compressors per MPI rank
 #   note: 16 avoids hyperthreading (32 virtual cores, 16 physical)
-export SRUN_CPUS_PER_TASK=16
-export OMP_NUM_THREADS=${SRUN_CPUS_PER_TASK}
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 
 # GPU-aware MPI optimizations
 GPU_AWARE_MPI="amrex.use_gpu_aware_mpi=1"

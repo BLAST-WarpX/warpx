@@ -92,7 +92,7 @@
 #include <utility>
 
 using namespace amrex;
-using namespace warpx::fields;
+using warpx::fields::FieldType;
 
 int WarpX::do_moving_window = 0;
 int WarpX::start_moving_window_step = 0;
@@ -182,7 +182,8 @@ bool WarpX::do_multi_J = false;
 int WarpX::do_multi_J_n_depositions;
 bool WarpX::safe_guard_cells = false;
 
-std::map<std::string, amrex::MultiFab *> WarpX::multifab_map;
+utils::parser::IntervalsParser WarpX::dt_update_interval;
+
 std::map<std::string, amrex::iMultiFab *> WarpX::imultifab_map;
 
 IntVect WarpX::filter_npass_each_dir(1);
@@ -194,9 +195,29 @@ amrex::IntVect m_rho_nodal_flag;
 
 WarpX* WarpX::m_instance = nullptr;
 
+namespace
+{
+
+    [[nodiscard]] bool
+    isAnyBoundaryPML(
+        const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_lo,
+        const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_hi)
+    {
+        constexpr auto is_pml = [](const FieldBoundaryType fbt) {return (fbt == FieldBoundaryType::PML);};
+        const auto is_any_pml =
+            std::any_of(field_boundary_lo.begin(), field_boundary_lo.end(), is_pml) ||
+            std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(), is_pml);
+        return is_any_pml;
+    }
+}
+
 void WarpX::MakeWarpX ()
 {
     ParseGeometryInput();
+
+    ReadMovingWindowParameters(
+        do_moving_window, start_moving_window_step, end_moving_window_step,
+        moving_window_dir, moving_window_v);
 
     ConvertLabParamsToBoost();
     ReadBCParams();
@@ -292,67 +313,17 @@ WarpX::WarpX ()
 
     // Fluid Container
     if (do_fluid_species) {
-        myfl = std::make_unique<MultiFluidContainer>(nlevs_max);
+        myfl = std::make_unique<MultiFluidContainer>();
     }
-
-    Efield_aux.resize(nlevs_max);
-    Bfield_aux.resize(nlevs_max);
-
-    F_fp.resize(nlevs_max);
-    G_fp.resize(nlevs_max);
-    rho_fp.resize(nlevs_max);
-    phi_fp.resize(nlevs_max);
-    current_fp.resize(nlevs_max);
-    Efield_fp.resize(nlevs_max);
-    Bfield_fp.resize(nlevs_max);
 
     Efield_dotMask.resize(nlevs_max);
     Bfield_dotMask.resize(nlevs_max);
     Afield_dotMask.resize(nlevs_max);
     phi_dotMask.resize(nlevs_max);
 
-    // Only allocate vector potential arrays when using the Magnetostatic Solver
-    if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic)
-    {
-        vector_potential_fp_nodal.resize(nlevs_max);
-        vector_potential_grad_buf_e_stag.resize(nlevs_max);
-        vector_potential_grad_buf_b_stag.resize(nlevs_max);
-    }
-
-    if (fft_do_time_averaging)
-    {
-        Efield_avg_fp.resize(nlevs_max);
-        Bfield_avg_fp.resize(nlevs_max);
-    }
-
-    // Same as Bfield_fp/Efield_fp for reading external field data
-    Bfield_fp_external.resize(nlevs_max);
-    Efield_fp_external.resize(nlevs_max);
-    B_external_particle_field.resize(1);
-    E_external_particle_field.resize(1);
-
-    m_edge_lengths.resize(nlevs_max);
-    m_face_areas.resize(nlevs_max);
-    m_distance_to_eb.resize(nlevs_max);
     m_flag_info_face.resize(nlevs_max);
     m_flag_ext_face.resize(nlevs_max);
     m_borrowing.resize(nlevs_max);
-    m_area_mod.resize(nlevs_max);
-
-    ECTRhofield.resize(nlevs_max);
-    Venl.resize(nlevs_max);
-
-    current_store.resize(nlevs_max);
-
-    if (do_current_centering)
-    {
-        current_fp_nodal.resize(nlevs_max);
-    }
-
-    if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Vay)
-    {
-        current_fp_vay.resize(nlevs_max);
-    }
 
     // Create Electrostatic Solver object if needed
     if ((WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrame)
@@ -368,28 +339,11 @@ WarpX::WarpX ()
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC)
     {
         // Create hybrid-PIC model object if needed
-        m_hybrid_pic_model = std::make_unique<HybridPICModel>(nlevs_max);
+        m_hybrid_pic_model = std::make_unique<HybridPICModel>();
     }
 
-    F_cp.resize(nlevs_max);
-    G_cp.resize(nlevs_max);
-    rho_cp.resize(nlevs_max);
-    current_cp.resize(nlevs_max);
-    Efield_cp.resize(nlevs_max);
-    Bfield_cp.resize(nlevs_max);
-
-    if (fft_do_time_averaging)
-    {
-        Efield_avg_cp.resize(nlevs_max);
-        Bfield_avg_cp.resize(nlevs_max);
-    }
-
-    Efield_cax.resize(nlevs_max);
-    Bfield_cax.resize(nlevs_max);
     current_buffer_masks.resize(nlevs_max);
     gather_buffer_masks.resize(nlevs_max);
-    current_buf.resize(nlevs_max);
-    charge_buf.resize(nlevs_max);
 
     pml.resize(nlevs_max);
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
@@ -688,42 +642,11 @@ WarpX::ReadParameters ()
         pp_warpx.query("compute_max_step_from_btd",
             compute_max_step_from_btd);
 
-        pp_warpx.query("do_moving_window", do_moving_window);
-        if (do_moving_window)
-        {
-            utils::parser::queryWithParser(
-                pp_warpx, "start_moving_window_step", start_moving_window_step);
-            utils::parser::queryWithParser(
-                pp_warpx, "end_moving_window_step", end_moving_window_step);
-            std::string s;
-            pp_warpx.get("moving_window_dir", s);
-
-            if (s == "z" || s == "Z") {
-                moving_window_dir = WARPX_ZINDEX;
-            }
-#if defined(WARPX_DIM_3D)
-            else if (s == "y" || s == "Y") {
-                moving_window_dir = 1;
-            }
-#endif
-#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_3D)
-            else if (s == "x" || s == "X") {
-                moving_window_dir = 0;
-            }
-#endif
-
-            else {
-                WARPX_ABORT_WITH_MESSAGE("Unknown moving_window_dir: "+s);
-            }
-
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(Geom(0).isPeriodic(moving_window_dir) == 0,
-                       "The problem must be non-periodic in the moving window direction");
-
+        if (do_moving_window) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                Geom(0).isPeriodic(moving_window_dir) == 0,
+                "The problem must be non-periodic in the moving window direction");
             moving_window_x = geom[0].ProbLo(moving_window_dir);
-
-            utils::parser::getWithParser(
-                pp_warpx, "moving_window_v", moving_window_v);
-            moving_window_v *= PhysConst::c;
         }
 
         m_p_ext_field_params = std::make_unique<ExternalFieldParams>(pp_warpx);
@@ -775,7 +698,12 @@ WarpX::ReadParameters ()
         pp_boundary.query("verboncoeur_axis_correction", verboncoeur_axis_correction);
 #endif
 
+        // Read timestepping options
         utils::parser::queryWithParser(pp_warpx, "const_dt", m_const_dt);
+        utils::parser::queryWithParser(pp_warpx, "max_dt", m_max_dt);
+        std::vector<std::string> dt_interval_vec = {"-1"};
+        pp_warpx.queryarr("dt_update_interval", dt_interval_vec);
+        dt_update_interval = utils::parser::IntervalsParser(dt_interval_vec);
 
         // Filter currently not working with FDTD solver in RZ geometry: turn OFF by default
         // (see https://github.com/ECP-WarpX/WarpX/issues/1943)
@@ -966,7 +894,7 @@ WarpX::ReadParameters ()
         }
 
 #ifdef WARPX_DIM_RZ
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE( isAnyBoundaryPML() == false || electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD,
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE( ::isAnyBoundaryPML(field_boundary_lo, field_boundary_hi) == false || electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD,
             "PML are not implemented in RZ geometry with FDTD; please set a different boundary condition using boundary.field_lo and boundary.field_hi.");
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE( field_boundary_lo[1] != FieldBoundaryType::PML && field_boundary_hi[1] != FieldBoundaryType::PML,
             "PML are not implemented in RZ geometry along z; please set a different boundary condition using boundary.field_lo and boundary.field_hi.");
@@ -1448,8 +1376,9 @@ WarpX::ReadParameters ()
         // Instead, if warpx.grid_type=collocated, the momentum-conserving and
         // energy conserving field gathering algorithms are equivalent (forces
         // gathered from the collocated grid) and no fields centering occurs.
-        if (WarpX::field_gathering_algo == GatheringAlgo::MomentumConserving &&
-            WarpX::grid_type != GridType::Collocated)
+        if ((WarpX::field_gathering_algo == GatheringAlgo::MomentumConserving
+            && WarpX::grid_type != GridType::Collocated)
+            || WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic)
         {
             utils::parser::queryWithParser(
                 pp_warpx, "field_centering_nox", field_centering_nox);
@@ -2048,63 +1977,13 @@ WarpX::MakeNewLevelFromCoarse (int /*lev*/, amrex::Real /*time*/, const amrex::B
 void
 WarpX::ClearLevel (int lev)
 {
+    m_fields.clear_level(lev);
+
     for (int i = 0; i < 3; ++i) {
-        Efield_aux[lev][i].reset();
-        Bfield_aux[lev][i].reset();
-
-        current_fp[lev][i].reset();
-        Efield_fp [lev][i].reset();
-        Bfield_fp [lev][i].reset();
-
         Efield_dotMask [lev][i].reset();
         Bfield_dotMask [lev][i].reset();
         Afield_dotMask [lev][i].reset();
-
-        current_store[lev][i].reset();
-
-        if (do_current_centering)
-        {
-            current_fp_nodal[lev][i].reset();
-        }
-
-        if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Vay)
-        {
-            current_fp_vay[lev][i].reset();
-        }
-
-        if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic)
-        {
-            vector_potential_fp_nodal[lev][i].reset();
-            vector_potential_grad_buf_e_stag[lev][i].reset();
-            vector_potential_grad_buf_b_stag[lev][i].reset();
-        }
-
-        current_cp[lev][i].reset();
-        Efield_cp [lev][i].reset();
-        Bfield_cp [lev][i].reset();
-
-        Efield_cax[lev][i].reset();
-        Bfield_cax[lev][i].reset();
-        current_buf[lev][i].reset();
     }
-
-    if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC)
-    {
-        m_hybrid_pic_model->ClearLevel(lev);
-    }
-
-    charge_buf[lev].reset();
-
-    current_buffer_masks[lev].reset();
-    gather_buffer_masks[lev].reset();
-
-    F_fp  [lev].reset();
-    G_fp  [lev].reset();
-    rho_fp[lev].reset();
-    phi_fp[lev].reset();
-    F_cp  [lev].reset();
-    G_cp  [lev].reset();
-    rho_cp[lev].reset();
 
     phi_dotMask[lev].reset();
 
@@ -2151,7 +2030,7 @@ WarpX::AllocLevelData (int lev, const BoxArray& ba, const DistributionMapping& d
         safe_guard_cells,
         WarpX::do_multi_J,
         WarpX::fft_do_time_averaging,
-        WarpX::isAnyBoundaryPML(),
+        ::isAnyBoundaryPML(field_boundary_lo, field_boundary_hi),
         WarpX::do_pml_in_domain,
         WarpX::pml_ncell,
         this->refRatio(),
@@ -2201,6 +2080,8 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
                       const IntVect& ngEB, IntVect& ngJ, const IntVect& ngRho,
                       const IntVect& ngF, const IntVect& ngG, const bool aux_is_nodal)
 {
+    using ablastr::fields::Direction;
+
     // Declare nodal flags
     IntVect Ex_nodal_flag, Ey_nodal_flag, Ez_nodal_flag;
     IntVect Bx_nodal_flag, By_nodal_flag, Bz_nodal_flag;
@@ -2302,61 +2183,55 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
     //
     const std::array<Real,3> dx = CellSize(lev);
 
-    AllocInitMultiFab(Bfield_fp[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps, ngEB, lev, "Bfield_fp[x]", 0.0_rt);
-    AllocInitMultiFab(Bfield_fp[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps, ngEB, lev, "Bfield_fp[y]", 0.0_rt);
-    AllocInitMultiFab(Bfield_fp[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps, ngEB, lev, "Bfield_fp[z]", 0.0_rt);
+    m_fields.alloc_init(FieldType::Bfield_fp, Direction{0}, lev, amrex::convert(ba, Bx_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+    m_fields.alloc_init(FieldType::Bfield_fp, Direction{1}, lev, amrex::convert(ba, By_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+    m_fields.alloc_init(FieldType::Bfield_fp, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
 
-    AllocInitMultiFab(Efield_fp[lev][0], amrex::convert(ba, Ex_nodal_flag), dm, ncomps, ngEB, lev, "Efield_fp[x]", 0.0_rt);
-    AllocInitMultiFab(Efield_fp[lev][1], amrex::convert(ba, Ey_nodal_flag), dm, ncomps, ngEB, lev, "Efield_fp[y]", 0.0_rt);
-    AllocInitMultiFab(Efield_fp[lev][2], amrex::convert(ba, Ez_nodal_flag), dm, ncomps, ngEB, lev, "Efield_fp[z]", 0.0_rt);
+    m_fields.alloc_init(FieldType::Efield_fp, Direction{0}, lev, amrex::convert(ba, Ex_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+    m_fields.alloc_init(FieldType::Efield_fp, Direction{1}, lev, amrex::convert(ba, Ey_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+    m_fields.alloc_init(FieldType::Efield_fp, Direction{2}, lev, amrex::convert(ba, Ez_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
 
-    AllocInitMultiFab(current_fp[lev][0], amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ, lev, "current_fp[x]", 0.0_rt);
-    AllocInitMultiFab(current_fp[lev][1], amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, lev, "current_fp[y]", 0.0_rt);
-    AllocInitMultiFab(current_fp[lev][2], amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, lev, "current_fp[z]", 0.0_rt);
+    m_fields.alloc_init(FieldType::current_fp, Direction{0}, lev, amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+    m_fields.alloc_init(FieldType::current_fp, Direction{1}, lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+    m_fields.alloc_init(FieldType::current_fp, Direction{2}, lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
 
     if (do_current_centering)
     {
         amrex::BoxArray const& nodal_ba = amrex::convert(ba, amrex::IntVect::TheNodeVector());
-        AllocInitMultiFab(current_fp_nodal[lev][0], nodal_ba, dm, ncomps, ngJ, lev, "current_fp_nodal[x]", 0.0_rt);
-        AllocInitMultiFab(current_fp_nodal[lev][1], nodal_ba, dm, ncomps, ngJ, lev, "current_fp_nodal[y]", 0.0_rt);
-        AllocInitMultiFab(current_fp_nodal[lev][2], nodal_ba, dm, ncomps, ngJ, lev, "current_fp_nodal[z]", 0.0_rt);
+        m_fields.alloc_init(FieldType::current_fp_nodal, Direction{0}, lev, nodal_ba, dm, ncomps, ngJ, 0.0_rt);
+        m_fields.alloc_init(FieldType::current_fp_nodal, Direction{1}, lev, nodal_ba, dm, ncomps, ngJ, 0.0_rt);
+        m_fields.alloc_init(FieldType::current_fp_nodal, Direction{2}, lev, nodal_ba, dm, ncomps, ngJ, 0.0_rt);
     }
 
     if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Vay)
     {
-        AllocInitMultiFab(current_fp_vay[lev][0], amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngJ, lev, "current_fp_vay[x]", 0.0_rt);
-        AllocInitMultiFab(current_fp_vay[lev][1], amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngJ, lev, "current_fp_vay[y]", 0.0_rt);
-        AllocInitMultiFab(current_fp_vay[lev][2], amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngJ, lev, "current_fp_vay[z]", 0.0_rt);
+        m_fields.alloc_init(FieldType::current_fp_vay, Direction{0}, lev, amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        m_fields.alloc_init(FieldType::current_fp_vay, Direction{1}, lev, amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        m_fields.alloc_init(FieldType::current_fp_vay, Direction{2}, lev, amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
     }
 
     if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic)
     {
-        AllocInitMultiFab(vector_potential_fp_nodal[lev][0], amrex::convert(ba, rho_nodal_flag),
-            dm, ncomps, ngRho, lev, "vector_potential_fp_nodal[x]", 0.0_rt);
-        AllocInitMultiFab(vector_potential_fp_nodal[lev][1], amrex::convert(ba, rho_nodal_flag),
-            dm, ncomps, ngRho, lev, "vector_potential_fp_nodal[y]", 0.0_rt);
-        AllocInitMultiFab(vector_potential_fp_nodal[lev][2], amrex::convert(ba, rho_nodal_flag),
-            dm, ncomps, ngRho, lev, "vector_potential_fp_nodal[z]", 0.0_rt);
+        m_fields.alloc_init(FieldType::vector_potential_fp_nodal, Direction{0}, lev, amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho, 0.0_rt);
+        m_fields.alloc_init(FieldType::vector_potential_fp_nodal, Direction{1}, lev, amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho, 0.0_rt);
+        m_fields.alloc_init(FieldType::vector_potential_fp_nodal, Direction{2}, lev, amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho, 0.0_rt);
 
-        AllocInitMultiFab(vector_potential_grad_buf_e_stag[lev][0], amrex::convert(ba, Ex_nodal_flag),
-            dm, ncomps, ngEB, lev, "vector_potential_grad_buf_e_stag[x]", 0.0_rt);
-        AllocInitMultiFab(vector_potential_grad_buf_e_stag[lev][1], amrex::convert(ba, Ey_nodal_flag),
-            dm, ncomps, ngEB, lev, "vector_potential_grad_buf_e_stag[y]", 0.0_rt);
-        AllocInitMultiFab(vector_potential_grad_buf_e_stag[lev][2], amrex::convert(ba, Ez_nodal_flag),
-            dm, ncomps, ngEB, lev, "vector_potential_grad_buf_e_stag[z]", 0.0_rt);
+        // Memory buffers for computing magnetostatic fields
+        // Vector Potential A and previous step.  Time buffer needed for computing dA/dt to first order
+        m_fields.alloc_init(FieldType::vector_potential_grad_buf_e_stag, Direction{0}, lev, amrex::convert(ba, Ex_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::vector_potential_grad_buf_e_stag, Direction{1}, lev, amrex::convert(ba, Ey_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::vector_potential_grad_buf_e_stag, Direction{2}, lev, amrex::convert(ba, Ez_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
 
-        AllocInitMultiFab(vector_potential_grad_buf_b_stag[lev][0], amrex::convert(ba, Bx_nodal_flag),
-            dm, ncomps, ngEB, lev, "vector_potential_grad_buf_b_stag[x]", 0.0_rt);
-        AllocInitMultiFab(vector_potential_grad_buf_b_stag[lev][1], amrex::convert(ba, By_nodal_flag),
-            dm, ncomps, ngEB, lev, "vector_potential_grad_buf_b_stag[y]", 0.0_rt);
-        AllocInitMultiFab(vector_potential_grad_buf_b_stag[lev][2], amrex::convert(ba, Bz_nodal_flag),
-            dm, ncomps, ngEB, lev, "vector_potential_grad_buf_b_stag[z]", 0.0_rt);
+        m_fields.alloc_init(FieldType::vector_potential_grad_buf_b_stag, Direction{0}, lev, amrex::convert(ba, Bx_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::vector_potential_grad_buf_b_stag, Direction{1}, lev, amrex::convert(ba, By_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::vector_potential_grad_buf_b_stag, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
     }
 
     // Allocate extra multifabs needed by the kinetic-fluid hybrid algorithm.
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC)
     {
         m_hybrid_pic_model->AllocateLevelMFs(
+            m_fields,
             lev, ba, dm, ncomps, ngJ, ngRho, jx_nodal_flag, jy_nodal_flag,
             jz_nodal_flag, rho_nodal_flag
         );
@@ -2364,10 +2239,10 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
 
     // Allocate extra multifabs needed for fluids
     if (do_fluid_species) {
-        myfl->AllocateLevelMFs(lev, ba, dm);
+        myfl->AllocateLevelMFs(m_fields, ba, dm, lev);
         auto & warpx = GetInstance();
         const amrex::Real cur_time = warpx.gett_new(lev);
-        myfl->InitData(lev, geom[lev].Domain(),cur_time);
+        myfl->InitData(m_fields, geom[lev].Domain(), cur_time, lev);
     }
 
     // Allocate extra multifabs for macroscopic properties of the medium
@@ -2379,50 +2254,41 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
 
     if (fft_do_time_averaging)
     {
-        AllocInitMultiFab(Bfield_avg_fp[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps, ngEB, lev, "Bfield_avg_fp[x]", 0.0_rt);
-        AllocInitMultiFab(Bfield_avg_fp[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps, ngEB, lev, "Bfield_avg_fp[y]", 0.0_rt);
-        AllocInitMultiFab(Bfield_avg_fp[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps, ngEB, lev, "Bfield_avg_fp[z]", 0.0_rt);
+        m_fields.alloc_init(FieldType::Bfield_avg_fp, Direction{0}, lev, amrex::convert(ba, Bx_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Bfield_avg_fp, Direction{1}, lev, amrex::convert(ba, By_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Bfield_avg_fp, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
 
-        AllocInitMultiFab(Efield_avg_fp[lev][0], amrex::convert(ba, Ex_nodal_flag), dm, ncomps, ngEB, lev, "Efield_avg_fp[x]", 0.0_rt);
-        AllocInitMultiFab(Efield_avg_fp[lev][1], amrex::convert(ba, Ey_nodal_flag), dm, ncomps, ngEB, lev, "Efield_avg_fp[y]", 0.0_rt);
-        AllocInitMultiFab(Efield_avg_fp[lev][2], amrex::convert(ba, Ez_nodal_flag), dm, ncomps, ngEB, lev, "Efield_avg_fp[z]", 0.0_rt);
+        m_fields.alloc_init(FieldType::Efield_avg_fp, Direction{0}, lev, amrex::convert(ba, Ex_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Efield_avg_fp, Direction{1}, lev, amrex::convert(ba, Ey_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Efield_avg_fp, Direction{2}, lev, amrex::convert(ba, Ez_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
     }
 
     if (EB::enabled()) {
         constexpr int nc_ls = 1;
         amrex::IntVect const ng_ls(2);
-        AllocInitMultiFab(m_distance_to_eb[lev], amrex::convert(ba, IntVect::TheNodeVector()), dm, nc_ls, ng_ls, lev,
-                          "m_distance_to_eb");
+        //EB level set
+        m_fields.alloc_init(FieldType::distance_to_eb, lev, amrex::convert(ba, IntVect::TheNodeVector()), dm, nc_ls, ng_ls, 0.0_rt);
 
         // EB info are needed only at the finest level
         if (lev == maxLevel()) {
             if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
-                AllocInitMultiFab(m_edge_lengths[lev][0], amrex::convert(ba, Ex_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_edge_lengths[x]");
-                AllocInitMultiFab(m_edge_lengths[lev][1], amrex::convert(ba, Ey_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_edge_lengths[y]");
-                AllocInitMultiFab(m_edge_lengths[lev][2], amrex::convert(ba, Ez_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_edge_lengths[z]");
-                AllocInitMultiFab(m_face_areas[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_face_areas[x]");
-                AllocInitMultiFab(m_face_areas[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_face_areas[y]");
-                AllocInitMultiFab(m_face_areas[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_face_areas[z]");
+                //! EB: Lengths of the mesh edges
+                m_fields.alloc_init(FieldType::edge_lengths, Direction{0}, lev, amrex::convert(ba, Ex_nodal_flag),
+                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+                m_fields.alloc_init(FieldType::edge_lengths, Direction{1}, lev, amrex::convert(ba, Ey_nodal_flag),
+                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+                m_fields.alloc_init(FieldType::edge_lengths, Direction{2}, lev, amrex::convert(ba, Ez_nodal_flag),
+                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+
+                //! EB: Areas of the mesh faces
+                m_fields.alloc_init(FieldType::face_areas, Direction{0}, lev, amrex::convert(ba, Bx_nodal_flag),
+                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+                m_fields.alloc_init(FieldType::face_areas, Direction{1}, lev, amrex::convert(ba, By_nodal_flag),
+                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+                m_fields.alloc_init(FieldType::face_areas, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag),
+                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
             }
             if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
-                AllocInitMultiFab(m_edge_lengths[lev][0], amrex::convert(ba, Ex_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_edge_lengths[x]");
-                AllocInitMultiFab(m_edge_lengths[lev][1], amrex::convert(ba, Ey_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_edge_lengths[y]");
-                AllocInitMultiFab(m_edge_lengths[lev][2], amrex::convert(ba, Ez_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_edge_lengths[z]");
-                AllocInitMultiFab(m_face_areas[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_face_areas[x]");
-                AllocInitMultiFab(m_face_areas[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_face_areas[y]");
-                AllocInitMultiFab(m_face_areas[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_face_areas[z]");
                 AllocInitMultiFab(m_flag_info_face[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
                                   guard_cells.ng_FieldSolver, lev, "m_flag_info_face[x]");
                 AllocInitMultiFab(m_flag_info_face[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
@@ -2435,31 +2301,47 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
                                   guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[y]");
                 AllocInitMultiFab(m_flag_ext_face[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
                                   guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[z]");
-                AllocInitMultiFab(m_area_mod[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_area_mod[x]");
-                AllocInitMultiFab(m_area_mod[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_area_mod[y]");
-                AllocInitMultiFab(m_area_mod[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_area_mod[z]");
+
+                /** EB: area_mod contains the modified areas of the mesh faces, i.e. if a face is enlarged it
+                * contains the area of the enlarged face
+                * This is only used for the ECT solver.*/
+                m_fields.alloc_init(FieldType::area_mod, Direction{0}, lev, amrex::convert(ba, Bx_nodal_flag),
+                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+                m_fields.alloc_init(FieldType::area_mod, Direction{1}, lev, amrex::convert(ba, By_nodal_flag),
+                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+                m_fields.alloc_init(FieldType::area_mod, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag),
+                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+
                 m_borrowing[lev][0] = std::make_unique<amrex::LayoutData<FaceInfoBox>>(
                         amrex::convert(ba, Bx_nodal_flag), dm);
                 m_borrowing[lev][1] = std::make_unique<amrex::LayoutData<FaceInfoBox>>(
                         amrex::convert(ba, By_nodal_flag), dm);
                 m_borrowing[lev][2] = std::make_unique<amrex::LayoutData<FaceInfoBox>>(
                         amrex::convert(ba, Bz_nodal_flag), dm);
-                AllocInitMultiFab(Venl[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "Venl[x]");
-                AllocInitMultiFab(Venl[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "Venl[y]");
-                AllocInitMultiFab(Venl[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "Venl[z]");
 
-                AllocInitMultiFab(ECTRhofield[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "ECTRhofield[x]", 0.0_rt);
-                AllocInitMultiFab(ECTRhofield[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "ECTRhofield[y]", 0.0_rt);
-                AllocInitMultiFab(ECTRhofield[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "ECTRhofield[z]", 0.0_rt);
+                /** Venl contains the electromotive force for every mesh face, i.e. every entry is
+                * the corresponding entry in ECTRhofield multiplied by the total area (possibly with enlargement)
+                * This is only used for the ECT solver.*/
+                m_fields.alloc_init(FieldType::Venl, Direction{0}, lev, amrex::convert(ba, Bx_nodal_flag),
+                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+                m_fields.alloc_init(FieldType::Venl, Direction{1}, lev, amrex::convert(ba, By_nodal_flag),
+                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+                m_fields.alloc_init(FieldType::Venl, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag),
+                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+
+                /** ECTRhofield is needed only by the ect
+                * solver and it contains the electromotive force density for every mesh face.
+                * The name ECTRhofield has been used to comply with the notation of the paper
+                * https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=4463918 (page 9, equation 4
+                * and below).
+                * Although it's called rho it has nothing to do with the charge density!
+                * This is only used for the ECT solver.*/
+                m_fields.alloc_init(FieldType::ECTRhofield, Direction{0}, lev, amrex::convert(ba, Bx_nodal_flag),
+                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+                m_fields.alloc_init(FieldType::ECTRhofield, Direction{1}, lev, amrex::convert(ba, By_nodal_flag),
+                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+                m_fields.alloc_init(FieldType::ECTRhofield, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag),
+                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
             }
         }
     }
@@ -2481,31 +2363,38 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
     }
     if (rho_ncomps > 0)
     {
-        AllocInitMultiFab(rho_fp[lev], amrex::convert(ba, rho_nodal_flag), dm, rho_ncomps, ngRho, lev, "rho_fp", 0.0_rt);
+        m_fields.alloc_init(FieldType::rho_fp,
+            lev, amrex::convert(ba, rho_nodal_flag), dm,
+            rho_ncomps, ngRho, 0.0_rt);
     }
 
     if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrame ||
         electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic)
     {
         const IntVect ngPhi = IntVect( AMREX_D_DECL(1,1,1) );
-        AllocInitMultiFab(phi_fp[lev], amrex::convert(ba, phi_nodal_flag), dm, ncomps, ngPhi, lev, "phi_fp", 0.0_rt);
+        m_fields.alloc_init(FieldType::phi_fp, lev, amrex::convert(ba, phi_nodal_flag), dm,
+                             ncomps, ngPhi, 0.0_rt );
     }
 
     if (do_subcycling && lev == 0)
     {
-        AllocInitMultiFab(current_store[lev][0], amrex::convert(ba,jx_nodal_flag),dm,ncomps,ngJ,lev, "current_store[x]");
-        AllocInitMultiFab(current_store[lev][1], amrex::convert(ba,jy_nodal_flag),dm,ncomps,ngJ,lev, "current_store[y]");
-        AllocInitMultiFab(current_store[lev][2], amrex::convert(ba,jz_nodal_flag),dm,ncomps,ngJ,lev, "current_store[z]");
+        m_fields.alloc_init(FieldType::current_store, Direction{0}, lev, amrex::convert(ba,jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        m_fields.alloc_init(FieldType::current_store, Direction{1}, lev, amrex::convert(ba,jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        m_fields.alloc_init(FieldType::current_store, Direction{2}, lev, amrex::convert(ba,jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
     }
 
     if (do_dive_cleaning)
     {
-        AllocInitMultiFab(F_fp[lev], amrex::convert(ba, F_nodal_flag), dm, ncomps, ngF, lev, "F_fp", 0.0_rt);
+        m_fields.alloc_init(FieldType::F_fp,
+            lev, amrex::convert(ba, F_nodal_flag), dm,
+            ncomps, ngF, 0.0_rt);
     }
 
     if (do_divb_cleaning)
     {
-        AllocInitMultiFab(G_fp[lev], amrex::convert(ba, G_nodal_flag), dm, ncomps, ngG, lev, "G_fp", 0.0_rt);
+        m_fields.alloc_init(FieldType::G_fp,
+            lev, amrex::convert(ba, G_nodal_flag), dm,
+            ncomps, ngG, 0.0_rt);
     }
 
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD)
@@ -2574,90 +2463,103 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         // Create aux multifabs on Nodal Box Array
         BoxArray const nba = amrex::convert(ba,IntVect::TheNodeVector());
 
-        AllocInitMultiFab(Bfield_aux[lev][0], nba, dm, ncomps, ngEB, lev, "Bfield_aux[x]", 0.0_rt);
-        AllocInitMultiFab(Bfield_aux[lev][1], nba, dm, ncomps, ngEB, lev, "Bfield_aux[y]", 0.0_rt);
-        AllocInitMultiFab(Bfield_aux[lev][2], nba, dm, ncomps, ngEB, lev, "Bfield_aux[z]", 0.0_rt);
+        m_fields.alloc_init(FieldType::Bfield_aux, Direction{0}, lev, nba, dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Bfield_aux, Direction{1}, lev, nba, dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Bfield_aux, Direction{2}, lev, nba, dm, ncomps, ngEB, 0.0_rt);
 
-        AllocInitMultiFab(Efield_aux[lev][0], nba, dm, ncomps, ngEB, lev, "Efield_aux[x]", 0.0_rt);
-        AllocInitMultiFab(Efield_aux[lev][1], nba, dm, ncomps, ngEB, lev, "Efield_aux[y]", 0.0_rt);
-        AllocInitMultiFab(Efield_aux[lev][2], nba, dm, ncomps, ngEB, lev, "Efield_aux[z]", 0.0_rt);
+        m_fields.alloc_init(FieldType::Efield_aux, Direction{0}, lev, nba, dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Efield_aux, Direction{1}, lev, nba, dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Efield_aux, Direction{2}, lev, nba, dm, ncomps, ngEB, 0.0_rt);
     } else if (lev == 0) {
         if (WarpX::fft_do_time_averaging) {
-            AliasInitMultiFab(Bfield_aux[lev][0], *Bfield_avg_fp[lev][0], 0, ncomps, lev, "Bfield_aux[x]", 0.0_rt);
-            AliasInitMultiFab(Bfield_aux[lev][1], *Bfield_avg_fp[lev][1], 0, ncomps, lev, "Bfield_aux[y]", 0.0_rt);
-            AliasInitMultiFab(Bfield_aux[lev][2], *Bfield_avg_fp[lev][2], 0, ncomps, lev, "Bfield_aux[z]", 0.0_rt);
+            m_fields.alias_init(FieldType::Bfield_aux, FieldType::Bfield_avg_fp, Direction{0}, lev, 0.0_rt);
+            m_fields.alias_init(FieldType::Bfield_aux, FieldType::Bfield_avg_fp, Direction{1}, lev, 0.0_rt);
+            m_fields.alias_init(FieldType::Bfield_aux, FieldType::Bfield_avg_fp, Direction{2}, lev, 0.0_rt);
 
-            AliasInitMultiFab(Efield_aux[lev][0], *Efield_avg_fp[lev][0], 0, ncomps, lev, "Efield_aux[x]", 0.0_rt);
-            AliasInitMultiFab(Efield_aux[lev][1], *Efield_avg_fp[lev][1], 0, ncomps, lev, "Efield_aux[y]", 0.0_rt);
-            AliasInitMultiFab(Efield_aux[lev][2], *Efield_avg_fp[lev][2], 0, ncomps, lev, "Efield_aux[z]", 0.0_rt);
+            m_fields.alias_init(FieldType::Efield_aux, FieldType::Efield_avg_fp, Direction{0}, lev, 0.0_rt);
+            m_fields.alias_init(FieldType::Efield_aux, FieldType::Efield_avg_fp, Direction{1}, lev, 0.0_rt);
+            m_fields.alias_init(FieldType::Efield_aux, FieldType::Efield_avg_fp, Direction{2}, lev, 0.0_rt);
         } else {
             if (mypc->m_B_ext_particle_s == "read_from_file") {
-                AllocInitMultiFab(Bfield_aux[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps, ngEB, lev, "Bfield_aux[x]");
-                AllocInitMultiFab(Bfield_aux[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps, ngEB, lev, "Bfield_aux[y]");
-                AllocInitMultiFab(Bfield_aux[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps, ngEB, lev, "Bfield_aux[z]");
+                m_fields.alloc_init(FieldType::Bfield_aux, Direction{0}, lev, amrex::convert(ba, Bx_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+                m_fields.alloc_init(FieldType::Bfield_aux, Direction{1}, lev, amrex::convert(ba, By_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+                m_fields.alloc_init(FieldType::Bfield_aux, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
             } else {
                 // In this case, the aux grid is simply an alias of the fp grid (most common case in WarpX)
-                AliasInitMultiFab(Bfield_aux[lev][0], *Bfield_fp[lev][0], 0, ncomps, lev, "Bfield_aux[x]", 0.0_rt);
-                AliasInitMultiFab(Bfield_aux[lev][1], *Bfield_fp[lev][1], 0, ncomps, lev, "Bfield_aux[y]", 0.0_rt);
-                AliasInitMultiFab(Bfield_aux[lev][2], *Bfield_fp[lev][2], 0, ncomps, lev, "Bfield_aux[z]", 0.0_rt);
+                m_fields.alias_init(FieldType::Bfield_aux, FieldType::Bfield_fp, Direction{0}, lev, 0.0_rt);
+                m_fields.alias_init(FieldType::Bfield_aux, FieldType::Bfield_fp, Direction{1}, lev, 0.0_rt);
+                m_fields.alias_init(FieldType::Bfield_aux, FieldType::Bfield_fp, Direction{2}, lev, 0.0_rt);
             }
             if (mypc->m_E_ext_particle_s == "read_from_file") {
-                AllocInitMultiFab(Efield_aux[lev][0], amrex::convert(ba, Ex_nodal_flag), dm, ncomps, ngEB, lev, "Efield_aux[x]");
-                AllocInitMultiFab(Efield_aux[lev][1], amrex::convert(ba, Ey_nodal_flag), dm, ncomps, ngEB, lev, "Efield_aux[y]");
-                AllocInitMultiFab(Efield_aux[lev][2], amrex::convert(ba, Ez_nodal_flag), dm, ncomps, ngEB, lev, "Efield_aux[z]");
+                m_fields.alloc_init(FieldType::Efield_aux, Direction{0}, lev, amrex::convert(ba, Ex_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+                m_fields.alloc_init(FieldType::Efield_aux, Direction{1}, lev, amrex::convert(ba, Ey_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+                m_fields.alloc_init(FieldType::Efield_aux, Direction{2}, lev, amrex::convert(ba, Ez_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
             } else {
                 // In this case, the aux grid is simply an alias of the fp grid (most common case in WarpX)
-                AliasInitMultiFab(Efield_aux[lev][0], *Efield_fp[lev][0], 0, ncomps, lev, "Efield_aux[x]", 0.0_rt);
-                AliasInitMultiFab(Efield_aux[lev][1], *Efield_fp[lev][1], 0, ncomps, lev, "Efield_aux[y]", 0.0_rt);
-                AliasInitMultiFab(Efield_aux[lev][2], *Efield_fp[lev][2], 0, ncomps, lev, "Efield_aux[z]", 0.0_rt);
+                m_fields.alias_init(FieldType::Efield_aux, FieldType::Efield_fp, Direction{0}, lev, 0.0_rt);
+                m_fields.alias_init(FieldType::Efield_aux, FieldType::Efield_fp, Direction{1}, lev, 0.0_rt);
+                m_fields.alias_init(FieldType::Efield_aux, FieldType::Efield_fp, Direction{2}, lev, 0.0_rt);
             }
         }
     } else {
-        AllocInitMultiFab(Bfield_aux[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps, ngEB, lev, "Bfield_aux[x]", 0.0_rt);
-        AllocInitMultiFab(Bfield_aux[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps, ngEB, lev, "Bfield_aux[y]", 0.0_rt);
-        AllocInitMultiFab(Bfield_aux[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps, ngEB, lev, "Bfield_aux[z]", 0.0_rt);
+        m_fields.alloc_init(FieldType::Bfield_aux, Direction{0}, lev, amrex::convert(ba, Bx_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Bfield_aux, Direction{1}, lev, amrex::convert(ba, By_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Bfield_aux, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
 
-        AllocInitMultiFab(Efield_aux[lev][0], amrex::convert(ba, Ex_nodal_flag), dm, ncomps, ngEB, lev, "Efield_aux[x]", 0.0_rt);
-        AllocInitMultiFab(Efield_aux[lev][1], amrex::convert(ba, Ey_nodal_flag), dm, ncomps, ngEB, lev, "Efield_aux[y]", 0.0_rt);
-        AllocInitMultiFab(Efield_aux[lev][2], amrex::convert(ba, Ez_nodal_flag), dm, ncomps, ngEB, lev, "Efield_aux[z]", 0.0_rt);
+        m_fields.alloc_init(FieldType::Efield_aux, Direction{0}, lev, amrex::convert(ba, Ex_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Efield_aux, Direction{1}, lev, amrex::convert(ba, Ey_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Efield_aux, Direction{2}, lev, amrex::convert(ba, Ez_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
     }
 
     // The external fields that are read from file
     if (m_p_ext_field_params->B_ext_grid_type != ExternalFieldType::default_zero && m_p_ext_field_params->B_ext_grid_type != ExternalFieldType::constant) {
         // These fields will be added directly to the grid, i.e. to fp, and need to match the index type
-        AllocInitMultiFab(Bfield_fp_external[lev][0], amrex::convert(ba, Bfield_fp[lev][0]->ixType()),
-            dm, ncomps, ngEB, lev, "Bfield_fp_external[x]", 0.0_rt);
-        AllocInitMultiFab(Bfield_fp_external[lev][1], amrex::convert(ba, Bfield_fp[lev][1]->ixType()),
-            dm, ncomps, ngEB, lev, "Bfield_fp_external[y]", 0.0_rt);
-        AllocInitMultiFab(Bfield_fp_external[lev][2], amrex::convert(ba, Bfield_fp[lev][2]->ixType()),
-            dm, ncomps, ngEB, lev, "Bfield_fp_external[z]", 0.0_rt);
+        m_fields.alloc_init(FieldType::Bfield_fp_external, Direction{0}, lev,
+            amrex::convert(ba, m_fields.get(FieldType::Bfield_fp,Direction{0},lev)->ixType()),
+            dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Bfield_fp_external, Direction{1}, lev,
+            amrex::convert(ba, m_fields.get(FieldType::Bfield_fp,Direction{1},lev)->ixType()),
+            dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Bfield_fp_external, Direction{2}, lev,
+            amrex::convert(ba, m_fields.get(FieldType::Bfield_fp,Direction{2},lev)->ixType()),
+            dm, ncomps, ngEB, 0.0_rt);
     }
     if (mypc->m_B_ext_particle_s == "read_from_file") {
         //  These fields will be added to the fields that the particles see, and need to match the index type
-        AllocInitMultiFab(B_external_particle_field[lev][0], amrex::convert(ba, Bfield_aux[lev][0]->ixType()),
-            dm, ncomps, ngEB, lev, "B_external_particle_field[x]", 0.0_rt);
-        AllocInitMultiFab(B_external_particle_field[lev][1], amrex::convert(ba, Bfield_aux[lev][1]->ixType()),
-            dm, ncomps, ngEB, lev, "B_external_particle_field[y]", 0.0_rt);
-        AllocInitMultiFab(B_external_particle_field[lev][2], amrex::convert(ba, Bfield_aux[lev][2]->ixType()),
-            dm, ncomps, ngEB, lev, "B_external_particle_field[z]", 0.0_rt);
+        auto *Bfield_aux_levl_0 = m_fields.get(FieldType::Bfield_aux, Direction{0}, lev);
+        auto *Bfield_aux_levl_1 = m_fields.get(FieldType::Bfield_aux, Direction{1}, lev);
+        auto *Bfield_aux_levl_2 = m_fields.get(FieldType::Bfield_aux, Direction{2}, lev);
+
+        // Same as Bfield_fp for reading external field data
+        m_fields.alloc_init(FieldType::B_external_particle_field, Direction{0}, lev, amrex::convert(ba, Bfield_aux_levl_0->ixType()),
+            dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::B_external_particle_field, Direction{1}, lev, amrex::convert(ba, Bfield_aux_levl_1->ixType()),
+            dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::B_external_particle_field, Direction{2}, lev, amrex::convert(ba, Bfield_aux_levl_2->ixType()),
+            dm, ncomps, ngEB, 0.0_rt);
     }
     if (m_p_ext_field_params->E_ext_grid_type != ExternalFieldType::default_zero && m_p_ext_field_params->E_ext_grid_type != ExternalFieldType::constant) {
         // These fields will be added directly to the grid, i.e. to fp, and need to match the index type
-        AllocInitMultiFab(Efield_fp_external[lev][0], amrex::convert(ba, Efield_fp[lev][0]->ixType()),
-            dm, ncomps, ngEB, lev, "Efield_fp_external[x]", 0.0_rt);
-        AllocInitMultiFab(Efield_fp_external[lev][1], amrex::convert(ba, Efield_fp[lev][1]->ixType()),
-            dm, ncomps, ngEB, lev, "Efield_fp_external[y]", 0.0_rt);
-        AllocInitMultiFab(Efield_fp_external[lev][2], amrex::convert(ba, Efield_fp[lev][2]->ixType()),
-            dm, ncomps, ngEB, lev, "Efield_fp_external[z]", 0.0_rt);
+        m_fields.alloc_init(FieldType::Efield_fp_external, Direction{0}, lev, amrex::convert(ba, m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->ixType()),
+            dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Efield_fp_external, Direction{1}, lev, amrex::convert(ba, m_fields.get(FieldType::Efield_fp, Direction{1}, lev)->ixType()),
+            dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Efield_fp_external, Direction{2}, lev, amrex::convert(ba, m_fields.get(FieldType::Efield_fp, Direction{2}, lev)->ixType()),
+            dm, ncomps, ngEB, 0.0_rt);
     }
     if (mypc->m_E_ext_particle_s == "read_from_file") {
         //  These fields will be added to the fields that the particles see, and need to match the index type
-        AllocInitMultiFab(E_external_particle_field[lev][0], amrex::convert(ba, Efield_aux[lev][0]->ixType()),
-            dm, ncomps, ngEB, lev, "E_external_particle_field[x]", 0.0_rt);
-        AllocInitMultiFab(E_external_particle_field[lev][1], amrex::convert(ba, Efield_aux[lev][1]->ixType()),
-            dm, ncomps, ngEB, lev, "E_external_particle_field[y]", 0.0_rt);
-        AllocInitMultiFab(E_external_particle_field[lev][2], amrex::convert(ba, Efield_aux[lev][2]->ixType()),
-            dm, ncomps, ngEB, lev, "E_external_particle_field[z]", 0.0_rt);
+        auto *Efield_aux_levl_0 = m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
+        auto *Efield_aux_levl_1 = m_fields.get(FieldType::Efield_aux, Direction{1}, lev);
+        auto *Efield_aux_levl_2 = m_fields.get(FieldType::Efield_aux, Direction{2}, lev);
+
+        // Same as Efield_fp for reading external field data
+        m_fields.alloc_init(FieldType::E_external_particle_field, Direction{0}, lev, amrex::convert(ba, Efield_aux_levl_0->ixType()),
+            dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::E_external_particle_field, Direction{1}, lev, amrex::convert(ba, Efield_aux_levl_1->ixType()),
+            dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::E_external_particle_field, Direction{2}, lev, amrex::convert(ba, Efield_aux_levl_2->ixType()),
+            dm, ncomps, ngEB, 0.0_rt);
     }
 
     //
@@ -2670,49 +2572,57 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         const std::array<Real,3> cdx = CellSize(lev-1);
 
         // Create the MultiFabs for B
-        AllocInitMultiFab(Bfield_cp[lev][0], amrex::convert(cba, Bx_nodal_flag), dm, ncomps, ngEB, lev, "Bfield_cp[x]", 0.0_rt);
-        AllocInitMultiFab(Bfield_cp[lev][1], amrex::convert(cba, By_nodal_flag), dm, ncomps, ngEB, lev, "Bfield_cp[y]", 0.0_rt);
-        AllocInitMultiFab(Bfield_cp[lev][2], amrex::convert(cba, Bz_nodal_flag), dm, ncomps, ngEB, lev, "Bfield_cp[z]", 0.0_rt);
+        m_fields.alloc_init(FieldType::Bfield_cp, Direction{0}, lev, amrex::convert(cba, Bx_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Bfield_cp, Direction{1}, lev, amrex::convert(cba, By_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Bfield_cp, Direction{2}, lev, amrex::convert(cba, Bz_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
 
         // Create the MultiFabs for E
-        AllocInitMultiFab(Efield_cp[lev][0], amrex::convert(cba, Ex_nodal_flag), dm, ncomps, ngEB, lev, "Efield_cp[x]", 0.0_rt);
-        AllocInitMultiFab(Efield_cp[lev][1], amrex::convert(cba, Ey_nodal_flag), dm, ncomps, ngEB, lev, "Efield_cp[y]", 0.0_rt);
-        AllocInitMultiFab(Efield_cp[lev][2], amrex::convert(cba, Ez_nodal_flag), dm, ncomps, ngEB, lev, "Efield_cp[z]", 0.0_rt);
+        m_fields.alloc_init(FieldType::Efield_cp, Direction{0}, lev, amrex::convert(cba, Ex_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Efield_cp, Direction{1}, lev, amrex::convert(cba, Ey_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::Efield_cp, Direction{2}, lev, amrex::convert(cba, Ez_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
 
         if (fft_do_time_averaging)
         {
-            AllocInitMultiFab(Bfield_avg_cp[lev][0], amrex::convert(cba, Bx_nodal_flag), dm, ncomps, ngEB, lev, "Bfield_avg_cp[x]", 0.0_rt);
-            AllocInitMultiFab(Bfield_avg_cp[lev][1], amrex::convert(cba, By_nodal_flag), dm, ncomps, ngEB, lev, "Bfield_avg_cp[y]", 0.0_rt);
-            AllocInitMultiFab(Bfield_avg_cp[lev][2], amrex::convert(cba, Bz_nodal_flag), dm, ncomps, ngEB, lev, "Bfield_avg_cp[z]", 0.0_rt);
+            m_fields.alloc_init(FieldType::Bfield_avg_cp, Direction{0}, lev, amrex::convert(cba, Bx_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+            m_fields.alloc_init(FieldType::Bfield_avg_cp, Direction{1}, lev, amrex::convert(cba, By_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+            m_fields.alloc_init(FieldType::Bfield_avg_cp, Direction{2}, lev, amrex::convert(cba, Bz_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
 
-            AllocInitMultiFab(Efield_avg_cp[lev][0], amrex::convert(cba, Ex_nodal_flag), dm, ncomps, ngEB, lev, "Efield_avg_cp[x]", 0.0_rt);
-            AllocInitMultiFab(Efield_avg_cp[lev][1], amrex::convert(cba, Ey_nodal_flag), dm, ncomps, ngEB, lev, "Efield_avg_cp[y]", 0.0_rt);
-            AllocInitMultiFab(Efield_avg_cp[lev][2], amrex::convert(cba, Ez_nodal_flag), dm, ncomps, ngEB, lev, "Efield_avg_cp[z]", 0.0_rt);
+            m_fields.alloc_init(FieldType::Efield_avg_cp, Direction{0}, lev, amrex::convert(cba, Ex_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+            m_fields.alloc_init(FieldType::Efield_avg_cp, Direction{1}, lev, amrex::convert(cba, Ey_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+            m_fields.alloc_init(FieldType::Efield_avg_cp, Direction{2}, lev, amrex::convert(cba, Ez_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
         }
 
         // Create the MultiFabs for the current
-        AllocInitMultiFab(current_cp[lev][0], amrex::convert(cba, jx_nodal_flag), dm, ncomps, ngJ, lev, "current_cp[x]", 0.0_rt);
-        AllocInitMultiFab(current_cp[lev][1], amrex::convert(cba, jy_nodal_flag), dm, ncomps, ngJ, lev, "current_cp[y]", 0.0_rt);
-        AllocInitMultiFab(current_cp[lev][2], amrex::convert(cba, jz_nodal_flag), dm, ncomps, ngJ, lev, "current_cp[z]", 0.0_rt);
+        m_fields.alloc_init(FieldType::current_cp, Direction{0}, lev, amrex::convert(cba, jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        m_fields.alloc_init(FieldType::current_cp, Direction{1}, lev, amrex::convert(cba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        m_fields.alloc_init(FieldType::current_cp, Direction{2}, lev, amrex::convert(cba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
 
         if (rho_ncomps > 0) {
-            AllocInitMultiFab(rho_cp[lev], amrex::convert(cba, rho_nodal_flag), dm, rho_ncomps, ngRho, lev, "rho_cp", 0.0_rt);
+            m_fields.alloc_init(FieldType::rho_cp,
+                lev, amrex::convert(cba, rho_nodal_flag), dm,
+                rho_ncomps, ngRho, 0.0_rt);
         }
 
         if (do_dive_cleaning)
         {
-            AllocInitMultiFab(F_cp[lev], amrex::convert(cba, IntVect::TheUnitVector()), dm, ncomps, ngF, lev, "F_cp", 0.0_rt);
+            m_fields.alloc_init(FieldType::F_cp,
+                lev, amrex::convert(cba, IntVect::TheUnitVector()), dm,
+                ncomps, ngF, 0.0_rt);
         }
 
         if (do_divb_cleaning)
         {
             if (grid_type == GridType::Collocated)
             {
-                AllocInitMultiFab(G_cp[lev], amrex::convert(cba, IntVect::TheUnitVector()), dm, ncomps, ngG, lev, "G_cp", 0.0_rt);
+                m_fields.alloc_init(FieldType::G_cp,
+                    lev, amrex::convert(cba, IntVect::TheUnitVector()), dm,
+                    ncomps, ngG, 0.0_rt);
             }
             else // grid_type=staggered or grid_type=hybrid
             {
-                AllocInitMultiFab(G_cp[lev], amrex::convert(cba, IntVect::TheZeroVector()), dm, ncomps, ngG, lev, "G_cp", 0.0_rt);
+                m_fields.alloc_init(FieldType::G_cp,
+                    lev, amrex::convert(cba, IntVect::TheZeroVector()), dm,
+                    ncomps, ngG, 0.0_rt);
             }
         }
 
@@ -2770,22 +2680,25 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         if (n_field_gather_buffer > 0 || mypc->nSpeciesGatherFromMainGrid() > 0) {
             if (aux_is_nodal) {
                 BoxArray const& cnba = amrex::convert(cba,IntVect::TheNodeVector());
-                AllocInitMultiFab(Bfield_cax[lev][0], cnba,dm,ncomps,ngEB,lev, "Bfield_cax[x]", 0.0_rt);
-                AllocInitMultiFab(Bfield_cax[lev][1], cnba,dm,ncomps,ngEB,lev, "Bfield_cax[y]", 0.0_rt);
-                AllocInitMultiFab(Bfield_cax[lev][2], cnba,dm,ncomps,ngEB,lev, "Bfield_cax[z]", 0.0_rt);
-                AllocInitMultiFab(Efield_cax[lev][0], cnba,dm,ncomps,ngEB,lev, "Efield_cax[x]", 0.0_rt);
-                AllocInitMultiFab(Efield_cax[lev][1], cnba,dm,ncomps,ngEB,lev, "Efield_cax[y]", 0.0_rt);
-                AllocInitMultiFab(Efield_cax[lev][2], cnba,dm,ncomps,ngEB,lev, "Efield_cax[z]", 0.0_rt);
-            } else {
                 // Create the MultiFabs for B
-                AllocInitMultiFab(Bfield_cax[lev][0], amrex::convert(cba,Bx_nodal_flag),dm,ncomps,ngEB,lev, "Bfield_cax[x]", 0.0_rt);
-                AllocInitMultiFab(Bfield_cax[lev][1], amrex::convert(cba,By_nodal_flag),dm,ncomps,ngEB,lev, "Bfield_cax[y]", 0.0_rt);
-                AllocInitMultiFab(Bfield_cax[lev][2], amrex::convert(cba,Bz_nodal_flag),dm,ncomps,ngEB,lev, "Bfield_cax[z]", 0.0_rt);
+                m_fields.alloc_init(FieldType::Bfield_cax, Direction{0}, lev, cnba, dm, ncomps, ngEB, 0.0_rt);
+                m_fields.alloc_init(FieldType::Bfield_cax, Direction{1}, lev, cnba, dm, ncomps, ngEB, 0.0_rt);
+                m_fields.alloc_init(FieldType::Bfield_cax, Direction{2}, lev, cnba, dm, ncomps, ngEB, 0.0_rt);
 
                 // Create the MultiFabs for E
-                AllocInitMultiFab(Efield_cax[lev][0], amrex::convert(cba,Ex_nodal_flag),dm,ncomps,ngEB,lev, "Efield_cax[x]", 0.0_rt);
-                AllocInitMultiFab(Efield_cax[lev][1], amrex::convert(cba,Ey_nodal_flag),dm,ncomps,ngEB,lev, "Efield_cax[y]", 0.0_rt);
-                AllocInitMultiFab(Efield_cax[lev][2], amrex::convert(cba,Ez_nodal_flag),dm,ncomps,ngEB,lev, "Efield_cax[z]", 0.0_rt);
+                m_fields.alloc_init(FieldType::Efield_cax, Direction{0}, lev, cnba, dm, ncomps, ngEB, 0.0_rt);
+                m_fields.alloc_init(FieldType::Efield_cax, Direction{1}, lev, cnba, dm, ncomps, ngEB, 0.0_rt);
+                m_fields.alloc_init(FieldType::Efield_cax, Direction{2}, lev, cnba, dm, ncomps, ngEB, 0.0_rt);
+            } else {
+                // Create the MultiFabs for B
+                m_fields.alloc_init(FieldType::Bfield_cax, Direction{0}, lev, amrex::convert(cba, Bx_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+                m_fields.alloc_init(FieldType::Bfield_cax, Direction{1}, lev, amrex::convert(cba, By_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+                m_fields.alloc_init(FieldType::Bfield_cax, Direction{2}, lev, amrex::convert(cba, Bz_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+
+                // Create the MultiFabs for E
+                m_fields.alloc_init(FieldType::Efield_cax, Direction{0}, lev, amrex::convert(cba,Ex_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+                m_fields.alloc_init(FieldType::Efield_cax, Direction{1}, lev, amrex::convert(cba,Ey_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+                m_fields.alloc_init(FieldType::Efield_cax, Direction{2}, lev, amrex::convert(cba,Ez_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
             }
 
             AllocInitMultiFab(gather_buffer_masks[lev], ba, dm, ncomps, amrex::IntVect(1), lev, "gather_buffer_masks");
@@ -2794,11 +2707,11 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         }
 
         if (n_current_deposition_buffer > 0) {
-            AllocInitMultiFab(current_buf[lev][0], amrex::convert(cba,jx_nodal_flag),dm,ncomps,ngJ,lev, "current_buf[x]");
-            AllocInitMultiFab(current_buf[lev][1], amrex::convert(cba,jy_nodal_flag),dm,ncomps,ngJ,lev, "current_buf[y]");
-            AllocInitMultiFab(current_buf[lev][2], amrex::convert(cba,jz_nodal_flag),dm,ncomps,ngJ,lev, "current_buf[z]");
-            if (rho_cp[lev]) {
-                AllocInitMultiFab(charge_buf[lev], amrex::convert(cba,rho_nodal_flag),dm,2*ncomps,ngRho,lev, "charge_buf");
+            m_fields.alloc_init(FieldType::current_buf, Direction{0}, lev, amrex::convert(cba,jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+            m_fields.alloc_init(FieldType::current_buf, Direction{1}, lev, amrex::convert(cba,jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+            m_fields.alloc_init(FieldType::current_buf, Direction{2}, lev, amrex::convert(cba,jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+            if (m_fields.has(FieldType::rho_cp, lev)) {
+                m_fields.alloc_init(FieldType::rho_buf, lev, amrex::convert(cba,rho_nodal_flag), dm, 2*ncomps, ngRho, 0.0_rt);
             }
             AllocInitMultiFab(current_buffer_masks[lev], ba, dm, ncomps, amrex::IntVect(1), lev, "current_buffer_masks");
             // Current buffer masks have 1 ghost cell, because of the fact
@@ -2845,7 +2758,7 @@ void WarpX::AllocLevelSpectralSolverRZ (amrex::Vector<std::unique_ptr<SpectralSo
                                                   m_v_galilean,
                                                   dx_vect,
                                                   solver_dt,
-                                                  isAnyBoundaryPML(),
+                                                  ::isAnyBoundaryPML(field_boundary_lo, field_boundary_hi),
                                                   update_with_rho,
                                                   fft_do_time_averaging,
                                                   J_in_time,
@@ -3001,7 +2914,7 @@ WarpX::RefRatio (int lev)
 
 void
 WarpX::ComputeDivB (amrex::MultiFab& divB, int const dcomp,
-                    const std::array<const amrex::MultiFab* const, 3>& B,
+                    ablastr::fields::VectorField const& B,
                     const std::array<amrex::Real,3>& dx)
 {
     ComputeDivB(divB, dcomp, B, dx, IntVect::TheZeroVector());
@@ -3009,7 +2922,7 @@ WarpX::ComputeDivB (amrex::MultiFab& divB, int const dcomp,
 
 void
 WarpX::ComputeDivB (amrex::MultiFab& divB, int const dcomp,
-                    const std::array<const amrex::MultiFab* const, 3>& B,
+                    ablastr::fields::VectorField const& B,
                     const std::array<amrex::Real,3>& dx, IntVect const ngrow)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(grid_type != GridType::Collocated,
@@ -3049,13 +2962,15 @@ WarpX::ComputeDivE(amrex::MultiFab& divE, const int lev)
 {
     if ( WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD ) {
 #ifdef WARPX_USE_FFT
-        spectral_solver_fp[lev]->ComputeSpectralDivE( lev, Efield_aux[lev], divE );
+        const ablastr::fields::VectorField Efield_aux_lev = m_fields.get_alldirs(FieldType::Efield_aux, lev);
+        spectral_solver_fp[lev]->ComputeSpectralDivE(lev, Efield_aux_lev, divE);
 #else
         WARPX_ABORT_WITH_MESSAGE(
             "ComputeDivE: PSATD requested but not compiled");
 #endif
     } else {
-        m_fdtd_solver_fp[lev]->ComputeDivE( Efield_aux[lev], divE );
+        const ablastr::fields::VectorField Efield_aux_lev = m_fields.get_alldirs(FieldType::Efield_aux, lev);
+        m_fdtd_solver_fp[lev]->ComputeDivE(Efield_aux_lev, divE);
     }
 }
 
@@ -3330,10 +3245,12 @@ WarpX::GatherBufferMasks (int lev)
 void
 WarpX::StoreCurrent (int lev)
 {
+    using ablastr::fields::Direction;
     for (int idim = 0; idim < 3; ++idim) {
-        if (current_store[lev][idim]) {
-            MultiFab::Copy(*current_store[lev][idim], *current_fp[lev][idim],
-                           0, 0, 1, current_store[lev][idim]->nGrowVect());
+        if (m_fields.has(FieldType::current_store, Direction{idim},lev)) {
+            MultiFab::Copy(*m_fields.get(FieldType::current_store, Direction{idim}, lev),
+                           *m_fields.get(FieldType::current_fp, Direction{idim}, lev),
+                           0, 0, 1, m_fields.get(FieldType::current_store, Direction{idim}, lev)->nGrowVect());
         }
     }
 }
@@ -3341,21 +3258,17 @@ WarpX::StoreCurrent (int lev)
 void
 WarpX::RestoreCurrent (int lev)
 {
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
     for (int idim = 0; idim < 3; ++idim) {
-        if (current_store[lev][idim]) {
-            std::swap(current_fp[lev][idim], current_store[lev][idim]);
+        if (m_fields.has(FieldType::current_store, Direction{idim}, lev)) {
+            std::swap(
+                *m_fields.get(FieldType::current_fp, Direction{idim}, lev),
+                *m_fields.get(FieldType::current_store, Direction{idim}, lev)
+            );
         }
     }
-}
-
-bool
-WarpX::isAnyBoundaryPML()
-{
-    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-        if ( WarpX::field_boundary_lo[idim] == FieldBoundaryType::PML) { return true; }
-        if ( WarpX::field_boundary_hi[idim] == FieldBoundaryType::PML) { return true; }
-    }
-    return false;
 }
 
 bool
@@ -3378,26 +3291,6 @@ TagWithLevelSuffix (std::string name, int const level)
 
 void
 WarpX::AllocInitMultiFab (
-    std::unique_ptr<amrex::MultiFab>& mf,
-    const amrex::BoxArray& ba,
-    const amrex::DistributionMapping& dm,
-    const int ncomp,
-    const amrex::IntVect& ngrow,
-    const int level,
-    const std::string& name,
-    std::optional<const amrex::Real> initial_value)
-{
-    const auto name_with_suffix = TagWithLevelSuffix(name, level);
-    const auto tag = amrex::MFInfo().SetTag(name_with_suffix);
-    mf = std::make_unique<amrex::MultiFab>(ba, dm, ncomp, ngrow, tag);
-    if (initial_value) {
-        mf->setVal(*initial_value);
-    }
-    multifab_map[name_with_suffix] = mf.get();
-}
-
-void
-WarpX::AllocInitMultiFab (
     std::unique_ptr<amrex::iMultiFab>& mf,
     const amrex::BoxArray& ba,
     const amrex::DistributionMapping& dm,
@@ -3414,173 +3307,6 @@ WarpX::AllocInitMultiFab (
         mf->setVal(*initial_value);
     }
     imultifab_map[name_with_suffix] = mf.get();
-}
-
-void
-WarpX::AliasInitMultiFab (
-    std::unique_ptr<amrex::MultiFab>& mf,
-    const amrex::MultiFab& mf_to_alias,
-    const int scomp,
-    const int ncomp,
-    const int level,
-    const std::string& name,
-    std::optional<const amrex::Real> initial_value)
-{
-    const auto name_with_suffix = TagWithLevelSuffix(name, level);
-    mf = std::make_unique<amrex::MultiFab>(mf_to_alias, amrex::make_alias, scomp, ncomp);
-    if (initial_value) {
-        mf->setVal(*initial_value);
-    }
-    multifab_map[name_with_suffix] = mf.get();
-}
-
-void
-WarpX::AllocInitMultiFabFromModel (
-    std::unique_ptr<amrex::MultiFab>& mf,
-    amrex::MultiFab& mf_model,
-    const int level,
-    const std::string& name,
-    std::optional<const amrex::Real> initial_value)
-{
-    const auto name_with_suffix = TagWithLevelSuffix(name, level);
-    const auto tag = amrex::MFInfo().SetTag(name_with_suffix);
-    mf = std::make_unique<amrex::MultiFab>(mf_model.boxArray(), mf_model.DistributionMap(),
-                                           mf_model.nComp(), mf_model.nGrowVect(), tag);
-    if (initial_value) {
-        mf->setVal(*initial_value);
-    }
-    multifab_map[name_with_suffix] = mf.get();
-}
-
-amrex::MultiFab*
-WarpX::getFieldPointerUnchecked (const FieldType field_type, const int lev, const int direction) const
-{
-    // This function does *not* check if the returned field pointer is != nullptr
-
-    amrex::MultiFab* field_pointer = nullptr;
-
-    switch(field_type)
-    {
-        case FieldType::Efield_aux :
-            field_pointer = Efield_aux[lev][direction].get();
-            break;
-        case FieldType::Bfield_aux :
-            field_pointer = Bfield_aux[lev][direction].get();
-            break;
-        case FieldType::Efield_fp :
-            field_pointer = Efield_fp[lev][direction].get();
-            break;
-        case FieldType::Bfield_fp :
-            field_pointer = Bfield_fp[lev][direction].get();
-            break;
-        case FieldType::Efield_fp_external :
-            field_pointer = Efield_fp_external[lev][direction].get();
-            break;
-        case FieldType::Bfield_fp_external :
-            field_pointer = Bfield_fp_external[lev][direction].get();
-            break;
-        case FieldType::current_fp :
-            field_pointer = current_fp[lev][direction].get();
-            break;
-        case FieldType::current_fp_nodal :
-            field_pointer = current_fp_nodal[lev][direction].get();
-            break;
-        case FieldType::rho_fp :
-            field_pointer = rho_fp[lev].get();
-            break;
-        case FieldType::F_fp :
-            field_pointer = F_fp[lev].get();
-            break;
-        case FieldType::G_fp :
-            field_pointer = G_fp[lev].get();
-            break;
-        case FieldType::phi_fp :
-            field_pointer = phi_fp[lev].get();
-            break;
-        case FieldType::vector_potential_fp :
-            field_pointer = vector_potential_fp_nodal[lev][direction].get();
-            break;
-        case FieldType::Efield_cp :
-            field_pointer = Efield_cp[lev][direction].get();
-            break;
-        case FieldType::Bfield_cp :
-            field_pointer = Bfield_cp[lev][direction].get();
-            break;
-        case FieldType::current_cp :
-            field_pointer = current_cp[lev][direction].get();
-            break;
-        case FieldType::rho_cp :
-            field_pointer = rho_cp[lev].get();
-            break;
-        case FieldType::F_cp :
-            field_pointer = F_cp[lev].get();
-            break;
-        case FieldType::G_cp :
-            field_pointer = G_cp[lev].get();
-            break;
-        case FieldType::edge_lengths :
-            field_pointer = m_edge_lengths[lev][direction].get();
-            break;
-        case FieldType::face_areas :
-            field_pointer = m_face_areas[lev][direction].get();
-            break;
-        case FieldType::Efield_avg_fp :
-            field_pointer = Efield_avg_fp[lev][direction].get();
-            break;
-        case FieldType::Bfield_avg_fp :
-            field_pointer = Bfield_avg_fp[lev][direction].get();
-            break;
-        case FieldType::Efield_avg_cp :
-            field_pointer = Efield_avg_cp[lev][direction].get();
-            break;
-        case FieldType::Bfield_avg_cp :
-            field_pointer = Bfield_avg_cp[lev][direction].get();
-            break;
-        default:
-            WARPX_ABORT_WITH_MESSAGE("Invalid field type");
-            break;
-    }
-
-    return field_pointer;
-}
-
-bool
-WarpX::isFieldInitialized (const FieldType field_type, const int lev, const int direction) const
-{
-    const bool is_field_init = (getFieldPointerUnchecked(field_type, lev, direction) != nullptr);
-    return is_field_init;
-}
-
-amrex::MultiFab*
-WarpX::getFieldPointer (const FieldType field_type, const int lev, const int direction) const
-{
-    auto* const field_pointer = getFieldPointerUnchecked(field_type, lev, direction);
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        field_pointer != nullptr, "Requested field is not initialized!");
-    return field_pointer;
-}
-
-std::array<const amrex::MultiFab* const, 3>
-WarpX::getFieldPointerArray (const FieldType field_type, const int lev) const
-{
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        (field_type == FieldType::Efield_aux) || (field_type == FieldType::Bfield_aux) ||
-        (field_type == FieldType::Efield_fp) || (field_type == FieldType::Bfield_fp) ||
-        (field_type == FieldType::Efield_fp_external) || (field_type == FieldType::Bfield_fp_external) ||
-        (field_type == FieldType::current_fp) || (field_type == FieldType::current_fp_nodal) ||
-        (field_type == FieldType::Efield_cp) || (field_type == FieldType::Bfield_cp) ||
-        (field_type == FieldType::current_cp), "Requested field type is not a vector.");
-
-    return std::array<const amrex::MultiFab* const, 3>{
-        getFieldPointer(field_type, lev, 0),
-        getFieldPointer(field_type, lev, 1),
-        getFieldPointer(field_type, lev, 2)};
-}
-
-const amrex::MultiFab&
-WarpX::getField(FieldType field_type, const int lev, const int direction) const
-{
-    return *getFieldPointer(field_type, lev, direction);
 }
 
 amrex::DistributionMapping
@@ -3609,55 +3335,22 @@ WarpX::MakeDistributionMap (int lev, amrex::BoxArray const& ba)
     }
 }
 
-const amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>,3>>&
-WarpX::getMultiLevelField(warpx::fields::FieldType field_type) const
-{
-    switch(field_type)
-    {
-        case FieldType::Efield_aux :
-            return Efield_aux;
-        case FieldType::Bfield_aux :
-            return Bfield_aux;
-        case FieldType::Efield_fp :
-            return Efield_fp;
-        case FieldType::Efield_fp_external :
-            return Efield_fp_external;
-        case FieldType::Bfield_fp :
-            return Bfield_fp;
-        case FieldType::Bfield_fp_external :
-            return Bfield_fp_external;
-        case FieldType::current_fp :
-            return current_fp;
-        case FieldType::current_fp_nodal :
-            return current_fp_nodal;
-        case FieldType::Efield_cp :
-            return Efield_cp;
-        case FieldType::Bfield_cp :
-            return Bfield_cp;
-        case FieldType::current_cp :
-            return current_cp;
-        default:
-            WARPX_ABORT_WITH_MESSAGE("Invalid field type");
-            return Efield_fp;
-    }
-}
-
 const amrex::iMultiFab*
 WarpX::getFieldDotMaskPointer ( FieldType field_type, int lev, int dir ) const
 {
     switch(field_type)
     {
         case FieldType::Efield_fp :
-            SetDotMask( Efield_dotMask[lev][dir], field_type, lev, dir );
+            SetDotMask( Efield_dotMask[lev][dir], "Efield_fp", lev, dir );
             return Efield_dotMask[lev][dir].get();
         case FieldType::Bfield_fp :
-            SetDotMask( Bfield_dotMask[lev][dir], field_type, lev, dir );
+            SetDotMask( Bfield_dotMask[lev][dir], "Bfield_fp", lev, dir );
             return Bfield_dotMask[lev][dir].get();
         case FieldType::vector_potential_fp :
-            SetDotMask( Afield_dotMask[lev][dir], field_type, lev, dir );
+            SetDotMask( Afield_dotMask[lev][dir], "vector_potential_fp", lev, dir );
             return Afield_dotMask[lev][dir].get();
         case FieldType::phi_fp :
-            SetDotMask( phi_dotMask[lev], field_type, lev, 0 );
+            SetDotMask( phi_dotMask[lev], "phi_fp", lev, 0 );
             return phi_dotMask[lev].get();
         default:
             WARPX_ABORT_WITH_MESSAGE("Invalid field type for dotMask");
@@ -3666,15 +3359,15 @@ WarpX::getFieldDotMaskPointer ( FieldType field_type, int lev, int dir ) const
 }
 
 void WarpX::SetDotMask( std::unique_ptr<amrex::iMultiFab>& field_dotMask,
-                        FieldType field_type, int lev, int dir ) const
+                        std::string const & field_name, int lev, int dir ) const
 {
     // Define the dot mask for this field_type needed to properly compute dotProduct()
     // for field values that have shared locations on different MPI ranks
     if (field_dotMask != nullptr) { return; }
 
-    const amrex::MultiFab* this_field = getFieldPointer(field_type,lev,dir);
-    const amrex::BoxArray& this_ba = this_field->boxArray();
-    const amrex::MultiFab tmp( this_ba, this_field->DistributionMap(),
+    ablastr::fields::ConstVectorField const& this_field = m_fields.get_alldirs(field_name,lev);
+    const amrex::BoxArray& this_ba = this_field[dir]->boxArray();
+    const amrex::MultiFab tmp( this_ba, this_field[dir]->DistributionMap(),
                                1, 0, amrex::MFInfo().SetAlloc(false) );
     const amrex::Periodicity& period = Geom(lev).periodicity();
     field_dotMask = tmp.OwnerMask(period);

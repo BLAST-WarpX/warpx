@@ -44,15 +44,10 @@ public:
      * \param[in,out] Bfield Field contribution from phi computed from each species' charge density is added
      */
     void ComputeSpaceChargeField (
-        [[maybe_unused]] amrex::Vector< std::unique_ptr<amrex::MultiFab> >& rho_fp,
-        [[maybe_unused]] amrex::Vector< std::unique_ptr<amrex::MultiFab> >& rho_cp,
-                         amrex::Vector< std::unique_ptr<amrex::MultiFab> >& charge_buf,
-                         amrex::Vector< std::unique_ptr<amrex::MultiFab> >& phi_fp,
-                         MultiParticleContainer& mpc,
-        [[maybe_unused]] MultiFluidContainer* mfl,
-                         amrex::Vector< std::array< std::unique_ptr<amrex::MultiFab>, 3> >& Efield_fp,
-                         amrex::Vector< std::array< std::unique_ptr<amrex::MultiFab>, 3> >& Bfield_fp
-    ) override;
+        ablastr::fields::MultiFabRegister& fields,
+        MultiParticleContainer& mpc,
+        MultiFluidContainer* mfl,
+        int max_level) override;
 
     /**
      * Compute the charge density of the species paricle container, pc,
@@ -65,10 +60,9 @@ public:
      * \param[in] Bfield Bfield updated to include potential computed for selected species charge density as source
      */
     void AddSpaceChargeField (
-        amrex::Vector<std::unique_ptr<amrex::MultiFab> >& charge_buf,
         WarpXParticleContainer& pc,
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>>& Efield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>>& Bfield
+        ablastr::fields::MultiLevelVectorField& Efield_fp,
+        ablastr::fields::MultiLevelVectorField& Bfield_fp
     );
 
     /** Compute the potential `phi` by solving the Poisson equation with the
@@ -77,7 +71,7 @@ public:
     * \param[in] Efield Efield updated to include potential gradient from boundary condition
     */
     void AddBoundaryField (
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>>& Efield
+        ablastr::fields::MultiLevelVectorField& Efield
     );
 };
 

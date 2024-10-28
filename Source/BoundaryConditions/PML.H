@@ -17,6 +17,8 @@
 #   include "FieldSolver/SpectralSolver/SpectralSolver.H"
 #endif
 
+#include <ablastr/fields/MultiFabRegister.H>
+
 #include <AMReX_MultiFab.H>
 #include <AMReX_BoxArray.H>
 #include <AMReX_Config.H>
@@ -155,23 +157,6 @@ public:
 
     void ComputePMLFactors (amrex::Real dt);
 
-    std::array<amrex::MultiFab*,3> GetE_fp ();
-    std::array<amrex::MultiFab*,3> GetB_fp ();
-    std::array<amrex::MultiFab*,3> Getj_fp ();
-    std::array<amrex::MultiFab*,3> GetE_cp ();
-    std::array<amrex::MultiFab*,3> GetB_cp ();
-    std::array<amrex::MultiFab*,3> Getj_cp ();
-    std::array<amrex::MultiFab*,3> Get_edge_lengths ();
-    std::array<amrex::MultiFab*,3> Get_face_areas ();
-
-    // Used when WarpX::do_pml_dive_cleaning = true
-    amrex::MultiFab* GetF_fp ();
-    amrex::MultiFab* GetF_cp ();
-
-    // Used when WarpX::do_pml_divb_cleaning = true
-    amrex::MultiFab* GetG_fp ();
-    amrex::MultiFab* GetG_cp ();
-
     [[nodiscard]] const MultiSigmaBox& GetMultiSigmaBox_fp () const
     {
         return *sigba_fp;
@@ -183,35 +168,33 @@ public:
     }
 
 #ifdef WARPX_USE_FFT
-    void PushPSATD (int lev);
+    void PushPSATD (ablastr::fields::MultiFabRegister& fields, int lev);
 #endif
 
-    void CopyJtoPMLs (const std::array<amrex::MultiFab*,3>& j_fp,
-                    const std::array<amrex::MultiFab*,3>& j_cp);
+    void CopyJtoPMLs (ablastr::fields::MultiFabRegister& fields, int lev);
 
-    void Exchange (const std::array<amrex::MultiFab*,3>& mf_pml,
-                   const std::array<amrex::MultiFab*,3>& mf,
+    void Exchange (ablastr::fields::VectorField mf_pml,
+                   ablastr::fields::VectorField mf,
+                   const PatchType& patch_type,
+                   int do_pml_in_domain);
+    void Exchange (amrex::MultiFab* mf_pml,
+                   amrex::MultiFab* mf,
                    const PatchType& patch_type,
                    int do_pml_in_domain);
 
-    void CopyJtoPMLs (PatchType patch_type,
-                    const std::array<amrex::MultiFab*,3>& jp);
+    void CopyJtoPMLs (
+        ablastr::fields::MultiFabRegister& fields,
+        PatchType patch_type,
+        int lev
+    );
 
-    void ExchangeF (amrex::MultiFab* F_fp, amrex::MultiFab* F_cp, int do_pml_in_domain);
-    void ExchangeF (PatchType patch_type, amrex::MultiFab* Fp, int do_pml_in_domain);
-
-    void ExchangeG (amrex::MultiFab* G_fp, amrex::MultiFab* G_cp, int do_pml_in_domain);
-    void ExchangeG (PatchType patch_type, amrex::MultiFab* Gp, int do_pml_in_domain);
-
-    void FillBoundaryE (PatchType patch_type, std::optional<bool> nodal_sync=std::nullopt);
-    void FillBoundaryB (PatchType patch_type, std::optional<bool> nodal_sync=std::nullopt);
-    void FillBoundaryF (PatchType patch_type, std::optional<bool> nodal_sync=std::nullopt);
-    void FillBoundaryG (PatchType patch_type, std::optional<bool> nodal_sync=std::nullopt);
+    void FillBoundary (ablastr::fields::VectorField mf_pml, PatchType patch_type, std::optional<bool> nodal_sync=std::nullopt);
+    void FillBoundary (amrex::MultiFab & mf_pml, PatchType patch_type, std::optional<bool> nodal_sync=std::nullopt);
 
     [[nodiscard]] bool ok () const { return m_ok; }
 
-    void CheckPoint (const std::string& dir) const;
-    void Restart (const std::string& dir);
+    void CheckPoint (ablastr::fields::MultiFabRegister& fields, const std::string& dir) const;
+    void Restart (ablastr::fields::MultiFabRegister& fields, const std::string& dir);
 
     static void Exchange (amrex::MultiFab& pml, amrex::MultiFab& reg, const amrex::Geometry& geom, int do_pml_in_domain);
 
@@ -226,24 +209,6 @@ private:
 
     const amrex::Geometry* m_geom;
     const amrex::Geometry* m_cgeom;
-
-    std::array<std::unique_ptr<amrex::MultiFab>,3> pml_E_fp;
-    std::array<std::unique_ptr<amrex::MultiFab>,3> pml_B_fp;
-    std::array<std::unique_ptr<amrex::MultiFab>,3> pml_j_fp;
-
-    std::array<std::unique_ptr<amrex::MultiFab>,3> pml_edge_lengths;
-
-    std::array<std::unique_ptr<amrex::MultiFab>,3> pml_E_cp;
-    std::array<std::unique_ptr<amrex::MultiFab>,3> pml_B_cp;
-    std::array<std::unique_ptr<amrex::MultiFab>,3> pml_j_cp;
-
-    // Used when WarpX::do_pml_dive_cleaning = true
-    std::unique_ptr<amrex::MultiFab> pml_F_fp;
-    std::unique_ptr<amrex::MultiFab> pml_F_cp;
-
-    // Used when WarpX::do_pml_divb_cleaning = true
-    std::unique_ptr<amrex::MultiFab> pml_G_fp;
-    std::unique_ptr<amrex::MultiFab> pml_G_cp;
 
     std::unique_ptr<MultiSigmaBox> sigba_fp;
     std::unique_ptr<MultiSigmaBox> sigba_cp;
@@ -293,13 +258,15 @@ private:
 };
 
 #ifdef WARPX_USE_FFT
-void PushPMLPSATDSinglePatch( int lev,
+void PushPMLPSATDSinglePatch (
+    int lev,
     SpectralSolver& solver,
-    std::array<std::unique_ptr<amrex::MultiFab>,3>& pml_E,
-    std::array<std::unique_ptr<amrex::MultiFab>,3>& pml_B,
-    std::unique_ptr<amrex::MultiFab>& pml_F,
-    std::unique_ptr<amrex::MultiFab>& pml_G,
-    const amrex::IntVect& fill_guards);
+    ablastr::fields::VectorField& pml_E,
+    ablastr::fields::VectorField& pml_B,
+    ablastr::fields::ScalarField pml_F,
+    ablastr::fields::ScalarField pml_G,
+    const amrex::IntVect& fill_guards
+);
 #endif
 
 #endif

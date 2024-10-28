@@ -22,19 +22,14 @@ public:
     void InitData () override;
 
     void ComputeSpaceChargeField (
-        amrex::Vector< std::unique_ptr<amrex::MultiFab> >& rho_fp,
-        amrex::Vector< std::unique_ptr<amrex::MultiFab> >& rho_cp,
-        amrex::Vector< std::unique_ptr<amrex::MultiFab> >& charge_buf,
-        amrex::Vector< std::unique_ptr<amrex::MultiFab> >& phi_fp,
+        ablastr::fields::MultiFabRegister& fields,
         MultiParticleContainer& mpc,
         MultiFluidContainer* mfl,
-        amrex::Vector< std::array< std::unique_ptr<amrex::MultiFab>, 3> >& Efield_fp,
-        amrex::Vector< std::array< std::unique_ptr<amrex::MultiFab>, 3> >& Bfield_fp
-    ) override;
+        int max_level) override;
 
     void computePhiTriDiagonal (
-        const amrex::Vector<std::unique_ptr<amrex::MultiFab> >& rho,
-        amrex::Vector<std::unique_ptr<amrex::MultiFab> >& phi
+        const ablastr::fields::MultiLevelScalarField& rho,
+        const ablastr::fields::MultiLevelScalarField& phi
     );
 
 };

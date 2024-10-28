@@ -90,6 +90,11 @@ Scientific works in laser-ion acceleration and laser-matter interaction.
    Physical Review Research **6**, 033148, 2024.
    `DOI:10.1103/PhysRevResearch.6.033148 <https://doi.org/10.1103/PhysRevResearch.6.033148>`__
 
+#. Zaïm N, Sainte-Marie A, Fedeli L, Bartoli P, Huebl A, Leblanc A, Vay J-L, Vincenti H.
+   **Light-matter interaction near the Schwinger limit using tightly focused doppler-boosted lasers**.
+   Physical Review Letters **132**, 175002, 2024.
+   `DOI:10.1103/PhysRevLett.132.175002 <https://doi.org/10.1103/PhysRevLett.132.175002>`__
+
 #. Knight B, Gautam C, Stoner C, Egner B, Smith J, Orban C, Manfredi J, Frische K, Dexter M, Chowdhury E, Patnaik A (2023).
    **Detailed Characterization of a kHz-rate Laser-Driven Fusion at a Thin Liquid Sheet with a Neutron Detection Suite**.
    High Power Laser Science and Engineering, 1-13, 2023.
@@ -109,6 +114,11 @@ Scientific works in laser-ion acceleration and laser-matter interaction.
    **Low-divergence MeV-class proton beams from kHz-driven laser-solid interactions**.
    Phys. Rev. Accel. Beams **25**, 093402, 2022.
    `DOI:10.1103/PhysRevAccelBeams.25.093402 <https://doi.org/10.1103/PhysRevAccelBeams.25.093402>`__
+
+#. Fedeli L, Sainte-Marie A, Zaïm N, Thévenet M, Vay J-L, Myers A, Quéré F, Vincenti H.
+   **Probing strong-field QED with Doppler-boosted PetaWatt-class lasers**.
+   Physical Review Letters **127**, 114801, 2021.
+   `DOI:10.1103/PhysRevLett.127.114801 <https://doi.org/10.1103/PhysRevLett.127.114801>`__
 
 
 Particle Accelerator & Beam Physics

@@ -291,14 +291,9 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
 }
 
 void
-RigidInjectedParticleContainer::Evolve (int lev,
-                                        const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
-                                        const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
-                                        MultiFab& jx, MultiFab& jy, MultiFab& jz,
-                                        MultiFab* cjx, MultiFab* cjy, MultiFab* cjz,
-                                        MultiFab* rho, MultiFab* crho,
-                                        const MultiFab* cEx, const MultiFab* cEy, const MultiFab* cEz,
-                                        const MultiFab* cBx, const MultiFab* cBy, const MultiFab* cBz,
+RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
+                                        int lev,
+                                        const std::string& current_fp_string,
                                         Real t, Real dt, DtType a_dt_type, bool skip_deposition,
                                         PushType push_type)
 {
@@ -317,14 +312,9 @@ RigidInjectedParticleContainer::Evolve (int lev,
     done_injecting_lev = ((zinject_plane_levels[lev] < plo[WARPX_ZINDEX] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c >= 0.) ||
                            (zinject_plane_levels[lev] > phi[WARPX_ZINDEX] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c <= 0.));
 
-    PhysicalParticleContainer::Evolve (lev,
-                                       Ex, Ey, Ez,
-                                       Bx, By, Bz,
-                                       jx, jy, jz,
-                                       cjx, cjy, cjz,
-                                       rho, crho,
-                                       cEx, cEy, cEz,
-                                       cBx, cBy, cBz,
+    PhysicalParticleContainer::Evolve (fields,
+                                       lev,
+                                       current_fp_string,
                                        t, dt, a_dt_type, skip_deposition, push_type);
 }
 
