@@ -738,6 +738,39 @@ class UniformDistribution(
         if density_scale is not None:
             species.add_new_group_attr(source_name, "density", density_scale)
 
+class AnalyticFluxDistribution(
+    picmistandard.PICMI_AnalyticFluxDistribution, DensityDistributionBase
+):
+    def distribution_initialize_inputs(
+        self, species_number, layout, species, density_scale, source_name
+    ):
+        self.fill_in = False
+        self.set_mangle_dict()
+        self.set_species_attributes(species, layout, source_name)
+
+        species.add_new_group_attr(source_name, "flux_profile", "constant")
+        species.add_new_group_attr(source_name, "flux", self.flux_expression)
+        if density_scale is not None:
+            species.add_new_group_attr(source_name, "flux", density_scale)
+        species.add_new_group_attr(
+            source_name, "flux_normal_axis", self.flux_normal_axis
+        )
+        species.add_new_group_attr(
+            source_name, "surface_flux_pos", self.surface_flux_position
+        )
+        species.add_new_group_attr(source_name, "flux_direction", self.flux_direction)
+        species.add_new_group_attr(source_name, "flux_tmin", self.flux_tmin)
+        species.add_new_group_attr(source_name, "flux_tmax", self.flux_tmax)
+
+        # --- Use specific attributes for flux injection
+        species.add_new_group_attr(source_name, "injection_style", "nfluxpercell")
+        assert isinstance(layout, PseudoRandomLayout), Exception(
+            "UniformFluxDistribution only supports the PseudoRandomLayout in WarpX"
+        )
+        if self.gaussian_flux_momentum_distribution:
+            species.add_new_group_attr(
+                source_name, "momentum_distribution_type", "gaussianflux"
+            )
 
 class AnalyticDistribution(
     picmistandard.PICMI_AnalyticDistribution, DensityDistributionBase
