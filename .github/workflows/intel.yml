@@ -112,6 +112,7 @@ jobs:
         set +e
         source /opt/intel/oneapi/setvars.sh
         set -e
+        export PATH=$PATH:/opt/intel/oneapi/compiler/2024.2/bin  # FIXME
         export CXX=$(which icpx)
         export CC=$(which icx)
 
@@ -176,6 +177,7 @@ jobs:
         set +e
         source /opt/intel/oneapi/setvars.sh
         set -e
+        export PATH=$PATH:/opt/intel/oneapi/compiler/2024.2/bin  # FIXME
         export CXX=$(which icpx)
         export CC=$(which icx)
         export CXXFLAGS="-fsycl ${CXXFLAGS}"
