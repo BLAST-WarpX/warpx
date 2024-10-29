@@ -691,6 +691,11 @@ class DensityDistributionBase(object):
 class UniformFluxDistribution(
     picmistandard.PICMI_UniformFluxDistribution, DensityDistributionBase
 ):
+    def init(self, kw):
+        self.inject_from_embedded_boundary = kw.pop(
+            "warpx_inject_from_embedded_boundary", False
+        )
+
     def distribution_initialize_inputs(
         self, species_number, layout, species, density_scale, source_name
     ):
@@ -702,13 +707,22 @@ class UniformFluxDistribution(
         species.add_new_group_attr(source_name, "flux", self.flux)
         if density_scale is not None:
             species.add_new_group_attr(source_name, "flux", density_scale)
-        species.add_new_group_attr(
-            source_name, "flux_normal_axis", self.flux_normal_axis
-        )
-        species.add_new_group_attr(
-            source_name, "surface_flux_pos", self.surface_flux_position
-        )
-        species.add_new_group_attr(source_name, "flux_direction", self.flux_direction)
+
+        if not self.inject_from_embedded_boundary:
+            species.add_new_group_attr(
+                source_name, "flux_normal_axis", self.flux_normal_axis
+            )
+            species.add_new_group_attr(
+                source_name, "surface_flux_pos", self.surface_flux_position
+            )
+            species.add_new_group_attr(
+                source_name, "flux_direction", self.flux_direction
+            )
+        else:
+            species.add_new_group_attr(
+                source_name, "inject_from_embedded_boundary", True
+            )
+
         species.add_new_group_attr(source_name, "flux_tmin", self.flux_tmin)
         species.add_new_group_attr(source_name, "flux_tmax", self.flux_tmax)
 

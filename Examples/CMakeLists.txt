@@ -93,6 +93,11 @@ function(add_warpx_test
         return()
     endif()
 
+    # cannot run executable tests w/o WarpX executable application
+    if(NOT python AND NOT WarpX_APP)
+        return()
+    endif()
+
     # set MPI executable
     set(THIS_MPI_TEST_EXE
         ${MPIEXEC_EXECUTABLE}
