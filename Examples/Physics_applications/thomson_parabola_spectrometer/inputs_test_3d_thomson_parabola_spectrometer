@@ -184,9 +184,9 @@ carbon12_6.save_particles_at_zhi = 1
 carbon12_4.save_particles_at_zhi = 1
 
 diag1.diag_type = Full
-diag1.fields_to_plot = Ex Bx
+diag1.fields_to_plot = rho_hydrogen1_1 rho_carbon12_6 rho_carbon12_4
 diag1.format = openpmd
-diag1.intervals = 0
+diag1.intervals = 50:50
 diag1.write_species = 1
 diag1.species = hydrogen1_1 carbon12_6 carbon12_4
-diag1.dump_last_timestep = 1
+diag1.dump_last_timestep = 0
