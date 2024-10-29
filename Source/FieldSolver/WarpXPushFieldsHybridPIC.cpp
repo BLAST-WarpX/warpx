@@ -198,7 +198,6 @@ void WarpX::HybridPICEvolveFields ()
             if !(Efield_fp[lev][idim]->is_finite(true)) {
                 amrex::Abort("Non-finite value detected in E-field; this indicates more substeps should be used in the field solver.");
             }
-            );
         }
     }
 }
