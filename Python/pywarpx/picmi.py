@@ -738,6 +738,7 @@ class UniformDistribution(
         if density_scale is not None:
             species.add_new_group_attr(source_name, "density", density_scale)
 
+
 class AnalyticFluxDistribution(
     picmistandard.PICMI_AnalyticFluxDistribution, DensityDistributionBase
 ):
@@ -771,6 +772,7 @@ class AnalyticFluxDistribution(
             species.add_new_group_attr(
                 source_name, "momentum_distribution_type", "gaussianflux"
             )
+
 
 class AnalyticDistribution(
     picmistandard.PICMI_AnalyticDistribution, DensityDistributionBase
