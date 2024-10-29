@@ -163,8 +163,6 @@ AMREX_FORCE_INLINE
 void
 ExternalVectorPotential::ZeroFieldinEB (ablastr::fields::VectorField const& Field, EB::CoverTopology topology, const int lev)
 {
-    auto &warpx = WarpX::GetInstance();
-
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())

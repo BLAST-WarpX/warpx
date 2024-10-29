@@ -14,24 +14,14 @@
 #  include <AMReX.H>
 #  include <AMReX_Array.H>
 #  include <AMReX_Array4.H>
-#  include <AMReX_Box.H>
-#  include <AMReX_BoxArray.H>
-#  include <AMReX_BoxList.H>
 #  include <AMReX_Config.H>
-#  include <AMReX_FabArray.H>
-#  include <AMReX_FabFactory.H>
 #  include <AMReX_GpuControl.H>
 #  include <AMReX_GpuDevice.H>
 #  include <AMReX_GpuQualifiers.H>
 #  include <AMReX_MFIter.H>
 #  include <AMReX_MultiFab.H>
-#  include <AMReX_iMultiFab.H>
-#  include <AMReX_ParmParse.H>
-#  include <AMReX_Parser.H>
 #  include <AMReX_REAL.H>
 #  include <AMReX_SPACE.H>
-#  include <AMReX_Vector.H>
-#  include <AMReX_EB2_IF_Base.H>
 
 namespace EB {
 
