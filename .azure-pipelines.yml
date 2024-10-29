@@ -167,10 +167,16 @@ jobs:
 
       # run tests (exclude pytest.AMReX when running Python tests)
       ctest --test-dir build --output-on-failure -E AMReX
+      ctest_exit_status=$?
 
-      # find and print backtraces
+      # find and print backtraces (regardless of CTest exit status)
       find build/bin/ -type f -name "Backtrace*" \
       -exec echo -e "\nBacktrace\n---------\n{}\n---------" \; \
       -exec cat {} \; \
       -exec echo -e "\n" \;
+
+      # exit program based on CTest exit status
+      if (( ${ctest_exit_status} != 0 )); then
+        exit ${ctest_exit_status}
+      fi
     displayName: 'Test'
