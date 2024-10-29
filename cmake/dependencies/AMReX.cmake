@@ -93,7 +93,7 @@ macro(find_amrex)
         set(AMReX_PROBINIT OFF CACHE INTERNAL "")
         set(AMReX_TINY_PROFILE ON CACHE BOOL "")
         set(AMReX_LINEAR_SOLVERS_EM ON CACHE INTERNAL "")
-        set(AMReX_LINEAR_SOLVER_INCFLO OFF CACHE INTERNAL "")
+        set(AMReX_LINEAR_SOLVERS_INCFLO OFF CACHE INTERNAL "")
 
         if(WarpX_ASCENT OR WarpX_SENSEI)
             set(AMReX_GPU_RDC ON CACHE BOOL "")
@@ -283,7 +283,7 @@ set(WarpX_amrex_src ""
 set(WarpX_amrex_repo "https://github.com/AMReX-Codes/amrex.git"
     CACHE STRING
     "Repository URI to pull and build AMReX from if(WarpX_amrex_internal)")
-set(WarpX_amrex_branch "e1222803739ed2342b9ff6fc2d57316ff0d6cb0c"
+set(WarpX_amrex_branch "62c2a81eac7862d526e5861ef2befc00b7f5b759"
     CACHE STRING
     "Repository branch for WarpX_amrex_repo if(WarpX_amrex_internal)")
 

@@ -3271,6 +3271,57 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
 ElectrostaticFieldDiagnostic = FieldDiagnostic
 
 
+class TimeAveragedFieldDiagnostic(FieldDiagnostic):
+    """
+    See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
+
+    Parameters
+    ----------
+    warpx_time_average_mode: str
+        Type of time averaging diagnostic
+        Supported values include ``"none"``, ``"fixed_start"``, and ``"dynamic_start"``
+
+            * ``"none"`` for no averaging (instantaneous fields)
+            * ``"fixed_start"`` for a diagnostic that averages all fields between the current output step and a fixed point in time
+            * ``"dynamic_start"`` for a constant averaging period and output at different points in time (non-overlapping)
+
+    warpx_average_period_steps: int, optional
+        Configures the number of time steps in an averaging period.
+        Set this only in the ``"dynamic_start"`` mode and only if ``warpx_average_period_time`` has not already been set.
+        Will be ignored in the ``"fixed_start"`` mode (with warning).
+
+    warpx_average_period_time: float, optional
+        Configures the time (SI units) in an averaging period.
+        Set this only in the ``"dynamic_start"`` mode and only if ``average_period_steps`` has not already been set.
+        Will be ignored in the ``"fixed_start"`` mode (with warning).
+
+    warpx_average_start_steps: int, optional
+        Configures the time step at which time-averaging begins.
+        Set this only in the ``"fixed_start"`` mode.
+        Will be ignored in the ``"dynamic_start"`` mode (with warning).
+    """
+
+    def init(self, kw):
+        super().init(kw)
+        self.time_average_mode = kw.pop("warpx_time_average_mode", None)
+        self.average_period_steps = kw.pop("warpx_average_period_steps", None)
+        self.average_period_time = kw.pop("warpx_average_period_time", None)
+        self.average_start_step = kw.pop("warpx_average_start_step", None)
+
+    def diagnostic_initialize_inputs(self):
+        super().diagnostic_initialize_inputs()
+
+        self.diagnostic.set_or_replace_attr("diag_type", "TimeAveraged")
+
+        if "write_species" not in self.diagnostic.argvattrs:
+            self.diagnostic.write_species = False
+
+        self.diagnostic.time_average_mode = self.time_average_mode
+        self.diagnostic.average_period_steps = self.average_period_steps
+        self.diagnostic.average_period_time = self.average_period_time
+        self.diagnostic.average_start_step = self.average_start_step
+
+
 class Checkpoint(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
     """
     Sets up checkpointing of the simulation, allowing for later restarts

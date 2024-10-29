@@ -141,7 +141,7 @@ Attribute name        ``int``/``real``  Description                         Wher
                                         Wheeler process                                physics is used.
 ====================  ================  ==================================  ===== ==== ======================
 
-WarpX allows extra runtime attributes to be added to particle containers (through ``AddRealComp("attrname")`` or ``AddIntComp("attrname")``).
+WarpX allows extra runtime attributes to be added to particle containers (through ``NewRealComp("attrname")`` or ``NewIntComp("attrname")``).
 The attribute name can then be used to access the values of that attribute.
 For example, using a particle iterator, ``pti``, to loop over the particles the command ``pti.GetAttribs(particle_comps["attrname"]).dataPtr();`` will return the values of the ``"attrname"`` attribute.
 
