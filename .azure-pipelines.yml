@@ -167,4 +167,10 @@ jobs:
 
       # run tests (exclude pytest.AMReX when running Python tests)
       ctest --test-dir build --output-on-failure -E AMReX
+
+      # find and print backtraces
+      find build/bin/ -type f -name "Backtrace*" \
+      -exec echo -e "\nBacktrace\n---------\n{}\n---------" \; \
+      -exec cat {} \; \
+      -exec echo -e "\n" \;
     displayName: 'Test'
