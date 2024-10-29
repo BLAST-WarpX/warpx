@@ -138,24 +138,24 @@ PsatdAlgorithmComoving::pushSpectralFields (SpectralFieldData& f) const
             const Complex     X4   = X4_arr(i,j,k);
 
             // Update E
-            fields(i,j,k,Idx.Ex) = C*Ex_old + S_ck*c2*I*(ky_mod*Bz_old - kz_mod*By_old)
-                + X4*Jx - I*(X2*rho_new - X3*rho_old)*kx_mod;
+            fields(i,j,k,Idx.Ex) = std::nan(""); //C*Ex_old + S_ck*c2*I*(ky_mod*Bz_old - kz_mod*By_old)
+                //+ X4*Jx - I*(X2*rho_new - X3*rho_old)*kx_mod;
 
-            fields(i,j,k,Idx.Ey) = C*Ey_old + S_ck*c2*I*(kz_mod*Bx_old - kx_mod*Bz_old)
-                + X4*Jy - I*(X2*rho_new - X3*rho_old)*ky_mod;
+            fields(i,j,k,Idx.Ey) = std::nan(""); //C*Ey_old + S_ck*c2*I*(kz_mod*Bx_old - kx_mod*Bz_old)
+                //+ X4*Jy - I*(X2*rho_new - X3*rho_old)*ky_mod;
 
-            fields(i,j,k,Idx.Ez) = C*Ez_old + S_ck*c2*I*(kx_mod*By_old - ky_mod*Bx_old)
-                + X4*Jz - I*(X2*rho_new - X3*rho_old)*kz_mod;
+            fields(i,j,k,Idx.Ez) = std::nan(""); //C*Ez_old + S_ck*c2*I*(kx_mod*By_old - ky_mod*Bx_old)
+                //+ X4*Jz - I*(X2*rho_new - X3*rho_old)*kz_mod;
 
             // Update B
-            fields(i,j,k,Idx.Bx) = C*Bx_old - S_ck*I*(ky_mod*Ez_old - kz_mod*Ey_old)
-                + X1*I*(ky_mod*Jz - kz_mod*Jy);
+            fields(i,j,k,Idx.Bx) = std::nan(""); //C*Bx_old - S_ck*I*(ky_mod*Ez_old - kz_mod*Ey_old)
+                //+ X1*I*(ky_mod*Jz - kz_mod*Jy);
 
-            fields(i,j,k,Idx.By) = C*By_old - S_ck*I*(kz_mod*Ex_old - kx_mod*Ez_old)
-                + X1*I*(kz_mod*Jx - kx_mod*Jz);
+            fields(i,j,k,Idx.By) = std::nan(""); //C*By_old - S_ck*I*(kz_mod*Ex_old - kx_mod*Ez_old)
+                //+ X1*I*(kz_mod*Jx - kx_mod*Jz);
 
-            fields(i,j,k,Idx.Bz) = C*Bz_old - S_ck*I*(kx_mod*Ey_old - ky_mod*Ex_old)
-                + X1*I*(kx_mod*Jy - ky_mod*Jx);
+            fields(i,j,k,Idx.Bz) = std::nan(""); //C*Bz_old - S_ck*I*(kx_mod*Ey_old - ky_mod*Ex_old)
+                //+ X1*I*(kx_mod*Jy - ky_mod*Jx);
         });
     }
 }
