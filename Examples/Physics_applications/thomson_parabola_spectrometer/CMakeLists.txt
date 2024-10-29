@@ -10,4 +10,3 @@ add_warpx_test(
     diags/diag1  # output
     OFF  # dependency
 )
-
