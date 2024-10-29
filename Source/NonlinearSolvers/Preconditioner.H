@@ -66,7 +66,7 @@ class Preconditioner
          *      A x = b
          *  where A is a linear operator.
          */
-        virtual void Apply (T&, const T&) = 0;
+        virtual void Apply (T& a_x, const T& a_b) = 0;
 
         /**
          * \brief Check if the nonlinear solver has been defined.
