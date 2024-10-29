@@ -45,11 +45,11 @@ public:
     // Can have topology of f or e for 'face' or 'edge'
     AMREX_GPU_HOST_DEVICE
     bool isCovered (
-        const int idir,
-        const CoverTopology topology,
-        const int i,
-        const int j,
-        const int k) const noexcept
+        [[maybe_unused]] const int idir,
+        [[maybe_unused]] const CoverTopology topology,
+        [[maybe_unused]] const int i,
+        [[maybe_unused]] const int j,
+        [[maybe_unused]] const int k) const noexcept
     {
         bool is_covered = false;
 
