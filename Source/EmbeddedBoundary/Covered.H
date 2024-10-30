@@ -51,9 +51,9 @@ public:
         [[maybe_unused]] const int j,
         [[maybe_unused]] const int k) const noexcept
     {
+#ifdef AMREX_USE_EB
         bool is_covered = false;
 
-#ifdef AMREX_USE_EB
         switch (idir)
         {
         case 0:
@@ -105,9 +105,10 @@ public:
 #endif
             break;
         }
-#endif //AMREX_USE_EB
-
         return is_covered;
+#else
+        return false;
+#endif //AMREX_USE_EB
     }
 };
 
