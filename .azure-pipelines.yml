@@ -33,7 +33,7 @@ jobs:
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS=2 -DWarpX_FFT=ON -DWarpX_PYTHON=ON
       # Cartesian 3D
       cartesian_3d:
-        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=3 -DWarpX_FFT=ON -DWarpX_PYTHON=ON
+        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=3 -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_HEFFTE=ON
         WARPX_HEFFTE: 'TRUE'
       # Cylindrical RZ
       cylindrical_rz:
