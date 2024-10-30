@@ -269,8 +269,8 @@ Overall simulation parameters
             If 0, solve Poisson equation in full 3D geometry.
             If 1, solve Poisson equation in a quasi 3D geometry, neglecting the :math:`z` derivatives in the Laplacian of the Poisson equation.
             In practice, in this case, the code performes many 2D Poisson solves on all :math:`(x,y)` slices, each slice at a given :math:`z`.
-            This is often a good approximation for ultra-relativistic beams propagating along the :math:`z` direction, with the relativistic solver. 
-            As a consequence, this solver does not need to do an FFT along the :math:`z` direction, 
+            This is often a good approximation for ultra-relativistic beams propagating along the :math:`z` direction, with the relativistic solver.
+            As a consequence, this solver does not need to do an FFT along the :math:`z` direction,
             and instead uses only transverse FFTs (along :math:`x` and :math:`y`) at each :math:`z` position (or :math:`z` "slice").
 
           * warpx.use_distributed_3d_fft_solver (`bool`, default: 0): Choose whether the 3D FFTs performed in the
