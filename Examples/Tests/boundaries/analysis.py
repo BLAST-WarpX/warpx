@@ -23,7 +23,7 @@ from scipy.constants import c, m_e
 
 yt.funcs.mylog.setLevel(0)
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 # The min and max size of the box along the three axis.
 dmin = -1.0
@@ -111,5 +111,8 @@ assert np.all(
     np.abs((zz - zza) / zz) < 1.0e-15
 ), "Periodic particle position not correct"
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

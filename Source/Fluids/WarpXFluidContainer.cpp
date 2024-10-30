@@ -1010,24 +1010,23 @@ void WarpXFluidContainer::GatherAndPush (
     // External field parsers
     external_e_fields = (m_E_ext_s == "parse_e_ext_function");
     external_b_fields = (m_B_ext_s == "parse_b_ext_function");
+
     amrex::ParserExecutor<4> Exfield_parser;
     amrex::ParserExecutor<4> Eyfield_parser;
     amrex::ParserExecutor<4> Ezfield_parser;
     amrex::ParserExecutor<4> Bxfield_parser;
     amrex::ParserExecutor<4> Byfield_parser;
     amrex::ParserExecutor<4> Bzfield_parser;
-    if (external_e_fields){
-        constexpr int num_arguments = 4; //x,y,z,t
-        Exfield_parser = m_Ex_parser->compile<num_arguments>();
-        Eyfield_parser = m_Ey_parser->compile<num_arguments>();
-        Ezfield_parser = m_Ez_parser->compile<num_arguments>();
-    }
 
+    if (external_e_fields){
+        Exfield_parser = m_Ex_parser->compile<4>();
+        Eyfield_parser = m_Ey_parser->compile<4>();
+        Ezfield_parser = m_Ez_parser->compile<4>();
+    }
     if (external_b_fields){
-        constexpr int num_arguments = 4; //x,y,z,t
-        Bxfield_parser = m_Bx_parser->compile<num_arguments>();
-        Byfield_parser = m_By_parser->compile<num_arguments>();
-        Bzfield_parser = m_Bz_parser->compile<num_arguments>();
+        Bxfield_parser = m_Bx_parser->compile<4>();
+        Byfield_parser = m_By_parser->compile<4>();
+        Bzfield_parser = m_Bz_parser->compile<4>();
     }
 
 

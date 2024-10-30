@@ -30,7 +30,7 @@ void init_WarpXParticleContainer (py::module& m)
     > wpc (m, "WarpXParticleContainer");
     wpc
         .def("add_real_comp",
-            [](WarpXParticleContainer& pc, const std::string& name, bool comm) { pc.AddRealComp(name, comm); },
+            [](WarpXParticleContainer& pc, const std::string& name, bool comm) { pc.NewRealComp(name, comm); },
             py::arg("name"), py::arg("comm")
         )
         .def("add_n_particles",

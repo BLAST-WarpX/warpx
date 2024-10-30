@@ -24,7 +24,7 @@ from scipy.constants import c, e, m_e
 
 yt.funcs.mylog.setLevel(0)
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 filename = sys.argv[1]
 ds = yt.load(filename)
@@ -131,5 +131,8 @@ assert abs(np.abs((ux - ux_sim) / ux)) < 0.002, Exception(
     "error in x particle velocity"
 )
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

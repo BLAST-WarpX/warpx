@@ -27,7 +27,7 @@ import numpy as np
 from scipy.constants import c, e, epsilon_0, m_e
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 # test name
 test_name = os.path.split(os.getcwd())[1]
@@ -212,7 +212,8 @@ if div_cleaning:
     print("tolerance = {}".format(tolerance))
     assert error_rel < tolerance
 
-if re.search("single_precision", test_name):
-    checksumAPI.evaluate_checksum(test_name, fn, rtol=1.0e-3)
-else:
-    checksumAPI.evaluate_checksum(test_name, fn)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

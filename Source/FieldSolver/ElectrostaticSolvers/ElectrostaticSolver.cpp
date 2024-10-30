@@ -201,12 +201,12 @@ ElectrostaticSolver::computePhi (
         warpx.DistributionMap(),
         warpx.boxArray(),
         WarpX::grid_type,
-        *m_poisson_boundary_handler,
         is_solver_igf_on_lev0,
         EB::enabled(),
         WarpX::do_single_precision_comms,
         warpx.refRatio(),
         post_phi_calculation,
+        *m_poisson_boundary_handler,
         warpx.gett_new(0),
         eb_farray_box_factory
     );

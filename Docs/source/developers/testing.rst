@@ -1,34 +1,44 @@
 .. _developers-testing:
 
-Testing the code
+Testing the Code
 ================
 
-When adding a new feature, you want to make sure that (i) you did not break the existing code and (ii) your contribution gives correct results. While the code is tested regularly remotely (on the cloud when commits are pushed to an open PR, and every night on local clusters), it can also be useful to run tests on your custom input file. This section details how to use both automated and custom tests.
+When proposing a code change, you want to make sure that
 
-Continuous Integration in WarpX
--------------------------------
+* the code change does not break the existing code;
+* the code change gives correct results (numerics, physics, etc.).
 
-Configuration
-^^^^^^^^^^^^^
+WarpX follows the continuous integration (CI) software development practice, where automated builds and tests are run after merging code changes into the main branch.
 
-Our regression tests are run with `CTest <https://cmake.org/cmake/help/book/mastering-cmake/chapter/Testing%20With%20CMake%20and%20CTest.html#>`__, an executable that comes with CMake.
-
-The test suite is ready to run once you have configured and built WarpX with CMake, following the instructions that you find in our :ref:`Users <install-cmake>` or :ref:`Developers <building-cmake>` sections.
-
-A test that requires a build option that was not configured and built will be skipped automatically. For example, if you configure and build WarpX in 1D only, any test of dimensionality other than 1D, which would require WarpX to be configured and built in the corresponding dimensionality, will be skipped automatically.
+While the code is tested regularly remotely (on the cloud when commits are pushed to an open PR, and every night on local clusters), it can also be useful to run tests on your custom input file.
 
 How to run pre-commit tests locally
 -----------------------------------
 
-When proposing code changes to Warpx, we perform a couple of automated stylistic and correctness checks on the code change.
-You can run those locally before you push to save some time, install them once like this:
+First, when proposing a code change, we perform a couple of automated style and correctness checks.
+
+If you install the ``pre-commit`` tool on your local machine via
 
 .. code-block:: sh
 
    python -m pip install -U pre-commit
    pre-commit install
 
+the style and correctness checks will run automatically on your local machine, after you commit the change and before you push.
+
+If you do not install the ``pre-commit`` tool on your local machine, these checks will run automatically as part of our CI workflows and a commit containing style and correctness changes might be added automatically to your branch.
+In that case, you will need to pull that automated commit before pushing further changes.
+
 See `pre-commit.com <https://pre-commit.com>`__ and our ``.pre-commit-config.yaml`` file in the repository for more details.
+
+How to configure the automated tests
+------------------------------------
+
+Our regression tests are run with `CTest <https://cmake.org/cmake/help/book/mastering-cmake/chapter/Testing%20With%20CMake%20and%20CTest.html#>`__, an executable that comes with CMake.
+
+The test suite is ready to run once you have configured and built WarpX with CMake, following the instructions that you find in our :ref:`Users <install-cmake>` or :ref:`Developers <building-cmake>` sections.
+
+A test that requires a build option that was not configured and built will be skipped automatically. For example, if you configure and build WarpX in 1D only, any test of dimensionality other than 1D, which would require WarpX to be configured and built in the corresponding dimensionality, will be skipped automatically.
 
 How to run automated tests locally
 ----------------------------------
@@ -107,7 +117,15 @@ If you modify the code base locally and want to assess the effects of your code 
 How to add automated tests
 --------------------------
 
-As mentioned above, the input files and scripts used by the automated tests can be found in the `Examples <https://github.com/ECP-WarpX/WarpX/tree/development/Examples>`__ directory, either under `Physics_applications <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Physics_applications>`__ or `Tests <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests>`__.
+An automated test typically consists of the following components:
+
+* input file or PICMI input script;
+* analysis script;
+* checksum file.
+
+To learn more about how to use checksums in automated tests, please see the corresponding section :ref:`Checksums on Tests <developers-checksum>`.
+
+As mentioned above, the input files and scripts used by the automated tests can be found in the `Examples <https://github.com/ECP-WarpX/WarpX/tree/development/Examples>`__ directory, under either `Physics_applications <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Physics_applications>`__ or `Tests <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests>`__.
 
 Each test directory must contain a file named ``CMakeLists.txt`` where all tests associated with the input files and scripts in that directory must be listed.
 
@@ -173,7 +191,8 @@ A new test can be added by adding a corresponding entry in ``CMakeLists.txt`` as
 
 If you need a new Python package dependency for testing, please add it in `Regression/requirements.txt <https://github.com/ECP-WarpX/WarpX/blob/development/Regression/requirements.txt>`__.
 
-Sometimes two or more tests share a large number of input parameters. The shared input parameters can be collected in a "base" input file that can be passed as a runtime parameter in the actual test input files through the parameter ``FILE``.
+Sometimes two or more tests share a large number of input parameters.
+The shared input parameters can be collected in a "base" input file that can be passed as a runtime parameter in the actual test input files through the parameter ``FILE``.
 
 If the new test is added in a new directory that did not exist before, please add the name of that directory with the command ``add_subdirectory`` in `Physics_applications/CMakeLists.txt <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Physics_applications/CMakeLists.txt>`__ or `Tests/CMakeLists.txt <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests/CMakeLists.txt>`__, depending on where the new test directory is located.
 

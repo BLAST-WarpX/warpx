@@ -184,7 +184,6 @@ bool WarpX::safe_guard_cells = false;
 
 utils::parser::IntervalsParser WarpX::dt_update_interval;
 
-std::map<std::string, amrex::MultiFab *> WarpX::multifab_map;
 std::map<std::string, amrex::iMultiFab *> WarpX::imultifab_map;
 
 IntVect WarpX::filter_npass_each_dir(1);
@@ -195,6 +194,22 @@ int WarpX::n_current_deposition_buffer = -1;
 amrex::IntVect m_rho_nodal_flag;
 
 WarpX* WarpX::m_instance = nullptr;
+
+namespace
+{
+
+    [[nodiscard]] bool
+    isAnyBoundaryPML(
+        const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_lo,
+        const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_hi)
+    {
+        constexpr auto is_pml = [](const FieldBoundaryType fbt) {return (fbt == FieldBoundaryType::PML);};
+        const auto is_any_pml =
+            std::any_of(field_boundary_lo.begin(), field_boundary_lo.end(), is_pml) ||
+            std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(), is_pml);
+        return is_any_pml;
+    }
+}
 
 void WarpX::MakeWarpX ()
 {
@@ -879,7 +894,7 @@ WarpX::ReadParameters ()
         }
 
 #ifdef WARPX_DIM_RZ
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE( isAnyBoundaryPML() == false || electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD,
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE( ::isAnyBoundaryPML(field_boundary_lo, field_boundary_hi) == false || electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD,
             "PML are not implemented in RZ geometry with FDTD; please set a different boundary condition using boundary.field_lo and boundary.field_hi.");
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE( field_boundary_lo[1] != FieldBoundaryType::PML && field_boundary_hi[1] != FieldBoundaryType::PML,
             "PML are not implemented in RZ geometry along z; please set a different boundary condition using boundary.field_lo and boundary.field_hi.");
@@ -2015,7 +2030,7 @@ WarpX::AllocLevelData (int lev, const BoxArray& ba, const DistributionMapping& d
         safe_guard_cells,
         WarpX::do_multi_J,
         WarpX::fft_do_time_averaging,
-        WarpX::isAnyBoundaryPML(),
+        ::isAnyBoundaryPML(field_boundary_lo, field_boundary_hi),
         WarpX::do_pml_in_domain,
         WarpX::pml_ncell,
         this->refRatio(),
@@ -2743,7 +2758,7 @@ void WarpX::AllocLevelSpectralSolverRZ (amrex::Vector<std::unique_ptr<SpectralSo
                                                   m_v_galilean,
                                                   dx_vect,
                                                   solver_dt,
-                                                  isAnyBoundaryPML(),
+                                                  ::isAnyBoundaryPML(field_boundary_lo, field_boundary_hi),
                                                   update_with_rho,
                                                   fft_do_time_averaging,
                                                   J_in_time,
@@ -3257,16 +3272,6 @@ WarpX::RestoreCurrent (int lev)
 }
 
 bool
-WarpX::isAnyBoundaryPML()
-{
-    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-        if ( WarpX::field_boundary_lo[idim] == FieldBoundaryType::PML) { return true; }
-        if ( WarpX::field_boundary_hi[idim] == FieldBoundaryType::PML) { return true; }
-    }
-    return false;
-}
-
-bool
 WarpX::isAnyParticleBoundaryThermal ()
 {
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
@@ -3282,26 +3287,6 @@ TagWithLevelSuffix (std::string name, int const level)
     // Add the suffix "[level=level]"
     name.append("[level=").append(std::to_string(level)).append("]");
     return name;
-}
-
-void
-WarpX::AllocInitMultiFab (
-    std::unique_ptr<amrex::MultiFab>& mf,
-    const amrex::BoxArray& ba,
-    const amrex::DistributionMapping& dm,
-    const int ncomp,
-    const amrex::IntVect& ngrow,
-    const int level,
-    const std::string& name,
-    std::optional<const amrex::Real> initial_value)
-{
-    const auto name_with_suffix = TagWithLevelSuffix(name, level);
-    const auto tag = amrex::MFInfo().SetTag(name_with_suffix);
-    mf = std::make_unique<amrex::MultiFab>(ba, dm, ncomp, ngrow, tag);
-    if (initial_value) {
-        mf->setVal(*initial_value);
-    }
-    multifab_map[name_with_suffix] = mf.get();
 }
 
 void
@@ -3322,24 +3307,6 @@ WarpX::AllocInitMultiFab (
         mf->setVal(*initial_value);
     }
     imultifab_map[name_with_suffix] = mf.get();
-}
-
-void
-WarpX::AliasInitMultiFab (
-    std::unique_ptr<amrex::MultiFab>& mf,
-    const amrex::MultiFab& mf_to_alias,
-    const int scomp,
-    const int ncomp,
-    const int level,
-    const std::string& name,
-    std::optional<const amrex::Real> initial_value)
-{
-    const auto name_with_suffix = TagWithLevelSuffix(name, level);
-    mf = std::make_unique<amrex::MultiFab>(mf_to_alias, amrex::make_alias, scomp, ncomp);
-    if (initial_value) {
-        mf->setVal(*initial_value);
-    }
-    multifab_map[name_with_suffix] = mf.get();
 }
 
 amrex::DistributionMapping

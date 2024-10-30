@@ -68,8 +68,7 @@ void WarpX::HybridPICEvolveFields ()
     const int sub_steps = m_hybrid_pic_model->m_substeps;
 
     // Get the external current
-    m_hybrid_pic_model->GetCurrentExternal(
-        m_fields.get_mr_levels_alldirs(FieldType::edge_lengths, finest_level));
+    m_hybrid_pic_model->GetCurrentExternal();
 
     // Reference hybrid-PIC multifabs
     ablastr::fields::MultiLevelScalarField rho_fp_temp = m_fields.get_mr_levels(FieldType::hybrid_rho_fp_temp, finest_level);
@@ -165,7 +164,7 @@ void WarpX::HybridPICEvolveFields ()
     m_hybrid_pic_model->CalculateElectronPressure();
 
     // Update the E field to t=n+1 using the extrapolated J_i^n+1 value
-    m_hybrid_pic_model->CalculateCurrentAmpere(
+    m_hybrid_pic_model->CalculatePlasmaCurrent(
         m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::edge_lengths, finest_level));
     m_hybrid_pic_model->HybridPICSolveE(

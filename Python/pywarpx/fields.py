@@ -33,7 +33,7 @@ FaceAreasxWrapper, FaceAreasyWrapper, FaceAreaszWrapper
 ExFPPMLWrapper, EyFPPMLWrapper, EzFPPMLWrapper
 BxFPPMLWrapper, ByFPPMLWrapper, BzFPPMLWrapper
 JxFPPMLWrapper, JyFPPMLWrapper, JzFPPMLWrapper
-JxFPAmpereWrapper, JyFPAmpereWrapper, JzFPAmpereWrapper
+JxFPPlasmaWrapper, JyFPPlasmaWrapper, JzFPPlasmaWrapper
 FFPPMLWrapper, GFPPMLWrapper
 
 ExCPPMLWrapper, EyCPPMLWrapper, EzCPPMLWrapper
@@ -873,27 +873,27 @@ def FaceAreaszWrapper(level=0, include_ghosts=False):
     )
 
 
-def JxFPAmpereWrapper(level=0, include_ghosts=False):
+def JxFPPlasmaWrapper(level=0, include_ghosts=False):
     return _MultiFABWrapper(
-        mf_name="hybrid_current_fp_ampere",
+        mf_name="hybrid_current_fp_plasma",
         idir=0,
         level=level,
         include_ghosts=include_ghosts,
     )
 
 
-def JyFPAmpereWrapper(level=0, include_ghosts=False):
+def JyFPPlasmaWrapper(level=0, include_ghosts=False):
     return _MultiFABWrapper(
-        mf_name="hybrid_current_fp_ampere",
+        mf_name="hybrid_current_fp_plasma",
         idir=1,
         level=level,
         include_ghosts=include_ghosts,
     )
 
 
-def JzFPAmpereWrapper(level=0, include_ghosts=False):
+def JzFPPlasmaWrapper(level=0, include_ghosts=False):
     return _MultiFABWrapper(
-        mf_name="hybrid_current_fp_ampere",
+        mf_name="hybrid_current_fp_plasma",
         idir=2,
         level=level,
         include_ghosts=include_ghosts,

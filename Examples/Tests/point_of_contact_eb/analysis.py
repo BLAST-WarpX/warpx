@@ -17,12 +17,7 @@ from openpmd_viewer import OpenPMDTimeSeries
 
 yt.funcs.mylog.setLevel(0)
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
-
-# Open plotfile specified in command line
-filename = sys.argv[1]
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename, output_format="openpmd")
+from checksumAPI import evaluate_checksum
 
 ts_scraping = OpenPMDTimeSeries("./diags/diag2/particles_at_eb/")
 
@@ -97,3 +92,10 @@ assert (
     and (diff_ny < tolerance_n)
     and (np.abs(nz) < 1e-8)
 ), "Test point_of_contact did not pass"
+
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+    output_format="openpmd",
+)

@@ -25,7 +25,7 @@ from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import c, e, m_e
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 # Physical parameters of the test
 gamma_bunch = 100.6
@@ -40,7 +40,8 @@ beta_boost = (1 - 1.0 / gamma_boost**2) ** 0.5
 
 
 # Analyze the diagnostics showing quantities in the lab frame
-ts_lab = OpenPMDTimeSeries("diags/diag_labframe")
+filename = sys.argv[1]
+ts_lab = OpenPMDTimeSeries(filename)
 
 
 # Extract the growth of the peak electric field
@@ -71,7 +72,7 @@ p = np.polyfit(z_lab_peak[i_start:i_end], log_P_peak[i_start:i_end], 1)
 # Extract the gain length
 Lg = 1 / p[0]
 Lg_expected = 0.22  # Expected gain length from https://arxiv.org/pdf/2009.13645
-print("Gain length: ", Lg)
+print(f"Gain length: {Lg}")
 assert abs(Lg - Lg_expected) / Lg_expected < 0.15
 
 # Check that the radiation wavelength is the expected one
@@ -82,8 +83,8 @@ fft_E = abs(np.fft.fft(Ex))
 lambd = 1.0 / np.fft.fftfreq(Nz, d=info.dz)
 lambda_radiation_lab = lambd[fft_E[: Nz // 2].argmax()]
 lambda_expected = lambda_u / (2 * gamma_boost**2)
-print("lambda_radiation_lab", lambda_radiation_lab)
-print("lambda_expected", lambda_expected)
+print(f"lambda_radiation_lab: {lambda_radiation_lab}")
+print(f"lambda_expected: {lambda_expected}")
 assert abs(lambda_radiation_lab - lambda_expected) / lambda_expected < 0.01
 
 # Analyze the diagnostics showing quantities in the boosted frame
@@ -120,7 +121,7 @@ p = np.polyfit(z_lab_peak[i_start:i_end], log_P_peak[i_start:i_end], 1)
 # Extract the gain length
 Lg = 1 / p[0]
 Lg_expected = 0.22  # Expected gain length from https://arxiv.org/pdf/2009.13645
-print("Gain length: ", Lg)
+print(f"Gain length: {Lg}")
 assert abs(Lg - Lg_expected) / Lg_expected < 0.15
 
 # Check that the radiation wavelength is the expected one
@@ -136,7 +137,9 @@ lambda_radiation_lab = lambda_radiation_boost / (2 * gamma_boost)
 lambda_expected = lambda_u / (2 * gamma_boost**2)
 assert abs(lambda_radiation_lab - lambda_expected) / lambda_expected < 0.01
 
-# Evaluate the checksum
-filename = sys.argv[1]
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename, output_format="openpmd")
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+    output_format="openpmd",
+)

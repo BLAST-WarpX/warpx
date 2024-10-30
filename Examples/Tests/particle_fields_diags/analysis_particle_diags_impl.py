@@ -20,7 +20,7 @@ import yt
 from scipy.constants import c, e, m_e, m_p
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 
 def do_analysis(single_precision=False):
@@ -248,5 +248,9 @@ def do_analysis(single_precision=False):
         assert error_opmd[k] < tolerance
         print(k, "relative error openPMD = ", error_opmd[k])
 
-    test_name = os.path.split(os.getcwd())[1]
-    checksumAPI.evaluate_checksum(test_name, fn, rtol=check_tolerance)
+    # compare checksums
+    evaluate_checksum(
+        test_name=os.path.split(os.getcwd())[1],
+        output_file=sys.argv[1],
+        rtol=check_tolerance,
+    )

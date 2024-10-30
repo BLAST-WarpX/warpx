@@ -14,7 +14,7 @@ import yt
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
 import analysis_breit_wheeler_core as ac
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 # This script is a frontend for the analysis routines
 # in analysis_breit_wheeler_core.py (please refer to this file for
@@ -58,8 +58,11 @@ def main():
 
     ac.check(dt, particle_data)
 
-    test_name = os.path.split(os.getcwd())[1]
-    checksumAPI.evaluate_checksum(test_name, filename_end)
+    # compare checksums
+    evaluate_checksum(
+        test_name=os.path.split(os.getcwd())[1],
+        output_file=sys.argv[1],
+    )
 
 
 if __name__ == "__main__":

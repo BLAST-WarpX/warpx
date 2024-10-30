@@ -45,11 +45,11 @@ namespace warpx::fields
         vector_potential_fp_nodal,
         vector_potential_grad_buf_e_stag,
         vector_potential_grad_buf_b_stag,
-        hybrid_electron_pressure_fp,
-        hybrid_rho_fp_temp,
-        hybrid_current_fp_temp,
-        hybrid_current_fp_ampere,
-        hybrid_current_fp_external,
+        hybrid_electron_pressure_fp, /**< Used with Ohm's law solver. Stores the electron pressure */
+        hybrid_rho_fp_temp,          /**< Used with Ohm's law solver. Stores the time interpolated/extrapolated charge density */
+        hybrid_current_fp_temp,      /**< Used with Ohm's law solver. Stores the time interpolated/extrapolated current density */
+        hybrid_current_fp_plasma,    /**< Used with Ohm's law solver. Stores plasma current calculated as J_plasma = curl x B / mu0 - J_ext */
+        hybrid_current_fp_external,  /**< Used with Ohm's law solver. Stores external current */
         Efield_cp,  /**< Only used with MR. The field that is updated by the field solver at each timestep, on the coarse patch of each level */
         Bfield_cp,  /**< Only used with MR. The field that is updated by the field solver at each timestep, on the coarse patch of each level */
         current_cp, /**< Only used with MR. The current that is used as a source for the field solver, on the coarse patch of each level */
@@ -100,7 +100,7 @@ namespace warpx::fields
         FieldType::vector_potential_grad_buf_e_stag,
         FieldType::vector_potential_grad_buf_b_stag,
         FieldType::hybrid_current_fp_temp,
-        FieldType::hybrid_current_fp_ampere,
+        FieldType::hybrid_current_fp_plasma,
         FieldType::hybrid_current_fp_external,
         FieldType::Efield_cp,
         FieldType::Bfield_cp,

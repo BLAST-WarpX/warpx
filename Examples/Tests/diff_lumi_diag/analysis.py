@@ -11,7 +11,7 @@ import numpy as np
 from read_raw_data import read_reduced_diags_histogram
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 # Extract the differential luminosity from the file
 _, _, E_bin, bin_data = read_reduced_diags_histogram(
@@ -37,16 +37,28 @@ dL_dE_th = (
     * np.exp(-((E_bin - 2 * E_beam) ** 2) / (2 * sigma_E**2))
 )
 
+# Extract test name from path
+test_name = os.path.split(os.getcwd())[1]
+print("test_name", test_name)
+
+# Pick tolerance
+if "leptons" in test_name:
+    tol = 1e-2
+elif "photons" in test_name:
+    # In the photons case, the particles are
+    # initialized from a density distribution ;
+    # tolerance is larger due to lower particle statistics
+    tol = 6e-2
+
 # Check that the simulation result and analytical result match
 error = abs(dL_dE_sim - dL_dE_th).max() / abs(dL_dE_th).max()
-tol = 1e-2
 print("Relative error: ", error)
 print("Tolerance: ", tol)
 assert error < tol
 
-# Get name of the test
-fn = sys.argv[1]
-test_name = os.path.split(os.getcwd())[1]
-
-# Run checksum regression test
-checksumAPI.evaluate_checksum(test_name, fn, rtol=1e-2)
+# compare checksums
+evaluate_checksum(
+    test_name=test_name,
+    output_file=sys.argv[1],
+    rtol=1e-2,
+)

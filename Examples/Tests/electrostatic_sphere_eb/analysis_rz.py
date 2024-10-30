@@ -24,7 +24,7 @@ import yt
 from unyt import m
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 tolerance = 0.0041
 
@@ -67,5 +67,9 @@ print("max error of Er = ", errmax_Er)
 print("tolerance = ", tolerance)
 assert errmax_phi < tolerance and errmax_Er < tolerance
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn, do_particles=False)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+    do_particles=False,
+)

@@ -19,7 +19,7 @@ import yt
 
 yt.funcs.mylog.setLevel(0)
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 filename = sys.argv[1]
 
@@ -50,5 +50,8 @@ print(f"err_energy = {err_energy}")
 print(f"tol_energy = {tol_energy}")
 assert err_energy < tol_energy
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

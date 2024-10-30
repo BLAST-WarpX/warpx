@@ -405,31 +405,6 @@ public:
 
     /**
      * \brief
-     * Allocate and optionally initialize the MultiFab. This also adds the MultiFab
-     * to the map of MultiFabs (used to ease the access to MultiFabs from the Python
-     * interface
-     *
-     * \param[out] mf The MultiFab unique pointer to be allocated
-     * \param[in] ba The BoxArray describing the MultiFab
-     * \param[in] dm The DistributionMapping describing the MultiFab
-     * \param[in] ncomp The number of components in the MultiFab
-     * \param[in] ngrow The number of guard cells in the MultiFab
-     * \param[in] level The refinement level
-     * \param[in] name The name of the MultiFab to use in the map
-     * \param[in] initial_value The optional initial value
-     */
-    static void AllocInitMultiFab (
-        std::unique_ptr<amrex::MultiFab>& mf,
-        const amrex::BoxArray& ba,
-        const amrex::DistributionMapping& dm,
-        int ncomp,
-        const amrex::IntVect& ngrow,
-        int level,
-        const std::string& name,
-        std::optional<const amrex::Real> initial_value = {});
-
-    /**
-     * \brief
      * Allocate and optionally initialize the iMultiFab. This also adds the iMultiFab
      * to the map of MultiFabs (used to ease the access to MultiFabs from the Python
      * interface
@@ -453,30 +428,9 @@ public:
         const std::string& name,
         std::optional<const int> initial_value = {});
 
-    /**
-     * \brief
-     * Create an alias of a MultiFab, adding the alias to the MultiFab map
-     * \param[out] mf The MultiFab to create
-     * \param[in] mf_to_alias The MultiFab to alias
-     * \param[in] scomp The starting component to be aliased
-     * \param[in] ncomp The number of components to alias
-     * \param[in] level The refinement level
-     * \param[in] name The name of the MultiFab to use in the map
-     * \param[in] initial_value optional initial value for MultiFab
-     */
-    static void AliasInitMultiFab (
-        std::unique_ptr<amrex::MultiFab>& mf,
-        const amrex::MultiFab& mf_to_alias,
-        int scomp,
-        int ncomp,
-        int level,
-        const std::string& name,
-        std::optional<const amrex::Real> initial_value);
-
-    // Maps of all of the MultiFabs and iMultiFabs used (this can include MFs from other classes)
-    // This is a convenience for the Python interface, allowing all MultiFabs
+    // Maps of all of the iMultiFabs used (this can include MFs from other classes)
+    // This is a convenience for the Python interface, allowing all iMultiFabs
     // to be easily referenced from Python.
-    static std::map<std::string, amrex::MultiFab *> multifab_map;
     static std::map<std::string, amrex::iMultiFab *> imultifab_map;
 
     /**
@@ -735,7 +689,7 @@ public:
     void DampJPML (int lev, PatchType patch_type);
 
     void CopyJPML ();
-    bool isAnyBoundaryPML();
+
     /** True if any of the particle boundary condition type is Thermal */
     static bool isAnyParticleBoundaryThermal();
 
@@ -950,34 +904,31 @@ public:
 
     /**
      * \brief
-     * This function initializes the E and B fields on each level
+     * This function computes the E, B, and J fields on each level
      * using the parser and the user-defined function for the external fields.
      * The subroutine will parse the x_/y_z_external_grid_function and
      * then, the field multifab is initialized based on the (x,y,z) position
      * on the staggered yee-grid or cell-centered grid, in the interior cells
      * and guard cells.
      *
-     * \param[in] mfx x-component of the field to be initialized
-     * \param[in] mfy y-component of the field to be initialized
-     * \param[in] mfz z-component of the field to be initialized
-     * \param[in] xfield_parser parser function to initialize x-field
-     * \param[in] yfield_parser parser function to initialize y-field
-     * \param[in] zfield_parser parser function to initialize z-field
+     * \param[in] field FieldType
+     * \param[in] fx_parser parser function to initialize x-field
+     * \param[in] fy_parser parser function to initialize y-field
+     * \param[in] fz_parser parser function to initialize z-field
      * \param[in] edge_lengths edge lengths information
      * \param[in] face_areas face areas information
-     * \param[in] field flag indicating which field is being initialized ('E' for electric, 'B' for magnetic)
+     * \param[in] topology flag indicating if field is edge-based or face-based
      * \param[in] lev level of the Multifabs that is initialized
      * \param[in] patch_type PatchType on which the field is initialized (fine or coarse)
      */
-    void InitializeExternalFieldsOnGridUsingParser (
-         amrex::MultiFab *mfx, amrex::MultiFab *mfy, amrex::MultiFab *mfz,
-         amrex::ParserExecutor<3> const& xfield_parser,
-         amrex::ParserExecutor<3> const& yfield_parser,
-         amrex::ParserExecutor<3> const& zfield_parser,
-         ablastr::fields::VectorField const& edge_lengths,
-         ablastr::fields::VectorField const& face_areas,
-         [[maybe_unused]] char field,
-         int lev, PatchType patch_type);
+    void ComputeExternalFieldOnGridUsingParser (
+        warpx::fields::FieldType field,
+        amrex::ParserExecutor<4> const& fx_parser,
+        amrex::ParserExecutor<4> const& fy_parser,
+        amrex::ParserExecutor<4> const& fz_parser,
+        int lev, PatchType patch_type, [[maybe_unused]] char topology,
+        std::optional<ablastr::fields::VectorField> const& edge_lengths = std::nullopt,
+        std::optional<ablastr::fields::VectorField> const& face_areas = std::nullopt);
 
     /**
      * \brief Load field values from a user-specified openPMD file,

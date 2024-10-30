@@ -141,9 +141,8 @@ class FiniteDifferenceSolver
           * https://link.springer.com/chapter/10.1007/3-540-36530-3_8
           *
           * \param[out] Efield  vector of electric field MultiFabs updated at a given level
-          * \param[in] Jfield   vector of total current MultiFabs at a given level
+          * \param[in] Jfield   vector of total plasma current MultiFabs at a given level
           * \param[in] Jifield  vector of ion current density MultiFabs at a given level
-          * \param[in] Jextfield  vector of external current density MultiFabs at a given level
           * \param[in] Bfield   vector of magnetic field MultiFabs at a given level
           * \param[in] rhofield scalar ion charge density Multifab at a given level
           * \param[in] Pefield  scalar electron pressure MultiFab at a given level
@@ -153,15 +152,14 @@ class FiniteDifferenceSolver
           * \param[in] solve_for_Faraday boolean flag for whether the E-field is solved to be used in Faraday's equation
           */
         void HybridPICSolveE ( ablastr::fields::VectorField const& Efield,
-                      ablastr::fields::VectorField & Jfield,
-                      ablastr::fields::VectorField const& Jifield,
-                      ablastr::fields::VectorField const& Jextfield,
-                      ablastr::fields::VectorField const& Bfield,
-                      amrex::MultiFab const& rhofield,
-                      amrex::MultiFab const& Pefield,
-                      ablastr::fields::VectorField const& edge_lengths,
-                      int lev, HybridPICModel const* hybrid_model,
-                      bool solve_for_Faraday );
+                               ablastr::fields::VectorField & Jfield,
+                               ablastr::fields::VectorField const& Jifield,
+                               ablastr::fields::VectorField const& Bfield,
+                               amrex::MultiFab const& rhofield,
+                               amrex::MultiFab const& Pefield,
+                               ablastr::fields::VectorField const& edge_lengths,
+                               int lev, HybridPICModel const* hybrid_model,
+                               bool solve_for_Faraday );
 
         /**
           * \brief Calculation of total current using Ampere's law (without
@@ -241,7 +239,6 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField const& Efield,
             ablastr::fields::VectorField const& Jfield,
             ablastr::fields::VectorField const& Jifield,
-            ablastr::fields::VectorField const& Jextfield,
             ablastr::fields::VectorField const& Bfield,
             amrex::MultiFab const& rhofield,
             amrex::MultiFab const& Pefield,
@@ -346,7 +343,6 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField const& Efield,
             ablastr::fields::VectorField const& Jfield,
             ablastr::fields::VectorField const& Jifield,
-            ablastr::fields::VectorField const& Jextfield,
             ablastr::fields::VectorField const& Bfield,
             amrex::MultiFab const& rhofield,
             amrex::MultiFab const& Pefield,

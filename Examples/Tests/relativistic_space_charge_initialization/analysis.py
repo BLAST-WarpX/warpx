@@ -25,7 +25,7 @@ import yt
 
 yt.funcs.mylog.setLevel(0)
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 # Parameters from the Simulation
 Qtot = -1.0e-20
@@ -95,5 +95,9 @@ def check(E, E_th, label):
 
 check(Ex_array, Ex_th, "Ex")
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename, do_particles=False)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+    do_particles=False,
+)

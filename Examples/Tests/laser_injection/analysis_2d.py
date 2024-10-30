@@ -30,7 +30,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.signal import hilbert
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 # Maximum acceptable error for this test
 relative_error_threshold = 0.05
@@ -225,8 +225,11 @@ def main():
 
     check_laser(filename_end)
 
-    test_name = os.path.split(os.getcwd())[1]
-    checksumAPI.evaluate_checksum(test_name, filename_end)
+    # compare checksums
+    evaluate_checksum(
+        test_name=os.path.split(os.getcwd())[1],
+        output_file=sys.argv[1],
+    )
 
 
 if __name__ == "__main__":

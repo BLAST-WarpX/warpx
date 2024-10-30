@@ -53,28 +53,22 @@ public:
      * external current multifab. Note the external current can be a function
      * of time and therefore this should be re-evaluated at every step.
      */
-    void GetCurrentExternal (
-        ablastr::fields::MultiLevelVectorField const& edge_lengths
-    );
-    void GetCurrentExternal (
-        ablastr::fields::VectorField const& edge_lengths,
-        int lev
-    );
+    void GetCurrentExternal ();
 
     /**
      * \brief
-     * Function to calculate the total current based on Ampere's law while
-     * neglecting displacement current (J = curl x B). Used in the Ohm's law
-     * solver (kinetic-fluid hybrid model).
+     * Function to calculate the total plasma current based on Ampere's law while
+     * neglecting displacement current (J = curl x B). Any external current is
+     * subtracted as well. Used in the Ohm's law solver (kinetic-fluid hybrid model).
      *
      * \param[in] Bfield       Magnetic field from which the current is calculated.
      * \param[in] edge_lengths Length of cell edges taking embedded boundaries into account
      */
-    void CalculateCurrentAmpere (
+    void CalculatePlasmaCurrent (
         ablastr::fields::MultiLevelVectorField const& Bfield,
         ablastr::fields::MultiLevelVectorField const& edge_lengths
     );
-    void CalculateCurrentAmpere (
+    void CalculatePlasmaCurrent (
         ablastr::fields::VectorField const& Bfield,
         ablastr::fields::VectorField const& edge_lengths,
         int lev
