@@ -32,7 +32,6 @@ my_constants.N_macro_particles = 1e3
 
 # maximum energy of the different species
 # we assume that all the species have a
-# _carbon12_6 means carbon ion with 12 nucleons, of which 6 protons
 # uniform energy distribution in [0.5*Emax,Emax]
 my_constants.Emax_hydrogen1_1 = 40*MeV
 my_constants.Emax_carbon12_6 = 20*MeV
@@ -101,6 +100,7 @@ hydrogen1_1.z_rms = 0
 hydrogen1_1.do_not_gather = 1
 hydrogen1_1.do_not_deposit = 1
 
+# carbon12_6 means carbon ions with 12 nucleons, of which 6 protons
 carbon12_6.charge = 6*q_e
 carbon12_6.initialize_self_fields = 0
 carbon12_6.injection_style = gaussian_beam
