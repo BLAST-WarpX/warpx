@@ -68,8 +68,8 @@ namespace ablastr::math::anyfft
 
     FFTplan CreatePlanMany(int * real_size, amrex::Real * real_array,
                            Complex * complex_array, const direction dir, const int dim,
-                           int howmany, int * inembed, int istride, int idist,
-                           int * onembed, int ostride, int odist)
+                           int howmany, [[maybe_unused]] int * inembed, [[maybe_unused]] int istride, [[maybe_unused]] int idist,
+                           [[maybe_unused]] int * onembed, [[maybe_unused]] int ostride, [[maybe_unused]] int odist)
     {
         FFTplan fft_plan;
 
@@ -77,32 +77,8 @@ namespace ablastr::math::anyfft
                                                     std::size_t(real_size[1]),
                                                     std::size_t(real_size[2]))};
 
-        const std::size_t roc_istride[] = {AMREX_D_DECL( (dir == direction::R2C) ? std::size_t(istride * real_size[0]) : std::size_t(istride * (real_size[0]/2+1)),
-                                                          std::size_t(istride * real_size[1]),
-                                                          std::size_t(istride * real_size[2]))};
-
-        const std::size_t roc_ostride[] = {AMREX_D_DECL( (dir == direction::R2C) ? std::size_t(ostride * (real_size[0]/2+1)) : std::size_t(ostride * real_size[0]),
-                                                          std::size_t(ostride*real_size[1]),
-                                                          std::size_t(ostride*real_size[2]))};
-
-        rocfft_plan_description desc = nullptr;
-        rocfft_status result = rocfft_plan_description_set_data_layout(
-                                desc,
-                                (dir == direction::R2C) ? rocfft_array_type_real : rocfft_array_type_hermitian_interleaved,
-                                (dir == direction::R2C) ? rocfft_array_type_hermitian_interleaved : rocfft_array_type_real,
-                                (const size_t *) inembed,
-                                (const size_t *) onembed,
-                                dim,
-                                roc_istride,
-                                (const std::size_t)(idist),
-                                dim,
-                                roc_ostride,
-                                (const std::size_t)(odist));
-        assert_rocfft_status("rocfft_plan_description_set_data_layout", result);
-
-
         // Initialize fft_plan.m_plan with the vendor fft plan.
-        result = rocfft_plan_create(&(fft_plan.m_plan),
+        rocfft_status result = rocfft_plan_create(&(fft_plan.m_plan),
                                     rocfft_placement_notinplace,
                                     (dir == direction::R2C)
                                     ? rocfft_transform_type_real_forward
@@ -113,12 +89,10 @@ namespace ablastr::math::anyfft
                                     rocfft_precision_double,
 #endif
                                     dim, lengths,
-                                    howmany, // number of transforms,
-                                    desc);
+                                    howmany, // number of transforms - batch size
+                                    nullptr);
 
         assert_rocfft_status("rocfft_plan_create", result);
-        result = rocfft_plan_description_destroy(desc);
-        assert_rocfft_status("rocfft_plan_description_destroy", result);
 
         // Store meta-data in fft_plan
         fft_plan.m_real_array = real_array;
