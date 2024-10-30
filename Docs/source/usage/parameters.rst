@@ -267,12 +267,15 @@ Overall simulation parameters
 
           * warpx.use_2d_slices_fft_solver (`bool`, default: 0): Select the type of Integrated Green Function solver.
             If 0, solve Poisson equation in full 3D geometry.
-            If 1, solve Poisson equation in a quasi 3D geometry. In this case, the code performes many 2D Poisson solves
-            on all :math:`(x,y)` slices, each slice at a given :math:`z`.
+            If 1, solve Poisson equation in a quasi 3D geometry, neglecting the :math:`z` derivatives in the Laplacian of the Poisson equation.
+            In practice, in this case, the code performes many 2D Poisson solves on all :math:`(x,y)` slices, each slice at a given :math:`z`.
+            This is often a good approximation for ultra-relativistic beams propagating along the :math:`z` direction, with the relativistic solver. 
+            As a consequence, this solver does not need to do an FFT along the :math:`z` direction, 
+            and instead uses only transverse FFTs (along :math:`x` and :math:`y`) at each :math:`z` position (or :math:`z` "slice").
 
           * warpx.use_distributed_3d_fft_solver (`bool`, default: 0): Choose whether the 3D FFTs performed in the
             full 3D Integrated Green Function solver are distributed.
-            If 0, the FFTs are performed on a single process (the rest of the code is still fully parallel).
+            If 0, the FFTs are performed on a single MPI rank (the rest of the code is still fully parallel).
             If 1, the FFTs are distributed using the heFFTe library. The code must be compiled with `-DWarpX_HEFFTE=ON`.
 
 * ``warpx.self_fields_required_precision`` (`float`, default: 1.e-11)
