@@ -39,7 +39,6 @@ electron.uz_m = 0.07
 
 # Diagnostics
 diagnostics.diags_names = diag1
-diag1.intervals = 1
+diag1.intervals = 10
 diag1.diag_type = Full
 diag1.fields_to_plot = none
-diag1.format = openpmd
