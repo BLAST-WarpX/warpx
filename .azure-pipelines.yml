@@ -3,12 +3,16 @@
 pool:
   vmImage: 'ubuntu-20.04'
 
-pr:
-  autoCancel: true
-  drafts: false
+trigger:
   branches:
     include:
     - development
+pr:
+  autoCancel: true
+  drafts: false
+  paths:
+    exclude:
+    - Docs
 
 jobs:
 - job:

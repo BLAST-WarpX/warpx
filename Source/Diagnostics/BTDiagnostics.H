@@ -28,7 +28,7 @@ class BTDiagnostics final : public Diagnostics
 {
 public:
 
-    BTDiagnostics (int i, const std::string& name);
+    BTDiagnostics (int i, const std::string& name, DiagTypes diag_type);
 
 private:
     /** Whether to plot raw (i.e., NOT cell-centered) fields */

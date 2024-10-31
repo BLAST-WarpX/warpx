@@ -10,6 +10,11 @@ function(find_pybind11)
         message(STATUS "pybind11 repository: ${WarpX_pybind11_repo} (${WarpX_pybind11_branch})")
         include(FetchContent)
     endif()
+
+    # rely on our find_package(Python ...) call
+    # https://pybind11.readthedocs.io/en/stable/compiling.html#modules-with-cmake
+    set(PYBIND11_FINDPYTHON ON)
+
     if(WarpX_pybind11_internal OR WarpX_pybind11_src)
         set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 

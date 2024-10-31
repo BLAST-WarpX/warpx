@@ -254,7 +254,7 @@ endif()
 
 # Python
 if(WarpX_PYTHON)
-    find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+    find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)
 
     # default installation directories: Python
     warpx_set_default_install_dirs_python()
