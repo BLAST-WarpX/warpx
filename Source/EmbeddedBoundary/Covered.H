@@ -43,7 +43,7 @@ public:
     Covered (amrex::MFIter &mfi, int lev);
 
     // Can have topology of f or e for 'face' or 'edge'
-    AMREX_GPU_HOST_DEVICE [[nodiscard]]
+    [[nodiscard]] AMREX_GPU_HOST_DEVICE
     bool isCovered (
         [[maybe_unused]] const int idir,
         [[maybe_unused]] const CoverTopology topology,
