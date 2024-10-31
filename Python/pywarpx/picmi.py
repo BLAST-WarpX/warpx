@@ -1898,10 +1898,10 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         How frequently the timestep is updated. Adaptive timestepping is disabled when this is <= 0.
 
     warpx_cfl: float, optional
-        Fraction of the CFL condition for particle velocity vs grid size, used to set the timestep when `dt_update_interval > 0`.
+        Fraction of the CFL condition for particle velocity vs grid size, used to set the timestep when `warpx_dt_update_interval > 0`.
 
     warpx_max_dt: float, optional
-        The maximum allowable timestep when `dt_update_interval > 0`.
+        The maximum allowable timestep when `warpx_dt_update_interval > 0`.
 
     """
 
