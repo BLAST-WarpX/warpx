@@ -1894,7 +1894,7 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
     warpx_self_fields_verbosity: integer, default=2
         Level of verbosity for the lab frame solver
 
-    warpx_dt_update_interval: string, optional (default = -1)
+    warpx_dt_update_interval: integer, optional (default = -1)
         How frequently the timestep is updated. Adaptive timestepping is disabled when this is <= 0.
 
     warpx_cfl: float, optional
