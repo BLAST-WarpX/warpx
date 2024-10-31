@@ -62,6 +62,7 @@ electrons.uz = gamma_bunch
 electrons.zmax = -25e-6
 electrons.zmin = -125e-6
 electrons.zinject_plane=0.0
+electrons.rigid_advance=0
 
 positrons.charge = q_e
 positrons.injection_style = nuniformpercell
@@ -76,6 +77,7 @@ positrons.uz = gamma_bunch
 positrons.zmax = -25e-6
 positrons.zmin = -125e-6
 positrons.zinject_plane=0.0
+positrons.rigid_advance=0
 
 warpx.do_moving_window = 1
 warpx.moving_window_dir = z
@@ -84,7 +86,7 @@ warpx.moving_window_v = sqrt(1-(1+K*K/2)/(gamma_bunch*gamma_bunch))
 # Undulator field
 particles.B_ext_particle_init_style = parse_B_ext_particle_function
 particles.Bx_external_particle_function(x,y,z,t) = 0
-particles.By_external_particle_function(x,y,z,t) = Bu*cos(k_u*z)
+particles.By_external_particle_function(x,y,z,t) = if( z>0, Bu*cos(k_u*z), 0 )
 particles.Bz_external_particle_function(x,y,z,t) =0.0
 
 warpx.cfl = 0.99
