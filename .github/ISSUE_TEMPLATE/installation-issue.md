@@ -1,6 +1,6 @@
 ---
 name: Installation issue
-about: Report an issue with installing or setting up WarpX
+about: Report an issue with installing or setting up WarpX.
 labels: [install]
 ---
 

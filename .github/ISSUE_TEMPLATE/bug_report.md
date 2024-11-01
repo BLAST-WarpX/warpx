@@ -52,7 +52,7 @@ If you encountered the issue on an HPC cluster, please check our [HPC documentat
 ## Steps taken so far
 What troubleshooting steps have you taken so far, and what were the results?
 
-Have you tried compiling and running in debug mode, following the instructions in our [debugging documentation](https://warpx.readthedocs.io/en/latest/usage/workflows/debugging.html)?
+Have you tried debugging the code, following the instructions in our [debugging documentation](https://warpx.readthedocs.io/en/latest/usage/workflows/debugging.html)?
 
 ## Additional information
 If applicable, please add any additional information that may help explain the issue, such as log files (e.g., build logs, error logs, etc.), error messages (e.g., compiler errors, runtime errors, etc.), screenshots, or other relevant details.
