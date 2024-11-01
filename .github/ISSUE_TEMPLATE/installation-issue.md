@@ -31,9 +31,9 @@ A clear and concise description of the issue.
 
 If you encountered the issue on an HPC cluster, please check our [HPC documentation](https://warpx.readthedocs.io/en/latest/install/hpc.html) to see if your HPC cluster is already supported.
 
-If you encountered the issue installing from source with CMake, please provide the output of the following commands:
-1. `cmake --fresh -S . -B build`
-2. `cmake --build build`
+If you encountered the issue installing from source with CMake, please provide the output of the following steps:
+1. buildsystem generation: output of `cmake --fresh -S . -B build` (include your specific build options, e.g., `-DWarpX_DIMS=3`)
+2. project build: output of `cmake --build build` (include your specific build options, e.g., `-j 4`)
 
 If applicable, please add any additional information about your software environment:
 - [ ] CMake: e.g., 3.24.0
