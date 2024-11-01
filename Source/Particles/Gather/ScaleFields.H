@@ -55,7 +55,8 @@ struct ScaleFields
         // (Note that here, `zp` is the particle position at time n*dt)
         amrex::Real dtscale = 0.5_rt - (m_z_plane_previous - zp)/(m_vz_ave_boosted + m_v_boost)/m_dt;
         // If the particle stays to the left of the plane during the
-        // whole push, simply set the scaling factor to 0.
+        // whole push, simply set the scaling factor to 0, and thus
+        // the velocity push leaves the velocity unchanged.
         if (dtscale < 0._rt) {
             dtscale = 0;
         }
