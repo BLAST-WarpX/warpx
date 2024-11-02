@@ -244,7 +244,7 @@ computePhi (
     "The FFT Poisson solver is currently only implemented for 3D!");
 #endif
 
-#if defined(ABLASTR_USE_HEFFTE) && !defined(ABLASTR_USE_FFT) 
+#if defined(ABLASTR_USE_HEFFTE) && !defined(ABLASTR_USE_FFT)
     ABLASTR_ABORT_WITH_MESSAGE("Must compile with FFT support to be able to use HEFFTE.");
 #endif
 

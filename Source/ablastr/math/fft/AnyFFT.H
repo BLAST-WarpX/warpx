@@ -165,10 +165,10 @@ namespace ablastr::math::anyfft
      * \param[in] dim direction, number of dimensions of the arrays. Must be <= AMREX_SPACEDIM.
      * \param[in] howmany number of transforms to compute
      * \param[in] inembed number of elements in each dimension in the input array
-     * \param[in] istride distance between the n-th element of two consecutive inputs to be transformed  
+     * \param[in] istride distance between the n-th element of two consecutive inputs to be transformed
      * \param[in] idist distance between two consecutive inputs to be transformed
-     * \param[in] onembed number of elements in each dimension in the output array 
-     * \param[in] ostride distance between the n-th element of two consecutive transformed outputs  
+     * \param[in] onembed number of elements in each dimension in the output array
+     * \param[in] ostride distance between the n-th element of two consecutive transformed outputs
      * \param[in] odist distance between two consecutive transformed outputs
      *  */
     FFTplan CreatePlanMany(int * real_size, amrex::Real * real_array,

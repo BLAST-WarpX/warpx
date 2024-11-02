@@ -283,7 +283,7 @@ computePhiIGF ( amrex::MultiFab const & rho,
             ablastr::math::anyfft::DestroyPlan(backward_plan);
 
             // Normalize, since (FFT + inverse FFT) results in a factor N
-            // Note that we use nrx*nry instead of realspace_box.numPts() 
+            // Note that we use nrx*nry instead of realspace_box.numPts()
             // because here FFTs are in 2D along x and y
             const amrex::Real normalization = 1._rt / (nrx*nry);
             tmp_G.mult( normalization );
