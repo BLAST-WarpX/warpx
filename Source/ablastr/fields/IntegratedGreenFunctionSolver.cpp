@@ -54,7 +54,7 @@ computePhiIGF ( amrex::MultiFab const & rho,
 
     // Check that the user-defined inputs are consistent
     ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(!(is_2d_slices && is_3d_distributed), \
-    "Must choose between the quasi-3D and the fully 3D solver.");
+    "Must choose between the 2d slice solver and the fully 3D solver.");
 
     // Define box that encompasses the full domain
     amrex::Box domain = ba.minimalBox();
@@ -239,24 +239,26 @@ computePhiIGF ( amrex::MultiFab const & rho,
         const int nsz = c_local_box.length(2);
 
         if(is_2d_slices){
-                        // Create many plans at once
+            // Create many plans at once
+            // The 2D slice solver performes, for every z, a 2D transform in the transverse plane (x,y).
+            // Hence, we use AMREX_SPACEDIM-1=2 and not AMREX_SPACEDIM=3 in the batched FFT calculations.
             int fft_size[] = {nry, nrx};
             BL_PROFILE_VAR_START(timer_plans);
             ablastr::math::anyfft::FFTplan forward_plan_rho = ablastr::math::anyfft::CreatePlanMany(
                 fft_size, tmp_rho[local_boxid].dataPtr(),
                 reinterpret_cast<ablastr::math::anyfft::Complex*>(tmp_rho_fft.dataPtr()),
                 ablastr::math::anyfft::direction::R2C, AMREX_SPACEDIM-1,
-                nrz, nullptr, 1, nrx*nry, nullptr, 1, nsx*nsy);
+                nrz, fft_size, 1, nrx*nry, fft_size, 1, nsx*nsy);
             ablastr::math::anyfft::FFTplan forward_plan_G = ablastr::math::anyfft::CreatePlanMany(
                 fft_size, tmp_G[local_boxid].dataPtr(),
                 reinterpret_cast<ablastr::math::anyfft::Complex*>(tmp_G_fft.dataPtr()),
                 ablastr::math::anyfft::direction::R2C, AMREX_SPACEDIM-1,
-                nrz, nullptr, 1, nrx*nry, nullptr, 1, nsx*nsy);
+                nrz, fft_size, 1, nrx*nry, fft_size, 1, nsx*nsy);
             ablastr::math::anyfft::FFTplan backward_plan = ablastr::math::anyfft::CreatePlanMany(
                 fft_size, tmp_G[local_boxid].dataPtr(),
                 reinterpret_cast<ablastr::math::anyfft::Complex*>(tmp_G_fft.dataPtr()),
                 ablastr::math::anyfft::direction::C2R, AMREX_SPACEDIM-1,
-                nsz, nullptr, 1, nsx*nsy, nullptr, 1, nrx*nry);
+                nsz, fft_size, 1, nsx*nsy, fft_size, 1, nrx*nry);
             BL_PROFILE_VAR_STOP(timer_plans);
 
             // Forward transforms of rho and G
@@ -280,7 +282,9 @@ computePhiIGF ( amrex::MultiFab const & rho,
             ablastr::math::anyfft::DestroyPlan(forward_plan_rho);
             ablastr::math::anyfft::DestroyPlan(backward_plan);
 
-            // Normalize, since (FFT + inverse FFT) results in a factor N but in 2d
+            // Normalize, since (FFT + inverse FFT) results in a factor N
+            // Note that we use nrx*nry instead of realspace_box.numPts() 
+            // because here FFTs are in 2D along x and y
             const amrex::Real normalization = 1._rt / (nrx*nry);
             tmp_G.mult( normalization );
         } else {

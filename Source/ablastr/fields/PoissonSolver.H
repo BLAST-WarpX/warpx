@@ -17,7 +17,7 @@
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/profiler/ProfilerWrapper.H>
 
-#if (defined(ABLASTR_USE_FFT) || defined(ABLASTR_USE_HEFFTE)) && defined(WARPX_DIM_3D)
+#if defined(ABLASTR_USE_FFT) && defined(WARPX_DIM_3D)
 #include <ablastr/fields/IntegratedGreenFunctionSolver.H>
 #endif
 
@@ -234,21 +234,29 @@ computePhi (
                                        "Embedded boundary solve requested but not compiled in");
 #endif
 
-#if (!defined(ABLASTR_USE_FFT)) && (!defined(ABLASTR_USE_HEFFTE))
-        ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE( !is_solver_igf_on_lev0,
-        "Must compile with FFT or HEFFTE support to use the IGF solver!");
+#if !defined(ABLASTR_USE_FFT)
+    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE( !is_solver_igf_on_lev0,
+    "Must compile with FFT support to use the IGF solver!");
 #endif
 
 #if !defined(WARPX_DIM_3D)
-        ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE( !is_solver_igf_on_lev0,
-        "The FFT Poisson solver is currently only implemented for 3D!");
+    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE( !is_solver_igf_on_lev0,
+    "The FFT Poisson solver is currently only implemented for 3D!");
+#endif
+
+#if defined(ABLASTR_USE_HEFFTE) && !defined(ABLASTR_USE_FFT) 
+    ABLASTR_ABORT_WITH_MESSAGE("Must compile with FFT support to be able to use HEFFTE.");
 #endif
 
 #if !defined(ABLASTR_USE_HEFFTE)
-    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(!is_igf_3d_distr, \
+    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(!is_igf_3d_distr,
     "Must compile with HEFFTE to use 3D distributed FFTs in the IGF solver.");
 #endif
 
+#if defined(ABLASTR_USE_HEFFTE)
+    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(!(is_igf_3d_distr && !is_solver_igf_on_lev0),
+    "Must select the IGF solver with warpx.poisson_solver = fft to use 3D distributed FFTs in the IGF solver!");
+#endif
 
     // Set the value of beta
     amrex::Array<amrex::Real, AMREX_SPACEDIM> beta_solver =
@@ -272,7 +280,7 @@ computePhi (
                               geom[lev].CellSize(1)/std::sqrt(1._rt-beta_solver[1]*beta_solver[1]),
                               geom[lev].CellSize(2)/std::sqrt(1._rt-beta_solver[2]*beta_solver[2]))};
 
-#if ((defined(ABLASTR_USE_FFT) || defined(ABLASTR_USE_HEFFTE)) && defined(WARPX_DIM_3D))
+#if (defined(ABLASTR_USE_FFT) && defined(WARPX_DIM_3D))
         // Use the Integrated Green Function solver (FFT) on the coarsest level if it was selected
         if(is_solver_igf_on_lev0 && lev==0){
             if ( max_norm_b == 0 ) {

@@ -156,14 +156,21 @@ namespace ablastr::math::anyfft
     FFTplan CreatePlan(const amrex::IntVect& real_size, amrex::Real* real_array,
                        Complex* complex_array, direction dir, int dim);
 
-    /** \brief create FFT plan for the backend FFT library.
+    /** \brief create multiple FFT plans for the backend FFT library.
      * \param[in] real_size Size of the real array, along each dimension.
      *                      Only the first dim elements are used.
      * \param[out] real_array Real array from/to where R2C/C2R FFT is performed
      * \param[out] complex_array Complex array to/from where R2C/C2R FFT is performed
      * \param[in] dir direction, either R2C or C2R
      * \param[in] dim direction, number of dimensions of the arrays. Must be <= AMREX_SPACEDIM.
-     */
+     * \param[in] howmany number of transforms to compute
+     * \param[in] inembed number of elements in each dimension in the input array
+     * \param[in] istride distance between the n-th element of two consecutive inputs to be transformed  
+     * \param[in] idist distance between two consecutive inputs to be transformed
+     * \param[in] onembed number of elements in each dimension in the output array 
+     * \param[in] ostride distance between the n-th element of two consecutive transformed outputs  
+     * \param[in] odist distance between two consecutive transformed outputs
+     *  */
     FFTplan CreatePlanMany(int * real_size, amrex::Real * real_array,
                            Complex * complex_array, direction dir, int dim,
                            int howmany, int * inembed, int istride, int idist,
