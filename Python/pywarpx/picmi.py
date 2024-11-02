@@ -749,10 +749,26 @@ class AnalyticFluxDistribution(
         self.set_mangle_dict()
         self.set_species_attributes(species, layout, source_name)
 
-        species.add_new_group_attr(source_name, "flux_profile", "constant")
-        species.add_new_group_attr(source_name, "flux", self.flux_expression)
+        species.add_new_group_attr(source_name, "flux_profile", "parse_flux_function")
+
         if density_scale is not None:
             species.add_new_group_attr(source_name, "flux", density_scale)
+
+        expression = pywarpx.my_constants.mangle_expression(
+            self.flux, self.mangle_dict
+        )
+        if density_scale is None:
+            species.add_new_group_attr(
+                source_name, "flux_function(x,y,z,t)", expression
+            )
+        else:
+            species.add_new_group_attr(
+                source_name,
+                "flux_function(x,y,z,t)",
+                "{}*({})".format(density_scale, expression),
+            )
+
+
         species.add_new_group_attr(
             source_name, "flux_normal_axis", self.flux_normal_axis
         )
