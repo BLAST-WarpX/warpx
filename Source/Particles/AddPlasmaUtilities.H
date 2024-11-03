@@ -22,6 +22,29 @@
 #include <AMReX_REAL.H>
 #include <AMReX_RealBox.H>
 
+struct PDim3 {
+    amrex::ParticleReal x, y, z;
+
+    AMREX_GPU_HOST_DEVICE
+    PDim3(const amrex::XDim3& a):
+        x{static_cast<amrex::ParticleReal>(a.x)},
+        y{static_cast<amrex::ParticleReal>(a.y)},
+        z{static_cast<amrex::ParticleReal>(a.z)}
+    {}
+
+    AMREX_GPU_HOST_DEVICE
+    ~PDim3() = default;
+
+    AMREX_GPU_HOST_DEVICE
+    PDim3(PDim3 const &)            = default;
+    AMREX_GPU_HOST_DEVICE
+    PDim3& operator=(PDim3 const &) = default;
+    AMREX_GPU_HOST_DEVICE
+    PDim3(PDim3&&)                  = default;
+    AMREX_GPU_HOST_DEVICE
+    PDim3& operator=(PDim3&&)       = default;
+};
+
 /*
   Finds the overlap region between the given tile_realbox and part_realbox, returning true
   if an overlap exists and false if otherwise. This also sets the parameters overlap_realbox,
@@ -71,12 +94,124 @@ int compute_area_weights (const amrex::IntVect& iv, const int normal_axis) {
     return r;
 }
 
+
+#ifdef AMREX_USE_EB
 /*
-  This computes the scale_fac (used for setting the particle weights) on a on area basis
-  (used for flux injection).
+ * \brief This computes the scale_fac (used for setting the particle weights) on a on area basis
+ * (used for flux injection from the embedded boundary).
+ *
+ * \param[in] dx: cell size in each direction
+ * \param[in] num_ppc_real: number of particles per cell
+ * \param[in] eb_bnd_normal_arr: array containing the normal to the embedded boundary
+ * \param[in] i, j, k: indices of the cell
+ *
+ * \return scale_fac: the scaling factor to be applied to the weight of the particles
  */
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-amrex::Real compute_scale_fac_area (const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dx,
+amrex::Real compute_scale_fac_area_eb (
+    const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dx,
+    const amrex::Real num_ppc_real,
+    amrex::Array4<const amrex::Real> const& eb_bnd_normal_arr,
+    int i, int j, int k ) {
+    using namespace amrex::literals;
+    // Scale particle weight by the area of the emitting surface, within one cell
+    // By definition, eb_bnd_area_arr is normalized (unitless).
+    // Here we undo the normalization (i.e. multiply by the surface used for normalization in amrex:
+    // see https://amrex-codes.github.io/amrex/docs_html/EB.html#embedded-boundary-data-structures)
+#if defined(WARPX_DIM_3D)
+    const amrex::Real nx = eb_bnd_normal_arr(i,j,k,0);
+    const amrex::Real ny = eb_bnd_normal_arr(i,j,k,1);
+    const amrex::Real nz = eb_bnd_normal_arr(i,j,k,2);
+    amrex::Real scale_fac = std::sqrt(amrex::Math::powi<2>(nx*dx[1]*dx[2]) +
+                  amrex::Math::powi<2>(ny*dx[0]*dx[2]) +
+                  amrex::Math::powi<2>(nz*dx[0]*dx[1]));
+
+#elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
+    const amrex::Real nx = eb_bnd_normal_arr(i,j,k,0);
+    const amrex::Real nz = eb_bnd_normal_arr(i,j,k,1);
+    amrex::Real scale_fac = std::sqrt(amrex::Math::powi<2>(nx*dx[1]) +
+                  amrex::Math::powi<2>(nz*dx[0]));
+#else
+    amrex::ignore_unused(dx, eb_bnd_normal_arr, i, j, k);
+    amrex::Real scale_fac = 0.0_rt;
+#endif
+    // Do not multiply by eb_bnd_area_arr(i,j,k) here because this
+    // already taken into account by emitting a number of macroparticles
+    // that is proportional to the area of eb_bnd_area_arr(i,j,k).
+    scale_fac /= num_ppc_real;
+    return scale_fac;
+}
+
+/* \brief Rotate the momentum of the particle so that the z direction
+ * transforms to the normal of the embedded boundary.
+ *
+ * More specifically, before calling this function, `pu.z` has the
+ * momentum distribution that is meant for the direction normal to the
+ * embedded boundary, and `pu.x`/`pu.y` have the momentum distribution that
+ * is meant for the tangentional direction. After calling this function,
+ * `pu.x`, `pu.y`, `pu.z` will have the correct momentum distribution,
+ * consistent with the local normal to the embedded boundary.
+ *
+ * \param[inout] pu momentum of the particle
+ * \param[in] eb_bnd_normal_arr: array containing the normal to the embedded boundary
+ * \param[in] i, j, k: indices of the cell
+ * */
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void rotate_momentum_eb (
+    PDim3 & pu,
+    amrex::Array4<const amrex::Real> const& eb_bnd_normal_arr,
+    int i, int j, int k )
+{
+    using namespace amrex::literals;
+
+#if defined(WARPX_DIM_3D)
+    // The minus sign below takes into account the fact that eb_bnd_normal_arr
+    // points towards the covered region, while particles are to be emitted
+    // *away* from the covered region.
+    amrex::Real const nx = -eb_bnd_normal_arr(i,j,k,0);
+    amrex::Real const ny = -eb_bnd_normal_arr(i,j,k,1);
+    amrex::Real const nz = -eb_bnd_normal_arr(i,j,k,2);
+
+    // Rotate the momentum in theta and phi
+    amrex::Real const cos_theta = nz;
+    amrex::Real const sin_theta = std::sqrt(1._rt-nz*nz);
+    amrex::Real const nperp = std::sqrt(nx*nx + ny*ny);
+    amrex::Real cos_phi = 1;
+    amrex::Real sin_phi = 0;
+    if ( nperp > 0.0 ) {
+        cos_phi = nx/nperp;
+        sin_phi = ny/nperp;
+    }
+    // Apply rotation matrix
+    amrex::Real const ux = pu.x*cos_theta*cos_phi - pu.y*sin_phi + pu.z*sin_theta*cos_phi;
+    amrex::Real const uy = pu.x*cos_theta*sin_phi + pu.y*cos_phi + pu.z*sin_theta*sin_phi;
+    amrex::Real const uz = -pu.x*sin_theta + pu.z*cos_theta;
+    pu.x = ux;
+    pu.y = uy;
+    pu.z = uz;
+
+#elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
+    // The minus sign below takes into account the fact that eb_bnd_normal_arr
+    // points towards the covered region, while particles are to be emitted
+    // *away* from the covered region.
+    amrex::Real const sin_theta = -eb_bnd_normal_arr(i,j,k,0);
+    amrex::Real const cos_theta = -eb_bnd_normal_arr(i,j,k,1);
+    amrex::Real const uz = pu.z*cos_theta - pu.x*sin_theta;
+    amrex::Real const ux = pu.x*cos_theta + pu.z*sin_theta;
+    pu.x = ux;
+    pu.z = uz;
+#else
+    amrex::ignore_unused(pu, eb_bnd_normal_arr, i, j, k);
+#endif
+}
+#endif //AMREX_USE_EB
+
+/*
+  This computes the scale_fac (used for setting the particle weights) on a on area basis
+  (used for flux injection from a plane).
+ */
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real compute_scale_fac_area_plane (const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dx,
                                     const amrex::Real num_ppc_real, const int flux_normal_axis) {
     using namespace amrex::literals;
     amrex::Real scale_fac = AMREX_D_TERM(dx[0],*dx[1],*dx[2])/num_ppc_real;

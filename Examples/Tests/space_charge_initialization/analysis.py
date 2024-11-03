@@ -26,7 +26,7 @@ from scipy.special import gammainc
 
 yt.funcs.mylog.setLevel(0)
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 # Parameters from the Simulation
 Qtot = -1.0e-20
@@ -124,5 +124,9 @@ check(Ey_array, Ey_th, "Ey")
 if ds.dimensionality == 3:
     check(Ez_array, Ez_th, "Ez")
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename, do_particles=0)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+    do_particles=False,
+)

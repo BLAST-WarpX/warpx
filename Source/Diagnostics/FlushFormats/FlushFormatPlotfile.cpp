@@ -1,6 +1,6 @@
 #include "FlushFormatPlotfile.H"
 
-#include "FieldSolver/Fields.H"
+#include "Fields.H"
 #include "Diagnostics/MultiDiagnostics.H"
 #include "Diagnostics/ParticleDiag/ParticleDiag.H"
 #include "Particles/Filter/FilterFunctors.H"
@@ -12,6 +12,8 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
+
+#include <ablastr/fields/MultiFabRegister.H>
 
 #include <AMReX.H>
 #include <AMReX_Box.H>
@@ -48,7 +50,7 @@
 #include <vector>
 
 using namespace amrex;
-using namespace warpx::fields;
+using warpx::fields::FieldType;
 
 namespace
 {
@@ -554,6 +556,8 @@ FlushFormatPlotfile::WriteAllRawFields(
     const bool plot_raw_fields, const int nlevels, const std::string& plotfilename,
     const bool plot_raw_fields_guards) const
 {
+    using ablastr::fields::Direction;
+
     if (!plot_raw_fields) { return; }
     auto & warpx = WarpX::GetInstance();
     for (int lev = 0; lev < nlevels; ++lev)
@@ -564,84 +568,103 @@ FlushFormatPlotfile::WriteAllRawFields(
 
         // Auxiliary patch
 
-        WriteRawMF( warpx.getField(FieldType::Efield_aux, lev, 0), dm, raw_pltname, default_level_prefix, "Ex_aux", lev, plot_raw_fields_guards);
-        WriteRawMF( warpx.getField(FieldType::Efield_aux, lev, 1), dm, raw_pltname, default_level_prefix, "Ey_aux", lev, plot_raw_fields_guards);
-        WriteRawMF( warpx.getField(FieldType::Efield_aux, lev, 2), dm, raw_pltname, default_level_prefix, "Ez_aux", lev, plot_raw_fields_guards);
-        WriteRawMF( warpx.getField(FieldType::Bfield_aux, lev, 0), dm, raw_pltname, default_level_prefix, "Bx_aux", lev, plot_raw_fields_guards);
-        WriteRawMF( warpx.getField(FieldType::Bfield_aux, lev, 1), dm, raw_pltname, default_level_prefix, "By_aux", lev, plot_raw_fields_guards);
-        WriteRawMF( warpx.getField(FieldType::Bfield_aux, lev, 2), dm, raw_pltname, default_level_prefix, "Bz_aux", lev, plot_raw_fields_guards);
+        WriteRawMF( *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, lev), dm, raw_pltname, default_level_prefix, "Ex_aux", lev, plot_raw_fields_guards);
+        WriteRawMF( *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, lev), dm, raw_pltname, default_level_prefix, "Ey_aux", lev, plot_raw_fields_guards);
+        WriteRawMF( *warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, lev), dm, raw_pltname, default_level_prefix, "Ez_aux", lev, plot_raw_fields_guards);
+        WriteRawMF( *warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, lev), dm, raw_pltname, default_level_prefix, "Bx_aux", lev, plot_raw_fields_guards);
+        WriteRawMF( *warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, lev), dm, raw_pltname, default_level_prefix, "By_aux", lev, plot_raw_fields_guards);
+        WriteRawMF( *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, lev), dm, raw_pltname, default_level_prefix, "Bz_aux", lev, plot_raw_fields_guards);
 
         // fine patch
-        WriteRawMF( warpx.getField(FieldType::Efield_fp, lev, 0), dm, raw_pltname, default_level_prefix, "Ex_fp", lev, plot_raw_fields_guards);
-        WriteRawMF( warpx.getField(FieldType::Efield_fp, lev, 1), dm, raw_pltname, default_level_prefix, "Ey_fp", lev, plot_raw_fields_guards);
-        WriteRawMF( warpx.getField(FieldType::Efield_fp, lev, 2), dm, raw_pltname, default_level_prefix, "Ez_fp", lev, plot_raw_fields_guards);
-        WriteRawMF( warpx.getField(FieldType::current_fp, lev, 0), dm, raw_pltname, default_level_prefix, "jx_fp", lev, plot_raw_fields_guards);
-        WriteRawMF( warpx.getField(FieldType::current_fp, lev, 1), dm, raw_pltname, default_level_prefix, "jy_fp", lev, plot_raw_fields_guards);
-        WriteRawMF( warpx.getField(FieldType::current_fp, lev, 2), dm, raw_pltname, default_level_prefix, "jz_fp", lev, plot_raw_fields_guards);
-        WriteRawMF( warpx.getField(FieldType::Bfield_fp, lev, 0), dm, raw_pltname, default_level_prefix, "Bx_fp", lev, plot_raw_fields_guards);
-        WriteRawMF( warpx.getField(FieldType::Bfield_fp, lev, 1), dm, raw_pltname, default_level_prefix, "By_fp", lev, plot_raw_fields_guards);
-        WriteRawMF( warpx.getField(FieldType::Bfield_fp, lev, 2), dm, raw_pltname, default_level_prefix, "Bz_fp", lev, plot_raw_fields_guards);
-        if (warpx.isFieldInitialized(FieldType::F_fp, lev))
+        WriteRawMF( *warpx.m_fields.get(FieldType::Efield_fp, Direction{0}, lev), dm, raw_pltname,
+                    default_level_prefix, "Ex_fp", lev, plot_raw_fields_guards );
+        WriteRawMF( *warpx.m_fields.get(FieldType::Efield_fp, Direction{1}, lev), dm, raw_pltname,
+                    default_level_prefix, "Ey_fp", lev, plot_raw_fields_guards );
+        WriteRawMF( *warpx.m_fields.get(FieldType::Efield_fp, Direction{2}, lev), dm, raw_pltname,
+                    default_level_prefix, "Ez_fp", lev, plot_raw_fields_guards );
+        WriteRawMF( *warpx.m_fields.get(FieldType::current_fp,Direction{0}, lev), dm, raw_pltname,
+                    default_level_prefix, "jx_fp", lev,plot_raw_fields_guards );
+        WriteRawMF( *warpx.m_fields.get(FieldType::current_fp,Direction{1}, lev), dm, raw_pltname,
+                    default_level_prefix, "jy_fp", lev,plot_raw_fields_guards );
+        WriteRawMF( *warpx.m_fields.get(FieldType::current_fp,Direction{2}, lev), dm, raw_pltname,
+                    default_level_prefix, "jz_fp", lev,plot_raw_fields_guards );
+        WriteRawMF( *warpx.m_fields.get(FieldType::Bfield_fp, Direction{0}, lev), dm, raw_pltname,
+                    default_level_prefix, "Bx_fp", lev, plot_raw_fields_guards );
+        WriteRawMF( *warpx.m_fields.get(FieldType::Bfield_fp, Direction{1}, lev), dm, raw_pltname,
+                    default_level_prefix, "By_fp", lev, plot_raw_fields_guards );
+        WriteRawMF( *warpx.m_fields.get(FieldType::Bfield_fp, Direction{2}, lev), dm, raw_pltname,
+                    default_level_prefix, "Bz_fp", lev, plot_raw_fields_guards );
+        if (warpx.m_fields.has(FieldType::F_fp, lev))
         {
-            WriteRawMF(warpx.getField(FieldType::F_fp, lev), dm, raw_pltname, default_level_prefix, "F_fp", lev, plot_raw_fields_guards);
+            WriteRawMF( *warpx.m_fields.get(FieldType::F_fp, lev), dm, raw_pltname,
+                        default_level_prefix, "F_fp", lev, plot_raw_fields_guards );
         }
-        if (warpx.isFieldInitialized(FieldType::rho_fp, lev))
+        if (warpx.m_fields.has(FieldType::rho_fp, lev))
         {
             // rho_fp will have either ncomps or 2*ncomps (2 being the old and new). When 2, return the new so
             // there is time synchronization.
-            const int nstart = warpx.getField(FieldType::rho_fp, lev).nComp() - WarpX::ncomps;
-            const MultiFab rho_new(warpx.getField(FieldType::rho_fp, lev), amrex::make_alias, nstart, WarpX::ncomps);
+            const int nstart = warpx.m_fields.get(FieldType::rho_fp, lev)->nComp() - WarpX::ncomps;
+            const MultiFab rho_new(*warpx.m_fields.get(FieldType::rho_fp, lev), amrex::make_alias, nstart, WarpX::ncomps);
             WriteRawMF(rho_new, dm, raw_pltname, default_level_prefix, "rho_fp", lev, plot_raw_fields_guards);
         }
-        if (warpx.isFieldInitialized(FieldType::phi_fp, lev)) {
-            WriteRawMF(warpx.getField(FieldType::phi_fp, lev), dm, raw_pltname, default_level_prefix, "phi_fp", lev, plot_raw_fields_guards);
+        if (warpx.m_fields.has(FieldType::phi_fp, lev)) {
+            WriteRawMF( *warpx.m_fields.get(FieldType::phi_fp, lev), dm, raw_pltname,
+                        default_level_prefix, "phi_fp", lev, plot_raw_fields_guards );
         }
 
         // Averaged fields on fine patch
         if (WarpX::fft_do_time_averaging)
         {
-            WriteRawMF(warpx.getField(FieldType::Efield_avg_fp, lev, 0) , dm, raw_pltname, default_level_prefix,
+            WriteRawMF(*warpx.m_fields.get(FieldType::Efield_avg_fp, Direction{0}, lev) , dm, raw_pltname, default_level_prefix,
                        "Ex_avg_fp", lev, plot_raw_fields_guards);
 
-            WriteRawMF(warpx.getField(FieldType::Efield_avg_fp, lev, 1) , dm, raw_pltname, default_level_prefix,
+            WriteRawMF(*warpx.m_fields.get(FieldType::Efield_avg_fp, Direction{1}, lev) , dm, raw_pltname, default_level_prefix,
                        "Ey_avg_fp", lev, plot_raw_fields_guards);
 
-            WriteRawMF(warpx.getField(FieldType::Efield_avg_fp, lev, 2) , dm, raw_pltname, default_level_prefix,
+            WriteRawMF(*warpx.m_fields.get(FieldType::Efield_avg_fp, Direction{2}, lev) , dm, raw_pltname, default_level_prefix,
                        "Ez_avg_fp", lev, plot_raw_fields_guards);
 
-            WriteRawMF(warpx.getField(FieldType::Bfield_avg_fp, lev, 0) , dm, raw_pltname, default_level_prefix,
+            WriteRawMF(*warpx.m_fields.get(FieldType::Bfield_avg_fp, Direction{0}, lev) , dm, raw_pltname, default_level_prefix,
                        "Bx_avg_fp", lev, plot_raw_fields_guards);
 
-            WriteRawMF(warpx.getField(FieldType::Bfield_avg_fp, lev, 1) , dm, raw_pltname, default_level_prefix,
+            WriteRawMF(*warpx.m_fields.get(FieldType::Bfield_avg_fp, Direction{1}, lev) , dm, raw_pltname, default_level_prefix,
                        "By_avg_fp", lev, plot_raw_fields_guards);
 
-            WriteRawMF(warpx.getField(FieldType::Bfield_avg_fp, lev, 2) , dm, raw_pltname, default_level_prefix,
+            WriteRawMF(*warpx.m_fields.get(FieldType::Bfield_avg_fp, Direction{2}, lev) , dm, raw_pltname, default_level_prefix,
                        "Bz_avg_fp", lev, plot_raw_fields_guards);
         }
 
         // Coarse path
         if (lev > 0) {
             WriteCoarseVector( "E",
-                               warpx.getFieldPointer(FieldType::Efield_cp, lev, 0), warpx.getFieldPointer(FieldType::Efield_cp, lev, 1), warpx.getFieldPointer(FieldType::Efield_cp, lev, 2),
-                               warpx.getFieldPointer(FieldType::Efield_fp, lev, 0), warpx.getFieldPointer(FieldType::Efield_fp, lev, 1), warpx.getFieldPointer(FieldType::Efield_fp, lev, 2),
+                               warpx.m_fields.get(FieldType::Efield_cp, Direction{0}, lev),
+                               warpx.m_fields.get(FieldType::Efield_cp, Direction{1}, lev),
+                               warpx.m_fields.get(FieldType::Efield_cp, Direction{2}, lev),
+                               warpx.m_fields.get(FieldType::Efield_fp, Direction{0}, lev),
+                               warpx.m_fields.get(FieldType::Efield_fp, Direction{1}, lev),
+                               warpx.m_fields.get(FieldType::Efield_fp, Direction{2}, lev),
                                dm, raw_pltname, default_level_prefix, lev, plot_raw_fields_guards);
             WriteCoarseVector( "B",
-                               warpx.getFieldPointer(FieldType::Bfield_cp, lev, 0), warpx.getFieldPointer(FieldType::Bfield_cp, lev, 1), warpx.getFieldPointer(FieldType::Bfield_cp, lev, 2),
-                               warpx.getFieldPointer(FieldType::Bfield_fp, lev, 0), warpx.getFieldPointer(FieldType::Bfield_fp, lev, 1), warpx.getFieldPointer(FieldType::Bfield_fp, lev, 2),
+                               warpx.m_fields.get(FieldType::Bfield_cp, Direction{0}, lev),
+                               warpx.m_fields.get(FieldType::Bfield_cp, Direction{1}, lev),
+                               warpx.m_fields.get(FieldType::Bfield_cp, Direction{2}, lev),
+                               warpx.m_fields.get(FieldType::Bfield_fp, Direction{0}, lev),
+                               warpx.m_fields.get(FieldType::Bfield_fp, Direction{1}, lev),
+                               warpx.m_fields.get(FieldType::Bfield_fp, Direction{2}, lev),
                                dm, raw_pltname, default_level_prefix, lev, plot_raw_fields_guards);
             WriteCoarseVector( "j",
-                               warpx.getFieldPointer(FieldType::current_cp, lev, 0), warpx.getFieldPointer(FieldType::current_cp, lev, 1), warpx.getFieldPointer(FieldType::current_cp, lev, 2),
-                               warpx.getFieldPointer(FieldType::current_fp, lev, 0), warpx.getFieldPointer(FieldType::current_fp, lev, 1), warpx.getFieldPointer(FieldType::current_fp, lev, 2),
+                               warpx.m_fields.get(FieldType::current_cp, Direction{0}, lev), warpx.m_fields.get(FieldType::current_cp, Direction{1}, lev), warpx.m_fields.get(FieldType::current_cp, Direction{2}, lev),
+                               warpx.m_fields.get(FieldType::current_fp, Direction{0}, lev), warpx.m_fields.get(FieldType::current_fp, Direction{1}, lev), warpx.m_fields.get(FieldType::current_fp, Direction{2}, lev),
                                dm, raw_pltname, default_level_prefix, lev, plot_raw_fields_guards);
-            if (warpx.isFieldInitialized(FieldType::F_fp, lev) && warpx.isFieldInitialized(FieldType::F_cp, lev))
+            if (warpx.m_fields.has(FieldType::F_fp, lev) && warpx.m_fields.has(FieldType::F_cp, lev))
             {
-                WriteCoarseScalar("F", warpx.getFieldPointer(FieldType::F_cp, lev), warpx.getFieldPointer(FieldType::F_fp, lev),
+                WriteCoarseScalar("F", warpx.m_fields.get(FieldType::F_cp, lev), warpx.m_fields.get(FieldType::F_fp, lev),
                     dm, raw_pltname, default_level_prefix, lev, plot_raw_fields_guards, 0);
             }
-            if (warpx.isFieldInitialized(FieldType::rho_fp, lev) && warpx.isFieldInitialized(FieldType::rho_cp, lev))
+            if (warpx.m_fields.has(FieldType::rho_fp, lev) && warpx.m_fields.has(FieldType::rho_cp, lev))
             {
                 // Use the component 1 of `rho_cp`, i.e. rho_new for time synchronization
-                WriteCoarseScalar("rho", warpx.getFieldPointer(FieldType::rho_cp, lev), warpx.getFieldPointer(FieldType::rho_fp, lev),
+                WriteCoarseScalar("rho", warpx.m_fields.get(FieldType::rho_cp, lev), warpx.m_fields.get(FieldType::rho_fp, lev),
                     dm, raw_pltname, default_level_prefix, lev, plot_raw_fields_guards, 1);
             }
         }

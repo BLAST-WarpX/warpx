@@ -7,7 +7,7 @@
 #include "SemiImplicitEM.H"
 #include "WarpX.H"
 
-using namespace warpx::fields;
+using warpx::fields::FieldType;
 using namespace amrex::literals;
 
 void SemiImplicitEM::Define ( WarpX*  a_WarpX )
@@ -20,7 +20,7 @@ void SemiImplicitEM::Define ( WarpX*  a_WarpX )
     m_WarpX = a_WarpX;
 
     // Define E and Eold vectors
-    m_E.Define( m_WarpX, FieldType::Efield_fp );
+    m_E.Define( m_WarpX, "Efield_fp" );
     m_Eold.Define( m_E );
 
     // Parse implicit solver parameters

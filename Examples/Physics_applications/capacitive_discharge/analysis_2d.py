@@ -7,12 +7,15 @@
 # solver that directly solves the Poisson equation using matrix inversion
 # rather than the iterative approach from the MLMG solver.
 
+import os
 import sys
 
-sys.path.append("../../../../warpx/Regression/Checksum/")
+sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
+from checksumAPI import evaluate_checksum
 
-import checksumAPI
-
-my_check = checksumAPI.evaluate_checksum(
-    "test_2d_background_mcc", "diags/diag1000050", do_particles=True, rtol=5e-3
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+    rtol=5e-3,
 )

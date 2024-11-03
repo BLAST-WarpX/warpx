@@ -19,7 +19,7 @@
 #else
 #include <FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H>
 #endif
-#include <FieldSolver/Fields.H>
+#include "Fields.H"
 #include <Initialization/ExternalField.H>
 #include <ablastr/utils/Communication.H>
 #include <Utils/WarpXProfilerWrapper.H>
@@ -30,9 +30,10 @@ using namespace amrex;
 
 namespace warpx::initialization {
 
-ProjectionDivCleaner::ProjectionDivCleaner(warpx::fields::FieldType a_field_type) :
-    m_field_type(a_field_type)
+ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name) :
+    m_field_name(a_field_name)
 {
+    using ablastr::fields::Direction;
     ReadParameters();
 
     auto& warpx = WarpX::GetInstance();
@@ -48,7 +49,7 @@ ProjectionDivCleaner::ProjectionDivCleaner(warpx::fields::FieldType a_field_type
     m_source.resize(m_levels);
 
     const int ncomps = WarpX::ncomps;
-    auto const& ng = warpx.getFieldPointer(m_field_type, 0, 0)->nGrowVect();
+    auto const& ng = warpx.m_fields.get(m_field_name, Direction{0}, 0)->nGrowVect();
 
     for (int lev = 0; lev < m_levels; ++lev)
     {
@@ -201,6 +202,8 @@ ProjectionDivCleaner::solve ()
 void
 ProjectionDivCleaner::setSourceFromBfield ()
 {
+    using ablastr::fields::Direction;
+
     // Get WarpX object
     auto & warpx = WarpX::GetInstance();
     const auto& geom = warpx.Geom();
@@ -211,7 +214,9 @@ ProjectionDivCleaner::setSourceFromBfield ()
         WarpX::ComputeDivB(
             *m_source[ilev],
             0,
-            warpx.getFieldPointerArray(m_field_type, ilev),
+            {warpx.m_fields.get(m_field_name, Direction{0}, ilev),
+             warpx.m_fields.get(m_field_name, Direction{1}, ilev),
+             warpx.m_fields.get(m_field_name, Direction{2}, ilev)},
             WarpX::CellSize(0)
             );
 
@@ -228,6 +233,8 @@ ProjectionDivCleaner::setSourceFromBfield ()
 void
 ProjectionDivCleaner::correctBfield ()
 {
+    using ablastr::fields::Direction;
+
     // Get WarpX object
     auto & warpx = WarpX::GetInstance();
     const auto& geom = warpx.Geom();
@@ -236,9 +243,9 @@ ProjectionDivCleaner::correctBfield ()
     for (int ilev = 0; ilev < m_levels; ++ilev)
     {
         // Grab B-field multifabs at this level
-        amrex::MultiFab* Bx = warpx.getFieldPointer(m_field_type, ilev, 0);
-        amrex::MultiFab* By = warpx.getFieldPointer(m_field_type, ilev, 1);
-        amrex::MultiFab* Bz = warpx.getFieldPointer(m_field_type, ilev, 2);
+        amrex::MultiFab* Bx = warpx.m_fields.get(m_field_name, Direction{0}, ilev);
+        amrex::MultiFab* By = warpx.m_fields.get(m_field_name, Direction{1}, ilev);
+        amrex::MultiFab* Bz = warpx.m_fields.get(m_field_name, Direction{2}, ilev);
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
@@ -337,8 +344,8 @@ WarpX::ProjectionCleanDivB() {
                 ablastr::warn_manager::WarnPriority::low);
         }
 
-        warpx::initialization::ProjectionDivCleaner dc(
-            warpx::fields::FieldType::Bfield_fp_external);
+        warpx::initialization::ProjectionDivCleaner dc("Bfield_fp_external");
+
 
         dc.setSourceFromBfield();
         dc.solve();

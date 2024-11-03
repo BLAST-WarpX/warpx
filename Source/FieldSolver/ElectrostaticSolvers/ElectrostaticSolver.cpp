@@ -8,10 +8,14 @@
  */
 
 #include "ElectrostaticSolver.H"
-#include <ablastr/fields/PoissonSolver.H>
 #include "EmbeddedBoundary/Enabled.H"
+#include "Fields.H"
+
+#include <ablastr/fields/PoissonSolver.H>
+
 
 using namespace amrex;
+using warpx::fields::FieldType;
 
 ElectrostaticSolver::ElectrostaticSolver (int nlevs_max) : num_levels{nlevs_max}
 {
@@ -39,7 +43,7 @@ void ElectrostaticSolver::ReadParameters () {
 
 void
 ElectrostaticSolver::setPhiBC (
-    amrex::Vector<std::unique_ptr<amrex::MultiFab>>& phi,
+    ablastr::fields::MultiLevelScalarField const& phi,
     amrex::Real t
 ) const
 {
@@ -110,19 +114,23 @@ ElectrostaticSolver::setPhiBC (
 
 
 void
-ElectrostaticSolver::computePhi (const amrex::Vector<std::unique_ptr<amrex::MultiFab> >& rho,
-                   amrex::Vector<std::unique_ptr<amrex::MultiFab> >& phi,
-                   std::array<Real, 3> const beta,
-                   Real const required_precision,
-                   Real absolute_tolerance,
-                   int const max_iters,
-                   int const verbosity) const {
+ElectrostaticSolver::computePhi (
+    ablastr::fields::MultiLevelScalarField const& rho,
+    ablastr::fields::MultiLevelScalarField const& phi,
+    std::array<Real, 3> const beta,
+    Real const required_precision,
+    Real absolute_tolerance,
+    int const max_iters,
+    int const verbosity) const
+{
+    using ablastr::fields::Direction;
+
     // create a vector to our fields, sorted by level
     amrex::Vector<amrex::MultiFab *> sorted_rho;
     amrex::Vector<amrex::MultiFab *> sorted_phi;
     for (int lev = 0; lev < num_levels; ++lev) {
-        sorted_rho.emplace_back(rho[lev].get());
-        sorted_phi.emplace_back(phi[lev].get());
+        sorted_rho.emplace_back(rho[lev]);
+        sorted_phi.emplace_back(phi[lev]);
     }
 
     std::optional<EBCalcEfromPhiPerLevel> post_phi_calculation;
@@ -149,18 +157,18 @@ ElectrostaticSolver::computePhi (const amrex::Vector<std::unique_ptr<amrex::Mult
                 e_field.push_back(
 #if defined(WARPX_DIM_1D_Z)
                     amrex::Array<amrex::MultiFab*, 1>{
-                        warpx.getFieldPointer(warpx::fields::FieldType::Efield_fp, lev, 2)
+                        warpx.m_fields.get(FieldType::Efield_fp, Direction{2}, lev)
                     }
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                     amrex::Array<amrex::MultiFab*, 2>{
-                        warpx.getFieldPointer(warpx::fields::FieldType::Efield_fp, lev, 0),
-                        warpx.getFieldPointer(warpx::fields::FieldType::Efield_fp, lev, 2)
+                        warpx.m_fields.get(FieldType::Efield_fp, Direction{0}, lev),
+                        warpx.m_fields.get(FieldType::Efield_fp, Direction{2}, lev)
                     }
 #elif defined(WARPX_DIM_3D)
                     amrex::Array<amrex::MultiFab *, 3>{
-                        warpx.getFieldPointer(warpx::fields::FieldType::Efield_fp, lev, 0),
-                        warpx.getFieldPointer(warpx::fields::FieldType::Efield_fp, lev, 1),
-                        warpx.getFieldPointer(warpx::fields::FieldType::Efield_fp, lev, 2)
+                        warpx.m_fields.get(FieldType::Efield_fp, Direction{0}, lev),
+                        warpx.m_fields.get(FieldType::Efield_fp, Direction{1}, lev),
+                        warpx.m_fields.get(FieldType::Efield_fp, Direction{2}, lev)
                     }
 #endif
                 );
@@ -193,12 +201,12 @@ ElectrostaticSolver::computePhi (const amrex::Vector<std::unique_ptr<amrex::Mult
         warpx.DistributionMap(),
         warpx.boxArray(),
         WarpX::grid_type,
-        *m_poisson_boundary_handler,
         is_solver_igf_on_lev0,
         EB::enabled(),
         WarpX::do_single_precision_comms,
         warpx.refRatio(),
         post_phi_calculation,
+        *m_poisson_boundary_handler,
         warpx.gett_new(0),
         eb_farray_box_factory
     );
@@ -206,9 +214,10 @@ ElectrostaticSolver::computePhi (const amrex::Vector<std::unique_ptr<amrex::Mult
 }
 
 void
-ElectrostaticSolver::computeE (amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>, 3> >& E,
-            const amrex::Vector<std::unique_ptr<amrex::MultiFab> >& phi,
-            std::array<amrex::Real, 3> const beta ) const
+ElectrostaticSolver::computeE (
+    ablastr::fields::MultiLevelVectorField const& E,
+    ablastr::fields::MultiLevelScalarField const& phi,
+    std::array<amrex::Real, 3> beta ) const
 {
     auto & warpx = WarpX::GetInstance();
     for (int lev = 0; lev < num_levels; lev++) {
@@ -369,9 +378,10 @@ ElectrostaticSolver::computeE (amrex::Vector<std::array<std::unique_ptr<amrex::M
 }
 
 
-void ElectrostaticSolver::computeB (amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>, 3> >& B,
-            const amrex::Vector<std::unique_ptr<amrex::MultiFab> >& phi,
-            std::array<amrex::Real, 3> const beta ) const
+void ElectrostaticSolver::computeB (
+        ablastr::fields::MultiLevelVectorField const& B,
+        ablastr::fields::MultiLevelScalarField const& phi,
+        std::array<amrex::Real, 3> beta) const
 {
     // return early if beta is 0 since there will be no B-field
     if ((beta[0] == 0._rt) && (beta[1] == 0._rt) && (beta[2] == 0._rt)) { return; }

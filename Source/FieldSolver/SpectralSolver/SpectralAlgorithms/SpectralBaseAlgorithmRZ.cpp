@@ -6,6 +6,8 @@
  */
 #include "SpectralBaseAlgorithmRZ.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
+
 #include <cmath>
 
 using namespace amrex;
@@ -18,7 +20,7 @@ void
 SpectralBaseAlgorithmRZ::ComputeSpectralDivE (
     const int lev,
     SpectralFieldDataRZ& field_data,
-    const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
+    ablastr::fields::VectorField const & Efield,
     amrex::MultiFab& divE )
 {
     using amrex::operator""_rt;

@@ -117,7 +117,7 @@ For Nvidia CUDA GPU support, you will need to have `a recent CUDA driver install
 
 .. code-block:: bash
 
-   conda install -c nvidia -c conda-forge cuda cupy
+   conda install -c nvidia -c conda-forge cuda cuda-nvtx-dev cupy
 
 More info for `CUDA-enabled ML packages <https://twitter.com/jeremyphoward/status/1697435241152127369>`__.
 

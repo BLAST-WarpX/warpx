@@ -1,0 +1,15 @@
+FILE = inputs_base_from_eb
+
+# number of grid points
+amr.n_cell = 8 16
+
+# Geometry
+geometry.dims = RZ
+geometry.prob_lo     =  0 -4
+geometry.prob_hi     =  4  4
+
+# Boundary condition
+boundary.field_lo = none periodic
+boundary.field_hi = pec periodic
+
+electron.num_particles_per_cell = 300

@@ -19,7 +19,7 @@ First, we build
 build `Catalyst 2 <https://catalyst-in-situ.readthedocs.io/en/latest/build_and_install.html>`_
 using the conduit library created in the previous step.
 The latter can be achieved by adding the installation path of conduit to the environmental
-variable `CMAKE_PREFIX_PATH` and setting `CATALYST_WITH_EXTERNAL_CONDUIT=ON` during the configuration step of Catalyst.
+variable ``CMAKE_PREFIX_PATH`` and setting ``CATALYST_WITH_EXTERNAL_CONDUIT=ON`` during the configuration step of Catalyst.
 
 Then we build ParaView master (on a commit after 2024.07.01, tested on ``4ef351a54ff747ef7169e2e52e77d9703a9dfa77``) following the developer instructions provided
 `here <https://github.com/Kitware/ParaView/blob/master/Documentation/dev/build.md>`__ .
@@ -27,7 +27,7 @@ A representative set of options for a headless ParaView installation is provided
 `here <https://gitlab.kitware.com/christos.tsolakis/catalyst-amrex-docker-images/-/blob/ci-catalyst-amrex-warpx-20240701/docker/ubuntu22_04/install_paraview.sh>`__
 Afterward, WarpX must be built with ``WarpX_CATALYST=ON``.
 Also, make sure to provide the installed paths of Conduit and Catalyst via
-`CMAKE_PREFIX_PATH` before configuring WarpX.
+``CMAKE_PREFIX_PATH`` before configuring WarpX.
 
 Inputs File Configuration
 -------------------------
@@ -41,7 +41,7 @@ In addition to configuring the diagnostics, the following parameters must be inc
     * ``catalyst.implementation_search_paths``: The locations to search for the given implementation. The specific file being searched for will be ``catalyst_{implementation}.so``.
 
 The latter two can also be given via the environmental variables
-`CATALYST_IMPLEMENTATION_NAME` and `CATALYST_IMPLEMENTATION_PATHS`
+``CATALYST_IMPLEMENTATION_NAME`` and ``CATALYST_IMPLEMENTATION_PATHS``
 respectively.
 
 Because the scripts and implementations are global, Catalyst does not benefit from nor differentiate between multiple diagnostics.
@@ -110,7 +110,7 @@ To generate the data dumps one must first set the environmental variable ``CATAL
 
 This will run the simulation and write the conduit nodes under ``CATALYST_DATA_DUMP_DIRECTORY``.
 
-Afterward, one can replay the generated nodes by setting up the `CATALYST_IMPLEMENTATION_*` variables for the `catalyst_replay` executable (which can be found in the catalyst build directory) appropriately. For example:
+Afterward, one can replay the generated nodes by setting up the ``CATALYST_IMPLEMENTATION_*`` variables for the ``catalyst_replay`` executable (which can be found in the catalyst build directory) appropriately. For example:
 
 .. code-block:: bash
 

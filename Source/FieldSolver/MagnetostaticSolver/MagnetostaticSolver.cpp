@@ -6,6 +6,7 @@
  */
 #include "WarpX.H"
 
+#include "Fields.H"
 #include "FieldSolver/MagnetostaticSolver/MagnetostaticSolver.H"
 #include "EmbeddedBoundary/Enabled.H"
 #include "Parallelization/GuardCellManager.H"
@@ -19,6 +20,7 @@
 #include "Utils/WarpXProfilerWrapper.H"
 #include "Parallelization/WarpXComm_K.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/warn_manager/WarnManager.H>
 #include <ablastr/fields/VectorPoissonSolver.H>
@@ -71,6 +73,9 @@ WarpX::ComputeMagnetostaticField()
 void
 WarpX::AddMagnetostaticFieldLabFrame()
 {
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
     WARPX_PROFILE("WarpX::AddMagnetostaticFieldLabFrame");
 
     // Store the boundary conditions for the field solver if they haven't been
@@ -87,7 +92,7 @@ WarpX::AddMagnetostaticFieldLabFrame()
     // reset current_fp before depositing current density for this step
     for (int lev = 0; lev <= max_level; lev++) {
         for (int dim=0; dim < 3; dim++) {
-            current_fp[lev][dim]->setVal(0.);
+            m_fields.get(FieldType::current_fp, Direction{dim}, lev)->setVal(0.);
         }
     }
 
@@ -95,22 +100,26 @@ WarpX::AddMagnetostaticFieldLabFrame()
     for (int ispecies=0; ispecies<mypc->nSpecies(); ispecies++){
         WarpXParticleContainer& species = mypc->GetParticleContainer(ispecies);
         if (!species.do_not_deposit) {
-            species.DepositCurrent(current_fp, dt[0], 0.);
+            species.DepositCurrent(
+                m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
+                dt[0], 0.);
         }
     }
 
 #ifdef WARPX_DIM_RZ
     for (int lev = 0; lev <= max_level; lev++) {
-        ApplyInverseVolumeScalingToCurrentDensity(current_fp[lev][0].get(),
-                                                  current_fp[lev][1].get(),
-                                                  current_fp[lev][2].get(), lev);
+        ApplyInverseVolumeScalingToCurrentDensity(
+            m_fields.get(FieldType::current_fp, Direction{0}, lev),
+            m_fields.get(FieldType::current_fp, Direction{1}, lev),
+            m_fields.get(FieldType::current_fp, Direction{2}, lev),
+            lev );
     }
 #endif
 
-    SyncCurrent(current_fp, current_cp, current_buf); // Apply filter, perform MPI exchange, interpolate across levels
+    SyncCurrent("current_fp");
 
     // set the boundary and current density potentials
-    setVectorPotentialBC(vector_potential_fp_nodal);
+    setVectorPotentialBC(m_fields.get_mr_levels_alldirs(FieldType::vector_potential_fp_nodal, finest_level));
 
     // Compute the vector potential A, by solving the Poisson equation
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( !IsPythonCallbackInstalled("poissonsolver"),
@@ -123,9 +132,11 @@ WarpX::AddMagnetostaticFieldLabFrame()
     const int self_fields_max_iters = 200;
     const int self_fields_verbosity = 2;
 
-    computeVectorPotential( current_fp, vector_potential_fp_nodal, self_fields_required_precision,
-                     magnetostatic_absolute_tolerance, self_fields_max_iters,
-                     self_fields_verbosity );
+    computeVectorPotential(
+        m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
+        m_fields.get_mr_levels_alldirs(FieldType::vector_potential_fp_nodal, finest_level),
+        self_fields_required_precision, magnetostatic_absolute_tolerance, self_fields_max_iters,
+        self_fields_verbosity);
 }
 
 /* Compute the vector potential `A` by solving the Poisson equation with `J` as
@@ -145,37 +156,43 @@ WarpX::AddMagnetostaticFieldLabFrame()
    \param[in] verbosity The verbosity setting for the MLMG solver
 */
 void
-WarpX::computeVectorPotential (const amrex::Vector<amrex::Array<std::unique_ptr<amrex::MultiFab>,3> >& curr,
-                                amrex::Vector<amrex::Array<std::unique_ptr<amrex::MultiFab>,3> >& A,
-                                Real const required_precision,
-                                Real absolute_tolerance,
-                                int const max_iters,
-                                int const verbosity) const
+WarpX::computeVectorPotential (ablastr::fields::MultiLevelVectorField const& curr,
+                               ablastr::fields::MultiLevelVectorField const& A,
+                               Real const required_precision,
+                               Real absolute_tolerance,
+                               int const max_iters,
+                               int const verbosity) // const // This breaks non-const m_fields.get_mr_levels_alldirs
 {
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
     // create a vector to our fields, sorted by level
     amrex::Vector<amrex::Array<amrex::MultiFab*,3>> sorted_curr;
     amrex::Vector<amrex::Array<amrex::MultiFab*,3>> sorted_A;
     for (int lev = 0; lev <= finest_level; ++lev) {
-        sorted_curr.emplace_back(amrex::Array<amrex::MultiFab*,3> ({curr[lev][0].get(),
-                                                                    curr[lev][1].get(),
-                                                                    curr[lev][2].get()}));
-        sorted_A.emplace_back(amrex::Array<amrex::MultiFab*,3> ({A[lev][0].get(),
-                                                                 A[lev][1].get(),
-                                                                 A[lev][2].get()}));
+        sorted_curr.emplace_back(amrex::Array<amrex::MultiFab*,3> ({curr[lev][0],
+                                                                    curr[lev][1],
+                                                                    curr[lev][2]}));
+        sorted_A.emplace_back(amrex::Array<amrex::MultiFab*,3> ({A[lev][0],
+                                                                 A[lev][1],
+                                                                 A[lev][2]}));
     }
 
-#if defined(AMREX_USE_EB)
-    const std::optional<MagnetostaticSolver::EBCalcBfromVectorPotentialPerLevel> post_A_calculation({Bfield_fp,
-                                                                                               vector_potential_grad_buf_e_stag,
-                                                                                               vector_potential_grad_buf_b_stag});
+    const ablastr::fields::MultiLevelVectorField Bfield_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level);
+    const std::optional<MagnetostaticSolver::EBCalcBfromVectorPotentialPerLevel> post_A_calculation(
+    {
+        Bfield_fp,
+        m_fields.get_mr_levels_alldirs(FieldType::vector_potential_grad_buf_e_stag, finest_level),
+        m_fields.get_mr_levels_alldirs(FieldType::vector_potential_grad_buf_b_stag, finest_level)
+    });
 
+#if defined(AMREX_USE_EB)
     amrex::Vector<amrex::EBFArrayBoxFactory const *> factories;
     for (int lev = 0; lev <= finest_level; ++lev) {
         factories.push_back(&WarpX::fieldEBFactory(lev));
     }
     const std::optional<amrex::Vector<amrex::EBFArrayBoxFactory const *> > eb_farray_box_factory({factories});
 #else
-    const std::optional<MagnetostaticSolver::EBCalcBfromVectorPotentialPerLevel> post_A_calculation;
     const std::optional<amrex::Vector<amrex::FArrayBoxFactory const *> > eb_farray_box_factory;
 #endif
 
@@ -210,8 +227,10 @@ WarpX::computeVectorPotential (const amrex::Vector<amrex::Array<std::unique_ptr<
    \param[inout] A The vector potential
 */
 void
-WarpX::setVectorPotentialBC ( amrex::Vector<amrex::Array<std::unique_ptr<amrex::MultiFab>,3>>& A ) const
+WarpX::setVectorPotentialBC (ablastr::fields::MultiLevelVectorField const& A) const
 {
+    using ablastr::fields::Direction;
+
     // check if any dimension has non-periodic boundary conditions
     if (!m_vector_poisson_boundary_handler.has_non_periodic) { return; }
 
@@ -226,11 +245,11 @@ WarpX::setVectorPotentialBC ( amrex::Vector<amrex::Array<std::unique_ptr<amrex::
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-            for ( MFIter mfi(*A[lev][adim], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+            for ( MFIter mfi(*A[lev][Direction{adim}], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
                 // Extract the vector potential
-                auto A_arr = A[lev][adim]->array(mfi);
+                auto A_arr = A[lev][Direction{adim}]->array(mfi);
                 // Extract tileboxes for which to loop
-                const Box& tb  = mfi.tilebox( A[lev][adim]->ixType().toIntVect());
+                const Box& tb  = mfi.tilebox( A[lev][Direction{adim}]->ixType().toIntVect());
 
                 // loop over dimensions
                 for (int idim=0; idim<AMREX_SPACEDIM; idim++){
@@ -356,8 +375,8 @@ void MagnetostaticSolver::VectorPoissonBoundaryHandler::defineVectorPotentialBCs
     bcs_set = true;
 }
 
-void MagnetostaticSolver::EBCalcBfromVectorPotentialPerLevel::doInterp(const std::unique_ptr<amrex::MultiFab> &src,
-                                                                       const std::unique_ptr<amrex::MultiFab> &dst)
+void MagnetostaticSolver::EBCalcBfromVectorPotentialPerLevel::doInterp (amrex::MultiFab & src,
+                                                                        amrex::MultiFab & dst)
 {
     WarpX &warpx = WarpX::GetInstance();
 
@@ -373,20 +392,20 @@ void MagnetostaticSolver::EBCalcBfromVectorPotentialPerLevel::doInterp(const std
     amrex::Real const * stencil_coeffs_z = warpx.device_field_centering_stencil_coeffs_z.data();
 
     // Synchronize the ghost cells, do halo exchange
-    ablastr::utils::communication::FillBoundary(*src,
-                                                src->nGrowVect(),
+    ablastr::utils::communication::FillBoundary(src,
+                                                src.nGrowVect(),
                                                 WarpX::do_single_precision_comms);
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-    for (MFIter mfi(*dst, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    for (MFIter mfi(dst, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
-        IntVect const src_stag = src->ixType().toIntVect();
-        IntVect const dst_stag = dst->ixType().toIntVect();
+        IntVect const src_stag = src.ixType().toIntVect();
+        IntVect const dst_stag = dst.ixType().toIntVect();
 
-        Array4<amrex::Real const> const& src_arr = src->const_array(mfi);
-        Array4<amrex::Real> const& dst_arr = dst->array(mfi);
+        Array4<amrex::Real const> const& src_arr = src.const_array(mfi);
+        Array4<amrex::Real> const& dst_arr = dst.array(mfi);
 
         const Box bx = mfi.tilebox();
 
@@ -408,12 +427,12 @@ void MagnetostaticSolver::EBCalcBfromVectorPotentialPerLevel::operator()(amrex::
     const amrex::Array<amrex::MultiFab*, AMREX_SPACEDIM> buf_ptr =
     {
 #if defined(WARPX_DIM_3D)
-        m_grad_buf_e_stag[lev][0].get(),
-        m_grad_buf_e_stag[lev][1].get(),
-        m_grad_buf_e_stag[lev][2].get()
+        m_grad_buf_e_stag[lev][0],
+        m_grad_buf_e_stag[lev][1],
+        m_grad_buf_e_stag[lev][2]
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-        m_grad_buf_e_stag[lev][0].get(),
-        m_grad_buf_e_stag[lev][2].get()
+        m_grad_buf_e_stag[lev][0],
+        m_grad_buf_e_stag[lev][2]
 #endif
     };
 
@@ -421,13 +440,13 @@ void MagnetostaticSolver::EBCalcBfromVectorPotentialPerLevel::operator()(amrex::
     mlmg[0]->getGradSolution({buf_ptr});
 
     // Interpolate dAx/dz to By grid buffer, then add to By
-    this->doInterp(m_grad_buf_e_stag[lev][2],
-                   m_grad_buf_b_stag[lev][1]);
+    this->doInterp(*m_grad_buf_e_stag[lev][2],
+                   *m_grad_buf_b_stag[lev][1]);
     MultiFab::Add(*(m_b_field[lev][1]), *(m_grad_buf_b_stag[lev][1]), 0, 0, 1, 0 );
 
     // Interpolate dAx/dy to Bz grid buffer, then subtract from Bz
-    this->doInterp(m_grad_buf_e_stag[lev][1],
-                   m_grad_buf_b_stag[lev][2]);
+    this->doInterp(*m_grad_buf_e_stag[lev][1],
+                   *m_grad_buf_b_stag[lev][2]);
     m_grad_buf_b_stag[lev][2]->mult(-1._rt);
     MultiFab::Add(*(m_b_field[lev][2]), *(m_grad_buf_b_stag[lev][2]), 0, 0, 1, 0 );
 
@@ -435,13 +454,13 @@ void MagnetostaticSolver::EBCalcBfromVectorPotentialPerLevel::operator()(amrex::
     mlmg[1]->getGradSolution({buf_ptr});
 
     // Interpolate dAy/dx to Bz grid buffer, then add to Bz
-    this->doInterp(m_grad_buf_e_stag[lev][0],
-                   m_grad_buf_b_stag[lev][2]);
+    this->doInterp(*m_grad_buf_e_stag[lev][0],
+                   *m_grad_buf_b_stag[lev][2]);
     MultiFab::Add(*(m_b_field[lev][2]), *(m_grad_buf_b_stag[lev][2]), 0, 0, 1, 0 );
 
     // Interpolate dAy/dz to Bx grid buffer, then subtract from Bx
-    this->doInterp(m_grad_buf_e_stag[lev][2],
-                   m_grad_buf_b_stag[lev][0]);
+    this->doInterp(*m_grad_buf_e_stag[lev][2],
+                   *m_grad_buf_b_stag[lev][0]);
     m_grad_buf_b_stag[lev][0]->mult(-1._rt);
     MultiFab::Add(*(m_b_field[lev][0]), *(m_grad_buf_b_stag[lev][0]), 0, 0, 1, 0 );
 
@@ -449,13 +468,13 @@ void MagnetostaticSolver::EBCalcBfromVectorPotentialPerLevel::operator()(amrex::
     mlmg[2]->getGradSolution({buf_ptr});
 
     // Interpolate dAz/dy to Bx grid buffer, then add to Bx
-    this->doInterp(m_grad_buf_e_stag[lev][1],
-                   m_grad_buf_b_stag[lev][0]);
+    this->doInterp(*m_grad_buf_e_stag[lev][1],
+                   *m_grad_buf_b_stag[lev][0]);
     MultiFab::Add(*(m_b_field[lev][0]), *(m_grad_buf_b_stag[lev][0]), 0, 0, 1, 0 );
 
     // Interpolate dAz/dx to By grid buffer, then subtract from By
-    this->doInterp(m_grad_buf_e_stag[lev][0],
-                   m_grad_buf_b_stag[lev][1]);
+    this->doInterp(*m_grad_buf_e_stag[lev][0],
+                   *m_grad_buf_b_stag[lev][1]);
     m_grad_buf_b_stag[lev][1]->mult(-1._rt);
     MultiFab::Add(*(m_b_field[lev][1]), *(m_grad_buf_b_stag[lev][1]), 0, 0, 1, 0 );
 }

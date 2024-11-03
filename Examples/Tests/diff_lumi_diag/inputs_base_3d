@@ -6,12 +6,11 @@ my_constants.mc2_eV = m_e*clight*clight/q_e
 # BEAMS
 my_constants.beam_energy_eV = 125.e9
 my_constants.beam_gamma = beam_energy_eV/(mc2_eV)
-my_constants.beam_charge = 1.2e10*q_e
+my_constants.beam_N = 1.2e10
 my_constants.sigmax = 500e-9
 my_constants.sigmay = 10e-9
 my_constants.sigmaz = 300e-3
-my_constants.muz = -4*sigmaz
-my_constants.nmacropart = 2e5
+my_constants.muz = 4*sigmaz
 
 # BOX
 my_constants.Lx = 8*sigmax
@@ -62,17 +61,6 @@ warpx.poisson_solver = fft
 #################################
 particles.species_names = beam1 beam2
 
-beam1.species_type = electron
-beam1.injection_style = gaussian_beam
-beam1.x_rms = sigmax
-beam1.y_rms = sigmay
-beam1.z_rms = sigmaz
-beam1.x_m = 0
-beam1.y_m = 0
-beam1.z_m = muz
-beam1.npart = nmacropart
-beam1.q_tot = -beam_charge
-beam1.z_cut = 4
 beam1.momentum_distribution_type = gaussian
 beam1.uz_m = beam_gamma
 beam1.uy_m = 0.0
@@ -82,17 +70,6 @@ beam1.uy_th = 0
 beam1.uz_th = 0.02*beam_gamma
 beam1.do_not_deposit = 1
 
-beam2.species_type = positron
-beam2.injection_style = gaussian_beam
-beam2.x_rms = sigmax
-beam2.y_rms = sigmay
-beam2.z_rms = sigmaz
-beam2.x_m = 0
-beam2.y_m = 0
-beam2.z_m = -muz
-beam2.npart = nmacropart
-beam2.q_tot = beam_charge
-beam2.z_cut = 4
 beam2.momentum_distribution_type = gaussian
 beam2.uz_m = -beam_gamma
 beam2.uy_m = 0.0
@@ -108,7 +85,7 @@ beam2.do_not_deposit = 1
 # FULL
 diagnostics.diags_names = diag1
 
-diag1.intervals = 1
+diag1.intervals = 80
 diag1.diag_type = Full
 diag1.write_species = 1
 diag1.fields_to_plot = rho_beam1 rho_beam2

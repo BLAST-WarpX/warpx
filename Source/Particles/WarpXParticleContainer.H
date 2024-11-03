@@ -25,6 +25,8 @@
 #include "MultiParticleContainer_fwd.H"
 #include "NamedComponentParticleContainer.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
+
 #include <AMReX_Array.H>
 #include <AMReX_FArrayBox.H>
 #include <AMReX_GpuAllocators.H>
@@ -145,14 +147,9 @@ public:
      * particles for a time dt (typically one timestep). It is a pure virtual
      * function for flexibility.
      */
-    virtual void Evolve (int lev,
-                         const amrex::MultiFab& Ex, const amrex::MultiFab& Ey, const amrex::MultiFab& Ez,
-                         const amrex::MultiFab& Bx, const amrex::MultiFab& By, const amrex::MultiFab& Bz,
-                         amrex::MultiFab& jx, amrex::MultiFab& jy, amrex::MultiFab& jz,
-                         amrex::MultiFab* cjx, amrex::MultiFab* cjy, amrex::MultiFab* cjz,
-                         amrex::MultiFab* rho, amrex::MultiFab* crho,
-                         const amrex::MultiFab* cEx, const amrex::MultiFab* cEy, const amrex::MultiFab* cEz,
-                         const amrex::MultiFab* cBx, const amrex::MultiFab* cBy, const amrex::MultiFab* cBz,
+    virtual void Evolve (ablastr::fields::MultiFabRegister& fields,
+                         int lev,
+                         const std::string& current_fp_string,
                          amrex::Real t, amrex::Real dt, DtType a_dt_type=DtType::Full, bool skip_deposition=false,
                          PushType push_type=PushType::Explicit) = 0;
 
@@ -199,7 +196,7 @@ public:
      *                          the particle position will be temporarily modified to match
      *                          the time of the deposition.
      */
-    void DepositCurrent (amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > >& J,
+    void DepositCurrent (ablastr::fields::MultiLevelVectorField const & J,
                          amrex::Real dt, amrex::Real relative_time);
 
     /**
@@ -212,12 +209,12 @@ public:
      * \param[in] interpolate_across_levels whether to average down from the fine patch to the coarse patch
      * \param[in] icomp component of the MultiFab where rho is deposited (old, new)
      */
-    void DepositCharge (amrex::Vector<std::unique_ptr<amrex::MultiFab> >& rho,
+    void DepositCharge (const ablastr::fields::MultiLevelScalarField& rho,
                         bool local = false, bool reset = false,
                         bool apply_boundary_and_scale_volume = false,
                         bool interpolate_across_levels = true,
                         int icomp = 0);
-    void DepositCharge (std::unique_ptr<amrex::MultiFab>& rho, int lev,
+    void DepositCharge (amrex::MultiFab* rho, int lev,
                         bool local = false, bool reset = false,
                         bool apply_boundary_and_scale_volume = false,
                         int icomp = 0);

@@ -7,10 +7,11 @@
  */
 #include "SliceDiagnostic.H"
 
-#include "FieldSolver/Fields.H"
+#include "Fields.H"
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -41,7 +42,7 @@
 #include <sstream>
 
 using namespace amrex;
-using namespace warpx::fields;
+using warpx::fields::FieldType;
 
 /* \brief
  *  The functions creates the slice for diagnostics based on the user-input.
@@ -175,6 +176,10 @@ CreateSlice( const MultiFab& mf, const Vector<Geometry> &dom_geom,
         const MultiFab& mfSrc = *smf;
         MultiFab& mfDst = *cs_mf;
 
+        auto & warpx = WarpX::GetInstance();
+
+        using ablastr::fields::Direction;
+
         MFIter mfi_dst(mfDst);
         for (MFIter mfi(mfSrc); mfi.isValid(); ++mfi) {
 
@@ -196,27 +201,27 @@ CreateSlice( const MultiFab& mf, const Vector<Geometry> &dom_geom,
                 amrex::amrex_avgdown_nodes(Dst_bx, Dst_fabox, Src_fabox, dcomp,
                                            scomp, ncomp, slice_cr_ratio);
             }
-            if( SliceType == WarpX::GetInstance().getField(FieldType::Efield_aux, 0,0).ixType().toIntVect() ) {
+            if( SliceType == warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, 0)->ixType().toIntVect() ) {
                 amrex::amrex_avgdown_edges(Dst_bx, Dst_fabox, Src_fabox, dcomp,
                                            scomp, ncomp, slice_cr_ratio, 0);
             }
-            if( SliceType == WarpX::GetInstance().getField(FieldType::Efield_aux, 0,1).ixType().toIntVect() ) {
+            if( SliceType == warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, 0)->ixType().toIntVect() ) {
                 amrex::amrex_avgdown_edges(Dst_bx, Dst_fabox, Src_fabox, dcomp,
                                            scomp, ncomp, slice_cr_ratio, 1);
             }
-            if( SliceType == WarpX::GetInstance().getField(FieldType::Efield_aux, 0,2).ixType().toIntVect() ) {
+            if( SliceType == warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, 0)->ixType().toIntVect() ) {
                 amrex::amrex_avgdown_edges(Dst_bx, Dst_fabox, Src_fabox, dcomp,
                                            scomp, ncomp, slice_cr_ratio, 2);
             }
-            if( SliceType == WarpX::GetInstance().getField(FieldType::Bfield_aux, 0,0).ixType().toIntVect() ) {
+            if( SliceType == warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, 0)->ixType().toIntVect() ) {
                 amrex::amrex_avgdown_faces(Dst_bx, Dst_fabox, Src_fabox, dcomp,
                                            scomp, ncomp, slice_cr_ratio, 0);
             }
-            if( SliceType == WarpX::GetInstance().getField(FieldType::Bfield_aux, 0,1).ixType().toIntVect() ) {
+            if( SliceType == warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, 0)->ixType().toIntVect() ) {
                 amrex::amrex_avgdown_faces(Dst_bx, Dst_fabox, Src_fabox, dcomp,
                                            scomp, ncomp, slice_cr_ratio, 1);
             }
-            if( SliceType == WarpX::GetInstance().getField(FieldType::Bfield_aux, 0,2).ixType().toIntVect() ) {
+            if( SliceType == warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, 0)->ixType().toIntVect() ) {
                 amrex::amrex_avgdown_faces(Dst_bx, Dst_fabox, Src_fabox, dcomp,
                                            scomp, ncomp, slice_cr_ratio, 2);
             }

@@ -1,6 +1,12 @@
 name: 🪟 Windows
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    paths-ignore:
+      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-windows
@@ -10,7 +16,9 @@ jobs:
   build_win_msvc:
     name: MSVC C++17 w/o MPI
     runs-on: windows-latest
-    if: github.event.pull_request.draft == false
+    # disabled due to issues in #5230
+    if: 0
+    #if: github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5

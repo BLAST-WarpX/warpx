@@ -6,6 +6,7 @@
  */
 #include "FiniteDifferenceSolver.H"
 
+#include "Fields.H"
 #ifndef WARPX_DIM_RZ
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
@@ -18,6 +19,8 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
+
+#include <ablastr/fields/MultiFabRegister.H>
 
 #include <AMReX.H>
 #include <AMReX_Array4.H>
@@ -42,22 +45,48 @@
 #include <memory>
 
 using namespace amrex;
+using namespace ablastr::fields;
 
 /**
  * \brief Update the E field, over one timestep
  */
 void FiniteDifferenceSolver::EvolveE (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Efield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& face_areas,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& ECTRhofield,
-    std::unique_ptr<amrex::MultiFab> const& Ffield,
-    int lev, amrex::Real const dt ) {
+    ablastr::fields::MultiFabRegister & fields,
+    int lev,
+    PatchType patch_type,
+    ablastr::fields::VectorField const& Efield,
+    amrex::Real const dt
+)
+{
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
 
-    if (m_fdtd_algo != ElectromagneticSolverAlgo::ECT) {
-        amrex::ignore_unused(face_areas, ECTRhofield);
+    const ablastr::fields::VectorField Bfield = patch_type == PatchType::fine ?
+        fields.get_alldirs(FieldType::Bfield_fp, lev) : fields.get_alldirs(FieldType::Bfield_cp, lev);
+    const ablastr::fields::VectorField Jfield = patch_type == PatchType::fine ?
+        fields.get_alldirs(FieldType::current_fp, lev) : fields.get_alldirs(FieldType::current_cp, lev);
+
+    amrex::MultiFab* Ffield = nullptr;
+    if (fields.has(FieldType::F_fp, lev)) {
+        Ffield = patch_type == PatchType::fine ?
+                 fields.get(FieldType::F_fp, lev) : fields.get(FieldType::F_cp, lev);
+    }
+
+    ablastr::fields::VectorField edge_lengths;
+    if (fields.has_vector(FieldType::edge_lengths, lev)) {
+        edge_lengths = fields.get_alldirs(FieldType::edge_lengths, lev);
+    }
+    ablastr::fields::VectorField face_areas;
+    if (fields.has_vector(FieldType::face_areas, lev)) {
+        face_areas = fields.get_alldirs(FieldType::face_areas, lev);
+    }
+    ablastr::fields::VectorField area_mod;
+    if (fields.has_vector(FieldType::area_mod, lev)) {
+        area_mod = fields.get_alldirs(FieldType::area_mod, lev);
+    }
+    ablastr::fields::VectorField ECTRhofield;
+    if (fields.has_vector(FieldType::ECTRhofield, lev)) {
+        ECTRhofield = fields.get_alldirs(FieldType::ECTRhofield, lev);
     }
 
     // Select algorithm (The choice of algorithm is a runtime option,
@@ -90,11 +119,11 @@ void FiniteDifferenceSolver::EvolveE (
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::EvolveECartesian (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Efield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
-    std::unique_ptr<amrex::MultiFab> const& Ffield,
+    ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField const& Bfield,
+    ablastr::fields::VectorField const& Jfield,
+    VectorField const& edge_lengths,
+    amrex::MultiFab const* Ffield,
     int lev, amrex::Real const dt ) {
 
 #ifndef AMREX_USE_EB
@@ -191,7 +220,7 @@ void FiniteDifferenceSolver::EvolveECartesian (
         if (Ffield) {
 
             // Extract field data for this grid/tile
-            const Array4<Real> F = Ffield->array(mfi);
+            const Array4<Real const> F = Ffield->array(mfi);
 
             // Loop over the cells and update the fields
             amrex::ParallelFor(tex, tey, tez,
@@ -224,11 +253,11 @@ void FiniteDifferenceSolver::EvolveECartesian (
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::EvolveECylindrical (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Efield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
-    std::unique_ptr<amrex::MultiFab> const& Ffield,
+    ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField const& Bfield,
+    ablastr::fields::VectorField const& Jfield,
+    ablastr::fields::VectorField const& edge_lengths,
+    amrex::MultiFab const* Ffield,
     int lev, amrex::Real const dt ) {
 
 #ifndef AMREX_USE_EB
@@ -391,7 +420,7 @@ void FiniteDifferenceSolver::EvolveECylindrical (
         if (Ffield) {
 
             // Extract field data for this grid/tile
-            const Array4<Real> F = Ffield->array(mfi);
+            const Array4<Real const> F = Ffield->array(mfi);
 
             // Loop over the cells and update the fields
             amrex::ParallelFor(ter, tet, tez,

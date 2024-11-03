@@ -16,7 +16,7 @@ from scipy.constants import epsilon_0
 yt.funcs.mylog.setLevel(50)
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 # Plotfile data set
 fn = sys.argv[1]
@@ -35,6 +35,8 @@ print("error_rel = {}".format(error_rel))
 print("tolerance = {}".format(tolerance))
 assert error_rel < tolerance
 
-# Checksum analysis
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

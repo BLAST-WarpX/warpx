@@ -7,11 +7,13 @@
 #include "LoadBalanceCosts.H"
 
 #include "Diagnostics/ReducedDiags/ReducedDiags.H"
-#include "FieldSolver/Fields.H"
+#include "Fields.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "WarpX.H"
+
+#include <ablastr/fields/MultiFabRegister.H>
 
 #include <AMReX_Box.H>
 #include <AMReX_Config.H>
@@ -36,7 +38,7 @@
 #include <utility>
 
 using namespace amrex;
-using namespace warpx::fields;
+using warpx::fields::FieldType;
 
 namespace
 {
@@ -123,11 +125,13 @@ void LoadBalanceCosts::ComputeDiags (int step)
     // shift index for m_data
     int shift_m_data = 0;
 
+    using ablastr::fields::Direction;
+
     // save data
     for (int lev = 0; lev < nLevels; ++lev)
     {
         const amrex::DistributionMapping& dm = warpx.DistributionMap(lev);
-        const MultiFab & Ex = warpx.getField(FieldType::Efield_aux, lev,0);
+        const MultiFab & Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
         for (MFIter mfi(Ex, false); mfi.isValid(); ++mfi)
         {
             const Box& tbx = mfi.tilebox();

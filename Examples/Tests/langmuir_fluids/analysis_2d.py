@@ -26,7 +26,7 @@ import numpy as np
 from scipy.constants import c, e, epsilon_0, m_e
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 # this will be the name of the plot file
 fn = sys.argv[1]
@@ -178,5 +178,8 @@ print("tolerance_rel: " + str(tolerance_rel))
 
 assert error_rel < tolerance_rel
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

@@ -41,7 +41,7 @@ using namespace amrex;
  */
 void FiniteDifferenceSolver::EvolveFPML (
     amrex::MultiFab* Ffield,
-    std::array< amrex::MultiFab*, 3 > const Efield,
+    ablastr::fields::VectorField const Efield,
     amrex::Real const dt ) {
 
     // Select algorithm (The choice of algorithm is a runtime option,
@@ -75,7 +75,7 @@ void FiniteDifferenceSolver::EvolveFPML (
 template<typename T_Algo>
 void FiniteDifferenceSolver::EvolveFPMLCartesian (
     amrex::MultiFab* Ffield,
-    std::array< amrex::MultiFab*, 3 > const Efield,
+    ablastr::fields::VectorField const Efield,
     amrex::Real const dt ) {
 
     // Loop through the grids, and over the tiles within each grid

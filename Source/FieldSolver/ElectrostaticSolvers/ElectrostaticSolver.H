@@ -50,15 +50,10 @@ public:
      *        This function must be defined in the derived classes.
      */
     virtual void ComputeSpaceChargeField (
-        [[maybe_unused]] amrex::Vector< std::unique_ptr<amrex::MultiFab> >& rho_fp,
-        [[maybe_unused]] amrex::Vector< std::unique_ptr<amrex::MultiFab> >& rho_cp,
-        [[maybe_unused]] amrex::Vector< std::unique_ptr<amrex::MultiFab> >& charge_buf,
-        [[maybe_unused]] amrex::Vector< std::unique_ptr<amrex::MultiFab> >& phi_fp,
-        [[maybe_unused]] MultiParticleContainer& mpc,
-        [[maybe_unused]] MultiFluidContainer* mfl,
-        [[maybe_unused]] amrex::Vector< std::array< std::unique_ptr<amrex::MultiFab>, 3> >& Efield_fp,
-        [[maybe_unused]] amrex::Vector< std::array< std::unique_ptr<amrex::MultiFab>, 3> >& Bfield_fp
-    ) = 0;
+        ablastr::fields::MultiFabRegister& fields,
+        MultiParticleContainer& mpc,
+        MultiFluidContainer* mfl,
+        int max_level) = 0;
 
     /**
      * \brief Set Dirichlet boundary conditions for the electrostatic solver.
@@ -69,7 +64,7 @@ public:
      * \param[in] idim The dimension for which the Dirichlet boundary condition is set
      */
     void setPhiBC (
-        amrex::Vector<std::unique_ptr<amrex::MultiFab>>& phi,
+        ablastr::fields::MultiLevelScalarField const& phi,
         amrex::Real t
     ) const;
 
@@ -91,8 +86,8 @@ public:
      * \param[in] verbosity The verbosity setting for the MLMG solver
      */
     void computePhi (
-        const amrex::Vector<std::unique_ptr<amrex::MultiFab> >& rho,
-        amrex::Vector<std::unique_ptr<amrex::MultiFab> >& phi,
+        ablastr::fields::MultiLevelScalarField const& rho,
+        ablastr::fields::MultiLevelScalarField const& phi,
         std::array<amrex::Real, 3> beta,
         amrex::Real required_precision,
         amrex::Real absolute_tolerance,
@@ -116,8 +111,8 @@ public:
      * \param[in] beta Represents the velocity of the source of `phi`
      */
     void computeE (
-        amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>, 3> >& E,
-        const amrex::Vector<std::unique_ptr<amrex::MultiFab> >& phi,
+        ablastr::fields::MultiLevelVectorField const& E,
+        ablastr::fields::MultiLevelScalarField const& phi,
         std::array<amrex::Real, 3> beta
     ) const;
 
@@ -136,8 +131,8 @@ public:
      *\param[in] beta Represents the velocity of the source of `phi`
      */
     void computeB (
-        amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>, 3> >& B,
-        const amrex::Vector<std::unique_ptr<amrex::MultiFab> >& phi,
+        ablastr::fields::MultiLevelVectorField const& B,
+        ablastr::fields::MultiLevelScalarField const& phi,
         std::array<amrex::Real, 3> beta
     ) const;
 

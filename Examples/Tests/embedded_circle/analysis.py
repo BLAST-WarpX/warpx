@@ -4,13 +4,11 @@ import os
 import sys
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
-# this will be the name of the plot file
-fn = sys.argv[1]
-
-# Get name of the test
-test_name = os.path.split(os.getcwd())[1]
-
-# Run checksum regression test
-checksumAPI.evaluate_checksum(test_name, fn, rtol=1e-2)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+    rtol=1e-2,
+)

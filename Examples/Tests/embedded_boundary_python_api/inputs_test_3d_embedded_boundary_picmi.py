@@ -94,7 +94,7 @@ face_areas_x = fields.FaceAreasxWrapper()
 face_areas_y = fields.FaceAreasyWrapper()
 face_areas_z = fields.FaceAreaszWrapper()
 
-print("======== Testing the wrappers of m_edge_lengths =========")
+print("======== Testing the wrappers of edge_lengths =========")
 
 ly_slice_x = edge_lengths_y[nx // 2, :, :]
 lz_slice_x = edge_lengths_z[nx // 2, :, :]
@@ -159,7 +159,7 @@ perimeter_slice_z_true = L_cavity * 4
 print("Perimeter of the middle z-slice:", perimeter_slice_z)
 assert np.isclose(perimeter_slice_z, perimeter_slice_z_true, rtol=1e-05, atol=1e-08)
 
-print("======== Testing the wrappers of m_face_areas =========")
+print("======== Testing the wrappers of face_areas =========")
 
 Sx_slice = np.sum(face_areas_x[nx // 2, :, :])
 dx = (xmax - xmin) / nx

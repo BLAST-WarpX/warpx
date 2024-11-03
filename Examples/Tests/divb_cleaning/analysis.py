@@ -15,9 +15,8 @@ import numpy as np
 import yt
 
 yt.funcs.mylog.setLevel(50)
-import re
 
-import checksumAPI
+from checksumAPI import evaluate_checksum
 from scipy.constants import c
 
 # Name of the last plotfile
@@ -53,9 +52,8 @@ tolerance = 1e-1
 
 assert rel_error < tolerance
 
-test_name = os.path.split(os.getcwd())[1]
-
-if re.search("single_precision", fn):
-    checksumAPI.evaluate_checksum(test_name, fn, rtol=1.0e-3)
-else:
-    checksumAPI.evaluate_checksum(test_name, fn)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

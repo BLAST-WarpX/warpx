@@ -14,6 +14,7 @@
 #include "Deposition/CurrentDeposition.H"
 #include "Deposition/SharedDepositionUtils.H"
 #include "EmbeddedBoundary/Enabled.H"
+#include "Fields.H"
 #include "Pusher/GetAndSetPosition.H"
 #include "Pusher/UpdatePosition.H"
 #include "ParticleBoundaries_K.H"
@@ -173,6 +174,7 @@ WarpXParticleContainer::AddNParticles (int /*lev*/, long n,
                                        int uniqueparticles, amrex::Long id)
 {
     using namespace amrex::literals;
+    using warpx::fields::FieldType;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE((PIdx::nattribs + nattr_real - 1) <= NumRealComps(),
                                      "Too many real attributes specified");
@@ -302,8 +304,11 @@ WarpXParticleContainer::AddNParticles (int /*lev*/, long n,
     // Remove particles that are inside the embedded boundaries
 #ifdef AMREX_USE_EB
     if (EB::enabled()) {
-        auto & distance_to_eb = WarpX::GetInstance().GetDistanceToEB();
-        scrapeParticlesAtEB( *this, amrex::GetVecOfConstPtrs(distance_to_eb), ParticleBoundaryProcess::Absorb());
+        auto & warpx = WarpX::GetInstance();
+        scrapeParticlesAtEB(
+            *this,
+            warpx.m_fields.get_mr_levels(FieldType::distance_to_eb, warpx.finestLevel()),
+            ParticleBoundaryProcess::Absorb());
         deleteInvalidParticles();
     }
 #endif
@@ -823,7 +828,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
 
 void
 WarpXParticleContainer::DepositCurrent (
-    amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > >& J,
+    ablastr::fields::MultiLevelVectorField const & J,
     const amrex::Real dt, const amrex::Real relative_time)
 {
     // Loop over the refinement levels
@@ -853,7 +858,7 @@ WarpXParticleContainer::DepositCurrent (
             }
 
             DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev,
-                           J[lev][0].get(), J[lev][1].get(), J[lev][2].get(),
+                           J[lev][0], J[lev][1], J[lev][2],
                            0, np, thread_num, lev, lev, dt, relative_time, PushType::Explicit);
         }
 #ifdef AMREX_USE_OMP
@@ -1170,7 +1175,7 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
 }
 
 void
-WarpXParticleContainer::DepositCharge (amrex::Vector<std::unique_ptr<amrex::MultiFab> >& rho,
+WarpXParticleContainer::DepositCharge (const ablastr::fields::MultiLevelScalarField& rho,
                                        const bool local, const bool reset,
                                        const bool apply_boundary_and_scale_volume,
                                        const bool interpolate_across_levels,
@@ -1211,7 +1216,7 @@ WarpXParticleContainer::DepositCharge (amrex::Vector<std::unique_ptr<amrex::Mult
 }
 
 void
-WarpXParticleContainer::DepositCharge (std::unique_ptr<amrex::MultiFab>& rho,
+WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
                                        const int lev, const bool local, const bool reset,
                                        const bool apply_boundary_and_scale_volume,
                                        const int icomp)
@@ -1245,7 +1250,7 @@ WarpXParticleContainer::DepositCharge (std::unique_ptr<amrex::MultiFab>& rho,
             ion_lev = pti.GetiAttribs(particle_icomps["ionizationLevel"]).dataPtr();
         }
 
-        DepositCharge(pti, wp, ion_lev, rho.get(), icomp, 0, np, thread_num, lev, lev);
+        DepositCharge(pti, wp, ion_lev, rho, icomp, 0, np, thread_num, lev, lev);
     }
 #ifdef AMREX_USE_OMP
     }
@@ -1254,7 +1259,7 @@ WarpXParticleContainer::DepositCharge (std::unique_ptr<amrex::MultiFab>& rho,
 #ifdef WARPX_DIM_RZ
     if (apply_boundary_and_scale_volume)
     {
-        WarpX::GetInstance().ApplyInverseVolumeScalingToChargeDensity(rho.get(), lev);
+        WarpX::GetInstance().ApplyInverseVolumeScalingToChargeDensity(rho, lev);
     }
 #endif
 
@@ -1273,7 +1278,7 @@ WarpXParticleContainer::DepositCharge (std::unique_ptr<amrex::MultiFab>& rho,
     if (apply_boundary_and_scale_volume)
     {
         // Reflect density over PEC boundaries, if needed.
-        WarpX::GetInstance().ApplyRhofieldBoundary(lev, rho.get(), PatchType::fine);
+        WarpX::GetInstance().ApplyRhofieldBoundary(lev, rho, PatchType::fine);
     }
 #endif
 }
@@ -1300,7 +1305,7 @@ WarpXParticleContainer::GetChargeDensity (int lev, bool local)
     const int ng_rho = warpx.get_ng_depos_rho().max();
 
     auto rho = std::make_unique<MultiFab>(nba, dm, WarpX::ncomps,ng_rho);
-    DepositCharge(rho, lev, local, true, true, 0);
+    DepositCharge(rho.get(), lev, local, true, true, 0);
     return rho;
 }
 

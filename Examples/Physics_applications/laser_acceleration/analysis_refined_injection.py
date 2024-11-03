@@ -17,7 +17,7 @@ import yt
 yt.funcs.mylog.setLevel(50)
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 # this will be the name of the plot file
 fn = sys.argv[1]
@@ -59,5 +59,8 @@ rho_slice = rho[13:51, 475]
 # Test uniformity up to 0.5% relative variation
 assert rho_slice.std() < 0.005 * abs(rho_slice.mean())
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)
