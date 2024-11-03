@@ -7,7 +7,7 @@
 #include "SemiImplicitEM.H"
 #include "WarpX.H"
 
-using namespace warpx::fields;
+using warpx::fields::FieldType;
 using namespace amrex::literals;
 
 void SemiImplicitEM::Define ( WarpX*  a_WarpX )
@@ -20,7 +20,7 @@ void SemiImplicitEM::Define ( WarpX*  a_WarpX )
     m_WarpX = a_WarpX;
 
     // Define E and Eold vectors
-    m_E.Define( m_WarpX, FieldType::Efield_fp );
+    m_E.Define( m_WarpX, "Efield_fp" );
     m_Eold.Define( m_E );
 
     // Parse implicit solver parameters
@@ -36,21 +36,20 @@ void SemiImplicitEM::Define ( WarpX*  a_WarpX )
 void SemiImplicitEM::PrintParameters () const
 {
     if (!m_WarpX->Verbose()) { return; }
-    amrex::Print() << std::endl;
-    amrex::Print() << "-----------------------------------------------------------" << std::endl;
-    amrex::Print() << "----------- SEMI IMPLICIT EM SOLVER PARAMETERS ------------" << std::endl;
-    amrex::Print() << "-----------------------------------------------------------" << std::endl;
-    amrex::Print() << "max particle iterations:    " << m_max_particle_iterations << std::endl;
-    amrex::Print() << "particle tolerance:         " << m_particle_tolerance << std::endl;
+    amrex::Print() << "\n";
+    amrex::Print() << "-----------------------------------------------------------\n";
+    amrex::Print() << "----------- SEMI IMPLICIT EM SOLVER PARAMETERS ------------\n";
+    amrex::Print() << "-----------------------------------------------------------\n";
+    amrex::Print() << "max particle iterations:    " << m_max_particle_iterations << "\n";
+    amrex::Print() << "particle tolerance:         " << m_particle_tolerance << "\n";
     if (m_nlsolver_type==NonlinearSolverType::Picard) {
-        amrex::Print() << "Nonlinear solver type:      Picard" << std::endl;
+        amrex::Print() << "Nonlinear solver type:      Picard\n";
     }
     else if (m_nlsolver_type==NonlinearSolverType::Newton) {
-        amrex::Print() << "Nonlinear solver type:      Newton" << std::endl;
+        amrex::Print() << "Nonlinear solver type:      Newton\n";
     }
     m_nlsolver->PrintParams();
-    amrex::Print() << "-----------------------------------------------------------" << std::endl;
-    amrex::Print() << std::endl;
+    amrex::Print() << "-----------------------------------------------------------\n\n";
 }
 
 void SemiImplicitEM::OneStep ( amrex::Real  a_time,

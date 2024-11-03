@@ -8,7 +8,9 @@ module load cpe/23.12
 module load craype-accel-amd-gfx90a craype-x86-trento
 module load PrgEnv-cray
 module load CCE-GPU-3.0.0
-module load amd-mixed/5.2.3
+module load amd-mixed/5.7.1
+module load develop
+module load cmake/3.27.9
 
 # optional: for PSATD in RZ geometry support
 export CMAKE_PREFIX_PATH=${SHAREDHOMEDIR}/sw/adastra/gpu/blaspp-2024.05.31:$CMAKE_PREFIX_PATH

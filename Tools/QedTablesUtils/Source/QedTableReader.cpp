@@ -57,7 +57,7 @@ class qs_photon_emission_table_wrapper :
 
 int main (int argc, char** argv)
 {
-    cout << "### QED Table Reader ###" << endl;
+    cout << "### QED Table Reader ###\n";
     const auto args_map = ParseArgs(line_commands, argc, argv);
 
     if (args_map.empty() || Contains(args_map, "-h")){

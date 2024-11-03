@@ -37,9 +37,9 @@ SpectralSolver::SpectralSolver (
                 const bool pml, const bool periodic_single_box,
                 const bool update_with_rho,
                 const bool fft_do_time_averaging,
-                const int psatd_solution_type,
-                const int J_in_time,
-                const int rho_in_time,
+                const PSATDSolutionType psatd_solution_type,
+                const JInTime J_in_time,
+                const RhoInTime rho_in_time,
                 const bool dive_cleaning,
                 const bool divb_cleaning)
 {

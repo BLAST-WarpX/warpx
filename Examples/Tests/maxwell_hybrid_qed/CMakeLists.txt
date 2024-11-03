@@ -6,7 +6,6 @@ if(WarpX_FFT)
         test_2d_maxwell_hybrid_qed_solver  # name
         2  # dims
         2  # nprocs
-        OFF  # eb
         inputs_test_2d_maxwell_hybrid_qed_solver  # inputs
         analysis.py  # analysis
         diags/diag1000300  # output

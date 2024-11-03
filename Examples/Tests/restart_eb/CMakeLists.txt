@@ -6,7 +6,6 @@ if(WarpX_EB)
         test_3d_eb_picmi  # name
         3  # dims
         1  # nprocs
-        ON  # eb
         inputs_test_3d_eb_picmi.py  # inputs
         analysis_default_regression.py  # analysis
         diags/diag1000060  # output
@@ -20,8 +19,7 @@ endif()
 #        test_3d_eb_picmi_restart  # name
 #        3  # dims
 #        1  # nprocs
-#        ON  # eb
-#        "inputs_test_3d_eb_picmi.py amr.restart='../test_3d_eb_picmi/diags/chk000030'"  # inputs
+##        "inputs_test_3d_eb_picmi.py amr.restart='../test_3d_eb_picmi/diags/chk000030'"  # inputs
 #        analysis_default_restart.py  # analysis
 #        diags/diag1000060  # output
 #        test_3d_eb_picmi  # dependency

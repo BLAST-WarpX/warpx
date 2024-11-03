@@ -27,7 +27,7 @@ for dirpath, dirnames, filenames in os.walk(top="./Examples"):
                     # skip lines related to other function arguments
                     # NOTE: update range call to reflect changes
                     #       in the interface of 'add_warpx_test'
-                    for _ in range(3):
+                    for _ in range(2):  # skip over: dims, nprocs
                         next(f)
                     # strip leading whitespaces, remove end-of-line comments
                     testinput = next(f).lstrip().split(" ")[0]

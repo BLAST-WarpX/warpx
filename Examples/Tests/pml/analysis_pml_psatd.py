@@ -17,7 +17,7 @@ import yt
 
 yt.funcs.mylog.setLevel(0)
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 filename = sys.argv[1]
 
@@ -75,5 +75,8 @@ print("reflectivity_max = " + str(reflectivity_max))
 
 assert reflectivity < reflectivity_max
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

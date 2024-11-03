@@ -9,6 +9,7 @@
 #define WARPX_UTILS_WARPXALGORITHMSELECTION_H_
 
 #include <AMReX_BaseFwd.H>
+#include <AMReX_Enum.H>
 #include <ablastr/utils/Enums.H>
 
 #include <string>
@@ -20,23 +21,19 @@ using namespace ablastr::utils::enums;  // NOLINT(google-global-names-in-headers
   * \brief struct to determine the computational medium, i.e., vacuum or material/macroscopic
            default is vacuum.
   */
-struct MediumForEM {
-    enum {
-        Vacuum = 0,
-        Macroscopic = 1
-    };
-};
+AMREX_ENUM(MediumForEM,
+           Vacuum,
+           Macroscopic,
+           Default = Vacuum);
 
 /**
   * \brief struct to select the overall evolve scheme
   */
-struct EvolveScheme {
-    enum {
-        Explicit = 0,
-        ThetaImplicitEM = 1,
-        SemiImplicitEM = 2
-    };
-};
+AMREX_ENUM(EvolveScheme,
+           Explicit,
+           ThetaImplicitEM,
+           SemiImplicitEM,
+           Default = Explicit);
 
 /**
   * \brief struct to select algorithm for macroscopic Maxwell solver
@@ -44,158 +41,116 @@ struct EvolveScheme {
            Backward Euler (fully-implicit) represents sigma*E = sigma*E^(n+1)
            default is Backward Euler as it is more robust.
   */
-struct MacroscopicSolverAlgo {
-    enum {
-        BackwardEuler = 0,
-        LaxWendroff = 1
-    };
-};
+AMREX_ENUM(MacroscopicSolverAlgo,
+           BackwardEuler,
+           LaxWendroff,
+           Default = BackwardEuler);
 
-struct ElectromagneticSolverAlgo {
-    enum {
-        None = 0,
-        Yee = 1,
-        CKC = 2,
-        PSATD = 3,
-        ECT = 4,
-        HybridPIC = 5
-    };
-};
+AMREX_ENUM(ElectromagneticSolverAlgo,
+           None,
+           Yee,
+           CKC,
+           PSATD,
+           ECT,
+           HybridPIC,
+           hybrid = HybridPIC,
+           Default = Yee);
 
-struct ElectrostaticSolverAlgo {
-    enum {
-        None = 0,
-        Relativistic = 1,
-        LabFrameElectroMagnetostatic = 2,
-        LabFrame = 3  // Non relativistic
-    };
-};
+AMREX_ENUM(ElectrostaticSolverAlgo,
+           None,
+           Relativistic,
+           LabFrameElectroMagnetostatic,
+           LabFrame,
+           Default = None);
 
-struct PoissonSolverAlgo {
-    enum {
-        Multigrid = 1,
-        IntegratedGreenFunction = 2,
-    };
-};
+AMREX_ENUM(PoissonSolverAlgo,
+           Multigrid,
+           IntegratedGreenFunction,
+           fft = IntegratedGreenFunction,
+           Default = Multigrid);
 
-struct ParticlePusherAlgo {
-    enum {
-        Boris = 0,
-        Vay = 1,
-        HigueraCary = 2
-    };
-};
+AMREX_ENUM(ParticlePusherAlgo,
+           Boris,
+           Vay,
+           HigueraCary,
+           higuera = HigueraCary,
+           Default = Boris);
 
-struct CurrentDepositionAlgo {
-    enum {
-        Esirkepov = 0,
-        Direct = 1,
-        Vay = 2,
-        Villasenor = 3
-    };
-};
+AMREX_ENUM(CurrentDepositionAlgo,
+           Esirkepov,
+           Direct,
+           Vay,
+           Villasenor,
+           Default = Esirkepov);
 
-struct ChargeDepositionAlgo {
-    // Only the Standard algorithm is implemented
-    enum {
-        Standard = 0
-    };
-};
+AMREX_ENUM(ChargeDepositionAlgo,
+           Standard,
+           Default = Standard);
 
-struct GatheringAlgo {
-    enum {
-        EnergyConserving = 0,
-        MomentumConserving
-    };
-};
+AMREX_ENUM(GatheringAlgo,
+           EnergyConserving,
+           MomentumConserving,
+           Default = EnergyConserving);
 
-struct PSATDSolutionType {
-    enum {
-        FirstOrder = 0,
-        SecondOrder = 1
-    };
-};
+AMREX_ENUM(PSATDSolutionType,
+           FirstOrder,
+           SecondOrder,
+           Default = SecondOrder);
 
-struct JInTime {
-    enum {
-        Constant = 0,
-        Linear = 1
-    };
-};
+AMREX_ENUM(JInTime,
+           Constant,
+           Linear,
+           Default = Constant);
 
-struct RhoInTime {
-    enum {
-        Constant = 0,
-        Linear = 1
-    };
-};
+AMREX_ENUM(RhoInTime,
+           Constant,
+           Linear,
+           Default = Linear);
 
 /** Strategy to compute weights for use in load balance.
  */
-struct LoadBalanceCostsUpdateAlgo {
-    enum {
-        Timers    = 0, //!< load balance according to in-code timer-based weights (i.e., with  `costs`)
-        Heuristic = 1  /**< load balance according to weights computed from number of cells
-                             and number of particles per box (i.e., with `costs_heuristic`) */
-    };
-};
+AMREX_ENUM(LoadBalanceCostsUpdateAlgo,
+           Timers,     //!< load balance according to in-code timer-based weights (i.e., with  `costs`)
+           Heuristic,  /**< load balance according to weights computed from number of cells
+                          and number of particles per box (i.e., with `costs_heuristic`) */
+           Default = Timers);
 
 /** Field boundary conditions at the domain boundary
  */
-enum struct FieldBoundaryType {
-        PML = 0,
-        Periodic = 1,
-        PEC = 2,      //!< perfect electric conductor (PEC) with E_tangential=0
-        PMC = 3,      //!< perfect magnetic conductor (PMC) with B_tangential=0
-        Damped = 4,   // Fields in the guard cells are damped for PSATD
-                      //in the moving window direction
-        Absorbing_SilverMueller = 5, // Silver-Mueller boundary condition
-        Neumann = 6, // For electrostatic, the normal E is set to zero
-        None = 7,    // The fields values at the boundary are not updated. This is
-                     // useful for RZ simulations, at r=0.
-        Open = 8     // Used in the Integrated Green Function Poisson solver
-                     // Note that the solver implicitely assumes open BCs:
-                     // no need to enforce them separately
-};
+AMREX_ENUM(FieldBoundaryType,
+           PML,
+           Periodic,
+           PEC,      //!< perfect electric conductor (PEC) with E_tangential=0
+           PMC,      //!< perfect magnetic conductor (PMC) with B_tangential=0
+           Damped,   // Fields in the guard cells are damped for PSATD
+                     //in the moving window direction
+           Absorbing_SilverMueller, // Silver-Mueller boundary condition
+           absorbingsilvermueller = Absorbing_SilverMueller,
+           Neumann, // For electrostatic, the normal E is set to zero
+           None,    // The fields values at the boundary are not updated. This is
+                    // useful for RZ simulations, at r=0.
+           Open,    // Used in the Integrated Green Function Poisson solver
+                    // Note that the solver implicitely assumes open BCs:
+                    // no need to enforce them separately
+           Default = PML);
 
 /** Particle boundary conditions at the domain boundary
  */
-enum struct ParticleBoundaryType {
-        Absorbing = 0,     //!< particles crossing domain boundary are removed
-        Open = 1,          //!< particles cross domain boundary leave with damped j
-        Reflecting = 2,     //!< particles are reflected
-        Periodic = 3,      //!< particles are introduced from the periodic boundary
-        Thermal = 4,
-        None = 5           //!< For r=0 boundary with RZ simulations
-};
+AMREX_ENUM(ParticleBoundaryType,
+           Absorbing,     //!< particles crossing domain boundary are removed
+           Open,          //!< particles cross domain boundary leave with damped j
+           Reflecting,    //!< particles are reflected
+           Periodic,      //!< particles are introduced from the periodic boundary
+           Thermal,
+           None,          //!< For r=0 boundary with RZ simulations
+           Default = Absorbing);
 
 /** MPI reductions
  */
-struct ReductionType {
-    enum {
-        Maximum = 0,
-        Minimum = 1,
-        Sum = 2
-    };
-};
-
-int
-GetAlgorithmInteger(const amrex::ParmParse& pp, const char* pp_search_key );
-
-/** Select BC Type for fields, if field=true
- *  else select BCType for particles.
- */
-FieldBoundaryType
-GetFieldBCTypeInteger( std::string BCType );
-
-/** Select BC Type for particles.
- */
-ParticleBoundaryType
-GetParticleBCTypeInteger( std::string BCType );
-
-/** Find the name associated with a BC type
- */
-std::string
-GetFieldBCTypeString( FieldBoundaryType fb_type );
+AMREX_ENUM(ReductionType,
+           Maximum,
+           Minimum,
+           Sum,
+           Integral = Sum);
 
 #endif // WARPX_UTILS_WARPXALGORITHMSELECTION_H_

@@ -113,7 +113,7 @@ RhoMaximum::RhoMaximum (const std::string& rd_name)
                                          + "_|rho|_lev" + std::to_string(lev) + "(C/m^3)";
                 }
             }
-            ofs << std::endl;
+            ofs << "\n";
             // close file
             ofs.close();
         }

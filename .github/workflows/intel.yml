@@ -1,6 +1,12 @@
 name: 🐧 Intel
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    paths-ignore:
+      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-intel
@@ -106,6 +112,7 @@ jobs:
         set +e
         source /opt/intel/oneapi/setvars.sh
         set -e
+        export PATH=$PATH:/opt/intel/oneapi/compiler/2024.2/bin  # FIXME
         export CXX=$(which icpx)
         export CC=$(which icx)
 
@@ -170,6 +177,7 @@ jobs:
         set +e
         source /opt/intel/oneapi/setvars.sh
         set -e
+        export PATH=$PATH:/opt/intel/oneapi/compiler/2024.2/bin  # FIXME
         export CXX=$(which icpx)
         export CC=$(which icx)
         export CXXFLAGS="-fsycl ${CXXFLAGS}"
@@ -180,6 +188,7 @@ jobs:
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_COMPUTE=SYCL         \
           -DWarpX_EB=ON                \
+          -DWarpX_FFT=ON               \
           -DWarpX_PYTHON=ON            \
           -DWarpX_MPI=OFF              \
           -DWarpX_OPENPMD=ON           \

@@ -71,6 +71,7 @@ namespace ablastr::fields {
  * \param[in] dmap the distribution mapping per level (e.g., from AmrMesh)
  * \param[in] grids the grids per level (e.g., from AmrMesh)
  * \param[in] boundary_handler a handler for boundary conditions, for example @see MagnetostaticSolver::VectorPoissonBoundaryHandler
+ * \param[in] eb_enabled solve with embedded boundaries
  * \param[in] do_single_precision_comms perform communications in single precision
  * \param[in] rel_ref_ratio mesh refinement ratio between levels (default: 1)
  * \param[in] post_A_calculation perform a calculation per level directly after A was calculated; required for embedded boundaries (default: none)
@@ -85,15 +86,16 @@ template<
 void
 computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > const & curr,
                             amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > & A,
-                            amrex::Real const relative_tolerance,
+                            amrex::Real relative_tolerance,
                             amrex::Real absolute_tolerance,
-                            int const max_iters,
-                            int const verbosity,
+                            int max_iters,
+                            int verbosity,
                             amrex::Vector<amrex::Geometry> const& geom,
                             amrex::Vector<amrex::DistributionMapping> const& dmap,
                             amrex::Vector<amrex::BoxArray> const& grids,
                             T_BoundaryHandler const boundary_handler,
-                            bool const do_single_precision_comms = false,
+                            bool eb_enabled = false,
+                            bool do_single_precision_comms = false,
                             std::optional<amrex::Vector<amrex::IntVect> > rel_ref_ratio = std::nullopt,
                             [[maybe_unused]] T_PostACalculationFunctor post_A_calculation = std::nullopt,
                             [[maybe_unused]] std::optional<amrex::Real const> current_time = std::nullopt, // only used for EB
@@ -107,6 +109,11 @@ computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > co
                                            "rel_ref_ratio must be set if mesh-refinement is used");
         rel_ref_ratio = amrex::Vector<amrex::IntVect>{{amrex::IntVect(AMREX_D_DECL(1, 1, 1))}};
     }
+
+#if !defined(AMREX_USE_EB)
+    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(!eb_enabled,
+                                       "Embedded boundary solve requested but not compiled in");
+#endif
 
     auto const finest_level = static_cast<int>(curr.size()) - 1;
 
@@ -134,24 +141,18 @@ computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > co
 
     // Loop over dimensions of A to solve each component individually
     for (int lev=0; lev<=finest_level; lev++) {
-        amrex::MLEBNodeFDLaplacian linopx(
-            {geom[lev]}, {grids[lev]}, {dmap[lev]}, info
-#if defined(AMREX_USE_EB)
-                , {eb_farray_box_factory.value()[lev]}
+        amrex::MLEBNodeFDLaplacian linopx, linopy, linopz;
+        if (eb_enabled) {
+#ifdef AMREX_USE_EB
+            linopx.define({geom[lev]}, {grids[lev]}, {dmap[lev]}, info, {eb_farray_box_factory.value()[lev]});
+            linopy.define({geom[lev]}, {grids[lev]}, {dmap[lev]}, info, {eb_farray_box_factory.value()[lev]});
+            linopz.define({geom[lev]}, {grids[lev]}, {dmap[lev]}, info, {eb_farray_box_factory.value()[lev]});
 #endif
-            );
-        amrex::MLEBNodeFDLaplacian linopy(
-            {geom[lev]}, {grids[lev]}, {dmap[lev]}, info
-#if defined(AMREX_USE_EB)
-                , {eb_farray_box_factory.value()[lev]}
-#endif
-            );
-        amrex::MLEBNodeFDLaplacian linopz(
-            {geom[lev]}, {grids[lev]}, {dmap[lev]}, info
-#if defined(AMREX_USE_EB)
-                , {eb_farray_box_factory.value()[lev]}
-#endif
-        );
+        } else {
+            linopx.define({geom[lev]}, {grids[lev]}, {dmap[lev]}, info);
+            linopy.define({geom[lev]}, {grids[lev]}, {dmap[lev]}, info);
+            linopz.define({geom[lev]}, {grids[lev]}, {dmap[lev]}, info);
+        }
 
         amrex::Array<amrex::MLEBNodeFDLaplacian*,3> linop = {&linopx,&linopy,&linopz};
         amrex::Array<std::unique_ptr<amrex::MLMG>,3> mlmg;
@@ -163,9 +164,9 @@ computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > co
             // Note: this assumes that beta is zero
             linop[adim]->setSigma({AMREX_D_DECL(1._rt, 1._rt, 1._rt)});
 
-#if defined(AMREX_USE_EB)
             // Set Homogeneous Dirichlet Boundary on EB
-            linop[adim]->setEBDirichlet(0_rt);
+#if defined(AMREX_USE_EB)
+            if (eb_enabled) { linop[adim]->setEBDirichlet(0_rt); }
 #endif
 
 #ifdef WARPX_DIM_RZ

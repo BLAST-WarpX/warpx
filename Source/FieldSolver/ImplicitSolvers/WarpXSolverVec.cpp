@@ -7,11 +7,22 @@
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "WarpX.H"
 
-using namespace warpx::fields;
+using warpx::fields::FieldType;
 
-void WarpXSolverVec::Define ( WarpX*     a_WarpX,
-                              FieldType  a_array_type,
-                              FieldType  a_scalar_type )
+WarpXSolverVec::~WarpXSolverVec ()
+{
+    for (auto & lvl : m_array_vec)
+    {
+        for (int i =0; i<3; ++i)
+        {
+            delete lvl[i];
+        }
+    }
+}
+
+void WarpXSolverVec::Define ( WarpX*  a_WarpX,
+                         const std::string&  a_vector_type_name,
+                         const std::string&  a_scalar_type_name )
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !IsDefined(),
@@ -23,8 +34,33 @@ void WarpXSolverVec::Define ( WarpX*     a_WarpX,
         m_warpx_ptr_defined = true;
     }
 
-    m_array_type = a_array_type;
-    m_scalar_type = a_scalar_type;
+    m_vector_type_name = a_vector_type_name;
+    m_scalar_type_name = a_scalar_type_name;
+
+    if (m_vector_type_name=="Efield_fp") {
+        m_array_type = FieldType::Efield_fp;
+    }
+    else if (m_vector_type_name=="Bfield_fp") {
+        m_array_type = FieldType::Bfield_fp;
+    }
+    else if (m_vector_type_name=="vector_potential_fp_nodal") {
+        m_array_type = FieldType::vector_potential_fp;
+    }
+    else if (m_vector_type_name!="none") {
+        WARPX_ABORT_WITH_MESSAGE(a_vector_type_name
+                    +"is not a valid option for array type used in Definining"
+                    +"a WarpXSolverVec. Valid array types are: Efield_fp, Bfield_fp,"
+                    +"and vector_potential_fp_nodal");
+    }
+
+    if (m_scalar_type_name=="phi_fp") {
+        m_scalar_type = FieldType::phi_fp;
+    }
+    else if (m_scalar_type_name!="none") {
+        WARPX_ABORT_WITH_MESSAGE(a_scalar_type_name
+                    +"is not a valid option for scalar type used in Definining"
+                    +"a WarpXSolverVec. Valid scalar types are: phi_fp");
+    }
 
     m_array_vec.resize(m_num_amr_levels);
     m_scalar_vec.resize(m_num_amr_levels);
@@ -37,13 +73,12 @@ void WarpXSolverVec::Define ( WarpX*     a_WarpX,
             "WarpXSolverVec::Define() called with array_type not an array field");
 
         for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-            using arr_mf_type = std::array<const amrex::MultiFab* const, 3>;
-            const arr_mf_type this_array = m_WarpX->getFieldPointerArray(m_array_type, lev);
+            const ablastr::fields::VectorField this_array = m_WarpX->m_fields.get_alldirs(m_vector_type_name, lev);
             for (int n = 0; n < 3; n++) {
-                m_array_vec[lev][n] = std::make_unique<amrex::MultiFab>( this_array[n]->boxArray(),
-                                                                         this_array[n]->DistributionMap(),
-                                                                         this_array[n]->nComp(),
-                                                                         amrex::IntVect::TheZeroVector() );
+                m_array_vec[lev][n] = new amrex::MultiFab( this_array[n]->boxArray(),
+                                                           this_array[n]->DistributionMap(),
+                                                           this_array[n]->nComp(),
+                                                           amrex::IntVect::TheZeroVector() );
             }
         }
 
@@ -57,11 +92,11 @@ void WarpXSolverVec::Define ( WarpX*     a_WarpX,
             "WarpXSolverVec::Define() called with scalar_type not a scalar field ");
 
         for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-            const amrex::MultiFab* this_mf = m_WarpX->getFieldPointer(m_scalar_type,lev,0);
-            m_scalar_vec[lev] = std::make_unique<amrex::MultiFab>( this_mf->boxArray(),
-                                                                   this_mf->DistributionMap(),
-                                                                   this_mf->nComp(),
-                                                                   amrex::IntVect::TheZeroVector() );
+            const amrex::MultiFab* this_mf = m_WarpX->m_fields.get(m_scalar_type_name,lev);
+            m_scalar_vec[lev] = new amrex::MultiFab( this_mf->boxArray(),
+                                                     this_mf->DistributionMap(),
+                                                     this_mf->nComp(),
+                                                     amrex::IntVect::TheZeroVector() );
         }
 
     }
@@ -87,16 +122,15 @@ void WarpXSolverVec::Copy ( FieldType  a_array_type,
 
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         if (m_array_type != FieldType::None) {
-            using arr_mf_type = std::array<const amrex::MultiFab* const, 3>;
-            const arr_mf_type this_array = m_WarpX->getFieldPointerArray(m_array_type, lev);
+            const ablastr::fields::VectorField this_array = m_WarpX->m_fields.get_alldirs(m_vector_type_name, lev);
             for (int n = 0; n < 3; ++n) {
                 amrex::MultiFab::Copy( *m_array_vec[lev][n], *this_array[n], 0, 0, m_ncomp,
                                        amrex::IntVect::TheZeroVector() );
             }
         }
         if (m_scalar_type != FieldType::None) {
-            const amrex::MultiFab* this_scalar = m_WarpX->getFieldPointer(m_scalar_type,lev,0);
-            amrex::MultiFab::Copy( *m_scalar_vec[lev], *this_scalar, 0, 0, m_ncomp,
+            const amrex::MultiFab* this_mf = m_WarpX->m_fields.get(m_scalar_type_name,lev);
+            amrex::MultiFab::Copy( *m_scalar_vec[lev], *this_mf, 0, 0, m_ncomp,
                                    amrex::IntVect::TheZeroVector() );
         }
     }

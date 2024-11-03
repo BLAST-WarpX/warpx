@@ -92,6 +92,8 @@ macro(find_amrex)
         set(AMReX_PARTICLES ON CACHE INTERNAL "")
         set(AMReX_PROBINIT OFF CACHE INTERNAL "")
         set(AMReX_TINY_PROFILE ON CACHE BOOL "")
+        set(AMReX_LINEAR_SOLVERS_EM ON CACHE INTERNAL "")
+        set(AMReX_LINEAR_SOLVERS_INCFLO OFF CACHE INTERNAL "")
 
         if(WarpX_ASCENT OR WarpX_SENSEI)
             set(AMReX_GPU_RDC ON CACHE BOOL "")
@@ -200,6 +202,8 @@ macro(find_amrex)
         mark_as_advanced(AMReX_HYPRE)
         mark_as_advanced(AMReX_IPO)
         mark_as_advanced(AMReX_LINEAR_SOLVERS)
+        mark_as_advanced(AMReX_LINEAR_SOLVERS_INCFLO)
+        mark_as_advanced(AMReX_LINEAR_SOLVERS_EM)
         mark_as_advanced(AMReX_MEM_PROFILE)
         mark_as_advanced(AMReX_MPI)
         mark_as_advanced(AMReX_MPI_THREAD_MULTIPLE)
@@ -256,7 +260,7 @@ macro(find_amrex)
         endif()
         set(COMPONENT_PRECISION ${WarpX_PRECISION} P${WarpX_PARTICLE_PRECISION})
 
-        find_package(AMReX 24.09 CONFIG REQUIRED COMPONENTS ${COMPONENT_ASCENT} ${COMPONENT_CATALYST} ${COMPONENT_DIMS} ${COMPONENT_EB} PARTICLES ${COMPONENT_PIC} ${COMPONENT_PRECISION} ${COMPONENT_SENSEI} LSOLVERS)
+        find_package(AMReX 24.10 CONFIG REQUIRED COMPONENTS ${COMPONENT_ASCENT} ${COMPONENT_CATALYST} ${COMPONENT_DIMS} ${COMPONENT_EB} PARTICLES ${COMPONENT_PIC} ${COMPONENT_PRECISION} ${COMPONENT_SENSEI} LSOLVERS)
         # note: TINYP skipped because user-configured and optional
 
         # AMReX CMake helper scripts
@@ -279,7 +283,7 @@ set(WarpX_amrex_src ""
 set(WarpX_amrex_repo "https://github.com/AMReX-Codes/amrex.git"
     CACHE STRING
     "Repository URI to pull and build AMReX from if(WarpX_amrex_internal)")
-set(WarpX_amrex_branch "216ce6f37de4b65be57fc1006b3457b4fc318e03"
+set(WarpX_amrex_branch "92679babfc2cc66ca06ee591a80001db57c89878"
     CACHE STRING
     "Repository branch for WarpX_amrex_repo if(WarpX_amrex_internal)")
 

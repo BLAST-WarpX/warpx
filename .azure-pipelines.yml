@@ -3,9 +3,16 @@
 pool:
   vmImage: 'ubuntu-20.04'
 
+trigger:
+  branches:
+    include:
+    - development
 pr:
   autoCancel: true
   drafts: false
+  paths:
+    exclude:
+    - Docs
 
 jobs:
 - job:
@@ -35,10 +42,6 @@ jobs:
       # Cylindrical RZ
       cylindrical_rz:
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS=RZ -DWarpX_FFT=ON -DWarpX_PYTHON=ON
-        WARPX_RZ_FFT: 'TRUE'
-      # embedded boundaries
-      embedded_boundaries:
-        WARPX_CMAKE_FLAGS: -DWarpX_DIMS='1;2;3;RZ' -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_EB=ON
         WARPX_RZ_FFT: 'TRUE'
       # single precision
       #single_precision:

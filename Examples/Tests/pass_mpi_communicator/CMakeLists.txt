@@ -9,7 +9,6 @@ add_warpx_test(
     test_2d_pass_mpi_comm_picmi  # name
     2  # dims
     2  # nprocs
-    OFF  # eb
     inputs_test_2d_pass_mpi_comm_picmi.py  # inputs
     OFF #analysis.py  # analysis
     OFF  # output

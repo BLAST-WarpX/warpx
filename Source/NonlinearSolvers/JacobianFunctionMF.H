@@ -21,8 +21,8 @@ class JacobianFunctionMF
 
     using RT = typename T::value_type;
 
-    JacobianFunctionMF<T,Ops>() = default;
-    ~JacobianFunctionMF<T,Ops>() = default;
+    JacobianFunctionMF() = default;
+    ~JacobianFunctionMF() = default;
 
     // Default move and copy operations
     JacobianFunctionMF(const JacobianFunctionMF&) = default;

@@ -6,7 +6,6 @@ if(WarpX_EB)
         test_rz_embedded_boundary_diffraction  # name
         RZ  # dims
         2  # nprocs
-        ON  # eb
         inputs_test_rz_embedded_boundary_diffraction  # inputs
         analysis_fields.py  # analysis
         diags/diag1/  # output

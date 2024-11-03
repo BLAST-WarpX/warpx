@@ -77,9 +77,9 @@ For example, this builds WarpX in all geometries, enables Python bindings and Nv
 Build Options
 -------------
 
-============================= ============================================ =========================================================
+============================= ============================================ ===========================================================
 CMake Option                  Default & Values                             Description
-============================= ============================================ =========================================================
+============================= ============================================ ===========================================================
 ``CMAKE_BUILD_TYPE``          RelWithDebInfo/**Release**/Debug             `Type of build, symbols & optimizations <https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html>`__
 ``CMAKE_INSTALL_PREFIX``      system-dependent path                        `Install path prefix <https://cmake.org/cmake/help/latest/variable/CMAKE_INSTALL_PREFIX.html>`__
 ``CMAKE_VERBOSE_MAKEFILE``    ON/**OFF**                                   `Print all compiler commands to the terminal during build <https://cmake.org/cmake/help/latest/variable/CMAKE_VERBOSE_MAKEFILE.html>`__
@@ -88,7 +88,7 @@ CMake Option                  Default & Values                             Descr
 ``WarpX_CATALYST``            ON/**OFF**                                   Catalyst in situ visualization
 ``WarpX_COMPUTE``             NOACC/**OMP**/CUDA/SYCL/HIP                  On-node, accelerated computing backend
 ``WarpX_DIMS``                **3**/2/1/RZ                                 Simulation dimensionality. Use ``"1;2;RZ;3"`` for all.
-``WarpX_EB``                  ON/**OFF**                                   Embedded boundary support (not supported in RZ yet)
+``WarpX_EB``                  **ON**/OFF                                   Embedded boundary support (not supported in RZ yet)
 ``WarpX_IPO``                 ON/**OFF**                                   Compile WarpX with interprocedural optimization (aka LTO)
 ``WarpX_LIB``                 ON/**OFF**                                   Build WarpX as a library, e.g., for PICMI Python
 ``WarpX_MPI``                 **ON**/OFF                                   Multi-node support (message-passing)
@@ -105,9 +105,9 @@ CMake Option                  Default & Values                             Descr
 ``WarpX_QED_TABLES_GEN_OMP``  **AUTO**/ON/OFF                              Enables OpenMP support for QED lookup tables generation
 ``WarpX_SENSEI``              ON/**OFF**                                   SENSEI in situ visualization
 ``Python_EXECUTABLE``         (newest found)                               Path to Python executable
-``PY_PIP_OPTIONS``            ``-v``                                       Additional options for ``pip``, e.g., ``-vvv``
-``PY_PIP_INSTALL_OPTIONS``                                                 Additional options for ``pip install``, e.g., ``--user``
-============================= ============================================ =========================================================
+``PY_PIP_OPTIONS``            ``-v``                                       Additional options for ``pip``, e.g., ``-vvv;-q``
+``PY_PIP_INSTALL_OPTIONS``                                                 Additional options for ``pip install``, e.g., ``--user;-q``
+============================= ============================================ ===========================================================
 
 WarpX can be configured in further detail with options from AMReX, which are documented in the AMReX manual:
 
@@ -269,7 +269,7 @@ Environment Variable          Default & Values                             Descr
 ============================= ============================================ ================================================================
 ``WARPX_COMPUTE``             NOACC/**OMP**/CUDA/SYCL/HIP                  On-node, accelerated computing backend
 ``WARPX_DIMS``                ``"1;2;3;RZ"``                               Simulation dimensionalities (semicolon-separated list)
-``WARPX_EB``                  ON/**OFF**                                   Embedded boundary support (not supported in RZ yet)
+``WARPX_EB``                  **ON**/OFF                                   Embedded boundary support (not supported in RZ yet)
 ``WARPX_MPI``                 ON/**OFF**                                   Multi-node support (message-passing)
 ``WARPX_OPENPMD``             **ON**/OFF                                   openPMD I/O (HDF5, ADIOS)
 ``WARPX_PRECISION``           SINGLE/**DOUBLE**                            Floating point precision (single/double)

@@ -2,7 +2,7 @@ name: CleanUpCache
 
 on:
   workflow_run:
-    workflows: [🧹 clang-tidy, 🔍 CodeQL, 🐧 CUDA, 🐧 HIP, 🐧 Intel, 🍏 macOS, 🐧 OpenMP]
+    workflows: [🧴 clang sanitizers, 🧹 clang-tidy, 🔍 CodeQL, 🐧 CUDA, 🐧 HIP, 🐧 Intel, 🍏 macOS, 🐧 OpenMP]
     types:
       - completed
 

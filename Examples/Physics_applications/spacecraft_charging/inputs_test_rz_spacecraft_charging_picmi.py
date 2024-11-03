@@ -121,12 +121,12 @@ def compute_virtual_charge_on_spacecraft():
     # Compute integral of rho over volume of the domain
     # (i.e. total charge of the plasma particles)
     rho_integral = (
-        (rho[1 : nr - 1, 1 : nz - 1] * r[1 : nr - 1, np.newaxis]).sum() * dr * dz
+        (rho[1 : nr - 1, 1 : nz - 1] * r[1 : nr - 1, np.newaxis]).sum()
+        * 2
+        * np.pi
+        * dr
+        * dz
     )
-
-    # Due to an oddity in WarpX (which will probably be solved later)
-    # we need to multiply `rho` by `-epsilon_0` to get the correct charge
-    rho_integral *= 2 * np.pi * -scc.epsilon_0  # does this oddity still exist?
 
     # Compute charge of the spacecraft, based on Gauss theorem
     q_spacecraft = -rho_integral - scc.epsilon_0 * grad_phi_integral

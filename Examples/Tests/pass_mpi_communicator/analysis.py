@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # This is a script that analyses the simulation results from
-# the script `PICMI_inputs_2d`.
+# the script `inputs_test_2d_pass_mpi_comm_picmi.py`.
 
 import sys
 

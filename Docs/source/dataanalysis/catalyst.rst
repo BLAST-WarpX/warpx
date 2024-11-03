@@ -9,28 +9,25 @@ visualization and analysis capabilities, which is what this document will focus 
 
 Enabling Catalyst
 -----------------
-In order to use Catalyst with WarpX, you must `build Catalyst 2 <https://catalyst-in-situ.readthedocs.io/en/latest/build_and_install.html>`_ and `build <https://github.com/Kitware/ParaView/blob/master/Documentation/dev/build.md>`__ or `install <https://www.paraview.org/download/>`__ ParaView 5.9+. Afterward, AMReX must be built with ``AMReX_CONDUIT=TRUE``,
-``AMReX_CATALYST=TRUE``, ``Conduit_DIR=/path/to/conduit``, and ``Catalyst_DIR=/path/to/catalyst`` (``/path/to/catalyst`` should be the directory containing ``catalyst-config.cmake``, not the path to the implementation).
+In order to use Catalyst with WarpX, we need to ensure that we will be using the same version of
+conduit across all libraries i.e Catalyst, AMReX and ParaView. One way to achieve this is to
+build conduit externally and use it for compiling all the above packages.
+This ensures compatibility when passing conduit nodes between WarpX and ParaView.
 
-Once AMReX is appropriately built, WarpX can be built with the following options:
+First, we build
+`Conduit <https://llnl-conduit.readthedocs.io/en/latest/building.html>`_ and then
+build `Catalyst 2 <https://catalyst-in-situ.readthedocs.io/en/latest/build_and_install.html>`_
+using the conduit library created in the previous step.
+The latter can be achieved by adding the installation path of conduit to the environmental
+variable ``CMAKE_PREFIX_PATH`` and setting ``CATALYST_WITH_EXTERNAL_CONDUIT=ON`` during the configuration step of Catalyst.
 
-.. code-block:: cmake
-
-    WarpX_amrex_internal=FALSE
-    AMReX_DIR="/path/to/amrex/build"
-
-If they cannot be found, ``Conduit_DIR`` and ``Catalyst_DIR`` will have to be set again. Ensure that AMReX is built with all required options, some common ones being:
-
-.. code-block:: cmake
-
-    AMReX_MPI=TRUE
-    AMReX_MPI_THREAD_MULTIPLE=TRUE
-    AMReX_LINEAR_SOLVERS=TRUE
-    AMReX_PARTICLES=TRUE
-    AMReX_PARTICLES_PRECISION=DOUBLE
-    AMReX_PIC=TRUE
-    AMReX_TINY_PROFILE=TRUE
-
+Then we build ParaView master (on a commit after 2024.07.01, tested on ``4ef351a54ff747ef7169e2e52e77d9703a9dfa77``) following the developer instructions provided
+`here <https://github.com/Kitware/ParaView/blob/master/Documentation/dev/build.md>`__ .
+A representative set of options for a headless ParaView installation is provided
+`here <https://gitlab.kitware.com/christos.tsolakis/catalyst-amrex-docker-images/-/blob/ci-catalyst-amrex-warpx-20240701/docker/ubuntu22_04/install_paraview.sh>`__
+Afterward, WarpX must be built with ``WarpX_CATALYST=ON``.
+Also, make sure to provide the installed paths of Conduit and Catalyst via
+``CMAKE_PREFIX_PATH`` before configuring WarpX.
 
 Inputs File Configuration
 -------------------------
@@ -43,6 +40,10 @@ In addition to configuring the diagnostics, the following parameters must be inc
     * ``catalyst.implementation`` (default ``paraview``): The name of the implementation being used (case sensitive).
     * ``catalyst.implementation_search_paths``: The locations to search for the given implementation. The specific file being searched for will be ``catalyst_{implementation}.so``.
 
+The latter two can also be given via the environmental variables
+``CATALYST_IMPLEMENTATION_NAME`` and ``CATALYST_IMPLEMENTATION_PATHS``
+respectively.
+
 Because the scripts and implementations are global, Catalyst does not benefit from nor differentiate between multiple diagnostics.
 
 
@@ -53,66 +54,10 @@ Catalyst uses the files specified in ``catalyst.script_paths`` to run all analys
 The following script, :code:`simple_catalyst_pipeline.py`, automatically detects the type of data for both the mesh and particles, then creates an extractor for them. In most
 cases, these will be saved as ``.VTPC`` files which can be read with the ``XML Partitioned Dataset Collection Reader``.
 
-.. code-block:: python
+.. literalinclude:: catalyst/catalyst_simple_pipeline.py
+   :language: python
+   :caption:  You can copy this file from ``Docs/source/dataanalysis/catalyst/catalyst_simple_pipeline.py``.
 
-    from paraview.simple import *
-    from paraview import catalyst
-
-    # Helper function
-    def create_extractor(data_node, filename="Dataset"):
-        VTK_TYPES = ["vtkImageData", "vtkRectilinearGrid", "vtkStructuredGrid", "vtkPolyData", "vtkUnstructuredGrid", "vtkUniformGridAMR", "vtkMultiBlockDataSet", "vtkPartitionedDataSet", "vtkPartitionedDataSetCollection", "vtkHyperTreeGrid"]
-        FILE_ASSOCIATIONS = ["VTI", "VTR", "VTS", "VTP", "VTU", "VTH", "VTM", "VTPD", "VTPC", "HTG"]
-        clientside_data = data_node.GetClientSideObject().GetOutputDataObject(0) # Gets the dataobject from the default output port
-
-        # Loop is required because .IsA() detects valid classes that inherit from the VTK_TYPES
-        for i, vtk_type in enumerate(VTK_TYPES):
-            if (clientside_data.IsA(vtk_type)):
-                filetype = FILE_ASSOCIATIONS[i]
-                extractor = CreateExtractor(filetype, data_node, registrationName=f"_{filetype}")
-                extractor.Writer.FileName = filename + "_{timestep:}" + f".{filetype}"
-                return extractor
-
-        raise RuntimeError(f"Unsupported data type: {clientside_data.GetClassName()}")
-
-    # Camera settings
-    paraview.simple._DisableFirstRenderCameraReset()  # Prevents the camera from being shown
-
-    # Options
-    options = catalyst.Options()
-
-    options.CatalystLiveTrigger = "TimeStep"  # "Python", "TimeStep", "TimeValue"
-    options.EnableCatalystLive = 0  # 0 (disabled), 1 (enabled)
-    if (options.EnableCatalystLive == 1):
-        options.CatalystLiveURL = "localhost:22222"  # localhost:22222 is default
-
-    options.ExtractsOutputDirectory = "datasets"  # Base for where all files are saved
-    options.GenerateCinemaSpecification = 0 # 0 (disabled), 1 (enabled), generates additional descriptor files for cinema exports
-    options.GlobalTrigger = "TimeStep"  # "Python", "TimeStep", "TimeValue"
-
-    meshSource = PVTrivialProducer(registrationName="mesh")  # "mesh" is the node where the mesh data is stored
-    create_extractor(meshSource, filename="meshdata")
-    particleSource = PVTrivialProducer(registrationName="particles")  # "particles" is the node where particle data is stored
-    create_extractor(particleSource, filename="particledata")
-
-    # Called on catalyst initialize (after Cxx side initialize)
-    def catalyst_initialize():
-        return
-
-    # Called on catalyst execute (after Cxx side update)
-    def catalyst_execute(info):
-        print(f"Time: {info.time}, Timestep: {info.timestep}, Cycle: {info.cycle}")
-        return
-
-    # Callback if global trigger is set to "Python"
-    def is_activated(controller):
-        return True
-
-    # Called on catalyst finalize (after Cxx side finalize)
-    def catalyst_finalize():
-        return
-
-    if __name__ == '__main__':
-        paraview.simple.SaveExtractsUsingCatalystOptions(options)
 
 
 For the case of ParaView Catalyst, pipelines are run with ParaView's included ``pvbatch`` executable and use the ``paraview`` library to modify the data. While pipeline scripts
@@ -159,9 +104,32 @@ Steps one is advised so that proper scaling and framing can be done, however in 
 
 Replay
 ------
+Catalyst 2.0 supports generating binary data dumps for the conduit nodes passed to each ``catalyst_`` call at each iteration. This allows to debug/adapt catalyst scripts without having to rerun the simulation each time.
 
-Catalyst 2 supports replay capabilities, which can be read about `here <https://catalyst-in-situ.readthedocs.io/en/latest/catalyst_replay.html>`_.
+To generate the data dumps one must first set the environmental variable ``CATALYST_DATA_DUMP_DIRECTORY`` to the path where the dumps should be saved. Then, run the simulation as normal but replace ``catalyst.implementation=stub`` either in the calling script of WarpX or as an additional argument.
 
-.. note::
+This will run the simulation and write the conduit nodes under ``CATALYST_DATA_DUMP_DIRECTORY``.
 
-   * TODO: Add more extensive documentation on replay
+Afterward, one can replay the generated nodes by setting up the ``CATALYST_IMPLEMENTATION_*`` variables for the ``catalyst_replay`` executable (which can be found in the catalyst build directory) appropriately. For example:
+
+.. code-block:: bash
+
+    # dump conduit nodes
+    export CATALYST_DATA_DUMP_DIRECTORY=./raw_data
+    mpiexec -n N <WarpX build directory>/bin/warpx.2d ./inputs_2d catalyst.script_paths=catalyst_pipeline.py catalyst.implementation="stub"
+    # validate that files have been written
+    ls ./raw_data/
+    ... many files of the format XXXX.conduit_bin.Y.Z
+
+    # replay them
+    export CATALYST_IMPLEMENTATION_NAME=paraview
+    export CATALYST_IMPLEMENTATION_PATHS=<paraview install path>/lib/catalyst
+    export CATALYST_IMPLEMENTATION_PREFER_ENV=YES
+    export CATALYST_DEBUG=1 # optional but helps to make sure the right paths are used
+    export PYTHONPATH=${PYTHONPATH}/$(pwd) # or the path containing catalyst_pipeline.py in general
+    # N needs to be the same as when we generated the dump
+    mpiexec -n N <catalyst install path>/bin/catalyst_replay ./raw_data
+    # check extractor output  e.g
+    ls ./datasets/
+
+For more information see the documentation for catalyst replay `here <https://catalyst-in-situ.readthedocs.io/en/latest/catalyst_replay.html>`__ .

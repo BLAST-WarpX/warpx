@@ -28,7 +28,7 @@
 
 /* This function initializes the stencil coefficients for the chosen finite-difference algorithm */
 FiniteDifferenceSolver::FiniteDifferenceSolver (
-    int const fdtd_algo,
+    ElectromagneticSolverAlgo const fdtd_algo,
     std::array<amrex::Real,3> cell_size,
     ablastr::utils::enums::GridType grid_type):
     // Register the type of finite-difference algorithm

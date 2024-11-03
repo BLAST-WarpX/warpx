@@ -6,7 +6,6 @@ if(WarpX_EB)
         test_2d_field_probe  # name
         2  # dims
         2  # nprocs
-        ON  # eb
         inputs_test_2d_field_probe  # inputs
         analysis.py  # analysis
         diags/diag1000544  # output

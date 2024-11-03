@@ -28,9 +28,9 @@ class NewtonSolver : public NonlinearSolver<Vec,Ops>
 {
 public:
 
-    NewtonSolver<Vec,Ops>() = default;
+    NewtonSolver() = default;
 
-    ~NewtonSolver<Vec,Ops>() override = default;
+    ~NewtonSolver() override = default;
 
     // Prohibit Move and Copy operations
     NewtonSolver(const NewtonSolver&) = delete;
@@ -69,16 +69,16 @@ public:
 
     void PrintParams () const override
     {
-        amrex::Print()     << "Newton verbose:             " << (this->m_verbose?"true":"false") << std::endl;
-        amrex::Print()     << "Newton max iterations:      " << m_maxits << std::endl;
-        amrex::Print()     << "Newton relative tolerance:  " << m_rtol << std::endl;
-        amrex::Print()     << "Newton absolute tolerance:  " << m_atol << std::endl;
-        amrex::Print()     << "Newton require convergence: " << (m_require_convergence?"true":"false") << std::endl;
-        amrex::Print()     << "GMRES verbose:            " << m_gmres_verbose_int << std::endl;
-        amrex::Print()     << "GMRES restart length:     " << m_gmres_restart_length << std::endl;
-        amrex::Print()     << "GMRES max iterations:     " << m_gmres_maxits << std::endl;
-        amrex::Print()     << "GMRES relative tolerance: " << m_gmres_rtol << std::endl;
-        amrex::Print()     << "GMRES absolute tolerance: " << m_gmres_atol << std::endl;
+        amrex::Print()     << "Newton verbose:             " << (this->m_verbose?"true":"false") << "\n";
+        amrex::Print()     << "Newton max iterations:      " << m_maxits << "\n";
+        amrex::Print()     << "Newton relative tolerance:  " << m_rtol << "\n";
+        amrex::Print()     << "Newton absolute tolerance:  " << m_atol << "\n";
+        amrex::Print()     << "Newton require convergence: " << (m_require_convergence?"true":"false") << "\n";
+        amrex::Print()     << "GMRES verbose:            " << m_gmres_verbose_int << "\n";
+        amrex::Print()     << "GMRES restart length:     " << m_gmres_restart_length << "\n";
+        amrex::Print()     << "GMRES max iterations:     " << m_gmres_maxits << "\n";
+        amrex::Print()     << "GMRES relative tolerance: " << m_gmres_rtol << "\n";
+        amrex::Print()     << "GMRES absolute tolerance: " << m_gmres_atol << "\n";
     }
 
 private:
@@ -261,19 +261,19 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
 
         if (norm_abs < m_rtol) {
             amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
-                           << ". Satisfied absolute tolerance " << m_atol << std::endl;
+                           << ". Satisfied absolute tolerance " << m_atol << "\n";
             break;
         }
 
         if (norm_rel < m_rtol) {
             amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
-                           << ". Satisfied relative tolerance " << m_rtol << std::endl;
+                           << ". Satisfied relative tolerance " << m_rtol << "\n";
             break;
         }
 
         if (norm_abs > 100._rt*norm0) {
             amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
-                           << ". SOLVER DIVERGED! relative tolerance = " << m_rtol << std::endl;
+                           << ". SOLVER DIVERGED! relative tolerance = " << m_rtol << "\n";
             std::stringstream convergenceMsg;
             convergenceMsg << "Newton: exiting at iteration " << std::setw(3) << iter <<
                               ". SOLVER DIVERGED! absolute norm = " << norm_abs <<
@@ -291,7 +291,7 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
         iter++;
         if (iter >= m_maxits) {
             amrex::Print() << "Newton: exiting at iter = " << std::setw(3) << iter
-                           << ". Maximum iteration reached: iter = " << m_maxits << std::endl;
+                           << ". Maximum iteration reached: iter = " << m_maxits << "\n";
             break;
         }
 

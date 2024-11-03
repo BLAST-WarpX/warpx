@@ -9,16 +9,13 @@
 import os
 import sys
 
-import yt
-
-yt.funcs.mylog.setLevel(50)
-
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
-# Name of the plotfile
-fn = sys.argv[1]
-
-test_name = os.path.split(os.getcwd())[1]
-
-checksumAPI.evaluate_checksum(test_name, fn, rtol=1e-4, do_particles=False)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+    rtol=1e-4,
+    do_particles=False,
+)

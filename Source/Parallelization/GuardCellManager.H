@@ -7,6 +7,7 @@
 #ifndef WARPX_GUARDCELLMANAGER_H_
 #define WARPX_GUARDCELLMANAGER_H_
 
+#include <Utils/WarpXAlgorithmSelection.H>
 #include <ablastr/utils/Enums.H>
 
 #include <AMReX_Array.H>
@@ -63,7 +64,7 @@ public:
         int nox,
         int nox_fft, int noy_fft, int noz_fft,
         int nci_corr_stencil,
-        int electromagnetic_solver_id,
+        ElectromagneticSolverAlgo electromagnetic_solver_id,
         int max_level,
         const amrex::Vector<amrex::Real>& v_galilean,
         const amrex::Vector<amrex::Real>& v_comoving,

@@ -99,14 +99,6 @@ private:
     WarpXSolverVec m_E, m_Eold;
 
     /**
-     * \brief B is a derived variable from E. Need to save Bold to update B during
-     * the iterative nonlinear solve for E. Bold is owned here, but only used by WarpX.
-     * It is not used directly by the nonlinear solver, nor is it the same size as the
-     * solver vector (size E), and so it should not be WarpXSolverVec type.
-     */
-    amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > > m_Bold;
-
-    /**
      * \brief Update the E and B fields owned by WarpX
      */
     void UpdateWarpXFields ( const WarpXSolverVec&  a_E,

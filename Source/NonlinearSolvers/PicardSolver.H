@@ -26,9 +26,9 @@ class PicardSolver : public NonlinearSolver<Vec,Ops>
 {
 public:
 
-    PicardSolver<Vec,Ops>() = default;
+    PicardSolver() = default;
 
-    ~PicardSolver<Vec,Ops>() override = default;
+    ~PicardSolver() override = default;
 
     // Prohibit Move and Copy operations
     PicardSolver(const PicardSolver&) = delete;
@@ -55,10 +55,10 @@ public:
 
     void PrintParams () const override
     {
-        amrex::Print() << "Picard max iterations:      " << m_maxits << std::endl;
-        amrex::Print() << "Picard relative tolerance:  " << m_rtol << std::endl;
-        amrex::Print() << "Picard absolute tolerance:  " << m_atol << std::endl;
-        amrex::Print() << "Picard require convergence: " << (m_require_convergence?"true":"false") << std::endl;
+        amrex::Print() << "Picard max iterations:      " << m_maxits << "\n";
+        amrex::Print() << "Picard relative tolerance:  " << m_rtol << "\n";
+        amrex::Print() << "Picard absolute tolerance:  " << m_atol << "\n";
+        amrex::Print() << "Picard require convergence: " << (m_require_convergence?"true":"false") << "\n";
     }
 
 private:
@@ -179,19 +179,19 @@ void PicardSolver<Vec,Ops>::Solve ( Vec&         a_U,
 
         if (norm_abs < m_atol) {
             amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
-                           << ". Satisfied absolute tolerance " << m_atol << std::endl;
+                           << ". Satisfied absolute tolerance " << m_atol << "\n";
             break;
         }
 
         if (norm_rel < m_rtol) {
             amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
-                           << ". Satisfied relative tolerance " << m_rtol << std::endl;
+                           << ". Satisfied relative tolerance " << m_rtol << "\n";
             break;
         }
 
         if (iter >= m_maxits) {
             amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
-                           << ". Maximum iteration reached: iter = " << m_maxits << std::endl;
+                           << ". Maximum iteration reached: iter = " << m_maxits << "\n";
             break;
         }
 

@@ -6,7 +6,6 @@ if(WarpX_FFT)
         test_2d_python_wrappers_picmi  # name
         2  # dims
         2  # nprocs
-        OFF  # eb
         inputs_test_2d_python_wrappers_picmi.py  # inputs
         analysis_default_regression.py  # analysis
         diags/diag1000100  # output

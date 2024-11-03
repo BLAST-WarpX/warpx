@@ -23,7 +23,7 @@ import yt
 from scipy.constants import e
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 # this will be the name of the plot file
 last_fn = sys.argv[1]
@@ -124,5 +124,8 @@ print("TApar at 30ps error = ", error)
 print("tolerance = ", tolerance)
 assert error < tolerance
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, last_fn)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

@@ -1714,9 +1714,9 @@ void doGatherShapeNImplicit (
                      const amrex::Dim3& lo,
                      const int n_rz_azimuthal_modes,
                      const int nox,
-                     const int depos_type )
+                     const CurrentDepositionAlgo depos_type )
 {
-    if (depos_type==0) { // CurrentDepositionAlgo::Esirkepov
+    if (depos_type == CurrentDepositionAlgo::Esirkepov) {
         if (nox == 1) {
             doGatherShapeNEsirkepovStencilImplicit<1>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
@@ -1743,7 +1743,7 @@ void doGatherShapeNImplicit (
                                                       dinv, xyzmin, lo, n_rz_azimuthal_modes);
         }
     }
-    else if (depos_type==3) { // CurrentDepositionAlgo::Villasenor
+    else if (depos_type == CurrentDepositionAlgo::Villasenor) {
         if (nox == 1) {
             doGatherPicnicShapeN<1>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
@@ -1770,7 +1770,7 @@ void doGatherShapeNImplicit (
                                     dinv, xyzmin, lo, n_rz_azimuthal_modes);
         }
     }
-    else if (depos_type==1) { // CurrentDepositionAlgo::Direct
+    else if (depos_type == CurrentDepositionAlgo::Direct) {
         if (nox == 1) {
             doGatherShapeN<1,0>(xp_nph, yp_nph, zp_nph, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                 ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,

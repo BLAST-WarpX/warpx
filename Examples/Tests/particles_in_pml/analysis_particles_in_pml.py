@@ -25,7 +25,7 @@ import yt
 
 yt.funcs.mylog.setLevel(0)
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 # Open plotfile specified in command line
 filename = sys.argv[1]
@@ -67,5 +67,8 @@ else:
 print("tolerance_abs: " + str(tolerance_abs))
 assert max_Efield < tolerance_abs
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

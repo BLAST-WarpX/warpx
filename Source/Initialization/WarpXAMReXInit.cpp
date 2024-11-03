@@ -12,7 +12,7 @@
 #include <AMReX.H>
 #include <AMReX_ccse-mpi.H>
 #include <AMReX_ParmParse.H>
-#include <AMReX_TinyProfiler.H>
+#include <AMReX_BLProfiler.H>
 
 #include <string>
 

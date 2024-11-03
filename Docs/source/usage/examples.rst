@@ -43,8 +43,8 @@ Particle Accelerator & Beam Physics
    :maxdepth: 1
 
    examples/gaussian_beam/README.rst
-   examples/beam-beam_collision/README.rst
-
+   examples/beam_beam_collision/README.rst
+   examples/free_electron_laser/README.rst
 
 High Energy Astrophysical Plasma Physics
 ----------------------------------------
@@ -101,7 +101,7 @@ examples below were generated at that time.
 .. toctree::
    :maxdepth: 1
 
-   examples/ohm_solver_EM_modes/README.rst
+   examples/ohm_solver_em_modes/README.rst
    examples/ohm_solver_ion_beam_instability/README.rst
    examples/ohm_solver_ion_Landau_damping/README.rst
 
@@ -127,15 +127,20 @@ Manipulating fields via Python
 
 An example of using Python to access the simulation charge density, solve the Poisson equation (using ``superLU``) and write the resulting electrostatic potential back to the simulation is given in the input file below. This example uses the ``fields.py`` module included in the ``pywarpx`` library.
 
-* :download:`Direct Poisson solver example <../../../Examples/Physics_applications/capacitive_discharge/PICMI_inputs_2d.py>`
+* :download:`Direct Poisson solver example <../../../Examples/Physics_applications/capacitive_discharge/inputs_test_2d_background_mcc_picmi.py>`
 
 An example of initializing the fields by accessing their data through Python, advancing the simulation for a chosen number of time steps, and plotting the fields again through Python. The simulation runs with 128 regular cells, 8 guard cells, and 10 PML cells, in each direction. Moreover, it uses div(E) and div(B) cleaning both in the regular grid and in the PML and initializes all available electromagnetic fields (E,B,F,G) identically.
 
-* :download:`Unit pulse with PML <../../../Examples/Tests/python_wrappers/PICMI_inputs_2d.py>`
+* :download:`Unit pulse with PML <../../../Examples/Tests/python_wrappers/inputs_test_2d_python_wrappers_picmi.py>`
 
 
 Many Further Examples, Demos and Tests
 --------------------------------------
+
+.. toctree::
+   :maxdepth: 1
+
+   examples/field_ionization/README.rst
 
 WarpX runs over 200 integration tests on a variety of modeling cases, which validate and demonstrate its functionality.
 Please see the `Examples/Tests/ <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests>`__ directory for many more examples.

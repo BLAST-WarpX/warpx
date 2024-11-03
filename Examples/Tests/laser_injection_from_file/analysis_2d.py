@@ -28,7 +28,7 @@ from scipy.signal import hilbert
 yt.funcs.mylog.setLevel(50)
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 # Maximum acceptable error for this test
 relative_error_threshold = 0.065
@@ -139,5 +139,8 @@ relative_error_freq = np.abs(freq - exp_freq) / exp_freq
 print("Relative error frequency: ", relative_error_freq)
 assert relative_error_freq < relative_error_threshold
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

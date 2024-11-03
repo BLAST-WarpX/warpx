@@ -27,9 +27,7 @@ import scipy.special as scs
 from read_raw_data import read_reduced_diags, read_reduced_diags_histogram
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
-
-filename = sys.argv[1]
+from checksumAPI import evaluate_checksum
 
 # print tolerance
 tolerance = 0.02
@@ -451,6 +449,8 @@ print("gaussian_parse_momentum_function velocity difference:", f9_error)
 
 assert f9_error < tolerance
 
-
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

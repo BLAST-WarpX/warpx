@@ -36,7 +36,7 @@
 #include <Utils/WarpXConst.H>
 #include <Utils/WarpXProfilerWrapper.H>
 #include <Utils/WarpXUtil.H>
-
+#include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver.H"
 #include <AMReX.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_ParallelDescriptor.H>
@@ -55,6 +55,8 @@ namespace warpx {
 
 void init_WarpX (py::module& m)
 {
+    using ablastr::fields::Direction;
+
     // Expose the WarpX instance
     m.def("get_instance",
         [] () { return &WarpX::GetInstance(); },
@@ -111,16 +113,57 @@ void init_WarpX (py::module& m)
             py::arg("lev")
         )
         .def("multifab",
-            [](WarpX const & wx, std::string const multifab_name) {
-                if (wx.multifab_map.count(multifab_name) > 0) {
-                    return wx.multifab_map.at(multifab_name);
+             [](WarpX & wx, std::string internal_name) {
+                 if (wx.m_fields.internal_has(internal_name)) {
+                     return wx.m_fields.internal_get(internal_name);
+                 } else {
+                     throw std::runtime_error("MultiFab '" + internal_name + "' is unknown or is not allocated!");
+                 }
+             },
+             py::arg("internal_name"),
+             py::return_value_policy::reference_internal,
+             R"doc(Return a MultiFab by its internal name (deprecated).
+
+The multifab('internal_name') signature is deprecated.
+Please use:
+- multifab('prefix', level=...) for scalar fields
+- multifab('prefix', dir=..., level=...) for vector field components
+where 'prefix' is the part of 'internal_name';'  before the [])doc"
+        )
+        .def("multifab",
+            [](WarpX & wx, std::string scalar_name, int level) {
+                if (wx.m_fields.has(scalar_name, level)) {
+                    return wx.m_fields.get(scalar_name, level);
                 } else {
-                    throw std::runtime_error("The MultiFab '" + multifab_name + "' is unknown or is not allocated!");
+                    throw std::runtime_error("The scalar field '" + scalar_name + "' is unknown or is not allocated!");
                 }
             },
-            py::arg("multifab_name"),
+            py::arg("scalar_name"),
+            py::arg("level"),
             py::return_value_policy::reference_internal,
-            R"doc(Return MultiFabs by name, e.g., ``\"Efield_aux[x][level=0]\"``, ``\"Efield_cp[x][level=0]\"``, ...
+            R"doc(Return scalar fields (MultiFabs) by name and level, e.g., ``\"rho_fp\"``, ``\"phi_fp"``, ...
+
+The physical fields in WarpX have the following naming:
+
+- ``_fp`` are the "fine" patches, the regular resolution of a current mesh-refinement level
+- ``_aux`` are temporary (auxiliar) patches at the same resolution as ``_fp``.
+  They usually include contributions from other levels and can be interpolated for gather routines of particles.
+- ``_cp`` are "coarse" patches, at the same resolution (but not necessary values) as the ``_fp`` of ``level - 1``
+  (only for level 1 and higher).)doc"
+        )
+        .def("multifab",
+            [](WarpX & wx, std::string vector_name, Direction dir, int level) {
+                if (wx.m_fields.has(vector_name, dir, level)) {
+                    return wx.m_fields.get(vector_name, dir, level);
+                } else {
+                    throw std::runtime_error("The vector field '" + vector_name + "' is unknown or is not allocated!");
+                }
+            },
+            py::arg("vector_name"),
+            py::arg("dir"),
+            py::arg("level"),
+            py::return_value_policy::reference_internal,
+            R"doc(Return the component of a vector field (MultiFab) by name, direction, and level, e.g., ``\"Efield_aux\"``, ``\"Efield_fp"``, ...
 
 The physical fields in WarpX have the following naming:
 
@@ -176,13 +219,13 @@ The physical fields in WarpX have the following naming:
                std::string potential_lo_y, std::string potential_hi_y,
                std::string potential_lo_z, std::string potential_hi_z)
             {
-                if (potential_lo_x != "") wx.m_poisson_boundary_handler.potential_xlo_str = potential_lo_x;
-                if (potential_hi_x != "") wx.m_poisson_boundary_handler.potential_xhi_str = potential_hi_x;
-                if (potential_lo_y != "") wx.m_poisson_boundary_handler.potential_ylo_str = potential_lo_y;
-                if (potential_hi_y != "") wx.m_poisson_boundary_handler.potential_yhi_str = potential_hi_y;
-                if (potential_lo_z != "") wx.m_poisson_boundary_handler.potential_zlo_str = potential_lo_z;
-                if (potential_hi_z != "") wx.m_poisson_boundary_handler.potential_zhi_str = potential_hi_z;
-                wx.m_poisson_boundary_handler.buildParsers();
+                if (potential_lo_x != "") wx.GetElectrostaticSolver().m_poisson_boundary_handler->potential_xlo_str = potential_lo_x;
+                if (potential_hi_x != "") wx.GetElectrostaticSolver().m_poisson_boundary_handler->potential_xhi_str = potential_hi_x;
+                if (potential_lo_y != "") wx.GetElectrostaticSolver().m_poisson_boundary_handler->potential_ylo_str = potential_lo_y;
+                if (potential_hi_y != "") wx.GetElectrostaticSolver().m_poisson_boundary_handler->potential_yhi_str = potential_hi_y;
+                if (potential_lo_z != "") wx.GetElectrostaticSolver().m_poisson_boundary_handler->potential_zlo_str = potential_lo_z;
+                if (potential_hi_z != "") wx.GetElectrostaticSolver().m_poisson_boundary_handler->potential_zhi_str = potential_hi_z;
+                wx.GetElectrostaticSolver().m_poisson_boundary_handler->BuildParsers();
             },
             py::arg("potential_lo_x") = "",
             py::arg("potential_hi_x") = "",
@@ -194,7 +237,7 @@ The physical fields in WarpX have the following naming:
         )
         .def("set_potential_on_eb",
             [](WarpX& wx, std::string potential) {
-                wx.m_poisson_boundary_handler.setPotentialEB(potential);
+                wx.GetElectrostaticSolver().m_poisson_boundary_handler->setPotentialEB(potential);
             },
             py::arg("potential"),
             "Sets the EB potential string and updates the function parser."
@@ -202,6 +245,10 @@ The physical fields in WarpX have the following naming:
         .def_static("run_div_cleaner",
             [] () { WarpX::ProjectionCleanDivB(); },
             "Executes projection based divergence cleaner on loaded Bfield_fp_external."
+        )
+        .def("synchronize",
+            [] (WarpX& wx) { wx.Synchronize(); },
+            "Synchronize particle velocities and positions."
         )
     ;
 

@@ -6,7 +6,7 @@ a conducting sphere (spacecraft) immersed in an initially static
 thermal plasma. The potential on the spacecraft decreases over
 the time to reach an equilibrium floating potential.
 
-An input Python file PICMI_inputs_rz.py is used.
+An input Python file inputs_test_rz_spacecraft_charging_picmi.py is used.
 
 The test will check the curve fitting parameters v0 and tau defined
 by the following exponential function: phi(t)=v0(1-exp(-t/tau))
@@ -23,13 +23,9 @@ from scipy.optimize import curve_fit
 
 yt.funcs.mylog.setLevel(0)
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
-# Open plotfile specified in command line
 filename = sys.argv[1]
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename, output_format="openpmd")
-
 ts = OpenPMDTimeSeries(filename)
 dt = 1.27e-8
 t = []
@@ -78,3 +74,10 @@ print("percentage error for tau = " + str(diff_tau * 100) + "%")
 assert (diff_v0 < tolerance_v0) and (
     diff_tau < tolerance_tau
 ), "Test spacecraft_charging did not pass"
+
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+    output_format="openpmd",
+)

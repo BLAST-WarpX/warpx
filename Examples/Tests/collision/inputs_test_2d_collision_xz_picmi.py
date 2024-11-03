@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # --- Input file for binary Coulomb collision testing. This input script
-# --- runs the same test as inputs_2d but via Python, therefore the input
+# --- runs the same test as inputs_test_2d_collision_xz but via Python, therefore the input
 # --- values where directly copied from inputs_2d.
 
 from pywarpx import picmi
@@ -142,5 +142,5 @@ sim.add_diagnostic(field_diag)
 ##### SIMULATION EXECUTION ######
 #################################
 
-# sim.write_input_file('PICMI_inputs_2d')
+# sim.write_input_file('inputs_test_2d_collision_xz')
 sim.step(max_steps)

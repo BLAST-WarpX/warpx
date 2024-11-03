@@ -33,7 +33,7 @@ import post_processing_utils
 import yt
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 tolerance = 0.001
 
@@ -111,5 +111,8 @@ post_processing_utils.check_random_filter(
     last_fn, random_filter_fn, random_fraction, dim, species_name
 )
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, last_fn)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

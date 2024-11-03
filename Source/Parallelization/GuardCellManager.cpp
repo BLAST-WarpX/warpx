@@ -42,7 +42,7 @@ guardCellManager::Init (
     const int nox,
     const int nox_fft, const int noy_fft, const int noz_fft,
     const int nci_corr_stencil,
-    const int electromagnetic_solver_id,
+    const ElectromagneticSolverAlgo electromagnetic_solver_id,
     const int max_level,
     const amrex::Vector<amrex::Real>& v_galilean,
     const amrex::Vector<amrex::Real>& v_comoving,

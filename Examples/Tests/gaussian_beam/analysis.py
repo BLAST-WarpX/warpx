@@ -14,8 +14,7 @@ import numpy as np
 from scipy.constants import c, eV, m_e, micro, nano
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-
-import checksumAPI
+from checksumAPI import evaluate_checksum
 from openpmd_viewer import OpenPMDTimeSeries
 
 GeV = 1e9 * eV
@@ -38,8 +37,6 @@ def s(z, sigma0, emit):
     at position z, given its emittance and size at focus."""
     return np.sqrt(sigma0**2 + emit**2 * (z - focal_distance) ** 2 / sigma0**2)
 
-
-filename = sys.argv[1]
 
 ts = OpenPMDTimeSeries("./diags/openpmd/")
 
@@ -71,5 +68,8 @@ sy_theory = s(subgrid, sigmay, emity / gamma)
 assert np.allclose(sx, sx_theory, rtol=0.051, atol=0)
 assert np.allclose(sy, sy_theory, rtol=0.038, atol=0)
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

@@ -7,7 +7,7 @@
 #ifndef WARPX_EB_ENABLED_H_
 #define WARPX_EB_ENABLED_H_
 
-#include <AMReX_ParmParse.H>
+#include <AMReX_Config.H>
 
 namespace EB
 {

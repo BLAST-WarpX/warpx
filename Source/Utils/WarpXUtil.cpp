@@ -14,6 +14,7 @@
 #include "WarpXProfilerWrapper.H"
 #include "WarpXUtil.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX.H>
@@ -76,7 +77,8 @@ void ParseGeometryInput()
 
 #ifdef WARPX_DIM_RZ
     const ParmParse pp_algo("algo");
-    const int electromagnetic_solver_id = GetAlgorithmInteger(pp_algo, "maxwell_solver");
+    auto electromagnetic_solver_id = ElectromagneticSolverAlgo::Default;
+    pp_algo.query_enum_sloppy("maxwell_solver", electromagnetic_solver_id, "-_");
     if (electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD)
     {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(prob_lo[0] == 0.,
@@ -138,6 +140,43 @@ void ReadBoostedFrameParameters(Real& gamma_boost, Real& beta_boost,
     }
 }
 
+void ReadMovingWindowParameters(
+    int& do_moving_window, int& start_moving_window_step, int& end_moving_window_step,
+    int& moving_window_dir, amrex::Real& moving_window_v)
+{
+    const ParmParse pp_warpx("warpx");
+    pp_warpx.query("do_moving_window", do_moving_window);
+    if (do_moving_window) {
+        utils::parser::queryWithParser(
+            pp_warpx, "start_moving_window_step", start_moving_window_step);
+        utils::parser::queryWithParser(
+            pp_warpx, "end_moving_window_step", end_moving_window_step);
+        std::string s;
+        pp_warpx.get("moving_window_dir", s);
+
+        if (s == "z" || s == "Z") {
+            moving_window_dir = WARPX_ZINDEX;
+        }
+#if defined(WARPX_DIM_3D)
+        else if (s == "y" || s == "Y") {
+            moving_window_dir = 1;
+        }
+#endif
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_3D)
+        else if (s == "x" || s == "X") {
+            moving_window_dir = 0;
+        }
+#endif
+        else {
+            WARPX_ABORT_WITH_MESSAGE("Unknown moving_window_dir: "+s);
+        }
+
+        utils::parser::getWithParser(
+            pp_warpx, "moving_window_v", moving_window_v);
+        moving_window_v *= PhysConst::c;
+    }
+}
+
 void ConvertLabParamsToBoost()
 {
     Real gamma_boost = 1., beta_boost = 0.;
@@ -194,8 +233,11 @@ void ConvertLabParamsToBoost()
     {
         if (boost_direction[dim_map[idim]]) {
             amrex::Real convert_factor;
-            // Assume that the window travels with speed +c
-            convert_factor = 1._rt/( gamma_boost * ( 1 - beta_boost ) );
+            amrex::Real beta_window = beta_boost;
+            if (WarpX::do_moving_window && idim == WarpX::moving_window_dir) {
+                beta_window = WarpX::moving_window_v / PhysConst::c;
+            }
+            convert_factor = 1._rt/( gamma_boost * ( 1 - beta_boost * beta_window ) );
             prob_lo[idim] *= convert_factor;
             prob_hi[idim] *= convert_factor;
             if (max_level > 0){
@@ -220,16 +262,18 @@ void ConvertLabParamsToBoost()
 
 }
 
-/* \brief Function that sets the value of MultiFab MF to zero for z between
- * zmin and zmax.
- */
-void NullifyMF(amrex::MultiFab& mf, int lev, amrex::Real zmin, amrex::Real zmax){
-    WARPX_PROFILE("WarpXUtil::NullifyMF()");
-    int const ncomp = mf.nComp();
+void NullifyMFinstance (
+    amrex::MultiFab *mf,
+    int lev,
+    amrex::Real zmin,
+    amrex::Real zmax
+)
+{
+    int const ncomp = mf->nComp();
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-    for(amrex::MFIter mfi(mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi){
+    for(amrex::MFIter mfi(*mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi){
         const amrex::Box& bx = mfi.tilebox();
         // Get box lower and upper physical z bound, and dz
         const amrex::Real zmin_box = WarpX::LowerCorner(bx, lev, 0._rt).z;
@@ -245,7 +289,7 @@ void NullifyMF(amrex::MultiFab& mf, int lev, amrex::Real zmin, amrex::Real zmax)
 #endif
         // Check if box intersect with [zmin, zmax]
         if ( (zmax>zmin_box && zmin<=zmax_box) ){
-            const Array4<Real> arr = mf[mfi].array();
+            const Array4<Real> arr = (*mf)[mfi].array();
             // Set field to 0 between zmin and zmax
             ParallelFor(bx, ncomp,
                 [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept{
@@ -263,6 +307,39 @@ void NullifyMF(amrex::MultiFab& mf, int lev, amrex::Real zmin, amrex::Real zmax)
             );
         }
     }
+}
+
+void NullifyMF (
+    ablastr::fields::MultiFabRegister& multifab_map,
+    std::string const& mf_name,
+    int lev,
+    amrex::Real zmin,
+    amrex::Real zmax
+)
+{
+    WARPX_PROFILE("WarpXUtil::NullifyMF()");
+    if (!multifab_map.has(mf_name, lev)) { return; }
+
+    auto * mf = multifab_map.get(mf_name, lev);
+
+    NullifyMFinstance ( mf, lev, zmin, zmax);
+}
+
+void NullifyMF (
+    ablastr::fields::MultiFabRegister& multifab_map,
+    std::string const& mf_name,
+    ablastr::fields::Direction dir,
+    int lev,
+    amrex::Real zmin,
+    amrex::Real zmax
+)
+{
+    WARPX_PROFILE("WarpXUtil::NullifyMF()");
+    if (!multifab_map.has(mf_name, dir, lev)) { return; }
+
+    auto * mf = multifab_map.get(mf_name, dir, lev);
+
+    NullifyMFinstance ( mf, lev, zmin, zmax);
 }
 
 namespace WarpXUtilIO{
@@ -310,7 +387,8 @@ void CheckGriddingForRZSpectral ()
     CheckDims();
 
     const ParmParse pp_algo("algo");
-    const int electromagnetic_solver_id = GetAlgorithmInteger(pp_algo, "maxwell_solver");
+    auto electromagnetic_solver_id = ElectromagneticSolverAlgo::Default;
+    pp_algo.query_enum_sloppy("maxwell_solver", electromagnetic_solver_id, "-_");
 
     // only check for PSATD in RZ
     if (electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
@@ -395,16 +473,14 @@ void CheckGriddingForRZSpectral ()
 void ReadBCParams ()
 {
 
-    amrex::Vector<std::string> field_BC_lo(AMREX_SPACEDIM,"default");
-    amrex::Vector<std::string> field_BC_hi(AMREX_SPACEDIM,"default");
-    amrex::Vector<std::string> particle_BC_lo(AMREX_SPACEDIM,"default");
-    amrex::Vector<std::string> particle_BC_hi(AMREX_SPACEDIM,"default");
     amrex::Vector<int> geom_periodicity(AMREX_SPACEDIM,0);
     ParmParse pp_geometry("geometry");
     const ParmParse pp_warpx("warpx");
     const ParmParse pp_algo("algo");
-    const int electromagnetic_solver_id = GetAlgorithmInteger(pp_algo, "maxwell_solver");
-    const int poisson_solver_id = GetAlgorithmInteger(pp_warpx, "poisson_solver");
+    auto electromagnetic_solver_id = ElectromagneticSolverAlgo::Default;
+    pp_algo.query_enum_sloppy("maxwell_solver", electromagnetic_solver_id, "-_");
+    auto poisson_solver_id = PoissonSolverAlgo::Default;
+    pp_warpx.query_enum_sloppy("poisson_solver", poisson_solver_id, "-_");
 
     if (pp_geometry.queryarr("is_periodic", geom_periodicity))
     {
@@ -419,26 +495,21 @@ void ReadBCParams ()
     // particle boundary may not be explicitly specified for some applications
     bool particle_boundary_specified = false;
     const ParmParse pp_boundary("boundary");
-    pp_boundary.queryarr("field_lo", field_BC_lo, 0, AMREX_SPACEDIM);
-    pp_boundary.queryarr("field_hi", field_BC_hi, 0, AMREX_SPACEDIM);
-    if (pp_boundary.queryarr("particle_lo", particle_BC_lo, 0, AMREX_SPACEDIM)) {
-        particle_boundary_specified = true;
-    }
-    if (pp_boundary.queryarr("particle_hi", particle_BC_hi, 0, AMREX_SPACEDIM)) {
-        particle_boundary_specified = true;
-    }
-    AMREX_ALWAYS_ASSERT(field_BC_lo.size() == AMREX_SPACEDIM);
-    AMREX_ALWAYS_ASSERT(field_BC_hi.size() == AMREX_SPACEDIM);
-    AMREX_ALWAYS_ASSERT(particle_BC_lo.size() == AMREX_SPACEDIM);
-    AMREX_ALWAYS_ASSERT(particle_BC_hi.size() == AMREX_SPACEDIM);
-
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
         // Get field boundary type
-        WarpX::field_boundary_lo[idim] = GetFieldBCTypeInteger(field_BC_lo[idim]);
-        WarpX::field_boundary_hi[idim] = GetFieldBCTypeInteger(field_BC_hi[idim]);
+        pp_boundary.query_enum_sloppy("field_lo",
+                                      WarpX::field_boundary_lo[idim], "-_", idim);
+        pp_boundary.query_enum_sloppy("field_hi",
+                                      WarpX::field_boundary_hi[idim], "-_", idim);
         // Get particle boundary type
-        WarpX::particle_boundary_lo[idim] = GetParticleBCTypeInteger(particle_BC_lo[idim]);
-        WarpX::particle_boundary_hi[idim] = GetParticleBCTypeInteger(particle_BC_hi[idim]);
+        if (pp_boundary.query_enum_sloppy("particle_lo",
+                                          WarpX::particle_boundary_lo[idim], "-_", idim)) {
+            particle_boundary_specified = true;
+        }
+        if (pp_boundary.query_enum_sloppy("particle_hi",
+                                          WarpX::particle_boundary_hi[idim], "-_", idim)) {
+            particle_boundary_specified = true;
+        }
 
         if (WarpX::field_boundary_lo[idim] == FieldBoundaryType::Periodic ||
             WarpX::field_boundary_hi[idim] == FieldBoundaryType::Periodic ||

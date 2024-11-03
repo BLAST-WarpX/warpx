@@ -6,7 +6,6 @@ if(WarpX_FFT)
         test_2d_vay_deposition  # name
         2  # dims
         2  # nprocs
-        OFF  # eb
         inputs_test_2d_vay_deposition  # inputs
         analysis.py  # analysis
         diags/diag1000050  # output
@@ -19,7 +18,6 @@ if(WarpX_FFT)
         test_3d_vay_deposition  # name
         3  # dims
         2  # nprocs
-        OFF  # eb
         inputs_test_3d_vay_deposition  # inputs
         analysis.py  # analysis
         diags/diag1000025  # output

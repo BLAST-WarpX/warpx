@@ -90,6 +90,6 @@ particlesConvertUnits (ConvertDirection convert_direction, T_ParticleContainer* 
  */
 void
 storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
-    int electrostatic_solver_id, bool is_full_diagnostic );
+    ElectrostaticSolverAlgo electrostatic_solver_id, bool is_full_diagnostic );
 
 #endif /* WARPX_PARTICLEIO_H_ */

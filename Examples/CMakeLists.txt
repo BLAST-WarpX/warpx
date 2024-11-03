@@ -20,7 +20,6 @@ endif()
 # name: unique name of this test
 # dims: 1,2,RZ,3
 # nprocs: 1 or 2 (maybe refactor later on to just depend on WarpX_MPI)
-# eb: needs EB support? (temporary until handled as runtime parameter)
 # inputs: inputs file or PICMI script, WarpX_MPI decides w/ or w/o MPI
 # analysis: analysis script, always run without MPI
 # output: output file(s) to analyze
@@ -30,7 +29,6 @@ function(add_warpx_test
     name
     dims
     nprocs
-    eb
     inputs
     analysis
     output
@@ -39,17 +37,6 @@ function(add_warpx_test
     # cannot run MPI tests w/o MPI build
     if(nprocs GREATER_EQUAL 2 AND NOT WarpX_MPI)
         message(WARNING "${name}: cannot run MPI tests without MPI build")
-        return()
-    endif()
-
-    # cannot run EB tests w/o EB build
-    if(eb AND NOT WarpX_EB)
-        message(WARNING "${name}: cannot run EB tests without EB build")
-        return()
-    endif()
-
-    # do not run no-EB tests w/ EB build
-    if(NOT eb AND WarpX_EB)
         return()
     endif()
 
@@ -103,6 +90,11 @@ function(add_warpx_test
 
     # cannot run Python tests w/o Python support
     if(python AND NOT WarpX_PYTHON)
+        return()
+    endif()
+
+    # cannot run executable tests w/o WarpX executable application
+    if(NOT python AND NOT WarpX_APP)
         return()
     endif()
 
@@ -228,6 +220,22 @@ function(add_warpx_test
             set_property(TEST ${dependency}.cleanup APPEND PROPERTY DEPENDS "${name}.cleanup")
         endif()
     endif()
+endfunction()
+
+# Add a CTest label to a WarpX test set.
+#
+# Labeling it here will add the label to the run test, its analysis and its cleanup.
+#
+# name: unique name of this test
+# label: ctest LABELS property value to be added
+#
+function(label_warpx_test name label)
+    set(_test_names "${name}.run;${name}.analysis;${name}.cleanup")
+    foreach(_test_name IN LISTS _test_names)
+        if(TEST ${_test_name})
+            set_property(TEST ${_test_name} APPEND PROPERTY LABELS "${label}")
+        endif()
+    endforeach()
 endfunction()
 
 # Add tests (alphabetical order) ##############################################

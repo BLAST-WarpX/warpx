@@ -21,6 +21,8 @@
 #include <string>
 #include <vector>
 
+/** All types of diagnostics. */
+enum struct DiagTypes {Full, BackTransformed, BoundaryScraping, TimeAveraged};
 /**
  * \brief base class for diagnostics.
  * Contains main routines to filter, compute and flush diagnostics.
@@ -35,7 +37,7 @@ public:
      * @param i index of diagnostics in MultiDiagnostics::alldiags
      * @param name diagnostics name in the inputs file
      */
-    Diagnostics (int i, std::string name);
+    Diagnostics (int i, std::string name, DiagTypes diag_type);
 
     /** Virtual Destructor to handle clean destruction of derived classes */
     virtual ~Diagnostics ();
@@ -45,6 +47,8 @@ public:
     Diagnostics(Diagnostics&& )                    = default;
     Diagnostics& operator=(Diagnostics&& )         = default;
 
+    /** Stores the diag type */
+    DiagTypes m_diag_type;
     /** Pack (stack) all fields in the cell-centered output MultiFab m_mf_output.
      *
      * Fields are computed (e.g., cell-centered or back-transformed)
@@ -266,6 +270,12 @@ protected:
      *  The second vector is loops over the total number of levels.
      */
     amrex::Vector< amrex::Vector< amrex::MultiFab > >  m_mf_output;
+    /** summation multifab, where all fields (computed, cell-centered, and stacked)
+     *  are summed for every step in a time averaging period.
+     *  The first vector is for total number of snapshots. (=1 for FullDiagnostics)
+     *  The second vector is loops over the total number of levels.
+     */
+    amrex::Vector< amrex::Vector <amrex::MultiFab > > m_sum_mf_output;
 
     /** Geometry that defines the domain attributes corresponding to output multifab.
      *  Specifically, the user-defined physical co-ordinates for the diagnostics

@@ -8,17 +8,19 @@
 #ifndef ABLASTR_UTILS_ENUMS_H_
 #define ABLASTR_UTILS_ENUMS_H_
 
+#include <AMReX_Enum.H>
+
 namespace ablastr::utils::enums
 {
     /** Type of grids used in a simulation:
      *
      * Collocated at the same location (AMReX: all "NODAL"), staggered (Yee-style), or hybrid.
      */
-    enum struct GridType {
-        Collocated = 0,
-        Staggered = 1,
-        Hybrid = 2
-    };
+    AMREX_ENUM(GridType,
+               Collocated,
+               Staggered,
+               Hybrid,
+               Default = Staggered);
 
     /** Mesh-refinement patch
      *

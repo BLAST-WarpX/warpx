@@ -733,7 +733,7 @@ class ParticleContainerWrapper(object):
         sync_rho       : bool
             If True, perform MPI exchange and properly set boundary cells for rho_fp.
         """
-        rho_fp = libwarpx.warpx.multifab(f"rho_fp[level={level}]")
+        rho_fp = libwarpx.warpx.multifab("rho_fp", level)
 
         if rho_fp is None:
             raise RuntimeError("Multifab `rho_fp` is not allocated.")

@@ -28,9 +28,9 @@ class NonlinearSolver
 {
 public:
 
-    NonlinearSolver<Vec,Ops>() = default;
+    NonlinearSolver() = default;
 
-    virtual ~NonlinearSolver<Vec,Ops>() = default;
+    virtual ~NonlinearSolver() = default;
 
     // Prohibit Move and Copy operations
     NonlinearSolver(const NonlinearSolver&) = delete;

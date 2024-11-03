@@ -1,6 +1,12 @@
 name: 🐧 In Situ Vis
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    paths-ignore:
+      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-insituvis
@@ -101,8 +107,8 @@ jobs:
         cmake --build build -j 10
     - name: 2D Test
       run: |
-        cp Examples/Tests/ionization/inputs_test_2d_ionization_lab .
-        cp Examples/Tests/ionization/catalyst_pipeline.py .
+        cp Examples/Tests/field_ionization/inputs_test_2d_ionization_lab .
+        cp Examples/Tests/field_ionization/catalyst_pipeline.py .
         mpiexec -n 2 ./build/bin/warpx.2d \
             inputs_test_2d_ionization_lab \
             catalyst.script_paths = catalyst_pipeline.py\

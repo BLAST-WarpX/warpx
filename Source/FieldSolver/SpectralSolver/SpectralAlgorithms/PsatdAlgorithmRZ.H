@@ -27,8 +27,8 @@ class PsatdAlgorithmRZ : public SpectralBaseAlgorithmRZ
                          amrex::Real dt_step,
                          bool update_with_rho,
                          bool time_averaging,
-                         int J_in_time,
-                         int rho_in_time,
+                         JInTime J_in_time,
+                         RhoInTime rho_in_time,
                          bool dive_cleaning,
                          bool divb_cleaning);
         // Redefine functions from base class
@@ -65,7 +65,7 @@ class PsatdAlgorithmRZ : public SpectralBaseAlgorithmRZ
         amrex::Real m_dt;
         bool m_update_with_rho;
         bool m_time_averaging;
-        int m_J_in_time;
+        JInTime m_J_in_time;
         bool m_dive_cleaning;
         bool m_divb_cleaning;
         SpectralRealCoefficients C_coef, S_ck_coef, X1_coef, X2_coef, X3_coef;

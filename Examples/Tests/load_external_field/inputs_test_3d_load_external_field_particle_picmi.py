@@ -134,5 +134,5 @@ sim.add_diagnostic(particle_diag)
 ##### SIMULATION EXECUTION ######
 #################################
 
-# sim.write_input_file('PICMI_inputs_3d')
+# sim.write_input_file('inputs_test_3d_load_external_field_particle')
 sim.step(max_steps)

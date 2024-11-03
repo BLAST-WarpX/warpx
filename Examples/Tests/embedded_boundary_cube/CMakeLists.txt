@@ -6,7 +6,6 @@ if(WarpX_EB)
         test_2d_embedded_boundary_cube  # name
         2  # dims
         1  # nprocs
-        ON  # eb
         inputs_test_2d_embedded_boundary_cube  # inputs
         analysis_fields_2d.py  # analysis
         diags/diag1000114  # output
@@ -19,7 +18,6 @@ if(WarpX_EB)
         test_3d_embedded_boundary_cube  # name
         3  # dims
         1  # nprocs
-        ON  # eb
         inputs_test_3d_embedded_boundary_cube  # inputs
         analysis_fields.py  # analysis
         diags/diag1000208  # output
@@ -32,7 +30,6 @@ if(WarpX_EB)
         test_3d_embedded_boundary_cube_macroscopic  # name
         3  # dims
         1  # nprocs
-        ON  # eb
         inputs_test_3d_embedded_boundary_cube_macroscopic  # inputs
         analysis_fields.py  # analysis
         diags/diag1000208  # output

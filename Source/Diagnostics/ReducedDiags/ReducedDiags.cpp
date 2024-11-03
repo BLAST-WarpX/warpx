@@ -121,7 +121,7 @@ void ReducedDiags::WriteToFile (int step) const
     // end loop over data size
 
     // end line
-    ofs << std::endl;
+    ofs << "\n";
 
     // close file
     ofs.close();

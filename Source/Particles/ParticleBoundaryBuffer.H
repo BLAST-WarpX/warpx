@@ -12,6 +12,8 @@
 #include "Particles/PinnedMemoryParticleContainer.H"
 #include "Utils/export.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
+
 #include <vector>
 
 
@@ -41,7 +43,7 @@ public:
 
     void gatherParticlesFromDomainBoundaries (MultiParticleContainer& mypc);
     void gatherParticlesFromEmbeddedBoundaries (
-        MultiParticleContainer& mypc, const amrex::Vector<const amrex::MultiFab*>& distance_to_eb
+        MultiParticleContainer& mypc, ablastr::fields::MultiLevelScalarField const& distance_to_eb
     );
 
     void redistribute ();

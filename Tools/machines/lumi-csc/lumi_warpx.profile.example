@@ -2,9 +2,9 @@
 #export proj="project_..."
 
 # required dependencies
-module load LUMI/23.09  partition/G
-module load rocm/5.2.3  # waiting for 5.5 for next bump
-module load buildtools/23.09
+module load LUMI/24.03  partition/G
+module load rocm/6.0.3
+module load buildtools/24.03
 
 # optional: just an additional text editor
 module load nano
@@ -27,7 +27,7 @@ export PATH=${SW_DIR}/hdf5-1.14.1.2/bin:${PATH}
 export PATH=${SW_DIR}/adios2-2.8.3/bin:${PATH}
 
 # optional: for Python bindings or libEnsemble
-module load cray-python/3.10.10
+module load cray-python/3.11.7
 
 if [ -d "${SW_DIR}/venvs/warpx-lumi" ]
 then

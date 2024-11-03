@@ -19,7 +19,7 @@ void AbortWithMessage(const std::string& msg)
 
 void SuccessExit()
 {
-    std::cout << "___________________________" << std::endl;
+    std::cout << "___________________________\n";
     exit(0);
 }
 

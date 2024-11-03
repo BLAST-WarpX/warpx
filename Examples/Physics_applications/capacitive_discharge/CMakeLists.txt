@@ -5,7 +5,6 @@ add_warpx_test(
     test_1d_background_mcc_picmi  # name
     1  # dims
     2  # nprocs
-    OFF  # eb
     "inputs_base_1d_picmi.py --test --pythonsolver"  # inputs
     analysis_1d.py  # analysis
     diags/diag1000050  # output
@@ -16,7 +15,6 @@ add_warpx_test(
     test_1d_dsmc_picmi  # name
     1  # dims
     2  # nprocs
-    OFF  # eb
     "inputs_base_1d_picmi.py --test --dsmc"  # inputs
     analysis_dsmc.py  # analysis
     diags/diag1000050  # output
@@ -27,7 +25,6 @@ add_warpx_test(
     test_2d_background_mcc  # name
     2  # dims
     2  # nprocs
-    OFF  # eb
     inputs_test_2d_background_mcc  # inputs
     analysis_default_regression.py  # analysis
     diags/diag1000050  # output
@@ -39,8 +36,7 @@ add_warpx_test(
 #    test_2d_background_mcc_dp_psp  # name
 #    2  # dims
 #    2  # nprocs
-#    OFF  # eb
-#    inputs_test_2d_background_mcc_dp_psp  # inputs
+##    inputs_test_2d_background_mcc_dp_psp  # inputs
 #    analysis_default_regression.py  # analysis
 #    diags/diag1000050  # output
 #    OFF  # dependency
@@ -50,7 +46,6 @@ add_warpx_test(
     test_2d_background_mcc_picmi  # name
     2  # dims
     2  # nprocs
-    OFF  # eb
     inputs_test_2d_background_mcc_picmi.py  # inputs
     analysis_2d.py  # analysis
     diags/diag1000050  # output

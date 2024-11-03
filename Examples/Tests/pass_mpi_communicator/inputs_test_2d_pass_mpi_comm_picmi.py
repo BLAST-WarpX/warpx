@@ -126,7 +126,7 @@ sim.add_diagnostic(part_diag)
 # simulation run
 ##########################
 
-# TODO: Enable in pyAMReX, then enable lines in PICMI_inputs_2d.py again
+# TODO: Enable in pyAMReX, then enable lines in inputs_test_2d_pass_mpi_comm_picmi.py again
 # https://github.com/AMReX-Codes/pyamrex/issues/163
 
 # sim.step(max_steps, mpi_comm=new_comm)
@@ -141,7 +141,7 @@ sim.add_diagnostic(part_diag)
 # If any of these tests fail, the terminal will print that the
 # program crashed.
 
-# TODO: Enable in pyAMReX, then enable lines in PICMI_inputs_2d.py again
+# TODO: Enable in pyAMReX, then enable lines in inputs_test_2d_pass_mpi_comm_picmi.py again
 # https://github.com/AMReX-Codes/pyamrex/issues/163
 # comm_world_size = comm_world.size
 # new_comm_size = new_comm.size

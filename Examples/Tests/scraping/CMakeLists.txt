@@ -6,7 +6,6 @@ if(WarpX_EB)
         test_rz_scraping  # name
         RZ  # dims
         2  # nprocs
-        ON  # eb
         inputs_test_rz_scraping  # inputs
         analysis_rz.py  # analysis
         diags/diag1000037  # output
@@ -19,7 +18,6 @@ if(WarpX_EB)
         test_rz_scraping_filter  # name
         RZ  # dims
         2  # nprocs
-        ON  # eb
         inputs_test_rz_scraping_filter  # inputs
         analysis_rz_filter.py  # analysis
         diags/diag1000037  # output

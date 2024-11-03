@@ -28,7 +28,7 @@ Optional dependencies include:
 - `FFTW3 <http://www.fftw.org>`__: for spectral solver (PSATD or IGF) support when running on CPU or SYCL
 
   - also needs the ``pkg-config`` tool on Unix
-- `heFFTe 2.4.0+ <https://github.com/icl-utk-edu/heffte`__: for multi-node spectral solver (IGF) support
+- `heFFTe 2.4.0+ <https://github.com/icl-utk-edu/heffte>`__: for multi-node spectral solver (IGF) support
 - `BLAS++ <https://github.com/icl-utk-edu/blaspp>`__ and `LAPACK++ <https://github.com/icl-utk-edu/lapackpp>`__: for spectral solver (PSATD) support in RZ geometry
 - `Boost 1.66.0+ <https://www.boost.org/>`__: for QED lookup tables generation support
 - `openPMD-api 0.15.1+ <https://github.com/openPMD/openPMD-api>`__: we automatically download and compile a copy of openPMD-api for openPMD I/O support
@@ -117,7 +117,7 @@ For Nvidia CUDA GPU support, you will need to have `a recent CUDA driver install
 
 .. code-block:: bash
 
-   conda install -c nvidia -c conda-forge cuda cupy
+   conda install -c nvidia -c conda-forge cuda cuda-nvtx-dev cupy
 
 More info for `CUDA-enabled ML packages <https://twitter.com/jeremyphoward/status/1697435241152127369>`__.
 

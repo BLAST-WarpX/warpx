@@ -87,23 +87,21 @@ Filter::ApplyStencil (FArrayBox& dstfab, const FArrayBox& srcfab,
     DoFilter(tbx, src, dst, scomp, dcomp, ncomp);
 }
 
-/* \brief Apply stencil (2D/3D, CPU/GPU)
+/* \brief Apply stencil (CPU/GPU)
  */
 void Filter::DoFilter (const Box& tbx,
                        Array4<Real const> const& src,
                        Array4<Real      > const& dst,
                        int scomp, int dcomp, int ncomp)
 {
-#if (AMREX_SPACEDIM >= 2)
-    amrex::Real const* AMREX_RESTRICT sx = stencil_x.data();
-#endif
-#if defined(WARPX_DIM_3D)
-    amrex::Real const* AMREX_RESTRICT sy = stencil_y.data();
-#endif
-    amrex::Real const* AMREX_RESTRICT sz = stencil_z.data();
+    AMREX_D_TERM(
+    amrex::Real const* AMREX_RESTRICT s0 = m_stencil_0.data();,
+    amrex::Real const* AMREX_RESTRICT s1 = m_stencil_1.data();,
+    amrex::Real const* AMREX_RESTRICT s2 = m_stencil_2.data();
+    )
     Dim3 slen_local = slen;
 
-#if defined(WARPX_DIM_3D)
+#if AMREX_SPACEDIM == 3
     AMREX_PARALLEL_FOR_4D ( tbx, ncomp, i, j, k, n,
     {
         Real d = 0.0;
@@ -115,25 +113,25 @@ void Filter::DoFilter (const Box& tbx,
             return src.contains(jj,kk,ll) ? src(jj,kk,ll,nn) : 0.0_rt;
         };
 
-        for         (int iz=0; iz < slen_local.z; ++iz){
-            for     (int iy=0; iy < slen_local.y; ++iy){
-                for (int ix=0; ix < slen_local.x; ++ix){
-                    Real sss = sx[ix]*sy[iy]*sz[iz];
-                    d += sss*( src_zeropad(i-ix,j-iy,k-iz,scomp+n)
-                              +src_zeropad(i+ix,j-iy,k-iz,scomp+n)
-                              +src_zeropad(i-ix,j+iy,k-iz,scomp+n)
-                              +src_zeropad(i+ix,j+iy,k-iz,scomp+n)
-                              +src_zeropad(i-ix,j-iy,k+iz,scomp+n)
-                              +src_zeropad(i+ix,j-iy,k+iz,scomp+n)
-                              +src_zeropad(i-ix,j+iy,k+iz,scomp+n)
-                              +src_zeropad(i+ix,j+iy,k+iz,scomp+n));
+        for         (int i2=0; i2 < slen_local.z; ++i2){
+            for     (int i1=0; i1 < slen_local.y; ++i1){
+                for (int i0=0; i0 < slen_local.x; ++i0){
+                    Real sss = s0[i0]*s1[i1]*s2[i2];
+                    d += sss*( src_zeropad(i-i0,j-i1,k-i2,scomp+n)
+                              +src_zeropad(i+i0,j-i1,k-i2,scomp+n)
+                              +src_zeropad(i-i0,j+i1,k-i2,scomp+n)
+                              +src_zeropad(i+i0,j+i1,k-i2,scomp+n)
+                              +src_zeropad(i-i0,j-i1,k+i2,scomp+n)
+                              +src_zeropad(i+i0,j-i1,k+i2,scomp+n)
+                              +src_zeropad(i-i0,j+i1,k+i2,scomp+n)
+                              +src_zeropad(i+i0,j+i1,k+i2,scomp+n));
                 }
             }
         }
 
         dst(i,j,k,dcomp+n) = d;
     });
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+#elif AMREX_SPACEDIM == 2
     AMREX_PARALLEL_FOR_4D ( tbx, ncomp, i, j, k, n,
     {
         Real d = 0.0;
@@ -145,21 +143,21 @@ void Filter::DoFilter (const Box& tbx,
             return src.contains(jj,kk,ll) ? src(jj,kk,ll,nn) : 0.0_rt;
         };
 
-        for         (int iz=0; iz < slen_local.z; ++iz){
-            for     (int iy=0; iy < slen_local.y; ++iy){
-                for (int ix=0; ix < slen_local.x; ++ix){
-                    Real sss = sx[ix]*sz[iy];
-                    d += sss*( src_zeropad(i-ix,j-iy,k,scomp+n)
-                              +src_zeropad(i+ix,j-iy,k,scomp+n)
-                              +src_zeropad(i-ix,j+iy,k,scomp+n)
-                              +src_zeropad(i+ix,j+iy,k,scomp+n));
+        for         (int i2=0; i2 < slen_local.z; ++i2){
+            for     (int i1=0; i1 < slen_local.y; ++i1){
+                for (int i0=0; i0 < slen_local.x; ++i0){
+                    Real sss = s0[i0]*s1[i1];
+                    d += sss*( src_zeropad(i-i0,j-i1,k,scomp+n)
+                              +src_zeropad(i+i0,j-i1,k,scomp+n)
+                              +src_zeropad(i-i0,j+i1,k,scomp+n)
+                              +src_zeropad(i+i0,j+i1,k,scomp+n));
                 }
             }
         }
 
         dst(i,j,k,dcomp+n) = d;
     });
-#elif defined(WARPX_DIM_1D_Z)
+#elif AMREX_SPACEDIM == 1
     AMREX_PARALLEL_FOR_4D ( tbx, ncomp, i, j, k, n,
     {
         Real d = 0.0;
@@ -171,21 +169,18 @@ void Filter::DoFilter (const Box& tbx,
             return src.contains(jj,kk,ll) ? src(jj,kk,ll,nn) : 0.0_rt;
         };
 
-        for         (int iz=0; iz < slen_local.z; ++iz){
-            for     (int iy=0; iy < slen_local.y; ++iy){
-                for (int ix=0; ix < slen_local.x; ++ix){
-                    Real sss = sz[iy];
-                    d += sss*( src_zeropad(i-ix,j,k,scomp+n)
-                              +src_zeropad(i+ix,j,k,scomp+n));
+        for         (int i2=0; i2 < slen_local.z; ++i2){
+            for     (int i1=0; i1 < slen_local.y; ++i1){
+                for (int i0=0; i0 < slen_local.x; ++i0){
+                    Real sss = s0[i0];
+                    d += sss*( src_zeropad(i-i0,j,k,scomp+n)
+                              +src_zeropad(i+i0,j,k,scomp+n));
                 }
             }
         }
 
         dst(i,j,k,dcomp+n) = d;
     });
-#else
-    WARPX_ABORT_WITH_MESSAGE(
-        "Filter not implemented for the current geometry!");
 #endif
 }
 
@@ -278,13 +273,11 @@ void Filter::DoFilter (const Box& tbx,
     const auto lo = amrex::lbound(tbx);
     const auto hi = amrex::ubound(tbx);
     // tmp and dst are of type Array4 (Fortran ordering)
-#if (AMREX_SPACEDIM >= 2)
-    amrex::Real const* AMREX_RESTRICT sx = stencil_x.data();
-#endif
-#if defined(WARPX_DIM_3D)
-    amrex::Real const* AMREX_RESTRICT sy = stencil_y.data();
-#endif
-    amrex::Real const* AMREX_RESTRICT sz = stencil_z.data();
+    AMREX_D_TERM(
+    amrex::Real const* AMREX_RESTRICT s0 = m_stencil_0.data();,
+    amrex::Real const* AMREX_RESTRICT s1 = m_stencil_1.data();,
+    amrex::Real const* AMREX_RESTRICT s2 = m_stencil_2.data();
+    )
     for (int n = 0; n < ncomp; ++n) {
         // Set dst value to 0.
         for         (int k = lo.z; k <= hi.z; ++k) {
@@ -295,41 +288,32 @@ void Filter::DoFilter (const Box& tbx,
             }
         }
         // 3 nested loop on 3D stencil
-        for         (int iz=0; iz < slen.z; ++iz){
-            for     (int iy=0; iy < slen.y; ++iy){
-                for (int ix=0; ix < slen.x; ++ix){
-#if defined(WARPX_DIM_3D)
-                    const Real sss = sx[ix]*sy[iy]*sz[iz];
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                    const Real sss = sx[ix]*sz[iy];
-#else
-                    const Real sss = sz[ix];
-#endif
+        for         (int i2=0; i2 < slen.z; ++i2){
+            for     (int i1=0; i1 < slen.y; ++i1){
+                for (int i0=0; i0 < slen.x; ++i0){
+                    const Real sss = AMREX_D_TERM(s0[i0], *s1[i1], *s2[i2]);
                     // 3 nested loop on 3D array
                     for         (int k = lo.z; k <= hi.z; ++k) {
                         for     (int j = lo.y; j <= hi.y; ++j) {
                             AMREX_PRAGMA_SIMD
                             for (int i = lo.x; i <= hi.x; ++i) {
-#if defined(WARPX_DIM_3D)
-                                dst(i,j,k,dcomp+n) += sss*(tmp(i-ix,j-iy,k-iz,scomp+n)
-                                                          +tmp(i+ix,j-iy,k-iz,scomp+n)
-                                                          +tmp(i-ix,j+iy,k-iz,scomp+n)
-                                                          +tmp(i+ix,j+iy,k-iz,scomp+n)
-                                                          +tmp(i-ix,j-iy,k+iz,scomp+n)
-                                                          +tmp(i+ix,j-iy,k+iz,scomp+n)
-                                                          +tmp(i-ix,j+iy,k+iz,scomp+n)
-                                                          +tmp(i+ix,j+iy,k+iz,scomp+n));
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                                dst(i,j,k,dcomp+n) += sss*(tmp(i-ix,j-iy,k,scomp+n)
-                                                          +tmp(i+ix,j-iy,k,scomp+n)
-                                                          +tmp(i-ix,j+iy,k,scomp+n)
-                                                          +tmp(i+ix,j+iy,k,scomp+n));
-#elif defined(WARPX_DIM_1D_Z)
-                                dst(i,j,k,dcomp+n) += sss*(tmp(i-ix,j,k,scomp+n)
-                                                          +tmp(i+ix,j,k,scomp+n));
-#else
-    WARPX_ABORT_WITH_MESSAGE(
-        "Filter not implemented for the current geometry!");
+#if AMREX_SPACEDIM == 3
+                                dst(i,j,k,dcomp+n) += sss*(tmp(i-i0,j-i1,k-i2,scomp+n)
+                                                          +tmp(i+i0,j-i1,k-i2,scomp+n)
+                                                          +tmp(i-i0,j+i1,k-i2,scomp+n)
+                                                          +tmp(i+i0,j+i1,k-i2,scomp+n)
+                                                          +tmp(i-i0,j-i1,k+i2,scomp+n)
+                                                          +tmp(i+i0,j-i1,k+i2,scomp+n)
+                                                          +tmp(i-i0,j+i1,k+i2,scomp+n)
+                                                          +tmp(i+i0,j+i1,k+i2,scomp+n));
+#elif AMREX_SPACEDIM == 2
+                                dst(i,j,k,dcomp+n) += sss*(tmp(i-i0,j-i1,k,scomp+n)
+                                                          +tmp(i+i0,j-i1,k,scomp+n)
+                                                          +tmp(i-i0,j+i1,k,scomp+n)
+                                                          +tmp(i+i0,j+i1,k,scomp+n));
+#elif AMREX_SPACEDIM == 1
+                                dst(i,j,k,dcomp+n) += sss*(tmp(i-i0,j,k,scomp+n)
+                                                          +tmp(i+i0,j,k,scomp+n));
 #endif
                             }
                         }

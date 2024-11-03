@@ -28,7 +28,7 @@ class BTDiagnostics final : public Diagnostics
 {
 public:
 
-    BTDiagnostics (int i, const std::string& name);
+    BTDiagnostics (int i, const std::string& name, DiagTypes diag_type);
 
 private:
     /** Whether to plot raw (i.e., NOT cell-centered) fields */
@@ -161,6 +161,7 @@ private:
      *  in z-direction for both 2D and 3D simulations in the Cartesian frame of reference.
      */
     int m_moving_window_dir;
+    amrex::Real m_moving_window_beta;
 
     /** Number of back-transformed snapshots in the lab-frame requested by the user */
     int m_num_snapshots_lab = std::numeric_limits<int>::lowest();
@@ -241,7 +242,7 @@ private:
      *  will be used by all snapshots to obtain lab-frame data at the respective
      *  z slice location.
      */
-    amrex::Vector<std::unique_ptr<amrex::MultiFab> > m_cell_centered_data;
+    std::string const m_cell_centered_data_name;
     /** Vector of pointers to compute cell-centered data, per level, per component
      *  using the coarsening-ratio provided by the user.
      */
@@ -346,7 +347,7 @@ private:
      *  \param[in] i_buffer snapshot index
      */
     void SetSnapshotFullStatus (int i_buffer);
-    /** Vector of field-data stored in the cell-centered multifab, m_cell_centered_data.
+    /** Vector of field-data stored in the cell-centered MultiFab.
      *  All the fields are stored regardless of the specific fields to plot selected
      *  by the user.
      */

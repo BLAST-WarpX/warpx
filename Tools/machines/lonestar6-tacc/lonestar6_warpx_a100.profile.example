@@ -1,0 +1,59 @@
+# please set your project account
+#export proj="<yourProject>"  # change me
+
+# required dependencies
+module purge
+module load TACC
+module load gcc/11.2.0
+module load cuda/12.2
+module load cmake
+module load mvapich2
+
+# optional: for QED support with detailed tables
+module load boost/1.84
+
+# optional: for openPMD and PSATD+RZ support
+module load phdf5/1.10.4
+
+SW_DIR="${WORK}/sw/lonestar6/sw/lonestar6/a100"
+export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-1.21.1:${CMAKE_PREFIX_PATH}
+export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.8.3:${CMAKE_PREFIX_PATH}
+export CMAKE_PREFIX_PATH=${SW_DIR}/blaspp-2024.05.31:${CMAKE_PREFIX_PATH}
+export CMAKE_PREFIX_PATH=${SW_DIR}/lapackpp-2024.05.31:${CMAKE_PREFIX_PATH}
+export CMAKE_PREFIX_PATH=${SW_DIR}/heffte-2.4.0:${CMAKE_PREFIX_PATH}
+
+export LD_LIBRARY_PATH=${SW_DIR}/c-blosc-1.21.1/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/adios2-2.8.3/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/heffte-2.4.0/lib64:$LD_LIBRARY_PATH
+
+export PATH=${SW_DIR}/adios2-2.8.3/bin:${PATH}
+
+# optional: CCache
+#module load ccache  # TODO: request from support
+
+# optional: for Python bindings or libEnsemble
+module load python3/3.9.7
+
+if [ -d "$WORK/sw/lonestar6/a100/venvs/warpx-a100" ]
+then
+  source $WORK/sw/lonestar6/a100/venvs/warpx-a100/bin/activate
+fi
+
+# an alias to request an interactive batch node for one hour
+#   for parallel execution, start on the batch node: srun <command>
+alias getNode="salloc -N 1 --ntasks-per-node=2 -t 1:00:00 -p gpu-100 --gpu-bind=single:1 -c 32 -G 2 -A $proj"
+# an alias to run a command on a batch node for up to 30min
+#   usage: runNode <command>
+alias runNode="srun -N 1 --ntasks-per-node=2 -t 0:30:00 -p gpu-100 --gpu-bind=single:1 -c 32 -G 2 -A $proj"
+
+# optimize CUDA compilation for A100
+export AMREX_CUDA_ARCH=8.0
+
+# compiler environment hints
+export CC=$(which gcc)
+export CXX=$(which g++)
+export FC=$(which gfortran)
+export CUDACXX=$(which nvcc)
+export CUDAHOSTCXX=${CXX}

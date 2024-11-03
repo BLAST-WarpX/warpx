@@ -5,7 +5,6 @@ add_warpx_test(
     test_2d_dirichlet_bc  # name
     2  # dims
     2  # nprocs
-    OFF  # eb
     inputs_test_2d_dirichlet_bc  # inputs
     analysis.py  # analysis
     diags/diag1000100  # output
@@ -16,7 +15,6 @@ add_warpx_test(
     test_2d_dirichlet_bc_picmi  # name
     2  # dims
     2  # nprocs
-    OFF  # eb
     inputs_test_2d_dirichlet_bc_picmi.py  # inputs
     analysis.py  # analysis
     diags/diag1000100  # output
