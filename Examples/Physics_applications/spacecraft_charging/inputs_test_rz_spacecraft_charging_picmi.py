@@ -49,12 +49,12 @@ class SpaceChargeFieldCorrector(object):
             q = compute_actual_charge_on_spacecraft()
 
         # Correct fields so as to recover the actual charge
-        Er = ExWrapper(include_ghosts=True)
-        Er[...] += (q - q_v) * self.normalized_Er
-        Ez = EzWrapper(include_ghosts=True)
-        Ez[...] += (q - q_v) * self.normalized_Ez
-        phi = PhiFPWrapper(include_ghosts=True)
-        phi[...] += (q - q_v) * self.normalized_phi
+        Er = ExWrapper()
+        Er[(), ()] += (q - q_v) * self.normalized_Er
+        Ez = EzWrapper()
+        Ez[(), ()] += (q - q_v) * self.normalized_Ez
+        phi = PhiFPWrapper()
+        phi[(), ()] += (q - q_v) * self.normalized_phi
         self.spacecraft_potential += (q - q_v) * self.spacecraft_capacitance
         sim.extension.warpx.set_potential_on_eb("%f" % self.spacecraft_potential)
         print("Setting potential to %f" % self.spacecraft_potential)
@@ -71,7 +71,7 @@ class SpaceChargeFieldCorrector(object):
         self.spacecraft_capacitance = 1.0 / q_v  # the potential was set to 1V
 
         # Check that this iteration corresponded to a vacuum solve
-        rho = RhoFPWrapper(include_ghosts=False)
+        rho = RhoFPWrapper()
 
         # In principle, we should check that `rho` is exactly 0
         # However, due to machine precision errors when adding the charge
@@ -79,12 +79,12 @@ class SpaceChargeFieldCorrector(object):
         assert np.all(abs(rho[...]) < 1.0e-11)
 
         # Record fields
-        Er = ExWrapper(include_ghosts=True)[:, :]
-        self.normalized_Er = Er[...] / q_v
-        Ez = EzWrapper(include_ghosts=True)[:, :]
-        self.normalized_Ez = Ez[...] / q_v
-        phi = PhiFPWrapper(include_ghosts=True)[:, :]
-        self.normalized_phi = phi[...] / q_v
+        Er = ExWrapper()[(), ()]
+        self.normalized_Er = Er / q_v
+        Ez = EzWrapper()[(), ()]
+        self.normalized_Ez = Ez / q_v
+        phi = PhiFPWrapper()[(), ()]
+        self.normalized_phi = phi / q_v
 
         self.saved_first_iteration_fields = True
         self.correct_space_charge_fields(q=0)
@@ -98,8 +98,8 @@ def compute_virtual_charge_on_spacecraft():
     that WarpX thinks there should be on the spacecraft.
     """
     # Get global array for the whole domain (across MPI ranks)
-    phi = PhiFPWrapper(include_ghosts=False)[:, :]
-    rho = RhoFPWrapper(include_ghosts=False)[:, :]
+    phi = PhiFPWrapper()[:, :]
+    rho = RhoFPWrapper()[:, :]
 
     # Check that this codes correspond to the global size of the box
     assert phi.shape == (nr + 1, nz + 1)
