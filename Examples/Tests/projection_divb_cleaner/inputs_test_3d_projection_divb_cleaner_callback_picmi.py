@@ -196,15 +196,15 @@ class ProjectionDivCleanerTest(object):
 def load_current_ring():
     curr_loop = CurrentLoop(radius=0.75)
 
-    Bx = fields.BxFPExternalWrapper(include_ghosts=True)
-    By = fields.ByFPExternalWrapper(include_ghosts=True)
-    Bz = fields.BzFPExternalWrapper(include_ghosts=True)
+    Bx = fields.BxFPExternalWrapper()
+    By = fields.ByFPExternalWrapper()
+    Bz = fields.BzFPExternalWrapper()
 
-    Bx[:, :, :] = curr_loop(Bx.mesh("x"), Bx.mesh("y"), Bx.mesh("z"), coord="x")
+    Bx[(), (), ()] = curr_loop(Bx.mesh("x"), Bx.mesh("y"), Bx.mesh("z"), coord="x")
 
-    By[:, :, :] = curr_loop(By.mesh("x"), By.mesh("y"), By.mesh("z"), coord="y")
+    By[(), (), ()] = curr_loop(By.mesh("x"), By.mesh("y"), By.mesh("z"), coord="y")
 
-    Bz[:, :, :] = curr_loop(Bz.mesh("x"), Bz.mesh("y"), Bz.mesh("z"), coord="z")
+    Bz[(), (), ()] = curr_loop(Bz.mesh("x"), Bz.mesh("y"), Bz.mesh("z"), coord="z")
 
     comm.Barrier()
 
@@ -215,13 +215,13 @@ simulation.step()
 ##############################################
 # Post load image generation and error check #
 ##############################################
-Bxg = fields.BxWrapper(include_ghosts=True)
-Byg = fields.ByWrapper(include_ghosts=True)
-Bzg = fields.BzWrapper(include_ghosts=True)
+Bxg = fields.BxWrapper()
+Byg = fields.ByWrapper()
+Bzg = fields.BzWrapper()
 
-Bx_local = Bxg[:, :, :]
-By_local = Byg[:, :, :]
-Bz_local = Bzg[:, :, :]
+Bx_local = Bxg[(), (), ()]
+By_local = Byg[(), (), ()]
+Bz_local = Bzg[(), (), ()]
 
 dBxdx = (Bx_local[1:, :, :] - Bx_local[:-1, :, :]) / run.DX
 dBydy = (By_local[:, 1:, :] - By_local[:, :-1, :]) / run.DY
