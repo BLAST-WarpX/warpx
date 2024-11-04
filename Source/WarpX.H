@@ -135,7 +135,7 @@ public:
     void UpdateMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const&  a_Bn,
                                           amrex::Real  a_thetadt );
     void ApplyMagneticFieldBCs ();
-    void SpectralSourceFreeFieldAdvance();
+    void SpectralSourceFreeFieldAdvance ();
     void FinishMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const&  a_Bn,
                                           amrex::Real  a_theta );
     void FinishImplicitField ( const ablastr::fields::MultiLevelVectorField&  Field_fp,

@@ -119,7 +119,7 @@ WarpX::ApplyMagneticFieldBCs()
 }
 
 void
-WarpX::SpectralSourceFreeFieldAdvance()
+WarpX::SpectralSourceFreeFieldAdvance ()
 {
     using namespace amrex::literals;
     using warpx::fields::FieldType;
@@ -151,9 +151,9 @@ WarpX::SpectralSourceFreeFieldAdvance()
 
     // Restore the current_fp MultiFab. Note that this is only needed for diagnostics when
     // J is being written out (since current_fp is not otherwise used).
-    amrex::MultiFab::Copy(*(current_fp[0]), j0, 0, 0, 1, current_fp[0]->nGrowVect());
-    amrex::MultiFab::Copy(*(current_fp[1]), j1, 0, 0, 1, current_fp[1]->nGrowVect());
-    amrex::MultiFab::Copy(*(current_fp[2]), j2, 0, 0, 1, current_fp[2]->nGrowVect());
+    amrex::MultiFab::Copy(*(current_fp[0]), j0, 0, 0, current_fp[0]->nComp(), current_fp[0]->nGrowVect());
+    amrex::MultiFab::Copy(*(current_fp[1]), j1, 0, 0, current_fp[1]->nComp(), current_fp[1]->nGrowVect());
+    amrex::MultiFab::Copy(*(current_fp[2]), j2, 0, 0, current_fp[2]->nComp(), current_fp[2]->nGrowVect());
 }
 
 void

@@ -26,8 +26,8 @@ void StrangImplicitSpectralEM::Define ( WarpX* const a_WarpX )
 
 
     // Parse nonlinear solver parameters
-    const amrex::ParmParse pp("implicit_evolve");
-    parseNonlinearSolverParams( pp );
+    const amrex::ParmParse pp_implicit_evolve("implicit_evolve");
+    parseNonlinearSolverParams( pp_implicit_evolve );
 
     // Define the nonlinear solver
     m_nlsolver->Define(m_E, this);
@@ -101,8 +101,8 @@ void StrangImplicitSpectralEM::ComputeRHS ( WarpXSolverVec& a_RHS,
                                             int a_nl_iter,
                                             bool a_from_jacobian )
 {
-    // update WarpX-owned Efield_fp and Bfield_fp using current state of E from
-    // the nonlinear solver at time n+1/2
+    // Update WarpX-owned Efield_fp and Bfield_fp using current state of
+    // E from the nonlinear solver at time n+1/2
     UpdateWarpXFields( a_E, a_time, a_dt );
 
     // Self consistently update particle positions and velocities using the
