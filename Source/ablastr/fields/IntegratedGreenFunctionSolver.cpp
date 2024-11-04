@@ -248,17 +248,17 @@ computePhiIGF ( amrex::MultiFab const & rho,
                 fft_size, tmp_rho[local_boxid].dataPtr(),
                 reinterpret_cast<ablastr::math::anyfft::Complex*>(tmp_rho_fft.dataPtr()),
                 ablastr::math::anyfft::direction::R2C, AMREX_SPACEDIM-1,
-                nrz, fft_size, 1, nrx*nry, fft_size, 1, nsx*nsy);
+                nrz, nullptr, 1, nrx*nry, nullptr, 1, nsx*nsy);
             ablastr::math::anyfft::FFTplan forward_plan_G = ablastr::math::anyfft::CreatePlanMany(
                 fft_size, tmp_G[local_boxid].dataPtr(),
                 reinterpret_cast<ablastr::math::anyfft::Complex*>(tmp_G_fft.dataPtr()),
                 ablastr::math::anyfft::direction::R2C, AMREX_SPACEDIM-1,
-                nrz, fft_size, 1, nrx*nry, fft_size, 1, nsx*nsy);
+                nrz, nullptr, 1, nrx*nry, nullptr, 1, nsx*nsy);
             ablastr::math::anyfft::FFTplan backward_plan = ablastr::math::anyfft::CreatePlanMany(
                 fft_size, tmp_G[local_boxid].dataPtr(),
                 reinterpret_cast<ablastr::math::anyfft::Complex*>(tmp_G_fft.dataPtr()),
                 ablastr::math::anyfft::direction::C2R, AMREX_SPACEDIM-1,
-                nsz, fft_size, 1, nsx*nsy, fft_size, 1, nrx*nry);
+                nsz, nullptr, 1, nsx*nsy, nullptr, 1, nrx*nry);
             BL_PROFILE_VAR_STOP(timer_plans);
 
             // Forward transforms of rho and G
