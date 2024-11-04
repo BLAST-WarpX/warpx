@@ -78,8 +78,8 @@ Diagnostics::BaseReadParameters ()
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrame ||
             warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic ||
-            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameSemiImplicit,
-            "plot phi only works if do_electrostatic = labframe, do_electrostatic = labframe-electromagnetostatic or do_electrostatic = labframe-semi-implicit");
+            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameEffectivePotential,
+            "plot phi only works if do_electrostatic = labframe, do_electrostatic = labframe-electromagnetostatic or do_electrostatic = labframe-effective-potential");
     }
 
     // Sanity check if user requests to plot A

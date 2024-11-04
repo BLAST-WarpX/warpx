@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# --- Test script for the semi-implicit Poisson solver. This test is based on the
+# --- Test script for the effective potential Poisson solver. This test is based on the
 # --- adiabatic plasma expansion benchmark from Connor et al. (2021)
 # --- doi.org/10.1109/TPS.2021.3072353.
 # --- In the benchmark an expanding plasma ball with Gaussian density distribution
@@ -54,7 +54,7 @@ class PlasmaExpansionSimulation(object):
     DT = 0.8  # Time step (electron streaming)
 
     # Solver parameter
-    C_SI = 1.0  # Semi-implicit factor
+    C_EP = 1.0  # Effective potential factor
 
     def __init__(self, verbose):
         """Get input parameters for the specific case desired."""
@@ -162,8 +162,8 @@ class PlasmaExpansionSimulation(object):
         solver = picmi.ElectrostaticSolver(
             grid=self.grid,
             method="Multigrid",
-            warpx_semi_implicit=True,
-            warpx_semi_implicit_factor=self.C_SI,
+            warpx_effective_potential=True,
+            warpx_effective_potential_factor=self.C_EP,
             warpx_self_fields_verbosity=self.verbose,
         )
         simulation.solver = solver

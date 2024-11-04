@@ -9,8 +9,8 @@
 /*
  * This file was copied and edited from PoissonSolver.H in the same directory.
  */
-#ifndef ABLASTR_SEMI_IMPLICIT_POISSON_SOLVER_H
-#define ABLASTR_SEMI_IMPLICIT_POISSON_SOLVER_H
+#ifndef ABLASTR_EFFECTIVE_POTENTIAL_POISSON_SOLVER_H
+#define ABLASTR_EFFECTIVE_POTENTIAL_POISSON_SOLVER_H
 
 #include <ablastr/constant.H>
 #include <ablastr/utils/Communication.H>
@@ -98,7 +98,7 @@ template<
     typename T_FArrayBoxFactory = void
 >
 void
-computeSemiImplicitPhi (
+computeEffectivePotentialPhi (
     ablastr::fields::MultiLevelScalarField const& rho,
     ablastr::fields::MultiLevelScalarField const& phi,
     amrex::MultiFab const & sigma,
@@ -121,7 +121,7 @@ computeSemiImplicitPhi (
 ) {
     using namespace amrex::literals;
 
-    ABLASTR_PROFILE("computeSemiImplicitPhi");
+    ABLASTR_PROFILE("computeEffectivePotentialPhi");
 
     if (!rel_ref_ratio.has_value()) {
         ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(rho.size() == 1u,
@@ -138,7 +138,7 @@ computeSemiImplicitPhi (
     }
 
     ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE( !is_solver_igf_on_lev0,
-        "FFT solver cannot be used with semi-implicit Poisson solve");
+        "FFT solver cannot be used with effective potential Poisson solve");
 
 #ifdef WARPX_DIM_RZ
         constexpr bool is_rz = true;
@@ -271,4 +271,4 @@ computeSemiImplicitPhi (
 
 } // namespace ablastr::fields
 
-#endif // ABLASTR_SEMI_IMPLICIT_POISSON_SOLVER_H
+#endif // ABLASTR_EFFECTIVE_POTENTIAL_POISSON_SOLVER_H

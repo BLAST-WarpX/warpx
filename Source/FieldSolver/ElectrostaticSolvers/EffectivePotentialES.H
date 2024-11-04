@@ -13,17 +13,17 @@
 #include "ElectrostaticSolver.H"
 
 #include <ablastr/coarsen/sample.H>
-#include <ablastr/fields/SemiImplicitPoissonSolver.H>
+#include <ablastr/fields/EffectivePotentialPoissonSolver.H>
 
-class SemiImplicitES final : public ElectrostaticSolver
+class EffectivePotentialES final : public ElectrostaticSolver
 {
 public:
 
-    SemiImplicitES (int nlevs_max) : ElectrostaticSolver (nlevs_max) {
+    EffectivePotentialES (int nlevs_max) : ElectrostaticSolver (nlevs_max) {
         ReadParameters();
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             (nlevs_max == 1),
-            "Semi-implicit electrostatic solver only supports one level at present"
+            "Effective potential electrostatic solver only supports one level at present"
         );
     }
 

@@ -19,7 +19,7 @@
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver.H"
 #include "FieldSolver/ElectrostaticSolvers/LabFrameExplicitES.H"
 #include "FieldSolver/ElectrostaticSolvers/RelativisticExplicitES.H"
-#include "FieldSolver/ElectrostaticSolvers/SemiImplicitES.H"
+#include "FieldSolver/ElectrostaticSolvers/EffectivePotentialES.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
@@ -332,10 +332,10 @@ WarpX::WarpX ()
     {
         m_electrostatic_solver = std::make_unique<LabFrameExplicitES>(nlevs_max);
     }
-    // Initialize the semi-implicit electrostatic solver if required
-    else if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameSemiImplicit)
+    // Initialize the effective potential electrostatic solver if required
+    else if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameEffectivePotential)
     {
-        m_electrostatic_solver = std::make_unique<SemiImplicitES>(nlevs_max);
+        m_electrostatic_solver = std::make_unique<EffectivePotentialES>(nlevs_max);
     }
     else
     {
@@ -2355,7 +2355,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
     int rho_ncomps = 0;
     if( (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrame) ||
         (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic) ||
-        (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameSemiImplicit) ||
+        (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameEffectivePotential) ||
         (electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) ) {
         rho_ncomps = ncomps;
     }
@@ -2377,7 +2377,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
 
     if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrame ||
         electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic ||
-        electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameSemiImplicit )
+        electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameEffectivePotential )
     {
         const IntVect ngPhi = IntVect( AMREX_D_DECL(1,1,1) );
         m_fields.alloc_init(FieldType::phi_fp, lev, amrex::convert(ba, phi_nodal_flag), dm,

@@ -228,20 +228,22 @@ Overall simulation parameters
         \boldsymbol{\nabla}^2 \phi = - \rho/\epsilon_0 \qquad \boldsymbol{E} = - \boldsymbol{\nabla}\phi \\
         \boldsymbol{\nabla}^2 \boldsymbol{A} = - \mu_0 \boldsymbol{j} \qquad \boldsymbol{B} = \boldsymbol{\nabla}\times\boldsymbol{A}
 
-    * ``labframe-semi-implicit``: Poisson's equation is solved with a modified dielectric function
-      to create a semi-implicit scheme which is robust to the numerical instability seen
-      in explicit electrostatic PIC when :math:`\Delta t \omega_{pe} > 2`.
-      If this option is used the additional parameter ``warpx.semi_implicit_factor`` can also be
-      specified to set the value of :math:`C_{SI}` (default 4). The method is stable for :math:`C_{SI} \geq 1`
-      regardless of :math:`\Delta t`, however, the larger :math:`C_{SI}` is set, the lower the numerical plasma
-      frequency will be and therefore care must be taken to not set :math:`C_{SI}` so high that the plasma mode
+    * ``labframe-effective-potential``: Poisson's equation is solved with a modified dielectric function
+      (resulting in an "effective potential") to create a semi-implicit scheme which is robust to the
+      numerical instability seen in explicit electrostatic PIC when :math:`\Delta t \omega_{pe} > 2`.
+      If this option is used the additional parameter ``warpx.effective_potential_factor`` can also be
+      specified to set the value of :math:`C_{EP}` (default 4). The method is stable for :math:`C_{EP} \geq 1`
+      regardless of :math:`\Delta t`, however, the larger :math:`C_{EP}` is set, the lower the numerical plasma
+      frequency will be and therefore care must be taken to not set it so high that the plasma mode
       hybridizes with other modes of interest.
-      Details of the method can be found in Appendix A of :cite:t:`param-Barnes2021`.
+      Details of the method can be found in Appendix A of :cite:t:`param-Barnes2021` (note that in that paper
+      the method is referred to as "semi-implicit electrostatic" but here it has been renamed to "effective potential"
+      to avoid confusion with the semi-implicit method of Chen et al.).
       In short, the code solves:
 
       .. math::
 
-        \boldsymbol{\nabla}\cdot\left(1+\frac{C_{SI}}{4}\sum_{s \in \text{species}}(\omega_{ps}\Delta t)^2 \right)\boldsymbol{\nabla} \phi = - \rho/\epsilon_0 \qquad \boldsymbol{E} = - \boldsymbol{\nabla}\phi
+        \boldsymbol{\nabla}\cdot\left(1+\frac{C_{EP}}{4}\sum_{s \in \text{species}}(\omega_{ps}\Delta t)^2 \right)\boldsymbol{\nabla} \phi = - \rho/\epsilon_0 \qquad \boldsymbol{E} = - \boldsymbol{\nabla}\phi
 
     * ``relativistic``: Poisson's equation is solved **for each species**
       in their respective rest frame. The corresponding field

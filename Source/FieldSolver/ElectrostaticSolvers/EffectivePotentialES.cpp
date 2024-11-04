@@ -7,7 +7,7 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#include "SemiImplicitES.H"
+#include "EffectivePotentialES.H"
 #include "Fluids/MultiFluidContainer_fwd.H"
 #include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
@@ -17,18 +17,18 @@
 
 using namespace amrex;
 
-void SemiImplicitES::InitData() {
+void EffectivePotentialES::InitData() {
     auto & warpx = WarpX::GetInstance();
     m_poisson_boundary_handler->DefinePhiBCs(warpx.Geom(0));
 }
 
-void SemiImplicitES::ComputeSpaceChargeField (
+void EffectivePotentialES::ComputeSpaceChargeField (
     ablastr::fields::MultiFabRegister& fields,
     MultiParticleContainer& mpc,
     [[maybe_unused]] MultiFluidContainer* mfl,
     int max_level)
 {
-    WARPX_PROFILE("SemiImplicitES::ComputeSpaceChargeField");
+    WARPX_PROFILE("EffectivePotentialES::ComputeSpaceChargeField");
 
     using ablastr::fields::MultiLevelScalarField;
     using ablastr::fields::MultiLevelVectorField;
@@ -70,7 +70,7 @@ void SemiImplicitES::ComputeSpaceChargeField (
     if (!EB::enabled()) { computeE( Efield_fp, phi_fp, beta ); }
 }
 
-void SemiImplicitES::computePhi (
+void EffectivePotentialES::computePhi (
     ablastr::fields::MultiLevelScalarField const& rho,
     ablastr::fields::MultiLevelScalarField const& phi) const
 {
@@ -87,7 +87,7 @@ void SemiImplicitES::computePhi (
                 self_fields_verbosity);
 }
 
-void SemiImplicitES::ComputeSigma (MultiFab& sigma) const
+void EffectivePotentialES::ComputeSigma (MultiFab& sigma) const
 {
     // Reset sigma to 1
     sigma.setVal(1.0_rt);
@@ -95,7 +95,7 @@ void SemiImplicitES::ComputeSigma (MultiFab& sigma) const
     // Get the user set value for C_SI (defaults to 4)
     amrex::Real C_SI = 4.0;
     const ParmParse pp_warpx("warpx");
-    utils::parser::queryWithParser(pp_warpx, "semi_implicit_factor", C_SI);
+    utils::parser::queryWithParser(pp_warpx, "effective_potential_factor", C_SI);
 
     int const lev = 0;
 
@@ -119,7 +119,7 @@ void SemiImplicitES::ComputeSigma (MultiFab& sigma) const
     auto& warpx = WarpX::GetInstance();
     auto& mypc = warpx.GetPartContainer();
 
-    // The semi-implicit dielectric function is given by
+    // The effective potential dielectric function is given by
     // \varepsilon_{SI} = \varepsilon * (1 + \sum_{i in species} C_{SI}*(w_pi * dt)^2/4)
     // Note the use of the plasma frequency in rad/s (not Hz) and the factor of 1/4,
     // these choices make it so that C_SI = 1 is the marginal stability threshold.
@@ -162,7 +162,7 @@ void SemiImplicitES::ComputeSigma (MultiFab& sigma) const
 }
 
 
-void SemiImplicitES::computePhi (
+void EffectivePotentialES::computePhi (
     ablastr::fields::MultiLevelScalarField const& rho,
     ablastr::fields::MultiLevelScalarField const& phi,
     amrex::MultiFab const& sigma,
@@ -233,7 +233,7 @@ void SemiImplicitES::computePhi (
 #endif
     }
 
-    ablastr::fields::computeSemiImplicitPhi(
+    ablastr::fields::computeEffectivePotentialPhi(
         sorted_rho,
         sorted_phi,
         sigma,
