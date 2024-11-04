@@ -200,18 +200,32 @@ laser1.profile_focal_distance = 4.0e-6  # focal distance from the antenna [m]
 #################################
 # Diagnostics
 #
-diagnostics.diags_names = diag1 openPMDfw openPMDbw
+diagnostics.diags_names = diagInst diagTimeAvg openPMDfw openPMDbw
 
-diag1.intervals = 100
-diag1.diag_type = Full
-diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho rho_electrons rho_hydrogen
+# instantaneous field and particle diagnostic
+diagInst.intervals = 100,96:100  # second interval only for CI testing the time-averaged diags
+diagInst.diag_type = Full
+diagInst.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho rho_electrons rho_hydrogen
 # reduce resolution of output fields
-diag1.coarsening_ratio = 4 4
+diagInst.coarsening_ratio = 4 4
 # demonstration of a spatial and momentum filter
-diag1.electrons.plot_filter_function(t,x,y,z,ux,uy,uz) = (uz>=0) * (x<1.0e-6) * (x>-1.0e-6)
-diag1.hydrogen.plot_filter_function(t,x,y,z,ux,uy,uz) = (uz>=0) * (x<1.0e-6) * (x>-1.0e-6)
-diag1.format = openpmd
-diag1.openpmd_backend = h5
+diagInst.electrons.plot_filter_function(t,x,y,z,ux,uy,uz) = (uz>=0) * (x<1.0e-6) * (x>-1.0e-6)
+diagInst.hydrogen.plot_filter_function(t,x,y,z,ux,uy,uz) = (uz>=0) * (x<1.0e-6) * (x>-1.0e-6)
+diagInst.format = openpmd
+diagInst.openpmd_backend = h5
+
+# time-averaged particle and field diagnostic
+diagTimeAvg.intervals = 100
+diagTimeAvg.diag_type = TimeAveraged
+diagTimeAvg.time_average_mode = dynamic_start
+#diagTimeAvg.average_period_time = 2.67e-15  # period of 800 nm light waves
+diagTimeAvg.average_period_steps = 5  # use only either `time` or `steps`
+diagTimeAvg.write_species = 0
+diagTimeAvg.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho rho_electrons rho_hydrogen
+# reduce resolution of output fields
+diagTimeAvg.coarsening_ratio = 4 4
+diagTimeAvg.format = openpmd
+diagTimeAvg.openpmd_backend = h5
 
 openPMDfw.intervals = 100
 openPMDfw.diag_type = Full

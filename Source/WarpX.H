@@ -690,7 +690,7 @@ public:
     void DampJPML (int lev, PatchType patch_type);
 
     void CopyJPML ();
-    bool isAnyBoundaryPML();
+
     /** True if any of the particle boundary condition type is Thermal */
     static bool isAnyParticleBoundaryThermal();
 

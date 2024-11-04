@@ -44,7 +44,7 @@ Particle Accelerator & Beam Physics
 
    examples/gaussian_beam/README.rst
    examples/beam_beam_collision/README.rst
-
+   examples/free_electron_laser/README.rst
 
 High Energy Astrophysical Plasma Physics
 ----------------------------------------
