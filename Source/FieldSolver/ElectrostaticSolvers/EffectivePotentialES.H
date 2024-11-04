@@ -7,8 +7,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef WARPX_SEMIIMPLICITES_H_
-#define WARPX_SEMIIMPLICITES_H_
+#ifndef WARPX_EFFECTIVEPOTENTIALES_H_
+#define WARPX_EFFECTIVEPOTENTIALES_H_
 
 #include "ElectrostaticSolver.H"
 
@@ -38,7 +38,7 @@ public:
     void ComputeSigma ( amrex::MultiFab& sigma ) const;
 
     /**
-     * Compute the potential `phi` by solving the semi-implicit Poisson equation
+     * Compute the potential `phi` by solving the semi-implicit Poisson equation using the Effective Potential method
      * with `rho` as the source.
      * More specifically, this solves the equation
      *  \f[
@@ -68,4 +68,4 @@ public:
 
 };
 
-#endif // WARPX_SEMIIMPLICITES_H_
+#endif // WARPX_EFFECTIVEPOTENTIALES_H_
