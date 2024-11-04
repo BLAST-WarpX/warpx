@@ -4,7 +4,7 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#include "FieldSolver/Fields.H"
+#include "Fields.H"
 #include "StrangImplicitSpectralEM.H"
 #include "WarpX.H"
 
