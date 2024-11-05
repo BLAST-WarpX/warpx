@@ -72,14 +72,16 @@ function(add_warpx_test
     separate_arguments(ANALYSIS_LIST UNIX_COMMAND "${analysis}")
     list(GET ANALYSIS_LIST 0 ANALYSIS_FILE)
     cmake_path(SET ANALYSIS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/${ANALYSIS_FILE}")
-    # TODO Enable lines below to handle command-line arguments
-    #list(LENGTH ANALYSIS_LIST ANALYSIS_LIST_LENGTH)
-    #if(ANALYSIS_LIST_LENGTH GREATER 1)
-    #    list(SUBLIST ANALYSIS_LIST 1 -1 ANALYSIS_ARGS)
-    #    list(JOIN ANALYSIS_ARGS " " ANALYSIS_ARGS)
-    #else()
-    #    set(ANALYSIS_ARGS "")
-    #endif()
+    list(LENGTH ANALYSIS_LIST ANALYSIS_LIST_LENGTH)
+    if(ANALYSIS_LIST_LENGTH GREATER 1)
+        list(SUBLIST ANALYSIS_LIST 1 -1 ANALYSIS_ARGS)
+        list(JOIN ANALYSIS_ARGS " " ANALYSIS_ARGS)
+    else()
+        set(ANALYSIS_ARGS "")
+    endif()
+    MESSAGE(STATUS ">>> ANALYSIS_FILE = ${ANALYSIS_FILE}")
+    MESSAGE(STATUS ">>> ANALYSIS_ARGS = ${ANALYSIS_ARGS}")
+    MESSAGE(STATUS "")
 
     # Python test?
     set(python OFF)
@@ -175,11 +177,15 @@ function(add_warpx_test
 
     # test analysis
     if(analysis)
+        # for argparse, do not pass command-line arguments as one quoted string
+        separate_arguments(ANALYSIS_ARGS UNIX_COMMAND "${ANALYSIS_ARGS}")
         add_test(
             NAME ${name}.analysis
             COMMAND
-                ${THIS_Python_SCRIPT_EXE} ${ANALYSIS_FILE}
-                ${output}
+                ${THIS_Python_SCRIPT_EXE}
+                ${ANALYSIS_FILE}
+                ${ANALYSIS_ARGS}
+                #${output}
             WORKING_DIRECTORY ${THIS_WORKING_DIR}
         )
         # test analysis depends on test run

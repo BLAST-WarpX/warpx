@@ -47,7 +47,8 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_background_mcc_picmi.py  # inputs
-    analysis_2d.py  # analysis
+    #OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000050 --format plotfile --rtol 5e-3"  # checksums
     diags/diag1000050  # output
     OFF  # dependency
 )
