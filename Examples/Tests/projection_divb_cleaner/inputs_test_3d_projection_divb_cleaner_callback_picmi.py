@@ -50,8 +50,11 @@ class CurrentLoop(object):
 
         return coeff * term1 * term2 * r
 
-    def __call__(self, xv, yv, zv, coord="x"):
+    def __call__(self, BB, coord="x"):
         # Generate B-field mesh
+        xv = BB.mesh("x", include_ghosts=True)
+        yv = BB.mesh("y", include_ghosts=True)
+        zv = BB.mesh("z", include_ghosts=True)
         XMB, YMB, ZMB = np.meshgrid(xv, yv, zv, indexing="ij")
         RMB = np.sqrt(XMB**2 + YMB**2)
 
@@ -200,11 +203,11 @@ def load_current_ring():
     By = fields.ByFPExternalWrapper()
     Bz = fields.BzFPExternalWrapper()
 
-    Bx[(), (), ()] = curr_loop(Bx.mesh("x"), Bx.mesh("y"), Bx.mesh("z"), coord="x")
+    Bx[(), (), ()] = curr_loop(Bx, coord="x")
 
-    By[(), (), ()] = curr_loop(By.mesh("x"), By.mesh("y"), By.mesh("z"), coord="y")
+    By[(), (), ()] = curr_loop(By, coord="y")
 
-    Bz[(), (), ()] = curr_loop(Bz.mesh("x"), Bz.mesh("y"), Bz.mesh("z"), coord="z")
+    Bz[(), (), ()] = curr_loop(Bz, coord="z")
 
     comm.Barrier()
 
