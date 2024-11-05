@@ -166,7 +166,7 @@ namespace
         } else {
             if (OnBoundary && (E_like ^ is_normal_to_boundary)) {
                 // If ijk_vec is on a boundary, set to zero if
-                // E_like and tangential or and B_like and normal
+                // E_like and tangential or B_like and normal
                 field(ijk_vec,n) = 0._rt;
             } else if (GuardCell) {
                 // Fnormal and Ftangential is set opposite and equal to the value
