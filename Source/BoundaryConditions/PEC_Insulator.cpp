@@ -21,34 +21,6 @@
 namespace
 {
     /**
-     * \brief Calculates the number of grid points the given index is beyond the
-     *        domain boundary i.e. a value of +1 means the current cell is
-     *        outside of the simulation domain by 1 cell. Note that the high
-     *        side domain boundary is between cell dom_hi and dom_hi+1 for cell
-     *        centered grids and on cell dom_hi+1 for nodal grid. This is why
-     *        (dom_hi[idim] + is_nodal[idim]) is used below.
-     *
-     * \param[in] dom_lo, dom_hi  Domain boundaries
-     * \param[in] ijk_vec         Cell coordinates
-     * \param[in] is_nodal        Whether the field of interest is nodal
-     * \param[in] idim            Dimension of interest
-     * \param[in] iside           -1 for low and +1 for high
-     *
-     * \returns number of grid points beyond the boundary
-     */
-    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-    int get_cell_count_to_boundary (
-        amrex::IntVect const & dom_lo,
-        amrex::IntVect const & dom_hi,
-        amrex::IntVect const & ijk_vec,
-        amrex::IntVect const & is_nodal, int idim, int iside)
-    {
-        return ((iside == -1) ? (dom_lo[idim] - ijk_vec[idim])
-                             : (ijk_vec[idim] - (dom_hi[idim] + is_nodal[idim])));
-    }
-
-
-    /**
      * \brief At the specified grid location, apply either the PEC or insulator boundary condition if
      *        the cell is on the boundary or in the guard cells.
      *
@@ -112,10 +84,14 @@ namespace
                         : is_insulator_hi[idim] == 1 );
                 }
                 if (isPEC_InsulatorBoundary) {
-                    // grid point ijk_vec is ig number of points pass the
-                    // domain boundary in direction, idim
-                    int const ig = ::get_cell_count_to_boundary(
-                        dom_lo, dom_hi, ijk_vec, is_nodal, idim, iside);
+                    // Calculates the number of grid points ijk_vec is beyond the
+                    // domain boundary i.e. a value of +1 means the current cell is
+                    // outside of the simulation domain by 1 cell. Note that the high
+                    // side domain boundary is between cell dom_hi and dom_hi+1 for cell
+                    // centered grids and on cell dom_hi+1 for nodal grid. This is why
+                    // (dom_hi[idim] + is_nodal[idim]) is used.
+                    int const ig = ((iside == -1) ? (dom_lo[idim] - ijk_vec[idim])
+                                                  : (ijk_vec[idim] - (dom_hi[idim] + is_nodal[idim])));
 
 #if (defined WARPX_DIM_XZ) || (defined WARPX_DIM_RZ)
                     // For 2D : for icomp==1, (Fy in XZ, Ftheta in RZ),
