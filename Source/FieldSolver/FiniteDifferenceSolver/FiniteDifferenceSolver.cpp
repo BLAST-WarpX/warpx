@@ -28,17 +28,17 @@
 FiniteDifferenceSolver::FiniteDifferenceSolver (
     ElectromagneticSolverAlgo const fdtd_algo,
     std::array<amrex::Real,3> cell_size,
-    ablastr::utils::enums::GridType grid_type):
+    ablastr::utils::enums::GridType grid_type,
+    int ncomps):
     // Register the type of finite-difference algorithm
     m_fdtd_algo{fdtd_algo},
-    m_grid_type{grid_type}
+    m_grid_type{grid_type},
+    m_ncomps{ncomps}
 {
     // return if not FDTD
     if (fdtd_algo == ElectromagneticSolverAlgo::None || fdtd_algo == ElectromagneticSolverAlgo::PSATD) {
         return;
     }
-
-    m_ncomps = WarpX::ncomps;
 
     // Calculate coefficients of finite-difference stencil
 #ifdef WARPX_DIM_RZ

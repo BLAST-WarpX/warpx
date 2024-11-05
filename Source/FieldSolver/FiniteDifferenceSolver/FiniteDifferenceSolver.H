@@ -50,7 +50,8 @@ class FiniteDifferenceSolver
         FiniteDifferenceSolver (
             ElectromagneticSolverAlgo fdtd_algo,
             std::array<amrex::Real,3> cell_size,
-            ablastr::utils::enums::GridType grid_type );
+            ablastr::utils::enums::GridType grid_type,
+            int ncomps);
 
         void EvolveB ( ablastr::fields::MultiFabRegister& fields,
                        int lev,

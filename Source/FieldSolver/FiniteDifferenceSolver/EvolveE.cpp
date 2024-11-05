@@ -44,7 +44,6 @@
 #include <array>
 #include <memory>
 
-using namespace amrex;
 using namespace ablastr::fields;
 
 /**
@@ -128,13 +127,13 @@ void FiniteDifferenceSolver::EvolveE (
 #endif
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-    Real constexpr c2 = PhysConst::c * PhysConst::c;
+    amrex::Real constexpr c2 = PhysConst::c * PhysConst::c;
 
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-    for ( MFIter mfi(*Efield[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+    for ( amrex::MFIter mfi(*Efield[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
         {
             amrex::Gpu::synchronize();
@@ -142,15 +141,15 @@ void FiniteDifferenceSolver::EvolveE (
         auto wt = static_cast<amrex::Real>(amrex::second());
 
         // Extract field data for this grid/tile
-        Array4<Real> const& Ex = Efield[0]->array(mfi);
-        Array4<Real> const& Ey = Efield[1]->array(mfi);
-        Array4<Real> const& Ez = Efield[2]->array(mfi);
-        Array4<Real> const& Bx = Bfield[0]->array(mfi);
-        Array4<Real> const& By = Bfield[1]->array(mfi);
-        Array4<Real> const& Bz = Bfield[2]->array(mfi);
-        Array4<Real> const& jx = Jfield[0]->array(mfi);
-        Array4<Real> const& jy = Jfield[1]->array(mfi);
-        Array4<Real> const& jz = Jfield[2]->array(mfi);
+        amrex::Array4<amrex::Real> const& Ex = Efield[0]->array(mfi);
+        amrex::Array4<amrex::Real> const& Ey = Efield[1]->array(mfi);
+        amrex::Array4<amrex::Real> const& Ez = Efield[2]->array(mfi);
+        amrex::Array4<amrex::Real> const& Bx = Bfield[0]->array(mfi);
+        amrex::Array4<amrex::Real> const& By = Bfield[1]->array(mfi);
+        amrex::Array4<amrex::Real> const& Bz = Bfield[2]->array(mfi);
+        amrex::Array4<amrex::Real> const& jx = Jfield[0]->array(mfi);
+        amrex::Array4<amrex::Real> const& jy = Jfield[1]->array(mfi);
+        amrex::Array4<amrex::Real> const& jz = Jfield[2]->array(mfi);
 
         amrex::Array4<amrex::Real> lx, ly, lz;
         if (EB::enabled()) {
@@ -160,14 +159,14 @@ void FiniteDifferenceSolver::EvolveE (
         }
 
         // Extract stencil coefficients
-        Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
-        Real const * const AMREX_RESTRICT coefs_y = m_stencil_coefs_y.dataPtr();
-        Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
+        amrex::Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
+        amrex::Real const * const AMREX_RESTRICT coefs_y = m_stencil_coefs_y.dataPtr();
+        amrex::Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
 
         // Extract tileboxes for which to loop
-        Box const& tex  = mfi.tilebox(Efield[0]->ixType().toIntVect());
-        Box const& tey  = mfi.tilebox(Efield[1]->ixType().toIntVect());
-        Box const& tez  = mfi.tilebox(Efield[2]->ixType().toIntVect());
+        amrex::Box const& tex = mfi.tilebox(Efield[0]->ixType().toIntVect());
+        amrex::Box const& tey = mfi.tilebox(Efield[1]->ixType().toIntVect());
+        amrex::Box const& tez = mfi.tilebox(Efield[2]->ixType().toIntVect());
 
         // Loop over the cells and update the fields
         amrex::ParallelFor(
@@ -223,7 +222,7 @@ void FiniteDifferenceSolver::EvolveE (
         if (Ffield) {
 
             // Extract field data for this grid/tile
-            const Array4<Real const> F = Ffield->array(mfi);
+            const amrex::Array4<amrex::Real const> F = Ffield->array(mfi);
 
             // Loop over the cells and update the fields
             amrex::ParallelFor(
