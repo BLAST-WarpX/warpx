@@ -75,6 +75,7 @@ public:
     void Define ( const WarpXSolverVec&  a_solver_vec )
     {
         assertIsDefined( a_solver_vec );
+        m_num_amr_levels = a_solver_vec.m_num_amr_levels;
         Define( WarpXSolverVec::m_WarpX,
                 a_solver_vec.getVectorType(),
                 a_solver_vec.getScalarType() );
@@ -300,7 +301,7 @@ private:
     std::string m_scalar_type_name = "none";
 
     static constexpr int m_ncomp = 1;
-    static constexpr int m_num_amr_levels = 1;
+    int m_num_amr_levels = 1;
 
     inline static bool m_warpx_ptr_defined = false;
     inline static WarpX* m_WarpX = nullptr;

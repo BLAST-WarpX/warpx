@@ -114,6 +114,8 @@ Diagnostics
 
 .. autoclass:: pywarpx.picmi.FieldDiagnostic
 
+.. autoclass:: pywarpx.picmi.TimeAveragedFieldDiagnostic
+
 .. autoclass:: pywarpx.picmi.ElectrostaticFieldDiagnostic
 
 .. autoclass:: pywarpx.picmi.Checkpoint

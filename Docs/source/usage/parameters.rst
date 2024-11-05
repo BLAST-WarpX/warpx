@@ -2633,10 +2633,11 @@ Diagnostics and output
 In-situ visualization
 ^^^^^^^^^^^^^^^^^^^^^
 
-WarpX has four types of diagnostics:
-``FullDiagnostics`` consist in dumps of fields and particles at given iterations,
-``BackTransformedDiagnostics`` are used when running a simulation in a boosted frame, to reconstruct output data to the lab frame,
-``BoundaryScrapingDiagnostics`` are used to collect the particles that are absorbed at the boundary, throughout the simulation, and
+WarpX has five types of diagnostics:
+``Full`` diagnostics consist in dumps of fields and particles at given iterations,
+``TimeAveraged`` diagnostics only allow field data, which they output after averaging over a period of time,
+``BackTransformed`` diagnostics are used when running a simulation in a boosted frame, to reconstruct output data to the lab frame,
+``BoundaryScraping`` diagnostics are used to collect the particles that are absorbed at the boundary, throughout the simulation, and
 ``ReducedDiags`` allow the user to compute some reduced quantity (particle temperature, max of a field) and write a small amount of data to text files.
 Similar to what is done for physical species, WarpX has a class Diagnostics that allows users to initialize different diagnostics, each of them with different fields, resolution and period.
 This currently applies to standard diagnostics, but should be extended to back-transformed diagnostics and reduced diagnostics (and others) in a near future.
@@ -2882,12 +2883,58 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
 * ``warpx.mffile_nstreams`` (`int`) optional (default `4`)
     Limit the number of concurrent readers per file.
 
+
+.. _running-cpp-parameters-diagnostics-timeavg:
+
+Time-Averaged Diagnostics
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``TimeAveraged`` diagnostics are a special type of ``Full`` diagnostics that allows for the output of time-averaged field data.
+This type of diagnostics can be created using ``<diag_name>.diag_type = TimeAveraged``.
+We support only field data and related options from the list at `Full Diagnostics`_.
+
+.. note::
+
+    As with ``Full`` diagnostics, ``TimeAveraged`` diagnostics output the initial **instantaneous** conditions of the selected fields on step 0 (unless more specific output intervals exclude output for step 0).
+
+In addition, ``TimeAveraged`` diagnostic options include:
+
+* ``<diag_name>.time_average_mode`` (`string`, default `none`)
+    Describes the operating mode for time averaged field output.
+
+    * ``none`` for no averaging (instantaneous fields)
+
+    * ``fixed_start`` for a diagnostic that averages all fields between the current output step and a fixed point in time
+
+    * ``dynamic_start`` for a constant averaging period and output at different points in time (non-overlapping)
+
+    .. note::
+
+        To enable time-averaged field output with intervals tightly spaced enough for overlapping averaging periods,
+        please create additional instances of ``TimeAveraged`` diagnostics.
+
+* ``<diag_name>.average_period_steps`` (`int`)
+    Configures the number of time steps in an averaging period.
+    Set this only in the ``dynamic_start`` mode and only if ``average_period_time`` has not already been set.
+    Will be ignored in the ``fixed_start`` mode (with warning).
+
+* ``<diag_name>.average_period_time`` (`float`, in seconds)
+    Configures the time (SI units) in an averaging period.
+    Set this only in the ``dynamic_start`` mode and only if ``average_period_steps`` has not already been set.
+    Will be ignored in the ``fixed_start`` mode (with warning).
+
+* ``<diag_name>.average_start_step`` (`int`)
+    Configures the time step at which time-averaging begins.
+    Set this only in the ``fixed_start`` mode.
+    Will be ignored in the ``dynamic_start`` mode (with warning).
+
 .. _running-cpp-parameters-diagnostics-btd:
 
 BackTransformed Diagnostics
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ``BackTransformed`` diag type are used when running a simulation in a boosted frame, to reconstruct output data to the lab frame. This option can be set using ``<diag_name>.diag_type = BackTransformed``. We support the following list of options from `Full Diagnostics`_
+
     ``<diag_name>.format``, ``<diag_name>.openpmd_backend``, ``<diag_name>.dump_rz_modes``, ``<diag_name>.file_prefix``, ``<diag_name>.diag_lo``, ``<diag_name>.diag_hi``, ``<diag_name>.write_species``, ``<diag_name>.species``.
 
     Additional options for this diagnostic include:

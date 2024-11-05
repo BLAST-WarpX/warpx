@@ -114,6 +114,11 @@ void init_WarpX (py::module& m)
         )
         .def("multifab",
              [](WarpX & wx, std::string internal_name) {
+                 py::print("WARNING: WarpX' multifab('internal_name') signature is deprecated.\nPlease use:\n"
+                           "- multifab('prefix', level=...) for scalar fields\n"
+                           "- multifab('prefix', dir=..., level=...) for vector field components\n"
+                           "where 'prefix' is the part of 'internal_name';'  before the []",
+                           py::arg("file") = py::module_::import("sys").attr("stderr"));
                  if (wx.m_fields.internal_has(internal_name)) {
                      return wx.m_fields.internal_get(internal_name);
                  } else {

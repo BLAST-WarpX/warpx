@@ -113,6 +113,16 @@ public:
 
     [[nodiscard]] int Verbose () const { return verbose; }
 
+    [[nodiscard]] const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& GetFieldBoundaryLo () const
+    {
+        return field_boundary_lo;
+    }
+
+    [[nodiscard]] const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& GetFieldBoundaryHi () const
+    {
+        return field_boundary_hi;
+    }
+
     void InitData ();
 
     void Evolve (int numsteps = -1);

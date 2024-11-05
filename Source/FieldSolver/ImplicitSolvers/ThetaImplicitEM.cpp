@@ -19,6 +19,7 @@ void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
 
     // Retain a pointer back to main WarpX class
     m_WarpX = a_WarpX;
+    m_num_amr_levels = 1;
 
     // Define E and Eold vectors
     m_E.Define( m_WarpX, "Efield_fp" );
@@ -26,8 +27,7 @@ void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
 
     // Define B_old MultiFabs
     using ablastr::fields::Direction;
-    const int num_levels = 1;
-    for (int lev = 0; lev < num_levels; ++lev) {
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         const auto& ba_Bx = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev)->boxArray();
         const auto& ba_By = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{1}, lev)->boxArray();
         const auto& ba_Bz = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev)->boxArray();
