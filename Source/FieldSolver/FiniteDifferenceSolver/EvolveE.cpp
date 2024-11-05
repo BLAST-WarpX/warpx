@@ -195,7 +195,7 @@ void FiniteDifferenceSolver::EvolveE (
 
                 Ey(i, j, k, n) += c2 * dt * (
                     + T_Algo::Curl_Nodal_1(Bz, Bx, coefs_z, coefs_x, i, j, k, n)
-                    - PhysConst::mu0 * jy(i, j, k) );
+                    - PhysConst::mu0 * jy(i, j, k, n) );
             },
 
             tez, m_ncomps,
@@ -204,7 +204,7 @@ void FiniteDifferenceSolver::EvolveE (
                 if (lz && lz(i,j,k) <= 0) { return; }
                 Ez(i, j, k, n) += c2 * dt * (
                     + T_Algo::Curl_Nodal_2(Bx, By, coefs_x, coefs_y, i, j, k, n)
-                    - PhysConst::mu0 * jz(i, j, k) );
+                    - PhysConst::mu0 * jz(i, j, k, n) );
             }
 
         );
