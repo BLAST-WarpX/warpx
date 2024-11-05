@@ -143,8 +143,8 @@ void FiniteDifferenceSolver::ComputeDivECylindrical (
         Array4<Real> const& Ez = Efield[2]->array(mfi);
 
         // Extract stencil coefficients
-        Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
-        auto const n_coefs_r = static_cast<int>(m_stencil_coefs_r.size());
+        Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
+        auto const n_coefs_x = static_cast<int>(m_stencil_coefs_x.size());
         Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
         auto const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
 
@@ -163,15 +163,15 @@ void FiniteDifferenceSolver::ComputeDivECylindrical (
                 Real const r = rmin + i*dr; // r on a nodal grid (F is nodal in r)
                 if (r != 0) { // Off-axis, regular equations
                     divE(i, j, 0, 0) =
-                          T_Algo::DownwardDrr_over_r(Er, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
+                          T_Algo::DownwardDrr_over_r(Er, r, dr, coefs_x, n_coefs_x, i, j, 0, 0)
                         + T_Algo::DownwardDz(Ez, coefs_z, n_coefs_z, i, j, 0, 0);
                     for (int m=1 ; m<nmodes ; m++) { // Higher-order modes
                         divE(i, j, 0, 2*m-1) =
-                              T_Algo::DownwardDrr_over_r(Er, r, dr, coefs_r, n_coefs_r, i, j, 0, 2*m-1)
+                              T_Algo::DownwardDrr_over_r(Er, r, dr, coefs_x, n_coefs_x, i, j, 0, 2*m-1)
                             + m * Et( i, j, 0, 2*m )/r
                             + T_Algo::DownwardDz(Ez, coefs_z, n_coefs_z, i, j, 0, 2*m-1); // Real part
                         divE(i, j, 0, 2*m  ) =
-                              T_Algo::DownwardDrr_over_r(Er, r, dr, coefs_r, n_coefs_r, i, j, 0, 2*m)
+                              T_Algo::DownwardDrr_over_r(Er, r, dr, coefs_x, n_coefs_x, i, j, 0, 2*m)
                             - m * Et( i, j, 0, 2*m-1 )/r
                             + T_Algo::DownwardDz(Ez, coefs_z, n_coefs_z, i, j, 0, 2*m  ); // Imaginary part
                     }

@@ -93,19 +93,19 @@ void FiniteDifferenceSolver::EvolveE (
     // but we compile code for each algorithm, using templates)
 #ifdef WARPX_DIM_RZ
     if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee){
-        EvolveECylindrical <CylindricalYeeAlgorithm> ( Efield, Bfield, Jfield, edge_lengths, Ffield, lev, dt );
+        EvolveE <CylindricalYeeAlgorithm> ( Efield, Bfield, Jfield, edge_lengths, Ffield, lev, dt );
 #else
     if (m_grid_type == GridType::Collocated) {
 
-        EvolveECartesian <CartesianNodalAlgorithm> ( Efield, Bfield, Jfield, edge_lengths, Ffield, lev, dt );
+        EvolveE <CartesianNodalAlgorithm> ( Efield, Bfield, Jfield, edge_lengths, Ffield, lev, dt );
 
     } else if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee || m_fdtd_algo == ElectromagneticSolverAlgo::ECT) {
 
-        EvolveECartesian <CartesianYeeAlgorithm> ( Efield, Bfield, Jfield, edge_lengths, Ffield, lev, dt );
+        EvolveE <CartesianYeeAlgorithm> ( Efield, Bfield, Jfield, edge_lengths, Ffield, lev, dt );
 
     } else if (m_fdtd_algo == ElectromagneticSolverAlgo::CKC) {
 
-        EvolveECartesian <CartesianCKCAlgorithm> ( Efield, Bfield, Jfield, edge_lengths, Ffield, lev, dt );
+        EvolveE <CartesianCKCAlgorithm> ( Efield, Bfield, Jfield, edge_lengths, Ffield, lev, dt );
 
 #endif
     } else {
@@ -114,11 +114,8 @@ void FiniteDifferenceSolver::EvolveE (
 
 }
 
-
-#ifndef WARPX_DIM_RZ
-
 template<typename T_Algo>
-void FiniteDifferenceSolver::EvolveECartesian (
+void FiniteDifferenceSolver::EvolveE (
     ablastr::fields::VectorField const& Efield,
     ablastr::fields::VectorField const& Bfield,
     ablastr::fields::VectorField const& Jfield,
@@ -190,7 +187,7 @@ void FiniteDifferenceSolver::EvolveECartesian (
                 // Skip field push if this cell is fully covered by embedded boundaries
 #ifdef WARPX_DIM_3D
                 if (ly && ly(i,j,k) <= 0) { return; }
-#elif defined(WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                 //In XZ Ey is associated with a mesh node, so we need to check if the mesh node is covered
                 amrex::ignore_unused(ly);
                 if (lx && (lx(i, j, k)<=0 || lx(i-1, j, k)<=0 || lz(i, j-1, k)<=0 || lz(i, j, k)<=0)) { return; }
@@ -211,6 +208,15 @@ void FiniteDifferenceSolver::EvolveECartesian (
             }
 
         );
+
+#ifdef WARPX_DIM_RZ
+        // Place holder
+        amrex::ParallelFor(tey, m_ncomps,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) {
+                T_Algo::UpdateEthetaOnAxis(Ey, Ex, coefs_y, i, j, k, n);
+            }
+        );
+#endif
 
         // If F is not a null pointer, further update E using the grad(F) term
         // (hyperbolic correction for errors in charge conservation)
@@ -250,145 +256,3 @@ void FiniteDifferenceSolver::EvolveECartesian (
     }
 
 }
-
-#else // corresponds to ifndef WARPX_DIM_RZ
-
-template<typename T_Algo>
-void FiniteDifferenceSolver::EvolveECylindrical (
-    ablastr::fields::VectorField const& Efield,
-    ablastr::fields::VectorField const& Bfield,
-    ablastr::fields::VectorField const& Jfield,
-    ablastr::fields::VectorField const& edge_lengths,
-    amrex::MultiFab const* Ffield,
-    int lev, amrex::Real const dt ) {
-
-#ifndef AMREX_USE_EB
-    amrex::ignore_unused(edge_lengths);
-#endif
-
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
-    // Loop through the grids, and over the tiles within each grid
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-    for ( MFIter mfi(*Efield[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-        }
-        auto wt = static_cast<amrex::Real>(amrex::second());
-
-        // Extract field data for this grid/tile
-        Array4<Real> const& Er = Efield[0]->array(mfi);
-        Array4<Real> const& Et = Efield[1]->array(mfi);
-        Array4<Real> const& Ez = Efield[2]->array(mfi);
-        Array4<Real> const& Br = Bfield[0]->array(mfi);
-        Array4<Real> const& Bt = Bfield[1]->array(mfi);
-        Array4<Real> const& Bz = Bfield[2]->array(mfi);
-        Array4<Real> const& jr = Jfield[0]->array(mfi);
-        Array4<Real> const& jt = Jfield[1]->array(mfi);
-        Array4<Real> const& jz = Jfield[2]->array(mfi);
-
-        amrex::Array4<amrex::Real> lr, lz;
-        if (EB::enabled()) {
-            lr = edge_lengths[0]->array(mfi);
-            lz = edge_lengths[2]->array(mfi);
-        }
-
-        // Extract stencil coefficients
-        Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
-        Real const * const AMREX_RESTRICT coefs_t = m_stencil_coefs_t.dataPtr();
-        Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
-
-        // Extract tileboxes for which to loop
-        Box const& ter  = mfi.tilebox(Efield[0]->ixType().toIntVect());
-        Box const& tet  = mfi.tilebox(Efield[1]->ixType().toIntVect());
-        Box const& tez  = mfi.tilebox(Efield[2]->ixType().toIntVect());
-
-        Real const c2 = PhysConst::c * PhysConst::c;
-
-        // Loop over the cells and update the fields
-        amrex::ParallelFor(
-
-            ter, m_ncomps,
-            [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
-                // Skip field push if this cell is fully covered by embedded boundaries
-                if (lr && lr(i, j, 0) <= 0) { return; }
-
-                Er(i, j, k, n) += c2 * dt * (
-                    + T_Algo::Curl_Nodal_0(Bt, Bz, coefs_t, coefs_z, i, j, k, n)
-                    - PhysConst::mu0 * jr(i, j, k, n) );
-
-            },
-
-            tet, m_ncomps,
-            [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
-                // Skip field push if this cell is fully covered by embedded boundaries
-                // The Et field is at a node, so we need to check if the node is covered
-                if (lr && (lr(i, j, 0)<=0 || lr(i-1, j, 0)<=0 || lz(i, j-1, 0)<=0 || lz(i, j, 0)<=0)) { return; }
-
-                Et(i, j, k, n) += c2 * dt*(
-                    + T_Algo::Curl_Nodal_1(Bz, Br, coefs_z, coefs_r, i, j, k, n)
-                    - PhysConst::mu0 * jt(i, j, 0, n) );
-            },
-
-            tez, m_ncomps,
-            [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
-                // Skip field push if this cell is fully covered by embedded boundaries
-                if (lz && lz(i, j, 0) <= 0) { return; }
-
-                Ez(i, j, k, n) += c2 * dt*(
-                    + T_Algo::Curl_Nodal_2(Br, Bt, coefs_r, coefs_t, i, j, k, n)
-                    - PhysConst::mu0 * jz(i, j, 0, n) );
-            }
-
-        ); // end of loop over cells
-
-        // Place holder
-        amrex::ParallelFor(tet, m_ncomps,
-            [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) {
-                T_Algo::UpdateEthetaOnAxis(Et, Er, coefs_t, i, j, k, n);
-            }
-        );
-
-        // If F is not a null pointer, further update E using the grad(F) term
-        // (hyperbolic correction for errors in charge conservation)
-        if (Ffield) {
-
-            // Extract field data for this grid/tile
-            const Array4<Real const> F = Ffield->array(mfi);
-
-            // Loop over the cells and update the fields
-            amrex::ParallelFor(
-
-                ter, m_ncomps,
-                [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
-                    Er(i, j, k, n) += c2 * dt * T_Algo::Grad_cell_0(F, coefs_r, i, j, k, n);
-                },
-
-                tet, m_ncomps,
-                [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
-                    Et(i, j, k, n) += c2 * dt * T_Algo::Grad_cell_1(F, coefs_t, i, j, k, n);
-                },
-
-                tez, m_ncomps,
-                [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
-                    Ez(i, j, k, n) += c2 * dt * T_Algo::Grad_cell_2(F, coefs_z, i, j, k, n);
-                }
-
-            ); // end of loop over cells
-
-        } // end of if condition for F
-
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-            wt = static_cast<amrex::Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
-    } // end of loop over grid/tiles
-
-}
-
-#endif // corresponds to ifndef WARPX_DIM_RZ

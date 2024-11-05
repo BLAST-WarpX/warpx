@@ -412,8 +412,8 @@ void FiniteDifferenceSolver::EvolveBCylindrical (
         Array4<Real> const& Ez = Efield[2]->array(mfi);
 
         // Extract stencil coefficients
-        Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
-        auto const n_coefs_r = static_cast<int>(m_stencil_coefs_r.size());
+        Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
+        auto const n_coefs_x = static_cast<int>(m_stencil_coefs_x.size());
         Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
         auto const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
 
@@ -465,26 +465,26 @@ void FiniteDifferenceSolver::EvolveBCylindrical (
 
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
                 Bt(i, j, 0, 0) += dt*(
-                    T_Algo::UpwardDr(Ez, coefs_r, n_coefs_r, i, j, 0, 0)
+                    T_Algo::UpwardDr(Ez, coefs_x, n_coefs_x, i, j, 0, 0)
                     - T_Algo::UpwardDz(Er, coefs_z, n_coefs_z, i, j, 0, 0)); // Mode m=0
                 for (int m=1 ; m<nmodes ; m++) { // Higher-order modes
                     Bt(i, j, 0, 2*m-1) += dt*(
-                        T_Algo::UpwardDr(Ez, coefs_r, n_coefs_r, i, j, 0, 2*m-1)
+                        T_Algo::UpwardDr(Ez, coefs_x, n_coefs_x, i, j, 0, 2*m-1)
                         - T_Algo::UpwardDz(Er, coefs_z, n_coefs_z, i, j, 0, 2*m-1)); // Real part
                     Bt(i, j, 0, 2*m  ) += dt*(
-                        T_Algo::UpwardDr(Ez, coefs_r, n_coefs_r, i, j, 0, 2*m  )
+                        T_Algo::UpwardDr(Ez, coefs_x, n_coefs_x, i, j, 0, 2*m  )
                         - T_Algo::UpwardDz(Er, coefs_z, n_coefs_z, i, j, 0, 2*m  )); // Imaginary part
                 }
             },
 
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
                 Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bz is cell-centered in r)
-                Bz(i, j, 0, 0) += dt*( - T_Algo::UpwardDrr_over_r(Et, r, dr, coefs_r, n_coefs_r, i, j, 0, 0));
+                Bz(i, j, 0, 0) += dt*( - T_Algo::UpwardDrr_over_r(Et, r, dr, coefs_x, n_coefs_x, i, j, 0, 0));
                 for (int m=1 ; m<nmodes ; m++) { // Higher-order modes
                     Bz(i, j, 0, 2*m-1) += dt*( m * Er(i, j, 0, 2*m  )/r
-                        - T_Algo::UpwardDrr_over_r(Et, r, dr, coefs_r, n_coefs_r, i, j, 0, 2*m-1)); // Real part
+                        - T_Algo::UpwardDrr_over_r(Et, r, dr, coefs_x, n_coefs_x, i, j, 0, 2*m-1)); // Real part
                     Bz(i, j, 0, 2*m  ) += dt*(-m * Er(i, j, 0, 2*m-1)/r
-                        - T_Algo::UpwardDrr_over_r(Et, r, dr, coefs_r, n_coefs_r, i, j, 0, 2*m  )); // Imaginary part
+                        - T_Algo::UpwardDrr_over_r(Et, r, dr, coefs_x, n_coefs_x, i, j, 0, 2*m  )); // Imaginary part
                 }
             }
 

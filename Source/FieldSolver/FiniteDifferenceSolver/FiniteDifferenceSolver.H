@@ -185,40 +185,32 @@ class FiniteDifferenceSolver
 #ifdef WARPX_DIM_RZ
         amrex::Real m_dr, m_rmin;
         int m_nmodes;
-        // host-only
-        amrex::Vector<amrex::Real> m_h_stencil_coefs_r, m_h_stencil_coefs_t, m_h_stencil_coefs_z;
-        // device copy after init
-        amrex::Gpu::DeviceVector<amrex::Real> m_stencil_coefs_r;
-        amrex::Gpu::DeviceVector<amrex::Real> m_stencil_coefs_t;
-        amrex::Gpu::DeviceVector<amrex::Real> m_stencil_coefs_z;
-#else
+#endif
         // host-only
         amrex::Vector<amrex::Real> m_h_stencil_coefs_x, m_h_stencil_coefs_y, m_h_stencil_coefs_z;
         // device copy after init
         amrex::Gpu::DeviceVector<amrex::Real> m_stencil_coefs_x;
         amrex::Gpu::DeviceVector<amrex::Real> m_stencil_coefs_y;
         amrex::Gpu::DeviceVector<amrex::Real> m_stencil_coefs_z;
-#endif
 
     public:
         // The member functions below contain extended __device__ lambda.
         // In order to compile with nvcc, they need to be public.
+
+        template< typename T_Algo >
+        void EvolveE (
+            ablastr::fields::VectorField const& Efield,
+            ablastr::fields::VectorField const& Bfield,
+            ablastr::fields::VectorField const& Jfield,
+            ablastr::fields::VectorField const& edge_lengths,
+            amrex::MultiFab const* Ffield,
+            int lev, amrex::Real dt );
 
 #ifdef WARPX_DIM_RZ
         template< typename T_Algo >
         void EvolveBCylindrical (
             ablastr::fields::VectorField const& Bfield,
             ablastr::fields::VectorField const& Efield,
-            int lev,
-            amrex::Real dt );
-
-        template< typename T_Algo >
-        void EvolveECylindrical (
-            ablastr::fields::VectorField const& Efield,
-            ablastr::fields::VectorField const& Bfield,
-            ablastr::fields::VectorField const& Jfield,
-            ablastr::fields::VectorField const& edge_lengths,
-            amrex::MultiFab const* Ffield,
             int lev,
             amrex::Real dt );
 
@@ -262,15 +254,6 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField const& Bfield,
             ablastr::fields::VectorField const& Efield,
             amrex::MultiFab const * Gfield,
-            int lev, amrex::Real dt );
-
-        template< typename T_Algo >
-        void EvolveECartesian (
-            ablastr::fields::VectorField const& Efield,
-            ablastr::fields::VectorField const& Bfield,
-            ablastr::fields::VectorField const& Jfield,
-            ablastr::fields::VectorField const& edge_lengths,
-            amrex::MultiFab const* Ffield,
             int lev, amrex::Real dt );
 
         template< typename T_Algo >

@@ -47,21 +47,10 @@ FiniteDifferenceSolver::FiniteDifferenceSolver (
     m_rmin = WarpX::GetInstance().Geom(0).ProbLo(0);
     if (fdtd_algo == ElectromagneticSolverAlgo::Yee ||
         fdtd_algo == ElectromagneticSolverAlgo::HybridPIC ) {
+
         CylindricalYeeAlgorithm::InitializeStencilCoefficients( cell_size, m_rmin,
-            m_h_stencil_coefs_r, m_h_stencil_coefs_t, m_h_stencil_coefs_z );
-        m_stencil_coefs_r.resize(m_h_stencil_coefs_r.size());
-        m_stencil_coefs_t.resize(m_h_stencil_coefs_t.size());
-        m_stencil_coefs_z.resize(m_h_stencil_coefs_z.size());
-        amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
-                              m_h_stencil_coefs_r.begin(), m_h_stencil_coefs_r.end(),
-                              m_stencil_coefs_r.begin());
-        amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
-                              m_h_stencil_coefs_t.begin(), m_h_stencil_coefs_t.end(),
-                              m_stencil_coefs_t.begin());
-        amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
-                              m_h_stencil_coefs_z.begin(), m_h_stencil_coefs_z.end(),
-                              m_stencil_coefs_z.begin());
-        amrex::Gpu::synchronize();
+            m_h_stencil_coefs_x, m_h_stencil_coefs_y, m_h_stencil_coefs_z );
+
     } else {
         WARPX_ABORT_WITH_MESSAGE(
             "FiniteDifferenceSolver: Unknown algorithm");
@@ -88,6 +77,7 @@ FiniteDifferenceSolver::FiniteDifferenceSolver (
         WARPX_ABORT_WITH_MESSAGE(
             "FiniteDifferenceSolver: Unknown algorithm");
     }
+#endif
 
     m_stencil_coefs_x.resize(m_h_stencil_coefs_x.size());
     m_stencil_coefs_y.resize(m_h_stencil_coefs_y.size());
@@ -103,5 +93,4 @@ FiniteDifferenceSolver::FiniteDifferenceSolver (
                           m_h_stencil_coefs_z.begin(), m_h_stencil_coefs_z.end(),
                           m_stencil_coefs_z.begin());
     amrex::Gpu::synchronize();
-#endif
 }
