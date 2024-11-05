@@ -164,11 +164,8 @@ void FiniteDifferenceSolver::EvolveECartesian (
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
-        auto const n_coefs_x = static_cast<int>(m_stencil_coefs_x.size());
         Real const * const AMREX_RESTRICT coefs_y = m_stencil_coefs_y.dataPtr();
-        auto const n_coefs_y = static_cast<int>(m_stencil_coefs_y.size());
         Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
-        auto const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
 
         // Extract tileboxes for which to loop
         Box const& tex  = mfi.tilebox(Efield[0]->ixType().toIntVect());
@@ -176,18 +173,19 @@ void FiniteDifferenceSolver::EvolveECartesian (
         Box const& tez  = mfi.tilebox(Efield[2]->ixType().toIntVect());
 
         // Loop over the cells and update the fields
-        amrex::ParallelFor(tex, m_ncomps,
+        amrex::ParallelFor(
 
+            tex, m_ncomps,
             [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
                 // Skip field push if this cell is fully covered by embedded boundaries
                 if (lx && lx(i, j, k) <= 0) { return; }
 
-                Ex(i, j, k) += c2 * dt * (
+                Ex(i, j, k, n) += c2 * dt * (
                     + T_Algo::Curl_Nodal_0(By, Bz, coefs_y, coefs_z, i, j, k, n)
                     - PhysConst::mu0 * jx(i, j, k, n) );
             },
 
-        tey, m_ncomps,
+            tey, m_ncomps,
             [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
                 // Skip field push if this cell is fully covered by embedded boundaries
 #ifdef WARPX_DIM_3D
@@ -198,16 +196,16 @@ void FiniteDifferenceSolver::EvolveECartesian (
                 if (lx && (lx(i, j, k)<=0 || lx(i-1, j, k)<=0 || lz(i, j-1, k)<=0 || lz(i, j, k)<=0)) { return; }
 #endif
 
-                Ey(i, j, k) += c2 * dt * (
+                Ey(i, j, k, n) += c2 * dt * (
                     + T_Algo::Curl_Nodal_1(Bz, Bx, coefs_z, coefs_x, i, j, k, n)
                     - PhysConst::mu0 * jy(i, j, k) );
             },
 
-        tez, m_ncomps,
+            tez, m_ncomps,
             [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
                 // Skip field push if this cell is fully covered by embedded boundaries
                 if (lz && lz(i,j,k) <= 0) { return; }
-                Ez(i, j, k) += c2 * dt * (
+                Ez(i, j, k, n) += c2 * dt * (
                     + T_Algo::Curl_Nodal_2(Bx, By, coefs_x, coefs_y, i, j, k, n)
                     - PhysConst::mu0 * jz(i, j, k) );
             }
@@ -222,16 +220,21 @@ void FiniteDifferenceSolver::EvolveECartesian (
             const Array4<Real const> F = Ffield->array(mfi);
 
             // Loop over the cells and update the fields
-            amrex::ParallelFor(tex, tey, tez,
+            amrex::ParallelFor(
 
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    Ex(i, j, k) += c2 * dt * T_Algo::UpwardDx(F, coefs_x, n_coefs_x, i, j, k);
+                tex, m_ncomps,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
+                    Ex(i, j, k, n) += c2 * dt * T_Algo::Grad_cell_0(F, coefs_x, i, j, k, n);
                 },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    Ey(i, j, k) += c2 * dt * T_Algo::UpwardDy(F, coefs_y, n_coefs_y, i, j, k);
+
+                tey, m_ncomps,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
+                    Ey(i, j, k, n) += c2 * dt * T_Algo::Grad_cell_1(F, coefs_y, i, j, k, n);
                 },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    Ez(i, j, k) += c2 * dt * T_Algo::UpwardDz(F, coefs_z, n_coefs_z, i, j, k);
+
+                tez, m_ncomps,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
+                    Ez(i, j, k, n) += c2 * dt * T_Algo::Grad_cell_2(F, coefs_z, i, j, k, n);
                 }
 
             );
@@ -295,15 +298,8 @@ void FiniteDifferenceSolver::EvolveECylindrical (
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
-        auto const n_coefs_r = static_cast<int>(m_stencil_coefs_r.size());
         Real const * const AMREX_RESTRICT coefs_t = m_stencil_coefs_t.dataPtr();
         Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
-        auto const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
-
-        // Extract cylindrical specific parameters
-        Real const dr = m_dr;
-        int const nmodes = m_nmodes;
-        Real const rmin = m_rmin;
 
         // Extract tileboxes for which to loop
         Box const& ter  = mfi.tilebox(Efield[0]->ixType().toIntVect());
@@ -315,7 +311,8 @@ void FiniteDifferenceSolver::EvolveECylindrical (
         // Loop over the cells and update the fields
         amrex::ParallelFor(
 
-            ter, m_ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
+            ter, m_ncomps,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
                 // Skip field push if this cell is fully covered by embedded boundaries
                 if (lr && lr(i, j, 0) <= 0) { return; }
 
@@ -325,21 +322,23 @@ void FiniteDifferenceSolver::EvolveECylindrical (
 
             },
 
-            tet, m_ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
+            tet, m_ncomps,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
                 // Skip field push if this cell is fully covered by embedded boundaries
                 // The Et field is at a node, so we need to check if the node is covered
                 if (lr && (lr(i, j, 0)<=0 || lr(i-1, j, 0)<=0 || lz(i, j-1, 0)<=0 || lz(i, j, 0)<=0)) { return; }
 
-                Et(i, j, 0, 0) += c2 * dt*(
+                Et(i, j, k, n) += c2 * dt*(
                     + T_Algo::Curl_Nodal_1(Bz, Br, coefs_z, coefs_r, i, j, k, n)
                     - PhysConst::mu0 * jt(i, j, 0, n) );
             },
 
-            tez, m_ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
+            tez, m_ncomps,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
                 // Skip field push if this cell is fully covered by embedded boundaries
                 if (lz && lz(i, j, 0) <= 0) { return; }
 
-                Ez(i, j, 0, 0) += c2 * dt*(
+                Ez(i, j, k, n) += c2 * dt*(
                     + T_Algo::Curl_Nodal_2(Br, Bt, coefs_r, coefs_t, i, j, k, n)
                     - PhysConst::mu0 * jz(i, j, 0, n) );
             }
@@ -361,39 +360,21 @@ void FiniteDifferenceSolver::EvolveECylindrical (
             const Array4<Real const> F = Ffield->array(mfi);
 
             // Loop over the cells and update the fields
-            amrex::ParallelFor(ter, tet, tez,
+            amrex::ParallelFor(
 
-                [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                    Er(i, j, 0, 0) += c2 * dt * T_Algo::UpwardDr(F, coefs_r, n_coefs_r, i, j, 0, 0);
-                    for (int m=1; m<nmodes; m++) { // Higher-order modes
-                        Er(i, j, 0, 2*m-1) += c2 * dt * T_Algo::UpwardDr(F, coefs_r, n_coefs_r, i, j, 0, 2*m-1); // Real part
-                        Er(i, j, 0, 2*m  ) += c2 * dt * T_Algo::UpwardDr(F, coefs_r, n_coefs_r, i, j, 0, 2*m  ); // Imaginary part
-                    }
+                ter, m_ncomps,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
+                    Er(i, j, k, n) += c2 * dt * T_Algo::Grad_cell_0(F, coefs_r, i, j, k, n);
                 },
-                [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                    // Mode m=0: no update
-                    Real const r = rmin + i*dr; // r on a nodal grid (Et is nodal in r)
-                    if (r != 0){ // Off-axis, regular Maxwell equations
-                        for (int m=1; m<nmodes; m++) { // Higher-order modes
-                            Et(i, j, 0, 2*m-1) += c2 * dt *  m * F(i, j, 0, 2*m  )/r; // Real part
-                            Et(i, j, 0, 2*m  ) += c2 * dt * -m * F(i, j, 0, 2*m-1)/r; // Imaginary part
-                        }
-                    } else { // r==0: on-axis corrections
-                        // For m==1, F is linear in r, for small r
-                        // Therefore, the formula below regularizes the singularity
-                        if (nmodes >= 2) { // needs to have at least m=0 and m=1
-                            int const m=1;
-                            Et(i, j, 0, 2*m-1) += c2 * dt *  m * F(i+1, j, 0, 2*m  )/dr; // Real part
-                            Et(i, j, 0, 2*m  ) += c2 * dt * -m * F(i+1, j, 0, 2*m-1)/dr; // Imaginary part
-                        }
-                    }
+
+                tet, m_ncomps,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
+                    Et(i, j, k, n) += c2 * dt * T_Algo::Grad_cell_1(F, coefs_t, i, j, k, n);
                 },
-                [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                    Ez(i, j, 0, 0) += c2 * dt * T_Algo::UpwardDz(F, coefs_z, n_coefs_z, i, j, 0, 0);
-                    for (int m=1; m<nmodes; m++) { // Higher-order modes
-                        Ez(i, j, 0, 2*m-1) += c2 * dt * T_Algo::UpwardDz(F, coefs_z, n_coefs_z, i, j, 0, 2*m-1); // Real part
-                        Ez(i, j, 0, 2*m  ) += c2 * dt * T_Algo::UpwardDz(F, coefs_z, n_coefs_z, i, j, 0, 2*m  ); // Imaginary part
-                    }
+
+                tez, m_ncomps,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k, int n){
+                    Ez(i, j, k, n) += c2 * dt * T_Algo::Grad_cell_2(F, coefs_z, i, j, k, n);
                 }
 
             ); // end of loop over cells

@@ -326,6 +326,67 @@ struct CylindricalYeeAlgorithm {
         }
     }
 
+    /**
+     * Calculate the gradiant along x on a cell-centered grid, from a nodal field `F`*/
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real Grad_cell_0 (
+        amrex::Array4<amrex::Real const> const& F,
+        amrex::Real const * const coefs_x,
+        int const i, int const j, int const k, int const comp=0 ) {
+
+        return UpwardDr(F, coefs_x, 3, i, j, k, comp);
+
+    }
+
+    /**
+     * Calculate the gradiant along y on a cell-centered grid, from a nodal field `F`*/
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real Grad_cell_1 (
+        amrex::Array4<amrex::Real const> const& F,
+        amrex::Real const * const coefs_t,
+        int const i, int const j, int const k, int const comp=0 ) {
+
+        using namespace amrex::literals;
+
+        amrex::Real const dr = coefs_t[0];
+        amrex::Real const rmin = coefs_t[1];
+        amrex::Real const r = rmin + i*dr; // r on a nodal grid (Et is nodal in r)
+        if (r != 0) { // Off-axis, regular Maxwell equations
+            if (comp > 0) {
+                if ((comp % 2) == 1) {
+                    return (comp + 1._rt)/2._rt * F(i, j, k, comp+1)/r; // Real part
+                } else { // (comp % 2) == 0
+                    return -(comp)/2._rt * F(i, j, k, comp-1)/r; // Imaginary part
+                }
+            } else {
+                return 0._rt;
+            }
+        } else { // r==0: on-axis corrections
+            // For m==1, F is linear in r, for small r
+            // Therefore, the formula below regularizes the singularity
+            if (comp == 1) {
+                return F(i+1, j, k, 2)/dr; // Real part
+            } else if (comp == 2) {
+                return -F(i+1, j, k, 1)/dr; // Imaginary part
+            } else {
+                return 0._rt;
+            }
+        }
+
+    }
+
+    /**
+     * Calculate the gradiant along z on a cell-centered grid, from a nodal field `F`*/
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real Grad_cell_2 (
+        amrex::Array4<amrex::Real const> const& F,
+        amrex::Real const * const coefs_z,
+        int const i, int const j, int const k, int const comp=0 ) {
+
+        return UpwardDz(F, coefs_z, 1, i, j, k, comp);
+
+    }
+
 };
 
 #endif // WARPX_FINITE_DIFFERENCE_ALGORITHM_CYLINDRICAL_YEE_H_

@@ -343,6 +343,42 @@ struct CartesianCKCAlgorithm {
                 + DownwardDx(Fy, coefs_x, 6, i, j, k, ncomp));
     }
 
+    /**
+     * Calculate the gradiant along x on a cell-centered grid, from a nodal field `F`*/
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real Grad_cell_0 (
+        amrex::Array4<amrex::Real const> const& F,
+        amrex::Real const * const coefs_x,
+        int const i, int const j, int const k, int const ncomp=0 ) {
+
+        return UpwardDx(F, coefs_x, 6, i, j, k, ncomp);
+
+    }
+
+    /**
+     * Calculate the gradiant along y on a cell-centered grid, from a nodal field `F`*/
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real Grad_cell_1 (
+        amrex::Array4<amrex::Real const> const& F,
+        amrex::Real const * const coefs_y,
+        int const i, int const j, int const k, int const ncomp=0 ) {
+
+        return UpwardDy(F, coefs_y, 6, i, j, k, ncomp);
+
+    }
+
+    /**
+     * Calculate the gradiant along z on a cell-centered grid, from a nodal field `F`*/
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real Grad_cell_2 (
+        amrex::Array4<amrex::Real const> const& F,
+        amrex::Real const * const coefs_z,
+        int const i, int const j, int const k, int const ncomp=0 ) {
+
+        return UpwardDz(F, coefs_z, 6, i, j, k, ncomp);
+
+    }
+
 };
 
 #endif // WARPX_FINITE_DIFFERENCE_ALGORITHM_CARTESIAN_CKC_H_
