@@ -111,16 +111,3 @@ ax1.set_xlim(0, 18)
 ax1.set_title(f"Ion Landau damping - {sim.dim}d")
 plt.tight_layout()
 plt.savefig(f"diags/ion_Landau_damping_T_ratio_{sim.T_ratio}.png")
-
-if sim.test:
-    import os
-    import sys
-
-    sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-    from checksumAPI import evaluate_checksum
-
-    # compare checksums
-    evaluate_checksum(
-        test_name=os.path.split(os.getcwd())[1],
-        output_file=sys.argv[1],
-    )
