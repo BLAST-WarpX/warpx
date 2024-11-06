@@ -112,7 +112,7 @@ The wrapper provides access to the data via global indexing.
 Using standard array indexing with square brackets, the data can be accessed using indices that are relative to the full domain (across the MultiFab and across processors).
 For indices within the domain, values from valid cells are always returned. The ghost cells at the exterior of the domain are accessed using imagninary numbers, with negative values accessing the lower ghost cells, and positive the upper ghost cells.
 With multiple processors, when the data is fetched, the result is broadcast to all processors (and is a global operation).
-This example will return the ``Bz`` field at all points along ``x`` at the specified ``y`` and ``z`` indices.
+This example will return the ``Bz`` field at all valid interior points along ``x`` at the specified ``y`` and ``z`` indices.
 
 .. code-block:: python
 
