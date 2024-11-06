@@ -1051,19 +1051,23 @@ WarpX::InitLevelData (int lev, Real /*time*/)
     }
 }
 
-void WarpX::ComputeExternalFieldOnGridUsingParser (
-    warpx::fields::FieldType field,
+template<typename T>
+void ComputeExternalFieldOnGridUsingParser_template (
+    T field,
     amrex::ParserExecutor<4> const& fx_parser,
     amrex::ParserExecutor<4> const& fy_parser,
     amrex::ParserExecutor<4> const& fz_parser,
     int lev, PatchType patch_type, EB::CoverTopology topology)
 {
-    auto t = gett_new(lev);
+    auto &warpx = WarpX::GetInstance();
+    auto const &geom = warpx.Geom(lev);
 
-    auto dx_lev = geom[lev].CellSizeArray();
-    const RealBox& real_box = geom[lev].ProbDomain();
+    auto t = warpx.gett_new(lev);
 
-    amrex::IntVect refratio = (lev > 0 ) ? RefRatio(lev-1) : amrex::IntVect(1);
+    auto dx_lev = geom.CellSizeArray();
+    const RealBox& real_box = geom.ProbDomain();
+
+    amrex::IntVect refratio = (lev > 0 ) ? warpx.RefRatio(lev-1) : amrex::IntVect(1);
     if (patch_type == PatchType::coarse) {
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             dx_lev[idim] = dx_lev[idim] * refratio[idim];
@@ -1071,9 +1075,9 @@ void WarpX::ComputeExternalFieldOnGridUsingParser (
     }
 
     using ablastr::fields::Direction;
-    amrex::MultiFab* mfx = m_fields.get(field, Direction{0}, lev);
-    amrex::MultiFab* mfy = m_fields.get(field, Direction{1}, lev);
-    amrex::MultiFab* mfz = m_fields.get(field, Direction{2}, lev);
+    amrex::MultiFab* mfx = warpx.m_fields.get(field, Direction{0}, lev);
+    amrex::MultiFab* mfy = warpx.m_fields.get(field, Direction{1}, lev);
+    amrex::MultiFab* mfz = warpx.m_fields.get(field, Direction{2}, lev);
 
     const amrex::IntVect x_nodal_flag = mfx->ixType().toIntVect();
     const amrex::IntVect y_nodal_flag = mfy->ixType().toIntVect();
@@ -1170,6 +1174,31 @@ void WarpX::ComputeExternalFieldOnGridUsingParser (
     }
 }
 
+void WarpX::ComputeExternalFieldOnGridUsingParser (
+    warpx::fields::FieldType field,
+    amrex::ParserExecutor<4> const& fx_parser,
+    amrex::ParserExecutor<4> const& fy_parser,
+    amrex::ParserExecutor<4> const& fz_parser,
+    int lev, PatchType patch_type, EB::CoverTopology topology)
+{
+    ComputeExternalFieldOnGridUsingParser_template<warpx::fields::FieldType> (
+        field,
+        fx_parser, fy_parser, fz_parser,
+        lev, patch_type, topology);
+}
+
+void WarpX::ComputeExternalFieldOnGridUsingParser (
+    std::string const& field,
+    amrex::ParserExecutor<4> const& fx_parser,
+    amrex::ParserExecutor<4> const& fy_parser,
+    amrex::ParserExecutor<4> const& fz_parser,
+    int lev, PatchType patch_type, EB::CoverTopology topology)
+{
+    ComputeExternalFieldOnGridUsingParser_template<std::string const&> (
+        field,
+        fx_parser, fy_parser, fz_parser,
+        lev, patch_type, topology);
+}
 void WarpX::CheckGuardCells()
 {
     for (int lev = 0; lev <= max_level; ++lev)

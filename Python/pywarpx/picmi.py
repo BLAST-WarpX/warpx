@@ -1800,10 +1800,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Jx_external_function=None,
         Jy_external_function=None,
         Jz_external_function=None,
-        Ax_external_function=None,
-        Ay_external_function=None,
-        Az_external_function=None,
-        A_time_external_function=None,
+        A_external=None,
         **kw,
     ):
         self.grid = grid
@@ -1824,18 +1821,22 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
 
         self.add_external_fields = None
 
-        self.Ax_external_function = Ax_external_function
-        self.Ay_external_function = Ay_external_function
-        self.Az_external_function = Az_external_function
+        # It is expected that a nested dicitonary will be passed
+        # into picmi for each field that has different timings
+        # e.g. 
+        # A_external = {
+        #     '<field_name1>': {
+        #         'Ax_external_function': ...,
+        #         'Ax_external_function': ...,
+        #         'Ax_external_function': ...,
+        #         'A_time_external_function': ...
+        #     },
+        #     '<field_name2>: {...}'
+        # }
+        self.A_external = A_external
 
-        if (
-            Ax_external_function is not None
-            or Ay_external_function is not None
-            or Az_external_function is not None
-        ):
+        if (A_external is not None):
             self.add_external_fields = True
-
-        self.A_time_external_function = A_time_external_function
 
         # Handle keyword arguments used in expressions
         self.user_defined_kw = {}
@@ -1887,29 +1888,36 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         )
         pywarpx.hybridpicmodel.add_external_fields = self.add_external_fields
         pywarpx.external_vector_potential.__setattr__(
-            "Ax_external_grid_function(x,y,z)",
+            "fields",
             pywarpx.my_constants.mangle_expression(
-                self.Ax_external_function, self.mangle_dict
+                list(self.A_external.keys()), self.mangle_dict
             ),
         )
-        pywarpx.external_vector_potential.__setattr__(
-            "Ay_external_grid_function(x,y,z)",
-            pywarpx.my_constants.mangle_expression(
-                self.Ay_external_function, self.mangle_dict
-            ),
-        )
-        pywarpx.external_vector_potential.__setattr__(
-            "Az_external_grid_function(x,y,z)",
-            pywarpx.my_constants.mangle_expression(
-                self.Az_external_function, self.mangle_dict
-            ),
-        )
-        pywarpx.external_vector_potential.__setattr__(
-            "A_time_external_function(t)",
-            pywarpx.my_constants.mangle_expression(
-                self.A_time_external_function, self.mangle_dict
-            ),
-        )
+        for field_name, field_dict in self.A_external.items():
+            pywarpx.external_vector_potential.__setattr__(
+                f"{field_name}.Ax_external_grid_function(x,y,z)",
+                pywarpx.my_constants.mangle_expression(
+                    field_dict['Ax_external_function'], self.mangle_dict
+                ),
+            )
+            pywarpx.external_vector_potential.__setattr__(
+                f"{field_name}.Ay_external_grid_function(x,y,z)",
+                pywarpx.my_constants.mangle_expression(
+                    field_dict['Ay_external_function'], self.mangle_dict
+                ),
+            )
+            pywarpx.external_vector_potential.__setattr__(
+                f"{field_name}.Az_external_grid_function(x,y,z)",
+                pywarpx.my_constants.mangle_expression(
+                    field_dict['Az_external_function'], self.mangle_dict
+                ),
+            )
+            pywarpx.external_vector_potential.__setattr__(
+                f"{field_name}.A_time_external_function(t)",
+                pywarpx.my_constants.mangle_expression(
+                    field_dict['A_time_external_function'], self.mangle_dict
+                ),
+            )
 
 
 class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):

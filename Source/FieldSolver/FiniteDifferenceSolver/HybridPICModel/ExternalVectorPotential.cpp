@@ -28,17 +28,54 @@ ExternalVectorPotential::ReadParameters ()
 {
     const ParmParse pp_ext_A("external_vector_potential");
 
-    utils::parser::queryWithParser(pp_ext_A, "read_from_file", m_read_A_from_file);
+    pp_ext_A.queryarr("fields", m_field_names);
 
-    if (m_read_A_from_file) {
-        pp_ext_A.query("path", m_external_file_path);
-    } else {
-        pp_ext_A.query("Ax_external_grid_function(x,y,z)", m_Ax_ext_grid_function);
-        pp_ext_A.query("Ay_external_grid_function(x,y,z)", m_Ay_ext_grid_function);
-        pp_ext_A.query("Az_external_grid_function(x,y,z)", m_Az_ext_grid_function);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_field_names.empty(),
+        "No external field names defined in external_vector_potential.fields");
+
+    m_nFields = m_field_names.size();
+
+    // Resize vectors and set defaults
+    m_Ax_ext_grid_function.resize(m_nFields);
+    m_Ay_ext_grid_function.resize(m_nFields);
+    m_Az_ext_grid_function.resize(m_nFields);
+    for (std::string & field : m_Ax_ext_grid_function) field = "0.0";
+    for (std::string & field : m_Ay_ext_grid_function) field = "0.0";
+    for (std::string & field : m_Az_ext_grid_function) field = "0.0";
+
+    m_A_external_parser.resize(m_nFields);
+    m_A_external.resize(m_nFields);
+
+    m_A_ext_time_function.resize(m_nFields);
+    for (std::string & field_time : m_A_ext_time_function) field_time = "1.0";
+
+    m_A_external_time_parser.resize(m_nFields);
+    m_A_time_scale.resize(m_nFields);
+
+    m_read_A_from_file.resize(m_nFields);
+    m_external_file_path.resize(m_nFields);
+    for (std::string & file_name : m_external_file_path) file_name = "";
+
+    for (int i = 0; i < m_nFields; ++i) {
+        bool read_from_file = false;
+        utils::parser::queryWithParser(pp_ext_A,
+            (m_field_names[i]+".read_from_file").c_str(), read_from_file);
+        m_read_A_from_file[i] = read_from_file;
+
+        if (m_read_A_from_file[i]) {
+            pp_ext_A.query((m_field_names[i]+".path").c_str(), m_external_file_path[i]);
+        } else {
+            pp_ext_A.query((m_field_names[i]+".Ax_external_grid_function(x,y,z)").c_str(),
+                m_Ax_ext_grid_function[i]);
+            pp_ext_A.query((m_field_names[i]+".Ay_external_grid_function(x,y,z)").c_str(),
+                m_Ay_ext_grid_function[i]);
+            pp_ext_A.query((m_field_names[i]+".Az_external_grid_function(x,y,z)").c_str(),
+                m_Az_ext_grid_function[i]);
+        }
+
+        pp_ext_A.query((m_field_names[i]+".A_time_external_function(t)").c_str(),
+            m_A_ext_time_function[i]);
     }
-
-    pp_ext_A.query("A_time_external_function(t)", m_A_ext_time_function);
 }
 
 void
@@ -55,15 +92,29 @@ ExternalVectorPotential::AllocateLevelMFs (
     const IntVect& Bz_nodal_flag)
 {
     using ablastr::fields::Direction;
-    fields.alloc_init(FieldType::hybrid_A_fp_external, Direction{0},
-        lev, amrex::convert(ba, Ex_nodal_flag),
-        dm, ncomps, ngEB, 0.0_rt);
-    fields.alloc_init(FieldType::hybrid_A_fp_external, Direction{1},
-        lev, amrex::convert(ba, Ey_nodal_flag),
-        dm, ncomps, ngEB, 0.0_rt);
-    fields.alloc_init(FieldType::hybrid_A_fp_external, Direction{2},
-        lev, amrex::convert(ba, Ez_nodal_flag),
-        dm, ncomps, ngEB, 0.0_rt);
+    for (std::string const & field_name : m_field_names) {
+        std::string const Aext_field = field_name + std::string{"_Aext"};
+        fields.alloc_init(Aext_field, Direction{0},
+            lev, amrex::convert(ba, Ex_nodal_flag),
+            dm, ncomps, ngEB, 0.0_rt);
+        fields.alloc_init(Aext_field, Direction{1},
+            lev, amrex::convert(ba, Ey_nodal_flag),
+            dm, ncomps, ngEB, 0.0_rt);
+        fields.alloc_init(Aext_field, Direction{2},
+            lev, amrex::convert(ba, Ez_nodal_flag),
+            dm, ncomps, ngEB, 0.0_rt);
+        
+        std::string const curlAext_field = field_name + std::string{"_curlAext"};
+        fields.alloc_init(curlAext_field, Direction{0},
+            lev, amrex::convert(ba, Bx_nodal_flag),
+            dm, ncomps, ngEB, 0.0_rt);
+        fields.alloc_init(curlAext_field, Direction{1},
+            lev, amrex::convert(ba, By_nodal_flag),
+            dm, ncomps, ngEB, 0.0_rt);
+        fields.alloc_init(curlAext_field, Direction{2},
+            lev, amrex::convert(ba, Bz_nodal_flag),
+            dm, ncomps, ngEB, 0.0_rt);
+    }
     fields.alloc_init(FieldType::hybrid_E_fp_external, Direction{0},
         lev, amrex::convert(ba, Ex_nodal_flag),
         dm, ncomps, ngEB, 0.0_rt);
@@ -90,71 +141,97 @@ ExternalVectorPotential::InitData ()
     using ablastr::fields::Direction;
     auto& warpx = WarpX::GetInstance();
 
-    if (m_read_A_from_file) {
-        // Read A fields from file
-        for (auto lev = 0; lev <= warpx.finestLevel(); ++lev) {
+    for (int i = 0; i < m_nFields; ++i) {
+        
+        std::string const Aext_field = m_field_names[i] + std::string{"_Aext"};
+
+        if (m_read_A_from_file[i]) {
+            // Read A fields from file
+            for (auto lev = 0; lev <= warpx.finestLevel(); ++lev) {
 #if defined(WARPX_DIM_RZ)
-            warpx.ReadExternalFieldFromFile(m_external_file_path,
-                warpx.m_fields.get(FieldType::hybrid_A_fp_external, Direction{0}, lev),
-                "A", "r");
-            warpx.ReadExternalFieldFromFile(m_external_file_path,
-                warpx.m_fields.get(FieldType::hybrid_A_fp_external, Direction{1}, lev),
-                "A", "t");
-            warpx.ReadExternalFieldFromFile(m_external_file_path,
-                warpx.m_fields.get(FieldType::hybrid_A_fp_external, Direction{2}, lev),
-                "A", "z");
+                warpx.ReadExternalFieldFromFile(m_external_file_path[i],
+                    warpx.m_fields.get(Aext_field, Direction{0}, lev),
+                    "A", "r");
+                warpx.ReadExternalFieldFromFile(m_external_file_path[i],
+                    warpx.m_fields.get(Aext_field, Direction{1}, lev),
+                    "A", "t");
+                warpx.ReadExternalFieldFromFile(m_external_file_path[i],
+                    warpx.m_fields.get(Aext_field, Direction{2}, lev),
+                    "A", "z");
 #else
-            warpx.ReadExternalFieldFromFile(m_external_file_path,
-                warpx.m_fields.get(FieldType::hybrid_A_fp_external, Direction{0}, lev),
-                "A", "x");
-            warpx.ReadExternalFieldFromFile(m_external_file_path,
-                warpx.m_fields.get(FieldType::hybrid_A_fp_external, Direction{1}, lev),
-                "A", "y");
-            warpx.ReadExternalFieldFromFile(m_external_file_path,
-                warpx.m_fields.get(FieldType::hybrid_A_fp_external, Direction{2}, lev),
-                "A", "z");
+                warpx.ReadExternalFieldFromFile(m_external_file_path[i],
+                    warpx.m_fields.get(Aext_field, Direction{0}, lev),
+                    "A", "x");
+                warpx.ReadExternalFieldFromFile(m_external_file_path[i],
+                    warpx.m_fields.get(Aext_field, Direction{1}, lev),
+                    "A", "y");
+                warpx.ReadExternalFieldFromFile(m_external_file_path[i],
+                    warpx.m_fields.get(Aext_field, Direction{2}, lev),
+                    "A", "z");
 #endif
-        }
-    } else {
-        // Initialize the A fields from expression
-        m_A_external_parser[0] = std::make_unique<amrex::Parser>(
-            utils::parser::makeParser(m_Ax_ext_grid_function,{"x","y","z","t"}));
-        m_A_external_parser[1] = std::make_unique<amrex::Parser>(
-            utils::parser::makeParser(m_Ay_ext_grid_function,{"x","y","z","t"}));
-        m_A_external_parser[2] = std::make_unique<amrex::Parser>(
-            utils::parser::makeParser(m_Az_ext_grid_function,{"x","y","z","t"}));
-        m_A_external[0] = m_A_external_parser[0]->compile<4>();
-        m_A_external[1] = m_A_external_parser[1]->compile<4>();
-        m_A_external[2] = m_A_external_parser[2]->compile<4>();
+            }
+        } else {
+            // Initialize the A fields from expression
+            m_A_external_parser[i][0] = std::make_unique<amrex::Parser>(
+                utils::parser::makeParser(m_Ax_ext_grid_function[i],{"x","y","z","t"}));
+            m_A_external_parser[i][1] = std::make_unique<amrex::Parser>(
+                utils::parser::makeParser(m_Ay_ext_grid_function[i],{"x","y","z","t"}));
+            m_A_external_parser[i][2] = std::make_unique<amrex::Parser>(
+                utils::parser::makeParser(m_Az_ext_grid_function[i],{"x","y","z","t"}));
+            m_A_external[i][0] = m_A_external_parser[i][0]->compile<4>();
+            m_A_external[i][1] = m_A_external_parser[i][1]->compile<4>();
+            m_A_external[i][2] = m_A_external_parser[i][2]->compile<4>();
 
-        // check if the external current parsers depend on time
-        for (int i=0; i<3; i++) {
-            const std::set<std::string> A_ext_symbols = m_A_external_parser[i]->symbols();
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(A_ext_symbols.count("t") == 0,
-                "Externally Applied Vector potential time variation must be set with A_time_external_function(t)");
-        }
+            // check if the external current parsers depend on time
+            for (int idim=0; idim<3; idim++) {
+                const std::set<std::string> A_ext_symbols = m_A_external_parser[i][idim]->symbols();
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(A_ext_symbols.count("t") == 0,
+                    "Externally Applied Vector potential time variation must be set with A_time_external_function(t)");
+            }
 
-        // Initialize data onto grid
-        for (auto lev = 0; lev <= warpx.finestLevel(); ++lev) {
-            warpx.ComputeExternalFieldOnGridUsingParser(
-                FieldType::hybrid_A_fp_external,
-                m_A_external[0],
-                m_A_external[1],
-                m_A_external[2],
-                lev, PatchType::fine, EB::CoverTopology::none);
+            // Initialize data onto grid
+            for (auto lev = 0; lev <= warpx.finestLevel(); ++lev) {
+                warpx.ComputeExternalFieldOnGridUsingParser(
+                    Aext_field,
+                    m_A_external[i][0],
+                    m_A_external[i][1],
+                    m_A_external[i][2],
+                    lev, PatchType::fine, EB::CoverTopology::none);
 
-            for (int idir = 0; idir < 3; ++idir) {
-                warpx.m_fields.get(FieldType::hybrid_A_fp_external, Direction{idir}, lev)->
-                    FillBoundary(warpx.Geom(lev).periodicity());
+                for (int idir = 0; idir < 3; ++idir) {
+                    warpx.m_fields.get(Aext_field, Direction{idir}, lev)->
+                        FillBoundary(warpx.Geom(lev).periodicity());
+                }
             }
         }
+
+        amrex::Gpu::streamSynchronize();
+
+        // Compute the curl of at at max and store
+        std::string const curlAext_field = m_field_names[i] + std::string{"_curlAext"};
+
+        ablastr::fields::MultiLevelVectorField A_ext =
+            warpx.m_fields.get_mr_levels_alldirs(Aext_field, warpx.finestLevel());
+        ablastr::fields::MultiLevelVectorField curlA_ext =
+            warpx.m_fields.get_mr_levels_alldirs(curlAext_field, warpx.finestLevel());
+
+        for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+            warpx.get_pointer_fdtd_solver_fp(lev)->ComputeCurlA(
+                curlA_ext[lev],
+                A_ext[lev],
+                lev
+            );
+
+            ZeroFieldinEB(curlA_ext[lev], EB::CoverTopology::face, lev);
+            ZeroFieldinEB(A_ext[lev], EB::CoverTopology::edge, lev);
+        }
+
+        // Generate parser for time function
+        m_A_external_time_parser[i] = std::make_unique<amrex::Parser>(
+            utils::parser::makeParser(m_A_ext_time_function[i],{"t",}));
+        m_A_time_scale[i] = m_A_external_time_parser[i]->compile<1>();
+
     }
-
-    amrex::Gpu::streamSynchronize();
-
-    m_A_external_time_parser = std::make_unique<amrex::Parser>(
-        utils::parser::makeParser(m_A_ext_time_function,{"t",}));
-    m_A_time_scale = m_A_external_time_parser->compile<1>();
 
     UpdateHybridExternalFields(warpx.gett_new(0), warpx.getdt(0));
 }
@@ -204,40 +281,56 @@ ExternalVectorPotential::UpdateHybridExternalFields (const amrex::Real t, const 
     using ablastr::fields::Direction;
     auto& warpx = WarpX::GetInstance();
 
-    // Get B-field Scaling Factor
-    amrex::Real scale_factor_B = m_A_time_scale(t);
 
-    // Get dA/dt scaling factor based on time centered FD around t
-    amrex::Real sf_l = m_A_time_scale(t-0.5_rt*dt);
-    amrex::Real sf_r = m_A_time_scale(t+0.5_rt*dt);
-    amrex::Real scale_factor_E = -(sf_r - sf_l)/dt;
-
-    ablastr::fields::MultiLevelVectorField A_ext =
-        warpx.m_fields.get_mr_levels_alldirs(FieldType::hybrid_A_fp_external, warpx.finestLevel());
     ablastr::fields::MultiLevelVectorField B_ext =
         warpx.m_fields.get_mr_levels_alldirs(FieldType::hybrid_B_fp_external, warpx.finestLevel());
     ablastr::fields::MultiLevelVectorField E_ext =
         warpx.m_fields.get_mr_levels_alldirs(FieldType::hybrid_E_fp_external, warpx.finestLevel());
 
+    // Zero E and B external fields
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
-        warpx.get_pointer_fdtd_solver_fp(lev)->ComputeCurlA(
-            B_ext[lev],
-            A_ext[lev],
-            lev
-        );
-
         for (int idir = 0; idir < 3; ++idir) {
-            // Scale B field by the time factor
-            B_ext[lev][Direction{idir}]->mult(scale_factor_B);
-            B_ext[lev][Direction{idir}]->FillBoundary(warpx.Geom(lev).periodicity());
-
-            // Copy A into E and scale by the (-) derivative of the time function
-            E_ext[lev][Direction{idir}]->setVal(scale_factor_E);
-            amrex::MultiFab::Multiply(*E_ext[lev][Direction{idir}], *A_ext[lev][Direction{idir}], 0, 0, 1, 0);
-            E_ext[lev][Direction{idir}]->FillBoundary(warpx.Geom(lev).periodicity());
+            B_ext[lev][Direction{idir}]->setVal(0.0_rt);
+            E_ext[lev][Direction{idir}]->setVal(0.0_rt);
         }
-        ZeroFieldinEB(B_ext[lev], EB::CoverTopology::face, lev);
-        ZeroFieldinEB(E_ext[lev], EB::CoverTopology::edge, lev);
+    }
+
+    for (int i = 0; i < m_nFields; ++i) {
+        std::string const Aext_field = m_field_names[i] + std::string{"_Aext"};
+        std::string const curlAext_field = m_field_names[i] + std::string{"_curlAext"};
+
+        // Get B-field Scaling Factor
+        amrex::Real scale_factor_B = m_A_time_scale[i](t);
+
+        // Get dA/dt scaling factor based on time centered FD around t
+        amrex::Real sf_l = m_A_time_scale[i](t-0.5_rt*dt);
+        amrex::Real sf_r = m_A_time_scale[i](t+0.5_rt*dt);
+        amrex::Real scale_factor_E = -(sf_r - sf_l)/dt;
+
+        ablastr::fields::MultiLevelVectorField A_ext =
+            warpx.m_fields.get_mr_levels_alldirs(Aext_field, warpx.finestLevel());
+        ablastr::fields::MultiLevelVectorField curlA_ext =
+            warpx.m_fields.get_mr_levels_alldirs(curlAext_field, warpx.finestLevel());
+
+        for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+            for (int idir = 0; idir < 3; ++idir) {
+                // Scale A_ext by - \partial A / \partial t and add to E_ext
+                amrex::MultiFab::LinComb(
+                    *E_ext[lev][Direction{idir}],
+                    1.0_rt, *E_ext[lev][Direction{idir}], 0,
+                    scale_factor_E, *A_ext[lev][Direction{idir}], 0,
+                    0, 1, 0);
+                E_ext[lev][Direction{idir}]->FillBoundary(warpx.Geom(lev).periodicity());
+
+                // Scale curlA_ext by the t function and add to B_ext
+                amrex::MultiFab::LinComb(
+                    *B_ext[lev][Direction{idir}],
+                    1.0_rt, *B_ext[lev][Direction{idir}], 0,
+                    scale_factor_B, *curlA_ext[lev][Direction{idir}], 0,
+                    0, 1, 0);
+                B_ext[lev][Direction{idir}]->FillBoundary(warpx.Geom(lev).periodicity());
+            }
+        }
     }
     amrex::Gpu::streamSynchronize();
 }
