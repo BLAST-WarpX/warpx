@@ -1823,7 +1823,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
 
         # It is expected that a nested dicitonary will be passed
         # into picmi for each field that has different timings
-        # e.g. 
+        # e.g.
         # A_external = {
         #     '<field_name1>': {
         #         'Ax_external_function': ...,
@@ -1835,7 +1835,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         # }
         self.A_external = A_external
 
-        if (A_external is not None):
+        if A_external is not None:
             self.add_external_fields = True
 
         # Handle keyword arguments used in expressions
@@ -1897,25 +1897,25 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
             pywarpx.external_vector_potential.__setattr__(
                 f"{field_name}.Ax_external_grid_function(x,y,z)",
                 pywarpx.my_constants.mangle_expression(
-                    field_dict['Ax_external_function'], self.mangle_dict
+                    field_dict["Ax_external_function"], self.mangle_dict
                 ),
             )
             pywarpx.external_vector_potential.__setattr__(
                 f"{field_name}.Ay_external_grid_function(x,y,z)",
                 pywarpx.my_constants.mangle_expression(
-                    field_dict['Ay_external_function'], self.mangle_dict
+                    field_dict["Ay_external_function"], self.mangle_dict
                 ),
             )
             pywarpx.external_vector_potential.__setattr__(
                 f"{field_name}.Az_external_grid_function(x,y,z)",
                 pywarpx.my_constants.mangle_expression(
-                    field_dict['Az_external_function'], self.mangle_dict
+                    field_dict["Az_external_function"], self.mangle_dict
                 ),
             )
             pywarpx.external_vector_potential.__setattr__(
                 f"{field_name}.A_time_external_function(t)",
                 pywarpx.my_constants.mangle_expression(
-                    field_dict['A_time_external_function'], self.mangle_dict
+                    field_dict["A_time_external_function"], self.mangle_dict
                 ),
             )
 
