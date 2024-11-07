@@ -361,8 +361,8 @@ void FiniteDifferenceSolver::HybridPICSolveE (
         amrex::Abort(Utils::TextMsg::Err(
             "HybridSolveE: The hybrid-PIC electromagnetic solver algorithm must be used"));
     }
-    auto& warpx = WarpX::GetInstance();
-    warpx.ApplyEfieldBoundary(lev, PatchType::fine);
+    // auto& warpx = WarpX::GetInstance();
+    // warpx.ApplyEfieldBoundary(lev, PatchType::fine);
 }
 
 #ifdef WARPX_DIM_RZ
