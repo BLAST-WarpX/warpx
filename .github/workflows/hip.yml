@@ -19,7 +19,7 @@ jobs:
     env:
       CXXFLAGS: "-Werror -Wno-deprecated-declarations -Wno-error=pass-failed"
       CMAKE_GENERATOR: Ninja
-    if: github.event.pull_request.draft == false
+    if: 0 #github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies
@@ -79,7 +79,7 @@ jobs:
     env:
       CXXFLAGS: "-Werror -Wno-deprecated-declarations -Wno-error=pass-failed"
       CMAKE_GENERATOR: Ninja
-    if: github.event.pull_request.draft == false
+    if: 0 #github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies

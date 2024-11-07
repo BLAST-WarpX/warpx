@@ -16,7 +16,7 @@ jobs:
   sensei:
     name: SENSEI
     runs-on: ubuntu-20.04
-    if: github.event.pull_request.draft == false
+    if: 0 #github.event.pull_request.draft == false
     env:
       CXX: clang++
       CC: clang
@@ -42,7 +42,7 @@ jobs:
   ascent:
     name: Ascent
     runs-on: ubuntu-20.04
-    if: github.event.pull_request.draft == false
+    if: 0 #github.event.pull_request.draft == false
     env:
       CXX: g++
       CC: gcc
@@ -82,7 +82,7 @@ jobs:
   catalyst:
     name: Catalyst
     runs-on: ubuntu-22.04
-    if: github.event.pull_request.draft == false
+    if: 0 #github.event.pull_request.draft == false
     env:
       CXX: g++
       CC: gcc

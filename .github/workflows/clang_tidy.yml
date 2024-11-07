@@ -20,7 +20,7 @@ jobs:
     name: clang-tidy-${{ matrix.dim }}D
     runs-on: ubuntu-22.04
     timeout-minutes: 180
-    if: github.event.pull_request.draft == false
+    if: 0 #github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies

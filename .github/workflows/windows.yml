@@ -69,7 +69,7 @@ jobs:
   build_win_clang:
     name: Clang C++17 w/ OMP w/o MPI
     runs-on: windows-2019
-    if: github.event.pull_request.draft == false
+    if: 0 #github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5

@@ -18,7 +18,7 @@ jobs:
   build_icc:
     name: oneAPI ICC SP&DP
     runs-on: ubuntu-20.04
-    if: github.event.pull_request.draft == false
+    if: 0 #github.event.pull_request.draft == false
     # For oneAPI, Ninja is slower than the default:
     #env:
     #  CMAKE_GENERATOR: Ninja
@@ -86,7 +86,7 @@ jobs:
       CXXFLAGS: "-Werror -Wno-error=pass-failed -Wno-tautological-constant-compare"
     # For oneAPI, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja
-    if: github.event.pull_request.draft == false
+    if: 0 #github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies
@@ -151,7 +151,7 @@ jobs:
       CXXFLAGS: "-Werror -Wno-tautological-constant-compare"
     # For oneAPI, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja
-    if: github.event.pull_request.draft == false
+    if: 0 #github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies

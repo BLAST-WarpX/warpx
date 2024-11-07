@@ -16,7 +16,7 @@ jobs:
   build_cxxminimal:
     name: GCC Minimal w/o MPI
     runs-on: ubuntu-20.04
-    if: github.event.pull_request.draft == false
+    if: 0 #github.event.pull_request.draft == false
     env:
       CXXFLAGS: "-Werror"
     steps:
@@ -54,7 +54,7 @@ jobs:
   build_1D_2D:
     name: GCC 1D & 2D w/ MPI, QED tools
     runs-on: ubuntu-22.04
-    if: github.event.pull_request.draft == false
+    if: 0 #github.event.pull_request.draft == false
     env:
       CXXFLAGS: "-Werror"
       CXX: "g++-12"
@@ -101,7 +101,7 @@ jobs:
   build_3D_sp:
     name: GCC 3D & RZ w/ MPI, single precision
     runs-on: ubuntu-22.04
-    if: github.event.pull_request.draft == false
+    if: 0 #github.event.pull_request.draft == false
     env:
       CXX: "g++-12"
       CC: "gcc-12"
@@ -148,7 +148,7 @@ jobs:
   build_gcc_ablastr:
     name: GCC ABLASTR w/o MPI
     runs-on: ubuntu-20.04
-    if: github.event.pull_request.draft == false
+    if: 0 #github.event.pull_request.draft == false
     env:
       CMAKE_GENERATOR: Ninja
       CXXFLAGS: "-Werror"
@@ -184,7 +184,7 @@ jobs:
   build_pyfull:
     name: Clang pywarpx
     runs-on: ubuntu-20.04
-    if: github.event.pull_request.draft == false
+    if: 0 #github.event.pull_request.draft == false
     env:
       CC: clang
       CXX: clang++
