@@ -32,6 +32,8 @@ Covered::Covered (amrex::MFIter &mfi, int lev)
         auto edge_lengths = warpx.m_fields.get_alldirs(FieldType::edge_lengths, lev);
         auto face_areas = warpx.m_fields.get_alldirs(FieldType::face_areas, lev);
 
+        m_eb_enabled = true;
+
         lx = edge_lengths[0]->array(mfi);
         ly = edge_lengths[1]->array(mfi);
         lz = edge_lengths[2]->array(mfi);

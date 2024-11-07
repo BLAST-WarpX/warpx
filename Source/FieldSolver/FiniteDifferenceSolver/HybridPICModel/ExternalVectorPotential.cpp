@@ -93,7 +93,7 @@ ExternalVectorPotential::AllocateLevelMFs (
 {
     using ablastr::fields::Direction;
     for (std::string const & field_name : m_field_names) {
-        std::string const Aext_field = field_name + std::string{"_Aext"};
+        std::string Aext_field = field_name + std::string{"_Aext"};
         fields.alloc_init(Aext_field, Direction{0},
             lev, amrex::convert(ba, Ex_nodal_flag),
             dm, ncomps, ngEB, 0.0_rt);
@@ -104,7 +104,7 @@ ExternalVectorPotential::AllocateLevelMFs (
             lev, amrex::convert(ba, Ez_nodal_flag),
             dm, ncomps, ngEB, 0.0_rt);
         
-        std::string const curlAext_field = field_name + std::string{"_curlAext"};
+        std::string curlAext_field = field_name + std::string{"_curlAext"};
         fields.alloc_init(curlAext_field, Direction{0},
             lev, amrex::convert(ba, Bx_nodal_flag),
             dm, ncomps, ngEB, 0.0_rt);
@@ -143,7 +143,7 @@ ExternalVectorPotential::InitData ()
 
     for (int i = 0; i < m_nFields; ++i) {
         
-        std::string const Aext_field = m_field_names[i] + std::string{"_Aext"};
+        std::string Aext_field = m_field_names[i] + std::string{"_Aext"};
 
         if (m_read_A_from_file[i]) {
             // Read A fields from file
@@ -208,7 +208,7 @@ ExternalVectorPotential::InitData ()
         amrex::Gpu::streamSynchronize();
 
         // Compute the curl of at at max and store
-        std::string const curlAext_field = m_field_names[i] + std::string{"_curlAext"};
+        std::string curlAext_field = m_field_names[i] + std::string{"_curlAext"};
 
         ablastr::fields::MultiLevelVectorField A_ext =
             warpx.m_fields.get_mr_levels_alldirs(Aext_field, warpx.finestLevel());
@@ -222,8 +222,10 @@ ExternalVectorPotential::InitData ()
                 lev
             );
 
-            ZeroFieldinEB(curlA_ext[lev], EB::CoverTopology::face, lev);
-            ZeroFieldinEB(A_ext[lev], EB::CoverTopology::edge, lev);
+            for (int idir = 0; idir < 3; ++idir) {
+                warpx.m_fields.get(curlAext_field, Direction{idir}, lev)->
+                    FillBoundary(warpx.Geom(lev).periodicity());
+            }
         }
 
         // Generate parser for time function
@@ -320,14 +322,20 @@ ExternalVectorPotential::UpdateHybridExternalFields (const amrex::Real t, const 
                     1.0_rt, *E_ext[lev][Direction{idir}], 0,
                     scale_factor_E, *A_ext[lev][Direction{idir}], 0,
                     0, 1, 0);
-                E_ext[lev][Direction{idir}]->FillBoundary(warpx.Geom(lev).periodicity());
-
+                
                 // Scale curlA_ext by the t function and add to B_ext
                 amrex::MultiFab::LinComb(
                     *B_ext[lev][Direction{idir}],
                     1.0_rt, *B_ext[lev][Direction{idir}], 0,
                     scale_factor_B, *curlA_ext[lev][Direction{idir}], 0,
                     0, 1, 0);
+            }
+
+            ZeroFieldinEB(B_ext[lev], EB::CoverTopology::face, lev);
+            ZeroFieldinEB(E_ext[lev], EB::CoverTopology::edge, lev);
+
+            for (int idir = 0; idir < 3; ++idir) {
+                E_ext[lev][Direction{idir}]->FillBoundary(warpx.Geom(lev).periodicity());
                 B_ext[lev][Direction{idir}]->FillBoundary(warpx.Geom(lev).periodicity());
             }
         }

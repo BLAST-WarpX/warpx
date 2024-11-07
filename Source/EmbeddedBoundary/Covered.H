@@ -40,6 +40,10 @@ public:
     amrex::Dim3 lx_lo, lx_hi, lz_lo, lz_hi;
 #endif
 
+    // This state should be captured as part of this object and shipped
+    // to device via lambda capture.
+    bool m_eb_enabled = false;
+
     Covered (amrex::MFIter &mfi, int lev);
 
     // Can have topology of f or e for 'face' or 'edge'
@@ -53,57 +57,59 @@ public:
     {
 #ifdef AMREX_USE_EB
         bool is_covered = false;
-
-        switch (idir)
-        {
-        case 0:
+        
+        if (m_eb_enabled) {
+            switch (idir)
+            {
+            case 0:
 #ifdef WARPX_DIM_3D
-            if((topology==CoverTopology::edge and lx(i, j, k)<=0) or (topology==CoverTopology::face and Sx(i, j, k)<=0))
-            {
-                is_covered = true;
-            }
+                if((topology==CoverTopology::edge and lx(i, j, k)<=0) or (topology==CoverTopology::face and Sx(i, j, k)<=0))
+                {
+                    is_covered = true;
+                }
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-            //In XZ and RZ Ex is associated with a x-edge, while Bx is associated with a z-edge
-            if((topology==CoverTopology::edge and lx(i, j, k)<=0) or (topology==CoverTopology::face and lz(i, j, k)<=0))
-            {
-                is_covered = true;
-            }
+                //In XZ and RZ Ex is associated with a x-edge, while Bx is associated with a z-edge
+                if((topology==CoverTopology::edge and lx(i, j, k)<=0) or (topology==CoverTopology::face and lz(i, j, k)<=0))
+                {
+                    is_covered = true;
+                }
 #endif
-            break;
+                break;
 
-        case 1:
+            case 1:
 #ifdef WARPX_DIM_3D
-            if((topology==CoverTopology::edge and ly(i, j, k)<=0) or (topology==CoverTopology::face and Sy(i, j, k)<=0))
-            {
-                is_covered = true;
-            }
+                if((topology==CoverTopology::edge and ly(i, j, k)<=0) or (topology==CoverTopology::face and Sy(i, j, k)<=0))
+                {
+                    is_covered = true;
+                }
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-            //In XZ and RZ Ey is associated with a mesh node, so we need to check if  the mesh node is covered
-            if( (topology==CoverTopology::edge and (lx(std::min(i  , lx_hi.x), std::min(j  , lx_hi.y), k)<=0
-                            || lx(std::max(i-1, lx_lo.x), std::min(j  , lx_hi.y), k)<=0
-                            || lz(std::min(i  , lz_hi.x), std::min(j  , lz_hi.y), k)<=0
-                            || lz(std::min(i  , lz_hi.x), std::max(j-1, lz_lo.y), k)<=0)) or
-                (topology==CoverTopology::face and Sy(i,j,k)<=0))
-            {
-                is_covered = true;
-            }
+                //In XZ and RZ Ey is associated with a mesh node, so we need to check if  the mesh node is covered
+                if( (topology==CoverTopology::edge and (lx(std::min(i  , lx_hi.x), std::min(j  , lx_hi.y), k)<=0
+                                || lx(std::max(i-1, lx_lo.x), std::min(j  , lx_hi.y), k)<=0
+                                || lz(std::min(i  , lz_hi.x), std::min(j  , lz_hi.y), k)<=0
+                                || lz(std::min(i  , lz_hi.x), std::max(j-1, lz_lo.y), k)<=0)) or
+                    (topology==CoverTopology::face and Sy(i,j,k)<=0))
+                {
+                    is_covered = true;
+                }
 #endif
-            break;
+                break;
 
-        case 2:
+            case 2:
 #ifdef WARPX_DIM_3D
-            if((topology==CoverTopology::edge and lz(i, j, k)<=0) or (topology==CoverTopology::face and Sz(i, j, k)<=0))
-            {
-                is_covered = true;
-            }
+                if((topology==CoverTopology::edge and lz(i, j, k)<=0) or (topology==CoverTopology::face and Sz(i, j, k)<=0))
+                {
+                    is_covered = true;
+                }
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-            //In XZ and RZ Ez is associated with a z-edge, while Bz is associated with a x-edge
-            if((topology==CoverTopology::edge and lz(i, j, k)<=0) or (topology==CoverTopology::face and lx(i, j, k)<=0))
-            {
-                is_covered = true;
-            }
+                //In XZ and RZ Ez is associated with a z-edge, while Bz is associated with a x-edge
+                if((topology==CoverTopology::edge and lz(i, j, k)<=0) or (topology==CoverTopology::face and lx(i, j, k)<=0))
+                {
+                    is_covered = true;
+                }
 #endif
-            break;
+                break;
+            }
         }
         return is_covered;
 #else
