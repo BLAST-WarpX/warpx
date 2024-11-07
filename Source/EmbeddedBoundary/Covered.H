@@ -57,7 +57,7 @@ public:
     {
 #ifdef AMREX_USE_EB
         bool is_covered = false;
-        
+
         if (m_eb_enabled) {
             switch (idir)
             {

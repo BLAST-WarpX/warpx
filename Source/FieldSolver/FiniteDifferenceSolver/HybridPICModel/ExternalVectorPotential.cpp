@@ -322,7 +322,7 @@ ExternalVectorPotential::UpdateHybridExternalFields (const amrex::Real t, const 
                     1.0_rt, *E_ext[lev][Direction{idir}], 0,
                     scale_factor_E, *A_ext[lev][Direction{idir}], 0,
                     0, 1, 0);
-                
+
                 // Scale curlA_ext by the t function and add to B_ext
                 amrex::MultiFab::LinComb(
                     *B_ext[lev][Direction{idir}],
