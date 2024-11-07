@@ -68,7 +68,7 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
     // for the profiler
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
-    // reset Jfield
+    // reset Bfield
     Bfield[0]->setVal(0);
     Bfield[1]->setVal(0);
     Bfield[2]->setVal(0);
@@ -133,7 +133,7 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
                     Br(i, j, 0, 0) = 0.; // Mode m=0
                     for (int m=1; m<nmodes; m++) { // Higher-order modes
                         if (m == 1){
-                            // For m==1, Ez is linear in r, for small r
+                            // For m==1, Bz is linear in r, for small r
                             // Therefore, the formula below regularizes the singularity
                             Br(i, j, 0, 2*m-1) = - (
                                 T_Algo::UpwardDz(At, coefs_z, n_coefs_z, i, j, 0, 2*m-1)
@@ -269,6 +269,7 @@ void FiniteDifferenceSolver::ComputeCurlACartesian (
 
             // Bz calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                // Skip if this cell is fully covered by embedded boundaries
                 if (cov_ptr.isCovered(2, EB::CoverTopology::face, i, j, k)) { return; }
 
                 Bz(i, j, k) = (
