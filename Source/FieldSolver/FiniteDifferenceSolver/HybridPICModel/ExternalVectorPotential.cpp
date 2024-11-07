@@ -103,7 +103,7 @@ ExternalVectorPotential::AllocateLevelMFs (
         fields.alloc_init(Aext_field, Direction{2},
             lev, amrex::convert(ba, Ez_nodal_flag),
             dm, ncomps, ngEB, 0.0_rt);
-        
+
         std::string curlAext_field = field_name + std::string{"_curlAext"};
         fields.alloc_init(curlAext_field, Direction{0},
             lev, amrex::convert(ba, Bx_nodal_flag),
@@ -142,7 +142,7 @@ ExternalVectorPotential::InitData ()
     auto& warpx = WarpX::GetInstance();
 
     for (int i = 0; i < m_nFields; ++i) {
-        
+
         std::string Aext_field = m_field_names[i] + std::string{"_Aext"};
 
         if (m_read_A_from_file[i]) {
