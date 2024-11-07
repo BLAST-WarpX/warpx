@@ -676,7 +676,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 // Add resistivity only if E field value is used to update B
                 if (solve_for_Faraday) { Ez(i, j, 0) += eta(rho_val, jtot_val) * Jz(i, j, 0); }
 
-                if (include_hyper_resistivity_term && solve_for_Faraday) {
+                if (include_hyper_resistivity_term) {
                     auto nabla2Jz = T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, 0, 0);
                     Ez(i, j, 0) -= eta_h * nabla2Jz;
                 }
