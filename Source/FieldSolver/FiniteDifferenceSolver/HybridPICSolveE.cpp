@@ -863,9 +863,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
         Array4<Real> Ex_ext, Ey_ext, Ez_ext;
         if (include_external_fields) {
-        Ex_ext = Efield_external[0]->array(mfi);
-        Ey_ext = Efield_external[1]->array(mfi);
-        Ez_ext = Efield_external[2]->array(mfi);
+            Ex_ext = Efield_external[0]->array(mfi);
+            Ey_ext = Efield_external[1]->array(mfi);
+            Ez_ext = Efield_external[2]->array(mfi);
         }
 
         EB::Covered const& cov_ptr = EB::Covered(mfi, lev);
