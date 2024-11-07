@@ -1783,7 +1783,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
     Jx/y/z_external_function: str
         Function of space and time specifying external (non-plasma) currents.
 
-    Ex/y/z_external_function: str
+    Ax/y/z_external_function: str
         Function of space and time specifying external (non-plasma) E-fields.
     """
 
