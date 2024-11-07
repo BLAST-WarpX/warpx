@@ -94,7 +94,7 @@ mark_as_advanced(WarpX_TEST_FPETRAP)
 option(WarpX_TEST_DEBUG "Run CI tests with the -g compile option" OFF)
 mark_as_advanced(WarpX_TEST_DEBUG)
 if(WarpX_TEST_DEBUG)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g1")
 endif()
 
 set(WarpX_DIMS_VALUES 1 2 3 RZ)
