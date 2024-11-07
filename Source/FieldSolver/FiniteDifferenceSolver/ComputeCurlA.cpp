@@ -269,6 +269,7 @@ void FiniteDifferenceSolver::ComputeCurlACartesian (
 
             // Bz calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                // Skip if this cell is fully covered by embedded boundaries
                 if (cov_ptr.isCovered(2, EB::CoverTopology::face, i, j, k)) { return; }
 
                 Bz(i, j, k) = (
