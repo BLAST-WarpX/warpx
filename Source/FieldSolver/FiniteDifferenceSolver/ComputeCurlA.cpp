@@ -68,7 +68,7 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
     // for the profiler
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
-    // reset Jfield
+    // reset Bfield
     Bfield[0]->setVal(0);
     Bfield[1]->setVal(0);
     Bfield[2]->setVal(0);
