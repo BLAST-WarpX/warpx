@@ -65,7 +65,11 @@ WarpX::ComputeMagnetostaticField()
     // Fields have been reset in Electrostatic solver for this time step, these fields
     // are added into the B fields after electrostatic solve
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(this->max_level == 0, "Magnetostatic solver not implemented with mesh refinement.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(this->max_level == 0,
+        "Magnetostatic solver not implemented with mesh refinement.");
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(EB::enabled(),
+        "Magnetostatic Solver currently requires an embedded boundary.");
 
     AddMagnetostaticFieldLabFrame();
 }
@@ -128,7 +132,13 @@ WarpX::AddMagnetostaticFieldLabFrame()
     // const amrex::Real magnetostatic_absolute_tolerance = self_fields_absolute_tolerance*PhysConst::c;
     // temporary fix!!!
     const amrex::Real magnetostatic_absolute_tolerance = 0.0;
-    const amrex::Real self_fields_required_precision = 1e-12;
+    amrex::Real self_fields_required_precision;
+    if constexpr (std::is_same<Real, float>::value) {
+        self_fields_required_precision = 1e-5;
+    }
+    else {
+        self_fields_required_precision = 1e-11;
+    }
     const int self_fields_max_iters = 200;
     const int self_fields_verbosity = 2;
 
@@ -187,11 +197,16 @@ WarpX::computeVectorPotential (ablastr::fields::MultiLevelVectorField const& cur
     });
 
 #if defined(AMREX_USE_EB)
-    amrex::Vector<amrex::EBFArrayBoxFactory const *> factories;
-    for (int lev = 0; lev <= finest_level; ++lev) {
-        factories.push_back(&WarpX::fieldEBFactory(lev));
+    std::optional<amrex::Vector<amrex::EBFArrayBoxFactory const *> > eb_farray_box_factory;
+    auto &warpx = WarpX::GetInstance();
+
+    if (EB::enabled()) {
+        amrex::Vector<amrex::EBFArrayBoxFactory const *> factories;
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            factories.push_back(&warpx.fieldEBFactory(lev));
+        }
+        eb_farray_box_factory = factories;
     }
-    const std::optional<amrex::Vector<amrex::EBFArrayBoxFactory const *> > eb_farray_box_factory({factories});
 #else
     const std::optional<amrex::Vector<amrex::FArrayBoxFactory const *> > eb_farray_box_factory;
 #endif
