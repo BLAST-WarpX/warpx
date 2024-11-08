@@ -691,6 +691,11 @@ class DensityDistributionBase(object):
 class UniformFluxDistribution(
     picmistandard.PICMI_UniformFluxDistribution, DensityDistributionBase
 ):
+    def init(self, kw):
+        self.inject_from_embedded_boundary = kw.pop(
+            "warpx_inject_from_embedded_boundary", False
+        )
+
     def distribution_initialize_inputs(
         self, species_number, layout, species, density_scale, source_name
     ):
@@ -702,13 +707,22 @@ class UniformFluxDistribution(
         species.add_new_group_attr(source_name, "flux", self.flux)
         if density_scale is not None:
             species.add_new_group_attr(source_name, "flux", density_scale)
-        species.add_new_group_attr(
-            source_name, "flux_normal_axis", self.flux_normal_axis
-        )
-        species.add_new_group_attr(
-            source_name, "surface_flux_pos", self.surface_flux_position
-        )
-        species.add_new_group_attr(source_name, "flux_direction", self.flux_direction)
+
+        if not self.inject_from_embedded_boundary:
+            species.add_new_group_attr(
+                source_name, "flux_normal_axis", self.flux_normal_axis
+            )
+            species.add_new_group_attr(
+                source_name, "surface_flux_pos", self.surface_flux_position
+            )
+            species.add_new_group_attr(
+                source_name, "flux_direction", self.flux_direction
+            )
+        else:
+            species.add_new_group_attr(
+                source_name, "inject_from_embedded_boundary", True
+            )
+
         species.add_new_group_attr(source_name, "flux_tmin", self.flux_tmin)
         species.add_new_group_attr(source_name, "flux_tmax", self.flux_tmax)
 
@@ -1928,14 +1942,14 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
     warpx_self_fields_verbosity: integer, default=2
         Level of verbosity for the lab frame solver
 
-    warpx_dt_update_interval: string, optional (default = -1)
+    warpx_dt_update_interval: integer, optional (default = -1)
         How frequently the timestep is updated. Adaptive timestepping is disabled when this is <= 0.
 
     warpx_cfl: float, optional
-        Fraction of the CFL condition for particle velocity vs grid size, used to set the timestep when `dt_update_interval > 0`.
+        Fraction of the CFL condition for particle velocity vs grid size, used to set the timestep when `warpx_dt_update_interval > 0`.
 
     warpx_max_dt: float, optional
-        The maximum allowable timestep when `dt_update_interval > 0`.
+        The maximum allowable timestep when `warpx_dt_update_interval > 0`.
 
     """
 
@@ -1945,7 +1959,7 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         self.self_fields_verbosity = kw.pop("warpx_self_fields_verbosity", None)
         self.magnetostatic = kw.pop("warpx_magnetostatic", False)
         self.cfl = kw.pop("warpx_cfl", None)
-        self.dt_update_interval = kw.pop("dt_update_interval", None)
+        self.dt_update_interval = kw.pop("warpx_dt_update_interval", None)
         self.max_dt = kw.pop("warpx_max_dt", None)
 
     def solver_initialize_inputs(self):

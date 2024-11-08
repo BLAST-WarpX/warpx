@@ -8,12 +8,11 @@
 #define THETA_IMPLICIT_EM_H_
 
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
+#include "ImplicitSolver.H"
 
 #include <AMReX_Array.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
-
-#include "ImplicitSolver.H"
 
 /** @file
  *  Theta-implicit electromagnetic time solver class. This is a fully implicit
@@ -79,7 +78,7 @@ public:
                       int              a_nl_iter,
                       bool             a_from_jacobian ) override;
 
-    [[nodiscard]] amrex::Real theta () const { return m_theta; }
+    [[nodiscard]] amrex::Real theta () const override { return m_theta; }
 
 private:
 

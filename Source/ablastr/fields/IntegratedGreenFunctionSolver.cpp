@@ -120,7 +120,7 @@ computePhiIGF ( amrex::MultiFab const & rho,
     tmp_G.setVal(0);
 
     BL_PROFILE_VAR_START(timer_pcopies);
-    // Copy from rho including its ghost cells to tmp_rho
+    // Copy from rho to tmp_rho
     tmp_rho.ParallelCopy( rho, 0, 0, 1, amrex::IntVect::TheZeroVector(), amrex::IntVect::TheZeroVector() );
     BL_PROFILE_VAR_STOP(timer_pcopies);
 

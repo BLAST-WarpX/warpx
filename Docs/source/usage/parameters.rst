@@ -493,6 +493,37 @@ Domain Boundary Conditions
 
     * ``pec``: This option can be used to set a Perfect Electric Conductor at the simulation boundary. Please see the :ref:`PEC theory section <theory-bc-pec>` for more details. Note that PEC boundary is invalid at `r=0` for the RZ solver. Please use ``none`` option. This boundary condition does not work with the spectral solver.
 
+    * ``pec_insulator``: This option specifies a mixed perfect electric conductor and insulator boundary, where some part of the
+      boundary is PEC and some is insulator. In the insulator portion, the normal fields are extrapolated and the tangential fields
+      are either set to the specified value or extrapolated. The region that is insulator is specified using a spatially dependent expression with the insulator being in the area where the value of the expression is greater than zero.
+      The expressions are given for the low and high boundary on each axis, as listed below. The tangential fields are specified as
+      expressions that can depend on the location and time. The tangential fields are in two pairs, the electric fields and the
+      magnetic fields. In each pair, if one is specified, the other will be set to zero if not also specified.
+
+      * ``insulator.area_x_lo(y,z)``: For the lower x (or r) boundary, expression specifying the insulator location
+
+      * ``insulator.area_x_hi(y,z)``: For the upper x (or r) boundary, expression specifying the insulator location
+
+      * ``insulator.area_y_lo(x,z)``: For the lower y boundary, expression specifying the insulator location
+
+      * ``insulator.area_y_hi(x,z)``: For the upper y boundary, expression specifying the insulator location
+
+      * ``insulator.area_z_lo(x,y)``: For the lower z boundary, expression specifying the insulator location
+
+      * ``insulator.area_z_hi(x,y)``: For the upper z boundary, expression specifying the insulator location
+
+      * ``insulator.Ey_x_lo(y,z,t)``, ``insulator.Ez_x_lo(y,z,t)``, ``insulator.By_x_lo(y,z,t)``, ``insulator.Bz_x_lo(y,z,t)``: expressions of the tangential field values for the lower x (or r) boundary
+
+      * ``insulator.Ey_x_hi(y,z,t)``, ``insulator.Ez_x_hi(y,z,t)``, ``insulator.By_x_hi(y,z,t)``, ``insulator.Bz_x_hi(y,z,t)``: expressions of the tangential field values for the upper x (or r) boundary
+
+      * ``insulator.Ex_y_lo(x,z,t)``, ``insulator.Ez_y_lo(x,z,t)``, ``insulator.Bx_y_lo(x,z,t)``, ``insulator.Bz_y_lo(x,z,t)``: expressions of the tangential field values for the lower y boundary
+
+      * ``insulator.Ex_y_hi(x,z,t)``, ``insulator.Ez_y_hi(x,z,t)``, ``insulator.Bx_y_hi(x,z,t)``, ``insulator.Bz_y_hi(x,z,t)``: expressions of the tangential field values for the upper y boundary
+
+      * ``insulator.Ex_z_lo(x,y,t)``, ``insulator.Ey_z_lo(x,y,t)``, ``insulator.Bx_z_lo(x,y,t)``, ``insulator.By_z_lo(x,y,t)``: expressions of the tangential field values for the lower z boundary
+
+      * ``insulator.Ex_z_hi(x,y,t)``, ``insulator.Ey_z_hi(x,y,t)``, ``insulator.Bx_z_hi(x,y,t)``, ``insulator.By_z_hi(x,y,t)``: expressions of the tangential field values for the upper z boundary
+
     * ``none``: No boundary condition is applied to the fields with the electromagnetic solver. This option must be used for the RZ-solver at `r=0`.
 
     * ``neumann``: For the electrostatic multigrid solver, a Neumann boundary condition (with gradient of the potential equal to 0) will be applied on the specified boundary.
