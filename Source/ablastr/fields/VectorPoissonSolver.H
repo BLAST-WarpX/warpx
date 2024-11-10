@@ -140,7 +140,7 @@ computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > co
     // Loop over dimensions of A to solve each component individually
     for (int lev=0; lev<=finest_level; lev++) {
         amrex::LPInfo info;
-        
+
 #ifdef WARPX_DIM_RZ
         constexpr bool is_rz = true;
 #else
