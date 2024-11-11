@@ -9,14 +9,17 @@ from checksumAPI import evaluate_checksum
 
 
 def main(args):
-    # parse test name from test directory
+    # parse test name from test director
+    # (remove "_restart" suffix for restart tests)
     test_name = os.path.split(os.getcwd())[1]
+    test_name = test_name.replace("_restart", "")
     # compare checksums
     evaluate_checksum(
         test_name=test_name,
         output_file=args.path,
         output_format=args.format,
         rtol=args.rtol,
+        do_particles=(not args.skip_particles),
     )
 
 
@@ -48,6 +51,12 @@ if __name__ == "__main__":
         type=float,
         required=False,
         default=1e-9,
+    )
+    parser.add_argument(
+        "--skip-particles",
+        help="",
+        action="store_true",
+        dest="skip_particles",
     )
     # parse arguments
     args = parser.parse_args()

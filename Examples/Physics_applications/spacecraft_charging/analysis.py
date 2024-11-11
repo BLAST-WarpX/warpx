@@ -12,7 +12,6 @@ The test will check the curve fitting parameters v0 and tau defined
 by the following exponential function: phi(t)=v0(1-exp(-t/tau))
 """
 
-import os
 import sys
 
 import matplotlib.pyplot as plt
@@ -22,8 +21,6 @@ from openpmd_viewer import OpenPMDTimeSeries
 from scipy.optimize import curve_fit
 
 yt.funcs.mylog.setLevel(0)
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 filename = sys.argv[1]
 ts = OpenPMDTimeSeries(filename)
@@ -74,10 +71,3 @@ print("percentage error for tau = " + str(diff_tau * 100) + "%")
 assert (diff_v0 < tolerance_v0) and (
     diff_tau < tolerance_tau
 ), "Test spacecraft_charging did not pass"
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-    output_format="openpmd",
-)
