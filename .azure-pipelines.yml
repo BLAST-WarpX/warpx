@@ -77,7 +77,7 @@ jobs:
     displayName: Cache Python Libraries
 
   - bash: |
-      set -eu -o pipefail
+      set -o nounset errexit pipefail
       cat /proc/cpuinfo | grep "model name" | sort -u
       df -h
       echo 'Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/80-retries
@@ -146,25 +146,36 @@ jobs:
     displayName: 'Install dependencies'
 
   - bash: |
-      set -eu -o pipefail
+      # set options
+      set -o nounset errexit pipefail
+      # display disk space usage
       df -h
-
       # configure
       export AMReX_CMAKE_FLAGS="-DAMReX_ASSERTIONS=ON -DAMReX_TESTING=ON"
-      cmake -S . -B build       \
-        ${AMReX_CMAKE_FLAGS}    \
-        ${WARPX_CMAKE_FLAGS}    \
-        -DWarpX_TEST_CLEANUP=ON \
-        -DWarpX_TEST_FPETRAP=ON
-
+      export WARPX_TEST_FLAGS="-DWarpX_TEST_CLEANUP=ON -DWarpX_TEST_FPETRAP=ON -DWarpX_TEST_DEBUG=ON"
+      cmake -S . -B build    \
+        ${AMReX_CMAKE_FLAGS} \
+        ${WARPX_CMAKE_FLAGS} \
+        ${WARPX_TEST_FLAGS}
       # build
       cmake --build build -j 2
+      # display disk space usage
       df -h
     displayName: 'Build'
 
   - bash: |
-      set -eu -o pipefail
-
+      # set options
+      set -o nounset errexit pipefail
       # run tests (exclude pytest.AMReX when running Python tests)
       ctest --test-dir build --output-on-failure -E AMReX
     displayName: 'Test'
+
+  - bash: |
+      # set options
+      set -o nounset errexit pipefail
+      # find and print backtrace
+      find build/bin/ -type f -name "Backtrace*" \
+        -exec echo -e "\nBacktrace\n---------\n{}\n---------" \; \
+        -exec cat {} \;
+    displayName: 'Logs'
+    condition: always()

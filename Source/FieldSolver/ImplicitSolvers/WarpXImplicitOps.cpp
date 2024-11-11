@@ -52,7 +52,10 @@ WarpX::ImplicitPreRHSOp ( amrex::Real  a_cur_time,
                           bool         a_from_jacobian )
 {
     using namespace amrex::literals;
+    using warpx::fields::FieldType;
     amrex::ignore_unused( a_full_dt, a_nl_iter, a_from_jacobian );
+
+    if (use_filter) { ApplyFilterMF(m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level), 0); }
 
     // Advance the particle positions by 1/2 dt,
     // particle velocities by dt, then take average of old and new v,

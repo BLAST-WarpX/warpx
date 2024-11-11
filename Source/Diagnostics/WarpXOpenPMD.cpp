@@ -1226,6 +1226,8 @@ WarpXOpenPMDPlot::SetupFields ( openPMD::Container< openPMD::Mesh >& meshes,
     if (WarpX::do_dive_cleaning) {
         meshes.setAttribute("chargeCorrectionParameters", "period=1");
     }
+    // TODO set meta-data information for time-averaged quantities
+    // but we need information of the specific diagnostic in here
 }
 
 

@@ -34,6 +34,8 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
         m_warpx_ptr_defined = true;
     }
 
+    m_num_amr_levels = 1;
+
     m_vector_type_name = a_vector_type_name;
     m_scalar_type_name = a_scalar_type_name;
 
