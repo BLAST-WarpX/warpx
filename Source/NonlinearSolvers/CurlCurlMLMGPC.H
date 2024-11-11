@@ -18,7 +18,7 @@
 #include <AMReX_Array.H>
 #include <AMReX_Vector.H>
 #include <AMReX_MultiFab.H>
-#ifndef WARPX_DIM_1D_Z // currently not implemented in 1D
+#if (AMREX_SPACEDIM > 1) // currently not implemented in 1D
 #include <AMReX_MLLinOp.H>
 #include <AMReX_MLCurlCurl.H>
 #include <AMReX_MLMG.H>
@@ -132,7 +132,7 @@ class CurlCurlMLMGPC : public Preconditioner<T,Ops>
         amrex::IntVect m_gv;
 
 // currently not implemented in 1D
-#ifndef WARPX_DIM_1D_Z
+#if (AMREX_SPACEDIM > 1)
         amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> m_bc_lo;
         amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> m_bc_hi;
 
@@ -209,7 +209,7 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
     readParameters();
 
 // currently not implemented in 1D
-#ifdef WARPX_DIM_1D_Z
+#if (AMREX_SPACEDIM == 1)
     WARPX_ABORT_WITH_MESSAGE("CurlCurlMLMGPC not yet implemented for 1D");
 #else
     // create info object for curl-curl op
@@ -276,7 +276,7 @@ void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
     const RT beta = RT(1.0);
 
 // currently not implemented in 1D
-#ifndef WARPX_DIM_1D_Z
+#if (AMREX_SPACEDIM > 1)
     m_curl_curl->setScalars(alpha, beta);
 #endif
 
@@ -320,7 +320,7 @@ void CurlCurlMLMGPC<T,Ops>::Apply (T& a_x, const T& a_b)
     for (int n = 0; n < m_num_amr_levels; n++) {
 
         // Copy initial guess to local object
-#if defined(WARPX_DIM_1D_Z)
+#if (AMREX_SPACEDIM == 1)
         // Missing dimensions is x,y in WarpX and y,z in AMReX
         WARPX_ABORT_WITH_MESSAGE("CurlCurlMLMGPC not yet implemented for 1D");
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
@@ -341,7 +341,7 @@ void CurlCurlMLMGPC<T,Ops>::Apply (T& a_x, const T& a_b)
 #endif
 
 // currently not implemented in 1D
-#ifndef WARPX_DIM_1D_Z
+#if (AMREX_SPACEDIM > 1)
         m_curl_curl->prepareRHS({&rhs});
         if (m_use_gmres) {
             m_gmres_solver->solve(solution, rhs, m_rtol, m_atol);

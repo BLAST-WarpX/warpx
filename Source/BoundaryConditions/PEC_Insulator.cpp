@@ -128,7 +128,7 @@ namespace
                         field_value = ( (iside == -1) ? field_lo[idim] : field_hi[idim] );
                         set_field = ( (iside == -1) ? set_field_lo[idim]==1 : set_field_hi[idim]==1 );
 
-#if (defined WARPX_DIM_RZ)
+#if (defined WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                         if (idim == 0 && iside == +1) {
                             // Upper radial boundary
                             amrex::Real const rguard = ijk_vec[idim] + 0.5_rt*(1._rt - is_nodal[idim]);
@@ -139,10 +139,16 @@ namespace
                                 amrex::Real const rmirror = ijk_mirror[idim] + 0.5_rt*(1._rt - is_nodal[idim]);
                                 // Calculate radial scale factor
                                 sign *= rmirror/rguard;
+#if defined(WARPX_DIM_RSPHERE)
+                                sign *= rmirror/rguard;
+#endif
                             }
                             if (isInsulatorBoundary) {
                                 // Apply radial scale factor
                                 field_value *= dom_hi[idim]/rguard;
+#if defined(WARPX_DIM_RSPHERE)
+                                field_value *= dom_hi[idim]/rguard;
+#endif
                             }
                         }
 #endif
@@ -196,7 +202,7 @@ PEC_Insulator::PEC_Insulator ()
 
     amrex::ParmParse const pp_insulator("insulator");
 
-#if (AMREX_SPACEDIM > 1)
+#ifndef WARPX_DIM_1D_Z
     std::string str_area_x_lo = "0";
     std::string str_area_x_hi = "0";
     utils::parser::Query_parserString( pp_insulator, "area_x_lo(y,z)", str_area_x_lo);
@@ -271,17 +277,20 @@ PEC_Insulator::ApplyPEC_InsulatortoEfield (
     bool const E_like = true;
     ApplyPEC_InsulatortoField(Efield, field_boundary_lo, field_boundary_hi, ng_fieldgather, geom,
                               lev, patch_type, ref_ratios, time, split_pml_field,
-                              E_like,
-#if (AMREX_SPACEDIM > 1)
-                              m_set_E_x_lo, m_set_E_x_hi,
-                              m_Ey_x_lo, m_Ez_x_lo, m_Ey_x_hi, m_Ez_x_hi,
+                              E_like
+#ifndef WARPX_DIM_1D_Z
+                              , m_set_E_x_lo, m_set_E_x_hi,
+                              m_Ey_x_lo, m_Ez_x_lo, m_Ey_x_hi, m_Ez_x_hi
 #endif
 #if defined(WARPX_DIM_3D)
-                              m_set_E_y_lo, m_set_E_y_hi,
-                              m_Ex_y_lo, m_Ez_y_lo, m_Ex_y_hi, m_Ez_y_hi,
+                              , m_set_E_y_lo, m_set_E_y_hi,
+                              m_Ex_y_lo, m_Ez_y_lo, m_Ex_y_hi, m_Ez_y_hi
 #endif
-                              m_set_E_z_lo, m_set_E_z_hi,
-                              m_Ex_z_lo, m_Ey_z_lo, m_Ex_z_hi, m_Ey_z_hi);
+#if defined(WARPX_ZINDEX)
+                              , m_set_E_z_lo, m_set_E_z_hi,
+                              m_Ex_z_lo, m_Ey_z_lo, m_Ex_z_hi, m_Ey_z_hi
+#endif
+                              );
 }
 
 
@@ -298,17 +307,20 @@ PEC_Insulator::ApplyPEC_InsulatortoBfield (
     bool const split_pml_field = false;
     ApplyPEC_InsulatortoField(Bfield, field_boundary_lo, field_boundary_hi, ng_fieldgather, geom,
                               lev, patch_type, ref_ratios, time, split_pml_field,
-                              E_like,
-#if (AMREX_SPACEDIM > 1)
-                              m_set_B_x_lo, m_set_B_x_hi,
-                              m_By_x_lo, m_Bz_x_lo, m_By_x_hi, m_Bz_x_hi,
+                              E_like
+#ifndef WARPX_DIM_1D_Z
+                              , m_set_B_x_lo, m_set_B_x_hi,
+                              m_By_x_lo, m_Bz_x_lo, m_By_x_hi, m_Bz_x_hi
 #endif
 #if defined(WARPX_DIM_3D)
-                              m_set_B_y_lo, m_set_B_y_hi,
-                              m_Bx_y_lo, m_Bz_y_lo, m_Bx_y_hi, m_Bz_y_hi,
+                              , m_set_B_y_lo, m_set_B_y_hi,
+                              m_Bx_y_lo, m_Bz_y_lo, m_Bx_y_hi, m_Bz_y_hi
 #endif
-                              m_set_B_z_lo, m_set_B_z_hi,
-                              m_Bx_z_lo, m_By_z_lo, m_Bx_z_hi, m_By_z_hi);
+#if defined(WARPX_ZINDEX)
+                              , m_set_B_z_lo, m_set_B_z_hi,
+                              m_Bx_z_lo, m_By_z_lo, m_Bx_z_hi, m_By_z_hi
+#endif
+                              );
 }
 
 
@@ -321,20 +333,23 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
     int lev, PatchType patch_type, amrex::Vector<amrex::IntVect> const & ref_ratios,
     amrex::Real time,
     bool split_pml_field,
-    bool E_like,
-#if (AMREX_SPACEDIM > 1)
-    bool set_F_x_lo, bool set_F_x_hi,
+    bool E_like
+#ifndef WARPX_DIM_1D_Z
+    , bool set_F_x_lo, bool set_F_x_hi,
     std::unique_ptr<amrex::Parser> const & a_Fy_x_lo, std::unique_ptr<amrex::Parser> const & a_Fz_x_lo,
-    std::unique_ptr<amrex::Parser> const & a_Fy_x_hi, std::unique_ptr<amrex::Parser> const & a_Fz_x_hi,
+    std::unique_ptr<amrex::Parser> const & a_Fy_x_hi, std::unique_ptr<amrex::Parser> const & a_Fz_x_hi
 #endif
 #if defined(WARPX_DIM_3D)
-    bool set_F_y_lo, bool set_F_y_hi,
+    , bool set_F_y_lo, bool set_F_y_hi,
     std::unique_ptr<amrex::Parser> const & a_Fx_y_lo, std::unique_ptr<amrex::Parser> const & a_Fz_y_lo,
-    std::unique_ptr<amrex::Parser> const & a_Fx_y_hi, std::unique_ptr<amrex::Parser> const & a_Fz_y_hi,
+    std::unique_ptr<amrex::Parser> const & a_Fx_y_hi, std::unique_ptr<amrex::Parser> const & a_Fz_y_hi
 #endif
-    bool set_F_z_lo, bool set_F_z_hi,
+#if defined(WARPX_ZINDEX)
+    , bool set_F_z_lo, bool set_F_z_hi,
     std::unique_ptr<amrex::Parser> const & a_Fx_z_lo, std::unique_ptr<amrex::Parser> const & a_Fy_z_lo,
-    std::unique_ptr<amrex::Parser> const & a_Fx_z_hi, std::unique_ptr<amrex::Parser> const & a_Fy_z_hi)
+    std::unique_ptr<amrex::Parser> const & a_Fx_z_hi, std::unique_ptr<amrex::Parser> const & a_Fy_z_hi
+#endif
+    )
 {
     using namespace amrex::literals;
     amrex::Box domain_box = geom.Domain();
@@ -350,7 +365,7 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
         fbndry_hi[idim] = field_boundary_hi[idim];
     }
 
-#if (AMREX_SPACEDIM > 1)
+#ifndef WARPX_DIM_1D_Z
     amrex::ParserExecutor<2> const area_parsers_x_lo = m_insulator_area_lo[0]->compile<2>();
     amrex::ParserExecutor<2> const area_parsers_x_hi = m_insulator_area_hi[0]->compile<2>();
 #endif
@@ -358,10 +373,12 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
     amrex::ParserExecutor<2> const area_parsers_y_lo = m_insulator_area_lo[1]->compile<2>();
     amrex::ParserExecutor<2> const area_parsers_y_hi = m_insulator_area_hi[1]->compile<2>();
 #endif
+#if defined(WARPX_ZINDEX)
     amrex::ParserExecutor<2> const area_parsers_z_lo = m_insulator_area_lo[WARPX_ZINDEX]->compile<2>();
     amrex::ParserExecutor<2> const area_parsers_z_hi = m_insulator_area_hi[WARPX_ZINDEX]->compile<2>();
+#endif
 
-#if (AMREX_SPACEDIM > 1)
+#ifndef WARPX_DIM_1D_Z
     amrex::ParserExecutor<3> const Fy_x_lo_parser = a_Fy_x_lo->compile<3>();
     amrex::ParserExecutor<3> const Fz_x_lo_parser = a_Fz_x_lo->compile<3>();
     amrex::ParserExecutor<3> const Fy_x_hi_parser = a_Fy_x_hi->compile<3>();
@@ -373,10 +390,12 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
     amrex::ParserExecutor<3> const Fx_y_hi_parser = a_Fx_y_hi->compile<3>();
     amrex::ParserExecutor<3> const Fz_y_hi_parser = a_Fz_y_hi->compile<3>();
 #endif
+#if defined(WARPX_ZINDEX)
     amrex::ParserExecutor<3> const Fx_z_lo_parser = a_Fx_z_lo->compile<3>();
     amrex::ParserExecutor<3> const Fy_z_lo_parser = a_Fy_z_lo->compile<3>();
     amrex::ParserExecutor<3> const Fx_z_hi_parser = a_Fx_z_hi->compile<3>();
     amrex::ParserExecutor<3> const Fy_z_hi_parser = a_Fy_z_hi->compile<3>();
+#endif
 
     amrex::IntVect const Fx_nodal = field[0]->ixType().toIntVect();
     amrex::IntVect const Fy_nodal = field[1]->ixType().toIntVect();
@@ -426,10 +445,16 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                 amrex::ignore_unused(j, k);
 
                 amrex::IntVect const iv(AMREX_D_DECL(i, j, k));
+#if defined(WARPX_DIM_3D) || defined(WARPX_ZINDEX)
                 amrex::Real const x = (AMREX_SPACEDIM > 1 ? xyzmin_x.x + (iv[0] - lo_x[0])*dx[0] : 0._rt);
+#endif
                 amrex::Real const y = (AMREX_SPACEDIM == 3 ? xyzmin_x.y + (iv[1] - lo_x[1])*dx[1] : 0._rt);
-#if (AMREX_SPACEDIM > 1)
+#ifndef WARPX_DIM_1D_Z
+#if defined(WARPX_ZINDEX)
                 amrex::Real const z = xyzmin_x.z + (iv[WARPX_ZINDEX] - lo_x[WARPX_ZINDEX])*dx[2];
+#else
+                amrex::Real const z = 0._rt;
+#endif
 #endif
 
                 amrex::IntVect is_insulator_lo;
@@ -437,7 +462,7 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                 amrex::RealVect F_lo, F_hi;
                 amrex::IntVect set_field_lo;
                 amrex::IntVect set_field_hi;
-#if (AMREX_SPACEDIM > 1)
+#ifndef WARPX_DIM_1D_Z
                 is_insulator_lo[0] = (area_parsers_x_lo(y, z) > 0._rt);
                 is_insulator_hi[0] = (area_parsers_x_hi(y, z) > 0._rt);
                 F_lo[0] = 0._rt;  // Will be unused
@@ -453,12 +478,14 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                 set_field_lo[1] = set_F_y_lo;
                 set_field_hi[1] = set_F_y_hi;
 #endif
+#if defined(WARPX_ZINDEX)
                 is_insulator_lo[WARPX_ZINDEX] = (area_parsers_z_lo(x, y) > 0._rt);
                 is_insulator_hi[WARPX_ZINDEX] = (area_parsers_z_hi(x, y) > 0._rt);
                 F_lo[WARPX_ZINDEX] = (set_F_z_lo ? Fx_z_lo_parser(x, y, time) : 0._rt);
                 F_hi[WARPX_ZINDEX] = (set_F_z_hi ? Fx_z_hi_parser(x, y, time) : 0._rt);
                 set_field_lo[WARPX_ZINDEX] = set_F_z_lo;
                 set_field_hi[WARPX_ZINDEX] = set_F_z_hi;
+#endif
 
                 int const icomp = 0;
                 ::SetFieldOnPEC_Insulator(icomp, domain_lo, domain_hi, iv, n,
@@ -471,10 +498,16 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                 amrex::ignore_unused(j, k);
 
                 amrex::IntVect const iv(AMREX_D_DECL(i, j, k));
+#if defined(WARPX_DIM_3D) || defined(WARPX_ZINDEX)
                 amrex::Real const x = (AMREX_SPACEDIM > 1 ? xyzmin_y.x + (iv[0] - lo_y[0])*dx[0] : 0._rt);
+#endif
                 amrex::Real const y = (AMREX_SPACEDIM == 3 ? xyzmin_y.y + (iv[1] - lo_y[1])*dx[1] : 0._rt);
-#if (AMREX_SPACEDIM > 1)
+#ifndef WARPX_DIM_1D_Z
+#if defined(WARPX_ZINDEX)
                 amrex::Real const z = xyzmin_y.z + (iv[WARPX_ZINDEX] - lo_y[WARPX_ZINDEX])*dx[2];
+#else
+                amrex::Real const z = 0._rt;
+#endif
 #endif
 
                 amrex::IntVect is_insulator_lo;
@@ -482,7 +515,7 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                 amrex::RealVect F_lo, F_hi;
                 amrex::IntVect set_field_lo;
                 amrex::IntVect set_field_hi;
-#if (AMREX_SPACEDIM > 1)
+#ifndef WARPX_DIM_1D_Z
                 is_insulator_lo[0] = (area_parsers_x_lo(y, z) > 0._rt);
                 is_insulator_hi[0] = (area_parsers_x_hi(y, z) > 0._rt);
                 F_lo[0] = (set_F_x_lo ? Fy_x_lo_parser(y, z, time) : 0._rt);
@@ -498,12 +531,14 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                 set_field_lo[1] = 0;  // Will be unused
                 set_field_hi[1] = 0;  // Will be unused
 #endif
+#if defined(WARPX_ZINDEX)
                 is_insulator_lo[WARPX_ZINDEX] = (area_parsers_z_lo(x, y) > 0._rt);
                 is_insulator_hi[WARPX_ZINDEX] = (area_parsers_z_hi(x, y) > 0._rt);
                 F_lo[WARPX_ZINDEX] = (set_F_z_lo ? Fy_z_lo_parser(x, y, time) : 0._rt);
                 F_hi[WARPX_ZINDEX] = (set_F_z_hi ? Fy_z_hi_parser(x, y, time) : 0._rt);
                 set_field_lo[WARPX_ZINDEX] = set_F_z_lo;
                 set_field_hi[WARPX_ZINDEX] = set_F_z_hi;
+#endif
 
                 int const icomp = 1;
                 ::SetFieldOnPEC_Insulator(icomp, domain_lo, domain_hi, iv, n,
@@ -516,10 +551,16 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                 amrex::ignore_unused(j, k);
 
                 amrex::IntVect const iv(AMREX_D_DECL(i, j, k));
+#if defined(WARPX_DIM_3D) || defined(WARPX_ZINDEX)
                 amrex::Real const x = (AMREX_SPACEDIM > 1 ? xyzmin_z.x + (iv[0] - lo_z[0])*dx[0] : 0._rt);
+#endif
                 amrex::Real const y = (AMREX_SPACEDIM == 3 ? xyzmin_z.y + (iv[1] - lo_z[1])*dx[1] : 0._rt);
-#if (AMREX_SPACEDIM > 1)
+#ifndef WARPX_DIM_1D_Z
+#if defined(WARPX_ZINDEX)
                 amrex::Real const z = xyzmin_z.z + (iv[WARPX_ZINDEX] - lo_z[WARPX_ZINDEX])*dx[2];
+#else
+                amrex::Real const z = 0._rt;
+#endif
 #endif
 
                 amrex::IntVect is_insulator_lo;
@@ -527,7 +568,7 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                 amrex::RealVect F_lo, F_hi;
                 amrex::IntVect set_field_lo;
                 amrex::IntVect set_field_hi;
-#if (AMREX_SPACEDIM > 1)
+#ifndef WARPX_DIM_1D_Z
                 is_insulator_lo[0] = (area_parsers_x_lo(y, z) > 0._rt);
                 is_insulator_hi[0] = (area_parsers_x_hi(y, z) > 0._rt);
                 F_lo[0] = (set_F_x_lo ? Fz_x_lo_parser(y, z, time) : 0._rt);
@@ -543,12 +584,14 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                 set_field_lo[1] = set_F_y_lo;
                 set_field_hi[1] = set_F_y_hi;
 #endif
+#if defined(WARPX_ZINDEX)
                 is_insulator_lo[WARPX_ZINDEX] = (area_parsers_z_lo(x, y) > 0._rt);
                 is_insulator_hi[WARPX_ZINDEX] = (area_parsers_z_hi(x, y) > 0._rt);
                 F_lo[WARPX_ZINDEX] = 0._rt;  // Will be unused
                 F_hi[WARPX_ZINDEX] = 0._rt;  // Will be unused
                 set_field_lo[WARPX_ZINDEX] = 0;  // Will be unused
                 set_field_hi[WARPX_ZINDEX] = 0;  // Will be unused
+#endif
 
                 int const icomp = 2;
                 ::SetFieldOnPEC_Insulator(icomp, domain_lo, domain_hi, iv, n,
