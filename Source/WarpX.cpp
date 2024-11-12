@@ -488,6 +488,7 @@ WarpX::ReadParameters ()
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT && !EB::enabled()) {
             throw std::runtime_error("ECP Solver requires to enable embedded boundaries at runtime.");
         }
+        pp_algo.query_enum_sloppy("evolve_scheme", evolve_scheme, "-_");
     }
 
     {
@@ -705,6 +706,11 @@ WarpX::ReadParameters ()
         std::vector<std::string> dt_interval_vec = {"-1"};
         pp_warpx.queryarr("dt_update_interval", dt_interval_vec);
         dt_update_interval = utils::parser::IntervalsParser(dt_interval_vec);
+
+        // Filter defaults to true for the explicit scheme, and false for the implicit schemes
+        if (evolve_scheme != EvolveScheme::Explicit) {
+            use_filter = false;
+        }
 
         // Filter currently not working with FDTD solver in RZ geometry: turn OFF by default
         // (see https://github.com/ECP-WarpX/WarpX/issues/1943)
@@ -1113,7 +1119,6 @@ WarpX::ReadParameters ()
         pp_algo.query_enum_sloppy("current_deposition", current_deposition_algo, "-_");
         pp_algo.query_enum_sloppy("charge_deposition", charge_deposition_algo, "-_");
         pp_algo.query_enum_sloppy("particle_pusher", particle_pusher_algo, "-_");
-        pp_algo.query_enum_sloppy("evolve_scheme", evolve_scheme, "-_");
 
         // check for implicit evolve scheme
         if (evolve_scheme == EvolveScheme::SemiImplicitEM) {
