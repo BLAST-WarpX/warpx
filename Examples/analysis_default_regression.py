@@ -19,7 +19,7 @@ def main(args):
         output_file=args.path,
         output_format=args.format,
         rtol=args.rtol,
-        do_particles=(not args.skip_particles),
+        do_particles=args.do_particles,
     )
 
 
@@ -60,8 +60,10 @@ if __name__ == "__main__":
     )
     # parse arguments
     args = parser.parse_args()
-    # set args.format (not parsed)
+    # set args.format (based on args.plotfile and args.openpmd)
     args.format = "plotfile" if args.plotfile else "openpmd"
+    # set args.do_particles (based on args.skip_particles)
+    args.do_particles = False if args.skip_particles else True
     # TODO check environment and reset tolerance (portable, machine precision)
     # execute main function
     main(args)
