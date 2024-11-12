@@ -1,0 +1,98 @@
+#################################
+########## CONSTANTS ############
+#################################
+
+my_constants.n0 = 1.e30          # m^-3
+my_constants.nz = 40
+my_constants.Ti = 100.           # eV
+my_constants.Te = 100.           # eV
+my_constants.wpe = q_e*sqrt(n0/(m_e*epsilon0))
+my_constants.de0 = clight/wpe
+my_constants.nppcz = 10          # number of particles/cell in z
+my_constants.dt = 0.1/wpe        # s
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 20
+amr.n_cell = nz nz
+amr.max_grid_size = nz
+amr.max_level = 0
+geometry.dims = 2
+geometry.prob_lo = 0.0  0.0  # physical domain
+geometry.prob_hi = 10.0*de0  10.0*de0
+
+#################################
+####### Boundary condition ######
+#################################
+boundary.field_lo = periodic periodic
+boundary.field_hi = periodic periodic
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.serialize_initial_conditions = 1
+warpx.verbose = 1
+warpx.const_dt = dt
+#warpx.cfl = 0.5656
+warpx.use_filter = 0
+
+algo.maxwell_solver = psatd
+algo.evolve_scheme = strang_implicit_spectral_em
+implicit_evolve.nonlinear_solver = "picard"
+
+picard.verbose = true
+picard.max_iterations = 9
+picard.relative_tolerance = 0.0
+picard.absolute_tolerance = 0.0
+picard.require_convergence = false
+
+algo.particle_pusher = "boris"
+
+algo.particle_shape = 2
+algo.current_deposition = direct
+algo.charge_deposition = standard
+algo.field_gathering = energy-conserving
+interpolation.galerkin_scheme = 0
+
+psatd.periodic_single_box_fft = 1
+psatd.update_with_rho = 0
+
+#################################
+############ PLASMA #############
+#################################
+particles.species_names = electrons protons
+
+electrons.species_type = electron
+electrons.injection_style = "NUniformPerCell"
+electrons.num_particles_per_cell_each_dim = nppcz nppcz
+electrons.profile = constant
+electrons.density = n0
+electrons.momentum_distribution_type = gaussian
+electrons.ux_th = sqrt(Te*q_e/m_e)/clight
+electrons.uy_th = sqrt(Te*q_e/m_e)/clight
+electrons.uz_th = sqrt(Te*q_e/m_e)/clight
+
+protons.species_type = proton
+protons.injection_style = "NUniformPerCell"
+protons.num_particles_per_cell_each_dim = nppcz nppcz
+protons.profile = constant
+protons.density = n0
+protons.momentum_distribution_type = gaussian
+protons.ux_th = sqrt(Ti*q_e/m_p)/clight
+protons.uy_th = sqrt(Ti*q_e/m_p)/clight
+protons.uz_th = sqrt(Ti*q_e/m_p)/clight
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 20
+diag1.diag_type = Full
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho divE
+diag1.electrons.variables = x z w ux uy uz
+diag1.protons.variables = x z w ux uy uz
+
+warpx.reduced_diags_names = particle_energy field_energy
+particle_energy.type = ParticleEnergy
+particle_energy.intervals = 1
+field_energy.type = FieldEnergy
+field_energy.intervals = 1

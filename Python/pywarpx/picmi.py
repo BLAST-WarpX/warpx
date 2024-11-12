@@ -1894,14 +1894,14 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
     warpx_self_fields_verbosity: integer, default=2
         Level of verbosity for the lab frame solver
 
-    warpx_dt_update_interval: string, optional (default = -1)
+    warpx_dt_update_interval: integer, optional (default = -1)
         How frequently the timestep is updated. Adaptive timestepping is disabled when this is <= 0.
 
     warpx_cfl: float, optional
-        Fraction of the CFL condition for particle velocity vs grid size, used to set the timestep when `dt_update_interval > 0`.
+        Fraction of the CFL condition for particle velocity vs grid size, used to set the timestep when `warpx_dt_update_interval > 0`.
 
     warpx_max_dt: float, optional
-        The maximum allowable timestep when `dt_update_interval > 0`.
+        The maximum allowable timestep when `warpx_dt_update_interval > 0`.
 
     """
 
@@ -1911,7 +1911,7 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         self.self_fields_verbosity = kw.pop("warpx_self_fields_verbosity", None)
         self.magnetostatic = kw.pop("warpx_magnetostatic", False)
         self.cfl = kw.pop("warpx_cfl", None)
-        self.dt_update_interval = kw.pop("dt_update_interval", None)
+        self.dt_update_interval = kw.pop("warpx_dt_update_interval", None)
         self.max_dt = kw.pop("warpx_max_dt", None)
 
     def solver_initialize_inputs(self):

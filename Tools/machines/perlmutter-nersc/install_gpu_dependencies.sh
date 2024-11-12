@@ -177,7 +177,7 @@ python3 -m pip install --upgrade cupy-cuda12x  # CUDA 12 compatible wheel
 # optimas (based on libEnsemble & ax->botorch->gpytorch->pytorch)
 python3 -m pip install --upgrade torch  # CUDA 12 compatible wheel
 python3 -m pip install --upgrade optimas[all]
-
+python3 -m pip install --upgrade lasy
 
 # remove build temporary directory
 rm -rf ${build_dir}

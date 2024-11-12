@@ -7,6 +7,9 @@
 #ifndef JacobianFunctionMF_H_
 #define JacobianFunctionMF_H_
 
+#include "CurlCurlMLMGPC.H"
+#include <string>
+
 /**
  * \brief This is a linear function class for computing the action of a
  *  Jacobian on a vector using a matrix-free finite-difference method.
@@ -35,14 +38,18 @@ class JacobianFunctionMF
     inline
     void precond ( T& a_U, const T& a_X )
     {
-        if (m_usePreCond) { a_U.zero(); }
-        else { a_U.Copy(a_X); }
+        if (m_usePreCond) {
+            a_U.zero();
+            m_preCond->Apply(a_U, a_X);
+        } else {
+            a_U.Copy(a_X);
+        }
     }
 
     inline
     void updatePreCondMat ( const T&  a_X )
     {
-        amrex::ignore_unused(a_X);
+        if (m_usePreCond) { m_preCond->Update(a_X); }
     }
 
     inline
@@ -133,15 +140,25 @@ class JacobianFunctionMF
     void curTime ( RT a_time )
     {
         m_cur_time = a_time;
+        if (m_usePreCond) { m_preCond->CurTime(a_time); }
     }
 
     inline
     void curTimeStep ( RT a_dt )
     {
         m_dt = a_dt;
+        if (m_usePreCond) { m_preCond->CurTimeStep(a_dt); }
     }
 
-    void define( const T&, Ops* );
+    inline
+    void printParams () const
+    {
+        if (m_pc_type != PreconditionerType::none) {
+            m_preCond->printParameters();
+        }
+    }
+
+    void define( const T&, Ops*, const PreconditionerType& );
 
     private:
 
@@ -151,16 +168,18 @@ class JacobianFunctionMF
     RT m_epsJFNK = RT(1.0e-6);
     RT m_normY0;
     RT m_cur_time, m_dt;
-    std::string m_pc_type;
+
+    PreconditionerType m_pc_type = PreconditionerType::none;
 
     T m_Z, m_Y0, m_R0, m_R;
-    Ops* m_ops;
-
+    Ops* m_ops = nullptr;
+    std::unique_ptr<Preconditioner<T,Ops>> m_preCond = nullptr;
 };
 
 template <class T, class Ops>
-void JacobianFunctionMF<T,Ops>::define ( const T&  a_U,
-                                         Ops*      a_ops )
+void JacobianFunctionMF<T,Ops>::define ( const T& a_U,
+                                         Ops* a_ops,
+                                         const PreconditionerType& a_pc_type )
 {
     m_Z.Define(a_U);
     m_Y0.Define(a_U);
@@ -168,6 +187,20 @@ void JacobianFunctionMF<T,Ops>::define ( const T&  a_U,
     m_R.Define(a_U);
 
     m_ops = a_ops;
+
+    m_usePreCond = (a_pc_type != PreconditionerType::none);
+    if (m_usePreCond) {
+        m_pc_type = a_pc_type;
+        if (m_pc_type == PreconditionerType::pc_curl_curl_mlmg) {
+            m_preCond = std::make_unique<CurlCurlMLMGPC<T,Ops>>();
+        } else {
+            std::stringstream convergenceMsg;
+            convergenceMsg << "JacobianFunctionMF::define(): " << amrex::getEnumNameString(m_pc_type)
+                            << " is not a valid preconditioner type.";
+            WARPX_ABORT_WITH_MESSAGE(convergenceMsg.str());
+        }
+        m_preCond->Define(a_U, a_ops);
+    }
 
     m_is_defined = true;
 }

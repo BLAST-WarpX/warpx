@@ -51,6 +51,19 @@ void utils::parser::Store_parserString(
     }
 }
 
+bool utils::parser::Query_parserString(
+    amrex::ParmParse const& pp,
+    std::string const& query_string,
+    std::string& stored_string)
+{
+    bool const input_specified = pp.contains(query_string.c_str());
+    if (input_specified) {
+        stored_string.clear();
+        utils::parser::Store_parserString(pp, query_string, stored_string);
+    }
+    return input_specified;
+}
+
 int utils::parser::query (const amrex::ParmParse& a_pp, std::string const& group, char const * str, std::string& val)
 {
     const bool is_specified_without_group = a_pp.contains(str);
