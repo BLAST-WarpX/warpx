@@ -431,7 +431,7 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                 amrex::Real const shifty = (Fx_nodal[1] ? 0._rt : 0.5_rt);
                 amrex::Real const y = (AMREX_SPACEDIM == 3 ? xyzmin_x.y + (iv[1] - lo_x[1] + shifty)*dx[1] : 0._rt);
 #if (AMREX_SPACEDIM > 1)
-                amrex::Real const shiftz = (Fx_nodal[2] ? 0._rt : 0.5_rt);
+                amrex::Real const shiftz = (Fx_nodal[WARPX_ZINDEX] ? 0._rt : 0.5_rt);
                 amrex::Real const z = xyzmin_x.z + (iv[WARPX_ZINDEX] - lo_x[WARPX_ZINDEX] + shiftz)*dx[2];
 #endif
 
@@ -479,7 +479,7 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                 amrex::Real const shifty = (Fy_nodal[1] ? 0._rt : 0.5_rt);
                 amrex::Real const y = (AMREX_SPACEDIM == 3 ? xyzmin_y.y + (iv[1] - lo_y[1] + shifty)*dx[1] : 0._rt);
 #if (AMREX_SPACEDIM > 1)
-                amrex::Real const shiftz = (Fy_nodal[2] ? 0._rt : 0.5_rt);
+                amrex::Real const shiftz = (Fy_nodal[WARPX_ZINDEX] ? 0._rt : 0.5_rt);
                 amrex::Real const z = xyzmin_y.z + (iv[WARPX_ZINDEX] - lo_y[WARPX_ZINDEX] + shiftz)*dx[2];
 #endif
 
@@ -527,7 +527,7 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                 amrex::Real const shifty = (Fz_nodal[1] ? 0._rt : 0.5_rt);
                 amrex::Real const y = (AMREX_SPACEDIM == 3 ? xyzmin_z.y + (iv[1] - lo_z[1] + shifty)*dx[1] : 0._rt);
 #if (AMREX_SPACEDIM > 1)
-                amrex::Real const shiftz = (Fz_nodal[2] ? 0._rt : 0.5_rt);
+                amrex::Real const shiftz = (Fz_nodal[WARPX_ZINDEX] ? 0._rt : 0.5_rt);
                 amrex::Real const z = xyzmin_z.z + (iv[WARPX_ZINDEX] - lo_z[WARPX_ZINDEX] + shiftz)*dx[2];
 #endif
 
