@@ -27,7 +27,9 @@
  *      up^{n+1} = up^n + dt*qp/mp*(Ep^{n+1/2} + up^{n+1/2}/gammap^{n+1/2} x Bp^{n+1/2})
  *    Advance (Eg^n+1/2, Bg^n+1/2) -> (Eg^{n+1}, Bg^{n+1}) source free // E transverse
  *
- *  The algorithm is exactly energy conserving for.
+ *  The algorithm is exactly energy conserving only with a single box, periodic fft (psatd.periodic_single_box_fft = 1).
+ *  With multiple boxes, energy is not conserved since the ffts in each box assumes periodic in the box which
+ *  is not consistent with the current.
  *  The algorithm is numerially stable for any time step.
  *  I.e., the CFL condition for light waves does not
  *  have to be satisifed and the time step is not limited by the plasma period. However, how
