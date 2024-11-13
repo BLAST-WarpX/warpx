@@ -11,12 +11,7 @@ as the beam travels through the undulator, due to the Free-Electron-Laser instab
 The parameters of the simulation are taken from section 5.1 of :cite:t:`ex-Fallahi2020`.
 
 The simulation is performed in 1D, and uses the boosted-frame technique as described in
-<<<<<<< HEAD
-:cite:t:`ex-VayFELA2009` and :cite:t:`ex-VayFELB2009`, to reduce the computational cost of the simulation.
-(The Lorentz frame of the simulation is moving at the average speed of the beam in the undulator.)
-=======
 :cite:t:`ex-VayFELA2009` and :cite:t:`ex-VayFELB2009` to reduce the computational cost (the Lorentz frame of the simulation is moving at the average speed of the beam in the undulator).
->>>>>>> development
 Even though the simulation is run in this boosted frame, the results are reconstructed in the
 laboratory frame, using WarpX's ``BackTransformed`` diagnostic.
 
@@ -27,11 +22,7 @@ represent the physical electron beam, as discussed in :cite:t:`ex-VayFELB2009`.
 Run
 ---
 
-<<<<<<< HEAD
-For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with ``mpiexec -n 4 ...`` or ``srun -n 4 ...``, depending on the system.
-=======
 This example can be run with the WarpX executable using an input file: ``warpx.1d inputs_test_1d_fel``. For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with ``mpiexec -n 4 ...`` or ``srun -n 4 ...``, depending on the system.
->>>>>>> development
 
 .. literalinclude:: inputs_test_1d_fel
    :language: ini
@@ -40,12 +31,7 @@ This example can be run with the WarpX executable using an input file: ``warpx.1
 Visualize
 ---------
 
-<<<<<<< HEAD
-The figure below shows the results of the simulation. The left panel shows the exponential growth of the radiation
-along the undulator. (Note that the vertical scale is in log scale.) The right panel shows a snapshot of the simulation,
-=======
 The figure below shows the results of the simulation. The left panel shows the exponential growth of the radiation along the undulator (note that the vertical axis is plotted in log scale). The right panel shows a snapshot of the simulation,
->>>>>>> development
 1.6 m into the undulator. Microbunching of the beam is visible in the electron density (blue). One can also see the
 emitted FEL radiation (red) slipping ahead of the beam.
 
