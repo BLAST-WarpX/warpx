@@ -342,8 +342,6 @@ QdsmcParticleContainer::PushX (int lev, amrex::Real dt)
         });
     }
     // search for maximum part_dx/part_dy/part_dz and assert if larger than dx/dy/dz
-    // qdsmc particles should not move out of the cells were they are initialized on each step !!!
-    // which means that the i,j,k values are constant during the entire simulation
     // ...
     // ...
 
