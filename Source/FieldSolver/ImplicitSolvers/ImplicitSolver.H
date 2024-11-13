@@ -1,4 +1,4 @@
-/* Copyright 2024 Justin Angus
+/* Copyright 2024 Justin Angus, Debojyoti Ghosh
  *
  * This file is part of WarpX.
  *
@@ -9,9 +9,11 @@
 
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "NonlinearSolvers/NonlinearSolverLibrary.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 
 #include <AMReX_Array.H>
 #include <AMReX_REAL.H>
+#include <AMReX_LO_BCTYPES.H>
 
 /**
  * \brief Base class for implicit time solvers. The base functions are those
@@ -85,6 +87,16 @@ public:
                               int              a_nl_iter,
                               bool             a_from_jacobian ) = 0;
 
+    [[nodiscard]] virtual amrex::Real theta () const { return 1.0; }
+
+    [[nodiscard]] int numAMRLevels () const { return m_num_amr_levels; }
+
+    [[nodiscard]] const amrex::Geometry& GetGeometry (int) const;
+    [[nodiscard]] const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& GetFieldBoundaryLo () const;
+    [[nodiscard]] const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& GetFieldBoundaryHi () const;
+    [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> GetLinOpBCLo () const;
+    [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> GetLinOpBCHi () const;
+
 protected:
 
     /**
@@ -93,6 +105,11 @@ protected:
     WarpX* m_WarpX;
 
     bool m_is_defined = false;
+
+    /**
+     * \brief Number of AMR levels
+     */
+    int m_num_amr_levels = 1;
 
     /**
      * \brief Nonlinear solver type and object
@@ -139,6 +156,11 @@ protected:
         }
 
     }
+
+    /**
+     * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType
+     */
+    [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> convertFieldBCToLinOpBC ( const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& ) const;
 
 };
 

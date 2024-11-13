@@ -7,6 +7,7 @@
 
 #include <WarpX.H>
 // see WarpX.cpp - full includes for _fwd.H headers
+#include <BoundaryConditions/PEC_Insulator.H>
 #include <BoundaryConditions/PML.H>
 #include <Diagnostics/MultiDiagnostics.H>
 #include <Diagnostics/ReducedDiags/MultiReducedDiags.H>
