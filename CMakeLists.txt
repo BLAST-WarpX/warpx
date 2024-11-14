@@ -1,7 +1,7 @@
 # Preamble ####################################################################
 #
 cmake_minimum_required(VERSION 3.24.0)
-project(WarpX VERSION 24.10)
+project(WarpX VERSION 24.11)
 
 include(${WarpX_SOURCE_DIR}/cmake/WarpXFunctions.cmake)
 
@@ -89,6 +89,13 @@ mark_as_advanced(WarpX_TEST_CLEANUP)
 # Advanced option to run CI tests with FPE-trapping runtime parameters
 option(WarpX_TEST_FPETRAP "Run CI tests with FPE-trapping runtime parameters" OFF)
 mark_as_advanced(WarpX_TEST_FPETRAP)
+
+# Advanced option to run CI tests with the -g compile option
+option(WarpX_TEST_DEBUG "Run CI tests with the -g compile option" OFF)
+mark_as_advanced(WarpX_TEST_DEBUG)
+if(WarpX_TEST_DEBUG)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g1")
+endif()
 
 set(WarpX_DIMS_VALUES 1 2 3 RZ)
 set(WarpX_DIMS 3 CACHE STRING "Simulation dimensionality <1;2;3;RZ>")

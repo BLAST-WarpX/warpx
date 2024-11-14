@@ -33,6 +33,7 @@ AMREX_ENUM(EvolveScheme,
            Explicit,
            ThetaImplicitEM,
            SemiImplicitEM,
+           StrangImplicitSpectralEM,
            Default = Explicit);
 
 /**
@@ -133,6 +134,7 @@ AMREX_ENUM(FieldBoundaryType,
            Open,    // Used in the Integrated Green Function Poisson solver
                     // Note that the solver implicitely assumes open BCs:
                     // no need to enforce them separately
+           PECInsulator, // Mixed boundary with PEC and insulator
            Default = PML);
 
 /** Particle boundary conditions at the domain boundary

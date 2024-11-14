@@ -93,6 +93,14 @@ Overall simulation parameters
       The PS-JFNK method is described in `Angus et al., An implicit particle code with exact energy and charge conservation for electromagnetic studies of dense plasmas <https://doi.org/10.1016/j.jcp.2023.112383>`__ . (The version implemented in WarpX is an updated version that includes the relativistic gamma factor for the particles.) Also see `Chen et al., An energy- and charge-conserving, implicit, electrostatic particle-in-cell algorithm. <https://doi.org/10.1016/j.jcp.2011.05.031>`__ .
       Exact energy conservation requires that the interpolation stencil used for the field gather match that used for the current deposition. ``algo.current_deposition = direct`` must be used with ``interpolation.galerkin_scheme = 0``, and ``algo.current_deposition = Esirkepov`` must be used with ``interpolation.galerkin_scheme = 1``. If using ``algo.current_deposition = villasenor``, the corresponding field gather routine will automatically be selected and the ``interpolation.galerkin_scheme`` flag does not need to be specified. The Esirkepov and villasenor deposition schemes are charge-conserving.
 
+    * ``strang_implicit_spectral_em``: Use a fully implicit electromagnetic solver. All of the comments for ``theta_implicit_em``
+      above apply here as well (except that theta is fixed to 0.5 and that charge will not be conserved).
+      In this version, the advance is Strang split, with a half advance of the source free Maxwell's equation (with a spectral solver), a full advance of the particles plus longitudinal E field, and a second half advance of the source free Maxwell's equations.
+      The advantage of this method is that with the Spectral advance of the fields, it is dispersionless.
+      Note that exact energy convergence is achieved only with one grid block and ``psatd.periodic_single_box_fft == 1``. Otherwise,
+      the energy convservation is spoiled because of the inconsistency of the periodic assumption of the spectral solver and the
+      non-periodic behavior of the individual blocks.
+
     * ``semi_implicit_em``: Use an approximately energy conserving semi-implicit electromagnetic solver. Choices for the nonlinear solver include a Picard iteration scheme and particle-suppressed JFNK.
       Note that this method has the CFL limitation :math:`\Delta t < c/\sqrt( \sum_i 1/\Delta x_i^2 )`. The Picard solver for this method can only be expected to work well when :math:`\omega_{pe} \Delta t` is less than one.
       The method is described in `Chen et al., A semi-implicit, energy- and charge-conserving particle-in-cell algorithm for the relativistic Vlasov-Maxwell equations <https://doi.org/10.1016/j.jcp.2020.109228>`__.
@@ -105,16 +113,16 @@ Overall simulation parameters
     exactly energy conserving, but the solver may perform better.
 
 * ``implicit_evolve.nonlinear_solver`` (`string`, default: None)
-    When `algo.evolve_scheme` is either `theta_implicit_em` or `semi_implicit_em`, this sets the nonlinear solver used
+    When `algo.evolve_scheme` is either `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em`, this sets the nonlinear solver used
     to advance the field-particle system in time. Options are `picard` or `newton`.
 
 * ``implicit_evolve.max_particle_iterations`` (`integer`, default: 21)
-    When `algo.evolve_scheme` is either `theta_implicit_em` or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton`
+    When `algo.evolve_scheme` is either `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton`
     , this sets the maximum number of iterations for the method used to obtain a self-consistent update of the particles at
     each iteration in the JFNK process.
 
 * ``implicit_evolve.particle_tolerance`` (`float`, default: 1.e-10)
-    When `algo.evolve_scheme` is either `theta_implicit_em` or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton`
+    When `algo.evolve_scheme` is either `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton`
     , this sets the relative tolerance for the iterative method used to obtain a self-consistent update of the particles at
     each iteration in the JFNK process.
 
@@ -509,6 +517,37 @@ Domain Boundary Conditions
     * ``damped``: This is the recommended option in the moving direction when using the spectral solver with moving window (currently only supported along z). This boundary condition applies a damping factor to the electric and magnetic fields in the outer half of the guard cells, using a sine squared profile. As the spectral solver is by nature periodic, the damping prevents fields from wrapping around to the other end of the domain when the periodicity is not desired. This boundary condition is only valid when using the spectral solver.
 
     * ``pec``: This option can be used to set a Perfect Electric Conductor at the simulation boundary. Please see the :ref:`PEC theory section <theory-bc-pec>` for more details. Note that PEC boundary is invalid at `r=0` for the RZ solver. Please use ``none`` option. This boundary condition does not work with the spectral solver.
+
+    * ``pec_insulator``: This option specifies a mixed perfect electric conductor and insulator boundary, where some part of the
+      boundary is PEC and some is insulator. In the insulator portion, the normal fields are extrapolated and the tangential fields
+      are either set to the specified value or extrapolated. The region that is insulator is specified using a spatially dependent expression with the insulator being in the area where the value of the expression is greater than zero.
+      The expressions are given for the low and high boundary on each axis, as listed below. The tangential fields are specified as
+      expressions that can depend on the location and time. The tangential fields are in two pairs, the electric fields and the
+      magnetic fields. In each pair, if one is specified, the other will be set to zero if not also specified.
+
+      * ``insulator.area_x_lo(y,z)``: For the lower x (or r) boundary, expression specifying the insulator location
+
+      * ``insulator.area_x_hi(y,z)``: For the upper x (or r) boundary, expression specifying the insulator location
+
+      * ``insulator.area_y_lo(x,z)``: For the lower y boundary, expression specifying the insulator location
+
+      * ``insulator.area_y_hi(x,z)``: For the upper y boundary, expression specifying the insulator location
+
+      * ``insulator.area_z_lo(x,y)``: For the lower z boundary, expression specifying the insulator location
+
+      * ``insulator.area_z_hi(x,y)``: For the upper z boundary, expression specifying the insulator location
+
+      * ``insulator.Ey_x_lo(y,z,t)``, ``insulator.Ez_x_lo(y,z,t)``, ``insulator.By_x_lo(y,z,t)``, ``insulator.Bz_x_lo(y,z,t)``: expressions of the tangential field values for the lower x (or r) boundary
+
+      * ``insulator.Ey_x_hi(y,z,t)``, ``insulator.Ez_x_hi(y,z,t)``, ``insulator.By_x_hi(y,z,t)``, ``insulator.Bz_x_hi(y,z,t)``: expressions of the tangential field values for the upper x (or r) boundary
+
+      * ``insulator.Ex_y_lo(x,z,t)``, ``insulator.Ez_y_lo(x,z,t)``, ``insulator.Bx_y_lo(x,z,t)``, ``insulator.Bz_y_lo(x,z,t)``: expressions of the tangential field values for the lower y boundary
+
+      * ``insulator.Ex_y_hi(x,z,t)``, ``insulator.Ez_y_hi(x,z,t)``, ``insulator.Bx_y_hi(x,z,t)``, ``insulator.Bz_y_hi(x,z,t)``: expressions of the tangential field values for the upper y boundary
+
+      * ``insulator.Ex_z_lo(x,y,t)``, ``insulator.Ey_z_lo(x,y,t)``, ``insulator.Bx_z_lo(x,y,t)``, ``insulator.By_z_lo(x,y,t)``: expressions of the tangential field values for the lower z boundary
+
+      * ``insulator.Ex_z_hi(x,y,t)``, ``insulator.Ey_z_hi(x,y,t)``, ``insulator.Bx_z_hi(x,y,t)``, ``insulator.By_z_hi(x,y,t)``: expressions of the tangential field values for the upper z boundary
 
     * ``none``: No boundary condition is applied to the fields with the electromagnetic solver. This option must be used for the RZ-solver at `r=0`.
 
@@ -2172,10 +2211,13 @@ Time step
 Filtering
 ^^^^^^^^^
 
-* ``warpx.use_filter`` (`0` or `1`; default: `1`, except for RZ FDTD)
-    Whether to smooth the charge and currents on the mesh, after depositing them from the macro-particles.
+* ``warpx.use_filter`` (`0` or `1`)
+    Whether to use filtering in the simulation.
+    With the explicit evolve scheme, the filtering is turned on by default, except for RZ FDTD.
+    With the implicit evolve schemes, the filtering is turned off by default.
+    The filtering smoothes the charge and currents on the mesh, after depositing them from the macro-particles.
+    With implicit schemes, the electric field is also filtered (to maintain consistency for energy conservation).
     This uses a bilinear filter (see the :ref:`filtering section <theory-pic-filter>`).
-    The default is `1` in all cases, except for simulations in RZ geometry using the FDTD solver.
     With the RZ PSATD solver, the filtering is done in :math:`k`-space.
 
     .. warning::
@@ -2650,10 +2692,11 @@ Diagnostics and output
 In-situ visualization
 ^^^^^^^^^^^^^^^^^^^^^
 
-WarpX has four types of diagnostics:
-``FullDiagnostics`` consist in dumps of fields and particles at given iterations,
-``BackTransformedDiagnostics`` are used when running a simulation in a boosted frame, to reconstruct output data to the lab frame,
-``BoundaryScrapingDiagnostics`` are used to collect the particles that are absorbed at the boundary, throughout the simulation, and
+WarpX has five types of diagnostics:
+``Full`` diagnostics consist in dumps of fields and particles at given iterations,
+``TimeAveraged`` diagnostics only allow field data, which they output after averaging over a period of time,
+``BackTransformed`` diagnostics are used when running a simulation in a boosted frame, to reconstruct output data to the lab frame,
+``BoundaryScraping`` diagnostics are used to collect the particles that are absorbed at the boundary, throughout the simulation, and
 ``ReducedDiags`` allow the user to compute some reduced quantity (particle temperature, max of a field) and write a small amount of data to text files.
 Similar to what is done for physical species, WarpX has a class Diagnostics that allows users to initialize different diagnostics, each of them with different fields, resolution and period.
 This currently applies to standard diagnostics, but should be extended to back-transformed diagnostics and reduced diagnostics (and others) in a near future.
@@ -2899,12 +2942,58 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
 * ``warpx.mffile_nstreams`` (`int`) optional (default `4`)
     Limit the number of concurrent readers per file.
 
+
+.. _running-cpp-parameters-diagnostics-timeavg:
+
+Time-Averaged Diagnostics
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``TimeAveraged`` diagnostics are a special type of ``Full`` diagnostics that allows for the output of time-averaged field data.
+This type of diagnostics can be created using ``<diag_name>.diag_type = TimeAveraged``.
+We support only field data and related options from the list at `Full Diagnostics`_.
+
+.. note::
+
+    As with ``Full`` diagnostics, ``TimeAveraged`` diagnostics output the initial **instantaneous** conditions of the selected fields on step 0 (unless more specific output intervals exclude output for step 0).
+
+In addition, ``TimeAveraged`` diagnostic options include:
+
+* ``<diag_name>.time_average_mode`` (`string`, default `none`)
+    Describes the operating mode for time averaged field output.
+
+    * ``none`` for no averaging (instantaneous fields)
+
+    * ``fixed_start`` for a diagnostic that averages all fields between the current output step and a fixed point in time
+
+    * ``dynamic_start`` for a constant averaging period and output at different points in time (non-overlapping)
+
+    .. note::
+
+        To enable time-averaged field output with intervals tightly spaced enough for overlapping averaging periods,
+        please create additional instances of ``TimeAveraged`` diagnostics.
+
+* ``<diag_name>.average_period_steps`` (`int`)
+    Configures the number of time steps in an averaging period.
+    Set this only in the ``dynamic_start`` mode and only if ``average_period_time`` has not already been set.
+    Will be ignored in the ``fixed_start`` mode (with warning).
+
+* ``<diag_name>.average_period_time`` (`float`, in seconds)
+    Configures the time (SI units) in an averaging period.
+    Set this only in the ``dynamic_start`` mode and only if ``average_period_steps`` has not already been set.
+    Will be ignored in the ``fixed_start`` mode (with warning).
+
+* ``<diag_name>.average_start_step`` (`int`)
+    Configures the time step at which time-averaging begins.
+    Set this only in the ``fixed_start`` mode.
+    Will be ignored in the ``dynamic_start`` mode (with warning).
+
 .. _running-cpp-parameters-diagnostics-btd:
 
 BackTransformed Diagnostics
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ``BackTransformed`` diag type are used when running a simulation in a boosted frame, to reconstruct output data to the lab frame. This option can be set using ``<diag_name>.diag_type = BackTransformed``. We support the following list of options from `Full Diagnostics`_
+
     ``<diag_name>.format``, ``<diag_name>.openpmd_backend``, ``<diag_name>.dump_rz_modes``, ``<diag_name>.file_prefix``, ``<diag_name>.diag_lo``, ``<diag_name>.diag_hi``, ``<diag_name>.write_species``, ``<diag_name>.species``.
 
     Additional options for this diagnostic include:

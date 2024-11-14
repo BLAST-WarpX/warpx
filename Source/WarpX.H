@@ -12,6 +12,7 @@
 #ifndef WARPX_H_
 #define WARPX_H_
 
+#include "BoundaryConditions/PEC_Insulator_fwd.H"
 #include "BoundaryConditions/PML_fwd.H"
 #include "Diagnostics/MultiDiagnostics_fwd.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags_fwd.H"
@@ -113,6 +114,16 @@ public:
 
     [[nodiscard]] int Verbose () const { return verbose; }
 
+    [[nodiscard]] const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& GetFieldBoundaryLo () const
+    {
+        return field_boundary_lo;
+    }
+
+    [[nodiscard]] const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& GetFieldBoundaryHi () const
+    {
+        return field_boundary_hi;
+    }
+
     void InitData ();
 
     void Evolve (int numsteps = -1);
@@ -135,6 +146,7 @@ public:
     void UpdateMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const&  a_Bn,
                                           amrex::Real  a_thetadt );
     void ApplyMagneticFieldBCs ();
+    void SpectralSourceFreeFieldAdvance ();
     void FinishMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const&  a_Bn,
                                           amrex::Real  a_theta );
     void FinishImplicitField ( const ablastr::fields::MultiLevelVectorField&  Field_fp,
@@ -1205,12 +1217,12 @@ private:
         int lev);
     void StoreCurrent (int lev);
     void RestoreCurrent (int lev);
-    void ApplyFilterJ (
-        const ablastr::fields::MultiLevelVectorField& current,
+    void ApplyFilterMF (
+        const ablastr::fields::MultiLevelVectorField& mfvec,
         int lev,
         int idim);
-    void ApplyFilterJ (
-        const ablastr::fields::MultiLevelVectorField& current,
+    void ApplyFilterMF (
+        const ablastr::fields::MultiLevelVectorField& mfvec,
         int lev);
     void SumBoundaryJ (
         const ablastr::fields::MultiLevelVectorField& current,
@@ -1424,6 +1436,9 @@ private:
     amrex::Vector<std::unique_ptr<PML_RZ> > pml_rz;
 #endif
     amrex::Real v_particle_pml;
+
+    // Insulator boundary conditions
+    std::unique_ptr<PEC_Insulator> pec_insulator_boundary;
 
     // External fields parameters
     std::unique_ptr<ExternalFieldParams> m_p_ext_field_params;

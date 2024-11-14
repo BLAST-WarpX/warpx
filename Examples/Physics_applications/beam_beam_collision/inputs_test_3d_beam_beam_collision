@@ -203,6 +203,12 @@ qed_bw.chi_min = 1.e-2
 #qed_bw.tab_pair_frac_how_many=512
 #qed_bw.save_table_in=my_bw_table.txt
 
+# if you wish to use existing tables:
+#qed_qs.lookup_table_mode=load
+#qed_qs.load_table_from = /path/to/my_qs_table.txt
+#qed_bw.lookup_table_mode=load
+#qed_bw.load_table_from = /path/to/my_bw_table.txt
+
 warpx.do_qed_schwinger = 0.
 
 #################################

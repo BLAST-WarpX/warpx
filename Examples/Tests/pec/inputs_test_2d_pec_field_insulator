@@ -1,0 +1,34 @@
+# Maximum number of time steps
+max_step = 10
+
+# number of grid points
+amr.n_cell = 32 32
+amr.blocking_factor = 16
+
+# Maximum level in hierarchy (for now must be 0, i.e., one level in total)
+amr.max_level = 0
+
+# Geometry
+geometry.dims = 2
+geometry.prob_lo = 0.     2.e-2 # physical domain
+geometry.prob_hi = 1.e-2  3.e-2
+
+# Boundary condition
+boundary.field_lo = neumann      periodic
+boundary.field_hi = PECInsulator periodic
+
+warpx.serialize_initial_conditions = 1
+
+# Verbosity
+warpx.verbose = 1
+
+# CFL
+warpx.cfl = 1.0
+
+insulator.area_x_hi(y,z) = (2.25e-2 <= z and z <= 2.75e-2)
+insulator.By_x_hi(y,z,t) = min(t/1.0e-12,1)*1.e1*3.3e-4
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 10
+diag1.diag_type = Full

@@ -11,6 +11,7 @@
  */
 #include "WarpX.H"
 
+#include "BoundaryConditions/PEC_Insulator.H"
 #include "BoundaryConditions/PML.H"
 #include "Diagnostics/MultiDiagnostics.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
@@ -493,6 +494,7 @@ WarpX::ReadParameters ()
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT && !EB::enabled()) {
             throw std::runtime_error("ECP Solver requires to enable embedded boundaries at runtime.");
         }
+        pp_algo.query_enum_sloppy("evolve_scheme", evolve_scheme, "-_");
     }
 
     {
@@ -710,6 +712,11 @@ WarpX::ReadParameters ()
         std::vector<std::string> dt_interval_vec = {"-1"};
         pp_warpx.queryarr("dt_update_interval", dt_interval_vec);
         dt_update_interval = utils::parser::IntervalsParser(dt_interval_vec);
+
+        // Filter defaults to true for the explicit scheme, and false for the implicit schemes
+        if (evolve_scheme != EvolveScheme::Explicit) {
+            use_filter = false;
+        }
 
         // Filter currently not working with FDTD solver in RZ geometry: turn OFF by default
         // (see https://github.com/ECP-WarpX/WarpX/issues/1943)
@@ -1118,7 +1125,6 @@ WarpX::ReadParameters ()
         pp_algo.query_enum_sloppy("current_deposition", current_deposition_algo, "-_");
         pp_algo.query_enum_sloppy("charge_deposition", charge_deposition_algo, "-_");
         pp_algo.query_enum_sloppy("particle_pusher", particle_pusher_algo, "-_");
-        pp_algo.query_enum_sloppy("evolve_scheme", evolve_scheme, "-_");
 
         // check for implicit evolve scheme
         if (evolve_scheme == EvolveScheme::SemiImplicitEM) {
@@ -1126,6 +1132,9 @@ WarpX::ReadParameters ()
         }
         else if (evolve_scheme == EvolveScheme::ThetaImplicitEM) {
             m_implicit_solver = std::make_unique<ThetaImplicitEM>();
+        }
+        else if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+            m_implicit_solver = std::make_unique<StrangImplicitSpectralEM>();
         }
 
         // implicit evolve schemes not setup to use mirrors
@@ -1172,7 +1181,8 @@ WarpX::ReadParameters ()
         if (current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 evolve_scheme == EvolveScheme::SemiImplicitEM ||
-                evolve_scheme == EvolveScheme::ThetaImplicitEM,
+                evolve_scheme == EvolveScheme::ThetaImplicitEM ||
+                evolve_scheme == EvolveScheme::StrangImplicitSpectralEM,
                 "Villasenor current deposition can only"
                 "be used with Implicit evolve schemes.");
         }
@@ -1243,7 +1253,8 @@ WarpX::ReadParameters ()
         }
 
         if (evolve_scheme == EvolveScheme::SemiImplicitEM ||
-            evolve_scheme == EvolveScheme::ThetaImplicitEM) {
+            evolve_scheme == EvolveScheme::ThetaImplicitEM ||
+            evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 current_deposition_algo == CurrentDepositionAlgo::Esirkepov ||
@@ -1253,8 +1264,9 @@ WarpX::ReadParameters ()
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee ||
-                electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC,
-                "Only the Yee EM solver is supported with the implicit and semi-implicit schemes");
+                electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC ||
+                electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD,
+                "Only the Yee, CKC, and PSATD EM solvers are supported with the implicit and semi-implicit schemes");
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 particle_pusher_algo == ParticlePusherAlgo::Boris ||
@@ -1264,6 +1276,11 @@ WarpX::ReadParameters ()
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 field_gathering_algo != GatheringAlgo::MomentumConserving,
                     "With implicit and semi-implicit schemes, the momentum conserving field gather is not supported as it would not conserve energy");
+        }
+        if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD,
+                "With the strang_implicit_spectral_em evolve scheme, the algo.maxwell_solver must be psatd");
         }
 
         // Load balancing parameters
@@ -1690,6 +1707,9 @@ WarpX::ReadParameters ()
             );
         }
     }
+
+    // Setup pec_insulator boundary conditions
+    pec_insulator_boundary = std::make_unique<PEC_Insulator>();
 
     // for slice generation //
     {
@@ -2756,6 +2776,10 @@ void WarpX::AllocLevelSpectralSolverRZ (amrex::Vector<std::unique_ptr<SpectralSo
 
     amrex::Real solver_dt = dt[lev];
     if (WarpX::do_multi_J) { solver_dt /= static_cast<amrex::Real>(WarpX::do_multi_J_n_depositions); }
+    if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+        // The step is Strang split into two half steps
+        solver_dt /= 2.;
+    }
 
     auto pss = std::make_unique<SpectralSolverRZ>(lev,
                                                   realspace_ba,
@@ -2809,6 +2833,10 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
 
     amrex::Real solver_dt = dt[lev];
     if (WarpX::do_multi_J) { solver_dt /= static_cast<amrex::Real>(WarpX::do_multi_J_n_depositions); }
+    if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+        // The step is Strang split into two half steps
+        solver_dt /= 2.;
+    }
 
     auto pss = std::make_unique<SpectralSolver>(lev,
                                                 realspace_ba,
