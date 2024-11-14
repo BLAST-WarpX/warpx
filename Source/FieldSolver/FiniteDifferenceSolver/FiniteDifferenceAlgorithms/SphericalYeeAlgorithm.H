@@ -42,10 +42,9 @@ struct SphericalYeeAlgorithm {
      */
     static amrex::Real ComputeMaxDt (amrex::Real const * const dx) {
         using namespace amrex::literals;
-        const amrex::Real alpha = 0.22_rt;  // Check this value!
-        const amrex::Real delta_t = 1._rt / ( std::sqrt(
-                                     (1._rt + alpha) / (dx[0]*dx[0])
-                              ) * PhysConst::c );
+        // Check this value! This was determined empirically (for one case)
+        const amrex::Real alpha = 0.001_rt;
+        const amrex::Real delta_t = 1._rt / ( std::sqrt( (1._rt + alpha) / (dx[0]*dx[0])) * PhysConst::c );
         return delta_t;
     }
 
