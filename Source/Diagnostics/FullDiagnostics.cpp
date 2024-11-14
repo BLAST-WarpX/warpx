@@ -407,7 +407,11 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
     // diagnostic output
     bool deposit_current = !m_solver_deposits_current;
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     std::vector<std::string> field_names = {"r", "t", "z"};
+#elif defined(WARPX_DIM_RSPHERE)
+    std::vector<std::string> field_names = {"r", "t", "p"};
+#endif
 
     // Fill vector of functors for all components except individual cylindrical modes.
     const auto m_varname_fields_size = static_cast<int>(m_varnames_fields.size());
@@ -821,8 +825,10 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
 
     using ablastr::fields::Direction;
 
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     std::vector<std::string> field_names = {"r", "t", "z"};
+#elif defined(WARPX_DIM_RSPHERE)
+    std::vector<std::string> field_names = {"r", "t", "p"};
 #else
     std::vector<std::string> field_names = {"x", "y", "z"};
 #endif
