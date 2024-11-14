@@ -236,6 +236,8 @@ void HybridPICModel::InitData ()
 
     const auto elec_temp = m_elec_temp;
     // Initialize electron temperature multifab
+    // This assumes an uniform electron temperature in the domain
+    // ...
 // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())

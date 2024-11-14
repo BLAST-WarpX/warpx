@@ -175,15 +175,15 @@ void WarpX::HybridPICEvolveFields ()
         // Update Ue in electron fluid container
         // check at what step this should be calculated, here Ue is at n+1
         // maybe move up to be consistent with Ke initialization
-        hybrid_electron_fl->HybridUpdateUe(m_fields, finest_level);
+        hybrid_electron_fl->HybridInitializeUe(m_fields, finest_level);
 
-        // Solve electron energy equation without sources or sinks
-        // and update electron temperature before calculating Pe
-        // hybrid_electron_fl->SolveEEEqQDSMC(); // should take rho, Je
+        // call functions from the qdsmc particle container ...
+        //      1 - Set KeNe for each particle (gather)
+        //      2 - Push the qdsmc particles
+        //      3 - Deposit KeNe to the grid
 
-        // Update Te after QDSMC solver is used
+        // Update Te after QDSMC solver:
         hybrid_electron_fl->HybridUpdateTe(m_fields, m_hybrid_pic_model->m_gamma, finest_level);
-
     }
 
     // Calculate the electron pressure at t=n+1

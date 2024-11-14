@@ -158,6 +158,7 @@ public:
     void ImplicitComputeRHSE (int lev, PatchType patch_type, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
 
     MultiParticleContainer& GetPartContainer () { return *mypc; }
+    QdsmcParticleContainer& GetPartContainer () { return *qdsmc_hybrid_electron_pc; }
     MultiFluidContainer& GetFluidContainer () { return *myfl; }
     WarpXFluidContainer& GetElectronFluidContainer () { return *hybrid_electron_fl; }
     MacroscopicProperties& GetMacroscopicProperties () { return *m_macroscopic_properties; }
@@ -1381,6 +1382,9 @@ private:
     std::unique_ptr<MultiParticleContainer> mypc;
     std::unique_ptr<MultiDiagnostics> multi_diags;
 
+    // Qdsmc particle container for electron (fluid) used in the electron energy equation solver in the hybrid pic model
+    std::unique_ptr<QdsmcParticleContainer> qdsmc_hybrid_electron_pc;
+    
     // Fluid container
     bool do_fluid_species = false;
     std::unique_ptr<MultiFluidContainer> myfl;

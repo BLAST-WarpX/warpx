@@ -344,6 +344,9 @@ WarpX::WarpX ()
 
         // Create electron fluid container for hybrid-PIC model
         hybrid_electron_fl = std::make_unique<WarpXFluidContainer>(0, "electrons_hybrid", true);
+
+        // Create electron qdsmc particle container for hybrid-PIC model
+        qdsmc_hybrid_electron_pc = std::make_unique<QdsmcParticleContainer>(this);
     }
 
     current_buffer_masks.resize(nlevs_max);

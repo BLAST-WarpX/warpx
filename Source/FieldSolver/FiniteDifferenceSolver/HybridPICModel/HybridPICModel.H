@@ -213,16 +213,16 @@ struct ElectronPressure {
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real get_pressure (amrex::Real const n0,
-                                     amrex::Real const Te,
+                                     amrex::Real const T0,
                                      amrex::Real const gamma,
                                      amrex::Real const rho) {
-        return n0 * Te * std::pow((rho/PhysConst::q_e)/n0, gamma);
+        return n0 * T0 * std::pow((rho/PhysConst::q_e)/n0, gamma);
     }
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    static amrex::Real get_pressure_ideal_gas (amrex::Real const T,
+    static amrex::Real get_pressure_ideal_gas (amrex::Real const Te,
                                                amrex::Real const rho) {
-        return T*(rho/PhysConst::q_e);
+        return Te*(rho/PhysConst::q_e);
     }
 };
 

@@ -1407,14 +1407,15 @@ void WarpXFluidContainer::DepositCurrent(
 }
 
 
-void WarpXFluidContainer::HybridUpdateUe (ablastr::fields::MultiFabRegister& fields, int lev)
+// Update this function using pre-built functions of multifabs ?
+void WarpXFluidContainer::HybridInitializeUe (ablastr::fields::MultiFabRegister& fields, int lev)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
     ablastr::fields::ScalarField rho_fp = fields.get(FieldType::rho_fp, lev);
     ablastr::fields::VectorField current_fp_ampere = fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
-    ablastr::fields::VectorField current_fp = fields.get_alldirs(FieldType::current_fp, lev);
+    ablastr::fields::VectorField current_fp_temp = fields.get_alldirs(FieldType::current_fp_temp, lev); // ion current
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -1467,7 +1468,7 @@ void WarpXFluidContainer::HybridInitializeKe (ablastr::fields::MultiFabRegister&
 
             ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                 if( rho(i, j, k) > 0.0_rt ){
-                    Ke(i, j, k) = Te(i, j, k)*std::pow((rho(i, j, k)/PhysConst::q_e), 1-gamma)/PhysConst::q_e;
+                    Ke(i, j, k) = Te(i, j, k)*std::pow((rho(i, j, k)/PhysConst::q_e), 1-gamma);
                 }
             });
         }
@@ -1491,6 +1492,7 @@ void WarpXFluidContainer::HybridUpdateTe (ablastr::fields::MultiFabRegister& fie
             const Box& tilebox  = mfi.tilebox();
 
             ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                Te(i, j, k) = 0;
                 if( rho(i, j, k) > 0.0_rt ){
                     Te(i, j, k) = Ke(i, j, k)*std::pow((rho(i, j, k)/PhysConst::q_e), gamma-1)*PhysConst::q_e;
                 }
