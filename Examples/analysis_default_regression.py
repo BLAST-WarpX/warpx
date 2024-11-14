@@ -9,10 +9,18 @@ from checksumAPI import evaluate_checksum
 
 
 def main(args):
-    # parse test name from test director (remove "_restart" suffix
-    # for restart tests, same checksums as original test)
+    # parse test name from test directory
     test_name = os.path.split(os.getcwd())[1]
-    test_name = test_name.replace("_restart", "")
+    if "_restart" in test_name:
+        rtol_restart = 1e-12
+        print(
+            f"Warning: Setting relative tolerance {rtol_restart} for restart checksum analysis"
+        )
+        # use original test's checksums
+        test_name = test_name.replace("_restart", "")
+        # reset relative tolerance
+        args.rtol = rtol_restart
+    # TODO check environment and reset tolerance (portable, machine precision)
     # compare checksums
     evaluate_checksum(
         test_name=test_name,
@@ -75,6 +83,5 @@ if __name__ == "__main__":
     args.do_fields = False if args.skip_fields else True
     # set args.do_particles (not parsed, based on args.skip_particles)
     args.do_particles = False if args.skip_particles else True
-    # TODO check environment and reset tolerance (portable, machine precision)
     # execute main function
     main(args)
