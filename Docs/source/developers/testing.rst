@@ -140,8 +140,8 @@ A new test can be added by adding a corresponding entry in ``CMakeLists.txt`` as
            1  # dims
            2  # nprocs
            inputs_test_1d_laser_acceleration  # inputs
-           analysis.py  # analysis
-           diags/diag1000100  # output (plotfile)
+           "analysis.py diags/diag1000100"  # analysis
+           "analysis_default_regression.py --path diags/diag1000100 --plotfile"  # checksum
            OFF  # dependency
        )
 
@@ -154,8 +154,8 @@ A new test can be added by adding a corresponding entry in ``CMakeLists.txt`` as
            2  # dims
            2  # nprocs
            inputs_test_2d_laser_acceleration_picmi.py  # inputs
-           analysis.py  # analysis
-           diags/diag1000100  # output (plotfile)
+           "analysis.py diags/diag1000100"  # analysis
+           "analysis_default_regression.py --path diags/diag1000100 --plotfile"  # checksum
            OFF  # dependency
        )
 
@@ -168,14 +168,14 @@ A new test can be added by adding a corresponding entry in ``CMakeLists.txt`` as
            3  # dims
            2  # nprocs
            inputs_test_3d_laser_acceleration_restart  # inputs
-           analysis_default_restart.py  # analysis
-           diags/diag1000100  # output (plotfile)
+           "analysis_default_restart.py diags/diag1000100"  # analysis
+           "analysis_default_regression.py --path diags/diag1000100 --plotfile"  # checksum
            test_3d_laser_acceleration  # dependency
        )
 
   Note that the restart has an explicit dependency, namely it can run only provided that the original test, from which the restart checkpoint files will be read, runs first.
 
-* A more complex example. Add the **PICMI test** ``test_rz_laser_acceleration_picmi``, with custom command-line arguments ``--test`` and ``dir``, and openPMD time series output:
+* A more complex example. Add the **PICMI test** ``test_rz_laser_acceleration_picmi``, with custom command-line arguments ``--test`` and ``dir``, openPMD time series output, and custom command line arguments for the checksum comparison:
 
   .. code-block:: cmake
 
@@ -184,8 +184,8 @@ A new test can be added by adding a corresponding entry in ``CMakeLists.txt`` as
            RZ  # dims
            2   # nprocs
            "inputs_test_rz_laser_acceleration_picmi.py --test --dir 1"  # inputs
-           analysis.py  # analysis
-           diags/diag1/  # output (openPMD time series)
+           "analysis.py diags/diag1/"  # analysis
+           "analysis_default_regression.py --path diags/diag1/ --openpmd --skip-particles --rtol 1e-7"  # checksum
            OFF  # dependency
        )
 
@@ -195,6 +195,12 @@ Sometimes two or more tests share a large number of input parameters.
 The shared input parameters can be collected in a "base" input file that can be passed as a runtime parameter in the actual test input files through the parameter ``FILE``.
 
 If the new test is added in a new directory that did not exist before, please add the name of that directory with the command ``add_subdirectory`` in `Physics_applications/CMakeLists.txt <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Physics_applications/CMakeLists.txt>`__ or `Tests/CMakeLists.txt <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests/CMakeLists.txt>`__, depending on where the new test directory is located.
+
+If not already present, the default regression analysis script ``analysis_default_regression.py`` in the examples above must be linked from `Examples/analysis_default_regression.py <https://github.com/ECP-WarpX/WarpX/blob/development/Examples/analysis_default_regression.py>`__, by executing once the following command from the test directory:
+
+  .. code-block:: bash
+
+       ln -s ../../analysis_default_regression.py analysis_default_regression.py
 
 Naming conventions for automated tests
 --------------------------------------
