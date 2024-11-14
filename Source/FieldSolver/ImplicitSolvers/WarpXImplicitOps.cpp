@@ -122,6 +122,44 @@ WarpX::ApplyMagneticFieldBCs()
 }
 
 void
+WarpX::SpectralSourceFreeFieldAdvance ()
+{
+    using namespace amrex::literals;
+    using warpx::fields::FieldType;
+    // Do the first piece of the Strang splitting, source free advance of E and B
+    // It would be more efficient to write a specialized PSATD advance that does not use J,
+    // but this works for now.
+
+    // Create temporary MultiFabs to hold J
+    int const lev = 0;
+    ablastr::fields::VectorField current_fp = m_fields.get_alldirs(FieldType::current_fp, lev);
+    amrex::MultiFab* rho_fp = m_fields.get(FieldType::rho_fp, lev);
+    amrex::MultiFab j0(current_fp[0]->boxArray(), current_fp[0]->DistributionMap(),
+                       current_fp[0]->nComp(), current_fp[0]->nGrowVect());
+    amrex::MultiFab j1(current_fp[1]->boxArray(), current_fp[1]->DistributionMap(),
+                       current_fp[1]->nComp(), current_fp[1]->nGrowVect());
+    amrex::MultiFab j2(current_fp[2]->boxArray(), current_fp[2]->DistributionMap(),
+                       current_fp[2]->nComp(), current_fp[2]->nGrowVect());
+    amrex::MultiFab::Copy(j0, *(current_fp[0]), 0, 0, current_fp[0]->nComp(), current_fp[0]->nGrowVect());
+    amrex::MultiFab::Copy(j1, *(current_fp[1]), 0, 0, current_fp[1]->nComp(), current_fp[1]->nGrowVect());
+    amrex::MultiFab::Copy(j2, *(current_fp[2]), 0, 0, current_fp[2]->nComp(), current_fp[2]->nGrowVect());
+
+    current_fp[0]->setVal(0._rt);
+    current_fp[1]->setVal(0._rt);
+    current_fp[2]->setVal(0._rt);
+    if (rho_fp) { rho_fp->setVal(0._rt); }
+    PushPSATD(); // Note that this does dt/2
+    FillBoundaryE(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
+    FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
+
+    // Restore the current_fp MultiFab. Note that this is only needed for diagnostics when
+    // J is being written out (since current_fp is not otherwise used).
+    amrex::MultiFab::Copy(*(current_fp[0]), j0, 0, 0, current_fp[0]->nComp(), current_fp[0]->nGrowVect());
+    amrex::MultiFab::Copy(*(current_fp[1]), j1, 0, 0, current_fp[1]->nComp(), current_fp[1]->nGrowVect());
+    amrex::MultiFab::Copy(*(current_fp[2]), j2, 0, 0, current_fp[2]->nComp(), current_fp[2]->nGrowVect());
+}
+
+void
 WarpX::SaveParticlesAtImplicitStepStart ( )
 {
     // The implicit advance routines require the particle velocity
