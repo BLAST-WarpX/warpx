@@ -19,6 +19,7 @@ def main(args):
         output_file=args.path,
         output_format=args.format,
         rtol=args.rtol,
+        do_fields=args.do_fields,
         do_particles=args.do_particles,
     )
 
@@ -29,40 +30,50 @@ if __name__ == "__main__":
     # add arguments: output path
     parser.add_argument(
         "--path",
-        help="",
+        help="path to output file(s)",
         type=str,
     )
     # add arguments: output format
     format_group = parser.add_mutually_exclusive_group(required=True)
     format_group.add_argument(
         "--plotfile",
-        help="",
+        help="output format is plotfile",
         action="store_true",
     )
     format_group.add_argument(
         "--openpmd",
-        help="",
+        help="output format is openPMD",
         action="store_true",
     )
     # add arguments: relative tolerance
     parser.add_argument(
         "--rtol",
-        help="",
+        help="relative tolerance to compare checksums",
         type=float,
         required=False,
         default=1e-9,
     )
+    # add arguments: skip fields
+    parser.add_argument(
+        "--skip-fields",
+        help="skip fields when comparing checksums",
+        action="store_true",
+        dest="skip_fields",
+    )
+    # add arguments: skip particles
     parser.add_argument(
         "--skip-particles",
-        help="",
+        help="skip particles when comparing checksums",
         action="store_true",
         dest="skip_particles",
     )
     # parse arguments
     args = parser.parse_args()
-    # set args.format (based on args.plotfile and args.openpmd)
+    # set args.format (not parsed, based on args.plotfile and args.openpmd)
     args.format = "plotfile" if args.plotfile else "openpmd"
-    # set args.do_particles (based on args.skip_particles)
+    # set args.do_fields (not parsed, based on args.skip_fields)
+    args.do_fields = False if args.skip_fields else True
+    # set args.do_particles (not parsed, based on args.skip_particles)
     args.do_particles = False if args.skip_particles else True
     # TODO check environment and reset tolerance (portable, machine precision)
     # execute main function
