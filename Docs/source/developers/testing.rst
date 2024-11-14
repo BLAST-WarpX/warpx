@@ -202,6 +202,21 @@ If not already present, the default regression analysis script ``analysis_defaul
 
        ln -s ../../analysis_default_regression.py analysis_default_regression.py
 
+Here is the help message of the default regression analysis script, including usage and list of available options and arguments:
+
+  .. code-block:: bash
+
+       usage: analysis_default_regression.py [-h] [--path PATH] (--plotfile | --openpmd) [--rtol RTOL] [--skip-fields]
+                                             [--skip-particles]
+       options:
+         -h, --help        show this help message and exit
+         --path PATH       path to output file(s)
+         --plotfile        output format is plotfile
+         --openpmd         output format is openPMD
+         --rtol RTOL       relative tolerance to compare checksums
+         --skip-fields     skip fields when comparing checksums
+         --skip-particles  skip particles when comparing checksums
+
 Naming conventions for automated tests
 --------------------------------------
 
