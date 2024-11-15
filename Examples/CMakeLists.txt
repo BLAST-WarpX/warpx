@@ -21,8 +21,8 @@ endif()
 # dims: 1,2,RZ,3
 # nprocs: 1 or 2 (maybe refactor later on to just depend on WarpX_MPI)
 # inputs: inputs file or PICMI script, WarpX_MPI decides w/ or w/o MPI
-# analysis: analysis script, always run without MPI
-# output: output file(s) to analyze
+# analysis: custom test analysis command, always run without MPI
+# checksum: default regression analysis command (checksum benchmark)
 # dependency: name of base test that must run first
 #
 function(add_warpx_test
@@ -194,7 +194,6 @@ function(add_warpx_test
                 ${THIS_Python_SCRIPT_EXE}
                 ${ANALYSIS_FILE}
                 ${ANALYSIS_ARGS}
-                #${output}
             WORKING_DIRECTORY ${THIS_WORKING_DIR}
         )
         # test analysis depends on test run
@@ -218,7 +217,6 @@ function(add_warpx_test
                 ${THIS_Python_SCRIPT_EXE}
                 ${CHECKSUM_FILE}
                 ${CHECKSUM_ARGS}
-                #${output}
             WORKING_DIRECTORY ${THIS_WORKING_DIR}
         )
         # test analysis depends on test run
