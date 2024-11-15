@@ -29,13 +29,16 @@ df -h
 # https://github.com/ECP-WarpX/WarpX/pull/1566#issuecomment-790934878
 
 # try apt install up to five times, to avoid connection splits
+# FIXME install latest version of IntelLLVM, Intel MKL
+#       after conflicts with openPMD are resolved
 status=1
 for itry in {1..5}
 do
     sudo apt-get install -y --no-install-recommends \
         build-essential \
         cmake           \
-        intel-oneapi-compiler-dpcpp-cpp intel-oneapi-mkl-devel \
+        intel-oneapi-compiler-dpcpp-cpp=2024.2.1-1079 \
+        intel-oneapi-mkl-devel=2024.2.1-103 \
         g++ gfortran    \
         libopenmpi-dev  \
         openmpi-bin     \

@@ -16,10 +16,7 @@ import sys
 import numpy as np
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
-
-# this will be the name of the plot file
-fn = sys.argv[1]
+from checksumAPI import evaluate_checksum
 
 field_energy = np.loadtxt("diags/reducedfiles/field_energy.txt", skiprows=1)
 particle_energy = np.loadtxt("diags/reducedfiles/particle_energy.txt", skiprows=1)
@@ -41,5 +38,8 @@ print(f"tolerance: {tolerance_rel}")
 
 assert max_delta_E < tolerance_rel
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

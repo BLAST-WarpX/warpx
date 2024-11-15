@@ -7,6 +7,7 @@
 
 #include <WarpX.H>
 // see WarpX.cpp - full includes for _fwd.H headers
+#include <BoundaryConditions/PEC_Insulator.H>
 #include <BoundaryConditions/PML.H>
 #include <Diagnostics/MultiDiagnostics.H>
 #include <Diagnostics/ReducedDiags/MultiReducedDiags.H>
@@ -111,13 +112,6 @@ void init_WarpX (py::module& m)
             [](WarpX const & wx, int const lev) { return wx.boxArray(lev); },
             //py::overload_cast< int >(&WarpX::boxArray, py::const_),
             py::arg("lev")
-        )
-        .def("field",
-             [](WarpX const & wx) {
-                 return wx.multifab_map;
-             },
-             py::return_value_policy::reference_internal,
-             R"doc(Registry to all WarpX MultiFab (fields).)doc"
         )
         .def("multifab",
              [](WarpX & wx, std::string internal_name) {

@@ -384,11 +384,11 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
                 if (!buffer[i].isDefined())
                 {
                     buffer[i] = pc.make_alike<amrex::PinnedArenaAllocator>();
-                    buffer[i].AddIntComp("stepScraped", false);
-                    buffer[i].AddRealComp("deltaTimeScraped", false);
-                    buffer[i].AddRealComp("nx", false);
-                    buffer[i].AddRealComp("ny", false);
-                    buffer[i].AddRealComp("nz", false);
+                    buffer[i].NewIntComp("stepScraped", false);
+                    buffer[i].NewRealComp("deltaTimeScraped", false);
+                    buffer[i].NewRealComp("nx", false);
+                    buffer[i].NewRealComp("ny", false);
+                    buffer[i].NewRealComp("nz", false);
                 }
 
                 auto& species_buffer = buffer[i];
@@ -481,11 +481,11 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
             if (!buffer[i].isDefined())
             {
                 buffer[i] = pc.make_alike<amrex::PinnedArenaAllocator>();
-                buffer[i].AddIntComp("stepScraped", false);
-                buffer[i].AddRealComp("deltaTimeScraped", false);
-                buffer[i].AddRealComp("nx", false);
-                buffer[i].AddRealComp("ny", false);
-                buffer[i].AddRealComp("nz", false);
+                buffer[i].NewIntComp("stepScraped", false);
+                buffer[i].NewRealComp("deltaTimeScraped", false);
+                buffer[i].NewRealComp("nx", false);
+                buffer[i].NewRealComp("ny", false);
+                buffer[i].NewRealComp("nz", false);
 
             }
 

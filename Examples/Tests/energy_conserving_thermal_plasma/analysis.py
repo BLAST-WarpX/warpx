@@ -18,10 +18,7 @@ import sys
 import numpy as np
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
-
-# this will be the name of the plot file
-fn = sys.argv[1]
+from checksumAPI import evaluate_checksum
 
 # Get energy as a function of time, from reduced diagnostics
 EFdata = np.genfromtxt("./diags/reducedfiles/EF.txt")  # Field energy
@@ -33,6 +30,8 @@ print(abs(E - E[0]) / E[0])
 # Check that the energy is conserved to 0.3%
 assert np.all(abs(E - E[0]) / E[0] < 0.003)
 
-# Checksum test
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

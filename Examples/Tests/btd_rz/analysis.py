@@ -17,7 +17,7 @@ from scipy.constants import c, e, m_e
 from scipy.optimize import curve_fit
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 
 def gaussian_laser(z, a0, z0_phase, z0_prop, ctau, lambda0):
@@ -58,6 +58,8 @@ Ex_fit = gaussian_laser(info.z, a0, z0_fit, z0_b + Lprop_b, ctau0, lambda0)
 ## Check that the a0 agrees within 5% of the predicted value
 assert np.allclose(Ex, Ex_fit, atol=0.18 * Ex.max())
 
-# Checksum regression analysis
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, plotfile)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

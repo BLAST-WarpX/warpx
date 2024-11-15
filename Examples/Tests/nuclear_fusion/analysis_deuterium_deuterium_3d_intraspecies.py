@@ -29,10 +29,7 @@ import sys
 import numpy as np
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
-
-# Name of the plotfile
-fn = sys.argv[1]
+from checksumAPI import evaluate_checksum
 
 # Load data from reduced diagnostics (physical time and neutron weights)
 time = np.loadtxt("./reduced_diags/particle_number.txt", usecols=1)
@@ -52,6 +49,8 @@ print("error = ", error)
 print("tolerance = ", tolerance)
 assert error < tolerance
 
-# Compare checksums with benchmark
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

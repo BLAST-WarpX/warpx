@@ -5,17 +5,21 @@ import re
 import sys
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
-# this will be the name of the plot file
-fn = sys.argv[1]
-
-# Get name of the test
 test_name = os.path.split(os.getcwd())[1]
+output_file = sys.argv[1]
 
 # Run checksum regression test
-if re.search("single_precision", fn):
-    checksumAPI.evaluate_checksum(test_name, fn, rtol=2.0e-6)
+if re.search("single_precision", output_file):
+    evaluate_checksum(
+        test_name=test_name,
+        output_file=output_file,
+        rtol=2e-6,
+    )
 else:
     # using default relative tolerance
-    checksumAPI.evaluate_checksum(test_name, fn)
+    evaluate_checksum(
+        test_name=test_name,
+        output_file=output_file,
+    )

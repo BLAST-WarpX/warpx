@@ -9,7 +9,7 @@ from scipy.constants import epsilon_0, pi
 from scipy.special import erf
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from checksumAPI import evaluate_checksum
 
 sigmaz = 300e-6
 sigmax = 516e-9
@@ -37,8 +37,6 @@ def evaluate_E(x, y, z):
     return E_complex.imag, E_complex.real
 
 
-fn = sys.argv[1]
-
 path = os.path.join("diags", "diag2")
 ts = OpenPMDTimeSeries(path)
 
@@ -64,8 +62,9 @@ for k, z in enumerate(grid_z, start=1):
     assert np.allclose(Ey_warpx, Ey_theory, rtol=0.029, atol=0)
 
 
-# Get name of the test
-test_name = os.path.split(os.getcwd())[1]
-
-# Run checksum regression test
-checksumAPI.evaluate_checksum(test_name, fn, rtol=1e-2)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+    rtol=1e-2,
+)

@@ -7,15 +7,8 @@ import sys
 
 import numpy as np
 
-sys.path.append("../../../../warpx/Regression/Checksum/")
-
-import checksumAPI
-
-# this will be the name of the plot file
-fn = sys.argv[1]
-test_name = os.path.split(os.getcwd())[1]
-
-my_check = checksumAPI.evaluate_checksum(test_name, fn, do_particles=True)
+sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
+from checksumAPI import evaluate_checksum
 
 # fmt: off
 ref_density = np.array([
@@ -58,3 +51,9 @@ ref_density = np.array([
 density_data = np.load("ion_density_case_1.npy")
 print(repr(density_data))
 assert np.allclose(density_data, ref_density)
+
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

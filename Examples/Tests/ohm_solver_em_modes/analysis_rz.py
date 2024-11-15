@@ -187,9 +187,11 @@ if sim.test:
     import sys
 
     sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-    import checksumAPI
+    from checksumAPI import evaluate_checksum
 
-    # this will be the name of the plot file
-    fn = sys.argv[1]
-    test_name = os.path.split(os.getcwd())[1]
-    checksumAPI.evaluate_checksum(test_name, fn, rtol=1e-6)
+    # compare checksums
+    evaluate_checksum(
+        test_name=os.path.split(os.getcwd())[1],
+        output_file=sys.argv[1],
+        rtol=1e-6,
+    )
