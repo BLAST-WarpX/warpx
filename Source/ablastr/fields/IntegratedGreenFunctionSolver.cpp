@@ -48,14 +48,11 @@ computePhiIGF ( amrex::MultiFab const & rho,
     // Do we grow the domain in the z-direction in the 2D mode?
     bool const do_2d_fft = false;
 
-    // Specify the number of processes for FFT. Can be any posistive number
-    // including 1.
     int nprocs = amrex::ParallelDescriptor::NProcs();
     {
-        amrex::ParmParse const pp("ablastr");
-        bool do_serial_fft = false;
-        pp.query("do_serial_fft", do_serial_fft);
-        if (do_serial_fft) { nprocs = 1; };
+        amrex::ParmParse pp("ablastr");
+        pp.queryAdd("nprocs_igf_fft", nprocs);
+        nprocs = std::max(1,std::min(nprocs, amrex::ParallelDescriptor::NProcs()));
     }
 
     static std::unique_ptr<amrex::FFT::OpenBCSolver<amrex::Real>> obc_solver;
