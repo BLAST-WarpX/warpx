@@ -52,6 +52,7 @@ implicit_evolve.particle_tolerance = 1.0e-12
 #picard.relative_tolerance = 0.0 #1.0e-12
 #picard.absolute_tolerance = 0.0 #1.0e-24
 #picard.require_convergence = false
+#picard.diagnostic_file = "diags/picard_solver.txt"
 
 implicit_evolve.nonlinear_solver = "newton"
 newton.verbose = true
@@ -59,6 +60,7 @@ newton.max_iterations = 20
 newton.relative_tolerance = 1.0e-12
 newton.absolute_tolerance = 0.0
 newton.require_convergence = false
+newton.diagnostic_file = "diags/newton_solver.txt"
 
 gmres.verbose_int = 2
 gmres.max_iterations = 1000

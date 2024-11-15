@@ -77,7 +77,7 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real a_time,
 
     // Solve nonlinear system for E at t_{n+1/2}
     // Particles will be advanced to t_{n+1/2}
-    m_nlsolver->Solve( m_E, m_Eold, half_time, a_dt );
+    m_nlsolver->Solve( m_E, m_Eold, half_time, a_dt, a_step );
 
     // Update WarpX owned Efield_fp and Bfield_fp to t_{n+1/2}
     UpdateWarpXFields( m_E, half_time, a_dt );
