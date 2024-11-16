@@ -1,4 +1,4 @@
-name: Check changed files
+name: PR analysis
 
 on:
   pull_request:
@@ -9,6 +9,7 @@ concurrency:
 
 jobs:
   check_diff:
+    name: Check files changed
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout code
@@ -31,13 +32,13 @@ jobs:
       - name: Fetch head branch from forked repository
         run: |
           git fetch fork ${HEAD_REF}
-      - name: Get changed files
+      - name: Get files changed
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           git diff --name-only --diff-filter=ACMRTUXB origin/${BASE_REF}..fork/${HEAD_REF} > check_diff.txt
-      - name: Check changed files
+      - name: Check files changed
         run: |
           if grep -v -E "^(docs|\.github)/" check_diff.txt; then
             echo "skip=false" >> ${GITHUB_OUTPUT}

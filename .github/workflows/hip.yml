@@ -4,7 +4,10 @@ on:
   push:
     branches:
       - "development"
-  pull_request:
+  workflow_run:
+    workflows: [PR analysis]
+    types:
+      - completed
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-hip
@@ -17,7 +20,7 @@ jobs:
     env:
       CXXFLAGS: "-Werror -Wno-deprecated-declarations -Wno-error=pass-failed"
       CMAKE_GENERATOR: Ninja
-    if: github.event.pull_request.draft == false
+    if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies
@@ -77,7 +80,7 @@ jobs:
     env:
       CXXFLAGS: "-Werror -Wno-deprecated-declarations -Wno-error=pass-failed"
       CMAKE_GENERATOR: Ninja
-    if: github.event.pull_request.draft == false
+    if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies

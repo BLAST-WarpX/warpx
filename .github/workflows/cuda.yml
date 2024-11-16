@@ -4,10 +4,10 @@ on:
   push:
     branches:
       - "development"
-  pull_request:
   workflow_run:
-    workflows: [Check changed files]
-    types: [completed]
+    workflows: [PR analysis]
+    types:
+      - completed
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-cuda
