@@ -1,0 +1,29 @@
+name: Check changed files
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.head_ref }}-checkdiff
+  cancel-in-progress: true
+
+jobs:
+  check_diff:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Get changed files
+        run: |
+          git diff --name-only --diff-filter=ACMRTUXB ${GITHUB_BASE_REF}..${GITHUB_HEAD_REF} > check_diff.txt
+      - name: Check changed files
+        run: |
+          if grep -v -E "^(docs|\.github)/" check_diff.txt; then
+            echo "skip=false" >> ${GITHUB_OUTPUT}
+          else
+            echo "skip=true" >> ${GITHUB_OUTPUT}
+          fi
+    outputs:
+      skip: ${{ steps.check.outputs.skip_workflows }}
