@@ -83,11 +83,8 @@ public:
     virtual void ComputeRHS ( WarpXSolverVec&  a_RHS,
                         const WarpXSolverVec&  a_E,
                               amrex::Real      a_time,
-                              amrex::Real      a_dt,
                               int              a_nl_iter,
                               bool             a_from_jacobian ) = 0;
-
-    [[nodiscard]] virtual amrex::Real theta () const { return 1.0; }
 
     [[nodiscard]] int numAMRLevels () const { return m_num_amr_levels; }
 
@@ -110,6 +107,11 @@ protected:
      * \brief Number of AMR levels
      */
     int m_num_amr_levels = 1;
+
+    /**
+     * \brief Time step
+     */
+    mutable amrex::Real m_dt = 0.0;
 
     /**
      * \brief Nonlinear solver type and object

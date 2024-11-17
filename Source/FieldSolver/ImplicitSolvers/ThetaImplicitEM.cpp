@@ -83,6 +83,9 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  a_time,
     // Fields have Eg^{n} and Bg^{n}
     // Particles have up^{n} and xp^{n}.
 
+    // Set the member time step
+    m_dt = a_dt;
+
     // Save up and xp at the start of the time step
     m_WarpX->SaveParticlesAtImplicitStepStart ( );
 
@@ -99,21 +102,21 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  a_time,
         }
     }
 
-    const amrex::Real theta_time = a_time + m_theta*a_dt;
+    const amrex::Real theta_time = a_time + m_theta*m_dt;
 
     // Solve nonlinear system for Eg at t_{n+theta}
     // Particles will be advanced to t_{n+1/2}
     m_E.Copy(m_Eold); // initial guess for Eg^{n+theta}
-    m_nlsolver->Solve( m_E, m_Eold, theta_time, a_dt );
+    m_nlsolver->Solve( m_E, m_Eold, theta_time, m_theta*m_dt );
 
     // Update WarpX owned Efield_fp and Bfield_fp to t_{n+theta}
-    UpdateWarpXFields( m_E, theta_time, a_dt );
+    UpdateWarpXFields( m_E, theta_time );
 
     // Advance particles from time n+1/2 to time n+1
     m_WarpX->FinishImplicitParticleUpdate();
 
     // Advance Eg and Bg from time n+theta to time n+1
-    const amrex::Real new_time = a_time + a_dt;
+    const amrex::Real new_time = a_time + m_dt;
     FinishFieldUpdate( new_time );
 
 }
@@ -121,25 +124,23 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  a_time,
 void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
                              const WarpXSolverVec&  a_E,
                                    amrex::Real      a_time,
-                                   amrex::Real      a_dt,
                                    int              a_nl_iter,
                                    bool             a_from_jacobian )
 {
     // Update WarpX-owned Efield_fp and Bfield_fp using current state of
     // Eg from the nonlinear solver at time n+theta
-    UpdateWarpXFields( a_E, a_time, a_dt );
+    UpdateWarpXFields( a_E, a_time );
 
     // Update particle positions and velocities using the current state
     // of Eg and Bg. Deposit current density at time n+1/2
-    m_WarpX->ImplicitPreRHSOp( a_time, a_dt, a_nl_iter, a_from_jacobian );
+    m_WarpX->ImplicitPreRHSOp( a_time, m_dt, a_nl_iter, a_from_jacobian );
 
     // RHS = cvac^2*m_theta*dt*( curl(Bg^{n+theta}) - mu0*Jg^{n+1/2} )
-    m_WarpX->ImplicitComputeRHSE(m_theta*a_dt, a_RHS);
+    m_WarpX->ImplicitComputeRHSE( m_theta*m_dt, a_RHS);
 }
 
 void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
-                                          amrex::Real            a_time,
-                                          amrex::Real            a_dt )
+                                          amrex::Real            a_time )
 {
     amrex::ignore_unused(a_time);
 
@@ -148,7 +149,7 @@ void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
 
     // Update Bfield_fp owned by WarpX
     ablastr::fields::MultiLevelVectorField const& B_old = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::B_old, 0);
-    m_WarpX->UpdateMagneticFieldAndApplyBCs(B_old, m_theta * a_dt );
+    m_WarpX->UpdateMagneticFieldAndApplyBCs( B_old, m_theta*m_dt );
 
 }
 
@@ -164,6 +165,6 @@ void ThetaImplicitEM::FinishFieldUpdate ( amrex::Real  a_new_time )
     m_E.linComb( c0, m_E, c1, m_Eold );
     m_WarpX->SetElectricFieldAndApplyBCs( m_E );
     ablastr::fields::MultiLevelVectorField const & B_old = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::B_old, 0);
-    m_WarpX->FinishMagneticFieldAndApplyBCs(B_old, m_theta );
+    m_WarpX->FinishMagneticFieldAndApplyBCs( B_old, m_theta );
 
 }
