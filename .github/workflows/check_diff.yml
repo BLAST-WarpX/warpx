@@ -40,7 +40,7 @@ jobs:
           git diff --name-only --diff-filter=ACMRTUXB origin/${BASE_REF}..fork/${HEAD_REF} > check_diff.txt
       - name: Check files changed
         run: |
-          if grep -v -E "^(docs|\.github)/" check_diff.txt; then
+          if grep -v -E "^(docs|\.github)/|\.azure-pipelines\.yml$" check_diff.txt; then
             echo "skip=false" >> ${GITHUB_OUTPUT}
           else
             echo "skip=true" >> ${GITHUB_OUTPUT}
