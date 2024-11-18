@@ -17,8 +17,7 @@ jobs:
   build_appleclang:
     name: AppleClang
     runs-on: macos-latest
-    #if: github.event.pull_request.draft == false
-    if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
+    #if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
     env:
       HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: TRUE
       # For macOS, Ninja is slower than the default:
