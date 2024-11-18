@@ -11,18 +11,14 @@ jobs:
   check_diff:
     name: Check files changed
     runs-on: ubuntu-20.04
+    env:
+      BASE_REF: ${{ github.event.pull_request.base.ref }}
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Define base and head refs
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: |
-          echo "Base ref: ${BASE_REF}"
-          echo "Head ref: ${HEAD_REF}"
       - name: Add forked repository as remote
         run: |
           git remote add fork ${{ github.event.pull_request.head.repo.clone_url }}
@@ -33,17 +29,17 @@ jobs:
         run: |
           git fetch fork ${HEAD_REF}
       - name: Get files changed
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           git diff --name-only --diff-filter=ACMRTUXB origin/${BASE_REF}..fork/${HEAD_REF} > check_diff.txt
       - name: Check files changed
         run: |
-          if grep -v -E "^(docs|\.github)/|\.azure-pipelines\.yml$" check_diff.txt; then
+          if grep -v -E "^(Docs|\.github)/|\.azure-pipelines\.yml$" check_diff.txt; then
+            echo "skip=false"
             echo "skip=false" >> ${GITHUB_OUTPUT}
           else
+            echo "skip=true"
             echo "skip=true" >> ${GITHUB_OUTPUT}
           fi
+          echo "GITHUB_OUTPUT = ${GITHUB_OUTPUT}"
     outputs:
       skip: ${{ steps.check.outputs.skip }}
