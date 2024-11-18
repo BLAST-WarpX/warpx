@@ -13,6 +13,8 @@ pr:
   paths:
     exclude:
     - Docs
+    - .github/workflows/**
+    - .azure-pipelines.yml
 
 jobs:
 - job:
