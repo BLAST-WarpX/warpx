@@ -14,18 +14,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  skip:
-    name: Skip
-    runs-on: macos-latest
-    if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "true" }}
-    steps:
-    - name: Skip checks
-      run: |
-        echo "Skip checks"
   build_appleclang:
     name: AppleClang
     runs-on: macos-latest
-    if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
+    #if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
     env:
       CXXFLAGS: "-Werror -Wno-error=pass-failed"
       HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: TRUE

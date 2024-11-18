@@ -19,7 +19,6 @@ jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
-    if: 0
     #if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
     permissions:
       actions: read

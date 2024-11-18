@@ -70,7 +70,6 @@ jobs:
   build_win_clang:
     name: Clang C++17 w/ OMP w/o MPI
     runs-on: windows-2019
-    if: 0
     #if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
     steps:
     - uses: actions/checkout@v4
