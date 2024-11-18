@@ -4,10 +4,9 @@ on:
   push:
     branches:
       - "development"
-  workflow_run:
-    workflows: [PR analysis]
-    types:
-      - completed
+  pull_request:
+    paths-ignore:
+      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-clangsanitizers
@@ -18,7 +17,7 @@ jobs:
     name: Clang UB sanitizer
     runs-on: ubuntu-22.04
     container: ubuntu:23.10
-    #if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
+    if: github.event.pull_request.draft == false
     env:
       CC: clang
       CXX: clang++
@@ -84,7 +83,7 @@ jobs:
     name: Clang thread sanitizer
     runs-on: ubuntu-22.04
     container: ubuntu:23.10
-    #if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
+    if: github.event.pull_request.draft == false
     env:
       CC: clang
       CXX: clang++

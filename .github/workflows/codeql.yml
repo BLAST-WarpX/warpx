@@ -2,12 +2,9 @@ name: 🔍 CodeQL
 
 on:
   push:
-    branches:
-      - "development"
-  workflow_run:
-    workflows: [PR analysis]
-    types:
-      - completed
+    branches: [ "development" ]
+  pull_request:
+    branches: [ "development" ]
   schedule:
     - cron: "27 3 * * 0"
 
@@ -19,7 +16,7 @@ jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
-    #if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
+    if: github.event.pull_request.draft == false
     permissions:
       actions: read
       contents: read

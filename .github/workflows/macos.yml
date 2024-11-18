@@ -4,10 +4,9 @@ on:
   push:
     branches:
       - "development"
-  workflow_run:
-    workflows: [PR analysis]
-    types:
-      - completed
+  pull_request:
+    paths-ignore:
+      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-macos
@@ -17,8 +16,7 @@ jobs:
   build_appleclang:
     name: AppleClang
     runs-on: macos-latest
-    if: 0
-    #if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
+    if: github.event.pull_request.draft == false
     env:
       HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: TRUE
       # For macOS, Ninja is slower than the default:

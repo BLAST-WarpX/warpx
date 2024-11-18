@@ -4,10 +4,9 @@ on:
   push:
     branches:
       - "development"
-  workflow_run:
-    workflows: [PR analysis]
-    types:
-      - completed
+  pull_request:
+    paths-ignore:
+      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-windows
@@ -19,7 +18,7 @@ jobs:
     runs-on: windows-latest
     # disabled due to issues in #5230
     if: 0
-    #if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
+    #if: github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
@@ -70,7 +69,7 @@ jobs:
   build_win_clang:
     name: Clang C++17 w/ OMP w/o MPI
     runs-on: windows-2019
-    #if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
+    if: github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5

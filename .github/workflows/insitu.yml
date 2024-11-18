@@ -4,10 +4,9 @@ on:
   push:
     branches:
       - "development"
-  workflow_run:
-    workflows: [PR analysis]
-    types:
-      - completed
+  pull_request:
+    paths-ignore:
+      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-insituvis
@@ -17,7 +16,7 @@ jobs:
   sensei:
     name: SENSEI
     runs-on: ubuntu-20.04
-    #if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
+    if: github.event.pull_request.draft == false
     env:
       CXX: clang++
       CC: clang
@@ -43,7 +42,7 @@ jobs:
   ascent:
     name: Ascent
     runs-on: ubuntu-20.04
-    #if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
+    if: github.event.pull_request.draft == false
     env:
       CXX: g++
       CC: gcc
@@ -83,7 +82,7 @@ jobs:
   catalyst:
     name: Catalyst
     runs-on: ubuntu-22.04
-    #if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
+    if: github.event.pull_request.draft == false
     env:
       CXX: g++
       CC: gcc
