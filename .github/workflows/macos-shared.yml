@@ -1,18 +1,3 @@
-name: 🍏 macOS
-
-on:
-  push:
-    branches:
-      - "development"
-  workflow_run:
-    workflows: [PR analysis]
-    types:
-      - completed
-
-concurrency:
-  group: ${{ github.ref }}-${{ github.head_ref }}-macos
-  cancel-in-progress: true
-
 jobs:
   build_appleclang:
     name: AppleClang
