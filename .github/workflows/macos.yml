@@ -4,7 +4,10 @@ on:
   push:
     branches:
       - "development"
-  pull_request:
+  workflow_run:
+    workflows: [PR analysis]
+    types:
+      - completed
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-macos
