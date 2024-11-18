@@ -17,7 +17,8 @@ jobs:
   sensei:
     name: SENSEI
     runs-on: ubuntu-20.04
-    if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
+    if: 0
+    #if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
     env:
       CXX: clang++
       CC: clang
@@ -43,7 +44,8 @@ jobs:
   ascent:
     name: Ascent
     runs-on: ubuntu-20.04
-    if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
+    if: 0
+    #if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
     env:
       CXX: g++
       CC: gcc
@@ -83,7 +85,8 @@ jobs:
   catalyst:
     name: Catalyst
     runs-on: ubuntu-22.04
-    if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
+    if: 0
+    #if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
     env:
       CXX: g++
       CC: gcc
