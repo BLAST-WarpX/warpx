@@ -1,67 +1,58 @@
-/* Copyright 2024 Justin Angus
+/* Copyright 2024 David Grote
  *
  * This file is part of WarpX.
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef THETA_IMPLICIT_EM_H_
-#define THETA_IMPLICIT_EM_H_
+#ifndef STRANG_IMPLICIT_SPECTRALEM_H_
+#define STRANG_IMPLICIT_SPECTRALEM_H_
 
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
-#include "ImplicitSolver.H"
 
 #include <AMReX_Array.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
 
+#include "ImplicitSolver.H"
+
 /** @file
- *  Theta-implicit electromagnetic time solver class. This is a fully implicit
+ *  Implicit spectral electromagnetic time solver class. This is a fully implicit
  *  algorithm where both the fields and particles are treated implicitly.
  *
  *  The time stencil is
- *  Eg^{n+1} = Eg^n + c^2*dt*( curlBg^{n+theta} - mu0*Jg^{n+1/2} )
- *  Bg^{n+1} = Bg^n - dt*curlEg^{n+theta}
- *  xp^{n+1} = xp^n + dt*up^{n+1/2}/(0.5*(gammap^n + gammap^{n+1}))
- *  up^{n+1} = up^n + dt*qp/mp*(Ep^{n+theta} + up^{n+1/2}/gammap^{n+1/2} x Bp^{n+theta})
- *  where f^{n+theta} = (1.0-theta)*f^{n} + theta*f^{n+1} with 0.5 <= theta <= 1.0
+ *    Advance (Eg^n, Bg^n) -> (Eg^{n+1/2}, Bg^{n+1/2}) source free // E transverse
+ *    Iterate:
+ *      Eg^{n+1} = Eg^n + c^2*dt*( - mu0*Jg^{n+1/2} ) // E longitudinal
+ *      xp^{n+1} = xp^n + dt*up^{n+1/2}/(0.5*(gammap^n + gammap^{n+1}))
+ *      up^{n+1} = up^n + dt*qp/mp*(Ep^{n+1/2} + up^{n+1/2}/gammap^{n+1/2} x Bp^{n+1/2})
+ *    Advance (Eg^n+1/2, Bg^n+1/2) -> (Eg^{n+1}, Bg^{n+1}) source free // E transverse
  *
- *  The user-specified time-biasing parameter theta used for the fields on the RHS is bound
- *  between 0.5 and 1.0. The algorithm is exactly energy conserving for theta = 0.5.
- *  Signifcant damping of high-k modes will occur as theta approaches 1.0. The algorithm is
- *  numerially stable for any time step. I.e., the CFL condition for light waves does not
+ *  The algorithm is exactly energy conserving only with a single box, periodic fft (psatd.periodic_single_box_fft = 1).
+ *  With multiple boxes, energy is not conserved since the ffts in each box assumes periodic in the box which
+ *  is not consistent with the current.
+ *  The algorithm is numerially stable for any time step.
+ *  I.e., the CFL condition for light waves does not
  *  have to be satisifed and the time step is not limited by the plasma period. However, how
  *  efficiently the algorithm can use large time steps depends strongly on the nonlinear solver.
  *  Furthermore, the time step should always be such that particles do not travel outside the
  *  ghost region of the box they live in, which is an MPI-related limitation. The time step
  *  is always limited by the need to resolve the appropriate physics.
  *
- *  See S. Markidis, G. Lapenta, "The energy conserving particle-in-cell method." JCP 230 (2011).
- *
- *  See G. Chen, L. Chacon, D.C. Barnes, "An energy- and charge-conserving, implicit,
- *  elctrostatic particle-in-cell algorithm." JCP 230 (2011).
- *
- *  See J.R. Angus, A. Link, A. Friedman, D. Ghosh, J. D. Johnson, "On numerical energy
- *  conservation for an implicit particle-in-cell method coupled with a binary Monte-Carlo
- *  algorithm for Coulomb collisions.", JCP 456 (2022).
- *
- *  See J.R. Angus, W. Farmer, A. Friedman, D. Ghosh, D. Grote, D. Larson, A. Link, "An
- *  implicit particle code with exact energy and charge conservation for electromagnetic studies
- *  of dense plasmas.", JCP 491 (2023).
  */
 
-class ThetaImplicitEM : public ImplicitSolver
+class StrangImplicitSpectralEM : public ImplicitSolver
 {
 public:
 
-    ThetaImplicitEM() = default;
+    StrangImplicitSpectralEM() = default;
 
-    ~ThetaImplicitEM() override = default;
+    ~StrangImplicitSpectralEM() override = default;
 
     // Prohibit Move and Copy operations
-    ThetaImplicitEM(const ThetaImplicitEM&) = delete;
-    ThetaImplicitEM& operator=(const ThetaImplicitEM&) = delete;
-    ThetaImplicitEM(ThetaImplicitEM&&) = delete;
-    ThetaImplicitEM& operator=(ThetaImplicitEM&&) = delete;
+    StrangImplicitSpectralEM(const StrangImplicitSpectralEM&) = delete;
+    StrangImplicitSpectralEM& operator=(const StrangImplicitSpectralEM&) = delete;
+    StrangImplicitSpectralEM(StrangImplicitSpectralEM&&) = delete;
+    StrangImplicitSpectralEM& operator=(StrangImplicitSpectralEM&&) = delete;
 
     void Define ( WarpX*  a_WarpX ) override;
 
@@ -80,11 +71,6 @@ public:
 private:
 
     /**
-     * \brief Time-biasing parameter for fields used on RHS to advance system
-     */
-    amrex::Real m_theta = 0.5;
-
-    /**
      * \brief Solver vectors to be used in the nonlinear solver to solve for the
      * electric field E. The main logic for determining which variables should be
      * WarpXSolverVec type is that it must have the same size and have the same
@@ -95,9 +81,17 @@ private:
     WarpXSolverVec m_E, m_Eold;
 
     /**
+     * \brief B is a derived variable from E. Need to save Bold to update B during
+     * the iterative nonlinear solve for E. Bold is owned here, but only used by WarpX.
+     * It is not used directly by the nonlinear solver, nor is it the same size as the
+     * solver vector (size E), and so it should not be WarpXSolverVec type.
+     */
+    amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > > m_Bold;
+
+    /**
      * \brief Update the E and B fields owned by WarpX
      */
-    void UpdateWarpXFields ( const WarpXSolverVec&  a_E,
+    void UpdateWarpXFields ( WarpXSolverVec const&  a_E,
                              amrex::Real            a_time );
 
     /**
