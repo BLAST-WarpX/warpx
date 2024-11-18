@@ -1,6 +1,9 @@
 name: PR analysis
 
 on:
+  workflow_call:
+    outputs:
+      skip: { type: boolean, description: "Whether to skip dependent CI checks" }
   pull_request:
 
 concurrency:
@@ -32,6 +35,7 @@ jobs:
         run: |
           git diff --name-only --diff-filter=ACMRTUXB origin/${BASE_REF}..fork/${HEAD_REF} > check_diff.txt
       - name: Check files changed
+        id: check
         run: |
           if grep -v -E "^(Docs|\.github)/|\.azure-pipelines\.yml$" check_diff.txt; then
             echo "skip=false"
