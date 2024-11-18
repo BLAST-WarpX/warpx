@@ -143,48 +143,6 @@ cmake \
     --parallel ${build_procs}
 rm -rf ${build_dir}/lapackpp-tioga-mi300a-build
 
-# heFFTe
-if [ -d ${SRC_DIR}/heffte ]
-then
-  cd ${SRC_DIR}/heffte
-  git fetch --prune
-  git checkout v2.4.0
-  cd -
-else
-  git clone -b v2.4.0 https://github.com/icl-utk-edu/heffte.git ${SRC_DIR}/heffte
-fi
-cmake \
-    --fresh                             \
-    -S ${SRC_DIR}/heffte                \
-    -B ${build_dir}/heffte-build        \
-    -DBUILD_SHARED_LIBS=ON              \
-    -DCMAKE_BUILD_TYPE=Release          \
-    -DCMAKE_CXX_STANDARD=17             \
-    -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON         \
-    -DCMAKE_INSTALL_PREFIX=${SW_DIR}/heffte-2.4.0  \
-    -DHeffte_DISABLE_GPU_AWARE_MPI=OFF  \
-    -DHeffte_ENABLE_AVX=OFF             \
-    -DHeffte_ENABLE_AVX512=OFF          \
-    -DHeffte_ENABLE_FFTW=OFF            \
-    -DHeffte_ENABLE_CUDA=OFF            \
-    -DHeffte_ENABLE_ROCM=ON             \
-    -DHeffte_ENABLE_ONEAPI=OFF          \
-    -DHeffte_ENABLE_MKL=OFF             \
-    -DHeffte_ENABLE_DOXYGEN=OFF         \
-    -DHeffte_SEQUENTIAL_TESTING=OFF     \
-    -DHeffte_ENABLE_TESTING=OFF         \
-    -DHeffte_ENABLE_TRACING=OFF         \
-    -DHeffte_ENABLE_PYTHON=OFF          \
-    -DHeffte_ENABLE_FORTRAN=OFF         \
-    -DHeffte_ENABLE_SWIG=OFF            \
-    -DHeffte_ENABLE_MAGMA=OFF
-cmake \
-    --build ${build_dir}/heffte-build   \
-    --target install                    \
-    --parallel ${build_procs}
-rm -rf ${build_dir}/heffte-build
-
-
 # Python ######################################################################
 #
 # sometimes, the Lassen PIP Index is down

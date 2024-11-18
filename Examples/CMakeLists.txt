@@ -93,6 +93,11 @@ function(add_warpx_test
         return()
     endif()
 
+    # cannot run executable tests w/o WarpX executable application
+    if(NOT python AND NOT WarpX_APP)
+        return()
+    endif()
+
     # set MPI executable
     set(THIS_MPI_TEST_EXE
         ${MPIEXEC_EXECUTABLE}
@@ -193,7 +198,7 @@ function(add_warpx_test
     if(WarpX_TEST_CLEANUP)
         add_test(
             NAME ${name}.cleanup
-            COMMAND ${CMAKE_COMMAND} -E rm -rf ${THIS_WORKING_DIR}
+            COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/Examples/test_cleanup.cmake ${THIS_WORKING_DIR}
         )
         # test cleanup depends on test run
         set_property(TEST ${name}.cleanup APPEND PROPERTY DEPENDS "${name}.run")

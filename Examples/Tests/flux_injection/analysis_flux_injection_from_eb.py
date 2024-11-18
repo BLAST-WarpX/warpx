@@ -32,7 +32,7 @@ yt.funcs.mylog.setLevel(0)
 fn = sys.argv[1]
 ds = yt.load(fn)
 ad = ds.all_data()
-t_max = ds.current_time.item()  # time of simulation
+t_inj = 0.5e-8  # duration for which the flux injection was active
 
 # Extract the dimensionality of the simulation
 with open("./warpx_used_inputs", "r") as f:
@@ -52,7 +52,7 @@ if dims == "3D" or dims == "RZ":
     emission_surface = 4 * np.pi * R**2  # in m^2
 elif dims == "2D":
     emission_surface = 2 * np.pi * R  # in m
-Ntot = flux * emission_surface * t_max
+Ntot = flux * emission_surface * t_inj
 
 # Parameters of the histogram
 hist_bins = 50
