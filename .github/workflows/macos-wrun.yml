@@ -13,3 +13,5 @@ concurrency:
 jobs:
   build_appleclang:
     uses: ./.github/workflows/macos-shared.yml
+    with:
+      skip: ${{ github.event.workflow_run.outputs.skip }}

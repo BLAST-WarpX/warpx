@@ -1,7 +1,16 @@
+on:
+  workflow_call:
+    inputs:
+      skip:
+        description: Skip the workflow
+        required: true
+        type: boolean
+
 jobs:
   build_appleclang:
     name: AppleClang
     runs-on: macos-latest
+    if: ${{ inputs.skip == false }}
     #if: ${{ github.event.pull_request.draft == false && github.event.workflow_run.outputs.skip == "false" }}
     env:
       HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: TRUE
