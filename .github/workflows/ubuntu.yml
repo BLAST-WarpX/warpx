@@ -20,19 +20,16 @@ jobs:
     name: GCC Minimal w/o MPI
     runs-on: ubuntu-20.04
     needs: skip_checks
-    if: github.event.pull_request.draft == false
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     env:
       CXXFLAGS: "-Werror"
     steps:
     - name: Checkout code
-      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/checkout@v4
     - name: Install dependencies
-      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         .github/workflows/dependencies/gcc.sh
     - name: CCache Cache
-      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
@@ -40,7 +37,6 @@ jobs:
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: Build WarpX
-      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -61,21 +57,18 @@ jobs:
     name: GCC 1D & 2D w/ MPI, QED tools
     runs-on: ubuntu-22.04
     needs: skip_checks
-    if: github.event.pull_request.draft == false
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     env:
       CXXFLAGS: "-Werror"
       CXX: "g++-12"
       CC: "gcc-12"
     steps:
     - name: Checkout code
-      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/checkout@v4
     - name: Install dependencies
-      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         .github/workflows/dependencies/gcc12.sh
     - name: CCache Cache
-      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
@@ -83,7 +76,6 @@ jobs:
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: Build WarpX
-      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -103,27 +95,23 @@ jobs:
         ccache -s
         du -hs ~/.cache/ccache
     - name: Run QED table tools
-      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         .github/workflows/scripts/checkQEDTableGenerator.sh
   build_3D_sp:
     name: GCC 3D & RZ w/ MPI, single precision
     runs-on: ubuntu-22.04
     needs: skip_checks
-    if: github.event.pull_request.draft == false
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     env:
       CXX: "g++-12"
       CC: "gcc-12"
     steps:
     - name: Checkout code
-      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/checkout@v4
     - name: Install dependencies
-      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         .github/workflows/dependencies/gcc12_blaspp_lapackpp.sh
     - name: CCache Cache
-      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
@@ -131,7 +119,6 @@ jobs:
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: Build WarpX
-      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -158,21 +145,18 @@ jobs:
     name: GCC ABLASTR w/o MPI
     runs-on: ubuntu-20.04
     needs: skip_checks
-    if: github.event.pull_request.draft == false
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     env:
       CMAKE_GENERATOR: Ninja
       CXXFLAGS: "-Werror"
     steps:
     - name: Checkout code
-      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/checkout@v4
     - name: Install dependencies
-      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         .github/workflows/dependencies/gcc.sh
         sudo apt-get install -y libopenmpi-dev openmpi-bin
     - name: CCache Cache
-      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
@@ -180,7 +164,6 @@ jobs:
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: Build WarpX
-      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -197,7 +180,7 @@ jobs:
     name: Clang pywarpx
     runs-on: ubuntu-20.04
     needs: skip_checks
-    if: github.event.pull_request.draft == false
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     env:
       CC: clang
       CXX: clang++
@@ -205,14 +188,11 @@ jobs:
       #CMAKE_GENERATOR: Ninja
     steps:
     - name: Checkout code
-      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/checkout@v4
     - name: Install dependencies
-      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         .github/workflows/dependencies/pyfull.sh
     - name: CCache Cache
-      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
@@ -220,7 +200,6 @@ jobs:
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: Build WarpX
-      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -238,7 +217,6 @@ jobs:
         ccache -s
         du -hs ~/.cache/ccache
     - name: Run pywarpx
-      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export OMP_NUM_THREADS=1
         mpirun -n 2 Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_picmi.py

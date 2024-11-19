@@ -27,15 +27,12 @@ jobs:
       #CMAKE_GENERATOR: Ninja
     steps:
     - name: Checkout code
-      #if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/checkout@v4
     - name: Install Python
-      #if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/setup-python@v5
       with:
         python-version: '3.x'
     - name: Install brew dependencies
-      #if: needs.skip_checks.outputs.skip == 'false'
       run: |
         set +e
         brew unlink gcc
@@ -52,14 +49,12 @@ jobs:
         brew tap openpmd/openpmd
         brew install openpmd-api
     - name: Install pip dependencies
-      #if: needs.skip_checks.outputs.skip == 'false'
       run: |
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade build packaging setuptools wheel
         python3 -m pip install --upgrade mpi4py
         python3 -m pip install --upgrade -r Regression/requirements.txt
     - name: CCache Cache
-      #if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/Library/Caches/ccache
@@ -67,7 +62,6 @@ jobs:
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: Build WarpX
-      #if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -93,7 +87,6 @@ jobs:
         du -hs ~/Library/Caches/ccache
         ccache -s
     - name: Run pywarpx
-      #if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export OMP_NUM_THREADS=1
         mpirun -n 2 Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_picmi.py

@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-22.04
     container: ubuntu:23.10
     needs: skip_checks
-    if: github.event.pull_request.draft == false
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     env:
       CC: clang
       CXX: clang++
@@ -29,14 +29,11 @@ jobs:
       #CMAKE_GENERATOR: Ninja
     steps:
     - name: Checkout code
-      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/checkout@v4
     - name: Install dependencies
-      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         .github/workflows/dependencies/clang17.sh
     - name: CCache Cache
-      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
@@ -44,7 +41,6 @@ jobs:
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: Build WarpX
-      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -68,7 +64,6 @@ jobs:
         ccache -s
         du -hs ~/.cache/ccache
     - name: Run with UB sanitizer
-      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         # We need these two lines because these tests run inside a docker container
         export OMPI_ALLOW_RUN_AS_ROOT=1
@@ -85,7 +80,7 @@ jobs:
     runs-on: ubuntu-22.04
     container: ubuntu:23.10
     needs: skip_checks
-    if: github.event.pull_request.draft == false
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     env:
       CC: clang
       CXX: clang++
@@ -93,14 +88,11 @@ jobs:
       #CMAKE_GENERATOR: Ninja
     steps:
     - name: Checkout code
-      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/checkout@v4
     - name: Install dependencies
-      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         .github/workflows/dependencies/clang17.sh
     - name: CCache Cache
-      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
@@ -108,7 +100,6 @@ jobs:
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: Build WarpX
-      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -146,7 +137,6 @@ jobs:
         ccache -s
         du -hs ~/.cache/ccache
     - name: Run with thread sanitizer
-      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export PMIX_MCA_gds=hash
         export TSAN_OPTIONS='ignore_noninstrumented_modules=1'
