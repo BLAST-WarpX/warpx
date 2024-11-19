@@ -3,6 +3,7 @@ on:
   workflow_call:
 jobs:
   skip_checks:
+    name: Skip checks?
     runs-on: macos-latest
     steps:
       - name: Checkout code
