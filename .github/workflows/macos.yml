@@ -11,24 +11,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-
+  #skip_checks:
+  #  name: Skip checks?
+  #  runs-on: macos-latest
+  #  steps:
+  #    - name: Checkout code
+  #      uses: actions/checkout@v4
+  #      with:
+  #        fetch-depth: 0
+  #    - name: Run PR analysis
+  #      run: |
+  #        .github/workflows/scripts/check_diff.sh     \
+  #          ${{ github.event.pull_request.head.ref }} \
+  #          ${{ github.event.pull_request.base.ref }} \
+  #          ${{ github.event.pull_request.head.repo.clone_url }}
+  #  outputs:
+  #    skip: ${{ env.SKIP_CHECKS }}
   skip_checks:
-    name: Skip checks?
-    runs-on: macos-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Run PR analysis
-        run: |
-          .github/workflows/scripts/check_diff.sh     \
-            ${{ github.event.pull_request.head.ref }} \
-            ${{ github.event.pull_request.base.ref }} \
-            ${{ github.event.pull_request.head.repo.clone_url }}
-    outputs:
-      skip: ${{ env.SKIP_CHECKS }}
-
+    uses: ./.github/workflows/skip_checks.yml
   build_appleclang:
     name: AppleClang
     runs-on: macos-latest
