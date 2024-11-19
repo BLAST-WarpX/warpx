@@ -15,7 +15,7 @@ jobs:
     name: Analyze
     uses: ./.github/workflows/skip_checks.yml
     with:
-      runs-on: macos-latest
+      runs-on: ubuntu-latest
   sensei:
     name: SENSEI
     runs-on: ubuntu-20.04
