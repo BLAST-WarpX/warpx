@@ -35,8 +35,8 @@ paths_ignore_string=$(IFS='|'; echo "${paths_ignore[*]}")
 # Set skip variable after inspecting files changed
 if ! grep -qEv "^(${paths_ignore_string})" check_diff.txt; then
   echo "Skip checks"
-  echo "SKIP_CHECKS=true" >> ${GITHUB_ENV}
+  echo "SKIP_CHECKS='true'" >> ${GITHUB_ENV}
 else
   echo "Run checks"
-  echo "SKIP_CHECKS=false" >> ${GITHUB_ENV}
+  echo "SKIP_CHECKS='false'" >> ${GITHUB_ENV}
 fi
