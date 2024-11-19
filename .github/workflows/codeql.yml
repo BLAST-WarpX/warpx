@@ -30,7 +30,7 @@ jobs:
     outputs:
       skip: ${{ env.SKIP_CHECKS }}
   analyze:
-    name: Analyze
+    name: Query code
     runs-on: ubuntu-latest
     needs: skip_checks
     if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
