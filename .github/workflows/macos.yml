@@ -12,36 +12,31 @@ concurrency:
 
 jobs:
   skip_checks:
-    name: Skip
+    name: Analyze PR
     runs-on: macos-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Analyze PR
+      - name: Skip checks?
         run: |
           .github/workflows/scripts/check_diff.sh     \
             ${{ github.event.pull_request.head.ref }} \
             ${{ github.event.pull_request.base.ref }} \
             ${{ github.event.pull_request.head.repo.clone_url }}
-      - name: Debug
-        run: echo "env.SKIP_CHECKS=${{ env.SKIP_CHECKS }}"
     outputs:
       skip: ${{ env.SKIP_CHECKS }}
   build_appleclang:
     name: AppleClang
     runs-on: macos-latest
     needs: skip_checks
-    #if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
-    if: ${{ github.event.pull_request.draft == false }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     env:
       HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: TRUE
       # For macOS, Ninja is slower than the default:
       #CMAKE_GENERATOR: Ninja
     steps:
-    - name: Debugging
-      run: echo "SKIP=${{ needs.skip_checks.outputs.skip }}"
     - name: Checkout code
       uses: actions/checkout@v4
     - name: Install Python

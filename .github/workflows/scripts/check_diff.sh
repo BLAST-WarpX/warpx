@@ -24,8 +24,8 @@ cat check_diff.txt
 # Set paths to ignore
 paths_ignore=()
 paths_ignore+=("Docs/")
-paths_ignore+=(".github/")
-paths_ignore+=(".azure-pipelines.yml")
+#paths_ignore+=(".github/")
+#paths_ignore+=(".azure-pipelines.yml")
 echo "Paths to ignore:"
 echo ${paths_ignore[@]}
 
