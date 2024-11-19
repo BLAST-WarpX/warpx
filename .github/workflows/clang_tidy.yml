@@ -5,14 +5,17 @@ on:
     branches:
       - "development"
   pull_request:
-    paths-ignore:
-      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-clangtidy
   cancel-in-progress: true
 
 jobs:
+  skip_checks:
+    name: Analyze
+    uses: ./.github/workflows/skip_checks.yml
+    with:
+      runs-on: ubuntu-latest
   run_clang_tidy:
     strategy:
       matrix:
@@ -20,20 +23,26 @@ jobs:
     name: clang-tidy-${{ matrix.dim }}D
     runs-on: ubuntu-22.04
     timeout-minutes: 180
+    needs: skip_checks
     if: github.event.pull_request.draft == false
     steps:
-    - uses: actions/checkout@v4
-    - name: install dependencies
+    - name: Checkout code
+      if: needs.skip_checks.outputs.skip == 'false'
+      uses: actions/checkout@v4
+    - name: Install dependencies
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         .github/workflows/dependencies/clang15.sh
-    - name: set up cache
+    - name: Set up cache
+      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: build WarpX & run clang-tidy
+    - name: Build WarpX & run clang-tidy
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -41,10 +50,8 @@ jobs:
         export CCACHE_EXTRAFILES=${{ github.workspace }}/.clang-tidy
         export CCACHE_LOGFILE=${{ github.workspace }}/ccache.log.txt
         ccache -z
-
         export CXX=$(which clang++-15)
         export CC=$(which clang-15)
-
         cmake -S . -B build_clang_tidy      \
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
           -DWarpX_DIMS="${{ matrix.dim }}"  \
@@ -56,13 +63,10 @@ jobs:
           -DWarpX_OPENPMD=ON                \
           -DWarpX_PRECISION=SINGLE          \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-
         cmake --build build_clang_tidy -j 4
-
         ${{github.workspace}}/.github/workflows/source/makeMakefileForClangTidy.py --input ${{github.workspace}}/ccache.log.txt
         make -j4 --keep-going -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-15 \
             CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
-
         ccache -s
         du -hs ~/.cache/ccache
