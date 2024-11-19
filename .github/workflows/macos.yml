@@ -12,28 +12,23 @@ concurrency:
 
 jobs:
   skip_checks:
-    name: Analyze
-    uses: ./.github/workflows/skip_checks.yml
-    with:
-      runs-on: macos-latest
-  #skip_checks:
-  #  name: Skip
-  #  runs-on: macos-latest
-  #  steps:
-  #    - name: Checkout code
-  #      uses: actions/checkout@v4
-  #      with:
-  #        fetch-depth: 0
-  #    - name: Analyze PR
-  #      run: |
-  #        .github/workflows/scripts/check_diff.sh     \
-  #          ${{ github.event.pull_request.head.ref }} \
-  #          ${{ github.event.pull_request.base.ref }} \
-  #          ${{ github.event.pull_request.head.repo.clone_url }}
-  #    - name: Debug
-  #      run: echo "env.SKIP_CHECKS=${{ env.SKIP_CHECKS }}"
-  #  outputs:
-  #    skip: ${{ env.SKIP_CHECKS }}
+    name: Skip
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Analyze PR
+        run: |
+          .github/workflows/scripts/check_diff.sh     \
+            ${{ github.event.pull_request.head.ref }} \
+            ${{ github.event.pull_request.base.ref }} \
+            ${{ github.event.pull_request.head.repo.clone_url }}
+      - name: Debug
+        run: echo "env.SKIP_CHECKS=${{ env.SKIP_CHECKS }}"
+    outputs:
+      skip: ${{ env.SKIP_CHECKS }}
   build_appleclang:
     name: AppleClang
     runs-on: macos-latest
