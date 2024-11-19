@@ -26,6 +26,8 @@ jobs:
       # For macOS, Ninja is slower than the default:
       #CMAKE_GENERATOR: Ninja
     steps:
+    - name: Debugging
+      run: echo "SKIP=${{ needs.skip_checks.outputs }}"
     - name: Checkout code
       uses: actions/checkout@v4
     - name: Install Python
