@@ -1,6 +1,9 @@
 name: 🍏 macOS
 
 on:
+  push:
+    branches:
+      - "development"
   pull_request:
 
 concurrency:
@@ -17,7 +20,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Run PR analysis script
+      - name: Run PR analysis
         run: |
           .github/workflows/scripts/check_diff.sh     \
             ${{ github.event.pull_request.head.ref }} \
@@ -31,73 +34,71 @@ jobs:
     runs-on: macos-latest
     needs: skip_checks
     if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
+    env:
+      HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: TRUE
+      # For macOS, Ninja is slower than the default:
+      #CMAKE_GENERATOR: Ninja
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Install Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-      - name: Install brew dependencies
-        run: |
-          set +e
-          brew unlink gcc
-          brew update
-          brew upgrade || true
-          brew install ccache
-          brew install fftw
-          brew install libomp
-          brew link --overwrite --force libomp
-          brew install ninja
-          brew install open-mpi
-          brew install pkg-config
-          set -e
-          brew tap openpmd/openpmd
-          brew install openpmd-api
-      - name: Install pip dependencies
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install --upgrade build packaging setuptools wheel
-          python3 -m pip install --upgrade mpi4py
-          python3 -m pip install --upgrade -r Regression/requirements.txt
-      - name: CCache Cache
-        uses: actions/cache@v4
-        with:
-          path: ~/Library/Caches/ccache
-          key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
-          restore-keys: |
-               ccache-${{ github.workflow }}-${{ github.job }}-git-
-      - name: Build WarpX
-        run: |
-          export CCACHE_COMPRESS=1
-          export CCACHE_COMPRESSLEVEL=10
-          export CCACHE_MAXSIZE=100M
-          export CCACHE_SLOPPINESS=time_macros
-          ccache -z
-
-          export CXXFLAGS="-Werror -Wno-error=pass-failed"
-
-          cmake -S . -B build_dp         \
-            -DCMAKE_VERBOSE_MAKEFILE=ON  \
-            -DWarpX_EB=OFF               \
-            -DWarpX_OPENPMD=ON           \
-            -DWarpX_openpmd_internal=OFF
-          cmake --build build_dp -j 3
-
-          cmake -S . -B build_sp         \
-            -DCMAKE_VERBOSE_MAKEFILE=ON  \
-            -DWarpX_EB=OFF               \
-            -DWarpX_PYTHON=ON            \
-            -DWarpX_OPENPMD=ON           \
-            -DWarpX_openpmd_internal=OFF \
-            -DWarpX_PRECISION=SINGLE
-          cmake --build build_sp -j 3
-          cmake --build build_sp --target pip_install
-
-          du -hs ~/Library/Caches/ccache
-          ccache -s
-      - name: Run pywarpx
-        run: |
-          export OMP_NUM_THREADS=1
-
-          mpirun -n 2 Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_picmi.py
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      name: Install Python
+      with:
+        python-version: '3.x'
+    - name: install brew dependencies
+      run: |
+        set +e
+        brew unlink gcc
+        brew update
+        brew upgrade || true
+        brew install ccache
+        brew install fftw
+        brew install libomp
+        brew link --overwrite --force libomp
+        brew install ninja
+        brew install open-mpi
+        brew install pkg-config
+        set -e
+        brew tap openpmd/openpmd
+        brew install openpmd-api
+    - name: install pip dependencies
+      run: |
+        python3 -m pip install --upgrade pip
+        python3 -m pip install --upgrade build packaging setuptools wheel
+        python3 -m pip install --upgrade mpi4py
+        python3 -m pip install --upgrade -r Regression/requirements.txt
+    - name: CCache Cache
+      uses: actions/cache@v4
+      with:
+        path: ~/Library/Caches/ccache
+        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
+        restore-keys: |
+             ccache-${{ github.workflow }}-${{ github.job }}-git-
+    - name: build WarpX
+      run: |
+        export CCACHE_COMPRESS=1
+        export CCACHE_COMPRESSLEVEL=10
+        export CCACHE_MAXSIZE=100M
+        export CCACHE_SLOPPINESS=time_macros
+        ccache -z
+        export CXXFLAGS="-Werror -Wno-error=pass-failed"
+        cmake -S . -B build_dp         \
+          -DCMAKE_VERBOSE_MAKEFILE=ON  \
+          -DWarpX_EB=OFF               \
+          -DWarpX_OPENPMD=ON           \
+          -DWarpX_openpmd_internal=OFF
+        cmake --build build_dp -j 3
+        cmake -S . -B build_sp         \
+          -DCMAKE_VERBOSE_MAKEFILE=ON  \
+          -DWarpX_EB=OFF               \
+          -DWarpX_PYTHON=ON            \
+          -DWarpX_OPENPMD=ON           \
+          -DWarpX_openpmd_internal=OFF \
+          -DWarpX_PRECISION=SINGLE
+        cmake --build build_sp -j 3
+        cmake --build build_sp --target pip_install
+        du -hs ~/Library/Caches/ccache
+        ccache -s
+    - name: run pywarpx
+      run: |
+        export OMP_NUM_THREADS=1
+        mpirun -n 2 Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_picmi.py

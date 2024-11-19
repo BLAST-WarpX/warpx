@@ -3,14 +3,12 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set -o xtrace
 
 # Parse command line arguments
 head_ref=${1}
 base_ref=${2}
 clone_url=${3}
-
-# Set paths to ignore
-paths_ignore="^(Docs|\.github)/|\.azure-pipelines\.yml$"
 
 # Add forked repository as remote
 git remote add fork ${clone_url}
@@ -23,12 +21,20 @@ git fetch fork ${head_ref}
 
 # Save output of git diff to inspect files changed
 git diff --name-only --diff-filter=ACMRTUXB origin/${base_ref}..fork/${head_ref} > check_diff.txt
+echo "Files changed:"
+cat check_diff.txt
+
+# Set paths to ignore
+paths_ignore=()
+paths_ignore+=("Docs/")
+paths_ignore+=(".github/")
+paths_ignore+=(".azure-pipelines.yml")
+
+# Set string for grep command
+paths_ignore_string=$(IFS='|'; echo "${paths_ignore[*]}")
 
 # Set skip variable after inspecting files changed
-skip=$(grep -v -E "${paths_ignore}" check_diff.txt)
-
-# Set an environment variable based on the output
-if [ -z "$skip" ]; then
+if ! grep -qEv "^(${paths_ignore_string})" check_diff.txt; then
   echo "SKIP_CHECKS=true" >> $GITHUB_ENV
 else
   echo "SKIP_CHECKS=false" >> $GITHUB_ENV
