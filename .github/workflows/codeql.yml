@@ -13,92 +13,88 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  skip_checks:
+    name: Analyze
+    uses: ./.github/workflows/skip_checks.yml
+    with:
+      runs-on: ubuntu-latest
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
+    needs: skip_checks
     if: github.event.pull_request.draft == false
     permissions:
       actions: read
       contents: read
       security-events: write
-
     strategy:
       fail-fast: false
       matrix:
         language: [ python, cpp ]
-
     steps:
-      - name: Checkout
+      - name: Checkout code
+        if: needs.skip_checks.outputs.skip == 'false'
         uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        name: Install Python
+      - name: Install Python
+        if: needs.skip_checks.outputs.skip == 'false'
+        uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-
       - name: Install Packages (C++)
-        if: ${{ matrix.language == 'cpp' }}
+        if: ${{ needs.skip_checks.outputs.skip == 'false' && matrix.language == 'cpp' }}
         run: |
           sudo apt-get update
           sudo apt-get install --yes cmake openmpi-bin libopenmpi-dev libhdf5-openmpi-dev libadios-openmpi-dev ccache
-
           python -m pip install --upgrade pip
           python -m pip install --upgrade pipx
           python -m pip install --upgrade wheel
           python -m pip install --upgrade cmake
           python -m pipx install cmake
-
       - name: Set Up Cache
-        if: ${{ matrix.language == 'cpp' }}
+        if: ${{ needs.skip_checks.outputs.skip == 'false' && matrix.language == 'cpp' }}
         uses: actions/cache@v4
         with:
           path: ~/.cache/ccache
           key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
           restore-keys: |
                ccache-${{ github.workflow }}-${{ github.job }}-git-
-
       - name: Configure (C++)
-        if: ${{ matrix.language == 'cpp' }}
+        if: ${{ needs.skip_checks.outputs.skip == 'false' && matrix.language == 'cpp' }}
         run: |
           cmake -S . -B build -DWarpX_OPENPMD=ON
-
       - name: Initialize CodeQL
+        if: needs.skip_checks.outputs.skip == 'false'
         uses: github/codeql-action/init@v3
         with:
           config-file: ./.github/codeql/warpx-codeql.yml
           languages: ${{ matrix.language }}
           queries: +security-and-quality
-
       - name: Build (py)
+        if: ${{ needs.skip_checks.outputs.skip == 'false' && matrix.language == 'python' }}
         uses: github/codeql-action/autobuild@v3
-        if: ${{ matrix.language == 'python' }}
-
       - name: Build (C++)
-        if: ${{ matrix.language == 'cpp' }}
+        if: ${{ needs.skip_checks.outputs.skip == 'false' && matrix.language == 'cpp' }}
         run: |
           export CCACHE_COMPRESS=1
           export CCACHE_COMPRESSLEVEL=10
           export CCACHE_MAXSIZE=100M
           ccache -z
-
           cmake --build build -j 4
-
           ccache -s
           du -hs ~/.cache/ccache
-
           # Make sure CodeQL has something to do
           touch Source/Utils/WarpXVersion.cpp
           export CCACHE_DISABLE=1
           cmake --build build -j 4
-
       - name: Perform CodeQL Analysis
+        if: needs.skip_checks.outputs.skip == 'false'
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
           upload: False
           output: sarif-results
-
       - name: filter-sarif
+        if: needs.skip_checks.outputs.skip == 'false'
         uses: advanced-security/filter-sarif@v1
         with:
           patterns: |
@@ -111,8 +107,8 @@ jobs:
             -build/_deps/*/*/*/*/*/*/*/*
           input: sarif-results/${{ matrix.language }}.sarif
           output: sarif-results/${{ matrix.language }}.sarif
-
       - name: Upload SARIF
+        if: needs.skip_checks.outputs.skip == 'false'
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: sarif-results/${{ matrix.language }}.sarif
