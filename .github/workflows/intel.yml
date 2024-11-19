@@ -5,8 +5,6 @@ on:
     branches:
       - "development"
   pull_request:
-    paths-ignore:
-      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-intel
@@ -15,42 +13,50 @@ concurrency:
 jobs:
 # Ref.: https://github.com/rscohn2/oneapi-ci
 # intel-basekit intel-hpckit are too large in size
+  skip_checks:
+    name: Analyze
+    uses: ./.github/workflows/skip_checks.yml
+    with:
+      runs-on: macos-latest
   build_icc:
     name: oneAPI ICC SP&DP
     runs-on: ubuntu-20.04
+    needs: skip_checks
     if: github.event.pull_request.draft == false
     # For oneAPI, Ninja is slower than the default:
     #env:
     #  CMAKE_GENERATOR: Ninja
     steps:
-    - uses: actions/checkout@v4
-    - name: install dependencies
+    - name: Checkout code
+      if: needs.skip_checks.outputs.skip == 'false'
+      uses: actions/checkout@v4
+    - name: Install dependencies
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         .github/workflows/dependencies/icc.sh
     - name: CCache Cache
+      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: build WarpX
+    - name: Build WarpX
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
         export CCACHE_MAXSIZE=200M
         export CCACHE_DEPEND=1
         ccache -z
-
         set +eu
         source /opt/intel/oneapi/setvars.sh
         set -eu
         export CXX=$(which icpc)
         export CC=$(which icc)
-
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade build packaging setuptools wheel
-
         cmake -S . -B build_dp \
           -DCMAKE_VERBOSE_MAKEFILE=ON \
           -DpyAMReX_IPO=OFF           \
@@ -60,7 +66,6 @@ jobs:
           -DWarpX_OPENPMD=ON          \
           -DWarpX_openpmd_internal=OFF
         cmake --build build_dp -j 4
-
         cmake -S . -B build_sp \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DpyAMReX_IPO=OFF            \
@@ -72,10 +77,8 @@ jobs:
           -DWarpX_PRECISION=SINGLE
         cmake --build build_sp -j 4
         cmake --build build_sp --target pip_install
-
         ccache -s
         du -hs ~/.cache/ccache
-
   build_icpx:
     name: oneAPI ICX SP
     runs-on: ubuntu-20.04
@@ -86,21 +89,27 @@ jobs:
       CXXFLAGS: "-Werror -Wno-error=pass-failed -Wno-tautological-constant-compare"
     # For oneAPI, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja
+    needs: skip_checks
     if: github.event.pull_request.draft == false
     steps:
-    - uses: actions/checkout@v4
-    - name: install dependencies
+    - name: Checkout code
+      if: needs.skip_checks.outputs.skip == 'false'
+      uses: actions/checkout@v4
+    - name: Install dependencies
+      if: needs.skip_checks.outputs.skip == 'false'
       shell: bash
       run: |
         .github/workflows/dependencies/dpcpp.sh
     - name: CCache Cache
+      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: build WarpX
+    - name: Build WarpX
+      if: needs.skip_checks.outputs.skip == 'false'
       shell: bash
       run: |
         export CCACHE_COMPRESS=1
@@ -108,17 +117,14 @@ jobs:
         export CCACHE_MAXSIZE=100M
         export CCACHE_DEPEND=1
         ccache -z
-
         set +e
         source /opt/intel/oneapi/setvars.sh
         set -e
         export PATH=$PATH:/opt/intel/oneapi/compiler/2024.2/bin  # FIXME
         export CXX=$(which icpx)
         export CC=$(which icx)
-
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade build packaging setuptools wheel
-
         cmake -S . -B build_sp         \
           -DCMAKE_CXX_FLAGS_RELEASE="-O1 -DNDEBUG" \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
@@ -129,18 +135,16 @@ jobs:
           -DWarpX_PRECISION=SINGLE
         cmake --build build_sp -j 4
         cmake --build build_sp --target pip_install
-
         ccache -s
         du -hs ~/.cache/ccache
-
-    - name: run pywarpx
+    - name: Run pywarpx
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         set +e
         source /opt/intel/oneapi/setvars.sh
         set -e
         export OMP_NUM_THREADS=2
         Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_picmi.py
-
   build_dpcc:
     name: oneAPI DPC++ SP
     runs-on: ubuntu-20.04
@@ -151,21 +155,27 @@ jobs:
       CXXFLAGS: "-Werror -Wno-tautological-constant-compare"
     # For oneAPI, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja
+    needs: skip_checks
     if: github.event.pull_request.draft == false
     steps:
-    - uses: actions/checkout@v4
-    - name: install dependencies
+    - name: Checkout code
+      if: needs.skip_checks.outputs.skip == 'false'
+      uses: actions/checkout@v4
+    - name: Install dependencies
+      if: needs.skip_checks.outputs.skip == 'false'
       shell: bash
       run: |
         .github/workflows/dependencies/dpcpp.sh
     - name: CCache Cache
+      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: build WarpX
+    - name: Build WarpX
+      if: needs.skip_checks.outputs.skip == 'false'
       shell: bash
       run: |
         export CCACHE_COMPRESS=1
@@ -173,7 +183,6 @@ jobs:
         export CCACHE_MAXSIZE=100M
         export CCACHE_DEPEND=1
         ccache -z
-
         set +e
         source /opt/intel/oneapi/setvars.sh
         set -e
@@ -181,7 +190,6 @@ jobs:
         export CXX=$(which icpx)
         export CC=$(which icx)
         export CXXFLAGS="-fsycl ${CXXFLAGS}"
-
         cmake -S . -B build_sp         \
           -DCMAKE_CXX_FLAGS_RELEASE="-O1 -DNDEBUG" \
           -DBUILD_SHARED_LIBS=ON       \
@@ -194,10 +202,8 @@ jobs:
           -DWarpX_OPENPMD=ON           \
           -DWarpX_PRECISION=SINGLE
         cmake --build build_sp -j 4
-
         ccache -s
         du -hs ~/.cache/ccache
-
      # Skip this as it will copy the binary artifacts and we are tight on disk space
      #   python3 -m pip install --upgrade pip
      #   python3 -m pip install --upgrade build packaging setuptools wheel
