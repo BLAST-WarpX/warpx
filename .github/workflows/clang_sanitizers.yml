@@ -84,6 +84,7 @@ jobs:
     name: Clang thread sanitizer
     runs-on: ubuntu-22.04
     container: ubuntu:23.10
+    needs: skip_checks
     if: github.event.pull_request.draft == false
     env:
       CC: clang
