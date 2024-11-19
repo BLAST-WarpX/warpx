@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 180
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == 'false' }}
+    if: ${{ github.event.pull_request.draft == false }}
     steps:
     - name: Checkout code
       if: ${{ needs.skip_checks.outputs.skip == 'false' }}
@@ -63,16 +63,16 @@ jobs:
         ccache -z
         export CXX=$(which clang++-15)
         export CC=$(which clang-15)
-        cmake -S . -B build_clang_tidy      \
-          -DCMAKE_VERBOSE_MAKEFILE=ON       \
-          -DWarpX_DIMS="${{ matrix.dim }}"  \
-          -DWarpX_MPI=ON                    \
-          -DWarpX_COMPUTE=OMP               \
-          -DWarpX_FFT=ON                    \
-          -DWarpX_QED=ON                    \
-          -DWarpX_QED_TABLE_GEN=ON          \
-          -DWarpX_OPENPMD=ON                \
-          -DWarpX_PRECISION=SINGLE          \
+        cmake -S . -B build_clang_tidy     \
+          -DCMAKE_VERBOSE_MAKEFILE=ON      \
+          -DWarpX_DIMS="${{ matrix.dim }}" \
+          -DWarpX_MPI=ON                   \
+          -DWarpX_COMPUTE=OMP              \
+          -DWarpX_FFT=ON                   \
+          -DWarpX_QED=ON                   \
+          -DWarpX_QED_TABLE_GEN=ON         \
+          -DWarpX_OPENPMD=ON               \
+          -DWarpX_PRECISION=SINGLE         \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         cmake --build build_clang_tidy -j 4
         ${{github.workspace}}/.github/workflows/source/makeMakefileForClangTidy.py --input ${{github.workspace}}/ccache.log.txt
