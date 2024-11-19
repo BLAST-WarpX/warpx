@@ -14,15 +14,26 @@ jobs:
 # Ref.: https://github.com/rscohn2/oneapi-ci
 # intel-basekit intel-hpckit are too large in size
   skip_checks:
-    name: Analyze
-    uses: ./.github/workflows/skip_checks.yml
-    with:
-      runs-on: ubuntu-latest
+    name: Analyze PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Skip checks?
+        run: |
+          .github/workflows/scripts/check_diff.sh     \
+            ${{ github.event.pull_request.head.ref }} \
+            ${{ github.event.pull_request.base.ref }} \
+            ${{ github.event.pull_request.head.repo.clone_url }}
+    outputs:
+      skip: ${{ env.SKIP_CHECKS }}
   build_icc:
     name: oneAPI ICC SP&DP
     runs-on: ubuntu-20.04
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     # For oneAPI, Ninja is slower than the default:
     #env:
     #  CMAKE_GENERATOR: Ninja
@@ -86,7 +97,7 @@ jobs:
     # For oneAPI, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -147,7 +158,7 @@ jobs:
     # For oneAPI, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4

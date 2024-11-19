@@ -12,15 +12,26 @@ concurrency:
 
 jobs:
   skip_checks:
-    name: Analyze
-    uses: ./.github/workflows/skip_checks.yml
-    with:
-      runs-on: ubuntu-latest
+    name: Analyze PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Skip checks?
+        run: |
+          .github/workflows/scripts/check_diff.sh     \
+            ${{ github.event.pull_request.head.ref }} \
+            ${{ github.event.pull_request.base.ref }} \
+            ${{ github.event.pull_request.head.repo.clone_url }}
+    outputs:
+      skip: ${{ env.SKIP_CHECKS }}
   sensei:
     name: SENSEI
     runs-on: ubuntu-20.04
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     env:
       CXX: clang++
       CC: clang
@@ -47,7 +58,7 @@ jobs:
     name: Ascent
     runs-on: ubuntu-20.04
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     env:
       CXX: g++
       CC: gcc
@@ -88,7 +99,7 @@ jobs:
     name: Catalyst
     runs-on: ubuntu-22.04
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     env:
       CXX: g++
       CC: gcc
