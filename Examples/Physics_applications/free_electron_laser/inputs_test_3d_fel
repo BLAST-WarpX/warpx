@@ -67,6 +67,7 @@ electrons.xmin = -130e-6
 electrons.ymax = 130e-6
 electrons.ymin = -130e-6
 electrons.zinject_plane=0.0
+electrons.rigid_advance = 0
 
 positrons.charge = q_e
 positrons.injection_style = nuniformpercell
@@ -85,6 +86,7 @@ positrons.xmin = -130e-6
 positrons.ymax = 130e-6
 positrons.ymin = -130e-6
 positrons.zinject_plane=0.0
+positrons.rigid_advance = 0
 
 warpx.do_moving_window = 1
 warpx.moving_window_dir = z

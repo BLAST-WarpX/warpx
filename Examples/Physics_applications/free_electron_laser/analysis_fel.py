@@ -88,7 +88,8 @@ print(f"lambda_expected: {lambda_expected}")
 assert abs(lambda_radiation_lab - lambda_expected) / lambda_expected < 0.01
 
 # Analyze the diagnostics showing quantities in the boosted frame
-ts = OpenPMDTimeSeries("diags/diag_boostedframe")
+root = os.path.split(filename)[0]
+ts = OpenPMDTimeSeries(root + "/diag_boostedframe")
 
 
 # Extract the growth of the peak electric field
