@@ -5,17 +5,21 @@ on:
     branches:
       - "development"
   pull_request:
-    paths-ignore:
-      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-insituvis
   cancel-in-progress: true
 
 jobs:
+  skip_checks:
+    name: Analyze
+    uses: ./.github/workflows/skip_checks.yml
+    with:
+      runs-on: macos-latest
   sensei:
     name: SENSEI
     runs-on: ubuntu-20.04
+    needs: skip_checks
     if: github.event.pull_request.draft == false
     env:
       CXX: clang++
@@ -27,21 +31,26 @@ jobs:
     container:
       image: senseiinsitu/ci:fedora35-amrex-20220613
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      if: needs.skip_checks.outputs.skip == 'false'
+      uses: actions/checkout@v4
     - name: Setup cmake
+      if: needs.skip_checks.outputs.skip == 'false'
       uses: jwlawson/actions-setup-cmake@v2
     - name: Configure
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         cmake -S . -B build     \
           -DWarpX_SENSEI=ON     \
           -DWarpX_COMPUTE=NOACC
     - name: Build
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         cmake --build build -j 4
-
   ascent:
     name: Ascent
     runs-on: ubuntu-20.04
+    needs: skip_checks
     if: github.event.pull_request.draft == false
     env:
       CXX: g++
@@ -51,18 +60,23 @@ jobs:
     container:
       image: alpinedav/ascent:0.9.2
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      if: needs.skip_checks.outputs.skip == 'false'
+      uses: actions/checkout@v4
     - name: Configure
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         . /ascent_docker_setup_env.sh
         cmake -S . -B build   \
             -DWarpX_ASCENT=ON \
             -DWarpX_COMPUTE=NOACC
     - name: Build
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         . /ascent_docker_setup_env.sh
         cmake --build build -j 4
     - name: Test
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         cp Examples/Physics_applications/laser_acceleration/inputs_base_3d .
         cp Examples/Physics_applications/laser_acceleration/3d_ascent_actions.yaml ascent_actions.yaml
@@ -72,16 +86,17 @@ jobs:
             diag1.intervals = 30:40:10 \
             diag1.format = ascent
     - uses: actions/upload-artifact@v4
+      if: needs.skip_checks.outputs.skip == 'false'
       with:
         name: ascent-test-artifacts
         path: |
           *.png
           conduit_*
         if-no-files-found: error
-
   catalyst:
     name: Catalyst
     runs-on: ubuntu-22.04
+    needs: skip_checks
     if: github.event.pull_request.draft == false
     env:
       CXX: g++
@@ -90,22 +105,26 @@ jobs:
       CATALYST_DEBUG: 1
       CATALYST_IMPLEMENTATION_PATHS: /opt/paraview/lib/catalyst
       OMP_NUM_THREADS: 1
-
     # Container build scripts:
     # https://gitlab.kitware.com/christos.tsolakis/catalyst-amrex-docker-images
     container:
       image: kitware/paraview:ci-catalyst-amrex-warpx-20240828
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      if: needs.skip_checks.outputs.skip == 'false'
+      uses: actions/checkout@v4
     - name: Configure
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         cmake -S . -B build   \
             -DWarpX_DIMS="2;3" \
             -DWarpX_CATALYST=ON
     - name: Build
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         cmake --build build -j 10
     - name: 2D Test
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         cp Examples/Tests/field_ionization/inputs_test_2d_ionization_lab .
         cp Examples/Tests/field_ionization/catalyst_pipeline.py .
@@ -117,6 +136,7 @@ jobs:
             diag1.species = "electrons ions"\
             diag1.format = catalyst
     - name: 3D Test
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         cp Examples/Tests/electrostatic_sphere/inputs_base_3d .
         cp Examples/Tests/electrostatic_sphere/catalyst_pipeline.py .
@@ -128,6 +148,7 @@ jobs:
             diag1.format = catalyst\
             diag1.intervals = 3
     - uses: actions/upload-artifact@v4
+      if: needs.skip_checks.outputs.skip == 'false'
       with:
         name: catalyst-test-artifacts
         path: |
