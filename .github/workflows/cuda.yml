@@ -5,8 +5,6 @@ on:
     branches:
       - "development"
   pull_request:
-    paths-ignore:
-      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-cuda
@@ -17,43 +15,52 @@ jobs:
 #   https://gitlab.com/nvidia/container-images/cuda/-/blob/master/dist/ubuntu18.04/10.1/base/Dockerfile
 #   https://github.com/ComputationalRadiationPhysics/picongpu/blob/0.5.0/share/picongpu/dockerfiles/ubuntu-1604/Dockerfile
 #   https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/
+  skip_checks:
+    name: Analyze
+    uses: ./.github/workflows/skip_checks.yml
+    with:
+      runs-on: ubuntu-latest
   build_nvcc:
     name: NVCC 11.3 SP
     runs-on: ubuntu-20.04
+    needs: skip_checks
     if: github.event.pull_request.draft == false
     env:
       CXXFLAGS: "-Werror"
       CMAKE_GENERATOR: Ninja
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
-      name: Install Python
+    - name: Checkout code
+      if: needs.skip_checks.outputs.skip == 'false'
+      uses: actions/checkout@v4
+    - name: Install Python
+      if: needs.skip_checks.outputs.skip == 'false'
+      uses: actions/setup-python@v5
       with:
         python-version: '3.x'
-    - name: install dependencies
+    - name: Install dependencies
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         .github/workflows/dependencies/nvcc11-3.sh
     - name: CCache Cache
+      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: install openPMD-api
+    - name: Install openPMD-api
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
         export CCACHE_MAXSIZE=600M
         ccache -z
-
         export CEI_SUDO="sudo"
         export CEI_TMP="/tmp/cei"
-
         export PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
         export LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
         which nvcc || echo "nvcc not in PATH!"
-
         cmake-easyinstall --prefix=/usr/local \
           git+https://github.com/openPMD/openPMD-api.git@0.15.1 \
           -DopenPMD_USE_PYTHON=OFF    \
@@ -62,16 +69,15 @@ jobs:
           -DBUILD_CLI_TOOLS=OFF       \
           -DCMAKE_CXX_COMPILER_LAUNCHER=$(which ccache) \
           -DCMAKE_VERBOSE_MAKEFILE=ON
-    - name: build WarpX
+    - name: Build WarpX
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
         export CCACHE_MAXSIZE=600M
-
         export PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
         export LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
         which nvcc || echo "nvcc not in PATH!"
-
         cmake -S . -B build_sp         \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_COMPUTE=CUDA         \
@@ -85,65 +91,69 @@ jobs:
           -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON \
           -DAMReX_CUDA_ERROR_CAPTURE_THIS=ON
         cmake --build build_sp -j 4
-
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade build packaging setuptools wheel
         export WARPX_MPI=ON
         export PYWARPX_LIB_DIR=$PWD/build_sp/lib/site-packages/pywarpx/
         python3 -m pip wheel .
         python3 -m pip install *.whl
-
         ccache -s
         du -hs ~/.cache/ccache
-
   # make sure legacy build system continues to build, i.e., that we don't forget
   # to add new .cpp files
   build_nvcc_gnumake:
     name: NVCC 11.8.0 GNUmake
     runs-on: ubuntu-20.04
+    needs: skip_checks
     if: github.event.pull_request.draft == false
     steps:
-    - uses: actions/checkout@v4
-    - name: install dependencies
+    - name: Checkout code
+      if: needs.skip_checks.outputs.skip == 'false'
+      uses: actions/checkout@v4
+    - name: Install dependencies
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         .github/workflows/dependencies/nvcc11-8.sh
     - name: CCache Cache
+      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: build WarpX
+    - name: Build WarpX
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
         export CCACHE_MAXSIZE=600M
         ccache -z
-
         export PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
         export LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
         which nvcc || echo "nvcc not in PATH!"
-
         git clone https://github.com/AMReX-Codes/amrex.git ../amrex
         cd ../amrex && git checkout --detach 456c93c7d9512f1cdffac0574973d7df41417898 && cd -
         make COMP=gcc QED=FALSE USE_MPI=TRUE USE_GPU=TRUE USE_OMP=FALSE USE_FFT=TRUE USE_CCACHE=TRUE -j 4
-
         ccache -s
         du -hs ~/.cache/ccache
-
   build_nvhpc24-1-nvcc:
     name: NVHPC@24.1 NVCC/NVC++ Release [tests]
     runs-on: ubuntu-20.04
+    needs: skip_checks
     if: github.event.pull_request.draft == false
     #env:
     #  # For NVHPC, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      if: needs.skip_checks.outputs.skip == 'false'
+      uses: actions/checkout@v4
     - name: Dependencies
+      if: needs.skip_checks.outputs.skip == 'false'
       run: .github/workflows/dependencies/nvhpc.sh
     - name: CCache Cache
+      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
@@ -151,12 +161,12 @@ jobs:
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: Build & Install
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
         export CCACHE_MAXSIZE=600M
         ccache -z
-
         source /etc/profile.d/modules.sh
         module load /opt/nvidia/hpc_sdk/modulefiles/nvhpc/24.1
         which nvcc || echo "nvcc not in PATH!"
@@ -166,12 +176,10 @@ jobs:
         nvc++ --version
         nvc --version
         cmake --version
-
         export CC=$(which nvc)
         export CXX=$(which nvc++)
         export CUDACXX=$(which nvcc)
         export CUDAHOSTCXX=${CXX}
-
         cmake -S . -B build            \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_COMPUTE=CUDA         \
@@ -183,18 +191,15 @@ jobs:
           -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON \
           -DAMReX_CUDA_ERROR_CAPTURE_THIS=ON
         cmake --build build -j 4
-
         # work-around for mpi4py 3.1.1 build system issue with using
         # a GNU-built Python executable with non-GNU Python modules
         #   https://github.com/mpi4py/mpi4py/issues/114
         #export CFLAGS="-noswitcherror"
-
         #python3 -m pip install --upgrade pip
         #python3 -m pip install --upgrade build packaging setuptools wheel
         #export WARPX_MPI=ON
         #export PYWARPX_LIB_DIR=$PWD/build/lib/site-packages/pywarpx/
         #python3 -m pip wheel .
         #python3 -m pip install *.whl
-
         ccache -s
         du -hs ~/.cache/ccache
