@@ -1,6 +1,8 @@
 name: Skip checks
 on:
   workflow_call:
+  outputs:
+    skip: ${{ jobs.skip_checks.outputs.skip }}
 jobs:
   skip_checks:
     runs-on: macos-latest
