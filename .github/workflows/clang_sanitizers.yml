@@ -5,18 +5,22 @@ on:
     branches:
       - "development"
   pull_request:
-    paths-ignore:
-      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-clangsanitizers
   cancel-in-progress: true
 
 jobs:
+  skip_checks:
+    name: Analyze
+    uses: ./.github/workflows/skip_checks.yml
+    with:
+      runs-on: ubuntu-latest
   build_UB_sanitizer:
     name: Clang UB sanitizer
     runs-on: ubuntu-22.04
     container: ubuntu:23.10
+    needs: skip_checks
     if: github.event.pull_request.draft == false
     env:
       CC: clang
@@ -24,28 +28,31 @@ jobs:
       # On CI for this test, Ninja is slower than the default:
       #CMAKE_GENERATOR: Ninja
     steps:
-    - uses: actions/checkout@v4
-    - name: install dependencies
+    - name: Checkout code
+      if: needs.skip_checks.outputs.skip == 'false'
+      uses: actions/checkout@v4
+    - name: Install dependencies
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         .github/workflows/dependencies/clang17.sh
     - name: CCache Cache
+      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: build WarpX
+    - name: Build WarpX
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
         export CCACHE_MAXSIZE=100M
         ccache -z
-
         export CXX=$(which clang++-17)
         export CC=$(which clang-17)
         export CXXFLAGS="-fsanitize=undefined,address,pointer-compare -fno-sanitize-recover=all"
-
         cmake -S . -B build                 \
           -GNinja                           \
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
@@ -58,27 +65,21 @@ jobs:
           -DWarpX_PRECISION=SINGLE          \
           -DWarpX_PARTICLE_PRECISION=SINGLE
         cmake --build build -j 4
-
         ccache -s
         du -hs ~/.cache/ccache
-
-    - name: run with UB sanitizer
+    - name: Run with UB sanitizer
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
-
         # We need these two lines because these tests run inside a docker container
         export OMPI_ALLOW_RUN_AS_ROOT=1
         export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
-
         export OMP_NUM_THREADS=2
-
         #MPI implementations often leak memory
         export "ASAN_OPTIONS=detect_leaks=0"
-
         mpirun -n 2 ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_base_rz
         mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d
         mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d
         mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d
-
   build_thread_sanitizer:
     name: Clang thread sanitizer
     runs-on: ubuntu-22.04
@@ -90,28 +91,31 @@ jobs:
       # On CI for this test, Ninja is slower than the default:
       #CMAKE_GENERATOR: Ninja
     steps:
-    - uses: actions/checkout@v4
-    - name: install dependencies
+    - name: Checkout code
+      if: needs.skip_checks.outputs.skip == 'false'
+      uses: actions/checkout@v4
+    - name: Install dependencies
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         .github/workflows/dependencies/clang17.sh
     - name: CCache Cache
+      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: build WarpX
+    - name: Build WarpX
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
         export CCACHE_MAXSIZE=100M
         ccache -z
-
         export CXX=$(which clang++-17)
         export CC=$(which clang-17)
         export CXXFLAGS="-fsanitize=thread"
-
         cmake -S . -B build                 \
           -GNinja                           \
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
@@ -125,7 +129,6 @@ jobs:
           -DWarpX_PRECISION=DOUBLE          \
           -DWarpX_PARTICLE_PRECISION=DOUBLE
         cmake --build build -j 4
-
         cmake -S . -B build_EB              \
           -GNinja                           \
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
@@ -139,30 +142,23 @@ jobs:
           -DWarpX_PRECISION=DOUBLE          \
           -DWarpX_PARTICLE_PRECISION=DOUBLE
         cmake --build build_EB -j 4
-
         ccache -s
         du -hs ~/.cache/ccache
-
-    - name: run with thread sanitizer
+    - name: Run with thread sanitizer
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export PMIX_MCA_gds=hash
         export TSAN_OPTIONS='ignore_noninstrumented_modules=1'
         export ARCHER_OPTIONS="verbose=1"
-
         # We need these two lines because these tests run inside a docker container
         export OMPI_ALLOW_RUN_AS_ROOT=1
         export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
-
         export OMP_NUM_THREADS=2
-
         mpirun -n 2 ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_base_rz warpx.serialize_initial_conditions = 0
         mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d warpx.serialize_initial_conditions = 0
         mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d warpx.serialize_initial_conditions = 0
         mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d warpx.serialize_initial_conditions = 0
-
         git clone https://github.com/ECP-WarpX/warpx-data ../warpx-data
         cd Examples/Tests/embedded_circle
-
         ulimit -c unlimited
-
         mpirun -n 2 ../../../build_EB/bin/warpx.2d inputs_test_2d_embedded_circle warpx.serialize_initial_conditions = 0

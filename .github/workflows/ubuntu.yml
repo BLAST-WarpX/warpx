@@ -15,7 +15,7 @@ jobs:
     name: Analyze
     uses: ./.github/workflows/skip_checks.yml
     with:
-      runs-on: ubuntu-20.04
+      runs-on: ubuntu-latest
   build_cxxminimal:
     name: GCC Minimal w/o MPI
     runs-on: ubuntu-20.04
