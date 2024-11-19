@@ -21,15 +21,13 @@ git diff --name-only --diff-filter=ACMRTUXB origin/${base_ref}..fork/${head_ref}
 echo "Files changed:"
 cat check_diff.txt
 
-# Set paths to ignore
+# Set paths to ignore (please test grep command below when adding new patterns)
 paths_ignore=()
 paths_ignore+=("Docs/")
-paths_ignore+=(".github/")
-paths_ignore+=(".azure-pipelines.yml")
 echo "Paths to ignore:"
 echo ${paths_ignore[@]}
 
-# Set string for grep command
+# Set string for regular expression to grep
 paths_ignore_string=$(IFS='|'; echo "${paths_ignore[*]}")
 
 # Set skip variable after inspecting files changed
