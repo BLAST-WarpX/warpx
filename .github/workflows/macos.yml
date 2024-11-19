@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   skip_checks:
-    name: Analyze PR
+    name: analyze
     uses: ./.github/workflows/skip_checks.yml
   build_appleclang:
     name: AppleClang
