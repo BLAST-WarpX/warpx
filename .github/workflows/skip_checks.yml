@@ -2,14 +2,14 @@ on:
   workflow_call:
 jobs:
   skip_checks:
-    name: skip?
+    name: Skip
     runs-on: macos-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Run PR analysis
+      - name: Analyze PR
         run: |
           .github/workflows/scripts/check_diff.sh     \
             ${{ github.event.pull_request.head.ref }} \
