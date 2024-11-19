@@ -1,9 +1,13 @@
 on:
   workflow_call:
+    inputs:
+      runs-on:
+        description: "Type of machine to run on"
+        required: true
 jobs:
   skip_checks:
     name: Skip
-    runs-on: macos-latest
+    runs-on: ${{ inputs.runs-on }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
