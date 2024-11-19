@@ -11,40 +11,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  #skip_checks:
-  #  name: Skip checks?
-  #  runs-on: macos-latest
-  #  steps:
-  #    - name: Checkout code
-  #      uses: actions/checkout@v4
-  #      with:
-  #        fetch-depth: 0
-  #    - name: Run PR analysis
-  #      run: |
-  #        .github/workflows/scripts/check_diff.sh     \
-  #          ${{ github.event.pull_request.head.ref }} \
-  #          ${{ github.event.pull_request.base.ref }} \
-  #          ${{ github.event.pull_request.head.repo.clone_url }}
-  #  outputs:
-  #    skip: ${{ env.SKIP_CHECKS }}
   skip_checks:
+    name: Skip checks?
     uses: ./.github/workflows/skip_checks.yml
   build_appleclang:
     name: AppleClang
     runs-on: macos-latest
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: github.event.pull_request.draft == false
     env:
       HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: TRUE
       # For macOS, Ninja is slower than the default:
       #CMAKE_GENERATOR: Ninja
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
-      name: Install Python
+    - name: Checkout code
+      if: needs.skip_checks.outputs.skip == 'false'
+      uses: actions/checkout@v4
+    - name: Install Python
+      if: needs.skip_checks.outputs.skip == 'false'
+      uses: actions/setup-python@v5
       with:
         python-version: '3.x'
-    - name: install brew dependencies
+    - name: Install brew dependencies
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         set +e
         brew unlink gcc
@@ -60,20 +49,23 @@ jobs:
         set -e
         brew tap openpmd/openpmd
         brew install openpmd-api
-    - name: install pip dependencies
+    - name: Install pip dependencies
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade build packaging setuptools wheel
         python3 -m pip install --upgrade mpi4py
         python3 -m pip install --upgrade -r Regression/requirements.txt
     - name: CCache Cache
+      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/Library/Caches/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: build WarpX
+    - name: Build WarpX
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -98,7 +90,8 @@ jobs:
         cmake --build build_sp --target pip_install
         du -hs ~/Library/Caches/ccache
         ccache -s
-    - name: run pywarpx
+    - name: Run pywarpx
+      if: needs.skip_checks.outputs.skip == 'false'
       run: |
         export OMP_NUM_THREADS=1
         mpirun -n 2 Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_picmi.py
