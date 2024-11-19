@@ -4,6 +4,7 @@ on:
       runs-on:
         description: "Type of machine to run on"
         required: true
+        type: string
 jobs:
   skip_checks:
     name: Skip
