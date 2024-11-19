@@ -24,7 +24,7 @@ jobs:
     name: NVCC 11.3 SP
     runs-on: ubuntu-20.04
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
     env:
       CXXFLAGS: "-Werror"
       CMAKE_GENERATOR: Ninja
@@ -99,7 +99,7 @@ jobs:
     name: NVCC 11.8.0 GNUmake
     runs-on: ubuntu-20.04
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -131,7 +131,7 @@ jobs:
     name: NVHPC@24.1 NVCC/NVC++ Release [tests]
     runs-on: ubuntu-20.04
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
     #env:
     #  # For NVHPC, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja

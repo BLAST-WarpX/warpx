@@ -20,7 +20,7 @@ jobs:
     name: SENSEI
     runs-on: ubuntu-20.04
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
     env:
       CXX: clang++
       CC: clang
@@ -47,7 +47,7 @@ jobs:
     name: Ascent
     runs-on: ubuntu-20.04
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
     env:
       CXX: g++
       CC: gcc
@@ -88,7 +88,7 @@ jobs:
     name: Catalyst
     runs-on: ubuntu-22.04
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
     env:
       CXX: g++
       CC: gcc

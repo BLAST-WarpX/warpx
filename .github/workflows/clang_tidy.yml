@@ -27,14 +27,14 @@ jobs:
     if: ${{ github.event.pull_request.draft == false }}
     steps:
     - name: Checkout code
-      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
+      if: ${{ needs.skip_checks.outputs.skip == false }}
       uses: actions/checkout@v4
     - name: Install dependencies
-      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
+      if: ${{ needs.skip_checks.outputs.skip == false }}
       run: |
         .github/workflows/dependencies/clang15.sh
     - name: Set up cache
-      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
+      if: ${{ needs.skip_checks.outputs.skip == false }}
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
@@ -42,7 +42,7 @@ jobs:
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: Build WarpX & run clang-tidy
-      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
+      if: ${{ needs.skip_checks.outputs.skip == false }}
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10

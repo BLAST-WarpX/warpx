@@ -22,7 +22,7 @@ jobs:
     needs: skip_checks
     # disabled due to issues in #5230
     if: 0
-    #if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    #if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -72,7 +72,7 @@ jobs:
     name: Clang C++17 w/ OMP w/o MPI
     runs-on: windows-2019
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4

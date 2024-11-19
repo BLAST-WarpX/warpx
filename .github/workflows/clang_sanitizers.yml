@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-22.04
     container: ubuntu:23.10
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
     env:
       CC: clang
       CXX: clang++
@@ -80,7 +80,7 @@ jobs:
     runs-on: ubuntu-22.04
     container: ubuntu:23.10
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
     env:
       CC: clang
       CXX: clang++

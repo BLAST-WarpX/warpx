@@ -23,7 +23,7 @@ jobs:
       CXXFLAGS: "-Werror -Wno-deprecated-declarations -Wno-error=pass-failed"
       CMAKE_GENERATOR: Ninja
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -78,7 +78,7 @@ jobs:
       CXXFLAGS: "-Werror -Wno-deprecated-declarations -Wno-error=pass-failed"
       CMAKE_GENERATOR: Ninja
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4

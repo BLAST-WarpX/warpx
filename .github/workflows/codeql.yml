@@ -22,7 +22,7 @@ jobs:
     name: Analyze
     runs-on: ubuntu-latest
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
     permissions:
       actions: read
       contents: read

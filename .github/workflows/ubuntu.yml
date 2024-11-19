@@ -20,7 +20,7 @@ jobs:
     name: GCC Minimal w/o MPI
     runs-on: ubuntu-20.04
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
     env:
       CXXFLAGS: "-Werror"
     steps:
@@ -57,7 +57,7 @@ jobs:
     name: GCC 1D & 2D w/ MPI, QED tools
     runs-on: ubuntu-22.04
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
     env:
       CXXFLAGS: "-Werror"
       CXX: "g++-12"
@@ -101,7 +101,7 @@ jobs:
     name: GCC 3D & RZ w/ MPI, single precision
     runs-on: ubuntu-22.04
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
     env:
       CXX: "g++-12"
       CC: "gcc-12"
@@ -145,7 +145,7 @@ jobs:
     name: GCC ABLASTR w/o MPI
     runs-on: ubuntu-20.04
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
     env:
       CMAKE_GENERATOR: Ninja
       CXXFLAGS: "-Werror"
@@ -180,7 +180,7 @@ jobs:
     name: Clang pywarpx
     runs-on: ubuntu-20.04
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
     env:
       CC: clang
       CXX: clang++
