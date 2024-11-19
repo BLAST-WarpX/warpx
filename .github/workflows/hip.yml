@@ -5,53 +5,59 @@ on:
     branches:
       - "development"
   pull_request:
-    paths-ignore:
-      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-hip
   cancel-in-progress: true
 
 jobs:
+  skip_checks:
+    name: Analyze
+    uses: ./.github/workflows/skip_checks.yml
+    with:
+      runs-on: ubuntu-latest
   build_hip_3d_sp:
     name: HIP 3D SP
     runs-on: ubuntu-20.04
     env:
       CXXFLAGS: "-Werror -Wno-deprecated-declarations -Wno-error=pass-failed"
       CMAKE_GENERATOR: Ninja
+    needs: skip_checks
     if: github.event.pull_request.draft == false
     steps:
-    - uses: actions/checkout@v4
-    - name: install dependencies
+    - name: Checkout code
+      if: needs.skip_checks.outputs.skip == 'false'
+      uses: actions/checkout@v4
+    - name: Install dependencies
+      if: needs.skip_checks.outputs.skip == 'false'
       shell: bash
       run: .github/workflows/dependencies/hip.sh
     - name: CCache Cache
+      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: build WarpX
+    - name: Build WarpX
+      if: needs.skip_checks.outputs.skip == 'false'
       shell: bash
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
         export CCACHE_MAXSIZE=100M
         ccache -z
-
         source /etc/profile.d/rocm.sh
         hipcc --version
         which clang
         which clang++
         export CXX=$(which clang++)
         export CC=$(which clang)
-
         # "mpic++ --showme" forgets open-pal in Ubuntu 20.04 + OpenMPI 4.0.3
         #   https://bugs.launchpad.net/ubuntu/+source/openmpi/+bug/1941786
         #   https://github.com/open-mpi/ompi/issues/9317
         export LDFLAGS="-lopen-pal"
-
         cmake -S . -B build_sp \
           -DCMAKE_VERBOSE_MAKEFILE=ON \
           -DAMReX_AMD_ARCH=gfx900     \
@@ -63,54 +69,54 @@ jobs:
           -DWarpX_PRECISION=SINGLE    \
           -DWarpX_FFT=ON
         cmake --build build_sp -j 4
-
         export WARPX_MPI=OFF
         export PYWARPX_LIB_DIR=$PWD/build_sp/lib/site-packages/pywarpx/
         python3 -m pip wheel .
         python3 -m pip install *.whl
-
         ccache -s
         du -hs ~/.cache/ccache
-
   build_hip_2d_dp:
     name: HIP 2D DP
     runs-on: ubuntu-20.04
     env:
       CXXFLAGS: "-Werror -Wno-deprecated-declarations -Wno-error=pass-failed"
       CMAKE_GENERATOR: Ninja
+    needs: skip_checks
     if: github.event.pull_request.draft == false
     steps:
-    - uses: actions/checkout@v4
-    - name: install dependencies
+    - name: Checkout code
+      if: needs.skip_checks.outputs.skip == 'false'
+      uses: actions/checkout@v4
+    - name: Install dependencies
+      if: needs.skip_checks.outputs.skip == 'false'
       shell: bash
       run: .github/workflows/dependencies/hip.sh
     - name: CCache Cache
+      if: needs.skip_checks.outputs.skip == 'false'
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: build WarpX
+    - name: Build WarpX
+      if: needs.skip_checks.outputs.skip == 'false'
       shell: bash
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
         export CCACHE_MAXSIZE=100M
         ccache -z
-
         source /etc/profile.d/rocm.sh
         hipcc --version
         which clang
         which clang++
         export CXX=$(which clang++)
         export CC=$(which clang)
-
         # "mpic++ --showme" forgets open-pal in Ubuntu 20.04 + OpenMPI 4.0.3
         #   https://bugs.launchpad.net/ubuntu/+source/openmpi/+bug/1941786
         #   https://github.com/open-mpi/ompi/issues/9317
         export LDFLAGS="-lopen-pal"
-
         cmake -S . -B build_2d \
           -DCMAKE_VERBOSE_MAKEFILE=ON \
           -DAMReX_AMD_ARCH=gfx900     \
@@ -123,11 +129,9 @@ jobs:
           -DWarpX_PRECISION=DOUBLE    \
           -DWarpX_FFT=ON
         cmake --build build_2d -j 4
-
         export WARPX_MPI=OFF
         export PYWARPX_LIB_DIR=$PWD/build_2d/lib/site-packages/pywarpx/
         python3 -m pip wheel .
         python3 -m pip install *.whl
-
         ccache -s
         du -hs ~/.cache/ccache
