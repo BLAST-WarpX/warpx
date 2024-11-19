@@ -8,23 +8,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+
+  skip_checks:
+    name: Skip checks?
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run PR analysis script
+        run: |
+          .github/workflows/scripts/check_diff.sh     \
+            ${{ github.event.pull_request.head.ref }} \
+            ${{ github.event.pull_request.base.ref }} \
+            ${{ github.event.pull_request.head.repo.clone_url }}
+    outputs:
+      skip: ${{ env.SKIP_CHECKS }}
+
   build_appleclang:
     name: AppleClang
     runs-on: macos-latest
+    needs: skip_checks
+    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == false }}
     steps:
-      - name: Run PR analysis
-        uses: ./.github/workflows/pr-analysis.yml
-        id: pr_analysis
       - name: Checkout code
-        if: ${{ github.event.pull_request.draft == false && steps.pr_analysis.outputs.skip == "false" }}
         uses: actions/checkout@v4
       - name: Install Python
-        if: ${{ github.event.pull_request.draft == false && steps.pr_analysis.outputs.skip == "false" }}
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
       - name: Install brew dependencies
-        if: ${{ github.event.pull_request.draft == false && steps.pr_analysis.outputs.skip == "false" }}
         run: |
           set +e
           brew unlink gcc
@@ -41,14 +55,12 @@ jobs:
           brew tap openpmd/openpmd
           brew install openpmd-api
       - name: Install pip dependencies
-        if: ${{ github.event.pull_request.draft == false && steps.pr_analysis.outputs.skip == "false" }}
         run: |
           python3 -m pip install --upgrade pip
           python3 -m pip install --upgrade build packaging setuptools wheel
           python3 -m pip install --upgrade mpi4py
           python3 -m pip install --upgrade -r Regression/requirements.txt
       - name: CCache Cache
-        if: ${{ github.event.pull_request.draft == false && steps.pr_analysis.outputs.skip == "false" }}
         uses: actions/cache@v4
         with:
           path: ~/Library/Caches/ccache
@@ -56,7 +68,6 @@ jobs:
           restore-keys: |
                ccache-${{ github.workflow }}-${{ github.job }}-git-
       - name: Build WarpX
-        if: ${{ github.event.pull_request.draft == false && steps.pr_analysis.outputs.skip == "false" }}
         run: |
           export CCACHE_COMPRESS=1
           export CCACHE_COMPRESSLEVEL=10
@@ -86,7 +97,6 @@ jobs:
           du -hs ~/Library/Caches/ccache
           ccache -s
       - name: Run pywarpx
-        if: ${{ github.event.pull_request.draft == false && steps.pr_analysis.outputs.skip == "false" }}
         run: |
           export OMP_NUM_THREADS=1
 
