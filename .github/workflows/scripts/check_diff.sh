@@ -10,12 +10,10 @@ base_ref=${2}
 clone_url=${3}
 
 # Add forked repository as remote
-git remote add fork ${clone_url}
-
 # Fetch base branch from main repository
-git fetch origin ${base_ref}
-
 # Fetch head branch from forked repository
+git remote add fork ${clone_url}
+git fetch origin ${base_ref}
 git fetch fork ${head_ref}
 
 # Save output of git diff to inspect files changed
