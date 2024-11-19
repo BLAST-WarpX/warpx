@@ -3,7 +3,6 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-set -o xtrace
 
 # Parse command line arguments
 head_ref=${1}
@@ -29,13 +28,16 @@ paths_ignore=()
 paths_ignore+=("Docs/")
 paths_ignore+=(".github/")
 paths_ignore+=(".azure-pipelines.yml")
+echo "Paths to ignore:"
+echo ${paths_ignore}
 
 # Set string for grep command
 paths_ignore_string=$(IFS='|'; echo "${paths_ignore[*]}")
 
 # Set skip variable after inspecting files changed
 if ! grep -qEv "^(${paths_ignore_string})" check_diff.txt; then
-  echo "SKIP_CHECKS=true" >> $GITHUB_ENV
+  echo "SKIP_CHECKS=true" >> ${GITHUB_ENV}
 else
-  echo "SKIP_CHECKS=false" >> $GITHUB_ENV
+  echo "SKIP_CHECKS=false" >> ${GITHUB_ENV}
 fi
+echo "GITHUB_ENV = ${GITHUB_ENV}"
