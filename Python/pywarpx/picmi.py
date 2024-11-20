@@ -1887,37 +1887,38 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
             ),
         )
         pywarpx.hybridpicmodel.add_external_fields = self.add_external_fields
-        pywarpx.external_vector_potential.__setattr__(
-            "fields",
-            pywarpx.my_constants.mangle_expression(
-                list(self.A_external.keys()), self.mangle_dict
-            ),
-        )
-        for field_name, field_dict in self.A_external.items():
+        if self.add_external_fields:
             pywarpx.external_vector_potential.__setattr__(
-                f"{field_name}.Ax_external_grid_function(x,y,z)",
+                "fields",
                 pywarpx.my_constants.mangle_expression(
-                    field_dict["Ax_external_function"], self.mangle_dict
+                    list(self.A_external.keys()), self.mangle_dict
                 ),
             )
-            pywarpx.external_vector_potential.__setattr__(
-                f"{field_name}.Ay_external_grid_function(x,y,z)",
-                pywarpx.my_constants.mangle_expression(
-                    field_dict["Ay_external_function"], self.mangle_dict
-                ),
-            )
-            pywarpx.external_vector_potential.__setattr__(
-                f"{field_name}.Az_external_grid_function(x,y,z)",
-                pywarpx.my_constants.mangle_expression(
-                    field_dict["Az_external_function"], self.mangle_dict
-                ),
-            )
-            pywarpx.external_vector_potential.__setattr__(
-                f"{field_name}.A_time_external_function(t)",
-                pywarpx.my_constants.mangle_expression(
-                    field_dict["A_time_external_function"], self.mangle_dict
-                ),
-            )
+            for field_name, field_dict in self.A_external.items():
+                pywarpx.external_vector_potential.__setattr__(
+                    f"{field_name}.Ax_external_grid_function(x,y,z)",
+                    pywarpx.my_constants.mangle_expression(
+                        field_dict["Ax_external_function"], self.mangle_dict
+                    ),
+                )
+                pywarpx.external_vector_potential.__setattr__(
+                    f"{field_name}.Ay_external_grid_function(x,y,z)",
+                    pywarpx.my_constants.mangle_expression(
+                        field_dict["Ay_external_function"], self.mangle_dict
+                    ),
+                )
+                pywarpx.external_vector_potential.__setattr__(
+                    f"{field_name}.Az_external_grid_function(x,y,z)",
+                    pywarpx.my_constants.mangle_expression(
+                        field_dict["Az_external_function"], self.mangle_dict
+                    ),
+                )
+                pywarpx.external_vector_potential.__setattr__(
+                    f"{field_name}.A_time_external_function(t)",
+                    pywarpx.my_constants.mangle_expression(
+                        field_dict["A_time_external_function"], self.mangle_dict
+                    ),
+                )
 
 
 class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):

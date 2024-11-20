@@ -398,9 +398,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
     const bool include_external_fields = hybrid_model->m_add_external_fields;
 
-    auto const& warpx = WarpX::GetInstance();
-    ablastr::fields::ConstVectorField Bfield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_B_fp_external, 0); // lev=0
-    ablastr::fields::ConstVectorField Efield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_E_fp_external, 0); // lev=0
+    auto & warpx = WarpX::GetInstance();
+    ablastr::fields::VectorField Bfield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_B_fp_external, 0); // lev=0
+    ablastr::fields::VectorField Efield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_E_fp_external, 0); // lev=0
 
     // Index type required for interpolating fields from their respective
     // staggering to the Ex, Ey, Ez locations
@@ -457,9 +457,13 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real const> const& Br = Bfield[0]->const_array(mfi);
         Array4<Real const> const& Bt = Bfield[1]->const_array(mfi);
         Array4<Real const> const& Bz = Bfield[2]->const_array(mfi);
-        Array4<const Real> const& Br_ext = Bfield_external[0]->const_array(mfi);
-        Array4<const Real> const& Bt_ext = Bfield_external[1]->const_array(mfi);
-        Array4<const Real> const& Bz_ext = Bfield_external[2]->const_array(mfi);
+
+        Array4<Real> Br_ext, Bt_ext, Bz_ext;
+        if (include_external_fields) {
+            Br_ext = Bfield_external[0]->array(mfi);
+            Bt_ext = Bfield_external[1]->array(mfi);
+            Bz_ext = Bfield_external[2]->array(mfi);
+        }
 
         // Loop over the cells and update the nodal E field
         amrex::ParallelFor(mfi.tilebox(), [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
@@ -530,9 +534,13 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real const> const& enE = enE_nodal_mf.const_array(mfi);
         Array4<Real const> const& rho = rhofield.const_array(mfi);
         Array4<Real const> const& Pe = Pefield.const_array(mfi);
-        Array4<const Real> const& Er_ext = Efield_external[0]->const_array(mfi);
-        Array4<const Real> const& Et_ext = Efield_external[1]->const_array(mfi);
-        Array4<const Real> const& Ez_ext = Efield_external[2]->const_array(mfi);
+
+        Array4<Real> Er_ext, Et_ext, Ez_ext;
+        if (include_external_fields) {
+            Er_ext = Efield_external[0]->array(mfi);
+            Et_ext = Efield_external[1]->array(mfi);
+            Ez_ext = Efield_external[2]->array(mfi);
+        }
 
         EB::Covered const& cov_ptr = EB::Covered(mfi, lev);
 
