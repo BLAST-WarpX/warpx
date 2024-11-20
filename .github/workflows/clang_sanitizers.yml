@@ -140,7 +140,7 @@ jobs:
     - name: run with thread sanitizer
       run: |
         export PMIX_MCA_gds=hash
-        export TSAN_OPTIONS='ignore_noninstrumented_modules=1'
+        export TSAN_OPTIONS='symbolize=1 symbolize_inline=1 ignore_noninstrumented_modules=1'
         export ARCHER_OPTIONS="verbose=1"
 
         export OMP_NUM_THREADS=2
