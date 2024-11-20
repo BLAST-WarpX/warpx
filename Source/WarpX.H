@@ -158,7 +158,6 @@ public:
     void ImplicitComputeRHSE (int lev, PatchType patch_type, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
 
     MultiParticleContainer& GetPartContainer () { return *mypc; }
-    QdsmcParticleContainer& GetPartContainer () { return *qdsmc_hybrid_electron_pc; }
     MultiFluidContainer& GetFluidContainer () { return *myfl; }
     WarpXFluidContainer& GetElectronFluidContainer () { return *hybrid_electron_fl; }
     MacroscopicProperties& GetMacroscopicProperties () { return *m_macroscopic_properties; }

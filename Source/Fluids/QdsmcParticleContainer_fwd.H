@@ -5,9 +5,9 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef WARPX_QdsmcParticleContainer_H_
-#define WARPX_QdsmcParticleContainer_H_
+#ifndef WARPX_QdsmcParticleContainer_fwd_H_
+#define WARPX_QdsmcParticleContainer_fwd_H_
 
 class QdsmcParticleContainer;
 
-#endif /* WARPX_QdsmcParticleContainer_H_ */
+#endif /* WARPX_QdsmcParticleContainer_fwd_H_ */

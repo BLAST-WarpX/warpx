@@ -18,6 +18,8 @@
 #include "Particles/ParticleBoundaries.H"
 #include <ablastr/fields/MultiFabRegister.H>
 
+#include "QdsmcParticleContainer_fwd.H"
+
 /**
  * This enumerated struct is used to index the field probe particle
  * values that are being stored as SoA data. Nattribs

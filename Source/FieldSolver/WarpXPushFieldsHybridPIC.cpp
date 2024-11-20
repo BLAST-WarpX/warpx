@@ -175,7 +175,7 @@ void WarpX::HybridPICEvolveFields ()
         // Update Ue in electron fluid container
         // check at what step this should be calculated, here Ue is at n+1
         // maybe move up to be consistent with Ke initialization
-        hybrid_electron_fl->HybridInitializeUe(m_fields, finest_level);
+        hybrid_electron_fl->HybridInitializeUe(m_fields, *current_fp_temp[finest_level][0], *current_fp_temp[finest_level][1], *current_fp_temp[finest_level][2], finest_level);
 
         // call functions from the qdsmc particle container ...
         //      1 - Set KeNe for each particle (gather)

@@ -1408,14 +1408,14 @@ void WarpXFluidContainer::DepositCurrent(
 
 
 // Update this function using pre-built functions of multifabs ?
-void WarpXFluidContainer::HybridInitializeUe (ablastr::fields::MultiFabRegister& fields, int lev)
+void WarpXFluidContainer::HybridInitializeUe (ablastr::fields::MultiFabRegister& fields,
+        amrex::MultiFab &ji_x, amrex::MultiFab &ji_y, amrex::MultiFab &ji_z, int lev)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
     ablastr::fields::ScalarField rho_fp = fields.get(FieldType::rho_fp, lev);
     ablastr::fields::VectorField current_fp_ampere = fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
-    ablastr::fields::VectorField current_fp_temp = fields.get_alldirs(FieldType::current_fp_temp, lev); // ion current
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -1428,9 +1428,9 @@ void WarpXFluidContainer::HybridInitializeUe (ablastr::fields::MultiFabRegister&
             amrex::Array4<amrex::Real> const & Jy = current_fp_ampere[1]->array(mfi);
             amrex::Array4<amrex::Real> const & Jz = current_fp_ampere[2]->array(mfi);
 
-            amrex::Array4<amrex::Real> const & Jix = current_fp[0]->array(mfi);
-            amrex::Array4<amrex::Real> const & Jiy = current_fp[1]->array(mfi);
-            amrex::Array4<amrex::Real> const & Jiz = current_fp[2]->array(mfi);
+            amrex::Array4<amrex::Real> const & Jix = ji_x.array(mfi);
+            amrex::Array4<amrex::Real> const & Jiy = ji_y.array(mfi);
+            amrex::Array4<amrex::Real> const & Jiz = ji_z.array(mfi);
 
             const amrex::Array4<amrex::Real> Uex = fields.get(name_mf_NU, Direction{0}, lev)->array(mfi);
             const amrex::Array4<amrex::Real> Uey = fields.get(name_mf_NU, Direction{1}, lev)->array(mfi);
