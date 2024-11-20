@@ -10,6 +10,7 @@
 #define WARPX_LaserParticleContainer_H_
 
 #include "Evolve/WarpXDtType.H"
+#include "Evolve/WarpXPushType.H"
 #include "Laser/LaserProfiles.H"
 #include "WarpXParticleContainer.H"
 
@@ -55,26 +56,19 @@ public:
      * \brief Method to initialize runtime attributes. Does nothing for LaserParticleContainer.
      */
     void DefaultInitializeRuntimeAttributes (
-                        amrex::ParticleTile<amrex::Particle<NStructReal, NStructInt>,
-                                            NArrayReal, NArrayInt, amrex::PinnedArenaAllocator>& /*pinned_tile*/,
-                        const int /*n_external_attr_real*/,
-                        const int /*n_external_attr_int*/,
-                        const amrex::RandomEngine& /*engine*/) final {}
+        typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType& /*pinned_tile*/,
+        int /*n_external_attr_real*/,
+        int /*n_external_attr_int*/) final {}
 
     void ReadHeader (std::istream& is) final;
 
     void WriteHeader (std::ostream& os) const final;
 
-    void Evolve (int lev,
-                         const amrex::MultiFab&, const amrex::MultiFab&, const amrex::MultiFab&,
-                         const amrex::MultiFab&, const amrex::MultiFab&, const amrex::MultiFab&,
-                         amrex::MultiFab& jx, amrex::MultiFab& jy, amrex::MultiFab& jz,
-                         amrex::MultiFab*, amrex::MultiFab*, amrex::MultiFab*,
-                         amrex::MultiFab* rho, amrex::MultiFab* crho,
-                         const amrex::MultiFab*, const amrex::MultiFab*, const amrex::MultiFab*,
-                         const amrex::MultiFab*, const amrex::MultiFab*, const amrex::MultiFab*,
-                         amrex::Real t, amrex::Real dt, DtType a_dt_type=DtType::Full,
-                         bool skip_deposition=false) final;
+    void Evolve (ablastr::fields::MultiFabRegister& fields,
+                 int lev,
+                 const std::string& current_fp_string,
+                 amrex::Real t, amrex::Real dt, DtType a_dt_type=DtType::Full,
+                 bool skip_deposition=false, PushType push_type=PushType::Explicit) final;
 
     void PushP (int lev, amrex::Real dt,
                         const amrex::MultiFab& ,
@@ -95,7 +89,7 @@ public:
                                 amrex::ParticleReal * AMREX_RESTRICT puzp,
                                 amrex::ParticleReal const * AMREX_RESTRICT pwp,
                                 amrex::Real const * AMREX_RESTRICT amplitude,
-                                amrex::Real dt);
+                                amrex::Real dt, PushType push_type=PushType::Explicit);
 
 protected:
 

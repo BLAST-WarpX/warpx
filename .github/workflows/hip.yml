@@ -1,6 +1,12 @@
 name: 🐧 HIP
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    paths-ignore:
+      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-hip
@@ -15,12 +21,12 @@ jobs:
       CMAKE_GENERATOR: Ninja
     if: github.event.pull_request.draft == false
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: install dependencies
       shell: bash
       run: .github/workflows/dependencies/hip.sh
     - name: CCache Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -55,8 +61,8 @@ jobs:
           -DWarpX_MPI=ON              \
           -DWarpX_OPENPMD=ON          \
           -DWarpX_PRECISION=SINGLE    \
-          -DWarpX_PSATD=ON
-        cmake --build build_sp -j 2
+          -DWarpX_FFT=ON
+        cmake --build build_sp -j 4
 
         export WARPX_MPI=OFF
         export PYWARPX_LIB_DIR=$PWD/build_sp/lib/site-packages/pywarpx/
@@ -74,12 +80,12 @@ jobs:
       CMAKE_GENERATOR: Ninja
     if: github.event.pull_request.draft == false
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: install dependencies
       shell: bash
       run: .github/workflows/dependencies/hip.sh
     - name: CCache Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -115,8 +121,8 @@ jobs:
           -DWarpX_MPI=ON              \
           -DWarpX_OPENPMD=ON          \
           -DWarpX_PRECISION=DOUBLE    \
-          -DWarpX_PSATD=ON
-        cmake --build build_2d -j 2
+          -DWarpX_FFT=ON
+        cmake --build build_2d -j 4
 
         export WARPX_MPI=OFF
         export PYWARPX_LIB_DIR=$PWD/build_2d/lib/site-packages/pywarpx/
@@ -125,18 +131,3 @@ jobs:
 
         ccache -s
         du -hs ~/.cache/ccache
-
-  save_pr_number:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Save PR number
-        env:
-          PR_NUMBER: ${{ github.event.number }}
-        run: |
-          echo $PR_NUMBER > pr_number.txt
-      - uses: actions/upload-artifact@v3
-        with:
-          name: pr_number
-          path: pr_number.txt
-          retention-days: 1

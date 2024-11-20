@@ -6,8 +6,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef INJECTOR_DENSITY_H_
-#define INJECTOR_DENSITY_H_
+#ifndef WARPX_INJECTOR_DENSITY_H_
+#define WARPX_INJECTOR_DENSITY_H_
 
 #include "Utils/WarpXConst.H"
 
@@ -218,4 +218,4 @@ struct InjectorDensityDeleter {
     }
 };
 
-#endif
+#endif //WARPX_INJECTOR_DENSITY_H_

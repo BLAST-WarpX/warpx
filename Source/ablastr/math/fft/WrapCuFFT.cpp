@@ -8,6 +8,7 @@
 #include "AnyFFT.H"
 
 #include "ablastr/utils/TextMsg.H"
+#include "ablastr/profiler/ProfilerWrapper.H"
 
 namespace ablastr::math::anyfft
 {
@@ -30,6 +31,7 @@ namespace ablastr::math::anyfft
                        Complex * const complex_array, const direction dir, const int dim)
     {
         FFTplan fft_plan;
+        ABLASTR_PROFILE("ablastr::math::anyfft::CreatePlan");
 
         // Initialize fft_plan.m_plan with the vendor fft plan.
         cufftResult result;
@@ -40,8 +42,11 @@ namespace ablastr::math::anyfft
             } else if (dim == 2) {
                 result = cufftPlan2d(
                     &(fft_plan.m_plan), real_size[1], real_size[0], VendorR2C);
+            } else if (dim == 1) {
+                result = cufftPlan1d(
+                    &(fft_plan.m_plan), real_size[0], VendorR2C, 1);
             } else {
-                ABLASTR_ABORT_WITH_MESSAGE("only dim=2 and dim=3 have been implemented");
+                ABLASTR_ABORT_WITH_MESSAGE("only dim=1 and dim=2 and dim=3 have been implemented");
             }
         } else {
             if (dim == 3) {
@@ -50,6 +55,9 @@ namespace ablastr::math::anyfft
             } else if (dim == 2) {
                 result = cufftPlan2d(
                     &(fft_plan.m_plan), real_size[1], real_size[0], VendorC2R);
+            } else if (dim == 1) {
+                result = cufftPlan1d(
+                    &(fft_plan.m_plan), real_size[0], VendorC2R, 1);
             } else {
                 ABLASTR_ABORT_WITH_MESSAGE("only dim=2 and dim=3 have been implemented");
             }
@@ -69,10 +77,12 @@ namespace ablastr::math::anyfft
 
     void DestroyPlan(FFTplan& fft_plan)
     {
+        ABLASTR_PROFILE("ablastr::math::anyfft::DestroyPlan");
         cufftDestroy( fft_plan.m_plan );
     }
 
     void Execute(FFTplan& fft_plan){
+        ABLASTR_PROFILE("ablastr::math::anyfft::Execute");
         // make sure that this is done on the same GPU stream as the above copy
         cudaStream_t stream = amrex::Gpu::Device::cudaStream();
         cufftSetStream ( fft_plan.m_plan, stream);

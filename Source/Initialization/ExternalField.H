@@ -5,8 +5,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef EXTERNAL_FIELD_H_
-#define EXTERNAL_FIELD_H_
+#ifndef WARPX_EXTERNAL_FIELD_H_
+#define WARPX_EXTERNAL_FIELD_H_
 
 #include "ExternalField_fwd.H"
 
@@ -23,7 +23,8 @@ enum class ExternalFieldType
     default_zero,
     constant,
     parse_ext_grid_function,
-    read_from_file
+    read_from_file,
+    load_from_python
 };
 
 /**
@@ -66,4 +67,4 @@ struct ExternalFieldParams
     std::string external_fields_path;
 };
 
-#endif //EXTERNAL_FIELD_H_
+#endif //WARPX_EXTERNAL_FIELD_H_

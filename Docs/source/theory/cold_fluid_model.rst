@@ -42,14 +42,18 @@ where the particle quantities are calculated by the PIC algorithm.
 Implementation details
 ----------------------
 
+.. _fig_fluid_loop:
+
+.. figure:: https://github.com/ECP-WarpX/WarpX/assets/69021085/dcbcc0e4-7899-43e4-b580-f57eb359b457
+   :alt: Figure showing fluid Loop embedded within the overall PIC loop.
+
+   Fluid Loop embedded within the overall PIC loop.
+
 The fluid timeloop is embedded inside the standard PIC timeloop and consists of
 the following steps: 1. Higuera and Cary push of the momentum 2. Non-inertial (momentum source)
 terms (only in cylindrical geometry) 3. boundary conditions and MPI Communications 4. MUSCL
-scheme for advection terms 5. Current and Charge Deposition. The figure here gives
+scheme for advection terms 5. Current and Charge Deposition. :numref:`fig_fluid_loop` gives
 a visual representation of these steps, and we describe each of these in more detail.
-
-.. figure:: https://github.com/ECP-WarpX/WarpX/assets/69021085/dcbcc0e4-7899-43e4-b580-f57eb359b457
-   :alt: Fluid Loop embedded within the overall PIC loop.
 
 Step 0: **Preparation**
     Before the fluid loop begins, it is assumed that the program is in the state where fields :math:`\mathbf{E}`
@@ -59,14 +63,14 @@ Step 0: **Preparation**
     on a nodal grid and at half-integer timestep.
 
 Step 1: **Higuera and Cary Push**
-    The time staggering of the fields is used by the momentum source term, which is solved with a the
-    Higeura and Cary push (Higuera et al, 2017). We do not adopt spatial
+    The time staggering of the fields is used by the momentum source term, which is solved with a
+    Higuera and Cary push :cite:p:`cfm-HigueraPOP2017`. We do not adopt spatial
     grid staggering, all discretized fluid quantities exist on the nodal grid. External fields
     can be included at this step.
 
 Step 2: **Non-inertial Terms**
     In RZ, the divergence of the flux terms has additional non-zero elements outside of the
-    derivatives. These terms are Strang split and are time integrated via equation 2.18 from (Osher et al, 1988),
+    derivatives. These terms are Strang split and are time integrated via equation 2.18 from :cite:t:`cfm-ShuJCP1988`,
     which is the SSP-RK3 integrator.
 
 Step 3: **Boundary Conditions and Communications**
@@ -79,7 +83,7 @@ Step 4: **Advective Push**
     limiting is used. We further simplify the conservative equations in terms of primitive
     variables, :math:`\{ N, U_x, U_y, U_z \}`. Which we found to be
     more stable than conservative variables for the MUSCL reconstruction. Details of
-    the scheme can be found here (Van Leer et al, 1984).
+    the scheme can be found in :cite:t:`cfm-VanLeerBookChapter1997`.
 
 Step 5: **Current and Charge Deposition**
     Once this series of steps is complete and the fluids have been evolved by an entire
@@ -104,33 +108,5 @@ Step 5: **Current and Charge Deposition**
       If using the fluid model with the Kinetic-Fluid Hybrid model or the electrostatic solver, there is a known
       issue that the fluids deposit at a half-timestep offset in the charge-density.
 
-.. raw:: html
-
-   <div id="refs" class="references">
-
-.. raw:: html
-
-   <div id="ref-HigueraCary2017">
-
-Higuera, Adam V., and John R. Cary. "Structure-preserving second-order integration of relativistic charged particle trajectories in electromagnetic fields." Physics of Plasmas 24.5 (2017).
-
-.. raw:: html
-
-   </div>
-
-.. raw:: html
-
-   <div id="ref-OsherShu1988">
-
-Osher, Stanley, and Chi-Wang Shu. "Efficient implementation of essentially non-oscillatory shock-capturing schemes." J. Comput. Phys 77.2 (1988): 439-471.
-
-
-.. raw:: html
-
-   </div>
-
-.. raw:: html
-
-   <div id="ref-BVanLeer1984">
-
-Van Leer, Bram. "On the relation between the upwind-differencing schemes of Godunov, Engquist–Osher and Roe." SIAM Journal on Scientific and statistical Computing 5.1 (1984): 1-20.
+.. bibliography::
+   :keyprefix: cfm-

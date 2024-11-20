@@ -4,32 +4,33 @@ Ohm Solver: Magnetic Reconnection
 =================================
 
 Hybrid-PIC codes are often used to simulate magnetic reconnection in space plasmas.
-An example of magnetic reconnection from a force-free sheet is provided, based on the simulation described in :cite:t:`ex-Le2016`.
+An example of magnetic reconnection from a force-free sheet is provided, based on
+the simulation described in :cite:t:`ex-Le2016`.
 
 Run
 ---
 
-This example can be run as a **Python** script: ``python3 PICMI_inputs.py``.
+The following **Python** script configures and launches the simulation.
 
-.. literalinclude:: PICMI_inputs.py
-   :language: python3
-   :caption: You can copy this file from ``Examples/Tests/ohm_solver_magnetic_reconnection/PICMI_inputs.py``.
+.. dropdown:: Script ``inputs_test_2d_ohm_solver_magnetic_reconnection_picmi.py``
 
+   .. literalinclude:: inputs_test_2d_ohm_solver_magnetic_reconnection_picmi.py
+      :language: python3
+      :caption: You can copy this file from ``Examples/Tests/ohm_solver_magnetic_reconnection/inputs_test_2d_ohm_solver_magnetic_reconnection_picmi.py``.
+
+Running the full simulation should take about 4 hours if executed on 1 V100 GPU.
+For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with
+``mpiexec -n 4 ...`` or ``srun -n 4 ...``, depending on the system.
+
+   .. code-block:: bash
+
+      python3 inputs_test_2d_ohm_solver_magnetic_reconnection_picmi.py
 
 Analyze
 -------
 
-We run the following script to analyze correctness:
-
-.. note::
-
-   This section is TODO.
-
-
-Visualize
----------
-
-You can run the following script to visualize the B-field evolution over time:
+The following script extracts the reconnection rate as a function of time and
+animates the evolution of the magnetic field (as shown below).
 
 .. dropdown:: Script ``analysis.py``
 
@@ -41,4 +42,4 @@ You can run the following script to visualize the B-field evolution over time:
    :alt: Magnetic reconnection.
    :width: 70%
 
-   Magnetic reconnection.
+   Magnetic reconnection from a force-free sheet.

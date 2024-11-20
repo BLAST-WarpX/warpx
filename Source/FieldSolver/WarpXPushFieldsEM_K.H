@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef WarpXPushFieldsEM_K_h
-#define WarpXPushFieldsEM_K_h
+#ifndef WARPX_PushFieldsEM_K_h
+#define WARPX_PushFieldsEM_K_h
 
 #include "Utils/WarpXConst.H"
 
@@ -117,4 +117,4 @@ void damp_field_in_guards(
     }
 }
 
-#endif
+#endif //WARPX_PushFieldsEM_K_h

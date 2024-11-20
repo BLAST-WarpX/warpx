@@ -1,14 +1,17 @@
 #include "FlushFormatCheckpoint.H"
 
 #include "BoundaryConditions/PML.H"
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_PSATD)
+#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
 #   include "BoundaryConditions/PML_RZ.H"
 #endif
 #include "Diagnostics/ParticleDiag/ParticleDiag.H"
+#include "Fields.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
+
+#include <ablastr/fields/MultiFabRegister.H>
 
 #include <AMReX_MultiFab.H>
 #include <AMReX_ParticleIO.H>
@@ -19,6 +22,7 @@
 #include <AMReX_VisMF.H>
 
 using namespace amrex;
+using warpx::fields::FieldType;
 
 namespace
 {
@@ -39,8 +43,10 @@ FlushFormatCheckpoint::WriteToFile (
         bool /*isBTD*/, int /*snapshotID*/,
         int /*bufferID*/, int /*numBuffers*/,
         const amrex::Geometry& /*full_BTD_snapshot*/,
-        bool /*isLastBTDFlush*/, const amrex::Vector<int>& /* totalParticlesFlushedAlready*/) const
+        bool /*isLastBTDFlush*/) const
 {
+    using ablastr::fields::Direction;
+
     WARPX_PROFILE("FlushFormatCheckpoint::WriteToFile()");
 
     auto & warpx = WarpX::GetInstance();
@@ -62,85 +68,85 @@ FlushFormatCheckpoint::WriteToFile (
 
     for (int lev = 0; lev < nlev; ++lev)
     {
-        VisMF::Write(warpx.getEfield_fp(lev, 0),
+        VisMF::Write(*warpx.m_fields.get(FieldType::Efield_fp, Direction{0}, lev),
                      amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Ex_fp"));
-        VisMF::Write(warpx.getEfield_fp(lev, 1),
+        VisMF::Write(*warpx.m_fields.get(FieldType::Efield_fp, Direction{1}, lev),
                      amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Ey_fp"));
-        VisMF::Write(warpx.getEfield_fp(lev, 2),
+        VisMF::Write(*warpx.m_fields.get(FieldType::Efield_fp, Direction{2}, lev),
                      amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Ez_fp"));
-        VisMF::Write(warpx.getBfield_fp(lev, 0),
+        VisMF::Write(*warpx.m_fields.get(FieldType::Bfield_fp, Direction{0}, lev),
                      amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Bx_fp"));
-        VisMF::Write(warpx.getBfield_fp(lev, 1),
+        VisMF::Write(*warpx.m_fields.get(FieldType::Bfield_fp, Direction{1}, lev),
                      amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "By_fp"));
-        VisMF::Write(warpx.getBfield_fp(lev, 2),
+        VisMF::Write(*warpx.m_fields.get(FieldType::Bfield_fp, Direction{2}, lev),
                      amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Bz_fp"));
 
         if (WarpX::fft_do_time_averaging)
         {
-            VisMF::Write(warpx.getEfield_avg_fp(lev, 0),
+            VisMF::Write(*warpx.m_fields.get(FieldType::Efield_avg_fp, Direction{0}, lev),
                          amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Ex_avg_fp"));
-            VisMF::Write(warpx.getEfield_avg_fp(lev, 1),
+            VisMF::Write(*warpx.m_fields.get(FieldType::Efield_avg_fp, Direction{1}, lev),
                          amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Ey_avg_fp"));
-            VisMF::Write(warpx.getEfield_avg_fp(lev, 2),
+            VisMF::Write(*warpx.m_fields.get(FieldType::Efield_avg_fp, Direction{2}, lev),
                          amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Ez_avg_fp"));
 
-            VisMF::Write(warpx.getBfield_avg_fp(lev, 0),
+            VisMF::Write(*warpx.m_fields.get(FieldType::Bfield_avg_fp, Direction{0}, lev),
                          amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Bx_avg_fp"));
-            VisMF::Write(warpx.getBfield_avg_fp(lev, 1),
+            VisMF::Write(*warpx.m_fields.get(FieldType::Bfield_avg_fp, Direction{1}, lev),
                          amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "By_avg_fp"));
-            VisMF::Write(warpx.getBfield_avg_fp(lev, 2),
+            VisMF::Write(*warpx.m_fields.get(FieldType::Bfield_avg_fp, Direction{2}, lev),
                          amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Bz_avg_fp"));
         }
 
         if (warpx.getis_synchronized()) {
             // Need to save j if synchronized because after restart we need j to evolve E by dt/2.
-            VisMF::Write(warpx.getcurrent_fp(lev, 0),
+            VisMF::Write(*warpx.m_fields.get(FieldType::current_fp, Direction{0}, lev),
                          amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "jx_fp"));
-            VisMF::Write(warpx.getcurrent_fp(lev, 1),
+            VisMF::Write(*warpx.m_fields.get(FieldType::current_fp, Direction{1}, lev),
                          amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "jy_fp"));
-            VisMF::Write(warpx.getcurrent_fp(lev, 2),
+            VisMF::Write(*warpx.m_fields.get(FieldType::current_fp, Direction{2}, lev),
                          amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "jz_fp"));
         }
 
         if (lev > 0)
         {
-            VisMF::Write(warpx.getEfield_cp(lev, 0),
+            VisMF::Write(*warpx.m_fields.get(FieldType::Efield_cp, Direction{0}, lev),
                          amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Ex_cp"));
-            VisMF::Write(warpx.getEfield_cp(lev, 1),
+            VisMF::Write(*warpx.m_fields.get(FieldType::Efield_cp, Direction{1}, lev),
                          amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Ey_cp"));
-            VisMF::Write(warpx.getEfield_cp(lev, 2),
+            VisMF::Write(*warpx.m_fields.get(FieldType::Efield_cp, Direction{2}, lev),
                          amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Ez_cp"));
-            VisMF::Write(warpx.getBfield_cp(lev, 0),
+            VisMF::Write(*warpx.m_fields.get(FieldType::Bfield_cp, Direction{0}, lev),
                          amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Bx_cp"));
-            VisMF::Write(warpx.getBfield_cp(lev, 1),
+            VisMF::Write(*warpx.m_fields.get(FieldType::Bfield_cp, Direction{1}, lev),
                          amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "By_cp"));
-            VisMF::Write(warpx.getBfield_cp(lev, 2),
+            VisMF::Write(*warpx.m_fields.get(FieldType::Bfield_cp, Direction{2}, lev),
                          amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Bz_cp"));
 
             if (WarpX::fft_do_time_averaging)
             {
-                VisMF::Write(warpx.getEfield_avg_cp(lev, 0),
+                VisMF::Write(*warpx.m_fields.get(FieldType::Efield_avg_cp, Direction{0}, lev),
                              amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Ex_avg_cp"));
-                VisMF::Write(warpx.getEfield_avg_cp(lev, 1),
+                VisMF::Write(*warpx.m_fields.get(FieldType::Efield_avg_cp, Direction{1}, lev),
                              amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Ey_avg_cp"));
-                VisMF::Write(warpx.getEfield_avg_cp(lev, 2),
+                VisMF::Write(*warpx.m_fields.get(FieldType::Efield_avg_cp, Direction{2}, lev),
                              amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Ez_avg_cp"));
 
-                VisMF::Write(warpx.getBfield_avg_cp(lev, 0),
+                VisMF::Write(*warpx.m_fields.get(FieldType::Bfield_avg_cp, Direction{0}, lev),
                              amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Bx_avg_cp"));
-                VisMF::Write(warpx.getBfield_avg_cp(lev, 1),
+                VisMF::Write(*warpx.m_fields.get(FieldType::Bfield_avg_cp, Direction{1}, lev),
                              amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "By_avg_cp"));
-                VisMF::Write(warpx.getBfield_avg_cp(lev, 2),
+                VisMF::Write(*warpx.m_fields.get(FieldType::Bfield_avg_cp, Direction{2}, lev),
                              amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Bz_avg_cp"));
             }
 
             if (warpx.getis_synchronized()) {
                 // Need to save j if synchronized because after restart we need j to evolve E by dt/2.
-                VisMF::Write(warpx.getcurrent_cp(lev, 0),
+                VisMF::Write(*warpx.m_fields.get(FieldType::current_cp, Direction{0}, lev),
                              amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "jx_cp"));
-                VisMF::Write(warpx.getcurrent_cp(lev, 1),
+                VisMF::Write(*warpx.m_fields.get(FieldType::current_cp, Direction{1}, lev),
                              amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "jy_cp"));
-                VisMF::Write(warpx.getcurrent_cp(lev, 2),
+                VisMF::Write(*warpx.m_fields.get(FieldType::current_cp, Direction{2}, lev),
                              amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "jz_cp"));
             }
         }
@@ -148,11 +154,13 @@ FlushFormatCheckpoint::WriteToFile (
         if (warpx.DoPML()) {
             if (warpx.GetPML(lev)) {
                 warpx.GetPML(lev)->CheckPoint(
+                    warpx.m_fields,
                     amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "pml"));
             }
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_PSATD)
+#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
             if (warpx.GetPML_RZ(lev)) {
                 warpx.GetPML_RZ(lev)->CheckPoint(
+                    warpx.m_fields,
                     amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "pml_rz"));
             }
 #endif
@@ -172,14 +180,14 @@ FlushFormatCheckpoint::CheckpointParticles (
     const std::string& dir,
     const amrex::Vector<ParticleDiag>& particle_diags) const
 {
-    for (auto& part_diag: particle_diags) {
+    for (const auto& part_diag: particle_diags) {
         WarpXParticleContainer* pc = part_diag.getParticleContainer();
 
         Vector<std::string> real_names;
         Vector<std::string> int_names;
 
+        // note: positions skipped here, since we reconstruct a plotfile SoA from them
         real_names.push_back("weight");
-
         real_names.push_back("momentum_x");
         real_names.push_back("momentum_y");
         real_names.push_back("momentum_z");
@@ -189,9 +197,12 @@ FlushFormatCheckpoint::CheckpointParticles (
 #endif
 
         // get the names of the real comps
-        real_names.resize(pc->NumRealComps());
+        //   note: skips the mandatory AMREX_SPACEDIM positions for pure SoA
+        real_names.resize(pc->NumRealComps() - AMREX_SPACEDIM);
         auto runtime_rnames = pc->getParticleRuntimeComps();
-        for (auto const& x : runtime_rnames) { real_names[x.second+PIdx::nattribs] = x.first; }
+        for (auto const& x : runtime_rnames) {
+            real_names[x.second + PIdx::nattribs - AMREX_SPACEDIM] = x.first;
+        }
 
         // and the int comps
         int_names.resize(pc->NumIntComps());

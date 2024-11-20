@@ -4,6 +4,7 @@
 #include "ComputeDiagFunctors/BackTransformParticleFunctor.H"
 #include "Diagnostics/FlushFormats/FlushFormat.H"
 #include "Diagnostics/ParticleDiag/ParticleDiag.H"
+#include "FlushFormats/FlushFormatCatalyst.H"
 #include "FlushFormats/FlushFormatAscent.H"
 #include "FlushFormats/FlushFormatCheckpoint.H"
 #ifdef WARPX_USE_OPENPMD
@@ -37,8 +38,8 @@
 
 using namespace amrex::literals;
 
-Diagnostics::Diagnostics (int i, std::string name)
-    : m_diag_name(std::move(name)), m_diag_index(i)
+Diagnostics::Diagnostics (int i, std::string name, DiagTypes diag_type)
+    : m_diag_type(diag_type), m_diag_name(std::move(name)), m_diag_index(i)
 {
 }
 
@@ -228,8 +229,9 @@ Diagnostics::BaseReadParameters ()
        if (WarpX::boost_direction[ dim_map[WarpX::moving_window_dir] ] == 1) {
            // Convert user-defined lo and hi for diagnostics to account for boosted-frame
            // simulations with moving window
-           const amrex::Real convert_factor = 1._rt/(WarpX::gamma_boost * (1._rt - WarpX::beta_boost) );
-           // Assuming that the window travels with speed c
+           const amrex::Real beta_window = WarpX::moving_window_v / PhysConst::c;
+           const amrex::Real convert_factor = 1._rt/(
+               WarpX::gamma_boost * (1._rt - WarpX::beta_boost * beta_window) );
            m_lo[WarpX::moving_window_dir] *= convert_factor;
            m_hi[WarpX::moving_window_dir] *= convert_factor;
        }
@@ -268,6 +270,30 @@ Diagnostics::BaseReadParameters ()
                     // Store species index: will be used in RhoFunctor to dump
                     // rho for this species
                     m_rho_per_species_index.push_back(i);
+                    species_name_is_wrong = false;
+                }
+            }
+            // If species name was misspelled, abort with error message
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !species_name_is_wrong,
+                "Input error: string " + var + " in " + m_diag_name
+                + ".fields_to_plot does not match any species"
+            );
+        }
+        // Check if m_varnames contains a string of the form T_<species_name>
+        if (var.rfind("T_", 0) == 0) {
+            // Extract species name from the string T_<species_name>
+            const std::string species = var.substr(var.find("T_") + 2);
+            // Boolean used to check if species name was misspelled
+            bool species_name_is_wrong = true;
+            // Loop over all species
+            for (int i = 0, n = int(m_all_species_names.size()); i < n; i++) {
+                // Check if species name extracted from the string T_<species_name>
+                // matches any of the species in the simulation
+                if (species == m_all_species_names[i]) {
+                    // Store species index: will be used in TemperatureFunctor to dump
+                    // T for this species
+                    m_T_per_species_index.push_back(i);
                     species_name_is_wrong = false;
                 }
             }
@@ -481,7 +507,9 @@ Diagnostics::InitBaseData ()
         m_flush_format = std::make_unique<FlushFormatCheckpoint>() ;
     } else if (m_format == "ascent"){
         m_flush_format = std::make_unique<FlushFormatAscent>();
-    } else if (m_format == "sensei"){
+    } else if (m_format == "catalyst") {
+        m_flush_format = std::make_unique<FlushFormatCatalyst>();
+    } else if (m_format == "sensei") {
 #ifdef AMREX_USE_SENSEI_INSITU
         m_flush_format = std::make_unique<FlushFormatSensei>(
             dynamic_cast<amrex::AmrMesh*>(const_cast<WarpX*>(&warpx)),
@@ -506,6 +534,14 @@ Diagnostics::InitBaseData ()
     m_mf_output.resize( m_num_buffers );
     for (int i = 0; i < m_num_buffers; ++i) {
         m_mf_output[i].resize( nmax_lev );
+    }
+
+    // allocate vector of buffers and vector of levels for each buffer for summation multifab for TimeAveragedDiagnostics
+    if (m_diag_type == DiagTypes::TimeAveraged) {
+        m_sum_mf_output.resize(m_num_buffers);
+        for (int i = 0; i < m_num_buffers; ++i) {
+            m_sum_mf_output[i].resize( nmax_lev );
+        }
     }
 
     // allocate vector of geometry objects corresponding to each output multifab.
@@ -547,6 +583,15 @@ Diagnostics::ComputeAndPack ()
             // Check that the proper number of components of mf_avg were updated.
             AMREX_ALWAYS_ASSERT( icomp_dst == m_varnames.size() );
 
+            if (m_diag_type == DiagTypes::TimeAveraged) {
+
+                const amrex::Real real_a = 1.0;
+                // Compute m_sum_mf_output += real_a*m_mf_output
+                amrex::MultiFab::Saxpy(
+                        m_sum_mf_output[i_buffer][lev], real_a, m_mf_output[i_buffer][lev],
+                        0, 0, m_mf_output[i_buffer][lev].nComp(), m_mf_output[i_buffer][lev].nGrowVect());
+            }
+
             // needed for contour plots of rho, i.e. ascent/sensei
             if (m_format == "sensei" || m_format == "ascent") {
                 ablastr::utils::communication::FillBoundary(m_mf_output[i_buffer][lev], WarpX::do_single_precision_comms,
@@ -574,9 +619,7 @@ Diagnostics::FilterComputePackFlush (int step, bool force_flush)
     }
 
     for (int i_buffer = 0; i_buffer < m_num_buffers; ++i_buffer) {
-        if ( !DoDump (step, i_buffer, force_flush) ) continue;
+        if ( !DoDump (step, i_buffer, force_flush) ) { continue; }
         Flush(i_buffer, force_flush);
     }
-
-
 }

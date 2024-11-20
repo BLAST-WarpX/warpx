@@ -16,43 +16,48 @@
 # tolerance: 1.0e-30
 # Possible running time: ~ 1.0 s
 
-from glob import glob
 import os
 import sys
+from glob import glob
 
 import numpy as np
 import yt
 
-sys.path.insert(1, '../../../../warpx/Regression/Checksum/')
-import checksumAPI
+sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
+from checksumAPI import evaluate_checksum
 
 tolerance = 1.0e-15
 
 last_fn = sys.argv[1]
-if (last_fn[-1] == "/"): last_fn = last_fn[:-1]
+if last_fn[-1] == "/":
+    last_fn = last_fn[:-1]
 fn_list = glob(last_fn[:-5] + "?????")
 
 for fn in fn_list:
     # get time index j
     j = int(fn[-5:])
-    if j==0:
+    if j == 0:
         # load file
-        ds = yt.load( fn )
+        ds = yt.load(fn)
         ad = ds.all_data()
-        px1 = ad['particle_momentum_x'].to_ndarray()
-        py1 = ad['particle_momentum_y'].to_ndarray()
-    if j==150:
+        px1 = ad["particle_momentum_x"].to_ndarray()
+        py1 = ad["particle_momentum_y"].to_ndarray()
+    if j == 150:
         # load file
-        ds = yt.load( fn )
+        ds = yt.load(fn)
         ad = ds.all_data()
-        px2 = ad['particle_momentum_x'].to_ndarray()
-        py2 = ad['particle_momentum_y'].to_ndarray()
+        px2 = ad["particle_momentum_x"].to_ndarray()
+        py2 = ad["particle_momentum_y"].to_ndarray()
 
-error = np.max( abs(px1-px2)+abs(py1-py2) )
+error = np.max(abs(px1 - px2) + abs(py1 - py2))
 
-print('error = ', error)
-print('tolerance = ', tolerance)
-assert(error < tolerance)
+print("error = ", error)
+print("tolerance = ", tolerance)
+assert error < tolerance
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn, do_particles=False)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+    do_particles=False,
+)

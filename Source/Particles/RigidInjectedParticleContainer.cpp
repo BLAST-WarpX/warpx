@@ -73,7 +73,7 @@ void RigidInjectedParticleContainer::InitData()
 {
     // Perform Lorentz transform of `z_inject_plane`
     const amrex::Real t_boost = WarpX::GetInstance().gett_new(0);
-    amrex::Real zinject_plane_boost = zinject_plane/WarpX::gamma_boost
+    const amrex::Real zinject_plane_boost = zinject_plane/WarpX::gamma_boost
                                     - WarpX::beta_boost*PhysConst::c*t_boost;
     zinject_plane_levels.resize(finestLevel()+1, zinject_plane_boost);
 
@@ -117,9 +117,9 @@ RigidInjectedParticleContainer::RemapParticles()
                 for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
                 {
                     const auto& attribs = pti.GetAttribs();
-                    const auto uxp = attribs[PIdx::ux].dataPtr();
-                    const auto uyp = attribs[PIdx::uy].dataPtr();
-                    const auto uzp = attribs[PIdx::uz].dataPtr();
+                    const auto *const uxp = attribs[PIdx::ux].dataPtr();
+                    const auto *const uyp = attribs[PIdx::uy].dataPtr();
+                    const auto *const uzp = attribs[PIdx::uz].dataPtr();
 
                     const auto GetPosition = GetParticlePosition<PIdx>(pti);
                           auto SetPosition = SetParticlePosition<PIdx>(pti);
@@ -176,10 +176,6 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
 
     // Save the position, momentum and optical depth, making copies
     amrex::Gpu::DeviceVector<ParticleReal> xp_save, yp_save, zp_save;
-    amrex::Gpu::DeviceVector<ParticleReal> uxp_save, uyp_save, uzp_save;
-#ifdef WARPX_QED
-    amrex::Gpu::DeviceVector<ParticleReal> optical_depth_save;
-#endif
 
     const auto GetPosition = GetParticlePosition<PIdx>(pti, offset);
           auto SetPosition = SetParticlePosition<PIdx>(pti, offset);
@@ -188,12 +184,6 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
     amrex::ParticleReal* const AMREX_RESTRICT uy = uyp.dataPtr() + offset;
     amrex::ParticleReal* const AMREX_RESTRICT uz = uzp.dataPtr() + offset;
 
-#ifdef WARPX_QED
-    const bool loc_has_quantum_sync = has_quantum_sync();
-    amrex::ParticleReal* AMREX_RESTRICT p_optical_depth = nullptr;
-    amrex::ParticleReal* AMREX_RESTRICT p_optical_depth_save = nullptr;
-#endif
-
     if (!done_injecting_lev)
     {
         // If the old values are not already saved, create copies here.
@@ -201,26 +191,9 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
         yp_save.resize(np_to_push);
         zp_save.resize(np_to_push);
 
-        uxp_save.resize(np_to_push);
-        uyp_save.resize(np_to_push);
-        uzp_save.resize(np_to_push);
-
         amrex::ParticleReal* const AMREX_RESTRICT xp_save_ptr = xp_save.dataPtr();
         amrex::ParticleReal* const AMREX_RESTRICT yp_save_ptr = yp_save.dataPtr();
         amrex::ParticleReal* const AMREX_RESTRICT zp_save_ptr = zp_save.dataPtr();
-
-        amrex::ParticleReal* const AMREX_RESTRICT uxp_save_ptr = uxp_save.dataPtr();
-        amrex::ParticleReal* const AMREX_RESTRICT uyp_save_ptr = uyp_save.dataPtr();
-        amrex::ParticleReal* const AMREX_RESTRICT uzp_save_ptr = uzp_save.dataPtr();
-
-#ifdef WARPX_QED
-        if(loc_has_quantum_sync){
-            p_optical_depth = pti.GetAttribs(particle_comps["opticalDepthQSR"]).dataPtr()
-                              + offset;
-            optical_depth_save.resize(np_to_push);
-            p_optical_depth_save = optical_depth_save.dataPtr();
-        }
-#endif
 
         amrex::ParallelFor( np_to_push,
                             [=] AMREX_GPU_DEVICE (long i) {
@@ -229,13 +202,6 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                                 xp_save_ptr[i] = xp;
                                 yp_save_ptr[i] = yp;
                                 zp_save_ptr[i] = zp;
-                                uxp_save_ptr[i] = ux[i];
-                                uyp_save_ptr[i] = uy[i];
-                                uzp_save_ptr[i] = uz[i];
-#ifdef WARPX_QED
-                                if(loc_has_quantum_sync){
-                                    p_optical_depth_save[i] = p_optical_depth[i];}
-#endif
                             });
     }
 
@@ -252,9 +218,6 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
         amrex::ParticleReal* AMREX_RESTRICT x_save = xp_save.dataPtr();
         amrex::ParticleReal* AMREX_RESTRICT y_save = yp_save.dataPtr();
         amrex::ParticleReal* AMREX_RESTRICT z_save = zp_save.dataPtr();
-        amrex::ParticleReal* AMREX_RESTRICT ux_save = uxp_save.dataPtr();
-        amrex::ParticleReal* AMREX_RESTRICT uy_save = uyp_save.dataPtr();
-        amrex::ParticleReal* AMREX_RESTRICT uz_save = uzp_save.dataPtr();
 
         // Undo the push for particles not injected yet.
         // The zp are advanced a fixed amount.
@@ -267,9 +230,6 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                                 amrex::ParticleReal xp, yp, zp;
                                 GetPosition(i, xp, yp, zp);
                                 if (zp <= z_plane_lev) {
-                                    ux[i] = ux_save[i];
-                                    uy[i] = uy_save[i];
-                                    uz[i] = uz_save[i];
                                     xp = x_save[i];
                                     yp = y_save[i];
                                     if (rigid) {
@@ -281,25 +241,17 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                                         zp = z_save[i] + dt*uz[i]*gi;
                                     }
                                     SetPosition(i, xp, yp, zp);
-#ifdef WARPX_QED
-                                    if(loc_has_quantum_sync){
-                                        p_optical_depth[i] = p_optical_depth_save[i];}
-#endif
                                 }
                             });
     }
 }
 
 void
-RigidInjectedParticleContainer::Evolve (int lev,
-                                        const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
-                                        const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
-                                        MultiFab& jx, MultiFab& jy, MultiFab& jz,
-                                        MultiFab* cjx, MultiFab* cjy, MultiFab* cjz,
-                                        MultiFab* rho, MultiFab* crho,
-                                        const MultiFab* cEx, const MultiFab* cEy, const MultiFab* cEz,
-                                        const MultiFab* cBx, const MultiFab* cBy, const MultiFab* cBz,
-                                        Real t, Real dt, DtType a_dt_type, bool skip_deposition)
+RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
+                                        int lev,
+                                        const std::string& current_fp_string,
+                                        Real t, Real dt, DtType a_dt_type, bool skip_deposition,
+                                        PushType push_type)
 {
 
     // Update location of injection plane in the boosted frame
@@ -316,15 +268,10 @@ RigidInjectedParticleContainer::Evolve (int lev,
     done_injecting_lev = ((zinject_plane_levels[lev] < plo[WARPX_ZINDEX] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c >= 0.) ||
                            (zinject_plane_levels[lev] > phi[WARPX_ZINDEX] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c <= 0.));
 
-    PhysicalParticleContainer::Evolve (lev,
-                                       Ex, Ey, Ez,
-                                       Bx, By, Bz,
-                                       jx, jy, jz,
-                                       cjx, cjy, cjz,
-                                       rho, crho,
-                                       cEx, cEy, cEz,
-                                       cBx, cBy, cBz,
-                                       t, dt, a_dt_type, skip_deposition);
+    PhysicalParticleContainer::Evolve (fields,
+                                       lev,
+                                       current_fp_string,
+                                       t, dt, a_dt_type, skip_deposition, push_type);
 }
 
 void
@@ -334,9 +281,9 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
 {
     WARPX_PROFILE("RigidInjectedParticleContainer::PushP");
 
-    if (do_not_push) return;
+    if (do_not_push) { return; }
 
-    const std::array<Real,3>& dx = WarpX::CellSize(std::max(lev,0));
+    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(lev,0));
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel
@@ -368,7 +315,6 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
             const amrex::ParticleReal By_external_particle = m_B_external_particle[1];
             const amrex::ParticleReal Bz_external_particle = m_B_external_particle[2];
 
-            const std::array<amrex::Real,3>& xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
 
             const Dim3 lo = lbound(box);
 
@@ -376,8 +322,7 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
             const int nox = WarpX::nox;
             const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
 
-            const amrex::GpuArray<amrex::Real, 3> dx_arr = {dx[0], dx[1], dx[2]};
-            const amrex::GpuArray<amrex::Real, 3> xyzmin_arr = {xyzmin[0], xyzmin[1], xyzmin[2]};
+            const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
 
             amrex::Array4<const amrex::Real> const& ex_arr = exfab.array();
             amrex::Array4<const amrex::Real> const& ey_arr = eyfab.array();
@@ -444,10 +389,10 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
                 doGatherShapeN(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                               dx_arr, xyzmin_arr, lo, n_rz_azimuthal_modes,
+                               dinv, xyzmin, lo, n_rz_azimuthal_modes,
                                nox, galerkin_interpolation);
 
-                [[maybe_unused]] auto& getExternalEB_tmp = getExternalEB;
+                [[maybe_unused]] const auto& getExternalEB_tmp = getExternalEB;
                 if constexpr (exteb_control == has_exteb) {
                     getExternalEB(ip, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
                 }

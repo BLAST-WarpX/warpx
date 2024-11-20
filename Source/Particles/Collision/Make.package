@@ -1,5 +1,6 @@
 CEXE_sources += CollisionHandler.cpp
 CEXE_sources += CollisionBase.cpp
+CEXE_sources += ScatteringProcess.cpp
 
 include $(WARPX_HOME)/Source/Particles/Collision/BinaryCollision/Make.package
 include $(WARPX_HOME)/Source/Particles/Collision/BackgroundMCC/Make.package

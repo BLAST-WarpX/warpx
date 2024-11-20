@@ -22,7 +22,7 @@
 #include <regex>
 
 // constructor
-FieldReduction::FieldReduction (std::string rd_name)
+FieldReduction::FieldReduction (const std::string& rd_name)
 : ReducedDiags{rd_name}
 {
     using namespace amrex::literals;
@@ -60,9 +60,7 @@ FieldReduction::FieldReduction (std::string rd_name)
     parser_string = std::regex_replace(parser_string, std::regex("\n\\s*"), " ");
 
     // read reduction type
-    std::string reduction_type_string;
-    pp_rd_name.get("reduction_type", reduction_type_string);
-    m_reduction_type = GetAlgorithmInteger (pp_rd_name, "reduction_type");
+    pp_rd_name.get_enum_sloppy("reduction_type", m_reduction_type, "-_");
 
     if (amrex::ParallelDescriptor::IOProcessor())
     {
@@ -77,9 +75,9 @@ FieldReduction::FieldReduction (std::string rd_name)
             ofs << m_sep;
             ofs << "[" << c++ << "]time(s)";
             ofs << m_sep;
-            ofs << "[" << c++ << "]" + reduction_type_string + " of " + parser_string + " (SI units)";
+            ofs << "[" << c++ << "]" + amrex::getEnumNameString(m_reduction_type) + " of " + parser_string + " (SI units)";
 
-            ofs << std::endl;
+            ofs << "\n";
             // close file
             ofs.close();
         }
@@ -89,7 +87,7 @@ FieldReduction::FieldReduction (std::string rd_name)
 
 void FieldReduction::BackwardCompatibility ()
 {
-    amrex::ParmParse pp_rd_name(m_rd_name);
+    const amrex::ParmParse pp_rd_name(m_rd_name);
     std::vector<std::string> backward_strings;
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !pp_rd_name.queryarr("reduced_function(x,y,z,Ex,Ey,Ez,Bx,By,Bz)", backward_strings),

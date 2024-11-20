@@ -23,8 +23,8 @@
 using namespace amrex;
 
 // constructor
-ReducedDiags::ReducedDiags (std::string rd_name)
-    : m_rd_name(std::move(rd_name))
+ReducedDiags::ReducedDiags (const std::string& rd_name):
+m_rd_name{rd_name}
 {
     BackwardCompatibility();
 
@@ -40,7 +40,7 @@ ReducedDiags::ReducedDiags (std::string rd_name)
     std::string restart_chkfile;
     const ParmParse pp_amr("amr");
     pp_amr.query("restart", restart_chkfile);
-    bool IsNotRestart = restart_chkfile.empty();
+    const bool IsNotRestart = restart_chkfile.empty();
 
     if (ParallelDescriptor::IOProcessor())
     {
@@ -50,7 +50,7 @@ ReducedDiags::ReducedDiags (std::string rd_name)
         { amrex::CreateDirectoryFailed(m_path); }
 
         // replace / create output file
-        std::string rd_full_file_name = m_path + m_rd_name + "." + m_extension;
+        const std::string rd_full_file_name = m_path + m_rd_name + "." + m_extension;
         m_write_header = IsNotRestart || !amrex::FileExists(rd_full_file_name); // not a restart or file doesn't exist
         if (m_write_header)
         {
@@ -86,7 +86,7 @@ void ReducedDiags::LoadBalance ()
     // load balancing operations
 }
 
-void ReducedDiags::BackwardCompatibility ()
+void ReducedDiags::BackwardCompatibility () const
 {
     const amrex::ParmParse pp_rd_name(m_rd_name);
     std::vector<std::string> backward_strings;
@@ -116,12 +116,12 @@ void ReducedDiags::WriteToFile (int step) const
     ofs << WarpX::GetInstance().gett_new(0);
 
     // loop over data size and write
-    for (const auto& item : m_data) ofs << m_sep << item;
+    for (const auto& item : m_data) { ofs << m_sep << item; }
 
     // end loop over data size
 
     // end line
-    ofs << std::endl;
+    ofs << "\n";
 
     // close file
     ofs.close();

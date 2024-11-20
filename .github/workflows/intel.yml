@@ -1,6 +1,12 @@
 name: 🐧 Intel
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    paths-ignore:
+      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-intel
@@ -17,12 +23,12 @@ jobs:
     #env:
     #  CMAKE_GENERATOR: Ninja
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: install dependencies
       run: |
         .github/workflows/dependencies/icc.sh
     - name: CCache Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -53,7 +59,7 @@ jobs:
           -DWarpX_MPI=OFF             \
           -DWarpX_OPENPMD=ON          \
           -DWarpX_openpmd_internal=OFF
-        cmake --build build_dp -j 2
+        cmake --build build_dp -j 4
 
         cmake -S . -B build_sp \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
@@ -64,7 +70,7 @@ jobs:
           -DWarpX_OPENPMD=ON           \
           -DWarpX_openpmd_internal=OFF \
           -DWarpX_PRECISION=SINGLE
-        cmake --build build_sp -j 2
+        cmake --build build_sp -j 4
         cmake --build build_sp --target pip_install
 
         ccache -s
@@ -82,13 +88,13 @@ jobs:
     #  CMAKE_GENERATOR: Ninja
     if: github.event.pull_request.draft == false
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: install dependencies
       shell: bash
       run: |
         .github/workflows/dependencies/dpcpp.sh
     - name: CCache Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -106,6 +112,7 @@ jobs:
         set +e
         source /opt/intel/oneapi/setvars.sh
         set -e
+        export PATH=$PATH:/opt/intel/oneapi/compiler/2024.2/bin  # FIXME
         export CXX=$(which icpx)
         export CC=$(which icx)
 
@@ -115,12 +122,12 @@ jobs:
         cmake -S . -B build_sp         \
           -DCMAKE_CXX_FLAGS_RELEASE="-O1 -DNDEBUG" \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
-          -DWarpX_EB=ON                \
+          -DWarpX_EB=OFF               \
           -DWarpX_PYTHON=ON            \
           -DWarpX_MPI=OFF              \
           -DWarpX_OPENPMD=ON           \
           -DWarpX_PRECISION=SINGLE
-        cmake --build build_sp -j 2
+        cmake --build build_sp -j 4
         cmake --build build_sp --target pip_install
 
         ccache -s
@@ -132,7 +139,7 @@ jobs:
         source /opt/intel/oneapi/setvars.sh
         set -e
         export OMP_NUM_THREADS=2
-        Examples/Physics_applications/laser_acceleration/PICMI_inputs_3d.py
+        Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_picmi.py
 
   build_dpcc:
     name: oneAPI DPC++ SP
@@ -146,13 +153,13 @@ jobs:
     #  CMAKE_GENERATOR: Ninja
     if: github.event.pull_request.draft == false
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: install dependencies
       shell: bash
       run: |
         .github/workflows/dependencies/dpcpp.sh
     - name: CCache Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -170,6 +177,7 @@ jobs:
         set +e
         source /opt/intel/oneapi/setvars.sh
         set -e
+        export PATH=$PATH:/opt/intel/oneapi/compiler/2024.2/bin  # FIXME
         export CXX=$(which icpx)
         export CC=$(which icx)
         export CXXFLAGS="-fsycl ${CXXFLAGS}"
@@ -180,11 +188,12 @@ jobs:
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_COMPUTE=SYCL         \
           -DWarpX_EB=ON                \
+          -DWarpX_FFT=ON               \
           -DWarpX_PYTHON=ON            \
           -DWarpX_MPI=OFF              \
           -DWarpX_OPENPMD=ON           \
           -DWarpX_PRECISION=SINGLE
-        cmake --build build_sp -j 2
+        cmake --build build_sp -j 4
 
         ccache -s
         du -hs ~/.cache/ccache
@@ -194,18 +203,3 @@ jobs:
      #   python3 -m pip install --upgrade build packaging setuptools wheel
      #   PYWARPX_LIB_DIR=$PWD/build_sp/lib/site-packages/pywarpx/ python3 -m pip wheel .
      #   python3 -m pip install *.whl
-
-  save_pr_number:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Save PR number
-        env:
-          PR_NUMBER: ${{ github.event.number }}
-        run: |
-          echo $PR_NUMBER > pr_number.txt
-      - uses: actions/upload-artifact@v3
-        with:
-          name: pr_number
-          path: pr_number.txt
-          retention-days: 1

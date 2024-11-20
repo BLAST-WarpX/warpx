@@ -1,11 +1,11 @@
 """
- Copyright 2020
+Copyright 2020
 
- This file is part of WarpX.
+This file is part of WarpX.
 
- License: BSD-3-Clause-LBNL
- """
+License: BSD-3-Clause-LBNL
+"""
 
 import os
 
-benchmark_location = os.path.split(__file__)[0] + '/benchmarks_json'
+benchmark_location = os.path.split(__file__)[0] + "/benchmarks_json"

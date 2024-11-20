@@ -30,15 +30,19 @@ IonizationFilterFunc::IonizationFilterFunc (const WarpXParIter& a_pti, int lev, 
                                             const amrex::Real* const AMREX_RESTRICT a_adk_prefactor,
                                             const amrex::Real* const AMREX_RESTRICT a_adk_exp_prefactor,
                                             const amrex::Real* const AMREX_RESTRICT a_adk_power,
+                                            const amrex::Real* const AMREX_RESTRICT a_adk_correction_factors,
                                             int a_comp,
                                             int a_atomic_number,
+                                            int a_do_adk_correction,
                                             int a_offset) noexcept:
     m_ionization_energies{a_ionization_energies},
     m_adk_prefactor{a_adk_prefactor},
     m_adk_exp_prefactor{a_adk_exp_prefactor},
     m_adk_power{a_adk_power},
+    m_adk_correction_factors{a_adk_correction_factors},
     comp{a_comp},
     m_atomic_number{a_atomic_number},
+    m_do_adk_correction{a_do_adk_correction},
     m_Ex_external_particle{E_external_particle[0]},
     m_Ey_external_particle{E_external_particle[1]},
     m_Ez_external_particle{E_external_particle[2]},
@@ -72,11 +76,10 @@ IonizationFilterFunc::IonizationFilterFunc (const WarpXParIter& a_pti, int lev, 
     box.grow(ngEB);
 
     const std::array<amrex::Real,3>& dx = WarpX::CellSize(std::max(lev, 0));
-    m_dx_arr = {dx[0], dx[1], dx[2]};
+    m_dinv = amrex::XDim3{1._rt/dx[0], 1._rt/dx[1], 1._rt/dx[2]};
 
     // Lower corner of tile box physical domain (take into account Galilean shift)
-    const std::array<amrex::Real, 3>& xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
-    m_xyzmin_arr = {xyzmin[0], xyzmin[1], xyzmin[2]};
+    m_xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
 
     m_lo = amrex::lbound(box);
 }

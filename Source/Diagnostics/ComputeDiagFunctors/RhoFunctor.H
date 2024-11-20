@@ -27,6 +27,7 @@ public:
      */
     RhoFunctor (int lev,
                 amrex::IntVect crse_ratio,
+                bool apply_rz_psatd_filter = false,
                 int species_index = -1,
                 bool convertRZmodes2cartesian = true,
                 int ncomp = 1);
@@ -43,6 +44,9 @@ private:
 
     // Level on which source MultiFab mf_src is defined in RZ geometry
     int const m_lev;
+
+    // Whether to apply k-space filtering of charge density in the diagnostics output in RZ PSATD
+    bool m_apply_rz_psatd_filter;
 
     // Species index to dump rho per species
     const int m_species_index;

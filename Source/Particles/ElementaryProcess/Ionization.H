@@ -5,8 +5,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef IONIZATION_H_
-#define IONIZATION_H_
+#ifndef WARPX_IONIZATION_H_
+#define WARPX_IONIZATION_H_
 
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/Gather/GetExternalFields.H"
@@ -33,9 +33,11 @@ struct IonizationFilterFunc
     const amrex::Real* AMREX_RESTRICT m_adk_prefactor;
     const amrex::Real* AMREX_RESTRICT m_adk_exp_prefactor;
     const amrex::Real* AMREX_RESTRICT m_adk_power;
+    const amrex::Real* AMREX_RESTRICT m_adk_correction_factors;
 
     int comp;
     int m_atomic_number;
+    int m_do_adk_correction = 0;
 
     GetParticlePosition<PIdx> m_get_position;
     GetExternalEBField m_get_externalEB;
@@ -60,8 +62,8 @@ struct IonizationFilterFunc
     amrex::IndexType m_by_type;
     amrex::IndexType m_bz_type;
 
-    amrex::GpuArray<amrex::Real, 3> m_dx_arr;
-    amrex::GpuArray<amrex::Real, 3> m_xyzmin_arr;
+    amrex::XDim3 m_dinv;
+    amrex::XDim3 m_xyzmin;
 
     bool m_galerkin_interpolation;
     int m_nox;
@@ -82,8 +84,10 @@ struct IonizationFilterFunc
                           const amrex::Real* AMREX_RESTRICT a_adk_prefactor,
                           const amrex::Real* AMREX_RESTRICT a_adk_exp_prefactor,
                           const amrex::Real* AMREX_RESTRICT a_adk_power,
+                          const amrex::Real* AMREX_RESTRICT a_adk_correction_factors,
                           int a_comp,
                           int a_atomic_number,
+                          int a_do_adk_correction,
                           int a_offset = 0) noexcept;
 
     template <typename PData>
@@ -113,7 +117,7 @@ struct IonizationFilterFunc
             doGatherShapeN(xp, yp, zp, ex, ey, ez, bx, by, bz,
                            m_ex_arr, m_ey_arr, m_ez_arr, m_bx_arr, m_by_arr, m_bz_arr,
                            m_ex_type, m_ey_type, m_ez_type, m_bx_type, m_by_type, m_bz_type,
-                           m_dx_arr, m_xyzmin_arr, m_lo, m_n_rz_azimuthal_modes,
+                           m_dinv, m_xyzmin, m_lo, m_n_rz_azimuthal_modes,
                            m_nox, m_galerkin_interpolation);
             m_get_externalEB(i, ex, ey, ez, bx, by, bz);
 
@@ -133,9 +137,16 @@ struct IonizationFilterFunc
                                );
 
             // Compute probability of ionization p
-            const amrex::Real w_dtau = (E <= 0._rt) ? 0._rt : 1._rt/ ga * m_adk_prefactor[ion_lev] *
+            amrex::Real w_dtau = (E <= 0._rt) ? 0._rt : 1._rt/ ga * m_adk_prefactor[ion_lev] *
                 std::pow(E, m_adk_power[ion_lev]) *
                 std::exp( m_adk_exp_prefactor[ion_lev]/E );
+            // if requested, do Zhang's correction of ADK
+            if (m_do_adk_correction) {
+                const amrex::Real r = E / m_adk_correction_factors[3];
+                w_dtau *= std::exp(m_adk_correction_factors[0]*r*r+m_adk_correction_factors[1]*r+
+                                   m_adk_correction_factors[2]);
+            }
+
             const amrex::Real p = 1._rt - std::exp( - w_dtau );
 
             const amrex::Real random_draw = amrex::Random(engine);
@@ -160,4 +171,4 @@ struct IonizationTransformFunc
     }
 };
 
-#endif
+#endif //WARPX_IONIZATION_H_

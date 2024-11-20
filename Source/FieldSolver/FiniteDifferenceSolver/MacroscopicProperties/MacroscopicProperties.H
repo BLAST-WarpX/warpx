@@ -13,8 +13,11 @@
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_Array.H>
+#include <AMReX_BoxArray.H>
+#include <AMReX_DistributionMapping.H>
 #include <AMReX_Extension.H>
 #include <AMReX_GpuQualifiers.H>
+#include <AMReX_IntVect.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_Parser.H>
 #include <AMReX_REAL.H>
@@ -33,8 +36,32 @@ public:
     MacroscopicProperties (); // constructor
     /** Read user-defined macroscopic properties. Called in constructor. */
     void ReadParameters ();
-    /** Initialize multifabs storing macroscopic multifabs */
-    void InitData ();
+
+    /**
+     * \brief Allocate multifabs storing macroscopic multifabs
+     *
+     * @param[in] ba the box array associated to the multifabs E and B
+     * @param[in] dmap the distribution mapping
+     * @param[in] ng_EB_alloc guard cells allocated for multifabs E and B
+     */
+    void AllocateLevelMFs (
+        const amrex::BoxArray& ba,
+        const amrex::DistributionMapping& dm,
+        const amrex::IntVect& ng_EB_alloc );
+
+    /**
+     * \brief Initialize multifabs storing macroscopic multifabs
+     *
+     * @param[in] geom the geometry
+     * @param[in] Ex_stag staggering of the Ex field
+     * @param[in] Ey_stag staggering of the Ey field
+     * @param[in] Ez_stag staggering of the Ez field
+     */
+    void InitData (
+        const amrex::Geometry& geom,
+        const amrex::IntVect& Ex_stag,
+        const amrex::IntVect& Ey_stag,
+        const amrex::IntVect& Ez_stag);
 
     /** return MultiFab, sigma (conductivity) of the medium. */
     amrex::MultiFab& getsigma_mf  () {return (*m_sigma_mf);}

@@ -51,6 +51,19 @@ void utils::parser::Store_parserString(
     }
 }
 
+bool utils::parser::Query_parserString(
+    amrex::ParmParse const& pp,
+    std::string const& query_string,
+    std::string& stored_string)
+{
+    bool const input_specified = pp.contains(query_string.c_str());
+    if (input_specified) {
+        stored_string.clear();
+        utils::parser::Store_parserString(pp, query_string, stored_string);
+    }
+    return input_specified;
+}
+
 int utils::parser::query (const amrex::ParmParse& a_pp, std::string const& group, char const * str, std::string& val)
 {
     const bool is_specified_without_group = a_pp.contains(str);
@@ -135,7 +148,7 @@ amrex::Parser utils::parser::makeParser (
     parser.registerVariables(varnames);
 
     std::set<std::string> symbols = parser.symbols();
-    for (auto const& v : varnames) symbols.erase(v);
+    for (auto const& v : varnames) { symbols.erase(v); }
 
     // User can provide inputs under this name, through which expressions
     // can be provided for arbitrary variables. PICMI inputs are aware of
@@ -164,7 +177,7 @@ amrex::Parser utils::parser::makeParser (
     for (auto it = symbols.begin(); it != symbols.end(); ) {
         // Always parsing in double precision avoids potential overflows that may occur when parsing
         // user's expressions because of the limited range of exponentials in single precision
-        double v;
+        double v = 0.0;
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             recursive_symbols.count(*it)==0,

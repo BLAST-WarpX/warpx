@@ -114,8 +114,9 @@ void
 WarpXLaserProfiles::FromFileLaserProfile::update (amrex::Real t)
 {
     t += m_params.t_min - m_params.t_delay;
-    if(t >= m_params.t_max)
+    if(t >= m_params.t_max) {
         return;
+    }
     const auto idx_times = find_left_right_time_indices(t);
     const auto idx_t_left = idx_times.first;
     const auto idx_t_right = idx_times.second;
@@ -161,7 +162,7 @@ WarpXLaserProfiles::FromFileLaserProfile::fill_amplitude (
 }
 
 void
-WarpXLaserProfiles::FromFileLaserProfile::parse_lasy_file(std::string lasy_file_name)
+WarpXLaserProfiles::FromFileLaserProfile::parse_lasy_file(const std::string& lasy_file_name)
 {
 #ifdef WARPX_USE_OPENPMD
     if(ParallelDescriptor::IOProcessor()){
@@ -186,8 +187,8 @@ WarpXLaserProfiles::FromFileLaserProfile::parse_lasy_file(std::string lasy_file_
             m_params.n_rz_azimuthal_components = static_cast<int>(extent[0]);
             m_params.nt = static_cast<int>(extent[1]);
             m_params.nr = static_cast<int>(extent[2]);
-            if(m_params.nt <= 1) WARPX_ABORT_WITH_MESSAGE("nt in lasy file must be >=2");
-            if(m_params.nr <= 1) WARPX_ABORT_WITH_MESSAGE("nr in lasy file must be >=2");
+            if(m_params.nt <= 1) { WARPX_ABORT_WITH_MESSAGE("nt in lasy file must be >=2"); }
+            if(m_params.nr <= 1) { WARPX_ABORT_WITH_MESSAGE("nr in lasy file must be >=2"); }
             // Calculate the min and max of the grid
             m_params.t_min = static_cast<amrex::Real>(offset[0] + position[0]*spacing[0]);
             m_params.t_max = static_cast<amrex::Real>(m_params.t_min + (m_params.nt-1)*spacing[0]);
@@ -236,28 +237,28 @@ WarpXLaserProfiles::FromFileLaserProfile::parse_lasy_file(std::string lasy_file_
 }
 
 void
-WarpXLaserProfiles::FromFileLaserProfile::parse_binary_file (std::string binary_file_name)
+WarpXLaserProfiles::FromFileLaserProfile::parse_binary_file (const std::string& binary_file_name)
 {
     if(ParallelDescriptor::IOProcessor()){
         std::ifstream inp(binary_file_name, std::ios::binary);
-        if(!inp) WARPX_ABORT_WITH_MESSAGE("Failed to open binary file");
+        if(!inp) { WARPX_ABORT_WITH_MESSAGE("Failed to open binary file"); }
         inp.exceptions(std::ios_base::failbit | std::ios_base::badbit);
         //Uniform grid flag
         char flag;
         inp.read(&flag, 1);
-        if(!inp) WARPX_ABORT_WITH_MESSAGE("Failed to read grid type from binary file");
+        if(!inp) { WARPX_ABORT_WITH_MESSAGE("Failed to read grid type from binary file"); }
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(flag, "Binary files with non uniform grid are no longer supported");
         //Grid points along t, x and y
         inp.read(reinterpret_cast<char*>(&m_params.nt), sizeof(uint32_t));
         inp.read(reinterpret_cast<char*>(&m_params.nx), sizeof(uint32_t));
         inp.read(reinterpret_cast<char*>(&m_params.ny), sizeof(uint32_t));
-        if(!inp) WARPX_ABORT_WITH_MESSAGE("Failed to read sizes from binary file");
-        if(m_params.nt <= 1) WARPX_ABORT_WITH_MESSAGE("nt in binary file must be >=2");
-        if(m_params.nx <= 1) WARPX_ABORT_WITH_MESSAGE("nx in binary file must be >=2");
+        if(!inp) { WARPX_ABORT_WITH_MESSAGE("Failed to read sizes from binary file"); }
+        if(m_params.nt <= 1) { WARPX_ABORT_WITH_MESSAGE("nt in binary file must be >=2"); }
+        if(m_params.nx <= 1) { WARPX_ABORT_WITH_MESSAGE("nx in binary file must be >=2"); }
 #if (defined(WARPX_DIM_3D) || (defined WARPX_DIM_RZ))
-        if(m_params.ny <= 1) WARPX_ABORT_WITH_MESSAGE("ny in binary file must be >=2 in 3D");
+        if(m_params.ny <= 1) { WARPX_ABORT_WITH_MESSAGE("ny in binary file must be >=2 in 3D"); }
 #elif defined(WARPX_DIM_XZ)
-        if(m_params.ny != 1) WARPX_ABORT_WITH_MESSAGE("ny in binary file must be 1 in 2D");
+        if(m_params.ny != 1) { WARPX_ABORT_WITH_MESSAGE("ny in binary file must be 1 in 2D"); }
 #endif
         //Coordinates
         Vector<double> dbuf_t, dbuf_x, dbuf_y;
@@ -274,7 +275,7 @@ WarpXLaserProfiles::FromFileLaserProfile::parse_binary_file (std::string binary_
             static_cast<std::streamsize>(dbuf_x.size()*sizeof(double)));
         inp.read(reinterpret_cast<char*>(dbuf_y.dataPtr()),
             static_cast<std::streamsize>(dbuf_y.size()*sizeof(double)));
-        if(!inp) WARPX_ABORT_WITH_MESSAGE("Failed to read coords from binary file");
+        if(!inp) { WARPX_ABORT_WITH_MESSAGE("Failed to read coords from binary file"); }
 
         m_params.t_min = static_cast<amrex::Real>(dbuf_t[0]);
         m_params.t_max = static_cast<amrex::Real>(dbuf_t[1]);
@@ -383,7 +384,7 @@ WarpXLaserProfiles::FromFileLaserProfile::read_binary_data_t_chunk (int t_begin,
     if(ParallelDescriptor::IOProcessor()){
         //Read data chunk
         std::ifstream inp(m_params.binary_file_name, std::ios::binary);
-        if(!inp) WARPX_ABORT_WITH_MESSAGE("Failed to open binary file");
+        if(!inp) { WARPX_ABORT_WITH_MESSAGE("Failed to open binary file"); }
         inp.exceptions(std::ios_base::failbit | std::ios_base::badbit);
 #if (defined(WARPX_DIM_3D))
         auto skip_amount = 1 +
@@ -401,12 +402,12 @@ WarpXLaserProfiles::FromFileLaserProfile::read_binary_data_t_chunk (int t_begin,
         sizeof(double)*t_begin*m_params.nx*m_params.ny;
 #endif
         inp.seekg(static_cast<std::streamoff>(skip_amount));
-        if(!inp) WARPX_ABORT_WITH_MESSAGE("Failed to read field data from binary file");
+        if(!inp) { WARPX_ABORT_WITH_MESSAGE("Failed to read field data from binary file"); }
         const int read_size = (i_last - i_first + 1)*
             m_params.nx*m_params.ny;
         Vector<double> buf_e(read_size);
         inp.read(reinterpret_cast<char*>(buf_e.dataPtr()), static_cast<std::streamsize>(read_size*sizeof(double)));
-        if(!inp) WARPX_ABORT_WITH_MESSAGE("Failed to read field data from binary file");
+        if(!inp) { WARPX_ABORT_WITH_MESSAGE("Failed to read field data from binary file"); }
         std::transform(buf_e.begin(), buf_e.end(), h_E_binary_data.begin(),
             [](auto x) {return static_cast<amrex::Real>(x);} );
     }
@@ -440,7 +441,7 @@ WarpXLaserProfiles::FromFileLaserProfile::internal_fill_amplitude_uniform_cartes
     const auto tmp_y_max = m_params.y_max;
     const auto tmp_nx = m_params.nx;
     const auto tmp_ny = m_params.ny;
-    const auto p_E_lasy_data = m_params.E_lasy_data.dataPtr();
+    const auto *const p_E_lasy_data = m_params.E_lasy_data.dataPtr();
     const auto tmp_idx_first_time = m_params.first_time_index;
     const int idx_t_right = idx_t_left+1;
     const auto t_left = idx_t_left*
@@ -523,7 +524,7 @@ WarpXLaserProfiles::FromFileLaserProfile::internal_fill_amplitude_uniform_cylind
     const auto tmp_r_max = m_params.r_max;
     const auto tmp_nr = m_params.nr;
     const auto tmp_n_rz_azimuthal_components = m_params.n_rz_azimuthal_components;
-    const auto p_E_lasy_data = m_params.E_lasy_data.dataPtr();
+    const auto *const p_E_lasy_data = m_params.E_lasy_data.dataPtr();
     const auto tmp_idx_first_time = m_params.first_time_index;
     const int idx_t_right = idx_t_left+1;
     const auto t_left = idx_t_left*
@@ -625,7 +626,7 @@ WarpXLaserProfiles::FromFileLaserProfile::internal_fill_amplitude_uniform_binary
     const auto tmp_ny = m_params.ny;
 #endif
     const auto tmp_nx = m_params.nx;
-    const auto p_E_binary_data = m_params.E_binary_data.dataPtr();
+    const auto *const p_E_binary_data = m_params.E_binary_data.dataPtr();
     const auto tmp_idx_first_time = m_params.first_time_index;
     const int idx_t_right = idx_t_left+1;
     const auto t_left = idx_t_left*

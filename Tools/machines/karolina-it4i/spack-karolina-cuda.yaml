@@ -1,0 +1,80 @@
+spack:
+  specs:
+# Karolina's openssl version is deprecated
+  - openssl certs=system
+  - pkgconfig
+  - ccache
+  - cmake@3.26.5
+  - cuda@11.7.0
+  - openmpi@4.1.4 +atomics
+  - fftw
+  - hdf5@1.14.0
+  - adios2@2.9.2 ~mgard
+  - blaspp
+  - lapackpp
+  - boost@1.81.0 +program_options +atomic ~python
+  - python@3.11.6
+  - py-pip
+  - py-setuptools
+  - py-wheel
+  - py-cython
+  - py-mpi4py
+  - py-numpy@1.24.2
+  - openpmd-api@0.15.2 +python
+  - py-periodictable@1.5.0
+  - py-h5py
+# optional
+# - py-libensemble +nlopt
+
+  packages:
+    openssh:
+      externals:
+      - spec: openssh@7.4p1
+        prefix: /usr
+      buildable: False
+    cuda:
+      externals:
+      - spec: cuda@11.7.0
+        modules:
+        - CUDA/11.7.0
+      buildable: False
+    mpi:
+      buildable: False
+    openmpi:
+      externals:
+      - spec: openmpi@4.1.4 +atomics +cuda %gcc@11.3.0
+        modules:
+        - OpenMPI/4.1.4-GCC-11.3.0-CUDA-11.7.0
+    libfabric:
+      externals:
+      - spec: libfabric@1.15.1 %gcc@11.3.0
+        modules:
+        - libfabric/1.15.1-GCCcore-11.3.0
+      buildable: False
+    all:
+      target: [zen3]
+      compiler: [gcc@11.3.0]
+      variants: +mpi ~fortran +cuda cuda_arch=80
+      providers:
+        mpi: [openmpi@4.1.4]
+        cuda: [cuda@11.7.0]
+
+  compilers:
+  - compiler:
+      modules: [GCCcore/11.3.0]
+      operating_system: centos7
+      paths:
+        cc: /apps/all/GCCcore/11.3.0/bin/gcc
+        cxx: /apps/all/GCCcore/11.3.0/bin/g++
+        f77: /apps/all/GCCcore/11.3.0/bin/gfortran
+        fc: /apps/all/GCCcore/11.3.0/bin/gfortran
+      spec: gcc@=11.3.0
+      target: x86_64
+      flags: {}
+      environment: {}
+      extra_rpaths: []
+
+  view: true
+  concretizer:
+    reuse: false
+    unify: true

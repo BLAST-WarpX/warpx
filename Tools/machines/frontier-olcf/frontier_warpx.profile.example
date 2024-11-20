@@ -6,11 +6,12 @@ export MY_PROFILE=$(cd $(dirname $BASH_SOURCE) && pwd)"/"$(basename $BASH_SOURCE
 if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your $MY_PROFILE file! Please edit its line 2 to continue!"; return; fi
 
 # required dependencies
-module load cmake/3.23.2
+module switch Core Core/24.07
+module load cmake/3.27.9
 module load craype-accel-amd-gfx90a
-module load rocm/5.2.0  # waiting for 5.6 for next bump
-module load cray-mpich
-module load cce/15.0.0  # must be loaded after rocm
+module load rocm/5.7.1
+module load cray-mpich/8.1.28
+module load cce/17.0.0  # must be loaded after rocm
 
 # optional: faster builds
 module load ccache
@@ -20,20 +21,20 @@ module load ninja
 module load nano
 
 # optional: for PSATD in RZ geometry support
-export CMAKE_PREFIX_PATH=${HOME}/sw/frontier/gpu/blaspp-master:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${HOME}/sw/frontier/gpu/lapackpp-master:$CMAKE_PREFIX_PATH
-export LD_LIBRARY_PATH=${HOME}/sw/frontier/gpu/blaspp-master/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=${HOME}/sw/frontier/gpu/lapackpp-master/lib64:$LD_LIBRARY_PATH
+export CMAKE_PREFIX_PATH=${HOME}/sw/frontier/gpu/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${HOME}/sw/frontier/gpu/lapackpp-2024.05.31:$CMAKE_PREFIX_PATH
+export LD_LIBRARY_PATH=${HOME}/sw/frontier/gpu/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${HOME}/sw/frontier/gpu/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
 
 # optional: for QED lookup table generation support
-module load boost/1.79.0-cxx17
+module load boost/1.79.0
 
 # optional: for openPMD support
-module load adios2/2.8.3
-module load hdf5/1.14.0
+module load adios2/2.8.3-mpi
+module load hdf5/1.12.1-mpi
 
 # optional: for Python bindings or libEnsemble
-module load cray-python/3.9.13.1
+module load cray-python/3.11.5
 
 if [ -d "${HOME}/sw/frontier/gpu/venvs/warpx-frontier" ]
 then

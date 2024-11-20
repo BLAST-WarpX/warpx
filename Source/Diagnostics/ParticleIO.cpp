@@ -7,6 +7,7 @@
  * License: BSD-3-Clause-LBNL
  */
 
+#include "Fields.H"
 #include "Particles/ParticleIO.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/PhysicalParticleContainer.H"
@@ -17,6 +18,7 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/WarpXProfilerWrapper.H"
+#include "WarpX.H"
 
 #include <ablastr/utils/text/StreamUtils.H>
 
@@ -41,6 +43,7 @@
 #include <vector>
 
 using namespace amrex;
+using warpx::fields::FieldType;
 
 void
 LaserParticleContainer::ReadHeader (std::istream& is)
@@ -160,7 +163,7 @@ MultiParticleContainer::Restart (const std::string& dir)
             );
         }
 
-        for (int j = PIdx::nattribs; j < nr; ++j) {
+        for (int j = PIdx::nattribs-AMREX_SPACEDIM; j < nr; ++j) {
             const auto& comp_name = real_comp_names[j];
             auto current_comp_names = pc->getParticleComps();
             auto search = current_comp_names.find(comp_name);
@@ -170,7 +173,7 @@ MultiParticleContainer::Restart (const std::string& dir)
                     + " was found in the checkpoint file, but it has not been added yet. "
                     + " Adding it now."
                 );
-                pc->AddRealComp(comp_name);
+                pc->NewRealComp(comp_name);
             }
         }
 
@@ -203,7 +206,7 @@ MultiParticleContainer::Restart (const std::string& dir)
                     + " was found in the checkpoint file, but it has not been added yet. "
                     + " Adding it now."
                 );
-                pc->AddIntComp(comp_name);
+                pc->NewIntComp(comp_name);
             }
         }
 
@@ -233,5 +236,60 @@ MultiParticleContainer::WriteHeader (std::ostream& os) const
     // - lasers_names
     for (unsigned i = 0, n = species_names.size()+lasers_names.size(); i < n; ++i) {
         allcontainers.at(i)->WriteHeader(os);
+    }
+}
+
+void
+storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
+    ElectrostaticSolverAlgo electrostatic_solver_id, bool is_full_diagnostic ) {
+
+    using PinnedParIter = typename PinnedMemoryParticleContainer::ParIterType;
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrame) ||
+        (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic),
+        "Output of the electrostatic potential (phi) on the particles was requested, "
+        "but this is only available for `warpx.do_electrostatic=labframe` or `labframe-electromagnetostatic`.");
+    // When this is not a full diagnostic, the particles are not written at the same physical time (i.e. PIC iteration)
+    // that they were collected. This happens for diagnostics that use buffering (e.g. BackTransformed, BoundaryScraping).
+    // Here `phi` is gathered at the iteration when particles are written (not collected) and is thus mismatched.
+    // To avoid confusion, we raise an error in this case.
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        is_full_diagnostic,
+        "Output of the electrostatic potential (phi) on the particles was requested, "
+        "but this is only available with `diag_type = Full`.");
+    tmp.NewRealComp("phi");
+    int const phi_index = tmp.getParticleComps().at("phi");
+    auto& warpx = WarpX::GetInstance();
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (int lev=0; lev<=warpx.finestLevel(); lev++) {
+        const amrex::Geometry& geom = warpx.Geom(lev);
+        auto plo = geom.ProbLoArray();
+        auto dxi = geom.InvCellSizeArray();
+        amrex::MultiFab const& phi = *warpx.m_fields.get(FieldType::phi_fp, lev);
+
+        for (PinnedParIter pti(tmp, lev); pti.isValid(); ++pti) {
+
+            auto phi_grid = phi[pti].array();
+            const auto getPosition = GetParticlePosition<PIdx>(pti);
+            amrex::ParticleReal* phi_particle_arr = pti.GetStructOfArrays().GetRealData(phi_index).dataPtr();
+
+            // Loop over the particles and update their position
+            amrex::ParallelFor( pti.numParticles(),
+                [=] AMREX_GPU_DEVICE (long ip) {
+
+                    amrex::ParticleReal xp, yp, zp;
+                    getPosition(ip, xp, yp, zp);
+                    int i, j, k;
+                    amrex::Real W[AMREX_SPACEDIM][2];
+                    ablastr::particles::compute_weights<amrex::IndexType::NODE>(
+                        xp, yp, zp, plo, dxi, i, j, k, W);
+                    amrex::Real const phi_value  = ablastr::particles::interp_field_nodal(i, j, k, W, phi_grid);
+                    phi_particle_arr[ip] = phi_value;
+                }
+            );
+        }
     }
 }

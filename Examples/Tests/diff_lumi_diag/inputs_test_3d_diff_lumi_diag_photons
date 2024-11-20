@@ -1,0 +1,28 @@
+# base input parameters
+FILE = inputs_base_3d
+
+# Test with electrons/positrons: use parse_density_function
+
+beam1.species_type = electron
+beam1.injection_style = "NUniformPerCell"
+beam1.num_particles_per_cell_each_dim = 1 1 1
+beam1.profile = parse_density_function
+beam1.density_function(x,y,z) = "beam_N/(sqrt(2*pi)*2*pi*sigmax*sigmay*sigmaz)*exp(-x*x/(2*sigmax*sigmax)-y*y/(2*sigmay*sigmay)-(z+muz)*(z+muz)/(2*sigmaz*sigmaz))"
+beam1.xmin = -4*sigmax
+beam1.xmax =  4*sigmax
+beam1.ymin = -4*sigmay
+beam1.ymax =  4*sigmay
+beam1.zmin =-muz-4*sigmaz
+beam1.zmax =-muz+4*sigmaz
+
+beam2.species_type = positron
+beam2.injection_style = "NUniformPerCell"
+beam2.num_particles_per_cell_each_dim = 1 1 1
+beam2.profile = parse_density_function
+beam2.xmin = -4*sigmax
+beam2.xmax =  4*sigmax
+beam2.ymin = -4*sigmay
+beam2.ymax =  4*sigmay
+beam2.zmin = muz-4*sigmaz
+beam2.zmax = muz+4*sigmaz
+beam2.density_function(x,y,z) = "beam_N/(sqrt(2*pi)*2*pi*sigmax*sigmay*sigmaz)*exp(-x*x/(2*sigmax*sigmax)-y*y/(2*sigmay*sigmay)-(z-muz)*(z-muz)/(2*sigmaz*sigmaz))"

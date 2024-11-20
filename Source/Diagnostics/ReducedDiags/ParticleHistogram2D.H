@@ -30,10 +30,13 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    ParticleHistogram2D(std::string rd_name);
+    ParticleHistogram2D(const std::string& rd_name);
 
     /// File type
     std::string m_openpmd_backend {"default"};
+
+    /// minimum number of digits for file suffix (file-based only supported now for now) */
+    int m_file_min_digits = 6;
 
     /// number of bins on the abscissa and ordinate
     int m_bin_num_abs;

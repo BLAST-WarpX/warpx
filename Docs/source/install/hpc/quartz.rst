@@ -93,7 +93,7 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
    cd $HOME/src/warpx
    rm -rf build_quartz
 
-   cmake -S . -B build_quartz -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_quartz -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
    cmake --build build_quartz -j 6
 
 The WarpX application executables are now in ``$HOME/src/warpx/build_quartz/bin/``.
@@ -103,7 +103,7 @@ Additionally, the following commands will install WarpX as a Python module:
 
    rm -rf build_quartz_py
 
-   cmake -S . -B build_quartz_py -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_quartz_py -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
    cmake --build build_quartz_py -j 6 --target pip_install
 
 Now, you can :ref:`submit Quartz compute jobs <running-cpp-quartz>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).

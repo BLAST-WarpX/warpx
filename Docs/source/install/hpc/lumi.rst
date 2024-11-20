@@ -3,7 +3,7 @@
 LUMI (CSC)
 ==========
 
-The `LUMI cluster <https://www.lumi-supercomputer.eu>`_ is located at CSC (Finland).
+The `LUMI cluster <https://www.lumi-supercomputer.eu>`__ is located at CSC (Finland).
 Each node contains 4 AMD MI250X GPUs, each with 2 Graphics Compute Dies (GCDs) for a total of 8 GCDs per node.
 You can think of the 8 GCDs as 8 separate GPUs, each having 64 GB of high-bandwidth memory (HBM2E).
 
@@ -12,8 +12,11 @@ Introduction
 
 If you are new to this system, **please see the following resources**:
 
-* `Lumi user guide <https://docs.lumi-supercomputer.eu>`_
-* Batch system: `Slurm <https://docs.lumi-supercomputer.eu/runjobs/scheduled-jobs/slurm-quickstart/>`_
+* `Lumi user guide <https://docs.lumi-supercomputer.eu>`__
+
+  * `Project Maintainance <https://my.lumi-supercomputer.eu>`__ and `SSH Key management <https://mms.myaccessid.org>`__
+  * `Quotas and projects <https://docs.lumi-supercomputer.eu/runjobs/lumi_env/dailymanagement/>`__
+* Batch system: `Slurm <https://docs.lumi-supercomputer.eu/runjobs/scheduled-jobs/slurm-quickstart/>`__
 * `Data analytics and visualization <https://docs.lumi-supercomputer.eu/hardware/lumid/>`__
 * `Production directories <https://docs.lumi-supercomputer.eu/storage/>`__:
 
@@ -48,9 +51,16 @@ Create it now:
    .. literalinclude:: ../../../../Tools/machines/lumi-csc/lumi_warpx.profile.example
       :language: bash
 
-Edit the 2nd line of this script, which sets the ``export proj=""`` variable using a text editor
-such as ``nano``, ``emacs``, or ``vim`` (all available by default on
-LUMI login nodes).
+Edit the 2nd line of this script, which sets the ``export proj="project_..."`` variable using a text editor
+such as ``nano``, ``emacs``, or ``vim`` (all available by default on LUMI login nodes).
+You can find out your project name by running ``lumi-ldap-userinfo`` on LUMI.
+For example, if you are member of the project ``project_465000559``, then run ``nano $HOME/lumi_impactx.profile`` and edit line 2 to read:
+
+.. code-block:: bash
+
+   export proj="project_465000559"
+
+Exit the ``nano`` editor with ``Ctrl`` + ``O`` (save) and then ``Ctrl`` + ``X`` (exit).
 
 .. important::
 
@@ -88,7 +98,7 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
    cd $HOME/src/warpx
    rm -rf build_lumi
 
-   cmake -S . -B build_lumi -DWarpX_COMPUTE=HIP -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_lumi -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_QED_TABLES_GEN_OMP=OFF -DWarpX_DIMS="1;2;RZ;3"
    cmake --build build_lumi -j 16
 
 The WarpX application executables are now in ``$HOME/src/warpx/build_lumi/bin/``.
@@ -98,7 +108,7 @@ Additionally, the following commands will install WarpX as a Python module:
 
    rm -rf build_lumi_py
 
-   cmake -S . -B build_lumi_py -DWarpX_COMPUTE=HIP -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_lumi_py -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_QED_TABLES_GEN_OMP=OFF -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
    cmake --build build_lumi_py -j 16 --target pip_install
 
 
@@ -143,11 +153,26 @@ Running
 MI250X GPUs (2x64 GB)
 ^^^^^^^^^^^^^^^^^^^^^
 
-In non-interactive runs:
+The GPU partition on the supercomputer LUMI at CSC has up to `2978 nodes <https://docs.lumi-supercomputer.eu/hardware/lumig/>`__, each with 8 Graphics Compute Dies (GCDs).
+WarpX runs one MPI rank per Graphics Compute Die.
 
-.. literalinclude:: ../../../../Tools/machines/lumi-csc/submit.sh
+For interactive runs, simply use the aliases ``getNode`` or ``runNode ...``.
+
+The batch script below can be used to run a WarpX simulation on multiple nodes (change ``-N`` accordingly).
+Replace descriptions between chevrons ``<>`` by relevant values, for instance ``<project id>`` or the concete inputs file.
+Copy the executable or point to it via ``EXE`` and adjust the path for the ``INPUTS`` variable accordingly.
+
+.. literalinclude:: ../../../../Tools/machines/lumi-csc/lumi.sbatch
    :language: bash
-   :caption: You can copy this file from ``Tools/machines/lumi-csc/submit.sh``.
+   :caption: You can copy this file from ``Tools/machines/lumi-csc/lumi.sbatch``.
+
+To run a simulation, copy the lines above to a file ``lumi.sbatch`` and run
+
+.. code-block:: bash
+
+   sbatch lumi.sbatch
+
+to submit the job.
 
 
 .. _post-processing-lumi:

@@ -88,8 +88,9 @@ AcceleratorLattice::InitElementFinder (int const lev, amrex::BoxArray const & ba
 }
 
 void
-AcceleratorLattice::UpdateElementFinder (int const lev)
-{
+AcceleratorLattice::UpdateElementFinder (int const lev) // NOLINT(readability-make-member-function-const)
+{                                                       // Techniquely clang-tidy is correct because
+                                                        // m_element_finder is unique_ptr, not const*.
     if (m_lattice_defined) {
         for (amrex::MFIter mfi(*m_element_finder); mfi.isValid(); ++mfi)
         {
@@ -101,6 +102,6 @@ AcceleratorLattice::UpdateElementFinder (int const lev)
 LatticeElementFinderDevice
 AcceleratorLattice::GetFinderDeviceInstance (WarpXParIter const& a_pti, int const a_offset) const
 {
-    LatticeElementFinder & finder = (*m_element_finder)[a_pti];
+    const LatticeElementFinder & finder = (*m_element_finder)[a_pti];
     return finder.GetFinderDeviceInstance(a_pti, a_offset, *this);
 }

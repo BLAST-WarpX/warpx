@@ -11,6 +11,7 @@
 #include "SpectralFieldData_fwd.H"
 
 #include "SpectralKSpace.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpX_Complex.H"
 
 #include <ablastr/math/fft/AnyFFT.H>
@@ -59,8 +60,8 @@ class SpectralFieldIndex
          */
         SpectralFieldIndex (bool update_with_rho,
                             bool time_averaging,
-                            int J_in_time,
-                            int rho_in_time,
+                            JInTime J_in_time,
+                            RhoInTime rho_in_time,
                             bool dive_cleaning,
                             bool divb_cleaning,
                             bool pml,
@@ -176,11 +177,10 @@ class SpectralFieldData
         ablastr::math::anyfft::FFTplans forward_plan, backward_plan;
         // Correcting "shift" factors when performing FFT from/to
         // a cell-centered grid in real space, instead of a nodal grid
-        SpectralShiftFactor xshift_FFTfromCell, xshift_FFTtoCell,
-                            zshift_FFTfromCell, zshift_FFTtoCell;
-#if defined(WARPX_DIM_3D)
-        SpectralShiftFactor yshift_FFTfromCell, yshift_FFTtoCell;
-#endif
+        // (0,1,2) is the dimension number
+        SpectralShiftFactor shift0_FFTfromCell, shift0_FFTtoCell,
+                            shift1_FFTfromCell, shift1_FFTtoCell,
+                            shift2_FFTfromCell, shift2_FFTtoCell;
 
         bool m_periodic_single_box;
 };

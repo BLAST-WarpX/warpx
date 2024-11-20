@@ -73,8 +73,9 @@ namespace ablastr::utils::serialization
                 ", except vectors of std::string.");
 
             put_in(static_cast<int>(val.size()), vec);
-            for (const auto &el : val)
+            for (const auto &el : val) {
                 put_in(el, vec);
+            }
         }
     }
 
@@ -145,8 +146,9 @@ namespace ablastr::utils::serialization
 
             const auto length = get_out<int>(it);
             std::vector<T> res(length);
-            for (int i = 0; i < length; ++i)
+            for (int i = 0; i < length; ++i) {
                 res[i] = get_out<T>(it);
+            }
 
             return res;
         }

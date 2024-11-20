@@ -22,17 +22,17 @@ The implementation has been tested against the benchmark results from :cite:t:`e
 Run
 ---
 
-The 1D PICMI input file can be used to reproduce the results from Turner et al. for a given case, ``N`` from 1 to 4, by executing ``python3 PICMI_inputs_1d.py -n N``, e.g.,
+The 1D PICMI input file can be used to reproduce the results from Turner et al. for a given case, ``N`` from 1 to 4, by executing ``python3 inputs_base_1d_picmi.py -n N``, e.g.,
 
 .. code-block:: bash
 
-   python3 PICMI_inputs_1d.py -n 1
+   python3 inputs_base_1d_picmi.py -n 1
 
 For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with ``mpiexec -n 4 ...`` or ``srun -n 4 ...``, depending on the system.
 
-.. literalinclude:: PICMI_inputs_1d.py
+.. literalinclude:: inputs_base_1d_picmi.py
    :language: python3
-   :caption: You can copy this file from ``Examples/Physics_applications/capacitive_discharge/PICMI_inputs_1d.py``.
+   :caption: You can copy this file from ``Examples/Physics_applications/capacitive_discharge/inputs_base_1d_picmi.py``.
 
 
 Analyze

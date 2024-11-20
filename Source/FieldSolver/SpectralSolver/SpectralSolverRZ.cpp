@@ -29,14 +29,15 @@ SpectralSolverRZ::SpectralSolverRZ (const int lev,
                                     amrex::BoxArray const & realspace_ba,
                                     amrex::DistributionMapping const & dm,
                                     int const n_rz_azimuthal_modes,
-                                    int const norder_z, short const grid_type,
+                                    int const norder_z,
+                                    ablastr::utils::enums::GridType grid_type,
                                     const amrex::Vector<amrex::Real>& v_galilean,
                                     amrex::RealVect const dx, amrex::Real const dt,
                                     bool const with_pml,
                                     bool const update_with_rho,
                                     const bool fft_do_time_averaging,
-                                    const int J_in_time,
-                                    const int rho_in_time,
+                                    const JInTime J_in_time,
+                                    const RhoInTime rho_in_time,
                                     const bool dive_cleaning,
                                     const bool divb_cleaning)
     : k_space(realspace_ba, dm, dx)
@@ -141,8 +142,10 @@ SpectralSolverRZ::pushSpectralFields (const bool doing_pml) {
   */
 void
 SpectralSolverRZ::ComputeSpectralDivE (const int lev,
-                                       const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
-                                       amrex::MultiFab& divE) {
+                                       ablastr::fields::VectorField const & Efield,
+                                       amrex::MultiFab& divE
+)
+{
     algorithm->ComputeSpectralDivE(lev, field_data, Efield, divE);
 }
 

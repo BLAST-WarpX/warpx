@@ -18,7 +18,7 @@ exclude: '^share/openPMD/thirdParty'
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v5.0.0
     hooks:
     - id: trailing-whitespace
       args: [--markdown-linebreak-ext=md]
@@ -49,7 +49,7 @@ repos:
 
 # Changes tabs to spaces
 - repo: https://github.com/Lucas-C/pre-commit-hooks
-  rev: v1.5.4
+  rev: v1.5.5
   hooks:
   - id: remove-tabs
     exclude: 'Make.WarpX|Make.package|Makefile|GNUmake'
@@ -66,43 +66,16 @@ repos:
 # C++ formatting
 # clang-format
 
-# Autoremoves unused Python imports
-- repo: https://github.com/hadialqattan/pycln
-  rev: v2.4.0
+# Python: Ruff linter & formatter
+#   https://docs.astral.sh/ruff/
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.7.4
   hooks:
-  - id: pycln
-    name: pycln (python)
-
-# Sorts Python imports according to PEP8
-# https://www.python.org/dev/peps/pep-0008/#imports
-- repo: https://github.com/pycqa/isort
-  rev: 5.13.0
-  hooks:
-  - id: isort
-    name: isort (python)
-
-# Python: Flake8 (checks only, does this support auto-fixes?)
-#- repo: https://github.com/PyCQA/flake8
-#  rev: 4.0.1
-#  hooks:
-#  - id: flake8
-#    additional_dependencies: &flake8_dependencies
-#      - flake8-bugbear
-#      - pep8-naming
-#    exclude: ^(docs/.*|tools/.*)$
-# Alternatively: use autopep8?
-
-# Python Formatting
-#- repo: https://github.com/psf/black
-#  rev: 21.10b0 # Keep in sync with blacken-docs
-#  hooks:
-#  - id: black
-#- repo: https://github.com/asottile/blacken-docs
-#  rev: v1.11.0
-#  hooks:
-#  - id: blacken-docs
-#    additional_dependencies:
-#    - black==21.10b0 # keep in sync with black hook
+    # Run the linter
+    - id: ruff
+      args: [--fix, --exit-non-zero-on-fix]
+    # Run the formatter
+    - id: ruff-format
 
 # Jupyter Notebooks: clean up all cell outputs
 - repo: https://github.com/roy-ht/pre-commit-jupyter
@@ -116,7 +89,7 @@ repos:
 
 # Checks the manifest for missing files (native support)
 - repo: https://github.com/mgedmin/check-manifest
-  rev: "0.49"
+  rev: "0.50"
   hooks:
   - id: check-manifest
     # This is a slow hook, so only run this if --hook-stage manual is passed

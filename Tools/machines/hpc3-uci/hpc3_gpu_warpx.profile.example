@@ -6,7 +6,7 @@ export MY_PROFILE=$(cd $(dirname $BASH_SOURCE) && pwd)"/"$(basename $BASH_SOURCE
 if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your $MY_PROFILE file! Please edit its line 2 to continue!"; return; fi
 
 # required dependencies
-module load cmake/3.22.1
+module load cmake/3.30.2
 module load gcc/11.2.0
 module load cuda/11.7.1
 module load openmpi/4.1.2/gcc.11.2.0
@@ -19,13 +19,13 @@ module load OpenBLAS/0.3.21
 module load hdf5/1.13.1/gcc.11.2.0-openmpi.4.1.2
 export CMAKE_PREFIX_PATH=${HOME}/sw/hpc3/gpu/c-blosc-1.21.1:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=${HOME}/sw/hpc3/gpu/adios2-2.8.3:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${HOME}/sw/hpc3/gpu/blaspp-master:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${HOME}/sw/hpc3/gpu/lapackpp-master:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${HOME}/sw/hpc3/gpu/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${HOME}/sw/hpc3/gpu/lapackpp-2024.05.31:$CMAKE_PREFIX_PATH
 
 export LD_LIBRARY_PATH=${HOME}/sw/hpc3/gpu/c-blosc-1.21.1/lib64:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=${HOME}/sw/hpc3/gpu/adios2-2.8.3/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=${HOME}/sw/hpc3/gpu/blaspp-master/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=${HOME}/sw/hpc3/gpu/lapackpp-master/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${HOME}/sw/hpc3/gpu/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${HOME}/sw/hpc3/gpu/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
 
 export PATH=${HOME}/sw/hpc3/gpu/adios2-2.8.3/bin:${PATH}
 

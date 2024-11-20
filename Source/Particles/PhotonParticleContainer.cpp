@@ -93,8 +93,8 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
                                  int lev, int gather_lev,
                                  amrex::Real dt, ScaleFields /*scaleFields*/, DtType a_dt_type)
 {
-    // Get cell size on gather_lev
-    const std::array<Real,3>& dx = WarpX::CellSize(std::max(gather_lev,0));
+    // Get inverse cell size on gather_lev
+    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));
 
     // Get box from which field is gathered.
     // If not gathering from the finest level, the box is coarsened.
@@ -142,16 +142,13 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
     const amrex::ParticleReal Bz_external_particle = m_B_external_particle[2];
 
     // Lower corner of tile box physical domain (take into account Galilean shift)
-    const std::array<amrex::Real, 3>& xyzmin = WarpX::LowerCorner(box, gather_lev, 0._rt);
+    const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, gather_lev, 0._rt);
 
     const Dim3 lo = lbound(box);
 
     const bool galerkin_interpolation = WarpX::galerkin_interpolation;
     const int nox = WarpX::nox;
     const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
-
-    const amrex::GpuArray<amrex::Real, 3> dx_arr = {dx[0], dx[1], dx[2]};
-    const amrex::GpuArray<amrex::Real, 3> xyzmin_arr = {xyzmin[0], xyzmin[1], xyzmin[2]};
 
     amrex::Array4<const amrex::Real> const& ex_arr = exfab->array();
     amrex::Array4<const amrex::Real> const& ey_arr = eyfab->array();
@@ -185,7 +182,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
                        np_to_push,
                        [=] AMREX_GPU_DEVICE (long i, auto exteb_control,
                                              auto qed_control) {
-            if (do_copy) copyAttribs(i);
+            if (do_copy) { copyAttribs(i); }
             ParticleReal x, y, z;
             GetPosition(i, x, y, z);
 
@@ -201,21 +198,21 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
                 doGatherShapeN(x, y, z, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                               dx_arr, xyzmin_arr, lo, n_rz_azimuthal_modes,
+                               dinv, xyzmin, lo, n_rz_azimuthal_modes,
                                nox, galerkin_interpolation);
             }
 
-            [[maybe_unused]] auto& getExternalEB_tmp = getExternalEB; // workaround for nvcc
+            [[maybe_unused]] const auto& getExternalEB_tmp = getExternalEB; // workaround for nvcc
             if constexpr (exteb_control == has_exteb) {
                 getExternalEB(i, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
             }
 
 #ifdef WARPX_QED
-            [[maybe_unused]] auto& evolve_opt_tmp = evolve_opt;
-            [[maybe_unused]] auto p_optical_depth_BW_tmp = p_optical_depth_BW;
-            [[maybe_unused]] auto ux_tmp = ux; // for nvhpc
-            [[maybe_unused]] auto uy_tmp = uy;
-            [[maybe_unused]] auto uz_tmp = uz;
+            [[maybe_unused]] const auto& evolve_opt_tmp = evolve_opt;
+            [[maybe_unused]] auto *p_optical_depth_BW_tmp = p_optical_depth_BW;
+            [[maybe_unused]] auto *ux_tmp = ux; // for nvhpc
+            [[maybe_unused]] auto *uy_tmp = uy;
+            [[maybe_unused]] auto *uz_tmp = uz;
             [[maybe_unused]] auto dt_tmp = dt;
             if constexpr (qed_control == has_qed) {
                 evolve_opt(ux[i], uy[i], uz[i], Exp, Eyp, Ezp, Bxp, Byp, Bzp,
@@ -232,26 +229,17 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
 }
 
 void
-PhotonParticleContainer::Evolve (int lev,
-                                 const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
-                                 const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
-                                 MultiFab& jx, MultiFab& jy, MultiFab& jz,
-                                 MultiFab* cjx, MultiFab* cjy, MultiFab* cjz,
-                                 MultiFab* rho, MultiFab* crho,
-                                 const MultiFab* cEx, const MultiFab* cEy, const MultiFab* cEz,
-                                 const MultiFab* cBx, const MultiFab* cBy, const MultiFab* cBz,
-                                 Real t, Real dt, DtType a_dt_type, bool skip_deposition)
+PhotonParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
+                                 int lev,
+                                 const std::string& current_fp_string,
+                                 Real t, Real dt, DtType a_dt_type, bool skip_deposition,
+                                 PushType push_type)
 {
     // This does gather, push and deposit.
     // Push and deposit have been re-written for photons
-    PhysicalParticleContainer::Evolve (lev,
-                                       Ex, Ey, Ez,
-                                       Bx, By, Bz,
-                                       jx, jy, jz,
-                                       cjx, cjy, cjz,
-                                       rho, crho,
-                                       cEx, cEy, cEz,
-                                       cBx, cBy, cBz,
-                                       t, dt, a_dt_type, skip_deposition);
+    PhysicalParticleContainer::Evolve (fields,
+                                       lev,
+                                       current_fp_string,
+                                       t, dt, a_dt_type, skip_deposition, push_type);
 
 }

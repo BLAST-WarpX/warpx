@@ -18,6 +18,12 @@ export INPUT="i.3d"
 
 export XOS_MMM_L_PAGING_POLICY=demand:demand:demand
 
+# Add HDF5 library path to LD_LIBRARY_PATH
+# This is done manually to avoid calling spack during the run,
+# since this would take a significant amount of time.
+export LD_LIBRARY_PATH=/vol0004/apps/oss/spack-v0.19/opt/spack/linux-rhel8-a64fx/fj-4.8.1/hdf5-1.12.2-im6lxevf76cu6cbzspi4itgz3l4gncjj/lib:$LD_LIBRARY_PATH
+
+# Broadcast WarpX executable to all the nodes
 llio_transfer ${EXE}
 
 mpiexec -stdout-proc ./output.%j/%/1000r/stdout -stderr-proc ./output.%j/%/1000r/stderr -n ${MPI_RANKS} ${EXE} ${INPUT}

@@ -6,34 +6,40 @@ export MY_PROFILE=$(cd $(dirname $BASH_SOURCE) && pwd)"/"$(basename $BASH_SOURCE
 if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your $MY_PROFILE file! Please edit its line 2 to continue!"; return; fi
 
 # required dependencies
-module load cmake/3.22.0
+module load gpu
+module load PrgEnv-gnu
+module load craype
+module load craype-x86-milan
+module load craype-accel-nvidia80
+module load cudatoolkit
+module load cmake/3.24.3
 
 # optional: for QED support with detailed tables
 export BOOST_ROOT=/global/common/software/spackecp/perlmutter/e4s-23.05/default/spack/opt/spack/linux-sles15-zen3/gcc-11.2.0/boost-1.82.0-ow5r5qrgslcwu33grygouajmuluzuzv3
 
 # optional: for openPMD and PSATD+RZ support
-module load cray-hdf5-parallel/1.12.2.7
+module load cray-hdf5-parallel/1.12.2.9
 export CMAKE_PREFIX_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/c-blosc-1.21.1:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/adios2-2.8.3:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/blaspp-master:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/lapackpp-master:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/lapackpp-2024.05.31:$CMAKE_PREFIX_PATH
 
 export LD_LIBRARY_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/c-blosc-1.21.1/lib64:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/adios2-2.8.3/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/blaspp-master/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/lapackpp-master/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
 
 export PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/adios2-2.8.3/bin:${PATH}
 
 # optional: CCache
-export PATH=/global/common/software/spackecp/perlmutter/e4s-23.05/default/spack/opt/spack/linux-sles15-zen3/gcc-11.2.0/ccache-4.8-eqk2d3bipbpkgwxq7ujlp6mckwal4dwz/bin:$PATH
+export PATH=/global/common/software/spackecp/perlmutter/e4s-23.08/default/spack/opt/spack/linux-sles15-zen3/gcc-11.2.0/ccache-4.8.2-cvooxdw5wgvv2g3vjxjkrpv6dopginv6/bin:$PATH
 
 # optional: for Python bindings or libEnsemble
-module load cray-python/3.9.13.1
+module load cray-python/3.11.5
 
-if [ -d "${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/venvs/warpx" ]
+if [ -d "${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/venvs/warpx-gpu" ]
 then
-  source ${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/venvs/warpx/bin/activate
+  source ${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/venvs/warpx-gpu/bin/activate
 fi
 
 # an alias to request an interactive batch node for one hour

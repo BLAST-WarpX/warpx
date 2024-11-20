@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef PARTICLES_KINETIC_ENERGY_H_
-#define PARTICLES_KINETIC_ENERGY_H_
+#ifndef WARPX_PARTICLES_KINETIC_ENERGY_H_
+#define WARPX_PARTICLES_KINETIC_ENERGY_H_
 
 #include "Utils/WarpXConst.H"
 
@@ -68,4 +68,4 @@ namespace Algorithms{
 
 }
 
-#endif // PARTICLES_ALGORITHMS_H_
+#endif // WARPX_PARTICLES_KINETIC_ENERGY_H_

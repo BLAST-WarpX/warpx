@@ -76,6 +76,7 @@ include $(WARPX_HOME)/Source/BoundaryConditions/Make.package
 include $(WARPX_HOME)/Source/Diagnostics/Make.package
 include $(WARPX_HOME)/Source/EmbeddedBoundary/Make.package
 include $(WARPX_HOME)/Source/FieldSolver/Make.package
+include $(WARPX_HOME)/Source/NonlinearSolvers/Make.package
 include $(WARPX_HOME)/Source/Filter/Make.package
 include $(WARPX_HOME)/Source/Fluids/Make.package
 include $(WARPX_HOME)/Source/Initialization/Make.package
@@ -90,7 +91,7 @@ include $(AMREX_HOME)/Src/Base/Make.package
 include $(AMREX_HOME)/Src/Particle/Make.package
 include $(AMREX_HOME)/Src/Boundary/Make.package
 include $(AMREX_HOME)/Src/AmrCore/Make.package
-include $(AMREX_HOME)/Src/LinearSolvers/MLMG/Make.package
+include $(AMREX_HOME)/Src/LinearSolvers/Make.package
 
 ifeq ($(USE_SENSEI_INSITU),TRUE)
   include $(AMREX_HOME)/Src/Amr/Make.package
@@ -171,9 +172,9 @@ ifeq ($(USE_OPENPMD), TRUE)
 endif
 
 
-ifeq ($(USE_PSATD),TRUE)
+ifeq ($(USE_FFT),TRUE)
   USERSuffix := $(USERSuffix).PSATD
-  DEFINES += -DWARPX_USE_PSATD -DABLASTR_USE_FFT
+  DEFINES += -DWARPX_USE_FFT -DABLASTR_USE_FFT
   ifeq ($(USE_CUDA),TRUE)
     # Use cuFFT
     libraries += -lcufft
@@ -182,6 +183,8 @@ ifeq ($(USE_PSATD),TRUE)
     INCLUDE_LOCATIONS += $(ROC_PATH)/rocfft/include
     LIBRARY_LOCATIONS += $(ROC_PATH)/rocfft/lib
     libraries += -lrocfft
+  else ifeq ($(USE_SYCL),TRUE)
+    # nothing
   else # Running on CPU
     # Use FFTW
     ifeq ($(PRECISION),FLOAT)
@@ -212,11 +215,6 @@ endif
 
 ifeq ($(USE_HDF5),TRUE)
   DEFINES += -DWARPX_USE_HDF5
-endif
-
-ifeq ($(USE_GPUCLOCK),TRUE)
-  USERSuffix := $(USERSuffix).GPUCLOCK
-  DEFINES += -DWARPX_USE_GPUCLOCK
 endif
 
 # job_info support
@@ -330,7 +328,7 @@ $(srcTempDir)/Utils/export.H:
 	@echo "#endif" >> $@
 
 cleanconfig::
-	$(SILENT) $(RM) -r $(srcTempDir)/Utils
+	$(SILENT) $(RM) -r $(srcTempDir)/Utils $(srcTempDir)/ablastr
 
 include $(AMREX_HOME)/Tools/GNUMake/Make.rules
 

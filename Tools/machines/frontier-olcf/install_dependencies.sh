@@ -14,7 +14,7 @@ set -eu -o pipefail
 
 # Check: ######################################################################
 #
-#   Was perlmutter_gpu_warpx.profile sourced and configured correctly?
+#   Was frontier_warpx.profile sourced and configured correctly?
 if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your frontier_warpx.profile file! Please edit its line 2 to continue!"; exit 1; fi
 
 
@@ -49,14 +49,13 @@ if [ -d $HOME/src/blaspp ]
 then
   cd $HOME/src/blaspp
   git fetch --prune
-  git checkout master
-  git pull
+  git checkout v2024.05.31
   cd -
 else
-  git clone https://github.com/icl-utk-edu/blaspp.git $HOME/src/blaspp
+  git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git $HOME/src/blaspp
 fi
 rm -rf $HOME/src/blaspp-frontier-gpu-build
-CXX=$(which CC) cmake -S $HOME/src/blaspp -B $HOME/src/blaspp-frontier-gpu-build -Duse_openmp=OFF -Dgpu_backend=hip -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-master
+CXX=$(which CC) cmake -S $HOME/src/blaspp -B $HOME/src/blaspp-frontier-gpu-build -Duse_openmp=OFF -Dgpu_backend=hip -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
 cmake --build $HOME/src/blaspp-frontier-gpu-build --target install --parallel 16
 rm -rf $HOME/src/blaspp-frontier-gpu-build
 
@@ -65,17 +64,15 @@ if [ -d $HOME/src/lapackpp ]
 then
   cd $HOME/src/lapackpp
   git fetch --prune
-  git checkout master
-  git pull
+  git checkout v2024.05.31
   cd -
 else
-  git clone https://github.com/icl-utk-edu/lapackpp.git $HOME/src/lapackpp
+  git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git $HOME/src/lapackpp
 fi
 rm -rf $HOME/src/lapackpp-frontier-gpu-build
-CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $HOME/src/lapackpp -B $HOME/src/lapackpp-frontier-gpu-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-master
+CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $HOME/src/lapackpp -B $HOME/src/lapackpp-frontier-gpu-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
 cmake --build $HOME/src/lapackpp-frontier-gpu-build --target install --parallel 16
 rm -rf $HOME/src/lapackpp-frontier-gpu-build
-
 
 # Python ######################################################################
 #
@@ -111,8 +108,6 @@ CUPY_INSTALL_USE_HIP=1  \
 ROCM_HOME=${ROCM_PATH}  \
 HCC_AMDGPU_TARGET=${AMREX_AMD_ARCH}  \
   python3 -m pip install -v cupy
-# optional: for libEnsemble
-python3 -m pip install -r $HOME/src/warpx/Tools/LibEnsemble/requirements.txt
 # optional: for optimas (based on libEnsemble & ax->botorch->gpytorch->pytorch)
 #python3 -m pip install --upgrade torch --index-url https://download.pytorch.org/whl/rocm5.4.2
 #python3 -m pip install -r $HOME/src/warpx/Tools/optimas/requirements.txt

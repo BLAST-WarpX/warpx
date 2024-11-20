@@ -14,27 +14,32 @@
 #include "SpectralKSpace.H"
 #include "SpectralSolver.H"
 #include "Utils/TextMsg.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXProfilerWrapper.H"
+
+#include <ablastr/utils/Enums.H>
 
 #include <memory>
 
-#if WARPX_USE_PSATD
+#if WARPX_USE_FFT
 
-SpectralSolver::SpectralSolver(
+SpectralSolver::SpectralSolver (
                 const int lev,
                 const amrex::BoxArray& realspace_ba,
                 const amrex::DistributionMapping& dm,
-                const int norder_x, const int norder_y,
-                const int norder_z, const short grid_type,
+                const int norder_x,
+                const int norder_y,
+                const int norder_z,
+                ablastr::utils::enums::GridType grid_type,
                 const amrex::Vector<amrex::Real>& v_galilean,
                 const amrex::Vector<amrex::Real>& v_comoving,
                 const amrex::RealVect dx, const amrex::Real dt,
                 const bool pml, const bool periodic_single_box,
                 const bool update_with_rho,
                 const bool fft_do_time_averaging,
-                const int psatd_solution_type,
-                const int J_in_time,
-                const int rho_in_time,
+                const PSATDSolutionType psatd_solution_type,
+                const JInTime J_in_time,
+                const RhoInTime rho_in_time,
                 const bool dive_cleaning,
                 const bool divb_cleaning)
 {
@@ -144,4 +149,4 @@ SpectralSolver::pushSpectralFields(){
     algorithm->pushSpectralFields( field_data );
 }
 
-#endif // WARPX_USE_PSATD
+#endif // WARPX_USE_FFT

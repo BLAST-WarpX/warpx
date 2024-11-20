@@ -10,10 +10,11 @@ from glob import glob
 
 import numpy as np
 
-HeaderInfo = namedtuple('HeaderInfo', ['version', 'how', 'ncomp', 'nghost'])
+HeaderInfo = namedtuple("HeaderInfo", ["version", "how", "ncomp", "nghost"])
+
 
 def read_data(plt_file):
-    '''
+    """
 
     This function reads the raw (i.e. not averaged to cell centers) data
     from a WarpX plt file. The plt file must have been written with the
@@ -33,9 +34,9 @@ def read_data(plt_file):
 
         >>> data = read_data("plt00016")
         >>> print(data.keys())
-        >>> print(data['Ex'].shape)
+        >>> print(data["Ex"].shape)
 
-    '''
+    """
     all_data = []
     raw_files = sorted(glob(plt_file + "/raw_fields/Level_*/"))
     for raw_file in raw_files:
@@ -69,33 +70,35 @@ def _line_to_numpy_arrays(line):
 def _read_local_Header(header_file, dim):
     with open(header_file, "r") as f:
         t_snapshot = float(f.readline())
-        if dim==2:
+        if dim == 2:
             nx, nz = [int(x) for x in f.readline().split()]
             ny = 1
             xmin, zmin = [float(x) for x in f.readline().split()]
             ymin = 0
             xmax, zmax = [float(x) for x in f.readline().split()]
             ymax = 0
-        if dim==3:
+        if dim == 3:
             nx, ny, nz = [int(x) for x in f.readline().split()]
             xmin, ymin, zmin = [float(x) for x in f.readline().split()]
             xmax, ymax, zmax = [float(x) for x in f.readline().split()]
         field_names = f.readline().split()
 
     local_info = {
-        't_snapshot'  : t_snapshot,
-        'field_names' : field_names,
-        'xmin' : xmin,
-        'ymin' : ymin,
-        'zmin' : zmin,
-        'xmax' : xmax,
-        'ymax' : ymax,
-        'zmax' : zmax,
-        'nx'   : nx,
-        'ny'   : ny,
-        'nz'   : nz
-        }
+        "t_snapshot": t_snapshot,
+        "field_names": field_names,
+        "xmin": xmin,
+        "ymin": ymin,
+        "zmin": zmin,
+        "xmax": xmax,
+        "ymax": ymax,
+        "zmax": zmax,
+        "nx": nx,
+        "ny": ny,
+        "nz": nz,
+    }
     return local_info
+
+
 ## ------------------------------------------------------------
 ## USE THIS INSTEAD OF THE PREVIOUS FUNCTION IF Header contains
 ## (x,y,z) min and max vectors instead of zmin and zmax
@@ -115,25 +118,23 @@ def _read_local_Header(header_file, dim):
 
 def _read_global_Header(header_file):
     with open(header_file, "r") as f:
-
         nshapshots = int(f.readline())
         dt_between_snapshots = float(f.readline())
         gamma_boost = float(f.readline())
         beta_boost = float(f.readline())
 
     global_info = {
-        'nshapshots' : nshapshots,
-        'dt_between_snapshots' : dt_between_snapshots,
-        'gamma_boost' : gamma_boost,
-        'beta_boost' : beta_boost
-        }
+        "nshapshots": nshapshots,
+        "dt_between_snapshots": dt_between_snapshots,
+        "gamma_boost": gamma_boost,
+        "beta_boost": beta_boost,
+    }
 
     return global_info
 
 
 def _read_header(header_file):
     with open(header_file, "r") as f:
-
         version = int(f.readline())
         how = int(f.readline())
         ncomp = int(f.readline())
@@ -142,9 +143,11 @@ def _read_header(header_file):
         # If the number of ghost cells varies depending on the direction,
         # s is a string of the form '(9,8)\n' in 2D or '(9,8,9)\n' in 3D.
         s = f.readline()
-        s = s.replace('(', '') # remove left  parenthesis '(', if any
-        s = s.replace(')', '') # remove right parenthesis ')', if any
-        nghost = np.fromstring(s, dtype = int, sep = ',') # convert from string to numpy array
+        s = s.replace("(", "")  # remove left  parenthesis '(', if any
+        s = s.replace(")", "")  # remove right parenthesis ')', if any
+        nghost = np.fromstring(
+            s, dtype=int, sep=","
+        )  # convert from string to numpy array
 
         header = HeaderInfo(version, how, ncomp, nghost)
 
@@ -155,12 +158,10 @@ def _read_header(header_file):
         boxes = []
         for line in f:
             clean_line = line.strip().split()
-            if clean_line == [')']:
+            if clean_line == [")"]:
                 break
             lo_corner, hi_corner, node_type = _line_to_numpy_arrays(clean_line)
-            boxes.append((lo_corner - nghost,
-                          hi_corner + nghost,
-                          node_type))
+            boxes.append((lo_corner - nghost, hi_corner + nghost, node_type))
 
         # read the file and offset position for the corresponding box
         file_names = []
@@ -182,7 +183,6 @@ def _combine_boxes(boxes):
 
 
 def _read_field(raw_file, field_name):
-
     header_file = raw_file + field_name + "_H"
     boxes, file_names, offsets, header = _read_header(header_file)
 
@@ -200,11 +200,11 @@ def _read_field(raw_file, field_name):
             shape = np.append(shape, header.ncomp)
         with open(raw_file + fn, "rb") as f:
             f.seek(offset)
-            if (header.version == 1):
+            if header.version == 1:
                 f.readline()  # skip the first line
-            arr = np.fromfile(f, 'float64', np.product(shape))
-            arr = arr.reshape(shape, order='F')
-            box_shape = [slice(l,h+1) for l, h in zip(lo, hi)]
+            arr = np.fromfile(f, "float64", np.product(shape))
+            arr = arr.reshape(shape, order="F")
+            box_shape = [slice(low, hig + 1) for low, hig in zip(lo, hi)]
             if header.ncomp > 1:
                 box_shape += [slice(None)]
             data[tuple(box_shape)] = arr
@@ -212,9 +212,7 @@ def _read_field(raw_file, field_name):
     return data
 
 
-
 def _read_buffer(snapshot, header_fn, _component_names):
-
     boxes, file_names, offsets, header = _read_header(header_fn)
 
     dom_lo, dom_hi = _combine_boxes(boxes)
@@ -230,18 +228,21 @@ def _read_buffer(snapshot, header_fn, _component_names):
         size = np.product(shape)
         with open(snapshot + "/Level_0/" + fn, "rb") as f:
             f.seek(offset)
-            if (header.version == 1):
+            if header.version == 1:
                 f.readline()  # skip the first line
-            arr = np.fromfile(f, 'float64', header.ncomp*size)
+            arr = np.fromfile(f, "float64", header.ncomp * size)
             for i in range(header.ncomp):
-                comp_data = arr[i*size:(i+1)*size].reshape(shape, order='F')
+                comp_data = arr[i * size : (i + 1) * size].reshape(shape, order="F")
                 data = all_data[_component_names[i]]
-                data[tuple([slice(l,h+1) for l, h in zip(lo, hi)])] = comp_data
+                data[tuple([slice(low, hig + 1) for low, hig in zip(lo, hi)])] = (
+                    comp_data
+                )
                 all_data[_component_names[i]] = data
     return all_data
 
-def read_reduced_diags(filename, delimiter=' '):
-    '''
+
+def read_reduced_diags(filename, delimiter=" "):
+    """
     Read data written by WarpX Reduced Diagnostics, and return them into Python objects
     input:
     - filename name of file to open
@@ -249,54 +250,67 @@ def read_reduced_diags(filename, delimiter=' '):
     output:
     - metadata_dict dictionary where first key is the type of metadata, second is the field
     - data dictionary with data
-    '''
+    """
     # Read header line
-    unformatted_header = list( np.genfromtxt( filename, comments="@", max_rows=1, dtype="str", delimiter=delimiter) )
+    unformatted_header = list(
+        np.genfromtxt(
+            filename, comments="@", max_rows=1, dtype="str", delimiter=delimiter
+        )
+    )
     # From header line, get field name, units and column number
-    field_names =  [s[s.find("]")+1:s.find("(")] for s in unformatted_header]
-    field_units =  [s[s.find("(")+1:s.find(")")] for s in unformatted_header]
-    field_column =  [s[s.find("[")+1:s.find("]")] for s in unformatted_header]
+    field_names = [s[s.find("]") + 1 : s.find("(")] for s in unformatted_header]
+    field_units = [s[s.find("(") + 1 : s.find(")")] for s in unformatted_header]
+    field_column = [s[s.find("[") + 1 : s.find("]")] for s in unformatted_header]
     # Load data and re-format to a dictionary
-    data = np.loadtxt( filename, delimiter=delimiter )
+    data = np.loadtxt(filename, delimiter=delimiter)
     if data.ndim == 1:
         data_dict = {key: np.atleast_1d(data[i]) for i, key in enumerate(field_names)}
     else:
-        data_dict = {key: data[:,i] for i, key in enumerate(field_names)}
+        data_dict = {key: data[:, i] for i, key in enumerate(field_names)}
     # Put header data into a dictionary
     metadata_dict = {}
-    metadata_dict['units'] = {key: field_units[i] for i, key in enumerate(field_names)}
-    metadata_dict['column'] = {key: field_column[i] for i, key in enumerate(field_names)}
+    metadata_dict["units"] = {key: field_units[i] for i, key in enumerate(field_names)}
+    metadata_dict["column"] = {
+        key: field_column[i] for i, key in enumerate(field_names)
+    }
     return metadata_dict, data_dict
 
-def read_reduced_diags_histogram(filename, delimiter=' '):
-    '''
+
+def read_reduced_diags_histogram(filename, delimiter=" "):
+    """
     Modified based on read_reduced_diags
     Two extra return objects:
     - bin_value: the values of bins
     - bin_data: the histogram data values of bins
-    '''
+    """
     # Read header line
-    unformatted_header = list( np.genfromtxt( filename, comments="@", max_rows=1, dtype="str", delimiter=delimiter) )
+    unformatted_header = list(
+        np.genfromtxt(
+            filename, comments="@", max_rows=1, dtype="str", delimiter=delimiter
+        )
+    )
     # From header line, get field name, units and column number
-    field_names     = [s[s.find("]")+1:s.find("(")] for s in unformatted_header]
-    field_names[2:] = [s[s.find("b"):s.find("=")] for s in field_names[2:]]
-    field_units     = [s[s.find("(")+1:s.find(")")] for s in unformatted_header]
-    field_column    = [s[s.find("[")+1:s.find("]")] for s in unformatted_header]
-    field_bin       = [s[s.find("=")+1:s.find("(")] for s in unformatted_header]
+    field_names = [s[s.find("]") + 1 : s.find("(")] for s in unformatted_header]
+    field_names[2:] = [s[s.find("b") : s.find("=")] for s in field_names[2:]]
+    field_units = [s[s.find("(") + 1 : s.find(")")] for s in unformatted_header]
+    field_column = [s[s.find("[") + 1 : s.find("]")] for s in unformatted_header]
+    field_bin = [s[s.find("=") + 1 : s.find("(")] for s in unformatted_header]
     # Load data and re-format to a dictionary
-    data = np.loadtxt( filename, delimiter=delimiter )
+    data = np.loadtxt(filename, delimiter=delimiter)
     if data.ndim == 1:
         data_dict = {key: data[i] for i, key in enumerate(field_names)}
     else:
-        data_dict = {key: data[:,i] for i, key in enumerate(field_names)}
+        data_dict = {key: data[:, i] for i, key in enumerate(field_names)}
     # Put header data into a dictionary
     metadata_dict = {}
-    metadata_dict['units']  = {key: field_units[i]  for i, key in enumerate(field_names)}
-    metadata_dict['column'] = {key: field_column[i] for i, key in enumerate(field_names)}
+    metadata_dict["units"] = {key: field_units[i] for i, key in enumerate(field_names)}
+    metadata_dict["column"] = {
+        key: field_column[i] for i, key in enumerate(field_names)
+    }
     # Save bin values
-    bin_value = np.asarray(field_bin[2:], dtype=np.float64, order='C')
+    bin_value = np.asarray(field_bin[2:], dtype=np.float64, order="C")
     if data.ndim == 1:
-        bin_data  = data[2:]
+        bin_data = data[2:]
     else:
-        bin_data  = data[:,2:]
+        bin_data = data[:, 2:]
     return metadata_dict, data_dict, bin_value, bin_data

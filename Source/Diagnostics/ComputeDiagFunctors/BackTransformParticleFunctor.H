@@ -143,19 +143,19 @@ struct LorentzTransformParticles
         const amrex::ParticleReal uzp = uz_old_p * weight_old
                                       + uz_new_p * weight_new;
 #if defined (WARPX_DIM_3D)
-        dst.m_aos[i_dst].pos(0) = xp;
-        dst.m_aos[i_dst].pos(1) = yp;
-        dst.m_aos[i_dst].pos(2) = zp;
+        dst.m_rdata[PIdx::x][i_dst] = xp;
+        dst.m_rdata[PIdx::y][i_dst] = yp;
+        dst.m_rdata[PIdx::z][i_dst] = zp;
 #elif defined (WARPX_DIM_RZ)
-        dst.m_aos[i_dst].pos(0) = std::sqrt(xp*xp + yp*yp);
-        dst.m_aos[i_dst].pos(1) = zp;
+        dst.m_rdata[PIdx::x][i_dst] = std::sqrt(xp*xp + yp*yp);
+        dst.m_rdata[PIdx::z][i_dst] = zp;
         dst.m_rdata[PIdx::theta][i_dst] = std::atan2(yp, xp);
 #elif defined (WARPX_DIM_XZ)
-        dst.m_aos[i_dst].pos(0) = xp;
-        dst.m_aos[i_dst].pos(1) = zp;
+        dst.m_rdata[PIdx::x][i_dst] = xp;
+        dst.m_rdata[PIdx::z][i_dst] = zp;
         amrex::ignore_unused(yp);
 #elif defined (WARPX_DIM_1D_Z)
-        dst.m_aos[i_dst].pos(0) = zp;
+        dst.m_rdata[PIdx::z][i_dst] = zp;
         amrex::ignore_unused(xp, yp);
 #else
         amrex::ignore_unused(xp, yp, zp);

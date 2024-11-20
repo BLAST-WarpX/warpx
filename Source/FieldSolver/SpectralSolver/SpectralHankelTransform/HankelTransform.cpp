@@ -36,7 +36,8 @@ HankelTransform::HankelTransform (int const hankel_order,
     //   SYCL note: we need to double check AMReX device ID conventions and
     //   BLAS++ device ID conventions are the same
     int const device_id = amrex::Gpu::Device::deviceId();
-    m_queue = std::make_unique<blas::Queue>( device_id, 0 );
+    blas::Queue::stream_t stream_id = amrex::Gpu::gpuStream();
+    m_queue = std::make_unique<blas::Queue>( device_id, stream_id );
 #endif
 
     amrex::Vector<amrex::Real> alphas;
@@ -54,7 +55,7 @@ HankelTransform::HankelTransform (int const hankel_order,
 
     // Calculate the spatial grid (Uniform grid with a half-cell offset)
     amrex::Vector<amrex::Real> rmesh(m_nr);
-    amrex::Real dr = rmax/m_nr;
+    const amrex::Real dr = rmax/m_nr;
     for (int ir=0 ; ir < m_nr ; ir++) {
         rmesh[ir] = dr*(ir + 0.5_rt);
     }

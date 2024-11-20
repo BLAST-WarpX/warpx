@@ -7,10 +7,13 @@
 #include "LoadBalanceCosts.H"
 
 #include "Diagnostics/ReducedDiags/ReducedDiags.H"
+#include "Fields.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "WarpX.H"
+
+#include <ablastr/fields/MultiFabRegister.H>
 
 #include <AMReX_Box.H>
 #include <AMReX_Config.H>
@@ -35,6 +38,7 @@
 #include <utility>
 
 using namespace amrex;
+using warpx::fields::FieldType;
 
 namespace
 {
@@ -56,8 +60,7 @@ namespace
             auto const & plev  = pc.GetParticles(lev);
 
             auto const & ptile = plev.at(box_index);
-            auto const & aos   = ptile.GetArrayOfStructs();
-            auto const np = aos.numParticles();
+            auto const np = ptile.numParticles();
             num_macro_particles += np;
         }
 
@@ -66,7 +69,7 @@ namespace
 }
 
 // constructor
-LoadBalanceCosts::LoadBalanceCosts (std::string rd_name)
+LoadBalanceCosts::LoadBalanceCosts (const std::string& rd_name)
     : ReducedDiags{rd_name}
 {
 }
@@ -87,7 +90,7 @@ void LoadBalanceCosts::ComputeDiags (int step)
     int nBoxes = 0;
     for (int lev = 0; lev < nLevels; ++lev)
     {
-        const auto cost = WarpX::getCosts(lev);
+        auto *const cost = WarpX::getCosts(lev);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             cost, "ERROR: costs are not initialized on level " + std::to_string(lev) + " !");
         nBoxes += cost->size();
@@ -122,11 +125,13 @@ void LoadBalanceCosts::ComputeDiags (int step)
     // shift index for m_data
     int shift_m_data = 0;
 
+    using ablastr::fields::Direction;
+
     // save data
     for (int lev = 0; lev < nLevels; ++lev)
     {
         const amrex::DistributionMapping& dm = warpx.DistributionMap(lev);
-        const MultiFab & Ex = warpx.getEfield(lev,0);
+        const MultiFab & Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
         for (MFIter mfi(Ex, false); mfi.isValid(); ++mfi)
         {
             const Box& tbx = mfi.tilebox();
@@ -274,7 +279,7 @@ void LoadBalanceCosts::WriteToFile (int step) const
     // end loop over data size
 
     // end line
-    ofs << std::endl;
+    ofs << "\n";
 
     // close file
     ofs.close();
@@ -282,7 +287,7 @@ void LoadBalanceCosts::WriteToFile (int step) const
     // get a reference to WarpX instance
     auto& warpx = WarpX::GetInstance();
 
-    if (!ParallelDescriptor::IOProcessor()) return;
+    if (!ParallelDescriptor::IOProcessor()) { return; }
 
     // final step is a special case, fill jagged array with NaN
     if (m_intervals.nextContains(step+1) > warpx.maxStep())
@@ -328,7 +333,7 @@ void LoadBalanceCosts::WriteToFile (int step) const
             ofstmp << m_sep;
             ofstmp << "[" << c++ << "]hostname_box_" + std::to_string(boxNumber) + "()";
         }
-        ofstmp << std::endl;
+        ofstmp << "\n";
 
         // open the data-containing file
         const std::string fileDataName = m_path + m_rd_name + "." + m_extension;
@@ -347,7 +352,7 @@ void LoadBalanceCosts::WriteToFile (int step) const
             while (std::getline(ss, token, m_sep[0]))
             {
                 cnt += 1;
-                if (ss.peek() == m_sep[0]) ss.ignore();
+                if (ss.peek() == m_sep[0]) { ss.ignore(); }
             }
 
             // 2 columns for step, time; then nBoxes*nDatafields columns for data;
@@ -359,7 +364,7 @@ void LoadBalanceCosts::WriteToFile (int step) const
             {
                 ofstmp << m_sep << "NaN";
             }
-            ofstmp << std::endl;
+            ofstmp << "\n";
         }
 
         // close files

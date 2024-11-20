@@ -58,7 +58,7 @@ HardEdgedQuadrupoleDevice::InitHardEdgedQuadrupoleDevice (HardEdgedQuadrupole co
 
     nelements = h_quad.nelements;
 
-    if (nelements == 0) return;
+    if (nelements == 0) { return; }
 
     d_zs_arr = h_quad.d_zs.data();
     d_ze_arr = h_quad.d_ze.data();

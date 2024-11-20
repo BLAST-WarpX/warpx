@@ -6,6 +6,7 @@
  */
 
 #ifndef WARPX_MultiFluidContainer_fwd_H_
+#define WARPX_MultiFluidContainer_fwd_H_
 
 class MultiFluidContainer;
 

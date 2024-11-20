@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-from pathlib import Path
+
+import sys
 
 import yt
 
@@ -11,19 +12,13 @@ import yt
 # the problem domain yet.
 
 # all particles are still there
-if Path("particle_scrape_plt000040").is_dir():
-    filename = "particle_scrape_plt000040"
-else:
-    filename = "Python_particle_scrape_plt000040"
+filename = "diags/diag1000040"
 ds40 = yt.load(filename)
-np40 = ds40.index.particle_headers['electrons'].num_particles
-assert(np40 == 612)
+np40 = ds40.index.particle_headers["electrons"].num_particles
+assert np40 == 612
 
 # all particles have been removed
-if Path("particle_scrape_plt000060").is_dir():
-    filename = "particle_scrape_plt000060"
-else:
-    filename = "Python_particle_scrape_plt000060"
+filename = sys.argv[1]
 ds60 = yt.load(filename)
-np60 = ds60.index.particle_headers['electrons'].num_particles
-assert(np60 == 0)
+np60 = ds60.index.particle_headers["electrons"].num_particles
+assert np60 == 0

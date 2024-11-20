@@ -5,16 +5,19 @@
 # License: BSD-3-Clause-LBNL
 
 # WarpX PICMI bindings w/o C++ component (used for autoclass docs)
--e Python
+-e ../Python
 breathe
 docutils>=0.17.1
 
+openpmd-viewer  # for checksumAPI
+
 # PICMI API docs
 # note: keep in sync with version in ../requirements.txt
-picmistandard==0.28.0
+picmistandard==0.31.0
 # for development against an unreleased PICMI version, use:
 # picmistandard @ git+https://github.com/picmi-standard/picmi.git#subdirectory=PICMI_Python
 
+pybtex
 pygments
 recommonmark
 # Sphinx<7.2 because we are waiting for
@@ -25,3 +28,4 @@ sphinx-design
 sphinx_rtd_theme>=1.1.1
 sphinxcontrib-bibtex
 sphinxcontrib-napoleon
+yt  # for checksumAPI

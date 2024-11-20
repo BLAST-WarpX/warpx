@@ -1,0 +1,65 @@
+# please set your project account, ie DD-N-N
+export proj="<proj_id>"  # change me!
+
+# Name and Path of this Script ################### (DO NOT change!)
+export MY_PROFILE=$(cd $(dirname $BASH_SOURCE) && pwd)"/"$(basename $BASH_SOURCE)
+
+if [ -z ${proj-} ]; then
+    echo "WARNING: The 'proj' variable is not yet set in your $MY_PROFILE file!"
+    echo "Please edit its line 2 to continue!"
+    return
+fi
+
+# set env variable storing the path to the work directory
+# please check if your project ID belongs to proj1, proj2, proj3 etc
+export WORK="/mnt/proj<N>/${proj,,}/${USER}"  # change me!
+mkdir -p WORK
+
+# clone warpx
+# you can also clone your own fork here, eg git@github.com:<user>/WarpX.git
+if [ ! -d "$WORK/src/warpx" ]
+then
+    git clone https://github.com/ECP-WarpX/WarpX.git $WORK/src/warpx
+fi
+
+# load required modules
+module purge
+module load OpenMPI/4.1.4-GCC-11.3.0-CUDA-11.7.0
+
+source $WORK/spack/share/spack/setup-env.sh && spack env activate warpx-karolina-cuda && {
+    echo "Spack environment 'warpx-karolina-cuda' activated successfully."
+} || {
+    echo "Failed to activate Spack environment 'warpx-karolina-cuda'. Please run install_dependencies.sh."
+}
+
+# Text Editor for Tools ########################## (edit this line)
+# examples: "nano", "vim", "emacs -nw" or without terminal: "gedit"
+#export EDITOR="nano"  # change me!
+
+# allocate an interactive shell for one hour
+# usage: getNode 2  # allocates two interactive nodes (default: 1)
+function getNode() {
+    if [ -z "$1" ] ; then
+        numNodes=1
+    else
+        numNodes=$1
+    fi
+    export OMP_NUM_THREADS=16
+    srun --time=1:00:00 --nodes=$numNodes --ntasks=$((8 * $numNodes)) --ntasks-per-node=8 --cpus-per-task=16 --exclusive --gpus-per-node=8 -p qgpu -A $proj --pty bash
+}
+
+# Environment #####################################################
+# optimize CUDA compilation for A100
+export AMREX_CUDA_ARCH="8.0"
+export SCRATCH="/scratch/project/${proj,,}/${USER}"
+
+# optimize CPU microarchitecture for AMD EPYC 7763 (zen3)
+export CFLAGS="-march=znver3"
+export CXXFLAGS="-march=znver3"
+
+# compiler environment hints
+export CC=$(which gcc)
+export CXX=$(which g++)
+export FC=$(which gfortran)
+export CUDACXX=$(which nvcc)
+export CUDAHOSTCXX=${CXX}

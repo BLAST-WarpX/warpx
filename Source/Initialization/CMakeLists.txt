@@ -11,6 +11,9 @@ foreach(D IN LISTS WarpX_DIMS)
         TemperatureProperties.cpp
         VelocityProperties.cpp
         WarpXAMReXInit.cpp
+        WarpXInit.cpp
         WarpXInitData.cpp
     )
 endforeach()
+
+add_subdirectory(DivCleaner)

@@ -124,7 +124,7 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
    cd $HOME/src/warpx
    rm -rf build_summit
 
-   cmake -S . -B build_summit -DWarpX_COMPUTE=CUDA -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_summit -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
    cmake --build build_summit -j 8
 
 The WarpX application executables are now in ``$HOME/src/warpx/build_summit/bin/``.
@@ -134,7 +134,7 @@ Additionally, the following commands will install WarpX as a Python module:
 
    rm -rf build_summit_py
 
-   cmake -S . -B build_summit_py -DWarpX_COMPUTE=CUDA -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_summit_py -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
    cmake --build build_summit_py -j 8 --target pip_install
 
 Now, you can :ref:`submit Summit compute jobs <running-cpp-summit>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).

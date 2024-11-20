@@ -4,8 +4,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef FILTERFUNCTORS_H
-#define FILTERFUNCTORS_H
+#ifndef WARPX_FILTERFUNCTORS_H
+#define WARPX_FILTERFUNCTORS_H
 
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/WarpXParticleContainer.H"
@@ -164,10 +164,10 @@ struct GeometryFilter
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     bool operator () (const SuperParticleType& p, const amrex::RandomEngine&) const noexcept
     {
-        if ( !m_is_active ) return true;
-        return ! (AMREX_D_TERM( (p.pos(0) < m_domain.lo(0)) || (p.pos(0) > m_domain.hi(0) ),
-                            ||  (p.pos(1) < m_domain.lo(1)) || (p.pos(1) > m_domain.hi(1) ),
-                            ||  (p.pos(2) < m_domain.lo(2)) || (p.pos(2) > m_domain.hi(2) )));
+        if ( !m_is_active ) { return true; }
+        return AMREX_D_TERM(    (p.pos(0) >= m_domain.lo(0)) && (p.pos(0) <= m_domain.hi(0) ),
+                            &&  (p.pos(1) >= m_domain.lo(1)) && (p.pos(1) <= m_domain.hi(1) ),
+                            &&  (p.pos(2) >= m_domain.lo(2)) && (p.pos(2) <= m_domain.hi(2) ));
     }
 private:
     /** Whether this diagnostics is activated. Select all particles if false */
@@ -176,4 +176,4 @@ private:
     const amrex::RealBox m_domain;
 };
 
-#endif // FILTERFUNCTORS_H
+#endif // WARPX_FILTERFUNCTORS_H

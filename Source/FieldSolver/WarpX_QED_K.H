@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef WarpX_QED_K_h
-#define WarpX_QED_K_h
+#ifndef WARPX_QED_K_h
+#define WARPX_QED_K_h
 
 #include "Utils/WarpXConst.H"
 
@@ -359,4 +359,4 @@ const amrex::Real dyi = 1._rt/dy;
 
 }
 
-#endif
+#endif //WARPX_QED_K_h

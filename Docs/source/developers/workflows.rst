@@ -8,5 +8,7 @@ Workflows
 
    profiling
    testing
-   documentation
    checksum
+   run_clang_tidy_locally
+   local_compile
+   documentation

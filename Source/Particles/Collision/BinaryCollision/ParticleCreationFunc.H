@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef PARTICLE_CREATION_FUNC_H_
-#define PARTICLE_CREATION_FUNC_H_
+#ifndef WARPX_PARTICLE_CREATION_FUNC_H_
+#define WARPX_PARTICLE_CREATION_FUNC_H_
 
 #include "BinaryCollisionUtils.H"
 
@@ -15,7 +15,6 @@
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
-#include "WarpX.H"
 
 #include <AMReX_DenseBins.H>
 #include <AMReX_GpuAtomic.H>
@@ -30,13 +29,15 @@
  * \brief This functor creates particles produced from a binary collision and sets their initial
  * properties (position, momentum, weight).
  */
-class ParticleCreationFunc{
+class ParticleCreationFunc
+{
     // Define shortcuts for frequently-used type names
-    using ParticleType = WarpXParticleContainer::ParticleType;
-    using ParticleTileType = WarpXParticleContainer::ParticleTileType;
-    using ParticleBins = amrex::DenseBins<ParticleType>;
-    using index_type = ParticleBins::index_type;
-    using SoaData_type = WarpXParticleContainer::ParticleTileType::ParticleTileDataType;
+    using ParticleType = typename WarpXParticleContainer::ParticleType;
+    using ParticleTileType = typename WarpXParticleContainer::ParticleTileType;
+    using ParticleTileDataType = typename ParticleTileType::ParticleTileDataType;
+    using ParticleBins = amrex::DenseBins<ParticleTileDataType>;
+    using index_type = typename ParticleBins::index_type;
+    using SoaData_type = typename WarpXParticleContainer::ParticleTileType::ParticleTileDataType;
 
 public:
     /**
@@ -50,7 +51,7 @@ public:
      * @param[in] collision_name the name of the collision
      * @param[in] mypc pointer to the MultiParticleContainer
      */
-    ParticleCreationFunc (std::string collision_name, MultiParticleContainer const * mypc);
+    ParticleCreationFunc (const std::string& collision_name, MultiParticleContainer const * mypc);
 
     /**
      * \brief operator() of the ParticleCreationFunc class. It creates new particles from binary
@@ -66,15 +67,8 @@ public:
      * function specific to the considered binary collision.
      *
      * @param[in] n_total_pairs how many binary collisions have been performed in this tile
-     * @param[in, out] soa_1 struct of array data of the first colliding particle species
-     * @param[in, out] soa_2 struct of array data of the second colliding particle species
+     * @param[in, out] ptile1,ptile2 the particle tiles of the two colliding species
      * @param[out] tile_products array containing tile data of the product particles.
-     * @param[out] particle_ptr_1 pointer to data of the first colliding particle species. Is
-     *             needed to set the id of a particle to -1 in order to delete it when its weight
-     *             reaches 0.
-     * @param[out] particle_ptr_2 pointer to data of the second colliding particle species. Is
-     *             needed to set the id of a particle to -1 in order to delete it when its weight
-     *             reaches 0.
      * @param[in] m1 mass of the first colliding particle species
      * @param[in] m2 mass of the second colliding particle species
      * @param[in] products_mass array storing the mass of product particles
@@ -99,9 +93,9 @@ public:
     AMREX_INLINE
     amrex::Vector<int> operator() (
                     const index_type& n_total_pairs,
-                    const SoaData_type& soa_1, const SoaData_type& soa_2,
+                    ParticleTileType& ptile1, ParticleTileType& ptile2,
+                    const amrex::Vector<WarpXParticleContainer*>& pc_products,
                     ParticleTileType** AMREX_RESTRICT tile_products,
-                    ParticleType* particle_ptr_1, ParticleType*  particle_ptr_2,
                     const amrex::ParticleReal& m1, const amrex::ParticleReal& m2,
                     const amrex::Vector<amrex::ParticleReal>& products_mass,
                     const index_type* AMREX_RESTRICT p_mask,
@@ -115,7 +109,7 @@ public:
     {
         using namespace amrex::literals;
 
-        if (n_total_pairs == 0) return amrex::Vector<int>(m_num_product_species, 0);
+        if (n_total_pairs == 0) { return amrex::Vector<int>(m_num_product_species, 0); }
 
         // Compute offset array and allocate memory for the produced species
         amrex::Gpu::DeviceVector<index_type> offsets(n_total_pairs);
@@ -134,8 +128,8 @@ public:
             tile_products[i]->resize(products_np[i] + num_added);
         }
 
-        amrex::ParticleReal* AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
-        amrex::ParticleReal* AMREX_RESTRICT w2 = soa_2.m_rdata[PIdx::w];
+        const auto soa_1 = ptile1.getParticleTileData();
+        const auto soa_2 = ptile2.getParticleTileData();
 
         // Create necessary GPU vectors, that will be used in the kernel below
         amrex::Vector<SoaData_type> soa_products;
@@ -198,24 +192,6 @@ public:
                     }
                 }
 
-                // Remove p_pair_reaction_weight[i] from the colliding particles' weights
-                amrex::Gpu::Atomic::AddNoRet(&w1[p_pair_indices_1[i]],
-                                                -p_pair_reaction_weight[i]);
-                amrex::Gpu::Atomic::AddNoRet(&w2[p_pair_indices_2[i]],
-                                                -p_pair_reaction_weight[i]);
-
-                // If the colliding particle weight decreases to zero, remove particle by
-                // setting its id to -1
-                constexpr amrex::Long minus_one_long = -1;
-                if (w1[p_pair_indices_1[i]] <= amrex::ParticleReal(0.))
-                {
-                    particle_ptr_1[p_pair_indices_1[i]].atomicSetID(minus_one_long);
-                }
-                if (w2[p_pair_indices_2[i]] <= amrex::ParticleReal(0.))
-                {
-                    particle_ptr_2[p_pair_indices_2[i]].atomicSetID(minus_one_long);
-                }
-
                 // Initialize the product particles' momentum, using a function depending on the
                 // specific collision type
                 if (t_collision_type == CollisionType::ProtonBoronToAlphasFusion)
@@ -251,6 +227,27 @@ public:
             }
         });
 
+        // Initialize the user runtime components
+        for (int i = 0; i < m_num_product_species; i++)
+        {
+            const auto start_index = int(products_np[i]);
+            const auto stop_index  = int(products_np[i] + num_added_vec[i]);
+            ParticleCreation::DefaultInitializeRuntimeAttributes(*tile_products[i],
+                                       0, 0,
+                                       pc_products[i]->getUserRealAttribs(), pc_products[i]->getUserIntAttribs(),
+                                       pc_products[i]->getParticleComps(), pc_products[i]->getParticleiComps(),
+                                       pc_products[i]->getUserRealAttribParser(),
+                                       pc_products[i]->getUserIntAttribParser(),
+#ifdef WARPX_QED
+                                       false, // do not initialize QED quantities, since they were initialized
+                                              // when calling the SmartCopy functors
+                                       pc_products[i]->get_breit_wheeler_engine_ptr(),
+                                       pc_products[i]->get_quantum_sync_engine_ptr(),
+#endif
+                                       pc_products[i]->getIonizationInitialLevel(),
+                                       start_index, stop_index);
+        }
+
         amrex::Gpu::synchronize();
 
         return num_added_vec;
@@ -272,25 +269,27 @@ private:
  * \brief This class does nothing and is used as second template parameter for binary collisions
  * that do not create particles.
  */
-class NoParticleCreationFunc{
-    using ParticleType = WarpXParticleContainer::ParticleType;
-    using ParticleTileType = WarpXParticleContainer::ParticleTileType;
-    using ParticleBins = amrex::DenseBins<ParticleType>;
-    using index_type = ParticleBins::index_type;
-    using SoaData_type = WarpXParticleContainer::ParticleTileType::ParticleTileDataType;
+class NoParticleCreationFunc
+{
+    using ParticleType = typename WarpXParticleContainer::ParticleType;
+    using ParticleTileType = typename WarpXParticleContainer::ParticleTileType;
+    using ParticleTileDataType = typename ParticleTileType::ParticleTileDataType;
+    using ParticleBins = amrex::DenseBins<ParticleTileDataType>;
+    using index_type = typename ParticleBins::index_type;
+    using SoaData_type = typename WarpXParticleContainer::ParticleTileType::ParticleTileDataType;
 
 public:
     NoParticleCreationFunc () = default;
 
-    NoParticleCreationFunc (const std::string /*collision_name*/,
+    NoParticleCreationFunc (const std::string& /*collision_name*/,
                             MultiParticleContainer const * const /*mypc*/) {}
 
     AMREX_INLINE
     amrex::Vector<int> operator() (
                     const index_type& /*n_total_pairs*/,
-                    const SoaData_type& /*soa_1*/, const SoaData_type& /*soa_2*/,
+                    ParticleTileType& /*ptile1*/, ParticleTileType& /*ptile2*/,
+                    amrex::Vector<WarpXParticleContainer*>& /*pc_products*/,
                     ParticleTileType** /*tile_products*/,
-                    ParticleType* /*particle_ptr_1*/, ParticleType* /*particle_ptr_2*/,
                     const amrex::ParticleReal& /*m1*/, const amrex::ParticleReal& /*m2*/,
                     const amrex::Vector<amrex::ParticleReal>& /*products_mass*/,
                     const index_type* /*p_mask*/, const amrex::Vector<index_type>& /*products_np*/,
@@ -303,4 +302,4 @@ public:
     }
 };
 
-#endif // PARTICLE_CREATION_FUNC_H_
+#endif // WARPX_PARTICLE_CREATION_FUNC_H_

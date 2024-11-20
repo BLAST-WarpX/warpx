@@ -23,14 +23,14 @@ Please add the following sentence to your publications, it helps contributors ke
 
 **Plain text:**
 
-  This research used the open-source particle-in-cell code WarpX https://github.com/ECP-WarpX/WarpX, primarily funded by the US DOE Exascale Computing Project. Primary WarpX contributors are with LBNL, LLNL, CEA-LIDYL, SLAC, DESY, CERN, and TAE Technologies. We acknowledge all WarpX contributors.
+  This research used the open-source particle-in-cell code WarpX https://github.com/ECP-WarpX/WarpX. Primary WarpX contributors are with LBNL, LLNL, CEA-LIDYL, SLAC, DESY, CERN, and TAE Technologies. We acknowledge all WarpX contributors.
 
 **LaTeX:**
 
 .. code-block:: latex
 
   \usepackage{hyperref}
-  This research used the open-source particle-in-cell code WarpX \url{https://github.com/ECP-WarpX/WarpX}, primarily funded by the US DOE Exascale Computing Project.
+  This research used the open-source particle-in-cell code WarpX \url{https://github.com/ECP-WarpX/WarpX}.
   Primary WarpX contributors are with LBNL, LLNL, CEA-LIDYL, SLAC, DESY, CERN, and TAE Technologies.
   We acknowledge all WarpX contributors.
 
@@ -52,6 +52,16 @@ Prior WarpX references
 ----------------------
 
 If your project uses a specific algorithm or component, please consider citing the respective publications in addition.
+
+- Shapoval O, Zoni E, Lehe R, Thévenet M, and Vay J-L.
+  **Pseudospectral particle-in-cell formulation with arbitrary charge and current-density time dependencies for the modeling of relativistic plasmas**.
+  Physical Review E **110**, 025206, 2024.
+  `DOI:10.1103/PhysRevE.110.025206 <https://doi.org/10.1103/PhysRevE.110.025206>`__
+
+- Sandberg R T, Lehe R, Mitchell C E, Garten M, Myers A, Qiang J, Vay J-L and Huebl A.
+  **Synthesizing Particle-in-Cell Simulations Through Learning and GPU Computing for Hybrid Particle Accelerator Beamlines**.
+  Proc. of Platform for Advanced Scientific Computing (PASC'24), *PASC24 Best Paper Award*, 2024.
+  `DOI:10.1145/3659914.3659937 <https://doi.org/10.1145/3659914.3659937>`__
 
 - Sandberg R T, Lehe R, Mitchell C E, Garten M, Qiang J, Vay J-L and Huebl A.
   **Hybrid Beamline Element ML-Training for Surrogates in the ImpactX Beam-Dynamics Code**.

@@ -19,6 +19,8 @@ public:
                   to the output diagnostic MultiFab, mf_dst.
      * \param[in] convertRZmodes2cartesian (in cylindrical) whether to
      *            sum all modes in mf_src before cell-centering into dst multifab.
+     * \param[in] deposit_current whether to deposit current. Used to output current in cases
+                  where no field solve is used.
      * \param[in] ncomp Number of component of mf_src to cell-center in dst multifab.
      */
     JFunctor (int dir, int lev,

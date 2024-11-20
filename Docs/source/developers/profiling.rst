@@ -121,7 +121,7 @@ Perlmutter Example
 """"""""""""""""""
 
 Example on how to create traces on a multi-GPU system that uses the Slurm scheduler (e.g., NERSC's Perlmutter system).
-You can either run this on an interactive node or use the Slurm batch script header :ref:`documented here <running-cpp-perlmutter-A100-GPUs>`.
+You can either run this on an interactive node or use the Slurm batch script header :ref:`documented here <running-cpp-perlmutter>`.
 
 .. code-block:: bash
 

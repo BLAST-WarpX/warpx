@@ -54,7 +54,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    LoadBalanceCosts(std::string rd_name);
+    LoadBalanceCosts(const std::string& rd_name);
 
     /**
      * This function updates the costs, given the current distribution mapping,

@@ -1,0 +1,45 @@
+max_step = 4
+warpx.verbose = 1
+warpx.const_dt = 1e-10
+amr.n_cell = 256
+amr.max_grid_size = 64
+amr.max_level = 0
+geometry.dims = 1
+geometry.prob_lo = 0
+geometry.prob_hi = 0.1
+
+# Boundary condition and field solver
+boundary.field_lo = periodic
+boundary.field_hi = periodic
+boundary.particle_lo = periodic
+boundary.particle_hi = periodic
+algo.particle_shape = 1
+algo.maxwell_solver = none
+
+particles.species_names = hydrogen
+hydrogen.mass = 1.67262192369e-27
+hydrogen.charge = 1.602176634e-19
+hydrogen.injection_style = nrandompercell
+hydrogen.initialize_self_fields = 0
+hydrogen.do_not_push = 1
+hydrogen.do_resampling = 1
+hydrogen.resampling_min_ppc = 10
+hydrogen.resampling_trigger_intervals = 1::2
+hydrogen.resampling_algorithm = velocity_coincidence_thinning
+hydrogen.resampling_algorithm_velocity_grid_type = cartesian
+hydrogen.resampling_algorithm_delta_u = 10000000.0 5000000.0 7000000.0
+hydrogen.num_particles_per_cell = 2500
+hydrogen.momentum_distribution_type = gaussian
+hydrogen.ux_m = 0.0
+hydrogen.uy_m = 0.0
+hydrogen.uz_m = 0.0
+hydrogen.ux_th = 0.000326
+hydrogen.uy_th = 0.000326
+hydrogen.uz_th = 0.000326
+hydrogen.profile = constant
+hydrogen.density = 1e+19
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 4
+diag1.diag_type = Full

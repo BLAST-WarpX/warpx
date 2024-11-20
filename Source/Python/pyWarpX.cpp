@@ -32,6 +32,7 @@
 // forward declarations of exposed classes
 void init_BoundaryBufferParIter (py::module&);
 void init_MultiParticleContainer (py::module&);
+void init_MultiFabRegister (py::module&);
 void init_ParticleBoundaryBuffer (py::module&);
 void init_PinnedMemoryParticleContainer (py::module&);
 void init_WarpXParIter (py::module&);
@@ -59,6 +60,7 @@ PYBIND11_MODULE(PYWARPX_MODULE_NAME, m) {
     )pbdoc";
 
     // note: order from parent to child classes
+    init_MultiFabRegister(m);
     init_PinnedMemoryParticleContainer(m);
     init_WarpXParticleContainer(m);
     init_WarpXParIter(m);

@@ -7,9 +7,11 @@
  */
 #include "SliceDiagnostic.H"
 
-#include "WarpX.H"
+#include "Fields.H"
 #include "Utils/TextMsg.H"
+#include "WarpX.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -40,7 +42,7 @@
 #include <sstream>
 
 using namespace amrex;
-
+using warpx::fields::FieldType;
 
 /* \brief
  *  The functions creates the slice for diagnostics based on the user-input.
@@ -152,7 +154,7 @@ CreateSlice( const MultiFab& mf, const Vector<Geometry> &dom_geom,
     ablastr::utils::communication::ParallelCopy(*smf, mf, 0, 0, ncomp, nghost_vect, nghost_vect, WarpX::do_single_precision_comms);
 
     // interpolate if required on refined slice //
-    if (interpolate == 1 ) {
+    if (interpolate) {
        InterpolateSliceValues( *smf, interp_lo, slice_cc_nd_box, dom_geom,
                                ncomp, nghost, slice_lo, slice_hi, SliceType, real_box);
     }
@@ -173,6 +175,10 @@ CreateSlice( const MultiFab& mf, const Vector<Geometry> &dom_geom,
 
         const MultiFab& mfSrc = *smf;
         MultiFab& mfDst = *cs_mf;
+
+        auto & warpx = WarpX::GetInstance();
+
+        using ablastr::fields::Direction;
 
         MFIter mfi_dst(mfDst);
         for (MFIter mfi(mfSrc); mfi.isValid(); ++mfi) {
@@ -195,27 +201,27 @@ CreateSlice( const MultiFab& mf, const Vector<Geometry> &dom_geom,
                 amrex::amrex_avgdown_nodes(Dst_bx, Dst_fabox, Src_fabox, dcomp,
                                            scomp, ncomp, slice_cr_ratio);
             }
-            if( SliceType == WarpX::GetInstance().getEfield(0,0).ixType().toIntVect() ) {
+            if( SliceType == warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, 0)->ixType().toIntVect() ) {
                 amrex::amrex_avgdown_edges(Dst_bx, Dst_fabox, Src_fabox, dcomp,
                                            scomp, ncomp, slice_cr_ratio, 0);
             }
-            if( SliceType == WarpX::GetInstance().getEfield(0,1).ixType().toIntVect() ) {
+            if( SliceType == warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, 0)->ixType().toIntVect() ) {
                 amrex::amrex_avgdown_edges(Dst_bx, Dst_fabox, Src_fabox, dcomp,
                                            scomp, ncomp, slice_cr_ratio, 1);
             }
-            if( SliceType == WarpX::GetInstance().getEfield(0,2).ixType().toIntVect() ) {
+            if( SliceType == warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, 0)->ixType().toIntVect() ) {
                 amrex::amrex_avgdown_edges(Dst_bx, Dst_fabox, Src_fabox, dcomp,
                                            scomp, ncomp, slice_cr_ratio, 2);
             }
-            if( SliceType == WarpX::GetInstance().getBfield(0,0).ixType().toIntVect() ) {
+            if( SliceType == warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, 0)->ixType().toIntVect() ) {
                 amrex::amrex_avgdown_faces(Dst_bx, Dst_fabox, Src_fabox, dcomp,
                                            scomp, ncomp, slice_cr_ratio, 0);
             }
-            if( SliceType == WarpX::GetInstance().getBfield(0,1).ixType().toIntVect() ) {
+            if( SliceType == warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, 0)->ixType().toIntVect() ) {
                 amrex::amrex_avgdown_faces(Dst_bx, Dst_fabox, Src_fabox, dcomp,
                                            scomp, ncomp, slice_cr_ratio, 1);
             }
-            if( SliceType == WarpX::GetInstance().getBfield(0,2).ixType().toIntVect() ) {
+            if( SliceType == warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, 0)->ixType().toIntVect() ) {
                 amrex::amrex_avgdown_faces(Dst_bx, Dst_fabox, Src_fabox, dcomp,
                                            scomp, ncomp, slice_cr_ratio, 2);
             }
@@ -309,7 +315,7 @@ CheckSliceInput( const RealBox real_box, RealBox &slice_cc_nd_box,
             slice_cc_nd_box.setLo( idim, slice_realbox.lo(idim) );
             slice_cc_nd_box.setHi( idim, slice_realbox.hi(idim) );
 
-            if ( slice_cr_ratio[idim] > 1) slice_cr_ratio[idim] = 1;
+            if ( slice_cr_ratio[idim] > 1) { slice_cr_ratio[idim] = 1; }
 
             // check for interpolation -- compute index lo with floor and ceil
             if ( slice_cc_nd_box.lo(idim) - real_box.lo(idim) >= fac ) {
@@ -419,7 +425,7 @@ CheckSliceInput( const RealBox real_box, RealBox &slice_cc_nd_box,
  */
 void
 InterpolateSliceValues(MultiFab& smf, IntVect interp_lo, RealBox slice_realbox,
-                       Vector<Geometry> geom, int ncomp, int nghost,
+                       const Vector<Geometry>& geom, int ncomp, int nghost,
                        IntVect slice_lo, IntVect /*slice_hi*/, IntVect SliceType,
                        const RealBox real_box)
 {

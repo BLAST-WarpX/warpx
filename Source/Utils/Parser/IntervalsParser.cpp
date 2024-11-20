@@ -92,7 +92,7 @@ utils::parser::IntervalsParser::IntervalsParser (
     const std::vector<std::string>& instr_vec)
 {
     std::string inconcatenated;
-    for (const auto& instr_element : instr_vec) inconcatenated +=instr_element;
+    for (const auto& instr_element : instr_vec) { inconcatenated +=instr_element; }
 
     auto insplit = ablastr::utils::text::split_string<std::vector<std::string>>(
         inconcatenated, m_separator);
@@ -102,7 +102,7 @@ utils::parser::IntervalsParser::IntervalsParser (
         const SliceParser temp_slice(inslc);
         m_slices.push_back(temp_slice);
         if ((temp_slice.getPeriod() > 0) &&
-               (temp_slice.getStop() >= temp_slice.getStart())) m_activated = true;
+               (temp_slice.getStop() >= temp_slice.getStart())) { m_activated = true; }
     }
 }
 
@@ -155,7 +155,7 @@ utils::parser::BTDIntervalsParser::BTDIntervalsParser (
     const std::vector<std::string>& instr_vec)
 {
     std::string inconcatenated;
-    for (const auto& instr_element : instr_vec) inconcatenated +=instr_element;
+    for (const auto& instr_element : instr_vec) { inconcatenated +=instr_element; }
 
     auto const insplit = ablastr::utils::text::split_string<std::vector<std::string>>(
         inconcatenated, std::string(1,m_separator));

@@ -1,31 +1,38 @@
 # please set your project account
-#export proj=<yourProject>
+#export proj="project_..."
 
 # required dependencies
-module load LUMI/23.03  partition/G
-module load rocm/5.2.3  # waiting for 5.5 for next bump
-module load buildtools/23.03
+module load LUMI/24.03  partition/G
+module load rocm/6.0.3
+module load buildtools/24.03
 
 # optional: just an additional text editor
 module load nano
 
 # optional: for PSATD in RZ geometry support
-export CMAKE_PREFIX_PATH=${HOME}/sw/lumi/gpu/blaspp-master:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${HOME}/sw/lumi/gpu/lapackpp-master:$CMAKE_PREFIX_PATH
-export LD_LIBRARY_PATH=${HOME}/sw/lumi/gpu/blaspp-master/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=${HOME}/sw/lumi/gpu/lapackpp-master/lib64:$LD_LIBRARY_PATH
+SW_DIR="${HOME}/sw/lumi/gpu"
+export CMAKE_PREFIX_PATH=${SW_DIR}/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/lapackpp-2024.05.31:$CMAKE_PREFIX_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
 
 # optional: for QED lookup table generation support
-module load Boost/1.81.0-cpeCray-23.03
+module load Boost/1.82.0-cpeCray-23.09
 
 # optional: for openPMD support
-module load cray-hdf5/1.12.2.3
-export CMAKE_PREFIX_PATH=${HOME}/sw/lumi/gpu/c-blosc-1.21.1:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${HOME}/sw/lumi/gpu/adios2-2.8.3:$CMAKE_PREFIX_PATH
-export PATH=${HOME}/sw/lumi/gpu/adios2-2.8.3/bin:${PATH}
+export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-1.21.1:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/hdf5-1.14.1.2:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.8.3:$CMAKE_PREFIX_PATH
+export PATH=${SW_DIR}/hdf5-1.14.1.2/bin:${PATH}
+export PATH=${SW_DIR}/adios2-2.8.3/bin:${PATH}
 
 # optional: for Python bindings or libEnsemble
-module load cray-python/3.9.13.1
+module load cray-python/3.11.7
+
+if [ -d "${SW_DIR}/venvs/warpx-lumi" ]
+then
+  source ${SW_DIR}/venvs/warpx-lumi/bin/activate
+fi
 
 # an alias to request an interactive batch node for one hour
 #   for paralle execution, start on the batch node: srun <command>
@@ -41,9 +48,13 @@ export MPICH_GPU_SUPPORT_ENABLED=1
 export AMREX_AMD_ARCH=gfx90a
 
 # compiler environment hints
-export CC=$(which cc)
-export CXX=$(which CC)
-export FC=$(which ftn)
+# Warning: using the compiler wrappers cc and CC
+#          instead of amdclang and amdclang++
+#          currently results in a significant
+#          loss of performances
+export CC=$(which amdclang)
+export CXX=$(which amdclang++)
+export FC=$(which amdflang)
 export CFLAGS="-I${ROCM_PATH}/include"
 export CXXFLAGS="-I${ROCM_PATH}/include -Wno-pass-failed"
-export LDFLAGS="-L${ROCM_PATH}/lib -lamdhip64"
+export LDFLAGS="-L${ROCM_PATH}/lib -lamdhip64 ${PE_MPICH_GTL_DIR_amd_gfx90a} -lmpi_gtl_hsa"

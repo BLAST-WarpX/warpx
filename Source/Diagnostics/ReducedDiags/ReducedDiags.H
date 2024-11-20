@@ -52,7 +52,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    ReducedDiags (std::string rd_name);
+    ReducedDiags (const std::string& rd_name);
 
     /**
      * Virtual destructor for polymorphism
@@ -94,7 +94,7 @@ public:
      * This function queries deprecated input parameters and aborts
      * the run if one of them is specified.
      */
-    void BackwardCompatibility ();
+    void BackwardCompatibility () const;
 
 };
 

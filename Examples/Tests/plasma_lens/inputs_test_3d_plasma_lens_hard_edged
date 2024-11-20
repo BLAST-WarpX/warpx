@@ -1,0 +1,73 @@
+# Maximum number of time steps
+max_step = 84
+
+# number of grid points
+amr.n_cell =  16 16 16
+
+amr.max_level = 0
+
+# Geometry
+geometry.dims = 3
+geometry.prob_lo     = -1.0  -1.0   0.0   # physical domain
+geometry.prob_hi     =  1.0   1.0   2.0
+
+boundary.field_lo = pec pec pec
+boundary.field_hi = pec pec pec
+boundary.particle_lo = absorbing absorbing absorbing
+boundary.particle_hi = absorbing absorbing absorbing
+
+# Algorithms
+algo.particle_shape = 1
+warpx.cfl = 0.7
+
+my_constants.vel_z = 0.5*clight
+
+# particles
+particles.species_names = electrons
+
+electrons.charge = -q_e
+electrons.mass = m_e
+electrons.injection_style = "MultipleParticles"
+electrons.multiple_particles_pos_x = 0.05 0.
+electrons.multiple_particles_pos_y = 0. 0.04
+electrons.multiple_particles_pos_z = 0.05 0.05
+electrons.multiple_particles_ux = 0. 0.
+electrons.multiple_particles_uy = 0. 0.
+electrons.multiple_particles_uz = vel_z/clight vel_z/clight
+electrons.multiple_particles_weight = 1. 1.
+
+lattice.elements = drift1 plasmalens1 drift2 plasmalens2 drift3 plasmalens3 drift4 plasmalens4
+
+drift1.type = drift
+drift1.ds = 0.1
+
+plasmalens1.type = plasmalens
+plasmalens1.ds = 0.1
+plasmalens1.dEdx = 600000.
+
+drift2.type = drift
+drift2.ds = 0.41
+
+plasmalens2.type = plasmalens
+plasmalens2.ds = 0.11
+plasmalens2.dEdx = 800000.
+
+drift3.type = drift
+drift3.ds = 0.4
+
+plasmalens3.type = plasmalens
+plasmalens3.ds = 0.12
+plasmalens3.dEdx = 600000.
+
+drift4.type = drift
+drift4.ds = 0.39
+
+plasmalens4.type = plasmalens
+plasmalens4.ds = 0.13
+plasmalens4.dEdx = 200000.
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 84
+diag1.diag_type = Full
+diag1.electrons.variables = x y z ux uy uz

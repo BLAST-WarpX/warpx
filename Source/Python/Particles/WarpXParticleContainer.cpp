@@ -12,11 +12,11 @@
 void init_WarpXParIter (py::module& m)
 {
     py::class_<
-        WarpXParIter, amrex::ParIter<0,0,PIdx::nattribs>
+        WarpXParIter, amrex::ParIterSoA<PIdx::nattribs, 0>
     >(m, "WarpXParIter")
-        .def(py::init<amrex::ParIter<0,0,PIdx::nattribs>::ContainerType&, int>(),
+        .def(py::init<amrex::ParIterSoA<PIdx::nattribs, 0>::ContainerType&, int>(),
             py::arg("particle_container"), py::arg("level"))
-        .def(py::init<amrex::ParIter<0,0,PIdx::nattribs>::ContainerType&, int, amrex::MFItInfo&>(),
+        .def(py::init<amrex::ParIterSoA<PIdx::nattribs, 0>::ContainerType&, int, amrex::MFItInfo&>(),
             py::arg("particle_container"), py::arg("level"),
             py::arg("info"))
     ;
@@ -26,11 +26,11 @@ void init_WarpXParticleContainer (py::module& m)
 {
     py::class_<
         WarpXParticleContainer,
-        amrex::ParticleContainer<0, 0, PIdx::nattribs, 0>
+        amrex::ParticleContainerPureSoA<PIdx::nattribs, 0>
     > wpc (m, "WarpXParticleContainer");
     wpc
         .def("add_real_comp",
-            [](WarpXParticleContainer& pc, const std::string& name, bool const comm) { pc.AddRealComp(name, comm); },
+            [](WarpXParticleContainer& pc, const std::string& name, bool comm) { pc.NewRealComp(name, comm); },
             py::arg("name"), py::arg("comm")
         )
         .def("add_n_particles",
@@ -85,11 +85,18 @@ void init_WarpXParticleContainer (py::module& m)
             py::arg("nattr_int"), py::arg("attr_int"),
             py::arg("uniqueparticles"), py::arg("id")=-1
         )
-        .def("num_real_comps", &WarpXParticleContainer::NumRealComps)
         .def("get_comp_index",
             [](WarpXParticleContainer& pc, std::string comp_name)
             {
                 auto particle_comps = pc.getParticleComps();
+                return particle_comps.at(comp_name);
+            },
+            py::arg("comp_name")
+        )
+        .def("get_icomp_index",
+            [](WarpXParticleContainer& pc, std::string comp_name)
+            {
+                auto particle_comps = pc.getParticleiComps();
                 return particle_comps.at(comp_name);
             },
             py::arg("comp_name")
@@ -101,6 +108,10 @@ void init_WarpXParticleContainer (py::module& m)
         .def("total_number_of_particles",
             &WarpXParticleContainer::TotalNumberOfParticles,
             py::arg("valid_particles_only"), py::arg("local")
+        )
+        .def("sum_particle_weight",
+            &WarpXParticleContainer::sumParticleWeight,
+            py::arg("local")
         )
         .def("sum_particle_charge",
             &WarpXParticleContainer::sumParticleCharge,
@@ -125,6 +136,10 @@ void init_WarpXParticleContainer (py::module& m)
                 return pc.GetChargeDensity(lev, local);
             },
             py::arg("lev"), py::arg("local")
+        )
+        .def("set_do_not_push",
+            [](WarpXParticleContainer& pc, bool flag) { pc.setDoNotPush(flag); },
+            py::arg("flag")
         )
     ;
 }

@@ -25,10 +25,10 @@ void CheckSliceInput( amrex::RealBox real_box,
     amrex::IntVect &slice_hi, amrex::IntVect &interp_lo);
 
 void InterpolateSliceValues( amrex::MultiFab& smf,
-    amrex::IntVect interp_lo, amrex::RealBox slice_realbox,
-    amrex::Vector<amrex::Geometry> geom, int ncomp, int nghost,
-    amrex::IntVect slice_lo, amrex::IntVect slice_hi,
-    amrex::IntVect SliceType, amrex::RealBox real_box);
+     amrex::IntVect interp_lo, amrex::RealBox slice_realbox,
+     const amrex::Vector<amrex::Geometry>& geom, int ncomp, int nghost,
+     amrex::IntVect slice_lo, amrex::IntVect slice_hi,
+     amrex::IntVect SliceType, amrex::RealBox real_box);
 
 void InterpolateLo( const amrex::Box& bx, amrex::FArrayBox &fabox,
     amrex::IntVect slice_lo, amrex::Vector<amrex::Geometry> geom,

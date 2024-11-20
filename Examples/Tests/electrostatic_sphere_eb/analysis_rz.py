@@ -20,50 +20,56 @@ import os
 import sys
 
 import numpy as np
-from unyt import m
 import yt
+from unyt import m
 
-sys.path.insert(1, '../../../../warpx/Regression/Checksum/')
-import checksumAPI
+sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
+from checksumAPI import evaluate_checksum
 
 tolerance = 0.0041
 
 fn = sys.argv[1]
-ds = yt.load( fn )
+ds = yt.load(fn)
 
-all_data_level_0 = ds.covering_grid(level=0,left_edge=ds.domain_left_edge, dims=ds.domain_dimensions)
-phi = all_data_level_0['boxlib', 'phi'].v.squeeze()
-Er = all_data_level_0['boxlib', 'Er'].v.squeeze()
+all_data_level_0 = ds.covering_grid(
+    level=0, left_edge=ds.domain_left_edge, dims=ds.domain_dimensions
+)
+phi = all_data_level_0["boxlib", "phi"].v.squeeze()
+Er = all_data_level_0["boxlib", "Er"].v.squeeze()
 
-Dx = ds.domain_width/ds.domain_dimensions
+Dx = ds.domain_width / ds.domain_dimensions
 dr = Dx[0]
 rmin = ds.domain_left_edge[0]
 rmax = ds.domain_right_edge[0]
 nr = phi.shape[0]
-r = np.linspace(rmin+dr/2.,rmax-dr/2.,nr)
-B = 1.0/np.log(0.1/0.5)
-A = -B*np.log(0.5)
+r = np.linspace(rmin + dr / 2.0, rmax - dr / 2.0, nr)
+B = 1.0 / np.log(0.1 / 0.5)
+A = -B * np.log(0.5)
 
 err = 0.0
 errmax_phi = 0.0
 errmax_Er = 0.0
 for i in range(len(r)):
     # outside EB and last cutcell
-    if r[i] > 0.1*m + dr:
-        phi_theory = A+B*np.log(r[i])
-        Er_theory = -B/float(r[i])
-        err = abs( phi_theory - phi[i,:] ).max() / phi_theory
-        if err>errmax_phi:
+    if r[i] > 0.1 * m + dr:
+        phi_theory = A + B * np.log(r[i])
+        Er_theory = -B / float(r[i])
+        err = abs(phi_theory - phi[i, :]).max() / phi_theory
+        if err > errmax_phi:
             errmax_phi = err
-        err = abs( Er_theory - Er[i,:] ).max() / Er_theory
+        err = abs(Er_theory - Er[i, :]).max() / Er_theory
         # Exclude the last inaccurate interpolation.
-        if err>errmax_Er and i<len(r)-1:
+        if err > errmax_Er and i < len(r) - 1:
             errmax_Er = err
 
-print('max error of phi = ', errmax_phi)
-print('max error of Er = ', errmax_Er)
-print('tolerance = ', tolerance)
-assert(errmax_phi<tolerance and errmax_Er<tolerance)
+print("max error of phi = ", errmax_phi)
+print("max error of Er = ", errmax_Er)
+print("tolerance = ", tolerance)
+assert errmax_phi < tolerance and errmax_Er < tolerance
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn, do_particles=False)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+    do_particles=False,
+)

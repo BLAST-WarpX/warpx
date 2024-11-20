@@ -7,9 +7,9 @@
 #ifndef WARPX_PARTICLES_COLLISION_BACKGROUNDMCCCOLLISION_H_
 #define WARPX_PARTICLES_COLLISION_BACKGROUNDMCCCOLLISION_H_
 
-#include "MCCProcess.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/Collision/CollisionBase.H"
+#include "Particles/Collision/ScatteringProcess.H"
 
 #include <AMReX_Parser.H>
 #include <AMReX_REAL.H>
@@ -23,7 +23,7 @@ class BackgroundMCCCollision final
     : public CollisionBase
 {
 public:
-    BackgroundMCCCollision (std::string collision_name);
+    BackgroundMCCCollision (std::string const& collision_name);
 
     ~BackgroundMCCCollision () override = default;
 
@@ -32,7 +32,7 @@ public:
     BackgroundMCCCollision ( BackgroundMCCCollision&& )                  = delete;
     BackgroundMCCCollision& operator= ( BackgroundMCCCollision&& )       = delete;
 
-    amrex::ParticleReal get_nu_max (amrex::Vector<MCCProcess> const& mcc_processes);
+    [[nodiscard]] amrex::ParticleReal get_nu_max (amrex::Vector<ScatteringProcess> const& mcc_processes) const;
 
     /** Perform the collisions
      *
@@ -70,10 +70,10 @@ public:
 
 private:
 
-    amrex::Vector<MCCProcess> m_scattering_processes;
-    amrex::Vector<MCCProcess> m_ionization_processes;
-    amrex::Gpu::DeviceVector<MCCProcess::Executor> m_scattering_processes_exe;
-    amrex::Gpu::DeviceVector<MCCProcess::Executor> m_ionization_processes_exe;
+    amrex::Vector<ScatteringProcess> m_scattering_processes;
+    amrex::Vector<ScatteringProcess> m_ionization_processes;
+    amrex::Gpu::DeviceVector<ScatteringProcess::Executor> m_scattering_processes_exe;
+    amrex::Gpu::DeviceVector<ScatteringProcess::Executor> m_ionization_processes_exe;
 
     bool init_flag = false;
     bool ionization_flag = false;

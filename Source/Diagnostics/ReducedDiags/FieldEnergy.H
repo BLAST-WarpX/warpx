@@ -26,7 +26,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    FieldEnergy(std::string rd_name);
+    FieldEnergy(const std::string& rd_name);
 
     /**
      * This function computes the field energy (EF):

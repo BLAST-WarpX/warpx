@@ -11,6 +11,10 @@
 
 #include "SpectralAlgorithms/SpectralBaseAlgorithm.H"
 #include "SpectralFieldData.H"
+#include "Utils/WarpXAlgorithmSelection.H"
+
+#include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/utils/Enums.H>
 
 #include <AMReX_Array.H>
 #include <AMReX_REAL.H>
@@ -21,7 +25,7 @@
 #include <array>
 #include <memory>
 
-#ifdef WARPX_USE_PSATD
+#ifdef WARPX_USE_FFT
 /**
  * \brief Top-level class for the electromagnetic spectral solver
  *
@@ -72,8 +76,10 @@ class SpectralSolver
         SpectralSolver (int lev,
                         const amrex::BoxArray& realspace_ba,
                         const amrex::DistributionMapping& dm,
-                        int norder_x, int norder_y,
-                        int norder_z, short grid_type,
+                        int norder_x,
+                        int norder_y,
+                        int norder_z,
+                        ablastr::utils::enums::GridType grid_type,
                         const amrex::Vector<amrex::Real>& v_galilean,
                         const amrex::Vector<amrex::Real>& v_comoving,
                         amrex::RealVect dx,
@@ -82,9 +88,9 @@ class SpectralSolver
                         bool periodic_single_box,
                         bool update_with_rho,
                         bool fft_do_time_averaging,
-                        int psatd_solution_type,
-                        int J_in_time,
-                        int rho_in_time,
+                        PSATDSolutionType psatd_solution_type,
+                        JInTime J_in_time,
+                        RhoInTime rho_in_time,
                         bool dive_cleaning,
                         bool divb_cleaning);
 
@@ -121,9 +127,12 @@ class SpectralSolver
           * \brief Public interface to call the member function ComputeSpectralDivE
           * of the base class SpectralBaseAlgorithm from objects of class SpectralSolver
           */
-        void ComputeSpectralDivE ( int lev,
-                                   const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
-                                   amrex::MultiFab& divE ) {
+        void ComputeSpectralDivE (
+            int lev,
+            ablastr::fields::VectorField const & Efield,
+            amrex::MultiFab& divE
+        )
+        {
             algorithm->ComputeSpectralDivE( lev, field_data, Efield, divE );
         }
 
@@ -205,5 +214,5 @@ class SpectralSolver
         // to an instance of a sub-class defining a specific algorithm
         std::unique_ptr<SpectralBaseAlgorithm> algorithm;
 };
-#endif // WARPX_USE_PSATD
+#endif // WARPX_USE_FFT
 #endif // WARPX_SPECTRAL_SOLVER_H_

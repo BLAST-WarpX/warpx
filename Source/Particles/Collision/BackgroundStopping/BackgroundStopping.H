@@ -24,7 +24,7 @@ class BackgroundStopping final
     : public CollisionBase
 {
 public:
-    BackgroundStopping (std::string collision_name);
+    BackgroundStopping (const std::string& collision_name);
 
     ~BackgroundStopping () override = default;
 

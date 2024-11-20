@@ -196,7 +196,7 @@ namespace ablastr::utils::msg_logger
         *
         * @param[in] msg a Msg struct
         */
-        void record_msg(Msg msg);
+        void record_msg(const Msg& msg);
 
         /**
         * \brief This function returns a vector containing the recorded messages

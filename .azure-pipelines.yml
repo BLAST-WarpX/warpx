@@ -3,12 +3,20 @@
 pool:
   vmImage: 'ubuntu-20.04'
 
+trigger:
+  branches:
+    include:
+    - development
 pr:
   autoCancel: true
   drafts: false
+  paths:
+    exclude:
+    - Docs
 
 jobs:
 - job:
+  # FIXME remove unused variables
   variables:
     BLASPP_HOME: '/usr/local'
     CEI_SUDO: 'sudo'
@@ -16,32 +24,31 @@ jobs:
     CMAKE_GENERATOR: 'Ninja'
     FFTW_HOME: '/usr'
     LAPACKPP_HOME: '/usr/local'
-    OMP_NUM_THREADS: 1
     WARPX_CI_CCACHE: 'TRUE'
-    WARPX_CI_NUM_MAKE_JOBS: 2
-    WARPX_CI_OPENPMD: 'TRUE'
-    WARPX_CI_TMP: '/tmp/ci'
+    #WARPX_OPENPMD: 'TRUE'
 
   strategy:
     matrix:
-      cartesian1d:
-        WARPX_CI_REGULAR_CARTESIAN_1D: 'TRUE'
-        WARPX_CI_PSATD: 'FALSE'
-      cartesian2d:
-        WARPX_CI_REGULAR_CARTESIAN_2D: 'TRUE'
-      cartesian3d:
-        WARPX_CI_REGULAR_CARTESIAN_3D: 'TRUE'
-      single_precision:
-        WARPX_CI_SINGLE_PRECISION: 'TRUE'
-      rz_or_nompi:
-        WARPX_CI_RZ_OR_NOMPI: 'TRUE'
-      qed:
-        WARPX_CI_QED: 'TRUE'
-      embedded_boundary:
-        WARPX_CI_EB: 'TRUE'
+      # Cartesian 1D
+      cartesian_1d:
+        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=1 -DWarpX_FFT=ON -DWarpX_PYTHON=ON
+      # Cartesian 2D
+      cartesian_2d:
+        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=2 -DWarpX_FFT=ON -DWarpX_PYTHON=ON
+      # Cartesian 3D
+      cartesian_3d:
+        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=3 -DWarpX_FFT=ON -DWarpX_PYTHON=ON
+      # Cylindrical RZ
+      cylindrical_rz:
+        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=RZ -DWarpX_FFT=ON -DWarpX_PYTHON=ON
+        WARPX_RZ_FFT: 'TRUE'
+      # single precision
+      #single_precision:
+      #  WARPX_CMAKE_FLAGS: -DWarpX_DIMS='1;2;3;RZ' -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PRECISION=SINGLE
+      #  WARPX_RZ_FFT: 'TRUE'
 
   # default: 60; maximum: 360
-  timeoutInMinutes: 180
+  timeoutInMinutes: 240
 
   steps:
   # set up caches:
@@ -50,9 +57,8 @@ jobs:
   - task: Cache@2
     continueOnError: true
     inputs:
-      key: 'Ccache | "$(System.JobName)" | .azure-pipelines.yml | cmake/dependencies/AMReX.cmake | run_test.sh'
+      key: 'Ccache | "$(System.JobName)" | .azure-pipelines.yml | cmake/dependencies/AMReX.cmake'
       restoreKeys: |
-         Ccache | "$(System.JobName)" | .azure-pipelines.yml | cmake/dependencies/AMReX.cmake | run_test.sh
          Ccache | "$(System.JobName)" | .azure-pipelines.yml | cmake/dependencies/AMReX.cmake
          Ccache | "$(System.JobName)" | .azure-pipelines.yml
       path: /home/vsts/.ccache
@@ -62,16 +68,15 @@ jobs:
   - task: Cache@2
     continueOnError: true
     inputs:
-      key: 'Python3 | "$(System.JobName)" | .azure-pipelines.yml | run_test.sh'
+      key: 'Python3 | "$(System.JobName)" | .azure-pipelines.yml'
       restoreKeys: |
-         Python3 | "$(System.JobName)" | .azure-pipelines.yml | run_test.sh
          Python3 | "$(System.JobName)" | .azure-pipelines.yml
       path: /home/vsts/.local/lib/python3.8
       cacheHitVar: PYTHON38_CACHE_RESTORED
     displayName: Cache Python Libraries
 
   - bash: |
-      set -eu -o pipefail
+      set -o nounset errexit pipefail
       cat /proc/cpuinfo | grep "model name" | sort -u
       df -h
       echo 'Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/80-retries
@@ -82,6 +87,8 @@ jobs:
         python3 python3-pandas python3-pip python3-venv python3-setuptools libblas-dev liblapack-dev
       ccache --set-config=max_size=10.0G
       python3 -m pip install --upgrade pip
+      python3 -m pip install --upgrade build
+      python3 -m pip install --upgrade packaging
       python3 -m pip install --upgrade setuptools
       python3 -m pip install --upgrade wheel
       python3 -m pip install --upgrade virtualenv
@@ -91,32 +98,72 @@ jobs:
       export PATH="$HOME/.local/bin:$PATH"
       sudo curl -L -o /usr/local/bin/cmake-easyinstall https://raw.githubusercontent.com/ax3l/cmake-easyinstall/main/cmake-easyinstall
       sudo chmod a+x /usr/local/bin/cmake-easyinstall
-      if [ "${WARPX_CI_OPENPMD:-FALSE}" == "TRUE" ]; then
-        cmake-easyinstall --prefix=/usr/local                   \
-          git+https://github.com/openPMD/openPMD-api.git@0.14.3 \
-          -DCMAKE_CXX_COMPILER_LAUNCHER=$(which ccache)         \
-          -DCMAKE_VERBOSE_MAKEFILE=ON                           \
-          -DopenPMD_USE_PYTHON=OFF -DBUILD_TESTING=OFF -DBUILD_EXAMPLES=OFF -DBUILD_CLI_TOOLS=OFF
-        python3 -m pip install --upgrade openpmd-api
-      fi
-      if [[ "${WARPX_CI_RZ_OR_NOMPI:-FALSE}" == "TRUE" ]]; then
-        cmake-easyinstall --prefix=/usr/local git+https://github.com/icl-utk-edu/blaspp.git \
+      #if [ "${WARPX_OPENPMD:-FALSE}" == "TRUE" ]; then
+      #  cmake-easyinstall --prefix=/usr/local                   \
+      #    git+https://github.com/openPMD/openPMD-api.git@0.14.3 \
+      #    -DCMAKE_CXX_COMPILER_LAUNCHER=$(which ccache)         \
+      #    -DCMAKE_VERBOSE_MAKEFILE=ON                           \
+      #    -DopenPMD_USE_PYTHON=OFF -DBUILD_TESTING=OFF -DBUILD_EXAMPLES=OFF -DBUILD_CLI_TOOLS=OFF
+      #  #python3 -m pip install --upgrade openpmd-api
+      #fi
+      if [ "${WARPX_RZ_FFT:-FALSE}" == "TRUE" ]; then
+        # BLAS++
+        cmake-easyinstall --prefix=/usr/local           \
+          git+https://github.com/icl-utk-edu/blaspp.git \
           -DCMAKE_CXX_COMPILER_LAUNCHER=$(which ccache) \
           -DCMAKE_CXX_STANDARD=17                       \
           -Duse_openmp=OFF -Dbuild_tests=OFF -DCMAKE_VERBOSE_MAKEFILE=ON
-        cmake-easyinstall --prefix=/usr/local git+https://github.com/icl-utk-edu/lapackpp.git \
-          -DCMAKE_CXX_COMPILER_LAUNCHER=$(which ccache) \
-          -DCMAKE_CXX_STANDARD=17                       \
+        # LAPACK++
+        cmake-easyinstall --prefix=/usr/local             \
+          git+https://github.com/icl-utk-edu/lapackpp.git \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=$(which ccache)   \
+          -DCMAKE_CXX_STANDARD=17                         \
           -Duse_cmake_find_lapack=ON -Dbuild_tests=OFF -DCMAKE_VERBOSE_MAKEFILE=ON
       fi
+      # Python modules required for test analysis
+      python3 -m pip install --upgrade -r Regression/requirements.txt
+      python3 -m pip cache purge
+      # external repositories required for test analysis
+      cd ..
+      git clone --depth 1 https://github.com/ECP-WarpX/warpx-data.git
+      # TODO select only specific datasets?
+      git clone --depth 1 https://github.com/openPMD/openPMD-example-datasets.git
+      cd -
       rm -rf ${CEI_TMP}
       df -h
     displayName: 'Install dependencies'
 
   - bash: |
-      set -eu -o pipefail
+      # set options
+      set -o nounset errexit pipefail
+      # display disk space usage
       df -h
-      ./run_test.sh
-      rm -rf ${WARPX_CI_TMP}
+      # configure
+      export AMReX_CMAKE_FLAGS="-DAMReX_ASSERTIONS=ON -DAMReX_TESTING=ON"
+      export WARPX_TEST_FLAGS="-DWarpX_TEST_CLEANUP=ON -DWarpX_TEST_FPETRAP=ON -DWarpX_TEST_DEBUG=ON"
+      cmake -S . -B build    \
+        ${AMReX_CMAKE_FLAGS} \
+        ${WARPX_CMAKE_FLAGS} \
+        ${WARPX_TEST_FLAGS}
+      # build
+      cmake --build build -j 2
+      # display disk space usage
       df -h
-    displayName: 'Build & test'
+    displayName: 'Build'
+
+  - bash: |
+      # set options
+      set -o nounset errexit pipefail
+      # run tests (exclude pytest.AMReX when running Python tests)
+      ctest --test-dir build --output-on-failure -E AMReX
+    displayName: 'Test'
+
+  - bash: |
+      # set options
+      set -o nounset errexit pipefail
+      # find and print backtrace
+      find build/bin/ -type f -name "Backtrace*" \
+        -exec echo -e "\nBacktrace\n---------\n{}\n---------" \; \
+        -exec cat {} \;
+    displayName: 'Logs'
+    condition: always()

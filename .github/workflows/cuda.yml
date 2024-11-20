@@ -1,6 +1,12 @@
 name: 🐧 CUDA
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    paths-ignore:
+      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-cuda
@@ -19,8 +25,8 @@ jobs:
       CXXFLAGS: "-Werror"
       CMAKE_GENERATOR: Ninja
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v4
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
       name: Install Python
       with:
         python-version: '3.x'
@@ -28,7 +34,7 @@ jobs:
       run: |
         .github/workflows/dependencies/nvcc11-3.sh
     - name: CCache Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -43,6 +49,11 @@ jobs:
 
         export CEI_SUDO="sudo"
         export CEI_TMP="/tmp/cei"
+
+        export PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
+        export LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
+        which nvcc || echo "nvcc not in PATH!"
+
         cmake-easyinstall --prefix=/usr/local \
           git+https://github.com/openPMD/openPMD-api.git@0.15.1 \
           -DopenPMD_USE_PYTHON=OFF    \
@@ -70,10 +81,10 @@ jobs:
           -DWarpX_OPENPMD=ON           \
           -DWarpX_openpmd_internal=OFF \
           -DWarpX_PRECISION=SINGLE     \
-          -DWarpX_PSATD=ON             \
+          -DWarpX_FFT=ON               \
           -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON \
           -DAMReX_CUDA_ERROR_CAPTURE_THIS=ON
-        cmake --build build_sp -j 2
+        cmake --build build_sp -j 4
 
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade build packaging setuptools wheel
@@ -92,12 +103,12 @@ jobs:
     runs-on: ubuntu-20.04
     if: github.event.pull_request.draft == false
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: install dependencies
       run: |
         .github/workflows/dependencies/nvcc11-8.sh
     - name: CCache Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -115,25 +126,25 @@ jobs:
         which nvcc || echo "nvcc not in PATH!"
 
         git clone https://github.com/AMReX-Codes/amrex.git ../amrex
-        cd ../amrex && git checkout --detach 23.12 && cd -
-        make COMP=gcc QED=FALSE USE_MPI=TRUE USE_GPU=TRUE USE_OMP=FALSE USE_PSATD=TRUE USE_CCACHE=TRUE -j 2
+        cd ../amrex && git checkout --detach 456c93c7d9512f1cdffac0574973d7df41417898 && cd -
+        make COMP=gcc QED=FALSE USE_MPI=TRUE USE_GPU=TRUE USE_OMP=FALSE USE_FFT=TRUE USE_CCACHE=TRUE -j 4
 
         ccache -s
         du -hs ~/.cache/ccache
 
-  build_nvhpc21-11-nvcc:
-    name: NVHPC@21.11 NVCC/NVC++ Release [tests]
+  build_nvhpc24-1-nvcc:
+    name: NVHPC@24.1 NVCC/NVC++ Release [tests]
     runs-on: ubuntu-20.04
     if: github.event.pull_request.draft == false
     #env:
     #  # For NVHPC, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Dependencies
       run: .github/workflows/dependencies/nvhpc.sh
     - name: CCache Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -147,7 +158,7 @@ jobs:
         ccache -z
 
         source /etc/profile.d/modules.sh
-        module load /opt/nvidia/hpc_sdk/modulefiles/nvhpc/21.11
+        module load /opt/nvidia/hpc_sdk/modulefiles/nvhpc/24.1
         which nvcc || echo "nvcc not in PATH!"
         which nvc++ || echo "nvc++ not in PATH!"
         which nvc || echo "nvc not in PATH!"
@@ -165,13 +176,13 @@ jobs:
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_COMPUTE=CUDA         \
           -DWarpX_EB=ON                \
-          -DWarpX_PYTHON=ON            \
+          -DWarpX_PYTHON=OFF           \
           -DAMReX_CUDA_ARCH=8.0        \
           -DWarpX_OPENPMD=ON           \
-          -DWarpX_PSATD=ON             \
+          -DWarpX_FFT=ON               \
           -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON \
           -DAMReX_CUDA_ERROR_CAPTURE_THIS=ON
-        cmake --build build -j 2
+        cmake --build build -j 4
 
         # work-around for mpi4py 3.1.1 build system issue with using
         # a GNU-built Python executable with non-GNU Python modules
@@ -187,18 +198,3 @@ jobs:
 
         ccache -s
         du -hs ~/.cache/ccache
-
-  save_pr_number:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Save PR number
-        env:
-          PR_NUMBER: ${{ github.event.number }}
-        run: |
-          echo $PR_NUMBER > pr_number.txt
-      - uses: actions/upload-artifact@v3
-        with:
-          name: pr_number
-          path: pr_number.txt
-          retention-days: 1

@@ -73,10 +73,11 @@ WarpXLaserProfiles::GaussianLaserProfile::init (
         m_params.stc_direction[1]*m_common_params.p_X[1] +
         m_params.stc_direction[2]*m_common_params.p_X[2];
 
-    if (arg < -1.0_rt || arg > 1.0_rt)
+    if (arg < -1.0_rt || arg > 1.0_rt) {
         m_params.theta_stc = 0._rt;
-    else
+    } else {
         m_params.theta_stc = std::acos(arg);
+    }
 #else
     m_params.theta_stc = 0.;
 #endif

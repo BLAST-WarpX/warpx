@@ -27,8 +27,9 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
     std::string openpmd_backend {"default"};
     pp_diag_name.query("openpmd_backend", openpmd_backend);
     // pick first available backend if default is chosen
-    if( openpmd_backend == "default" )
+    if( openpmd_backend == "default" ) {
         openpmd_backend = WarpXOpenPMDFileType();
+    }
     pp_diag_name.add("openpmd_backend", openpmd_backend);
 
 
@@ -37,12 +38,13 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
     const bool encodingDefined = pp_diag_name.query("openpmd_encoding", openpmd_encoding);
 
     openPMD::IterationEncoding encoding = openPMD::IterationEncoding::groupBased;
-    if ( openpmd_encoding == "v" )
+    if ( openpmd_encoding == "v" ) {
         encoding = openPMD::IterationEncoding::variableBased;
-    else if ( openpmd_encoding == "g" )
+    } else if ( openpmd_encoding == "g" ) {
         encoding = openPMD::IterationEncoding::groupBased;
-    else if ( openpmd_encoding == "f" )
+    } else if ( openpmd_encoding == "f" ) {
         encoding = openPMD::IterationEncoding::fileBased;
+    }
 
     std::string diag_type_str;
     pp_diag_name.get("diag_type", diag_type_str);
@@ -65,8 +67,9 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
     {
         bool openpmd_tspf = false;
         const bool tspfDefined = pp_diag_name.query("openpmd_tspf", openpmd_tspf);
-        if ( tspfDefined && openpmd_tspf )
+        if ( tspfDefined && openpmd_tspf ) {
             encoding = openPMD::IterationEncoding::fileBased;
+        }
     }
 
     // ADIOS2 operator type & parameters
@@ -123,7 +126,7 @@ FlushFormatOpenPMD::WriteToFile (
     const bool use_pinned_pc,
     bool isBTD, int snapshotID, int bufferID, int numBuffers,
     const amrex::Geometry& full_BTD_snapshot,
-    bool isLastBTDFlush, const amrex::Vector<int>& totalParticlesFlushedAlready) const
+    bool isLastBTDFlush) const
 {
     WARPX_PROFILE("FlushFormatOpenPMD::WriteToFile()");
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
@@ -148,8 +151,9 @@ FlushFormatOpenPMD::WriteToFile (
     int output_iteration = iteration[0];
     // in backtransformed diagnostics (BTD), we dump into a series of labframe
     // snapshots
-    if( isBTD )
+    if( isBTD ) {
         output_iteration = snapshotID;
+    }
 
     // Set step and output directory name.
     m_OpenPMDPlotWriter->SetStep(output_iteration, prefix, file_min_digits, isBTD);
@@ -160,7 +164,7 @@ FlushFormatOpenPMD::WriteToFile (
 
     // particles: all (reside only on locally finest level)
     m_OpenPMDPlotWriter->WriteOpenPMDParticles(
-        particle_diags, static_cast<amrex::Real>(time), use_pinned_pc, isBTD, isLastBTDFlush, totalParticlesFlushedAlready);
+        particle_diags, static_cast<amrex::Real>(time), use_pinned_pc, isBTD, isLastBTDFlush);
 
     // signal that no further updates will be written to this iteration
     m_OpenPMDPlotWriter->CloseStep(isBTD, isLastBTDFlush);

@@ -45,12 +45,12 @@ A package for WarpX is available via the `Conda <https://conda.io>`_ package man
 
 .. tip::
 
-   We recommend to configure your conda to use the faster `libmamba` `dependency solver <https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community>`__.
+   We recommend to configure your conda to use the faster ``libmamba`` `dependency solver <https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community>`__.
 
    .. code-block:: bash
 
-      conda update -n base conda
-      conda install -n base conda-libmamba-solver
+      conda update -y -n base conda
+      conda install -y -n base conda-libmamba-solver
       conda config --set solver libmamba
 
    We recommend to deactivate that conda self-activates its ``base`` environment.

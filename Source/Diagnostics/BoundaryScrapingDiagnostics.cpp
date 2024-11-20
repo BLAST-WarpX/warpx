@@ -6,6 +6,7 @@
  */
 
 #include "BoundaryScrapingDiagnostics.H"
+#include "EmbeddedBoundary/Enabled.H"
 #include "ComputeDiagFunctors/ComputeDiagFunctor.H"
 #include "Diagnostics/Diagnostics.H"
 #include "Diagnostics/FlushFormats/FlushFormat.H"
@@ -21,8 +22,8 @@
 
 using namespace amrex::literals;
 
-BoundaryScrapingDiagnostics::BoundaryScrapingDiagnostics (int i, std::string name)
-    : Diagnostics(i, name)
+BoundaryScrapingDiagnostics::BoundaryScrapingDiagnostics (int i, const std::string& name, DiagTypes diag_type)
+    : Diagnostics{i, name, diag_type}
 {
     ReadParameters();
 }
@@ -39,11 +40,11 @@ BoundaryScrapingDiagnostics::ReadParameters ()
 
     // num_buffers corresponds to the number of boundaries
     // (upper/lower domain boundary in each dimension)
-    // + the EB boundary if available
     m_num_buffers = AMREX_SPACEDIM*2;
-#ifdef AMREX_USE_EB
-    m_num_buffers += 1;
-#endif
+
+    // + the EB boundary if available
+    bool const eb_enabled = EB::enabled();
+    if (eb_enabled) { m_num_buffers += 1; }
 
     // Do a few checks
 #ifndef WARPX_USE_OPENPMD
@@ -102,15 +103,6 @@ BoundaryScrapingDiagnostics::InitializeParticleBuffer ()
             m_output_species[i_buffer].push_back(ParticleDiag(m_diag_name, species_name, pc, bnd_buffer));
         }
     }
-    // Initialize total number of particles flushed
-    m_totalParticles_flushed_already.resize(m_num_buffers);
-    for (int i_buffer = 0; i_buffer < m_num_buffers; ++i_buffer) {
-        int const n_species = static_cast<int>(m_output_species_names.size());
-        m_totalParticles_flushed_already[i_buffer].resize(n_species);
-        for (int i_species=0; i_species<n_species; i_species++) {
-            m_totalParticles_flushed_already[i_buffer][i_species] = 0;
-        }
-    }
 }
 
 bool
@@ -142,7 +134,7 @@ BoundaryScrapingDiagnostics::Flush (int i_buffer, bool /* force_flush */)
 
     // If the saving of the particles was not set up for any of the species for this boundary
     // or if no particles have been lost, then don't write anything out.
-    if (n_particles == 0) return;
+    if (n_particles == 0) { return; }
 
     // This is not a backtransform diagnostics
     bool const isBTD = false;
@@ -157,11 +149,13 @@ BoundaryScrapingDiagnostics::Flush (int i_buffer, bool /* force_flush */)
     const std::string file_prefix = m_file_prefix + "/particles_at_" + particle_buffer.boundaryName(i_buffer);
 
     m_flush_format->WriteToFile(
-        m_varnames, m_mf_output[i_buffer], m_geom_output[i_buffer], warpx.getistep(),
-        warpx.gett_new(0), m_output_species[i_buffer], nlev_output, file_prefix,
+        m_varnames, m_mf_output.at(i_buffer), m_geom_output.at(i_buffer), warpx.getistep(),
+        warpx.gett_new(0),
+        m_output_species.at(i_buffer),
+        nlev_output, file_prefix,
         m_file_min_digits, false, false, use_pinned_pc, isBTD,
         warpx.getistep(0), bufferID, numBTDBuffers, geom,
-        isLastBTD, m_totalParticles_flushed_already[i_buffer]);
+        isLastBTD);
 
     // Now that the data has been written out, clear out the buffer
     particle_buffer.clearParticles(i_buffer);

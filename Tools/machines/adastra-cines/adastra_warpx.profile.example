@@ -1,30 +1,35 @@
-# please set your project account
+# please set your project account and uncomment the following two lines
 #export proj=your_project_id
+#myproject -a $proj
 
 # required dependencies
+module purge
+module load cpe/23.12
 module load craype-accel-amd-gfx90a craype-x86-trento
 module load PrgEnv-cray
-module load amd-mixed/5.2.3
-module load CPE-23.02-cce-15.0.1-GPU-softs
+module load CCE-GPU-3.0.0
+module load amd-mixed/5.7.1
+module load develop
+module load cmake/3.27.9
 
 # optional: for PSATD in RZ geometry support
-export CMAKE_PREFIX_PATH=${HOME}/sw/adastra/gpu/blaspp-master:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${HOME}/sw/adastra/gpu/lapackpp-master:$CMAKE_PREFIX_PATH
-export LD_LIBRARY_PATH=${HOME}/sw/adastra/gpu/blaspp-master/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=${HOME}/sw/adastra/gpu/lapackpp-master/lib64:$LD_LIBRARY_PATH
+export CMAKE_PREFIX_PATH=${SHAREDHOMEDIR}/sw/adastra/gpu/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SHAREDHOMEDIR}/sw/adastra/gpu/lapackpp-2024.05.31:$CMAKE_PREFIX_PATH
+export LD_LIBRARY_PATH=${SHAREDHOMEDIR}/sw/adastra/gpu/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SHAREDHOMEDIR}/sw/adastra/gpu/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
 
 # optional: for QED lookup table generation support
-module load boost/1.81.0-mpi-python3
+module load boost/1.83.0-mpi-python3
 
 # optional: for openPMD support
 module load cray-hdf5-parallel
-export CMAKE_PREFIX_PATH=${HOME}/sw/adastra/gpu/c-blosc-1.21.1:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${HOME}/sw/adastra/gpu/adios2-2.8.3:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SHAREDHOMEDIR}/sw/adastra/gpu/c-blosc-1.21.1:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SHAREDHOMEDIR}/sw/adastra/gpu/adios2-2.8.3:$CMAKE_PREFIX_PATH
 
 export PATH=${HOME}/sw/adastra/gpu/adios2-2.8.3/bin:${PATH}
 
 # optional: for Python bindings or libEnsemble
-module load cray-python/3.9.13.1
+module load cray-python/3.11.5
 
 # fix system defaults: do not escape $ with a \ on tab completion
 shopt -s direxpand
@@ -49,7 +54,4 @@ export AMREX_AMD_ARCH=gfx90a
 # compiler environment hints
 export CC=$(which cc)
 export CXX=$(which CC)
-export FC=$(which ftn)
-export CFLAGS="-I${ROCM_PATH}/include"
-export CXXFLAGS="-I${ROCM_PATH}/include -Wno-pass-failed"
-export LDFLAGS="-L${ROCM_PATH}/lib -lamdhip64"
+export FC=$(which amdflang)

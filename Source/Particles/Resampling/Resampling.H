@@ -62,7 +62,7 @@ public:
      *
      * @param[in] species_name the name of the resampled species
      */
-    Resampling (std::string species_name);
+    Resampling (const std::string& species_name);
 
     /**
      * \brief A method that returns true if resampling should be done for the considered species

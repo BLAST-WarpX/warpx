@@ -9,7 +9,7 @@
 
 using namespace amrex;
 
-void InjectorMomentum::clear ()
+void InjectorMomentum::clear () // NOLINT(readability-make-member-function-const)
 {
     switch (type)
     {

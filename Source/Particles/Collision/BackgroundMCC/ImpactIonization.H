@@ -4,10 +4,10 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef WARPX_PARTICLES_COLLISION_MCC_SCATTERING_H_
-#define WARPX_PARTICLES_COLLISION_MCC_SCATTERING_H_
+#ifndef WARPX_PARTICLES_COLLISION_IMPACT_IONIZATION_H_
+#define WARPX_PARTICLES_COLLISION_IMPACT_IONIZATION_H_
 
-#include "MCCProcess.H"
+#include "Particles/Collision/ScatteringProcess.H"
 
 #include "Utils/ParticleUtils.H"
 #include "Utils/WarpXConst.H"
@@ -39,7 +39,7 @@ public:
     * ensure accurate energy calculations (otherwise errors occur with single
     * or mixed precision builds of WarpX).
     *
-    * @param[in] mcc_process an MCCProcess object associated with the ionization
+    * @param[in] mcc_process an ScatteringProcess object associated with the ionization
     * @param[in] mass colliding particle's mass (could also assume electron)
     * @param[in] total_collision_prob total probability for a collision to occur
     * @param[in] nu_max maximum collision frequency
@@ -48,7 +48,7 @@ public:
     * @param[in] t the current simulation time
     */
     ImpactIonizationFilterFunc(
-        MCCProcess const& mcc_process,
+        ScatteringProcess const& mcc_process,
         double const mass,
         amrex::ParticleReal const total_collision_prob,
         amrex::ParticleReal const nu_max,
@@ -77,7 +77,7 @@ public:
         using std::sqrt;
 
         // determine if this particle should collide
-        if (Random(engine) > m_total_collision_prob) return false;
+        if (Random(engine) > m_total_collision_prob) { return false; }
 
         // get references to the particle to get its position
         const auto& p = ptd.getSuperParticle(i);
@@ -108,7 +108,7 @@ public:
     }
 
 private:
-    MCCProcess::Executor m_mcc_process;
+    ScatteringProcess::Executor m_mcc_process;
     double m_mass;
     amrex::ParticleReal m_total_collision_prob = 0;
     amrex::ParticleReal m_nu_max;
@@ -227,4 +227,4 @@ private:
     amrex::ParserExecutor<4> m_T_a_func;
     amrex::Real m_t;
 };
-#endif // WARPX_PARTICLES_COLLISION_MCC_SCATTERING_H_
+#endif // WARPX_PARTICLES_COLLISION_IMPACT_IONIZATION_H_

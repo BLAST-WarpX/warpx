@@ -1,6 +1,12 @@
 name: 🧹 clang-tidy
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    paths-ignore:
+      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-clangtidy
@@ -8,16 +14,20 @@ concurrency:
 
 jobs:
   run_clang_tidy:
-    name: clang-tidy
+    strategy:
+      matrix:
+        dim: [1, 2, RZ, 3]
+    name: clang-tidy-${{ matrix.dim }}D
     runs-on: ubuntu-22.04
+    timeout-minutes: 180
     if: github.event.pull_request.draft == false
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/clang14.sh
+        .github/workflows/dependencies/clang15.sh
     - name: set up cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -32,42 +42,27 @@ jobs:
         export CCACHE_LOGFILE=${{ github.workspace }}/ccache.log.txt
         ccache -z
 
-        export CXX=$(which clang++)
-        export CC=$(which clang)
+        export CXX=$(which clang++-15)
+        export CC=$(which clang-15)
 
-        cmake -S . -B build_clang_tidy \
-          -DCMAKE_VERBOSE_MAKEFILE=ON  \
-          -DWarpX_DIMS="1;2;3;RZ"      \
-          -DWarpX_MPI=ON               \
-          -DWarpX_COMPUTE=OMP          \
-          -DWarpX_PSATD=ON             \
-          -DWarpX_QED=ON               \
-          -DWarpX_QED_TABLE_GEN=ON     \
-          -DWarpX_OPENPMD=ON           \
-          -DWarpX_PRECISION=SINGLE     \
+        cmake -S . -B build_clang_tidy      \
+          -DCMAKE_VERBOSE_MAKEFILE=ON       \
+          -DWarpX_DIMS="${{ matrix.dim }}"  \
+          -DWarpX_MPI=ON                    \
+          -DWarpX_COMPUTE=OMP               \
+          -DWarpX_FFT=ON                    \
+          -DWarpX_QED=ON                    \
+          -DWarpX_QED_TABLE_GEN=ON          \
+          -DWarpX_OPENPMD=ON                \
+          -DWarpX_PRECISION=SINGLE          \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
-        cmake --build build_clang_tidy -j 2
+        cmake --build build_clang_tidy -j 4
 
         ${{github.workspace}}/.github/workflows/source/makeMakefileForClangTidy.py --input ${{github.workspace}}/ccache.log.txt
-        make -j2 --keep-going -f clang-tidy-ccache-misses.mak \
-            CLANG_TIDY=clang-tidy \
+        make -j4 --keep-going -f clang-tidy-ccache-misses.mak \
+            CLANG_TIDY=clang-tidy-15 \
             CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
 
         ccache -s
         du -hs ~/.cache/ccache
-
-  save_pr_number:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Save PR number
-        env:
-          PR_NUMBER: ${{ github.event.number }}
-        run: |
-          echo $PR_NUMBER > pr_number.txt
-      - uses: actions/upload-artifact@v3
-        with:
-          name: pr_number
-          path: pr_number.txt
-          retention-days: 1

@@ -1,0 +1,10 @@
+# base input parameters
+FILE = inputs_base_3d
+
+# test input parameters
+algo.current_deposition = esirkepov
+algo.maxwell_solver = psatd
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz part_per_cell rho divE
+psatd.current_correction = 1
+psatd.periodic_single_box_fft = 1
+warpx.cfl = 0.5773502691896258

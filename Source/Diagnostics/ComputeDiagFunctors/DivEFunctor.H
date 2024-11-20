@@ -3,6 +3,8 @@
 
 #include "ComputeDiagFunctor.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
+
 #include <AMReX_BaseFwd.H>
 
 #include <array>
@@ -21,8 +23,13 @@ public:
      * \param[in] convertRZmodes2cartesian if true, all RZ modes are averaged into one component
      * \param[in] ncomp Number of component of mf_src to cell-center in dst multifab.
      */
-    DivEFunctor(std::array<const amrex::MultiFab* const, 3> arr_mf_src, int lev, amrex::IntVect crse_ratio,
-                bool convertRZmodes2cartesian=true, int ncomp=1);
+    DivEFunctor (
+        ablastr::fields::VectorField const & arr_mf_src,
+        int lev,
+        amrex::IntVect crse_ratio,
+        bool convertRZmodes2cartesian=true,
+        int ncomp=1
+    );
 
     /** \brief Compute DivE directly into mf_dst.
      *
@@ -33,7 +40,7 @@ public:
     void operator()(amrex::MultiFab& mf_dst, int dcomp, int /*i_buffer=0*/) const override;
 private:
     /** Vector of pointer to source multifab Bx, By, Bz */
-    std::array<const amrex::MultiFab * const, 3> m_arr_mf_src;
+    ablastr::fields::VectorField m_arr_mf_src;
     int const m_lev; /**< level on which mf_src is defined (used in cylindrical) */
     /**< (for cylindrical) whether to average all modes into 1 comp */
     bool m_convertRZmodes2cartesian;

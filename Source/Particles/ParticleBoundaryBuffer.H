@@ -4,13 +4,15 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef PARTICLEBOUNDARYBUFFER_H_
-#define PARTICLEBOUNDARYBUFFER_H_
+#ifndef WARPX_PARTICLEBOUNDARYBUFFER_H_
+#define WARPX_PARTICLEBOUNDARYBUFFER_H_
 
 #include "Particles/MultiParticleContainer_fwd.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Particles/PinnedMemoryParticleContainer.H"
 #include "Utils/export.H"
+
+#include <ablastr/fields/MultiFabRegister.H>
 
 #include <vector>
 
@@ -39,8 +41,10 @@ public:
 
     const std::vector<std::string>& getSpeciesNames() const;
 
-    void gatherParticles (MultiParticleContainer& mypc,
-                          const amrex::Vector<const amrex::MultiFab*>& distance_to_eb);
+    void gatherParticlesFromDomainBoundaries (MultiParticleContainer& mypc);
+    void gatherParticlesFromEmbeddedBoundaries (
+        MultiParticleContainer& mypc, ablastr::fields::MultiLevelScalarField const& distance_to_eb
+    );
 
     void redistribute ();
     void clearParticles ();
@@ -48,11 +52,11 @@ public:
 
     void printNumParticles () const;
 
-    int getNumParticlesInContainer(std::string species_name, int boundary, bool local);
+    int getNumParticlesInContainer(const std::string& species_name, int boundary, bool local);
 
-    PinnedMemoryParticleContainer& getParticleBuffer(std::string species_name, int boundary);
+    PinnedMemoryParticleContainer& getParticleBuffer(const std::string& species_name, int boundary);
 
-    PinnedMemoryParticleContainer* getParticleBufferPointer(std::string species_name, int boundary);
+    PinnedMemoryParticleContainer* getParticleBufferPointer(const std::string& species_name, int boundary);
 
     static constexpr int numBoundaries () {
         return AMREX_SPACEDIM*2
@@ -80,4 +84,4 @@ private:
     mutable std::vector<std::string> m_species_names;
 };
 
-#endif /*PARTICLEBOUNDARYBUFFER_H_*/
+#endif /*WARPX_PARTICLEBOUNDARYBUFFER_H_*/

@@ -18,8 +18,8 @@ import numpy as np
 import scipy.constants as sc
 import yt
 
-sys.path.insert(1, '../../../../warpx/Regression/Checksum/')
-import checksumAPI
+sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
+from checksumAPI import evaluate_checksum
 
 e = sc.e
 pi = sc.pi
@@ -29,34 +29,43 @@ m = sc.m_e
 dt = 1.4e-17
 ne = 1.116e28
 log = 2.0
-T_par = 5.62*e
-T_per = 5.1*e
+T_par = 5.62 * e
+T_per = 5.1 * e
 
-A = 1.0 - T_per/T_par
-mu = (e**4*ne*log/(8.0*pi**1.5*ep0**2*m**0.5*T_par**1.5)
-     *A**(-2)*(-3.0+(3.0-A)*np.arctanh(A**0.5)/A**0.5))
+A = 1.0 - T_per / T_par
+mu = (
+    e**4
+    * ne
+    * log
+    / (8.0 * pi**1.5 * ep0**2 * m**0.5 * T_par**1.5)
+    * A ** (-2)
+    * (-3.0 + (3.0 - A) * np.arctanh(A**0.5) / A**0.5)
+)
 
 fn = sys.argv[1]
 ds = yt.load(fn)
 ad = ds.all_data()
-vx = ad['electron', 'particle_momentum_x'].to_ndarray()/m
-vy = ad['electron', 'particle_momentum_y'].to_ndarray()/m
-Tx = np.mean(vx**2)*m/e
-Ty = np.mean(vy**2)*m/e
+vx = ad["electron", "particle_momentum_x"].to_ndarray() / m
+vy = ad["electron", "particle_momentum_y"].to_ndarray() / m
+Tx = np.mean(vx**2) * m / e
+Ty = np.mean(vy**2) * m / e
 
 nt = 100
 Tx0 = T_par
 Ty0 = T_per
-for _ in range(nt-1):
-    Tx0 = Tx0 + dt*mu*(Ty0-Tx0)*2.0
-    Ty0 = Ty0 + dt*mu*(Tx0-Ty0)
+for _ in range(nt - 1):
+    Tx0 = Tx0 + dt * mu * (Ty0 - Tx0) * 2.0
+    Ty0 = Ty0 + dt * mu * (Tx0 - Ty0)
 
 tolerance = 0.05
-error = np.maximum(abs(Tx-Tx0/e)/Tx, abs(Ty-Ty0/e)/Ty)
+error = np.maximum(abs(Tx - Tx0 / e) / Tx, abs(Ty - Ty0 / e) / Ty)
 
-print(f'error = {error}')
-print(f'tolerance = {tolerance}')
-assert(error < tolerance)
+print(f"error = {error}")
+print(f"tolerance = {tolerance}")
+assert error < tolerance
 
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn)
+# compare checksums
+evaluate_checksum(
+    test_name=os.path.split(os.getcwd())[1],
+    output_file=sys.argv[1],
+)

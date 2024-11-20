@@ -1,6 +1,12 @@
 name: 🐧 OpenMP
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    paths-ignore:
+      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-ubuntu
@@ -14,12 +20,12 @@ jobs:
     env:
       CXXFLAGS: "-Werror"
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: install dependencies
       run: |
         .github/workflows/dependencies/gcc.sh
     - name: CCache Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -38,15 +44,15 @@ jobs:
           -DWarpX_EB=OFF               \
           -DWarpX_MPI=OFF              \
           -DWarpX_QED=OFF
-        cmake --build build -j 2
-        ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_3d
-        ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_rz
+        cmake --build build -j 4
+        ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d
+        ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_base_rz
 
         ccache -s
         du -hs ~/.cache/ccache
 
   build_1D_2D:
-    name: GCC 1D & 2D w/ MPI
+    name: GCC 1D & 2D w/ MPI, QED tools
     runs-on: ubuntu-22.04
     if: github.event.pull_request.draft == false
     env:
@@ -54,12 +60,12 @@ jobs:
       CXX: "g++-12"
       CC: "gcc-12"
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: install dependencies
       run: |
         .github/workflows/dependencies/gcc12.sh
     - name: CCache Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -77,14 +83,20 @@ jobs:
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_DIMS="1;2"           \
           -DWarpX_EB=OFF               \
-          -DWarpX_PSATD=ON             \
-          -DWarpX_QED_TABLE_GEN=ON
-        cmake --build build -j 2
-        ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_1d
-        ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_2d
+          -DWarpX_FFT=ON               \
+          -DWarpX_QED_TABLE_GEN=ON     \
+          -DWarpX_QED_TOOLS=ON
+
+        cmake --build build -j 4
+        ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d
+        ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d
 
         ccache -s
         du -hs ~/.cache/ccache
+
+    - name: run QED table tools
+      run: |
+        .github/workflows/scripts/checkQEDTableGenerator.sh
 
   build_3D_sp:
     name: GCC 3D & RZ w/ MPI, single precision
@@ -94,12 +106,12 @@ jobs:
       CXX: "g++-12"
       CC: "gcc-12"
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: install dependencies
       run: |
         .github/workflows/dependencies/gcc12_blaspp_lapackpp.sh
     - name: CCache Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -121,14 +133,14 @@ jobs:
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
           -DWarpX_DIMS="RZ;3"               \
           -DWarpX_EB=OFF                    \
-          -DWarpX_PSATD=ON                  \
+          -DWarpX_FFT=ON                    \
           -DWarpX_PRECISION=SINGLE          \
           -DWarpX_PARTICLE_PRECISION=SINGLE \
           -DWarpX_QED_TABLE_GEN=ON
 
-        cmake --build build -j 2
-        ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_3d
-        ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_rz
+        cmake --build build -j 4
+        ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d
+        ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_base_rz
 
         ccache -s
         du -hs ~/.cache/ccache
@@ -141,13 +153,13 @@ jobs:
       CMAKE_GENERATOR: Ninja
       CXXFLAGS: "-Werror"
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: install dependencies
       run: |
         .github/workflows/dependencies/gcc.sh
         sudo apt-get install -y libopenmpi-dev openmpi-bin
     - name: CCache Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -164,7 +176,7 @@ jobs:
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_APP=OFF              \
           -DWarpX_LIB=OFF
-        cmake --build build -j 2
+        cmake --build build -j 4
 
         ccache -s
         du -hs ~/.cache/ccache
@@ -179,12 +191,12 @@ jobs:
       # On CI for this test, Ninja is slower than the default:
       #CMAKE_GENERATOR: Ninja
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: install dependencies
       run: |
         .github/workflows/dependencies/pyfull.sh
     - name: CCache Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -204,11 +216,10 @@ jobs:
 
         cmake -S . -B build            \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
-          -DWarpX_APP=OFF              \
-          -DWarpX_PSATD=ON             \
+          -DWarpX_FFT=ON               \
           -DWarpX_PYTHON=ON            \
           -DWarpX_QED_TABLE_GEN=ON
-        cmake --build build -j 2 --target pip_install
+        cmake --build build -j 4 --target pip_install
 
         ccache -s
         du -hs ~/.cache/ccache
@@ -216,19 +227,4 @@ jobs:
     - name: run pywarpx
       run: |
         export OMP_NUM_THREADS=1
-        mpirun -n 2 Examples/Physics_applications/laser_acceleration/PICMI_inputs_3d.py
-
-  save_pr_number:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Save PR number
-        env:
-          PR_NUMBER: ${{ github.event.number }}
-        run: |
-          echo $PR_NUMBER > pr_number.txt
-      - uses: actions/upload-artifact@v3
-        with:
-          name: pr_number
-          path: pr_number.txt
-          retention-days: 1
+        mpirun -n 2 Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_picmi.py

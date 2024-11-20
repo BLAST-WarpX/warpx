@@ -58,7 +58,7 @@ HardEdgedPlasmaLensDevice::InitHardEdgedPlasmaLensDevice (HardEdgedPlasmaLens co
 
     nelements = h_plasmalens.nelements;
 
-    if (nelements == 0) return;
+    if (nelements == 0) { return; }
 
     d_zs_arr = h_plasmalens.d_zs.data();
     d_ze_arr = h_plasmalens.d_ze.data();

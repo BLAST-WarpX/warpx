@@ -1,0 +1,13 @@
+# base input parameters
+FILE = inputs_base_2d
+
+# test input parameters
+algo.field_gathering = momentum-conserving
+algo.maxwell_solver = ckc
+amr.max_level = 1
+amr.ref_ratio = 4
+diag1.electrons.variables = x z w ux uy uz
+diag1.positrons.variables = x z w ux uy uz
+warpx.use_filter = 1
+warpx.fine_tag_lo = -10.e-6 -10.e-6
+warpx.fine_tag_hi =  10.e-6  10.e-6

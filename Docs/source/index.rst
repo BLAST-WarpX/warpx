@@ -3,7 +3,7 @@
 WarpX
 -----
 
-WarpX is an advanced, time-based, **electromagnetic & electrostatic Particle-In-Cell** code.
+WarpX is an advanced **electromagnetic & electrostatic Particle-In-Cell** code.
 
 It supports many features including:
 
@@ -75,9 +75,9 @@ Usage
    :hidden:
 
    usage/how_to_run
+   usage/examples
    usage/python
    usage/parameters
-   usage/examples
    usage/workflows
    usage/faq
 
@@ -107,12 +107,11 @@ Theory
    :hidden:
 
    theory/intro
-   theory/picsar_theory
+   theory/pic
    theory/amr
-   theory/PML
+   theory/boundary_conditions
    theory/boosted_frame
-   theory/input_output
-   theory/collisions
+   theory/multiphysics_extensions
    theory/kinetic_fluid_hybrid_model
    theory/cold_fluid_model
 
@@ -140,7 +139,6 @@ Maintenance
    :hidden:
 
    maintenance/release
-   maintenance/performance_tests
 
 Epilogue
 --------
@@ -150,4 +148,5 @@ Epilogue
    :hidden:
 
    glossary
+   governance
    acknowledgements

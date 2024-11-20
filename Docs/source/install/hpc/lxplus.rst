@@ -44,7 +44,7 @@ The easiest way to install the dependencies is to use the pre-prepared ``warpx.p
 
 .. code-block:: bash
 
-    cp $WORK/warpx/WarpX/Tools/machines/lxplus-cern/lxplus_warpx.profile.example $WORK/lxplus_warpx.profile
+    cp $WORK/warpx/Tools/machines/lxplus-cern/lxplus_warpx.profile.example $WORK/lxplus_warpx.profile
     source $WORK/lxplus_warpx.profile
 
 When doing this one can directly skip to the :ref:`Building WarpX <building-lxplus-warpx>` section.

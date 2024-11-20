@@ -36,7 +36,7 @@ amrex::Real V_calc (const amrex::Array4<amrex::Real>& U, int i, int j, int k, in
 {
     using namespace amrex::literals;
     // comp -> x, y, z -> 0, 1, 2, return Vx, Vy, or Vz:
-    amrex::Real gamma = std::sqrt(1.0_rt + (U(i,j,k,1)*U(i,j,k,1) + U(i,j,k,2)*U(i,j,k,2) + U(i,j,k,3)*U(i,j,k,3))/(c*c));
+    const amrex::Real gamma = std::sqrt(1.0_rt + (U(i,j,k,1)*U(i,j,k,1) + U(i,j,k,2)*U(i,j,k,2) + U(i,j,k,3)*U(i,j,k,3))/(c*c));
     return U(i,j,k,comp+1)/gamma;
 }
 // mindmod
@@ -44,12 +44,13 @@ AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::Real minmod (amrex::Real a, amrex::Real b)
 {
     using namespace amrex::literals;
-    if (a > 0.0_rt && b > 0.0_rt)
+    if (a > 0.0_rt && b > 0.0_rt) {
         return std::min(a, b);
-    else if (a < 0.0_rt && b < 0.0_rt)
+    } else if (a < 0.0_rt && b < 0.0_rt) {
         return std::max(a, b);
-    else
+    } else {
         return 0.0_rt;
+    }
 }
 // Min of 3 inputs
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -68,24 +69,26 @@ AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::Real minmod3 (amrex::Real a, amrex::Real b , amrex::Real c)
 {
     using namespace amrex::literals;
-    if (a > 0.0_rt && b > 0.0_rt && c > 0.0_rt)
+    if (a > 0.0_rt && b > 0.0_rt && c > 0.0_rt) {
         return min3(a,b,c);
-    else if (a < 0.0_rt && b < 0.0_rt && c < 0.0_rt)
+    } else if (a < 0.0_rt && b < 0.0_rt && c < 0.0_rt) {
         return max3(a,b,c);
-    else
+    } else {
         return 0.0;
+    }
 }
 //maxmod
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::Real maxmod (amrex::Real a, amrex::Real b)
 {
     using namespace amrex::literals;
-    if (a > 0.0_rt && b > 0.0_rt)
+    if (a > 0.0_rt && b > 0.0_rt) {
         return std::max(a, b);
-    else if (a < 0.0_rt && b < 0.0_rt)
+    } else if (a < 0.0_rt && b < 0.0_rt) {
         return std::min(a, b);
-    else
+    } else {
         return 0.0_rt;
+    }
 }
 // Rusanov Flux (density)
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -93,7 +96,7 @@ amrex::Real flux_N (const amrex::Array4<amrex::Real>& Um,  const amrex::Array4<a
 int i, int j, int k, amrex::Real Vm, amrex::Real Vp)
 {
     using namespace amrex::literals;
-    amrex::Real c = std::max( std::abs(Vm) , std::abs(Vp) );
+    const amrex::Real c = std::max( std::abs(Vm) , std::abs(Vp) );
     return 0.5_rt*(Vm*Um(i,j,k,0) + Vp*Up(i,j,k,0)) - (0.5_rt*c)*(Up(i,j,k,0) - Um(i,j,k,0));
 }
 // Rusanov Flux (Momentum density x)
@@ -102,7 +105,7 @@ amrex::Real flux_NUx (const amrex::Array4<amrex::Real>& Um,  const amrex::Array4
 int i, int j, int k, amrex::Real Vm, amrex::Real Vp)
 {
     using namespace amrex::literals;
-    amrex::Real c = std::max( std::abs(Vm) , std::abs(Vp) );
+    const amrex::Real c = std::max( std::abs(Vm) , std::abs(Vp) );
     return 0.5_rt*(Vm*Um(i,j,k,0)*Um(i,j,k,1) + Vp*Up(i,j,k,0)*Up(i,j,k,1))
         - (0.5_rt*c)*(Up(i,j,k,0)*Up(i,j,k,1) -    Um(i,j,k,0)*Um(i,j,k,1));
 }
@@ -112,7 +115,7 @@ amrex::Real flux_NUy (const amrex::Array4<amrex::Real>& Um,  const amrex::Array4
 int i, int j, int k, amrex::Real Vm, amrex::Real Vp)
 {
     using namespace amrex::literals;
-    amrex::Real c = std::max( std::abs(Vm) , std::abs(Vp) );
+    const amrex::Real c = std::max( std::abs(Vm) , std::abs(Vp) );
     return 0.5_rt*(Vm*Um(i,j,k,0)*Um(i,j,k,2) + Vp*Up(i,j,k,0)*Up(i,j,k,2))
         - (0.5_rt*c)*(Up(i,j,k,0)*Up(i,j,k,2) -    Um(i,j,k,0)*Um(i,j,k,2));
 }
@@ -122,7 +125,7 @@ amrex::Real flux_NUz (const amrex::Array4<amrex::Real>& Um,  const amrex::Array4
 int i, int j, int k, amrex::Real Vm, amrex::Real Vp)
 {
     using namespace amrex::literals;
-    amrex::Real c = std::max( std::abs(Vm) , std::abs(Vp) );
+    const amrex::Real c = std::max( std::abs(Vm) , std::abs(Vp) );
     return 0.5_rt*(Vm*Um(i,j,k,0)*Um(i,j,k,3) + Vp*Up(i,j,k,0)*Up(i,j,k,3))
         - (0.5_rt*c)*(Up(i,j,k,0)*Up(i,j,k,3) -    Um(i,j,k,0)*Um(i,j,k,3));
 }
@@ -132,30 +135,33 @@ amrex::Real ave_adjustable_diff (amrex::Real a, amrex::Real b)
 {
     using namespace amrex::literals;
     constexpr auto sigma = static_cast<amrex::Real>(2.0*0.732050807568877);
-    if (a*b > 0.0_rt)
+    if (a*b > 0.0_rt) {
         return minmod3( (a+b)/2.0_rt, sigma*a, sigma*b );
-    else
+    } else {
         return 0.0_rt;
+    }
 }
 // ave_minmod Low diffusivity
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::Real ave (amrex::Real a, amrex::Real b)
 {
     using namespace amrex::literals;
-    if (a*b > 0.0_rt)
+    if (a*b > 0.0_rt) {
         return minmod3( (a+b)/2.0_rt, 2.0_rt*a, 2.0_rt*b );
-    else
+    } else {
         return 0.0_rt;
+    }
 }
 // ave_superbee
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::Real ave_superbee (amrex::Real a, amrex::Real b)
 {
     using namespace amrex::literals;
-    if (a*b > 0.0_rt)
+    if (a*b > 0.0_rt) {
         return minmod( maxmod(a,b), minmod(2.0_rt*a,2.0_rt*b));
-    else
+    } else {
         return 0.0_rt;
+    }
 }
 // stage2 slope limiting
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -164,7 +170,7 @@ amrex::Real ave_stage2 (amrex::Real dQ, amrex::Real a, amrex::Real b, amrex::Rea
     using namespace amrex::literals;
     // sigma = sqrt(3) -1
     constexpr auto sigma = 0.732050807568877_rt;
-    amrex::Real dq_min = 2.0_rt*std::min( b - min3(a,b,c), max3(a,b,c) - b);
+    const amrex::Real dq_min = 2.0_rt*std::min( b - min3(a,b,c), max3(a,b,c) - b);
     return ( std::abs(dQ)/dQ ) * std::min( std::abs(dQ) , sigma*std::abs(dq_min) );
 }
 // Returns the offset indices for the "plus" grid
@@ -379,7 +385,7 @@ const amrex::Array4<amrex::Real>& NU, amrex::Real& U, int i, int j, int k)
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
     // U is zero if N is zero, Check positivity before dividing
     amrex::Real U_m = 0;
-    if (N(i-1,j,k) > 0) U_m = NU(i-1,j,k)/N(i-1,j,k);
+    if (N(i-1,j,k) > 0) { U_m = NU(i-1,j,k)/N(i-1,j,k); }
     return U - U_m;
 #else
     amrex::ignore_unused(N, NU, U, i, j, k);
@@ -396,7 +402,7 @@ const amrex::Array4<amrex::Real>& NU, amrex::Real& U, int i, int j, int k)
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
     // U is zero if N is zero, Check positivity before dividing
     amrex::Real U_p = 0;
-    if (N(i+1,j,k) > 0) U_p = NU(i+1,j,k)/N(i+1,j,k);
+    if (N(i+1,j,k) > 0) { U_p = NU(i+1,j,k)/N(i+1,j,k); }
     return U_p - U;
 #else
     amrex::ignore_unused(N, NU, U, i, j, k);
@@ -414,7 +420,7 @@ const amrex::Array4<amrex::Real>& NU, amrex::Real& U, int i, int j, int k)
 #if defined(WARPX_DIM_3D)
     // U is zero if N is zero, Check positivity before dividing
     amrex::Real U_m = 0;
-    if (N(i,j-1,k) > 0) U_m = NU(i,j-1,k)/N(i,j-1,k);
+    if (N(i,j-1,k) > 0) { U_m = NU(i,j-1,k)/N(i,j-1,k); }
     return U - U_m;
 #else
     amrex::ignore_unused(N, NU, U, i, j, k);
@@ -431,7 +437,7 @@ const amrex::Array4<amrex::Real>& NU, amrex::Real& U, int i, int j, int k)
 #if defined(WARPX_DIM_3D)
     // U is zero if N is zero, Check positivity before dividing
     amrex::Real U_p = 0;
-    if (N(i,j+1,k) > 0) U_p = NU(i,j+1,k)/N(i,j+1,k);
+    if (N(i,j+1,k) > 0) { U_p = NU(i,j+1,k)/N(i,j+1,k); }
     return U_p - U;
 #else
     amrex::ignore_unused(N, NU, U, i, j, k);
@@ -450,11 +456,11 @@ const amrex::Array4<amrex::Real>& NU, amrex::Real& U, int i, int j, int k)
 
     // U is zero if N is zero, Check positivity before dividing
 #if defined(WARPX_DIM_3D)
-    if (N(i,j,k-1) > 0) U_m = NU(i,j,k-1)/N(i,j,k-1);
+    if (N(i,j,k-1) > 0) { U_m = NU(i,j,k-1)/N(i,j,k-1); }
 #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
-    if (N(i,j-1,k) > 0) U_m = NU(i,j-1,k)/N(i,j-1,k);
+    if (N(i,j-1,k) > 0) { U_m = NU(i,j-1,k)/N(i,j-1,k); }
 #else
-    if (N(i-1,j,k) > 0) U_m = NU(i-1,j,k)/N(i-1,j,k);
+    if (N(i-1,j,k) > 0) { U_m = NU(i-1,j,k)/N(i-1,j,k); }
 #endif
 
     // Return the difference
@@ -471,11 +477,11 @@ const amrex::Array4<amrex::Real>& NU, amrex::Real& U, int i, int j, int k)
 
     // U is zero if N is zero, Check positivity before dividing
 #if defined(WARPX_DIM_3D)
-    if (N(i,j,k+1) > 0) U_p = NU(i,j,k+1)/N(i,j,k+1);
+    if (N(i,j,k+1) > 0) { U_p = NU(i,j,k+1)/N(i,j,k+1); }
 #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
-    if (N(i,j+1,k) > 0) U_p = NU(i,j+1,k)/N(i,j+1,k);
+    if (N(i,j+1,k) > 0) { U_p = NU(i,j+1,k)/N(i,j+1,k); }
 #else
-    if (N(i+1,j,k) > 0) U_p = NU(i+1,j,k)/N(i+1,j,k);
+    if (N(i+1,j,k) > 0) { U_p = NU(i+1,j,k)/N(i+1,j,k); }
 #endif
 
     // Return the difference
@@ -493,10 +499,10 @@ const amrex::Array4<amrex::Real>& U_plus,int i,int j,int k,amrex::Real clight, i
     int ip, jp, kp;
     plus_index_offsets(i, j, k, ip, jp, kp, dir);
 
-    amrex::Real V_L_minus = V_calc(U_minus,ip,jp,kp,dir,clight);
-    amrex::Real V_I_minus = V_calc(U_minus,i,j,k,dir,clight);
-    amrex::Real V_L_plus = V_calc(U_plus,ip,jp,kp,dir,clight);
-    amrex::Real V_I_plus = V_calc(U_plus,i,j,k,dir,clight);
+    const amrex::Real V_L_minus = V_calc(U_minus,ip,jp,kp,dir,clight);
+    const amrex::Real V_I_minus = V_calc(U_minus,i,j,k,dir,clight);
+    const amrex::Real V_L_plus = V_calc(U_plus,ip,jp,kp,dir,clight);
+    const amrex::Real V_I_plus = V_calc(U_plus,i,j,k,dir,clight);
 
     // Flux differences depending on the component to compute
     if (comp == 0){

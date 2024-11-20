@@ -5,8 +5,9 @@ Laser-Wakefield Acceleration of Electrons
 
 This example shows how to model a laser-wakefield accelerator (LWFA) :cite:p:`ex-TajimaDawson1982,ex-Esarey1996`.
 
-Laser-wakefield acceleration is best performed in 3D and quasi-cylindrical (RZ) geometry, which ensures that the plasma wavelength of the wakefield is modelled with the right scale lengths.
-RZ modeling enables efficient modeling if effects of asymmetry shall be ignored (e.g., asymmetric beams and transverse profiles, hosing of the injected beam, etc.).
+Laser-wakefield acceleration is best performed in 3D or quasi-cylindrical (RZ) geometry, in order to correctly capture some of the key physics (laser diffraction, beamloading, shape of the accelerating bubble in the blowout regime, etc.).
+For physical situations that have close-to-cylindrical symmetry, simulations in RZ geometry capture the relevant physics at a fraction of the computational cost of a 3D simulation.
+On the other hand, for physical situation with strong asymmetries (e.g., non-round laser driver, strong hosing of the accelerated beam, etc.), only 3D simulations are suitable.
 
 For LWFA scenarios with long propagation lengths, use the :ref:`boosted frame method <theory-boostedframe>`.
 An example can be seen in the :ref:`PWFA example <examples-pwfa>`.
@@ -23,43 +24,43 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
       This example can be run **either** as:
 
-      * **Python** script: ``python3 PICMI_inputs_3d.py`` or
-      * WarpX **executable** using an input file: ``warpx.3d inputs_3d max_step=400``
+      * **Python** script: ``python3 inputs_test_3d_laser_acceleration_picmi.py`` or
+      * WarpX **executable** using an input file: ``warpx.3d inputs_test_3d_laser_acceleration max_step=400``
 
       .. tab-set::
 
          .. tab-item:: Python: Script
 
-             .. literalinclude:: PICMI_inputs_3d.py
+             .. literalinclude:: inputs_test_3d_laser_acceleration_picmi.py
                 :language: python3
-                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/PICMI_inputs_3d.py``.
+                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_picmi.py``.
 
          .. tab-item:: Executable: Input File
 
-             .. literalinclude:: inputs_3d
+             .. literalinclude:: inputs_test_3d_laser_acceleration
                 :language: ini
-                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_3d``.
+                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration``.
 
    .. tab-item:: RZ
 
       This example can be run **either** as:
 
-      * **Python** script: ``python3 PICMI_inputs_rz.py`` or
-      * WarpX **executable** using an input file: ``warpx.rz inputs_3d max_step=400``
+      * **Python** script: ``python3 inputs_test_rz_laser_acceleration_picmi.py`` or
+      * WarpX **executable** using an input file: ``warpx.rz inputs_test_rz_laser_acceleration max_step=400``
 
       .. tab-set::
 
          .. tab-item:: Python: Script
 
-             .. literalinclude:: PICMI_inputs_rz.py
+             .. literalinclude:: inputs_test_rz_laser_acceleration_picmi.py
                 :language: python3
-                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/PICMI_inputs_rz.py``.
+                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_rz_laser_acceleration_picmi.py``.
 
          .. tab-item:: Executable: Input File
 
-             .. literalinclude:: inputs_rz
+             .. literalinclude:: inputs_test_rz_laser_acceleration
                 :language: ini
-                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_rz``.
+                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_rz_laser_acceleration``.
 
 Analyze
 -------

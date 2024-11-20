@@ -8,11 +8,9 @@
 #ifndef WARPX_FIELD_ACCESSOR_FUNCTORS_H
 #define WARPX_FIELD_ACCESSOR_FUNCTORS_H
 
-#include "WarpX.H"
-#include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H"
-
 #include <AMReX_Array.H>
-
+#include <AMReX_Extension.H>
+#include <AMReX_Gpu.H>
 
 /**
  * \brief Functor that returns the division of the source m_field Array4 value

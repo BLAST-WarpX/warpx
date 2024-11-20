@@ -22,7 +22,7 @@ then
     # create and activate the spack environment
     export SPACK_STACK_USE_PYTHON=1
     export SPACK_STACK_USE_CUDA=1
-    spack env create warpx-lxplus-cuda-py $WORK/WarpX/Tools/machines/lxplus-cern/spack.yaml
+    spack env create warpx-lxplus-cuda-py $WORK/warpx/Tools/machines/lxplus-cern/spack.yaml
     spack env activate warpx-lxplus-cuda-py
     spack install
 else

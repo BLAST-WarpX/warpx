@@ -36,17 +36,14 @@ A typical loop over particles reads:
       }
   }
 
-The innermost step ``[MY INNER LOOP]`` typically calls ``amrex::ParallelFor`` to perform operations on all particles in a portable way. For this reasons, the particle data needs to be converted in plain-old-data structures. The innermost loop in the code snippet above could look like:
+The innermost step ``[MY INNER LOOP]`` typically calls ``amrex::ParallelFor`` to perform operations on all particles in a portable way. The innermost loop in the code snippet above could look like:
 
 .. code-block:: cpp
 
-  // Get Array-Of-Struct particle data, also called data
-  // (x, y, z, id, cpu)
-  const auto& particles = pti.GetArrayOfStructs();
   // Get Struct-Of-Array particle data, also called attribs
-  // (ux, uy, uz, w, Exp, Ey, Ez, Bx, By, Bz)
+  // (x, y, z, ux, uy, uz, w)
   auto& attribs = pti.GetAttribs();
-  auto& Exp = attribs[PIdx::Ex];
+  auto& x = attribs[PIdx::x];
   // [...]
   // Number of particles in this box
   const long np = pti.numParticles();
@@ -66,7 +63,6 @@ On a loop over boxes in a ``MultiFab`` (``MFIter``), it can be useful to access 
   const int tile_id = mfi.LocalTileIndex();
   // Get GPU-friendly arrays of particle data
   auto& ptile = GetParticles(lev)[std::make_pair(grid_id,tile_id)];
-  ParticleType* pp = particle_tile.GetArrayOfStructs()().data();
   // Only need attribs (i.e., SoA data)
   auto& soa = ptile.GetStructOfArrays();
   // As an example, let's get the ux momentum
@@ -109,26 +105,43 @@ Particle attributes
 -------------------
 
 WarpX adds the following particle attributes by default to WarpX particles.
-These attributes are either stored in an Array-of-Struct (AoS) or Struct-of-Array (SoA) location of the AMReX particle containers.
+These attributes are stored in Struct-of-Array (SoA) locations of the AMReX particle containers: one SoA for ``amrex::ParticleReal`` attributes, one SoA for ``int`` attributes and one SoA for a ``uint64_t`` global particle index per particle.
 The data structures for those are either pre-described at compile-time (CT) or runtime (RT).
 
-====================  ================  ==================================  ===== ==== =====================
+====================  ================  ==================================  ===== ==== ======================
 Attribute name        ``int``/``real``  Description                         Where When Notes
-====================  ================  ==================================  ===== ==== =====================
-``position_x/y/z``    ``real``          Particle position.                  AoS   CT
-``cpu``               ``int``           CPU index where the particle        AoS   CT
+====================  ================  ==================================  ===== ==== ======================
+``position_x/y/z``    ``real``          Particle position.                  SoA   CT
+``weight``            ``real``          Particle position.                  SoA   CT
+``momentum_x/y/z``    ``real``          Particle position.                  SoA   CT
+``id``                ``amrex::Long``   CPU-local particle index            SoA   CT   First 40 bytes of
+                                        where the particle was created.                idcpu
+``cpu``               ``int``           CPU index where the particle        SoA   CT   Last 24 bytes of idcpu
                                         was created.
-``id``                ``int``           CPU-local particle index            AoS   CT
-                                        where the particle was created.
+``stepScraped``        ``int``          PIC iteration of the last step      SoA   RT   Added when there is
+                                        before the particle hits the                   particle-boundary
+                                        boundary.                                      interaction.
+                                                                                       Saved in the boundary
+                                                                                       buffers.
+``deltaTimeScraped``   ``real``         Difference of time between the      SoA   RT   Added when there is
+                                        ``stepScraped`` and the exact time             particle-boundary
+                                        when the particle hits the                     interaction.
+                                        boundary.                                      Saved in the boundary
+                                                                                       buffers.
+``n_x/y/z``            ``real``         Normal components to the boundary   SoA   RT   Added when there is
+                                        on the position where the particle             particle-boundary
+                                        hits the boundary.                             interaction.
+                                                                                       Saved in the boundary
+                                                                                       buffers.
 ``ionizationLevel``   ``int``           Ion ionization level                SoA   RT   Added when ionization
                                                                                        physics is used.
 ``opticalDepthQSR``   ``real``          QED: optical depth of the Quantum-  SoA   RT   Added when PICSAR QED
                                         Synchrotron process                            physics is used.
 ``opticalDepthBW``    ``real``          QED: optical depth of the Breit-    SoA   RT   Added when PICSAR QED
                                         Wheeler process                                physics is used.
-====================  ================  ==================================  ===== ==== =====================
+====================  ================  ==================================  ===== ==== ======================
 
-WarpX allows extra runtime attributes to be added to particle containers (through ``AddRealComp("attrname")`` or ``AddIntComp("attrname")``).
+WarpX allows extra runtime attributes to be added to particle containers (through ``NewRealComp("attrname")`` or ``NewIntComp("attrname")``).
 The attribute name can then be used to access the values of that attribute.
 For example, using a particle iterator, ``pti``, to loop over the particles the command ``pti.GetAttribs(particle_comps["attrname"]).dataPtr();`` will return the values of the ``"attrname"`` attribute.
 
@@ -147,7 +160,7 @@ Attribute name      ``int``/``real``  Description                        Default
                                       when they were created.
 ==================  ================  =================================  ==============
 
-A Python example that adds runtime options can be found in :download:`Examples/Tests/particle_data_python <../../../Examples/Tests/particle_data_python/PICMI_inputs_prev_pos_2d.py>`
+A Python example that adds runtime options can be found in :download:`Examples/Tests/particle_data_python <../../../Examples/Tests/particle_data_python/inputs_test_2d_prev_positions_picmi.py>`
 
 .. note::
 

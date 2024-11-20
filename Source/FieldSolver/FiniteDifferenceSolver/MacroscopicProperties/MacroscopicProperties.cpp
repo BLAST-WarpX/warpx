@@ -1,19 +1,16 @@
 #include "MacroscopicProperties.H"
 
+#include "Fields.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
-#include "WarpX.H"
 
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX_Array4.H>
-#include <AMReX_BoxArray.H>
 #include <AMReX_Config.H>
-#include <AMReX_DistributionMapping.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_IndexType.H>
-#include <AMReX_IntVect.H>
 #include <AMReX_MFIter.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_Print.H>
@@ -121,23 +118,26 @@ MacroscopicProperties::ReadParameters ()
 }
 
 void
-MacroscopicProperties::InitData ()
+MacroscopicProperties::AllocateLevelMFs (
+    const amrex::BoxArray& ba,
+    const amrex::DistributionMapping& dmap,
+    const amrex::IntVect& ng_EB_alloc )
 {
-    amrex::Print() << Utils::TextMsg::Info("we are in init data of macro");
-    auto & warpx = WarpX::GetInstance();
-
-    // Get BoxArray and DistributionMap of warpx instance.
-    const int lev = 0;
-    const amrex::BoxArray ba = warpx.boxArray(lev);
-    const amrex::DistributionMapping dmap = warpx.DistributionMap(lev);
-    const amrex::IntVect ng_EB_alloc = warpx.getngEB();
-    // Define material property multifabs using ba and dmap from WarpX instance
     // sigma is cell-centered MultiFab
     m_sigma_mf = std::make_unique<amrex::MultiFab>(ba, dmap, 1, ng_EB_alloc);
     // epsilon is cell-centered MultiFab
     m_eps_mf = std::make_unique<amrex::MultiFab>(ba, dmap, 1, ng_EB_alloc);
     // mu is cell-centered MultiFab
     m_mu_mf = std::make_unique<amrex::MultiFab>(ba, dmap, 1, ng_EB_alloc);
+}
+
+void
+MacroscopicProperties::InitData (
+    const amrex::Geometry& geom,
+    const amrex::IntVect& Ex_stag,
+    const amrex::IntVect& Ey_stag,
+    const amrex::IntVect& Ez_stag)
+{
     // Initialize sigma
     if (m_sigma_s == "constant") {
 
@@ -146,7 +146,7 @@ MacroscopicProperties::InitData ()
     } else if (m_sigma_s == "parse_sigma_function") {
 
         InitializeMacroMultiFabUsingParser(m_sigma_mf.get(), m_sigma_parser->compile<3>(),
-            warpx.Geom(lev).CellSizeArray(), warpx.Geom(lev).ProbDomain());
+            geom.CellSizeArray(), geom.ProbDomain());
     }
     // Initialize epsilon
     if (m_epsilon_s == "constant") {
@@ -156,7 +156,7 @@ MacroscopicProperties::InitData ()
     } else if (m_epsilon_s == "parse_epsilon_function") {
 
         InitializeMacroMultiFabUsingParser(m_eps_mf.get(), m_epsilon_parser->compile<3>(),
-        warpx.Geom(lev).CellSizeArray(), warpx.Geom(lev).ProbDomain());
+        geom.CellSizeArray(), geom.ProbDomain());
 
     }
     // In the Maxwell solver, `epsilon` is used in the denominator.
@@ -173,16 +173,14 @@ MacroscopicProperties::InitData ()
     } else if (m_mu_s == "parse_mu_function") {
 
         InitializeMacroMultiFabUsingParser(m_mu_mf.get(), m_mu_parser->compile<3>(),
-            warpx.Geom(lev).CellSizeArray(), warpx.Geom(lev).ProbDomain());
+            geom.CellSizeArray(), geom.ProbDomain());
 
     }
 
-    amrex::IntVect sigma_stag = m_sigma_mf->ixType().toIntVect();
-    amrex::IntVect epsilon_stag = m_eps_mf->ixType().toIntVect();
-    amrex::IntVect mu_stag = m_mu_mf->ixType().toIntVect();
-    amrex::IntVect Ex_stag = warpx.getEfield_fp(0,0).ixType().toIntVect();
-    amrex::IntVect Ey_stag = warpx.getEfield_fp(0,1).ixType().toIntVect();
-    amrex::IntVect Ez_stag = warpx.getEfield_fp(0,2).ixType().toIntVect();
+    const amrex::IntVect sigma_stag = m_sigma_mf->ixType().toIntVect();
+    const amrex::IntVect epsilon_stag = m_eps_mf->ixType().toIntVect();
+    const amrex::IntVect mu_stag = m_mu_mf->ixType().toIntVect();
+
 
     for ( int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
         sigma_IndexType[idim]   = sigma_stag[idim];

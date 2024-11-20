@@ -25,11 +25,15 @@ namespace ablastr::math::anyfft
     const auto VendorCreatePlanC2R3D = fftwf_plan_dft_c2r_3d;
     const auto VendorCreatePlanR2C2D = fftwf_plan_dft_r2c_2d;
     const auto VendorCreatePlanC2R2D = fftwf_plan_dft_c2r_2d;
+    const auto VendorCreatePlanR2C1D = fftwf_plan_dft_r2c_1d;
+    const auto VendorCreatePlanC2R1D = fftwf_plan_dft_c2r_1d;
 #else
     const auto VendorCreatePlanR2C3D = fftw_plan_dft_r2c_3d;
     const auto VendorCreatePlanC2R3D = fftw_plan_dft_c2r_3d;
     const auto VendorCreatePlanR2C2D = fftw_plan_dft_r2c_2d;
     const auto VendorCreatePlanC2R2D = fftw_plan_dft_c2r_2d;
+    const auto VendorCreatePlanR2C1D = fftw_plan_dft_r2c_1d;
+    const auto VendorCreatePlanC2R1D = fftw_plan_dft_c2r_1d;
 #endif
 
     FFTplan CreatePlan(const amrex::IntVect& real_size, amrex::Real * const real_array,
@@ -56,9 +60,12 @@ namespace ablastr::math::anyfft
             } else if (dim == 2) {
                 fft_plan.m_plan = VendorCreatePlanR2C2D(
                     real_size[1], real_size[0], real_array, complex_array, FFTW_ESTIMATE);
+            } else if (dim == 1) {
+                fft_plan.m_plan = VendorCreatePlanR2C1D(
+                    real_size[0], real_array, complex_array, FFTW_ESTIMATE);
             } else {
                 ABLASTR_ABORT_WITH_MESSAGE(
-                    "only dim=2 and dim=3 have been implemented");
+                    "only dim=1 and dim=2 and dim=3 have been implemented");
             }
         } else if (dir == direction::C2R){
             if (dim == 3) {
@@ -67,9 +74,12 @@ namespace ablastr::math::anyfft
             } else if (dim == 2) {
                 fft_plan.m_plan = VendorCreatePlanC2R2D(
                     real_size[1], real_size[0], complex_array, real_array, FFTW_ESTIMATE);
+            } else if (dim == 1) {
+                fft_plan.m_plan = VendorCreatePlanC2R1D(
+                    real_size[0], complex_array, real_array, FFTW_ESTIMATE);
             } else {
                 ABLASTR_ABORT_WITH_MESSAGE(
-                    "only dim=2 and dim=3 have been implemented. Should be easy to add dim=1.");
+                    "only dim=1 and dim=2 and dim=3 have been implemented.");
             }
         }
 

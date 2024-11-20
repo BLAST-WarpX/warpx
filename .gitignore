@@ -4,7 +4,7 @@ Python/pywarpx/libwarpx*.so
 d/
 f/
 o/
-build/
+build*/
 tmp_build_dir/
 test_dir
 test_dir/
@@ -38,7 +38,7 @@ Docs/warpx-doxygen-web.tag.xml
 Docs/openpmd-api-doxygen-web.tag.xml
 Docs/doxyhtml/
 Docs/doxyxml/
-Docs/source/_static/
+Docs/source/_static/doxyhtml
 
 ####################
 # Package Managers #

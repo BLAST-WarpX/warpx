@@ -17,7 +17,6 @@ set(WarpX_EB @WarpX_EB@)
 set(WarpX_EB_FOUND ${WarpX_EB})
 set(WarpX_LIB @WarpX_LIB@)
 set(WarpX_LIB_FOUND ${WarpX_LIB})
-WarpX_GPUCLOCK
 
 # dependencies
 set(WarpX_MPI @WarpX_MPI@)
@@ -36,11 +35,13 @@ if(WarpX_OPENPMD)
 endif()
 set(WarpX_OPENPMD_FOUND ${WarpX_OPENPMD})
 
-WarpX_ASCENT        "Ascent in situ diagnostics"                 OFF)
-WarpX_PSATD         "spectral solver support"                    OFF)
-WarpX_SENSEI        "SENSEI in situ diagnostics"                 OFF)
-WarpX_QED           "QED support (requires PICSAR)"                    ON)
-WarpX_QED_TABLE_GEN "QED table generation (requires PICSAR and Boost)" OFF)
+# TODO
+#WarpX_ASCENT        "Ascent in situ diagnostics"                 OFF)
+#WarpX_CATALYST      "Catalyst in situ diagnostics"               OFF)
+#WarpX_FFT           "FFT-based solvers"                          OFF)
+#WarpX_SENSEI        "SENSEI in situ diagnostics"                 OFF)
+#WarpX_QED           "QED support (requires PICSAR)"                    ON)
+#WarpX_QED_TABLE_GEN "QED table generation (requires PICSAR and Boost)" OFF)
 
 
 
@@ -51,7 +52,7 @@ endif()
 set(WarpX_ADIOS2_FOUND ${WarpX_HAVE_ADIOS2})
 
 # define central WarpX::app WarpX::shared ... targets
-ABLASTR here, too? or separate Config.cmake?
+#ABLASTR here, too? or separate Config.cmake?
 include("${CMAKE_CURRENT_LIST_DIR}/WarpXTargets.cmake")
 
 # check if components are fulfilled and set WarpX_<COMPONENT>_FOUND vars
