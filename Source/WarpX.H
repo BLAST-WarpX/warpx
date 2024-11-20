@@ -1383,7 +1383,7 @@ private:
 
     // Qdsmc particle container for electron (fluid) used in the electron energy equation solver in the hybrid pic model
     std::unique_ptr<QdsmcParticleContainer> qdsmc_hybrid_electron_pc;
-    
+
     // Fluid container
     bool do_fluid_species = false;
     std::unique_ptr<MultiFluidContainer> myfl;
