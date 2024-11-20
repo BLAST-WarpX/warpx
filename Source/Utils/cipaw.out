@@ -178,6 +178,6 @@ Coarsening ratio cr=2
  Find value at ii=7 by interpolating over the following points and weights:
  (3,1.0)  (4,1.0)
 
- ERROR: sum of weights ws=2.500 should be cr=2 for i=0
+ ERROR: sum of weights ws=2.5 should be cr=2 for i=0
 
- ERROR: sum of weights ws=2.500 should be cr=2 for i=3
+ ERROR: sum of weights ws=2.5 should be cr=2 for i=3

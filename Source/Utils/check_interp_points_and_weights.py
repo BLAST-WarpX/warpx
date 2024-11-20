@@ -106,7 +106,7 @@ def refinement_fine_grid_limits(sc, sf, cr, i_min, i_max):
     # print(" Before ii_min={} and ii_max={}".format(ii_min,ii_max))
 
     for ii in range(ii_range_start,ii_range_end+1):
-        num_i_pts, i_start, weights = refinement_points_and_weights(ii, sc, sf, cr)
+        num_i_pts, i_start, weights = refinement_points_and_weights(ii, sc, sf, cr, ii_min, ii_max)
         i_end = i_start + num_i_pts - 1
         if i_min <= i_end:
             ii_min = min(ii_min, ii)
@@ -118,21 +118,21 @@ def refinement_fine_grid_limits(sc, sf, cr, i_min, i_max):
     return [ii_min, ii_max]
 
 # Refinement for MR: interpolation points and weights
-def refinement_points_and_weights(ii, sc, sf, cr):
-    i_start = 0
-    num_i_pts = 0
+def refinement_points_and_weights(ii, sc, sf, cr, iimin, iimax):
+    idxmin = 0
+    numpts = 0
     if cr == 1:
-        num_i_pts = 1
-        i_start = ii
+        numpts = 1
+        idxmin = ii
     elif cr >= 2:
         if ii % cr == 0:
-            num_i_pts = (1 - sf) * (1 - sc) + sf * sc
+            numpts = (1 - sf) * (1 - sc) + sf * sc
         elif ii % cr != 0:
-            num_i_pts = (1 - sf) * (1 - sc) + 2 * sf * sc
-        i_start = (ii // cr) * (1 - sf) * (1 - sc) + (ii // cr) * sf * sc
-    weights = np.zeros(num_i_pts)
-    for ir in range(num_i_pts):
-        i = i_start + ir
+            numpts = (1 - sf) * (1 - sc) + 2 * sf * sc
+        idxmin = (ii // cr) * (1 - sf) * (1 - sc) + (ii // cr) * sf * sc
+    weights = np.zeros(numpts)
+    for ir in range(numpts):
+        i = idxmin + ir
         if ii == iimin or ii == iimax:
             weights[ir] = (1 - sf) * (1 - sc) + (
                 (abs(cr - abs(ii - i * cr))) / (cr) + (cr / 2 - 0.5)
@@ -141,7 +141,8 @@ def refinement_points_and_weights(ii, sc, sf, cr):
             weights[ir] = (1 - sf) * (1 - sc) + (
                 (abs(cr - abs(ii - i * cr))) / (cr)
             ) * sf * sc
-    return [num_i_pts, i_start, weights]
+    return [numpts, idxmin, weights]
+
 
 ## TODO Coarsening for IO: interpolation points and weights
 # def coarsening_points_and_weights_for_IO( i, sf, sc, cr ):
@@ -230,7 +231,7 @@ for sc in [0, 1]:
             print("\n WARNING: sc={} not equal to sf={}, not implemented for Refinement for MR, continue ...".format(sc, sf))
             continue
 
-        imin, imax  = refinement_coarse_grid_limits(sc, sf, cr)
+        imin, imax = refinement_coarse_grid_limits(sc, sf, cr)
         iimin, iimax = refinement_fine_grid_limits(sc, sf, cr, imin, imax)
 
         # Number of grid points
@@ -238,8 +239,8 @@ for sc in [0, 1]:
         print(   ' Min and max index on fine   grid: iimin={} iimax={}'.format( iimin, iimax ) )
 
         # Refinement for MR: interpolation points and weights
-        for ii in range (iimin, iimax+1): # index on fine grid
-            num_i_pts,i_start,weights = refinement_points_and_weights( ii, sc, sf, cr )
+        for ii in range (iimin, iimax+1):  # index on fine grid
+            num_i_pts, i_start, weights = refinement_points_and_weights(ii, sc, sf, cr, iimin, iimax)
             print(
                 "\n Find value at ii={} by interpolating over the following points and weights:".format(
                     ii
@@ -253,13 +254,13 @@ for sc in [0, 1]:
             print()
 
         # Refinement for MR: check conservation properties
-        for i in range(imin, imax + 1): # index on coarse grid
+        for i in range(imin, imax + 1):  # index on coarse grid
             ws = 0.0
-            for ii in range(iimin, iimax + 1): # index on fine grid
-                num_i_pts, idxmin, weights = refinement_points_and_weights(ii, sc, sf, cr)
+            for ii in range(iimin, iimax + 1):  # index on fine grid
+                num_i_pts, idxmin, weights = refinement_points_and_weights(ii, sc, sf, cr, iimin, iimax)
                 for ir in range(num_i_pts):  # interpolation points and weights
                     j = idxmin + ir
-                    if j == i: # interpolation point matches point on coarse grid
+                    if j == i:  # interpolation point matches point on coarse grid
                         ws += weights[ir]
             if abs(ws - cr) > 1E-9:
-                print("\n ERROR: sum of weights ws={:.3f} should be cr={} for i={}".format(ws, cr, i))
+                print("\n ERROR: sum of weights ws={} should be cr={} for i={}".format(ws, cr, i))
