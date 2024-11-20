@@ -1,0 +1,187 @@
+Coarsening ratio cr=2
+
+ Select coarsening ratio (cr>=1): cr=
+ **************************************************
+ * Staggering of coarse grid: sc=0 cell-centered  *
+ * Staggering of fine   grid: sf=0 cell-centered  *
+ **************************************************
+
+ Coarsening for MR: check interpolation points and weights
+ ---------------------------------------------------------
+
+ Min and max index on coarse grid:  imin=0  imax=3
+ Min and max index on fine   grid: iimin=0 iimax=7
+
+ Find value at i=0 by interpolating over the following points and weights:
+ (ii=0,w=0.500)  (ii=1,w=0.500)
+
+ Find value at i=1 by interpolating over the following points and weights:
+ (ii=2,w=0.500)  (ii=3,w=0.500)
+
+ Find value at i=2 by interpolating over the following points and weights:
+ (ii=4,w=0.500)  (ii=5,w=0.500)
+
+ Find value at i=3 by interpolating over the following points and weights:
+ (ii=6,w=0.500)  (ii=7,w=0.500)
+
+ Refinement for MR: check interpolation points and weights
+ ---------------------------------------------------------
+Before ii_min=206 and ii_max=-200
+After ii_min=0 and ii_max=7
+
+ Min and max index on coarse grid:  imin=0  imax=3
+ Min and max index on fine   grid: iimin=0 iimax=7
+
+ Find value at ii=0 by interpolating over the following points and weights:
+ (i=0,w=1.000)
+
+ Find value at ii=1 by interpolating over the following points and weights:
+ (i=0,w=1.000)
+
+ Find value at ii=2 by interpolating over the following points and weights:
+ (i=1,w=1.000)
+
+ Find value at ii=3 by interpolating over the following points and weights:
+ (i=1,w=1.000)
+
+ Find value at ii=4 by interpolating over the following points and weights:
+ (i=2,w=1.000)
+
+ Find value at ii=5 by interpolating over the following points and weights:
+ (i=2,w=1.000)
+
+ Find value at ii=6 by interpolating over the following points and weights:
+ (i=3,w=1.000)
+
+ Find value at ii=7 by interpolating over the following points and weights:
+ (i=3,w=1.000)
+
+ **************************************************
+ * Staggering of coarse grid: sc=0 cell-centered  *
+ * Staggering of fine   grid: sf=1 nodal          *
+ **************************************************
+
+ Coarsening for MR: check interpolation points and weights
+ ---------------------------------------------------------
+
+ Min and max index on coarse grid:  imin=-1  imax=4
+ Min and max index on fine   grid: iimin=0 iimax=8
+
+ Find value at i=-1 by interpolating over the following points and weights:
+ (ii=-2,w=0.250)  (ii=-1,w=0.500)  (ii=0,w=0.250)
+
+ Find value at i=0 by interpolating over the following points and weights:
+ (ii=0,w=0.250)  (ii=1,w=0.500)  (ii=2,w=0.250)
+
+ Find value at i=1 by interpolating over the following points and weights:
+ (ii=2,w=0.250)  (ii=3,w=0.500)  (ii=4,w=0.250)
+
+ Find value at i=2 by interpolating over the following points and weights:
+ (ii=4,w=0.250)  (ii=5,w=0.500)  (ii=6,w=0.250)
+
+ Find value at i=3 by interpolating over the following points and weights:
+ (ii=6,w=0.250)  (ii=7,w=0.500)  (ii=8,w=0.250)
+
+ Find value at i=4 by interpolating over the following points and weights:
+ (ii=8,w=0.250)  (ii=9,w=0.500)  (ii=10,w=0.250)
+
+ Refinement for MR: check interpolation points and weights
+ ---------------------------------------------------------
+
+ WARNING: sc=0 not equal to sf=1, not implemented for Refinement for MR, continue ...
+
+ **************************************************
+ * Staggering of coarse grid: sc=1 nodal          *
+ * Staggering of fine   grid: sf=0 cell-centered  *
+ **************************************************
+
+ Coarsening for MR: check interpolation points and weights
+ ---------------------------------------------------------
+
+ Min and max index on coarse grid:  imin=0  imax=4
+ Min and max index on fine   grid: iimin=0 iimax=7
+
+ Find value at i=0 by interpolating over the following points and weights:
+ (ii=-1,w=0.500)  (ii=0,w=0.500)
+
+ Find value at i=1 by interpolating over the following points and weights:
+ (ii=1,w=0.500)  (ii=2,w=0.500)
+
+ Find value at i=2 by interpolating over the following points and weights:
+ (ii=3,w=0.500)  (ii=4,w=0.500)
+
+ Find value at i=3 by interpolating over the following points and weights:
+ (ii=5,w=0.500)  (ii=6,w=0.500)
+
+ Find value at i=4 by interpolating over the following points and weights:
+ (ii=7,w=0.500)  (ii=8,w=0.500)
+
+ Refinement for MR: check interpolation points and weights
+ ---------------------------------------------------------
+
+ WARNING: sc=1 not equal to sf=0, not implemented for Refinement for MR, continue ...
+
+ **************************************************
+ * Staggering of coarse grid: sc=1 nodal          *
+ * Staggering of fine   grid: sf=1 nodal          *
+ **************************************************
+
+ Coarsening for MR: check interpolation points and weights
+ ---------------------------------------------------------
+
+ Min and max index on coarse grid:  imin=0  imax=4
+ Min and max index on fine   grid: iimin=0 iimax=8
+
+ Find value at i=0 by interpolating over the following points and weights:
+ (ii=-1,w=0.250)  (ii=0,w=0.500)  (ii=1,w=0.250)
+
+ Find value at i=1 by interpolating over the following points and weights:
+ (ii=1,w=0.250)  (ii=2,w=0.500)  (ii=3,w=0.250)
+
+ Find value at i=2 by interpolating over the following points and weights:
+ (ii=3,w=0.250)  (ii=4,w=0.500)  (ii=5,w=0.250)
+
+ Find value at i=3 by interpolating over the following points and weights:
+ (ii=5,w=0.250)  (ii=6,w=0.500)  (ii=7,w=0.250)
+
+ Find value at i=4 by interpolating over the following points and weights:
+ (ii=7,w=0.250)  (ii=8,w=0.500)  (ii=9,w=0.250)
+
+ Refinement for MR: check interpolation points and weights
+ ---------------------------------------------------------
+Before ii_min=206 and ii_max=-200
+After ii_min=-1 and ii_max=7
+
+ Min and max index on coarse grid:  imin=0  imax=3
+ Min and max index on fine   grid: iimin=-1 iimax=7
+
+ Find value at ii=-1 by interpolating over the following points and weights:
+ (i=-1,w=1.000)  (i=0,w=1.000)
+
+ Find value at ii=0 by interpolating over the following points and weights:
+ (i=0,w=1.000)
+
+ Find value at ii=1 by interpolating over the following points and weights:
+ (i=0,w=0.500)  (i=1,w=0.500)
+
+ Find value at ii=2 by interpolating over the following points and weights:
+ (i=1,w=1.000)
+
+ Find value at ii=3 by interpolating over the following points and weights:
+ (i=1,w=0.500)  (i=2,w=0.500)
+
+ Find value at ii=4 by interpolating over the following points and weights:
+ (i=2,w=1.000)
+
+ Find value at ii=5 by interpolating over the following points and weights:
+ (i=2,w=0.500)  (i=3,w=0.500)
+
+ Find value at ii=6 by interpolating over the following points and weights:
+ (i=3,w=1.000)
+
+ Find value at ii=7 by interpolating over the following points and weights:
+ (i=3,w=1.000)  (i=4,w=1.000)
+
+ ERROR: sum of weights ws=2.500 should be cr=2 for i=0
+
+ ERROR: sum of weights ws=2.500 should be cr=2 for i=3
