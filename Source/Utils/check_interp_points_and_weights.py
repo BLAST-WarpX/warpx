@@ -29,20 +29,27 @@ import sys
 
 import numpy as np
 
+# Coarsening: map fine grid to coarse grid
 
 # Fine grid limits (without ghost cells)
+# The find grid limits are arbitrarily chosen here to act as an example
 def coarsening_fine_grid_limits(sc, sf, cr):
     if sf == 0:  # cell-centered
-        iimin = 0
-        iimax = 4 * cr - 1
+        ii_min = 0
+        ii_max = 4 * cr - 1
     elif sf == 1:  # nodal
-        iimin = 0
-        iimax = 4 * cr
-    return [iimin, iimax]
+        ii_min = 0
+        ii_max = 4 * cr
+    return [ii_min, ii_max]
 
 
 # Coarse grid limits (without ghost cells)
 def coarsening_coarse_grid_limits(sc, sf, cr, ii_min, ii_max):
+    return coarsening_coarse_grid_limits_brute_force(sc, sf, cr, ii_min, ii_max)
+
+def coarsening_coarse_grid_limits_brute_force(sc, sf, cr, ii_min, ii_max):
+    # Find coarse grid limits given fine grid limits using brute force scan of a
+    # by checking ii values produced by coarsening_points_and_weights for a large range of i values
     i_range_start = (ii_min // cr) - 100
     i_range_end = (ii_max // cr) + 100
 
@@ -80,7 +87,7 @@ def coarsening_points_and_weights(i, sc, sf, cr):
     return [num_ii_pts, ii_start, weights]
 
 
-# Refinement functions
+# Refinement: map coarse grid to fine grid
 
 def refinement_coarse_grid_limits(sc, sf, cr):
     i_min = 0
@@ -96,7 +103,7 @@ def refinement_fine_grid_limits(sc, sf, cr, i_min, i_max):
     ii_min = ii_range_end
     ii_max = ii_range_start
 
-    print("Before ii_min={} and ii_max={}".format(ii_min,ii_max))
+    # print(" Before ii_min={} and ii_max={}".format(ii_min,ii_max))
 
     for ii in range(ii_range_start,ii_range_end+1):
         num_i_pts, i_start, weights = refinement_points_and_weights(ii, sc, sf, cr)
@@ -106,7 +113,7 @@ def refinement_fine_grid_limits(sc, sf, cr, i_min, i_max):
         if i_max >= i_start:
             ii_max = max(ii_max, ii)
 
-    print("After ii_min={} and ii_max={}".format(ii_min,ii_max))
+    # print(" After ii_min={} and ii_max={}".format(ii_min,ii_max))
 
     return [ii_min, ii_max]
 
@@ -197,7 +204,7 @@ for sc in [0, 1]:
             for ir in range(numpts):  # interpolation points and weights
                 ii = idxmin + ir
                 wtotal += weights[ir]
-                print(" (ii={},w={:.3f})".format(ii, weights[ir]), end="")
+                print(" ({},{})".format(ii, weights[ir]), end="")
                 if not (ir == numpts - 1):
                     print(" ", end="")
             print()
@@ -240,8 +247,8 @@ for sc in [0, 1]:
             )
             for ir in range(num_i_pts):  # interpolation points and weights
                 i = i_start + ir
-                print( ' (i={},w={:.3f})'.format( i, weights[ir] ), end="")
-                if not ( ir == num_i_pts-1 ):
+                print(" ({},{})".format(i, weights[ir]), end="")
+                if not (ir == num_i_pts - 1):
                     print(" ", end="")
             print()
 

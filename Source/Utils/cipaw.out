@@ -13,48 +13,46 @@ Coarsening ratio cr=2
  ---------------------------------------------------------
 
  Find value at i=0 by interpolating over the following points and weights:
- (ii=0,w=0.500)  (ii=1,w=0.500)
+ (0,0.5)  (1,0.5)
 
  Find value at i=1 by interpolating over the following points and weights:
- (ii=2,w=0.500)  (ii=3,w=0.500)
+ (2,0.5)  (3,0.5)
 
  Find value at i=2 by interpolating over the following points and weights:
- (ii=4,w=0.500)  (ii=5,w=0.500)
+ (4,0.5)  (5,0.5)
 
  Find value at i=3 by interpolating over the following points and weights:
- (ii=6,w=0.500)  (ii=7,w=0.500)
+ (6,0.5)  (7,0.5)
 
  Refinement for MR: check interpolation points and weights
  ---------------------------------------------------------
-Before ii_min=206 and ii_max=-200
-After ii_min=0 and ii_max=7
 
  Min and max index on coarse grid:  imin=0  imax=3
  Min and max index on fine   grid: iimin=0 iimax=7
 
  Find value at ii=0 by interpolating over the following points and weights:
- (i=0,w=1.000)
+ (0,1.0)
 
  Find value at ii=1 by interpolating over the following points and weights:
- (i=0,w=1.000)
+ (0,1.0)
 
  Find value at ii=2 by interpolating over the following points and weights:
- (i=1,w=1.000)
+ (1,1.0)
 
  Find value at ii=3 by interpolating over the following points and weights:
- (i=1,w=1.000)
+ (1,1.0)
 
  Find value at ii=4 by interpolating over the following points and weights:
- (i=2,w=1.000)
+ (2,1.0)
 
  Find value at ii=5 by interpolating over the following points and weights:
- (i=2,w=1.000)
+ (2,1.0)
 
  Find value at ii=6 by interpolating over the following points and weights:
- (i=3,w=1.000)
+ (3,1.0)
 
  Find value at ii=7 by interpolating over the following points and weights:
- (i=3,w=1.000)
+ (3,1.0)
 
  **************************************************
  * Staggering of coarse grid: sc=0 cell-centered  *
@@ -68,22 +66,22 @@ After ii_min=0 and ii_max=7
  ---------------------------------------------------------
 
  Find value at i=-1 by interpolating over the following points and weights:
- (ii=-2,w=0.250)  (ii=-1,w=0.500)  (ii=0,w=0.250)
+ (-2,0.25)  (-1,0.5)  (0,0.25)
 
  Find value at i=0 by interpolating over the following points and weights:
- (ii=0,w=0.250)  (ii=1,w=0.500)  (ii=2,w=0.250)
+ (0,0.25)  (1,0.5)  (2,0.25)
 
  Find value at i=1 by interpolating over the following points and weights:
- (ii=2,w=0.250)  (ii=3,w=0.500)  (ii=4,w=0.250)
+ (2,0.25)  (3,0.5)  (4,0.25)
 
  Find value at i=2 by interpolating over the following points and weights:
- (ii=4,w=0.250)  (ii=5,w=0.500)  (ii=6,w=0.250)
+ (4,0.25)  (5,0.5)  (6,0.25)
 
  Find value at i=3 by interpolating over the following points and weights:
- (ii=6,w=0.250)  (ii=7,w=0.500)  (ii=8,w=0.250)
+ (6,0.25)  (7,0.5)  (8,0.25)
 
  Find value at i=4 by interpolating over the following points and weights:
- (ii=8,w=0.250)  (ii=9,w=0.500)  (ii=10,w=0.250)
+ (8,0.25)  (9,0.5)  (10,0.25)
 
  Refinement for MR: check interpolation points and weights
  ---------------------------------------------------------
@@ -102,19 +100,19 @@ After ii_min=0 and ii_max=7
  ---------------------------------------------------------
 
  Find value at i=0 by interpolating over the following points and weights:
- (ii=-1,w=0.500)  (ii=0,w=0.500)
+ (-1,0.5)  (0,0.5)
 
  Find value at i=1 by interpolating over the following points and weights:
- (ii=1,w=0.500)  (ii=2,w=0.500)
+ (1,0.5)  (2,0.5)
 
  Find value at i=2 by interpolating over the following points and weights:
- (ii=3,w=0.500)  (ii=4,w=0.500)
+ (3,0.5)  (4,0.5)
 
  Find value at i=3 by interpolating over the following points and weights:
- (ii=5,w=0.500)  (ii=6,w=0.500)
+ (5,0.5)  (6,0.5)
 
  Find value at i=4 by interpolating over the following points and weights:
- (ii=7,w=0.500)  (ii=8,w=0.500)
+ (7,0.5)  (8,0.5)
 
  Refinement for MR: check interpolation points and weights
  ---------------------------------------------------------
@@ -133,54 +131,52 @@ After ii_min=0 and ii_max=7
  ---------------------------------------------------------
 
  Find value at i=0 by interpolating over the following points and weights:
- (ii=-1,w=0.250)  (ii=0,w=0.500)  (ii=1,w=0.250)
+ (-1,0.25)  (0,0.5)  (1,0.25)
 
  Find value at i=1 by interpolating over the following points and weights:
- (ii=1,w=0.250)  (ii=2,w=0.500)  (ii=3,w=0.250)
+ (1,0.25)  (2,0.5)  (3,0.25)
 
  Find value at i=2 by interpolating over the following points and weights:
- (ii=3,w=0.250)  (ii=4,w=0.500)  (ii=5,w=0.250)
+ (3,0.25)  (4,0.5)  (5,0.25)
 
  Find value at i=3 by interpolating over the following points and weights:
- (ii=5,w=0.250)  (ii=6,w=0.500)  (ii=7,w=0.250)
+ (5,0.25)  (6,0.5)  (7,0.25)
 
  Find value at i=4 by interpolating over the following points and weights:
- (ii=7,w=0.250)  (ii=8,w=0.500)  (ii=9,w=0.250)
+ (7,0.25)  (8,0.5)  (9,0.25)
 
  Refinement for MR: check interpolation points and weights
  ---------------------------------------------------------
-Before ii_min=206 and ii_max=-200
-After ii_min=-1 and ii_max=7
 
  Min and max index on coarse grid:  imin=0  imax=3
  Min and max index on fine   grid: iimin=-1 iimax=7
 
  Find value at ii=-1 by interpolating over the following points and weights:
- (i=-1,w=1.000)  (i=0,w=1.000)
+ (-1,1.0)  (0,1.0)
 
  Find value at ii=0 by interpolating over the following points and weights:
- (i=0,w=1.000)
+ (0,1.0)
 
  Find value at ii=1 by interpolating over the following points and weights:
- (i=0,w=0.500)  (i=1,w=0.500)
+ (0,0.5)  (1,0.5)
 
  Find value at ii=2 by interpolating over the following points and weights:
- (i=1,w=1.000)
+ (1,1.0)
 
  Find value at ii=3 by interpolating over the following points and weights:
- (i=1,w=0.500)  (i=2,w=0.500)
+ (1,0.5)  (2,0.5)
 
  Find value at ii=4 by interpolating over the following points and weights:
- (i=2,w=1.000)
+ (2,1.0)
 
  Find value at ii=5 by interpolating over the following points and weights:
- (i=2,w=0.500)  (i=3,w=0.500)
+ (2,0.5)  (3,0.5)
 
  Find value at ii=6 by interpolating over the following points and weights:
- (i=3,w=1.000)
+ (3,1.0)
 
  Find value at ii=7 by interpolating over the following points and weights:
- (i=3,w=1.000)  (i=4,w=1.000)
+ (3,1.0)  (4,1.0)
 
  ERROR: sum of weights ws=2.500 should be cr=2 for i=0
 
