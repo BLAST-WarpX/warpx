@@ -25,11 +25,23 @@
 # Source/ablastr/coarsen/sample.(H/.cpp)
 # -------------------------------------------------------------------------------
 
+import sys
 
 import numpy as np
 
-# Coarsening functions
 
+# Fine grid limits (without ghost cells)
+def coarsening_fine_grid_limits(sc, sf, cr):
+    if sf == 0:  # cell-centered
+        iimin = 0
+        iimax = 4 * cr - 1
+    elif sf == 1:  # nodal
+        iimin = 0
+        iimax = 4 * cr
+    return [iimin, iimax]
+
+
+# Coarse grid limits (without ghost cells)
 def coarsening_coarse_grid_limits(sc, sf, cr, ii_min, ii_max):
     i_range_start = (ii_min // cr) - 100
     i_range_end = (ii_max // cr) + 100
@@ -46,15 +58,8 @@ def coarsening_coarse_grid_limits(sc, sf, cr, ii_min, ii_max):
             i_max = max(i_max, i)
     return [i_min, i_max]
 
-def coarsening_fine_grid_limits(sc, sf, cr):
-    if sf == 0:  # cell-centered
-        iimin = 0
-        iimax = 4 * cr - 1
-    elif sf == 1:  # nodal
-        iimin = 0
-        iimax = 4 * cr
-    return [iimin, iimax]
 
+# Coarsening for MR: interpolation points and weights
 def coarsening_points_and_weights(i, sc, sf, cr):
     two_ii_start = -cr * sc + sf - 1
     if two_ii_start % 2 == 0:
@@ -167,9 +172,6 @@ for sc in [0, 1]:
             print(" nodal          *")
         print(" **************************************************")
 
-        print("\n Coarsening for MR: check interpolation points and weights")
-        print(" ---------------------------------------------------------")
-
         iimin, iimax = coarsening_fine_grid_limits(sc, sf, cr)
         imin, imax  = coarsening_coarse_grid_limits(sc, sf, cr, iimin, iimax)
 
@@ -179,6 +181,9 @@ for sc in [0, 1]:
         print(
             " Min and max index on fine   grid: iimin={} iimax={}".format(iimin, iimax)
         )
+
+        print("\n Coarsening for MR: check interpolation points and weights")
+        print(" ---------------------------------------------------------")
 
         # Coarsening for MR: interpolation points and weights
         for i in range(imin, imax+1): # index on coarse grid

@@ -6,11 +6,11 @@ Coarsening ratio cr=2
  * Staggering of fine   grid: sf=0 cell-centered  *
  **************************************************
 
- Coarsening for MR: check interpolation points and weights
- ---------------------------------------------------------
-
  Min and max index on coarse grid:  imin=0  imax=3
  Min and max index on fine   grid: iimin=0 iimax=7
+
+ Coarsening for MR: check interpolation points and weights
+ ---------------------------------------------------------
 
  Find value at i=0 by interpolating over the following points and weights:
  (ii=0,w=0.500)  (ii=1,w=0.500)
@@ -61,11 +61,11 @@ After ii_min=0 and ii_max=7
  * Staggering of fine   grid: sf=1 nodal          *
  **************************************************
 
- Coarsening for MR: check interpolation points and weights
- ---------------------------------------------------------
-
  Min and max index on coarse grid:  imin=-1  imax=4
  Min and max index on fine   grid: iimin=0 iimax=8
+
+ Coarsening for MR: check interpolation points and weights
+ ---------------------------------------------------------
 
  Find value at i=-1 by interpolating over the following points and weights:
  (ii=-2,w=0.250)  (ii=-1,w=0.500)  (ii=0,w=0.250)
@@ -95,11 +95,11 @@ After ii_min=0 and ii_max=7
  * Staggering of fine   grid: sf=0 cell-centered  *
  **************************************************
 
- Coarsening for MR: check interpolation points and weights
- ---------------------------------------------------------
-
  Min and max index on coarse grid:  imin=0  imax=4
  Min and max index on fine   grid: iimin=0 iimax=7
+
+ Coarsening for MR: check interpolation points and weights
+ ---------------------------------------------------------
 
  Find value at i=0 by interpolating over the following points and weights:
  (ii=-1,w=0.500)  (ii=0,w=0.500)
@@ -126,11 +126,11 @@ After ii_min=0 and ii_max=7
  * Staggering of fine   grid: sf=1 nodal          *
  **************************************************
 
- Coarsening for MR: check interpolation points and weights
- ---------------------------------------------------------
-
  Min and max index on coarse grid:  imin=0  imax=4
  Min and max index on fine   grid: iimin=0 iimax=8
+
+ Coarsening for MR: check interpolation points and weights
+ ---------------------------------------------------------
 
  Find value at i=0 by interpolating over the following points and weights:
  (ii=-1,w=0.250)  (ii=0,w=0.500)  (ii=1,w=0.250)
