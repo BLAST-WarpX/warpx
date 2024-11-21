@@ -135,7 +135,7 @@ public:
 
     // HybridUpdateUe calculates Ue from Je = J_ampere - Ji and saves in NU for hybrid solver
     void HybridInitializeUe (ablastr::fields::MultiFabRegister& fields,
-        amrex::MultiFab &ji_x, amrex::MultiFab &ji_y, amrex::MultiFab &ji_z, 
+        amrex::MultiFab &ji_x, amrex::MultiFab &ji_y, amrex::MultiFab &ji_z,
         HybridPICModel const* hybrid_model, int lev);
 
     // Sets Ke in fluid container MF to be used by qdsmc particles
