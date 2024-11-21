@@ -18,6 +18,8 @@
 #include <ablastr/coarsen/sample.H>
 #include <ablastr/utils/Communication.H>
 
+#include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
+
 using namespace ablastr::utils::communication;
 using namespace amrex;
 
@@ -1407,15 +1409,27 @@ void WarpXFluidContainer::DepositCurrent(
 }
 
 
-// Update this function using pre-built functions of multifabs ?
+
 void WarpXFluidContainer::HybridInitializeUe (ablastr::fields::MultiFabRegister& fields,
-        amrex::MultiFab &ji_x, amrex::MultiFab &ji_y, amrex::MultiFab &ji_z, int lev)
+        amrex::MultiFab &ji_x, amrex::MultiFab &ji_y, amrex::MultiFab &ji_z, 
+        HybridPICModel const* hybrid_model, int lev)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
     ablastr::fields::ScalarField rho_fp = fields.get(FieldType::rho_fp, lev);
     ablastr::fields::VectorField current_fp_ampere = fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
+
+    // Index type required for interpolating fields from their respective
+    // staggering to nodal grid
+    amrex::GpuArray<int, 3> const& Jx_stag = hybrid_model->Jx_IndexType;
+    amrex::GpuArray<int, 3> const& Jy_stag = hybrid_model->Jy_IndexType;
+    amrex::GpuArray<int, 3> const& Jz_stag = hybrid_model->Jz_IndexType;
+
+    // Parameters for 'interp' that maps from Yee to nodal mesh
+    amrex::GpuArray<int, 3> const& nodal = {1, 1, 1};
+    // The coarsingng is just 1 so no coarsening is done
+    amrex::GpuArray<int, 3> const& coarsen = {1, 1, 1};
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -1440,9 +1454,19 @@ void WarpXFluidContainer::HybridInitializeUe (ablastr::fields::MultiFabRegister&
 
             ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                 if( rho(i, j, k) > 0.0_rt ){
-                    Uex(i, j, k) = (Jx(i, j, k) - Jix(i, j, k))/rho(i, j, k);
-                    Uey(i, j, k) = (Jy(i, j, k) - Jiy(i, j, k))/rho(i, j, k);
-                    Uez(i, j, k) = (Jz(i, j, k) - Jiz(i, j, k))/rho(i, j, k);
+                    // Interpolate the total plasma current to a nodal grid
+                    auto const jx_interp = ablastr::coarsen::sample::Interp(Jx, Jx_stag, nodal, coarsen, i, j, k, 0);
+                    auto const jy_interp = ablastr::coarsen::sample::Interp(Jy, Jy_stag, nodal, coarsen, i, j, k, 0);
+                    auto const jz_interp = ablastr::coarsen::sample::Interp(Jz, Jz_stag, nodal, coarsen, i, j, k, 0);
+
+                    // Interpolate the ion current to a nodal grid
+                    auto const jix_interp = ablastr::coarsen::sample::Interp(Jix, Jx_stag, nodal, coarsen, i, j, k, 0);
+                    auto const jiy_interp = ablastr::coarsen::sample::Interp(Jiy, Jy_stag, nodal, coarsen, i, j, k, 0);
+                    auto const jiz_interp = ablastr::coarsen::sample::Interp(Jiz, Jz_stag, nodal, coarsen, i, j, k, 0);
+
+                    Uex(i, j, k) = (jx_interp - jix_interp)/rho(i, j, k);
+                    Uey(i, j, k) = (jy_interp - jiy_interp)/rho(i, j, k);
+                    Uez(i, j, k) = (jz_interp - jiz_interp)/rho(i, j, k);
                 }
 
             });

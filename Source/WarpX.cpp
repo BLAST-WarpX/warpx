@@ -345,6 +345,9 @@ WarpX::WarpX ()
 
         // Create electron fluid container for hybrid-PIC model
         hybrid_electron_fl = std::make_unique<WarpXFluidContainer>(0, "electrons_hybrid", true);
+
+        // Create electron qdsmc particle container for hybrid-PIC model electron energy equation solver
+        qdsmc_hybrid_electron_pc = std::make_unique<QdsmcParticleContainer>(this);
     }
 
     current_buffer_masks.resize(nlevs_max);
@@ -2261,6 +2264,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         );
 
         // allocate multifabs for electron fluid container used in hibryd-PIC model
+        // multifabs in fluid container are created as nodal (ba is converted to nodal in each alloc_init call)
         hybrid_electron_fl->AllocateLevelMFs(m_fields, ba, dm, lev);
     }
 

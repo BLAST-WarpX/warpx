@@ -184,7 +184,7 @@ QdsmcParticleContainer::InitParticles (int lev)
                     amrex::Real y = problo[1] + j*dx[1];
                     amrex::Real z = problo[2] + k*dx[2];
 
-                    if( x < probhi[0] && y < probhi[1] && z < probhi[2])
+                    if( x <= probhi[0] && y <= probhi[1] && z <= probhi[2])
                     {
                         xpos.push_back(x);
                         ypos.push_back(y);

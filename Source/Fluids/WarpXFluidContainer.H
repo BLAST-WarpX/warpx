@@ -11,6 +11,8 @@
 #include "Initialization/PlasmaInjector.H"
 #include "MultiFluidContainer.H"
 
+#include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
+
 #include<AMReX_MultiFab.H>
 #include<AMReX_Vector.H>
 
@@ -133,7 +135,8 @@ public:
 
     // HybridUpdateUe calculates Ue from Je = J_ampere - Ji and saves in NU for hybrid solver
     void HybridInitializeUe (ablastr::fields::MultiFabRegister& fields,
-        amrex::MultiFab &ji_x, amrex::MultiFab &ji_y, amrex::MultiFab &ji_z, int lev);
+        amrex::MultiFab &ji_x, amrex::MultiFab &ji_y, amrex::MultiFab &ji_z, 
+        HybridPICModel const* hybrid_model, int lev);
 
     // Sets Ke in fluid container MF to be used by qdsmc particles
     void HybridInitializeKe (ablastr::fields::MultiFabRegister& m_fields, amrex::Real gamma, int lev);
