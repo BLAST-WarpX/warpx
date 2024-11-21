@@ -215,8 +215,8 @@ QdsmcParticleContainer::SetV (int lev,
         auto& attribs = pti.GetStructOfArrays().GetRealData();
 
         // making box cell centered
-        //amrex::Box box = pti.tilebox();
-        //box.grow(Ux.nGrowVect());
+        // amrex::Box box = pti.tilebox();
+        // box.grow(Ux.nGrowVect());
 
         amrex::Box box = pti.tilebox();
         const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);

@@ -13,6 +13,7 @@
 #include "Utils/TextMsg.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
+#include "Fluids/QdsmcParticleContainer.H"
 #include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
@@ -181,10 +182,22 @@ void WarpX::HybridPICEvolveFields ()
             *current_fp_temp[finest_level][2],
             m_hybrid_pic_model.get(), finest_level);
 
-        // call functions from the qdsmc particle container ...
-        //      1 - Set KeNe for each particle (gather)
-        //      2 - Push the qdsmc particles
-        //      3 - Deposit KeNe to the grid
+        // Set fictitious electron particles velocities
+        qdsmc_hybrid_electron_pc->SetV(finest_level, 
+            *m_fields.get(hybrid_electron_fl->name_mf_NU, Direction{0}, finest_level),
+            *m_fields.get(hybrid_electron_fl->name_mf_NU, Direction{1}, finest_level),
+            *m_fields.get(hybrid_electron_fl->name_mf_NU, Direction{2}, finest_level));
+
+        // Set fictitious electron particles entropy
+        qdsmc_hybrid_electron_pc->SetK(finest_level,
+            *m_fields.get(hybrid_electron_fl->name_mf_K, finest_level),
+            *m_fields.get(FieldType::rho_fp, finest_level));
+
+        // Push fictitious electron particles
+        qdsmc_hybrid_electron_pc->PushX(finest_level, dt[0]);
+
+        // Deposit entropy from qdsmc
+        qdsmc_hybrid_electron_pc->DepositK(finest_level, *m_fields.get(hybrid_electron_fl->name_mf_K, finest_level));
 
         // Update Te after QDSMC solver:
         hybrid_electron_fl->HybridUpdateTe(m_fields, m_hybrid_pic_model->m_gamma, finest_level);
