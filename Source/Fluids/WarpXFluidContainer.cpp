@@ -1411,7 +1411,7 @@ void WarpXFluidContainer::DepositCurrent(
 
 
 void WarpXFluidContainer::HybridInitializeUe (ablastr::fields::MultiFabRegister& fields,
-        amrex::MultiFab &ji_x, amrex::MultiFab &ji_y, amrex::MultiFab &ji_z, 
+        amrex::MultiFab &ji_x, amrex::MultiFab &ji_y, amrex::MultiFab &ji_z,
         HybridPICModel const* hybrid_model, int lev)
 {
     using ablastr::fields::Direction;
