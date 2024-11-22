@@ -23,7 +23,6 @@
 #    include "ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper_fwd.H"
 #endif
 #include "MultiParticleContainer_fwd.H"
-#include "NamedComponentParticleContainer.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 
@@ -49,6 +48,26 @@
 #include <string>
 #include <utility>
 
+/** Real Particle Attributes stored in amrex::ParticleContainer's struct of array
+ */
+struct PIdx
+{
+    enum {
+#if !defined (WARPX_DIM_1D_Z)
+        x,
+#endif
+#if defined (WARPX_DIM_3D)
+        y,
+#endif
+        z,
+        w,      ///< weight
+        ux, uy, uz,
+#ifdef WARPX_DIM_RZ
+        theta,      ///< RZ needs all three position components
+#endif
+        nattribs    ///< number of compile-time attributes
+    };
+};
 
 class WarpXParIter
     : public amrex::ParIterSoA<PIdx::nattribs, 0>
@@ -109,7 +128,7 @@ public:
  * derived classes, e.g., Evolve) or actual functions (e.g. CurrentDeposition).
  */
 class WarpXParticleContainer
-    : public NamedComponentParticleContainer<amrex::DefaultAllocator>
+    : public amrex::ParticleContainerPureSoA<PIdx::nattribs, 0>
 {
 public:
     friend MultiParticleContainer;

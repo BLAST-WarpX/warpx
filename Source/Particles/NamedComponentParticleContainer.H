@@ -17,37 +17,6 @@
 #include <string>
 #include <utility>
 
-
-/** Real Particle Attributes stored in amrex::ParticleContainer's struct of array
- */
-struct PIdx
-{
-    enum {
-#if !defined (WARPX_DIM_1D_Z)
-        x,
-#endif
-#if defined (WARPX_DIM_3D)
-        y,
-#endif
-        z,
-        w,      ///< weight
-        ux, uy, uz,
-#ifdef WARPX_DIM_RZ
-        theta,      ///< RZ needs all three position components
-#endif
-        nattribs    ///< number of compile-time attributes
-    };
-};
-
-/** Integer Particle Attributes stored in amrex::ParticleContainer's struct of array
- */
-struct PIdxInt
-{
-    enum {
-        nattribs    ///< number of compile-time attributes
-    };
-};
-
 /** Particle Container class that allows to add/access particle components
  *  with a name (string) instead of doing so with an integer index.
  *  (The "components" are all the particle amrex::Real quantities.)
