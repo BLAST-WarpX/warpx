@@ -107,6 +107,8 @@ jobs:
         export CXXFLAGS="-fsanitize=thread"
 
         cmake -S . -B build                 \
+          -DWarpX_amrex_repo=https://github.com/EZoni/amrex.git \
+          -DWarpX_amrex_branch=fix_data_race \
           -GNinja                           \
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
@@ -121,6 +123,8 @@ jobs:
         cmake --build build -j 4
 
         cmake -S . -B build_EB              \
+          -DWarpX_amrex_repo=https://github.com/EZoni/amrex.git \
+          -DWarpX_amrex_branch=fix_data_race \
           -GNinja                           \
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
