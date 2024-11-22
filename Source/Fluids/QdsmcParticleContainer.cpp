@@ -341,6 +341,8 @@ QdsmcParticleContainer::PushX (int lev, amrex::Real dt)
 
         });
     }
+
+    Redistribute();
     // search for maximum part_dx/part_dy/part_dz and assert if larger than dx/dy/dz
     // ...
     // ...
@@ -394,6 +396,7 @@ QdsmcParticleContainer::DepositK(int lev, amrex::MultiFab &Kfield)
             if(part_entropy[ip]>0)
             {
                 do_deposit_scalar(arrKField, part_x[ip], part_y[ip], part_z[ip], xyzmin, dinv, part_entropy[ip]);
+                // is this kernel adding to the guard cells of each box ?
             }
         });
     }
