@@ -1478,7 +1478,7 @@ void WarpXFluidContainer::HybridInitializeKe (ablastr::fields::MultiFabRegister&
 {
     using warpx::fields::FieldType;
     ablastr::fields::ScalarField rho_fp = fields.get(FieldType::rho_fp, lev);
-    
+
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif

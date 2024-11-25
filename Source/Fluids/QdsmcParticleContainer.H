@@ -21,7 +21,7 @@
 #include "QdsmcParticleContainer_fwd.H"
 
 /**
- * This enumerated struct is used to index the qdsmc fictitious 
+ * This enumerated struct is used to index the qdsmc fictitious
  * particle values that are being stored as SoA data. Nattribs
  * is enumerated to give the number of attributes stored.
  */
