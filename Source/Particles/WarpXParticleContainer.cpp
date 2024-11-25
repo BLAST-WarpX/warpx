@@ -817,17 +817,12 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
     WARPX_PROFILE_VAR_STOP(blp_deposit);
 
 #ifndef AMREX_USE_GPU
-    {
     // CPU, tiling: atomicAdd local_j<xyz> into j<xyz>
     WARPX_PROFILE_VAR_START(blp_accumulate);
     (*jx)[pti].lockAdd(local_jx[thread_num], tbx, tbx, 0, 0, jx->nComp());
     (*jy)[pti].lockAdd(local_jy[thread_num], tby, tby, 0, 0, jy->nComp());
     (*jz)[pti].lockAdd(local_jz[thread_num], tbz, tbz, 0, 0, jz->nComp());
     WARPX_PROFILE_VAR_STOP(blp_accumulate);
-#ifdef AMREX_USE_OMP
-#pragma omp barrier
-#endif
-    }
 #endif
 }
 
