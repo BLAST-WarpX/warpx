@@ -350,8 +350,6 @@ QdsmcParticleContainer::PushX (int lev, amrex::Real dt)
 
 
 // Generalize this function to --> DepositScalar
-// does this fill the guard cells ?
-// do I need to add those cells between boxes after the particle iterator?
 void
 QdsmcParticleContainer::DepositK(int lev, amrex::MultiFab &Kfield)
 {
@@ -361,13 +359,12 @@ QdsmcParticleContainer::DepositK(int lev, amrex::MultiFab &Kfield)
     const amrex::Geometry &geom = warpx.Geom(lev);
     const amrex::Periodicity &period = geom.periodicity();
 
+    // We need to set the K multifab to 0 before depositing K values from qdsmc particles
+    Kfield.setVal(0._rt);
+
     for (iterator pti(*this, lev); pti.isValid(); ++pti)
     {
         auto const np = pti.numParticles();
-
-        // making box cell centered
-        //amrex::Box box = pti.tilebox();
-        //box.grow(Kfield.nGrowVect());
 
         amrex::Box box = pti.tilebox();
         const amrex::XDim3 xyzmin = warpx.LowerCorner(box, lev, 0._rt);
