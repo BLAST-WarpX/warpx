@@ -1478,7 +1478,7 @@ void WarpXFluidContainer::HybridInitializeKe (ablastr::fields::MultiFabRegister&
 {
     using warpx::fields::FieldType;
     ablastr::fields::ScalarField rho_fp = fields.get(FieldType::rho_fp, lev);
-
+    
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -1492,7 +1492,8 @@ void WarpXFluidContainer::HybridInitializeKe (ablastr::fields::MultiFabRegister&
 
             ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                 if( rho(i, j, k) > 0.0_rt ){
-                    Ke(i, j, k) = Te(i, j, k)*std::pow((rho(i, j, k)/PhysConst::q_e), 1-gamma);
+                    amrex::Real ne = rho(i, j, k)/PhysConst::q_e;
+                    Ke(i, j, k) = Te(i, j, k)*std::pow(ne, 1-gamma);
                 }
             });
         }
@@ -1503,6 +1504,11 @@ void WarpXFluidContainer::HybridUpdateTe (ablastr::fields::MultiFabRegister& fie
 {
     using warpx::fields::FieldType;
     ablastr::fields::ScalarField rho_fp = fields.get(FieldType::rho_fp, lev);
+
+    WarpX &warpx = WarpX::GetInstance();
+    const amrex::Geometry &geom = warpx.Geom(lev);
+    const auto dx = geom.CellSizeArray();
+    const auto cell_volume = dx[0]*dx[1]*dx[2];
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -1518,7 +1524,9 @@ void WarpXFluidContainer::HybridUpdateTe (ablastr::fields::MultiFabRegister& fie
             ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                 Te(i, j, k) = 0;
                 if( rho(i, j, k) > 0.0_rt ){
-                    Te(i, j, k) = Ke(i, j, k)*std::pow((rho(i, j, k)/PhysConst::q_e), gamma-1)*PhysConst::q_e;
+                    amrex::Real ne = rho(i, j, k)/PhysConst::q_e;
+                    amrex::Real N_cell = ne*cell_volume;
+                    Te(i, j, k) = (Ke(i, j, k)/std::pow(ne, 1-gamma))/N_cell;
                 }
             });
         }

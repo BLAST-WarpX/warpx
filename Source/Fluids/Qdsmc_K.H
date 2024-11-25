@@ -17,10 +17,10 @@
 
 
 /**
- * Qdsmc particles x0,y0,z0 positions should be cell centered
+ * Qdsmc particles x0,y0,z0 positions should at nodes positions
  * at the beginning of every step, so the field gathering
  * does not require any interpolation, it only needs to read
- * the values from the cell centered nodes.
+ * the values from the nodes.
  */
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void gather_density_entropy(const amrex::ParticleReal x0p,
@@ -48,9 +48,10 @@ void gather_density_entropy(const amrex::ParticleReal x0p,
 
 
 /**
- * Qdsmc particles x0,y0,z0 positions should match node positions
+ * Qdsmc particles x0,y0,z0 positions should at nodes positions
  * at the beginning of every step, so the field gathering
- * does not require any interpolation.
+ * does not require any interpolation, it only needs to read
+ * the values from the nodes.
  */
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void gather_vector_field_qdsmc(const amrex::ParticleReal x0p,
@@ -106,7 +107,9 @@ void push_qdsmc_particle(const amrex::ParticleReal x0p,
  */
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void do_deposit_scalar(amrex::Array4<amrex::Real> const& scalar_field,
-                    const amrex::ParticleReal xp, const amrex::ParticleReal yp, const amrex::ParticleReal zp,
+                    const amrex::ParticleReal xp,
+                    const amrex::ParticleReal yp,
+                    const amrex::ParticleReal zp,
                     const amrex::XDim3 & xyzmin,
                     const amrex::XDim3 & dinv,
                     const amrex::ParticleReal valuep)

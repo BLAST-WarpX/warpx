@@ -63,7 +63,7 @@ QdsmcParticleContainer::QdsmcParticleContainer (AmrCore* amr_core)
     : ParticleContainerPureSoA<QdsmcPIdx::nattribs, 0>(amr_core->GetParGDB())
 {
     SetParticleSize();
-    InitParticles(0); // only level 0 is used in HybridSolver
+    //InitParticles(0); // only level 0 is used in HybridSolver, commented since this is already called in WarpX.cpp
 }
 
 
@@ -214,10 +214,6 @@ QdsmcParticleContainer::SetV (int lev,
         auto const np = pti.numParticles();
         auto& attribs = pti.GetStructOfArrays().GetRealData();
 
-        // making box cell centered
-        // amrex::Box box = pti.tilebox();
-        // box.grow(Ux.nGrowVect());
-
         amrex::Box box = pti.tilebox();
         const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
 
@@ -233,8 +229,8 @@ QdsmcParticleContainer::SetV (int lev,
         const auto &arrUyfield = Uy[pti].array();
         const auto &arrUzfield = Uz[pti].array();
 
-        // Gather drift velocity directly from nodes
-        // since particles are located at the node positions before PushX
+        // Gather drift velocity directly from nodes since
+        // particles are located at the node positions before PushX
         amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (long ip)
         {
             amrex::Real vxp;
