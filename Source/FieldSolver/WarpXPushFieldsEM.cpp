@@ -717,6 +717,7 @@ void
 WarpX::PushPSATD (amrex::Real cur_time)
 {
 #ifndef WARPX_USE_FFT
+    amrex::ignore_unused(cur_time);
     WARPX_ABORT_WITH_MESSAGE(
         "PushFieldsEM: PSATD solver selected but not built");
 #else
