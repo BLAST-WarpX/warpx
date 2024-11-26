@@ -867,7 +867,7 @@ WarpX::PushPSATD (amrex::Real cur_time)
             pml[lev]->PushPSATD(m_fields, lev);
         }
 
-        amrex::Real const new_time = cur_time + spectral_solver_fp[lev].get_dt();
+        amrex::Real const new_time = cur_time + spectral_solver_fp[lev]->m_dt;
         ApplyEfieldBoundary(lev, PatchType::fine, new_time);
         if (lev > 0) { ApplyEfieldBoundary(lev, PatchType::coarse, new_time); }
         ApplyBfieldBoundary(lev, PatchType::fine, DtType::FirstHalf, new_time);
