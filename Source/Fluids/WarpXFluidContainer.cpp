@@ -1464,9 +1464,9 @@ void WarpXFluidContainer::HybridInitializeUe (ablastr::fields::MultiFabRegister&
                     auto const jiy_interp = ablastr::coarsen::sample::Interp(Jiy, Jy_stag, nodal, coarsen, i, j, k, 0);
                     auto const jiz_interp = ablastr::coarsen::sample::Interp(Jiz, Jz_stag, nodal, coarsen, i, j, k, 0);
 
-                    Uex(i, j, k) = (jx_interp - jix_interp)/rho(i, j, k);
-                    Uey(i, j, k) = (jy_interp - jiy_interp)/rho(i, j, k);
-                    Uez(i, j, k) = (jz_interp - jiz_interp)/rho(i, j, k);
+                    Uex(i, j, k) = -(jx_interp - jix_interp)/rho(i, j, k);
+                    Uey(i, j, k) = -(jy_interp - jiy_interp)/rho(i, j, k);
+                    Uez(i, j, k) = -(jz_interp - jiz_interp)/rho(i, j, k);
                 }
 
             });
