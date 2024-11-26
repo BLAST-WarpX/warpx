@@ -9,10 +9,11 @@
 
 #include "NonlinearSolver.H"
 #include "JacobianFunctionMF.H"
+#include "Preconditioner.H"
+#include "Utils/TextMsg.H"
 
 #include <AMReX_GMRES.H>
 #include <AMReX_ParmParse.H>
-#include "Utils/TextMsg.H"
 
 #include <vector>
 
@@ -79,6 +80,9 @@ public:
         amrex::Print()     << "GMRES max iterations:     " << m_gmres_maxits << "\n";
         amrex::Print()     << "GMRES relative tolerance: " << m_gmres_rtol << "\n";
         amrex::Print()     << "GMRES absolute tolerance: " << m_gmres_atol << "\n";
+        amrex::Print()     << "Preconditioner type:      " << amrex::getEnumNameString(m_pc_type) << "\n";
+
+        m_linear_function->printParams();
     }
 
 private:
@@ -138,9 +142,12 @@ private:
      */
     int m_gmres_restart_length = 30;
 
+    /**
+     * \brief Preconditioner type
+     */
+    PreconditionerType m_pc_type = PreconditionerType::none;
+
     mutable amrex::Real m_cur_time, m_dt;
-    mutable bool m_update_pc = false;
-    mutable bool m_update_pc_init = false;
 
     /**
      * \brief The linear function used by GMRES to compute A*v.
@@ -162,7 +169,6 @@ private:
                   const Vec&         a_U,
                   const Vec&         a_b,
                         amrex::Real  a_time,
-                        amrex::Real  a_dt,
                         int          a_iter ) const;
 
 };
@@ -184,7 +190,7 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
     m_ops = a_ops;
 
     m_linear_function = std::make_unique<JacobianFunctionMF<Vec,Ops>>();
-    m_linear_function->define(m_F, m_ops);
+    m_linear_function->define(m_F, m_ops, m_pc_type);
 
     m_linear_solver = std::make_unique<amrex::GMRES<Vec,JacobianFunctionMF<Vec,Ops>>>();
     m_linear_solver->define(*m_linear_function);
@@ -212,6 +218,9 @@ void NewtonSolver<Vec,Ops>::ParseParameters ()
     pp_gmres.query("absolute_tolerance",  m_gmres_atol);
     pp_gmres.query("relative_tolerance",  m_gmres_rtol);
     pp_gmres.query("max_iterations",      m_gmres_maxits);
+
+    const amrex::ParmParse pp_jac("jacobian");
+    pp_jac.query("pc_type", m_pc_type);
 }
 
 template <class Vec, class Ops>
@@ -242,7 +251,7 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
     for (iter = 0; iter < m_maxits;) {
 
         // Compute residual: F(U) = U - b - R(U)
-        EvalResidual(m_F, a_U, a_b, a_time, a_dt, iter);
+        EvalResidual(m_F, a_U, a_b, a_time, iter);
 
         // Compute norm of the residual
         norm_abs = m_F.norm2();
@@ -319,21 +328,17 @@ void NewtonSolver<Vec,Ops>::EvalResidual ( Vec&         a_F,
                                      const Vec&         a_U,
                                      const Vec&         a_b,
                                            amrex::Real  a_time,
-                                           amrex::Real  a_dt,
                                            int          a_iter ) const
 {
 
-    m_ops->ComputeRHS( m_R, a_U, a_time, a_dt, a_iter, false );
+    m_ops->ComputeRHS( m_R, a_U, a_time, a_iter, false );
 
     // set base U and R(U) for matrix-free Jacobian action calculation
     m_linear_function->setBaseSolution(a_U);
     m_linear_function->setBaseRHS(m_R);
 
     // update preconditioner
-    if (m_update_pc || m_update_pc_init) {
-        m_linear_function->updatePreCondMat(a_U);
-    }
-    m_update_pc_init = false;
+    m_linear_function->updatePreCondMat(a_U);
 
     // Compute residual: F(U) = U - b - R(U)
     a_F.Copy(a_U);

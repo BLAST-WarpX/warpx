@@ -121,7 +121,13 @@ amrex::RealVect interp_normal (int i, int j, int k, const amrex::Real W[AMREX_SP
 #else
     amrex::ignore_unused(i, j, k, ic, jc, kc, W, Wc, phi, dxi);
     amrex::RealVect normal(0.0);
-    WARPX_ABORT_WITH_MESSAGE("Error: interp_distance not yet implemented in 1D");
+
+    AMREX_IF_ON_DEVICE((
+        AMREX_DEVICE_ASSERT(0);
+    ))
+    AMREX_IF_ON_HOST((
+        WARPX_ABORT_WITH_MESSAGE("Error: interp_normal not yet implemented in 1D");
+    ))
 
 #endif
     return normal;

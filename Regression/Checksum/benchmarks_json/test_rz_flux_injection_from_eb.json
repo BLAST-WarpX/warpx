@@ -1,0 +1,12 @@
+{
+  "lev=0": {},
+  "electron": {
+    "particle_momentum_x": 3.3665608248716305e-19,
+    "particle_momentum_y": 3.392690322852239e-19,
+    "particle_momentum_z": 5.254577143779578e-19,
+    "particle_position_x": 26933.772112044953,
+    "particle_position_y": 26926.994273876346,
+    "particle_theta": 29492.77423173835,
+    "particle_weight": 2.4953304765944705e-07
+  }
+}

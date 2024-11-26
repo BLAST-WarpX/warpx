@@ -11,6 +11,7 @@
  */
 #include "WarpX.H"
 
+#include "BoundaryConditions/PEC_Insulator.H"
 #include "BoundaryConditions/PML.H"
 #include "Diagnostics/MultiDiagnostics.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
@@ -194,6 +195,22 @@ int WarpX::n_current_deposition_buffer = -1;
 amrex::IntVect m_rho_nodal_flag;
 
 WarpX* WarpX::m_instance = nullptr;
+
+namespace
+{
+
+    [[nodiscard]] bool
+    isAnyBoundaryPML(
+        const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_lo,
+        const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_hi)
+    {
+        constexpr auto is_pml = [](const FieldBoundaryType fbt) {return (fbt == FieldBoundaryType::PML);};
+        const auto is_any_pml =
+            std::any_of(field_boundary_lo.begin(), field_boundary_lo.end(), is_pml) ||
+            std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(), is_pml);
+        return is_any_pml;
+    }
+}
 
 void WarpX::MakeWarpX ()
 {
@@ -471,6 +488,7 @@ WarpX::ReadParameters ()
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT && !EB::enabled()) {
             throw std::runtime_error("ECP Solver requires to enable embedded boundaries at runtime.");
         }
+        pp_algo.query_enum_sloppy("evolve_scheme", evolve_scheme, "-_");
     }
 
     {
@@ -689,6 +707,11 @@ WarpX::ReadParameters ()
         pp_warpx.queryarr("dt_update_interval", dt_interval_vec);
         dt_update_interval = utils::parser::IntervalsParser(dt_interval_vec);
 
+        // Filter defaults to true for the explicit scheme, and false for the implicit schemes
+        if (evolve_scheme != EvolveScheme::Explicit) {
+            use_filter = false;
+        }
+
         // Filter currently not working with FDTD solver in RZ geometry: turn OFF by default
         // (see https://github.com/ECP-WarpX/WarpX/issues/1943)
 #ifdef WARPX_DIM_RZ
@@ -878,7 +901,7 @@ WarpX::ReadParameters ()
         }
 
 #ifdef WARPX_DIM_RZ
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE( isAnyBoundaryPML() == false || electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD,
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE( ::isAnyBoundaryPML(field_boundary_lo, field_boundary_hi) == false || electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD,
             "PML are not implemented in RZ geometry with FDTD; please set a different boundary condition using boundary.field_lo and boundary.field_hi.");
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE( field_boundary_lo[1] != FieldBoundaryType::PML && field_boundary_hi[1] != FieldBoundaryType::PML,
             "PML are not implemented in RZ geometry along z; please set a different boundary condition using boundary.field_lo and boundary.field_hi.");
@@ -1096,7 +1119,6 @@ WarpX::ReadParameters ()
         pp_algo.query_enum_sloppy("current_deposition", current_deposition_algo, "-_");
         pp_algo.query_enum_sloppy("charge_deposition", charge_deposition_algo, "-_");
         pp_algo.query_enum_sloppy("particle_pusher", particle_pusher_algo, "-_");
-        pp_algo.query_enum_sloppy("evolve_scheme", evolve_scheme, "-_");
 
         // check for implicit evolve scheme
         if (evolve_scheme == EvolveScheme::SemiImplicitEM) {
@@ -1104,6 +1126,9 @@ WarpX::ReadParameters ()
         }
         else if (evolve_scheme == EvolveScheme::ThetaImplicitEM) {
             m_implicit_solver = std::make_unique<ThetaImplicitEM>();
+        }
+        else if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+            m_implicit_solver = std::make_unique<StrangImplicitSpectralEM>();
         }
 
         // implicit evolve schemes not setup to use mirrors
@@ -1150,7 +1175,8 @@ WarpX::ReadParameters ()
         if (current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 evolve_scheme == EvolveScheme::SemiImplicitEM ||
-                evolve_scheme == EvolveScheme::ThetaImplicitEM,
+                evolve_scheme == EvolveScheme::ThetaImplicitEM ||
+                evolve_scheme == EvolveScheme::StrangImplicitSpectralEM,
                 "Villasenor current deposition can only"
                 "be used with Implicit evolve schemes.");
         }
@@ -1221,7 +1247,8 @@ WarpX::ReadParameters ()
         }
 
         if (evolve_scheme == EvolveScheme::SemiImplicitEM ||
-            evolve_scheme == EvolveScheme::ThetaImplicitEM) {
+            evolve_scheme == EvolveScheme::ThetaImplicitEM ||
+            evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 current_deposition_algo == CurrentDepositionAlgo::Esirkepov ||
@@ -1231,8 +1258,9 @@ WarpX::ReadParameters ()
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee ||
-                electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC,
-                "Only the Yee EM solver is supported with the implicit and semi-implicit schemes");
+                electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC ||
+                electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD,
+                "Only the Yee, CKC, and PSATD EM solvers are supported with the implicit and semi-implicit schemes");
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 particle_pusher_algo == ParticlePusherAlgo::Boris ||
@@ -1242,6 +1270,11 @@ WarpX::ReadParameters ()
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 field_gathering_algo != GatheringAlgo::MomentumConserving,
                     "With implicit and semi-implicit schemes, the momentum conserving field gather is not supported as it would not conserve energy");
+        }
+        if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD,
+                "With the strang_implicit_spectral_em evolve scheme, the algo.maxwell_solver must be psatd");
         }
 
         // Load balancing parameters
@@ -1669,6 +1702,9 @@ WarpX::ReadParameters ()
         }
     }
 
+    // Setup pec_insulator boundary conditions
+    pec_insulator_boundary = std::make_unique<PEC_Insulator>();
+
     // for slice generation //
     {
         const ParmParse pp_slice("slice");
@@ -2014,7 +2050,7 @@ WarpX::AllocLevelData (int lev, const BoxArray& ba, const DistributionMapping& d
         safe_guard_cells,
         WarpX::do_multi_J,
         WarpX::fft_do_time_averaging,
-        WarpX::isAnyBoundaryPML(),
+        ::isAnyBoundaryPML(field_boundary_lo, field_boundary_hi),
         WarpX::do_pml_in_domain,
         WarpX::pml_ncell,
         this->refRatio(),
@@ -2732,6 +2768,10 @@ void WarpX::AllocLevelSpectralSolverRZ (amrex::Vector<std::unique_ptr<SpectralSo
 
     amrex::Real solver_dt = dt[lev];
     if (WarpX::do_multi_J) { solver_dt /= static_cast<amrex::Real>(WarpX::do_multi_J_n_depositions); }
+    if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+        // The step is Strang split into two half steps
+        solver_dt /= 2.;
+    }
 
     auto pss = std::make_unique<SpectralSolverRZ>(lev,
                                                   realspace_ba,
@@ -2742,7 +2782,7 @@ void WarpX::AllocLevelSpectralSolverRZ (amrex::Vector<std::unique_ptr<SpectralSo
                                                   m_v_galilean,
                                                   dx_vect,
                                                   solver_dt,
-                                                  isAnyBoundaryPML(),
+                                                  ::isAnyBoundaryPML(field_boundary_lo, field_boundary_hi),
                                                   update_with_rho,
                                                   fft_do_time_averaging,
                                                   J_in_time,
@@ -2785,6 +2825,10 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
 
     amrex::Real solver_dt = dt[lev];
     if (WarpX::do_multi_J) { solver_dt /= static_cast<amrex::Real>(WarpX::do_multi_J_n_depositions); }
+    if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+        // The step is Strang split into two half steps
+        solver_dt /= 2.;
+    }
 
     auto pss = std::make_unique<SpectralSolver>(lev,
                                                 realspace_ba,
@@ -3253,16 +3297,6 @@ WarpX::RestoreCurrent (int lev)
             );
         }
     }
-}
-
-bool
-WarpX::isAnyBoundaryPML()
-{
-    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-        if ( WarpX::field_boundary_lo[idim] == FieldBoundaryType::PML) { return true; }
-        if ( WarpX::field_boundary_hi[idim] == FieldBoundaryType::PML) { return true; }
-    }
-    return false;
 }
 
 bool
