@@ -142,20 +142,18 @@ void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
 void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
                                           amrex::Real            a_time )
 {
-    amrex::ignore_unused(a_time);
 
     // Update Efield_fp owned by WarpX
-    m_WarpX->SetElectricFieldAndApplyBCs( a_E );
+    m_WarpX->SetElectricFieldAndApplyBCs( a_E, a_time );
 
     // Update Bfield_fp owned by WarpX
     ablastr::fields::MultiLevelVectorField const& B_old = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::B_old, 0);
-    m_WarpX->UpdateMagneticFieldAndApplyBCs( B_old, m_theta*m_dt );
+    m_WarpX->UpdateMagneticFieldAndApplyBCs( B_old, m_theta*m_dt, a_time );
 
 }
 
 void ThetaImplicitEM::FinishFieldUpdate ( amrex::Real  a_new_time )
 {
-    amrex::ignore_unused(a_new_time);
 
     // Eg^{n+1} = (1/theta)*Eg^{n+theta} + (1-1/theta)*Eg^n
     // Bg^{n+1} = (1/theta)*Bg^{n+theta} + (1-1/theta)*Bg^n
@@ -163,8 +161,8 @@ void ThetaImplicitEM::FinishFieldUpdate ( amrex::Real  a_new_time )
     const amrex::Real c0 = 1._rt/m_theta;
     const amrex::Real c1 = 1._rt - c0;
     m_E.linComb( c0, m_E, c1, m_Eold );
-    m_WarpX->SetElectricFieldAndApplyBCs( m_E );
+    m_WarpX->SetElectricFieldAndApplyBCs( m_E, a_new_time );
     ablastr::fields::MultiLevelVectorField const & B_old = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::B_old, 0);
-    m_WarpX->FinishMagneticFieldAndApplyBCs( B_old, m_theta );
+    m_WarpX->FinishMagneticFieldAndApplyBCs( B_old, m_theta, a_new_time );
 
 }

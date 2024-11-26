@@ -71,7 +71,7 @@ void SemiImplicitEM::OneStep ( amrex::Real  a_time,
     m_Eold.Copy( FieldType::Efield_fp );
 
     // Advance WarpX owned Bfield_fp from t_{n} to t_{n+1/2}
-    m_WarpX->EvolveB(0.5_rt*m_dt, DtType::FirstHalf);
+    m_WarpX->EvolveB(0.5_rt*m_dt, DtType::FirstHalf, a_time);
     m_WarpX->FillBoundaryB(m_WarpX->getngEB(), true);
 
     const amrex::Real half_time = a_time + 0.5_rt*m_dt;
@@ -82,7 +82,7 @@ void SemiImplicitEM::OneStep ( amrex::Real  a_time,
     m_nlsolver->Solve( m_E, m_Eold, half_time, 0.5_rt*m_dt );
 
     // Update WarpX owned Efield_fp to t_{n+1/2}
-    m_WarpX->SetElectricFieldAndApplyBCs( m_E );
+    m_WarpX->SetElectricFieldAndApplyBCs( m_E, half_time );
 
     // Advance particles from time n+1/2 to time n+1
     m_WarpX->FinishImplicitParticleUpdate();
@@ -90,10 +90,11 @@ void SemiImplicitEM::OneStep ( amrex::Real  a_time,
     // Advance Eg from time n+1/2 to time n+1
     // Eg^{n+1} = 2.0*Eg^{n+1/2} - Eg^n
     m_E.linComb( 2._rt, m_E, -1._rt, m_Eold );
-    m_WarpX->SetElectricFieldAndApplyBCs( m_E );
+    const amrex::Real new_time = a_time + m_dt;
+    m_WarpX->SetElectricFieldAndApplyBCs( m_E, new_time );
 
     // Advance WarpX owned Bfield_fp from t_{n+1/2} to t_{n+1}
-    m_WarpX->EvolveB(0.5_rt*m_dt, DtType::SecondHalf);
+    m_WarpX->EvolveB(0.5_rt*m_dt, DtType::SecondHalf, half_time);
     m_WarpX->FillBoundaryB(m_WarpX->getngEB(), true);
 
 }
@@ -106,7 +107,7 @@ void SemiImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
 {
     // Update WarpX-owned Efield_fp using current state of Eg from
     // the nonlinear solver at time n+theta
-    m_WarpX->SetElectricFieldAndApplyBCs( a_E );
+    m_WarpX->SetElectricFieldAndApplyBCs( a_E, a_time );
 
     // Update particle positions and velocities using the current state
     // of Eg and Bg. Deposit current density at time n+1/2

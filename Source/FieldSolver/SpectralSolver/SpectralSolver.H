@@ -198,6 +198,9 @@ class SpectralSolver
 
         SpectralFieldIndex m_spectral_index;
 
+        // Solve time step size
+        amrex::Real m_dt;
+
     protected:
 
         amrex::IntVect m_fill_guards;

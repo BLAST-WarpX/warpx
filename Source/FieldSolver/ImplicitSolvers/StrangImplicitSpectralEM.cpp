@@ -70,7 +70,7 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real a_time,
     m_WarpX->SaveParticlesAtImplicitStepStart();
 
     // Advance the fields to time n+1/2 source free
-    m_WarpX->SpectralSourceFreeFieldAdvance();
+    m_WarpX->SpectralSourceFreeFieldAdvance(a_time);
 
     // Save the fields at the start of the step
     m_Eold.Copy( FieldType::Efield_fp );
@@ -93,7 +93,7 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real a_time,
     FinishFieldUpdate( new_time );
 
     // Advance the fields to time n+1 source free
-    m_WarpX->SpectralSourceFreeFieldAdvance();
+    m_WarpX->SpectralSourceFreeFieldAdvance(half_time);
 
 }
 
@@ -120,20 +120,20 @@ void StrangImplicitSpectralEM::ComputeRHS ( WarpXSolverVec& a_RHS,
 }
 
 void StrangImplicitSpectralEM::UpdateWarpXFields (WarpXSolverVec const & a_E,
-                                                  amrex::Real /*a_time*/ )
+                                                  amrex::Real a_time )
 {
 
     // Update Efield_fp owned by WarpX
-    m_WarpX->SetElectricFieldAndApplyBCs( a_E );
+    m_WarpX->SetElectricFieldAndApplyBCs( a_E, a_time );
 
 }
 
-void StrangImplicitSpectralEM::FinishFieldUpdate ( amrex::Real /*a_new_time*/ )
+void StrangImplicitSpectralEM::FinishFieldUpdate ( amrex::Real a_new_time )
 {
     // Eg^{n+1} = 2*E_g^{n+1/2} - E_g^n
     amrex::Real const c0 = 1._rt/0.5_rt;
     amrex::Real const c1 = 1._rt - c0;
     m_E.linComb( c0, m_E, c1, m_Eold );
-    m_WarpX->SetElectricFieldAndApplyBCs( m_E );
+    m_WarpX->SetElectricFieldAndApplyBCs( m_E, a_new_time );
 
 }
