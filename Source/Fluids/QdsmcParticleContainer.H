@@ -15,10 +15,10 @@
 #include <AMReX_AmrCoreFwd.H>
 #include <AMReX_Vector.H>
 
-#include "Particles/ParticleBoundaries.H"
-#include <ablastr/fields/MultiFabRegister.H>
+//#include "Particles/ParticleBoundaries.H"
+//#include <ablastr/fields/MultiFabRegister.H>
 
-#include "QdsmcParticleContainer_fwd.H"
+//#include "QdsmcParticleContainer_fwd.H"
 
 /**
  * This enumerated struct is used to index the qdsmc fictitious
@@ -38,10 +38,6 @@ struct QdsmcPIdx
         z, z_node,
         vx, vy, vz,
         entropy, np_real,
-
-#ifdef WARPX_DIM_RZ
-        theta,      ///< RZ needs all three position components
-#endif
         nattribs
     };
 };
@@ -74,7 +70,7 @@ public:
 
     //! similar to WarpXParticleContainer::AddNParticles
 
-    void AddNParticles (int lev, amrex::Long n,
+    void AddNParticles (int lev, amrex::Long np,
                         amrex::Vector<amrex::ParticleReal> const & x,
                         amrex::Vector<amrex::ParticleReal> const & y,
                         amrex::Vector<amrex::ParticleReal> const & z);

@@ -235,26 +235,14 @@ void HybridPICModel::InitData ()
     }
 
     const auto elec_temp = m_elec_temp;
-    // Initialize electron temperature multifab
-    // This assumes an uniform electron temperature in the domain
-    // ...
-// Loop through the grids, and over the tiles within each grid
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-        for ( MFIter mfi(*warpx.m_fields.get("fluid_temperature_electrons_hybrid",  warpx.finestLevel()), TilingIfNotGPU()); mfi.isValid(); ++mfi )
-        {
-            Array4<Real> const& Te = warpx.m_fields.get("fluid_temperature_electrons_hybrid",  warpx.finestLevel())->array(mfi);
-            const Box& tilebox  = mfi.tilebox();
 
-            ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                Te(i, j, k) = elec_temp;
-            });
-        }
+    // Initialize electron temperature multifab
+    // This assumes an uniform electron temperature in the domain   
+    warpx.m_fields.get("fluid_temperature_electrons_hybrid",  warpx.finestLevel())->setVal(elec_temp);
 
     // Fill Boundaries in electron temperature multifab
     warpx.m_fields.get("fluid_temperature_electrons_hybrid",  warpx.finestLevel())->FillBoundary(warpx.Geom(warpx.finestLevel()).periodicity());
-
+    
 }
 
 void HybridPICModel::GetCurrentExternal ()

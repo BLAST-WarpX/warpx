@@ -2268,7 +2268,10 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         hybrid_electron_fl->AllocateLevelMFs(m_fields, ba, dm, lev);
 
         // Initialize qdsmc particle container (add fictitious particles in nodal grid)
-        qdsmc_hybrid_electron_pc->InitParticles(lev);
+        if(m_hybrid_pic_model->m_solve_electron_energy_equation){
+            qdsmc_hybrid_electron_pc->InitParticles(lev);
+        }
+        
     }
 
     // Allocate extra multifabs needed for fluids

@@ -201,6 +201,7 @@ public:
     amrex::GpuArray<int, 3> Ez_IndexType;
 
     bool m_solve_electron_energy_equation;
+
 };
 
 /**

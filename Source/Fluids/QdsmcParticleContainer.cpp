@@ -53,6 +53,7 @@
 #include <AMReX_ParticleUtil.H>
 #include <AMReX_Utility.H>
 
+#include <AMReX_Print.H>
 
 #include <algorithm>
 #include <cmath>
@@ -63,7 +64,6 @@ QdsmcParticleContainer::QdsmcParticleContainer (AmrCore* amr_core)
     : ParticleContainerPureSoA<QdsmcPIdx::nattribs, 0>(amr_core->GetParGDB())
 {
     SetParticleSize();
-    //InitParticles(0); // only level 0 is used in HybridSolver, commented since this is already called in WarpX.cpp
 }
 
 
@@ -78,68 +78,121 @@ QdsmcParticleContainer::AddNParticles (int lev, amrex::Long n,
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(y.size() == n,"y.size() != # of qdsmc particles to add");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(z.size() == n,"z.size() != # of qdsmc particles to add");
 
-    if (n <= 0){
-        Redistribute();
-        return;
-    }
     // have to resize here, not in the constructor because grids have not
     // been built when constructor was called.
     reserveData();
     resizeData();
 
+    long ibegin = 0;
+    long iend = n;
+    
+    const int myproc = amrex::ParallelDescriptor::MyProc();
+    const int nprocs = amrex::ParallelDescriptor::NProcs();
+    const auto navg = n/nprocs;
+    const auto nleft = n - navg * nprocs;
+    if (myproc < nleft) {
+        ibegin = myproc*(navg+1);
+        iend = ibegin + navg+1;
+    } else {
+        ibegin = myproc*navg + nleft;
+        iend = ibegin + navg;
+    }
+    
+
+    //if (np <= 0){
+    //    Redistribute();
+    //    return;
+    //}
+
+    //std::ofstream ofs("xyz_InitParticles.txt", std::ofstream::out); // REMOVE
+    //for(int i=0; i<np; i++){ //REMOVE
+    //    Print(ofs) << " x " << x[i] << " y " << y[i] << " z " << z[i] << std::endl; // REMOVE
+    //} //REMOVE
+    //ofs.close(); // REMOVE
+    // up to here, x,y,z vectors have the correct values
+
+    //  Add to grid 0 and tile 0
+    // Redistribute() will move them to proper places.
     auto& particle_tile = DefineAndReturnParticleTile(0, 0, 0);
 
     // Creates a temporary tile to obtain data from simulation. This data
     // is then coppied to the permament tile which is stored on the particle
     // (particle_tile).
     using PinnedTile = typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType;
-
     PinnedTile pinned_tile;
     pinned_tile.define(NumRuntimeRealComps(), NumRuntimeIntComps());
 
-    for (int i = 0; i < n; i++)
+    const std::size_t np = iend-ibegin;
+
+    std::ofstream ofsID("IDs.txt", std::ofstream::out); // REMOVE
+    for (auto i = ibegin; i < iend; ++i)
     {
         auto & idcpu_data = pinned_tile.GetStructOfArrays().GetIdCPUData();
-        idcpu_data.push_back(amrex::SetParticleIDandCPU(ParticleType::NextID(), ParallelDescriptor::MyProc()));
+        amrex::Long current_id = ParticleType::NextID();
+        idcpu_data.push_back(amrex::SetParticleIDandCPU(current_id, ParallelDescriptor::MyProc()));
+        Print(ofsID) << " i " << i <<" current_id " << current_id << std::endl; // REMOVE
     }
+    ofsID.close(); // REMOVE
 
-    // write Real attributes (SoA) to particle initialized zero
-    DefineAndReturnParticleTile(0, 0, 0);
+    //
+    // Check here if the idcpu_data is correct and compare with physical particle container
+    // ...
+    // ...
 
-    // for RZ write theta value
-#ifdef WARPX_DIM_RZ
-    pinned_tile.push_back_real(QdsmcPIdx::theta, n, 0.0);
-#endif
+    std::ofstream ofs0("some_params.txt", std::ofstream::out); // REMOVE
+    Print(ofs0) << " ibegin " << ibegin << " iend " << iend << " np " << np << " NReal " << NReal << std::endl; // REMOVE
+    Print(ofs0) << " NumRuntimeRealComps " << NumRuntimeRealComps() << " NumRuntimeIntComps " << NumRuntimeIntComps() << std::endl; // REMOVE
+    ofs0.close(); // REMOVE
+
+    //std::ofstream ofs("xyz_InitParticles.txt", std::ofstream::out); // REMOVE
+    //for(int i=0; i<np; i++){ //REMOVE
+    //    Print(ofs) << " x " << x[i] << " y " << y[i] << " z " << z[i] << std::endl; // REMOVE
+    //} //REMOVE
+    //ofs.close(); // REMOVE
+
 #if !defined (WARPX_DIM_1D_Z)
-    pinned_tile.push_back_real(QdsmcPIdx::x, x);
-    pinned_tile.push_back_real(QdsmcPIdx::x_node, x);
+    pinned_tile.push_back_real(QdsmcPIdx::x, x.data() + ibegin, x.data() + iend);
+    pinned_tile.push_back_real(QdsmcPIdx::x_node, x.data() + ibegin, x.data() + iend);
 #endif
 #if defined (WARPX_DIM_3D)
-    pinned_tile.push_back_real(QdsmcPIdx::y, y);
-    pinned_tile.push_back_real(QdsmcPIdx::y_node, y);
+    pinned_tile.push_back_real(QdsmcPIdx::y, y.data() + ibegin, y.data() + iend);
+    pinned_tile.push_back_real(QdsmcPIdx::y_node, y.data() + ibegin, y.data() + iend);
 #endif
-    pinned_tile.push_back_real(QdsmcPIdx::z, z);
-    pinned_tile.push_back_real(QdsmcPIdx::z_node, z);
-    pinned_tile.push_back_real(QdsmcPIdx::vx, n, 0.0);
-    pinned_tile.push_back_real(QdsmcPIdx::vy, n, 0.0);
-    pinned_tile.push_back_real(QdsmcPIdx::vz, n, 0.0);
-    pinned_tile.push_back_real(QdsmcPIdx::entropy, n, 0.0);
-    pinned_tile.push_back_real(QdsmcPIdx::np_real, n, 0.0);
+    pinned_tile.push_back_real(QdsmcPIdx::z, z.data() + ibegin, z.data() + iend);
+    pinned_tile.push_back_real(QdsmcPIdx::z_node, z.data() + ibegin, z.data() + iend);
+    pinned_tile.push_back_real(QdsmcPIdx::vx, np, 0.0_prt);
+    pinned_tile.push_back_real(QdsmcPIdx::vy, np, 0.0_prt);
+    pinned_tile.push_back_real(QdsmcPIdx::vz, np, 0.0_prt);
+    pinned_tile.push_back_real(QdsmcPIdx::entropy, np, 0.0_prt);
+    pinned_tile.push_back_real(QdsmcPIdx::np_real, np, 0.0_prt);
 
-    const auto old_np = particle_tile.numParticles();
-    const auto new_np = old_np + pinned_tile.numParticles();
+    if ( (NumRuntimeRealComps()>0) || (NumRuntimeIntComps()>0) ){
+            DefineAndReturnParticleTile(0, 0, 0);
+        }
+
+    pinned_tile.resize(np);
+    
+    auto old_np = particle_tile.numParticles();
+    auto new_np = old_np + pinned_tile.numParticles();
     particle_tile.resize(new_np);
     amrex::copyParticles(
-        particle_tile, pinned_tile, 0, old_np, pinned_tile.numParticles());
+            particle_tile, pinned_tile, 0, old_np, pinned_tile.numParticles()
+        );
 
+    // Move particles to their appropriate tiles
     Redistribute();
 
-    // Remove particles that are inside the embedded boundaries here
-    /**
-     *
-     *
-     *
-     */
+    // Remove particles that are inside the embedded boundaries
+//#ifdef AMREX_USE_EB
+//    if (EB::enabled()) {
+//        auto & warpx = WarpX::GetInstance();
+//        scrapeParticlesAtEB(
+//            *this,
+//            warpx.m_fields.get_mr_levels(FieldType::distance_to_eb, warpx.finestLevel()),
+//            ParticleBoundaryProcess::Absorb());
+//        deleteInvalidParticles();
+//    }
+//#endif
 }
 
 
@@ -152,7 +205,7 @@ QdsmcParticleContainer::InitParticles (int lev)
 
     const amrex::Real* dx = warpx.Geom(lev).CellSize();
 
-    // Read this from domain ?
+    // Number of cells in each direction
     int nx = (probhi[0] - problo[0])/dx[0];
     int ny = (probhi[1] - problo[1])/dx[1];
     int nz = (probhi[2] - problo[2])/dx[2];
@@ -164,6 +217,13 @@ QdsmcParticleContainer::InitParticles (int lev)
     amrex::Vector<amrex::ParticleReal> ypos;
     amrex::Vector<amrex::ParticleReal> zpos;
 
+    //std::ofstream ofs1("variables_InitParticles.txt", std::ofstream::out); // REMOVE
+    //Print(ofs1) << " problo[0] " << problo[0] << " problo[1] " << problo[1] << " problo[2] " << problo[2] << std::endl; // REMOVE
+    //Print(ofs1) << " probhi[0] " << probhi[0] << " probhi[1] " << probhi[1] << " probhi[2] " << probhi[2] << std::endl; // REMOVE
+    //Print(ofs1) << " dx[0] " << dx[0] << " dx[1] " << dx[1] << " dx[2] " << dx[2] << std::endl; // REMOVE
+    //Print(ofs1) << " nx " << nx << " ny " << ny << " nz " << nz << std::endl; // REMOVE
+    //ofs1.close(); // REMOVE
+
     // for now, only one MPI rank adds fictitious particles
     // this is done only once in an entire simulation
     if (ParallelDescriptor::IOProcessor())
@@ -174,30 +234,21 @@ QdsmcParticleContainer::InitParticles (int lev)
             {
                 for ( int k = 0; k <= nz; k++)
                 {
-                    // cell centered
-                    //amrex::Real x = problo[0] + (i+0.5)*dx[0];
-                    //amrex::Real y = problo[1] + (j+0.5)*dx[1];
-                    //amrex::Real z = problo[2] + (k+0.5)*dx[2];
-
                     // nodal
-                    amrex::Real x = problo[0] + i*dx[0];
-                    amrex::Real y = problo[1] + j*dx[1];
-                    amrex::Real z = problo[2] + k*dx[2];
+                    amrex::ParticleReal x = problo[0] + i*dx[0];
+                    amrex::ParticleReal y = problo[1] + j*dx[1];
+                    amrex::ParticleReal z = problo[2] + k*dx[2];
 
-                    if( x <= probhi[0] && y <= probhi[1] && z <= probhi[2])
-                    {
-                        xpos.push_back(x);
-                        ypos.push_back(y);
-                        zpos.push_back(z);
+                    xpos.push_back(x);
+                    ypos.push_back(y);
+                    zpos.push_back(z);
 
-                        n_to_add++;
-                    }
+                    n_to_add++;
                 }
             }
         }
     }
-
-    AddNParticles (0, n_to_add, xpos, ypos, zpos);
+    AddNParticles(0, n_to_add, xpos, ypos, zpos);
 }
 
 
@@ -338,7 +389,7 @@ QdsmcParticleContainer::PushX (int lev, amrex::Real dt)
         });
     }
 
-    Redistribute();
+    //Redistribute();
     // search for maximum part_dx/part_dy/part_dz and assert if larger than dx/dy/dz
     // ...
     // ...

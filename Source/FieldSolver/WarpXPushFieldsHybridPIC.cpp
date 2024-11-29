@@ -171,36 +171,35 @@ void WarpX::HybridPICEvolveFields ()
 
         // Initialize Ke = ne^(1-gamma)*Te
         // Move up, shouldn't Ke be defined with both ne and Te at n instead of ne at n+1 ?
-        hybrid_electron_fl->HybridInitializeKe(m_fields, m_hybrid_pic_model->m_gamma , finest_level);
+        hybrid_electron_fl->HybridInitializeKe(m_fields, m_hybrid_pic_model->m_gamma, m_hybrid_pic_model->m_n_floor, finest_level);
 
         // Update Ue in electron fluid container
         // check at what step this should be calculated, here Ue is at n+1
         // maybe move up to be consistent with Ke initialization
         hybrid_electron_fl->HybridInitializeUe(m_fields,
-            *current_fp_temp[finest_level][0],
-            *current_fp_temp[finest_level][1],
-            *current_fp_temp[finest_level][2],
-            m_hybrid_pic_model.get(), finest_level);
+            current_fp_temp[finest_level],
+            m_hybrid_pic_model.get(),
+            finest_level);
 
         // Set fictitious electron particles velocities
-        qdsmc_hybrid_electron_pc->SetV(finest_level,
-            *m_fields.get(hybrid_electron_fl->name_mf_NU, Direction{0}, finest_level),
-            *m_fields.get(hybrid_electron_fl->name_mf_NU, Direction{1}, finest_level),
-            *m_fields.get(hybrid_electron_fl->name_mf_NU, Direction{2}, finest_level));
+        //qdsmc_hybrid_electron_pc->SetV(finest_level,
+        //    *m_fields.get(hybrid_electron_fl->name_mf_NU, Direction{0}, finest_level),
+        //    *m_fields.get(hybrid_electron_fl->name_mf_NU, Direction{1}, finest_level),
+        //    *m_fields.get(hybrid_electron_fl->name_mf_NU, Direction{2}, finest_level));
 
         // Set fictitious electron particles entropy
-        qdsmc_hybrid_electron_pc->SetK(finest_level,
-            *m_fields.get(hybrid_electron_fl->name_mf_K, finest_level),
-            *m_fields.get(FieldType::rho_fp, finest_level));
+        //qdsmc_hybrid_electron_pc->SetK(finest_level,
+        //    *m_fields.get(hybrid_electron_fl->name_mf_K, finest_level),
+        //    *m_fields.get(FieldType::rho_fp, finest_level));
 
         // Push fictitious electron particles
-        qdsmc_hybrid_electron_pc->PushX(finest_level, dt[0]);
+        //qdsmc_hybrid_electron_pc->PushX(finest_level, dt[0]);
 
         // Deposit entropy from qdsmc
-        qdsmc_hybrid_electron_pc->DepositK(finest_level, *m_fields.get(hybrid_electron_fl->name_mf_K, finest_level));
+        //qdsmc_hybrid_electron_pc->DepositK(finest_level, *m_fields.get(hybrid_electron_fl->name_mf_K, finest_level));
 
         // Update Te after QDSMC solver:
-        hybrid_electron_fl->HybridUpdateTe(m_fields, m_hybrid_pic_model->m_gamma, finest_level);
+        //hybrid_electron_fl->HybridUpdateTe(m_fields, m_hybrid_pic_model->m_gamma, m_hybrid_pic_model->m_n_floor, finest_level);
     }
 
     // Calculate the electron pressure at t=n+1
