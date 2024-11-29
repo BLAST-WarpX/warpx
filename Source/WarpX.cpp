@@ -2271,7 +2271,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         if(m_hybrid_pic_model->m_solve_electron_energy_equation){
             qdsmc_hybrid_electron_pc->InitParticles(lev);
         }
-        
+
     }
 
     // Allocate extra multifabs needed for fluids

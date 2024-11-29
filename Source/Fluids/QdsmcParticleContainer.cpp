@@ -85,7 +85,7 @@ QdsmcParticleContainer::AddNParticles (int lev, amrex::Long n,
 
     long ibegin = 0;
     long iend = n;
-    
+
     const int myproc = amrex::ParallelDescriptor::MyProc();
     const int nprocs = amrex::ParallelDescriptor::NProcs();
     const auto navg = n/nprocs;
@@ -97,7 +97,7 @@ QdsmcParticleContainer::AddNParticles (int lev, amrex::Long n,
         ibegin = myproc*navg + nleft;
         iend = ibegin + navg;
     }
-    
+
 
     //if (np <= 0){
     //    Redistribute();
@@ -171,7 +171,7 @@ QdsmcParticleContainer::AddNParticles (int lev, amrex::Long n,
         }
 
     pinned_tile.resize(np);
-    
+
     auto old_np = particle_tile.numParticles();
     auto new_np = old_np + pinned_tile.numParticles();
     particle_tile.resize(new_np);

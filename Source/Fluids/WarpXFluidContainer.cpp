@@ -1468,7 +1468,7 @@ void WarpXFluidContainer::HybridInitializeUe (
                     amrex::Real rho_val = rho_floor;
                     if(rho(i, j, k) > rho_floor){
                         rho_val = rho(i, j, k);
-                    }                   
+                    }
 
                     // Interpolate the total plasma current to a nodal grid
                     auto const jx_interp = ablastr::coarsen::sample::Interp(Jx, Jx_stag, nodal, coarsen, i, j, k, 0);
@@ -1482,7 +1482,7 @@ void WarpXFluidContainer::HybridInitializeUe (
 
                     // this needs to be rewritten for multiple ion species when implemented :
 
-                    Uex(i, j, k) = -(jx_interp - jix_interp)/rho_val; 
+                    Uex(i, j, k) = -(jx_interp - jix_interp)/rho_val;
                     Uey(i, j, k) = -(jy_interp - jiy_interp)/rho_val;
                     Uez(i, j, k) = -(jz_interp - jiz_interp)/rho_val;
                 }
@@ -1521,7 +1521,7 @@ void WarpXFluidContainer::HybridInitializeKe (ablastr::fields::MultiFabRegister&
                     amrex::Real rho_val = rho_floor;
                     if(rho(i, j, k) > rho_floor){
                         rho_val = rho(i, j, k);
-                    }   
+                    }
 
                     amrex::Real ne = rho_val/PhysConst::q_e;
                     Ke(i, j, k) = Te(i, j, k)*std::pow(ne, 1-gamma)/PhysConst::q_e; // Ke with Te in eV to avoid small numbers

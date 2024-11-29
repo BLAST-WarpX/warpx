@@ -237,12 +237,12 @@ void HybridPICModel::InitData ()
     const auto elec_temp = m_elec_temp;
 
     // Initialize electron temperature multifab
-    // This assumes an uniform electron temperature in the domain   
+    // This assumes an uniform electron temperature in the domain
     warpx.m_fields.get("fluid_temperature_electrons_hybrid",  warpx.finestLevel())->setVal(elec_temp);
 
     // Fill Boundaries in electron temperature multifab
     warpx.m_fields.get("fluid_temperature_electrons_hybrid",  warpx.finestLevel())->FillBoundary(warpx.Geom(warpx.finestLevel()).periodicity());
-    
+
 }
 
 void HybridPICModel::GetCurrentExternal ()
