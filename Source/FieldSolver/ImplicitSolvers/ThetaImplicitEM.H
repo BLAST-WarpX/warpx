@@ -74,11 +74,8 @@ public:
     void ComputeRHS ( WarpXSolverVec&  a_RHS,
                 const WarpXSolverVec&  a_E,
                       amrex::Real      a_time,
-                      amrex::Real      a_dt,
                       int              a_nl_iter,
                       bool             a_from_jacobian ) override;
-
-    [[nodiscard]] amrex::Real theta () const override { return m_theta; }
 
 private:
 
@@ -101,8 +98,7 @@ private:
      * \brief Update the E and B fields owned by WarpX
      */
     void UpdateWarpXFields ( const WarpXSolverVec&  a_E,
-                             amrex::Real            a_time,
-                             amrex::Real            a_dt );
+                             amrex::Real            a_time );
 
     /**
      * \brief Nonlinear solver is for the time-centered values of E. After
