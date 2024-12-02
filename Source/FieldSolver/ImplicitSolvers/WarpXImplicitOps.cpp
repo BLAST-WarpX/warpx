@@ -116,7 +116,7 @@ WarpX::FinishMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField co
 }
 
 void
-WarpX::SpectralSourceFreeFieldAdvance (amrex::Real cur_time)
+WarpX::SpectralSourceFreeFieldAdvance (amrex::Real a_time)
 {
     using namespace amrex::literals;
     using warpx::fields::FieldType;
@@ -142,7 +142,7 @@ WarpX::SpectralSourceFreeFieldAdvance (amrex::Real cur_time)
     current_fp[1]->setVal(0._rt);
     current_fp[2]->setVal(0._rt);
     if (rho_fp) { rho_fp->setVal(0._rt); }
-    PushPSATD(cur_time); // Note that this does dt/2
+    PushPSATD(a_time); // Note that this does dt/2
     FillBoundaryE(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
     FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
 
