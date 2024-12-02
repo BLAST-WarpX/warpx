@@ -557,7 +557,7 @@ void HybridPICModel::FieldPush (
     HybridPICSolveE(Efield, Jfield, Bfield, rhofield, edge_lengths, true);
     warpx.FillBoundaryE(ng, nodal_sync);
     // Push forward the B-field using Faraday's law
-    amrex::Real t_old = warpx.gett_old(0);
+    amrex::Real const t_old = warpx.gett_old(0);
     warpx.EvolveB(dt, dt_type, t_old);
     warpx.FillBoundaryB(ng, nodal_sync);
 }
