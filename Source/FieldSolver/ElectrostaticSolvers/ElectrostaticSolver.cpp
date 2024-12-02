@@ -44,8 +44,6 @@ void ElectrostaticSolver::ReadParameters () {
     // FFT solver flags
    utils::parser::queryWithParser(
         pp_warpx, "use_2d_slices_fft_solver", is_igf_2d_slices);
-    utils::parser::queryWithParser(
-        pp_warpx, "use_distributed_3d_fft_solver", is_igf_3d_distributed);
 }
 
 void
@@ -129,8 +127,7 @@ ElectrostaticSolver::computePhi (
     Real absolute_tolerance,
     int const max_iters,
     int const verbosity,
-    bool const is_igf_2d,
-    bool const is_igf_3d_distr
+    bool const is_igf_2d
 ) const
 {
     using ablastr::fields::Direction;
@@ -213,7 +210,6 @@ ElectrostaticSolver::computePhi (
         WarpX::grid_type,
         is_solver_igf_on_lev0,
         is_igf_2d,
-        is_igf_3d_distr,
         EB::enabled(),
         WarpX::do_single_precision_comms,
         warpx.refRatio(),

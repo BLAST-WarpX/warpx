@@ -207,7 +207,6 @@ computePhi (
     utils::enums::GridType grid_type,
     bool is_solver_igf_on_lev0,
     [[maybe_unused]] bool const is_igf_2d,
-    [[maybe_unused]] bool const is_igf_3d_distr,
     bool eb_enabled = false,
     bool do_single_precision_comms = false,
     std::optional<amrex::Vector<amrex::IntVect> > rel_ref_ratio = std::nullopt,
@@ -244,20 +243,6 @@ computePhi (
     "The FFT Poisson solver is currently only implemented for 3D!");
 #endif
 
-#if defined(ABLASTR_USE_HEFFTE) && !defined(ABLASTR_USE_FFT)
-    ABLASTR_ABORT_WITH_MESSAGE("Must compile with FFT support to be able to use HEFFTE.");
-#endif
-
-#if !defined(ABLASTR_USE_HEFFTE)
-    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(!is_igf_3d_distr,
-    "Must compile with HEFFTE to use 3D distributed FFTs in the IGF solver.");
-#endif
-
-#if defined(ABLASTR_USE_HEFFTE)
-    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(!(is_igf_3d_distr && !is_solver_igf_on_lev0),
-    "Must select the IGF solver with warpx.poisson_solver = fft to use 3D distributed FFTs in the IGF solver!");
-#endif
-
     // Set the value of beta
     amrex::Array<amrex::Real, AMREX_SPACEDIM> beta_solver =
 #if defined(WARPX_DIM_1D_Z)
@@ -286,7 +271,7 @@ computePhi (
             if ( max_norm_b == 0 ) {
                 phi[lev]->setVal(0);
             } else {
-                computePhiIGF( *rho[lev], *phi[lev], dx_scaled, grids[lev], is_igf_2d, is_igf_3d_distr);
+                computePhiIGF( *rho[lev], *phi[lev], dx_scaled, grids[lev], is_igf_2d);
             }
             continue;
         }

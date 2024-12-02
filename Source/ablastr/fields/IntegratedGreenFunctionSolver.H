@@ -34,17 +34,24 @@ namespace ablastr::fields
      */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     amrex::Real
-    IntegratedPotential3D (amrex::Real x, amrex::Real y, amrex::Real z)
+    IntegratedPotential (amrex::Real x, amrex::Real y, amrex::Real z, bool do_2d_slices)
     {
-        amrex::Real const r = std::sqrt( x*x + y*y + z*z );
-        amrex::Real const G =
-            - 0.5_rt * z*z * std::atan( x*y/(z*r) )
-            - 0.5_rt * y*y * std::atan( x*z/(y*r) )
-            - 0.5_rt * x*x * std::atan( y*z/(x*r) )
-            + y*z*std::asinh( x/std::sqrt(y*y + z*z) )
-            + x*z*std::asinh( y/std::sqrt(x*x + z*z) )
-            + x*y*std::asinh( z/std::sqrt(x*x + y*y) );
-        return G;
+        if (do_2d_slices){
+            return  3_rt*x*y
+                    - x*x * std::atan(y/x)
+                    - y*y * std::atan(x/y)
+                    - x*y * std::log(x*x + y*y);
+
+        }
+        else{
+            amrex::Real const r = std::sqrt( x*x + y*y + z*z );
+            return  - 0.5_rt * z*z * std::atan( x*y/(z*r) )
+                    - 0.5_rt * y*y * std::atan( x*z/(y*r) )
+                    - 0.5_rt * x*x * std::atan( y*z/(x*r) )
+                    + y*z*std::asinh( x/std::sqrt(y*y + z*z) )
+                    + x*z*std::asinh( y/std::sqrt(x*x + z*z) )
+                    + x*y*std::asinh( z/std::sqrt(x*x + y*y) );
+        }
     }
 
 
@@ -61,19 +68,28 @@ namespace ablastr::fields
      */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     amrex::Real
-    SumOfIntegratedPotential3D (amrex::Real x, amrex::Real y, amrex::Real z, amrex::Real dx, amrex::Real dy, amrex::Real dz)
+    SumOfIntegratedPotential (amrex::Real x, amrex::Real y, amrex::Real z, amrex::Real dx, amrex::Real dy, amrex::Real dz, bool is_2d_slices)
     {
-        amrex::Real const G_value = 1._rt/(4._rt*ablastr::constant::math::pi*ablastr::constant::SI::ep0) * (
-            IntegratedPotential3D( x+0.5_rt*dx, y+0.5_rt*dy, z+0.5_rt*dz )
-          - IntegratedPotential3D( x-0.5_rt*dx, y+0.5_rt*dy, z+0.5_rt*dz )
-          - IntegratedPotential3D( x+0.5_rt*dx, y-0.5_rt*dy, z+0.5_rt*dz )
-          + IntegratedPotential3D( x-0.5_rt*dx, y-0.5_rt*dy, z+0.5_rt*dz )
-          - IntegratedPotential3D( x+0.5_rt*dx, y+0.5_rt*dy, z-0.5_rt*dz )
-          + IntegratedPotential3D( x-0.5_rt*dx, y+0.5_rt*dy, z-0.5_rt*dz )
-          + IntegratedPotential3D( x+0.5_rt*dx, y-0.5_rt*dy, z-0.5_rt*dz )
-          - IntegratedPotential3D( x-0.5_rt*dx, y-0.5_rt*dy, z-0.5_rt*dz )
-        );
-        return G_value;
+        if(is_2d_slices){
+            return 1._rt/(4._rt*ablastr::constant::math::pi*ablastr::constant::SI::ep0) * (
+                     IntegratedPotential( x+0.5_rt*dx, y+0.5_rt*dy, z, is_2d_slices)
+                   - IntegratedPotential( x+0.5_rt*dx, y-0.5_rt*dy, z, is_2d_slices )
+                   - IntegratedPotential( x-0.5_rt*dx, y+0.5_rt*dy, z, is_2d_slices )
+                   + IntegratedPotential( x-0.5_rt*dx, y-0.5_rt*dy, z, is_2d_slices )
+                   );
+        }
+        else{
+            return 1._rt/(4._rt*ablastr::constant::math::pi*ablastr::constant::SI::ep0) * (
+                     IntegratedPotential( x+0.5_rt*dx, y+0.5_rt*dy, z+0.5_rt*dz, is_2d_slices )
+                   - IntegratedPotential( x-0.5_rt*dx, y+0.5_rt*dy, z+0.5_rt*dz, is_2d_slices )
+                   - IntegratedPotential( x+0.5_rt*dx, y-0.5_rt*dy, z+0.5_rt*dz, is_2d_slices )
+                   + IntegratedPotential( x-0.5_rt*dx, y-0.5_rt*dy, z+0.5_rt*dz, is_2d_slices )
+                   - IntegratedPotential( x+0.5_rt*dx, y+0.5_rt*dy, z-0.5_rt*dz, is_2d_slices )
+                   + IntegratedPotential( x-0.5_rt*dx, y+0.5_rt*dy, z-0.5_rt*dz, is_2d_slices )
+                   + IntegratedPotential( x+0.5_rt*dx, y-0.5_rt*dy, z-0.5_rt*dz, is_2d_slices )
+                   - IntegratedPotential( x-0.5_rt*dx, y-0.5_rt*dy, z-0.5_rt*dz, is_2d_slices )
+                   );
+        }
     }
 
 
@@ -131,8 +147,7 @@ namespace ablastr::fields
                    amrex::MultiFab & phi,
                    std::array<amrex::Real, 3> const & cell_size,
                    amrex::BoxArray const & ba,
-                   bool is_2d_slices,
-                   bool is_3d_distributed);
+                   bool is_2d_slices);
 
 } // namespace ablastr::fields
 

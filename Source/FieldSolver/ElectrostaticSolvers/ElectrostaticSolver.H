@@ -93,8 +93,7 @@ public:
         amrex::Real absolute_tolerance,
         int max_iters,
         int verbosity,
-        bool is_igf_2d_slices,
-        bool is_igf_3d_distributed
+        bool is_igf_2d_slices
     ) const;
 
     /**
@@ -159,9 +158,6 @@ public:
     /** Parameters for FFT Poisson solver aka IGF */
     // 0: full 3D, 1: many 2D z-slices (quasi-3D)
     bool is_igf_2d_slices = false;
-    // fully 3D solver: if 0: FFTs on 1 process, if 1: with distributed FFTs
-    bool is_igf_3d_distributed = false;
-
 };
 
 #endif // WARPX_ELECTROSTATICSOLVER_H_

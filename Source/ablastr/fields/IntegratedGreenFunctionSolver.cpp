@@ -35,16 +35,11 @@ computePhiIGF ( amrex::MultiFab const & rho,
                 amrex::MultiFab & phi,
                 std::array<amrex::Real, 3> const & cell_size,
                 amrex::BoxArray const & ba,
-                bool const is_2d_slices,
-                bool const is_3d_distributed)
+                bool const do_2d_slices)
 {
     using namespace amrex::literals;
 
     BL_PROFILE("ablastr::fields::computePhiIGF");
-
-    // Check that the user-defined inputs are consistent
-    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(!(is_2d_slices && is_3d_distributed), \
-    "Must choose between the 2d slice solver and the fully 3D solver.");
 
     // Define box that encompasses the full domain
     amrex::Box domain = ba.minimalBox();
@@ -52,7 +47,7 @@ computePhiIGF ( amrex::MultiFab const & rho,
     domain.grow( phi.nGrowVect() ); // include guard cells
 
     // Do we grow the domain in the z-direction in the 2D mode?
-    bool const do_2d_fft = false;
+    //bool const do_2d_fft = false;
 
     int nprocs = amrex::ParallelDescriptor::NProcs();
     {
@@ -67,7 +62,7 @@ computePhiIGF ( amrex::MultiFab const & rho,
     }
     if (!obc_solver || obc_solver->Domain() != domain) {
         amrex::FFT::Info info{};
-        if (do_2d_fft) { info.setBatchMode(true); }
+        if (do_2d_slices) { info.setBatchMode(true); } // do 2D FFTs
         info.setNumProcs(nprocs);
         obc_solver = std::make_unique<amrex::FFT::OpenBCSolver<amrex::Real>>(domain, info);
     }
@@ -86,8 +81,10 @@ computePhiIGF ( amrex::MultiFab const & rho,
             amrex::Real const x = i0*dx;
             amrex::Real const y = j0*dy;
             amrex::Real const z = k0*dz;
-            return SumOfIntegratedPotential(x, y, z, dx, dy, dz);
+            
+            return SumOfIntegratedPotential(x, y, z, dx, dy, dz, do_2d_slices);
         });
+
 
     obc_solver->solve(phi, rho);
 }
