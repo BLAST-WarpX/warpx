@@ -400,6 +400,28 @@ WarpX::InitFromCheckpoint ()
 
     if (EB::enabled()) { InitializeEBGridData(maxLevel()); }
 
+    if (m_implicit_solver) {
+
+        m_implicit_solver->Define(this);
+        m_implicit_solver->GetParticleSolverParams( max_particle_its_in_implicit_scheme,
+                                                    particle_tol_in_implicit_scheme );
+
+        // Add space to save the positions and velocities at the start of the time steps
+        for (auto const& pc : *mypc) {
+#if (AMREX_SPACEDIM >= 2)
+            pc->NewRealComp("x_n");
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+            pc->NewRealComp("y_n");
+#endif
+            pc->NewRealComp("z_n");
+            pc->NewRealComp("ux_n");
+            pc->NewRealComp("uy_n");
+            pc->NewRealComp("uz_n");
+        }
+
+    }
+
     // Initialize particles
     mypc->AllocData();
     mypc->Restart(restart_chkfile);
