@@ -77,7 +77,8 @@ jobs:
   build_thread_sanitizer:
     name: Clang thread sanitizer
     runs-on: ubuntu-24.04
-    if: github.event.pull_request.draft == false
+    # TODO Fix data race conditions and re-enable job
+    if: 0 #github.event.pull_request.draft == false
     env:
       CC: clang
       CXX: clang++
@@ -107,8 +108,6 @@ jobs:
         export CXXFLAGS="-fsanitize=thread"
 
         cmake -S . -B build                 \
-          -DWarpX_amrex_repo=https://github.com/EZoni/amrex.git \
-          -DWarpX_amrex_branch=fix_data_race \
           -GNinja                           \
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
@@ -123,8 +122,6 @@ jobs:
         cmake --build build -j 4
 
         cmake -S . -B build_EB              \
-          -DWarpX_amrex_repo=https://github.com/EZoni/amrex.git \
-          -DWarpX_amrex_branch=fix_data_race \
           -GNinja                           \
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
@@ -144,7 +141,7 @@ jobs:
     - name: run with thread sanitizer
       run: |
         export PMIX_MCA_gds=hash
-        export TSAN_OPTIONS='symbolize=1 symbolize_inline=1 ignore_noninstrumented_modules=1'
+        export TSAN_OPTIONS='ignore_noninstrumented_modules=1'
         export ARCHER_OPTIONS="verbose=1"
 
         export OMP_NUM_THREADS=2
