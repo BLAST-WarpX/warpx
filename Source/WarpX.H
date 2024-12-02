@@ -145,7 +145,7 @@ public:
     void SetElectricFieldAndApplyBCs ( const WarpXSolverVec&  a_E );
     void UpdateMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const&  a_Bn,
                                           amrex::Real  a_thetadt );
-    void ApplyMagneticFieldBCs ();
+    void SpectralSourceFreeFieldAdvance ();
     void FinishMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const&  a_Bn,
                                           amrex::Real  a_theta );
     void FinishImplicitField ( const ablastr::fields::MultiLevelVectorField&  Field_fp,
@@ -1216,12 +1216,12 @@ private:
         int lev);
     void StoreCurrent (int lev);
     void RestoreCurrent (int lev);
-    void ApplyFilterJ (
-        const ablastr::fields::MultiLevelVectorField& current,
+    void ApplyFilterMF (
+        const ablastr::fields::MultiLevelVectorField& mfvec,
         int lev,
         int idim);
-    void ApplyFilterJ (
-        const ablastr::fields::MultiLevelVectorField& current,
+    void ApplyFilterMF (
+        const ablastr::fields::MultiLevelVectorField& mfvec,
         int lev);
     void SumBoundaryJ (
         const ablastr::fields::MultiLevelVectorField& current,

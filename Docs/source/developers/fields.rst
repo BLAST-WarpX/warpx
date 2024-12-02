@@ -119,7 +119,7 @@ Bilinear filter
 
 The multi-pass bilinear filter (applied on the current density) is implemented in ``Source/Filter/``, and class ``WarpX`` holds an instance of this class in member variable ``WarpX::bilinear_filter``. For performance reasons (to avoid creating too many guard cells), this filter is directly applied in communication routines, see ``WarpX::AddCurrentFromFineLevelandSumBoundary`` above and
 
-.. doxygenfunction:: WarpX::ApplyFilterJ(const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>, 3>> &current, int lev, int idim)
+.. doxygenfunction:: WarpX::ApplyFilterMF(const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>, 3>> &mfvec, int lev, int idim)
 
 .. doxygenfunction:: WarpX::SumBoundaryJ(const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>, 3>> &current, int lev, int idim, const amrex::Periodicity &period)
 

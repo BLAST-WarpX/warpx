@@ -32,6 +32,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_2d_theta_implicit_jfnk_vandb_filtered  # name
+    2  # dims
+    2  # nprocs
+    inputs_test_2d_theta_implicit_jfnk_vandb_filtered  # inputs
+    analysis_vandb_jfnk_2d.py  # analysis
+    diags/diag1000020  # output
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_2d_theta_implicit_jfnk_vandb_picmi  # name
     2  # dims
     2  # nprocs
@@ -40,3 +50,15 @@ add_warpx_test(
     diags/diag1000020  # output
     OFF  # dependency
 )
+
+if(WarpX_FFT)
+    add_warpx_test(
+        test_2d_theta_implicit_strang_psatd  # name
+        2  # dims
+        2  # nprocs
+        inputs_test_2d_theta_implicit_strang_psatd  # inputs
+        analysis_2d_psatd.py  # analysis
+        diags/diag1000020  # output
+        OFF  # dependency
+    )
+endif()

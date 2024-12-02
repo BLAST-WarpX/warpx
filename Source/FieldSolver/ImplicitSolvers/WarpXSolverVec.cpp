@@ -112,26 +112,27 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
 }
 
 void WarpXSolverVec::Copy ( FieldType  a_array_type,
-                            FieldType  a_scalar_type )
+                            FieldType  a_scalar_type,
+                            bool allow_type_mismatch)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         IsDefined(),
         "WarpXSolverVec::Copy() called on undefined WarpXSolverVec");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        a_array_type==m_array_type &&
-        a_scalar_type==m_scalar_type,
+        (a_array_type==m_array_type &&
+        a_scalar_type==m_scalar_type) || allow_type_mismatch,
         "WarpXSolverVec::Copy() called with vecs of different types");
 
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         if (m_array_type != FieldType::None) {
-            const ablastr::fields::VectorField this_array = m_WarpX->m_fields.get_alldirs(m_vector_type_name, lev);
+            const ablastr::fields::VectorField this_array = m_WarpX->m_fields.get_alldirs(a_array_type, lev);
             for (int n = 0; n < 3; ++n) {
                 amrex::MultiFab::Copy( *m_array_vec[lev][n], *this_array[n], 0, 0, m_ncomp,
                                        amrex::IntVect::TheZeroVector() );
             }
         }
         if (m_scalar_type != FieldType::None) {
-            const amrex::MultiFab* this_mf = m_WarpX->m_fields.get(m_scalar_type_name,lev);
+            const amrex::MultiFab* this_mf = m_WarpX->m_fields.get(a_scalar_type,lev);
             amrex::MultiFab::Copy( *m_scalar_vec[lev], *this_mf, 0, 0, m_ncomp,
                                    amrex::IntVect::TheZeroVector() );
         }

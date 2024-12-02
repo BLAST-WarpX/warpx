@@ -93,6 +93,14 @@ Overall simulation parameters
       The PS-JFNK method is described in `Angus et al., An implicit particle code with exact energy and charge conservation for electromagnetic studies of dense plasmas <https://doi.org/10.1016/j.jcp.2023.112383>`__ . (The version implemented in WarpX is an updated version that includes the relativistic gamma factor for the particles.) Also see `Chen et al., An energy- and charge-conserving, implicit, electrostatic particle-in-cell algorithm. <https://doi.org/10.1016/j.jcp.2011.05.031>`__ .
       Exact energy conservation requires that the interpolation stencil used for the field gather match that used for the current deposition. ``algo.current_deposition = direct`` must be used with ``interpolation.galerkin_scheme = 0``, and ``algo.current_deposition = Esirkepov`` must be used with ``interpolation.galerkin_scheme = 1``. If using ``algo.current_deposition = villasenor``, the corresponding field gather routine will automatically be selected and the ``interpolation.galerkin_scheme`` flag does not need to be specified. The Esirkepov and villasenor deposition schemes are charge-conserving.
 
+    * ``strang_implicit_spectral_em``: Use a fully implicit electromagnetic solver. All of the comments for ``theta_implicit_em``
+      above apply here as well (except that theta is fixed to 0.5 and that charge will not be conserved).
+      In this version, the advance is Strang split, with a half advance of the source free Maxwell's equation (with a spectral solver), a full advance of the particles plus longitudinal E field, and a second half advance of the source free Maxwell's equations.
+      The advantage of this method is that with the Spectral advance of the fields, it is dispersionless.
+      Note that exact energy convergence is achieved only with one grid block and ``psatd.periodic_single_box_fft == 1``. Otherwise,
+      the energy convservation is spoiled because of the inconsistency of the periodic assumption of the spectral solver and the
+      non-periodic behavior of the individual blocks.
+
     * ``semi_implicit_em``: Use an approximately energy conserving semi-implicit electromagnetic solver. Choices for the nonlinear solver include a Picard iteration scheme and particle-suppressed JFNK.
       Note that this method has the CFL limitation :math:`\Delta t < c/\sqrt( \sum_i 1/\Delta x_i^2 )`. The Picard solver for this method can only be expected to work well when :math:`\omega_{pe} \Delta t` is less than one.
       The method is described in `Chen et al., A semi-implicit, energy- and charge-conserving particle-in-cell algorithm for the relativistic Vlasov-Maxwell equations <https://doi.org/10.1016/j.jcp.2020.109228>`__.
@@ -105,16 +113,16 @@ Overall simulation parameters
     exactly energy conserving, but the solver may perform better.
 
 * ``implicit_evolve.nonlinear_solver`` (`string`, default: None)
-    When `algo.evolve_scheme` is either `theta_implicit_em` or `semi_implicit_em`, this sets the nonlinear solver used
+    When `algo.evolve_scheme` is either `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em`, this sets the nonlinear solver used
     to advance the field-particle system in time. Options are `picard` or `newton`.
 
 * ``implicit_evolve.max_particle_iterations`` (`integer`, default: 21)
-    When `algo.evolve_scheme` is either `theta_implicit_em` or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton`
+    When `algo.evolve_scheme` is either `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton`
     , this sets the maximum number of iterations for the method used to obtain a self-consistent update of the particles at
     each iteration in the JFNK process.
 
 * ``implicit_evolve.particle_tolerance`` (`float`, default: 1.e-10)
-    When `algo.evolve_scheme` is either `theta_implicit_em` or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton`
+    When `algo.evolve_scheme` is either `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton`
     , this sets the relative tolerance for the iterative method used to obtain a self-consistent update of the particles at
     each iteration in the JFNK process.
 
@@ -2186,10 +2194,13 @@ Time step
 Filtering
 ^^^^^^^^^
 
-* ``warpx.use_filter`` (`0` or `1`; default: `1`, except for RZ FDTD)
-    Whether to smooth the charge and currents on the mesh, after depositing them from the macro-particles.
+* ``warpx.use_filter`` (`0` or `1`)
+    Whether to use filtering in the simulation.
+    With the explicit evolve scheme, the filtering is turned on by default, except for RZ FDTD.
+    With the implicit evolve schemes, the filtering is turned off by default.
+    The filtering smoothes the charge and currents on the mesh, after depositing them from the macro-particles.
+    With implicit schemes, the electric field is also filtered (to maintain consistency for energy conservation).
     This uses a bilinear filter (see the :ref:`filtering section <theory-pic-filter>`).
-    The default is `1` in all cases, except for simulations in RZ geometry using the FDTD solver.
     With the RZ PSATD solver, the filtering is done in :math:`k`-space.
 
     .. warning::
@@ -2669,7 +2680,7 @@ WarpX has five types of diagnostics:
 ``TimeAveraged`` diagnostics only allow field data, which they output after averaging over a period of time,
 ``BackTransformed`` diagnostics are used when running a simulation in a boosted frame, to reconstruct output data to the lab frame,
 ``BoundaryScraping`` diagnostics are used to collect the particles that are absorbed at the boundary, throughout the simulation, and
-``ReducedDiags`` allow the user to compute some reduced quantity (particle temperature, max of a field) and write a small amount of data to text files.
+``ReducedDiags`` enable users to compute specific reduced quantities, such as particle temperature, energy histograms, or maximum field values, and efficiently save this in-situ analyzed data to files.
 Similar to what is done for physical species, WarpX has a class Diagnostics that allows users to initialize different diagnostics, each of them with different fields, resolution and period.
 This currently applies to standard diagnostics, but should be extended to back-transformed diagnostics and reduced diagnostics (and others) in a near future.
 
@@ -3053,15 +3064,14 @@ In addition to their usual attributes, the saved particles have
 Reduced Diagnostics
 ^^^^^^^^^^^^^^^^^^^
 
-``ReducedDiags`` allow the user to compute some reduced quantity (particle temperature, max of a field) and write a small amount of data to text files.
+``ReducedDiags`` enable users to compute specific reduced quantities, such as particle temperature, energy histograms, or maximum field values, and efficiently save this in-situ analyzed data to files.
+This shifts analysis from post-processing to runtime calculation of reduction operations (average, maximum, ...) and can greatly save disk space when "raw" particle and field outputs from `FullDiagnostics` can be avoided in favor of single values, 1D or 2D data at possibly even higher time resolution.
 
 * ``warpx.reduced_diags_names`` (`strings`, separated by spaces)
-    The names given by the user of simple reduced diagnostics.
-    Also the names of the output `.txt` files.
-    This reduced diagnostics aims to produce simple outputs
-    of the time history of some physical quantities.
+    A list of user-given names for reduced diagnostics.
+    By default, these names are also prefixing the names of output files.
     If ``warpx.reduced_diags_names`` is not provided in the input file,
-    no reduced diagnostics will be done.
+    no reduced diagnostics will be activated during the run.
     This is then used in the rest of the input deck;
     in this documentation we use ``<reduced_diags_name>`` as a placeholder.
 
@@ -3069,7 +3079,7 @@ Reduced Diagnostics
     The type of reduced diagnostics associated with this ``<reduced_diags_name>``.
     For example, ``ParticleEnergy``, ``FieldEnergy``, etc.
     All available types are described below in detail.
-    For all reduced diagnostics,
+    For all reduced diagnostics that are writing tabular data into text files,
     the first and the second columns in the output file are
     the time step and the corresponding physical time in seconds, respectively.
 
