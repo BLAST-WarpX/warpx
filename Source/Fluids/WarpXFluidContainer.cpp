@@ -1426,6 +1426,8 @@ void WarpXFluidContainer::HybridInitializeUe (
     m_fields.get(name_mf_NU, Direction{1}, lev)->setVal(0.0_rt);
     m_fields.get(name_mf_NU, Direction{2}, lev)->setVal(0.0_rt);
 
+    const auto ix_type = m_fields.get(name_mf_NU, Direction{0}, lev)->ixType().toIntVect();   
+
     ablastr::fields::ScalarField rho_fp = m_fields.get(FieldType::rho_fp, lev);
     ablastr::fields::VectorField current_fp_ampere = m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
 
@@ -1460,8 +1462,10 @@ void WarpXFluidContainer::HybridInitializeUe (
             amrex::Array4<amrex::Real> const& Uez = m_fields.get(name_mf_NU, Direction{2}, lev)->array(mfi);
 
             const Box& tilebox  = mfi.tilebox();
+            amrex::Box box = amrex::convert( tilebox, ix_type );
+            box.grow(m_fields.get(name_mf_K, lev)->nGrowVect());
 
-            ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+            ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                 if( rho(i, j, k) > 0.0_rt ){
 
                     // safety condition since we divide by rho_val later
@@ -1495,10 +1499,17 @@ void WarpXFluidContainer::HybridInitializeUe (
 void WarpXFluidContainer::HybridInitializeKe (ablastr::fields::MultiFabRegister& m_fields, amrex::Real gamma, amrex::Real n_floor, int lev)
 {
     using warpx::fields::FieldType;
-    ablastr::fields::ScalarField rho_fp = m_fields.get(FieldType::rho_fp, lev);
+
+    WarpX &warpx = WarpX::GetInstance();
+    const amrex::Geometry &geom = warpx.Geom(lev);
+    const amrex::Periodicity &period = geom.periodicity();
 
     // Set Ke to 0
-    m_fields.get(name_mf_K, lev)->setVal(0.0_rt);
+    m_fields.get(name_mf_K, lev)->setVal(0);
+
+    const auto ix_type = m_fields.get(name_mf_K, lev)->ixType().toIntVect();   
+
+    ablastr::fields::ScalarField rho_fp = m_fields.get(FieldType::rho_fp, lev);
 
     // For safety condition (divition by rho)
     amrex::Real rho_floor = PhysConst::q_e*n_floor;
@@ -1513,8 +1524,10 @@ void WarpXFluidContainer::HybridInitializeKe (ablastr::fields::MultiFabRegister&
             amrex::Array4<amrex::Real> const& Ke = m_fields.get(name_mf_K, lev)->array(mfi);
 
             const Box& tilebox  = mfi.tilebox();
+            amrex::Box box = amrex::convert( tilebox, ix_type );
+            box.grow(m_fields.get(name_mf_K, lev)->nGrowVect());
 
-            ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+            ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                 if( rho(i, j, k) > 0.0_rt ){
 
                     // safety condition since we divide by rho_val later
@@ -1528,18 +1541,26 @@ void WarpXFluidContainer::HybridInitializeKe (ablastr::fields::MultiFabRegister&
                 }
             });
         }
+    m_fields.get(name_mf_K, lev)->FillBoundary(m_fields.get(name_mf_K, lev)->nGrowVect(), period);
 }
 
 
 void WarpXFluidContainer::HybridUpdateTe (ablastr::fields::MultiFabRegister& m_fields, amrex::Real gamma, amrex::Real n_floor, int lev)
 {
     using warpx::fields::FieldType;
-    ablastr::fields::ScalarField rho_fp = m_fields.get(FieldType::rho_fp, lev);
 
     WarpX &warpx = WarpX::GetInstance();
     const amrex::Geometry &geom = warpx.Geom(lev);
+    const amrex::Periodicity &period = geom.periodicity();
     const auto dx = geom.CellSizeArray();
     const auto cell_volume = dx[0]*dx[1]*dx[2];
+
+    ablastr::fields::ScalarField rho_fp = m_fields.get(FieldType::rho_fp, lev);
+
+    // Set Te to 0
+    m_fields.get(name_mf_T, lev)->setVal(0);
+
+    const auto ix_type = m_fields.get(name_mf_T, lev)->ixType().toIntVect();   
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -1551,10 +1572,11 @@ void WarpXFluidContainer::HybridUpdateTe (ablastr::fields::MultiFabRegister& m_f
             amrex::Array4<amrex::Real> const& Te = m_fields.get(name_mf_T, lev)->array(mfi);
 
             const Box& tilebox  = mfi.tilebox();
+            amrex::Box box = amrex::convert( tilebox, ix_type );
+            box.grow(m_fields.get(name_mf_K, lev)->nGrowVect());
 
-            ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                Te(i, j, k) = 0;
-                if( rho(i, j, k) > 0.0_rt ){
+            ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                if( rho(i, j, k) > 0 ){
 
                     amrex::Real ne = rho(i, j, k)/PhysConst::q_e;
                     if(ne<n_floor){
@@ -1566,4 +1588,5 @@ void WarpXFluidContainer::HybridUpdateTe (ablastr::fields::MultiFabRegister& m_f
                 }
             });
         }
+    m_fields.get(name_mf_T, lev)->FillBoundary(m_fields.get(name_mf_T, lev)->nGrowVect(), period);
 }

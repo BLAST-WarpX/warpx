@@ -30,12 +30,13 @@ struct QdsmcPIdx
     enum
     {
 #if !defined (WARPX_DIM_1D_Z) // change this, this algorithm will only be used for the dimensions the Hybrid solver is compatible with
-        x, x_node,
+        x,
 #endif
 #if defined (WARPX_DIM_3D)
-        y, y_node,
+        y,
 #endif
-        z, z_node,
+        z,
+        x_node, y_node, z_node,
         vx, vy, vz,
         entropy, np_real,
         nattribs
@@ -103,6 +104,7 @@ public:
     // property/value valuep in a generic scalar multifab
     // using linear interpolation
     void DepositK(int lev, amrex::MultiFab &Kfield);
+
 };
 
 #endif // WARPX_QdsmcParticleContainer_H_

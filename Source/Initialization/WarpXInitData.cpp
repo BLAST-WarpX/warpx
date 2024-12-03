@@ -26,6 +26,7 @@
 #include "Initialization/ExternalField.H"
 #include "Initialization/DivCleaner/ProjectionDivCleaner.H"
 #include "Particles/MultiParticleContainer.H"
+#include "Fluids/QdsmcParticleContainer.H"
 #include "Utils/Algorithms/LinearInterpolation.H"
 #include "Utils/Logo/GetLogo.H"
 #include "Utils/Parser/ParserUtils.H"
@@ -703,6 +704,10 @@ WarpX::InitFromScratch ()
 
     mypc->AllocData();
     mypc->InitData();
+
+    if(m_hybrid_pic_model->m_solve_electron_energy_equation){
+        qdsmc_hybrid_electron_pc->InitParticles(0);
+    }
 
     InitPML();
 

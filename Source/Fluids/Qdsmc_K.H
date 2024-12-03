@@ -30,13 +30,13 @@ void gather_density_entropy(const amrex::ParticleReal x0p,
                             amrex::Real& kn_p,
                             amrex::Array4<amrex::Real const> const& rho_arr,
                             amrex::Array4<amrex::Real const> const& K_arr,
-                            const amrex::XDim3 & xyzmin,
+                            amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& plo,
                             const amrex::XDim3 & dinv,
                             const amrex::Real cell_volume)
 {
-    amrex::Real x = (x0p - xyzmin.x)*dinv.x;
-    amrex::Real y = (y0p - xyzmin.y)*dinv.y;
-    amrex::Real z = (z0p - xyzmin.z)*dinv.z;
+    amrex::Real x = (x0p - plo[0])*dinv.x;
+    amrex::Real y = (y0p - plo[1])*dinv.y;
+    amrex::Real z = (z0p - plo[2])*dinv.z;
 
     int i0p = std::floor(x);
     int j0p = std::floor(y);
@@ -48,7 +48,7 @@ void gather_density_entropy(const amrex::ParticleReal x0p,
 
 
 /**
- * Qdsmc particles x0,y0,z0 positions should at nodes positions
+ * Qdsmc particles x0,y0,z0 positions should be at nodes positions
  * at the beginning of every step, so the field gathering
  * does not require any interpolation, it only needs to read
  * the values from the nodes.
@@ -63,12 +63,12 @@ void gather_vector_field_qdsmc(const amrex::ParticleReal x0p,
                             amrex::Array4<amrex::Real const> const& field_x_arr,
                             amrex::Array4<amrex::Real const> const& field_y_arr,
                             amrex::Array4<amrex::Real const> const& field_z_arr,
-                            const amrex::XDim3 & xyzmin,
+                            amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& plo,
                             const amrex::XDim3 & dinv)
 {
-    amrex::Real x = (x0p - xyzmin.x)*dinv.x;
-    amrex::Real y = (y0p - xyzmin.y)*dinv.y;
-    amrex::Real z = (z0p - xyzmin.z)*dinv.z;
+    amrex::Real x = (x0p - plo[0])*dinv.x;
+    amrex::Real y = (y0p - plo[1])*dinv.y;
+    amrex::Real z = (z0p - plo[2])*dinv.z;
 
     int i0p = std::floor(x);
     int j0p = std::floor(y);
@@ -110,14 +110,14 @@ void do_deposit_scalar(amrex::Array4<amrex::Real> const& scalar_field,
                     const amrex::ParticleReal xp,
                     const amrex::ParticleReal yp,
                     const amrex::ParticleReal zp,
-                    const amrex::XDim3 & xyzmin,
+                    amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& plo,
                     const amrex::XDim3 & dinv,
                     const amrex::ParticleReal valuep)
 {
     // calculate di, dj, dk for particle in cell
-    amrex::Real x = (xp - xyzmin.x)*dinv.x;
-    amrex::Real y = (yp - xyzmin.y)*dinv.y;
-    amrex::Real z = (zp - xyzmin.z)*dinv.z;
+    amrex::Real x = (xp - plo[0])*dinv.x - 0.5;
+    amrex::Real y = (yp - plo[1])*dinv.y - 0.5;
+    amrex::Real z = (zp - plo[2])*dinv.z - 0.5;
 
     int i0p = std::floor(x);
     int j0p = std::floor(y);
