@@ -75,6 +75,7 @@ public:
     void Define ( const WarpXSolverVec&  a_solver_vec )
     {
         assertIsDefined( a_solver_vec );
+        m_num_amr_levels = a_solver_vec.m_num_amr_levels;
         Define( WarpXSolverVec::m_WarpX,
                 a_solver_vec.getVectorType(),
                 a_solver_vec.getScalarType() );
@@ -83,7 +84,8 @@ public:
     [[nodiscard]] RT dotProduct( const WarpXSolverVec&  a_X ) const;
 
     void Copy ( warpx::fields::FieldType  a_array_type,
-                warpx::fields::FieldType  a_scalar_type = warpx::fields::FieldType::None );
+                warpx::fields::FieldType  a_scalar_type = warpx::fields::FieldType::None,
+                bool allow_type_mismatch = false);
 
     inline
     void Copy ( const WarpXSolverVec&  a_solver_vec )
@@ -300,7 +302,7 @@ private:
     std::string m_scalar_type_name = "none";
 
     static constexpr int m_ncomp = 1;
-    static constexpr int m_num_amr_levels = 1;
+    int m_num_amr_levels = 1;
 
     inline static bool m_warpx_ptr_defined = false;
     inline static WarpX* m_WarpX = nullptr;

@@ -5,6 +5,8 @@ on:
     branches:
       - "development"
   pull_request:
+    paths-ignore:
+      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-windows

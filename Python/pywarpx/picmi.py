@@ -691,6 +691,11 @@ class DensityDistributionBase(object):
 class UniformFluxDistribution(
     picmistandard.PICMI_UniformFluxDistribution, DensityDistributionBase
 ):
+    def init(self, kw):
+        self.inject_from_embedded_boundary = kw.pop(
+            "warpx_inject_from_embedded_boundary", False
+        )
+
     def distribution_initialize_inputs(
         self, species_number, layout, species, density_scale, source_name
     ):
@@ -702,13 +707,22 @@ class UniformFluxDistribution(
         species.add_new_group_attr(source_name, "flux", self.flux)
         if density_scale is not None:
             species.add_new_group_attr(source_name, "flux", density_scale)
-        species.add_new_group_attr(
-            source_name, "flux_normal_axis", self.flux_normal_axis
-        )
-        species.add_new_group_attr(
-            source_name, "surface_flux_pos", self.surface_flux_position
-        )
-        species.add_new_group_attr(source_name, "flux_direction", self.flux_direction)
+
+        if not self.inject_from_embedded_boundary:
+            species.add_new_group_attr(
+                source_name, "flux_normal_axis", self.flux_normal_axis
+            )
+            species.add_new_group_attr(
+                source_name, "surface_flux_pos", self.surface_flux_position
+            )
+            species.add_new_group_attr(
+                source_name, "flux_direction", self.flux_direction
+            )
+        else:
+            species.add_new_group_attr(
+                source_name, "inject_from_embedded_boundary", True
+            )
+
         species.add_new_group_attr(source_name, "flux_tmin", self.flux_tmin)
         species.add_new_group_attr(source_name, "flux_tmax", self.flux_tmax)
 
@@ -1880,14 +1894,14 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
     warpx_self_fields_verbosity: integer, default=2
         Level of verbosity for the lab frame solver
 
-    warpx_dt_update_interval: string, optional (default = -1)
+    warpx_dt_update_interval: integer, optional (default = -1)
         How frequently the timestep is updated. Adaptive timestepping is disabled when this is <= 0.
 
     warpx_cfl: float, optional
-        Fraction of the CFL condition for particle velocity vs grid size, used to set the timestep when `dt_update_interval > 0`.
+        Fraction of the CFL condition for particle velocity vs grid size, used to set the timestep when `warpx_dt_update_interval > 0`.
 
     warpx_max_dt: float, optional
-        The maximum allowable timestep when `dt_update_interval > 0`.
+        The maximum allowable timestep when `warpx_dt_update_interval > 0`.
 
     """
 
@@ -1897,7 +1911,7 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         self.self_fields_verbosity = kw.pop("warpx_self_fields_verbosity", None)
         self.magnetostatic = kw.pop("warpx_magnetostatic", False)
         self.cfl = kw.pop("warpx_cfl", None)
-        self.dt_update_interval = kw.pop("dt_update_interval", None)
+        self.dt_update_interval = kw.pop("warpx_dt_update_interval", None)
         self.max_dt = kw.pop("warpx_max_dt", None)
 
     def solver_initialize_inputs(self):
@@ -3269,6 +3283,57 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
 
 
 ElectrostaticFieldDiagnostic = FieldDiagnostic
+
+
+class TimeAveragedFieldDiagnostic(FieldDiagnostic):
+    """
+    See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
+
+    Parameters
+    ----------
+    warpx_time_average_mode: str
+        Type of time averaging diagnostic
+        Supported values include ``"none"``, ``"fixed_start"``, and ``"dynamic_start"``
+
+            * ``"none"`` for no averaging (instantaneous fields)
+            * ``"fixed_start"`` for a diagnostic that averages all fields between the current output step and a fixed point in time
+            * ``"dynamic_start"`` for a constant averaging period and output at different points in time (non-overlapping)
+
+    warpx_average_period_steps: int, optional
+        Configures the number of time steps in an averaging period.
+        Set this only in the ``"dynamic_start"`` mode and only if ``warpx_average_period_time`` has not already been set.
+        Will be ignored in the ``"fixed_start"`` mode (with warning).
+
+    warpx_average_period_time: float, optional
+        Configures the time (SI units) in an averaging period.
+        Set this only in the ``"dynamic_start"`` mode and only if ``average_period_steps`` has not already been set.
+        Will be ignored in the ``"fixed_start"`` mode (with warning).
+
+    warpx_average_start_steps: int, optional
+        Configures the time step at which time-averaging begins.
+        Set this only in the ``"fixed_start"`` mode.
+        Will be ignored in the ``"dynamic_start"`` mode (with warning).
+    """
+
+    def init(self, kw):
+        super().init(kw)
+        self.time_average_mode = kw.pop("warpx_time_average_mode", None)
+        self.average_period_steps = kw.pop("warpx_average_period_steps", None)
+        self.average_period_time = kw.pop("warpx_average_period_time", None)
+        self.average_start_step = kw.pop("warpx_average_start_step", None)
+
+    def diagnostic_initialize_inputs(self):
+        super().diagnostic_initialize_inputs()
+
+        self.diagnostic.set_or_replace_attr("diag_type", "TimeAveraged")
+
+        if "write_species" not in self.diagnostic.argvattrs:
+            self.diagnostic.write_species = False
+
+        self.diagnostic.time_average_mode = self.time_average_mode
+        self.diagnostic.average_period_steps = self.average_period_steps
+        self.diagnostic.average_period_time = self.average_period_time
+        self.diagnostic.average_start_step = self.average_start_step
 
 
 class Checkpoint(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
