@@ -1597,8 +1597,6 @@ private:
      */
     void HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num_moved);
 
-    void ScrapeParticles ();
-
     /** Update the E and B fields in the explicit em PIC scheme.
      *
      * At the beginning, we have B^{n} and E^{n}.
