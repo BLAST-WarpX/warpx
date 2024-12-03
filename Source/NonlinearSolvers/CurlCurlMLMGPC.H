@@ -272,7 +272,8 @@ void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
     amrex::ignore_unused(a_U);
 
     // set the coefficients alpha and beta for curl-curl op
-    const RT alpha = (m_ops->theta()*this->m_dt*PhysConst::c) * (m_ops->theta()*this->m_dt*PhysConst::c);
+    // (m_dt here is actually theta<=0.5 times simulation dt)
+    const RT alpha = (this->m_dt*PhysConst::c) * (this->m_dt*PhysConst::c);
     const RT beta = RT(1.0);
 
 // currently not implemented in 1D
@@ -282,7 +283,7 @@ void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
 
     if (m_verbose) {
         amrex::Print() << "Updating " << amrex::getEnumNameString(PreconditionerType::pc_curl_curl_mlmg)
-                       << ": dt = " << this->m_dt << ", "
+                       << ": theta*dt = " << this->m_dt << ", "
                        << " coefficients: "
                        << "alpha = " << alpha << ", "
                        << "beta = " << beta << "\n";

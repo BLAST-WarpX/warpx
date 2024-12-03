@@ -107,45 +107,6 @@ CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $HOME/src/lapackpp -B 
 cmake --build ${build_dir}/lapackpp-pm-cpu-build --target install --parallel 16
 rm -rf ${build_dir}/lapackpp-pm-cpu-build
 
-# heFFTe
-if [ -d $HOME/src/heffte ]
-then
-  cd $HOME/src/heffte
-  git fetch --prune
-  git checkout v2.4.0
-  cd -
-else
-  git clone -b v2.4.0 https://github.com/icl-utk-edu/heffte.git ${HOME}/src/heffte
-fi
-rm -rf ${HOME}/src/heffte-pm-cpu-build
-cmake \
-    -S ${HOME}/src/heffte               \
-    -B ${build_dir}/heffte-pm-cpu-build \
-    -DBUILD_SHARED_LIBS=ON              \
-    -DCMAKE_BUILD_TYPE=Release          \
-    -DCMAKE_CXX_STANDARD=17             \
-    -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON  \
-    -DCMAKE_INSTALL_PREFIX=${SW_DIR}/heffte-2.4.0  \
-    -DHeffte_DISABLE_GPU_AWARE_MPI=ON   \
-    -DHeffte_ENABLE_AVX=ON              \
-    -DHeffte_ENABLE_AVX512=OFF          \
-    -DHeffte_ENABLE_FFTW=ON             \
-    -DHeffte_ENABLE_CUDA=OFF            \
-    -DHeffte_ENABLE_ROCM=OFF            \
-    -DHeffte_ENABLE_ONEAPI=OFF          \
-    -DHeffte_ENABLE_MKL=OFF             \
-    -DHeffte_ENABLE_DOXYGEN=OFF         \
-    -DHeffte_SEQUENTIAL_TESTING=OFF     \
-    -DHeffte_ENABLE_TESTING=OFF         \
-    -DHeffte_ENABLE_TRACING=OFF         \
-    -DHeffte_ENABLE_PYTHON=OFF          \
-    -DHeffte_ENABLE_FORTRAN=OFF         \
-    -DHeffte_ENABLE_SWIG=OFF            \
-    -DHeffte_ENABLE_MAGMA=OFF
-cmake --build ${build_dir}/heffte-pm-cpu-build --target install --parallel 16
-rm -rf ${build_dir}/heffte-pm-cpu-build
-
-
 # Python ######################################################################
 #
 python3 -m pip install --upgrade pip

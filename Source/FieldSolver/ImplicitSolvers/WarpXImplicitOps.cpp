@@ -101,7 +101,7 @@ WarpX::UpdateMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField co
         amrex::MultiFab::Copy(*Bfp[2], *a_Bn[lev][2], 0, 0, ncomps, a_Bn[lev][2]->nGrowVect());
     }
     EvolveB(a_thetadt, DtType::Full);
-    ApplyMagneticFieldBCs();
+    FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
 }
 
 void
@@ -111,14 +111,8 @@ WarpX::FinishMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField co
     using warpx::fields::FieldType;
 
     FinishImplicitField(m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, 0), a_Bn, a_theta);
-    ApplyMagneticFieldBCs();
-}
-
-void
-WarpX::ApplyMagneticFieldBCs()
-{
-    FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
     ApplyBfieldBoundary(0, PatchType::fine, DtType::Full);
+    FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
 }
 
 void

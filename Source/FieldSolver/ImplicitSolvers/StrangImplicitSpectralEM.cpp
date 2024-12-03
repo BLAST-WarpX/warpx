@@ -63,6 +63,9 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real a_time,
     // Fields have E^{n} and B^{n}
     // Particles have p^{n} and x^{n}.
 
+    // Set the member time step
+    m_dt = a_dt;
+
     // Save the values at the start of the time step,
     m_WarpX->SaveParticlesAtImplicitStepStart();
 
@@ -73,20 +76,20 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real a_time,
     m_Eold.Copy( FieldType::Efield_fp );
     m_E.Copy(m_Eold); // initial guess for E
 
-    amrex::Real const half_time = a_time + 0.5_rt*a_dt;
+    amrex::Real const half_time = a_time + 0.5_rt*m_dt;
 
     // Solve nonlinear system for E at t_{n+1/2}
     // Particles will be advanced to t_{n+1/2}
-    m_nlsolver->Solve( m_E, m_Eold, half_time, a_dt );
+    m_nlsolver->Solve( m_E, m_Eold, half_time, 0.5_rt*m_dt );
 
     // Update WarpX owned Efield_fp and Bfield_fp to t_{n+1/2}
-    UpdateWarpXFields( m_E, half_time, a_dt );
+    UpdateWarpXFields( m_E, half_time );
 
     // Advance particles from time n+1/2 to time n+1
     m_WarpX->FinishImplicitParticleUpdate();
 
     // Advance E and B fields from time n+1/2 to time n+1
-    amrex::Real const new_time = a_time + a_dt;
+    amrex::Real const new_time = a_time + m_dt;
     FinishFieldUpdate( new_time );
 
     // Advance the fields to time n+1 source free
@@ -97,29 +100,27 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real a_time,
 void StrangImplicitSpectralEM::ComputeRHS ( WarpXSolverVec& a_RHS,
                                             WarpXSolverVec const & a_E,
                                             amrex::Real a_time,
-                                            amrex::Real a_dt,
                                             int a_nl_iter,
                                             bool a_from_jacobian )
 {
     // Update WarpX-owned Efield_fp and Bfield_fp using current state of
     // E from the nonlinear solver at time n+1/2
-    UpdateWarpXFields( a_E, a_time, a_dt );
+    UpdateWarpXFields( a_E, a_time );
 
     // Self consistently update particle positions and velocities using the
     // current state of the fields E and B. Deposit current density at time n+1/2.
-    m_WarpX->ImplicitPreRHSOp( a_time, a_dt, a_nl_iter, a_from_jacobian );
+    m_WarpX->ImplicitPreRHSOp( a_time, m_dt, a_nl_iter, a_from_jacobian );
 
     // For Strang split implicit PSATD, the RHS = -dt*mu*c**2*J
     bool const allow_type_mismatch = true;
     a_RHS.Copy(FieldType::current_fp, warpx::fields::FieldType::None, allow_type_mismatch);
     amrex::Real constexpr coeff = PhysConst::c * PhysConst::c * PhysConst::mu0;
-    a_RHS.scale(-coeff * 0.5_rt*a_dt);
+    a_RHS.scale(-coeff * 0.5_rt*m_dt);
 
 }
 
 void StrangImplicitSpectralEM::UpdateWarpXFields (WarpXSolverVec const & a_E,
-                                                  amrex::Real /*a_time*/,
-                                                  amrex::Real /*a_dt*/)
+                                                  amrex::Real /*a_time*/ )
 {
 
     // Update Efield_fp owned by WarpX

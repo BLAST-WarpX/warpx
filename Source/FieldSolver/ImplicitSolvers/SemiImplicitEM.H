@@ -64,7 +64,6 @@ public:
     void ComputeRHS ( WarpXSolverVec&  a_RHS,
                 const WarpXSolverVec&  a_E,
                       amrex::Real      a_time,
-                      amrex::Real      a_dt,
                       int              a_nl_iter,
                       bool             a_from_jacobian ) override;
 
