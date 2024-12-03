@@ -1426,7 +1426,7 @@ void WarpXFluidContainer::HybridInitializeUe (
     m_fields.get(name_mf_NU, Direction{1}, lev)->setVal(0.0_rt);
     m_fields.get(name_mf_NU, Direction{2}, lev)->setVal(0.0_rt);
 
-    const auto ix_type = m_fields.get(name_mf_NU, Direction{0}, lev)->ixType().toIntVect();   
+    const auto ix_type = m_fields.get(name_mf_NU, Direction{0}, lev)->ixType().toIntVect();
 
     ablastr::fields::ScalarField rho_fp = m_fields.get(FieldType::rho_fp, lev);
     ablastr::fields::VectorField current_fp_ampere = m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
@@ -1507,7 +1507,7 @@ void WarpXFluidContainer::HybridInitializeKe (ablastr::fields::MultiFabRegister&
     // Set Ke to 0
     m_fields.get(name_mf_K, lev)->setVal(0);
 
-    const auto ix_type = m_fields.get(name_mf_K, lev)->ixType().toIntVect();   
+    const auto ix_type = m_fields.get(name_mf_K, lev)->ixType().toIntVect();
 
     ablastr::fields::ScalarField rho_fp = m_fields.get(FieldType::rho_fp, lev);
 
@@ -1560,7 +1560,7 @@ void WarpXFluidContainer::HybridUpdateTe (ablastr::fields::MultiFabRegister& m_f
     // Set Te to 0
     m_fields.get(name_mf_T, lev)->setVal(0);
 
-    const auto ix_type = m_fields.get(name_mf_T, lev)->ixType().toIntVect();   
+    const auto ix_type = m_fields.get(name_mf_T, lev)->ixType().toIntVect();
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())

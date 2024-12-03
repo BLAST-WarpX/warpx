@@ -251,7 +251,7 @@ QdsmcParticleContainer::SetV (int lev,
         amrex::Box tilebox = pti.tilebox();
         amrex::Box box = amrex::convert( tilebox, ix_type_Uxfield );
         box.grow(Ux.nGrowVect());
-        
+
         amrex::ParticleReal* const AMREX_RESTRICT part_x0 = attribs[QdsmcPIdx::x_node].dataPtr();
         amrex::ParticleReal* const AMREX_RESTRICT part_y0 = attribs[QdsmcPIdx::y_node].dataPtr();
         amrex::ParticleReal* const AMREX_RESTRICT part_z0 = attribs[QdsmcPIdx::z_node].dataPtr();
@@ -401,7 +401,7 @@ QdsmcParticleContainer::DepositK(int lev, amrex::MultiFab &Kfield)
     // We need to set the K multifab to 0 before depositing K values from qdsmc particles
     Kfield.setVal(0);
 
-    const auto ix_type = Kfield.ixType().toIntVect();   
+    const auto ix_type = Kfield.ixType().toIntVect();
 
     for (iterator pti(*this, lev); pti.isValid(); ++pti)
     {
@@ -438,6 +438,6 @@ QdsmcParticleContainer::DepositK(int lev, amrex::MultiFab &Kfield)
     ablastr::utils::communication::SumBoundary(
             Kfield, 0, Kfield.nComp(), Kfield.nGrowVect(), Kfield.nGrowVect(),
             WarpX::do_single_precision_comms, period);
-            
-    amrex::Gpu::streamSynchronize();    
+
+    amrex::Gpu::streamSynchronize();
 }
