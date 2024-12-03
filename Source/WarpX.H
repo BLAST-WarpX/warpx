@@ -1509,7 +1509,6 @@ private:
     amrex::Real stop_time = std::numeric_limits<amrex::Real>::max();
 
     int regrid_int = -1;
-
     amrex::Real cfl = amrex::Real(0.999);
 
     std::string restart_chkfile;
