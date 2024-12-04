@@ -44,7 +44,7 @@ namespace ablastr::fields
                               + y*z*std::asinh( x/std::sqrt(y*y + z*z) )
                               + x*z*std::asinh( y/std::sqrt(x*x + z*z) )
                               + x*y*std::asinh( z/std::sqrt(x*x + y*y) );
-        return G; 
+        return G;
     }
 
 

@@ -68,9 +68,9 @@ computePhiIGF ( amrex::MultiFab const & rho,
     amrex::Real const dx = cell_size[0];
     amrex::Real const dy = cell_size[1];
     amrex::Real const dz = cell_size[2];
-    
+
     if (!do_2d_slices){
-        // 2D sliced solver 
+        // 2D sliced solver
         obc_solver->setGreensFunction(
         [=] AMREX_GPU_DEVICE (int i, int j, int k) -> amrex::Real
         {
@@ -92,7 +92,7 @@ computePhiIGF ( amrex::MultiFab const & rho,
             int const j0 = j - lo[1];
             amrex::Real const x = i0*dx;
             amrex::Real const y = j0*dy;
- 
+
             return SumOfIntegratedPotential2D(x, y, dx, dy);
         });
 
