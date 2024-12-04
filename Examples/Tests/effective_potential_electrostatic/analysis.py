@@ -5,7 +5,7 @@
 # --- doi.org/10.1109/TPS.2021.3072353.
 # --- The electron density distribution (as a function of radius) is compared
 # --- with the analytically calculated density based on the input parameters
-# --- of the test simulation.
+# --- of the test simulation at each output timestep.
 
 import os
 import sys
@@ -25,14 +25,16 @@ with open("sim_parameters.dpkl", "rb") as f:
     sim = dill.load(f)
 
 # characteristic expansion time
-tau = sim.sigma_0 * np.sqrt(sim.M / (constants.kb * (sim.T_e + sim.T_i)))
+tau = sim["sigma_0"] * np.sqrt(sim["M"] / (constants.kb * (sim["T_e"] + sim["T_i"])))
 
 
 def get_analytic_density(r, t):
     expansion_factor = 1.0 + t**2 / tau**2
-    T = sim.T_e / expansion_factor
-    sigma = sim.sigma_0 * np.sqrt(expansion_factor)
-    return sim.n_plasma * (T / sim.T_e) ** 1.5 * np.exp(-(r**2) / (2.0 * sigma**2))
+    T = sim["T_e"] / expansion_factor
+    sigma = sim["sigma_0"] * np.sqrt(expansion_factor)
+    return (
+        sim["n_plasma"] * (T / sim["T_e"]) ** 1.5 * np.exp(-(r**2) / (2.0 * sigma**2))
+    )
 
 
 def get_radial_function(field, info):
