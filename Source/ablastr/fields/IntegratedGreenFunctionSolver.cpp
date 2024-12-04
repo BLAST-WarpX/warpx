@@ -92,6 +92,7 @@ computePhiIGF ( amrex::MultiFab const & rho,
             int const j0 = j - lo[1];
             amrex::Real const x = i0*dx;
             amrex::Real const y = j0*dy;
+            amrex::ignore_unused(k);
 
             return SumOfIntegratedPotential2D(x, y, dx, dy);
         });
