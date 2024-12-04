@@ -36,8 +36,8 @@ add_warpx_test(
     1  # dims
     2  # nprocs
     inputs_test_1d_laser_injection_implicit  # inputs
-    analysis_1d.py  # analysis
-    diags/diag1000240  # output
+    "analysis_1d.py diags/diag1000240"  # analysis
+    "analysis_default_regression.py --path diags/diag1000240 --plotfile"  # checksum
     OFF  # dependency
 )
 
@@ -46,7 +46,7 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_laser_injection_implicit  # inputs
-    analysis_2d.py  # analysis
-    diags/diag1000240  # output
+    "analysis_2d.py diags/diag1000240"  # analysis
+    "analysis_default_regression.py --path diags/diag1000240 --plotfile"  # checksum
     OFF  # dependency
 )
