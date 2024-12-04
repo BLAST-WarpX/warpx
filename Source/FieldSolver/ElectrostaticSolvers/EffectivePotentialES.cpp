@@ -74,7 +74,8 @@ void EffectivePotentialES::computePhi (
     ablastr::fields::MultiLevelScalarField const& rho,
     ablastr::fields::MultiLevelScalarField const& phi) const
 {
-    // Calculate the mass enhancement factor:
+    // Calculate the mass enhancement factor - see  Appendix A of
+    // Barnes, Journal of Comp. Phys., 424 (2021), 109852.
     // The "sigma" multifab stores the dressing of the Poisson equation. It
     // is a cell-centered multifab.
     auto const& ba = convert(rho[0]->boxArray(), IntVect(AMREX_D_DECL(0,0,0)));

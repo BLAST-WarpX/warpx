@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+#
+# --- Analysis script for the effective potential Poisson solver test. This test
+# --- is based on the adiabatic plasma expansion benchmark from Connor et al. (2021)
+# --- doi.org/10.1109/TPS.2021.3072353.
+# --- The electron density distribution (as a function of radius) is compared
+# --- with the analytically calculated density based on the input parameters
+# --- of the test simulation.
 
 import os
 import sys
