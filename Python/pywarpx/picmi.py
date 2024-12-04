@@ -3971,7 +3971,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
         self,
         diag_type,
         name=None,
-        period=1,
+        period=None,
         path=None,
         extension=None,
         separator=None,
