@@ -785,14 +785,15 @@ class AnalyticFluxDistribution(
                 "{}*({})".format(density_scale, expression),
             )
         if not self.inject_from_embedded_boundary:
-
             species.add_new_group_attr(
                 source_name, "flux_normal_axis", self.flux_normal_axis
             )
             species.add_new_group_attr(
                 source_name, "surface_flux_pos", self.surface_flux_position
             )
-            species.add_new_group_attr(source_name, "flux_direction", self.flux_direction)
+            species.add_new_group_attr(
+                source_name, "flux_direction", self.flux_direction
+            )
         else:
             species.add_new_group_attr(
                 source_name, "inject_from_embedded_boundary", True
