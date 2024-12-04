@@ -130,7 +130,7 @@ namespace ablastr::fields
                    amrex::MultiFab & phi,
                    std::array<amrex::Real, 3> const & cell_size,
                    amrex::BoxArray const & ba,
-                   bool is_2d_slices);
+                   bool do_2d_slices);
 
 } // namespace ablastr::fields
 
