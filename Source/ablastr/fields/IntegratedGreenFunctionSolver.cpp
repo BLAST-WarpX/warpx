@@ -46,9 +46,6 @@ computePhiIGF ( amrex::MultiFab const & rho,
     domain.surroundingNodes(); // get nodal points, since `phi` and `rho` are nodal
     domain.grow( phi.nGrowVect() ); // include guard cells
 
-    // Do we grow the domain in the z-direction in the 2D mode?
-    //bool const do_2d_fft = false;
-
     int nprocs = amrex::ParallelDescriptor::NProcs();
     {
         amrex::ParmParse pp("ablastr");
@@ -71,8 +68,10 @@ computePhiIGF ( amrex::MultiFab const & rho,
     amrex::Real const dx = cell_size[0];
     amrex::Real const dy = cell_size[1];
     amrex::Real const dz = cell_size[2];
-
-    obc_solver->setGreensFunction(
+    
+    if (!do_2d_slices){
+        // 2D sliced solver 
+        obc_solver->setGreensFunction(
         [=] AMREX_GPU_DEVICE (int i, int j, int k) -> amrex::Real
         {
             int const i0 = i - lo[0];
@@ -82,10 +81,24 @@ computePhiIGF ( amrex::MultiFab const & rho,
             amrex::Real const y = j0*dy;
             amrex::Real const z = k0*dz;
 
-            return SumOfIntegratedPotential(x, y, z, dx, dy, dz, do_2d_slices);
+            return SumOfIntegratedPotential3D(x, y, z, dx, dy, dz);
+        });
+    }else{
+        // fully 3D solver
+        obc_solver->setGreensFunction(
+        [=] AMREX_GPU_DEVICE (int i, int j, int k) -> amrex::Real
+        {
+            int const i0 = i - lo[0];
+            int const j0 = j - lo[1];
+            amrex::Real const x = i0*dx;
+            amrex::Real const y = j0*dy;
+ 
+            return SumOfIntegratedPotential2D(x, y, dx, dy);
         });
 
+    }
 
     obc_solver->solve(phi, rho);
-}
+} // computePhiIGF
+
 } // namespace ablastr::fields
