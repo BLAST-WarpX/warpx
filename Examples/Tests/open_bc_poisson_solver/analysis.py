@@ -60,14 +60,13 @@ for k, z in enumerate(grid_z, start=1):
     Ex_theory = evaluate_E(grid_x, 0.0, z)[0]
     Ey_theory = evaluate_E(0.0, grid_y, z)[1]
 
-    #assert np.allclose(Ex_warpx, Ex_theory, rtol=0.032, atol=0)
-    #assert np.allclose(Ey_warpx, Ey_theory, rtol=0.029, atol=0)
+    # assert np.allclose(Ex_warpx, Ex_theory, rtol=0.032, atol=0)
+    # assert np.allclose(Ey_warpx, Ey_theory, rtol=0.029, atol=0)
 
-    errx.append(np.abs((Ex_warpx-Ex_theory)/Ex_theory))
-    erry.append(np.abs((Ey_warpx-Ey_theory)/Ey_theory))
+    errx.append(np.abs((Ex_warpx - Ex_theory) / Ex_theory))
+    erry.append(np.abs((Ey_warpx - Ey_theory) / Ey_theory))
 
 print(np.max(errx), np.max(erry))
-
 
 
 # compare checksums
