@@ -76,7 +76,7 @@ namespace ablastr::fields {
  * \tparam T_FArrayBoxFactory usually nothing or an amrex::EBFArrayBoxFactory (EB ONLY)
  * \param[in] rho The charge density a given species
  * \param[out] phi The potential to be computed by this function
- * \param[in] sigma The matrix representing the mass operator used to lower the local plasma frequency 
+ * \param[in] sigma The matrix representing the mass operator used to lower the local plasma frequency
  * \param[in] relative_tolerance The relative convergence threshold for the MLMG solver
  * \param[in] absolute_tolerance The absolute convergence threshold for the MLMG solver
  * \param[in] max_iters The maximum number of iterations allowed for the MLMG solver
