@@ -75,39 +75,6 @@ namespace ablastr::math::anyfft
         return fft_plan;
     }
 
-    FFTplan CreatePlanMany(int * real_size, amrex::Real * real_array,
-                           Complex * complex_array, const direction dir, const int dim,
-                           int howmany, int * inembed, int istride, int idist,
-                           int * onembed, int ostride, int odist){
-
-        FFTplan fft_plan;
-        ABLASTR_PROFILE("ablastr::math::anyfft::CreatePlan");
-
-        // Initialize fft_plan.m_plan with the vendor fft plan.
-        cufftResult result;
-
-        if (dir == direction::R2C){
-            result = cufftPlanMany( &(fft_plan.m_plan), dim, real_size, inembed, istride, idist, onembed, ostride, odist, VendorR2C, howmany);
-        }
-        else if (dir == direction::C2R){
-            result = cufftPlanMany( &(fft_plan.m_plan), dim, real_size, inembed, istride, idist, onembed, ostride, odist, VendorC2R, howmany);
-        }
-
-
-        ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(result == CUFFT_SUCCESS,
-            "cufftplan failed! Error: " + cufftErrorToString(result));
-
-        // Store meta-data in fft_plan
-        fft_plan.m_real_array = real_array;
-        fft_plan.m_complex_array = complex_array;
-        fft_plan.m_dir = dir;
-        fft_plan.m_dim = dim;
-
-        return fft_plan;
-    }
-
-
-
     void DestroyPlan(FFTplan& fft_plan)
     {
         ABLASTR_PROFILE("ablastr::math::anyfft::DestroyPlan");

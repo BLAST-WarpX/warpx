@@ -36,15 +36,6 @@ namespace ablastr::math::anyfft
     const auto VendorCreatePlanC2R1D = fftw_plan_dft_c2r_1d;
 #endif
 
-#ifdef AMREX_USE_FLOAT
-    const auto VendorCreateManyPlanR2C = fftwf_plan_many_dft_r2c;
-    const auto VendorCreateManyPlanC2R = fftwf_plan_many_dft_c2r;
-#else
-    const auto VendorCreateManyPlanR2C = fftw_plan_many_dft_r2c;
-    const auto VendorCreateManyPlanC2R = fftw_plan_many_dft_c2r;
-#endif
-
-
     FFTplan CreatePlan(const amrex::IntVect& real_size, amrex::Real * const real_array,
                        Complex * const complex_array, const direction dir, const int dim)
     {
@@ -90,49 +81,6 @@ namespace ablastr::math::anyfft
                 ABLASTR_ABORT_WITH_MESSAGE(
                     "only dim=1 and dim=2 and dim=3 have been implemented.");
             }
-        }
-
-        // Store meta-data in fft_plan
-        fft_plan.m_real_array = real_array;
-        fft_plan.m_complex_array = complex_array;
-        fft_plan.m_dir = dir;
-        fft_plan.m_dim = dim;
-
-        return fft_plan;
-    }
-
-    FFTplan CreatePlanMany(int * real_size, amrex::Real * real_array,
-                           Complex * complex_array, const direction dir, const int dim,
-                           int howmany, int * inembed, int istride, int idist,
-                           int * onembed, int ostride, int odist)
-    {
-
-        FFTplan fft_plan;
-
-#if defined(AMREX_USE_OMP) && defined(WarpX_FFTW_OMP)
-#   ifdef AMREX_USE_FLOAT
-        fftwf_init_threads();
-        fftwf_plan_with_nthreads(omp_get_max_threads());
-#   else
-        fftw_init_threads();
-        fftw_plan_with_nthreads(omp_get_max_threads());
-#   endif
-#endif
-        if (dir == direction::R2C){
-
-            fft_plan.m_plan = VendorCreateManyPlanR2C(dim, real_size, howmany,
-                                                real_array, inembed,
-                                                istride, idist,
-                                                complex_array, onembed,
-                                                ostride, odist, FFTW_ESTIMATE);
-        } else if (dir == direction::C2R){
-
-            fft_plan.m_plan = VendorCreateManyPlanC2R(dim, real_size, howmany,
-                                                complex_array, inembed,
-                                                istride, idist,
-                                                real_array, onembed,
-                                                ostride, odist, FFTW_ESTIMATE);
-
         }
 
         // Store meta-data in fft_plan

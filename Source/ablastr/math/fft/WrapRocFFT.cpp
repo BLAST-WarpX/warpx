@@ -66,43 +66,6 @@ namespace ablastr::math::anyfft
         return fft_plan;
     }
 
-    FFTplan CreatePlanMany(int * real_size, amrex::Real * real_array,
-                           Complex * complex_array, const direction dir, const int dim,
-                           int howmany, [[maybe_unused]] int * inembed, [[maybe_unused]] int istride, [[maybe_unused]] int idist,
-                           [[maybe_unused]] int * onembed, [[maybe_unused]] int ostride, [[maybe_unused]] int odist)
-    {
-        FFTplan fft_plan;
-
-        const std::size_t lengths[] = {AMREX_D_DECL(std::size_t(real_size[0]),
-                                                    std::size_t(real_size[1]),
-                                                    std::size_t(real_size[2]))};
-
-        // Initialize fft_plan.m_plan with the vendor fft plan.
-        rocfft_status result = rocfft_plan_create(&(fft_plan.m_plan),
-                                    rocfft_placement_notinplace,
-                                    (dir == direction::R2C)
-                                    ? rocfft_transform_type_real_forward
-                                    : rocfft_transform_type_real_inverse,
-#ifdef AMREX_USE_FLOAT
-                                    rocfft_precision_single,
-#else
-                                    rocfft_precision_double,
-#endif
-                                    dim, lengths,
-                                    howmany, // number of transforms - batch size
-                                    nullptr);
-
-        assert_rocfft_status("rocfft_plan_create", result);
-
-        // Store meta-data in fft_plan
-        fft_plan.m_real_array = real_array;
-        fft_plan.m_complex_array = complex_array;
-        fft_plan.m_dir = dir;
-        fft_plan.m_dim = dim;
-
-        return fft_plan;
-    }
-
     void DestroyPlan (FFTplan& fft_plan)
     {
         rocfft_plan_destroy( fft_plan.m_plan );
