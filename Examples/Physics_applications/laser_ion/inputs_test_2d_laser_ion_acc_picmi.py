@@ -261,7 +261,8 @@ field_probe_scat_line_rdiag = picmi.ReducedDiagnostic(
 )
 
 load_balance_costs_rdiag = picmi.ReducedDiagnostic(
-    diag_type="LoadBalanceCosts", name="LBC",
+    diag_type="LoadBalanceCosts",
+    name="LBC",
 )
 
 # Set up simulation
