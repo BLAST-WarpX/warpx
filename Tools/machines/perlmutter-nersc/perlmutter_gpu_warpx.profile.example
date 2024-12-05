@@ -15,7 +15,7 @@ module load cudatoolkit
 module load cmake/3.24.3
 
 # optional: for QED support with detailed tables
-export BOOST_ROOT=/global/common/software/spackecp/perlmutter/e4s-23.05/default/spack/opt/spack/linux-sles15-zen3/gcc-11.2.0/boost-1.82.0-ow5r5qrgslcwu33grygouajmuluzuzv3
+export BOOST_ROOT=/global/common/software/spackecp/perlmutter/e4s-23.08/default/spack/opt/spack/linux-sles15-zen3/gcc-12.3.0/boost-1.83.0-nxqk3hnci5g3wqv75wvsmuke3w74mzxi
 
 # optional: for openPMD and PSATD+RZ support
 module load cray-hdf5-parallel/1.12.2.9
