@@ -18,8 +18,8 @@ echo 'Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/80-retries
 sudo apt-get -qqq update
 sudo apt-get install -y \
     cmake               \
-    clang-17            \
-    clang-tidy-17       \
+    clang-18            \
+    clang-tidy-18       \
     libblas-dev         \
     libc++-17-dev       \
     libboost-math-dev   \
@@ -37,9 +37,9 @@ sudo apt-get install -y \
     ccache              \
     pkg-config
 
-# Use clang 17
-export CXX=$(which clang++-17)
-export CC=$(which clang-17)
+# Use clang 18
+export CXX=$(which clang++-18)
+export CC=$(which clang-18)
 
 # cmake-easyinstall
 #
