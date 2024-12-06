@@ -144,7 +144,7 @@ void FieldEnergy::ComputeDiags (int step)
 // end void FieldEnergy::ComputeDiags
 
 // Function that computes the sum of the field squared.
-// This takes into account the half-cell volumes at the edges of the domain
+// This takes into account the fraction of the cell volumes within the domain
 // and the cell volumes in cylindrical coordinates.
 amrex::Real
 FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, int lev)

@@ -41,7 +41,7 @@ public:
 
     /**
      * \brief Calculate the integral of the field squared, taking into
-     *        account the covered cell volume.
+     *        account the fraction of the cell volume within the domain.
      *
      * \param field The MultiFab to be integrated
      * \param lev   The refinement level
