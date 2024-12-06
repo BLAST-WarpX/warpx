@@ -62,7 +62,8 @@ namespace
                                   amrex::GpuArray<FieldBoundaryType, 3> const fbndry_hi)
     {
         using namespace amrex::literals;
-        amrex::IntVect ijk_boundary = ijk_vec;
+        amrex::IntVect ijk_next = ijk_vec;
+        amrex::IntVect ijk_nextp1 = ijk_vec;
         amrex::IntVect ijk_mirror = ijk_vec;
         bool OnBoundary = false;
         bool GuardCell = false;
@@ -114,10 +115,9 @@ namespace
                     } else if (ig > 0) {
                         GuardCell = true;
 
-                        // Location of the nearby boundar cell
-                        ijk_boundary[idim] = ( (iside == -1)
-                                        ? (dom_lo[idim] - (1 - is_nodal[idim]))
-                                        : (dom_hi[idim] + 1));
+                        // Location of the next cells inward
+                        ijk_next[idim] = ijk_vec[idim] - ig*iside;
+                        ijk_nextp1[idim] = ijk_next[idim] - ig*iside;
 
                         // Mirror location inside the domain by "ig" number of cells
                         ijk_mirror[idim] = ( (iside == -1)
@@ -159,12 +159,12 @@ namespace
                 // The value on the boundary is left unmodified
                 // The values in the guard cells are extrapolated
                 if (GuardCell) {
-                    field(ijk_vec, n) = 2._rt*field(ijk_boundary, n) - field(ijk_mirror, n);
+                    field(ijk_vec, n) = 2._rt*field(ijk_next, n) - field(ijk_nextp1, n);
                 }
             } else if ((OnBoundary || GuardCell) && set_field) {
                 field(ijk_vec, n) = field_value;
             } else if (GuardCell) {
-                field(ijk_vec, n) = 2._rt*field(ijk_boundary, n) - field(ijk_mirror, n);
+                field(ijk_vec, n) = 2._rt*field(ijk_next, n) - field(ijk_nextp1, n);
             }
         } else {
             if (OnBoundary && (E_like ^ is_normal_to_boundary)) {
