@@ -62,8 +62,8 @@ namespace
                                   amrex::GpuArray<FieldBoundaryType, 3> const fbndry_hi)
     {
         using namespace amrex::literals;
+        amrex::IntVect ijk_boundary = ijk_vec;
         amrex::IntVect ijk_mirror = ijk_vec;
-        amrex::IntVect ijk_mirrorp1 = ijk_vec;
         bool OnBoundary = false;
         bool GuardCell = false;
         bool isInsulatorBoundary = false;
@@ -114,12 +114,15 @@ namespace
                     } else if (ig > 0) {
                         GuardCell = true;
 
+                        // Location of the nearby boundar cell
+                        ijk_boundary[idim] = ( (iside == -1)
+                                        ? (dom_lo[idim] - (1 - is_nodal[idim]))
+                                        : (dom_hi[idim] + 1));
+
                         // Mirror location inside the domain by "ig" number of cells
                         ijk_mirror[idim] = ( (iside == -1)
                                         ? (dom_lo[idim] + ig - (1 - is_nodal[idim]))
-                                        : (dom_hi[idim] + 1 - ig));
-                        // Location twice as far in, for extrapolation
-                        ijk_mirrorp1[idim] = 2*ijk_mirror[idim] - ijk_vec[idim];
+                                        : (dom_hi[idim] - ig + 1));
 
                         // Check for components with even symmetry.
                         // True for E_like and tangential, and B_like and normal
@@ -156,12 +159,12 @@ namespace
                 // The value on the boundary is left unmodified
                 // The values in the guard cells are extrapolated
                 if (GuardCell) {
-                    field(ijk_vec, n) = 2._rt*field(ijk_mirror, n) - field(ijk_mirrorp1, n);
+                    field(ijk_vec, n) = 2._rt*field(ijk_boundary, n) - field(ijk_mirror, n);
                 }
             } else if ((OnBoundary || GuardCell) && set_field) {
                 field(ijk_vec, n) = field_value;
             } else if (GuardCell) {
-                field(ijk_vec, n) = 2._rt*field(ijk_mirror, n) - field(ijk_mirrorp1, n);
+                field(ijk_vec, n) = 2._rt*field(ijk_boundary, n) - field(ijk_mirror, n);
             }
         } else {
             if (OnBoundary && (E_like ^ is_normal_to_boundary)) {
