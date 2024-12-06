@@ -67,13 +67,20 @@ public:
 
     void PrintParameters () const override;
 
-    void OneStep ( amrex::Real  a_time,
+    /**
+     * \brief Advances the simulation one time step
+     *
+     * \param[in] start_time The time at the start of the time step
+     * \param[in] a_dt The time step size
+     * \param[in] a_step The time step number
+     */
+    void OneStep ( amrex::Real  start_time,
                    amrex::Real  a_dt,
                    int          a_step ) override;
 
     void ComputeRHS ( WarpXSolverVec&  a_RHS,
                 const WarpXSolverVec&  a_E,
-                      amrex::Real      a_time,
+                      amrex::Real      start_time,
                       int              a_nl_iter,
                       bool             a_from_jacobian ) override;
 
@@ -98,7 +105,7 @@ private:
      * \brief Update the E and B fields owned by WarpX
      */
     void UpdateWarpXFields ( const WarpXSolverVec&  a_E,
-                             amrex::Real            a_time );
+                             amrex::Real            start_time );
 
     /**
      * \brief Nonlinear solver is for the time-centered values of E. After
