@@ -35,14 +35,16 @@ sudo apt-get install -y \
     pkg-config
 
 # parse clang version from command line
-clang_version=${1}
+version_number=${1}
 # add LLVM repository and install clang tools
-sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+wget https://apt.llvm.org/llvm.sh
+chmod +x llvm.sh
+sudo ./llvm.sh ${version_number}
 sudo apt-get update
-sudo apt-get install clang-${clang_version} clang-tidy-${clang_version}
+sudo apt-get install clang-${version_number} clang-tidy-${version_number}
 # export compiler flags
-export CXX=$(which clang++-${clang_version})
-export CC=$(which clang-${clang_version})
+export CXX=$(which clang++-${version_number})
+export CC=$(which clang-${version_number})
 
 # cmake-easyinstall
 #
