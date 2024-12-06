@@ -280,7 +280,7 @@ with open("./requirements.txt") as f:
 setup(
     name="pywarpx",
     # note PEP-440 syntax: x.y.zaN but x.y.z.devN
-    version="24.11",
+    version="24.12",
     packages=["pywarpx"],
     package_dir={"pywarpx": "Python/pywarpx"},
     author="Jean-Luc Vay, David P. Grote, Maxence Thévenet, Rémi Lehe, Andrew Myers, Weiqun Zhang, Axel Huebl, et al.",

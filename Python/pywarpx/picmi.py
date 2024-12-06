@@ -2770,6 +2770,21 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     warpx_used_inputs_file: string, optional
         The name of the text file that the used input parameters is written to,
+
+    warpx_reduced_diags_path: string, optional
+        Sets the default path for reduced diagnostic output files
+
+    warpx_reduced_diags_extension: string, optional
+        Sets the default extension for reduced diagnostic output files
+
+    warpx_reduced_diags_intervals: string, optional
+        Sets the default intervals for reduced diagnostic output files
+
+    warpx_reduced_diags_separator: string, optional
+        Sets the default separator for reduced diagnostic output files
+
+    warpx_reduced_diags_precision: integer, optional
+        Sets the default precision for reduced diagnostic output files
     """
 
     # Set the C++ WarpX interface (see _libwarpx.LibWarpX) as an extension to
@@ -2836,6 +2851,12 @@ class Simulation(picmistandard.PICMI_Simulation):
         self.checkpoint_signals = kw.pop("warpx_checkpoint_signals", None)
         self.numprocs = kw.pop("warpx_numprocs", None)
 
+        self.reduced_diags_path = kw.pop("warpx_reduced_diags_path", None)
+        self.reduced_diags_extension = kw.pop("warpx_reduced_diags_extension", None)
+        self.reduced_diags_intervals = kw.pop("warpx_reduced_diags_intervals", None)
+        self.reduced_diags_separator = kw.pop("warpx_reduced_diags_separator", None)
+        self.reduced_diags_precision = kw.pop("warpx_reduced_diags_precision", None)
+
         self.inputs_initialized = False
         self.warpx_initialized = False
 
@@ -2901,6 +2922,13 @@ class Simulation(picmistandard.PICMI_Simulation):
         pywarpx.warpx.checkpoint_signals = self.checkpoint_signals
 
         pywarpx.warpx.numprocs = self.numprocs
+
+        reduced_diags = pywarpx.warpx.get_bucket("reduced_diags")
+        reduced_diags.path = self.reduced_diags_path
+        reduced_diags.extension = self.reduced_diags_extension
+        reduced_diags.intervals = self.reduced_diags_intervals
+        reduced_diags.separator = self.reduced_diags_separator
+        reduced_diags.precision = self.reduced_diags_precision
 
         particle_shape = self.particle_shape
         for s in self.species:
@@ -3943,7 +3971,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
         self,
         diag_type,
         name=None,
-        period=1,
+        period=None,
         path=None,
         extension=None,
         separator=None,
