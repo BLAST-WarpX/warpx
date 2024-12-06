@@ -36,10 +36,10 @@ namespace ParticleUtils
 
     /* Find the particles and count the particles that are in each cell.
        Note that this does *not* rearrange particle arrays */
-    amrex::DenseBins<typename WarpXParticleContainer::ParticleTileType::ParticleTileDataType>
+    amrex::DenseBins<ParticleTileDataType>
     findParticlesInEachCell (int lev,
-                             amrex::MFIter const & mfi,
-                             WarpXParticleContainer::ParticleTileType & ptile) {
+                             const amrex::MFIter & mfi,
+                             ParticleTileType & ptile) {
 
         // Extract particle structures for this tile
         int const np = ptile.numParticles();

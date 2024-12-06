@@ -17,6 +17,10 @@
 
 namespace ParticleUtils {
 
+    // Define shortcuts for frequently-used type names
+    using ParticleTileType = typename WarpXParticleContainer::ParticleTileType;
+    using ParticleTileDataType = typename ParticleTileType::ParticleTileDataType;
+
     /**
      * \brief Find the particles and count the particles that are in each cell. More specifically
      * this function returns an amrex::DenseBins object containing an offset array and a permutation
@@ -28,10 +32,10 @@ namespace ParticleUtils {
      * @param[in] mfi the MultiFAB iterator.
      * @param[in] ptile the particle tile.
      */
-    amrex::DenseBins<typename WarpXParticleContainer::ParticleTileType::ParticleTileDataType>
+    amrex::DenseBins<ParticleTileDataType>
     findParticlesInEachCell (int lev,
-                             amrex::MFIter const & mfi,
-                             WarpXParticleContainer::ParticleTileType & ptile);
+                             const amrex::MFIter & mfi,
+                             ParticleTileType & ptile);
 
     /**
      * \brief Return (relativistic) particle energy given velocity and mass.
