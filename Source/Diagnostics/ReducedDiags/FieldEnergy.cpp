@@ -208,28 +208,28 @@ FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, int lev)
             amrex::ignore_unused(i,j,k,n);
 #if defined WARPX_DIM_RZ
             amrex::Real const r = rmin + (i - irmin)*dr;
-            amrex::Real volume_factor = r;
+            amrex::Real v_factor = r;
             if (r == 0._rt) {
-                volume_factor = dr/8._rt;
+                v_factor = dr/8._rt;
             } else if (rmin == 0._rt && i == irmax) {
-                volume_factor = r/2._rt - dr/8._rt;
+                v_factor = r/2._rt - dr/8._rt;
             }
-            if (j == domain_lo[1] && half_volume[1]) { volume_factor *= 0.5_rt; }
-            if (j == domain_hi[1] && half_volume[1]) { volume_factor *= 0.5_rt; }
+            if (j == domain_lo[1] && half_volume[1]) { v_factor *= 0.5_rt; }
+            if (j == domain_hi[1] && half_volume[1]) { v_factor *= 0.5_rt; }
             amrex::Real const theta_integral = (n == 0 ? 2._rt : 1._rt);
-            return MathConst::pi*volume_factor*theta_integral;
+            return MathConst::pi*v_factor*theta_integral;
 #else
             // On the boundaries, if the grid is nodal, use half of the volume.
-            amrex::Real volume_factor = 1._rt;
+            amrex::Real v_factor = 1._rt;
             AMREX_D_TERM(
-            if (i == domain_lo[0] && half_volume[0]) { volume_factor *= 0.5_rt; },
-            if (j == domain_lo[1] && half_volume[1]) { volume_factor *= 0.5_rt; },
-            if (k == domain_lo[2] && half_volume[2]) { volume_factor *= 0.5_rt; })
+            if (i == domain_lo[0] && half_volume[0]) { v_factor *= 0.5_rt; },
+            if (j == domain_lo[1] && half_volume[1]) { v_factor *= 0.5_rt; },
+            if (k == domain_lo[2] && half_volume[2]) { v_factor *= 0.5_rt; })
             AMREX_D_TERM(
-            if (i == domain_hi[0] && half_volume[0]) { volume_factor *= 0.5_rt; },
-            if (j == domain_hi[1] && half_volume[1]) { volume_factor *= 0.5_rt; },
-            if (k == domain_hi[2] && half_volume[2]) { volume_factor *= 0.5_rt; })
-            return volume_factor;
+            if (i == domain_hi[0] && half_volume[0]) { v_factor *= 0.5_rt; },
+            if (j == domain_hi[1] && half_volume[1]) { v_factor *= 0.5_rt; },
+            if (k == domain_hi[2] && half_volume[2]) { v_factor *= 0.5_rt; })
+            return v_factor;
 #endif
         };
 
