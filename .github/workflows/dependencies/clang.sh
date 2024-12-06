@@ -3,7 +3,6 @@
 # Copyright 2024 The WarpX Community
 #
 # License: BSD-3-Clause-LBNL
-# Authors: Luca Fedeli
 
 set -eu -o pipefail
 
@@ -15,11 +14,9 @@ echo 'Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/80-retries
 # This dependency file is currently used within a docker container,
 # which does not come (among others) with wget, xz-utils, curl, git,
 # ccache, and pkg-config pre-installed.
-sudo apt-get -qqq update
+sudo apt-get -qq update
 sudo apt-get install -y \
     cmake               \
-    clang-17            \
-    clang-tidy-17       \
     libblas-dev         \
     libc++-17-dev       \
     libboost-math-dev   \
@@ -37,9 +34,15 @@ sudo apt-get install -y \
     ccache              \
     pkg-config
 
-# Use clang 17
-export CXX=$(which clang++-17)
-export CC=$(which clang-17)
+# parse clang version from command line
+clang_version=${1}
+# add LLVM repository and install clang tools
+sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+sudo apt-get update
+sudo apt-get install clang-${clang_version} clang-tidy-${clang_version}
+# export compiler flags
+export CXX=$(which clang++-${clang_version})
+export CC=$(which clang-${clang_version})
 
 # cmake-easyinstall
 #
