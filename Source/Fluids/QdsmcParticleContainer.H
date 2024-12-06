@@ -105,6 +105,11 @@ public:
     // using linear interpolation
     void DepositK(int lev, amrex::MultiFab &Kfield);
 
+    // Reset particles positions to x0,y0,z0
+    // and v, np, K to 0
+    // then calls Redistribute()
+    void ResetParticles(int lev);
+
 };
 
 #endif // WARPX_QdsmcParticleContainer_H_

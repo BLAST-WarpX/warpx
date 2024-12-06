@@ -272,7 +272,7 @@ QdsmcParticleContainer::SetV (int lev,
             amrex::Real vyp;
             amrex::Real vzp;
 
-            gather_vector_field_qdsmc(part_x0[ip], part_y0[ip], part_z0[ip], vxp, vyp, vzp, arrUxfield, arrUyfield, arrUzfield, plo, dinv);
+            gather_vector_field_qdsmc(part_x0[ip], part_y0[ip], part_z0[ip], vxp, vyp, vzp, arrUxfield, arrUyfield, arrUzfield, plo, dinv, box);
 
             part_vx[ip] = vxp;
             part_vy[ip] = vyp;
@@ -307,8 +307,6 @@ QdsmcParticleContainer::SetK (int lev,
         amrex::Box box = amrex::convert( tilebox, ix_type_Kfield );
         box.grow(Kfield.nGrowVect());
 
-        const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
-
         amrex::ParticleReal* const AMREX_RESTRICT part_x0 = attribs[QdsmcPIdx::x_node].dataPtr();
         amrex::ParticleReal* const AMREX_RESTRICT part_y0 = attribs[QdsmcPIdx::y_node].dataPtr();
         amrex::ParticleReal* const AMREX_RESTRICT part_z0 = attribs[QdsmcPIdx::z_node].dataPtr();
@@ -326,7 +324,7 @@ QdsmcParticleContainer::SetK (int lev,
             amrex::Real n_p;
             amrex::Real kn_p;
 
-            gather_density_entropy(part_x0[ip], part_y0[ip], part_z0[ip], n_p, kn_p, arrrhofield, arrKfield, plo, dinv, cell_volume);
+            gather_density_entropy(part_x0[ip], part_y0[ip], part_z0[ip], n_p, kn_p, arrrhofield, arrKfield, plo, dinv, cell_volume, box);
 
             part_np_real[ip] = n_p;
             part_entropy[ip] = kn_p;
@@ -387,6 +385,48 @@ QdsmcParticleContainer::PushX (int lev, amrex::Real dt)
 }
 
 
+void
+QdsmcParticleContainer::ResetParticles(int lev)
+{
+    for (iterator pti(*this, lev); pti.isValid(); ++pti)
+    {
+        auto const np = pti.numParticles();
+        auto& attribs = pti.GetStructOfArrays().GetRealData();
+
+        amrex::ParticleReal* const AMREX_RESTRICT part_x0 = attribs[QdsmcPIdx::x_node].dataPtr();
+        amrex::ParticleReal* const AMREX_RESTRICT part_y0 = attribs[QdsmcPIdx::y_node].dataPtr();
+        amrex::ParticleReal* const AMREX_RESTRICT part_z0 = attribs[QdsmcPIdx::z_node].dataPtr();
+
+        amrex::ParticleReal* const AMREX_RESTRICT part_x = attribs[QdsmcPIdx::x].dataPtr();
+        amrex::ParticleReal* const AMREX_RESTRICT part_y = attribs[QdsmcPIdx::y].dataPtr();
+        amrex::ParticleReal* const AMREX_RESTRICT part_z = attribs[QdsmcPIdx::z].dataPtr();
+
+        amrex::ParticleReal* const AMREX_RESTRICT part_vx = attribs[QdsmcPIdx::vx].dataPtr();
+        amrex::ParticleReal* const AMREX_RESTRICT part_vy = attribs[QdsmcPIdx::vy].dataPtr();
+        amrex::ParticleReal* const AMREX_RESTRICT part_vz = attribs[QdsmcPIdx::vz].dataPtr();
+
+        amrex::ParticleReal* const AMREX_RESTRICT part_entropy = attribs[QdsmcPIdx::entropy].dataPtr();
+        amrex::ParticleReal* const AMREX_RESTRICT part_np_real = attribs[QdsmcPIdx::np_real].dataPtr();
+
+        amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (long ip)
+        {
+            part_x[ip] = part_x0[ip];
+            part_y[ip] = part_y0[ip];
+            part_z[ip] = part_z0[ip];
+
+            part_vx[ip] = 0;
+            part_vy[ip] = 0;
+            part_vz[ip] = 0;
+
+            part_entropy[ip] = 0;
+            part_np_real[ip] = 0;
+        });
+    }
+
+    Redistribute();
+}
+
+
 // Generalize this function to --> DepositScalar
 void
 QdsmcParticleContainer::DepositK(int lev, amrex::MultiFab &Kfield)
@@ -430,7 +470,7 @@ QdsmcParticleContainer::DepositK(int lev, amrex::MultiFab &Kfield)
             // avoid launching kernel for "empty" particles
             if(part_entropy[ip]>0)
             {
-                do_deposit_scalar(arrKField, part_x[ip], part_y[ip], part_z[ip], plo, dinv, part_entropy[ip]);
+                do_deposit_scalar(arrKField, part_x[ip], part_y[ip], part_z[ip], plo, dinv, part_entropy[ip], box);
             }
         });
     }
@@ -439,5 +479,8 @@ QdsmcParticleContainer::DepositK(int lev, amrex::MultiFab &Kfield)
             Kfield, 0, Kfield.nComp(), Kfield.nGrowVect(), Kfield.nGrowVect(),
             WarpX::do_single_precision_comms, period);
 
-    amrex::Gpu::streamSynchronize();
+    // Add fill boundary ?
+    //Kfield.FillBoundary(Kfield.nGrowVect(), period);
+
+    //amrex::Gpu::streamSynchronize();
 }
