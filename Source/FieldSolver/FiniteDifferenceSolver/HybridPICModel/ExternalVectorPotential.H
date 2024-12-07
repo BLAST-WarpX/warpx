@@ -82,6 +82,9 @@ public:
 
     void InitData ();
 
+    void CalculateExternalCurlA ();
+    void CalculateExternalCurlA (std::string& coil_name);
+
     AMREX_FORCE_INLINE
     void ZeroFieldinEB (
         ablastr::fields::VectorField const& Field,

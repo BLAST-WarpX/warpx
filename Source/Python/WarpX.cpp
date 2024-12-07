@@ -246,6 +246,10 @@ The physical fields in WarpX have the following naming:
             [] () { WarpX::ProjectionCleanDivB(); },
             "Executes projection based divergence cleaner on loaded Bfield_fp_external."
         )
+        .def_static("calculate_hybrid_external_curlA",
+            [] (WarpX& wx) { wx.CalculateExternalCurlA(); },
+            "Executes calculation of the curl of the external A in the hybrid solver."
+        )
         .def("synchronize",
             [] (WarpX& wx) { wx.Synchronize(); },
             "Synchronize particle velocities and positions."

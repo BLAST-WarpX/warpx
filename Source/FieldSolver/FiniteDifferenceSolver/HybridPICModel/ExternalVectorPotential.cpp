@@ -207,26 +207,7 @@ ExternalVectorPotential::InitData ()
 
         amrex::Gpu::streamSynchronize();
 
-        // Compute the curl of at at max and store
-        std::string curlAext_field = m_field_names[i] + std::string{"_curlAext"};
-
-        ablastr::fields::MultiLevelVectorField A_ext =
-            warpx.m_fields.get_mr_levels_alldirs(Aext_field, warpx.finestLevel());
-        ablastr::fields::MultiLevelVectorField curlA_ext =
-            warpx.m_fields.get_mr_levels_alldirs(curlAext_field, warpx.finestLevel());
-
-        for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
-            warpx.get_pointer_fdtd_solver_fp(lev)->ComputeCurlA(
-                curlA_ext[lev],
-                A_ext[lev],
-                lev
-            );
-
-            for (int idir = 0; idir < 3; ++idir) {
-                warpx.m_fields.get(curlAext_field, Direction{idir}, lev)->
-                    FillBoundary(warpx.Geom(lev).periodicity());
-            }
-        }
+        CalculateExternalCurlA(m_field_names[i]);
 
         // Generate parser for time function
         m_A_external_time_parser[i] = std::make_unique<amrex::Parser>(
@@ -236,6 +217,43 @@ ExternalVectorPotential::InitData ()
     }
 
     UpdateHybridExternalFields(warpx.gett_new(0), warpx.getdt(0));
+}
+
+
+void 
+ExternalVectorPotential::CalculateExternalCurlA ()
+{
+    for (auto fname : m_field_names) {
+        CalculateExternalCurlA(fname);
+    }
+}
+
+void 
+ExternalVectorPotential::CalculateExternalCurlA (std::string& coil_name)
+{
+    using ablastr::fields::Direction;
+    auto & warpx = WarpX::GetInstance();
+
+    // Compute the curl of at at max and store
+    std::string Aext_field = coil_name + std::string{"_Aext"};
+    std::string curlAext_field = coil_name + std::string{"_curlAext"};
+
+    ablastr::fields::MultiLevelVectorField A_ext =
+        warpx.m_fields.get_mr_levels_alldirs(Aext_field, warpx.finestLevel());
+    ablastr::fields::MultiLevelVectorField curlA_ext =
+        warpx.m_fields.get_mr_levels_alldirs(curlAext_field, warpx.finestLevel());
+
+    for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+        warpx.get_pointer_fdtd_solver_fp(lev)->ComputeCurlA(
+            curlA_ext[lev],
+            A_ext[lev],
+            lev);
+
+        for (int idir = 0; idir < 3; ++idir) {
+            warpx.m_fields.get(curlAext_field, Direction{idir}, lev)->
+                FillBoundary(warpx.Geom(lev).periodicity());
+        }
+    }
 }
 
 AMREX_FORCE_INLINE
