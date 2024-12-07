@@ -111,7 +111,7 @@ private:
      * \brief Nonlinear solver is for the time-centered values of E. After
      * the solver, need to use m_E and m_Eold to compute E^{n+1}
      */
-    void FinishFieldUpdate ( amrex::Real  a_new_time );
+    void FinishFieldUpdate ( amrex::Real end_time );
 
 };
 
