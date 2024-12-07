@@ -687,14 +687,33 @@ class DensityDistributionBase(object):
                 f"({expression})/{constants.c}",
             )
 
-
-class UniformFluxDistribution(
-    picmistandard.PICMI_UniformFluxDistribution, DensityDistributionBase
+class UniformDistribution(
+    picmistandard.PICMI_UniformDistribution, DensityDistributionBase
 ):
+    def distribution_initialize_inputs(
+        self, species_number, layout, species, density_scale, source_name
+    ):
+        self.set_mangle_dict()
+        self.set_species_attributes(species, layout, source_name)
+
+        # --- Only constant density is supported by this class
+        species.add_new_group_attr(source_name, "profile", "constant")
+        species.add_new_group_attr(source_name, "density", self.density)
+        if density_scale is not None:
+            species.add_new_group_attr(source_name, "density", density_scale)
+
+class FluxDistributionBase(object):
+    """ This is a base class for both uniform and analytic flux distributions."""
+
     def init(self, kw):
         self.inject_from_embedded_boundary = kw.pop(
             "warpx_inject_from_embedded_boundary", False
         )
+
+    def flux_profile_and_func_initialize(self, species, density_scale, source_name
+    ):
+    """ Initialize the flux profile and flux function."""
+        pass
 
     def distribution_initialize_inputs(
         self, species_number, layout, species, density_scale, source_name
@@ -703,10 +722,7 @@ class UniformFluxDistribution(
         self.set_mangle_dict()
         self.set_species_attributes(species, layout, source_name)
 
-        species.add_new_group_attr(source_name, "flux_profile", "constant")
-        species.add_new_group_attr(source_name, "flux", self.flux)
-        if density_scale is not None:
-            species.add_new_group_attr(source_name, "flux", density_scale)
+        self.flux_profile_and_func_initialize(species, density_scale, source_name)
 
         if not self.inject_from_embedded_boundary:
             species.add_new_group_attr(
@@ -736,43 +752,14 @@ class UniformFluxDistribution(
                 source_name, "momentum_distribution_type", "gaussianflux"
             )
 
-
-class UniformDistribution(
-    picmistandard.PICMI_UniformDistribution, DensityDistributionBase
-):
-    def distribution_initialize_inputs(
-        self, species_number, layout, species, density_scale, source_name
-    ):
-        self.set_mangle_dict()
-        self.set_species_attributes(species, layout, source_name)
-
-        # --- Only constant density is supported by this class
-        species.add_new_group_attr(source_name, "profile", "constant")
-        species.add_new_group_attr(source_name, "density", self.density)
-        if density_scale is not None:
-            species.add_new_group_attr(source_name, "density", density_scale)
-
-
 class AnalyticFluxDistribution(
-    picmistandard.PICMI_AnalyticFluxDistribution, DensityDistributionBase
+    picmistandard.PICMI_AnalyticFluxDistribution, FluxDistributionBase, DensityDistributionBase
 ):
-    def init(self, kw):
-        self.inject_from_embedded_boundary = kw.pop(
-            "warpx_inject_from_embedded_boundary", False
-        )
-
-    def distribution_initialize_inputs(
-        self, species_number, layout, species, density_scale, source_name
+    def flux_profile_and_func_initialize(self, species, density_scale, source_name
     ):
-        self.fill_in = False
-        self.set_mangle_dict()
-        self.set_species_attributes(species, layout, source_name)
-
         species.add_new_group_attr(source_name, "flux_profile", "parse_flux_function")
-
         if density_scale is not None:
             species.add_new_group_attr(source_name, "flux", density_scale)
-
         expression = pywarpx.my_constants.mangle_expression(self.flux, self.mangle_dict)
         if density_scale is None:
             species.add_new_group_attr(
@@ -784,33 +771,16 @@ class AnalyticFluxDistribution(
                 "flux_function(x,y,z,t)",
                 "{}*({})".format(density_scale, expression),
             )
-        if not self.inject_from_embedded_boundary:
 
-            species.add_new_group_attr(
-                source_name, "flux_normal_axis", self.flux_normal_axis
-            )
-            species.add_new_group_attr(
-                source_name, "surface_flux_pos", self.surface_flux_position
-            )
-            species.add_new_group_attr(source_name, "flux_direction", self.flux_direction)
-        else:
-            species.add_new_group_attr(
-                source_name, "inject_from_embedded_boundary", True
-            )
-
-        species.add_new_group_attr(source_name, "flux_tmin", self.flux_tmin)
-        species.add_new_group_attr(source_name, "flux_tmax", self.flux_tmax)
-
-        # --- Use specific attributes for flux injection
-        species.add_new_group_attr(source_name, "injection_style", "nfluxpercell")
-        assert isinstance(layout, PseudoRandomLayout), Exception(
-            "UniformFluxDistribution only supports the PseudoRandomLayout in WarpX"
-        )
-        if self.gaussian_flux_momentum_distribution:
-            species.add_new_group_attr(
-                source_name, "momentum_distribution_type", "gaussianflux"
-            )
-
+class UniformFluxDistribution(
+    picmistandard.PICMI_UniformFluxDistribution, FluxDistributionBase, DensityDistributionBase
+):
+    def flux_profile_and_func_initialize(self, species, density_scale, source_name
+    ):
+        species.add_new_group_attr(source_name, "flux_profile", "constant")
+        species.add_new_group_attr(source_name, "flux", self.flux)
+        if density_scale is not None:
+            species.add_new_group_attr(source_name, "flux", density_scale)
 
 class AnalyticDistribution(
     picmistandard.PICMI_AnalyticDistribution, DensityDistributionBase
