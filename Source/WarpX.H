@@ -1604,7 +1604,7 @@ private:
      */
     void ExplicitFillBoundaryEBUpdateAux ();
 
-    void PushPSATD (amrex::Real cur_time);
+    void PushPSATD (amrex::Real start_time);
 
 #ifdef WARPX_USE_FFT
 
