@@ -53,7 +53,8 @@ FlushFormatSensei::WriteToFile (
     bool plot_raw_fields, bool plot_raw_fields_guards,
     const bool use_pinned_pc,
     bool isBTD, int /*snapshotID*/, int /*bufferID*/, int /*numBuffers*/,
-    const amrex::Geometry& /*full_BTD_snapshot*/, bool /*isLastBTDFlush*/) const
+    const amrex::Geometry& /*full_BTD_snapshot*/, bool /*isLastBTDFlush*/,
+    int /*verbose*/ ) const
 {
     amrex::ignore_unused(
         geom, nlev, prefix, file_min_digits,

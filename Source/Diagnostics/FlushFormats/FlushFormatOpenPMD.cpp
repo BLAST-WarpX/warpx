@@ -126,20 +126,23 @@ FlushFormatOpenPMD::WriteToFile (
     const bool use_pinned_pc,
     bool isBTD, int snapshotID, int bufferID, int numBuffers,
     const amrex::Geometry& full_BTD_snapshot,
-    bool isLastBTDFlush) const
+    bool isLastBTDFlush,
+    int verbose) const
 {
     WARPX_PROFILE("FlushFormatOpenPMD::WriteToFile()");
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
-    if (!isBTD)
-    {
-        amrex::Print() << Utils::TextMsg::Info("Writing openPMD file " + filename);
-    } else
-    {
-        amrex::Print() << Utils::TextMsg::Info("Writing buffer " + std::to_string(bufferID+1) + " of " + std::to_string(numBuffers)
-                            + " to snapshot " + std::to_string(snapshotID) +  " to openPMD BTD " + prefix);
-        if (isLastBTDFlush)
+    if (verbose > 0) {
+        if (!isBTD)
         {
-            amrex::Print() << Utils::TextMsg::Info("Finished writing snapshot " + std::to_string(snapshotID) + " in openPMD BTD " + prefix);
+            amrex::Print() << Utils::TextMsg::Info("Writing openPMD file " + filename);
+        } else
+        {
+            amrex::Print() << Utils::TextMsg::Info("Writing buffer " + std::to_string(bufferID+1) + " of " + std::to_string(numBuffers)
+                                + " to snapshot " + std::to_string(snapshotID) +  " to openPMD BTD " + prefix);
+            if (isLastBTDFlush)
+            {
+                amrex::Print() << Utils::TextMsg::Info("Finished writing snapshot " + std::to_string(snapshotID) + " in openPMD BTD " + prefix);
+            }
         }
     }
 

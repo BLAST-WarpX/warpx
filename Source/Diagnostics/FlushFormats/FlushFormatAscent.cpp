@@ -21,7 +21,8 @@ FlushFormatAscent::WriteToFile (
     const bool /*use_pinned_pc*/,
     bool isBTD, int /*snapshotID*/, int /*bufferID*/, int /*numBuffers*/,
     const amrex::Geometry& /*full_BTD_snapshot*/,
-    bool /*isLastBTDFlush*/) const
+    bool /*isLastBTDFlush*/,
+    int /*verbose*/) const
 {
 #ifdef AMREX_USE_ASCENT
     WARPX_PROFILE("FlushFormatAscent::WriteToFile()");

@@ -43,7 +43,8 @@ FlushFormatCheckpoint::WriteToFile (
         bool /*isBTD*/, int /*snapshotID*/,
         int /*bufferID*/, int /*numBuffers*/,
         const amrex::Geometry& /*full_BTD_snapshot*/,
-        bool /*isLastBTDFlush*/) const
+        bool /*isLastBTDFlush*/,
+        int verbose) const
 {
     using ablastr::fields::Direction;
 
@@ -56,8 +57,10 @@ FlushFormatCheckpoint::WriteToFile (
 
     const std::string& checkpointname = amrex::Concatenate(prefix, iteration[0], file_min_digits);
 
-    amrex::Print() << Utils::TextMsg::Info(
-        "Writing checkpoint " + checkpointname);
+    if (verbose > 0) {
+        amrex::Print() << Utils::TextMsg::Info(
+            "Writing checkpoint " + checkpointname);
+    }
 
     // const int nlevels = finestLevel()+1;
     amrex::PreBuildDirectorHierarchy(checkpointname, default_level_prefix, nlev, true);

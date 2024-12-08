@@ -130,7 +130,8 @@ FlushFormatCatalyst::WriteToFile (
     bool /*use_pinned_pc*/,
     bool isBTD, int /*snapshotID*/, int /*bufferID*/, int /*numBuffers*/,
     const amrex::Geometry& /*full_BTD_snapshot*/,
-    bool /*isLastBTDFlush*/) const
+    bool /*isLastBTDFlush*/,
+    int /*verbose*/) const
 {
 #ifdef AMREX_USE_CATALYST
     amrex::Print() << Utils::TextMsg::Info("Running Catalyst pipeline scripts...");

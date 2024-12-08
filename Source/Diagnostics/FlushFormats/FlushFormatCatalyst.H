@@ -47,7 +47,8 @@ public:
         bool isBTD = false, int snapshotID = -1,
         int bufferID = 1, int numBuffers = 1,
         const amrex::Geometry& full_BTD_snapshot = amrex::Geometry(),
-        bool isLastBTDFlush = false)  const override;
+        bool isLastBTDFlush = false,
+        int verbose = 2)  const override;
 
 #ifdef AMREX_USE_CATALYST
     ~FlushFormatCatalyst() override;
