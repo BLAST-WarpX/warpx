@@ -62,6 +62,9 @@ Diagnostics::BaseReadParameters ()
     std::string dims;
     pp_geometry.get("dims", dims);
 
+    const amrex::ParmParse pp_warpx("warpx");
+    pp_warpx.query("verbose", m_verbose);
+
     // Query list of grid fields to write to output
     const bool varnames_specified = pp_diag_name.queryarr("fields_to_plot", m_varnames_fields);
     if (!varnames_specified){

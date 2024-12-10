@@ -190,6 +190,8 @@ public:
 protected:
     /** Read Parameters of the base Diagnostics class */
     bool BaseReadParameters ();
+    /** Whether to output a message when diagnostics are output */
+    int m_verbose = 2;
     /** Initialize member variables of the base Diagnostics class. */
     void InitBaseData ();
     /** Initialize m_mf_output vectors and data required to construct the buffers

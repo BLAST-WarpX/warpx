@@ -122,9 +122,6 @@ FullDiagnostics::ReadParameters ()
     const bool plot_raw_fields_guards_specified = pp_diag_name.query("plot_raw_fields_guards", m_plot_raw_fields_guards);
     const bool raw_specified = plot_raw_fields_specified || plot_raw_fields_guards_specified;
 
-    const amrex::ParmParse pp_warpx("warpx");
-    pp_warpx.query("verbose", m_verbose);
-
     if (m_diag_type == DiagTypes::TimeAveraged) {
         std::string m_time_average_mode_str = "none";
         /** Whether the diagnostics are averaging data over time or not
@@ -132,6 +129,7 @@ FullDiagnostics::ReadParameters ()
          */
         pp_diag_name.get("time_average_mode", m_time_average_mode_str);
 
+        const amrex::ParmParse pp_warpx("warpx");
         std::vector<std::string> dt_interval_vec = {"-1"};
         const bool timestep_may_vary = pp_warpx.queryarr("dt_update_interval", dt_interval_vec);
         amrex::Print() << Utils::TextMsg::Warn("Time step varies?" + std::to_string(timestep_may_vary));

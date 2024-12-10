@@ -66,11 +66,11 @@ FlushFormatPlotfile::WriteToFile (
     const amrex::Vector<ParticleDiag>& particle_diags, int nlev,
     const std::string prefix, int file_min_digits, bool plot_raw_fields,
     bool plot_raw_fields_guards,
+    int verbose,
     const bool /*use_pinned_pc*/,
     bool isBTD, int snapshotID,  int bufferID, int numBuffers,
     const amrex::Geometry& /*full_BTD_snapshot*/,
-    bool isLastBTDFlush,
-    int verbose) const
+    bool isLastBTDFlush) const
 {
     WARPX_PROFILE("FlushFormatPlotfile::WriteToFile()");
     auto & warpx = WarpX::GetInstance();

@@ -43,8 +43,6 @@ private:
     amrex::Real m_average_period_time = -1.0;
     /** Time step to start averaging */
     int m_average_start_step = -1;
-    /** Whether to output a message when diagnostics are output */
-    int m_verbose = 2;
     /** Flush m_mf_output or m_sum_mf_output and particles to file for the i^th buffer */
     void Flush (int i_buffer, bool /* force_flush */) override;
     /** Flush raw data */
