@@ -687,6 +687,7 @@ class DensityDistributionBase(object):
                 f"({expression})/{constants.c}",
             )
 
+
 class UniformDistribution(
     picmistandard.PICMI_UniformDistribution, DensityDistributionBase
 ):
@@ -702,8 +703,9 @@ class UniformDistribution(
         if density_scale is not None:
             species.add_new_group_attr(source_name, "density", density_scale)
 
+
 class FluxDistributionBase(object):
-    """ This is a base class for both uniform and analytic flux distributions."""
+    """This is a base class for both uniform and analytic flux distributions."""
 
     def init(self, kw):
         self.inject_from_embedded_boundary = kw.pop(
@@ -711,7 +713,7 @@ class FluxDistributionBase(object):
         )
 
     def initialize_flux_profile_func(self, species, density_scale, source_name):
-        """ Initialize the flux profile and flux function."""
+        """Initialize the flux profile and flux function."""
         pass
 
     def distribution_initialize_inputs(
@@ -751,11 +753,13 @@ class FluxDistributionBase(object):
                 source_name, "momentum_distribution_type", "gaussianflux"
             )
 
+
 class AnalyticFluxDistribution(
-    picmistandard.PICMI_AnalyticFluxDistribution, FluxDistributionBase, DensityDistributionBase
+    picmistandard.PICMI_AnalyticFluxDistribution,
+    FluxDistributionBase,
+    DensityDistributionBase,
 ):
-    def initialize_flux_profile_func(self, species, density_scale, source_name
-    ):
+    def initialize_flux_profile_func(self, species, density_scale, source_name):
         species.add_new_group_attr(source_name, "flux_profile", "parse_flux_function")
         if density_scale is not None:
             species.add_new_group_attr(source_name, "flux", density_scale)
@@ -771,15 +775,18 @@ class AnalyticFluxDistribution(
                 "{}*({})".format(density_scale, expression),
             )
 
+
 class UniformFluxDistribution(
-    picmistandard.PICMI_UniformFluxDistribution, FluxDistributionBase, DensityDistributionBase
+    picmistandard.PICMI_UniformFluxDistribution,
+    FluxDistributionBase,
+    DensityDistributionBase,
 ):
-    def initialize_flux_profile_func(self, species, density_scale, source_name
-    ):
+    def initialize_flux_profile_func(self, species, density_scale, source_name):
         species.add_new_group_attr(source_name, "flux_profile", "constant")
         species.add_new_group_attr(source_name, "flux", self.flux)
         if density_scale is not None:
             species.add_new_group_attr(source_name, "flux", density_scale)
+
 
 class AnalyticDistribution(
     picmistandard.PICMI_AnalyticDistribution, DensityDistributionBase
