@@ -42,6 +42,7 @@ SpectralSolver::SpectralSolver (
                 const RhoInTime rho_in_time,
                 const bool dive_cleaning,
                 const bool divb_cleaning)
+    : m_dt(dt)
 {
     // Initialize all structures using the same distribution mapping dm
 

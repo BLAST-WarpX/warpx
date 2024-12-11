@@ -68,14 +68,6 @@ WarpX::ComputeMagnetostaticField()
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(this->max_level == 0,
         "Magnetostatic solver not implemented with mesh refinement.");
 
-#if defined(AMREX_USE_EB)
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(EB::enabled(),
-        "Magnetostatic Solver currently requires an embedded boundary to be installed for "
-        "compatibility with AMReX when compiling with EB support. "
-        "Current workaround is to install an EB outside of domain or recompile with EB support off."
-        "Workaround for https://github.com/AMReX-Codes/amrex/issues/4223");
-#endif
-
     AddMagnetostaticFieldLabFrame();
 }
 
