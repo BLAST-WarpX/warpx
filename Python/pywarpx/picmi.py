@@ -710,9 +710,8 @@ class FluxDistributionBase(object):
             "warpx_inject_from_embedded_boundary", False
         )
 
-    def flux_profile_and_func_initialize(self, species, density_scale, source_name
-    ):
-    """ Initialize the flux profile and flux function."""
+    def initialize_flux_profile_func(self, species, density_scale, source_name):
+        """ Initialize the flux profile and flux function."""
         pass
 
     def distribution_initialize_inputs(
@@ -722,7 +721,7 @@ class FluxDistributionBase(object):
         self.set_mangle_dict()
         self.set_species_attributes(species, layout, source_name)
 
-        self.flux_profile_and_func_initialize(species, density_scale, source_name)
+        self.initialize_flux_profile_func(species, density_scale, source_name)
 
         if not self.inject_from_embedded_boundary:
             species.add_new_group_attr(
@@ -755,7 +754,7 @@ class FluxDistributionBase(object):
 class AnalyticFluxDistribution(
     picmistandard.PICMI_AnalyticFluxDistribution, FluxDistributionBase, DensityDistributionBase
 ):
-    def flux_profile_and_func_initialize(self, species, density_scale, source_name
+    def initialize_flux_profile_func(self, species, density_scale, source_name
     ):
         species.add_new_group_attr(source_name, "flux_profile", "parse_flux_function")
         if density_scale is not None:
@@ -775,7 +774,7 @@ class AnalyticFluxDistribution(
 class UniformFluxDistribution(
     picmistandard.PICMI_UniformFluxDistribution, FluxDistributionBase, DensityDistributionBase
 ):
-    def flux_profile_and_func_initialize(self, species, density_scale, source_name
+    def initialize_flux_profile_func(self, species, density_scale, source_name
     ):
         species.add_new_group_attr(source_name, "flux_profile", "constant")
         species.add_new_group_attr(source_name, "flux", self.flux)
