@@ -1894,6 +1894,16 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
     warpx_self_fields_verbosity: integer, default=2
         Level of verbosity for the lab frame solver
 
+    warpx_magnetostatic: bool, default=False
+        Whether to use the magnetostatic solver
+
+    warpx_effective_potential: bool, default=False
+        Whether to use the effective potential Poisson solver (EP-PIC)
+
+    warpx_effective_potential_factor: float, default=4
+        If the effective potential Poisson solver is used, this sets the value
+        of C_EP (the method is marginally stable at C_EP = 1)
+
     warpx_dt_update_interval: integer, optional (default = -1)
         How frequently the timestep is updated. Adaptive timestepping is disabled when this is <= 0.
 
@@ -1910,6 +1920,10 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         self.absolute_tolerance = kw.pop("warpx_absolute_tolerance", None)
         self.self_fields_verbosity = kw.pop("warpx_self_fields_verbosity", None)
         self.magnetostatic = kw.pop("warpx_magnetostatic", False)
+        self.effective_potential = kw.pop("warpx_effective_potential", False)
+        self.effective_potential_factor = kw.pop(
+            "warpx_effective_potential_factor", None
+        )
         self.cfl = kw.pop("warpx_cfl", None)
         self.dt_update_interval = kw.pop("warpx_dt_update_interval", None)
         self.max_dt = kw.pop("warpx_max_dt", None)
@@ -1930,6 +1944,11 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         else:
             if self.magnetostatic:
                 pywarpx.warpx.do_electrostatic = "labframe-electromagnetostatic"
+            elif self.effective_potential:
+                pywarpx.warpx.do_electrostatic = "labframe-effective-potential"
+                pywarpx.warpx.effective_potential_factor = (
+                    self.effective_potential_factor
+                )
             else:
                 pywarpx.warpx.do_electrostatic = "labframe"
             pywarpx.warpx.self_fields_required_precision = self.required_precision

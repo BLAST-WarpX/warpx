@@ -348,7 +348,8 @@ void HybridPICModel::HybridPICSolveE (
         Efield, current_fp_plasma, Jfield, Bfield, rhofield,
         *electron_pressure_fp, edge_lengths, lev, this, solve_for_Faraday
     );
-    warpx.ApplyEfieldBoundary(lev, patch_type);
+    amrex::Real const time = warpx.gett_old(0) + warpx.getdt(0);
+    warpx.ApplyEfieldBoundary(lev, patch_type, time);
 }
 
 void HybridPICModel::CalculateElectronPressure() const
@@ -556,6 +557,7 @@ void HybridPICModel::FieldPush (
     HybridPICSolveE(Efield, Jfield, Bfield, rhofield, edge_lengths, true);
     warpx.FillBoundaryE(ng, nodal_sync);
     // Push forward the B-field using Faraday's law
-    warpx.EvolveB(dt, dt_type);
+    amrex::Real const t_old = warpx.gett_old(0);
+    warpx.EvolveB(dt, dt_type, t_old);
     warpx.FillBoundaryB(ng, nodal_sync);
 }
