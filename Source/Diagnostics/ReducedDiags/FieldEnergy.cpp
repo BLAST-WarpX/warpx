@@ -159,17 +159,6 @@ FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, int lev)
     amrex::IntVect const domain_lo = matched_domain_box.smallEnd();
     amrex::IntVect const domain_hi = matched_domain_box.bigEnd();
 
-    amrex::IntVect is_periodic;
-    amrex::IntVect half_volume;;
-    for (int idir=0 ; idir < AMREX_SPACEDIM ; idir++) {
-        is_periodic[idir] = (WarpX::field_boundary_hi[idir] == FieldBoundaryType::Periodic);
-        // Only half of the cell volume is within the domain if the field
-        // is nodal but not periodic. For periodic, only the value on the lower
-        // boundary is used, accounting for the half cell at the lower and upper
-        // ends of the domain.
-        half_volume[idir] = (is_nodal[idir] && !is_periodic[idir]);
-    }
-
     amrex::ReduceOps<amrex::ReduceOpSum> reduce_ops;
     amrex::ReduceData<amrex::Real> reduce_data(reduce_ops);
     using ReduceTuple = typename decltype(reduce_data)::Type;
@@ -184,14 +173,6 @@ FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, int lev)
 
         amrex::Box const tilebox = mfi.tilebox();
         amrex::Box tb = convert(tilebox, is_nodal);
-
-        for (int idir=0 ; idir < AMREX_SPACEDIM ; idir++) {
-            if (is_periodic[idir]) {
-                // For periodic boundaries, do not include the data in the nodes
-                // on the upper edge of the domain
-                tb.enclosedCells(idir);
-            }
-        }
 
 #if defined(WARPX_DIM_RZ)
         // Lower corner of tile box physical domain
@@ -214,21 +195,21 @@ FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, int lev)
             } else if (rmin == 0._rt && i == irmax) {
                 v_factor = r/2._rt - dr/8._rt;
             }
-            if (j == domain_lo[1] && half_volume[1]) { v_factor *= 0.5_rt; }
-            if (j == domain_hi[1] && half_volume[1]) { v_factor *= 0.5_rt; }
+            if (j == domain_lo[1] && is_nodal[1]) { v_factor *= 0.5_rt; }
+            if (j == domain_hi[1] && is_nodal[1]) { v_factor *= 0.5_rt; }
             amrex::Real const theta_integral = (n == 0 ? 2._rt : 1._rt);
             return MathConst::pi*v_factor*theta_integral;
 #else
             // On the boundaries, if the grid is nodal, use half of the volume.
             amrex::Real v_factor = 1._rt;
             AMREX_D_TERM(
-            if (i == domain_lo[0] && half_volume[0]) { v_factor *= 0.5_rt; },
-            if (j == domain_lo[1] && half_volume[1]) { v_factor *= 0.5_rt; },
-            if (k == domain_lo[2] && half_volume[2]) { v_factor *= 0.5_rt; })
+            if (i == domain_lo[0] && is_nodal[0]) { v_factor *= 0.5_rt; },
+            if (j == domain_lo[1] && is_nodal[1]) { v_factor *= 0.5_rt; },
+            if (k == domain_lo[2] && is_nodal[2]) { v_factor *= 0.5_rt; })
             AMREX_D_TERM(
-            if (i == domain_hi[0] && half_volume[0]) { v_factor *= 0.5_rt; },
-            if (j == domain_hi[1] && half_volume[1]) { v_factor *= 0.5_rt; },
-            if (k == domain_hi[2] && half_volume[2]) { v_factor *= 0.5_rt; })
+            if (i == domain_hi[0] && is_nodal[0]) { v_factor *= 0.5_rt; },
+            if (j == domain_hi[1] && is_nodal[1]) { v_factor *= 0.5_rt; },
+            if (k == domain_hi[2] && is_nodal[2]) { v_factor *= 0.5_rt; })
             return v_factor;
 #endif
         };
