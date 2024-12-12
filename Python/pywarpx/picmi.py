@@ -759,6 +759,18 @@ class AnalyticFluxDistribution(
     FluxDistributionBase,
     DensityDistributionBase,
 ):
+    """
+    Parameters
+    ----------
+
+    warpx_inject_from_embedded_boundary: bool
+        When true, the flux is injected from the embedded boundaries instead
+        of a plane.
+    """
+
+    def init(self, kw):
+        FluxDistributionBase.init(self, kw)
+
     def initialize_flux_profile_func(self, species, density_scale, source_name):
         species.add_new_group_attr(source_name, "flux_profile", "parse_flux_function")
         if density_scale is not None:
@@ -781,6 +793,18 @@ class UniformFluxDistribution(
     FluxDistributionBase,
     DensityDistributionBase,
 ):
+    """
+    Parameters
+    ----------
+
+    warpx_inject_from_embedded_boundary: bool
+        When true, the flux is injected from the embedded boundaries instead
+        of a plane.
+    """
+
+    def init(self, kw):
+        FluxDistributionBase.init(self, kw)
+
     def initialize_flux_profile_func(self, species, density_scale, source_name):
         species.add_new_group_attr(source_name, "flux_profile", "constant")
         species.add_new_group_attr(source_name, "flux", self.flux)
