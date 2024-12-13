@@ -24,18 +24,19 @@ If you are new to this system, **please see the following resources**:
 Preparation
 -----------
 
-Use the following commands to download the WarpX source code:
+Use the following commands to download the WarpX source code.
+Note that these commands and the shell scripts all assume the bash shell.
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/ECP-WarpX/WarpX.git /usr/workspace/${USER}/dane/src/warpx
 
 We use system software modules, add environment hints and further dependencies via the file ``$HOME/dane_warpx.profile``.
 Create it now:
 
 .. code-block:: bash
 
-   cp $HOME/src/warpx/Tools/machines/dane-llnl/dane_warpx.profile.example $HOME/dane_warpx.profile
+   cp /usr/workspace/${USER}/dane/src/warpx/Tools/machines/dane-llnl/dane_warpx.profile.example $HOME/dane_warpx.profile
 
 .. dropdown:: Script Details
    :color: light
@@ -67,7 +68,7 @@ Finally, since Dane does not yet provide software modules for some of our depend
 
 .. code-block:: bash
 
-   bash $HOME/src/warpx/Tools/machines/dane-llnl/install_dependencies.sh
+   bash /usr/workspace/${USER}/dane/src/warpx/Tools/machines/dane-llnl/install_dependencies.sh
    source /usr/workspace/${USER}/dane/venvs/warpx-dane/bin/activate
 
 .. dropdown:: Script Details
@@ -88,13 +89,13 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
 
 .. code-block:: bash
 
-   cd $HOME/src/warpx
+   cd /usr/workspace/${USER}/dane/src/warpx
    rm -rf build_dane
 
    cmake -S . -B build_dane -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
    cmake --build build_dane -j 6
 
-The WarpX application executables are now in ``$HOME/src/warpx/build_dane/bin/``.
+The WarpX application executables are now in ``/usr/workspace/${USER}/dane/src/warpx/build_dane/bin/``.
 Additionally, the following commands will install WarpX as a Python module:
 
 .. code-block:: bash
@@ -118,7 +119,7 @@ If you already installed WarpX in the past and want to update it, start by getti
 
 .. code-block:: bash
 
-   cd $HOME/src/warpx
+   cd /usr/workspace/${USER}/dane/src/warpx
 
    # read the output of this command - does it look ok?
    git status
@@ -137,7 +138,7 @@ And, if needed,
 - log out and into the system, activate the now updated environment profile as usual,
 - :ref:`execute the dependency install scripts <building-dane-preparation>`.
 
-As a last step, clean the build directory ``rm -rf $HOME/src/warpx/build_dane`` and rebuild WarpX.
+As a last step, clean the build directory ``rm -rf /usr/workspace/${USER}/dane/src/warpx/build_dane`` and rebuild WarpX.
 
 
 .. _running-cpp-dane:
