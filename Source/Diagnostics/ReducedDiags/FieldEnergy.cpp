@@ -152,8 +152,6 @@ FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, int lev)
     // get a reference to WarpX instance
     auto const & warpx = WarpX::GetInstance();
 
-    amrex::Geometry const & geom = warpx.Geom(lev);
-
     amrex::IntVect const is_nodal = field.ixType().toIntVect();
 
     amrex::ReduceOps<amrex::ReduceOpSum> reduce_ops;
@@ -178,6 +176,7 @@ FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, int lev)
         amrex::XDim3 const xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
         amrex::Dim3 const lo = amrex::lbound(tilebox);
         amrex::Dim3 const hi = amrex::ubound(tilebox);
+        amrex::Geometry const & geom = warpx.Geom(lev);
         amrex::Real const dr = geom.CellSize(0);
         amrex::Real const rmin = xyzmin.x + (is_nodal[0] ? 0._rt : 0.5_rt*dr);
         int const irmin = lo.x;
