@@ -261,7 +261,8 @@ FullDiagnostics::Flush ( int i_buffer, bool /* force_flush */ )
                     m_varnames, m_sum_mf_output.at(i_buffer), m_geom_output.at(i_buffer), warpx.getistep(),
                     warpx.gett_new(0),
                     m_output_species.at(i_buffer), nlev_output, m_file_prefix,
-                    m_file_min_digits, m_plot_raw_fields, m_plot_raw_fields_guards);
+                    m_file_min_digits, m_plot_raw_fields, m_plot_raw_fields_guards,
+                    m_verbose);
 
             // Reset the values in the dynamic start time-averaged diagnostics after flush
             if (m_time_average_mode == TimeAverageType::Dynamic) {
@@ -281,7 +282,8 @@ FullDiagnostics::Flush ( int i_buffer, bool /* force_flush */ )
             m_varnames, m_mf_output.at(i_buffer), m_geom_output.at(i_buffer), warpx.getistep(),
             warpx.gett_new(0),
             m_output_species.at(i_buffer), nlev_output, m_file_prefix,
-            m_file_min_digits, m_plot_raw_fields, m_plot_raw_fields_guards);
+            m_file_min_digits, m_plot_raw_fields, m_plot_raw_fields_guards,
+            m_verbose);
     }
 
     FlushRaw();
@@ -340,7 +342,7 @@ FullDiagnostics::DoComputeAndPack (int step, bool force_flush)
                     }
                 }
                 // Print information on when time-averaging is active
-                if (in_averaging_period) {
+                if ((m_verbose > 1) && in_averaging_period) {
                     if (step == m_average_start_step) {
                         amrex::Print() << Utils::TextMsg::Info(
                                 "Begin time averaging for " + m_diag_name + " and output at step "

@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# Copyright 2023 The WarpX Community
+# Copyright 2024 The WarpX Community
 #
 # This file is part of WarpX.
 #
-# Author: Axel Huebl
+# Author: Axel Huebl, David Grote
 # License: BSD-3-Clause-LBNL
 
 # Exit on first error encountered #############################################
@@ -14,13 +14,13 @@ set -eu -o pipefail
 
 # Check: ######################################################################
 #
-#   Was quartz_warpx.profile sourced and configured correctly?
-if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your quartz_warpx.profile file! Please edit its line 2 to continue!"; exit 1; fi
+#   Was dane_warpx.profile sourced and configured correctly?
+if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your dane_warpx.profile file! Please edit its line 2 to continue!"; exit 1; fi
 
 
 # Remove old dependencies #####################################################
 #
-SW_DIR="/usr/workspace/${USER}/quartz"
+SW_DIR="/usr/workspace/${USER}/dane"
 rm -rf ${SW_DIR}
 mkdir -p ${SW_DIR}
 
@@ -41,13 +41,13 @@ if [ -d ${HOME}/src/c-blosc ]
 then
   cd ${HOME}/src/c-blosc
   git fetch --prune
-  git checkout v1.21.1
+  git checkout v1.21.6
   cd -
 else
-  git clone -b v1.21.1 https://github.com/Blosc/c-blosc.git ${HOME}/src/c-blosc
+  git clone -b v1.21.6 https://github.com/Blosc/c-blosc.git ${HOME}/src/c-blosc
 fi
-cmake -S ${HOME}/src/c-blosc -B ${build_dir}/c-blosc-quartz-build -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/c-blosc-1.21.1
-cmake --build ${build_dir}/c-blosc-quartz-build --target install --parallel 6
+cmake -S ${HOME}/src/c-blosc -B ${build_dir}/c-blosc-dane-build -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/c-blosc-1.21.6
+cmake --build ${build_dir}/c-blosc-dane-build --target install --parallel 6
 
 # ADIOS2
 if [ -d ${HOME}/src/adios2 ]
@@ -59,44 +59,44 @@ then
 else
   git clone -b v2.8.3 https://github.com/ornladios/ADIOS2.git ${HOME}/src/adios2
 fi
-cmake -S ${HOME}/src/adios2 -B ${build_dir}/adios2-quartz-build -DBUILD_TESTING=OFF -DADIOS2_BUILD_EXAMPLES=OFF -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_SST=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.8.3
-cmake --build ${build_dir}/adios2-quartz-build --target install -j 6
+cmake -S ${HOME}/src/adios2 -B ${build_dir}/adios2-dane-build -DBUILD_TESTING=OFF -DADIOS2_BUILD_EXAMPLES=OFF -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_SST=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.8.3
+cmake --build ${build_dir}/adios2-dane-build --target install -j 6
 
 # BLAS++ (for PSATD+RZ)
 if [ -d ${HOME}/src/blaspp ]
 then
   cd ${HOME}/src/blaspp
   git fetch --prune
-  git checkout v2024.05.31
+  git checkout v2024.10.26
   cd -
 else
-  git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git ${HOME}/src/blaspp
+  git clone -b v2024.10.26 https://github.com/icl-utk-edu/blaspp.git ${HOME}/src/blaspp
 fi
-cmake -S ${HOME}/src/blaspp -B ${build_dir}/blaspp-quartz-build -Duse_openmp=ON -Duse_cmake_find_blas=ON -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
-cmake --build ${build_dir}/blaspp-quartz-build --target install --parallel 6
+cmake -S ${HOME}/src/blaspp -B ${build_dir}/blaspp-dane-build -Duse_openmp=ON -Duse_cmake_find_blas=ON -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.10.26
+cmake --build ${build_dir}/blaspp-dane-build --target install --parallel 6
 
 # LAPACK++ (for PSATD+RZ)
 if [ -d ${HOME}/src/lapackpp ]
 then
   cd ${HOME}/src/lapackpp
   git fetch --prune
-  git checkout v2024.05.31
+  git checkout v2024.10.26
   cd -
 else
-  git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git ${HOME}/src/lapackpp
+  git clone -b v2024.10.26 https://github.com/icl-utk-edu/lapackpp.git ${HOME}/src/lapackpp
 fi
-CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S ${HOME}/src/lapackpp -B ${build_dir}/lapackpp-quartz-build -Duse_cmake_find_lapack=ON -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
-cmake --build ${build_dir}/lapackpp-quartz-build --target install --parallel 6
+CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S ${HOME}/src/lapackpp -B ${build_dir}/lapackpp-dane-build -Duse_cmake_find_lapack=ON -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.10.26
+cmake --build ${build_dir}/lapackpp-dane-build --target install --parallel 6
 
 
 # Python ######################################################################
 #
 python3 -m pip install --upgrade --user virtualenv
-rm -rf ${SW_DIR}/venvs/warpx-quartz
-python3 -m venv ${SW_DIR}/venvs/warpx-quartz
-source ${SW_DIR}/venvs/warpx-quartz/bin/activate
+rm -rf ${SW_DIR}/venvs/warpx-dane
+python3 -m venv ${SW_DIR}/venvs/warpx-dane
+source ${SW_DIR}/venvs/warpx-dane/bin/activate
 python3 -m pip install --upgrade pip
-python3 -m pip cache purge
+#python3 -m pip cache purge
 python3 -m pip install --upgrade build
 python3 -m pip install --upgrade packaging
 python3 -m pip install --upgrade wheel

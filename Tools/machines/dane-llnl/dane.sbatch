@@ -15,15 +15,14 @@
 # one MPI rank per half-socket (see below)
 #SBATCH --tasks-per-node=2
 # request all logical (virtual) cores per half-socket
-#SBATCH --cpus-per-task=18
+#SBATCH --cpus-per-task=112
 
 
-# each Quartz node has 1 socket of Intel Xeon E5-2695 v4
-# each Xeon CPU is divided into 2 bus rings that each have direct L3 access
+# each Dane node has 2 sockets of Intel Sapphire Rapids with 56 cores each
 export WARPX_NMPI_PER_NODE=2
 
-# each MPI rank per half-socket has 9 physical cores
-#   or 18 logical (virtual) cores
+# each MPI rank per half-socket has 56 physical cores
+#   or 112 logical (virtual) cores
 # over-subscribing each physical core with 2x
 #   hyperthreading led to a slight (3.5%) speedup on Cori's Intel Xeon E5-2698 v3,
 #   so we do the same here
@@ -33,7 +32,7 @@ export WARPX_NMPI_PER_NODE=2
 #   for N>9, also equally over close-by logical cores
 export OMP_PROC_BIND=spread
 export OMP_PLACES=threads
-export OMP_NUM_THREADS=18
+export OMP_NUM_THREADS=112
 
 EXE="<path/to/executable>"  # e.g. ./warpx
 
