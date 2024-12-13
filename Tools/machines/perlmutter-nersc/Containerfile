@@ -6,6 +6,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
     SW_DIR=/opt/software \
     FORCE_UNSAFE_CONFIGURE=1
 
+# Perlmutter A100 compilation optimization
+ENV AMREX_CUDA_ARCH=8.0 \
+    CUDAARCHS=80 \
+    CXXFLAGS="-march=znver3" \
+    CFLAGS="-march=znver3"
+
 # Install essential system dependencies including MPI libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
     autoconf \
