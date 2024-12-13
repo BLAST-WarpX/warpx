@@ -57,6 +57,6 @@ add_warpx_test(
     1  # nprocs
     inputs_test_rz_collision  # inputs
     "analysis_collision_rz.py diags/diag1000150"  # analysis
-    "analysis_default_regression.py --path diags/diag1000150 --plotfile --skip-particle"  # checksum
+    "analysis_default_regression.py --path diags/diag1000150 --plotfile --skip-particles"  # checksum
     OFF  # dependency
 )
