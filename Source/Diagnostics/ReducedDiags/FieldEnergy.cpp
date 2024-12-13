@@ -218,6 +218,8 @@ FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, [[maybe_unused]]int lev)
 
     }
 
-    amrex::Real const result = amrex::get<0>(reduce_data.value());
+    amrex::Real result = amrex::get<0>(reduce_data.value());
+    amrex::ParallelDescriptor::ReduceRealSum(result);
+
     return result;
 }
