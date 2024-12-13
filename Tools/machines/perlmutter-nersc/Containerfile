@@ -46,12 +46,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 FROM base AS c-blosc
 
 RUN git clone -b v1.21.1 https://github.com/Blosc/c-blosc.git /tmp/c-blosc && \
-    cd /tmp/c-blosc && \
-    mkdir build && cd build && \
-    cmake -DCMAKE_INSTALL_PREFIX=/usr .. && \
-    make -j$(nproc) && \
-    make install && \
-    rm -rf /tmp/c-blosc
+    cmake -S /tmp/c-blosc -B /tmp/c-blosc-build \
+      -DCMAKE_INSTALL_PREFIX=/usr .. && \
+    cmake --build /tmp/c-blosc-build --target install -j$(nproc) && \
+    rm -rf /tmp/c-blosc*
 
 # Install ADIOS2 from source
 FROM base AS adios2
