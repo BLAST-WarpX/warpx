@@ -147,11 +147,8 @@ void FieldEnergy::ComputeDiags (int step)
 // This takes into account the fraction of the cell volumes within the domain
 // and the cell volumes in cylindrical coordinates.
 amrex::Real
-FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, int lev)
+FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, [[maybe_unused]]int lev)
 {
-    // get a reference to WarpX instance
-    auto const & warpx = WarpX::GetInstance();
-
     amrex::IntVect const is_nodal = field.ixType().toIntVect();
 
     amrex::ReduceOps<amrex::ReduceOpSum> reduce_ops;
@@ -173,14 +170,11 @@ FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, int lev)
 
 #if defined(WARPX_DIM_RZ)
         // Lower corner of tile box physical domain
-        amrex::XDim3 const xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
-        amrex::Dim3 const lo = amrex::lbound(tilebox);
-        amrex::Dim3 const hi = amrex::ubound(tilebox);
+        auto const & warpx = WarpX::GetInstance();
         amrex::Geometry const & geom = warpx.Geom(lev);
         amrex::Real const dr = geom.CellSize(0);
+        amrex::XDim3 const xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
         amrex::Real const rmin = xyzmin.x + (is_nodal[0] ? 0._rt : 0.5_rt*dr);
-        int const irmin = lo.x;
-        int const irmax = hi.x;
 #endif
 
         // On the boundaries, if the grid is nodal, use half of the volume.
@@ -192,16 +186,13 @@ FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, int lev)
         auto volume_factor = [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
             amrex::ignore_unused(i,j,k,n);
 #if defined WARPX_DIM_RZ
-            amrex::Real const r = rmin + (i - irmin)*dr;
-            amrex::Real v_factor = r;
-            if (r == 0._rt) {
-                v_factor = dr/8._rt;
-            } else if (rmin == 0._rt && i == irmax) {
-                v_factor = r/2._rt - dr/8._rt;
-            }
+            amrex::Real const r = rmin + (i - tb_lo[0])*dr;
+            amrex::Real v_factor = 2._rt*r;
+            if (i == tb_lo[0] && is_nodal[0]) { v_factor = r + dr/4._rt; }
+            if (i == tb_hi[0] && is_nodal[0]) { v_factor = r - dr/4._rt; }
             if (j == tb_lo[1] && is_nodal[1]) { v_factor *= 0.5_rt; }
             if (j == tb_hi[1] && is_nodal[1]) { v_factor *= 0.5_rt; }
-            amrex::Real const theta_integral = (n == 0 ? 2._rt : 1._rt);
+            amrex::Real const theta_integral = (n == 0 ? 1._rt : 0.5_rt);
             return MathConst::pi*v_factor*theta_integral;
 #else
             amrex::Real v_factor = 1._rt;
