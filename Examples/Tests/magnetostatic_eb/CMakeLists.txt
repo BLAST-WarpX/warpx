@@ -8,7 +8,7 @@ if(WarpX_EB)
         1  # nprocs
         inputs_test_3d_magnetostatic_eb  # inputs
         OFF  # analysis
-        "analysis_default_regression.py --path diags/diag1000001 --plotfile"  # checksum
+        "analysis_default_regression.py --path diags/diag1000001"  # checksum
         OFF  # dependency
     )
 endif()
@@ -20,7 +20,7 @@ if(WarpX_EB)
         1  # nprocs
         inputs_test_3d_magnetostatic_eb_picmi.py  # inputs
         OFF  # analysis
-        "analysis_default_regression.py --path diags/diag1000001 --plotfile"  # checksum
+        "analysis_default_regression.py --path diags/diag1000001"  # checksum
         OFF  # dependency
     )
 endif()
@@ -32,7 +32,7 @@ if(WarpX_EB)
         1   # nprocs
         inputs_test_rz_magnetostatic_eb_picmi.py  # inputs
         OFF  # analysis
-        "analysis_default_regression.py --path diags/diag1000001 --plotfile --skip-particles"  # checksum
+        "analysis_default_regression.py --path diags/diag1000001 --skip-particles"  # checksum
         OFF  # dependency
     )
 endif()

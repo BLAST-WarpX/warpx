@@ -4,6 +4,9 @@ import argparse
 import os
 import sys
 
+import yt
+from openpmd_viewer import OpenPMDTimeSeries
+
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
 from checksumAPI import evaluate_checksum
 
@@ -41,18 +44,6 @@ if __name__ == "__main__":
         help="path to output file(s)",
         type=str,
     )
-    # add arguments: output format
-    format_group = parser.add_mutually_exclusive_group(required=True)
-    format_group.add_argument(
-        "--plotfile",
-        help="output format is plotfile",
-        action="store_true",
-    )
-    format_group.add_argument(
-        "--openpmd",
-        help="output format is openPMD",
-        action="store_true",
-    )
     # add arguments: relative tolerance
     parser.add_argument(
         "--rtol",
@@ -77,8 +68,18 @@ if __name__ == "__main__":
     )
     # parse arguments
     args = parser.parse_args()
-    # set args.format (not parsed, based on args.plotfile and args.openpmd)
-    args.format = "plotfile" if args.plotfile else "openpmd"
+    # set args.format automatically
+    try:
+        ds = yt.load(args.path)
+    except Exception:
+        try:
+            ts = OpenPMDTimeSeries(args.path)
+        except Exception:
+            print("Could not open the file as a plotfile or an openPMD time series")
+        else:
+            args.format = "openpmd"
+    else:
+        args.format = "plotfile"
     # set args.do_fields (not parsed, based on args.skip_fields)
     args.do_fields = False if args.skip_fields else True
     # set args.do_particles (not parsed, based on args.skip_particles)

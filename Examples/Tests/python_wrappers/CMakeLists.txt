@@ -8,7 +8,7 @@ if(WarpX_FFT)
         2  # nprocs
         inputs_test_2d_python_wrappers_picmi.py  # inputs
         OFF  # analysis
-        "analysis_default_regression.py --path diags/diag1000100 --plotfile"  # checksum
+        "analysis_default_regression.py --path diags/diag1000100"  # checksum
         OFF  # dependency
     )
 endif()

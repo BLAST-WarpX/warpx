@@ -8,7 +8,7 @@ if(WarpX_EB)
         2  # nprocs
         inputs_test_2d_embedded_circle  # inputs
         OFF  # analysis
-        "analysis_default_regression.py --path diags/diag1000011 --plotfile --rtol 1e-2"  # checksum
+        "analysis_default_regression.py --path diags/diag1000011 --rtol 1e-2"  # checksum
         OFF  # dependency
     )
 endif()

@@ -7,6 +7,6 @@ add_warpx_test(
     2  # nprocs
     inputs_test_2d_larmor  # inputs
     OFF  # analysis
-    "analysis_default_regression.py --path diags/diag1000010 --plotfile"  # checksum
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
     OFF  # dependency
 )

@@ -7,7 +7,7 @@ add_warpx_test(
     2  # nprocs
     inputs_test_3d_particle_fields_diags  # inputs
     "analysis_particle_diags.py diags/diag1000200"  # analysis
-    "analysis_default_regression.py --path diags/diag1000200 --plotfile"  # checksum
+    "analysis_default_regression.py --path diags/diag1000200"  # checksum
     OFF  # dependency
 )
 
@@ -18,6 +18,6 @@ add_warpx_test(
 #    2  # nprocs
 #    inputs_test_3d_particle_fields_diags  # inputs
 #    "analysis_particle_diags_single.py diags/diag1000200"  # analysis
-#    "analysis_default_regression.py --path diags/diag1000200 --plotfile --rtol 1e-3"  # checksum
+#    "analysis_default_regression.py --path diags/diag1000200 --rtol 1e-3"  # checksum
 #    OFF  # dependency
 #)

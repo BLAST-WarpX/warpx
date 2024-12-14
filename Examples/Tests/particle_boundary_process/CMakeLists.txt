@@ -7,7 +7,7 @@ add_warpx_test(
     1  # nprocs
     inputs_test_2d_particle_reflection_picmi.py  # inputs
     OFF  # analysis
-    "analysis_default_regression.py --path diags/diag1000010 --plotfile"  # checksum
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
     OFF  # dependency
 )
 
@@ -18,7 +18,7 @@ if(WarpX_EB)
         2  # nprocs
         inputs_test_3d_particle_absorption  # inputs
         "analysis_absorption.py diags/diag1000060"  # analysis
-        "analysis_default_regression.py --path diags/diag1000060 --plotfile"  # checksum
+        "analysis_default_regression.py --path diags/diag1000060"  # checksum
         OFF  # dependency
     )
 endif()

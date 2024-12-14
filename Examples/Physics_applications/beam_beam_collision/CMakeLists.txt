@@ -7,7 +7,7 @@ add_warpx_test(
     2  # nprocs
     inputs_test_3d_beam_beam_collision  # inputs
     OFF  # analysis
-    "analysis_default_regression.py --path diags/diag1/ --openpmd"  # checksum
+    "analysis_default_regression.py --path diags/diag1/"  # checksum
     OFF  # dependency
 )
 label_warpx_test(test_3d_beam_beam_collision slow)

@@ -7,6 +7,6 @@ add_warpx_test(
     2  # nprocs
     inputs_test_1d_fel  # inputs
     "analysis_fel.py diags/diag_labframe"  # analysis
-    "analysis_default_regression.py --path diags/diag_labframe --openpmd"  # checksum
+    "analysis_default_regression.py --path diags/diag_labframe"  # checksum
     OFF  # dependency
 )

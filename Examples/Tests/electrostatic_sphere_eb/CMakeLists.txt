@@ -8,7 +8,7 @@ if(WarpX_EB)
         2  # nprocs
         inputs_test_3d_electrostatic_sphere_eb  # inputs
         "analysis.py"  # analysis
-        "analysis_default_regression.py --path diags/diag1000001 --plotfile"  # checksum
+        "analysis_default_regression.py --path diags/diag1000001"  # checksum
         OFF  # dependency
     )
 endif()
@@ -20,7 +20,7 @@ if(WarpX_EB)
         2  # nprocs
         inputs_test_3d_electrostatic_sphere_eb_mixed_bc  # inputs
         OFF  # analysis
-        "analysis_default_regression.py --path diags/diag1000001 --plotfile"  # checksum
+        "analysis_default_regression.py --path diags/diag1000001"  # checksum
         OFF  # dependency
     )
 endif()
@@ -32,7 +32,7 @@ if(WarpX_EB)
         2  # nprocs
         inputs_test_3d_electrostatic_sphere_eb_picmi.py  # inputs
         "analysis.py"  # analysis
-        "analysis_default_regression.py --path diags/diag1000002 --plotfile"  # checksum
+        "analysis_default_regression.py --path diags/diag1000002"  # checksum
         OFF  # dependency
     )
 endif()
@@ -44,7 +44,7 @@ if(WarpX_EB)
         2  # nprocs
         inputs_test_rz_electrostatic_sphere_eb  # inputs
         "analysis_rz.py diags/diag1000001"  # analysis
-        "analysis_default_regression.py --path diags/diag1000001 --plotfile --skip-particles"  # checksum
+        "analysis_default_regression.py --path diags/diag1000001 --skip-particles"  # checksum
         OFF  # dependency
     )
 endif()
@@ -56,7 +56,7 @@ if(WarpX_EB)
         2  # nprocs
         inputs_test_rz_electrostatic_sphere_eb_mr  # inputs
         "analysis_rz_mr.py diags/diag1/"  # analysis
-        "analysis_default_regression.py --path diags/diag1/ --openpmd"  # checksum
+        "analysis_default_regression.py --path diags/diag1/"  # checksum
         OFF  # dependency
     )
 endif()

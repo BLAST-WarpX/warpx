@@ -8,7 +8,7 @@ if(WarpX_EB)
         2  # nprocs
         inputs_test_rz_scraping  # inputs
         "analysis_rz.py diags/diag1000037"  # analysis
-        "analysis_default_regression.py --path diags/diag1000037 --plotfile --skip-particles"  # checksum
+        "analysis_default_regression.py --path diags/diag1000037 --skip-particles"  # checksum
         OFF  # dependency
     )
 endif()

@@ -7,7 +7,7 @@ add_warpx_test(
     2  # nprocs
     "inputs_base_1d_picmi.py --test --pythonsolver"  # inputs
     "analysis_1d.py"  # analysis
-    "analysis_default_regression.py --path diags/diag1000050 --plotfile"  # checksum
+    "analysis_default_regression.py --path diags/diag1000050"  # checksum
     OFF  # dependency
 )
 
@@ -17,7 +17,7 @@ add_warpx_test(
     2  # nprocs
     "inputs_base_1d_picmi.py --test --dsmc"  # inputs
     "analysis_dsmc.py"  # analysis
-    "analysis_default_regression.py --path diags/diag1000050 --plotfile"  # checksum
+    "analysis_default_regression.py --path diags/diag1000050"  # checksum
     OFF  # dependency
 )
 
@@ -27,7 +27,7 @@ add_warpx_test(
     2  # nprocs
     inputs_test_2d_background_mcc  # inputs
     OFF  # analysis
-    "analysis_default_regression.py --path diags/diag1000050 --plotfile"  # checksum
+    "analysis_default_regression.py --path diags/diag1000050"  # checksum
     OFF  # dependency
 )
 
@@ -38,7 +38,7 @@ add_warpx_test(
 #    2  # nprocs
 #    inputs_test_2d_background_mcc_dp_psp  # inputs
 #    OFF  # analysis
-#    "analysis_default_regression.py --path diags/diag1000050 --plotfile"  # checksum
+#    "analysis_default_regression.py --path diags/diag1000050"  # checksum
 #    OFF  # dependency
 #)
 
@@ -48,6 +48,6 @@ add_warpx_test(
     2  # nprocs
     inputs_test_2d_background_mcc_picmi.py  # inputs
     OFF  # analysis
-    "analysis_default_regression.py --path diags/diag1000050 --plotfile --rtol 5e-3"  # checksum
+    "analysis_default_regression.py --path diags/diag1000050 --rtol 5e-3"  # checksum
     OFF  # dependency
 )

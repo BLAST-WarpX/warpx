@@ -8,7 +8,7 @@ if(WarpX_EB)
         1  # nprocs
         inputs_test_3d_embedded_boundary_picmi.py  # inputs
         OFF  # analysis
-        "analysis_default_regression.py --path diags/diag1000002 --plotfile"  # checksum
+        "analysis_default_regression.py --path diags/diag1000002"  # checksum
         OFF  # dependency
     )
 endif()
