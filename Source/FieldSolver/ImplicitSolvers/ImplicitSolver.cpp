@@ -1,7 +1,29 @@
 #include "ImplicitSolver.H"
 #include "WarpX.H"
+#include "Particles/MultiParticleContainer.H"
 
 using namespace amrex;
+
+void ImplicitSolver::CreateParticleAttributes () const
+{
+    // Set comm to false to that the attributes are not communicated
+    // nor written to the checkpoint files
+    int const comm = 0;
+
+    // Add space to save the positions and velocities at the start of the time steps
+    for (auto const& pc : m_WarpX->GetPartContainer()) {
+#if (AMREX_SPACEDIM >= 2)
+        pc->NewRealComp("x_n", comm);
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+        pc->NewRealComp("y_n", comm);
+#endif
+        pc->NewRealComp("z_n", comm);
+        pc->NewRealComp("ux_n", comm);
+        pc->NewRealComp("uy_n", comm);
+        pc->NewRealComp("uz_n", comm);
+    }
+}
 
 const Geometry& ImplicitSolver::GetGeometry (const int a_lvl) const
 {
