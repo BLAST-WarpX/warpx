@@ -1415,6 +1415,10 @@ void WarpXFluidContainer::HybridInitializeUe (
         HybridPICModel const* hybrid_model,
         int lev)
 {
+    WarpX &warpx = WarpX::GetInstance();
+    const amrex::Geometry &geom = warpx.Geom(lev);
+    const amrex::Periodicity &period = geom.periodicity();
+    
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
@@ -1493,6 +1497,10 @@ void WarpXFluidContainer::HybridInitializeUe (
 
             });
         }
+
+    m_fields.get(name_mf_NU, Direction{0}, lev)->FillBoundary(m_fields.get(name_mf_NU, Direction{0}, lev)->nGrowVect(), period);
+    m_fields.get(name_mf_NU, Direction{1}, lev)->FillBoundary(m_fields.get(name_mf_NU, Direction{1}, lev)->nGrowVect(), period);
+    m_fields.get(name_mf_NU, Direction{2}, lev)->FillBoundary(m_fields.get(name_mf_NU, Direction{2}, lev)->nGrowVect(), period);
 }
 
 

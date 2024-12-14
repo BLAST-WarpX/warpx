@@ -479,8 +479,5 @@ QdsmcParticleContainer::DepositK(int lev, amrex::MultiFab &Kfield)
             Kfield, 0, Kfield.nComp(), Kfield.nGrowVect(), Kfield.nGrowVect(),
             WarpX::do_single_precision_comms, period);
 
-    // Add fill boundary ?
-    //Kfield.FillBoundary(Kfield.nGrowVect(), period);
-
     //amrex::Gpu::streamSynchronize();
 }
