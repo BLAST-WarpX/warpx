@@ -35,7 +35,7 @@ computePhiIGF ( amrex::MultiFab const & rho,
                 amrex::MultiFab & phi,
                 std::array<amrex::Real, 3> const & cell_size,
                 amrex::BoxArray const & ba,
-                bool const do_2d_slices)
+                bool const is_igf_2d_slices)
 {
     using namespace amrex::literals;
 
@@ -59,7 +59,7 @@ computePhiIGF ( amrex::MultiFab const & rho,
     }
     if (!obc_solver || obc_solver->Domain() != domain) {
         amrex::FFT::Info info{};
-        if (do_2d_slices) { info.setBatchMode(true); } // do 2D FFTs
+        if (is_igf_2d_slices) { info.setBatchMode(true); } // do 2D FFTs
         info.setNumProcs(nprocs);
         obc_solver = std::make_unique<amrex::FFT::OpenBCSolver<amrex::Real>>(domain, info);
     }
@@ -69,7 +69,7 @@ computePhiIGF ( amrex::MultiFab const & rho,
     amrex::Real const dy = cell_size[1];
     amrex::Real const dz = cell_size[2];
 
-    if (!do_2d_slices){
+    if (!is_igf_2d_slices){
         // 2D sliced solver
         obc_solver->setGreensFunction(
         [=] AMREX_GPU_DEVICE (int i, int j, int k) -> amrex::Real

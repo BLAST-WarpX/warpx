@@ -48,7 +48,7 @@ namespace ablastr::fields
     }
 
 
-    /** @brief Implements minus equation 58 in https://doi.org/10.1016/j.jcp.2004.01.008
+    /** @brief Implements equation 58 in https://doi.org/10.1016/j.jcp.2004.01.008
      *
      * @param[in] x x-coordinate of given location
      * @param[in] y y-coordinate of given location
@@ -130,7 +130,7 @@ namespace ablastr::fields
                    amrex::MultiFab & phi,
                    std::array<amrex::Real, 3> const & cell_size,
                    amrex::BoxArray const & ba,
-                   bool do_2d_slices);
+                   bool is_igf_2d_slices);
 
 } // namespace ablastr::fields
 
