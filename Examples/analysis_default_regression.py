@@ -70,10 +70,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # set args.format automatically
     try:
-        ds = yt.load(args.path)
+        yt.load(args.path)
     except Exception:
         try:
-            ts = OpenPMDTimeSeries(args.path)
+            OpenPMDTimeSeries(args.path)
         except Exception:
             print("Could not open the file as a plotfile or an openPMD time series")
         else:
