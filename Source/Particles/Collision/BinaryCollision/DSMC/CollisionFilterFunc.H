@@ -34,7 +34,7 @@
  * @param[in] scattering processes an array of scattering processes included for consideration.
  * @param[in] engine the random engine.
  */
-template <typename index_type>
+template <int max_process_count, typename index_type>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void CollisionPairFilter (const amrex::ParticleReal u1x, const amrex::ParticleReal u1y,
                           const amrex::ParticleReal u1z, const amrex::ParticleReal u2x,
@@ -65,11 +65,11 @@ void CollisionPairFilter (const amrex::ParticleReal u1x, const amrex::ParticleRe
 
     // Evaluate the cross-section for each scattering process to determine
     // the total collision probability.
-    AMREX_ASSERT_WITH_MESSAGE(
-        (process_count < 4), "Too many scattering processes in DSMC routine."
-    );
-    int coll_type[4] = {0, 0, 0, 0};
-    amrex::ParticleReal sigma_sums[4] = {0._prt, 0._prt, 0._prt, 0._prt};
+
+    // The size of the arrays below is a compile-time constant (template parameter)
+    // for performance reasons: it avoids dynamic memory allocation on the GPU.
+    int coll_type[max_process_count] = {0};
+    amrex::ParticleReal sigma_sums[max_process_count] = {0._prt};
     for (int ii = 0; ii < process_count; ii++) {
         auto const& scattering_process = scattering_processes[ii];
         coll_type[ii] = int(scattering_process.m_type);
