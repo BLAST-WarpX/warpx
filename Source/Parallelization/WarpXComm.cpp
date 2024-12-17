@@ -59,6 +59,7 @@ WarpX::UpdateAuxilaryData ()
     WARPX_PROFILE("WarpX::UpdateAuxilaryData()");
 
     using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
 
     amrex::MultiFab *Bfield_aux_lvl0_0 = m_fields.get(FieldType::Bfield_aux, Direction{0}, 0);
 
@@ -87,6 +88,11 @@ WarpX::UpdateAuxilaryData ()
             amrex::MultiFab::Add(*Bfield_aux[2], *B_ext_lev[2], 0, 0, B_ext_lev[2]->nComp(), guard_cells.ng_FieldGather);
         }
     }
+    const int lev = 0;
+    if (WarpX::use_filter) {
+            ApplyFilterMF(m_fields.get_mr_levels_alldirs(FieldType::Bfield_aux, finest_level), lev);
+            ApplyFilterMF(m_fields.get_mr_levels_alldirs(FieldType::Efield_aux, finest_level), lev);
+        }
 
 }
 
