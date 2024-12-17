@@ -128,7 +128,7 @@ WarpX::AddMagnetostaticFieldLabFrame()
 
     // const amrex::Real magnetostatic_absolute_tolerance = self_fields_absolute_tolerance*PhysConst::c;
     // temporary fix!!!
-    amrex::Real absolute_tolerance = 0.0;
+    const amrex::Real absolute_tolerance = 0.0;
     amrex::Real required_precision;
     if constexpr (std::is_same<Real, float>::value) {
         required_precision = 1e-5;
@@ -136,7 +136,7 @@ WarpX::AddMagnetostaticFieldLabFrame()
     else {
         required_precision = 1e-11;
     }
-    int verbosity = 2;
+    const int verbosity = 2;
 
     computeVectorPotential(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
