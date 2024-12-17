@@ -141,7 +141,7 @@ A new test can be added by adding a corresponding entry in ``CMakeLists.txt`` as
            2  # nprocs
            inputs_test_1d_laser_acceleration  # inputs
            "analysis.py diags/diag1000100"  # analysis
-           "analysis_default_regression.py --path diags/diag1000100 --plotfile"  # checksum
+           "analysis_default_regression.py --path diags/diag1000100"  # checksum
            OFF  # dependency
        )
 
@@ -155,7 +155,7 @@ A new test can be added by adding a corresponding entry in ``CMakeLists.txt`` as
            2  # nprocs
            inputs_test_2d_laser_acceleration_picmi.py  # inputs
            "analysis.py diags/diag1000100"  # analysis
-           "analysis_default_regression.py --path diags/diag1000100 --plotfile"  # checksum
+           "analysis_default_regression.py --path diags/diag1000100"  # checksum
            OFF  # dependency
        )
 
@@ -169,7 +169,7 @@ A new test can be added by adding a corresponding entry in ``CMakeLists.txt`` as
            2  # nprocs
            inputs_test_3d_laser_acceleration_restart  # inputs
            "analysis_default_restart.py diags/diag1000100"  # analysis
-           "analysis_default_regression.py --path diags/diag1000100 --plotfile"  # checksum
+           "analysis_default_regression.py --path diags/diag1000100"  # checksum
            test_3d_laser_acceleration  # dependency
        )
 
@@ -185,7 +185,7 @@ A new test can be added by adding a corresponding entry in ``CMakeLists.txt`` as
            2   # nprocs
            "inputs_test_rz_laser_acceleration_picmi.py --test --dir 1"  # inputs
            "analysis.py diags/diag1/"  # analysis
-           "analysis_default_regression.py --path diags/diag1/ --openpmd --skip-particles --rtol 1e-7"  # checksum
+           "analysis_default_regression.py --path diags/diag1/ --skip-particles --rtol 1e-7"  # checksum
            OFF  # dependency
        )
 
@@ -206,13 +206,10 @@ Here is the help message of the default regression analysis script, including us
 
   .. code-block:: bash
 
-       usage: analysis_default_regression.py [-h] [--path PATH] (--plotfile | --openpmd) [--rtol RTOL] [--skip-fields]
-                                             [--skip-particles]
+       usage: analysis_default_regression.py [-h] [--path PATH] [--rtol RTOL] [--skip-fields] [--skip-particles]
        options:
          -h, --help        show this help message and exit
          --path PATH       path to output file(s)
-         --plotfile        output format is plotfile
-         --openpmd         output format is openPMD
          --rtol RTOL       relative tolerance to compare checksums
          --skip-fields     skip fields when comparing checksums
          --skip-particles  skip particles when comparing checksums
