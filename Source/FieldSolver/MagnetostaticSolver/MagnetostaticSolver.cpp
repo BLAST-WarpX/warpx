@@ -136,24 +136,13 @@ WarpX::AddMagnetostaticFieldLabFrame()
     else {
         required_precision = 1e-11;
     }
-    int max_iters = 200;
     int verbosity = 2;
-
-    // load user specified parameters
-    const ParmParse pp_warpx("warpx");
-    utils::parser::queryWithParser(
-        pp_warpx, "self_fields_required_precision", required_precision);
-    utils::parser::queryWithParser(
-        pp_warpx, "self_fields_absolute_tolerance", absolute_tolerance);
-    utils::parser::queryWithParser(
-        pp_warpx, "self_fields_max_iters", max_iters);
-   utils::parser::queryWithParser(
-        pp_warpx, "self_fields_verbosity", verbosity);
 
     computeVectorPotential(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::vector_potential_fp_nodal, finest_level),
-        required_precision, absolute_tolerance, max_iters, verbosity
+        required_precision, absolute_tolerance, magnetostatic_solver_max_iters,
+        verbosity
     );
 }
 
