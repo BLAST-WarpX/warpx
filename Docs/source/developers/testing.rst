@@ -189,6 +189,8 @@ A new test can be added by adding a corresponding entry in ``CMakeLists.txt`` as
            OFF  # dependency
        )
 
+The ``analysis`` and ``checksum`` commands passed as arguments to ``add_warpx_test`` can be set to ``OFF`` if the intention is to skip the respective analysis for a given test.
+
 If you need a new Python package dependency for testing, please add it in `Regression/requirements.txt <https://github.com/ECP-WarpX/WarpX/blob/development/Regression/requirements.txt>`__.
 
 Sometimes two or more tests share a large number of input parameters.
