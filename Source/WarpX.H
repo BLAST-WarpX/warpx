@@ -50,6 +50,10 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/export.H"
 
+#ifdef WARPX_SURFACE_PHYSICS
+    #include "SurfacePhysics/SurfacePhysicsBase.H"
+#endif
+
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/utils/Enums.H>
 
@@ -170,6 +174,10 @@ public:
     }
 #endif
     ParticleBoundaryBuffer& GetParticleBoundaryBuffer () { return *m_particle_boundary_buffer; }
+
+#ifdef WARPX_SURFACE_PHYSICS
+    SurfacePhysicsBase& GetSurfacePhysicsModel () {return *m_surface_physics;}
+#endif
 
     static void shiftMF (amrex::MultiFab& mf, const amrex::Geometry& geom,
                          int num_shift, int dir, int lev, bool update_cost_flag,
@@ -461,6 +469,10 @@ public:
 
     [[nodiscard]] bool DoPML () const {return do_pml;}
     [[nodiscard]] bool DoFluidSpecies () const {return do_fluid_species;}
+
+#ifdef WARPX_SURFACE_PHYSICS
+    [[nodiscard]] bool DoSurfacePhysics () const {return do_surface_physics;}
+#endif
 
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
     const PML_RZ* getPMLRZ() {return pml_rz[0].get();}
@@ -1382,6 +1394,11 @@ private:
     // Fluid container
     bool do_fluid_species = false;
     std::unique_ptr<MultiFluidContainer> myfl;
+
+    bool do_surface_physics = false;
+#ifdef WARPX_SURFACE_PHYSICS
+    std::unique_ptr<SurfacePhysicsBase> m_surface_physics;
+#endif
 
     //
     // Fields: First array for level, second for direction

@@ -104,6 +104,13 @@ ifeq ($(USE_EB),TRUE)
   USERSuffix := $(USERSuffix).EB
 endif
 
+ifeq ($(USE_SURFACE_PHYSICS),TRUE)
+  include $(WARPX_HOME)/Source/SurfacePhysics/Make.package
+  CXXFLAGS += -DWARPX_SURFACE_PHYSICS
+  CFLAGS   += -DWARPX_SURFACE_PHYSICS
+  USERSuffix := $(USERSuffix).SPHYS
+endif
+
 ifeq ($(QED),TRUE)
   INCLUDE_LOCATIONS += $(PICSAR_HOME)/multi_physics/QED/include
   CXXFLAGS += -DWARPX_QED

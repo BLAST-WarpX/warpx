@@ -80,6 +80,7 @@ option(WarpX_QED_TABLE_GEN "QED table generation (requires PICSAR and Boost)"
                                                                         OFF)
 option(WarpX_QED_TOOLS     "Build external tool to generate QED lookup tables (requires PICSAR and Boost)"
                                                                         OFF)
+option(WarpX_SURFACE_PHYSICS "Surface Physics support"                  OFF)
 
 # Advanced option to automatically clean up CI test directories
 option(WarpX_TEST_CLEANUP "Clean up CI test directories" OFF)
@@ -440,6 +441,7 @@ if(WarpX_LIB)
     add_subdirectory(Source/Particles)
     add_subdirectory(Source/Python)
     add_subdirectory(Source/Utils)
+    add_subdirectory(Source/SurfacePhysics)
 endif()
 if(WarpX_QED_TOOLS)
     add_subdirectory(Tools/QedTablesUtils)
@@ -496,6 +498,10 @@ foreach(D IN LISTS WarpX_DIMS)
             target_compile_definitions(ablastr_${SD} PUBLIC WARPX_QED_TABLE_GEN)
         endif()
         target_link_libraries(ablastr_${SD} PUBLIC PXRMP_QED::PXRMP_QED)
+    endif()
+
+    if(WarpX_SURFACE_PHYSICS)
+        target_compile_definitions(ablastr_${SD} PUBLIC WARPX_SURFACE_PHYSICS)
     endif()
 endforeach()
 
@@ -561,6 +567,10 @@ foreach(D IN LISTS WarpX_DIMS)
     if(ABLASTR_FFT)
         # We need to enable FFT support in ABLASTR for PSATD solver
         target_compile_definitions(ablastr_${SD} PUBLIC ABLASTR_USE_FFT)
+    endif()
+
+    if(WarpX_SURFACE_PHYSICS)
+        target_compile_definitions(ablastr_${SD} PUBLIC WARPX_SURFACE_PHYSICS)
     endif()
 
     if(WarpX_PYTHON AND pyWarpX_VERSION_INFO)
