@@ -61,7 +61,6 @@ for k, z in enumerate(grid_z, start=1):
     assert np.allclose(Ex_warpx, Ex_theory, rtol=0.032, atol=0)
     assert np.allclose(Ey_warpx, Ey_theory, rtol=0.029, atol=0)
 
-
 # compare checksums
 evaluate_checksum(
     test_name=os.path.split(os.getcwd())[1],

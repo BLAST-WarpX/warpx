@@ -123,6 +123,7 @@ FlushFormatOpenPMD::WriteToFile (
     const amrex::Vector<ParticleDiag>& particle_diags, int output_levels,
     const std::string prefix, int file_min_digits, bool plot_raw_fields,
     bool plot_raw_fields_guards,
+    int verbose,
     const bool use_pinned_pc,
     bool isBTD, int snapshotID, int bufferID, int numBuffers,
     const amrex::Geometry& full_BTD_snapshot,
@@ -130,16 +131,18 @@ FlushFormatOpenPMD::WriteToFile (
 {
     WARPX_PROFILE("FlushFormatOpenPMD::WriteToFile()");
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
-    if (!isBTD)
-    {
-        amrex::Print() << Utils::TextMsg::Info("Writing openPMD file " + filename);
-    } else
-    {
-        amrex::Print() << Utils::TextMsg::Info("Writing buffer " + std::to_string(bufferID+1) + " of " + std::to_string(numBuffers)
-                            + " to snapshot " + std::to_string(snapshotID) +  " to openPMD BTD " + prefix);
-        if (isLastBTDFlush)
+    if (verbose > 0) {
+        if (!isBTD)
         {
-            amrex::Print() << Utils::TextMsg::Info("Finished writing snapshot " + std::to_string(snapshotID) + " in openPMD BTD " + prefix);
+            amrex::Print() << Utils::TextMsg::Info("Writing openPMD file " + filename);
+        } else
+        {
+            amrex::Print() << Utils::TextMsg::Info("Writing buffer " + std::to_string(bufferID+1) + " of " + std::to_string(numBuffers)
+                                + " to snapshot " + std::to_string(snapshotID) +  " to openPMD BTD " + prefix);
+            if (isLastBTDFlush)
+            {
+                amrex::Print() << Utils::TextMsg::Info("Finished writing snapshot " + std::to_string(snapshotID) + " in openPMD BTD " + prefix);
+            }
         }
     }
 

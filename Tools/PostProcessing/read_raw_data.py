@@ -202,7 +202,7 @@ def _read_field(raw_file, field_name):
             f.seek(offset)
             if header.version == 1:
                 f.readline()  # skip the first line
-            arr = np.fromfile(f, "float64", np.product(shape))
+            arr = np.fromfile(f, "float64", np.prod(shape))
             arr = arr.reshape(shape, order="F")
             box_shape = [slice(low, hig + 1) for low, hig in zip(lo, hi)]
             if header.ncomp > 1:
@@ -225,7 +225,7 @@ def _read_buffer(snapshot, header_fn, _component_names):
         lo = box[0] - dom_lo
         hi = box[1] - dom_lo
         shape = hi - lo + 1
-        size = np.product(shape)
+        size = np.prod(shape)
         with open(snapshot + "/Level_0/" + fn, "rb") as f:
             f.seek(offset)
             if header.version == 1:

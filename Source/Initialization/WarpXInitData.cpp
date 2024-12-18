@@ -278,6 +278,10 @@ WarpX::PrintMainPICparameters ()
       amrex::Print() << "Operation mode:       | Electrostatic" << "\n";
       amrex::Print() << "                      | - laboratory frame, electrostatic + magnetostatic" << "\n";
     }
+    else if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameEffectivePotential){
+      amrex::Print() << "Operation mode:       | Electrostatic" << "\n";
+      amrex::Print() << "                      | - laboratory frame, effective potential scheme" << "\n";
+    }
     else{
       amrex::Print() << "Operation mode:       | Electromagnetic" << "\n";
     }

@@ -62,6 +62,7 @@ AMREX_ENUM(ElectrostaticSolverAlgo,
            Relativistic,
            LabFrameElectroMagnetostatic,
            LabFrame,
+           LabFrameEffectivePotential,
            Default = None);
 
 AMREX_ENUM(PoissonSolverAlgo,
