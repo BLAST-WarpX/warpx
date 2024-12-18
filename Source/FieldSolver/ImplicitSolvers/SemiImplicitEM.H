@@ -57,13 +57,13 @@ public:
 
     void PrintParameters () const override;
 
-    void OneStep ( amrex::Real  a_time,
+    void OneStep ( amrex::Real  start_time,
                    amrex::Real  a_dt,
                    int          a_step ) override;
 
     void ComputeRHS ( WarpXSolverVec&  a_RHS,
                 const WarpXSolverVec&  a_E,
-                      amrex::Real      a_time,
+                      amrex::Real      half_time,
                       int              a_nl_iter,
                       bool             a_from_jacobian ) override;
 
