@@ -19,7 +19,7 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
     amrex::Vector<std::string> scattering_process_names;
     pp_collision_name.queryarr("scattering_processes", scattering_process_names);
     for (const auto& scattering_process : scattering_process_names) {
-        if (scattering_process.find("excitation") != std::string::npos) {
+        if (scattering_process.find("ionization") != std::string::npos) {
            m_ionization_flag = true;
         }
     }
