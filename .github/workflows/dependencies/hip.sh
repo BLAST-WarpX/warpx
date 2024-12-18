@@ -53,6 +53,7 @@ sudo apt-get install -y --no-install-recommends \
     rocm-dev        \
     rocfft-dev      \
     rocprim-dev     \
+    rocsparse-dev   \
     rocrand-dev     \
     hiprand-dev
 
