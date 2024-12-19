@@ -1,7 +1,7 @@
 .. _developers-testing:
 
-Testing the Code
-================
+How to test the code
+====================
 
 When proposing a code change, you want to make sure that
 

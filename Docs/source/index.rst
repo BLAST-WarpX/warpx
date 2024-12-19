@@ -126,7 +126,7 @@ Development
    developers/developers
    developers/doxygen
    developers/gnumake
-   developers/workflows
+   developers/how_to_guides
    developers/faq
 .. good to have in the future:
 ..   developers/repostructure

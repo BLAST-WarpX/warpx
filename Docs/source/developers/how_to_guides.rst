@@ -1,14 +1,13 @@
-.. _development-workflows:
+.. _development-howtoguides:
 
-Workflows
-=========
+How-to guides
+=============
 
 .. toctree::
    :maxdepth: 1
 
-   profiling
-   testing
-   checksum
+   how_to_profile
+   how_to_test
    run_clang_tidy_locally
    local_compile
    documentation
