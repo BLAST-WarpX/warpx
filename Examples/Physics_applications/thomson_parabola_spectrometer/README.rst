@@ -28,7 +28,7 @@ The PICMI input file is not available for this example yet.
 
 For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with ``mpiexec -n 4 ...`` or ``srun -n 4 ...``, depending on the system.
 
-.. literalinclude:: inputs
+.. literalinclude:: inputs_test_3d_thomson_parabola_spectrometer
    :language: ini
    :caption: You can copy this file from ``Examples/Physics_applications/thomson_parabola_spectrometer/inputs_test_3d_thomson_parabola_spectrometer``.
 
