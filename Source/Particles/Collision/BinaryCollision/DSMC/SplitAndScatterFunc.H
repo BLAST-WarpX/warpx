@@ -145,7 +145,6 @@ public:
                 // Set the weight of the new particles to p_pair_reaction_weight[i]
                 soa_products_data[0].m_rdata[PIdx::w][product1_index] = p_pair_reaction_weight[i];
 
-                // TODO: when the reaction is ionization, this still creates a second particle of the target...
                 const auto product2_index = products_np_data[1] +
                                            (p_offsets[i]*p_num_products_device[1] + 0);
                 // Make a copy of the particle from species 2
@@ -171,6 +170,12 @@ public:
                                         static_cast<int>(product3_index), engine);
                         // Set the weight of the new particles to p_pair_reaction_weight[i]
                         soa_products_data[2].m_rdata[PIdx::w][product3_index] = p_pair_reaction_weight[i];
+
+                        // The ion created in product 3 replaces the scattered neutral particle in product 2
+                        // (which would have been created by other, elastic scattering processes)
+                        // Therefore, we set the ID of the scattered neutral particle to invalid,
+                        // so that it gets removed in the next call to `ReDistribute` or `RemoveInvalidParticles`
+                        soa_products_data[1].idcpu(product2_index) = amrex::ParticleIdCpus::Invalid;
                     } else {
                         // Set IDs as invalid for slots that have been allocated for potential
                         // ionization events, so that the corresponding particles get removed in the next
