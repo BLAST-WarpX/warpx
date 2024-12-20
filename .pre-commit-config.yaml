@@ -69,7 +69,7 @@ repos:
 # Python: Ruff linter & formatter
 #   https://docs.astral.sh/ruff/
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.8.1
+  rev: v0.8.3
   hooks:
     # Run the linter
     - id: ruff

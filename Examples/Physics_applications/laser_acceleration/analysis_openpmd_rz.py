@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
 
-import os
 import sys
 
 import numpy as np
 import openpmd_api as io
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 filename = sys.argv[1]
 series = io.Series(f"{filename}/openpmd_%T.h5", io.Access.read_only)
@@ -67,10 +63,3 @@ beam_meanz = np.sum(np.dot(zlist, rhob0)) / np.sum(rhob0)
 assert (
     (electron_meanz > 0) and (beam_meanz < 0)
 ), "problem with openPMD+RZ.  Maybe openPMD+RZ mixed up the order of rho_<species> diagnostics?"
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-    output_format="openpmd",
-)

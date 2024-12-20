@@ -28,9 +28,6 @@ from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import c
 from scipy.optimize import fsolve
 
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
-
 yt.funcs.mylog.setLevel(0)
 
 # Open plotfile specified in command line
@@ -192,9 +189,3 @@ if "phi" in ts.avail_record_components["electron"]:
     assert abs((Ek_i + Ep_i) - (Ek_f + Ep_f)) < 0.003 * (
         Ek_i + Ep_i
     )  # Check conservation of energy
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

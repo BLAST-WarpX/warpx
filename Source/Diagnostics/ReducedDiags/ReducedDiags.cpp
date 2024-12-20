@@ -28,12 +28,15 @@ m_rd_name{rd_name}
 {
     BackwardCompatibility();
 
+    const ParmParse pp_rd("reduced_diags");
     const ParmParse pp_rd_name(m_rd_name);
 
     // read path
+    pp_rd.query("path", m_path);
     pp_rd_name.query("path", m_path);
 
     // read extension
+    pp_rd.query("extension", m_extension);
     pp_rd_name.query("extension", m_extension);
 
     // check if it is a restart run
@@ -61,13 +64,16 @@ m_rd_name{rd_name}
 
     // read reduced diags intervals
     std::vector<std::string> intervals_string_vec = {"1"};
-    pp_rd_name.getarr("intervals", intervals_string_vec);
+    pp_rd.queryarr("intervals", intervals_string_vec);
+    pp_rd_name.queryarr("intervals", intervals_string_vec);
     m_intervals = utils::parser::IntervalsParser(intervals_string_vec);
 
     // read separator
+    pp_rd.query("separator", m_sep);
     pp_rd_name.query("separator", m_sep);
 
     // precision of data in the output file
+    utils::parser::queryWithParser(pp_rd, "precision", m_precision);
     utils::parser::queryWithParser(pp_rd_name, "precision", m_precision);
 }
 // end constructor

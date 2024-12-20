@@ -34,7 +34,7 @@
  * @param[in] scattering processes an array of scattering processes included for consideration.
  * @param[in] engine the random engine.
  */
-template <typename index_type>
+template <int max_process_count, typename index_type>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void CollisionPairFilter (const amrex::ParticleReal u1x, const amrex::ParticleReal u1y,
                           const amrex::ParticleReal u1z, const amrex::ParticleReal u2x,

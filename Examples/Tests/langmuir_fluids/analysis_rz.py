@@ -14,7 +14,6 @@
 # Unrelated to the Langmuir waves, we also test the plotfile particle filter function in this
 # analysis script.
 import os
-import re
 import sys
 
 import matplotlib
@@ -28,16 +27,10 @@ yt.funcs.mylog.setLevel(50)
 import numpy as np
 from scipy.constants import c, e, epsilon_0, m_e
 
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
-
 # this will be the name of the plot file
 fn = sys.argv[1]
 
 test_name = os.path.split(os.getcwd())[1]
-
-# Parse test name and check if current correction (psatd.current_correction) is applied
-current_correction = True if re.search("current_correction", fn) else False
 
 # Parameters (these parameters must match the parameters in `inputs.multi.rz.rt`)
 epsilon = 0.01
@@ -225,9 +218,3 @@ print("error_rel    : " + str(error_rel))
 print("tolerance_rel: " + str(tolerance_rel))
 
 assert error_rel < tolerance_rel
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

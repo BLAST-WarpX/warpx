@@ -14,7 +14,6 @@ along each of the three axis. It launches particles heading toward each of the b
 and checks that they end up in the correct place (or are deleted).
 """
 
-import os
 import sys
 
 import numpy as np
@@ -22,8 +21,6 @@ import yt
 from scipy.constants import c, m_e
 
 yt.funcs.mylog.setLevel(0)
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 # The min and max size of the box along the three axis.
 dmin = -1.0
@@ -110,9 +107,3 @@ assert np.all(
 assert np.all(
     np.abs((zz - zza) / zz) < 1.0e-15
 ), "Periodic particle position not correct"
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)
