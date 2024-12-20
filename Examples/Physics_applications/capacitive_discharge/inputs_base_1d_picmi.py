@@ -268,40 +268,33 @@ class CapacitiveDischargeExample(object):
         #######################################################################
 
         cross_sec_direc = "../../../../warpx-data/MCC_cross_sections/He/"
-        electron_scattering_processes = {
-            "elastic": {"cross_section": cross_sec_direc + "electron_scattering.dat"},
-            "excitation1": {
-                "cross_section": cross_sec_direc + "excitation_1.dat",
-                "energy": 19.82,
-            },
-            "excitation2": {
-                "cross_section": cross_sec_direc + "excitation_2.dat",
-                "energy": 20.61,
-            },
-            "ionization": {
-                "cross_section": cross_sec_direc + "ionization.dat",
-                "energy": 24.55,
-                "species": self.ions,
-            },
-        }
 
-        if self.dsmc:
-            electron_colls = picmi.DSMCCollisions(
-                name="coll_elec",
-                species=[self.electrons, self.neutrals],
-                ndt=5,
-                scattering_processes=electron_scattering_processes,
-            )
-        else:
-            electron_colls = picmi.MCCCollisions(
-                name="coll_elec",
-                species=self.electrons,
-                background_density=self.gas_density,
-                background_temperature=self.gas_temp,
-                background_mass=self.ions.mass,
-                ndt=self.mcc_subcycling_steps,
-                scattering_processes=electron_scattering_processes,
-            )
+        electron_colls = picmi.MCCCollisions(
+            name="coll_elec",
+            species=self.electrons,
+            background_density=self.gas_density,
+            background_temperature=self.gas_temp,
+            background_mass=self.ions.mass,
+            ndt=self.mcc_subcycling_steps,
+            scattering_processes={
+                "elastic": {
+                    "cross_section": cross_sec_direc + "electron_scattering.dat"
+                },
+                "excitation1": {
+                    "cross_section": cross_sec_direc + "excitation_1.dat",
+                    "energy": 19.82,
+                },
+                "excitation2": {
+                    "cross_section": cross_sec_direc + "excitation_2.dat",
+                    "energy": 20.61,
+                },
+                "ionization": {
+                    "cross_section": cross_sec_direc + "ionization.dat",
+                    "energy": 24.55,
+                    "species": self.ions,
+                },
+            },
+        )
 
         ion_scattering_processes = {
             "elastic": {"cross_section": cross_sec_direc + "ion_scattering.dat"},
