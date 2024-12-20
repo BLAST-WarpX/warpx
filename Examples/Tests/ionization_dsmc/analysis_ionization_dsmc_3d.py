@@ -207,9 +207,6 @@ def check_tolerance(array, tolerance):
     ), f"Test did not pass: one or more elements exceed the tolerance of {tolerance}."
     print("All elements of are within the tolerance.")
 
-# For now, setting very high tolerances on purpose. This needs to be modified once all features are implemented in the PR.
-tolerance = 1 #5e-4
-
 plt.figure()
 labels = ["Plasma density $(n_e$)", "Neutral density $(n_n$)", "Normalized electron temperature $(T_en_e$)"]
 for (i, (label, field_warpx, field_theory, tolerance)) in enumerate(zip( labels, data_warpx, data_theory, tolerances)):
