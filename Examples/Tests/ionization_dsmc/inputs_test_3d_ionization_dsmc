@@ -95,15 +95,21 @@ coll_elec.type = dsmc
 #################################
 ############ DIAGNOSTICS #############
 #################################
-diagnostics.diags_names = diag1
+diagnostics.diags_names = diag1 diag2
 warpx.reduced_diags_names = counts
 counts.intervals = 5
 counts.path = diags/
 counts.type = ParticleNumber
 
 # Diagnostics
-diag1.intervals = 5
+diag1.intervals = 250
 diag1.diag_type = Full
 diag1.electrons.variables = ux uy uz
 diag1.neutrals.variables = ux uy uz
-diag1.format = openpmd
+diag1.format = plotfile
+
+diag2.intervals = 5
+diag2.diag_type = Full
+diag2.electrons.variables = ux uy uz
+diag2.neutrals.variables = ux uy uz
+diag2.format = openpmd

@@ -12,12 +12,7 @@ import tqdm
 from pywarpx import picmi
 constants = picmi.constants
 
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
-
-filename = sys.argv[1]
-testname = os.path.split(os.getcwd())[1]
-ts = OpenPMDTimeSeries(filename)
+ts = OpenPMDTimeSeries("diags/diag2/")
 
 q_e = constants.q_e
 m_p = constants.m_p
@@ -56,15 +51,13 @@ def get_Te(ts):
     return T_e        
 
 def get_density(ts):
-    number_data = np.genfromtxt("./diags/counts.txt")
+    number_data = np.genfromtxt("diags/counts.txt")
     Te = get_Te(ts)
     total_volume = L[0] * L[1] * L[2]
     electron_weight = number_data[:, 8]
     neutral_weight = number_data[:, 9]
     ne = electron_weight / total_volume
     nn = neutral_weight / total_volume
-    print(np.size(ne), np.size(Te))
-
     return [ne, nn, ne*Te]
 
 def compute_rate_coefficients(temperatures_eV, energy_eV, sigma_m2, num_samples = 1024):
@@ -99,7 +92,6 @@ def compute_rate_coefficients(temperatures_eV, energy_eV, sigma_m2, num_samples 
         # get cross section by interpolating on table
         sigma = np.interp(e, energy_eV, sigma_m2, left = 0)
         k[i] = np.mean(sigma * speed)
-    
     return k
 
 def rhs(state, params):
@@ -140,7 +132,6 @@ def rhs(state, params):
     # the opposite is true for the MCC solver
     f[1] = -ndot         # d(nn)/dt
     f[2] = 0             # d(ne*eps) / dt
-
     return f
     
 def solve_theory_model():
@@ -166,7 +157,6 @@ def solve_theory_model():
     ne = state_vec[:, 0]
     nn = state_vec[:, 1]
     Te = state_vec[:, 2] / (1.5 * ne)
-    print(np.size(ne), np.size(Te))
     return t, [ne, nn, ne*Te]
 
 
@@ -218,10 +208,3 @@ for (i, (label, field_warpx, field_theory, tolerance)) in enumerate(zip( labels,
     plt.legend()
     check_tolerance(relative_error, tolerance)
 plt.savefig('./relative_error_density_Te.png', dpi=150) 
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-    output_format="openpmd",
-)
