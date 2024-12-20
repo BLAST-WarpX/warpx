@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # DSMC ionization test script:
 #   - compares WarpX simulation results with theoretical model predictions.
-import os
-import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -63,7 +61,7 @@ def get_density(ts):
     neutral_weight = number_data[:, 9]
     ne = electron_weight / total_volume
     nn = neutral_weight / total_volume
-    return [ne, nn, ne*Te]
+    return [ne, nn, ne * Te]
 
 
 def compute_rate_coefficients(temperatures_eV, energy_eV, sigma_m2, num_samples=1024):
@@ -137,8 +135,8 @@ def rhs(state, params):
 
     # at present, the dsmc solver does not deplete electron energy but does deplete neutrals
     # the opposite is true for the MCC solver
-    f[1] = -ndot         # d(nn)/dt
-    f[2] = 0             # d(ne*eps) / dt
+    f[1] = -ndot  # d(nn)/dt
+    f[2] = 0  # d(ne*eps) / dt
     return f
 
 
@@ -169,7 +167,7 @@ def solve_theory_model():
     ne = state_vec[:, 0]
     nn = state_vec[:, 1]
     Te = state_vec[:, 2] / (1.5 * ne)
-    return t, [ne, nn, ne*Te]
+    return t, [ne, nn, ne * Te]
 
 
 t_warpx = np.loadtxt("diags/counts.txt")[:, 1]
@@ -232,4 +230,4 @@ for i, (label, field_warpx, field_theory, tolerance) in enumerate(
     plt.xlabel("Time [s]")
     plt.legend()
     check_tolerance(relative_error, tolerance)
-plt.savefig('./relative_error_density_Te.png', dpi=150) 
+plt.savefig("./relative_error_density_Te.png", dpi=150)
