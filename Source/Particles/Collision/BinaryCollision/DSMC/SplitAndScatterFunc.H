@@ -239,14 +239,14 @@ public:
                 } else if (mask[i] == int(ScatteringProcessType::IONIZATION)) {
                     // calculate kinetic energy of the incident electron
                     double E_coll;
-                    double energy_cost = 0; // TODO: update this: get from scattering process
+                    double const energy_cost = 0; // TODO: update this: get from scattering process
                     const amrex::ParticleReal u_coll2 = ux1*ux1 + uy1*uy1 + uz1*uz1;
                     ParticleUtils::getEnergy(u_coll2, m1, E_coll);
                     // each of the two electron (the scattered e) gets half the energy (could change this later)
-                    const auto E_out = static_cast<amrex::ParticleReal>((E_coll - energy_cost) / 2.0_prt * PhysConst::q_e);
+                    const amrex::ParticleReal E_out = static_cast<amrex::ParticleReal>((E_coll - energy_cost) / 2.0_prt * PhysConst::q_e);
                     constexpr auto c2 = PhysConst::c * PhysConst::c;
                     const auto mc2 = m1*c2;
-                    const amrex::ParticleReal up = sqrt(E_out * (E_out + 2.0_prt*mc2) / c2) / m1;
+                    const amrex::ParticleReal up = static_cast<amrex::ParticleReal>(std::sqrt(E_out * (E_out + 2.0_prt*mc2) / c2) / m1);
 
                     // isotropically scatter electrons
                     // - The incident electron
