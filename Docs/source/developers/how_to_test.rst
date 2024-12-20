@@ -3,33 +3,38 @@
 How to test the code
 ====================
 
-When proposing a code change, you want to make sure that
+When you propose code changes, you want to make sure that
 
-* the code change does not break the existing code;
-* the code change gives correct results (numerics, physics, etc.).
+* the code changes do not break the behavior of the rest of the code;
+* the code changes give correct results (numerics, physics, etc.).
 
-WarpX follows the continuous integration (CI) software development practice, where automated builds and tests are run after merging code changes into the main branch.
-
-While the code is tested regularly remotely (on the cloud when commits are pushed to an open PR, and every night on local clusters), it can also be useful to run tests on your custom input file.
+Following the continuous integration (CI) software development practice, WarpX runs automated builds and tests after a commit is pushed to an open PR as well as after a PR is merged into the main branch.
 
 How to run pre-commit tests locally
 -----------------------------------
 
-First, when proposing a code change, we perform a couple of automated style and correctness checks.
+First, WarpX uses `pre-commit <https://pre-commit.com/>`__ to perform automated style and correctness checks.
 
-If you install the ``pre-commit`` tool on your local machine via
+Here is how to install ``pre-commit`` locally:
 
-.. code-block:: sh
+#. Install ``pre-commit``:
 
-   python -m pip install -U pre-commit
-   pre-commit install
+   .. code-block:: sh
 
-the style and correctness checks will run automatically on your local machine, after you commit the change and before you push.
+      python -m pip install -U pre-commit
 
-If you do not install the ``pre-commit`` tool on your local machine, these checks will run automatically as part of our CI workflows and a commit containing style and correctness changes might be added automatically to your branch.
-In that case, you will need to pull that automated commit before pushing further changes.
+#. Install the git hook scripts:
 
-See `pre-commit.com <https://pre-commit.com>`__ and our ``.pre-commit-config.yaml`` file in the repository for more details.
+   .. code-block:: sh
+
+      pre-commit install
+
+If you install ``pre-commit`` locally, the style and correctness checks will run automatically on your computer, after you commit the code changes and before you push them to the remote repository.
+
+If you do not install ``pre-commit`` locally, these checks will run automatically as part of our CI workflows and a commit containing style and correctness changes might be added automatically to your branch after you have pushed your own commit.
+In that case, you will need to pull that automated commit before pushing further commits.
+
+The configuration options for ``pre-commit`` are set in the `pre-commit-config.yaml <https://github.com/ECP-WarpX/WarpX/blob/development/.pre-commit-config.yaml>`__ file.
 
 How to configure the automated tests
 ------------------------------------
@@ -43,11 +48,11 @@ A test that requires a build option that was not configured and built will be sk
 How to run automated tests locally
 ----------------------------------
 
-Once your new feature is ready, there are ways to check that you did not break anything.
+Once your code changes are ready, there are ways to check that they do not break the rest of the code.
 WarpX has automated tests running every time a commit is pushed to an open pull request.
 The input files and scripts used by the automated tests can be found in the `Examples <https://github.com/ECP-WarpX/WarpX/tree/development/Examples>`__ directory, either under `Physics_applications <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Physics_applications>`__ or `Tests <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests>`__.
 
-For easier debugging, it can be convenient to run the tests on your local machine by executing CTest as illustrated in the examples below (where we assume that WarpX was configured and built in the directory ``build``):
+For easier debugging, it can be convenient to run the tests on your local computer by executing CTest as illustrated in the examples below (where we assume that WarpX was configured and built in the directory ``build``):
 
 * List tests available for the current build options:
 
@@ -101,7 +106,7 @@ For easier debugging, it can be convenient to run the tests on your local machin
        ctest --test-dir build -R "test_3d_langmuir_multi\..*"
 
   Note that filtering with ``-R "test_3d_langmuir_multi"`` would include the additional tests that have the same substring in their name and would not be sufficient to isolate a single test.
-  Note also that the escaping ``\.`` in the regular expression is necessary in order to take into account the fact that each test is automatically appended with the strings ``.run``, ``.analysis`` and possibly ``.cleanup``.
+  Note also that the escaping ``\.`` in the regular expression is necessary in order to take into account the fact that each test is automatically appended with the strings ``.run``, ``.analysis``, ``.checksum`` and possibly ``.cleanup``.
 
 * Run only tests not labeled with the ``slow`` label:
 
@@ -123,13 +128,25 @@ An automated test typically consists of the following components:
 * analysis script;
 * checksum file.
 
-To learn more about how to use checksums in automated tests, please see the corresponding section :ref:`Checksums on Tests <developers-checksum>`.
-
 As mentioned above, the input files and scripts used by the automated tests can be found in the `Examples <https://github.com/ECP-WarpX/WarpX/tree/development/Examples>`__ directory, under either `Physics_applications <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Physics_applications>`__ or `Tests <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests>`__.
 
 Each test directory must contain a file named ``CMakeLists.txt`` where all tests associated with the input files and scripts in that directory must be listed.
 
-A new test can be added by adding a corresponding entry in ``CMakeLists.txt`` as illustrated in the examples below:
+A new test can be added by calling the function ``add_warpx_test`` in ``CMakeLists.txt``. The function has the following signature:
+
+.. code-block:: cmake
+
+     function(add_warpx_test
+         name        # unique name of this test
+         dims        # dimensionality (1, 2, RZ, 3)
+         nprocs      # number of processes (1, 2)
+         inputs      # inputs file or PICMI script
+         analysis    # custom test analysis command
+         checksum    # default regression analysis command (checksum benchmark)
+         dependency  # name of base test that must run first
+     )
+
+Here are some examples of commons use cases:
 
 * Add the **regular test** ``test_1d_laser_acceleration``:
 
