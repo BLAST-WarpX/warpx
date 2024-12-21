@@ -125,86 +125,54 @@ How to add automated tests
 An automated test typically consists of the following components:
 
 * input file or PICMI input script;
+
 * analysis script;
+
 * checksum file.
 
 As mentioned above, the input files and scripts used by the automated tests can be found in the `Examples <https://github.com/ECP-WarpX/WarpX/tree/development/Examples>`__ directory, under either `Physics_applications <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Physics_applications>`__ or `Tests <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests>`__.
 
 Each test directory must contain a file named ``CMakeLists.txt`` where all tests associated with the input files and scripts in that directory must be listed.
 
+A checksum file is [to-do] ...
+
 A new test can be added by calling the function ``add_warpx_test`` in ``CMakeLists.txt``. The function has the following signature:
 
 .. code-block:: cmake
 
      function(add_warpx_test
-         name        # unique name of this test
-         dims        # dimensionality (1, 2, RZ, 3)
-         nprocs      # number of processes (1, 2)
-         inputs      # inputs file or PICMI script
-         analysis    # custom test analysis command
-         checksum    # default regression analysis command (checksum benchmark)
-         dependency  # name of base test that must run first
+         name        # unique test name:
+                     # test_1d_example, test_2d_example_picmi, etc.
+         dims        # dimensionality: 1, 2, 3, RZ
+         nprocs      # number of processes: 1, 2
+         inputs      # inputs file or PICMI script:
+                     # inputs_test_1d_example, inputs_test_2d_example_picmi.py, "inputs_test_2d_example_picmi.py arg1 arg2", etc.
+         analysis    # custom test analysis command:
+                     # OFF, "analysis.py", "analysis.py arg1 arg2", etc.
+         checksum    # default regression analysis command:
+                     # OFF, "analysis_default_regression.py --path diags/diag1", etc.
+         dependency  # name of base test that must run first (must match name exactly):
+                     # OFF, test_1d_example_prepare, etc.
      )
 
-Here are some examples of commons use cases:
+Here's how to add an automated test:
 
-* Add the **regular test** ``test_1d_laser_acceleration``:
+#. Choose the test directory, either an existing one or a new one.
 
-  .. code-block:: cmake
+#. Add an input file or PICMI input script.
+   The name must follow the naming conventions described in the section :ref:`developers-testing-naming` below.
 
-       add_warpx_test(
-           test_1d_laser_acceleration  # name
-           1  # dims
-           2  # nprocs
-           inputs_test_1d_laser_acceleration  # inputs
-           "analysis.py diags/diag1000100"  # analysis
-           "analysis_default_regression.py --path diags/diag1000100"  # checksum
-           OFF  # dependency
-       )
+#. Add a Python analysis script to analyze the results of the test.
 
-* Add the **PICMI test** ``test_2d_laser_acceleration_picmi``:
+#. Add the test to the ``CMakeLists.txt`` file (add such file if you are adding the test in a new test directory) using the function ``add_warpx_test`` mentioned above.
 
-  .. code-block:: cmake
+#. If the test directory is new, add the directory with the command ``add_subdirectory`` in `Physics_applications/CMakeLists.txt <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Physics_applications/CMakeLists.txt>`__ or `Tests/CMakeLists.txt <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests/CMakeLists.txt>`__, depending on where the test directory is located.
 
-       add_warpx_test(
-           test_2d_laser_acceleration_picmi  # name
-           2  # dims
-           2  # nprocs
-           inputs_test_2d_laser_acceleration_picmi.py  # inputs
-           "analysis.py diags/diag1000100"  # analysis
-           "analysis_default_regression.py --path diags/diag1000100"  # checksum
-           OFF  # dependency
-       )
+#. If the test directory is new, make a symbolic link to the default regression analysis script ``analysis_default_regression.py`` from `Examples/analysis_default_regression.py <https://github.com/ECP-WarpX/WarpX/blob/development/Examples/analysis_default_regression.py>`__, by running ``ln -s ../../analysis_default_regression.py analysis_default_regression.py`` from the test directory.
 
-* Add the **restart test** ``test_3d_laser_acceleration_restart``:
+#. Run the test locally with ``ctest`` by prefixing the ``ctest`` command with ``CHECKSUM_RESET=ON`` in order to generate automatically the checksum file.
 
-  .. code-block:: cmake
-
-       add_warpx_test(
-           test_3d_laser_acceleration_restart  # name
-           3  # dims
-           2  # nprocs
-           inputs_test_3d_laser_acceleration_restart  # inputs
-           "analysis_default_restart.py diags/diag1000100"  # analysis
-           "analysis_default_regression.py --path diags/diag1000100"  # checksum
-           test_3d_laser_acceleration  # dependency
-       )
-
-  Note that the restart has an explicit dependency, namely it can run only provided that the original test, from which the restart checkpoint files will be read, runs first.
-
-* A more complex example. Add the **PICMI test** ``test_rz_laser_acceleration_picmi``, with custom command-line arguments ``--test`` and ``dir``, openPMD time series output, and custom command line arguments for the checksum comparison:
-
-  .. code-block:: cmake
-
-       add_warpx_test(
-           test_rz_laser_acceleration_picmi  # name
-           RZ  # dims
-           2   # nprocs
-           "inputs_test_rz_laser_acceleration_picmi.py --test --dir 1"  # inputs
-           "analysis.py diags/diag1/"  # analysis
-           "analysis_default_regression.py --path diags/diag1/ --skip-particles --rtol 1e-7"  # checksum
-           OFF  # dependency
-       )
+Once you have added the test, run the test locally again, without ``CHECKSUM_RESET=ON``, to check that everything works as expected.
 
 The ``analysis`` and ``checksum`` commands passed as arguments to ``add_warpx_test`` can be set to ``OFF`` if the intention is to skip the respective analysis for a given test.
 
@@ -212,14 +180,6 @@ If you need a new Python package dependency for testing, please add it in `Regre
 
 Sometimes two or more tests share a large number of input parameters.
 The shared input parameters can be collected in a "base" input file that can be passed as a runtime parameter in the actual test input files through the parameter ``FILE``.
-
-If the new test is added in a new directory that did not exist before, please add the name of that directory with the command ``add_subdirectory`` in `Physics_applications/CMakeLists.txt <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Physics_applications/CMakeLists.txt>`__ or `Tests/CMakeLists.txt <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests/CMakeLists.txt>`__, depending on where the new test directory is located.
-
-If not already present, the default regression analysis script ``analysis_default_regression.py`` in the examples above must be linked from `Examples/analysis_default_regression.py <https://github.com/ECP-WarpX/WarpX/blob/development/Examples/analysis_default_regression.py>`__, by executing once the following command from the test directory:
-
-  .. code-block:: bash
-
-       ln -s ../../analysis_default_regression.py analysis_default_regression.py
 
 Here is the help message of the default regression analysis script, including usage and list of available options and arguments:
 
@@ -232,6 +192,8 @@ Here is the help message of the default regression analysis script, including us
          --rtol RTOL       relative tolerance to compare checksums
          --skip-fields     skip fields when comparing checksums
          --skip-particles  skip particles when comparing checksums
+
+.. _developers-testing-naming:
 
 Naming conventions for automated tests
 --------------------------------------
@@ -247,41 +209,3 @@ Note that we currently obey the following snake\_case naming conventions for tes
 #. **Test input files** start with the string ``inputs_`` followed by the test name. For example, ``inputs_test_3d_laser_acceleration`` or ``inputs_test_3d_laser_acceleration_picmi.py`` or ``inputs_test_3d_laser_acceleration_restart``.
 
 #. **Base input files** (that is, files collecting input parameters shared between two or more tests) are typically named ``inputs_base_1d``, ``inputs_base_2d``, ``inputs_base_3d`` or ``inputs_base_rz``, possibly followed by additional strings if need be.
-
-Useful tool for plotfile comparison: ``fcompare``
--------------------------------------------------
-
-AMReX provides ``fcompare``, an executable that takes two ``plotfiles`` as input and returns the absolute and relative difference for each field between these two plotfiles. For some changes in the code, it is very convenient to run the same input file with an old and your current version, and ``fcompare`` the plotfiles at the same iteration. To use it:
-
-.. code-block:: sh
-
-   # Compile the executable
-   cd <path to AMReX>/Tools/Plotfile/ # This may change
-   make -j 8
-   # Run the executable to compare old and new versions
-   <path to AMReX>/Tools/Plotfile/fcompare.gnu.ex old/plt00200 new/plt00200
-
-which should return something like
-
-.. code-block:: sh
-
-             variable name             absolute error            relative error
-                                          (||A - B||)         (||A - B||/||A||)
-   ----------------------------------------------------------------------------
-   level = 0
-   jx                                 1.044455105e+11               1.021651316
-   jy                                  4.08631977e+16               7.734299273
-   jz                                 1.877301764e+14               1.073458933
-   Ex                                 4.196315448e+10               1.253551615
-   Ey                                 3.330698083e+12               6.436470137
-   Ez                                 2.598167798e+10              0.6804387128
-   Bx                                     273.8687473               2.340209782
-   By                                     152.3911863                1.10952567
-   Bz                                     37.43212767                 2.1977289
-   part_per_cell                                   15                    0.9375
-   Ex_fp                              4.196315448e+10               1.253551615
-   Ey_fp                              3.330698083e+12               6.436470137
-   Ez_fp                              2.598167798e+10              0.6804387128
-   Bx_fp                                  273.8687473               2.340209782
-   By_fp                                  152.3911863                1.10952567
-   Bz_fp                                  37.43212767                 2.1977289
