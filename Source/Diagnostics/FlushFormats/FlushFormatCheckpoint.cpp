@@ -192,14 +192,15 @@ FlushFormatCheckpoint::CheckpointParticles (
         Vector<int> write_int_comps;
 
         // note: positions skipped here, since we reconstruct a plotfile SoA from them
-        std::vector<std::string> fixed_names = {"weight",
-                                                "momentum_x",
-                                                "momentum_y",
-                                                "momentum_z"
+        std::vector<std::string> const fixed_names = {"weight",
+                                                      "momentum_x",
+                                                      "momentum_y",
+                                                      "momentum_z"
 #ifdef WARPX_DIM_RZ
-                                                ,"theta"
+                                                      ,"theta"
 #endif
-                                                };
+                                                      };
+
         for (auto const& name : fixed_names) {
             real_names.push_back(name);
             write_real_comps.push_back(1);
