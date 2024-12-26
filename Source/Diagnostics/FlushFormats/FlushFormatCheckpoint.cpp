@@ -203,6 +203,7 @@ FlushFormatCheckpoint::CheckpointParticles (
 
 #ifdef WARPX_DIM_RZ
         real_names.push_back("theta");
+        write_real_comps.push_back(1);
 #endif
 
         int const compile_time_comps = static_cast<int>(real_names.size());
