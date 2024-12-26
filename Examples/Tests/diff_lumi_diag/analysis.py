@@ -5,13 +5,9 @@
 # In that case, the differential luminosity can be calculated analytically.
 
 import os
-import sys
 
 import numpy as np
 from read_raw_data import read_reduced_diags_histogram
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 # Extract the differential luminosity from the file
 _, _, E_bin, bin_data = read_reduced_diags_histogram(
@@ -55,10 +51,3 @@ error = abs(dL_dE_sim - dL_dE_th).max() / abs(dL_dE_th).max()
 print("Relative error: ", error)
 print("Tolerance: ", tol)
 assert error < tol
-
-# compare checksums
-evaluate_checksum(
-    test_name=test_name,
-    output_file=sys.argv[1],
-    rtol=1e-2,
-)

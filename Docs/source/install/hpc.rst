@@ -50,7 +50,7 @@ This section documents quick-start guides for a selection of supercomputers that
    hpc/perlmutter
    hpc/pitzer
    hpc/polaris
-   hpc/quartz
+   hpc/dane
    hpc/summit
    hpc/taurus
    hpc/tioga

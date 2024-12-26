@@ -7,15 +7,9 @@
 # License: BSD-3-Clause-LBNL
 
 
-import os
-import sys
-
 import numpy as np
-from scipy.constants import c, eV, m_e, micro, nano
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 from openpmd_viewer import OpenPMDTimeSeries
+from scipy.constants import c, eV, m_e, micro, nano
 
 GeV = 1e9 * eV
 energy = 125.0 * GeV
@@ -67,9 +61,3 @@ sy_theory = s(subgrid, sigmay, emity / gamma)
 
 assert np.allclose(sx, sx_theory, rtol=0.051, atol=0)
 assert np.allclose(sy, sy_theory, rtol=0.038, atol=0)
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

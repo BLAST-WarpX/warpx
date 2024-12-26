@@ -12,7 +12,6 @@ verifying that the space-charge field of a Gaussian beam corresponds to
 the expected theoretical field.
 """
 
-import os
 import sys
 
 import matplotlib
@@ -25,8 +24,6 @@ import yt
 from scipy.special import gammainc
 
 yt.funcs.mylog.setLevel(0)
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 # Parameters from the Simulation
 Qtot = -1.0e-20
@@ -123,10 +120,3 @@ check(Ex_array, Ex_th, "Ex")
 check(Ey_array, Ey_th, "Ey")
 if ds.dimensionality == 3:
     check(Ez_array, Ez_th, "Ez")
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-    do_particles=False,
-)

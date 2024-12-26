@@ -714,9 +714,10 @@ WarpX::PSATDScaleAverageFields (const amrex::Real scale_factor)
 #endif // WARPX_USE_FFT
 
 void
-WarpX::PushPSATD ()
+WarpX::PushPSATD (amrex::Real start_time)
 {
 #ifndef WARPX_USE_FFT
+    amrex::ignore_unused(start_time);
     WARPX_ABORT_WITH_MESSAGE(
         "PushFieldsEM: PSATD solver selected but not built");
 #else
@@ -859,26 +860,28 @@ WarpX::PushPSATD ()
     if (WarpX::do_dive_cleaning) { PSATDBackwardTransformF(); }
     if (WarpX::do_divb_cleaning) { PSATDBackwardTransformG(); }
 
-    // Evolve the fields in the PML boxes
     for (int lev = 0; lev <= finest_level; ++lev)
     {
+        // Evolve the fields in the PML boxes
         if (pml[lev] && pml[lev]->ok())
         {
             pml[lev]->PushPSATD(m_fields, lev);
         }
-        ApplyEfieldBoundary(lev, PatchType::fine);
-        if (lev > 0) { ApplyEfieldBoundary(lev, PatchType::coarse); }
-        ApplyBfieldBoundary(lev, PatchType::fine, DtType::FirstHalf);
-        if (lev > 0) { ApplyBfieldBoundary(lev, PatchType::coarse, DtType::FirstHalf); }
+
+        amrex::Real const new_time = start_time + spectral_solver_fp[lev]->m_dt;
+        ApplyEfieldBoundary(lev, PatchType::fine, new_time);
+        if (lev > 0) { ApplyEfieldBoundary(lev, PatchType::coarse, new_time); }
+        ApplyBfieldBoundary(lev, PatchType::fine, DtType::FirstHalf, new_time);
+        if (lev > 0) { ApplyBfieldBoundary(lev, PatchType::coarse, DtType::FirstHalf, new_time); }
     }
 #endif
 }
 
 void
-WarpX::EvolveB (amrex::Real a_dt, DtType a_dt_type)
+WarpX::EvolveB (amrex::Real a_dt, DtType a_dt_type, amrex::Real start_time)
 {
     for (int lev = 0; lev <= finest_level; ++lev) {
-        EvolveB(lev, a_dt, a_dt_type);
+        EvolveB(lev, a_dt, a_dt_type, start_time);
     }
 
     // Allow execution of Python callback after B-field push
@@ -886,18 +889,18 @@ WarpX::EvolveB (amrex::Real a_dt, DtType a_dt_type)
 }
 
 void
-WarpX::EvolveB (int lev, amrex::Real a_dt, DtType a_dt_type)
+WarpX::EvolveB (int lev, amrex::Real a_dt, DtType a_dt_type, amrex::Real start_time)
 {
     WARPX_PROFILE("WarpX::EvolveB()");
-    EvolveB(lev, PatchType::fine, a_dt, a_dt_type);
+    EvolveB(lev, PatchType::fine, a_dt, a_dt_type, start_time);
     if (lev > 0)
     {
-        EvolveB(lev, PatchType::coarse, a_dt, a_dt_type);
+        EvolveB(lev, PatchType::coarse, a_dt, a_dt_type, start_time);
     }
 }
 
 void
-WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt, DtType a_dt_type)
+WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt, DtType a_dt_type, amrex::Real start_time)
 {
     // Evolve B field in regular cells
     if (patch_type == PatchType::fine) {
@@ -923,16 +926,17 @@ WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt, DtType a_dt_typ
         }
     }
 
-    ApplyBfieldBoundary(lev, patch_type, a_dt_type);
+    amrex::Real const new_time = start_time + a_dt;
+    ApplyBfieldBoundary(lev, patch_type, a_dt_type, new_time);
 }
 
 
 void
-WarpX::EvolveE (amrex::Real a_dt)
+WarpX::EvolveE (amrex::Real a_dt, amrex::Real start_time)
 {
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        EvolveE(lev, a_dt);
+        EvolveE(lev, a_dt, start_time);
     }
 
     // Allow execution of Python callback after E-field push
@@ -940,18 +944,18 @@ WarpX::EvolveE (amrex::Real a_dt)
 }
 
 void
-WarpX::EvolveE (int lev, amrex::Real a_dt)
+WarpX::EvolveE (int lev, amrex::Real a_dt, amrex::Real start_time)
 {
     WARPX_PROFILE("WarpX::EvolveE()");
-    EvolveE(lev, PatchType::fine, a_dt);
+    EvolveE(lev, PatchType::fine, a_dt, start_time);
     if (lev > 0)
     {
-        EvolveE(lev, PatchType::coarse, a_dt);
+        EvolveE(lev, PatchType::coarse, a_dt, start_time);
     }
 }
 
 void
-WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt)
+WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real start_time)
 {
     // Evolve E field in regular cells
     if (patch_type == PatchType::fine) {
@@ -987,7 +991,8 @@ WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt)
         }
     }
 
-    ApplyEfieldBoundary(lev, patch_type);
+    amrex::Real const new_time = start_time + a_dt;
+    ApplyEfieldBoundary(lev, patch_type, new_time);
 
     // ECTRhofield must be recomputed at the very end of the Efield update to ensure
     // that ECTRhofield is consistent with Efield
@@ -1118,15 +1123,15 @@ WarpX::EvolveG (int lev, PatchType patch_type, amrex::Real a_dt, DtType /*a_dt_t
 }
 
 void
-WarpX::MacroscopicEvolveE (amrex::Real a_dt)
+WarpX::MacroscopicEvolveE (amrex::Real a_dt, amrex::Real start_time)
 {
     for (int lev = 0; lev <= finest_level; ++lev ) {
-        MacroscopicEvolveE(lev, a_dt);
+        MacroscopicEvolveE(lev, a_dt, start_time);
     }
 }
 
 void
-WarpX::MacroscopicEvolveE (int lev, amrex::Real a_dt) {
+WarpX::MacroscopicEvolveE (int lev, amrex::Real a_dt, amrex::Real start_time) {
 
     WARPX_PROFILE("WarpX::MacroscopicEvolveE()");
 
@@ -1135,11 +1140,11 @@ WarpX::MacroscopicEvolveE (int lev, amrex::Real a_dt) {
         "Macroscopic EvolveE is not implemented for lev>0, yet."
     );
 
-    MacroscopicEvolveE(lev, PatchType::fine, a_dt);
+    MacroscopicEvolveE(lev, PatchType::fine, a_dt, start_time);
 }
 
 void
-WarpX::MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real a_dt) {
+WarpX::MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real start_time) {
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         patch_type == PatchType::fine,
@@ -1171,7 +1176,8 @@ WarpX::MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real a_dt) {
         }
     }
 
-    ApplyEfieldBoundary(lev, patch_type);
+    amrex::Real const new_time = start_time + a_dt;
+    ApplyEfieldBoundary(lev, patch_type, new_time);
 }
 
 void

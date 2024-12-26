@@ -15,8 +15,6 @@ The final positions are compared to the analytic solutions.
 The motion is slow enough that relativistic effects are ignored.
 """
 
-import os
-import re
 import sys
 
 import numpy as np
@@ -24,8 +22,6 @@ import yt
 from scipy.constants import c, e, m_e
 
 yt.funcs.mylog.setLevel(0)
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 filename = sys.argv[1]
 ds = yt.load(filename)
@@ -193,12 +189,4 @@ assert abs(np.abs((ux - ux_sim) / ux)) < velocity_tolerance, Exception(
 )
 assert abs(np.abs((uy - uy_sim) / uy)) < velocity_tolerance, Exception(
     "error in y particle velocity"
-)
-
-# compare checksums
-test_name = os.path.split(os.getcwd())[1]
-test_name = re.sub("_picmi", "", test_name)  # same checksums for PICMI test
-evaluate_checksum(
-    test_name=test_name,
-    output_file=sys.argv[1],
 )
