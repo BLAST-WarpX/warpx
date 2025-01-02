@@ -8,7 +8,6 @@ The electron is initially at: (0,0,-0.25) and moves with a velocity:
 An input file inputs_test_rz_particle_boundary_interaction_picmi.py is used.
 """
 
-import os
 import sys
 
 import numpy as np
@@ -16,8 +15,6 @@ import yt
 from openpmd_viewer import OpenPMDTimeSeries
 
 yt.funcs.mylog.setLevel(0)
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 # Open plotfile specified in command line
 filename = sys.argv[1]
@@ -49,10 +46,3 @@ print("percentage error for z = %5.4f %%" % (diff_z * 100))
 assert (
     (diff_x < tolerance) and (y[0] < 1e-8) and (diff_z < tolerance)
 ), "Test particle_boundary_interaction did not pass"
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-    output_format="openpmd",
-)

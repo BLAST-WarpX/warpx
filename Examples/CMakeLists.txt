@@ -21,8 +21,8 @@ endif()
 # dims: 1,2,RZ,3
 # nprocs: 1 or 2 (maybe refactor later on to just depend on WarpX_MPI)
 # inputs: inputs file or PICMI script, WarpX_MPI decides w/ or w/o MPI
-# analysis: analysis script, always run without MPI
-# output: output file(s) to analyze
+# analysis: custom test analysis command, always run without MPI
+# checksum: default regression analysis command (checksum benchmark)
 # dependency: name of base test that must run first
 #
 function(add_warpx_test
@@ -31,7 +31,7 @@ function(add_warpx_test
     nprocs
     inputs
     analysis
-    output
+    checksum
     dependency
 )
     # cannot run MPI tests w/o MPI build
@@ -72,14 +72,25 @@ function(add_warpx_test
     separate_arguments(ANALYSIS_LIST UNIX_COMMAND "${analysis}")
     list(GET ANALYSIS_LIST 0 ANALYSIS_FILE)
     cmake_path(SET ANALYSIS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/${ANALYSIS_FILE}")
-    # TODO Enable lines below to handle command-line arguments
-    #list(LENGTH ANALYSIS_LIST ANALYSIS_LIST_LENGTH)
-    #if(ANALYSIS_LIST_LENGTH GREATER 1)
-    #    list(SUBLIST ANALYSIS_LIST 1 -1 ANALYSIS_ARGS)
-    #    list(JOIN ANALYSIS_ARGS " " ANALYSIS_ARGS)
-    #else()
-    #    set(ANALYSIS_ARGS "")
-    #endif()
+    list(LENGTH ANALYSIS_LIST ANALYSIS_LIST_LENGTH)
+    if(ANALYSIS_LIST_LENGTH GREATER 1)
+        list(SUBLIST ANALYSIS_LIST 1 -1 ANALYSIS_ARGS)
+        list(JOIN ANALYSIS_ARGS " " ANALYSIS_ARGS)
+    else()
+        set(ANALYSIS_ARGS "")
+    endif()
+
+    # get checksum script and optional command-line arguments
+    separate_arguments(CHECKSUM_LIST UNIX_COMMAND "${checksum}")
+    list(GET CHECKSUM_LIST 0 CHECKSUM_FILE)
+    cmake_path(SET CHECKSUM_FILE "${CMAKE_CURRENT_SOURCE_DIR}/${CHECKSUM_FILE}")
+    list(LENGTH CHECKSUM_LIST CHECKSUM_LIST_LENGTH)
+    if(CHECKSUM_LIST_LENGTH GREATER 1)
+        list(SUBLIST CHECKSUM_LIST 1 -1 CHECKSUM_ARGS)
+        list(JOIN CHECKSUM_ARGS " " CHECKSUM_ARGS)
+    else()
+        set(CHECKSUM_ARGS "")
+    endif()
 
     # Python test?
     set(python OFF)
@@ -175,11 +186,14 @@ function(add_warpx_test
 
     # test analysis
     if(analysis)
+        # for argparse, do not pass command-line arguments as one quoted string
+        separate_arguments(ANALYSIS_ARGS UNIX_COMMAND "${ANALYSIS_ARGS}")
         add_test(
             NAME ${name}.analysis
             COMMAND
-                ${THIS_Python_SCRIPT_EXE} ${ANALYSIS_FILE}
-                ${output}
+                ${THIS_Python_SCRIPT_EXE}
+                ${ANALYSIS_FILE}
+                ${ANALYSIS_ARGS}
             WORKING_DIRECTORY ${THIS_WORKING_DIR}
         )
         # test analysis depends on test run
@@ -187,11 +201,35 @@ function(add_warpx_test
         # FIXME Use helper function to handle Windows exceptions
         set(PYTHONPATH "$ENV{PYTHONPATH}:${CMAKE_PYTHON_OUTPUT_DIRECTORY}")
         # add paths for custom Python modules
-        set(PYTHONPATH "${PYTHONPATH}:${WarpX_SOURCE_DIR}/Regression/Checksum")
         set(PYTHONPATH "${PYTHONPATH}:${WarpX_SOURCE_DIR}/Regression/PostProcessingUtils")
         set(PYTHONPATH "${PYTHONPATH}:${WarpX_SOURCE_DIR}/Tools/Parser")
         set(PYTHONPATH "${PYTHONPATH}:${WarpX_SOURCE_DIR}/Tools/PostProcessing")
         set_property(TEST ${name}.analysis APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${PYTHONPATH}")
+    endif()
+
+    # checksum analysis
+    if(checksum)
+        # for argparse, do not pass command-line arguments as one quoted string
+        separate_arguments(CHECKSUM_ARGS UNIX_COMMAND "${CHECKSUM_ARGS}")
+        add_test(
+            NAME ${name}.checksum
+            COMMAND
+                ${THIS_Python_SCRIPT_EXE}
+                ${CHECKSUM_FILE}
+                ${CHECKSUM_ARGS}
+            WORKING_DIRECTORY ${THIS_WORKING_DIR}
+        )
+        # test analysis depends on test run
+        set_property(TEST ${name}.checksum APPEND PROPERTY DEPENDS "${name}.run")
+        if(analysis)
+            # checksum analysis depends on test analysis
+            set_property(TEST ${name}.checksum APPEND PROPERTY DEPENDS "${name}.analysis")
+        endif()
+        # FIXME Use helper function to handle Windows exceptions
+        set(PYTHONPATH "$ENV{PYTHONPATH}:${CMAKE_PYTHON_OUTPUT_DIRECTORY}")
+        # add paths for custom Python modules
+        set(PYTHONPATH "${PYTHONPATH}:${WarpX_SOURCE_DIR}/Regression/Checksum")
+        set_property(TEST ${name}.checksum APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${PYTHONPATH}")
     endif()
 
     # CI: remove test directory after run
@@ -206,6 +244,10 @@ function(add_warpx_test
             # test cleanup depends on test analysis
             set_property(TEST ${name}.cleanup APPEND PROPERTY DEPENDS "${name}.analysis")
         endif()
+        if(checksum)
+            # test cleanup depends on test analysis
+            set_property(TEST ${name}.cleanup APPEND PROPERTY DEPENDS "${name}.checksum")
+        endif()
     endif()
 
     # Do we depend on another test?
@@ -214,6 +256,9 @@ function(add_warpx_test
         set_property(TEST ${name}.run APPEND PROPERTY DEPENDS "${dependency}.run")
         if(analysis)
             set_property(TEST ${name}.run APPEND PROPERTY DEPENDS "${dependency}.analysis")
+        endif()
+        if(checksum)
+            set_property(TEST ${name}.run APPEND PROPERTY DEPENDS "${dependency}.checksum")
         endif()
         if(WarpX_TEST_CLEANUP)
             # do not clean up dependency test before current test is completed

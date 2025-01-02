@@ -18,9 +18,6 @@ import sys
 import numpy as np
 import yt
 
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
-
 # define some parameters
 
 c = 299792458.0
@@ -160,9 +157,3 @@ def do_analysis(Ex, Ey, Ez, Bx, By, Bz):
 
 
 do_analysis(Ex_test, Ey_test, Ez_test, Bx_test, By_test, Bz_test)
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

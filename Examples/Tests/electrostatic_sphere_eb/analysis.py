@@ -4,13 +4,8 @@
 # using the same reference file as for the non-PICMI test since the two
 # tests are otherwise the same.
 
-import os
-import sys
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
 # Check reduced diagnostics for charge on EB
 import numpy as np
-from checksumAPI import evaluate_checksum
 from scipy.constants import epsilon_0
 
 # Theoretical charge on the embedded boundary, for sphere at potential phi_0
@@ -27,9 +22,3 @@ assert abs((q_sim - q_th) / q_th) < 0.06
 data_eighth = np.loadtxt("diags/reducedfiles/eb_charge_one_eighth.txt")
 q_sim_eighth = data_eighth[1, 2]
 assert abs((q_sim_eighth - q_th / 8) / (q_th / 8)) < 0.06
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

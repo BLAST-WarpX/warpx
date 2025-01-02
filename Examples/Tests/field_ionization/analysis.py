@@ -18,15 +18,12 @@ checks that, after the laser went through the plasma, ~32% of Nitrogen
 ions are N5+, in agreement with theory from Chen's article.
 """
 
-import os
 import sys
 
 import numpy as np
 import yt
 
 yt.funcs.mylog.setLevel(0)
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 # Open plotfile specified in command line, and get ion's ionization level.
 filename = sys.argv[1]
@@ -106,9 +103,3 @@ try:
     print("particle_orig_z has reasonable values")
 except yt.utilities.exceptions.YTFieldNotFound:
     pass  # The backtransformed diagnostic version of the test does not have orig_z
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)
