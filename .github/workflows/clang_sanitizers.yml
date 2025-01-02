@@ -109,7 +109,7 @@ jobs:
         cmake -S . -B build                 \
           -GNinja                           \
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
-          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DCMAKE_BUILD_TYPE=Debug          \
           -DWarpX_DIMS="1"                  \
           -DWarpX_FFT=ON                    \
           -DWarpX_QED=ON                    \
