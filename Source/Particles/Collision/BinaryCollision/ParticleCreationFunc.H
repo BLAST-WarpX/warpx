@@ -104,7 +104,8 @@ public:
                     const SmartCopy* AMREX_RESTRICT copy_species2,
                     const index_type* AMREX_RESTRICT p_pair_indices_1,
                     const index_type* AMREX_RESTRICT p_pair_indices_2,
-                    const amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight
+                    const amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
+                    const amrex::ParticleReal* AMREX_RESTRICT /*p_product_data*/
                     ) const
     {
         using namespace amrex::literals;
@@ -295,7 +296,8 @@ public:
                     const index_type* /*p_mask*/, const amrex::Vector<index_type>& /*products_np*/,
                     const SmartCopy* /*copy_species1*/, const SmartCopy* /*copy_species2*/,
                     const index_type* /*p_pair_indices_1*/, const index_type* /*p_pair_indices_2*/,
-                    const amrex::ParticleReal* /*p_pair_reaction_weight*/
+                    const amrex::ParticleReal* /*p_pair_reaction_weight*/,
+                    const amrex::ParticleReal* AMREX_RESTRICT /*p_product_data*/
                     ) const
     {
         return {};

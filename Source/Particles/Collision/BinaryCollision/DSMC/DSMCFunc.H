@@ -86,6 +86,7 @@ public:
          * @param[out] p_pair_reaction_weight stores the weight of the product particles. It is only
          * needed here to store information that will be used later on when actually creating the
          * product particles.
+         * @param[out] p_product_data stores addition data for the product particles. It is not used here.
          * @param[in] engine the random engine.
          */
         AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -104,6 +105,7 @@ public:
             index_type const cell_start_pair, index_type* AMREX_RESTRICT p_mask,
             index_type* AMREX_RESTRICT p_pair_indices_1, index_type* AMREX_RESTRICT p_pair_indices_2,
             amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
+            amrex::ParticleReal* AMREX_RESTRICT /*p_product_data*/,
             amrex::RandomEngine const& engine) const
         {
             amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
@@ -201,6 +203,7 @@ public:
         int m_process_count;
         bool m_computeSpeciesDensities = false;
         bool m_computeSpeciesTemperatures = false;
+        bool m_need_product_data = false;
         bool m_isSameSpecies = false;
         ScatteringProcess::Executor* m_scattering_processes_data;
     };
