@@ -121,10 +121,6 @@ MultiParticleContainer::MultiParticleContainer (AmrCore* amr_core)
     }
 
     pc_tmp = std::make_unique<PhysicalParticleContainer>(amr_core);
-
-    // Setup particle collisions
-    collisionhandler = std::make_unique<CollisionHandler>(this);
-
 }
 
 void
@@ -454,6 +450,9 @@ MultiParticleContainer::InitMultiPhysicsModules ()
     InitQED();
     CheckQEDProductSpecies();
 #endif
+
+    // Setup particle collisions
+    collisionhandler = std::make_unique<CollisionHandler>(this);
 }
 
 void
