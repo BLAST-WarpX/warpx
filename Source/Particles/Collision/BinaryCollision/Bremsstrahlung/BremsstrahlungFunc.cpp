@@ -63,4 +63,3 @@ BremsstrahlungFunc::UploadCrossSection (int Z)
     }
 
 }
-

@@ -473,5 +473,3 @@ private:
 };
 
 #endif // WARPX_BREMSSTRAHLUNG_FUNC_H_
-
-
