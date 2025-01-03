@@ -25,7 +25,11 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    ParticleExtrema(const std::string& rd_name);
+    ParticleExtrema (const std::string& rd_name);
+
+    /** initialize data after amr levels are initialized.
+     */
+    void InitData () override;
 
     /// name of species
     std::string m_species_name;
@@ -35,7 +39,7 @@ public:
      *
      * @param[in] step current time step
      */
-    void ComputeDiags(int step) final;
+    void ComputeDiags (int step) final;
 
 private:
     /// auxiliary structure to store headers and indices of the reduced diagnostics

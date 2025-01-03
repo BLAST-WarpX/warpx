@@ -26,7 +26,11 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    ColliderRelevant(const std::string& rd_name);
+    ColliderRelevant (const std::string& rd_name);
+
+    /** initialize data after amr levels are initialized.
+     */
+    void InitData () override;
 
     /// name of the two colliding species
     std::vector<std::string> m_beam_name;
@@ -44,7 +48,7 @@ public:
      * [14]thetay_min, [15]thetay_ave, [16]thetay_max, [17]thetay_std
      * same for second species follows.
      */
-    void ComputeDiags(int step) final;
+    void ComputeDiags (int step) final;
 
 private:
     /// auxiliary structure to store headers and indices of the reduced diagnostics

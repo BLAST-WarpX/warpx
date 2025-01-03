@@ -59,9 +59,13 @@ using warpx::fields::FieldType;
 // constructor
 ParticleExtrema::ParticleExtrema (const std::string& rd_name)
 : ReducedDiags{rd_name}
+{}
+
+void
+ParticleExtrema::InitData ()
 {
     // read species name
-    const amrex::ParmParse pp_rd_name(rd_name);
+    const amrex::ParmParse pp_rd_name(m_rd_name);
     pp_rd_name.get("species",m_species_name);
 
     // get WarpX class object

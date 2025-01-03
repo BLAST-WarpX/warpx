@@ -523,8 +523,6 @@ WarpX::InitData ()
 
     // Diagnostics
     multi_diags = std::make_unique<MultiDiagnostics>();
-
-    /** create object for reduced diagnostics */
     reduced_diags = std::make_unique<MultiReducedDiags>();
 
     // WarpX::computeMaxStepBoostAccelerator
@@ -542,10 +540,11 @@ WarpX::InitData ()
     }
     else
     {
-        InitFromCheckpoint();
+        InitFromCheckpoint();  // note: also restores BTD logic right now (split & move down?)
         WarpX::PrintDtDxDyDz();
         PostRestart();
         reduced_diags->InitData();
+        // InitDiagnostics();
     }
 
     ComputeMaxStep();
@@ -613,6 +612,9 @@ WarpX::InitData ()
     else {
         ExecutePythonCallback("afterInitatRestart");
     }
+
+
+    // Diagnostics
 
     if (restart_chkfile.empty() || write_diagnostics_on_restart) {
         // Write full diagnostics before the first iteration.
