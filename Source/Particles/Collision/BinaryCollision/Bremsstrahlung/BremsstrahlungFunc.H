@@ -317,7 +317,7 @@ public:
                 fmulti = fmulti/arg;
                 if (fmulti < 1.0_prt) { fmulti = 1.0_prt; }
             }
-            //q12 = 1.0 - exp(-arg);
+            //q12 = 1.0 - exp(-arg)
             amrex::ParticleReal q12 = arg;
 
             // Get a random number
