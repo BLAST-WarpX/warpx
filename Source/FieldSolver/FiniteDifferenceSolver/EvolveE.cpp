@@ -155,11 +155,24 @@ void FiniteDifferenceSolver::EvolveECartesian (
         Array4<Real> const& jy = Jfield[1]->array(mfi);
         Array4<Real> const& jz = Jfield[2]->array(mfi);
 
-        amrex::Array4<amrex::Real> lx, ly, lz;
+        // Extract structures for embedded boundaries
+        bool eb_fully_covered_box = false;
+        amrex::Array4<const typename FabArray<EBCellFlagFab>::value_type> eb_flag_arr;
         if (EB::enabled()) {
-            lx = edge_lengths[0]->array(mfi);
-            ly = edge_lengths[1]->array(mfi);
-            lz = edge_lengths[2]->array(mfi);
+#ifdef AMREX_USE_EB
+            auto & warpx = WarpX::GetInstance();
+            amrex::EBFArrayBoxFactory const& eb_box_factory = warpx.fieldEBFactory(lev);
+            amrex::FabArray<amrex::EBCellFlagFab> const& eb_flag = eb_box_factory.getMultiEBCellFlagFab();
+            amrex::Box const& box = mfi.tilebox( amrex::IntVect::TheCellVector() );
+            amrex::FabType const fab_type = eb_flag[mfi].getType(box);
+            if (fab_type == amrex::FabType::covered) {
+                eb_fully_covered_box = true;
+            } else if (!(fab_type == amrex::FabType::regular)) {
+                // For cells that are not fully covered or regular,
+                // we need to check each cell is covered or regular
+                eb_flag_arr = eb_flag.array(mfi);
+            }
+#endif
         }
 
         // Extract stencil coefficients
@@ -179,8 +192,21 @@ void FiniteDifferenceSolver::EvolveECartesian (
         amrex::ParallelFor(tex, tey, tez,
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                // Skip field push if this cell is fully covered by embedded boundaries
-                if (lx && lx(i, j, k) <= 0) { return; }
+
+                // Stair-case approximation to the embedded boundary:
+                // Skip field push if this edge touches a partially or fully covered cell
+                if (eb_fully_covered_box) { return; }
+                else if (eb_flag_arr) {
+#ifdef WARPX_DIM_3D
+                    if ( !eb_flag_arr(i, j-1, k-1).isRegular() ||
+                         !eb_flag_arr(i, j-1, k  ).isRegular() ||
+                         !eb_flag_arr(i, j  , k-1).isRegular() ||
+                         !eb_flag_arr(i, j  , k  ).isRegular() ) { return; }
+#elif (defined WARPX_DIM_XZ)
+                    if ( !eb_flag_arr(i, j-1, k).isRegular() ||
+                         !eb_flag_arr(i, j  , k).isRegular() ) { return; }
+#endif
+                }
 
                 Ex(i, j, k) += c2 * dt * (
                     - T_Algo::DownwardDz(By, coefs_z, n_coefs_z, i, j, k)
@@ -189,14 +215,23 @@ void FiniteDifferenceSolver::EvolveECartesian (
             },
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                // Skip field push if this cell is fully covered by embedded boundaries
+
+                // Stair-case approximation to the embedded boundary:
+                // Skip field push if this edge touches a partially or fully covered cell
+                if (eb_fully_covered_box) { return; }
+                else if (eb_flag_arr) {
 #ifdef WARPX_DIM_3D
-                if (ly && ly(i,j,k) <= 0) { return; }
-#elif defined(WARPX_DIM_XZ)
-                //In XZ Ey is associated with a mesh node, so we need to check if the mesh node is covered
-                amrex::ignore_unused(ly);
-                if (lx && (lx(i, j, k)<=0 || lx(i-1, j, k)<=0 || lz(i, j-1, k)<=0 || lz(i, j, k)<=0)) { return; }
+                    if ( !eb_flag_arr(i-1, j, k-1).isRegular() ||
+                         !eb_flag_arr(i-1, j, k  ).isRegular() ||
+                         !eb_flag_arr(i  , j, k-1).isRegular() ||
+                         !eb_flag_arr(i  , j, k  ).isRegular() ) { return; }
+#elif (defined WARPX_DIM_XZ)
+                    if ( !eb_flag_arr(i-1, j-1, k).isRegular() ||
+                         !eb_flag_arr(i-1, j  , k).isRegular() ||
+                         !eb_flag_arr(i  , j-1, k).isRegular() ||
+                         !eb_flag_arr(i  , j  , k).isRegular() ) { return; }
 #endif
+                }
 
                 Ey(i, j, k) += c2 * dt * (
                     - T_Algo::DownwardDx(Bz, coefs_x, n_coefs_x, i, j, k)
@@ -205,8 +240,22 @@ void FiniteDifferenceSolver::EvolveECartesian (
             },
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                // Skip field push if this cell is fully covered by embedded boundaries
-                if (lz && lz(i,j,k) <= 0) { return; }
+
+                // Stair-case approximation to the embedded boundary:
+                // Skip field push if this edge touches a partially or fully covered cell
+                if (eb_fully_covered_box) { return; }
+                else if (eb_flag_arr) {
+#ifdef WARPX_DIM_3D
+                    if ( !eb_flag_arr(i-1, j-1, k).isRegular() ||
+                         !eb_flag_arr(i-1, j  , k).isRegular() ||
+                         !eb_flag_arr(i  , j-1, k).isRegular() ||
+                         !eb_flag_arr(i  , j  , k).isRegular() ) { return; }
+#elif (defined WARPX_DIM_XZ)
+                    if ( !eb_flag_arr(i-1, j, k).isRegular() ||
+                         !eb_flag_arr(i  , j, k).isRegular() ) { return; }
+#endif
+                }
+
                 Ez(i, j, k) += c2 * dt * (
                     - T_Algo::DownwardDy(Bx, coefs_y, n_coefs_y, i, j, k)
                     + T_Algo::DownwardDx(By, coefs_x, n_coefs_x, i, j, k)
