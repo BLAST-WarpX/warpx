@@ -54,7 +54,7 @@ public:
      * @param[in] mypc pointer to the MultiParticleContainer
      * @param[in] isSameSpecies whether the two colliding species are the same (should always be false)
      */
-    BremsstrahlungFunc (std::string const& collision_name, MultiParticleContainer const * const mypc,
+    BremsstrahlungFunc (std::string const& collision_name, MultiParticleContainer const * mypc,
                         bool /*isSameSpecies*/);
 
     struct Executor {
@@ -85,7 +85,7 @@ public:
             index_type const I2s, index_type const I2e,
             index_type const* AMREX_RESTRICT I1,
             index_type const* AMREX_RESTRICT I2,
-            const SoaData_type& soa_1, const SoaData_type& soa_2,
+            SoaData_type const& soa_1, const SoaData_type& soa_2,
             GetParticlePosition<PIdx> /*get_position_1*/, GetParticlePosition<PIdx> /*get_position_2*/,
             amrex::ParticleReal const n1, amrex::ParticleReal const n2,
             amrex::ParticleReal const /*T1*/, amrex::ParticleReal const /*T2*/,
@@ -109,12 +109,12 @@ public:
             amrex::ParticleReal * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];
 
             // Number of macroparticles of each species
-            const index_type NI1 = I1e - I1s;
-            const index_type NI2 = I2e - I2s;
+            index_type const NI1 = I1e - I1s;
+            index_type const NI2 = I2e - I2s;
 
             // Only loop over the number of particles in the first species (the electrons)
-            const index_type max_N = NI1;
-            const index_type min_N = NI2;
+            index_type const max_N = NI1;
+            index_type const min_N = NI2;
 
             index_type pair_index = cell_start_pair + coll_idx;
 
@@ -124,7 +124,7 @@ public:
 #endif
 
             index_type i1 = I1s + coll_idx;
-            index_type i2 = I2s + coll_idx;
+            index_type const i2 = I2s + coll_idx;
             // we will start from collision number = coll_idx and then add
             // stride (smaller set size) until we do all collisions (larger set size)
             // If there are more atoms than electrons, this loop executes once
@@ -161,12 +161,12 @@ public:
                 u1y[I1[i1]] = u1xbuf_new*std::sin(-theta) + u1y[I1[i1]]*std::cos(-theta);
 #endif
 
-            }
+                p_pair_indices_1[pair_index] = I1[i1];
+                p_pair_indices_2[pair_index] = I2[i2];
+                i1 += min_N;
+                pair_index += min_N;
 
-            p_pair_indices_1[pair_index] = I1[i1];
-            p_pair_indices_2[pair_index] = I2[i2];
-            i1 += min_N;
-            pair_index += min_N;
+            }
         }
 
         static int constexpr nkoT1 = 17;
@@ -221,20 +221,20 @@ public:
             int index;
             if (KErel_eV >= m_KEgrid_eV[nkoT1-1]) {
                 index = nkoT1 - 2;
-                w0 = 0._prt;
-                w1 = 1._prt;
+                w0 = 0.0_prt;
+                w1 = 1.0_prt;
             } else {
                 // find index for electron energy interpolation
                 index = amrex::bisect(m_KEgrid_eV.data(), 0, nKE, KErel_eV);
 
                 // compute interpolation weights for k*dsigma/dk
                 w0 = (m_KEgrid_eV[index+1] - KErel_eV)/(m_KEgrid_eV[index+1] - m_KEgrid_eV[index]);
-                w1 = 1.0 - w0;
+                w1 = 1.0_prt - w0;
             }
 
             // kdsigdk at the cutoff
             amrex::ParticleReal const w00 = (m_koT1_grid[i0_cut+1] - koT1_cut)/(m_koT1_grid[i0_cut+1] - m_koT1_grid[i0_cut]);
-            amrex::ParticleReal const w01 = 1.0 - w00;
+            amrex::ParticleReal const w01 = 1.0_prt - w00;
             amrex::ParticleReal const kdsigdk_cut = (  w00*(w0*m_kdsigdk[index][i0_cut] + w1*m_kdsigdk[index+1][i0_cut])
                                                      + w01*(w0*m_kdsigdk[index][i0_cut+1] + w1*m_kdsigdk[index+1][i0_cut+1]));
 
@@ -246,7 +246,7 @@ public:
                 amrex::ParticleReal const this_k = (m_koT1_grid[i] + m_koT1_grid_im1)*0.5_prt;
                 amrex::ParticleReal const kdsigdk_i = w0*m_kdsigdk[index][i] + w1*m_kdsigdk[index+1][i];
                 // using centered k here mitigates divergece effect for k->0
-                amrex::ParticleReal const this_dsigdk = (kdsigdk_i + kdsigdk_im1)*0.5/this_k;
+                amrex::ParticleReal const this_dsigdk = (kdsigdk_i + kdsigdk_im1)*0.5_prt/this_k;
                 sigmaC[i] = sigmaC[i-1] + this_dsigdk*this_dk;
                 m_koT1_grid_im1 = m_koT1_grid[i];
                 kdsigdk_im1 = kdsigdk_i;
@@ -279,10 +279,10 @@ public:
             amrex::ParticleReal const m_e_eV = m1*PhysConst::c*PhysConst::c/PhysConst::q_e; // 0.511e6
 
             // compute gamma for particles 1 (electron) and 2 (ion)
-            amrex::ParticleReal gbp1sq = (u1x*u1x + u1y*u1y + u1z*u1z)/c2;
-            amrex::ParticleReal gbp2sq = (u2x*u2x + u2y*u2y + u2z*u2z)/c2;
-            amrex::ParticleReal gammap1 = std::sqrt(1.0_prt + gbp1sq);
-            amrex::ParticleReal gammap2 = std::sqrt(1.0_prt + gbp2sq);
+            amrex::ParticleReal const gbp1sq = (u1x*u1x + u1y*u1y + u1z*u1z)/c2;
+            amrex::ParticleReal const gbp2sq = (u2x*u2x + u2y*u2y + u2z*u2z)/c2;
+            amrex::ParticleReal const gammap1 = std::sqrt(1.0_prt + gbp1sq);
+            amrex::ParticleReal const gammap2 = std::sqrt(1.0_prt + gbp2sq);
 
             // transform electron to frame where ion is at rest
             amrex::ParticleReal u1x_rel = u1x;
@@ -291,9 +291,9 @@ public:
             ParticleUtils::doLorentzTransformWithU(u1x_rel, u1y_rel, u1z_rel, u2x, u2y, u2z);
 
             // compute electron KE in frame where ion is at rest
-            amrex::ParticleReal gbp1sq_rel = (u1x_rel*u1x_rel + u1y_rel*u1y_rel + u1z_rel*u1z_rel)/c2;
-            amrex::ParticleReal gammap1_rel = std::sqrt(1.0_prt + gbp1sq_rel);
-            amrex::ParticleReal KE_eV = m_e_eV*gbp1sq_rel/(1.0_prt + gammap1_rel);
+            amrex::ParticleReal const gbp1sq_rel = (u1x_rel*u1x_rel + u1y_rel*u1y_rel + u1z_rel*u1z_rel)/c2;
+            amrex::ParticleReal const gammap1_rel = std::sqrt(1.0_prt + gbp1sq_rel);
+            amrex::ParticleReal const KE_eV = m_e_eV*gbp1sq_rel/(1.0_prt + gammap1_rel);
 
             amrex::GpuArray<amrex::ParticleReal, nkoT1> sigmaC;
             sigmaC.fill(0._prt);
@@ -320,7 +320,7 @@ public:
                 if (fmulti < 1.0_prt) { fmulti = 1.0_prt; }
             }
             //q12 = 1.0 - exp(-arg)
-            amrex::ParticleReal q12 = arg;
+            amrex::ParticleReal const q12 = arg;
 
             // Get a random number
             amrex::ParticleReal const random_number = amrex::Random(engine);
@@ -331,14 +331,14 @@ public:
                  amrex::ParticleReal const w_photon = w1/fmulti;
 
                 // compute lab-frame electron kinetic energy before emission
-                amrex::ParticleReal KE_before = m_e_eV*gbp1sq/(1.0_prt + gammap1);
+                amrex::ParticleReal const KE_before = m_e_eV*gbp1sq/(1.0_prt + gammap1);
 
                 // get energy of photon (hbar*omega)
                 amrex::ParticleReal const random_number2 = amrex::Random(engine);
                 int const index = amrex::bisect(sigmaC.data(), i0_cut, nkoT1, random_number2);
                 amrex::ParticleReal const w0 = (random_number2 - sigmaC[index])/(sigmaC[index+1] - sigmaC[index]);
                 amrex::ParticleReal const Epi = (index == i0_cut ? koT1_cut : m_koT1_grid[index]);
-                amrex::ParticleReal const EphotonoT1 = (1._prt - w0)*Epi + w0*m_koT1_grid[index+1];
+                amrex::ParticleReal const EphotonoT1 = (1.0_prt - w0)*Epi + w0*m_koT1_grid[index+1];
                 amrex::ParticleReal const Ephoton_eV = EphotonoT1*KE_eV;
 
                 // adjust electron gamma and beta
@@ -358,9 +358,9 @@ public:
                 u1z = u1z_rel;
 
                 // compute electron kinetic energy after emission
-                gbp1sq = (u1x*u1x + u1y*u1y + u1z*u1z)/c2;
-                gammap1 = std::sqrt(1.0_prt + gbp1sq);
-                amrex::ParticleReal const KE_after = m_e_eV*gbp1sq/(1.0_prt + gammap1);
+                amrex::ParticleReal const gbp1sq_prime = (u1x*u1x + u1y*u1y + u1z*u1z)/c2;
+                amrex::ParticleReal const gammap1_prime = std::sqrt(1.0_prt + gbp1sq_prime);
+                amrex::ParticleReal const KE_after = m_e_eV*gbp1sq_prime/(1.0_prt + gammap1_prime);
 
                 // update energy lost to bremsstrahlung
                 amrex::ParticleReal const deltaE_eV = KE_after - KE_before;
