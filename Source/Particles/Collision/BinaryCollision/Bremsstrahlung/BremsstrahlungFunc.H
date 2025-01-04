@@ -203,7 +203,7 @@ public:
             }
 
             // find lo-index for koT1 cutoff (will typically be 1)
-            koT1_cut = std::max(KEcut_eV/KErel_eV, 1.0e-4);
+            koT1_cut = std::max(KEcut_eV/KErel_eV, 1.0e-4_prt);
             i0_cut = 0;
             for (int i=1; i < nkoT1; i++) {
                 if (m_koT1_grid[i] > koT1_cut) {
@@ -309,10 +309,12 @@ public:
             amrex::ParticleReal const beta1 = std::sqrt(gbp1sq_rel)/gammap1_rel; // magnitude electron beta
             amrex::ParticleReal arg = fmulti*beta1*PhysConst::c*sigma_total*n2*dt*gamma_factor;
             if (arg > 1.0_prt) {
+#ifndef AMREX_USE_GPU
                 amrex::Print() << "Notice: arg = " << arg << " in interSpeciesBremsstrahlung" << "\n";
                 amrex::Print() << "        beta1 = " << beta1 << "\n";
                 amrex::Print() << "        n2 = " << n2 << "\n";
                 amrex::Print() << "        sigma_total = " << sigma_total << "\n";
+#endif
                 arg = 1.0_prt;
                 fmulti = fmulti/arg;
                 if (fmulti < 1.0_prt) { fmulti = 1.0_prt; }
