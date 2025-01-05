@@ -155,11 +155,11 @@ void FiniteDifferenceSolver::EvolveECartesian (
         Array4<Real> const& jy = Jfield[1]->array(mfi);
         Array4<Real> const& jz = Jfield[2]->array(mfi);
 
+#ifdef AMREX_USE_EB
         // Extract structures for embedded boundaries
         bool eb_fully_covered_box = false;
         amrex::Array4<const typename FabArray<EBCellFlagFab>::value_type> eb_flag_arr;
         if (EB::enabled()) {
-#ifdef AMREX_USE_EB
             auto & warpx = WarpX::GetInstance();
             amrex::EBFArrayBoxFactory const& eb_box_factory = warpx.fieldEBFactory(lev);
             amrex::FabArray<amrex::EBCellFlagFab> const& eb_flag = eb_box_factory.getMultiEBCellFlagFab();
@@ -172,8 +172,8 @@ void FiniteDifferenceSolver::EvolveECartesian (
                 // we need to check each cell is covered or regular
                 eb_flag_arr = eb_flag.array(mfi);
             }
-#endif
         }
+#endif
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
@@ -193,6 +193,7 @@ void FiniteDifferenceSolver::EvolveECartesian (
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
 
+#ifdef AMREX_USE_EB
                 // Stair-case approximation to the embedded boundary:
                 // Skip field push if this edge touches a partially or fully covered cell
                 if (eb_fully_covered_box) { return; }
@@ -207,6 +208,7 @@ void FiniteDifferenceSolver::EvolveECartesian (
                          !eb_flag_arr(i, j  , k).isRegular() ) { return; }
 #endif
                 }
+#endif
 
                 Ex(i, j, k) += c2 * dt * (
                     - T_Algo::DownwardDz(By, coefs_z, n_coefs_z, i, j, k)
@@ -216,6 +218,7 @@ void FiniteDifferenceSolver::EvolveECartesian (
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
 
+#ifdef AMREX_USE_EB
                 // Stair-case approximation to the embedded boundary:
                 // Skip field push if this edge touches a partially or fully covered cell
                 if (eb_fully_covered_box) { return; }
@@ -232,6 +235,7 @@ void FiniteDifferenceSolver::EvolveECartesian (
                          !eb_flag_arr(i  , j  , k).isRegular() ) { return; }
 #endif
                 }
+#endif
 
                 Ey(i, j, k) += c2 * dt * (
                     - T_Algo::DownwardDx(Bz, coefs_x, n_coefs_x, i, j, k)
@@ -241,6 +245,7 @@ void FiniteDifferenceSolver::EvolveECartesian (
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
 
+#ifdef AMREX_USE_EB
                 // Stair-case approximation to the embedded boundary:
                 // Skip field push if this edge touches a partially or fully covered cell
                 if (eb_fully_covered_box) { return; }
@@ -255,6 +260,7 @@ void FiniteDifferenceSolver::EvolveECartesian (
                          !eb_flag_arr(i  , j, k).isRegular() ) { return; }
 #endif
                 }
+#endif
 
                 Ez(i, j, k) += c2 * dt * (
                     - T_Algo::DownwardDy(Bx, coefs_y, n_coefs_y, i, j, k)
