@@ -184,7 +184,7 @@ public:
          */
         AMREX_GPU_HOST_DEVICE AMREX_INLINE
         amrex::ParticleReal
-        CalculateCrossSection (amrex::ParticleReal KErel,
+        CalculateCrossSection (amrex::ParticleReal KErel_eV,
                                amrex::ParticleReal n1,
                                amrex::ParticleReal m1,
                                amrex::GpuArray<amrex::ParticleReal, nkoT1> & sigmaC,
@@ -193,7 +193,6 @@ public:
         {
             using namespace amrex::literals;
 
-            amrex::ParticleReal const KErel_eV = KErel/PhysConst::q_e;
             amrex::ParticleReal const wpe = PhysConst::q_e*std::sqrt(n1/(m1*PhysConst::ep0));
             amrex::ParticleReal const KEcut_eV = PhysConst::hbar*wpe/PhysConst::q_e;
 
@@ -219,7 +218,7 @@ public:
             // kdsigdk is linearly weighted in electron energy
             amrex::ParticleReal w0, w1;
             int index;
-            if (KErel_eV >= m_KEgrid_eV[nkoT1-1]) {
+            if (KErel_eV >= m_KEgrid_eV[nKE-1]) {
                 index = nkoT1 - 2;
                 w0 = 0.0_prt;
                 w1 = 1.0_prt;

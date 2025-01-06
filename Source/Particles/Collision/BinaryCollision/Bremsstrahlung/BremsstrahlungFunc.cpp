@@ -13,8 +13,11 @@
 using namespace amrex::literals;
 
 BremsstrahlungFunc::BremsstrahlungFunc (std::string const& collision_name, MultiParticleContainer const * const mypc,
-                                        bool /*isSameSpecies*/)
+                                        bool isSameSpecies)
 {
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!isSameSpecies,
+                                     "BremsstrahlungFunc: The two colliding species must be different");
+
     const amrex::ParmParse pp_collision_name(collision_name);
 
     // Read in the number of electrons on the target
@@ -26,12 +29,12 @@ BremsstrahlungFunc::BremsstrahlungFunc (std::string const& collision_name, Multi
     auto& product_species = mypc->GetParticleContainerFromName(product_species_name);
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(product_species.AmIA<PhysicalSpecies::photon>(),
-                                     "The product species must be photons");
+                                     "BremsstrahlungFunc: The product species must be photons");
 
     amrex::ParticleReal multiplier = 1._prt;
-    pp_collision_name.get("multiplier", multiplier);
+    pp_collision_name.query("multiplier", multiplier);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(multiplier >= 1.,
-                                     "The multiplier must be greater than or equal to one");
+                                     "BremsstrahlungFunc: The multiplier must be greater than or equal to one");
     m_exe.m_multiplier = multiplier;
 
     // Fill in the m_kdsigdk array
@@ -51,13 +54,13 @@ BremsstrahlungFunc::UploadCrossSection (int Z)
     std::vector<std::vector<amrex::ParticleReal>> & kdsigdk = m_kdsigdk_map.at(2);
 
     // Convert Seltzer and Berger energy-weighted differential cross section to units of [m^2]
-    for (int iee=0; iee < m_exe.nKE; iee++) {
+    for (int iee=0; iee < Executor::nKE; iee++) {
         amrex::ParticleReal const E = m_exe.m_KEgrid_eV[iee]/m_e_eV;
         amrex::ParticleReal const gamma = 1.0_rt + E;
         /* betaSq = 1.0 - 1.0/gamma/gamma */
         amrex::ParticleReal const betaSq = (E*E + 2._rt*E)/gamma/gamma;
         amrex::ParticleReal const scale_factor = 1.0e-31_rt*Z*Z/betaSq;
-        for (int iep=0; iep < m_exe.nkoT1; iep++) {
+        for (int iep=0; iep < Executor::nkoT1; iep++) {
             m_exe.m_kdsigdk[iee][iep] = kdsigdk[iee][iep]*scale_factor;
         }
     }
