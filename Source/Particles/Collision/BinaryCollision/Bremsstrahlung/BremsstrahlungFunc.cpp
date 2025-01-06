@@ -51,7 +51,7 @@ BremsstrahlungFunc::UploadCrossSection (int Z)
 
     constexpr auto m_e_eV = PhysConst::m_e*PhysConst::c*PhysConst::c/PhysConst::q_e; // 0.511e6
 
-    std::vector<std::vector<amrex::ParticleReal>> & kdsigdk = m_kdsigdk_map.at(2);
+    std::vector<std::vector<amrex::ParticleReal>> & kdsigdk = m_kdsigdk_map.at(Z);
 
     // Convert Seltzer and Berger energy-weighted differential cross section to units of [m^2]
     for (int iee=0; iee < Executor::nKE; iee++) {
