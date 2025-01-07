@@ -238,16 +238,16 @@ public:
                                                      + w01*(w0*m_kdsigdk[index][i0_cut+1] + w1*m_kdsigdk[index+1][i0_cut+1]));
 
             // create cumulative distribution using trapezoidal rule
-            amrex::ParticleReal m_koT1_grid_im1 = koT1_cut;
+            amrex::ParticleReal koT1_grid_im1 = koT1_cut;
             amrex::ParticleReal kdsigdk_im1 = kdsigdk_cut;
             for (int i=i0_cut+1; i < nkoT1; i++) {
-                amrex::ParticleReal const this_dk = (m_koT1_grid[i] - m_koT1_grid_im1);
-                amrex::ParticleReal const this_k = (m_koT1_grid[i] + m_koT1_grid_im1)*0.5_prt;
+                amrex::ParticleReal const this_dk = (m_koT1_grid[i] - koT1_grid_im1);
+                amrex::ParticleReal const this_k = (m_koT1_grid[i] + koT1_grid_im1)*0.5_prt;
                 amrex::ParticleReal const kdsigdk_i = w0*m_kdsigdk[index][i] + w1*m_kdsigdk[index+1][i];
                 // using centered k here mitigates divergece effect for k->0
                 amrex::ParticleReal const this_dsigdk = (kdsigdk_i + kdsigdk_im1)*0.5_prt/this_k;
                 sigmaC[i] = sigmaC[i-1] + this_dsigdk*this_dk;
-                m_koT1_grid_im1 = m_koT1_grid[i];
+                koT1_grid_im1 = m_koT1_grid[i];
                 kdsigdk_im1 = kdsigdk_i;
             }
             amrex::ParticleReal const sigma_total = sigmaC[nkoT1-1]; // total cross section [m^2]
