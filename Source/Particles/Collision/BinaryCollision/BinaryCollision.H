@@ -581,7 +581,7 @@ public:
             index_type* AMREX_RESTRICT p_coll_offsets = coll_offsets.dataPtr();
 
             // mask: equal to 1 if particle creation occurs for a given pair, 0 otherwise
-            amrex::Gpu::DeviceVector<index_type> mask(n_total_pairs);
+            amrex::Gpu::DeviceVector<index_type> mask(n_total_pairs, index_type(0));
             index_type* AMREX_RESTRICT p_mask = mask.dataPtr();
             // Will be filled with the index of the first particle of a given pair
             amrex::Gpu::DeviceVector<index_type> pair_indices_1(n_total_pairs);
