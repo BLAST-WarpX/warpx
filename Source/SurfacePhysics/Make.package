@@ -1,3 +1,4 @@
 CEXE_sources += SurfacePhysicsBase.cpp
+CEXE_sources += SurfaceParticleMapping.cpp
 
 VPATH_LOCATIONS += ${WARPX_HOME}/Source/SurfacePhysics

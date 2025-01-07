@@ -3,6 +3,9 @@
 
 #ifdef WARPX_SURFACE_PHYSICS
 
+#include "Particles/MultiParticleContainer_fwd.H"
+#include <ablastr/fields/MultiFabRegister.H>
+
 #include <AMReX.H>
 #include <AMReX_IntVect.H>
 #include <AMReX_Real.H>
@@ -21,6 +24,9 @@ public:
     void AllocAndInitInfluxBndVectors();
     void AllocAndInitOutfluxBndVectors();
 
+    void countParticlesFromEmbeddedBoundaries(
+        MultiParticleContainer& mypc, ablastr::fields::MultiLevelScalarField const& distance_to_eb);
+
     void nullifyInfluxParticleCounter ();
     void nullifyInfluxParticleCounter (int isp);
     void nullifyOutfluxParticleCounter ();
@@ -36,8 +42,8 @@ public:
     int num_outflux_species;
     amrex::Vector< amrex::Vector<amrex::Real> > bnd_influx;
     amrex::Vector< amrex::Vector<amrex::Real> > bnd_outflux;
-    amrex::Vector< amrex::Vector<int> > num_in_particles;
-    amrex::Vector< amrex::Vector<int> > num_out_particles;
+    amrex::Vector< amrex::Vector< amrex::Real > > num_in_particles;
+    amrex::Vector< amrex::Vector< amrex::Real > > num_out_particles;
 
     
 
