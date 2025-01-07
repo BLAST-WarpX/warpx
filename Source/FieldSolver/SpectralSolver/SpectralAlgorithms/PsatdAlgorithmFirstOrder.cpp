@@ -28,18 +28,19 @@
 
 using namespace amrex::literals;
 
-PsatdAlgorithmFirstOrder::PsatdAlgorithmFirstOrder(
+PsatdAlgorithmFirstOrder::PsatdAlgorithmFirstOrder (
     const SpectralKSpace& spectral_kspace,
     const amrex::DistributionMapping& dm,
     const SpectralFieldIndex& spectral_index,
     const int norder_x,
     const int norder_y,
     const int norder_z,
-    const short grid_type,
+    ablastr::utils::enums::GridType grid_type,
     const amrex::Real dt,
     const bool div_cleaning,
-    const int J_in_time,
-    const int rho_in_time)
+    const JInTime J_in_time,
+    const RhoInTime rho_in_time
+)
     // Initializer list
     : SpectralBaseAlgorithm(spectral_kspace, dm, spectral_index, norder_x, norder_y, norder_z, grid_type),
     m_dt(dt),

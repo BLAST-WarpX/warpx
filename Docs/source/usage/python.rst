@@ -53,6 +53,30 @@ Field solvers define the updates of electric and magnetic fields.
 
 .. autoclass:: pywarpx.picmi.ElectrostaticSolver
 
+Object that allows smoothing of fields.
+
+.. autoclass:: pywarpx.picmi.BinomialSmoother
+
+Evolve Schemes
+--------------
+
+These define the scheme use to evolve the fields and particles.
+An instance of one of these would be passed as the `evolve_scheme` into the `Simulation`.
+
+.. autoclass:: pywarpx.picmi.ExplicitEvolveScheme
+
+.. autoclass:: pywarpx.picmi.ThetaImplicitEMEvolveScheme
+
+.. autoclass:: pywarpx.picmi.SemiImplicitEMEvolveScheme
+
+There are several support classes use to specify components of the evolve schemes
+
+.. autoclass:: pywarpx.picmi.PicardNonlinearSolver
+
+.. autoclass:: pywarpx.picmi.NewtonNonlinearSolver
+
+.. autoclass:: pywarpx.picmi.GMRESLinearSolver
+
 Constants
 ---------
 
@@ -90,6 +114,8 @@ Diagnostics
 
 .. autoclass:: pywarpx.picmi.FieldDiagnostic
 
+.. autoclass:: pywarpx.picmi.TimeAveragedFieldDiagnostic
+
 .. autoclass:: pywarpx.picmi.ElectrostaticFieldDiagnostic
 
 .. autoclass:: pywarpx.picmi.Checkpoint
@@ -119,6 +145,10 @@ Particle distributions can be used for to initialize particles in a particle spe
 .. autoclass:: pywarpx.picmi.UniformDistribution
 
 .. autoclass:: pywarpx.picmi.AnalyticDistribution
+
+.. autoclass:: pywarpx.picmi.UniformFluxDistribution
+
+.. autoclass:: pywarpx.picmi.AnalyticFluxDistribution
 
 .. autoclass:: pywarpx.picmi.ParticleListDistribution
 

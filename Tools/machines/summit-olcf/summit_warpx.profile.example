@@ -18,10 +18,10 @@ module load ccache
 module load ninja
 
 # optional: for PSATD in RZ geometry support
-export CMAKE_PREFIX_PATH=/ccs/proj/$proj/${USER}/sw/summit/gpu/blaspp-master:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=/ccs/proj/$proj/${USER}/sw/summit/gpu/lapackpp-master:$CMAKE_PREFIX_PATH
-export LD_LIBRARY_PATH=/ccs/proj/$proj/${USER}/sw/summit/gpu/blaspp-master/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=/ccs/proj/$proj/${USER}/sw/summit/gpu/lapackpp-master/lib64:$LD_LIBRARY_PATH
+export CMAKE_PREFIX_PATH=/ccs/proj/$proj/${USER}/sw/summit/gpu/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=/ccs/proj/$proj/${USER}/sw/summit/gpu/lapackpp-2024.05.31:$CMAKE_PREFIX_PATH
+export LD_LIBRARY_PATH=/ccs/proj/$proj/${USER}/sw/summit/gpu/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/ccs/proj/$proj/${USER}/sw/summit/gpu/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
 
 # optional: for QED lookup table generation support
 module load boost/1.76.0

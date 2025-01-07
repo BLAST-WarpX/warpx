@@ -29,7 +29,7 @@ print(f"\nYour current source directory is: {REPO_DIR}")
 
 REPLY = input("Are you sure you want to continue? [y/N] ")
 print()
-if not REPLY in ["Y", "y"]:
+if REPLY not in ["Y", "y"]:
     print("You did not confirm with 'y', aborting.")
     sys.exit(1)
 
@@ -37,7 +37,9 @@ if not REPLY in ["Y", "y"]:
 # Current Versions ############################################################
 
 # pyAMReX development HEAD
-pyamrex_gh = requests.get('https://api.github.com/repos/AMReX-Codes/pyamrex/commits/development')
+pyamrex_gh = requests.get(
+    "https://api.github.com/repos/AMReX-Codes/pyamrex/commits/development"
+)
 pyamrex_HEAD = pyamrex_gh.json()["sha"]
 
 # WarpX references to pyAMReX: cmake/dependencies/pyAMReX.cmake
@@ -45,18 +47,20 @@ pyamrex_cmake_path = str(REPO_DIR.joinpath("cmake/dependencies/pyAMReX.cmake"))
 #   branch/commit/tag (git fetcher) version
 #     set(WarpX_pyamrex_branch "development" ...
 pyamrex_branch = f"unknown (format issue in {pyamrex_cmake_path})"
-with open(pyamrex_cmake_path, encoding='utf-8') as f:
-    r_minimal = re.findall(r'.*set\(WarpX_pyamrex_branch\s+"(.+)"\s+.*',
-                           f.read(), re.MULTILINE)
+with open(pyamrex_cmake_path, encoding="utf-8") as f:
+    r_minimal = re.findall(
+        r'.*set\(WarpX_pyamrex_branch\s+"(.+)"\s+.*', f.read(), re.MULTILINE
+    )
     if len(r_minimal) >= 1:
         pyamrex_branch = r_minimal[0]
 
 #   minimal (external) version
 #     find_package(AMReX YY.MM CONFIG ...
 pyamrex_minimal = f"unknown (format issue in {pyamrex_cmake_path})"
-with open(pyamrex_cmake_path, encoding='utf-8') as f:
-    r_minimal = re.findall(r'.*find_package\(pyAMReX\s+(.+)\s+CONFIG\s+.*',
-                           f.read(), re.MULTILINE)
+with open(pyamrex_cmake_path, encoding="utf-8") as f:
+    r_minimal = re.findall(
+        r".*find_package\(pyAMReX\s+(.+)\s+CONFIG\s+.*", f.read(), re.MULTILINE
+    )
     if len(r_minimal) >= 1:
         pyamrex_minimal = r_minimal[0]
 
@@ -67,15 +71,19 @@ print("""We will now run a few sed commands on your source directory.
 Please answer the following questions about the version number
 you want to require from pyAMReX:\n""")
 
-print(f"Currently, WarpX builds against this pyAMReX commit/branch/sha: {pyamrex_branch}")
+print(
+    f"Currently, WarpX builds against this pyAMReX commit/branch/sha: {pyamrex_branch}"
+)
 print(f"pyAMReX HEAD commit (development branch): {pyamrex_HEAD}")
-pyamrex_new_branch = input(f"Update pyAMReX commit/branch/sha: ").strip()
+pyamrex_new_branch = input("Update pyAMReX commit/branch/sha: ").strip()
 if not pyamrex_new_branch:
     pyamrex_new_branch = pyamrex_branch
     print(f"--> Nothing entered, will keep: {pyamrex_branch}")
 print()
 
-print(f"Currently, a pre-installed pyAMReX is required at least at version: {pyamrex_minimal}")
+print(
+    f"Currently, a pre-installed pyAMReX is required at least at version: {pyamrex_minimal}"
+)
 today = datetime.date.today().strftime("%y.%m")
 pyamrex_new_minimal = input(f"New minimal pyAMReX version (e.g. {today})? ").strip()
 if not pyamrex_new_minimal:
@@ -88,7 +96,7 @@ print(f"New minimal pyAMReX version:   {pyamrex_new_minimal}\n")
 
 REPLY = input("Is this information correct? Will now start updating! [y/N] ")
 print()
-if not REPLY in ["Y", "y"]:
+if REPLY not in ["Y", "y"]:
     print("You did not confirm with 'y', aborting.")
     sys.exit(1)
 
@@ -96,24 +104,28 @@ if not REPLY in ["Y", "y"]:
 # Updates #####################################################################
 
 # WarpX references to pyAMReX: cmake/dependencies/pyAMReX.cmake
-with open(pyamrex_cmake_path, encoding='utf-8') as f:
+with open(pyamrex_cmake_path, encoding="utf-8") as f:
     pyAMReX_cmake_content = f.read()
 
     #   branch/commit/tag (git fetcher) version
     #     set(WarpX_pyamrex_branch "development" ...
     pyAMReX_cmake_content = re.sub(
         r'(.*set\(WarpX_pyamrex_branch\s+")(.+)("\s+.*)',
-        r'\g<1>{}\g<3>'.format(pyamrex_new_branch),
-        pyAMReX_cmake_content, flags = re.MULTILINE)
+        r"\g<1>{}\g<3>".format(pyamrex_new_branch),
+        pyAMReX_cmake_content,
+        flags=re.MULTILINE,
+    )
 
     #   minimal (external) version
     #     find_package(AMReX YY.MM CONFIG ...
     pyAMReX_cmake_content = re.sub(
-        r'(.*find_package\(pyAMReX\s+)(.+)(\s+CONFIG\s+.*)',
-        r'\g<1>{}\g<3>'.format(pyamrex_new_minimal),
-        pyAMReX_cmake_content, flags = re.MULTILINE)
+        r"(.*find_package\(pyAMReX\s+)(.+)(\s+CONFIG\s+.*)",
+        r"\g<1>{}\g<3>".format(pyamrex_new_minimal),
+        pyAMReX_cmake_content,
+        flags=re.MULTILINE,
+    )
 
-with open(pyamrex_cmake_path, "w", encoding='utf-8') as f:
+with open(pyamrex_cmake_path, "w", encoding="utf-8") as f:
     f.write(pyAMReX_cmake_content)
 
 

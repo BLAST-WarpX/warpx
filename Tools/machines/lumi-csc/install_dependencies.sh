@@ -43,11 +43,10 @@ if [ -d ${SRC_DIR}/blaspp ]
 then
   cd ${SRC_DIR}/blaspp
   git fetch --prune
-  git checkout master
-  git pull
+  git checkout v2024.05.31
   cd -
 else
-  git clone https://github.com/icl-utk-edu/blaspp.git ${SRC_DIR}/blaspp
+  git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git ${SRC_DIR}/blaspp
 fi
 rm -rf ${build_dir}/blaspp-lumi-gpu-build
 CXX=$(which CC)                              \
@@ -56,7 +55,7 @@ cmake -S ${SRC_DIR}/blaspp                   \
       -Duse_openmp=OFF                       \
       -Dgpu_backend=hip                      \
       -DCMAKE_CXX_STANDARD=17                \
-      -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-master
+      -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
 cmake --build ${build_dir}/blaspp-lumi-gpu-build --target install --parallel 16
 rm -rf ${build_dir}/blaspp-lumi-gpu-build
 
@@ -65,11 +64,10 @@ if [ -d ${SRC_DIR}/lapackpp ]
 then
   cd ${SRC_DIR}/lapackpp
   git fetch --prune
-  git checkout master
-  git pull
+  git checkout v2024.05.31
   cd -
 else
-  git clone https://github.com/icl-utk-edu/lapackpp.git ${SRC_DIR}/lapackpp
+  git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git ${SRC_DIR}/lapackpp
 fi
 rm -rf ${build_dir}/lapackpp-lumi-gpu-build
 CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" \
@@ -78,7 +76,7 @@ cmake -S ${SRC_DIR}/lapackpp                     \
       -DCMAKE_CXX_STANDARD=17                    \
       -Dbuild_tests=OFF                          \
       -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON     \
-      -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-master
+      -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
 cmake --build ${build_dir}/lapackpp-lumi-gpu-build --target install --parallel 16
 rm -rf ${build_dir}/lapackpp-lumi-gpu-build
 

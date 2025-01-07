@@ -22,7 +22,9 @@
  *    x^{n+1} - x^{n} = dt*u^{n+1/2}/gamma^{n+1/2}
  */
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
-void UpdatePosition(amrex::ParticleReal& x, amrex::ParticleReal& y, amrex::ParticleReal& z,
+void UpdatePosition([[maybe_unused]] amrex::ParticleReal& x,
+                    [[maybe_unused]] amrex::ParticleReal& y,
+                    [[maybe_unused]] amrex::ParticleReal& z,
                     const amrex::ParticleReal ux, const amrex::ParticleReal uy, const amrex::ParticleReal uz,
                     const amrex::Real dt )
 {
@@ -35,13 +37,9 @@ void UpdatePosition(amrex::ParticleReal& x, amrex::ParticleReal& y, amrex::Parti
     // Update positions over one time step
 #if (AMREX_SPACEDIM >= 2)
     x += ux * inv_gamma * dt;
-#else
-    amrex::ignore_unused(x);
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) // RZ pushes particles in 3D
     y += uy * inv_gamma * dt;
-#else
-    amrex::ignore_unused(y);
 #endif
     z += uz * inv_gamma * dt;
 }
@@ -53,10 +51,12 @@ void UpdatePosition(amrex::ParticleReal& x, amrex::ParticleReal& y, amrex::Parti
  *    See Eqs. 15 and 17 in Chen, JCP 407 (2020) 109228.
  */
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
-void UpdatePositionImplicit(amrex::ParticleReal& x, amrex::ParticleReal& y, amrex::ParticleReal& z,
-                            const amrex::ParticleReal ux_n, const amrex::ParticleReal uy_n, const amrex::ParticleReal uz_n,
-                            const amrex::ParticleReal ux, const amrex::ParticleReal uy, const amrex::ParticleReal uz,
-                            const amrex::Real dt )
+void UpdatePositionImplicit ([[maybe_unused]] amrex::ParticleReal& x,
+                             [[maybe_unused]] amrex::ParticleReal& y,
+                             [[maybe_unused]] amrex::ParticleReal& z,
+                             const amrex::ParticleReal ux_n, const amrex::ParticleReal uy_n, const amrex::ParticleReal uz_n,
+                             const amrex::ParticleReal ux, const amrex::ParticleReal uy, const amrex::ParticleReal uz,
+                             const amrex::Real dt )
 {
     using namespace amrex::literals;
 
@@ -74,13 +74,9 @@ void UpdatePositionImplicit(amrex::ParticleReal& x, amrex::ParticleReal& y, amre
     // Update positions over one time step
 #if (AMREX_SPACEDIM >= 2)
     x += ux * inv_gamma * dt;
-#else
-    amrex::ignore_unused(x);
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) // RZ pushes particles in 3D
     y += uy * inv_gamma * dt;
-#else
-    amrex::ignore_unused(y);
 #endif
     z += uz * inv_gamma * dt;
 }
@@ -90,19 +86,18 @@ void UpdatePositionImplicit(amrex::ParticleReal& x, amrex::ParticleReal& y, amre
  *    of the particles for given electric and magnetic fields on the grid.
  */
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
-void PositionNorm( amrex::ParticleReal dxp, amrex::ParticleReal dyp, amrex::ParticleReal dzp,
-                   amrex::ParticleReal& dxp_save, amrex::ParticleReal& dyp_save, amrex::ParticleReal& dzp_save,
-                   amrex::ParticleReal idxg2, amrex::ParticleReal idyg2, amrex::ParticleReal idzg2,
+void PositionNorm ([[maybe_unused]] amrex::ParticleReal dxp,
+                   [[maybe_unused]] amrex::ParticleReal dyp,
+                   [[maybe_unused]] amrex::ParticleReal dzp,
+                   [[maybe_unused]] amrex::ParticleReal& dxp_save,
+                   [[maybe_unused]] amrex::ParticleReal& dyp_save,
+                   [[maybe_unused]] amrex::ParticleReal& dzp_save,
+                   [[maybe_unused]] amrex::ParticleReal idxg2,
+                   [[maybe_unused]] amrex::ParticleReal idyg2,
+                   [[maybe_unused]] amrex::ParticleReal idzg2,
                    amrex::ParticleReal& step_norm, const int iter )
 {
     using namespace amrex::literals;
-
-#if defined(WARPX_DIM_1D_Z)
-    amrex::ignore_unused(dxp, dxp_save, idxg2);
-#endif
-#if !defined(WARPX_DIM_3D)
-    amrex::ignore_unused(dyp, dyp_save, idyg2);
-#endif
 
     if (iter==0) { step_norm = 1.0_prt; }
     else {

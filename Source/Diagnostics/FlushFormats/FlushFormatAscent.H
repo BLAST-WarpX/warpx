@@ -1,7 +1,7 @@
 #ifndef WARPX_FLUSHFORMATASCENT_H_
 #define WARPX_FLUSHFORMATASCENT_H_
 
-#include "FlushFormat.H"
+#include "FlushFormatInSitu.H"
 
 #include "Diagnostics/ParticleDiag/ParticleDiag_fwd.H"
 
@@ -24,7 +24,7 @@
  * In particular, function WriteToFile takes fields and particles as input arguments,
  * and calls amrex functions to do the in-situ visualization.
  */
-class FlushFormatAscent : public FlushFormat
+class FlushFormatAscent : public FlushFormatInSitu
 {
 public:
     /** Do in-situ visualization for field and particle data */
@@ -37,20 +37,12 @@ public:
         std::string prefix, int file_min_digits,
         bool plot_raw_fields,
         bool plot_raw_fields_guards,
+        int verbose = 2,
         bool use_pinned_pc = false,
         bool isBTD = false, int snapshotID = -1,
         int bufferID = 1, int numBuffers = 1,
         const amrex::Geometry& full_BTD_snapshot = amrex::Geometry(),
-        bool isLastBTDFlush = false ) const override;
-
-#ifdef AMREX_USE_ASCENT
-    /** \brief Do in-situ visualization for particle data.
-     * \param[in] particle_diags Each element of this vector handles output of 1 species.
-     * \param[out] a_bp_mesh blueprint mesh generated from the container
-     * Only compile if AMREX_USE_ASCENT because we need to pass a conduit class
-     */
-    void WriteParticles(const amrex::Vector<ParticleDiag>& particle_diags, conduit::Node& a_bp_mesh) const;
-#endif
+        bool isLastBTDFlush = false) const override;
 
     FlushFormatAscent ()          = default;
     ~FlushFormatAscent() override = default;

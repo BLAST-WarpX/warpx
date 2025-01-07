@@ -1,10 +1,10 @@
 # basic dependencies
-numpy~=1.15
+numpy>=1.15
 periodictable~=1.5
 
 # PICMI
 # note: don't forget to update the version in Docs/requirements.txt, too
-picmistandard==0.28.0
+picmistandard==0.33.0
 #   for development against an unreleased PICMI version, use:
 #picmistandard @ git+https://github.com/picmi-standard/picmi.git#subdirectory=PICMI_Python
 

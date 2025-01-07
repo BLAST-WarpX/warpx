@@ -16,13 +16,13 @@ module load boost/1.80.0--openmpi--4.1.4--gcc--11.3.0
 module load openblas/0.3.21--gcc--11.3.0
 export CMAKE_PREFIX_PATH=/leonardo/prod/spack/03/install/0.19/linux-rhel8-icelake/gcc-11.3.0/c-blosc-1.21.1-aifmix6v5lwxgt7rigwoebalrgbcnv26:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=$HOME/sw/adios2-master:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=$HOME/sw/blaspp-master:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=$HOME/sw/lapackpp-master:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=$HOME/sw/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=$HOME/sw/lapackpp-2024.05.31:$CMAKE_PREFIX_PATH
 
 export LD_LIBRARY_PATH=/leonardo/prod/spack/03/install/0.19/linux-rhel8-icelake/gcc-11.3.0/c-blosc-1.21.1-aifmix6v5lwxgt7rigwoebalrgbcnv26/lib64:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=$HOME/sw/adios2-master/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=$HOME/sw/blaspp-master/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=$HOME/sw/lapackpp-master/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$HOME/sw/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$HOME/sw/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
 
 export PATH=$HOME/sw/adios2-master/bin:$PATH
 

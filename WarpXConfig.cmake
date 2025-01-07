@@ -37,6 +37,7 @@ set(WarpX_OPENPMD_FOUND ${WarpX_OPENPMD})
 
 # TODO
 #WarpX_ASCENT        "Ascent in situ diagnostics"                 OFF)
+#WarpX_CATALYST      "Catalyst in situ diagnostics"               OFF)
 #WarpX_FFT           "FFT-based solvers"                          OFF)
 #WarpX_SENSEI        "SENSEI in situ diagnostics"                 OFF)
 #WarpX_QED           "QED support (requires PICSAR)"                    ON)

@@ -6,4 +6,4 @@
 
 from .Bucket import Bucket
 
-interpolation = Bucket('interpolation')
+interpolation = Bucket("interpolation")

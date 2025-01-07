@@ -176,10 +176,6 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
 
     // Save the position, momentum and optical depth, making copies
     amrex::Gpu::DeviceVector<ParticleReal> xp_save, yp_save, zp_save;
-    amrex::Gpu::DeviceVector<ParticleReal> uxp_save, uyp_save, uzp_save;
-#ifdef WARPX_QED
-    amrex::Gpu::DeviceVector<ParticleReal> optical_depth_save;
-#endif
 
     const auto GetPosition = GetParticlePosition<PIdx>(pti, offset);
           auto SetPosition = SetParticlePosition<PIdx>(pti, offset);
@@ -188,12 +184,6 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
     amrex::ParticleReal* const AMREX_RESTRICT uy = uyp.dataPtr() + offset;
     amrex::ParticleReal* const AMREX_RESTRICT uz = uzp.dataPtr() + offset;
 
-#ifdef WARPX_QED
-    const bool loc_has_quantum_sync = has_quantum_sync();
-    amrex::ParticleReal* AMREX_RESTRICT p_optical_depth = nullptr;
-    amrex::ParticleReal* AMREX_RESTRICT p_optical_depth_save = nullptr;
-#endif
-
     if (!done_injecting_lev)
     {
         // If the old values are not already saved, create copies here.
@@ -201,26 +191,9 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
         yp_save.resize(np_to_push);
         zp_save.resize(np_to_push);
 
-        uxp_save.resize(np_to_push);
-        uyp_save.resize(np_to_push);
-        uzp_save.resize(np_to_push);
-
         amrex::ParticleReal* const AMREX_RESTRICT xp_save_ptr = xp_save.dataPtr();
         amrex::ParticleReal* const AMREX_RESTRICT yp_save_ptr = yp_save.dataPtr();
         amrex::ParticleReal* const AMREX_RESTRICT zp_save_ptr = zp_save.dataPtr();
-
-        amrex::ParticleReal* const AMREX_RESTRICT uxp_save_ptr = uxp_save.dataPtr();
-        amrex::ParticleReal* const AMREX_RESTRICT uyp_save_ptr = uyp_save.dataPtr();
-        amrex::ParticleReal* const AMREX_RESTRICT uzp_save_ptr = uzp_save.dataPtr();
-
-#ifdef WARPX_QED
-        if(loc_has_quantum_sync){
-            p_optical_depth = pti.GetAttribs(particle_comps["opticalDepthQSR"]).dataPtr()
-                              + offset;
-            optical_depth_save.resize(np_to_push);
-            p_optical_depth_save = optical_depth_save.dataPtr();
-        }
-#endif
 
         amrex::ParallelFor( np_to_push,
                             [=] AMREX_GPU_DEVICE (long i) {
@@ -229,13 +202,6 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                                 xp_save_ptr[i] = xp;
                                 yp_save_ptr[i] = yp;
                                 zp_save_ptr[i] = zp;
-                                uxp_save_ptr[i] = ux[i];
-                                uyp_save_ptr[i] = uy[i];
-                                uzp_save_ptr[i] = uz[i];
-#ifdef WARPX_QED
-                                if(loc_has_quantum_sync){
-                                    p_optical_depth_save[i] = p_optical_depth[i];}
-#endif
                             });
     }
 
@@ -252,9 +218,6 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
         amrex::ParticleReal* AMREX_RESTRICT x_save = xp_save.dataPtr();
         amrex::ParticleReal* AMREX_RESTRICT y_save = yp_save.dataPtr();
         amrex::ParticleReal* AMREX_RESTRICT z_save = zp_save.dataPtr();
-        amrex::ParticleReal* AMREX_RESTRICT ux_save = uxp_save.dataPtr();
-        amrex::ParticleReal* AMREX_RESTRICT uy_save = uyp_save.dataPtr();
-        amrex::ParticleReal* AMREX_RESTRICT uz_save = uzp_save.dataPtr();
 
         // Undo the push for particles not injected yet.
         // The zp are advanced a fixed amount.
@@ -267,9 +230,6 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                                 amrex::ParticleReal xp, yp, zp;
                                 GetPosition(i, xp, yp, zp);
                                 if (zp <= z_plane_lev) {
-                                    ux[i] = ux_save[i];
-                                    uy[i] = uy_save[i];
-                                    uz[i] = uz_save[i];
                                     xp = x_save[i];
                                     yp = y_save[i];
                                     if (rigid) {
@@ -281,24 +241,15 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                                         zp = z_save[i] + dt*uz[i]*gi;
                                     }
                                     SetPosition(i, xp, yp, zp);
-#ifdef WARPX_QED
-                                    if(loc_has_quantum_sync){
-                                        p_optical_depth[i] = p_optical_depth_save[i];}
-#endif
                                 }
                             });
     }
 }
 
 void
-RigidInjectedParticleContainer::Evolve (int lev,
-                                        const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
-                                        const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
-                                        MultiFab& jx, MultiFab& jy, MultiFab& jz,
-                                        MultiFab* cjx, MultiFab* cjy, MultiFab* cjz,
-                                        MultiFab* rho, MultiFab* crho,
-                                        const MultiFab* cEx, const MultiFab* cEy, const MultiFab* cEz,
-                                        const MultiFab* cBx, const MultiFab* cBy, const MultiFab* cBz,
+RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
+                                        int lev,
+                                        const std::string& current_fp_string,
                                         Real t, Real dt, DtType a_dt_type, bool skip_deposition,
                                         PushType push_type)
 {
@@ -317,14 +268,9 @@ RigidInjectedParticleContainer::Evolve (int lev,
     done_injecting_lev = ((zinject_plane_levels[lev] < plo[WARPX_ZINDEX] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c >= 0.) ||
                            (zinject_plane_levels[lev] > phi[WARPX_ZINDEX] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c <= 0.));
 
-    PhysicalParticleContainer::Evolve (lev,
-                                       Ex, Ey, Ez,
-                                       Bx, By, Bz,
-                                       jx, jy, jz,
-                                       cjx, cjy, cjz,
-                                       rho, crho,
-                                       cEx, cEy, cEz,
-                                       cBx, cBy, cBz,
+    PhysicalParticleContainer::Evolve (fields,
+                                       lev,
+                                       current_fp_string,
                                        t, dt, a_dt_type, skip_deposition, push_type);
 }
 

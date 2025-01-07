@@ -29,35 +29,50 @@ from openpmd_viewer import OpenPMDTimeSeries
 tolerance = 0
 
 fn = sys.argv[1]
-ds = yt.load( fn )
+ds = yt.load(fn)
 ad = ds.all_data()
-x = ad['electron', 'particle_position_x'].v
+x = ad["electron", "particle_position_x"].v
 
-error = len(x)-512
-print('error = ', error)
-print('tolerance = ', tolerance)
-assert(error==tolerance)
+error = len(x) - 512
+print("error = ", error)
+print("tolerance = ", tolerance)
+assert error == tolerance
 
 # Check that all the removed particles are properly recorded
 # by making sure that, at each iteration, the sum of the number of
 # remaining particles and scraped particles is equal to half the
 # original number of particles
 # also check that no particles with z <= 0 have been scraped
-ts_full = OpenPMDTimeSeries('./diags/diag2/')
-ts_scraping = OpenPMDTimeSeries('./diags/diag3/particles_at_eb')
+ts_full = OpenPMDTimeSeries("./diags/diag2/")
+ts_scraping = OpenPMDTimeSeries("./diags/diag3/particles_at_eb")
 
-def n_remaining_particles( iteration ):
-    w, = ts_full.get_particle(['w'], iteration=iteration)
+
+def n_remaining_particles(iteration):
+    (w,) = ts_full.get_particle(["w"], iteration=iteration)
     return len(w)
-def n_scraped_particles( iteration ):
-    step_scraped = ts_scraping.get_particle( ['stepScraped'], iteration=ts_scraping.iterations[0] )
+
+
+def n_scraped_particles(iteration):
+    step_scraped = ts_scraping.get_particle(
+        ["stepScraped"], iteration=ts_scraping.iterations[0]
+    )
     return (step_scraped <= iteration).sum()
-def n_scraped_z_leq_zero( iteration ):
-    z_pos, = ts_scraping.get_particle( ['z'], iteration=ts_scraping.iterations[0] )
+
+
+def n_scraped_z_leq_zero(iteration):
+    (z_pos,) = ts_scraping.get_particle(["z"], iteration=ts_scraping.iterations[0])
     return (z_pos <= 0).sum()
-n_remaining = np.array([ n_remaining_particles(iteration) for iteration in ts_full.iterations ])
-n_scraped = np.array([ n_scraped_particles(iteration) for iteration in ts_full.iterations ])
-n_z_leq_zero = np.array([ n_scraped_z_leq_zero(iteration) for iteration in ts_full.iterations ])
+
+
+n_remaining = np.array(
+    [n_remaining_particles(iteration) for iteration in ts_full.iterations]
+)
+n_scraped = np.array(
+    [n_scraped_particles(iteration) for iteration in ts_full.iterations]
+)
+n_z_leq_zero = np.array(
+    [n_scraped_z_leq_zero(iteration) for iteration in ts_full.iterations]
+)
 n_total = n_remaining[0]
-assert np.all( 2*n_scraped+n_remaining == n_total)
-assert np.all( n_z_leq_zero == 0)
+assert np.all(2 * n_scraped + n_remaining == n_total)
+assert np.all(n_z_leq_zero == 0)

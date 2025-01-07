@@ -2,7 +2,7 @@
 #export proj=<yourProject>
 
 # required dependencies
-module load cmake/3.19.0
+module load cmake/3.19.0  # please check for a 3.24+ module and report back
 module load gcc/10.3.0
 module load openmpi/gcc10/4.1.0
 

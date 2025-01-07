@@ -104,7 +104,7 @@ SignalHandling::parseSignalNameToNumber (const std::string &str)
 
     auto spf = signals_parser.compileHost<0>();
 
-    const int sig = spf();
+    const auto sig = int(spf());
     ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(sig < NUM_SIGNALS,
                                        "Parsed signal value is outside the supported range of [1, 31]");
 

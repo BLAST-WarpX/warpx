@@ -42,8 +42,11 @@ namespace ablastr::math::anyfft
             } else if (dim == 2) {
                 result = cufftPlan2d(
                     &(fft_plan.m_plan), real_size[1], real_size[0], VendorR2C);
+            } else if (dim == 1) {
+                result = cufftPlan1d(
+                    &(fft_plan.m_plan), real_size[0], VendorR2C, 1);
             } else {
-                ABLASTR_ABORT_WITH_MESSAGE("only dim=2 and dim=3 have been implemented");
+                ABLASTR_ABORT_WITH_MESSAGE("only dim=1 and dim=2 and dim=3 have been implemented");
             }
         } else {
             if (dim == 3) {
@@ -52,6 +55,9 @@ namespace ablastr::math::anyfft
             } else if (dim == 2) {
                 result = cufftPlan2d(
                     &(fft_plan.m_plan), real_size[1], real_size[0], VendorC2R);
+            } else if (dim == 1) {
+                result = cufftPlan1d(
+                    &(fft_plan.m_plan), real_size[0], VendorC2R, 1);
             } else {
                 ABLASTR_ABORT_WITH_MESSAGE("only dim=2 and dim=3 have been implemented");
             }

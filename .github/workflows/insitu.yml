@@ -1,6 +1,12 @@
 name: 🐧 In Situ Vis
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    paths-ignore:
+      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-insituvis
@@ -17,10 +23,13 @@ jobs:
       CXXFLAGS: "-Werror -Wshadow -Woverloaded-virtual -Wunreachable-code -Wno-error=pass-failed"
       CMAKE_GENERATOR: Ninja
       CMAKE_PREFIX_PATH: /root/install/sensei/v4.0.0/lib64/cmake
+      OMP_NUM_THREADS: 1
     container:
       image: senseiinsitu/ci:fedora35-amrex-20220613
     steps:
     - uses: actions/checkout@v4
+    - name: Setup cmake
+      uses: jwlawson/actions-setup-cmake@v2
     - name: Configure
       run: |
         cmake -S . -B build     \
@@ -38,6 +47,7 @@ jobs:
       CXX: g++
       CC: gcc
       CMAKE_PREFIX_PATH: /ascent/install/lib/cmake/
+      OMP_NUM_THREADS: 1
     container:
       image: alpinedav/ascent:0.9.2
     steps:
@@ -54,10 +64,10 @@ jobs:
         cmake --build build -j 4
     - name: Test
       run: |
-        cp Examples/Physics_applications/laser_acceleration/inputs_3d .
+        cp Examples/Physics_applications/laser_acceleration/inputs_base_3d .
         cp Examples/Physics_applications/laser_acceleration/3d_ascent_actions.yaml ascent_actions.yaml
         mpiexec -n 2 ./build/bin/warpx.3d \
-          inputs_3d                    \
+            inputs_base_3d             \
             max_step = 40              \
             diag1.intervals = 30:40:10 \
             diag1.format = ascent
@@ -67,4 +77,59 @@ jobs:
         path: |
           *.png
           conduit_*
+        if-no-files-found: error
+
+  catalyst:
+    name: Catalyst
+    runs-on: ubuntu-22.04
+    if: github.event.pull_request.draft == false
+    env:
+      CXX: g++
+      CC: gcc
+      CMAKE_PREFIX_PATH: "/opt/conduit:/opt/catalyst"
+      CATALYST_DEBUG: 1
+      CATALYST_IMPLEMENTATION_PATHS: /opt/paraview/lib/catalyst
+      OMP_NUM_THREADS: 1
+
+    # Container build scripts:
+    # https://gitlab.kitware.com/christos.tsolakis/catalyst-amrex-docker-images
+    container:
+      image: kitware/paraview:ci-catalyst-amrex-warpx-20240828
+    steps:
+    - uses: actions/checkout@v4
+    - name: Configure
+      run: |
+        cmake -S . -B build   \
+            -DWarpX_DIMS="2;3" \
+            -DWarpX_CATALYST=ON
+    - name: Build
+      run: |
+        cmake --build build -j 10
+    - name: 2D Test
+      run: |
+        cp Examples/Tests/field_ionization/inputs_test_2d_ionization_lab .
+        cp Examples/Tests/field_ionization/catalyst_pipeline.py .
+        mpiexec -n 2 ./build/bin/warpx.2d \
+            inputs_test_2d_ionization_lab \
+            catalyst.script_paths = catalyst_pipeline.py\
+            catalyst.implementation = paraview\
+            diag1.intervals = 16\
+            diag1.species = "electrons ions"\
+            diag1.format = catalyst
+    - name: 3D Test
+      run: |
+        cp Examples/Tests/electrostatic_sphere/inputs_base_3d .
+        cp Examples/Tests/electrostatic_sphere/catalyst_pipeline.py .
+        mpiexec -n 2 ./build/bin/warpx.3d \
+            inputs_base_3d \
+            catalyst.script_paths = catalyst_pipeline.py \
+            catalyst.implementation = paraview \
+            diagnostics.diags_names = diag1 \
+            diag1.format = catalyst\
+            diag1.intervals = 3
+    - uses: actions/upload-artifact@v4
+      with:
+        name: catalyst-test-artifacts
+        path: |
+          datasets/*.png
         if-no-files-found: error

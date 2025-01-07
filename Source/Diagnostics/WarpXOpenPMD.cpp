@@ -467,7 +467,7 @@ void WarpXOpenPMDPlot::CloseStep (bool isBTD, bool isLastBTDFlush)
             std::string const filename = GetFileName(filepath);
 
             std::ofstream pv_helper_file(m_dirPrefix + "/paraview.pmd");
-            pv_helper_file << filename << std::endl;
+            pv_helper_file << filename << "\n";
             pv_helper_file.close();
         }
     }
@@ -1196,6 +1196,8 @@ WarpXOpenPMDPlot::SetupFields ( openPMD::Container< openPMD::Mesh >& meshes,
     if (WarpX::do_dive_cleaning) {
         meshes.setAttribute("chargeCorrectionParameters", "period=1");
     }
+    // TODO set meta-data information for time-averaged quantities
+    // but we need information of the specific diagnostic in here
 }
 
 

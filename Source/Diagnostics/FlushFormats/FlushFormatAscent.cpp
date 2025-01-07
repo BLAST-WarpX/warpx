@@ -18,6 +18,7 @@ FlushFormatAscent::WriteToFile (
     const amrex::Vector<ParticleDiag>& particle_diags, int nlev,
     const std::string prefix, int file_min_digits, bool plot_raw_fields,
     bool plot_raw_fields_guards,
+    int verbose,
     const bool /*use_pinned_pc*/,
     bool isBTD, int /*snapshotID*/, int /*bufferID*/, int /*numBuffers*/,
     const amrex::Geometry& /*full_BTD_snapshot*/,
@@ -32,7 +33,9 @@ FlushFormatAscent::WriteToFile (
         "In-situ visualization is not currently supported for back-transformed diagnostics.");
 
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
-    amrex::Print() << Utils::TextMsg::Info("Writing Ascent file " + filename);
+    if (verbose > 0) {
+        amrex::Print() << Utils::TextMsg::Info("Writing Ascent file " + filename);
+    }
 
     // wrap mesh data
     WARPX_PROFILE_VAR("FlushFormatAscent::WriteToFile::MultiLevelToBlueprint", prof_ascent_mesh_blueprint);
@@ -67,57 +70,7 @@ FlushFormatAscent::WriteToFile (
 
 #else
     amrex::ignore_unused(varnames, mf, geom, iteration, time,
-        particle_diags, nlev, file_min_digits, isBTD);
+        particle_diags, nlev, file_min_digits, verbose, isBTD);
 #endif // AMREX_USE_ASCENT
     amrex::ignore_unused(prefix, plot_raw_fields, plot_raw_fields_guards);
 }
-
-#ifdef AMREX_USE_ASCENT
-void
-FlushFormatAscent::WriteParticles(const amrex::Vector<ParticleDiag>& particle_diags, conduit::Node& a_bp_mesh) const
-{
-    WARPX_PROFILE("FlushFormatAscent::WriteParticles()");
-
-    // wrap particle data for each species
-    // we prefix the fields with "particle_{species_name}" b/c we
-    // want to to uniquely name all the fields that can be plotted
-
-    for (unsigned i = 0, n = particle_diags.size(); i < n; ++i) {
-        Vector<std::string> particle_varnames;
-        Vector<std::string> particle_int_varnames;
-        std::string prefix = "particle_" + particle_diags[i].getSpeciesName();
-
-        // Get pc for species
-        // auto& pc = mypc->GetParticleContainer(i);
-        WarpXParticleContainer* pc = particle_diags[i].getParticleContainer();
-
-        // get names of real comps
-        std::map<std::string, int> real_comps_map = pc->getParticleComps();
-
-        // WarpXParticleContainer compile-time extra SoA attributes (Real): PIdx::nattribs
-        // not an efficient search, but N is small...
-        for(int j = 0; j < PIdx::nattribs; ++j)
-        {
-            auto rvn_it = real_comps_map.begin();
-            for (; rvn_it != real_comps_map.end(); ++rvn_it)
-                if (rvn_it->second == j)
-                    break;
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                rvn_it != real_comps_map.end(),
-                "Ascent: SoA real attribute not found");
-            std::string varname = rvn_it->first;
-            particle_varnames.push_back(prefix + "_" + varname);
-        }
-        // WarpXParticleContainer compile-time extra SoA attributes (int): 0
-
-        // WarpXParticleContainer "runtime" SoA attributes (Real), e.g QED: to do
-
-        // wrap pc for current species into a blueprint topology
-        amrex::ParticleContainerToBlueprint(*pc,
-                                            particle_varnames,
-                                            particle_int_varnames,
-                                            a_bp_mesh,
-                                            prefix);
-    }
-}
-#endif // AMREX_USE_ASCENT

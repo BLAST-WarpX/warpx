@@ -53,6 +53,11 @@ Prior WarpX references
 
 If your project uses a specific algorithm or component, please consider citing the respective publications in addition.
 
+- Shapoval O, Zoni E, Lehe R, Thévenet M, and Vay J-L.
+  **Pseudospectral particle-in-cell formulation with arbitrary charge and current-density time dependencies for the modeling of relativistic plasmas**.
+  Physical Review E **110**, 025206, 2024.
+  `DOI:10.1103/PhysRevE.110.025206 <https://doi.org/10.1103/PhysRevE.110.025206>`__
+
 - Sandberg R T, Lehe R, Mitchell C E, Garten M, Myers A, Qiang J, Vay J-L and Huebl A.
   **Synthesizing Particle-in-Cell Simulations Through Learning and GPU Computing for Hybrid Particle Accelerator Beamlines**.
   Proc. of Platform for Advanced Scientific Computing (PASC'24), *PASC24 Best Paper Award*, 2024.

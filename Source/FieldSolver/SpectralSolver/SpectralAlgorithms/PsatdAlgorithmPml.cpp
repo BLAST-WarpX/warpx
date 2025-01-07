@@ -37,7 +37,7 @@ PsatdAlgorithmPml::PsatdAlgorithmPml(
         int norder_x,
         int norder_y,
         int norder_z,
-        short grid_type,
+        ablastr::utils::enums::GridType grid_type,
         const amrex::Vector<amrex::Real>& v_galilean,
         Real dt,
         bool dive_cleaning,

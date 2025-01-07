@@ -79,14 +79,13 @@ if [ -d $HOME/src/blaspp ]
 then
   cd $HOME/src/blaspp
   git fetch --prune
-  git checkout master
-  git pull
+  git checkout v2024.05.31
   cd -
 else
-  git clone https://github.com/icl-utk-edu/blaspp.git $HOME/src/blaspp
+  git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git $HOME/src/blaspp
 fi
 rm -rf $HOME/src/blaspp-pm-gpu-build
-cmake -S $HOME/src/blaspp -B $HOME/src/blaspp-pm-gpu-build -Duse_openmp=OFF -Dgpu_backend=cuda -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-master
+cmake -S $HOME/src/blaspp -B $HOME/src/blaspp-pm-gpu-build -Duse_openmp=OFF -Dgpu_backend=cuda -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
 cmake --build $HOME/src/blaspp-pm-gpu-build --target install --parallel 8
 rm -rf $HOME/src/blaspp-pm-gpu-build
 
@@ -95,14 +94,13 @@ if [ -d $HOME/src/lapackpp ]
 then
   cd $HOME/src/lapackpp
   git fetch --prune
-  git checkout master
-  git pull
+  git checkout v2024.05.31
   cd -
 else
-  git clone https://github.com/icl-utk-edu/lapackpp.git $HOME/src/lapackpp
+  git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git $HOME/src/lapackpp
 fi
 rm -rf $HOME/src/lapackpp-pm-gpu-build
-CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $HOME/src/lapackpp -B $HOME/src/lapackpp-pm-gpu-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-master
+CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $HOME/src/lapackpp -B $HOME/src/lapackpp-pm-gpu-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
 cmake --build $HOME/src/lapackpp-pm-gpu-build --target install --parallel 8
 rm -rf $HOME/src/lapackpp-pm-gpu-build
 
@@ -120,6 +118,7 @@ python3 -m pip install --upgrade build
 python3 -m pip install --upgrade packaging
 python3 -m pip install --upgrade wheel
 python3 -m pip install --upgrade setuptools
+python3 -m pip install --upgrade pipx
 python3 -m pip install --upgrade cython
 python3 -m pip install --upgrade numpy
 python3 -m pip install --upgrade pandas

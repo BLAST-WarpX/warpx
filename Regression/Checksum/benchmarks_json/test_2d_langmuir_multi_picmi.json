@@ -1,0 +1,12 @@
+{
+  "lev=0": {
+    "Ex": 53556162492188.62,
+    "jx": 5.722548841990386e+16
+  },
+  "electrons": {
+    "particle_momentum_x": 1.0581442023547547e-19,
+    "particle_position_x": 0.0831038802568349,
+    "particle_position_y": 0.08191999999999999,
+    "particle_weight": 8000000000000001.0
+  }
+}

@@ -1,6 +1,6 @@
 #include "MacroscopicProperties.H"
 
-#include "FieldSolver/Fields.H"
+#include "Fields.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 
@@ -23,7 +23,6 @@
 #include <sstream>
 
 using namespace amrex;
-using namespace warpx::fields;
 
 MacroscopicProperties::MacroscopicProperties ()
 {
@@ -119,24 +118,26 @@ MacroscopicProperties::ReadParameters ()
 }
 
 void
-MacroscopicProperties::InitData (
+MacroscopicProperties::AllocateLevelMFs (
     const amrex::BoxArray& ba,
     const amrex::DistributionMapping& dmap,
-    const amrex::IntVect& ng_EB_alloc,
-    const amrex::Geometry& geom,
-    const amrex::IntVect& Ex_stag,
-    const amrex::IntVect& Ey_stag,
-    const amrex::IntVect& Ez_stag)
+    const amrex::IntVect& ng_EB_alloc )
 {
-    amrex::Print() << Utils::TextMsg::Info("we are in init data of macro");
-
-    // Define material property multifabs using ba and dmap from WarpX instance
     // sigma is cell-centered MultiFab
     m_sigma_mf = std::make_unique<amrex::MultiFab>(ba, dmap, 1, ng_EB_alloc);
     // epsilon is cell-centered MultiFab
     m_eps_mf = std::make_unique<amrex::MultiFab>(ba, dmap, 1, ng_EB_alloc);
     // mu is cell-centered MultiFab
     m_mu_mf = std::make_unique<amrex::MultiFab>(ba, dmap, 1, ng_EB_alloc);
+}
+
+void
+MacroscopicProperties::InitData (
+    const amrex::Geometry& geom,
+    const amrex::IntVect& Ex_stag,
+    const amrex::IntVect& Ey_stag,
+    const amrex::IntVect& Ez_stag)
+{
     // Initialize sigma
     if (m_sigma_s == "constant") {
 

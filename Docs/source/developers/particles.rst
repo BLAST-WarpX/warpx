@@ -141,7 +141,7 @@ Attribute name        ``int``/``real``  Description                         Wher
                                         Wheeler process                                physics is used.
 ====================  ================  ==================================  ===== ==== ======================
 
-WarpX allows extra runtime attributes to be added to particle containers (through ``AddRealComp("attrname")`` or ``AddIntComp("attrname")``).
+WarpX allows extra runtime attributes to be added to particle containers (through ``NewRealComp("attrname")`` or ``NewIntComp("attrname")``).
 The attribute name can then be used to access the values of that attribute.
 For example, using a particle iterator, ``pti``, to loop over the particles the command ``pti.GetAttribs(particle_comps["attrname"]).dataPtr();`` will return the values of the ``"attrname"`` attribute.
 
@@ -160,7 +160,7 @@ Attribute name      ``int``/``real``  Description                        Default
                                       when they were created.
 ==================  ================  =================================  ==============
 
-A Python example that adds runtime options can be found in :download:`Examples/Tests/particle_data_python <../../../Examples/Tests/particle_data_python/PICMI_inputs_prev_pos_2d.py>`
+A Python example that adds runtime options can be found in :download:`Examples/Tests/particle_data_python <../../../Examples/Tests/particle_data_python/inputs_test_2d_prev_positions_picmi.py>`
 
 .. note::
 

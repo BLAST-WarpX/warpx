@@ -82,13 +82,12 @@ if [ -d ${SRC_DIR}/blaspp ]
 then
   cd ${SRC_DIR}/blaspp
   git fetch --prune
-  git checkout master
-  git pull
+  git checkout v2024.05.31
   cd -
 else
-  git clone https://github.com/icl-utk-edu/blaspp.git ${SRC_DIR}/blaspp
+  git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git ${SRC_DIR}/blaspp
 fi
-cmake -S ${SRC_DIR}/blaspp -B ${build_dir}/blaspp-lassen-build -Duse_openmp=ON -Dgpu_backend=cuda -Duse_cmake_find_blas=ON -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-master
+cmake -S ${SRC_DIR}/blaspp -B ${build_dir}/blaspp-lassen-build -Duse_openmp=ON -Dgpu_backend=cuda -Duse_cmake_find_blas=ON -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
 cmake --build ${build_dir}/blaspp-lassen-build --target install --parallel 10
 
 # LAPACK++ (for PSATD+RZ)
@@ -96,13 +95,12 @@ if [ -d ${SRC_DIR}/lapackpp ]
 then
   cd ${SRC_DIR}/lapackpp
   git fetch --prune
-  git checkout master
-  git pull
+  git checkout v2024.05.31
   cd -
 else
-  git clone https://github.com/icl-utk-edu/lapackpp.git ${SRC_DIR}/lapackpp
+  git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git ${SRC_DIR}/lapackpp
 fi
-CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S ${SRC_DIR}/lapackpp -B ${build_dir}/lapackpp-lassen-build -Duse_cmake_find_lapack=ON -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-master -DLAPACK_LIBRARIES=/usr/lib64/liblapack.so
+CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S ${SRC_DIR}/lapackpp -B ${build_dir}/lapackpp-lassen-build -Duse_cmake_find_lapack=ON -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31 -DLAPACK_LIBRARIES=/usr/lib64/liblapack.so
 cmake --build ${build_dir}/lapackpp-lassen-build --target install --parallel 10
 
 
@@ -121,9 +119,7 @@ python3 -m pip install --upgrade build
 python3 -m pip install --upgrade packaging
 python3 -m pip install --upgrade wheel
 python3 -m pip install --upgrade setuptools
-# Older version for h4py
-# https://github.com/h5py/h5py/issues/2268
-python3 -m pip install --upgrade "cython<3"
+python3 -m pip install --upgrade cython
 python3 -m pip install --upgrade numpy
 python3 -m pip install --upgrade pandas
 CMAKE_PREFIX_PATH=/usr/lib64:${CMAKE_PREFIX_PATH} python3 -m pip install --upgrade -Ccompile-args="-j10" -Csetup-args=-Dblas=BLAS -Csetup-args=-Dlapack=BLAS scipy

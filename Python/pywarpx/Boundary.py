@@ -6,4 +6,4 @@
 
 from .Bucket import Bucket
 
-boundary = Bucket('boundary')
+boundary = Bucket("boundary")

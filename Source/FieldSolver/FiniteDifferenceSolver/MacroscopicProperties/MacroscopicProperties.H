@@ -38,20 +38,26 @@ public:
     void ReadParameters ();
 
     /**
-     * \brief Initialize multifabs storing macroscopic multifabs
+     * \brief Allocate multifabs storing macroscopic multifabs
      *
      * @param[in] ba the box array associated to the multifabs E and B
      * @param[in] dmap the distribution mapping
      * @param[in] ng_EB_alloc guard cells allocated for multifabs E and B
+     */
+    void AllocateLevelMFs (
+        const amrex::BoxArray& ba,
+        const amrex::DistributionMapping& dm,
+        const amrex::IntVect& ng_EB_alloc );
+
+    /**
+     * \brief Initialize multifabs storing macroscopic multifabs
+     *
      * @param[in] geom the geometry
      * @param[in] Ex_stag staggering of the Ex field
      * @param[in] Ey_stag staggering of the Ey field
      * @param[in] Ez_stag staggering of the Ez field
      */
     void InitData (
-        const amrex::BoxArray& ba,
-        const amrex::DistributionMapping& dmap,
-        const amrex::IntVect& ng_EB_alloc,
         const amrex::Geometry& geom,
         const amrex::IntVect& Ex_stag,
         const amrex::IntVect& Ey_stag,

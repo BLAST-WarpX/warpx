@@ -8,6 +8,8 @@
 #ifndef WARPX_UTILS_H_
 #define WARPX_UTILS_H_
 
+#include <ablastr/fields/MultiFabRegister.H>
+
 #include <AMReX_BoxArray.H>
 #include <AMReX_DistributionMapping.H>
 #include <AMReX_Extension.H>
@@ -31,6 +33,10 @@ void ParseGeometryInput();
 void ReadBoostedFrameParameters(amrex::Real& gamma_boost, amrex::Real& beta_boost,
                                 amrex::Vector<int>& boost_direction);
 
+void ReadMovingWindowParameters(
+    int& do_moving_window, int& start_moving_window_step, int& end_moving_window_step,
+    int& moving_window_dir, amrex::Real& moving_window_v);
+
 void ConvertLabParamsToBoost();
 
 /**
@@ -53,9 +59,53 @@ void CheckDims ();
  */
 void CheckGriddingForRZSpectral ();
 
-void NullifyMF(amrex::MultiFab& mf, int lev, amrex::Real zmin,
-               amrex::Real zmax);
+/** Function that sets the value of MultiFab MF to zero.
+ *
+ * \param[in] mf Pointer to the MultiFab
+ * \param[in] lev The mesh refinement level
+ * \param[in] zmin The minimum z of the range to be mullified
+ * \param[in] zmin The maximum z of the range to be mullified
+ */
+void NullifyMFinstance (
+    amrex::MultiFab *mf,
+    int lev,
+    amrex::Real zmin,
+    amrex::Real zmax
+);
 
+/** Function that sets the value of MultiFab MF to zero.
+ *
+ * \param[in] multifab_map Multifab registry
+ * \param[in] nf_name Name of Multifab to modify
+ * \param[in] lev The mesh refinement level
+ * \param[in] zmin The minimum z of the range to be mullified
+ * \param[in] zmin The maximum z of the range to be mullified
+ */
+void NullifyMF (
+    ablastr::fields::MultiFabRegister& multifab_map,
+    std::string const& mf_name,
+    int lev,
+    amrex::Real zmin,
+    amrex::Real zmax
+);
+
+/** Function that sets the value of MultiFab MF to zero.
+ *
+ * \param[in] multifab_map Multifab registry
+ * \param[in] nf_name Name of Multifab to modify
+ * \param[in] dir Direction, for Multifabs that are components of vectors
+ * \param[in] lev The mesh refinement level
+ * \param[in] zmin The minimum z of the range to be mullified
+ * \param[in] zmin The maximum z of the range to be mullified
+ */
+void NullifyMF (
+    ablastr::fields::MultiFabRegister& multifab_map,
+    std::string const& mf_name,
+    ablastr::fields::Direction dir,
+    int lev,
+    amrex::Real zmin,
+    amrex::Real zmax
+);
 
 namespace WarpXUtilIO{
 /**

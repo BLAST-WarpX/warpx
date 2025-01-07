@@ -45,7 +45,7 @@
  */
 template <int N, typename DstPC, typename DstTile, typename FAB, typename Index,
           typename CreateFunc1, typename CreateFunc2, typename TransFunc,
-          amrex::EnableIf_t<std::is_integral<Index>::value, int> foo = 0>
+          amrex::EnableIf_t<std::is_integral_v<Index>, int> foo = 0>
 Index filterCreateTransformFromFAB (DstPC& pc1, DstPC& pc2,
                                     DstTile& dst1, DstTile& dst2, const amrex::Box box,
                                     const FAB *src_FAB, const Index* mask,

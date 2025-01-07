@@ -51,7 +51,7 @@
  */
 template <int N, typename DstPC, typename DstTile, typename SrcTile, typename Index,
           typename TransFunc, typename CopyFunc,
-          amrex::EnableIf_t<std::is_integral<Index>::value, int> foo = 0>
+          amrex::EnableIf_t<std::is_integral_v<Index>, int> foo = 0>
 Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src,
                                     Index* mask, Index dst_index,
                                     CopyFunc&& copy, TransFunc&& transform) noexcept
@@ -210,7 +210,7 @@ Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src, Index
  */
 template <int N, typename DstPC, typename DstTile, typename SrcTile, typename Index,
           typename TransFunc, typename CopyFunc1, typename CopyFunc2,
-          amrex::EnableIf_t<std::is_integral<Index>::value, int> foo = 0>
+          amrex::EnableIf_t<std::is_integral_v<Index>, int> foo = 0>
 Index filterCopyTransformParticles (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTile& dst2, SrcTile& src, Index* mask,
                                     Index dst1_index, Index dst2_index,
                                     CopyFunc1&& copy1, CopyFunc2&& copy2,

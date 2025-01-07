@@ -53,22 +53,7 @@ TemperatureFunctor::operator() (amrex::MultiFab& mf_dst, const int dcomp, const 
                 amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dxi)
             {
                 // Get position in AMReX convention to calculate corresponding index.
-                // Ideally this will be replaced with the AMReX NGP interpolator
-                // Always do x direction.
-                int ii = 0, jj = 0, kk = 0;
-                const amrex::ParticleReal x = p.pos(0);
-                const amrex::Real lx = (x - plo[0]) * dxi[0];
-                ii = static_cast<int>(amrex::Math::floor(lx));
-#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-                const amrex::ParticleReal y = p.pos(1);
-                const amrex::Real ly = (y - plo[1]) * dxi[1];
-                jj = static_cast<int>(amrex::Math::floor(ly));
-#endif
-#if defined(WARPX_DIM_3D)
-                const amrex::ParticleReal z = p.pos(2);
-                const amrex::Real lz = (z - plo[2]) * dxi[2];
-                kk = static_cast<int>(amrex::Math::floor(lz));
-#endif
+                const auto [ii, jj, kk] = amrex::getParticleCell(p, plo, dxi).dim3();
 
                 const amrex::ParticleReal w  = p.rdata(PIdx::w);
                 const amrex::ParticleReal ux = p.rdata(PIdx::ux);
@@ -103,34 +88,20 @@ TemperatureFunctor::operator() (amrex::MultiFab& mf_dst, const int dcomp, const 
     for (WarpXParIter pti(pc, m_lev); pti.isValid(); ++pti)
     {
         const long np = pti.numParticles();
+        auto& tile = pti.GetParticleTile();
+        auto ptd = tile.getParticleTileData();
         amrex::ParticleReal* wp = pti.GetAttribs(PIdx::w).dataPtr();
         amrex::ParticleReal* uxp = pti.GetAttribs(PIdx::ux).dataPtr();
         amrex::ParticleReal* uyp = pti.GetAttribs(PIdx::uy).dataPtr();
         amrex::ParticleReal* uzp = pti.GetAttribs(PIdx::uz).dataPtr();
 
-        auto const GetPosition = GetParticlePosition<PIdx>(pti);
-
         amrex::Array4<amrex::Real> const& out_array = sum_mf.array(pti);
 
         amrex::ParallelFor(np,
             [=] AMREX_GPU_DEVICE (long ip) {
-                // --- Get particle quantities
-                amrex::ParticleReal xp, yp, zp;
-                GetPosition.AsStored(ip, xp, yp, zp);
-
                 // Get position in AMReX convention to calculate corresponding index.
-                int ii = 0, jj = 0, kk = 0;
-                const amrex::Real lx = (xp - plo[0]) * dxi[0];
-                ii = static_cast<int>(amrex::Math::floor(lx));
-#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                const amrex::Real lz = (zp - plo[1]) * dxi[1];
-                jj = static_cast<int>(amrex::Math::floor(lz));
-#elif defined(WARPX_DIM_3D)
-                const amrex::Real ly = (yp - plo[1]) * dxi[1];
-                jj = static_cast<int>(amrex::Math::floor(ly));
-                const amrex::Real lz = (zp - plo[2]) * dxi[2];
-                kk = static_cast<int>(amrex::Math::floor(lz));
-#endif
+                const auto p = WarpXParticleContainer::ParticleType(ptd, ip);
+                const auto [ii, jj, kk] = getParticleCell(p, plo, dxi).dim3();
 
                 const amrex::ParticleReal w  = wp[ip];
                 const amrex::ParticleReal ux = uxp[ip] - out_array(ii, jj, kk, 1);

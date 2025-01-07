@@ -49,7 +49,7 @@ void GenerateTableQS (const ParsedArgs& args, const string& outfile_name);
 
 int main (int argc, char** argv)
 {
-    cout << "### QED Table Generator ###" << endl;
+    cout << "### QED Table Generator ###\n";
     const auto args_map = ParseArgs(line_commands, argc, argv);
 
     if (args_map.empty() || Contains(args_map, "-h")){
@@ -106,7 +106,7 @@ template<typename RealType>
 void GenerateTableBW (const ParsedArgs& args, const string& outfile_name)
 {
     cout << "    Generating BW table " <<
-        (is_same<RealType, double>::value ? "(double "s : "(single "s) << " precision)\n"s;
+        (is_same_v<RealType, double> ? "(double "s : "(single "s) << " precision)\n"s;
 
     if (!Contains(args, "--dndt_chi_min")      || !Contains(args, "--dndt_chi_max") ||
         !Contains(args, "--dndt_how_many")     || !Contains(args, "--pair_chi_min") ||
@@ -173,7 +173,7 @@ template<typename RealType>
 void GenerateTableQS (const ParsedArgs& args, const string& outfile_name)
 {
     cout << "    Generating QS table " <<
-        (is_same<RealType, double>::value ? "(double "s : "(single "s) << " precision)\n"s;
+        (is_same_v<RealType, double> ? "(double "s : "(single "s) << " precision)\n"s;
 
     if (!Contains(args, "--dndt_chi_min")      || !Contains(args, "--dndt_chi_max") ||
         !Contains(args, "--dndt_how_many")     || !Contains(args, "--em_chi_min")   ||

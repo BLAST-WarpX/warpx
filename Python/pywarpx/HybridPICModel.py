@@ -8,4 +8,4 @@
 
 from .Bucket import Bucket
 
-hybridpicmodel = Bucket('hybrid_pic_model')
+hybridpicmodel = Bucket("hybrid_pic_model")

@@ -61,7 +61,7 @@ WarpX::ErrorEst (int lev, TagBoxArray& tags, Real /*time*/, int /*ngrow*/)
             } else {
                 tag_val = (pos > ftlo && pos < fthi);
             }
-            if ( tag_val == 1) {
+            if (tag_val) {
                 fab(i,j,k) = TagBox::SET;
             }
         });

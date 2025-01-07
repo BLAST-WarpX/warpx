@@ -38,14 +38,13 @@ if [ -d $SHAREDHOMEDIR/src/blaspp ]
 then
   cd $SHAREDHOMEDIR/src/blaspp
   git fetch --prune
-  git checkout master
-  git pull
+  git checkout v2024.05.31
   cd -
 else
-  git clone https://github.com/icl-utk-edu/blaspp.git $SHAREDHOMEDIR/src/blaspp
+  git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git $SHAREDHOMEDIR/src/blaspp
 fi
 rm -rf $SHAREDHOMEDIR/src/blaspp-adastra-gpu-build
-CXX=$(which CC) cmake -S $SHAREDHOMEDIR/src/blaspp -B $SHAREDHOMEDIR/src/blaspp-adastra-gpu-build -Duse_openmp=OFF -Dgpu_backend=hip -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-master
+CXX=$(which CC) cmake -S $SHAREDHOMEDIR/src/blaspp -B $SHAREDHOMEDIR/src/blaspp-adastra-gpu-build -Duse_openmp=OFF -Dgpu_backend=hip -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
 cmake --build $SHAREDHOMEDIR/src/blaspp-adastra-gpu-build --target install --parallel 16
 rm -rf $SHAREDHOMEDIR/src/blaspp-adastra-gpu-build
 
@@ -54,14 +53,13 @@ if [ -d $SHAREDHOMEDIR/src/lapackpp ]
 then
   cd $SHAREDHOMEDIR/src/lapackpp
   git fetch --prune
-  git checkout master
-  git pull
+  git checkout v2024.05.31
   cd -
 else
-  git clone https://github.com/icl-utk-edu/lapackpp.git $SHAREDHOMEDIR/src/lapackpp
+  git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git $SHAREDHOMEDIR/src/lapackpp
 fi
 rm -rf $SHAREDHOMEDIR/src/lapackpp-adastra-gpu-build
-CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $SHAREDHOMEDIR/src/lapackpp -B $SHAREDHOMEDIR/src/lapackpp-adastra-gpu-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-master
+CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $SHAREDHOMEDIR/src/lapackpp -B $SHAREDHOMEDIR/src/lapackpp-adastra-gpu-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
 cmake --build $SHAREDHOMEDIR/src/lapackpp-adastra-gpu-build --target install --parallel 16
 rm -rf $SHAREDHOMEDIR/src/lapackpp-adastra-gpu-build
 

@@ -131,6 +131,8 @@ public:
             index_type const* AMREX_RESTRICT I2,
             const SoaData_type& soa_1, const SoaData_type& soa_2,
             GetParticlePosition<PIdx> /*get_position_1*/, GetParticlePosition<PIdx> /*get_position_2*/,
+            amrex::ParticleReal const /*n1*/, amrex::ParticleReal const /*n2*/,
+            amrex::ParticleReal const /*T1*/, amrex::ParticleReal const /*T2*/,
             amrex::ParticleReal const  /*q1*/, amrex::ParticleReal const  /*q2*/,
             amrex::ParticleReal const  m1, amrex::ParticleReal const  m2,
             amrex::Real const  dt, amrex::Real const dV, index_type coll_idx,
@@ -143,11 +145,13 @@ public:
             amrex::ParticleReal * const AMREX_RESTRICT u1x = soa_1.m_rdata[PIdx::ux];
             amrex::ParticleReal * const AMREX_RESTRICT u1y = soa_1.m_rdata[PIdx::uy];
             amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
+            uint64_t* AMREX_RESTRICT idcpu1 = soa_1.m_idcpu;
 
             amrex::ParticleReal * const AMREX_RESTRICT w2 = soa_2.m_rdata[PIdx::w];
             amrex::ParticleReal * const AMREX_RESTRICT u2x = soa_2.m_rdata[PIdx::ux];
             amrex::ParticleReal * const AMREX_RESTRICT u2y = soa_2.m_rdata[PIdx::uy];
             amrex::ParticleReal * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];
+            uint64_t* AMREX_RESTRICT idcpu2 = soa_2.m_idcpu;
 
             // Number of macroparticles of each species
             const index_type NI1 = I1e - I1s;
@@ -157,18 +161,9 @@ public:
 
             index_type pair_index = cell_start_pair + coll_idx;
 
-            // Because the number of particles of each species is not always equal (NI1 != NI2
-            // in general), some macroparticles will be paired with multiple macroparticles of the
-            // other species and we need to decrease their weight accordingly.
-            // c1 corresponds to the minimum number of times a particle of species 1 will be paired
-            // with a particle of species 2. Same for c2.
-            // index_type(1): https://github.com/AMReX-Codes/amrex/pull/3684
-            const index_type c1 = amrex::max(NI2/NI1, index_type(1));
-            const index_type c2 = amrex::max(NI1/NI2, index_type(1));
-
             // multiplier ratio to take into account unsampled pairs
             const auto multiplier_ratio = static_cast<int>(
-                m_isSameSpecies ? 2*max_N - 1 : max_N);
+                m_isSameSpecies ? min_N + max_N - 1 : min_N);
 
 #if (defined WARPX_DIM_RZ)
             amrex::ParticleReal * const AMREX_RESTRICT theta1 = soa_1.m_rdata[PIdx::theta];
@@ -180,50 +175,60 @@ public:
             // stride (smaller set size) until we do all collisions (larger set size)
             for (index_type k = coll_idx; k < max_N; k += min_N)
             {
-                // c1k : how many times the current particle of species 1 is paired with a particle
-                // of species 2. Same for c2k.
-                const index_type c1k = (k%NI1 < max_N%NI1) ? c1 + 1: c1;
-                const index_type c2k = (k%NI2 < max_N%NI2) ? c2 + 1: c2;
+
+                // do not check for collision if a particle's weight was
+                // reduced to zero from a previous collision
+                if (idcpu1[ I1[i1] ]==amrex::ParticleIdCpus::Invalid ||
+                    idcpu2[ I2[i2] ]==amrex::ParticleIdCpus::Invalid ) {
+                    p_mask[pair_index] = false;
+                }
+                else {
 
 #if (defined WARPX_DIM_RZ)
-                /* In RZ geometry, macroparticles can collide with other macroparticles
-                 * in the same *cylindrical* cell. For this reason, collisions between macroparticles
-                 * are actually not local in space. In this case, the underlying assumption is that
-                 * particles within the same cylindrical cell represent a cylindrically-symmetry
-                 * momentum distribution function. Therefore, here, we temporarily rotate the
-                 * momentum of one of the macroparticles in agreement with this cylindrical symmetry.
-                 * (This is technically only valid if we use only the m=0 azimuthal mode in the simulation;
-                 * there is a corresponding assert statement at initialization.) */
-                amrex::ParticleReal const theta = theta2[I2[i2]]-theta1[I1[i1]];
-                amrex::ParticleReal const u1xbuf = u1x[I1[i1]];
-                u1x[I1[i1]] = u1xbuf*std::cos(theta) - u1y[I1[i1]]*std::sin(theta);
-                u1y[I1[i1]] = u1xbuf*std::sin(theta) + u1y[I1[i1]]*std::cos(theta);
+                    /* In RZ geometry, macroparticles can collide with other macroparticles
+                     * in the same *cylindrical* cell. For this reason, collisions between macroparticles
+                     * are actually not local in space. In this case, the underlying assumption is that
+                     * particles within the same cylindrical cell represent a cylindrically-symmetry
+                     * momentum distribution function. Therefore, here, we temporarily rotate the
+                     * momentum of one of the macroparticles in agreement with this cylindrical symmetry.
+                     * (This is technically only valid if we use only the m=0 azimuthal mode in the simulation;
+                     * there is a corresponding assert statement at initialization.) */
+                    amrex::ParticleReal const theta = theta2[I2[i2]]-theta1[I1[i1]];
+                    amrex::ParticleReal const u1xbuf = u1x[I1[i1]];
+                    u1x[I1[i1]] = u1xbuf*std::cos(theta) - u1y[I1[i1]]*std::sin(theta);
+                    u1y[I1[i1]] = u1xbuf*std::sin(theta) + u1y[I1[i1]]*std::cos(theta);
 #endif
 
-                SingleNuclearFusionEvent(
-                    u1x[ I1[i1] ], u1y[ I1[i1] ], u1z[ I1[i1] ],
-                    u2x[ I2[i2] ], u2y[ I2[i2] ], u2z[ I2[i2] ],
-                    m1, m2, w1[ I1[i1] ]/c1k, w2[ I2[i2] ]/c2k,
-                    dt, dV, static_cast<int>(pair_index), p_mask, p_pair_reaction_weight,
-                    m_fusion_multiplier, multiplier_ratio,
-                    m_probability_threshold,
-                    m_probability_target_value,
-                    m_fusion_type, engine);
+                    SingleNuclearFusionEvent(
+                        u1x[ I1[i1] ], u1y[ I1[i1] ], u1z[ I1[i1] ],
+                        u2x[ I2[i2] ], u2y[ I2[i2] ], u2z[ I2[i2] ],
+                        m1, m2, w1[ I1[i1] ], w2[ I2[i2] ],
+                        dt, dV, static_cast<int>(pair_index), p_mask, p_pair_reaction_weight,
+                        m_fusion_multiplier, multiplier_ratio,
+                        m_probability_threshold,
+                        m_probability_target_value,
+                        m_fusion_type, engine);
 
 #if (defined WARPX_DIM_RZ)
-                amrex::ParticleReal const u1xbuf_new = u1x[I1[i1]];
-                u1x[I1[i1]] = u1xbuf_new*std::cos(-theta) - u1y[I1[i1]]*std::sin(-theta);
-                u1y[I1[i1]] = u1xbuf_new*std::sin(-theta) + u1y[I1[i1]]*std::cos(-theta);
+                    amrex::ParticleReal const u1xbuf_new = u1x[I1[i1]];
+                    u1x[I1[i1]] = u1xbuf_new*std::cos(-theta) - u1y[I1[i1]]*std::sin(-theta);
+                    u1y[I1[i1]] = u1xbuf_new*std::sin(-theta) + u1y[I1[i1]]*std::cos(-theta);
 #endif
+
+                    // Remove pair reaction weight from the colliding particles' weights
+                    if (p_mask[pair_index]) {
+                        BinaryCollisionUtils::remove_weight_from_colliding_particle(
+                            w1[ I1[i1] ], idcpu1[ I1[i1] ], p_pair_reaction_weight[pair_index]);
+                        BinaryCollisionUtils::remove_weight_from_colliding_particle(
+                            w2[ I2[i2] ], idcpu2[ I2[i2] ], p_pair_reaction_weight[pair_index]);
+                    }
+
+                }
 
                 p_pair_indices_1[pair_index] = I1[i1];
                 p_pair_indices_2[pair_index] = I2[i2];
-                if (max_N == NI1) {
-                    i1 += min_N;
-                }
-                if (max_N == NI2) {
-                    i2 += min_N;
-                }
+                if (max_N == NI1) { i1 += min_N; }
+                if (max_N == NI2) { i2 += min_N; }
                 pair_index += min_N;
             }
         }
@@ -232,6 +237,8 @@ public:
         amrex::ParticleReal m_probability_threshold;
         amrex::ParticleReal m_probability_target_value;
         NuclearFusionType m_fusion_type;
+        bool m_computeSpeciesDensities = false;
+        bool m_computeSpeciesTemperatures = false;
         bool m_isSameSpecies;
     };
 

@@ -33,9 +33,9 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
    .. tab-item:: Executable: Input File
 
-      .. literalinclude:: inputs_2d
+      .. literalinclude:: inputs_test_2d_plasma_mirror
          :language: ini
-         :caption: You can copy this file from ``Examples/Physics_applications/plasma_mirror/inputs_2d``.
+         :caption: You can copy this file from ``Examples/Physics_applications/plasma_mirror/inputs_test_2d_plasma_mirror``.
 
 
 Analyze

@@ -5,6 +5,8 @@
 #include "Utils/WarpXConst.H"
 #include "Utils/WarpX_Complex.H"
 
+#include <ablastr/utils/Enums.H>
+
 #include <AMReX.H>
 #include <AMReX_Array4.H>
 #include <AMReX_BLProfiler.H>
@@ -26,8 +28,10 @@ using namespace amrex;
 PsatdAlgorithmComoving::PsatdAlgorithmComoving (const SpectralKSpace& spectral_kspace,
                                                 const DistributionMapping& dm,
                                                 const SpectralFieldIndex& spectral_index,
-                                                const int norder_x, const int norder_y,
-                                                const int norder_z, const short grid_type,
+                                                const int norder_x,
+                                                const int norder_y,
+                                                const int norder_z,
+                                                ablastr::utils::enums::GridType grid_type,
                                                 const amrex::Vector<amrex::Real>& v_comoving,
                                                 const amrex::Real dt,
                                                 const bool update_with_rho)
@@ -35,12 +39,12 @@ PsatdAlgorithmComoving::PsatdAlgorithmComoving (const SpectralKSpace& spectral_k
      : SpectralBaseAlgorithm{spectral_kspace, dm, spectral_index, norder_x, norder_y, norder_z, grid_type},
        // Initialize the infinite-order k vectors (the argument n_order = -1 selects
        // the infinite order option, the argument grid_type=GridType::Staggered is then irrelevant)
-       kx_vec{spectral_kspace.getModifiedKComponent(dm, 0, -1, GridType::Staggered)},
+       kx_vec{spectral_kspace.getModifiedKComponent(dm, 0, -1, ablastr::utils::enums::GridType::Staggered)},
 #if defined(WARPX_DIM_3D)
        ky_vec{spectral_kspace.getModifiedKComponent(dm, 1, -1, GridType::Staggered)},
        kz_vec{spectral_kspace.getModifiedKComponent(dm, 2, -1, GridType::Staggered)},
 #else
-       kz_vec{spectral_kspace.getModifiedKComponent(dm, 1, -1, GridType::Staggered)},
+       kz_vec{spectral_kspace.getModifiedKComponent(dm, 1, -1, ablastr::utils::enums::GridType::Staggered)},
 #endif
        m_v_comoving{v_comoving},
        m_dt{dt}

@@ -48,14 +48,13 @@ if [ -d $HOME/src/blaspp ]
 then
   cd $HOME/src/blaspp
   git fetch
-  git checkout master
-  git pull
+  git checkout v2024.05.31
   cd -
 else
-  git clone https://github.com/icl-utk-edu/blaspp.git $HOME/src/blaspp
+  git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git $HOME/src/blaspp
 fi
 rm -rf $HOME/src/blaspp-gpu-build
-CXX=$(which g++) cmake -S $HOME/src/blaspp -B $HOME/src/blaspp-gpu-build -Duse_openmp=OFF -Dgpu_backend=cuda -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-master
+CXX=$(which g++) cmake -S $HOME/src/blaspp -B $HOME/src/blaspp-gpu-build -Duse_openmp=OFF -Dgpu_backend=cuda -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
 cmake --build $HOME/src/blaspp-gpu-build --target install --parallel 16
 rm -rf $HOME/src/blaspp-gpu-build
 
@@ -65,14 +64,13 @@ if [ -d $HOME/src/lapackpp ]
 then
   cd $HOME/src/lapackpp
   git fetch
-  git checkout master
-  git pull
+  git checkout v2024.05.31
   cd -
 else
-  git clone https://github.com/icl-utk-edu/lapackpp.git $HOME/src/lapackpp
+  git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git $HOME/src/lapackpp
 fi
 rm -rf $HOME/src/lapackpp-gpu-build
-CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $HOME/src/lapackpp -B $HOME/src/lapackpp-gpu-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-master
+CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $HOME/src/lapackpp -B $HOME/src/lapackpp-gpu-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
 cmake --build $HOME/src/lapackpp-gpu-build --target install --parallel 16
 rm -rf $HOME/src/lapackpp-gpu-build
 

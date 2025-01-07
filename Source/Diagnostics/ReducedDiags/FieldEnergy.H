@@ -40,13 +40,14 @@ public:
     void ComputeDiags(int step) final;
 
     /**
-     * \brief Calculate the integral of the field squared in RZ
+     * \brief Calculate the integral of the field squared, taking into
+     *        account the fraction of the cell volume within the domain.
      *
      * \param field The MultiFab to be integrated
      * \param lev   The refinement level
      * \return The integral
      */
-    amrex::Real ComputeNorm2RZ(const amrex::MultiFab& field, int lev);
+    amrex::Real ComputeNorm2(const amrex::MultiFab& field, int lev);
 
 };
 

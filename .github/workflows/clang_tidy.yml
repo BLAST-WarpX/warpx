@@ -1,6 +1,12 @@
 name: 🧹 clang-tidy
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    paths-ignore:
+      - "Docs/**"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-clangtidy
@@ -13,6 +19,7 @@ jobs:
         dim: [1, 2, RZ, 3]
     name: clang-tidy-${{ matrix.dim }}D
     runs-on: ubuntu-22.04
+    timeout-minutes: 180
     if: github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
@@ -59,18 +66,3 @@ jobs:
 
         ccache -s
         du -hs ~/.cache/ccache
-
-  save_pr_number:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Save PR number
-        env:
-          PR_NUMBER: ${{ github.event.number }}
-        run: |
-          echo $PR_NUMBER > pr_number.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: pr_number
-          path: pr_number.txt
-          retention-days: 1

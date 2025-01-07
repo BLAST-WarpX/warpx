@@ -21,8 +21,8 @@ Run
 
 This example can be run **either** as:
 
-* **Python** script: ``mpiexec -n 2 python3 PICMI_inputs_2d.py`` or
-* WarpX **executable** using an input file: ``mpiexec -n 2 warpx.2d inputs_2d``
+* **Python** script: ``mpiexec -n 2 python3 inputs_test_2d_laser_ion_acc_picmi.py`` or
+* WarpX **executable** using an input file: ``mpiexec -n 2 warpx.2d inputs_test_2d_laser_ion_acc``
 
 .. tip::
 
@@ -35,16 +35,16 @@ This example can be run **either** as:
 
    .. tab-item:: Python: Script
 
-      .. literalinclude:: PICMI_inputs_2d.py
+      .. literalinclude:: inputs_test_2d_laser_ion_acc_picmi.py
          :language: python3
-         :caption: You can copy this file from ``Examples/Physics_applications/laser_ion/PICMI_inputs_2d.py``.
+         :caption: You can copy this file from ``Examples/Physics_applications/laser_ion/inputs_test_2d_laser_ion_acc_picmi.py``.
 
 
    .. tab-item:: Executable: Input File
 
-      .. literalinclude:: inputs_2d
+      .. literalinclude:: inputs_test_2d_laser_ion_acc
          :language: ini
-         :caption: You can copy this file from ``Examples/Physics_applications/laser_ion/inputs_2d``.
+         :caption: You can copy this file from ``Examples/Physics_applications/laser_ion/inputs_test_2d_laser_ion_acc``.
 
 Analyze
 -------
@@ -87,7 +87,7 @@ Visualize
    :alt: Particle densities for electrons (top), protons (middle), and electrons again in logarithmic scale (bottom).
    :width: 80%
 
-    Particle densities for electrons (top), protons (middle), and electrons again in logarithmic scale (bottom).
+   Particle densities for electrons (top), protons (middle), and electrons again in logarithmic scale (bottom).
 
 Particle density output illustrates the evolution of the target in time and space.
 Logarithmic scales can help to identify where the target becomes transparent for the laser pulse (bottom panel in :numref:`fig-tnsa-densities` ).

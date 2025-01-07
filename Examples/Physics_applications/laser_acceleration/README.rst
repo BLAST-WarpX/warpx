@@ -24,43 +24,43 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
       This example can be run **either** as:
 
-      * **Python** script: ``python3 PICMI_inputs_3d.py`` or
-      * WarpX **executable** using an input file: ``warpx.3d inputs_3d max_step=400``
+      * **Python** script: ``python3 inputs_test_3d_laser_acceleration_picmi.py`` or
+      * WarpX **executable** using an input file: ``warpx.3d inputs_test_3d_laser_acceleration max_step=400``
 
       .. tab-set::
 
          .. tab-item:: Python: Script
 
-             .. literalinclude:: PICMI_inputs_3d.py
+             .. literalinclude:: inputs_test_3d_laser_acceleration_picmi.py
                 :language: python3
-                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/PICMI_inputs_3d.py``.
+                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_picmi.py``.
 
          .. tab-item:: Executable: Input File
 
-             .. literalinclude:: inputs_3d
+             .. literalinclude:: inputs_test_3d_laser_acceleration
                 :language: ini
-                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_3d``.
+                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration``.
 
    .. tab-item:: RZ
 
       This example can be run **either** as:
 
-      * **Python** script: ``python3 PICMI_inputs_rz.py`` or
-      * WarpX **executable** using an input file: ``warpx.rz inputs_3d max_step=400``
+      * **Python** script: ``python3 inputs_test_rz_laser_acceleration_picmi.py`` or
+      * WarpX **executable** using an input file: ``warpx.rz inputs_test_rz_laser_acceleration max_step=400``
 
       .. tab-set::
 
          .. tab-item:: Python: Script
 
-             .. literalinclude:: PICMI_inputs_rz.py
+             .. literalinclude:: inputs_test_rz_laser_acceleration_picmi.py
                 :language: python3
-                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/PICMI_inputs_rz.py``.
+                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_rz_laser_acceleration_picmi.py``.
 
          .. tab-item:: Executable: Input File
 
-             .. literalinclude:: inputs_rz
+             .. literalinclude:: inputs_test_rz_laser_acceleration
                 :language: ini
-                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_rz``.
+                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_rz_laser_acceleration``.
 
 Analyze
 -------

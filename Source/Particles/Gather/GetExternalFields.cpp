@@ -50,19 +50,17 @@ GetExternalEBField::GetExternalEBField (const WarpXParIter& a_pti, long a_offset
     if (mypc.m_E_ext_particle_s == "parse_e_ext_particle_function")
     {
         m_Etype = ExternalFieldInitType::Parser;
-        constexpr auto num_arguments = 4; //x,y,z,t
-        m_Exfield_partparser = mypc.m_Ex_particle_parser->compile<num_arguments>();
-        m_Eyfield_partparser = mypc.m_Ey_particle_parser->compile<num_arguments>();
-        m_Ezfield_partparser = mypc.m_Ez_particle_parser->compile<num_arguments>();
+        m_Exfield_partparser = mypc.m_Ex_particle_parser->compile<4>();
+        m_Eyfield_partparser = mypc.m_Ey_particle_parser->compile<4>();
+        m_Ezfield_partparser = mypc.m_Ez_particle_parser->compile<4>();
     }
 
     if (mypc.m_B_ext_particle_s == "parse_b_ext_particle_function")
     {
         m_Btype = ExternalFieldInitType::Parser;
-        constexpr auto num_arguments = 4; //x,y,z,t
-        m_Bxfield_partparser = mypc.m_Bx_particle_parser->compile<num_arguments>();
-        m_Byfield_partparser = mypc.m_By_particle_parser->compile<num_arguments>();
-        m_Bzfield_partparser = mypc.m_Bz_particle_parser->compile<num_arguments>();
+        m_Bxfield_partparser = mypc.m_Bx_particle_parser->compile<4>();
+        m_Byfield_partparser = mypc.m_By_particle_parser->compile<4>();
+        m_Bzfield_partparser = mypc.m_Bz_particle_parser->compile<4>();
     }
 
     if (mypc.m_E_ext_particle_s == "repeated_plasma_lens" ||
@@ -81,6 +79,18 @@ GetExternalEBField::GetExternalEBField (const WarpXParIter& a_pti, long a_offset
         m_repeated_plasma_lens_lengths = mypc.d_repeated_plasma_lens_lengths.data();
         m_repeated_plasma_lens_strengths_E = mypc.d_repeated_plasma_lens_strengths_E.data();
         m_repeated_plasma_lens_strengths_B = mypc.d_repeated_plasma_lens_strengths_B.data();
+    }
+
+    // When the external particle fields are read from file,
+    // the external fields are not added directly inside the gather kernel.
+    // (Hence of `None`, which ensures that the gather kernel is compiled without support
+    // for external fields.) Instead, the external fields are added to the MultiFab
+    // Efield_aux and Bfield_aux before the particles gather from these MultiFab.
+    if (mypc.m_E_ext_particle_s == "read_from_file") {
+        m_Etype = ExternalFieldInitType::None;
+    }
+    if (mypc.m_B_ext_particle_s == "read_from_file") {
+        m_Btype = ExternalFieldInitType::None;
     }
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_Etype != Unknown, "Unknown E_ext_particle_init_style");

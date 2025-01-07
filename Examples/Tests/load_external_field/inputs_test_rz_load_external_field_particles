@@ -1,0 +1,66 @@
+warpx.abort_on_warning_threshold = medium
+warpx.serialize_initial_conditions = 0
+warpx.do_dynamic_scheduling = 0
+particles.do_tiling = 0
+
+particles.B_ext_particle_init_style = "read_from_file"
+particles.read_fields_from_path = "../../../../openPMD-example-datasets/example-femm-thetaMode.h5"
+
+warpx.grid_type = collocated
+warpx.do_electrostatic = labframe
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 300
+amr.n_cell = 40 40
+warpx.numprocs = 1 1
+amr.max_level = 0
+geometry.dims = RZ
+
+geometry.prob_lo =  0.0  0.0
+geometry.prob_hi =  1.0  5.0
+
+#################################
+###### Boundary Condition #######
+#################################
+boundary.field_lo = none pec
+boundary.field_hi = pec  pec
+boundary.potential_lo_x = 0
+boundary.potential_hi_x = 0
+boundary.potential_lo_y = 0
+boundary.potential_hi_y = 0
+boundary.potential_lo_z = 0
+boundary.potential_hi_z = 0
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.serialize_initial_conditions = 1
+warpx.verbose = 1
+warpx.const_dt = 4.40917904849092e-7
+warpx.use_filter = 0
+
+# Order of particle shape factors
+algo.particle_shape = 1
+
+#################################
+############ PLASMA #############
+#################################
+particles.species_names = proton
+proton.injection_style = "SingleParticle"
+proton.single_particle_pos = 0.0  0.2  2.5
+proton.single_particle_u = 9.506735958279367e-05  0.0  0.00013435537232359165
+proton.single_particle_weight = 1.0
+proton.do_not_deposit = 1
+proton.mass = m_p
+proton.charge = q_e
+
+# Diagnostics
+diagnostics.diags_names = diag1 chk
+diag1.intervals = 300
+diag1.diag_type = Full
+
+chk.intervals = 150
+chk.diag_type = Full
+chk.format = checkpoint
