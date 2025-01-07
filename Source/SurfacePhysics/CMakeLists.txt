@@ -4,6 +4,7 @@ foreach(D IN LISTS WarpX_DIMS)
         target_sources(lib_${SD}
           PRIVATE
             SurfacePhysicsBase.cpp
+            SurfaceParticleMapping.cpp
         )
     endif()
 endforeach()

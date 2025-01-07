@@ -45,8 +45,6 @@ SurfacePhysicsBase::initializeMapping ()
     auto & warpx = WarpX::GetInstance();
 
     const int lev = 0;
-//    const auto dx = warpx.Geom(lev).CellSizeArray();
-//    const auto problo = warpx.Geom(lev).ProbLoArray();
 
     // check if EB is enabled
     if (!EB::enabled() ) {
@@ -90,7 +88,6 @@ SurfacePhysicsBase::initializeMapping ()
             }
             else if (eb_flag_arr(i,j,k).isCovered() ) {
                 return;
-                amrex::Print() << " cell " << i << " " << j << " " << k << " is covered \n";
             }
             else {
                 amrex::Print() << " cell" << i << " j " << j << " " << k << " is cut!! \n";
@@ -106,11 +103,6 @@ SurfacePhysicsBase::initializeMapping ()
                 surf_normal_y.push_back(eb_bnd_normal_arr(i,j,k,1));
                 surf_normal_z.push_back(eb_bnd_normal_arr(i,j,k,2));
 #endif
-//                amrex::Print() << " surface normal is  " << surf_normal_x[surf_ijk.size()-1] << " " << surf_normal_z[surf_ijk.size()-1] << " \n";
-//                amrex::Print() << " what is cent ? " << eb_bnd_cent_arr(i,j,k)  << " " << eb_bnd_cent_arr(i,j,k,1)<< "\n";
-//                amrex::Real x_loc = problo[0] + (i + 0.5 + eb_bnd_cent_arr(i,j,k,0) ) * dx[0];
-//                amrex::Real z_loc = problo[1] + (j + 0.5 + eb_bnd_cent_arr(i,j,k,1) ) * dx[1];
-//                amrex::Print() << " x loc " << x_loc << "  zloc " << z_loc << "\n";
             }
         });
     }
