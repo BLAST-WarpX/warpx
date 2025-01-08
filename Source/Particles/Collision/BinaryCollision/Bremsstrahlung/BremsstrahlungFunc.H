@@ -98,12 +98,12 @@ public:
             amrex::ParticleReal* AMREX_RESTRICT p_product_data,
             amrex::RandomEngine const& engine) const
         {
-            amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
+            amrex::ParticleReal * const AMREX_RESTRICT weight1 = soa_1.m_rdata[PIdx::w];
             amrex::ParticleReal * const AMREX_RESTRICT u1x = soa_1.m_rdata[PIdx::ux];
             amrex::ParticleReal * const AMREX_RESTRICT u1y = soa_1.m_rdata[PIdx::uy];
             amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
 
-            amrex::ParticleReal * const AMREX_RESTRICT w2 = soa_2.m_rdata[PIdx::w];
+            amrex::ParticleReal * const AMREX_RESTRICT weight2 = soa_2.m_rdata[PIdx::w];
             amrex::ParticleReal * const AMREX_RESTRICT u2x = soa_2.m_rdata[PIdx::ux];
             amrex::ParticleReal * const AMREX_RESTRICT u2y = soa_2.m_rdata[PIdx::uy];
             amrex::ParticleReal * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];
@@ -150,7 +150,7 @@ public:
                 BremsstrahlungEvent(
                     u1x[ I1[i1] ], u1y[ I1[i1] ], u1z[ I1[i1] ],
                     u2x[ I2[i2] ], u2y[ I2[i2] ], u2z[ I2[i2] ],
-                    m1, w1[ I1[i1] ], w2[ I2[i2] ],
+                    m1, weight1[ I1[i1] ], weight2[ I2[i2] ],
                     n1, n2, dt, static_cast<int>(pair_index), p_mask,
                     p_pair_reaction_weight, p_product_data,
                     engine);
@@ -175,11 +175,15 @@ public:
         /* \brief Calculate the cross section given the electron energy.
          *        The differential cross section is cut off below the plasma frequency since the
          *        low energy photons would all be immediately absorbed by the surrounding plasma.
-         *        The normalized sigmaC is returned to allow calculating the photon energy.
          *
          * \param[in] E electron energy in Joules
          * \param[in] n1 the electron number density
-         * \param[out] sigmaC the normalized differential cross section
+         * \param[in] m1 the mass of the electrons
+         * \param[in] index the index for the electron energy grid
+         * \param[in] i0_cut the index below the cut off for the photon energy grid
+         * \param[in] koT1_cut the k of the photon energy cut off
+         * \param[in] kdsigdk_cut the ksigdk at the cut off
+         * \param[in] w0 the grid weighting at the cut off
          * \result the cross section
          */
         AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -187,9 +191,10 @@ public:
         CalculateCrossSection (amrex::ParticleReal KErel_eV,
                                amrex::ParticleReal n1,
                                amrex::ParticleReal m1,
-                               amrex::GpuArray<amrex::ParticleReal, nkoT1> & sigmaC,
+                               int & index,
                                int & i0_cut,
-                               amrex::ParticleReal & koT1_cut) const
+                               amrex::ParticleReal & koT1_cut, amrex::ParticleReal & kdsigdk_cut,
+                               amrex::ParticleReal & w0) const
         {
             using namespace amrex::literals;
 
@@ -216,55 +221,110 @@ public:
             }
 
             // kdsigdk is linearly weighted in electron energy
-            amrex::ParticleReal w0, w1;
-            int index;
             if (KErel_eV >= m_KEgrid_eV[nKE-1]) {
                 index = nkoT1 - 2;
                 w0 = 0.0_prt;
-                w1 = 1.0_prt;
             } else {
                 // find index for electron energy interpolation
                 index = amrex::bisect(m_KEgrid_eV.data(), 0, nKE, KErel_eV);
 
                 // compute interpolation weights for k*dsigma/dk
                 w0 = (m_KEgrid_eV[index+1] - KErel_eV)/(m_KEgrid_eV[index+1] - m_KEgrid_eV[index]);
-                w1 = 1.0_prt - w0;
             }
 
             // kdsigdk at the cutoff
             amrex::ParticleReal const w00 = (m_koT1_grid[i0_cut+1] - koT1_cut)/(m_koT1_grid[i0_cut+1] - m_koT1_grid[i0_cut]);
             amrex::ParticleReal const w01 = 1.0_prt - w00;
-            amrex::ParticleReal const kdsigdk_cut = (  w00*(w0*m_kdsigdk[index][i0_cut] + w1*m_kdsigdk[index+1][i0_cut])
-                                                     + w01*(w0*m_kdsigdk[index][i0_cut+1] + w1*m_kdsigdk[index+1][i0_cut+1]));
+            kdsigdk_cut = (  w00*(w0*m_kdsigdk[index][i0_cut  ] + (1.0_prt - w0)*m_kdsigdk[index+1][i0_cut])
+                           + w01*(w0*m_kdsigdk[index][i0_cut+1] + (1.0_prt - w0)*m_kdsigdk[index+1][i0_cut+1]));
+            // Scale kdsigdk_cut by the centered k to mitigate divergence effect for k->0
+            kdsigdk_cut *= koT1_cut/((m_koT1_grid[i0_cut+1] + koT1_cut)*0.5_prt);
 
-            // create cumulative distribution using trapezoidal rule
+            // Integrate the distribution using trapezoidal rule
             amrex::ParticleReal koT1_grid_im1 = koT1_cut;
             amrex::ParticleReal kdsigdk_im1 = kdsigdk_cut;
+            amrex::ParticleReal sigma = 0.0_prt;
             for (int i=i0_cut+1; i < nkoT1; i++) {
-                amrex::ParticleReal const this_dk = (m_koT1_grid[i] - koT1_grid_im1);
-                amrex::ParticleReal const this_k = (m_koT1_grid[i] + koT1_grid_im1)*0.5_prt;
-                amrex::ParticleReal const kdsigdk_i = w0*m_kdsigdk[index][i] + w1*m_kdsigdk[index+1][i];
-                // using centered k here mitigates divergece effect for k->0
-                amrex::ParticleReal const this_dsigdk = (kdsigdk_i + kdsigdk_im1)*0.5_prt/this_k;
-                sigmaC[i] = sigmaC[i-1] + this_dsigdk*this_dk;
+                amrex::ParticleReal const dk = (m_koT1_grid[i] - koT1_grid_im1);
+                amrex::ParticleReal const kdsigdk_i = w0*m_kdsigdk[index][i] + (1.0_prt - w0)*m_kdsigdk[index+1][i];
+                amrex::ParticleReal const dsigdk = (kdsigdk_i/m_koT1_grid[i] + kdsigdk_im1/koT1_grid_im1)*0.5_prt;
+                sigma = sigma + dsigdk*dk;
                 koT1_grid_im1 = m_koT1_grid[i];
                 kdsigdk_im1 = kdsigdk_i;
             }
-            amrex::ParticleReal const sigma_total = sigmaC[nkoT1-1]; // total cross section [m^2]
-
-            for (int i=i0_cut+1; i < nkoT1; i++) {
-                sigmaC[i] /= sigma_total;
-            }
+            amrex::ParticleReal const sigma_total = sigma; // total cross section [m^2]
 
             return sigma_total;
         }
 
+        /* \brief Generate the photon energy from the differential cross section
+         *
+         * \param[in] index the index for the electron energy grid
+         * \param[in] i0_cut the index below the cut off for the photon energy grid
+         * \param[in] koT1_cut the k of the photon energy cut off
+         * \param[in] kdsigdk_cut the ksigdk at the cut off
+         * \param[in] w0 the grid weighting at the cut off
+         * \param[in] sigma_total the total cross section
+         * \param[in] random_number the uniformly spaced random number
+         * \result the photon energy
+         */
+        AMREX_GPU_HOST_DEVICE AMREX_INLINE
+        amrex::ParticleReal
+        Photon_energy(int index, int i0_cut, amrex::ParticleReal koT1_cut, amrex::ParticleReal kdsigdk_cut,
+                      amrex::ParticleReal w0, amrex::ParticleReal sigma_total, amrex::ParticleReal random_number) const
+        {
+            using namespace amrex::literals;
+            amrex::ParticleReal koT1_grid_im1 = koT1_cut;
+            amrex::ParticleReal kdsigdk_im1 = kdsigdk_cut;
+            amrex::ParticleReal sigma = 0._prt;
+            amrex::ParticleReal kdsigdk_i;
+            amrex::ParticleReal dk;
+            int i;
+            for (i=i0_cut+1; i < nkoT1; i++) {
+                dk = (m_koT1_grid[i] - koT1_grid_im1);
+                kdsigdk_i = w0*m_kdsigdk[index][i] + (1.0_prt - w0)*m_kdsigdk[index+1][i];
+                amrex::ParticleReal const dsigdk = (kdsigdk_i/m_koT1_grid[i] + kdsigdk_im1/koT1_grid_im1)*0.5_prt;
+                amrex::ParticleReal const next_sigma = sigma + dsigdk*dk/sigma_total;
+                if (random_number > next_sigma) {
+                    sigma = next_sigma;
+                    koT1_grid_im1 = m_koT1_grid[i];
+                    kdsigdk_im1 = kdsigdk_i;
+                } else {
+                    break;
+                }
+            }
+
+            amrex::ParticleReal const nnorm_i = kdsigdk_im1/koT1_grid_im1/sigma_total;
+            amrex::ParticleReal const nnorm_ip1 = kdsigdk_i/m_koT1_grid[i]/sigma_total;
+            amrex::ParticleReal const result = ((std::sqrt(nnorm_i*nnorm_i +
+                                                           2._prt*(nnorm_ip1 - nnorm_i)*(random_number - sigma)/dk)
+                                                 - nnorm_i)/(nnorm_ip1 - nnorm_i))*dk + koT1_grid_im1;
+
+            return result;
+        }
+
+        /* \brief Do the Bremsstrahlung calculation
+         *
+         * \param[in] u1x, u1y, u1z the gamma*velocity of the first species, the electrons
+         * \param[in] u2x, u2y, u2z the gamma*velocity of the second species, the atoms
+         * \param[in] m1 the mass of the electrons
+         * \param[in] weight1 the particle weight of the electrons
+         * \param[in] weight2 the particle weight of the target (unused)
+         * \param[in] n1 the number density of the electrons
+         * \param[in] n2 the number density of the target
+         * \param[in] dt the time step size
+         * \param[in] pair_index the index number of the pair colliding
+         * \param[out] p_mask flags whether the pair collided
+         * \param[out] p_pair_reaction_weight the particle weight of the generated photon
+         * \param[out] p_product_data the energy of the generated photon
+         * \param[in] engine the random number generating engine
+         */
         AMREX_GPU_HOST_DEVICE AMREX_INLINE
         void BremsstrahlungEvent (amrex::ParticleReal & u1x, amrex::ParticleReal & u1y,
                                   amrex::ParticleReal & u1z, amrex::ParticleReal const& u2x,
                                   amrex::ParticleReal const& u2y, amrex::ParticleReal const& u2z,
                                   amrex::ParticleReal m1,
-                                  amrex::ParticleReal w1, amrex::ParticleReal /*w2*/,
+                                  amrex::ParticleReal weight1, amrex::ParticleReal /*weight2*/,
                                   amrex::ParticleReal n1, amrex::ParticleReal n2,
                                   amrex::Real dt, int pair_index,
                                   index_type* AMREX_RESTRICT p_mask,
@@ -294,11 +354,11 @@ public:
             amrex::ParticleReal const gammap1_rel = std::sqrt(1.0_prt + gbp1sq_rel);
             amrex::ParticleReal const KE_eV = m_e_eV*gbp1sq_rel/(1.0_prt + gammap1_rel);
 
-            amrex::GpuArray<amrex::ParticleReal, nkoT1> sigmaC;
-            sigmaC.fill(0._prt);
-            int i0_cut;
-            amrex::ParticleReal koT1_cut;
-            amrex::ParticleReal const sigma_total = CalculateCrossSection(KE_eV, n1, m1, sigmaC, i0_cut, koT1_cut);
+            int i0_cut, index;
+            amrex::ParticleReal koT1_cut, kdsigdk_cut;
+            amrex::ParticleReal w0;
+            amrex::ParticleReal const sigma_total = CalculateCrossSection(KE_eV, n1, m1,
+                                                                          index, i0_cut, koT1_cut, kdsigdk_cut, w0);
 
             if (sigma_total == 0._prt) { return; }
 
@@ -327,21 +387,19 @@ public:
             if (random_number < q12) {
 
                 // compute weight for photon
-                 amrex::ParticleReal const w_photon = w1/fmulti;
+                 amrex::ParticleReal const w_photon = weight1/fmulti;
 
                 // compute lab-frame electron kinetic energy before emission
                 amrex::ParticleReal const KE_before = m_e_eV*gbp1sq/(1.0_prt + gammap1);
 
                 // get energy of photon (hbar*omega)
                 amrex::ParticleReal const random_number2 = amrex::Random(engine);
-                int const index = amrex::bisect(sigmaC.data(), i0_cut, nkoT1, random_number2);
-                amrex::ParticleReal const w0 = (random_number2 - sigmaC[index])/(sigmaC[index+1] - sigmaC[index]);
-                amrex::ParticleReal const Epi = (index == i0_cut ? koT1_cut : m_koT1_grid[index]);
-                amrex::ParticleReal const EphotonoT1 = (1.0_prt - w0)*Epi + w0*m_koT1_grid[index+1];
+                amrex::ParticleReal const EphotonoT1 = Photon_energy(index, i0_cut, koT1_cut, kdsigdk_cut,
+                                                                     w0, sigma_total, random_number2);
                 amrex::ParticleReal const Ephoton_eV = EphotonoT1*KE_eV;
 
                 // adjust electron gamma and beta
-                amrex::ParticleReal const KE_prime_eV = KE_eV - Ephoton_eV*w_photon/w1;
+                amrex::ParticleReal const KE_prime_eV = KE_eV - Ephoton_eV*w_photon/weight1;
                 amrex::ParticleReal const gamma_prime = 1.0_prt + KE_prime_eV/m_e_eV;
 
                 // rescale electron beta in frame where ion is at rest
@@ -363,10 +421,10 @@ public:
 
                 // update energy lost to bremsstrahlung
                 amrex::ParticleReal const deltaE_eV = KE_after - KE_before;
-                /* m_deltaE_bremsstrahlung -= deltaE_eV*w1*PhysConst::q_e; // Joules */
+                /* m_deltaE_bremsstrahlung -= deltaE_eV*weight1*PhysConst::q_e; // Joules */
 
                 // compute photon energy in lab frame
-                amrex::ParticleReal const Ephoton_lab = deltaE_eV*w1/w_photon*PhysConst::q_e; // Joules
+                amrex::ParticleReal const Ephoton_lab = deltaE_eV*weight1/w_photon*PhysConst::q_e; // Joules
 
                 p_pair_reaction_weight[pair_index] = w_photon;
                 p_product_data[pair_index] = Ephoton_lab;
