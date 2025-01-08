@@ -122,7 +122,8 @@ For Nvidia CUDA GPU support, you will need to have `a recent CUDA driver install
 More info for `CUDA-enabled ML packages <https://twitter.com/jeremyphoward/status/1697435241152127369>`__.
 
 .. warning::
-   When you install CMake in a conda environment, conda sets several environment variables, e.g., ``CXXFLAGS``, to default values that are specific to the conda environment. Such values are concatenated to the values set by WarpX during buildsystem generation. In order to avoid unintended side effects (e.g., compiling with ``-O2`` instead of ``-O3``), please consider clearing ``CXXFLAGS`` and/or other relevant variables (e.g., via ``export CXXFLAGS=""``) before generating the buildsystem and compiling.
+
+   When you install CMake in a conda environment, conda sets several environment variables, e.g., ``CXXFLAGS``, to default values that are specific to the conda environment. Such values are concatenated to the values set by WarpX during buildsystem generation. In order to avoid unintended side effects (e.g., compiling with ``-O2`` instead of ``-O3``), please consider clearing ``CXXFLAGS`` and/or other relevant variables (e.g., via ``unset CXXFLAGS``) before generating the buildsystem and compiling.
 
 Spack (Linux/macOS)
 -------------------
