@@ -316,14 +316,15 @@ WarpX::MarkUpdateECells (
 
             if (fab_type == amrex::FabType::regular) {
 
-                // every cell in box is all regular
+                // Every cell in box is all regular: update E in every cell
+                // TODO: We actually need to check guard cells
                 amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                     update_E_arr(i, j, k) = 1;
                 });
 
             } else if (fab_type == amrex::FabType::covered) {
 
-                // every cell in box is all covered
+                // Every cell in box is all covered: do not update E
                 amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                     update_E_arr(i, j, k) = 0;
                 });
@@ -331,9 +332,41 @@ WarpX::MarkUpdateECells (
             } else {
 
                 auto const & flag = eb_flag[mfi].array();
+                auto index_type = m_fields.get(FieldType::Efield_fp, Direction{idim}, lev)->ixType();
+
                 amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                    update_E_arr(i, j, k) = flag(i, j, k).isRegular();
+
+                    // If neighboring cells are partially covered: do not update E
+                    int update_E = 1;
+
+                    // Check neighbors in the first spatial direction
+                    if ( index_type.nodeCentered(0) ) {
+                        if ( !flag(i, j, k).isRegular() || !flag(i-1, j, k).isRegular() ) { update_E = 0; }
+                    } else {
+                        if ( !flag(i, j, k).isRegular() ) { update_E = 0; }
+                    }
+
+#if AMREX_SPACEDIM > 1
+                    // Check neighbors in the second spatial direction
+                    if ( index_type.nodeCentered(1) ) {
+                        if ( !flag(i, j, k).isRegular() || !flag(i, j-1, k).isRegular() ) { update_E = 0; }
+                    } else {
+                        if ( !flag(i, j, k).isRegular() ) { update_E = 0; }
+                    }
+#endif
+
+#if AMREX_SPACEDIM > 2
+                    // Check neighbors in the third spatial direction
+                    if ( index_type.nodeCentered(2) ) {
+                        if ( !flag(i, j, k).isRegular() || !flag(i, j, k-1).isRegular() ) { update_E = 0; }
+                    } else {
+                        if ( !flag(i, j, k).isRegular() ) { update_E = 0; }
+                    }
+#endif
+                    update_E_arr(i, j, k) = update_E;
                 });
+
+            // TODO: Handle the case of the ECT solver
 
             }
 
