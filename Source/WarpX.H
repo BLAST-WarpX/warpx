@@ -1013,6 +1013,14 @@ public:
     void InitEB ();
 
 #ifdef AMREX_USE_EB
+    /** Set a flag to indicate which cells are in the valid domain and should be updated
+     * by the field solve, and which cells are in the EB and should not be updated.
+     * TODO: Add detail about criterion for Yee and ECT solver
+     */
+    void MarkUpdateECells (
+        amrex::EBFArrayBoxFactory const & eb_fact,
+        int const lev );
+
     /**
     * \brief Compute the length of the mesh edges. Here the length is a value in [0, 1].
     *        An edge of length 0 is fully covered.
@@ -1044,7 +1052,7 @@ public:
     *          - 2 for stable cells which have been intruded
     *        Here we cannot know if a cell is intruded or not so we initialize all stable cells with 1
     */
-    void MarkCells();
+    void MarkExtensionCells();
 #endif
 
     /**
@@ -1393,17 +1401,22 @@ private:
     mutable amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > Afield_dotMask;
     mutable amrex::Vector<            std::unique_ptr<amrex::iMultiFab>     > phi_dotMask;
 
+    /** EB: Flag to indicate whether the E location is inside the EB and therefore E should not be updated.
+     * (One array per level and per direction, due to staggering)
+    */
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_E;
+
     /** EB: for every mesh face flag_info_face contains a:
      *          * 0 if the face needs to be extended
      *          * 1 if the face is large enough to lend area to other faces
      *          * 2 if the face is actually intruded by other face
-     * It is initialized in WarpX::MarkCells
+     * It is initialized in WarpX::MarkExtensionCells
      * This is only used for the ECT solver.*/
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>, 3 > > m_flag_info_face;
     /** EB: for every mesh face face flag_ext_face contains a:
      *          * 1 if the face needs to be extended
      *          * 0 otherwise
-     * It is initialized in WarpX::MarkCells and then modified in WarpX::ComputeOneWayExtensions
+     * It is initialized in WarpX::MarkExtensionCells and then modified in WarpX::ComputeOneWayExtensions
      * and in WarpX::ComputeEightWaysExtensions
      * This is only used for the ECT solver.*/
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>, 3 > > m_flag_ext_face;

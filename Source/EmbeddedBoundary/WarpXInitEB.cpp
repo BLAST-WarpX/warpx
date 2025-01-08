@@ -291,9 +291,60 @@ WarpX::ScaleAreas (ablastr::fields::VectorField& face_areas,
     }
 }
 
+void
+WarpX::MarkUpdateECells (
+    amrex::EBFArrayBoxFactory const & eb_fact,
+    int const lev )
+{
+
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    // Extract structures for embedded boundaries
+    amrex::FabArray<amrex::EBCellFlagFab> const& eb_flag = eb_fact.getMultiEBCellFlagFab();
+
+    for (int idim = 0; idim < 3; ++idim) {
+
+        // TODO: Handle guard cells
+
+        for (amrex::MFIter mfi(*m_fields.get(FieldType::Efield_fp, Direction{idim}, lev)); mfi.isValid(); ++mfi) {
+
+            const amrex::Box& box = mfi.tilebox();
+            auto const & update_E_arr = m_eb_update_E[lev][idim]->array(mfi);
+
+            amrex::FabType const fab_type = eb_flag[mfi].getType(mfi.tilebox(amrex::IntVect::TheCellVector()));
+
+            if (fab_type == amrex::FabType::regular) {
+
+                // every cell in box is all regular
+                amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    update_E_arr(i, j, k) = 1;
+                });
+
+            } else if (fab_type == amrex::FabType::covered) {
+
+                // every cell in box is all covered
+                amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    update_E_arr(i, j, k) = 0;
+                });
+
+            } else {
+
+                auto const & flag = eb_flag[mfi].array();
+                amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    update_E_arr(i, j, k) = flag(i, j, k).isRegular();
+                });
+
+            }
+
+        }
+
+    }
+
+}
 
 void
-WarpX::MarkCells ()
+WarpX::MarkExtensionCells ()
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -302,7 +353,7 @@ WarpX::MarkCells ()
     auto const &cell_size = CellSize(maxLevel());
 
 #if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ)
-    WARPX_ABORT_WITH_MESSAGE("MarkCells only implemented in 2D and 3D");
+    WARPX_ABORT_WITH_MESSAGE("MarkExtensionCells only implemented in 2D and 3D");
 #endif
 
     for (int idim = 0; idim < 3; ++idim) {
