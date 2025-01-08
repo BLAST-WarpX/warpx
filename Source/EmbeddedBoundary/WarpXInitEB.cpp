@@ -305,38 +305,38 @@ WarpX::MarkUpdateECells (
 
     for (int idim = 0; idim < 3; ++idim) {
 
-        // TODO: Handle guard cells
-
         for (amrex::MFIter mfi(*m_fields.get(FieldType::Efield_fp, Direction{idim}, lev)); mfi.isValid(); ++mfi) {
 
             const amrex::Box& box = mfi.tilebox();
             auto const & update_E_arr = m_eb_update_E[lev][idim]->array(mfi);
 
-            amrex::FabType const fab_type = eb_flag[mfi].getType(mfi.tilebox(amrex::IntVect::TheCellVector()));
+            // Check if the box (including one layer of guard cells) contains a mix of covered and regular cells
+            const amrex::Box& eb_info_box = mfi.tilebox(amrex::IntVect::TheCellVector()).grow(1);
+            amrex::FabType const fab_type = eb_flag[mfi].getType( eb_info_box );
 
-            if (fab_type == amrex::FabType::regular) {
+            if (fab_type == amrex::FabType::regular) { // All cells in the box are regular
 
                 // Every cell in box is all regular: update E in every cell
-                // TODO: We actually need to check guard cells
                 amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                     update_E_arr(i, j, k) = 1;
                 });
 
-            } else if (fab_type == amrex::FabType::covered) {
+            } else if (fab_type == amrex::FabType::covered) { // All cells in the box are covered
 
                 // Every cell in box is all covered: do not update E
                 amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                     update_E_arr(i, j, k) = 0;
                 });
 
-            } else {
+            } else { // The box contains a mix of covered and regular cells
 
                 auto const & flag = eb_flag[mfi].array();
                 auto index_type = m_fields.get(FieldType::Efield_fp, Direction{idim}, lev)->ixType();
 
                 amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
 
-                    // If neighboring cells are partially covered: do not update E
+                    // Stair-case approximation: If neighboring cells are either partially
+                    // or fully covered (i.e. if they are not regular cells): do not update E
                     int update_E = 1;
 
                     // Check neighbors in the first spatial direction
