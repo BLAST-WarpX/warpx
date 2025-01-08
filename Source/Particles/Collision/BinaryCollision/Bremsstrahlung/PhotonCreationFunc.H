@@ -168,10 +168,11 @@ public:
                 auto& uz1 = soa_products_data[0].m_rdata[PIdx::uz][product_index];
 
                 // Normalize out the electron velocity and multiply by the photon momentum, E/c
+                // Also, the photon momentum is normalized by m_e
                 auto u1 = std::sqrt(ux1*ux1 + uy1*uy1 + uz1*uz1);
-                ux1 *= (p_product_data[i]/PhysConst::c)/u1;
-                uy1 *= (p_product_data[i]/PhysConst::c)/u1;
-                uz1 *= (p_product_data[i]/PhysConst::c)/u1;
+                ux1 *= (p_product_data[i]/PhysConst::c)/u1/PhysConst::m_e;
+                uy1 *= (p_product_data[i]/PhysConst::c)/u1/PhysConst::m_e;
+                uz1 *= (p_product_data[i]/PhysConst::c)/u1/PhysConst::m_e;
             }
         });
 
