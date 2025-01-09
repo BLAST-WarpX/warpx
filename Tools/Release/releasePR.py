@@ -81,7 +81,7 @@ process = subprocess.Popen(
     text=True,
 )
 
-stdout, stderr = process.communicate(answers)
+process.communicate(answers)
 del process
 
 # commit
@@ -104,7 +104,7 @@ process = subprocess.Popen(
     text=True,
 )
 
-stdout, stderr = process.communicate(answers)
+process.communicate(answers)
 del process
 
 # commit
@@ -127,7 +127,7 @@ process = subprocess.Popen(
     text=True,
 )
 
-stdout, stderr = process.communicate(answers)
+process.communicate(answers)
 del process
 
 # commit
@@ -149,7 +149,7 @@ process = subprocess.Popen(
     text=True,
 )
 
-stdout, stderr = process.communicate(answers)
+process.communicate(answers)
 del process
 
 # commit
