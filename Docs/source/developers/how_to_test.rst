@@ -134,7 +134,9 @@ As mentioned above, the input files and scripts used by the automated tests can 
 
 Each test directory must contain a file named ``CMakeLists.txt`` where all tests associated with the input files and scripts in that directory must be listed.
 
-A checksum file is [to-do] ...
+A checksum file is a file that contains reference values obtained by computing a chosen checksum for a set of fields.
+More precisely, we compute the sums of the absolute values of the arrays corresponding to each field from the results produced by the automated test and compare these checksums with the reference ones stored in the checksum file of that test, with respect to specific tolerances.
+This is expected to be sensitive enough to make the automated test fail if the code changes cause significant differences in the final results, thus catching possible bugs.
 
 A new test can be added by calling the function ``add_warpx_test`` in ``CMakeLists.txt``. The function has the following signature:
 
@@ -170,9 +172,9 @@ Here's how to add an automated test:
 
 #. If the test directory is new, make a symbolic link to the default regression analysis script ``analysis_default_regression.py`` from `Examples/analysis_default_regression.py <https://github.com/ECP-WarpX/WarpX/blob/development/Examples/analysis_default_regression.py>`__, by running ``ln -s ../../analysis_default_regression.py analysis_default_regression.py`` from the test directory.
 
-#. Run the test locally with ``ctest`` by prefixing the ``ctest`` command with ``CHECKSUM_RESET=ON`` in order to generate automatically the checksum file.
+#. Run the test locally with ``ctest``, after setting the environment variable ``CHECKSUM_RESET=ON``, in order to generate automatically the checksum file.
 
-Once you have added the test, run the test locally again, without ``CHECKSUM_RESET=ON``, to check that everything works as expected.
+Once you have added the test, run the test locally again, after resetting ``CHECKSUM_RESET=OFF``, to check that everything works as expected.
 
 The ``analysis`` and ``checksum`` commands passed as arguments to ``add_warpx_test`` can be set to ``OFF`` if the intention is to skip the respective analysis for a given test.
 
@@ -192,6 +194,40 @@ Here is the help message of the default regression analysis script, including us
          --rtol RTOL       relative tolerance to compare checksums
          --skip-fields     skip fields when comparing checksums
          --skip-particles  skip particles when comparing checksums
+
+How to reset checksums locally
+------------------------------
+
+It is possible to reset a checksum file locally by running the corresponding test with ``ctest`` with the environment variable ``CHECKSUM_RESET=ON``. For example:
+
+  .. code-block:: bash
+
+       CHECKSUM_RESET=ON ctest --test-dir build -R laser_acceleration
+
+Alternatively, it is also possible to reset multiple checksum files using the output of our Azure pipelines, which can be useful for code changes that result in resetting a large numbers of checksum files.
+Here's how to do so:
+
+#. On the GitHub page of the pull request, find (one of) the pipeline(s) failing due to checksum regressions and click on "Details" (highlighted in blue).
+
+   .. figure:: https://gist.github.com/user-attachments/assets/09db91b9-5711-4250-8b36-c52a6049e38e
+
+#. In the new page that opens up, click on "View more details on Azure pipelines" (highlighted in blue).
+
+   .. figure:: https://gist.github.com/user-attachments/assets/ab0c9a24-5518-4da7-890f-d79fa1c8de4c
+
+#. In the new page that opens up, select the group of tests for which you want to reset the checksum files (e.g., ``cartesian_3d``) and click on "View raw log".
+
+   .. figure:: https://gist.github.com/user-attachments/assets/06c1fe27-2c13-4bd3-b6b8-8b8941b37889
+
+#. Save the raw log as a text file on your computer.
+
+#. Go to the directory `Tools/DevUtils <https://github.com/ECP-WarpX/WarpX/tree/development/Tools/DevUtils>`__ and run the Python script `update_benchmarks_from_azure_output.py <https://github.com/ECP-WarpX/WarpX/blob/development/Tools/DevUtils/update_benchmarks_from_azure_output.py>`__ passing the path of the raw log text file as a command line argument:
+
+   .. code:: bash
+
+        python update_benchmarks_from_azure_output.py path/to/raw_log.txt
+
+   This will update the checksum files for all the tests in the raw log that did not pass the checksum analysis.
 
 .. _developers-testing-naming:
 
