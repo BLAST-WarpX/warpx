@@ -4,6 +4,7 @@ CEXE_sources += BeamRelevant.cpp
 CEXE_sources += ChargeOnEB.cpp
 CEXE_sources += ColliderRelevant.cpp
 CEXE_sources += DifferentialLuminosity.cpp
+CEXE_sources += DifferentialLuminosity2D.cpp
 CEXE_sources += FieldEnergy.cpp
 CEXE_sources += FieldMaximum.cpp
 CEXE_sources += FieldMomentum.cpp
