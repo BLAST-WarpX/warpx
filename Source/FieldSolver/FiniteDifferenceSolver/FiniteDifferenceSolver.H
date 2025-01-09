@@ -63,6 +63,7 @@ class FiniteDifferenceSolver
                        int lev,
                        PatchType patch_type,
                        ablastr::fields::VectorField const& Efield,
+                       std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
                        amrex::Real dt );
 
         void EvolveF ( amrex::MultiFab* Ffield,
@@ -215,7 +216,7 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField const& Efield,
             ablastr::fields::VectorField const& Bfield,
             ablastr::fields::VectorField const& Jfield,
-            ablastr::fields::VectorField const& edge_lengths,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
             amrex::MultiFab const* Ffield,
             int lev,
             amrex::Real dt );
@@ -267,7 +268,7 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField const& Efield,
             ablastr::fields::VectorField const& Bfield,
             ablastr::fields::VectorField const& Jfield,
-            ablastr::fields::VectorField const& edge_lengths,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
             amrex::MultiFab const* Ffield,
             int lev, amrex::Real dt );
 

@@ -337,15 +337,14 @@ WarpX::MarkUpdateECells (
 
                     // Stair-case approximation: If neighboring cells are either partially
                     // or fully covered (i.e. if they are not regular cells): do not update E
-                    int update_E = 1;
 
+                    int update_E = 1;
                     // Check neighbors in the first spatial direction
                     if ( index_type.nodeCentered(0) ) {
                         if ( !flag(i, j, k).isRegular() || !flag(i-1, j, k).isRegular() ) { update_E = 0; }
                     } else {
                         if ( !flag(i, j, k).isRegular() ) { update_E = 0; }
                     }
-
 #if AMREX_SPACEDIM > 1
                     // Check neighbors in the second spatial direction
                     if ( index_type.nodeCentered(1) ) {
@@ -354,7 +353,6 @@ WarpX::MarkUpdateECells (
                         if ( !flag(i, j, k).isRegular() ) { update_E = 0; }
                     }
 #endif
-
 #if AMREX_SPACEDIM > 2
                     // Check neighbors in the third spatial direction
                     if ( index_type.nodeCentered(2) ) {
