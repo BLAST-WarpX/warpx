@@ -8,6 +8,6 @@ How-to guides
 
    how_to_profile
    how_to_test
-   run_clang_tidy_locally
-   local_compile
-   documentation
+   how_to_run_clang_tidy
+   how_to_compile_locally
+   how_to_write_the_docs

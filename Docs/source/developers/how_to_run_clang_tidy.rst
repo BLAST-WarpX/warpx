@@ -1,7 +1,7 @@
 .. _developers-run_clang_tidy_locally:
 
-The clang-tidy linter
-=====================
+How to run the clang-tidy linter
+================================
 
 Clang-tidy CI test
 ------------------
