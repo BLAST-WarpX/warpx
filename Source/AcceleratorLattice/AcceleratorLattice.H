@@ -47,8 +47,8 @@ public:
      * @param[in] dm the distribution map at the level of refinement
      */
     void InitElementFinder (
-        int lev,
-        amrex::Real gamma_boost,
+        int const lev,
+        amrex::Real const gamma_boost,
         amrex::BoxArray const & ba,
         amrex::DistributionMapping const & dm);
 
