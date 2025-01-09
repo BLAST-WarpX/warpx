@@ -30,7 +30,9 @@ class ParticleContainerWrapper(object):
         if self.particle_container is None:
             try:
                 mypc = libwarpx.warpx.multi_particle_container()
-                self.particle_container = mypc.get_particle_container_from_name(self.name)
+                self.particle_container = mypc.get_particle_container_from_name(
+                    self.name
+                )
             except AttributeError as e:
                 msg = "This is likely caused by attempting to access a ParticleContainerWrapper before initialize_warpx has been called"
                 raise AttributeError(msg) from e
@@ -167,7 +169,9 @@ class ParticleContainerWrapper(object):
         # --- Note that the velocities are handled separately and not included in attr
         # --- (even though they are stored as attributes in the C++)
         for key, vals in kwargs.items():
-            attr[:, self.get_particle_container().get_comp_index(key) - built_in_attrs] = vals
+            attr[
+                :, self.get_particle_container().get_comp_index(key) - built_in_attrs
+            ] = vals
 
         nattr_int = 0
         attr_int = np.empty([0], dtype=np.int32)
@@ -264,7 +268,9 @@ class ParticleContainerWrapper(object):
         comp_idx = self.get_particle_container().get_comp_index(comp_name)
 
         data_array = []
-        for pti in libwarpx.libwarpx_so.WarpXParIter(self.get_particle_container(), level):
+        for pti in libwarpx.libwarpx_so.WarpXParIter(
+            self.get_particle_container(), level
+        ):
             soa = pti.soa()
             idx = soa.get_real_data(comp_idx)
             if copy_to_host:
@@ -309,7 +315,9 @@ class ParticleContainerWrapper(object):
         comp_idx = self.get_particle_container().get_icomp_index(comp_name)
 
         data_array = []
-        for pti in libwarpx.libwarpx_so.WarpXParIter(self.get_particle_container(), level):
+        for pti in libwarpx.libwarpx_so.WarpXParIter(
+            self.get_particle_container(), level
+        ):
             soa = pti.soa()
             idx = soa.get_int_data(comp_idx)
             if copy_to_host:
@@ -348,7 +356,9 @@ class ParticleContainerWrapper(object):
             The requested particle array data
         """
         data_array = []
-        for pti in libwarpx.libwarpx_so.WarpXParIter(self.get_particle_container(), level):
+        for pti in libwarpx.libwarpx_so.WarpXParIter(
+            self.get_particle_container(), level
+        ):
             soa = pti.soa()
             idx = soa.get_idcpu_data()
             if copy_to_host:
