@@ -24,17 +24,18 @@ class ParticleContainerWrapper(object):
 
     def __init__(self, species_name):
         self.name = species_name
+        self.particle_container = None
 
-        # grab the desired particle container
-        # if initialize_warpx() has not been called, libwarpx will not have a `warpx` attribute.
-        # We catch this error and provide the user with some useful information.
-        try:
-            mypc = libwarpx.warpx.multi_particle_container()
-        except AttributeError as e:
-            msg = "This may be caused by attempting to create a ParticleContainerWrapper before initialize_warpx has been called"
-            raise AttributeError(msg) from e
+    def get_particle_container(self):
+        if self.particle_container is None:
+            try:
+                mypc = libwarpx.warpx.multi_particle_container()
+                self.particle_container = mypc.get_particle_container_from_name(self.name)
+            except AttributeError as e:
+                msg = "This is likely caused by attempting to access a ParticleContainerWrapper before initialize_warpx has been called"
+                raise AttributeError(msg) from e
 
-        self.particle_container = mypc.get_particle_container_from_name(self.name)
+        return self.particle_container
 
     def add_particles(
         self,
@@ -159,14 +160,14 @@ class ParticleContainerWrapper(object):
             built_in_attrs += 1
 
         # --- The number of extra attributes (including the weight)
-        nattr = self.particle_container.num_real_comps - built_in_attrs
+        nattr = self.get_particle_container().num_real_comps - built_in_attrs
         attr = np.zeros((maxlen, nattr))
         attr[:, 0] = w
 
         # --- Note that the velocities are handled separately and not included in attr
         # --- (even though they are stored as attributes in the C++)
         for key, vals in kwargs.items():
-            attr[:, self.particle_container.get_comp_index(key) - built_in_attrs] = vals
+            attr[:, self.get_particle_container().get_comp_index(key) - built_in_attrs] = vals
 
         nattr_int = 0
         attr_int = np.empty([0], dtype=np.int32)
@@ -180,7 +181,7 @@ class ParticleContainerWrapper(object):
         # uy = uy.astype(self._numpy_particlereal_dtype, copy=False)
         # uz = uz.astype(self._numpy_particlereal_dtype, copy=False)
 
-        self.particle_container.add_n_particles(
+        self.get_particle_container().add_n_particles(
             0,
             x.size,
             x,
@@ -213,7 +214,7 @@ class ParticleContainerWrapper(object):
         int
             An integer count of the number of particles
         """
-        return self.particle_container.total_number_of_particles(True, local)
+        return self.get_particle_container().total_number_of_particles(True, local)
 
     nps = property(get_particle_count)
 
@@ -230,7 +231,7 @@ class ParticleContainerWrapper(object):
         comm           : bool
             Should the component be communicated
         """
-        self.particle_container.add_real_comp(pid_name, comm)
+        self.get_particle_container().add_real_comp(pid_name, comm)
 
     def get_particle_real_arrays(self, comp_name, level, copy_to_host=False):
         """
@@ -260,10 +261,10 @@ class ParticleContainerWrapper(object):
         List of arrays
             The requested particle array data
         """
-        comp_idx = self.particle_container.get_comp_index(comp_name)
+        comp_idx = self.get_particle_container().get_comp_index(comp_name)
 
         data_array = []
-        for pti in libwarpx.libwarpx_so.WarpXParIter(self.particle_container, level):
+        for pti in libwarpx.libwarpx_so.WarpXParIter(self.get_particle_container(), level):
             soa = pti.soa()
             idx = soa.get_real_data(comp_idx)
             if copy_to_host:
@@ -305,10 +306,10 @@ class ParticleContainerWrapper(object):
         List of arrays
             The requested particle array data
         """
-        comp_idx = self.particle_container.get_icomp_index(comp_name)
+        comp_idx = self.get_particle_container().get_icomp_index(comp_name)
 
         data_array = []
-        for pti in libwarpx.libwarpx_so.WarpXParIter(self.particle_container, level):
+        for pti in libwarpx.libwarpx_so.WarpXParIter(self.get_particle_container(), level):
             soa = pti.soa()
             idx = soa.get_int_data(comp_idx)
             if copy_to_host:
@@ -347,7 +348,7 @@ class ParticleContainerWrapper(object):
             The requested particle array data
         """
         data_array = []
-        for pti in libwarpx.libwarpx_so.WarpXParIter(self.particle_container, level):
+        for pti in libwarpx.libwarpx_so.WarpXParIter(self.get_particle_container(), level):
             soa = pti.soa()
             idx = soa.get_idcpu_data()
             if copy_to_host:
@@ -692,7 +693,7 @@ class ParticleContainerWrapper(object):
         local          : bool
             If True return total charge per processor
         """
-        return self.particle_container.sum_particle_charge(local)
+        return self.get_particle_container().sum_particle_charge(local)
 
     def getex(self):
         raise NotImplementedError("Particle E fields not supported")
@@ -749,7 +750,7 @@ class ParticleContainerWrapper(object):
             rho_fp.set_val(0.0)
 
         # deposit the charge density from the desired species
-        self.particle_container.deposit_charge(rho_fp, level)
+        self.get_particle_container().deposit_charge(rho_fp, level)
 
         if libwarpx.geometry_dim == "rz":
             libwarpx.warpx.apply_inverse_volume_scaling_to_charge_density(rho_fp, level)
@@ -765,7 +766,17 @@ class ParticleBoundaryBufferWrapper(object):
     """
 
     def __init__(self):
-        self.particle_buffer = libwarpx.warpx.get_particle_boundary_buffer()
+        self.particle_buffer = None
+
+    def get_particle_buffer(self):
+        if self.particle_buffer is None:
+            try:
+                self.particle_buffer = libwarpx.warpx.get_particle_boundary_buffer()
+            except AttributeError as e:
+                msg = "This is likely caused by attempting to access a ParticleContainerWrapper before initialize_warpx has been called"
+                raise AttributeError(msg) from e
+
+        return self.particle_buffer
 
     def get_particle_boundary_buffer_size(self, species_name, boundary, local=False):
         """
@@ -786,7 +797,7 @@ class ParticleBoundaryBufferWrapper(object):
             Whether to only return the number of particles in the current
             processor's buffer
         """
-        return self.particle_buffer.get_num_particles_in_container(
+        return self.get_particle_buffer().get_num_particles_in_container(
             species_name, self._get_boundary_number(boundary), local=local
         )
 
@@ -822,7 +833,7 @@ class ParticleBoundaryBufferWrapper(object):
         """
         xp, cupy_status = load_cupy()
 
-        part_container = self.particle_buffer.get_particle_container(
+        part_container = self.get_particle_buffer().get_particle_container(
             species_name, self._get_boundary_number(boundary)
         )
         data_array = []
@@ -852,7 +863,7 @@ class ParticleBoundaryBufferWrapper(object):
         Clear the buffer that holds the particles lost at the boundaries.
 
         """
-        self.particle_buffer.clear_particles()
+        self.get_particle_buffer().clear_particles()
 
     def _get_boundary_number(self, boundary):
         """
