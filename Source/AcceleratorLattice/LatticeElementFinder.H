@@ -34,7 +34,7 @@ struct LatticeElementFinder
      * @param[in] a_mfi specifies the grid where the finder is defined
      * @param[in] accelerator_lattice a reference to the accelerator lattice at the refinement level
      */
-    void InitElementFinder (int const lev, amrex::Real const gamma_boost,
+    void InitElementFinder (int lev, amrex::Real gamma_boost,
                             amrex::MFIter const& a_mfi,
                             AcceleratorLattice const& accelerator_lattice);
 
