@@ -55,7 +55,7 @@ void FiniteDifferenceSolver::EvolveE (
     int lev,
     PatchType patch_type,
     ablastr::fields::VectorField const& Efield,
-    std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     amrex::Real const dt
 )
 {
@@ -106,7 +106,7 @@ void FiniteDifferenceSolver::EvolveECartesian (
     ablastr::fields::VectorField const& Efield,
     ablastr::fields::VectorField const& Bfield,
     ablastr::fields::VectorField const& Jfield,
-    std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
     amrex::MultiFab const* Ffield,
     int lev, amrex::Real const dt ) {
 
@@ -239,7 +239,7 @@ void FiniteDifferenceSolver::EvolveECylindrical (
     ablastr::fields::VectorField const& Efield,
     ablastr::fields::VectorField const& Bfield,
     ablastr::fields::VectorField const& Jfield,
-    std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     amrex::MultiFab const* Ffield,
     int lev, amrex::Real const dt ) {
 
