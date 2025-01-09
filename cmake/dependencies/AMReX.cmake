@@ -51,7 +51,7 @@ macro(find_amrex)
             set(AMReX_OMP          OFF    CACHE INTERNAL "")
         endif()
 
-        if(WarpX_FFT)
+        if(WarpX_FFT OR ABLASTR_FFT)
             set(AMReX_FFT ON CACHE INTERNAL "")
         else()
             set(AMReX_FFT OFF CACHE INTERNAL "")
