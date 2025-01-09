@@ -773,7 +773,7 @@ class ParticleBoundaryBufferWrapper(object):
             try:
                 self.particle_buffer = libwarpx.warpx.get_particle_boundary_buffer()
             except AttributeError as e:
-                msg = "This is likely caused by attempting to access a ParticleContainerWrapper before initialize_warpx has been called"
+                msg = "This is likely caused by attempting to access a ParticleBoundaryBufferWrapper before initialize_warpx has been called"
                 raise AttributeError(msg) from e
 
         return self.particle_buffer
