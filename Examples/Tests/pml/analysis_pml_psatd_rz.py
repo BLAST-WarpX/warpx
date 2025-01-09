@@ -16,15 +16,12 @@ most of the pulse escapes the radial boundary. If the PML fails,
 the pulse will remain with in the domain.
 """
 
-import os
 import sys
 
 import numpy as np
 import yt
 
 yt.funcs.mylog.setLevel(0)
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 # Open plotfile specified in command line
 filename = sys.argv[1]
@@ -54,9 +51,3 @@ max_Efield = max(max_Ex, max_Ez)
 tolerance_abs = 2.0
 print("tolerance_abs: " + str(tolerance_abs))
 assert max_Efield < tolerance_abs
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

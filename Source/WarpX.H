@@ -12,6 +12,7 @@
 #ifndef WARPX_H_
 #define WARPX_H_
 
+#include "BoundaryConditions/PEC_Insulator_fwd.H"
 #include "BoundaryConditions/PML_fwd.H"
 #include "Diagnostics/MultiDiagnostics_fwd.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags_fwd.H"
@@ -113,6 +114,16 @@ public:
 
     [[nodiscard]] int Verbose () const { return verbose; }
 
+    [[nodiscard]] const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& GetFieldBoundaryLo () const
+    {
+        return field_boundary_lo;
+    }
+
+    [[nodiscard]] const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& GetFieldBoundaryHi () const
+    {
+        return field_boundary_hi;
+    }
+
     void InitData ();
 
     void Evolve (int numsteps = -1);
@@ -125,21 +136,21 @@ public:
     //
     // Functions used by implicit solvers
     //
-    void ImplicitPreRHSOp ( amrex::Real  cur_time,
-                            amrex::Real  a_full_dt,
-                            int          a_nl_iter,
-                            bool         a_from_jacobian );
+    void ImplicitPreRHSOp ( amrex::Real cur_time,
+                            amrex::Real a_full_dt,
+                            int         a_nl_iter,
+                            bool        a_from_jacobian );
     void SaveParticlesAtImplicitStepStart ();
     void FinishImplicitParticleUpdate ();
-    void SetElectricFieldAndApplyBCs ( const WarpXSolverVec&  a_E );
-    void UpdateMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const&  a_Bn,
-                                          amrex::Real  a_thetadt );
-    void ApplyMagneticFieldBCs ();
-    void FinishMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const&  a_Bn,
-                                          amrex::Real  a_theta );
-    void FinishImplicitField ( const ablastr::fields::MultiLevelVectorField&  Field_fp,
-                               const ablastr::fields::MultiLevelVectorField&  Field_n,
-                               amrex::Real  theta );
+    void SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time );
+    void UpdateMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const& a_Bn,
+                                          amrex::Real a_thetadt, amrex::Real start_time );
+    void SpectralSourceFreeFieldAdvance ( amrex::Real start_time);
+    void FinishMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const& a_Bn,
+                                          amrex::Real a_theta, amrex::Real a_time );
+    void FinishImplicitField ( const ablastr::fields::MultiLevelVectorField& Field_fp,
+                               const ablastr::fields::MultiLevelVectorField& Field_n,
+                               amrex::Real theta );
     void ImplicitComputeRHSE (         amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
     void ImplicitComputeRHSE (int lev, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
     void ImplicitComputeRHSE (int lev, PatchType patch_type, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
@@ -380,7 +391,6 @@ public:
     //! Specifies the type of grid used for the above sorting, i.e. cell-centered, nodal, or mixed
     static amrex::IntVect sort_idx_type;
 
-    static bool do_subcycling;
     static bool do_multi_J;
     static int do_multi_J_n_depositions;
 
@@ -531,22 +541,22 @@ public:
     void UpdateInjectionPosition (amrex::Real dt);
 
     void ResetProbDomain (const amrex::RealBox& rb);
-    void EvolveE (         amrex::Real dt);
-    void EvolveE (int lev, amrex::Real dt);
-    void EvolveB (         amrex::Real dt, DtType dt_type);
-    void EvolveB (int lev, amrex::Real dt, DtType dt_type);
+    void EvolveE (         amrex::Real dt, amrex::Real start_time);
+    void EvolveE (int lev, amrex::Real dt, amrex::Real start_time);
+    void EvolveB (         amrex::Real dt, DtType dt_type, amrex::Real start_time);
+    void EvolveB (int lev, amrex::Real dt, DtType dt_type, amrex::Real start_time);
     void EvolveF (         amrex::Real dt, DtType dt_type);
     void EvolveF (int lev, amrex::Real dt, DtType dt_type);
     void EvolveG (         amrex::Real dt, DtType dt_type);
     void EvolveG (int lev, amrex::Real dt, DtType dt_type);
-    void EvolveB (int lev, PatchType patch_type, amrex::Real dt, DtType dt_type);
-    void EvolveE (int lev, PatchType patch_type, amrex::Real dt);
+    void EvolveB (int lev, PatchType patch_type, amrex::Real dt, DtType dt_type, amrex::Real start_time);
+    void EvolveE (int lev, PatchType patch_type, amrex::Real dt, amrex::Real start_time);
     void EvolveF (int lev, PatchType patch_type, amrex::Real dt, DtType dt_type);
     void EvolveG (int lev, PatchType patch_type, amrex::Real dt, DtType dt_type);
 
-    void MacroscopicEvolveE (         amrex::Real dt);
-    void MacroscopicEvolveE (int lev, amrex::Real dt);
-    void MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real dt);
+    void MacroscopicEvolveE (         amrex::Real dt, amrex::Real start_time);
+    void MacroscopicEvolveE (int lev, amrex::Real dt, amrex::Real start_time);
+    void MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real dt, amrex::Real start_time);
 
     /**
      * \brief Hybrid-PIC field evolve function.
@@ -661,8 +671,8 @@ public:
                               amrex::MultiFab* Jy, amrex::MultiFab* Jz,
                               PatchType patch_type);
 
-    void ApplyEfieldBoundary (int lev, PatchType patch_type);
-    void ApplyBfieldBoundary (int lev, PatchType patch_type, DtType dt_type);
+    void ApplyEfieldBoundary (int lev, PatchType patch_type, amrex::Real cur_time);
+    void ApplyBfieldBoundary (int lev, PatchType patch_type, DtType dt_type, amrex::Real cur_time);
 
 #ifdef WARPX_DIM_RZ
     // Applies the boundary conditions that are specific to the axis when in RZ.
@@ -891,6 +901,7 @@ public:
 
     // Magnetostatic Solver Interface
     MagnetostaticSolver::VectorPoissonBoundaryHandler m_vector_poisson_boundary_handler;
+    int magnetostatic_solver_max_iters = 200;
     void ComputeMagnetostaticField ();
     void AddMagnetostaticFieldLabFrame ();
     void computeVectorPotential (ablastr::fields::MultiLevelVectorField const& curr,
@@ -1205,12 +1216,12 @@ private:
         int lev);
     void StoreCurrent (int lev);
     void RestoreCurrent (int lev);
-    void ApplyFilterJ (
-        const ablastr::fields::MultiLevelVectorField& current,
+    void ApplyFilterMF (
+        const ablastr::fields::MultiLevelVectorField& mfvec,
         int lev,
         int idim);
-    void ApplyFilterJ (
-        const ablastr::fields::MultiLevelVectorField& current,
+    void ApplyFilterMF (
+        const ablastr::fields::MultiLevelVectorField& mfvec,
         int lev);
     void SumBoundaryJ (
         const ablastr::fields::MultiLevelVectorField& current,
@@ -1425,6 +1436,9 @@ private:
 #endif
     amrex::Real v_particle_pml;
 
+    // Insulator boundary conditions
+    std::unique_ptr<PEC_Insulator> pec_insulator_boundary;
+
     // External fields parameters
     std::unique_ptr<ExternalFieldParams> m_p_ext_field_params;
 
@@ -1438,6 +1452,9 @@ private:
     // Timestepping parameters
     std::optional<amrex::Real> m_const_dt;
     std::optional<amrex::Real> m_max_dt;
+
+    // whether to use subcycling
+    bool m_do_subcycling = false;
 
     // Macroscopic properties
     std::unique_ptr<MacroscopicProperties> m_macroscopic_properties;
@@ -1583,8 +1600,6 @@ private:
      */
     void HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num_moved);
 
-    void ScrapeParticles ();
-
     /** Update the E and B fields in the explicit em PIC scheme.
      *
      * At the beginning, we have B^{n} and E^{n}.
@@ -1592,7 +1607,7 @@ private:
      */
     void ExplicitFillBoundaryEBUpdateAux ();
 
-    void PushPSATD ();
+    void PushPSATD (amrex::Real start_time);
 
 #ifdef WARPX_USE_FFT
 

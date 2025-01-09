@@ -14,15 +14,9 @@
 # Possible running time: ~ 19 s
 
 import glob
-import os
-import re
-import sys
 
 import numpy as np
 import yt
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 files = sorted(glob.glob("diags/diag1*"))[1:]
 assert len(files) > 0
@@ -45,11 +39,3 @@ expected_potentials_hi = 450.0 * np.sin(2.0 * np.pi * 13.56e6 * times)
 
 assert np.allclose(potentials_lo, expected_potentials_lo, rtol=0.1)
 assert np.allclose(potentials_hi, expected_potentials_hi, rtol=0.1)
-
-# compare checksums
-test_name = os.path.split(os.getcwd())[1]
-test_name = re.sub("_picmi", "", test_name)  # same checksums for PICMI test
-evaluate_checksum(
-    test_name=test_name,
-    output_file=sys.argv[1],
-)

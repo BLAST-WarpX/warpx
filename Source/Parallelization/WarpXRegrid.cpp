@@ -320,7 +320,7 @@ WarpX::ComputeCostsHeuristic (amrex::Vector<std::unique_ptr<amrex::LayoutData<am
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        const auto & mypc_ref = GetInstance().GetPartContainer();
+        const auto & mypc_ref = GetPartContainer();
         const auto nSpecies = mypc_ref.nSpecies();
 
         // Species loop

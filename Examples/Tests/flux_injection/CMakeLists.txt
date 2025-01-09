@@ -6,8 +6,8 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_flux_injection  # inputs
-    analysis_flux_injection_3d.py  # analysis
-    diags/diag1000002  # output
+    "analysis_flux_injection_3d.py diags/diag1000002"  # analysis
+    "analysis_default_regression.py --path diags/diag1000002"  # checksum
     OFF  # dependency
 )
 
@@ -16,8 +16,8 @@ add_warpx_test(
     RZ  # dims
     2  # nprocs
     inputs_test_rz_flux_injection  # inputs
-    analysis_flux_injection_rz.py  # analysis
-    diags/diag1000120  # output
+    "analysis_flux_injection_rz.py diags/diag1000120"  # analysis
+    "analysis_default_regression.py --path diags/diag1000120"  # checksum
     OFF  # dependency
 )
 
@@ -26,8 +26,8 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_flux_injection_from_eb  # inputs
-    analysis_flux_injection_from_eb.py  # analysis
-    diags/diag1000010  # output
+    "analysis_flux_injection_from_eb.py diags/diag1000010"  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
     OFF  # dependency
 )
 
@@ -36,8 +36,8 @@ add_warpx_test(
     RZ  # dims
     2  # nprocs
     inputs_test_rz_flux_injection_from_eb  # inputs
-    analysis_flux_injection_from_eb.py  # analysis
-    diags/diag1000010  # output
+    "analysis_flux_injection_from_eb.py diags/diag1000010"  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
     OFF  # dependency
 )
 
@@ -46,7 +46,7 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_flux_injection_from_eb  # inputs
-    analysis_flux_injection_from_eb.py  # analysis
-    diags/diag1000010  # output
+    "analysis_flux_injection_from_eb.py diags/diag1000010"  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
     OFF  # dependency
 )

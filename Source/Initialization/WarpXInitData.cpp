@@ -278,6 +278,10 @@ WarpX::PrintMainPICparameters ()
       amrex::Print() << "Operation mode:       | Electrostatic" << "\n";
       amrex::Print() << "                      | - laboratory frame, electrostatic + magnetostatic" << "\n";
     }
+    else if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameEffectivePotential){
+      amrex::Print() << "Operation mode:       | Electrostatic" << "\n";
+      amrex::Print() << "                      | - laboratory frame, effective potential scheme" << "\n";
+    }
     else{
       amrex::Print() << "Operation mode:       | Electromagnetic" << "\n";
     }
@@ -688,15 +692,15 @@ WarpX::InitFromScratch ()
         // Add space to save the positions and velocities at the start of the time steps
         for (auto const& pc : *mypc) {
 #if (AMREX_SPACEDIM >= 2)
-            pc->AddRealComp("x_n");
+            pc->NewRealComp("x_n");
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-            pc->AddRealComp("y_n");
+            pc->NewRealComp("y_n");
 #endif
-            pc->AddRealComp("z_n");
-            pc->AddRealComp("ux_n");
-            pc->AddRealComp("uy_n");
-            pc->AddRealComp("uz_n");
+            pc->NewRealComp("z_n");
+            pc->NewRealComp("ux_n");
+            pc->NewRealComp("uy_n");
+            pc->NewRealComp("uz_n");
         }
 
     }
@@ -846,7 +850,7 @@ WarpX::computeMaxStepBoostAccelerator() {
     const Real interaction_time_boost = (len_plasma_boost-zmin_domain_boost_step_0)/
         (moving_window_v-v_plasma_boost);
     // Divide by dt, and update value of max_step.
-    const auto computed_max_step = (do_subcycling)?
+    const auto computed_max_step = (m_do_subcycling)?
         static_cast<int>(interaction_time_boost/dt[0]):
         static_cast<int>(interaction_time_boost/dt[maxLevel()]);
     max_step = computed_max_step;
