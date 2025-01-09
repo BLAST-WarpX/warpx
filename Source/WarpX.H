@@ -902,6 +902,7 @@ public:
 
     // Magnetostatic Solver Interface
     MagnetostaticSolver::VectorPoissonBoundaryHandler m_vector_poisson_boundary_handler;
+    int magnetostatic_solver_max_iters = 200;
     void ComputeMagnetostaticField ();
     void AddMagnetostaticFieldLabFrame ();
     void computeVectorPotential (ablastr::fields::MultiLevelVectorField const& curr,

@@ -684,6 +684,7 @@ WarpX::ReadParameters ()
         poisson_solver_id!=PoissonSolverAlgo::IntegratedGreenFunction,
         "To use the FFT Poisson solver, compile with WARPX_USE_FFT=ON.");
 #endif
+        utils::parser::queryWithParser(pp_warpx, "self_fields_max_iters", magnetostatic_solver_max_iters);
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         (

@@ -65,14 +65,6 @@ Microelectronics
 * `ARTEMIS manual <https://artemis-em.readthedocs.io>`__
 
 
-Nuclear Fusion
---------------
-
-.. note::
-
-   TODO
-
-
 Fundamental Plasma Physics
 --------------------------
 
