@@ -415,23 +415,29 @@ MultiParticleContainer::AllocData ()
 void
 MultiParticleContainer::InitData ()
 {
+    InitMultiPhysicsModules();
+
     for (auto& pc : allcontainers) {
         pc->InitData();
     }
     pc_tmp->InitData();
 
-    InitMultiPhysicsModules();
+    // Setup particle collisions
+    collisionhandler = std::make_unique<CollisionHandler>(this);
 }
 
 void
 MultiParticleContainer::PostRestart ()
 {
+    InitMultiPhysicsModules();
+
     for (auto& pc : allcontainers) {
         pc->PostRestart();
     }
     pc_tmp->PostRestart();
 
-    InitMultiPhysicsModules();
+    // Setup particle collisions
+    collisionhandler = std::make_unique<CollisionHandler>(this);
 }
 
 void
@@ -450,9 +456,6 @@ MultiParticleContainer::InitMultiPhysicsModules ()
     InitQED();
     CheckQEDProductSpecies();
 #endif
-
-    // Setup particle collisions
-    collisionhandler = std::make_unique<CollisionHandler>(this);
 }
 
 void

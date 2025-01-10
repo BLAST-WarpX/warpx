@@ -19,6 +19,7 @@ PolicyVec getPolicies (const NameMap& names) noexcept
     h_policies.resize(names.size());
     for (const auto& kv : names)
     {
+        //amrex::Print() << "getPolicies: " << kv.first << " " << kv.second << std::endl;
         h_policies[kv.second] = initialization_policies[kv.first];
     }
 

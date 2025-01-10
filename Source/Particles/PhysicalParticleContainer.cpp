@@ -219,6 +219,90 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core,
       species_name(name)
 {
     BackwardCompatibility();
+
+    const ParmParse pp_species_name(species_name);
+
+    // species type
+    {
+        // Setup the charge and mass. There are multiple ways that they can be specified, so checks are needed to
+        // ensure that a value is specified and warnings given if multiple values are specified.
+        // The ordering is that species.charge and species.mass take precedence over all other values.
+        // Next is charge and mass determined from species_type.
+        // Last is charge and mass from the plasma injector setup
+        bool charge_from_source = false;
+        bool mass_from_source = false;
+        for (auto const& plasma_injector : plasma_injectors) {
+            // For now, use the last value for charge and mass that is found.
+            // A check could be added for consistency of multiple values, but it'll probably never be needed
+            charge_from_source |= plasma_injector->queryCharge(charge);
+            mass_from_source |= plasma_injector->queryMass(mass);
+        }
+
+        std::string physical_species_s;
+        const bool species_is_specified = pp_species_name.query("species_type", physical_species_s);
+        if (species_is_specified) {
+            const auto physical_species_from_string = species::from_string( physical_species_s );
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(physical_species_from_string,
+                                             physical_species_s + " does not exist!");
+            physical_species = physical_species_from_string.value();
+            charge = species::get_charge( physical_species );
+            mass = species::get_mass( physical_species );
+        }
+
+        // parse charge and mass (overriding values of an earlier species type)
+        const bool charge_is_specified = utils::parser::queryWithParser(pp_species_name, "charge", charge);
+        const bool mass_is_specified = utils::parser::queryWithParser(pp_species_name, "mass", mass);
+
+        if (charge_is_specified && species_is_specified) {
+            ablastr::warn_manager::WMRecordWarning("Species",
+                                                   "Both '" + species_name +  ".charge' and " +
+                                                   species_name + ".species_type' are specified.\n" +
+                                                   species_name + ".charge' will take precedence.\n");
+        }
+        if (mass_is_specified && species_is_specified) {
+            ablastr::warn_manager::WMRecordWarning("Species",
+                                                   "Both '" + species_name +  ".mass' and " +
+                                                   species_name + ".species_type' are specified.\n" +
+                                                   species_name + ".mass' will take precedence.\n");
+        }
+
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                charge_from_source ||
+                charge_is_specified ||
+                species_is_specified,
+                "Need to specify at least one of species_type or charge for species '" +
+                species_name + "'."
+        );
+
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                mass_from_source ||
+                mass_is_specified ||
+                species_is_specified,
+                "Need to specify at least one of species_type or mass for species '" +
+                species_name + "'."
+        );
+    }
+
+    // add runtime components
+    {
+        pp_species_name.query("do_field_ionization", do_field_ionization);
+        if (do_field_ionization) {
+            // Add runtime integer component for ionization level
+            NewIntComp("ionizationLevel");
+        }
+
+#ifdef WARPX_QED
+        pp_species_name.query("do_qed_quantum_sync", m_do_qed_quantum_sync);
+        if (m_do_qed_quantum_sync) {
+            NewRealComp("opticalDepthQSR");
+        }
+
+        if (m_do_qed_quantum_sync) {
+            pp_species_name.get("qed_quantum_sync_phot_product_species",
+                                m_qed_quantum_sync_phot_product_name);
+        }
+#endif
+    }
 }
 
 PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core)
@@ -266,64 +350,6 @@ void PhysicalParticleContainer::InitData ()
                                                                     source_name));
     }
 
-    // Setup the charge and mass. There are multiple ways that they can be specified, so checks are needed to
-    // ensure that a value is specified and warnings given if multiple values are specified.
-    // The ordering is that species.charge and species.mass take precedence over all other values.
-    // Next is charge and mass determined from species_type.
-    // Last is charge and mass from the plasma injector setup
-    bool charge_from_source = false;
-    bool mass_from_source = false;
-    for (auto const& plasma_injector : plasma_injectors) {
-        // For now, use the last value for charge and mass that is found.
-        // A check could be added for consistency of multiple values, but it'll probably never be needed
-        charge_from_source |= plasma_injector->queryCharge(charge);
-        mass_from_source |= plasma_injector->queryMass(mass);
-    }
-
-    std::string physical_species_s;
-    const bool species_is_specified = pp_species_name.query("species_type", physical_species_s);
-    if (species_is_specified) {
-        const auto physical_species_from_string = species::from_string( physical_species_s );
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(physical_species_from_string,
-            physical_species_s + " does not exist!");
-        physical_species = physical_species_from_string.value();
-        charge = species::get_charge( physical_species );
-        mass = species::get_mass( physical_species );
-    }
-
-    // parse charge and mass (overriding values above)
-    const bool charge_is_specified = utils::parser::queryWithParser(pp_species_name, "charge", charge);
-    const bool mass_is_specified = utils::parser::queryWithParser(pp_species_name, "mass", mass);
-
-    if (charge_is_specified && species_is_specified) {
-        ablastr::warn_manager::WMRecordWarning("Species",
-            "Both '" + species_name +  ".charge' and " +
-                species_name + ".species_type' are specified.\n" +
-                species_name + ".charge' will take precedence.\n");
-    }
-    if (mass_is_specified && species_is_specified) {
-        ablastr::warn_manager::WMRecordWarning("Species",
-            "Both '" + species_name +  ".mass' and " +
-                species_name + ".species_type' are specified.\n" +
-                species_name + ".mass' will take precedence.\n");
-    }
-
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        charge_from_source ||
-        charge_is_specified ||
-        species_is_specified,
-        "Need to specify at least one of species_type or charge for species '" +
-        species_name + "'."
-    );
-
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        mass_from_source ||
-        mass_is_specified ||
-        species_is_specified,
-        "Need to specify at least one of species_type or mass for species '" +
-        species_name + "'."
-    );
-
     pp_species_name.query("boost_adjust_transverse_positions", boost_adjust_transverse_positions);
     pp_species_name.query("do_backward_propagation", do_backward_propagation);
     pp_species_name.query("random_theta", m_rz_random_theta);
@@ -345,8 +371,6 @@ void PhysicalParticleContainer::InitData ()
         pp_species_name, "self_fields_max_iters", self_fields_max_iters);
     pp_species_name.query("self_fields_verbosity", self_fields_verbosity);
 
-    pp_species_name.query("do_field_ionization", do_field_ionization);
-
     pp_species_name.query("do_resampling", do_resampling);
     if (do_resampling) { m_resampler = Resampling(species_name); }
 
@@ -367,18 +391,6 @@ void PhysicalParticleContainer::InitData ()
         WarpX::particle_pusher_algo == ParticlePusherAlgo::Boris,
         "Radiation reaction can be enabled only if Boris pusher is used");
     //_____________________________
-
-#ifdef WARPX_QED
-    pp_species_name.query("do_qed_quantum_sync", m_do_qed_quantum_sync);
-    if (m_do_qed_quantum_sync) {
-        NewRealComp("opticalDepthQSR");
-    }
-
-    if (m_do_qed_quantum_sync){
-        pp_species_name.get("qed_quantum_sync_phot_product_species",
-                            m_qed_quantum_sync_phot_product_name);
-    }
-#endif
 
     // User-defined integer attributes
     pp_species_name.queryarr("addIntegerAttributes", m_user_int_attribs);
@@ -3118,8 +3130,7 @@ PhysicalParticleContainer::InitIonizationModule ()
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         physical_element == "H" || !do_adk_correction,
         "Correction to ADK by Zhang et al., PRA 90, 043410 (2014) only works with Hydrogen");
-    // Add runtime integer component for ionization level
-    NewIntComp("ionizationLevel");
+
     // Get atomic number and ionization energies from file
     const int ion_element_id = utils::physics::ion_map_ids.at(physical_element);
     ion_atomic_number = utils::physics::ion_atomic_numbers[ion_element_id];
