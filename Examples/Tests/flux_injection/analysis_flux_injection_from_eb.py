@@ -79,7 +79,7 @@ def compare_gaussian(u, w, u_th, label=""):
     w_th = Ntot * gaussian_dist(u_hist, u_th)
     plt.plot(u_hist, w_hist, label=label + ": simulation")
     plt.plot(u_hist, w_th, "--", label=label + ": theory")
-    assert np.allclose(w_hist, w_th, atol=0.08 * w_th.max())
+    assert np.allclose(w_hist, w_th, atol=0.07 * w_th.max())
 
 
 def compare_gaussian_flux(u, w, u_th, u_m, label=""):
