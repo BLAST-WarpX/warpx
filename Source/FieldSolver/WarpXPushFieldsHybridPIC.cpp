@@ -85,7 +85,7 @@ void WarpX::HybridPICEvolveFields ()
     {
         // copy rho_fp_temp to hybrid_electron_fl->name_mf_N
         m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->setVal(0);
-        MultiFab::Copy( *m_fields.get(hybrid_electron_fl->name_mf_N, finest_level), 
+        MultiFab::Copy( *m_fields.get(hybrid_electron_fl->name_mf_N, finest_level),
                         *m_fields.get(FieldType::hybrid_rho_fp_temp, finest_level),
                         0, 0, 1, m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->nGrowVect());
         // Calculate Ke
@@ -217,7 +217,7 @@ void WarpX::HybridPICEvolveFields ()
 
         // Update ne to n+1 before updating Te so the calculation is consistent
         m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->setVal(0);
-        MultiFab::Copy( *m_fields.get(hybrid_electron_fl->name_mf_N, finest_level), 
+        MultiFab::Copy( *m_fields.get(hybrid_electron_fl->name_mf_N, finest_level),
                         *m_fields.get(FieldType::rho_fp, finest_level),
                         0, 0, 1, m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->nGrowVect());
 

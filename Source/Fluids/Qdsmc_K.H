@@ -107,7 +107,7 @@ void gather_vector_field_qdsmc(const amrex::ParticleReal x0p,
     for         (int ioff = 0; ioff < 2; ++ioff){
         for     (int joff = 0; joff < 2; ++joff){
             for (int koff = 0; koff < 2; ++koff){
-                
+
                 amrex::IntVect c(i0p+ioff, j0p+joff, k0p+koff);
                 if (bx.contains(c)){ // Check if the cell is within the tile's box
                     field_x_p += sx[ioff]*sy[joff]*sz[koff]*field_x_arr(i0p+ioff,j0p+joff,k0p+koff);

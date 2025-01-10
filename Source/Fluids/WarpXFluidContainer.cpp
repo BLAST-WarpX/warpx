@@ -1422,7 +1422,7 @@ void WarpXFluidContainer::HybridInitializeUe (
     WarpX &warpx = WarpX::GetInstance();
     const amrex::Geometry &geom = warpx.Geom(lev);
     const amrex::Periodicity &period = geom.periodicity();
-    
+
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
@@ -1582,7 +1582,7 @@ void WarpXFluidContainer::HybridUpdateTe (ablastr::fields::MultiFabRegister& m_f
             amrex::Array4<amrex::Real> const& Ke = m_fields.get(name_mf_K, lev)->array(mfi);
             amrex::Array4<amrex::Real> const& Te = m_fields.get(name_mf_T, lev)->array(mfi);
             amrex::Array4<amrex::Real> const& weights = m_fields.get(name_mf_weights, lev)->array(mfi);
-            
+
             const Box& tilebox  = mfi.tilebox();
             amrex::Box box = amrex::convert( tilebox, ix_type );
             box.grow(m_fields.get(name_mf_K, lev)->nGrowVect());

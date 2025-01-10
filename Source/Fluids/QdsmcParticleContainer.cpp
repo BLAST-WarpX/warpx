@@ -479,14 +479,14 @@ QdsmcParticleContainer::DepositK(int lev, amrex::MultiFab &Kfield)
 
 
 
-// Auxiliary function, should generalize the function above 
+// Auxiliary function, should generalize the function above
 // to deposit a particle property (passed as argument)
 // to a multifab passed as argument
 void
 QdsmcParticleContainer::DepositField(int lev, amrex::MultiFab &Field)
 {
     const amrex::XDim3 dinv = WarpX::InvCellSize(lev);
-    
+
     WarpX &warpx = WarpX::GetInstance();
     const amrex::Geometry &geom = warpx.Geom(lev);
     const amrex::Periodicity &period = geom.periodicity();
