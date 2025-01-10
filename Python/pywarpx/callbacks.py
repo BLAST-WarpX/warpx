@@ -406,13 +406,16 @@ def callfromafterInitEsolve(f):
 def installafterInitEsolve(f):
     installcallback("afterInitEsolve", f)
 
+
 # ----------------------------------------------------------------------------
 def callfromafterInitatRestart(f):
     installcallback("afterInitatRestart", f)
     return f
 
+
 def installafterInitatRestart(f):
     installcallback("afterInitatRestart", f)
+
 
 # ----------------------------------------------------------------------------
 def callfromafterinit(f):
