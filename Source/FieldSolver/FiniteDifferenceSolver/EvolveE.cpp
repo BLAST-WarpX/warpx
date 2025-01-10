@@ -295,7 +295,7 @@ void FiniteDifferenceSolver::EvolveECylindrical (
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
 
                 // Skip field push in the embedded boundaries
-                if (update_Er_arr && update_Er_arr(i, j, k) == 0) { return; }
+                if (update_Er_arr && update_Er_arr(i, j, 0) == 0) { return; }
 
                 Real const r = rmin + (i + 0.5_rt)*dr; // r on cell-centered point (Er is cell-centered in r)
                 Er(i, j, 0, 0) +=  c2 * dt*(
@@ -316,7 +316,7 @@ void FiniteDifferenceSolver::EvolveECylindrical (
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
 
                 // Skip field push in the embedded boundaries
-                if (update_Et_arr && update_Et_arr(i, j, k) == 0) { return; }
+                if (update_Et_arr && update_Et_arr(i, j, 0) == 0) { return; }
 
                 Real const r = rmin + i*dr; // r on a nodal grid (Et is nodal in r)
                 if (r != 0) { // Off-axis, regular Maxwell equations
@@ -361,7 +361,7 @@ void FiniteDifferenceSolver::EvolveECylindrical (
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
 
                 // Skip field push in the embedded boundaries
-                if (update_Ez_arr && update_Ez_arr(i, j, k) == 0) { return; }
+                if (update_Ez_arr && update_Ez_arr(i, j, 0) == 0) { return; }
 
                 Real const r = rmin + i*dr; // r on a nodal grid (Ez is nodal in r)
                 if (r != 0) { // Off-axis, regular Maxwell equations
