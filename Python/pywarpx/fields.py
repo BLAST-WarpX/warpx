@@ -1084,6 +1084,13 @@ def Ke_HybridWrapper(level=0, include_ghosts=False):
     )
 
 
+def fluid_weights_HybridWrapper(level=0, include_ghosts=False):
+    return _MultiFABWrapper(
+        mf_name="fluid_qdsmc_weights_electrons_hybrid",
+        level=level,
+        include_ghosts=include_ghosts,
+    )
+
 def Hybrid_Pe_Wrapper(level=0, include_ghosts=False):
     return _MultiFABWrapper(
         mf_name="hybrid_electron_pressure_fp",

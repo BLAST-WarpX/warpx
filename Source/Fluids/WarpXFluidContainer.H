@@ -204,6 +204,7 @@ public:
     std::string name_mf_NU = "fluid_momentum_density_"+species_name;
     std::string name_mf_T = "fluid_temperature_"+species_name;
     std::string name_mf_K = "fluid_entropy_"+species_name;
+    std::string name_mf_weights = "fluid_qdsmc_weights_"+species_name;
 
 };
 

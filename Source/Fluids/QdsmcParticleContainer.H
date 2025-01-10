@@ -110,6 +110,9 @@ public:
     // then calls Redistribute()
     void ResetParticles(int lev);
 
+    // REMOVE
+    void DepositField(int lev, amrex::MultiFab &Field);
+
 };
 
 #endif // WARPX_QdsmcParticleContainer_H_

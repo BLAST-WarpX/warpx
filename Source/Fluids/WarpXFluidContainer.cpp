@@ -172,6 +172,10 @@ void WarpXFluidContainer::AllocateLevelMFs(ablastr::fields::MultiFabRegister& fi
             name_mf_K, lev, amrex::convert(ba, amrex::IntVect::TheNodeVector()), dm,
             ncomps, nguards, 0.0_rt);
 
+    fields.alloc_init(
+            name_mf_weights, lev, amrex::convert(ba, amrex::IntVect::TheNodeVector()), dm,
+            ncomps, nguards, 0.0_rt);
+
 }
 
 void WarpXFluidContainer::InitData(ablastr::fields::MultiFabRegister& fields, amrex::Box init_box, amrex::Real cur_time, int lev)
@@ -1432,7 +1436,8 @@ void WarpXFluidContainer::HybridInitializeUe (
 
     const auto ix_type = m_fields.get(name_mf_NU, Direction{0}, lev)->ixType().toIntVect();
 
-    ablastr::fields::ScalarField rho_fp = m_fields.get(FieldType::rho_fp, lev);
+    //ablastr::fields::ScalarField rho_fp = m_fields.get(FieldType::rho_fp, lev);
+
     ablastr::fields::VectorField current_fp_ampere = m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
 
     // Index type required for interpolating fields from their respective
@@ -1449,9 +1454,9 @@ void WarpXFluidContainer::HybridInitializeUe (
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-    for ( MFIter mfi(*rho_fp, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+    for ( MFIter mfi(*m_fields.get(name_mf_N, lev), TilingIfNotGPU()); mfi.isValid(); ++mfi )
         {
-            amrex::Array4<amrex::Real> const& rho = rho_fp->array(mfi);
+            amrex::Array4<amrex::Real> const& rho = m_fields.get(name_mf_N, lev)->array(mfi);
 
             amrex::Array4<amrex::Real> const& Jx = current_fp_ampere[0]->array(mfi);
             amrex::Array4<amrex::Real> const& Jy = current_fp_ampere[1]->array(mfi);
@@ -1517,7 +1522,7 @@ void WarpXFluidContainer::HybridInitializeKe (ablastr::fields::MultiFabRegister&
 
     const auto ix_type = m_fields.get(name_mf_K, lev)->ixType().toIntVect();
 
-    ablastr::fields::ScalarField rho_fp = m_fields.get(FieldType::rho_fp, lev);
+    //ablastr::fields::ScalarField rho_fp = m_fields.get(FieldType::rho_fp, lev);
 
     // For safety condition (divition by rho)
     amrex::Real rho_floor = PhysConst::q_e*n_floor;
@@ -1525,9 +1530,9 @@ void WarpXFluidContainer::HybridInitializeKe (ablastr::fields::MultiFabRegister&
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-    for ( MFIter mfi(*rho_fp, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+    for ( MFIter mfi(*m_fields.get(name_mf_N, lev), TilingIfNotGPU()); mfi.isValid(); ++mfi )
         {
-            amrex::Array4<amrex::Real> const& rho = rho_fp->array(mfi);
+            amrex::Array4<amrex::Real> const& rho = m_fields.get(name_mf_N, lev)->array(mfi);
             amrex::Array4<amrex::Real> const& Te = m_fields.get(name_mf_T, lev)->array(mfi);
             amrex::Array4<amrex::Real> const& Ke = m_fields.get(name_mf_K, lev)->array(mfi);
 
@@ -1563,8 +1568,6 @@ void WarpXFluidContainer::HybridUpdateTe (ablastr::fields::MultiFabRegister& m_f
     const auto dx = geom.CellSizeArray();
     const auto cell_volume = dx[0]*dx[1]*dx[2];
 
-    ablastr::fields::ScalarField rho_fp = m_fields.get(FieldType::rho_fp, lev);
-
     // Set Te to 0
     m_fields.get(name_mf_T, lev)->setVal(0);
 
@@ -1573,12 +1576,13 @@ void WarpXFluidContainer::HybridUpdateTe (ablastr::fields::MultiFabRegister& m_f
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-    for ( MFIter mfi(*rho_fp, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+    for ( MFIter mfi(*m_fields.get(name_mf_N, lev), TilingIfNotGPU()); mfi.isValid(); ++mfi )
         {
-            amrex::Array4<amrex::Real> const& rho = rho_fp->array(mfi);
+            amrex::Array4<amrex::Real> const& rho = m_fields.get(name_mf_N, lev)->array(mfi);
             amrex::Array4<amrex::Real> const& Ke = m_fields.get(name_mf_K, lev)->array(mfi);
             amrex::Array4<amrex::Real> const& Te = m_fields.get(name_mf_T, lev)->array(mfi);
-
+            amrex::Array4<amrex::Real> const& weights = m_fields.get(name_mf_weights, lev)->array(mfi);
+            
             const Box& tilebox  = mfi.tilebox();
             amrex::Box box = amrex::convert( tilebox, ix_type );
             box.grow(m_fields.get(name_mf_K, lev)->nGrowVect());
@@ -1590,9 +1594,13 @@ void WarpXFluidContainer::HybridUpdateTe (ablastr::fields::MultiFabRegister& m_f
                     if(ne<n_floor){
                         ne = n_floor;
                     }
-                    // this is needed since qdsmc particles advect Ke*N_cell where N_cell (Ne in Topanga paper) is the # of electrons in each cell
-                    amrex::Real N_cell = ne*cell_volume;
-                    Te(i, j, k) = (Ke(i, j, k)*PhysConst::q_e/std::pow(ne, 1-gamma))/N_cell; // Te in Joules
+                    amrex::Real weight = weights(i,j,k);
+                    if(weight<=0){
+                        weight = n_floor;
+                    }
+                    weight = weight*cell_volume;
+
+                    Te(i, j, k) = (Ke(i, j, k)*PhysConst::q_e/std::pow(ne, 1-gamma))/weight; // Te in Joules
                 }
             });
         }

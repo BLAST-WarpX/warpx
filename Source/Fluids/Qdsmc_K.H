@@ -20,7 +20,7 @@
  * Qdsmc particles x0,y0,z0 positions should at nodes positions
  * at the beginning of every step, so the field gathering
  * does not require any interpolation, it only needs to read
- * the values from the nodes.
+ * the values from the nodes. Interpolation added but not needed.
  */
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void gather_density_entropy(const amrex::ParticleReal x0p,
@@ -43,11 +43,28 @@ void gather_density_entropy(const amrex::ParticleReal x0p,
     int j0p = std::floor(y);
     int k0p = std::floor(z);
 
-    amrex::IntVect c(i0p, j0p, k0p);
-    if (bx.contains(c)){ // Check if the cell is within the tile's box
-        n_p = rho_arr(i0p,j0p,k0p)*cell_volume/PhysConst::q_e;
-        kn_p = K_arr(i0p,j0p,k0p)*n_p;
-    }     
+    amrex::Real dip = x - i0p;
+    amrex::Real djp = y - j0p;
+    amrex::Real dkp = z - k0p;
+
+    amrex:: Real sx[] = {1.-dip, dip};
+    amrex:: Real sy[] = {1.-djp, djp};
+    amrex:: Real sz[] = {1.-dkp, dkp};
+
+    for         (int ioff = 0; ioff < 2; ++ioff){
+        for     (int joff = 0; joff < 2; ++joff){
+            for (int koff = 0; koff < 2; ++koff){
+
+                amrex::IntVect c(i0p+ioff, j0p+joff, k0p+koff);
+                if (bx.contains(c)){ // Check if the cell is within the tile's box
+                    n_p += sx[ioff]*sy[joff]*sz[koff]*rho_arr(i0p+ioff,j0p+joff,k0p+koff)*cell_volume/PhysConst::q_e;
+                    kn_p += sx[ioff]*sy[joff]*sz[koff]*K_arr(i0p+ioff,j0p+joff,k0p+koff);
+                }
+            }
+        }
+    }
+    kn_p = kn_p*n_p;
+
 }
 
 
@@ -55,7 +72,7 @@ void gather_density_entropy(const amrex::ParticleReal x0p,
  * Qdsmc particles x0,y0,z0 positions should be at nodes positions
  * at the beginning of every step, so the field gathering
  * does not require any interpolation, it only needs to read
- * the values from the nodes.
+ * the values from the nodes. Interpolation added but not needed.
  */
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void gather_vector_field_qdsmc(const amrex::ParticleReal x0p,
@@ -79,13 +96,27 @@ void gather_vector_field_qdsmc(const amrex::ParticleReal x0p,
     int j0p = std::floor(y);
     int k0p = std::floor(z);
 
-    amrex::IntVect c(i0p, j0p, k0p);
-    if (bx.contains(c)){ // Check if the cell is within the tile's box
-        field_x_p = field_x_arr(i0p,j0p,k0p);
-        field_y_p = field_y_arr(i0p,j0p,k0p);
-        field_z_p = field_z_arr(i0p,j0p,k0p);
-    }    
+    amrex::Real dip = x - i0p;
+    amrex::Real djp = y - j0p;
+    amrex::Real dkp = z - k0p;
 
+    amrex:: Real sx[] = {1.-dip, dip};
+    amrex:: Real sy[] = {1.-djp, djp};
+    amrex:: Real sz[] = {1.-dkp, dkp};
+
+    for         (int ioff = 0; ioff < 2; ++ioff){
+        for     (int joff = 0; joff < 2; ++joff){
+            for (int koff = 0; koff < 2; ++koff){
+                
+                amrex::IntVect c(i0p+ioff, j0p+joff, k0p+koff);
+                if (bx.contains(c)){ // Check if the cell is within the tile's box
+                    field_x_p += sx[ioff]*sy[joff]*sz[koff]*field_x_arr(i0p+ioff,j0p+joff,k0p+koff);
+                    field_y_p += sx[ioff]*sy[joff]*sz[koff]*field_y_arr(i0p+ioff,j0p+joff,k0p+koff);
+                    field_z_p += sx[ioff]*sy[joff]*sz[koff]*field_z_arr(i0p+ioff,j0p+joff,k0p+koff);
+                }
+            }
+        }
+    }
 }
 
 

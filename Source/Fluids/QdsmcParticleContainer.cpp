@@ -264,13 +264,11 @@ QdsmcParticleContainer::SetV (int lev,
         const auto &arrUyfield = Uy[pti].array();
         const auto &arrUzfield = Uz[pti].array();
 
-        // Gather drift velocity directly from nodes since
-        // particles are located at the node positions before PushX
         amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (long ip)
         {
-            amrex::Real vxp;
-            amrex::Real vyp;
-            amrex::Real vzp;
+            amrex::Real vxp = 0;
+            amrex::Real vyp = 0;
+            amrex::Real vzp = 0;
 
             gather_vector_field_qdsmc(part_x0[ip], part_y0[ip], part_z0[ip], vxp, vyp, vzp, arrUxfield, arrUyfield, arrUzfield, plo, dinv, box);
 
@@ -317,12 +315,10 @@ QdsmcParticleContainer::SetK (int lev,
         const auto &arrKfield = Kfield[pti].array();
         const auto &arrrhofield = rhofield[pti].array();
 
-        // Gather entropy and density directly from nodes
-        // since particles are located at the node positions before PushX
         amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (long ip)
         {
-            amrex::Real n_p;
-            amrex::Real kn_p;
+            amrex::Real n_p = 0;
+            amrex::Real kn_p = 0;
 
             gather_density_entropy(part_x0[ip], part_y0[ip], part_z0[ip], n_p, kn_p, arrrhofield, arrKfield, plo, dinv, cell_volume, box);
 
@@ -479,5 +475,64 @@ QdsmcParticleContainer::DepositK(int lev, amrex::MultiFab &Kfield)
             Kfield, 0, Kfield.nComp(), Kfield.nGrowVect(), Kfield.nGrowVect(),
             WarpX::do_single_precision_comms, period);
 
-    //amrex::Gpu::streamSynchronize();
+}
+
+
+
+// Auxiliary function, should generalize the function above 
+// to deposit a particle property (passed as argument)
+// to a multifab passed as argument
+void
+QdsmcParticleContainer::DepositField(int lev, amrex::MultiFab &Field)
+{
+    const amrex::XDim3 dinv = WarpX::InvCellSize(lev);
+    
+    WarpX &warpx = WarpX::GetInstance();
+    const amrex::Geometry &geom = warpx.Geom(lev);
+    const amrex::Periodicity &period = geom.periodicity();
+    auto plo = geom.ProbLoArray();
+
+    const amrex::Real* dx = warpx.Geom(lev).CellSize();
+
+    Field.setVal(0);
+
+    const auto ix_type = Field.ixType().toIntVect();
+
+    for (iterator pti(*this, lev); pti.isValid(); ++pti)
+    {
+        auto const np = pti.numParticles();
+
+        amrex::Box tilebox = pti.tilebox();
+        amrex::Box box = amrex::convert( tilebox, ix_type );
+        box.grow(Field.nGrowVect());
+
+        auto& attribs = pti.GetStructOfArrays().GetRealData();
+
+        amrex::ParticleReal* const AMREX_RESTRICT part_x = attribs[QdsmcPIdx::x].dataPtr();
+        amrex::ParticleReal* const AMREX_RESTRICT part_y = attribs[QdsmcPIdx::y].dataPtr();
+        amrex::ParticleReal* const AMREX_RESTRICT part_z = attribs[QdsmcPIdx::z].dataPtr();
+
+        // should change this so that Deposit receives as argument which value to read from the QdsmcPIdx struct
+        amrex::ParticleReal* const AMREX_RESTRICT part_np_real = attribs[QdsmcPIdx::np_real].dataPtr();
+
+        // change this to just scalarField
+        auto arrField = Field[pti].array();
+
+        // Gather entropy and density directly from nodes
+        // since particles are located at the node positions before PushX
+        amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (long ip)
+        {
+            // avoid launching kernel for "empty" particles
+            if(part_np_real[ip]>0)
+            {
+                amrex::Real val = part_np_real[ip]/(dx[0]*dx[1]*dx[2]);
+                do_deposit_scalar(arrField, part_x[ip], part_y[ip], part_z[ip], plo, dinv, val, box);
+            }
+        });
+    }
+
+    ablastr::utils::communication::SumBoundary(
+            Field, 0, Field.nComp(), Field.nGrowVect(), Field.nGrowVect(),
+            WarpX::do_single_precision_comms, period);
+
 }
