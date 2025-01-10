@@ -292,9 +292,10 @@ WarpX::ScaleAreas (ablastr::fields::VectorField& face_areas,
 }
 
 void
-WarpX::MarkUpdateECells (
-    amrex::EBFArrayBoxFactory const & eb_fact,
-    int const lev )
+WarpX::MarkUpdateCells (
+    std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update,
+    ablastr::fields::VectorField const& field,
+    amrex::EBFArrayBoxFactory const & eb_fact )
 {
 
     using ablastr::fields::Direction;
@@ -305,10 +306,10 @@ WarpX::MarkUpdateECells (
 
     for (int idim = 0; idim < 3; ++idim) {
 
-        for (amrex::MFIter mfi(*m_fields.get(FieldType::Efield_fp, Direction{idim}, lev)); mfi.isValid(); ++mfi) {
+        for (amrex::MFIter mfi(*field[idim]); mfi.isValid(); ++mfi) {
 
             const amrex::Box& box = mfi.tilebox();
-            auto const & update_E_arr = m_eb_update_E[lev][idim]->array(mfi);
+            auto const & eb_update_arr = eb_update[idim]->array(mfi);
 
             // Check if the box (including one layer of guard cells) contains a mix of covered and regular cells
             const amrex::Box& eb_info_box = mfi.tilebox(amrex::IntVect::TheCellVector()).grow(1);
@@ -316,52 +317,52 @@ WarpX::MarkUpdateECells (
 
             if (fab_type == amrex::FabType::regular) { // All cells in the box are regular
 
-                // Every cell in box is all regular: update E in every cell
+                // Every cell in box is all regular: update field in every cell
                 amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                    update_E_arr(i, j, k) = 1;
+                    eb_update_arr(i, j, k) = 1;
                 });
 
             } else if (fab_type == amrex::FabType::covered) { // All cells in the box are covered
 
-                // Every cell in box is all covered: do not update E
+                // Every cell in box is all covered: do not update field
                 amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                    update_E_arr(i, j, k) = 0;
+                    eb_update_arr(i, j, k) = 0;
                 });
 
             } else { // The box contains a mix of covered and regular cells
 
                 auto const & flag = eb_flag[mfi].array();
-                auto index_type = m_fields.get(FieldType::Efield_fp, Direction{idim}, lev)->ixType();
+                auto index_type = field[idim]->ixType();
 
                 amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
 
                     // Stair-case approximation: If neighboring cells are either partially
-                    // or fully covered (i.e. if they are not regular cells): do not update E
+                    // or fully covered (i.e. if they are not regular cells): do not update field
 
-                    int update_E = 1;
+                    int eb_update = 1;
                     // Check neighbors in the first spatial direction
                     if ( index_type.nodeCentered(0) ) {
-                        if ( !flag(i, j, k).isRegular() || !flag(i-1, j, k).isRegular() ) { update_E = 0; }
+                        if ( !flag(i, j, k).isRegular() || !flag(i-1, j, k).isRegular() ) { eb_update = 0; }
                     } else {
-                        if ( !flag(i, j, k).isRegular() ) { update_E = 0; }
+                        if ( !flag(i, j, k).isRegular() ) { eb_update = 0; }
                     }
 #if AMREX_SPACEDIM > 1
                     // Check neighbors in the second spatial direction
                     if ( index_type.nodeCentered(1) ) {
-                        if ( !flag(i, j, k).isRegular() || !flag(i, j-1, k).isRegular() ) { update_E = 0; }
+                        if ( !flag(i, j, k).isRegular() || !flag(i, j-1, k).isRegular() ) { eb_update = 0; }
                     } else {
-                        if ( !flag(i, j, k).isRegular() ) { update_E = 0; }
+                        if ( !flag(i, j, k).isRegular() ) { eb_update = 0; }
                     }
 #endif
 #if AMREX_SPACEDIM > 2
                     // Check neighbors in the third spatial direction
                     if ( index_type.nodeCentered(2) ) {
-                        if ( !flag(i, j, k).isRegular() || !flag(i, j, k-1).isRegular() ) { update_E = 0; }
+                        if ( !flag(i, j, k).isRegular() || !flag(i, j, k-1).isRegular() ) { eb_update = 0; }
                     } else {
-                        if ( !flag(i, j, k).isRegular() ) { update_E = 0; }
+                        if ( !flag(i, j, k).isRegular() ) { eb_update = 0; }
                     }
 #endif
-                    update_E_arr(i, j, k) = update_E;
+                    eb_update_arr(i, j, k) = eb_update;
                 });
 
             // TODO: Handle the case of the ECT solver

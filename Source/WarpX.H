@@ -1013,13 +1013,25 @@ public:
     void InitEB ();
 
 #ifdef AMREX_USE_EB
-    /** Set a flag to indicate which cells are in the valid domain and should be updated
-     * by the field solve, and which cells are in the EB and should not be updated.
-     * TODO: Add detail about criterion for Yee and ECT solver
+    /** Set a flag to indicate on which grid points the field `field`
+     *  should be updated.
+     *
+     * More specifically, this function fill the iMultiFabs in `eb_update`
+     * (which have the same indexType as the MultiFabs in `field`) with 1
+     * or 0, depending on whether the grid point is in the valid region
+     * or in the embedded boundary.
+     *
+     * This uses a stair-case approximation of the embedded boundary
+     * (unless the ECT solver is used): If a grid point touches cells
+     * that are either partially or fully covered by the embedded
+     * boundary: do not update field.
+     *
+     * TODO Discuss ECT solver
      */
-    void MarkUpdateECells (
-        amrex::EBFArrayBoxFactory const & eb_fact,
-        int const lev );
+    void MarkUpdateCells (
+        std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update,
+        ablastr::fields::VectorField const & field,
+        amrex::EBFArrayBoxFactory const & eb_fact );
 
     /**
     * \brief Compute the length of the mesh edges. Here the length is a value in [0, 1].
