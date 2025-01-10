@@ -610,6 +610,9 @@ WarpX::InitData ()
             AddExternalFields(lev);
         }
     }
+    else {
+        ExecutePythonCallback("afterInitatRestart");
+    }
 
     if (restart_chkfile.empty() || write_diagnostics_on_restart) {
         // Write full diagnostics before the first iteration.
