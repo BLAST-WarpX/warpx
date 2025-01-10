@@ -81,16 +81,16 @@ option(WarpX_QED_TABLE_GEN "QED table generation (requires PICSAR and Boost)"
 option(WarpX_QED_TOOLS     "Build external tool to generate QED lookup tables (requires PICSAR and Boost)"
                                                                         OFF)
 
-# Advanced option to automatically clean up CI test directories
-option(WarpX_TEST_CLEANUP "Clean up CI test directories" OFF)
+# Advanced option to run tests
+option(WarpX_TEST_CLEANUP "Clean up test directories (for CI)" OFF)
+option(WarpX_TEST_DEBUGGER "Run tests without AMReX signal handling (to attach debuggers)" OFF)
+option(WarpX_TEST_FPETRAP "Run tests with FPE-trapping runtime parameters (for CI)" OFF)
 mark_as_advanced(WarpX_TEST_CLEANUP)
-
-# Advanced option to run CI tests with FPE-trapping runtime parameters
-option(WarpX_TEST_FPETRAP "Run CI tests with FPE-trapping runtime parameters" OFF)
+mark_as_advanced(WarpX_TEST_DEBUGGER)
 mark_as_advanced(WarpX_TEST_FPETRAP)
 
 # Advanced option to run CI tests with the -g compile option
-option(WarpX_TEST_DEBUG "Run CI tests with the -g compile option" OFF)
+option(WarpX_TEST_DEBUG "Compile tests with -g1 for symbols (for CI)" OFF)
 mark_as_advanced(WarpX_TEST_DEBUG)
 if(WarpX_TEST_DEBUG)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g1")

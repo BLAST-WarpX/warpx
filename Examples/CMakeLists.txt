@@ -145,6 +145,7 @@ function(add_warpx_test
         set(runtime_params
             "amrex.abort_on_unused_inputs = 1"
             "amrex.throw_exception = 1"
+            "amrex.signal_handling = 0"
             "warpx.always_warn_immediately = 1"
             "warpx.do_dynamic_scheduling = 0"
             "warpx.serialize_initial_conditions = 1"
@@ -158,6 +159,9 @@ function(add_warpx_test
                 "amrex.fpe_trap_overflow = 1"
                 "amrex.fpe_trap_zero = 1"
             )
+        endif()
+        if(WarpX_TEST_DEBUGGER)
+            set(runtime_params_fpetrap "amrex.signal_handling = 0")
         endif()
         add_test(
             NAME ${name}.run
