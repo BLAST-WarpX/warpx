@@ -60,6 +60,11 @@ public:
 
     void WriteToFile (int step) const final;
 
+private:
+
+    /// output data    // Array in which to accumulate the luminosity across timesteps
+    amrex::TableData<amrex::Real,2> m_d_data_2D;
+
 };
 
 #endif  // WARPX_DIAGNOSTICS_REDUCEDDIAGS_DIFFERENTIALLUMINOSITY2D_H_

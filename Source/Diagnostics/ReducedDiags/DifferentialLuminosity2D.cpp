@@ -122,6 +122,26 @@ DifferentialLuminosity2D::DifferentialLuminosity2D (const std::string& rd_name)
     m_bin_min_2 = bin_min_2;
     m_bin_size_2 = (bin_max_2 - bin_min_2) / bin_num_2;
 
+
+    // resize data array
+    Array<int,2> tlo{0,0}; // lower bounds
+    Array<int,2> thi{m_bin_num_1-1, m_bin_num_2-1}; // inclusive upper bounds
+    m_h_data_2D.resize(tlo, thi, The_Pinned_Arena());
+
+
+    auto const& h_table_data = m_h_data_2D.table();
+
+    // Initialize data on the host
+    for (int i = tlo[0]; i <= thi[0]; ++i) {
+        for (int j = tlo[1]; j <= thi[1]; ++j) {
+            h_table_data(i,j) = 0.0_rt;
+        }
+    }
+
+    m_d_data_2D.resize(tlo, thi);
+    m_d_data_2D.copy(m_h_data_2D);
+    Gpu::streamSynchronize();
+
 }
 
 void DifferentialLuminosity2D::ComputeDiags (int step)
@@ -130,25 +150,9 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
     amrex::ignore_unused(step);
 #else
 
-    // resize data array
-    Array<int,2> tlo{0,0}; // lower bounds
-    Array<int,2> thi{m_bin_num_1-1, m_bin_num_2-1}; // inclusive upper bounds
-    amrex::TableData<amrex::Real,2> d_data_2D(tlo, thi);
-    m_h_data_2D.resize(tlo, thi, The_Pinned_Arena());
-    auto const& h_table_data = m_h_data_2D.table();
-
-    // Initialize data on the host
-    if(step==0){
-    for (int i = tlo[0]; i <= thi[0]; ++i) {
-        for (int j = tlo[1]; j <= thi[1]; ++j) {
-            h_table_data(i,j) = 0.0_rt;
-        }
-    }}
-
-    d_data_2D.copy(m_h_data_2D);
-    auto d_table = d_data_2D.table();
-
     WARPX_PROFILE("DifferentialLuminosity2D::ComputeDiags");
+
+    auto d_table = m_d_data_2D.table();
 
     // Since this diagnostic *accumulates* the luminosity in the
     // array d_data, we add contributions at *each timestep*, but
@@ -261,7 +265,7 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
                         Real const u2_sq =  u2x[j_2]*u2x[j_2] + u2y[j_2]*u2y[j_2] + u2z[j_2]*u2z[j_2];
                         if (species2_is_photon) {
                             // photon case (momentum is normalized by m_e in WarpX)
-                            p2t = PhysConst::m_e*std::sqrt(u2_sq);
+                            p2t = PhysConst::m_e*std::sqrt( u2_sq );
                             p2x = PhysConst::m_e*u2x[j_2];
                             p2y = PhysConst::m_e*u2y[j_2];
                             p2z = PhysConst::m_e*u2z[j_2];
@@ -299,9 +303,9 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
                         Real const radicand = beta1_sq + beta2_sq - 2*beta1_dot_beta2 - beta1_sq*beta2_sq + beta1_dot_beta2*beta1_dot_beta2;
 
                         Real const d2L_dE1_dE2 = PhysConst::c * std::sqrt( radicand ) * w1[j_1] * w2[j_2] / (dV * bin_size_1 * bin_size_2) * dt; // m^-2 eV^-2
-                        if (d2L_dE1_dE2 < 0){
-                            amrex::Print(0) << "NEGATIVE VALUE!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-                        }
+
+                        //amrex::Print(0) << "DiffLumi 2D = " << d2L_dE1_dE2 << "  bin size 1 = " << bin_size_1 << "  bin size 2 = " << bin_size_2 << "\n";
+
                         amrex::Real &data = d_table(bin_1, bin_2);
                         amrex::HostDevice::Atomic::Add(&data, d2L_dE1_dE2);
 
@@ -318,12 +322,12 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
     if (m_intervals.contains(step+1)) {
 
         // Copy data from GPU memory
-        m_h_data_2D.copy(d_data_2D);
+        m_h_data_2D.copy(m_d_data_2D);
 
         // reduced sum over mpi ranks
-        const int size = static_cast<int> (d_data_2D.size());
+        const int size = static_cast<int> (m_d_data_2D.size());
         ParallelDescriptor::ReduceRealSum
-                (h_table_data.p, size, ParallelDescriptor::IOProcessorNumber());
+                (m_h_data_2D.table().p, size, ParallelDescriptor::IOProcessorNumber());
     }
 
     // Return for all that are not IO processor
@@ -378,7 +382,7 @@ void DifferentialLuminosity2D::WriteToFile (int step) const
     // record components
     auto data = f_mesh[io::RecordComponent::SCALAR];
 
-    data.setUnitSI(std::pow(PhysConst::q_e, -2));
+    //data.setUnitSI(std::pow(PhysConst::q_e, -2));
 
     // meta data
     f_mesh.setAxisLabels({"E2", "E1"}); // ordinate, abscissa
