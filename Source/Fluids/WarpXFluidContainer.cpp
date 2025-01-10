@@ -1436,8 +1436,6 @@ void WarpXFluidContainer::HybridInitializeUe (
 
     const auto ix_type = m_fields.get(name_mf_NU, Direction{0}, lev)->ixType().toIntVect();
 
-    //ablastr::fields::ScalarField rho_fp = m_fields.get(FieldType::rho_fp, lev);
-
     ablastr::fields::VectorField current_fp_ampere = m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
 
     // Index type required for interpolating fields from their respective
@@ -1521,8 +1519,6 @@ void WarpXFluidContainer::HybridInitializeKe (ablastr::fields::MultiFabRegister&
     m_fields.get(name_mf_K, lev)->setVal(0);
 
     const auto ix_type = m_fields.get(name_mf_K, lev)->ixType().toIntVect();
-
-    //ablastr::fields::ScalarField rho_fp = m_fields.get(FieldType::rho_fp, lev);
 
     // For safety condition (divition by rho)
     amrex::Real rho_floor = PhysConst::q_e*n_floor;
