@@ -337,31 +337,33 @@ WarpX::MarkUpdateCells (
                 amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
 
                     // Stair-case approximation: If neighboring cells are either partially
-                    // or fully covered (i.e. if they are not regular cells): do not update field
+                    // or fully covered: do not update field
 
-                    int eb_update = 1;
-                    // Check neighbors in the first spatial direction
-                    if ( index_type.nodeCentered(0) ) {
-                        if ( !flag(i, j, k).isRegular() || !flag(i-1, j, k).isRegular() ) { eb_update = 0; }
-                    } else {
-                        if ( !flag(i, j, k).isRegular() ) { eb_update = 0; }
-                    }
+                    // Check neighbors in the each spatial direction
+                    int i_start = 0;
+                    int j_start = 0;
+                    int k_start = 0;
+                    // If nodal in a given direction, we need to start from -1 (left-neighboring cell)
+                    if ( index_type.nodeCentered(0) ) { i_start = -1; };
 #if AMREX_SPACEDIM > 1
-                    // Check neighbors in the second spatial direction
-                    if ( index_type.nodeCentered(1) ) {
-                        if ( !flag(i, j, k).isRegular() || !flag(i, j-1, k).isRegular() ) { eb_update = 0; }
-                    } else {
-                        if ( !flag(i, j, k).isRegular() ) { eb_update = 0; }
-                    }
+                    if ( index_type.nodeCentered(1) ) { j_start = -1; };
 #endif
 #if AMREX_SPACEDIM > 2
-                    // Check neighbors in the third spatial direction
-                    if ( index_type.nodeCentered(2) ) {
-                        if ( !flag(i, j, k).isRegular() || !flag(i, j, k-1).isRegular() ) { eb_update = 0; }
-                    } else {
-                        if ( !flag(i, j, k).isRegular() ) { eb_update = 0; }
-                    }
+                    if ( index_type.nodeCentered(2) ) { k_start = -1; };
 #endif
+                    // Loop over neighboring cells
+                    int eb_update = 1;
+                    for (int ii = i_start; ii <= 1; ++ii) {
+                        for (int jj = j_start; jj <= 1; ++jj) {
+                            for (int kk = k_start; kk <= 1; ++kk) {
+                                // If one of the neighboring is either partially or fully covered
+                                // (i.e. if they are not regular cells), do not update field
+                                if ( !flag(i+ii, j+jj, k+kk).isRegular() ) {
+                                    eb_update = 0;
+                                }
+                            }
+                        }
+                    }
                     eb_update_arr(i, j, k) = eb_update;
                 });
 
