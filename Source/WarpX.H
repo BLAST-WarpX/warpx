@@ -1413,10 +1413,11 @@ private:
     mutable amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > Afield_dotMask;
     mutable amrex::Vector<            std::unique_ptr<amrex::iMultiFab>     > phi_dotMask;
 
-    /** EB: Flag to indicate whether the E location is inside the EB and therefore E should not be updated.
-     * (One array per level and per direction, due to staggering)
+    /** EB: Flag to indicate whether a gridpoint is inside the embedded boundary and therefore
+     * whether the E or B should not be updated. (One array per level and per direction, due to staggering)
     */
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_E;
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_B;
 
     /** EB: for every mesh face flag_info_face contains a:
      *          * 0 if the face needs to be extended

@@ -1305,6 +1305,11 @@ void WarpX::InitializeEBGridData (int lev)
                 m_eb_update_E[lev],
                 m_fields.get_alldirs(FieldType::Efield_fp, lev),
                 eb_fact );
+            // Mark on which grid points B should be updated
+            MarkUpdateCells(
+                m_eb_update_B[lev],
+                m_fields.get_alldirs(FieldType::Bfield_fp, lev),
+                eb_fact );
 
             // TODO: move inside if condition for ECT
             auto edge_lengths_lev = m_fields.get_alldirs(FieldType::edge_lengths, lev);
