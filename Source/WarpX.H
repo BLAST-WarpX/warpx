@@ -937,9 +937,8 @@ public:
         amrex::ParserExecutor<4> const& fx_parser,
         amrex::ParserExecutor<4> const& fy_parser,
         amrex::ParserExecutor<4> const& fz_parser,
-        int lev, PatchType patch_type, [[maybe_unused]] char topology,
-        std::optional<ablastr::fields::VectorField> const& edge_lengths = std::nullopt,
-        std::optional<ablastr::fields::VectorField> const& face_areas = std::nullopt);
+        int lev, PatchType patch_type,
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field);
 
     /**
      * \brief Load field values from a user-specified openPMD file,
@@ -1416,8 +1415,11 @@ private:
     /** EB: Flag to indicate whether a gridpoint is inside the embedded boundary and therefore
      * whether the E or B should not be updated. (One array per level and per direction, due to staggering)
     */
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_E;
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_B;
+    // TODO: leave as private, add setters, getters
+    public:
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_E;
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_B;
+    private:
 
     /** EB: for every mesh face flag_info_face contains a:
      *          * 0 if the face needs to be extended
