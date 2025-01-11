@@ -353,12 +353,12 @@ WarpX::MarkUpdateCells (
 #endif
                     // Loop over neighboring cells
                     int eb_update = 1;
-                    for (int ii = i_start; ii <= 1; ++ii) {
-                        for (int jj = j_start; jj <= 1; ++jj) {
-                            for (int kk = k_start; kk <= 1; ++kk) {
+                    for (int i_shift = i_start; i_shift <= 0; ++i_shift) {
+                        for (int j_shift = j_start; j_shift <= 0; ++j_shift) {
+                            for (int k_shift = k_start; k_shift <= 0; ++k_shift) {
                                 // If one of the neighboring is either partially or fully covered
                                 // (i.e. if they are not regular cells), do not update field
-                                if ( !flag(i+ii, j+jj, k+kk).isRegular() ) {
+                                if ( !flag(i+i_shift, j+j_shift, k+k_shift).isRegular() ) {
                                     eb_update = 0;
                                 }
                             }
