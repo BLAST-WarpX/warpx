@@ -1032,6 +1032,17 @@ public:
         ablastr::fields::VectorField const & field,
         amrex::EBFArrayBoxFactory const & eb_fact );
 
+    // TODO documentation
+    void MarkECTUpdateECells (
+        std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update_B,
+        ablastr::fields::VectorField const& edge_lengths );
+
+    // TODO documentation
+    void MarkECTUpdateBCells (
+        std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update_B,
+        ablastr::fields::VectorField const& face_areas,
+        ablastr::fields::VectorField const& edge_lengths );
+
     /**
     * \brief Compute the length of the mesh edges. Here the length is a value in [0, 1].
     *        An edge of length 0 is fully covered.

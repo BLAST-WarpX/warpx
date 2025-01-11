@@ -306,10 +306,13 @@ WarpX::MarkUpdateCells (
 
     for (int idim = 0; idim < 3; ++idim) {
 
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
         for (amrex::MFIter mfi(*field[idim]); mfi.isValid(); ++mfi) {
 
             const amrex::Box& box = mfi.tilebox();
-            auto const & eb_update_arr = eb_update[idim]->array(mfi);
+            amrex::Array4<int> const & eb_update_arr = eb_update[idim]->array(mfi);
 
             // Check if the box (including one layer of guard cells) contains a mix of covered and regular cells
             const amrex::Box& eb_info_box = mfi.tilebox(amrex::IntVect::TheCellVector()).grow(1);
@@ -367,14 +370,76 @@ WarpX::MarkUpdateCells (
                     eb_update_arr(i, j, k) = eb_update;
                 });
 
-            // TODO: Handle the case of the ECT solver
-
             }
 
         }
 
     }
 
+}
+
+void
+WarpX::MarkECTUpdateECells (
+    std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update_E,
+    ablastr::fields::VectorField const& edge_lengths )
+{
+}
+
+void
+WarpX::MarkECTUpdateBCells (
+    std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update_B,
+    ablastr::fields::VectorField const& face_areas,
+    ablastr::fields::VectorField const& edge_lengths )
+{
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( amrex::MFIter mfi(*eb_update_B[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+
+        const amrex::Box& tbx = mfi.tilebox( eb_update_B[0]->ixType().toIntVect(), eb_update_B[0]->nGrowVect() );
+        const amrex::Box& tby = mfi.tilebox( eb_update_B[1]->ixType().toIntVect(), eb_update_B[1]->nGrowVect() );
+        const amrex::Box& tbz = mfi.tilebox( eb_update_B[2]->ixType().toIntVect(), eb_update_B[2]->nGrowVect() );
+
+        amrex::Array4<int> const & eb_update_Bx_arr = eb_update_B[0]->array(mfi);
+        amrex::Array4<int> const & eb_update_By_arr = eb_update_B[1]->array(mfi);
+        amrex::Array4<int> const & eb_update_Bz_arr = eb_update_B[2]->array(mfi);
+
+#ifdef WARPX_DIM_3D
+        amrex::Array4<amrex::Real> const & Sx_arr = face_areas[0]->array(mfi);
+        amrex::Array4<amrex::Real> const & Sy_arr = face_areas[1]->array(mfi);
+        amrex::Array4<amrex::Real> const & Sz_arr = face_areas[2]->array(mfi);
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        amrex::Array4<amrex::Real> const & Sy_arr = face_areas[1]->array(mfi);
+        amrex::Array4<amrex::Real> const & lx_arr = edge_lengths[0]->array(mfi);
+        amrex::Array4<amrex::Real> const & lz_arr = edge_lengths[2]->array(mfi);
+#endif
+        amrex::ParallelFor (tbx, tby, tbz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+#ifdef WARPX_DIM_3D
+                // In 3D: do not update Bx if the face on which it lives is fully covered
+                eb_update_Bx_arr(i, j, k) = (Sx_arr(i, j, k) == 0)? 0 : 1;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                //In XZ and RZ, Bx lives on a z-edge ; do not update if fully covered
+                eb_update_Bx_arr(i, j, k) = (lz_arr(i, j, k) == 0)? 0 : 1;
+#endif
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                // Do not update By if the face on which it lives is fully covered
+                eb_update_By_arr(i, j, k) = (Sy_arr(i, j, k) == 0)? 0 : 1;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+#ifdef WARPX_DIM_3D
+                // In 3D: do not update Bz if the face on which it lives is fully covered
+                eb_update_Bz_arr(i, j, k) = (Sz_arr(i, j, k) == 0)? 0 : 1;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                //In XZ and RZ, Bz lives on a x-edge ; do not update if fully covered
+                eb_update_Bz_arr(i, j, k) = (lx_arr(i, j, k) == 0)? 0 : 1;
+#endif
+            }
+        );
+
+    }
 }
 
 void

@@ -1253,17 +1253,6 @@ void WarpX::InitializeEBGridData (int lev)
 
             auto const eb_fact = fieldEBFactory(lev);
 
-            // Mark on which grid points E should be updated
-            MarkUpdateCells(
-                m_eb_update_E[lev],
-                m_fields.get_alldirs(FieldType::Efield_fp, lev),
-                eb_fact );
-            // Mark on which grid points B should be updated
-            MarkUpdateCells(
-                m_eb_update_B[lev],
-                m_fields.get_alldirs(FieldType::Bfield_fp, lev),
-                eb_fact );
-
             // TODO: move inside if condition for ECT
             auto edge_lengths_lev = m_fields.get_alldirs(FieldType::edge_lengths, lev);
             ComputeEdgeLengths(edge_lengths_lev, eb_fact);
@@ -1274,8 +1263,24 @@ void WarpX::InitializeEBGridData (int lev)
             ScaleAreas(face_areas_lev, CellSize(lev));
 
             if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
+                // Mark on which grid points E should be updated
+                MarkECTUpdateECells( m_eb_update_E[lev], edge_lengths_lev );
+                // Mark on which grid points B should be updated
+                MarkECTUpdateBCells( m_eb_update_B[lev], face_areas_lev, edge_lengths_lev);
+                // Compute additional quantities required for the ECT solver
                 MarkExtensionCells();
                 ComputeFaceExtensions();
+            } else {
+                // Mark on which grid points E should be updated (stair-case approximation)
+                MarkUpdateCells(
+                    m_eb_update_E[lev],
+                    m_fields.get_alldirs(FieldType::Efield_fp, lev),
+                    eb_fact );
+                // Mark on which grid points B should be updated (stair-case approximation)
+                MarkUpdateCells(
+                    m_eb_update_B[lev],
+                    m_fields.get_alldirs(FieldType::Bfield_fp, lev),
+                    eb_fact );
             }
         }
 
