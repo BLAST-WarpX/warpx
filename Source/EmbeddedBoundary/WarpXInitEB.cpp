@@ -383,6 +383,60 @@ WarpX::MarkECTUpdateECells (
     std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update_E,
     ablastr::fields::VectorField const& edge_lengths )
 {
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( amrex::MFIter mfi(*eb_update_E[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+
+        const amrex::Box& tbx = mfi.tilebox( eb_update_E[0]->ixType().toIntVect(), eb_update_E[0]->nGrowVect() );
+        const amrex::Box& tby = mfi.tilebox( eb_update_E[1]->ixType().toIntVect(), eb_update_E[1]->nGrowVect() );
+        const amrex::Box& tbz = mfi.tilebox( eb_update_E[2]->ixType().toIntVect(), eb_update_E[2]->nGrowVect() );
+
+        amrex::Array4<int> const & eb_update_Ex_arr = eb_update_E[0]->array(mfi);
+        amrex::Array4<int> const & eb_update_Ey_arr = eb_update_E[1]->array(mfi);
+        amrex::Array4<int> const & eb_update_Ez_arr = eb_update_E[2]->array(mfi);
+
+        amrex::Array4<amrex::Real> const & lx_arr = edge_lengths[0]->array(mfi);
+        amrex::Array4<amrex::Real> const & lz_arr = edge_lengths[2]->array(mfi);
+#if defined(WARPX_DIM_3D)
+        amrex::Array4<amrex::Real> const & ly_arr = edge_lengths[1]->array(mfi);
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        amrex::Dim3 lx_lo = amrex::lbound(lx_arr);
+        amrex::Dim3 lx_hi = amrex::ubound(lx_arr);
+        amrex::Dim3 lz_lo = amrex::lbound(lz_arr);
+        amrex::Dim3 lz_hi = amrex::ubound(lz_arr);
+#endif
+
+        amrex::ParallelFor (tbx, tby, tbz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                // Do not update Ex if the edge on which it lives is fully covered
+                eb_update_Ex_arr(i, j, k) = (lx_arr(i, j, k) == 0)? 0 : 1;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+#ifdef WARPX_DIM_3D
+                // In 3D: Do not update Ey if the edge on which it lives is fully covered
+                eb_update_Ey_arr(i, j, k) = (ly_arr(i, j, k) == 0)? 0 : 1;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                // In XZ and RZ: Ey is associated with a mesh node,
+                // so we need to check if  the mesh node is covered
+                if((lx_arr(std::min(i  , lx_hi.x), std::min(j  , lx_hi.y), k)==0)
+                 ||(lx_arr(std::max(i-1, lx_lo.x), std::min(j  , lx_hi.y), k)==0)
+                 ||(lz_arr(std::min(i  , lz_hi.x), std::min(j  , lz_hi.y), k)==0)
+                 ||(lz_arr(std::min(i  , lz_hi.x), std::max(j-1, lz_lo.y), k)==0)) {
+                    eb_update_Ey_arr(i, j, k) = 0;
+                } else {
+                    eb_update_Ey_arr(i, j, k) = 1;
+                }
+#endif
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                // Do not update Ez if the edge on which it lives is fully covered
+                eb_update_Ez_arr(i, j, k) = (lz_arr(i, j, k) == 0)? 0 : 1;
+            }
+        );
+
+    }
 }
 
 void
