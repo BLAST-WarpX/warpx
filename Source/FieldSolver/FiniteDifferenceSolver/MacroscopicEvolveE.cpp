@@ -107,10 +107,6 @@ void FiniteDifferenceSolver::MacroscopicEvolveECartesian (
     amrex::Real const dt,
     std::unique_ptr<MacroscopicProperties> const& macroscopic_properties)
 {
-#ifndef AMREX_USE_EB
-    amrex::ignore_unused(edge_lengths);
-#endif
-
     amrex::MultiFab& sigma_mf = macroscopic_properties->getsigma_mf();
     amrex::MultiFab& epsilon_mf = macroscopic_properties->getepsilon_mf();
     amrex::MultiFab& mu_mf = macroscopic_properties->getmu_mf();
