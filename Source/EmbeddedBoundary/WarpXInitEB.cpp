@@ -343,16 +343,17 @@ WarpX::MarkUpdateCells (
                     // or fully covered: do not update field
 
                     // Check neighbors in the each spatial direction
-                    int i_start = 0;
-                    int j_start = 0;
-                    int k_start = 0;
                     // If nodal in a given direction, we need to start from -1 (left-neighboring cell)
-                    if ( index_type.nodeCentered(0) ) { i_start = -1; };
+                    int const i_start = ( index_type.nodeCentered(0) )? -1 : 0;
 #if AMREX_SPACEDIM > 1
-                    if ( index_type.nodeCentered(1) ) { j_start = -1; };
+                    int const j_start = ( index_type.nodeCentered(1) )? -1 : 0;
+#else
+                    int const j_start = 0;
 #endif
 #if AMREX_SPACEDIM > 2
-                    if ( index_type.nodeCentered(2) ) { k_start = -1; };
+                    int const k_start = ( index_type.nodeCentered(2) )? -1 : 0;
+#else
+                    int const k_start = 0;
 #endif
                     // Loop over neighboring cells
                     int eb_update = 1;
@@ -402,10 +403,10 @@ WarpX::MarkECTUpdateECells (
 #if defined(WARPX_DIM_3D)
         amrex::Array4<amrex::Real> const & ly_arr = edge_lengths[1]->array(mfi);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-        amrex::Dim3 lx_lo = amrex::lbound(lx_arr);
-        amrex::Dim3 lx_hi = amrex::ubound(lx_arr);
-        amrex::Dim3 lz_lo = amrex::lbound(lz_arr);
-        amrex::Dim3 lz_hi = amrex::ubound(lz_arr);
+        amrex::Dim3 const lx_lo = amrex::lbound(lx_arr);
+        amrex::Dim3 const lx_hi = amrex::ubound(lx_arr);
+        amrex::Dim3 const lz_lo = amrex::lbound(lz_arr);
+        amrex::Dim3 const lz_hi = amrex::ubound(lz_arr);
 #endif
 
         amrex::ParallelFor (tbx, tby, tbz,
