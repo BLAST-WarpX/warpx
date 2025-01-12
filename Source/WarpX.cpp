@@ -2304,14 +2304,14 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         if (lev == maxLevel()) {
             if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
 
-               AllocInitMultiFab(m_eb_update_E[lev][0], amrex::convert(ba, Ex_nodal_flag), dm, ncomps,
+                AllocInitMultiFab(m_eb_update_E[lev][0], amrex::convert(ba, Ex_nodal_flag), dm, ncomps,
                                   guard_cells.ng_FieldSolver, lev, "m_eb_update_E[x]");
                 AllocInitMultiFab(m_eb_update_E[lev][1], amrex::convert(ba, Ey_nodal_flag), dm, ncomps,
                                   guard_cells.ng_FieldSolver, lev, "m_eb_update_E[y]");
                 AllocInitMultiFab(m_eb_update_E[lev][2], amrex::convert(ba, Ez_nodal_flag), dm, ncomps,
                                   guard_cells.ng_FieldSolver, lev, "m_eb_update_E[z]");
 
-               AllocInitMultiFab(m_eb_update_B[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
+                AllocInitMultiFab(m_eb_update_B[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
                                   guard_cells.ng_FieldSolver, lev, "m_eb_update_B[x]");
                 AllocInitMultiFab(m_eb_update_B[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
                                   guard_cells.ng_FieldSolver, lev, "m_eb_update_B[y]");

@@ -1015,7 +1015,7 @@ public:
     /** Set a flag to indicate on which grid points the field `field`
      *  should be updated.
      *
-     * More specifically, this function fill the iMultiFabs in `eb_update`
+     * More specifically, this function fills the iMultiFabs in `eb_update`
      * (which have the same indexType as the MultiFabs in `field`) with 1
      * or 0, depending on whether the grid point is in the valid region
      * or in the embedded boundary.
@@ -1034,7 +1034,7 @@ public:
 
     // TODO documentation
     void MarkECTUpdateECells (
-        std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update_B,
+        std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update_E,
         ablastr::fields::VectorField const& edge_lengths );
 
     // TODO documentation
