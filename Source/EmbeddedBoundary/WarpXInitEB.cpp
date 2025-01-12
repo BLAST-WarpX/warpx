@@ -463,6 +463,7 @@ WarpX::MarkECTUpdateBCells (
         amrex::Array4<amrex::Real> const & Sx_arr = face_areas[0]->array(mfi);
         amrex::Array4<amrex::Real> const & Sy_arr = face_areas[1]->array(mfi);
         amrex::Array4<amrex::Real> const & Sz_arr = face_areas[2]->array(mfi);
+        amrex::ignore_unused(edge_lengths);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         amrex::Array4<amrex::Real> const & Sy_arr = face_areas[1]->array(mfi);
         amrex::Array4<amrex::Real> const & lx_arr = edge_lengths[0]->array(mfi);

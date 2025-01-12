@@ -111,7 +111,7 @@ class FiniteDifferenceSolver
                       ablastr::fields::VectorField const& Efield,
                       ablastr::fields::VectorField const& Bfield,
                       ablastr::fields::VectorField const& Jfield,
-                      ablastr::fields::VectorField const& edge_lengths,
+                      std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
                       amrex::Real dt,
                       std::unique_ptr<MacroscopicProperties> const& macroscopic_properties);
 
@@ -313,7 +313,7 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField const& Efield,
             ablastr::fields::VectorField const& Bfield,
             ablastr::fields::VectorField const& Jfield,
-            ablastr::fields::VectorField const& edge_lengths,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
             amrex::Real dt,
             std::unique_ptr<MacroscopicProperties> const& macroscopic_properties);
 
