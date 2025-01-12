@@ -169,6 +169,7 @@ public:
     }
 #endif
     ParticleBoundaryBuffer& GetParticleBoundaryBuffer () { return *m_particle_boundary_buffer; }
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag() { return m_eb_update_E; }
 
     static void shiftMF (amrex::MultiFab& mf, const amrex::Geometry& geom,
                          int num_shift, int dir, int lev, bool update_cost_flag,
@@ -1012,33 +1013,49 @@ public:
     void InitEB ();
 
 #ifdef AMREX_USE_EB
-    /** Set a flag to indicate on which grid points the field `field`
-     *  should be updated.
+    /** \brief Set a flag to indicate on which grid points the field `field`
+     *  should be updated, depending on their position relative to the embedded boundary.
+     *
+     * This function is used by all finite-difference solvers, except the
+     * ECT solver, which instead uses `MarkUpdateECellsECT` and `MarkUpdateBCellsECT`.
+     * It uses a stair-case approximation of the embedded boundary:
+     * If a grid point touches cells that are either partially or fully covered
+     * by the embedded boundary: the corresponding field is not updated.
      *
      * More specifically, this function fills the iMultiFabs in `eb_update`
      * (which have the same indexType as the MultiFabs in `field`) with 1
-     * or 0, depending on whether the grid point is in the valid region
-     * or in the embedded boundary.
-     *
-     * This uses a stair-case approximation of the embedded boundary
-     * (unless the ECT solver is used): If a grid point touches cells
-     * that are either partially or fully covered by the embedded
-     * boundary: do not update field.
-     *
-     * TODO Discuss ECT solver
+     * or 0, depending on whether the grid point should be updated or not.
      */
-    void MarkUpdateCells (
+    void MarkUpdateCellsStairCase (
         std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update,
         ablastr::fields::VectorField const & field,
         amrex::EBFArrayBoxFactory const & eb_fact );
 
-    // TODO documentation
-    void MarkECTUpdateECells (
+    /** \brief Set a flag to indicate on which grid points the E field
+     *  should be updated, depending on their position relative to the embedded boundary.
+     *
+     * This function is used by ECT solver. The E field is not updated if
+     * the edge on which it is defined is fully covered by the embedded boundary.
+     *
+     * More specifically, this function fills the iMultiFabs in `eb_update_E`
+     * (which have the same indexType as the E field) with 1 or 0, depending
+     * on whether the grid point should be updated or not.
+     */
+    void MarkUpdateECellsECT (
         std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update_E,
         ablastr::fields::VectorField const& edge_lengths );
 
-    // TODO documentation
-    void MarkECTUpdateBCells (
+    /** \brief Set a flag to indicate on which grid points the B field
+     *  should be updated, depending on their position relative to the embedded boundary.
+     *
+     * This function is used by ECT solver. The B field is not updated if
+     * the face on which it is defined is fully covered by the embedded boundary.
+     *
+     * More specifically, this function fills the iMultiFabs in `eb_update_B`
+     * (which have the same indexType as the B field) with 1 or 0, depending
+     * on whether the grid point should be updated or not.
+     */
+    void MarkUpdateBCellsECT (
         std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update_B,
         ablastr::fields::VectorField const& face_areas,
         ablastr::fields::VectorField const& edge_lengths );
@@ -1425,12 +1442,9 @@ private:
 
     /** EB: Flag to indicate whether a gridpoint is inside the embedded boundary and therefore
      * whether the E or B should not be updated. (One array per level and per direction, due to staggering)
-    */
-    // TODO: leave as private, add setters, getters
-    public:
-        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_E;
-        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_B;
-    private:
+     */
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_E;
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_B;
 
     /** EB: for every mesh face flag_info_face contains a:
      *          * 0 if the face needs to be extended

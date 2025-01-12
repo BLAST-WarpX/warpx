@@ -292,7 +292,7 @@ WarpX::ScaleAreas (ablastr::fields::VectorField& face_areas,
 }
 
 void
-WarpX::MarkUpdateCells (
+WarpX::MarkUpdateCellsStairCase (
     std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update,
     ablastr::fields::VectorField const& field,
     amrex::EBFArrayBoxFactory const & eb_fact )
@@ -380,7 +380,7 @@ WarpX::MarkUpdateCells (
 }
 
 void
-WarpX::MarkECTUpdateECells (
+WarpX::MarkUpdateECellsECT (
     std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update_E,
     ablastr::fields::VectorField const& edge_lengths )
 {
@@ -441,7 +441,7 @@ WarpX::MarkECTUpdateECells (
 }
 
 void
-WarpX::MarkECTUpdateBCells (
+WarpX::MarkUpdateBCellsECT (
     std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update_B,
     ablastr::fields::VectorField const& face_areas,
     ablastr::fields::VectorField const& edge_lengths )

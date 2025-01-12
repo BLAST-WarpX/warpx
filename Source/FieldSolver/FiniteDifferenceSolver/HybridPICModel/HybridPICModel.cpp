@@ -227,7 +227,7 @@ void HybridPICModel::InitData ()
             m_J_external[1],
             m_J_external[2],
             lev, PatchType::fine,
-            warpx.m_eb_update_E);
+            warpx.GetEBUpdateEFlag());
     }
 }
 
@@ -244,7 +244,7 @@ void HybridPICModel::GetCurrentExternal ()
             m_J_external[1],
             m_J_external[2],
             lev, PatchType::fine,
-            warpx.m_eb_update_E);
+            warpx.GetEBUpdateEFlag());
     }
 }
 
