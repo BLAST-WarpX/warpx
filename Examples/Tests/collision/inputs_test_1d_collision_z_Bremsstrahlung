@@ -109,4 +109,3 @@ photon_energy.bin_min = log10(10.)
 photon_energy.bin_max = log10(T1)
 photon_energy.intervals = 10
 photon_energy.precision = 18
-
