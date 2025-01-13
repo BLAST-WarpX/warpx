@@ -33,7 +33,7 @@ BremsstrahlungFunc::BremsstrahlungFunc (std::string const& collision_name, Multi
 
     bool create_photons = true;
     pp_collision_name.query("create_photons", create_photons);
-    m_exe.m_create_photons = create_photons
+    m_exe.m_create_photons = create_photons;
 
     amrex::ParticleReal multiplier = 1._prt;
     pp_collision_name.query("multiplier", multiplier);
