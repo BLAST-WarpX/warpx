@@ -382,7 +382,6 @@ public:
 
             // Get a random number
             amrex::ParticleReal const random_number = amrex::Random(engine);
-            p_mask[pair_index] = (random_number < q12);
             if (random_number < q12) {
 
                 // compute weight for photon
