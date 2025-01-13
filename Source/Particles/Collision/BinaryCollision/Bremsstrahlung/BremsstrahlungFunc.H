@@ -294,10 +294,12 @@ public:
                 }
             }
 
-            amrex::ParticleReal const f_i = kdsigdk_im1/koT1_grid_im1;
-            amrex::ParticleReal const f_ip1 = kdsigdk_i/m_koT1_grid[i];
-            amrex::ParticleReal const result = ((std::sqrt(f_i*f_i + 2._prt*(f_ip1 - f_i)*(random_number*sigma_total - sigma)/dk)
-                                                 - f_i)/(f_ip1 - f_i))*dk + koT1_grid_im1;
+            // k will be between k_im1 and k_i
+            amrex::ParticleReal const f_im1 = kdsigdk_im1/koT1_grid_im1;
+            amrex::ParticleReal const fi = kdsigdk_i/m_koT1_grid[i];
+            amrex::ParticleReal const x = (std::sqrt(f_im1*f_im1 + 2._prt*(fi - f_im1)*(random_number*sigma_total - sigma)/dk)
+                                           - f_im1)/(fi - f_im1);
+            amrex::ParticleReal const result = x*dk + koT1_grid_im1;
 
             return result;
         }
