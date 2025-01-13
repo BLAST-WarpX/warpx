@@ -284,8 +284,8 @@ public:
                 dk = (m_koT1_grid[i] - koT1_grid_im1);
                 kdsigdk_i = w0*m_kdsigdk[index][i] + (1.0_prt - w0)*m_kdsigdk[index+1][i];
                 amrex::ParticleReal const dsigdk = (kdsigdk_i/m_koT1_grid[i] + kdsigdk_im1/koT1_grid_im1)*0.5_prt;
-                amrex::ParticleReal const next_sigma = sigma + dsigdk*dk/sigma_total;
-                if (random_number > next_sigma) {
+                amrex::ParticleReal const next_sigma = sigma + dsigdk*dk;
+                if (random_number*sigma_total > next_sigma) {
                     sigma = next_sigma;
                     koT1_grid_im1 = m_koT1_grid[i];
                     kdsigdk_im1 = kdsigdk_i;
@@ -294,11 +294,10 @@ public:
                 }
             }
 
-            amrex::ParticleReal const nnorm_i = kdsigdk_im1/koT1_grid_im1/sigma_total;
-            amrex::ParticleReal const nnorm_ip1 = kdsigdk_i/m_koT1_grid[i]/sigma_total;
-            amrex::ParticleReal const result = ((std::sqrt(nnorm_i*nnorm_i +
-                                                           2._prt*(nnorm_ip1 - nnorm_i)*(random_number - sigma)/dk)
-                                                 - nnorm_i)/(nnorm_ip1 - nnorm_i))*dk + koT1_grid_im1;
+            amrex::ParticleReal const f_i = kdsigdk_im1/koT1_grid_im1;
+            amrex::ParticleReal const f_ip1 = kdsigdk_i/m_koT1_grid[i];
+            amrex::ParticleReal const result = ((std::sqrt(f_i*f_i + 2._prt*(f_ip1 - f_i)*(random_number*sigma_total - sigma)/dk)
+                                                 - f_i)/(f_ip1 - f_i))*dk + koT1_grid_im1;
 
             return result;
         }
