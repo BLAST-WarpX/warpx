@@ -43,6 +43,6 @@ print("\n")
 print("percentage error for x = %5.4f %%" % (diff_x * 100))
 print("percentage error for z = %5.4f %%" % (diff_z * 100))
 
-assert (
-    (diff_x < tolerance) and (y[0] < 1e-8) and (diff_z < tolerance)
-), "Test particle_boundary_interaction did not pass"
+assert (diff_x < tolerance) and (y[0] < 1e-8) and (diff_z < tolerance), (
+    "Test particle_boundary_interaction did not pass"
+)

@@ -342,7 +342,7 @@ setup(
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
         (
-            "License :: OSI Approved :: " "BSD License"
+            "License :: OSI Approved :: BSD License"
         ),  # TODO: use real SPDX: BSD-3-Clause-LBNL
     ],
     # new PEP 639 format

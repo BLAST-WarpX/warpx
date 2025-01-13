@@ -107,31 +107,31 @@ class ParticleContainerWrapper(object):
             maxlen = max(maxlen, lenw)
 
         # --- Make sure that the lengths of the input parameters are consistent
-        assert (
-            x is None or lenx == maxlen or lenx == 1
-        ), "Length of x doesn't match len of others"
-        assert (
-            y is None or leny == maxlen or leny == 1
-        ), "Length of y doesn't match len of others"
-        assert (
-            z is None or lenz == maxlen or lenz == 1
-        ), "Length of z doesn't match len of others"
-        assert (
-            ux is None or lenux == maxlen or lenux == 1
-        ), "Length of ux doesn't match len of others"
-        assert (
-            uy is None or lenuy == maxlen or lenuy == 1
-        ), "Length of uy doesn't match len of others"
-        assert (
-            uz is None or lenuz == maxlen or lenuz == 1
-        ), "Length of uz doesn't match len of others"
-        assert (
-            w is None or lenw == maxlen or lenw == 1
-        ), "Length of w doesn't match len of others"
+        assert x is None or lenx == maxlen or lenx == 1, (
+            "Length of x doesn't match len of others"
+        )
+        assert y is None or leny == maxlen or leny == 1, (
+            "Length of y doesn't match len of others"
+        )
+        assert z is None or lenz == maxlen or lenz == 1, (
+            "Length of z doesn't match len of others"
+        )
+        assert ux is None or lenux == maxlen or lenux == 1, (
+            "Length of ux doesn't match len of others"
+        )
+        assert uy is None or lenuy == maxlen or lenuy == 1, (
+            "Length of uy doesn't match len of others"
+        )
+        assert uz is None or lenuz == maxlen or lenuz == 1, (
+            "Length of uz doesn't match len of others"
+        )
+        assert w is None or lenw == maxlen or lenw == 1, (
+            "Length of w doesn't match len of others"
+        )
         for key, val in kwargs.items():
-            assert (
-                np.size(val) == 1 or len(val) == maxlen
-            ), f"Length of {key} doesn't match len of others"
+            assert np.size(val) == 1 or len(val) == maxlen, (
+                f"Length of {key} doesn't match len of others"
+            )
 
         # --- Broadcast scalars into appropriate length arrays
         # --- If the parameter was not supplied, use the default value
