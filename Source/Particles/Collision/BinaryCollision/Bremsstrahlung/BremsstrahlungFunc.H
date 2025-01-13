@@ -423,11 +423,14 @@ public:
                 amrex::ParticleReal const deltaE_eV = KE_after - KE_before;
                 /* m_deltaE_bremsstrahlung -= deltaE_eV*weight1*PhysConst::q_e; // Joules */
 
-                // compute photon energy in lab frame
-                amrex::ParticleReal const Ephoton_lab = deltaE_eV*weight1/w_photon*PhysConst::q_e; // Joules
+                if (m_create_photons) {
+                    // compute photon energy in lab frame
+                    amrex::ParticleReal const Ephoton_lab = deltaE_eV*weight1/w_photon*PhysConst::q_e; // Joules
 
-                p_pair_reaction_weight[pair_index] = w_photon;
-                p_product_data[pair_index] = Ephoton_lab;
+                    p_mask[pair_index] = true;
+                    p_pair_reaction_weight[pair_index] = w_photon;
+                    p_product_data[pair_index] = Ephoton_lab;
+                }
 
             }
 
@@ -435,6 +438,7 @@ public:
 
         bool m_computeSpeciesDensities = true;
         bool m_computeSpeciesTemperatures = false;
+        bool m_create_photons = true;
         bool m_need_product_data = true;
         amrex::ParticleReal m_multiplier;
 

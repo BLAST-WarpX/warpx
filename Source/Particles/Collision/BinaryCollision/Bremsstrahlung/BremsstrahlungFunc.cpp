@@ -31,6 +31,10 @@ BremsstrahlungFunc::BremsstrahlungFunc (std::string const& collision_name, Multi
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(product_species.AmIA<PhysicalSpecies::photon>(),
                                      "BremsstrahlungFunc: The product species must be photons");
 
+    bool create_photons = true;
+    pp_collision_name.query("create_photons", create_photons);
+    m_exe.m_create_photons = create_photons
+
     amrex::ParticleReal multiplier = 1._prt;
     pp_collision_name.query("multiplier", multiplier);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(multiplier >= 1.,
