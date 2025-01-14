@@ -1253,7 +1253,6 @@ void WarpX::InitializeEBGridData (int lev)
 
             auto const eb_fact = fieldEBFactory(lev);
 
-            // TODO: move inside if condition for ECT
             auto edge_lengths_lev = m_fields.get_alldirs(FieldType::edge_lengths, lev);
             ComputeEdgeLengths(edge_lengths_lev, eb_fact);
             ScaleEdges(edge_lengths_lev, CellSize(lev));

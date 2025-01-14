@@ -2318,7 +2318,6 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
                 AllocInitMultiFab(m_eb_update_B[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
                                   guard_cells.ng_FieldSolver, lev, "m_eb_update_B[z]");
 
-                // TODO: do not allocate these arrays anymore with the Yee solver
                 //! EB: Lengths of the mesh edges
                 m_fields.alloc_init(FieldType::edge_lengths, Direction{0}, lev, amrex::convert(ba, Ex_nodal_flag),
                     dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
