@@ -237,8 +237,10 @@ public:
             amrex::ParticleReal const w01 = 1.0_prt - w00;
             kdsigdk_cut = (  w00*(w0*m_kdsigdk[index][i0_cut  ] + (1.0_prt - w0)*m_kdsigdk[index+1][i0_cut])
                            + w01*(w0*m_kdsigdk[index][i0_cut+1] + (1.0_prt - w0)*m_kdsigdk[index+1][i0_cut+1]));
-            // Scale kdsigdk_cut by the centered k to mitigate divergence effect for k->0
-            kdsigdk_cut *= koT1_cut/((m_koT1_grid[i0_cut+1] + koT1_cut)*0.5_prt);
+            if (i0_cut == 0) {
+                // Scale kdsigdk_cut by the centered k to mitigate divergence effect for k->0
+                kdsigdk_cut *= koT1_cut/((m_koT1_grid[i0_cut+1] + koT1_cut)*0.5_prt);
+            }
 
             // Integrate the distribution using trapezoidal rule
             amrex::ParticleReal koT1_grid_im1 = koT1_cut;
