@@ -179,11 +179,11 @@ public:
          * \param[in] E electron energy in Joules
          * \param[in] n1 the electron number density
          * \param[in] m1 the mass of the electrons
-         * \param[in] index the index for the electron energy grid
-         * \param[in] i0_cut the index below the cut off for the photon energy grid
-         * \param[in] koT1_cut the k of the photon energy cut off
-         * \param[in] kdsigdk_cut the ksigdk at the cut off
-         * \param[in] w0 the grid weighting at the cut off
+         * \param[out] index the index for the electron energy grid
+         * \param[out] i0_cut the index below the cut off for the photon energy grid
+         * \param[out] koT1_cut the k of the photon energy cut off
+         * \param[out] kdsigdk_cut the ksigdk at the cut off
+         * \param[out] w0 the grid weighting at the cut off
          * \result the cross section
          */
         AMREX_GPU_HOST_DEVICE AMREX_INLINE

@@ -60,10 +60,10 @@ BremsstrahlungFunc::UploadCrossSection (int Z)
     // Convert Seltzer and Berger energy-weighted differential cross section to units of [m^2]
     for (int iee=0; iee < Executor::nKE; iee++) {
         amrex::ParticleReal const E = m_exe.m_KEgrid_eV[iee]/m_e_eV;
-        amrex::ParticleReal const gamma = 1.0_rt + E;
+        amrex::ParticleReal const gamma = 1.0_prt + E;
         /* betaSq = 1.0 - 1.0/gamma/gamma */
-        amrex::ParticleReal const betaSq = (E*E + 2._rt*E)/gamma/gamma;
-        amrex::ParticleReal const scale_factor = 1.0e-31_rt*Z*Z/betaSq;
+        amrex::ParticleReal const betaSq = (E*E + 2._prt*E)/gamma/gamma;
+        amrex::ParticleReal const scale_factor = 1.0e-31_prt*Z*Z/betaSq;
         for (int iep=0; iep < Executor::nkoT1; iep++) {
             m_exe.m_kdsigdk[iee][iep] = kdsigdk[iee][iep]*scale_factor;
         }
