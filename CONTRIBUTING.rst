@@ -33,6 +33,7 @@ Please, use discussions if you want to ask us something that is not technically 
 Feel free to ping us there!
 
 Pull Requests (PRs)
+"""""""""""""""""""
 
 Open a pull request if you want to add a new feature yourself.
 Follow the guide below for more details.
