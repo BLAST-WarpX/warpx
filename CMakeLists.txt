@@ -89,10 +89,11 @@ mark_as_advanced(WarpX_TEST_CLEANUP)
 mark_as_advanced(WarpX_TEST_DEBUGGER)
 mark_as_advanced(WarpX_TEST_FPETRAP)
 
-# Advanced option to run CI tests with the -g compile option
-option(WarpX_TEST_DEBUG "Compile tests with -g1 for symbols (for CI)" OFF)
-mark_as_advanced(WarpX_TEST_DEBUG)
-if(WarpX_TEST_DEBUG)
+# Advanced option to compile with the -g1 option for minimal debug symbols
+# (useful to see, e.g., line numbers in backtraces)
+option(WarpX_BACKTRACE_INFO "Compile tests with -g1 for debug symbols" OFF)
+mark_as_advanced(WarpX_BACKTRACE_INFO)
+if(WarpX_BACKTRACE_INFO)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g1")
 endif()
 
