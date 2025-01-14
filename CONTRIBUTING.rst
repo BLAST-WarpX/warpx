@@ -27,6 +27,7 @@ If it's something new, open an issue using a template.
 We'll use the issue to address the problem you've encountered.
 
 Discussions
+"""""""""""
 
 Discussions are for open-ended conversations, general questions, brainstorming ideas.
 Please, use discussions if you want to ask us something that is not technically a bug or a feature.
