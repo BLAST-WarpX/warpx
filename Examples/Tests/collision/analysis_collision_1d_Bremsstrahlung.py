@@ -94,13 +94,13 @@ dEdx = n_i * constants.alpha * r_e**2 * Z**2 * (T1 + m_e_eV) * phirad
 
 print(f"dE/dx analytic = {dEdx}")
 print(f"dE/dx simulated = {dEdx_simulation[-1]}")
-print(f"dE/dx simulated/analytic = {dEdx_simulation[-1]/dEdx}")
+print(f"dE/dx simulated/analytic = {dEdx_simulation[-1] / dEdx}")
 assert np.abs(dEdx_simulation[-1] / dEdx - 1.0) < 0.03
 
 sigam_total = 1.698e-28  # Calculated from table with k cutoff=1.e-4
 N_photon = n_e * n_i * L * beta * constants.c * sigam_total * dt
 print(
-    f"New photons per step simulated/analytic = {particle_number[-1,-1]/(particle_energy[-1,0]*N_photon)}"
+    f"New photons per step simulated/analytic = {particle_number[-1, -1] / (particle_energy[-1, 0] * N_photon)}"
 )
 assert (
     np.abs(particle_number[-1, -1] / (particle_energy[-1, 0] * N_photon) - 1.0) < 0.03
