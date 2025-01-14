@@ -84,7 +84,7 @@ public:
      * \param[in] absolute_tolerance The absolute convergence threshold for the MLMG solver
      * \param[in] max_iters The maximum number of iterations allowed for the MLMG solver
      * \param[in] verbosity The verbosity setting for the MLMG solver
-     * \param[in] is_igf_2d_slices boolean to select between fully 3D Poisson solver and quasi-3D, i.e. one 2D Poisson solve on every z slice (defulat: false)
+     * \param[in] is_igf_2d_slices boolean to select between fully 3D Poisson solver and quasi-3D, i.e. one 2D Poisson solve on every z slice (default: false)
      */
     void computePhi (
         ablastr::fields::MultiLevelScalarField const& rho,
