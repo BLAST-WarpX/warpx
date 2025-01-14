@@ -3623,10 +3623,13 @@ This shifts analysis from post-processing to runtime calculation of reduction op
 
         .. math::
 
-            \frac{d^2\mathcal{L}}{dE_1 dE_2}(E_1, E_2, t) = \int_0^t dt'\int d\boldsymbol{x}\,d\boldsymbol{p}_1 d\boldsymbol{p}_2\;
-             \sqrt{ |\boldsymbol{v}_1 - \boldsymbol{v}_2|^2 - |\boldsymbol{v}_1\times\boldsymbol{v}_2|^2/c^2} \\ f_1(\boldsymbol{x}, \boldsymbol{p}_1, t')f_2(\boldsymbol{x}, \boldsymbol{p}_2, t') \delta(E_1 - E_1(\boldsymbol{p}_1)) \delta(E_2 - E_2(\boldsymbol{p}_2))
+            \frac{d^2\mathcal{L}}{dE_1 dE_2}(E_1, E_2, t) = \int_0^t dt'\int d\boldsymbol{x}\, \int d\boldsymbol{p}_1 \int d\boldsymbol{p}_2\;
+             \sqrt{ |\boldsymbol{v}_1 - \boldsymbol{v}_2|^2 - |\boldsymbol{v}_1\times\boldsymbol{v}_2|^2/c^2} \\
+             f_1(\boldsymbol{x}, \boldsymbol{p}_1, t')f_2(\boldsymbol{x}, \boldsymbol{p}_2, t') \delta(E_1 - E_1(\boldsymbol{p}_1)) \delta(E_2 - E_2(\boldsymbol{p}_2))
 
-        where :math:`f_i` is the distribution function of species :math:`i`,
+        where :math:`f_i` is the distribution function of species :math:`i`
+        (normalized such that :math:`\int \int f(\boldsymbol{x} \boldsymbol{p}, t )d\boldsymbol{x} d\boldsymbol{p} = N`
+        is the number of particles in species :math:`i` at time :math:`t`),
         :math:`\boldsymbol{p}_i` and :math:`E_i (\boldsymbol{p}_i) = \sqrt{m_1^2c^4 + c^2 |\boldsymbol{p}_i|^2}`
         are, respectively, the momentum and the energy of a particle of the :math:`i`-th species.
         The 2D differential luminosity is given in units of :math:`\text{m}^{-2}.\text{eV}^{-2}`.
