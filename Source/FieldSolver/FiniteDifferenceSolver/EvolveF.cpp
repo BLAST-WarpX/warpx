@@ -155,8 +155,8 @@ void FiniteDifferenceSolver::EvolveFCylindrical (
         Array4<Real> const& rho = rhofield->array(mfi);
 
         // Extract stencil coefficients
-        Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
-        auto const n_coefs_r = static_cast<int>(m_stencil_coefs_r.size());
+        Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
+        auto const n_coefs_x = static_cast<int>(m_stencil_coefs_x.size());
         Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
         auto const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
 
@@ -186,17 +186,17 @@ void FiniteDifferenceSolver::EvolveFCylindrical (
                 if (r != 0) { // Off-axis, regular equations
                     F(i, j, 0, 0) += dt * (
                         - rho(i, j, 0, rho_shift) * inv_epsilon0
-                        + T_Algo::DownwardDrr_over_r(Er, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
+                        + T_Algo::DownwardDrr_over_r(Er, r, dr, coefs_x, n_coefs_x, i, j, 0, 0)
                         + T_Algo::DownwardDz(Ez, coefs_z, n_coefs_z, i, j, 0, 0) );
                     for (int m=1 ; m<nmodes ; m++) { // Higher-order modes
                         F(i, j, 0, 2*m-1) += dt * (
                             - rho(i, j, 0, rho_shift + 2*m-1) * inv_epsilon0
-                            + T_Algo::DownwardDrr_over_r(Er, r, dr, coefs_r, n_coefs_r, i, j, 0, 2*m-1)
+                            + T_Algo::DownwardDrr_over_r(Er, r, dr, coefs_x, n_coefs_x, i, j, 0, 2*m-1)
                             + m * Et( i, j, 0, 2*m )/r
                             + T_Algo::DownwardDz(Ez, coefs_z, n_coefs_z, i, j, 0, 2*m-1) ); // Real part
                         F(i, j, 0, 2*m  ) += dt *(
                             - rho(i, j, 0, rho_shift + 2*m-1) * inv_epsilon0
-                            + T_Algo::DownwardDrr_over_r(Er, r, dr, coefs_r, n_coefs_r, i, j, 0, 2*m-1)
+                            + T_Algo::DownwardDrr_over_r(Er, r, dr, coefs_x, n_coefs_x, i, j, 0, 2*m-1)
                             - m * Et( i, j, 0, 2*m-1 )/r
                             + T_Algo::DownwardDz(Ez, coefs_z, n_coefs_z, i, j, 0, 2*m  ) ); // Imaginary part
                     }

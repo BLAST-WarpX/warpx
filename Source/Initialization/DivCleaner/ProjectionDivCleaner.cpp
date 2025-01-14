@@ -73,8 +73,9 @@ ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name) :
 
     auto cell_size = WarpX::CellSize(0);
 #if defined(WARPX_DIM_RZ)
-    CylindricalYeeAlgorithm::InitializeStencilCoefficients( cell_size,
-            m_h_stencil_coefs_x, m_h_stencil_coefs_z );
+    amrex::Real const rmin = WarpX::GetInstance().Geom(0).ProbLo(0);
+    CylindricalYeeAlgorithm::InitializeStencilCoefficients( cell_size, rmin,
+            m_h_stencil_coefs_x, m_h_stencil_coefs_y, m_h_stencil_coefs_z );
 #else
     CartesianYeeAlgorithm::InitializeStencilCoefficients( cell_size,
             m_h_stencil_coefs_x, m_h_stencil_coefs_y, m_h_stencil_coefs_z );

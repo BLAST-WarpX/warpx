@@ -101,8 +101,8 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
         }
 
         // Extract stencil coefficients
-        Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
-        int const n_coefs_r = static_cast<int>(m_stencil_coefs_r.size());
+        Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
+        int const n_coefs_x = static_cast<int>(m_stencil_coefs_x.size());
         Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
         int const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
 
@@ -157,18 +157,18 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
                 if (r > 0.5_rt*dr) {
                     // Mode m=0
                     Jt(i, j, 0, 0) = one_over_mu0 * (
-                        - T_Algo::DownwardDr(Bz, coefs_r, n_coefs_r, i, j, 0, 0)
+                        - T_Algo::DownwardDr(Bz, coefs_x, n_coefs_x, i, j, 0, 0)
                         + T_Algo::DownwardDz(Br, coefs_z, n_coefs_z, i, j, 0, 0)
                     );
 
                     // Higher-order modes
                     for (int m=1 ; m<nmodes ; m++) { // Higher-order modes
                         Jt(i, j, 0, 2*m-1) = one_over_mu0 * (
-                            - T_Algo::DownwardDr(Bz, coefs_r, n_coefs_r, i, j, 0, 2*m-1)
+                            - T_Algo::DownwardDr(Bz, coefs_x, n_coefs_x, i, j, 0, 2*m-1)
                             + T_Algo::DownwardDz(Br, coefs_z, n_coefs_z, i, j, 0, 2*m-1)
                         ); // Real part
                         Jt(i, j, 0, 2*m  ) = one_over_mu0 * (
-                            - T_Algo::DownwardDr(Bz, coefs_r, n_coefs_r, i, j, 0, 2*m  )
+                            - T_Algo::DownwardDr(Bz, coefs_x, n_coefs_x, i, j, 0, 2*m  )
                             + T_Algo::DownwardDz(Br, coefs_z, n_coefs_z, i, j, 0, 2*m  )
                         ); // Imaginary part
                     }
@@ -202,17 +202,17 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
                 if (r > 0.5_rt*dr) {
                     // Mode m=0
                     Jz(i, j, 0, 0) = one_over_mu0 * (
-                       T_Algo::DownwardDrr_over_r(Bt, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
+                       T_Algo::DownwardDrr_over_r(Bt, r, dr, coefs_x, n_coefs_x, i, j, 0, 0)
                     );
                     // Higher-order modes
                     for (int m=1 ; m<nmodes ; m++) {
                         Jz(i, j, 0, 2*m-1) = one_over_mu0 * (
                             - m * Br(i, j, 0, 2*m  ) / r
-                            + T_Algo::DownwardDrr_over_r(Bt, r, dr, coefs_r, n_coefs_r, i, j, 0, 2*m-1)
+                            + T_Algo::DownwardDrr_over_r(Bt, r, dr, coefs_x, n_coefs_x, i, j, 0, 2*m-1)
                         ); // Real part
                         Jz(i, j, 0, 2*m  ) = one_over_mu0 * (
                             m * Br(i, j, 0, 2*m-1) / r
-                            + T_Algo::DownwardDrr_over_r(Bt, r, dr, coefs_r, n_coefs_r, i, j, 0, 2*m  )
+                            + T_Algo::DownwardDrr_over_r(Bt, r, dr, coefs_x, n_coefs_x, i, j, 0, 2*m  )
                         ); // Imaginary part
                     }
                 // r==0: on-axis corrections
@@ -545,8 +545,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         }
 
         // Extract stencil coefficients
-        Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
-        int const n_coefs_r = static_cast<int>(m_stencil_coefs_r.size());
+        Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
+        int const n_coefs_x = static_cast<int>(m_stencil_coefs_x.size());
         Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
         int const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
 
@@ -584,7 +584,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 // Get the gradient of the electron pressure if the longitudinal part of
                 // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
                 Real grad_Pe = 0._rt;
-                if (!solve_for_Faraday) { grad_Pe = T_Algo::UpwardDr(Pe, coefs_r, n_coefs_r, i, j, 0, 0); }
+                if (!solve_for_Faraday) { grad_Pe = T_Algo::UpwardDr(Pe, coefs_x, n_coefs_x, i, j, 0, 0); }
 
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_r = Interp(enE, nodal, Er_stag, coarsen, i, j, 0, 0);
@@ -598,7 +598,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     // r on cell-centered point (Jr is cell-centered in r)
                     Real const r = rmin + (i + 0.5_rt)*dr;
 
-                    auto nabla2Jr = T_Algo::Dr_rDr_over_r(Jr, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
+                    auto nabla2Jr = T_Algo::Dr_rDr_over_r(Jr, r, dr, coefs_x, n_coefs_x, i, j, 0, 0);
                     Er(i, j, 0) -= eta_h * nabla2Jr;
                 }
             },

@@ -50,7 +50,8 @@ class FiniteDifferenceSolver
         FiniteDifferenceSolver (
             ElectromagneticSolverAlgo fdtd_algo,
             std::array<amrex::Real,3> cell_size,
-            ablastr::utils::enums::GridType grid_type );
+            ablastr::utils::enums::GridType grid_type,
+            int ncomps);
 
         void EvolveB ( ablastr::fields::MultiFabRegister& fields,
                        int lev,
@@ -180,43 +181,37 @@ class FiniteDifferenceSolver
 
         ElectromagneticSolverAlgo m_fdtd_algo;
         ablastr::utils::enums::GridType m_grid_type;
+        int m_ncomps;
 
 #ifdef WARPX_DIM_RZ
         amrex::Real m_dr, m_rmin;
         int m_nmodes;
-        // host-only
-        amrex::Vector<amrex::Real> m_h_stencil_coefs_r, m_h_stencil_coefs_z;
-        // device copy after init
-        amrex::Gpu::DeviceVector<amrex::Real> m_stencil_coefs_r;
-        amrex::Gpu::DeviceVector<amrex::Real> m_stencil_coefs_z;
-#else
+#endif
         // host-only
         amrex::Vector<amrex::Real> m_h_stencil_coefs_x, m_h_stencil_coefs_y, m_h_stencil_coefs_z;
         // device copy after init
         amrex::Gpu::DeviceVector<amrex::Real> m_stencil_coefs_x;
         amrex::Gpu::DeviceVector<amrex::Real> m_stencil_coefs_y;
         amrex::Gpu::DeviceVector<amrex::Real> m_stencil_coefs_z;
-#endif
 
     public:
         // The member functions below contain extended __device__ lambda.
         // In order to compile with nvcc, they need to be public.
+
+        template< typename T_Algo >
+        void EvolveE (
+            ablastr::fields::VectorField const& Efield,
+            ablastr::fields::VectorField const& Bfield,
+            ablastr::fields::VectorField const& Jfield,
+            ablastr::fields::VectorField const& edge_lengths,
+            amrex::MultiFab const* Ffield,
+            int lev, amrex::Real dt );
 
 #ifdef WARPX_DIM_RZ
         template< typename T_Algo >
         void EvolveBCylindrical (
             ablastr::fields::VectorField const& Bfield,
             ablastr::fields::VectorField const& Efield,
-            int lev,
-            amrex::Real dt );
-
-        template< typename T_Algo >
-        void EvolveECylindrical (
-            ablastr::fields::VectorField const& Efield,
-            ablastr::fields::VectorField const& Bfield,
-            ablastr::fields::VectorField const& Jfield,
-            ablastr::fields::VectorField const& edge_lengths,
-            amrex::MultiFab const* Ffield,
             int lev,
             amrex::Real dt );
 
@@ -260,15 +255,6 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField const& Bfield,
             ablastr::fields::VectorField const& Efield,
             amrex::MultiFab const * Gfield,
-            int lev, amrex::Real dt );
-
-        template< typename T_Algo >
-        void EvolveECartesian (
-            ablastr::fields::VectorField const& Efield,
-            ablastr::fields::VectorField const& Bfield,
-            ablastr::fields::VectorField const& Jfield,
-            ablastr::fields::VectorField const& edge_lengths,
-            amrex::MultiFab const* Ffield,
             int lev, amrex::Real dt );
 
         template< typename T_Algo >

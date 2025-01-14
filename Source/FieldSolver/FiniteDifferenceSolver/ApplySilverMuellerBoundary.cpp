@@ -56,7 +56,7 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
 #ifdef WARPX_DIM_RZ
     // Calculate relevant coefficients
     amrex::Real const cdt = PhysConst::c*dt;
-    amrex::Real const cdt_over_dr = cdt*m_h_stencil_coefs_r[0];
+    amrex::Real const cdt_over_dr = cdt*m_h_stencil_coefs_x[0];
     amrex::Real const coef1_r = (1._rt - cdt_over_dr)/(1._rt + cdt_over_dr);
     amrex::Real const coef2_r = 2._rt*cdt_over_dr/(1._rt + cdt_over_dr) / PhysConst::c;
     amrex::Real const coef3_r = cdt/(1._rt + cdt_over_dr) / PhysConst::c;
