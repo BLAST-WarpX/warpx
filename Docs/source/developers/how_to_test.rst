@@ -245,3 +245,10 @@ Note that we currently obey the following snake\_case naming conventions for tes
 #. **Test input files** start with the string ``inputs_`` followed by the test name. For example, ``inputs_test_3d_laser_acceleration`` or ``inputs_test_3d_laser_acceleration_picmi.py`` or ``inputs_test_3d_laser_acceleration_restart``.
 
 #. **Base input files** (that is, files collecting input parameters shared between two or more tests) are typically named ``inputs_base_1d``, ``inputs_base_2d``, ``inputs_base_3d`` or ``inputs_base_rz``, possibly followed by additional strings if need be.
+
+Other resources
+---------------
+
+With regard to testing the code more generally, not necessarily in the context of continuous integration, AMReX provides a number of useful post-processing tools for plotfiles.
+The complete list of tools can be found `here <https://amrex-codes.github.io/amrex/docs_html/Post_Processing.html>`__.
+One tool that traditionally stood out as especially useful for core developers and maintainers is `fcompare <https://amrex-codes.github.io/amrex/docs_html/Post_Processing.html#fcompare>`__.
