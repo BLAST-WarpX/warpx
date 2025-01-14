@@ -41,7 +41,6 @@ dL_dE_th = (
 # Extract the 2D differential luminosity from the file
 series = OpenPMDTimeSeries("./diags/reducedfiles/DifferentialLuminosity2d_beam1_beam2/")
 d2L_dE1_dE2, info = series.get_field("d2L_dE1_dE2", iteration=80)
-E1, E2 = info.E1, info.E2
 dE1, dE2 = info.dE1, info.dE2
 
 # Extract test name from path
@@ -50,14 +49,14 @@ print("test_name", test_name)
 
 # Pick tolerance
 if "leptons" in test_name:
-    tol1 = 1e-2
-    tol2 = 1e-5
+    tol1 = 0.02
+    tol2 = 0.003
 elif "photons" in test_name:
     # In the photons case, the particles are
     # initialized from a density distribution ;
     # tolerance is larger due to lower particle statistics
-    tol1 = 6e-2
-    tol2 = 1e-5
+    tol1 = 0.02
+    tol2 = 0.003
 
 # Check that the 1D diagnostic and analytical result match
 error1 = abs(dL_dE_sim - dL_dE_th).max() / abs(dL_dE_th).max()

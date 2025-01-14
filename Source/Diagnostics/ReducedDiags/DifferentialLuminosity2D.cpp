@@ -357,7 +357,7 @@ void DifferentialLuminosity2D::WriteToFile (int step) const
             io::Access::CREATE);
     auto i = series.iterations[step + 1];
     // record
-    auto f_mesh = i.meshes["d2L_dE1_dE2"];
+    auto f_mesh = i.meshes["d2L_dE1_dE2"]; // m^-2 eV^-2
     f_mesh.setUnitDimension({
                             {io::UnitDimension::L, -6},
                             {io::UnitDimension::M, -2},
@@ -368,14 +368,10 @@ void DifferentialLuminosity2D::WriteToFile (int step) const
     auto data = f_mesh[io::RecordComponent::SCALAR];
 
     // meta data
-    f_mesh.setAxisLabels({"E2", "E1"}); // ordinate, abscissa
+    f_mesh.setAxisLabels({"E2", "E1"}); // eV, eV
     std::vector< double > const& gridGlobalOffset = {m_bin_min_2, m_bin_min_1};
     f_mesh.setGridGlobalOffset(gridGlobalOffset);
     f_mesh.setGridSpacing<amrex::Real>({m_bin_size_2, m_bin_size_1});
-
-    // to save the data in SI add the following:
-    // f_mesh.setGridUnitSI(PhysConst::q_e);
-    // data.setUnitSI(std::pow(PhysConst::q_e, -2));
 
     data.setPosition<amrex::Real>({0.5, 0.5});
 
