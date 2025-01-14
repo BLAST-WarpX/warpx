@@ -62,7 +62,7 @@ public:
 
 private:
 
-    /// output data    // Array in which to accumulate the luminosity across timesteps
+    /// output table in which to accumulate the luminosity across timesteps
     amrex::TableData<amrex::Real,2> m_d_data_2D;
 
 };

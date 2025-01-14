@@ -78,7 +78,7 @@ DifferentialLuminosity2D::DifferentialLuminosity2D (const std::string& rd_name)
     // RZ coordinate is not supported
 #if (defined WARPX_DIM_RZ)
     WARPX_ABORT_WITH_MESSAGE(
-        "DifferentialLuminosity2D diagnostics do not work in RZ geometry.");
+        "DifferentialLuminosity2D diagnostics does not work in RZ geometry.");
 #endif
 
     // read colliding species names - must be 2
@@ -89,9 +89,6 @@ DifferentialLuminosity2D::DifferentialLuminosity2D (const std::string& rd_name)
         m_beam_name.size() == 2u,
         "DifferentialLuminosity2D diagnostics must involve exactly two species");
 
-    // should we add an assert that checks that the selected species actually exist?
-    // ref. ParticleHistrogram2D
-
     pp_rd_name.query("openpmd_backend", m_openpmd_backend);
     pp_rd_name.query("file_min_digits", m_file_min_digits);
     // pick first available backend if default is chosen
@@ -100,7 +97,7 @@ DifferentialLuminosity2D::DifferentialLuminosity2D (const std::string& rd_name)
     }
     pp_rd_name.add("openpmd_backend", m_openpmd_backend);
 
-    // read bin parameters for first species
+    // read bin parameters for species 1
     int bin_num_1 = 0;
     amrex::Real bin_max_1 = 0.0_rt, bin_min_1 = 0.0_rt;
     utils::parser::getWithParser(pp_rd_name, "bin_number_1", bin_num_1);
@@ -111,7 +108,7 @@ DifferentialLuminosity2D::DifferentialLuminosity2D (const std::string& rd_name)
     m_bin_min_1 = bin_min_1;
     m_bin_size_1 = (bin_max_1 - bin_min_1) / bin_num_1;
 
-    // read bin parameters for second species
+    // read bin parameters for species 2
     int bin_num_2 = 0;
     amrex::Real bin_max_2 = 0.0_rt, bin_min_2 = 0.0_rt;
     utils::parser::getWithParser(pp_rd_name, "bin_number_2", bin_num_2);
@@ -122,27 +119,25 @@ DifferentialLuminosity2D::DifferentialLuminosity2D (const std::string& rd_name)
     m_bin_min_2 = bin_min_2;
     m_bin_size_2 = (bin_max_2 - bin_min_2) / bin_num_2;
 
-
-    // resize data array
+    // resize data array on the host
     Array<int,2> tlo{0,0}; // lower bounds
     Array<int,2> thi{m_bin_num_1-1, m_bin_num_2-1}; // inclusive upper bounds
     m_h_data_2D.resize(tlo, thi, The_Pinned_Arena());
 
-
     auto const& h_table_data = m_h_data_2D.table();
-
-    // Initialize data on the host
+    // initialize data on the host
     for (int i = tlo[0]; i <= thi[0]; ++i) {
         for (int j = tlo[1]; j <= thi[1]; ++j) {
             h_table_data(i,j) = 0.0_rt;
         }
     }
 
+    // resize data on the host
     m_d_data_2D.resize(tlo, thi);
+    // copy data from host to device
     m_d_data_2D.copy(m_h_data_2D);
     Gpu::streamSynchronize();
-
-}
+} // end constructor
 
 void DifferentialLuminosity2D::ComputeDiags (int step)
 {
@@ -152,13 +147,14 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
 
     WARPX_PROFILE("DifferentialLuminosity2D::ComputeDiags");
 
-    auto d_table = m_d_data_2D.table();
-
     // Since this diagnostic *accumulates* the luminosity in the
-    // array d_data, we add contributions at *each timestep*, but
+    // table m_d_data_2D, we add contributions at *each timestep*, but
     // we only write the data to file at intervals specified by the user.
     const Real c_sq = PhysConst::c*PhysConst::c;
     const Real c_over_qe = PhysConst::c/PhysConst::q_e;
+
+    // output table data
+    auto d_table = m_d_data_2D.table();
 
     // get a reference to WarpX instance
     auto& warpx = WarpX::GetInstance();
@@ -202,18 +198,19 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
             ParticleBins bins_1 = ParticleUtils::findParticlesInEachCell( lev, mfi, ptile_1 );
             ParticleBins bins_2 = ParticleUtils::findParticlesInEachCell( lev, mfi, ptile_2 );
 
-            // Species
+            // species 1
             const auto soa_1 = ptile_1.getParticleTileData();
             index_type* AMREX_RESTRICT indices_1 = bins_1.permutationPtr();
             index_type const* AMREX_RESTRICT cell_offsets_1 = bins_1.offsetsPtr();
 
-            // Particle data in the tile/box
+            // extract particle data of species 1 in the current tile/box
             amrex::ParticleReal * const AMREX_RESTRICT w1  = soa_1.m_rdata[PIdx::w];
-            amrex::ParticleReal * const AMREX_RESTRICT u1x = soa_1.m_rdata[PIdx::ux];
-            amrex::ParticleReal * const AMREX_RESTRICT u1y = soa_1.m_rdata[PIdx::uy]; // v*gamma=p/m
+            amrex::ParticleReal * const AMREX_RESTRICT u1x = soa_1.m_rdata[PIdx::ux]; // u=v*gamma=p/m
+            amrex::ParticleReal * const AMREX_RESTRICT u1y = soa_1.m_rdata[PIdx::uy];
             amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
             bool const species1_is_photon = species_1.AmIA<PhysicalSpecies::photon>();
 
+            // same for species 2
             const auto soa_2 = ptile_2.getParticleTileData();
             index_type* AMREX_RESTRICT indices_2 = bins_2.permutationPtr();
             index_type const* AMREX_RESTRICT cell_offsets_2 = bins_2.offsetsPtr();
@@ -224,7 +221,7 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
             amrex::ParticleReal * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];
             bool const species2_is_photon = species_2.AmIA<PhysicalSpecies::photon>();
 
-            // Extract low-level data
+            // Extract low-level (cell-level) data
             auto const n_cells = static_cast<int>(bins_1.numBins());
 
             // Loop over cells
@@ -279,14 +276,13 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
                         Real const E_1 = p1t * c_over_qe; // eV
                         Real const E_2 = p2t * c_over_qe; // eV
 
-                        // determine particle 1 bin
+                        // determine energy bin of particle 1
                         int const bin_1 = int(Math::floor((E_1-bin_min_1)/bin_size_1));
                         if ( bin_1<0 || bin_1>=num_bins_1 ) { continue; } // discard if out-of-range
 
-                        // determine particle 2 bin
+                        // determine energy bin of particle 2
                         int const bin_2 = int(Math::floor((E_2-bin_min_2)/bin_size_2));
                         if ( bin_2<0 || bin_2>=num_bins_2 ) { continue; } // discard if out-of-range
-
 
                         Real const inv_p1t = 1.0_rt/p1t;
                         Real const inv_p2t = 1.0_rt/p2t;
@@ -299,12 +295,9 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
                         // (v1 - v2)^2 = v1^2 + v2^2 - 2 v1.v2
                         // and (v1 x v2)^2 = v1^2 v2^2 - (v1.v2)^2
                         // we also use beta=v/c instead of v
-
                         Real const radicand = beta1_sq + beta2_sq - 2*beta1_dot_beta2 - beta1_sq*beta2_sq + beta1_dot_beta2*beta1_dot_beta2;
 
                         Real const d2L_dE1_dE2 = PhysConst::c * std::sqrt( radicand ) * w1[j_1] * w2[j_2] / (dV * bin_size_1 * bin_size_2) * dt; // m^-2 eV^-2
-
-                        //amrex::Print(0) << "DiffLumi 2D = " << d2L_dE1_dE2 << "  bin size 1 = " << bin_size_1 << "  bin size 2 = " << bin_size_2 << "\n";
 
                         amrex::Real &data = d_table(bin_1, bin_2);
                         amrex::HostDevice::Atomic::Add(&data, d2L_dE1_dE2);
@@ -314,7 +307,6 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
             }); // cells
         } // boxes
     } // levels
-
 
     // Only write to file at intervals specified by the user.
     // At these intervals, the data needs to ready on the CPU,
@@ -335,9 +327,6 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
 
 #endif // not RZ
 } // end void DifferentialLuminosity2D::ComputeDiags
-
-
-
 
 void DifferentialLuminosity2D::WriteToFile (int step) const
 {
@@ -368,21 +357,15 @@ void DifferentialLuminosity2D::WriteToFile (int step) const
             io::Access::CREATE);
     auto i = series.iterations[step + 1];
     // record
-    auto f_mesh = i.meshes["data"];
-    //f_mesh.setAttribute("energy_1", "E1");
-    //f_mesh.setAttribute("energy_2", "E2");
+    auto f_mesh = i.meshes["d2L_dE1_dE2"];
     f_mesh.setUnitDimension({
                             {io::UnitDimension::L, -6},
                             {io::UnitDimension::M, -2},
                             {io::UnitDimension::T,  4}
                             });
 
-    // add units!
-
     // record components
     auto data = f_mesh[io::RecordComponent::SCALAR];
-
-    //data.setUnitSI(std::pow(PhysConst::q_e, -2));
 
     // meta data
     f_mesh.setAxisLabels({"E2", "E1"}); // ordinate, abscissa
@@ -390,14 +373,16 @@ void DifferentialLuminosity2D::WriteToFile (int step) const
     f_mesh.setGridGlobalOffset(gridGlobalOffset);
     f_mesh.setGridSpacing<amrex::Real>({m_bin_size_2, m_bin_size_1});
 
+    // to save the data in SI add the following:
+    // f_mesh.setGridUnitSI(PhysConst::q_e);
+    // data.setUnitSI(std::pow(PhysConst::q_e, -2));
+
     data.setPosition<amrex::Real>({0.5, 0.5});
 
     auto dataset = io::Dataset(
             io::determineDatatype<double>(),
             {static_cast<unsigned long>(m_bin_num_2), static_cast<unsigned long>(m_bin_num_1)});
     data.resetDataset(dataset);
-
-    // UNIT DIMENSION IS NOT SET ON THE VALUES
 
     // Get time at level 0
     auto & warpx = WarpX::GetInstance();
@@ -415,6 +400,6 @@ void DifferentialLuminosity2D::WriteToFile (int step) const
     series.close();
 #else
     amrex::ignore_unused(step);
-    WARPX_ABORT_WITH_MESSAGE("ParticleHistogram2D: Needs openPMD-api compiled into WarpX, but was not found!");
+    WARPX_ABORT_WITH_MESSAGE("DifferentialLuminosity2D: Needs openPMD-api compiled into WarpX, but was not found!");
 #endif
 }
