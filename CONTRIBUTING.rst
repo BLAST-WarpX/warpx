@@ -17,6 +17,7 @@ What to do when
 ^^^^^^^^^^^^^^^
 
 Issues
+""""""
 
 Issues are used to track tasks that the contributors and/or maintainers can work on.
 Use issues for reporting bugs or installation problems and for requesting new features.
