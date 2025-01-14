@@ -131,7 +131,7 @@ The process is also the same as for elastic scattering except the excitation ene
 Benchmarks
 ----------
 
-See the :ref:`MCC example <examples-mcc-turner>` for a benchmark of the MCC
+See the :ref:`MCC example <examples-capacitive-discharge>` for a benchmark of the MCC
 implementation against literature results.
 
 Particle cooling due to elastic collisions

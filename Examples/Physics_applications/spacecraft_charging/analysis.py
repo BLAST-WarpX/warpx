@@ -68,6 +68,6 @@ diff_tau = np.abs((popt[1] - mean_tau) / mean_tau)
 print("percentage error for v0 = " + str(diff_v0 * 100) + "%")
 print("percentage error for tau = " + str(diff_tau * 100) + "%")
 
-assert (diff_v0 < tolerance_v0) and (
-    diff_tau < tolerance_tau
-), "Test spacecraft_charging did not pass"
+assert (diff_v0 < tolerance_v0) and (diff_tau < tolerance_tau), (
+    "Test spacecraft_charging did not pass"
+)

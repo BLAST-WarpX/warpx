@@ -285,7 +285,7 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
         }
 
         // Re-initialize the lattice element finder with the new ba and dm.
-        m_accelerator_lattice[lev]->InitElementFinder(lev, ba, dm);
+        m_accelerator_lattice[lev]->InitElementFinder(lev, gamma_boost, ba, dm);
 
         if (costs[lev] != nullptr)
         {
@@ -320,7 +320,7 @@ WarpX::ComputeCostsHeuristic (amrex::Vector<std::unique_ptr<amrex::LayoutData<am
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        const auto & mypc_ref = GetInstance().GetPartContainer();
+        const auto & mypc_ref = GetPartContainer();
         const auto nSpecies = mypc_ref.nSpecies();
 
         // Species loop

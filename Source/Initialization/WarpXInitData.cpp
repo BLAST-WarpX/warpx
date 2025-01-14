@@ -610,6 +610,9 @@ WarpX::InitData ()
             AddExternalFields(lev);
         }
     }
+    else {
+        ExecutePythonCallback("afterInitatRestart");
+    }
 
     if (restart_chkfile.empty() || write_diagnostics_on_restart) {
         // Write full diagnostics before the first iteration.
@@ -850,7 +853,7 @@ WarpX::computeMaxStepBoostAccelerator() {
     const Real interaction_time_boost = (len_plasma_boost-zmin_domain_boost_step_0)/
         (moving_window_v-v_plasma_boost);
     // Divide by dt, and update value of max_step.
-    const auto computed_max_step = (do_subcycling)?
+    const auto computed_max_step = (m_do_subcycling)?
         static_cast<int>(interaction_time_boost/dt[0]):
         static_cast<int>(interaction_time_boost/dt[maxLevel()]);
     max_step = computed_max_step;

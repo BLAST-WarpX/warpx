@@ -24,10 +24,21 @@ class ParticleContainerWrapper(object):
 
     def __init__(self, species_name):
         self.name = species_name
+        self._particle_container = None
 
-        # grab the desired particle container
-        mypc = libwarpx.warpx.multi_particle_container()
-        self.particle_container = mypc.get_particle_container_from_name(self.name)
+    @property
+    def particle_container(self):
+        if self._particle_container is None:
+            try:
+                mypc = libwarpx.warpx.multi_particle_container()
+                self._particle_container = mypc.get_particle_container_from_name(
+                    self.name
+                )
+            except AttributeError as e:
+                msg = "This is likely caused by attempting to access a ParticleContainerWrapper before initialize_warpx has been called"
+                raise AttributeError(msg) from e
+
+        return self._particle_container
 
     def add_particles(
         self,
@@ -96,31 +107,31 @@ class ParticleContainerWrapper(object):
             maxlen = max(maxlen, lenw)
 
         # --- Make sure that the lengths of the input parameters are consistent
-        assert (
-            x is None or lenx == maxlen or lenx == 1
-        ), "Length of x doesn't match len of others"
-        assert (
-            y is None or leny == maxlen or leny == 1
-        ), "Length of y doesn't match len of others"
-        assert (
-            z is None or lenz == maxlen or lenz == 1
-        ), "Length of z doesn't match len of others"
-        assert (
-            ux is None or lenux == maxlen or lenux == 1
-        ), "Length of ux doesn't match len of others"
-        assert (
-            uy is None or lenuy == maxlen or lenuy == 1
-        ), "Length of uy doesn't match len of others"
-        assert (
-            uz is None or lenuz == maxlen or lenuz == 1
-        ), "Length of uz doesn't match len of others"
-        assert (
-            w is None or lenw == maxlen or lenw == 1
-        ), "Length of w doesn't match len of others"
+        assert x is None or lenx == maxlen or lenx == 1, (
+            "Length of x doesn't match len of others"
+        )
+        assert y is None or leny == maxlen or leny == 1, (
+            "Length of y doesn't match len of others"
+        )
+        assert z is None or lenz == maxlen or lenz == 1, (
+            "Length of z doesn't match len of others"
+        )
+        assert ux is None or lenux == maxlen or lenux == 1, (
+            "Length of ux doesn't match len of others"
+        )
+        assert uy is None or lenuy == maxlen or lenuy == 1, (
+            "Length of uy doesn't match len of others"
+        )
+        assert uz is None or lenuz == maxlen or lenuz == 1, (
+            "Length of uz doesn't match len of others"
+        )
+        assert w is None or lenw == maxlen or lenw == 1, (
+            "Length of w doesn't match len of others"
+        )
         for key, val in kwargs.items():
-            assert (
-                np.size(val) == 1 or len(val) == maxlen
-            ), f"Length of {key} doesn't match len of others"
+            assert np.size(val) == 1 or len(val) == maxlen, (
+                f"Length of {key} doesn't match len of others"
+            )
 
         # --- Broadcast scalars into appropriate length arrays
         # --- If the parameter was not supplied, use the default value
@@ -758,7 +769,18 @@ class ParticleBoundaryBufferWrapper(object):
     """
 
     def __init__(self):
-        self.particle_buffer = libwarpx.warpx.get_particle_boundary_buffer()
+        self._particle_buffer = None
+
+    @property
+    def particle_buffer(self):
+        if self._particle_buffer is None:
+            try:
+                self._particle_buffer = libwarpx.warpx.get_particle_boundary_buffer()
+            except AttributeError as e:
+                msg = "This is likely caused by attempting to access a ParticleBoundaryBufferWrapper before initialize_warpx has been called"
+                raise AttributeError(msg) from e
+
+        return self._particle_buffer
 
     def get_particle_boundary_buffer_size(self, species_name, boundary, local=False):
         """

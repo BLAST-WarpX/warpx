@@ -118,9 +118,11 @@ vx = ux / gamma
 xx = xx + dt * vx
 
 # Compare the analytic to the simulated final values
-print(f"Error in x position is {abs(np.abs((xx - xx_sim)/xx))}, which should be < 0.01")
 print(
-    f"Error in x velocity is {abs(np.abs((ux - ux_sim)/ux))}, which should be < 0.002"
+    f"Error in x position is {abs(np.abs((xx - xx_sim) / xx))}, which should be < 0.01"
+)
+print(
+    f"Error in x velocity is {abs(np.abs((ux - ux_sim) / ux))}, which should be < 0.002"
 )
 
 assert abs(np.abs((xx - xx_sim) / xx)) < 0.01, Exception("error in x particle position")

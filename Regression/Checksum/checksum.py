@@ -238,8 +238,7 @@ class Checksum:
         # Dictionaries have same outer keys (levels, species)?
         if self.data.keys() != ref_benchmark.data.keys():
             print(
-                "ERROR: Benchmark and output file checksum "
-                "have different outer keys:"
+                "ERROR: Benchmark and output file checksum have different outer keys:"
             )
             print("Benchmark: %s" % ref_benchmark.data.keys())
             print("Test file: %s" % self.data.keys())
