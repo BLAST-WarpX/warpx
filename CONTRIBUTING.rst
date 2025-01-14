@@ -14,7 +14,7 @@ If you are new to git, you can follow `this tutorial <https://swcarpentry.github
 
 
 What to do when
----------------
+^^^^^^^^^^^^^^^
 
 Issues
 
