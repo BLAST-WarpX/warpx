@@ -2207,6 +2207,10 @@ Details about the collision models can be found in the :ref:`theory section <mul
 * ``<collision_name>.create_photons`` (`integer`)
     Only for ``bremsstrahlung``. Whether photons will be created, defaults to 1 (true).
 
+* ``<collision_name>.koT1_cut`` (`float`)
+    Only for ``bremsstrahlung``. Minimum energy of the photons created.
+    This is relative to the electron energy, defaulting to 1.e-4.
+
 .. _running-cpp-parameters-numerics:
 
 Numerics and algorithms

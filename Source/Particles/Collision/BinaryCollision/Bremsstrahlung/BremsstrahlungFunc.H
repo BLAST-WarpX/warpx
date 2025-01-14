@@ -207,7 +207,7 @@ public:
             }
 
             // find lo-index for koT1 cutoff (will typically be 1)
-            koT1_cut = std::max(KEcut_eV/KErel_eV, 1.0e-4_prt);
+            koT1_cut = std::max(KEcut_eV/KErel_eV, m_koT1_cut_default);
             i0_cut = 0;
             for (int i=1; i < nkoT1; i++) {
                 if (m_koT1_grid[i] > koT1_cut) {
@@ -242,19 +242,25 @@ public:
                 kdsigdk_cut *= koT1_cut/((m_koT1_grid[i0_cut+1] + koT1_cut)*0.5_prt);
             }
 
-            // Integrate the distribution using trapezoidal rule
-            amrex::ParticleReal koT1_grid_im1 = koT1_cut;
-            amrex::ParticleReal kdsigdk_im1 = kdsigdk_cut;
-            amrex::ParticleReal sigma = 0.0_prt;
-            for (int i=i0_cut+1; i < nkoT1; i++) {
-                amrex::ParticleReal const dk = (m_koT1_grid[i] - koT1_grid_im1);
-                amrex::ParticleReal const kdsigdk_i = w0*m_kdsigdk[index][i] + (1.0_prt - w0)*m_kdsigdk[index+1][i];
-                amrex::ParticleReal const dsigdk = (kdsigdk_i/m_koT1_grid[i] + kdsigdk_im1/koT1_grid_im1)*0.5_prt;
-                sigma = sigma + dsigdk*dk;
-                koT1_grid_im1 = m_koT1_grid[i];
-                kdsigdk_im1 = kdsigdk_i;
+            amrex::ParticleReal sigma_total;
+            if (KEcut_eV/KErel_eV <= m_koT1_cut_default) {
+                // Use precalculated value
+                sigma_total = w0*m_sigma_total[index] + (1.0_prt - w0)*m_sigma_total[index+1];
+            } else {
+                // Integrate the distribution using trapezoidal rule
+                amrex::ParticleReal koT1_grid_im1 = koT1_cut;
+                amrex::ParticleReal kdsigdk_im1 = kdsigdk_cut;
+                amrex::ParticleReal sigma = 0.0_prt;
+                for (int i=i0_cut+1; i < nkoT1; i++) {
+                    amrex::ParticleReal const dk = (m_koT1_grid[i] - koT1_grid_im1);
+                    amrex::ParticleReal const kdsigdk_i = w0*m_kdsigdk[index][i] + (1.0_prt - w0)*m_kdsigdk[index+1][i];
+                    amrex::ParticleReal const dsigdk = (kdsigdk_i/m_koT1_grid[i] + kdsigdk_im1/koT1_grid_im1)*0.5_prt;
+                    sigma = sigma + dsigdk*dk;
+                    koT1_grid_im1 = m_koT1_grid[i];
+                    kdsigdk_im1 = kdsigdk_i;
+                }
+                sigma_total = sigma;
             }
-            amrex::ParticleReal const sigma_total = sigma; // total cross section [m^2]
 
             return sigma_total;
         }
@@ -443,6 +449,7 @@ public:
         bool m_create_photons = true;
         bool m_need_product_data = true;
         amrex::ParticleReal m_multiplier;
+        amrex::ParticleReal m_koT1_cut_default;
 
         // relative photon energy grid ( koT1 = Ephoton_eV/KErel_eV )
         amrex::GpuArray<amrex::ParticleReal, nkoT1> m_koT1_grid = {0., 0.025, 0.05, 0.075, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.97, 0.99, 1.00};
@@ -452,6 +459,7 @@ public:
 
         // differential total cross section
         amrex::GpuArray<amrex::GpuArray<amrex::ParticleReal, nkoT1>, nKE> m_kdsigdk;
+        amrex::GpuArray<amrex::ParticleReal, nKE> m_sigma_total;
 
     };
 
