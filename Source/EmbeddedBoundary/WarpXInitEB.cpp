@@ -291,9 +291,215 @@ WarpX::ScaleAreas (ablastr::fields::VectorField& face_areas,
     }
 }
 
+void
+WarpX::MarkUpdateCellsStairCase (
+    std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update,
+    ablastr::fields::VectorField const& field,
+    amrex::EBFArrayBoxFactory const & eb_fact )
+{
+
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    // Extract structures for embedded boundaries
+    amrex::FabArray<amrex::EBCellFlagFab> const& eb_flag = eb_fact.getMultiEBCellFlagFab();
+
+    for (int idim = 0; idim < 3; ++idim) {
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(*field[idim]); mfi.isValid(); ++mfi) {
+
+            const amrex::Box& box = mfi.tilebox();
+            amrex::Array4<int> const & eb_update_arr = eb_update[idim]->array(mfi);
+
+            // Check if the box (including one layer of guard cells) contains a mix of covered and regular cells
+            const amrex::Box& eb_info_box = mfi.tilebox(amrex::IntVect::TheCellVector()).grow(1);
+            amrex::FabType const fab_type = eb_flag[mfi].getType( eb_info_box );
+
+            if (fab_type == amrex::FabType::regular) { // All cells in the box are regular
+
+                // Every cell in box is all regular: update field in every cell
+                amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    eb_update_arr(i, j, k) = 1;
+                });
+
+            } else if (fab_type == amrex::FabType::covered) { // All cells in the box are covered
+
+                // Every cell in box is all covered: do not update field
+                amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    eb_update_arr(i, j, k) = 0;
+                });
+
+            } else { // The box contains a mix of covered and regular cells
+
+                auto const & flag = eb_flag[mfi].array();
+                auto index_type = field[idim]->ixType();
+
+                amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+
+                    // Stair-case approximation: If neighboring cells are either partially
+                    // or fully covered: do not update field
+
+                    // Check neighbors in the each spatial direction
+                    // If nodal in a given direction, we need to start from -1 (left-neighboring cell)
+                    int const i_start = ( index_type.nodeCentered(0) )? -1 : 0;
+#if AMREX_SPACEDIM > 1
+                    int const j_start = ( index_type.nodeCentered(1) )? -1 : 0;
+#else
+                    int const j_start = 0;
+#endif
+#if AMREX_SPACEDIM > 2
+                    int const k_start = ( index_type.nodeCentered(2) )? -1 : 0;
+#else
+                    int const k_start = 0;
+#endif
+                    // Loop over neighboring cells
+                    int eb_update = 1;
+                    for (int i_shift = i_start; i_shift <= 0; ++i_shift) {
+                        for (int j_shift = j_start; j_shift <= 0; ++j_shift) {
+                            for (int k_shift = k_start; k_shift <= 0; ++k_shift) {
+                                // If one of the neighboring is either partially or fully covered
+                                // (i.e. if they are not regular cells), do not update field
+                                if ( !flag(i+i_shift, j+j_shift, k+k_shift).isRegular() ) {
+                                    eb_update = 0;
+                                }
+                            }
+                        }
+                    }
+                    eb_update_arr(i, j, k) = eb_update;
+                });
+
+            }
+
+        }
+
+    }
+
+}
 
 void
-WarpX::MarkCells ()
+WarpX::MarkUpdateECellsECT (
+    std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update_E,
+    ablastr::fields::VectorField const& edge_lengths )
+{
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( amrex::MFIter mfi(*eb_update_E[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+
+        const amrex::Box& tbx = mfi.tilebox( eb_update_E[0]->ixType().toIntVect(), eb_update_E[0]->nGrowVect() );
+        const amrex::Box& tby = mfi.tilebox( eb_update_E[1]->ixType().toIntVect(), eb_update_E[1]->nGrowVect() );
+        const amrex::Box& tbz = mfi.tilebox( eb_update_E[2]->ixType().toIntVect(), eb_update_E[2]->nGrowVect() );
+
+        amrex::Array4<int> const & eb_update_Ex_arr = eb_update_E[0]->array(mfi);
+        amrex::Array4<int> const & eb_update_Ey_arr = eb_update_E[1]->array(mfi);
+        amrex::Array4<int> const & eb_update_Ez_arr = eb_update_E[2]->array(mfi);
+
+        amrex::Array4<amrex::Real> const & lx_arr = edge_lengths[0]->array(mfi);
+        amrex::Array4<amrex::Real> const & lz_arr = edge_lengths[2]->array(mfi);
+#if defined(WARPX_DIM_3D)
+        amrex::Array4<amrex::Real> const & ly_arr = edge_lengths[1]->array(mfi);
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        amrex::Dim3 const lx_lo = amrex::lbound(lx_arr);
+        amrex::Dim3 const lx_hi = amrex::ubound(lx_arr);
+        amrex::Dim3 const lz_lo = amrex::lbound(lz_arr);
+        amrex::Dim3 const lz_hi = amrex::ubound(lz_arr);
+#endif
+
+        amrex::ParallelFor (tbx, tby, tbz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                // Do not update Ex if the edge on which it lives is fully covered
+                eb_update_Ex_arr(i, j, k) = (lx_arr(i, j, k) == 0)? 0 : 1;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+#ifdef WARPX_DIM_3D
+                // In 3D: Do not update Ey if the edge on which it lives is fully covered
+                eb_update_Ey_arr(i, j, k) = (ly_arr(i, j, k) == 0)? 0 : 1;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                // In XZ and RZ: Ey is associated with a mesh node,
+                // so we need to check if  the mesh node is covered
+                if((lx_arr(std::min(i  , lx_hi.x), std::min(j  , lx_hi.y), k)==0)
+                 ||(lx_arr(std::max(i-1, lx_lo.x), std::min(j  , lx_hi.y), k)==0)
+                 ||(lz_arr(std::min(i  , lz_hi.x), std::min(j  , lz_hi.y), k)==0)
+                 ||(lz_arr(std::min(i  , lz_hi.x), std::max(j-1, lz_lo.y), k)==0)) {
+                    eb_update_Ey_arr(i, j, k) = 0;
+                } else {
+                    eb_update_Ey_arr(i, j, k) = 1;
+                }
+#endif
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                // Do not update Ez if the edge on which it lives is fully covered
+                eb_update_Ez_arr(i, j, k) = (lz_arr(i, j, k) == 0)? 0 : 1;
+            }
+        );
+
+    }
+}
+
+void
+WarpX::MarkUpdateBCellsECT (
+    std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update_B,
+    ablastr::fields::VectorField const& face_areas,
+    ablastr::fields::VectorField const& edge_lengths )
+{
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( amrex::MFIter mfi(*eb_update_B[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+
+        const amrex::Box& tbx = mfi.tilebox( eb_update_B[0]->ixType().toIntVect(), eb_update_B[0]->nGrowVect() );
+        const amrex::Box& tby = mfi.tilebox( eb_update_B[1]->ixType().toIntVect(), eb_update_B[1]->nGrowVect() );
+        const amrex::Box& tbz = mfi.tilebox( eb_update_B[2]->ixType().toIntVect(), eb_update_B[2]->nGrowVect() );
+
+        amrex::Array4<int> const & eb_update_Bx_arr = eb_update_B[0]->array(mfi);
+        amrex::Array4<int> const & eb_update_By_arr = eb_update_B[1]->array(mfi);
+        amrex::Array4<int> const & eb_update_Bz_arr = eb_update_B[2]->array(mfi);
+
+#ifdef WARPX_DIM_3D
+        amrex::Array4<amrex::Real> const & Sx_arr = face_areas[0]->array(mfi);
+        amrex::Array4<amrex::Real> const & Sy_arr = face_areas[1]->array(mfi);
+        amrex::Array4<amrex::Real> const & Sz_arr = face_areas[2]->array(mfi);
+        amrex::ignore_unused(edge_lengths);
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        amrex::Array4<amrex::Real> const & Sy_arr = face_areas[1]->array(mfi);
+        amrex::Array4<amrex::Real> const & lx_arr = edge_lengths[0]->array(mfi);
+        amrex::Array4<amrex::Real> const & lz_arr = edge_lengths[2]->array(mfi);
+#endif
+        amrex::ParallelFor (tbx, tby, tbz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+#ifdef WARPX_DIM_3D
+                // In 3D: do not update Bx if the face on which it lives is fully covered
+                eb_update_Bx_arr(i, j, k) = (Sx_arr(i, j, k) == 0)? 0 : 1;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                //In XZ and RZ, Bx lives on a z-edge ; do not update if fully covered
+                eb_update_Bx_arr(i, j, k) = (lz_arr(i, j, k) == 0)? 0 : 1;
+#endif
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                // Do not update By if the face on which it lives is fully covered
+                eb_update_By_arr(i, j, k) = (Sy_arr(i, j, k) == 0)? 0 : 1;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+#ifdef WARPX_DIM_3D
+                // In 3D: do not update Bz if the face on which it lives is fully covered
+                eb_update_Bz_arr(i, j, k) = (Sz_arr(i, j, k) == 0)? 0 : 1;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                //In XZ and RZ, Bz lives on a x-edge ; do not update if fully covered
+                eb_update_Bz_arr(i, j, k) = (lx_arr(i, j, k) == 0)? 0 : 1;
+#endif
+            }
+        );
+
+    }
+}
+
+void
+WarpX::MarkExtensionCells ()
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -302,7 +508,7 @@ WarpX::MarkCells ()
     auto const &cell_size = CellSize(maxLevel());
 
 #if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ)
-    WARPX_ABORT_WITH_MESSAGE("MarkCells only implemented in 2D and 3D");
+    WARPX_ABORT_WITH_MESSAGE("MarkExtensionCells only implemented in 2D and 3D");
 #endif
 
     for (int idim = 0; idim < 3; ++idim) {
