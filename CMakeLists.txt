@@ -82,16 +82,16 @@ option(WarpX_QED_TOOLS     "Build external tool to generate QED lookup tables (r
                                                                         OFF)
 
 # Advanced option to run tests
-option(WarpX_TEST_CLEANUP "Clean up test directories (for CI)" OFF)
-option(WarpX_TEST_DEBUGGER "Run tests without AMReX signal handling (to attach debuggers)" OFF)
-option(WarpX_TEST_FPETRAP "Run tests with FPE-trapping runtime parameters (for CI)" OFF)
+option(WarpX_TEST_CLEANUP "Clean up automated test directories" OFF)
+option(WarpX_TEST_DEBUGGER "Run automated tests without AMReX signal handling (to attach debuggers)" OFF)
+option(WarpX_TEST_FPETRAP "Run automated tests with FPE-trapping runtime parameters" OFF)
 mark_as_advanced(WarpX_TEST_CLEANUP)
 mark_as_advanced(WarpX_TEST_DEBUGGER)
 mark_as_advanced(WarpX_TEST_FPETRAP)
 
 # Advanced option to compile with the -g1 option for minimal debug symbols
 # (useful to see, e.g., line numbers in backtraces)
-option(WarpX_BACKTRACE_INFO "Compile tests with -g1 for debug symbols" OFF)
+option(WarpX_BACKTRACE_INFO "Compile with -g1 for minimal debug symbols (currently used in CI tests)" OFF)
 mark_as_advanced(WarpX_BACKTRACE_INFO)
 if(WarpX_BACKTRACE_INFO)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g1")
