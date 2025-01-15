@@ -684,6 +684,7 @@ WarpX::ReadParameters ()
         "To use the FFT Poisson solver, compile with WARPX_USE_FFT=ON.");
 #endif
         utils::parser::queryWithParser(pp_warpx, "self_fields_max_iters", magnetostatic_solver_max_iters);
+        utils::parser::queryWithParser(pp_warpx, "self_fields_verbosity", magnetostatic_solver_verbosity);
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         (
