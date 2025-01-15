@@ -29,9 +29,6 @@ particle_energy = np.loadtxt(
 particle_number = np.loadtxt(
     os.path.join("diags", "reducedfiles", "particle_number.txt"), skiprows=1
 )
-photon_energy = np.loadtxt(
-    os.path.join("diags", "reducedfiles", "photon_energy.txt"), skiprows=1
-)
 
 total_energy = particle_energy[:, 2]
 electron_energy = particle_energy[:, 3]
