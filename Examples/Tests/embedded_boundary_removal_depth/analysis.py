@@ -84,9 +84,9 @@ else:
 
 
 def check_tolerance(array, tolerance):
-    assert np.all(
-        array <= tolerance
-    ), f"Test did not pass: one or more elements exceed the tolerance of {tolerance}."
+    assert np.all(array <= tolerance), (
+        f"Test did not pass: one or more elements exceed the tolerance of {tolerance}."
+    )
     print("All elements of are within the tolerance.")
 
 
