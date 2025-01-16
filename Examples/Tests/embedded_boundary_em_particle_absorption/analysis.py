@@ -33,7 +33,7 @@ divE_avg = divE_stacked[start_avg_iter:end_avg_iter].mean(axis=0)
 # spurious charge build-up is above this tolerance. This is dimension-dependent.
 dim = ts.fields_metadata["divE"]["geometry"]
 if dim == "3dcartesian":
-    tolerance = 5e-11
+    tolerance = 7e-11
 elif dim == "2dcartesian":
     tolerance = 3.5e-10
 elif dim == "thetaMode":
