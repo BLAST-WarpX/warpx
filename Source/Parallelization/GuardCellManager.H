@@ -7,6 +7,9 @@
 #ifndef WARPX_GUARDCELLMANAGER_H_
 #define WARPX_GUARDCELLMANAGER_H_
 
+#include <Utils/WarpXAlgorithmSelection.H>
+#include <ablastr/utils/Enums.H>
+
 #include <AMReX_Array.H>
 #include <AMReX_IntVect.H>
 #include <AMReX_REAL.H>
@@ -55,13 +58,13 @@ public:
         const amrex::Real * dx,
         bool do_subcycling,
         bool do_fdtd_nci_corr,
-        short grid_type,
+        ablastr::utils::enums::GridType grid_type,
         bool do_moving_window,
         int moving_window_dir,
         int nox,
         int nox_fft, int noy_fft, int noz_fft,
         int nci_corr_stencil,
-        int electromagnetic_solver_id,
+        ElectromagneticSolverAlgo electromagnetic_solver_id,
         int max_level,
         const amrex::Vector<amrex::Real>& v_galilean,
         const amrex::Vector<amrex::Real>& v_comoving,

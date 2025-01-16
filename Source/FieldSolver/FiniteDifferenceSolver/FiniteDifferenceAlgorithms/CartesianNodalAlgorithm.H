@@ -69,7 +69,7 @@ struct CartesianNodalAlgorithm {
      * account the staggering; but for `CartesianNodalAlgorithm`, they are equivalent) */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real UpwardDx (
-        amrex::Array4<amrex::Real> const& F,
+        amrex::Array4<amrex::Real const> const& F,
         amrex::Real const * const coefs_x, int const /*n_coefs_x*/,
         int const i, int const j, int const k, int const ncomp=0 ) {
 
@@ -89,7 +89,7 @@ struct CartesianNodalAlgorithm {
      * account the staggering; but for `CartesianNodalAlgorithm`, they are equivalent) */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real DownwardDx (
-        amrex::Array4<amrex::Real> const& F,
+        amrex::Array4<amrex::Real const> const& F,
         amrex::Real const * const coefs_x, int const n_coefs_x,
         int const i, int const j, int const k, int const ncomp=0 ) {
 
@@ -109,7 +109,7 @@ struct CartesianNodalAlgorithm {
      * account the staggering; but for `CartesianNodalAlgorithm`, they are equivalent) */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real UpwardDy (
-        amrex::Array4<amrex::Real> const& F,
+        amrex::Array4<amrex::Real const> const& F,
         amrex::Real const * const coefs_y, int const /*n_coefs_y*/,
         int const i, int const j, int const k, int const ncomp=0 ) {
 
@@ -129,7 +129,7 @@ struct CartesianNodalAlgorithm {
      * account the staggering; but for `CartesianNodalAlgorithm`, they are equivalent) */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real DownwardDy (
-        amrex::Array4<amrex::Real> const& F,
+        amrex::Array4<amrex::Real const> const& F,
         amrex::Real const * const coefs_y, int const n_coefs_y,
         int const i, int const j, int const k, int const ncomp=0 ) {
 
@@ -143,7 +143,7 @@ struct CartesianNodalAlgorithm {
      * account the staggering; but for `CartesianNodalAlgorithm`, they are equivalent) */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real UpwardDz (
-        amrex::Array4<amrex::Real> const& F,
+        amrex::Array4<amrex::Real const> const& F,
         amrex::Real const * const coefs_z, int const /*n_coefs_z*/,
         int const i, int const j, int const k, int const ncomp=0 ) {
 
@@ -164,7 +164,7 @@ struct CartesianNodalAlgorithm {
      * account the staggering; but for `CartesianNodalAlgorithm`, they are equivalent) */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real DownwardDz (
-        amrex::Array4<amrex::Real> const& F,
+        amrex::Array4<amrex::Real const> const& F,
         amrex::Real const * const coefs_z, int const n_coefs_z,
         int const i, int const j, int const k, int const ncomp=0 ) {
 

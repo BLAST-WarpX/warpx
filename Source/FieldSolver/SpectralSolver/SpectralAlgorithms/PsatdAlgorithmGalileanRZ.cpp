@@ -20,7 +20,7 @@ PsatdAlgorithmGalileanRZ::PsatdAlgorithmGalileanRZ (SpectralKSpaceRZ const & spe
                                                     amrex::DistributionMapping const & dm,
                                                     const SpectralFieldIndex& spectral_index,
                                                     int const n_rz_azimuthal_modes, int const norder_z,
-                                                    short const grid_type,
+                                                    ablastr::utils::enums::GridType grid_type,
                                                     const amrex::Vector<amrex::Real>& v_galilean,
                                                     amrex::Real const dt,
                                                     bool const update_with_rho):

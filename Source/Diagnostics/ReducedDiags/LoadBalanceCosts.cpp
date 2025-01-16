@@ -7,12 +7,14 @@
 #include "LoadBalanceCosts.H"
 
 #include "Diagnostics/ReducedDiags/ReducedDiags.H"
-#include "FieldSolver/Fields.H"
+#include "Fields.H"
 #include "LoadBalance/LoadBalance.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "WarpX.H"
+
+#include <ablastr/fields/MultiFabRegister.H>
 
 #include <AMReX_Box.H>
 #include <AMReX_Config.H>
@@ -39,6 +41,7 @@
 using namespace amrex;
 using namespace warpx::fields;
 using namespace warpx::load_balance;
+using warpx::fields::FieldType;
 
 namespace
 {
@@ -113,6 +116,8 @@ void LoadBalanceCosts::ComputeDiags (int step)
     // shift index for m_data
     int shift_m_data = 0;
 
+    using ablastr::fields::Direction;
+
     // save data
     for (int lev = 0; lev < nLevels; ++lev)
     {
@@ -120,7 +125,7 @@ void LoadBalanceCosts::ComputeDiags (int step)
         const auto& costs_at_lev = load_balance.get_costs(lev);
 
         const amrex::DistributionMapping& dm = warpx.DistributionMap(lev);
-        const MultiFab & Ex = warpx.getField(FieldType::Efield_aux, lev,0);
+        const MultiFab & Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
         for (MFIter mfi(Ex, false); mfi.isValid(); ++mfi)
         {
             const Box& tbx = mfi.tilebox();
@@ -268,7 +273,7 @@ void LoadBalanceCosts::WriteToFile (int step) const
     // end loop over data size
 
     // end line
-    ofs << std::endl;
+    ofs << "\n";
 
     // close file
     ofs.close();
@@ -322,7 +327,7 @@ void LoadBalanceCosts::WriteToFile (int step) const
             ofstmp << m_sep;
             ofstmp << "[" << c++ << "]hostname_box_" + std::to_string(boxNumber) + "()";
         }
-        ofstmp << std::endl;
+        ofstmp << "\n";
 
         // open the data-containing file
         const std::string fileDataName = m_path + m_rd_name + "." + m_extension;
@@ -353,7 +358,7 @@ void LoadBalanceCosts::WriteToFile (int step) const
             {
                 ofstmp << m_sep << "NaN";
             }
-            ofstmp << std::endl;
+            ofstmp << "\n";
         }
 
         // close files

@@ -1,143 +1,235 @@
 .. _developers-testing:
 
-Testing the code
+Testing the Code
 ================
 
-When adding a new feature, you want to make sure that (i) you did not break the existing code and (ii) your contribution gives correct results. While existing capabilities are tested regularly remotely (when commits are pushed to an open PR on CI, and every night on local clusters), it can also be useful to run tests on your custom input file. This section details how to use both automated and custom tests.
+When proposing a code change, you want to make sure that
 
-Continuous Integration in WarpX
--------------------------------
+* the code change does not break the existing code;
+* the code change gives correct results (numerics, physics, etc.).
 
-Configuration
-^^^^^^^^^^^^^
+WarpX follows the continuous integration (CI) software development practice, where automated builds and tests are run after merging code changes into the main branch.
 
-Our regression tests are using the suite published and documented at `AMReX-Codes/regression_testing <https://github.com/AMReX-Codes/regression_testing>`__.
+While the code is tested regularly remotely (on the cloud when commits are pushed to an open PR, and every night on local clusters), it can also be useful to run tests on your custom input file.
 
-Most of the configuration of our regression tests happens in ``Regression/Warpx-tests.ini``.
-We slightly modify this file in ``Regression/prepare_file_ci.py``.
+How to run pre-commit tests locally
+-----------------------------------
 
-For example, if you like to change the compiler to compilation to build on Nvidia GPUs, modify this block to add ``-DWarpX_COMPUTE=CUDA``:
+First, when proposing a code change, we perform a couple of automated style and correctness checks.
 
-.. code-block:: ini
-
-   [source]
-   dir = /home/regtester/AMReX_RegTesting/warpx
-   branch = development
-   cmakeSetupOpts = -DAMReX_ASSERTIONS=ON -DAMReX_TESTING=ON -DWarpX_COMPUTE=CUDA
-
-We also support changing compilation options via the usual :ref:`build environment variables <building-cmake-envvars>`.
-For instance, compiling with ``clang++ -Werror`` would be:
-
-.. code-block:: sh
-
-   export CXX=$(which clang++)
-   export CXXFLAGS="-Werror"
-
-
-Run Pre-Commit Tests Locally
-----------------------------
-
-When proposing code changes to Warpx, we perform a couple of automated stylistic and correctness checks on the code change.
-You can run those locally before you push to save some time, install them once like this:
+If you install the ``pre-commit`` tool on your local machine via
 
 .. code-block:: sh
 
    python -m pip install -U pre-commit
    pre-commit install
 
+the style and correctness checks will run automatically on your local machine, after you commit the change and before you push.
+
+If you do not install the ``pre-commit`` tool on your local machine, these checks will run automatically as part of our CI workflows and a commit containing style and correctness changes might be added automatically to your branch.
+In that case, you will need to pull that automated commit before pushing further changes.
+
 See `pre-commit.com <https://pre-commit.com>`__ and our ``.pre-commit-config.yaml`` file in the repository for more details.
 
+How to configure the automated tests
+------------------------------------
 
-Run the test suite locally
---------------------------
+Our regression tests are run with `CTest <https://cmake.org/cmake/help/book/mastering-cmake/chapter/Testing%20With%20CMake%20and%20CTest.html#>`__, an executable that comes with CMake.
+
+The test suite is ready to run once you have configured and built WarpX with CMake, following the instructions that you find in our :ref:`Users <install-cmake>` or :ref:`Developers <building-cmake>` sections.
+
+A test that requires a build option that was not configured and built will be skipped automatically. For example, if you configure and build WarpX in 1D only, any test of dimensionality other than 1D, which would require WarpX to be configured and built in the corresponding dimensionality, will be skipped automatically.
+
+How to run automated tests locally
+----------------------------------
 
 Once your new feature is ready, there are ways to check that you did not break anything.
-WarpX has automated tests running every time a commit is added to an open pull request.
-The list of automated tests is defined in `./Regression/WarpX-tests.ini <https://github.com/ECP-WarpX/WarpX/blob/development/Regression/WarpX-tests.ini>`__.
+WarpX has automated tests running every time a commit is pushed to an open pull request.
+The input files and scripts used by the automated tests can be found in the `Examples <https://github.com/ECP-WarpX/WarpX/tree/development/Examples>`__ directory, either under `Physics_applications <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Physics_applications>`__ or `Tests <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests>`__.
 
-For easier debugging, it can be convenient to run the tests on your local machine by executing the script
-`./run_test.sh <https://github.com/ECP-WarpX/WarpX/blob/development/run_test.sh>`__ from WarpX's root folder, as illustrated in the examples below:
+For easier debugging, it can be convenient to run the tests on your local machine by executing CTest as illustrated in the examples below (where we assume that WarpX was configured and built in the directory ``build``):
 
-.. code-block:: sh
+* List tests available for the current build options:
 
-    # Example:
-    # run all tests defined in ./Regression/WarpX-tests.ini
-    ./run_test.sh
+  .. code-block:: sh
 
-    # Example:
-    # run only the test named 'pml_x_yee'
-    ./run_test.sh pml_x_yee
+       ctest --test-dir build -N
 
-    # Example:
-    # run only the tests named 'pml_x_yee', 'pml_x_ckc' and 'pml_x_psatd'
-    ./run_test.sh pml_x_yee pml_x_ckc pml_x_psatd
+* Run tests available for the current build options:
 
-Note that the script `./run_test.sh <https://github.com/ECP-WarpX/WarpX/blob/development/run_test.sh>`__ runs the tests with the exact same compile-time options and runtime options used to run the tests remotely.
+  .. code-block:: sh
 
-Moreover, the script `./run_test.sh <https://github.com/ECP-WarpX/WarpX/blob/development/run_test.sh>`__ compiles all the executables that are necessary in order to run the chosen tests.
-The default number of threads allotted for compiling is set with ``numMakeJobs = 8`` in `./Regression/WarpX-tests.ini <https://github.com/ECP-WarpX/WarpX/blob/ad74bcbdd131a8797339ba38370b1195d0aecffb/Regression/WarpX-tests.ini#L20>`__.
-However, when running the tests on a local machine, it is usually possible and convenient to allot more threads for compiling, in order to speed up the builds.
-This can be accomplished by setting the environment variable ``WARPX_CI_NUM_MAKE_JOBS``, with the preferred number of threads that fits your local machine, e.g. ``export WARPX_CI_NUM_MAKE_JOBS=16`` (or less if your machine is smaller).
-On public CI, we overwrite the value to ``WARPX_CI_NUM_MAKE_JOBS=2``, in order to avoid overloading the available remote resources.
-Note that this will not change the number of threads used to run each test, but only the number of threads used to compile each executable necessary to run the tests.
+       ctest --test-dir build
 
-Once the execution of `./run_test.sh <https://github.com/ECP-WarpX/WarpX/blob/development/run_test.sh>`__ is completed, you can find all the relevant files associated with each test in one single directory.
-For example, if you run the single test ``pml_x_yee``, as shown above, on 04/30/2021,  you can find all relevant files in the directory ``./test_dir/rt-WarpX/WarpX-tests/2021-04-30/pml_x_yee/``.
-The content of this directory will look like the following (possibly including backtraces if the test crashed at runtime):
+* Run tests available for the current build options in parallel (while preserving existing dependencies between tests):
 
-.. code-block:: sh
+  .. code-block:: sh
 
-    $ ls ./test_dir/rt-WarpX/WarpX-tests/2021-04-30/pml_x_yee/
-    analysis_pml_yee.py     # Python analysis script
-    inputs_2d               # input file
-    main2d.gnu.TEST.TPROF.MTMPI.OMP.QED.ex  # executable
-    pml_x_yee.analysis.out  # Python analysis output
-    pml_x_yee.err.out       # error output
-    pml_x_yee.make.out      # build output
-    pml_x_yee_plt00000/     # data output (initialization)
-    pml_x_yee_plt00300/     # data output (last time step)
-    pml_x_yee.run.out       # test output
+       ctest --test-dir build -j 2
 
+* Run tests available for the current build options and output anything outputted by the test program if the test should fail:
 
-Add a test to the suite
------------------------
+  .. code-block:: sh
 
-There are three steps to follow to add a new automated test (illustrated here for PML boundary conditions):
+       ctest --test-dir build --output-on-failure
 
-* An input file for your test, in folder `Example/Tests/...`. For the PML test, the input file is at ``Examples/Tests/pml/inputs_2d``. You can also re-use an existing input file (even better!) and pass specific parameters at runtime (see below).
-* A Python script that reads simulation output and tests correctness versus theory or calibrated results. For the PML test, see ``Examples/Tests/pml/analysis_pml_yee.py``. It typically ends with Python statement ``assert( error<0.01 )``.
-* If you need a new Python package dependency for testing, add it in ``Regression/requirements.txt``
-* Add an entry to ``Regression/WarpX-tests.ini``, so that a WarpX simulation runs your test in the continuous integration process, and the Python script is executed to assess the correctness. For the PML test, the entry is
+* Run tests available for the current build options with verbose output:
 
-.. code-block::
+  .. code-block:: sh
 
-   [pml_x_yee]
-   buildDir = .
-   inputFile = Examples/Tests/pml/inputs2d
-   runtime_params = warpx.do_dynamic_scheduling=0 algo.maxwell_solver=yee
-   dim = 2
-   addToCompileString =
-   cmakeSetupOpts = -DWarpX_DIMS=2
-   restartTest = 0
-   useMPI = 1
-   numprocs = 2
-   useOMP = 1
-   numthreads = 1
-   compileTest = 0
-   doVis = 0
-   analysisRoutine = Examples/Tests/pml/analysis_pml_yee.py
+       ctest --test-dir build --verbose
 
-If you re-use an existing input file, you can add arguments to ``runtime_params``, like ``runtime_params = amr.max_level=1 amr.n_cell=32 512 max_step=100 plasma_e.zmin=-200.e-6``.
+* Run tests matching the regular expression ``laser_acceleration``:
 
-.. note::
+  .. code-block:: sh
 
-   If you added ``analysisRoutine = Examples/analysis_default_regression.py``, then run the new test case locally and add the :ref:`checksum <developers-checksum>` file for the expected output.
+       ctest --test-dir build -R laser_acceleration
 
-.. note::
+* Run tests except those matching the regular expression ``laser_acceleration``:
 
-   We run those tests on our continuous integration services, which at the moment only have 2 virtual CPU cores.
-   Thus, make sure that the product of ``numprocs`` and ``numthreads`` for a test is ``<=2``.
+  .. code-block:: sh
 
+       ctest --test-dir build -E laser_acceleration
+
+* Sometimes two or more tests share a large number of input parameters and differ by a small set of options.
+  Such tests typically also share a base string in their names.
+  For example, you can find three different tests named ``test_3d_langmuir_multi``, ``test_3d_langmuir_multi_nodal`` and ``test_3d_langmuir_multi_picmi``.
+  In such a case, if you wish to run the test ``test_3d_langmuir_multi`` only, this can be done again with the ``-R`` regular `expression filter <https://regex101.com>`__ via
+
+  .. code-block:: sh
+
+       ctest --test-dir build -R "test_3d_langmuir_multi\..*"
+
+  Note that filtering with ``-R "test_3d_langmuir_multi"`` would include the additional tests that have the same substring in their name and would not be sufficient to isolate a single test.
+  Note also that the escaping ``\.`` in the regular expression is necessary in order to take into account the fact that each test is automatically appended with the strings ``.run``, ``.analysis`` and possibly ``.cleanup``.
+
+* Run only tests not labeled with the ``slow`` label:
+
+  .. code-block:: sh
+
+       ctest --test-dir build -LE slow
+
+Once the execution of CTest is completed, you can find all files associated with each test in its corresponding directory under ``build/bin/``.
+For example, if you run the single test ``test_3d_laser_acceleration``, you can find all files associated with this test in the directory ``build/bin/test_3d_laser_acceleration/``.
+
+If you modify the code base locally and want to assess the effects of your code changes on the automated tests, you need to first rebuild WarpX including your code changes and then rerun CTest.
+
+How to add automated tests
+--------------------------
+
+An automated test typically consists of the following components:
+
+* input file or PICMI input script;
+* analysis script;
+* checksum file.
+
+To learn more about how to use checksums in automated tests, please see the corresponding section :ref:`Checksums on Tests <developers-checksum>`.
+
+As mentioned above, the input files and scripts used by the automated tests can be found in the `Examples <https://github.com/ECP-WarpX/WarpX/tree/development/Examples>`__ directory, under either `Physics_applications <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Physics_applications>`__ or `Tests <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests>`__.
+
+Each test directory must contain a file named ``CMakeLists.txt`` where all tests associated with the input files and scripts in that directory must be listed.
+
+A new test can be added by adding a corresponding entry in ``CMakeLists.txt`` as illustrated in the examples below:
+
+* Add the **regular test** ``test_1d_laser_acceleration``:
+
+  .. code-block:: cmake
+
+       add_warpx_test(
+           test_1d_laser_acceleration  # name
+           1  # dims
+           2  # nprocs
+           inputs_test_1d_laser_acceleration  # inputs
+           "analysis.py diags/diag1000100"  # analysis
+           "analysis_default_regression.py --path diags/diag1000100"  # checksum
+           OFF  # dependency
+       )
+
+* Add the **PICMI test** ``test_2d_laser_acceleration_picmi``:
+
+  .. code-block:: cmake
+
+       add_warpx_test(
+           test_2d_laser_acceleration_picmi  # name
+           2  # dims
+           2  # nprocs
+           inputs_test_2d_laser_acceleration_picmi.py  # inputs
+           "analysis.py diags/diag1000100"  # analysis
+           "analysis_default_regression.py --path diags/diag1000100"  # checksum
+           OFF  # dependency
+       )
+
+* Add the **restart test** ``test_3d_laser_acceleration_restart``:
+
+  .. code-block:: cmake
+
+       add_warpx_test(
+           test_3d_laser_acceleration_restart  # name
+           3  # dims
+           2  # nprocs
+           inputs_test_3d_laser_acceleration_restart  # inputs
+           "analysis_default_restart.py diags/diag1000100"  # analysis
+           "analysis_default_regression.py --path diags/diag1000100"  # checksum
+           test_3d_laser_acceleration  # dependency
+       )
+
+  Note that the restart has an explicit dependency, namely it can run only provided that the original test, from which the restart checkpoint files will be read, runs first.
+
+* A more complex example. Add the **PICMI test** ``test_rz_laser_acceleration_picmi``, with custom command-line arguments ``--test`` and ``dir``, openPMD time series output, and custom command line arguments for the checksum comparison:
+
+  .. code-block:: cmake
+
+       add_warpx_test(
+           test_rz_laser_acceleration_picmi  # name
+           RZ  # dims
+           2   # nprocs
+           "inputs_test_rz_laser_acceleration_picmi.py --test --dir 1"  # inputs
+           "analysis.py diags/diag1/"  # analysis
+           "analysis_default_regression.py --path diags/diag1/ --skip-particles --rtol 1e-7"  # checksum
+           OFF  # dependency
+       )
+
+The ``analysis`` and ``checksum`` commands passed as arguments to ``add_warpx_test`` can be set to ``OFF`` if the intention is to skip the respective analysis for a given test.
+
+If you need a new Python package dependency for testing, please add it in `Regression/requirements.txt <https://github.com/ECP-WarpX/WarpX/blob/development/Regression/requirements.txt>`__.
+
+Sometimes two or more tests share a large number of input parameters.
+The shared input parameters can be collected in a "base" input file that can be passed as a runtime parameter in the actual test input files through the parameter ``FILE``.
+
+If the new test is added in a new directory that did not exist before, please add the name of that directory with the command ``add_subdirectory`` in `Physics_applications/CMakeLists.txt <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Physics_applications/CMakeLists.txt>`__ or `Tests/CMakeLists.txt <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests/CMakeLists.txt>`__, depending on where the new test directory is located.
+
+If not already present, the default regression analysis script ``analysis_default_regression.py`` in the examples above must be linked from `Examples/analysis_default_regression.py <https://github.com/ECP-WarpX/WarpX/blob/development/Examples/analysis_default_regression.py>`__, by executing once the following command from the test directory:
+
+  .. code-block:: bash
+
+       ln -s ../../analysis_default_regression.py analysis_default_regression.py
+
+Here is the help message of the default regression analysis script, including usage and list of available options and arguments:
+
+  .. code-block:: bash
+
+       usage: analysis_default_regression.py [-h] [--path PATH] [--rtol RTOL] [--skip-fields] [--skip-particles]
+       options:
+         -h, --help        show this help message and exit
+         --path PATH       path to output file(s)
+         --rtol RTOL       relative tolerance to compare checksums
+         --skip-fields     skip fields when comparing checksums
+         --skip-particles  skip particles when comparing checksums
+
+Naming conventions for automated tests
+--------------------------------------
+
+Note that we currently obey the following snake\_case naming conventions for test names and test input files (which make automation tasks easier, e.g., parsing visually, parsing through code, sorting alphabetically, filtering tests in CTest via ``-R``, etc.):
+
+#. **Regular test names** start with the string ``test_1d_``, ``test_2d_``, ``test_3d_`` or ``test_rz_``, followed by a string that is descriptive of the test. For example, ``test_3d_laser_acceleration``.
+
+#. **PICMI test names** start with the string ``test_1d_``, ``test_2d_``, ``test_3d_`` or ``test_rz_``, followed by a string that is descriptive of the test, and end with the string ``_picmi``. For example, ``test_3d_laser_acceleration_picmi``.
+
+#. **Restart test names** end with the string ``_restart``. For example, ``test_3d_laser_acceleration_restart``.
+
+#. **Test input files** start with the string ``inputs_`` followed by the test name. For example, ``inputs_test_3d_laser_acceleration`` or ``inputs_test_3d_laser_acceleration_picmi.py`` or ``inputs_test_3d_laser_acceleration_restart``.
+
+#. **Base input files** (that is, files collecting input parameters shared between two or more tests) are typically named ``inputs_base_1d``, ``inputs_base_2d``, ``inputs_base_3d`` or ``inputs_base_rz``, possibly followed by additional strings if need be.
 
 Useful tool for plotfile comparison: ``fcompare``
 -------------------------------------------------

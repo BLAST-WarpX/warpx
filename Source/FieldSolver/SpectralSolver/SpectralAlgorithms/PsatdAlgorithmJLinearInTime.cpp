@@ -35,7 +35,7 @@ PsatdAlgorithmJLinearInTime::PsatdAlgorithmJLinearInTime(
     const int norder_x,
     const int norder_y,
     const int norder_z,
-    const short grid_type,
+    ablastr::utils::enums::GridType grid_type,
     const amrex::Real dt,
     const bool time_averaging,
     const bool dive_cleaning,

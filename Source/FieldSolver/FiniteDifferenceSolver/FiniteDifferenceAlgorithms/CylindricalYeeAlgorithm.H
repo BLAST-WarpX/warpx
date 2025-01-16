@@ -74,7 +74,7 @@ struct CylindricalYeeAlgorithm {
      * The input parameter `r` is given at the cell-centered position */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real UpwardDrr_over_r (
-        amrex::Array4<amrex::Real> const& F,
+        amrex::Array4<amrex::Real const> const& F,
         amrex::Real const r, amrex::Real const dr,
         amrex::Real const * const coefs_r, int const n_coefs_r,
         int const i, int const j, int const k, int const comp ) {
@@ -92,7 +92,7 @@ struct CylindricalYeeAlgorithm {
      * The input parameter `r` is given at the cell-centered position */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real DownwardDrr_over_r (
-        amrex::Array4<amrex::Real> const& F,
+        amrex::Array4<amrex::Real const> const& F,
         amrex::Real const r, amrex::Real const dr,
         amrex::Real const * const coefs_r, int const n_coefs_r,
         int const i, int const j, int const k, int const comp ) {
@@ -108,7 +108,7 @@ struct CylindricalYeeAlgorithm {
      * Perform derivative along r on a cell-centered grid, from a nodal field `F` */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real UpwardDr (
-        amrex::Array4<amrex::Real> const& F,
+        amrex::Array4<amrex::Real const> const& F,
         amrex::Real const * const coefs_r, int const n_coefs_r,
         int const i, int const j, int const k, int const comp ) {
 
@@ -123,7 +123,7 @@ struct CylindricalYeeAlgorithm {
      * Perform derivative along r on a nodal grid, from a cell-centered field `F` */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real DownwardDr (
-        amrex::Array4<amrex::Real> const& F,
+        amrex::Array4<amrex::Real const> const& F,
         amrex::Real const * const coefs_r, int const n_coefs_r,
         int const i, int const j, int const k, int const comp ) {
 
@@ -156,7 +156,7 @@ struct CylindricalYeeAlgorithm {
      * Perform derivative along z on a cell-centered grid, from a nodal field `F` */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real UpwardDz (
-        amrex::Array4<amrex::Real> const& F,
+        amrex::Array4<amrex::Real const> const& F,
         amrex::Real const * const coefs_z, int const n_coefs_z,
         int const i, int const j, int const k, int const comp ) {
 
@@ -170,7 +170,7 @@ struct CylindricalYeeAlgorithm {
      * Perform derivative along z on a nodal grid, from a cell-centered field `F` */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real DownwardDz (
-        amrex::Array4<amrex::Real> const& F,
+        amrex::Array4<amrex::Real const> const& F,
         amrex::Real const * const coefs_z, int const n_coefs_z,
         int const i, int const j, int const k, int const comp ) {
 

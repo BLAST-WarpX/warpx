@@ -762,16 +762,9 @@ void
 SpectralFieldDataRZ::ApplyFilter (const int lev, int const field_index1,
                                   int const field_index2, int const field_index3)
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-    const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, binomialfilter.boxArray(), binomialfilter.DistributionMap());
-
     for (amrex::MFIter mfi(binomialfilter); mfi.isValid(); ++mfi){
 
-        if (do_costs)
-        {
-            amrex::Gpu::synchronize();
-        }
-        auto wt = static_cast<amrex::Real>(amrex::second());
+        const auto cost_tracker = warpx::LoadBalance::CostTracker(lev, mfi);
 
         auto const & filter_r = binomialfilter[mfi].getFilterArrayR();
         auto const & filter_z = binomialfilter[mfi].getFilterArrayZ();
@@ -797,11 +790,6 @@ SpectralFieldDataRZ::ApplyFilter (const int lev, int const field_index1,
             fields_arr(i,j,k,ic3) *= filter_r_arr[ir]*filter_z_arr[j];
         });
 
-        if (do_costs)
-        {
-            amrex::Gpu::synchronize();
-            wt = static_cast<amrex::Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
+        cost_tracker.add();
     }
 }

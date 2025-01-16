@@ -32,7 +32,9 @@
  * @param[in] dt is the time step length between two collision calls.
  * @param[in] L is the Coulomb log and will be used if greater than zero,
  *            otherwise will be computed.
+ * @param[in] dV is the volume of the corresponding cell.
  * @param[in] engine the random number generator state & factory
+ * @param[in] isSameSpecies whether this is an intra-species collision process
  * @param[in] coll_idx is the collision index offset.
 */
 
@@ -81,6 +83,9 @@ void ElasticCollisionPerez (
     // bmax (screening length) cannot be smaller than atomic spacing
     const T_PR bmax = amrex::max(lmdD, rmin);
 
+    // set max cross section based on mfp = atomic spacing
+    const T_PR sigma_max = T_PR(1.0) / (maxn * rmin);
+
 #if (defined WARPX_DIM_RZ)
     T_PR * const AMREX_RESTRICT theta1 = soa_1.m_rdata[PIdx::theta];
     T_PR * const AMREX_RESTRICT theta2 = soa_2.m_rdata[PIdx::theta];
@@ -114,7 +119,7 @@ void ElasticCollisionPerez (
           // scattering path s12 in UpdateMomentumPerezElastic().
           // s12 is defined such that the expected value of the change in particle
           // velocity is equal to that from the full NxN pairing method, as described
-          // here https://arxiv.org/submit/5758216/view. This method is a direct extension
+          // here https://arxiv.org/abs/2407.19151. This method is a direct extension
           // of the original method by Takizuka and Abe JCP 25 (1977) to weighted particles.
           T_PR n12;
           const T_PR wpmax = amrex::max(w1[ I1[i1] ],w2[ I2[i2] ]);
@@ -124,10 +129,8 @@ void ElasticCollisionPerez (
           UpdateMomentumPerezElastic(
               u1x[ I1[i1] ], u1y[ I1[i1] ], u1z[ I1[i1] ],
               u2x[ I2[i2] ], u2y[ I2[i2] ], u2z[ I2[i2] ],
-              n1, n2, n12,
               q1, m1, w1[ I1[i1] ], q2, m2, w2[ I2[i2] ],
-              dt, L, bmax,
-              engine);
+              n12, sigma_max, L, bmax, dt, engine );
 
 #if (defined WARPX_DIM_RZ)
           T_PR const u1xbuf_new = u1x[I1[i1]];

@@ -3,25 +3,27 @@ foreach(D IN LISTS WarpX_DIMS)
     target_sources(lib_${SD}
       PRIVATE
         BeamRelevant.cpp
+        ChargeOnEB.cpp
         ColliderRelevant.cpp
+        DifferentialLuminosity.cpp
         FieldEnergy.cpp
+        FieldMaximum.cpp
+        FieldMomentum.cpp
         FieldProbe.cpp
         FieldProbeParticleContainer.cpp
-        FieldMomentum.cpp
+        FieldReduction.cpp
+        FieldProbe.cpp
         LoadBalanceCosts.cpp
         LoadBalanceEfficiency.cpp
         MultiReducedDiags.cpp
         ParticleEnergy.cpp
-        ParticleMomentum.cpp
+        ParticleExtrema.cpp
         ParticleHistogram.cpp
         ParticleHistogram2D.cpp
-        ReducedDiags.cpp
-        FieldMaximum.cpp
-        ParticleExtrema.cpp
-        RhoMaximum.cpp
+        ParticleMomentum.cpp
         ParticleNumber.cpp
-        FieldReduction.cpp
-        FieldProbe.cpp
-        ChargeOnEB.cpp
+        ReducedDiags.cpp
+        RhoMaximum.cpp
+        Timestep.cpp
     )
 endforeach()

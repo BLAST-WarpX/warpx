@@ -11,6 +11,8 @@
 #include "FieldSolver/SpectralSolver/SpectralKSpace.H"
 #include "SpectralBaseAlgorithm.H"
 
+#include <ablastr/utils/Enums.H>
+
 #include <AMReX_Array.H>
 #include <AMReX_Config.H>
 #include <AMReX_REAL.H>
@@ -53,11 +55,12 @@ class PsatdAlgorithmJLinearInTime : public SpectralBaseAlgorithm
             int norder_x,
             int norder_y,
             int norder_z,
-            short grid_type,
+            ablastr::utils::enums::GridType grid_type,
             amrex::Real dt,
             bool time_averaging,
             bool dive_cleaning,
-            bool divb_cleaning);
+            bool divb_cleaning
+        );
 
         /**
          * \brief Updates the E and B fields in spectral space, according to the multi-J PSATD equations

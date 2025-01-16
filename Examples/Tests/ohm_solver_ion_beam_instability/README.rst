@@ -13,11 +13,11 @@ Run
 The same input script can be used for 1d, 2d or 3d simulations as well as
 replicating either the resonant or non-resonant condition as indicated below.
 
-.. dropdown:: Script ``PICMI_inputs.py``
+.. dropdown:: Script ``inputs_test_1d_ohm_solver_ion_beam_picmi.py``
 
-   .. literalinclude:: PICMI_inputs.py
+   .. literalinclude:: inputs_test_1d_ohm_solver_ion_beam_picmi.py
       :language: python3
-      :caption: You can copy this file from ``Examples/Tests/ohm_solver_ion_beam_instability/PICMI_inputs.py``.
+      :caption: You can copy this file from ``Examples/Tests/ohm_solver_ion_beam_instability/inputs_test_1d_ohm_solver_ion_beam_picmi.py``.
 
 For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with ``mpiexec -n 4 ...`` or ``srun -n 4 ...``, depending on the system.
 
@@ -29,7 +29,7 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
       .. code-block:: bash
 
-         python3 PICMI_inputs.py -dim {1/2/3} --resonant
+         python3 inputs_test_1d_ohm_solver_ion_beam_picmi.py -dim {1/2/3} --resonant
 
    .. tab-item:: Non-resonant case
 
@@ -37,7 +37,7 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
       .. code-block:: bash
 
-         python3 PICMI_inputs.py -dim {1/2/3}
+         python3 inputs_test_1d_ohm_solver_ion_beam_picmi.py -dim {1/2/3}
 
 Analyze
 -------

@@ -1,4 +1,4 @@
-/* Copyright 2022 S. Eric Clark, LLNL
+/* Copyright 2022-2024 S. Eric Clark (Helion Energy, formerly LLNL)
  *
  * This file is part of WarpX.
  *
@@ -71,6 +71,7 @@ namespace ablastr::fields {
  * \param[in] dmap the distribution mapping per level (e.g., from AmrMesh)
  * \param[in] grids the grids per level (e.g., from AmrMesh)
  * \param[in] boundary_handler a handler for boundary conditions, for example @see MagnetostaticSolver::VectorPoissonBoundaryHandler
+ * \param[in] eb_enabled solve with embedded boundaries
  * \param[in] do_single_precision_comms perform communications in single precision
  * \param[in] rel_ref_ratio mesh refinement ratio between levels (default: 1)
  * \param[in] post_A_calculation perform a calculation per level directly after A was calculated; required for embedded boundaries (default: none)
@@ -85,15 +86,16 @@ template<
 void
 computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > const & curr,
                             amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > & A,
-                            amrex::Real const relative_tolerance,
+                            amrex::Real relative_tolerance,
                             amrex::Real absolute_tolerance,
-                            int const max_iters,
-                            int const verbosity,
+                            int max_iters,
+                            int verbosity,
                             amrex::Vector<amrex::Geometry> const& geom,
                             amrex::Vector<amrex::DistributionMapping> const& dmap,
                             amrex::Vector<amrex::BoxArray> const& grids,
                             T_BoundaryHandler const boundary_handler,
-                            bool const do_single_precision_comms = false,
+                            bool eb_enabled = false,
+                            bool do_single_precision_comms = false,
                             std::optional<amrex::Vector<amrex::IntVect> > rel_ref_ratio = std::nullopt,
                             [[maybe_unused]] T_PostACalculationFunctor post_A_calculation = std::nullopt,
                             [[maybe_unused]] std::optional<amrex::Real const> current_time = std::nullopt, // only used for EB
@@ -130,28 +132,53 @@ computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > co
         );
     }
 
-    const amrex::LPInfo& info = amrex::LPInfo();
-
     // Loop over dimensions of A to solve each component individually
     for (int lev=0; lev<=finest_level; lev++) {
-        amrex::MLEBNodeFDLaplacian linopx(
-            {geom[lev]}, {grids[lev]}, {dmap[lev]}, info
-#if defined(AMREX_USE_EB)
-                , {eb_farray_box_factory.value()[lev]}
+        amrex::LPInfo info;
+
+#ifdef WARPX_DIM_RZ
+        constexpr bool is_rz = true;
+#else
+        constexpr bool is_rz = false;
 #endif
-            );
-        amrex::MLEBNodeFDLaplacian linopy(
-            {geom[lev]}, {grids[lev]}, {dmap[lev]}, info
-#if defined(AMREX_USE_EB)
-                , {eb_farray_box_factory.value()[lev]}
+
+        amrex::Array<amrex::Real,AMREX_SPACEDIM> const dx
+            {AMREX_D_DECL(geom[lev].CellSize(0),
+                          geom[lev].CellSize(1),
+                          geom[lev].CellSize(2))};
+
+
+        if (!eb_enabled && !is_rz) {
+            // Determine whether to use semi-coarsening
+            int max_semicoarsening_level = 0;
+            int semicoarsening_direction = -1;
+            const auto min_dir = static_cast<int>(std::distance(dx.begin(),
+                                                                std::min_element(dx.begin(), dx.end())));
+            const auto max_dir = static_cast<int>(std::distance(dx.begin(),
+                                                                std::max_element(dx.begin(), dx.end())));
+            if (dx[max_dir] > dx[min_dir]) {
+                semicoarsening_direction = max_dir;
+                max_semicoarsening_level = static_cast<int>(std::log2(dx[max_dir] / dx[min_dir]));
+            }
+            if (max_semicoarsening_level > 0) {
+                info.setSemicoarsening(true);
+                info.setMaxSemicoarseningLevel(max_semicoarsening_level);
+                info.setSemicoarseningDirection(semicoarsening_direction);
+            }
+        }
+
+        amrex::MLEBNodeFDLaplacian linopx, linopy, linopz;
+        if (eb_enabled) {
+#ifdef AMREX_USE_EB
+            linopx.define({geom[lev]}, {grids[lev]}, {dmap[lev]}, info, {eb_farray_box_factory.value()[lev]});
+            linopy.define({geom[lev]}, {grids[lev]}, {dmap[lev]}, info, {eb_farray_box_factory.value()[lev]});
+            linopz.define({geom[lev]}, {grids[lev]}, {dmap[lev]}, info, {eb_farray_box_factory.value()[lev]});
 #endif
-            );
-        amrex::MLEBNodeFDLaplacian linopz(
-            {geom[lev]}, {grids[lev]}, {dmap[lev]}, info
-#if defined(AMREX_USE_EB)
-                , {eb_farray_box_factory.value()[lev]}
-#endif
-        );
+        } else {
+            linopx.define({geom[lev]}, {grids[lev]}, {dmap[lev]}, info);
+            linopy.define({geom[lev]}, {grids[lev]}, {dmap[lev]}, info);
+            linopz.define({geom[lev]}, {grids[lev]}, {dmap[lev]}, info);
+        }
 
         amrex::Array<amrex::MLEBNodeFDLaplacian*,3> linop = {&linopx,&linopy,&linopz};
         amrex::Array<std::unique_ptr<amrex::MLMG>,3> mlmg;
@@ -163,9 +190,9 @@ computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > co
             // Note: this assumes that beta is zero
             linop[adim]->setSigma({AMREX_D_DECL(1._rt, 1._rt, 1._rt)});
 
-#if defined(AMREX_USE_EB)
             // Set Homogeneous Dirichlet Boundary on EB
-            linop[adim]->setEBDirichlet(0_rt);
+#if defined(AMREX_USE_EB)
+            if (eb_enabled) { linop[adim]->setEBDirichlet(0_rt); }
 #endif
 
 #ifdef WARPX_DIM_RZ

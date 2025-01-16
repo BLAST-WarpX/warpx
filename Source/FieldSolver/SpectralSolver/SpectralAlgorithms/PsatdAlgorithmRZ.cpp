@@ -19,12 +19,14 @@ using namespace amrex::literals;
 PsatdAlgorithmRZ::PsatdAlgorithmRZ (SpectralKSpaceRZ const & spectral_kspace,
                                     amrex::DistributionMapping const & dm,
                                     const SpectralFieldIndex& spectral_index,
-                                    int const n_rz_azimuthal_modes, int const norder_z,
-                                    short const grid_type, amrex::Real const dt,
+                                    int const n_rz_azimuthal_modes,
+                                    int const norder_z,
+                                    ablastr::utils::enums::GridType grid_type,
+                                    amrex::Real const dt,
                                     bool const update_with_rho,
                                     const bool time_averaging,
-                                    const int J_in_time,
-                                    const int rho_in_time,
+                                    const JInTime J_in_time,
+                                    const RhoInTime rho_in_time,
                                     const bool dive_cleaning,
                                     const bool divb_cleaning):
     // Initialize members of base class and member variables

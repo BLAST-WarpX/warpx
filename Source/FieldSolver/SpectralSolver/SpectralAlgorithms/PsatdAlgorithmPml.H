@@ -12,8 +12,9 @@
 #include "FieldSolver/SpectralSolver/SpectralFieldData_fwd.H"
 #include "FieldSolver/SpectralSolver/SpectralKSpace_fwd.H"
 
-#include <AMReX_REAL.H>
+#include <ablastr/utils/Enums.H>
 
+#include <AMReX_REAL.H>
 #include <AMReX_BaseFwd.H>
 
 #include <array>
@@ -51,7 +52,7 @@ class PsatdAlgorithmPml : public SpectralBaseAlgorithm
             int norder_x,
             int norder_y,
             int norder_z,
-            short grid_type,
+            ablastr::utils::enums::GridType grid_type,
             const amrex::Vector<amrex::Real>& v_galilean,
             amrex::Real dt,
             bool dive_cleaning,

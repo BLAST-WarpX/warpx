@@ -3,6 +3,8 @@ ifeq ($(USE_FFT),TRUE)
     CEXE_sources += WrapCuFFT.cpp
   else ifeq ($(USE_HIP),TRUE)
     CEXE_sources += WrapRocFFT.cpp
+  else ifeq ($(USE_SYCL),TRUE)
+    CEXE_sources += WrapMklFFT.cpp
   else
     CEXE_sources += WrapFFTW.cpp
   endif

@@ -24,6 +24,7 @@ from .HybridPICModel import hybridpicmodel
 from .Interpolation import interpolation
 from .Lasers import lasers, lasers_list
 from .Particles import particles, particles_list
+from .ProjectionDivBCleaner import projectiondivbcleaner
 from .PSATD import psatd
 
 
@@ -37,7 +38,7 @@ class WarpX(Bucket):
 
         for k, v in kw.items():
             if v is not None:
-                argv.append(f'{k} = {v}')
+                argv.append(f"{k} = {v}")
 
         argv += warpx.attrlist()
         argv += my_constants.attrlist()
@@ -48,6 +49,7 @@ class WarpX(Bucket):
         argv += boundary.attrlist()
         argv += algo.attrlist()
         argv += interpolation.attrlist()
+        argv += projectiondivbcleaner.attrlist()
         argv += psatd.attrlist()
         argv += eb2.attrlist()
 
@@ -62,7 +64,9 @@ class WarpX(Bucket):
                 particles_list.append(getattr(Particles, pstring))
                 particles_list_names.append(pstring)
             else:
-                raise Exception('Species %s listed in species_names not defined'%pstring)
+                raise Exception(
+                    "Species %s listed in species_names not defined" % pstring
+                )
 
         argv += particles.attrlist()
         for particle in particles_list:
@@ -84,12 +88,25 @@ class WarpX(Bucket):
             for species_diagnostic in diagnostic._species_dict.values():
                 argv += species_diagnostic.attrlist()
 
-        reduced_diagnostics.reduced_diags_names = reduced_diagnostics._diagnostics_dict.keys()
+        reduced_diagnostics.reduced_diags_names = (
+            reduced_diagnostics._diagnostics_dict.keys()
+        )
         argv += reduced_diagnostics.attrlist()
         for diagnostic in reduced_diagnostics._diagnostics_dict.values():
             argv += diagnostic.attrlist()
 
+        for bucket in self._bucket_dict.values():
+            argv += bucket.attrlist()
+
         return argv
+
+    def get_bucket(self, bucket_name):
+        try:
+            return self._bucket_dict[bucket_name]
+        except KeyError:
+            bucket = Bucket(bucket_name)
+            self._bucket_dict[bucket_name] = bucket
+            return bucket
 
     def init(self, mpi_comm=None, **kw):
         # note: argv[0] needs to be an absolute path so it works with AMReX backtraces
@@ -109,25 +126,25 @@ class WarpX(Bucket):
     def getProbHi(self, direction):
         return libwarpx.libwarpx_so.warpx_getProbHi(direction)
 
-    def write_inputs(self, filename='inputs', **kw):
+    def write_inputs(self, filename="inputs", **kw):
         argv = self.create_argv_list(**kw)
 
         # Sort the argv list to make it more human readable
         argv.sort()
 
-        with open(filename, 'w') as ff:
-
-            prefix_old = ''
+        with open(filename, "w") as ff:
+            prefix_old = ""
             for arg in argv:
                 # This prints the name of the input group (prefix) as a header
                 # before each group to make the input file more human readable
-                prefix_new = re.split(' |\.', arg)[0]
+                prefix_new = re.split(r" |\.", arg)[0]
                 if prefix_new != prefix_old:
-                    if prefix_old != '':
-                        ff.write('\n')
-                    ff.write(f'# {prefix_new}\n')
+                    if prefix_old != "":
+                        ff.write("\n")
+                    ff.write(f"# {prefix_new}\n")
                     prefix_old = prefix_new
 
-                ff.write(f'{arg}\n')
+                ff.write(f"{arg}\n")
 
-warpx = WarpX('warpx')
+
+warpx = WarpX("warpx", _bucket_dict={})

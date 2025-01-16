@@ -1,0 +1,7 @@
+# base input parameters
+FILE = inputs_base_2d
+
+# test input parameters
+algo.current_deposition = direct
+diag1.electrons.variables = x z w ux uy uz
+diag1.positrons.variables = x z w ux uy uz

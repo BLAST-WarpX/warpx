@@ -36,7 +36,7 @@ PsatdAlgorithmJConstantInTime::PsatdAlgorithmJConstantInTime(
     const int norder_x,
     const int norder_y,
     const int norder_z,
-    const short grid_type,
+    ablastr::utils::enums::GridType grid_type,
     const amrex::Vector<amrex::Real>& v_galilean,
     const amrex::Real dt,
     const bool update_with_rho,

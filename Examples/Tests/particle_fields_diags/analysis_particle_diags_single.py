@@ -13,4 +13,4 @@
 
 import analysis_particle_diags_impl as an
 
-an.do_analysis(single_precision = True)
+an.do_analysis(single_precision=True)

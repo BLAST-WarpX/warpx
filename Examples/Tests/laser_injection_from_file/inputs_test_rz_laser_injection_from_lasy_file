@@ -1,0 +1,51 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+stop_time = 40.e-15
+amr.n_cell = 32 1024
+amr.max_grid_size = 512
+amr.blocking_factor = 32
+amr.max_level = 0
+geometry.dims = RZ
+geometry.prob_lo     = 0.e-6  -25.e-6   # physical domain
+geometry.prob_hi     =  25.e-6   25.e-6
+warpx.verbose = 1
+warpx.serialize_initial_conditions = 1
+
+#################################
+####### Boundary condition ######
+#################################
+boundary.field_lo = none periodic
+boundary.field_hi = pec periodic
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.cfl = 0.98
+warpx.use_filter = 0
+#algo.maxwell_solver = ckc
+algo.load_balance_intervals = -1
+warpx.n_rz_azimuthal_modes=2
+
+# Order of particle shape factors
+algo.particle_shape = 3
+
+#################################
+############# LASER #############
+#################################
+lasers.names        = lasy_laser
+lasy_laser.position     = 0. 0. 0. # This point is on the laser plane
+lasy_laser.direction    = 0. 0. 1.     # The plane normal direction
+lasy_laser.polarization = 0. 1. 0.     # The main polarization vector
+lasy_laser.e_max        = 1.e14        # Maximum amplitude of the laser field (in V/m)
+lasy_laser.wavelength = 1.0e-6         # The wavelength of the laser (in meters)
+lasy_laser.profile      = from_file
+lasy_laser.time_chunk_size = 50
+lasy_laser.lasy_file_name = "../test_rz_laser_injection_from_lasy_file_prepare/diags/gaussian_laser_3d_00000.h5"
+lasy_laser.delay = 0.0
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = -1
+diag1.fields_to_plot = Er Et Ez Br Bz jr jt jz
+diag1.diag_type = Full

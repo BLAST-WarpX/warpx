@@ -10,9 +10,11 @@
 #ifndef WARPX_LOADBALANCE_LOADBALANCE_H_
 #define WARPX_LOADBALANCE_LOADBALANCE_H_
 
-#include "Utils/Parser/IntervalsParser.H"
 #include "Particles/MultiParticleContainer.H"
+#include "Utils/Parser/IntervalsParser.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 
+#include <AMReX_Enum.H>
 #include <AMReX_LayoutData.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
@@ -28,16 +30,18 @@ namespace warpx::load_balance
 
     /** Strategy to compute weights for use in load balance.
     */
-    enum class CostsUpdateAlgo {
-        Timers   , //!< load balance according to in-code timer-based weights (i.e., with  `costs`)
-        Heuristic  /**< load balance according to weights computed from number of cells
-                             and number of particles per box (i.e., with `costs_heuristic`) */
-    };
+    AMREX_ENUM(
+        CostsUpdateAlgo,
+        Timers,     //!< load balance according to in-code timer-based weights (i.e., with  `costs`)
+        Heuristic,  /**< load balance according to weights computed from number of cells
+                          and number of particles per box (i.e., with `costs_heuristic`) */
+        Default = Timers);
 
-    enum class LoadBalanceStrategy {
+   AMREX_ENUM(
+        LoadBalanceStrategy,
         Knapsack,
         SpaceFillingCurve
-    };
+   );
 
     struct LoadBalanceResult
     {
@@ -78,7 +82,7 @@ namespace warpx::load_balance
         [[nodiscard]]
         utils::parser::IntervalsParser get_intervals () const;
 
-        void init (int nlevs_max, int nox, int electromagnetic_solver_id);
+        void init (int nlevs_max, int nox, ElectromagneticSolverAlgo electromagnetic_solver_id);
 
         void clear_level (int lev);
 
@@ -116,7 +120,7 @@ namespace warpx::load_balance
         */
         void compute_costs_if_heuristic (
             int finest_level,
-            const amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > >& efield_ref,
+            const amrex::Vector<std::array<amrex::MultiFab*, 3> >& efield_ref,
             const MultiParticleContainer& mypc_ref);
 
         LoadBalanceResult compute_new_distribution_mapping(int lev) const;
@@ -126,7 +130,7 @@ namespace warpx::load_balance
         ~ LoadBalance (){}
 
     private:
-        void set_weight_values_for_costs_update (int nox, int electromagnetic_solver_id);
+        void set_weight_values_for_costs_update (int nox, ElectromagneticSolverAlgo electromagnetic_solver_id);
 
         /**Flag to store if LoadBalance has been initialized*/
         bool m_initialized = false;

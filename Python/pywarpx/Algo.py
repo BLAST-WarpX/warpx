@@ -6,4 +6,4 @@
 
 from .Bucket import Bucket
 
-algo = Bucket('algo')
+algo = Bucket("algo")

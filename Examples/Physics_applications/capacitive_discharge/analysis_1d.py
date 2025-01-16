@@ -4,6 +4,7 @@
 
 import numpy as np
 
+# fmt: off
 ref_density = np.array([
        1.27989677e+14, 2.23601330e+14, 2.55400265e+14, 2.55664972e+14,
        2.55806841e+14, 2.55806052e+14, 2.55815865e+14, 2.55755151e+14,
@@ -39,7 +40,8 @@ ref_density = np.array([
        2.56041610e+14, 2.56041551e+14, 2.56088641e+14, 2.23853646e+14,
        1.27580207e+14
 ])
+# fmt: on
 
-density_data = np.load( 'ion_density_case_1.npy' )
+density_data = np.load("ion_density_case_1.npy")
 print(repr(density_data))
 assert np.allclose(density_data, ref_density)

@@ -46,7 +46,7 @@ namespace ablastr::particles
  * \param nc number of components to deposit
  */
 template< typename T_PC >
-static void
+void
 deposit_charge (typename T_PC::ParIterType& pti,
                 typename T_PC::RealVector const& wp,
                 amrex::Real const charge,

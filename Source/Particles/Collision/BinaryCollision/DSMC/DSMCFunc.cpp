@@ -19,7 +19,7 @@
 DSMCFunc::DSMCFunc (
     const std::string& collision_name,
     [[maybe_unused]] MultiParticleContainer const * const mypc,
-    [[maybe_unused]] const bool isSameSpecies )
+    const bool isSameSpecies ): m_isSameSpecies{isSameSpecies}
 {
     using namespace amrex::literals;
 
@@ -76,4 +76,5 @@ DSMCFunc::DSMCFunc (
     // Link executor to appropriate ScatteringProcess executors
     m_exe.m_scattering_processes_data = m_scattering_processes_exe.data();
     m_exe.m_process_count = process_count;
+    m_exe.m_isSameSpecies = m_isSameSpecies;
 }

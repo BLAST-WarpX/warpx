@@ -3,20 +3,24 @@ export proj=""  # change me!
 
 # swap to GNU programming environment (with gcc 11.2)
 module swap PrgEnv-nvhpc PrgEnv-gnu
-module swap gcc/12.2.0 gcc/11.2.0
-module load nvhpc-mixed/22.11
+module load gcc-native/12.3
+module load nvhpc-mixed/23.9
 
 # swap to the Milan cray package
-module swap craype-x86-rome craype-x86-milan
+module load craype-x86-milan
+
+# extra modules
+module use /soft/modulefiles
+module load spack-pe-gnu
 
 # required dependencies
-module load cmake/3.23.2
+module load cmake/3.27.7
 
 # optional: for QED support with detailed tables
-# module load boost/1.81.0
+module load boost
 
 # optional: for openPMD and PSATD+RZ support
-module load cray-hdf5-parallel/1.12.2.3
+module load hdf5/1.14.3
 export CMAKE_PREFIX_PATH=/home/${USER}/sw/polaris/gpu/c-blosc-1.21.1:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=/home/${USER}/sw/polaris/gpu/adios2-2.8.3:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=/home/${USER}/sw/polaris/gpu/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
@@ -30,7 +34,7 @@ export LD_LIBRARY_PATH=/home/${USER}/sw/polaris/gpu/lapackpp-2024.05.31/lib64:$L
 export PATH=/home/${USER}/sw/polaris/gpu/adios2-2.8.3/bin:${PATH}
 
 # optional: for Python bindings or libEnsemble
-module load cray-python/3.9.13.1
+module load python/3.10.9
 
 if [ -d "/home/${USER}/sw/polaris/gpu/venvs/warpx" ]
 then
@@ -49,7 +53,7 @@ export CXXFLAGS="-march=znver3"
 export CFLAGS="-march=znver3"
 
 # compiler environment hints
-export CC=$(which gcc)
-export CXX=$(which g++)
+export CC=$(which gcc-12)
+export CXX=$(which g++-12)
 export CUDACXX=$(which nvcc)
 export CUDAHOSTCXX=${CXX}

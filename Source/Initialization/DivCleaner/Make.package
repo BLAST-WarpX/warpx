@@ -1,0 +1,3 @@
+CEXE_sources += ProjectionDivCleaner.cpp
+
+VPATH_LOCATIONS   += $(WARPX_HOME)/Source/Initialization/DivCleaner

@@ -1,0 +1,5 @@
+# base input parameters
+FILE = inputs_base_3d
+
+# test input parameters
+warpx.do_single_precision_comms = 1

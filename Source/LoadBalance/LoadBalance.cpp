@@ -12,7 +12,6 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXAlgorithmSelection.H"
 
 #include "ablastr/warn_manager/WarnManager.H"
 
@@ -31,26 +30,12 @@ namespace
 {
     CostsUpdateAlgo parse_cost_update_algo ()
     {
-        using namespace std;
+        CostsUpdateAlgo load_balance_costs_update_algo = CostsUpdateAlgo::Default;
 
         const amrex::ParmParse pp_algo("algo");
+        pp_algo.query_enum_sloppy("load_balance_costs_update", load_balance_costs_update_algo, "-_");
 
-        if (std::string buf; pp_algo.query("load_balance_costs_update", buf))
-        {
-            if (buf == "timers"s){
-                return CostsUpdateAlgo::Timers;
-            }
-            else if (buf == "heuristic"s){
-                return CostsUpdateAlgo::Heuristic;
-            }
-            else{
-            WARPX_ABORT_WITH_MESSAGE(
-                "'"s + buf + "'"s + " is not a valid cost update algorithm. "s +
-                "Please select either 'heuristic' or 'timers'.");
-            }
-        }
-
-        return CostsUpdateAlgo::Timers;
+        return load_balance_costs_update_algo;
     }
 
     [[nodiscard]]
@@ -157,7 +142,7 @@ utils::parser::IntervalsParser LoadBalance::get_intervals () const
     return m_intervals;
 }
 
-void LoadBalance::init (const int nlevs_max, const int nox, const int electromagnetic_solver_id)
+void LoadBalance::init (const int nlevs_max, const int nox, const ElectromagneticSolverAlgo electromagnetic_solver_id)
 {
     m_intervals = ::parse_load_balance_intervals();
 
@@ -180,7 +165,7 @@ void LoadBalance::init (const int nlevs_max, const int nox, const int electromag
 }
 
 void LoadBalance::set_weight_values_for_costs_update (
-    const int nox, const int electromagnetic_solver_id)
+    const int nox, const ElectromagneticSolverAlgo electromagnetic_solver_id)
 {
     if constexpr (amrex_use_gpu){
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
@@ -367,7 +352,7 @@ void LoadBalance::allocate (const int lev,
 
 void LoadBalance::compute_costs_if_heuristic (
     const int finest_level,
-    const amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > >& efield_ref,
+    const amrex::Vector<std::array<amrex::MultiFab*, 3> >& efield_ref,
     const MultiParticleContainer& mypc_ref)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_initialized,
@@ -392,7 +377,7 @@ void LoadBalance::compute_costs_if_heuristic (
         }
 
         // Cell loop
-        const auto Ex = efield_ref[lev][0].get();
+        const auto Ex = efield_ref[lev][0];
         for (amrex::MFIter mfi(*Ex, false); mfi.isValid(); ++mfi)
         {
             const amrex::Box& gbx = mfi.growntilebox();

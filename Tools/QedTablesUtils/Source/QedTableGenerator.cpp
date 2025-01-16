@@ -49,7 +49,7 @@ void GenerateTableQS (const ParsedArgs& args, const string& outfile_name);
 
 int main (int argc, char** argv)
 {
-    cout << "### QED Table Generator ###" << endl;
+    cout << "### QED Table Generator ###\n";
     const auto args_map = ParseArgs(line_commands, argc, argv);
 
     if (args_map.empty() || Contains(args_map, "-h")){

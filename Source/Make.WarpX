@@ -184,6 +184,8 @@ ifeq ($(USE_FFT),TRUE)
     INCLUDE_LOCATIONS += $(ROC_PATH)/rocfft/include
     LIBRARY_LOCATIONS += $(ROC_PATH)/rocfft/lib
     libraries += -lrocfft
+  else ifeq ($(USE_SYCL),TRUE)
+    # nothing
   else # Running on CPU
     # Use FFTW
     ifeq ($(PRECISION),FLOAT)

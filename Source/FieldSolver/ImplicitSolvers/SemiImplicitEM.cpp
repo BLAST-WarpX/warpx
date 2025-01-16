@@ -7,7 +7,7 @@
 #include "SemiImplicitEM.H"
 #include "WarpX.H"
 
-using namespace warpx::fields;
+using warpx::fields::FieldType;
 using namespace amrex::literals;
 
 void SemiImplicitEM::Define ( WarpX*  a_WarpX )
@@ -20,13 +20,8 @@ void SemiImplicitEM::Define ( WarpX*  a_WarpX )
     m_WarpX = a_WarpX;
 
     // Define E and Eold vectors
-    m_E.Define( m_WarpX->getMultiLevelField(FieldType::Efield_fp) );
-    m_Eold.Define( m_WarpX->getMultiLevelField(FieldType::Efield_fp) );
-
-    // Need to define the WarpXSolverVec owned dot_mask to do dot
-    // product correctly for linear and nonlinear solvers
-    const amrex::Vector<amrex::Geometry>& Geom = m_WarpX->Geom();
-    m_E.SetDotMask(Geom);
+    m_E.Define( m_WarpX, "Efield_fp" );
+    m_Eold.Define( m_E );
 
     // Parse implicit solver parameters
     const amrex::ParmParse pp("implicit_evolve");
@@ -41,77 +36,83 @@ void SemiImplicitEM::Define ( WarpX*  a_WarpX )
 void SemiImplicitEM::PrintParameters () const
 {
     if (!m_WarpX->Verbose()) { return; }
-    amrex::Print() << std::endl;
-    amrex::Print() << "-----------------------------------------------------------" << std::endl;
-    amrex::Print() << "----------- SEMI IMPLICIT EM SOLVER PARAMETERS ------------" << std::endl;
-    amrex::Print() << "-----------------------------------------------------------" << std::endl;
-    amrex::Print() << "max particle iterations:    " << m_max_particle_iterations << std::endl;
-    amrex::Print() << "particle tolerance:         " << m_particle_tolerance << std::endl;
+    amrex::Print() << "\n";
+    amrex::Print() << "-----------------------------------------------------------\n";
+    amrex::Print() << "----------- SEMI IMPLICIT EM SOLVER PARAMETERS ------------\n";
+    amrex::Print() << "-----------------------------------------------------------\n";
+    amrex::Print() << "max particle iterations:    " << m_max_particle_iterations << "\n";
+    amrex::Print() << "particle tolerance:         " << m_particle_tolerance << "\n";
     if (m_nlsolver_type==NonlinearSolverType::Picard) {
-        amrex::Print() << "Nonlinear solver type:      Picard" << std::endl;
+        amrex::Print() << "Nonlinear solver type:      Picard\n";
     }
     else if (m_nlsolver_type==NonlinearSolverType::Newton) {
-        amrex::Print() << "Nonlinear solver type:      Newton" << std::endl;
+        amrex::Print() << "Nonlinear solver type:      Newton\n";
     }
     m_nlsolver->PrintParams();
-    amrex::Print() << "-----------------------------------------------------------" << std::endl;
-    amrex::Print() << std::endl;
+    amrex::Print() << "-----------------------------------------------------------\n\n";
 }
 
-void SemiImplicitEM::OneStep ( amrex::Real  a_time,
+void SemiImplicitEM::OneStep ( amrex::Real  start_time,
                                amrex::Real  a_dt,
                                int          a_step )
 {
     amrex::ignore_unused(a_step);
 
-    // Fields have E^{n}, B^{n-1/2}
-    // Particles have p^{n} and x^{n}.
+    // Set the member time step
+    m_dt = a_dt;
 
-    // Save the values at the start of the time step,
+    // Fields have Eg^{n}, Bg^{n}
+    // Particles have up^{n} and xp^{n}.
+
+    // Save up and xp at the start of the time step
     m_WarpX->SaveParticlesAtImplicitStepStart ( );
 
-    // Save the fields at the start of the step
-    m_Eold.Copy( m_WarpX->getMultiLevelField(FieldType::Efield_fp) );
-    m_E.Copy(m_Eold); // initial guess for E
+    // Save Eg at the start of the time step
+    m_Eold.Copy( FieldType::Efield_fp );
 
-    // Compute Bfield at time n+1/2
-    m_WarpX->EvolveB(a_dt, DtType::Full);
-    m_WarpX->ApplyMagneticFieldBCs();
+    // Advance WarpX owned Bfield_fp from t_{n} to t_{n+1/2}
+    m_WarpX->EvolveB(0.5_rt*m_dt, DtType::FirstHalf, start_time);
+    m_WarpX->FillBoundaryB(m_WarpX->getngEB(), true);
 
-    const amrex::Real half_time = a_time + 0.5_rt*a_dt;
+    const amrex::Real half_time = start_time + 0.5_rt*m_dt;
 
-    // Solve nonlinear system for E at t_{n+1/2}
+    // Solve nonlinear system for Eg at t_{n+1/2}
     // Particles will be advanced to t_{n+1/2}
-    m_nlsolver->Solve( m_E, m_Eold, half_time, a_dt );
+    m_E.Copy(m_Eold); // initial guess for Eg^{n+1/2}
+    m_nlsolver->Solve( m_E, m_Eold, half_time, 0.5_rt*m_dt );
 
     // Update WarpX owned Efield_fp to t_{n+1/2}
-    m_WarpX->SetElectricFieldAndApplyBCs( m_E );
+    m_WarpX->SetElectricFieldAndApplyBCs( m_E, half_time );
 
     // Advance particles from time n+1/2 to time n+1
     m_WarpX->FinishImplicitParticleUpdate();
 
-    // Advance E fields from time n+1/2 to time n+1
-    // Eg^{n+1} = 2.0*E_g^{n+1/2} - E_g^n
+    // Advance Eg from time n+1/2 to time n+1
+    // Eg^{n+1} = 2.0*Eg^{n+1/2} - Eg^n
     m_E.linComb( 2._rt, m_E, -1._rt, m_Eold );
-    m_WarpX->SetElectricFieldAndApplyBCs( m_E );
+    const amrex::Real new_time = start_time + m_dt;
+    m_WarpX->SetElectricFieldAndApplyBCs( m_E, new_time );
+
+    // Advance WarpX owned Bfield_fp from t_{n+1/2} to t_{n+1}
+    m_WarpX->EvolveB(0.5_rt*m_dt, DtType::SecondHalf, half_time);
+    m_WarpX->FillBoundaryB(m_WarpX->getngEB(), true);
 
 }
 
 void SemiImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
                             const WarpXSolverVec&  a_E,
-                                  amrex::Real      a_time,
-                                  amrex::Real      a_dt,
+                                  amrex::Real      half_time,
                                   int              a_nl_iter,
                                   bool             a_from_jacobian )
 {
-    // update WarpX-owned Efield_fp using current state of E from
+    // Update WarpX-owned Efield_fp using current state of Eg from
     // the nonlinear solver at time n+theta
-    m_WarpX->SetElectricFieldAndApplyBCs( a_E );
+    m_WarpX->SetElectricFieldAndApplyBCs( a_E, half_time );
 
-    // Self consistently update particle positions and velocities using the
-    // current state of the fields E and B. Deposit current density at time n+1/2.
-    m_WarpX->ImplicitPreRHSOp( a_time, a_dt, a_nl_iter, a_from_jacobian );
+    // Update particle positions and velocities using the current state
+    // of Eg and Bg. Deposit current density at time n+1/2
+    m_WarpX->ImplicitPreRHSOp( half_time, m_dt, a_nl_iter, a_from_jacobian );
 
-    // RHS = cvac^2*0.5*dt*( curl(B^{n+1/2}) - mu0*J^{n+1/2} )
-    m_WarpX->ImplicitComputeRHSE(0.5_rt*a_dt, a_RHS);
+    // RHS = cvac^2*0.5*dt*( curl(Bg^{n+1/2}) - mu0*Jg^{n+1/2} )
+    m_WarpX->ImplicitComputeRHSE(0.5_rt*m_dt, a_RHS);
 }

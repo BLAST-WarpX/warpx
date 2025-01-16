@@ -32,12 +32,7 @@ function(find_openpmd)
                 GIT_TAG        ${WarpX_openpmd_branch}
                 BUILD_IN_SOURCE 0
             )
-            FetchContent_GetProperties(fetchedopenpmd)
-
-            if(NOT fetchedopenpmd_POPULATED)
-                FetchContent_Populate(fetchedopenpmd)
-                add_subdirectory(${fetchedopenpmd_SOURCE_DIR} ${fetchedopenpmd_BINARY_DIR})
-            endif()
+            FetchContent_MakeAvailable(fetchedopenpmd)
 
             # advanced fetch options
             mark_as_advanced(FETCHCONTENT_BASE_DIR)

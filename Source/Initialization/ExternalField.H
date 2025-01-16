@@ -23,7 +23,8 @@ enum class ExternalFieldType
     default_zero,
     constant,
     parse_ext_grid_function,
-    read_from_file
+    read_from_file,
+    load_from_python
 };
 
 /**

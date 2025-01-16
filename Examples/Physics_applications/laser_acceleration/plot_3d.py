@@ -36,5 +36,6 @@ def plot_lwfa():
     fig.tight_layout()
     plt.show()
 
+
 if __name__ == "__main__":
     plot_lwfa()

@@ -9,6 +9,8 @@
 #include "FieldSolver/SpectralSolver/SpectralFieldData.H"
 #include "Utils/WarpX_Complex.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
+
 #include <AMReX_Array4.H>
 #include <AMReX_BaseFab.H>
 #include <AMReX_Config.H>
@@ -27,11 +29,15 @@ using namespace amrex;
 /**
  * \brief Constructor
  */
-SpectralBaseAlgorithm::SpectralBaseAlgorithm(const SpectralKSpace& spectral_kspace,
+SpectralBaseAlgorithm::SpectralBaseAlgorithm (
+    const SpectralKSpace& spectral_kspace,
     const amrex::DistributionMapping& dm,
     const SpectralFieldIndex& spectral_index,
-    const int norder_x, const int norder_y,
-    const int norder_z, const short grid_type):
+    const int norder_x,
+    const int norder_y,
+    const int norder_z,
+    ablastr::utils::enums::GridType grid_type
+):
         m_spectral_index(spectral_index),
     // Compute and assign the modified k vectors
         modified_kx_vec(spectral_kspace.getModifiedKComponent(dm,0,norder_x,grid_type)),
@@ -54,8 +60,9 @@ void
 SpectralBaseAlgorithm::ComputeSpectralDivE (
     const int lev,
     SpectralFieldData& field_data,
-    const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
-    amrex::MultiFab& divE )
+    ablastr::fields::VectorField const & Efield,
+    amrex::MultiFab& divE
+)
 {
     const SpectralFieldIndex& Idx = m_spectral_index;
 

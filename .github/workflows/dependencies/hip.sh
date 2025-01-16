@@ -53,6 +53,7 @@ sudo apt-get install -y --no-install-recommends \
     rocm-dev        \
     rocfft-dev      \
     rocprim-dev     \
+    rocsparse-dev   \
     rocrand-dev     \
     hiprand-dev
 
@@ -65,6 +66,13 @@ source /etc/profile.d/rocm.sh
 hipcc --version
 which clang
 which clang++
+export CXX=$(which clang++)
+export CC=$(which clang)
+
+# "mpic++ --showme" forgets open-pal in Ubuntu 20.04 + OpenMPI 4.0.3
+#   https://bugs.launchpad.net/ubuntu/+source/openmpi/+bug/1941786
+#   https://github.com/open-mpi/ompi/issues/9317
+export LDFLAGS="-lopen-pal"
 
 # cmake-easyinstall
 #

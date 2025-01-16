@@ -85,6 +85,16 @@ Laser-Plasma Interaction
 
 Scientific works in laser-ion acceleration and laser-matter interaction.
 
+#. Garten M, Bulanov S S, Hakimi S, Obst-Huebl L, Mitchell C E, Schroeder C B, Esarey E, Geddes C G R, Vay J-L, Huebl A.
+   **Laser-plasma ion beam booster based on hollow-channel magnetic vortex acceleration**.
+   Physical Review Research **6**, 033148, 2024.
+   `DOI:10.1103/PhysRevResearch.6.033148 <https://doi.org/10.1103/PhysRevResearch.6.033148>`__
+
+#. Zaïm N, Sainte-Marie A, Fedeli L, Bartoli P, Huebl A, Leblanc A, Vay J-L, Vincenti H.
+   **Light-matter interaction near the Schwinger limit using tightly focused doppler-boosted lasers**.
+   Physical Review Letters **132**, 175002, 2024.
+   `DOI:10.1103/PhysRevLett.132.175002 <https://doi.org/10.1103/PhysRevLett.132.175002>`__
+
 #. Knight B, Gautam C, Stoner C, Egner B, Smith J, Orban C, Manfredi J, Frische K, Dexter M, Chowdhury E, Patnaik A (2023).
    **Detailed Characterization of a kHz-rate Laser-Driven Fusion at a Thin Liquid Sheet with a Neutron Detection Suite**.
    High Power Laser Science and Engineering, 1-13, 2023.
@@ -104,6 +114,11 @@ Scientific works in laser-ion acceleration and laser-matter interaction.
    **Low-divergence MeV-class proton beams from kHz-driven laser-solid interactions**.
    Phys. Rev. Accel. Beams **25**, 093402, 2022.
    `DOI:10.1103/PhysRevAccelBeams.25.093402 <https://doi.org/10.1103/PhysRevAccelBeams.25.093402>`__
+
+#. Fedeli L, Sainte-Marie A, Zaïm N, Thévenet M, Vay J-L, Myers A, Quéré F, Vincenti H.
+   **Probing strong-field QED with Doppler-boosted PetaWatt-class lasers**.
+   Physical Review Letters **127**, 114801, 2021.
+   `DOI:10.1103/PhysRevLett.127.114801 <https://doi.org/10.1103/PhysRevLett.127.114801>`__
 
 
 Particle Accelerator & Beam Physics
@@ -141,8 +156,8 @@ Scientific works in astrophysical plasma modeling.
 
 #. Klion H, Jambunathan R, Rowan ME, Yang E, Willcox D, Vay J-L, Lehe R, Myers A, Huebl A, Zhang W.
    **Particle-in-Cell simulations of relativistic magnetic reconnection with advanced Maxwell solver algorithms**.
-   arXiv pre-print, 2023.
-   `DOI:10.48550/arXiv.2304.10566 <https://doi.org/10.48550/arXiv.2304.10566>`__
+   The Astrophysical Journal **952** 8, 2023.
+   `DOI:10.3847/1538-4357/acd75b <https://doi.org/10.3847/1538-4357/acd75b>`__
 
 
 Microelectronics
@@ -173,8 +188,26 @@ Scientific works in High-Performance Computing, applied mathematics and numerics
 
 Please see :ref:`this section <acknowledge_warpx_all_refs>`.
 
-Nuclear Fusion - Magnetically Confined Plasmas
-**********************************************
+Related works using WarpX:
+
+#. Yan Y., Du F., Tang J., Yu D and Zhao Y.,
+   **Numerical study on wave attenuation via 1D fully kinetic electromagnetic particle-in-cell simulations**.
+   Plasma Sources Sci. Technol. **33** 115013, 2024
+   `DOI:10.1088/1361-6595/ad8c7c <https://doi.org/10.1088/1361-6595/ad8c7c>`__
+
+
+Nuclear Fusion and Plasma Confinement
+*************************************
+
+#. Scheffel J. and Jäderberg J. and Bendtz K. and Holmberg R. and Lindvall K.,
+   **Axial Confinement in the Novatron Mirror Machine**.
+   arXiv 2410.20134
+   `DOI:10.48550/arXiv.2410.20134 <https://doi.org/10.48550/arXiv.2410.20134>`__
+
+#. Affolter M., Thompson R., Hepner S., Hayes E. C., Podolsky V., Borghei M., Carlsson J., Gargone A., Merthe D., McKee E., Langtry R.,
+   **The Orbitron: A crossed-field device for co-confinement of high energy ions and electrons**.
+   AIP Advances **14**, 085025, 2024.
+   `DOI:10.1063/5.0201470 <https://doi.org/10.1063/5.0201470>`__
 
 #. Nicks B. S., Putvinski S. and Tajima T.
    **Stabilization of the Alfvén-ion cyclotron instability through short plasmas: Fully kinetic simulations in a high-beta regime**.
@@ -185,3 +218,16 @@ Nuclear Fusion - Magnetically Confined Plasmas
    **Accelerated kinetic model for global macro stability studies of high-beta fusion reactors**.
    Physics of Plasmas **30**, 122508, 2023.
    `DOI:10.1063/5.0178288 <https://doi.org/10.1063/5.0178288>`__
+
+Plasma Thrusters and Electric Propulsion
+****************************************
+
+#. Xie L., Luo X., Zhou Z. and Zhao Y.,
+   **Effect of plasma initialization on 3D PIC simulation of Hall thruster azimuthal instability**.
+   Physica Scripta, **99**, 095602, 2024.
+   `DOI:10.1088/1402-4896/ad69e5 <https://doi.org/10.1088/1402-4896/ad69e5>`__
+
+#. Marks T. A. and Gorodetsky A. A.,
+   **Hall thruster simulations in WarpX**.
+   38th International Electric Propulsion Conference, Toulouse, France, 2024.
+   `DOI:10.7302/234915 <https://doi.org/10.7302/23491>`__
