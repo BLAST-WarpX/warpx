@@ -12,3 +12,7 @@ set(CTEST_NIGHTLY_START_TIME 08:00:00 UTC)
 set(CTEST_SUBMIT_URL https://my.cdash.org/submit.php?project=WarpX)
 
 set(CTEST_DROP_SITE_CDASH TRUE)
+
+# Additional settings
+set(CTEST_SITE "Azure-Pipelines")
+set(CTEST_BUILD_NAME "CI-Development")
