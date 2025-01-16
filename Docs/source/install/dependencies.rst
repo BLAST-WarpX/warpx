@@ -74,6 +74,13 @@ Conda (Linux/macOS/Windows)
 
       conda config --set auto_activate_base false
 
+   In order to make sure that the conda configuration uses ``conda-forge`` as the only channel, which will help avoid issues with blocked ``defaults`` or ``anaconda`` repositories, please set the following configurations:
+
+   .. code-block:: bash
+
+      conda config --add channels conda-forge
+      conda config --set channel_priority strict
+
 .. tab-set::
 
    .. tab-item:: With MPI (only Linux/macOS)
