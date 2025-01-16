@@ -126,7 +126,7 @@ namespace warpx::load_balance
         LoadBalanceResult compute_new_distribution_mapping(int lev) const;
 
     protected:
-        LoadBalance (){};
+        LoadBalance (){}
         ~ LoadBalance (){}
 
     private:
