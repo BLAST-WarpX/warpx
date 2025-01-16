@@ -688,41 +688,6 @@ class DensityDistributionBase(object):
             )
 
 
-class UniformFluxDistribution(
-    picmistandard.PICMI_UniformFluxDistribution, DensityDistributionBase
-):
-    def distribution_initialize_inputs(
-        self, species_number, layout, species, density_scale, source_name
-    ):
-        self.fill_in = False
-        self.set_mangle_dict()
-        self.set_species_attributes(species, layout, source_name)
-
-        species.add_new_group_attr(source_name, "flux_profile", "constant")
-        species.add_new_group_attr(source_name, "flux", self.flux)
-        if density_scale is not None:
-            species.add_new_group_attr(source_name, "flux", density_scale)
-        species.add_new_group_attr(
-            source_name, "flux_normal_axis", self.flux_normal_axis
-        )
-        species.add_new_group_attr(
-            source_name, "surface_flux_pos", self.surface_flux_position
-        )
-        species.add_new_group_attr(source_name, "flux_direction", self.flux_direction)
-        species.add_new_group_attr(source_name, "flux_tmin", self.flux_tmin)
-        species.add_new_group_attr(source_name, "flux_tmax", self.flux_tmax)
-
-        # --- Use specific attributes for flux injection
-        species.add_new_group_attr(source_name, "injection_style", "nfluxpercell")
-        assert isinstance(layout, PseudoRandomLayout), Exception(
-            "UniformFluxDistribution only supports the PseudoRandomLayout in WarpX"
-        )
-        if self.gaussian_flux_momentum_distribution:
-            species.add_new_group_attr(
-                source_name, "momentum_distribution_type", "gaussianflux"
-            )
-
-
 class UniformDistribution(
     picmistandard.PICMI_UniformDistribution, DensityDistributionBase
 ):
@@ -737,6 +702,114 @@ class UniformDistribution(
         species.add_new_group_attr(source_name, "density", self.density)
         if density_scale is not None:
             species.add_new_group_attr(source_name, "density", density_scale)
+
+
+class FluxDistributionBase(object):
+    """This is a base class for both uniform and analytic flux distributions."""
+
+    def init(self, kw):
+        self.inject_from_embedded_boundary = kw.pop(
+            "warpx_inject_from_embedded_boundary", False
+        )
+
+    def initialize_flux_profile_func(self, species, density_scale, source_name):
+        """Initialize the flux profile and flux function."""
+        pass
+
+    def distribution_initialize_inputs(
+        self, species_number, layout, species, density_scale, source_name
+    ):
+        self.fill_in = False
+        self.set_mangle_dict()
+        self.set_species_attributes(species, layout, source_name)
+
+        self.initialize_flux_profile_func(species, density_scale, source_name)
+
+        if not self.inject_from_embedded_boundary:
+            species.add_new_group_attr(
+                source_name, "flux_normal_axis", self.flux_normal_axis
+            )
+            species.add_new_group_attr(
+                source_name, "surface_flux_pos", self.surface_flux_position
+            )
+            species.add_new_group_attr(
+                source_name, "flux_direction", self.flux_direction
+            )
+        else:
+            species.add_new_group_attr(
+                source_name, "inject_from_embedded_boundary", True
+            )
+
+        species.add_new_group_attr(source_name, "flux_tmin", self.flux_tmin)
+        species.add_new_group_attr(source_name, "flux_tmax", self.flux_tmax)
+
+        # --- Use specific attributes for flux injection
+        species.add_new_group_attr(source_name, "injection_style", "nfluxpercell")
+        assert isinstance(layout, PseudoRandomLayout), Exception(
+            "UniformFluxDistribution only supports the PseudoRandomLayout in WarpX"
+        )
+        if self.gaussian_flux_momentum_distribution:
+            species.add_new_group_attr(
+                source_name, "momentum_distribution_type", "gaussianflux"
+            )
+
+
+class AnalyticFluxDistribution(
+    picmistandard.PICMI_AnalyticFluxDistribution,
+    FluxDistributionBase,
+    DensityDistributionBase,
+):
+    """
+    Parameters
+    ----------
+
+    warpx_inject_from_embedded_boundary: bool
+        When true, the flux is injected from the embedded boundaries instead
+        of a plane.
+    """
+
+    def init(self, kw):
+        FluxDistributionBase.init(self, kw)
+
+    def initialize_flux_profile_func(self, species, density_scale, source_name):
+        species.add_new_group_attr(source_name, "flux_profile", "parse_flux_function")
+        if density_scale is not None:
+            species.add_new_group_attr(source_name, "flux", density_scale)
+        expression = pywarpx.my_constants.mangle_expression(self.flux, self.mangle_dict)
+        if density_scale is None:
+            species.add_new_group_attr(
+                source_name, "flux_function(x,y,z,t)", expression
+            )
+        else:
+            species.add_new_group_attr(
+                source_name,
+                "flux_function(x,y,z,t)",
+                "{}*({})".format(density_scale, expression),
+            )
+
+
+class UniformFluxDistribution(
+    picmistandard.PICMI_UniformFluxDistribution,
+    FluxDistributionBase,
+    DensityDistributionBase,
+):
+    """
+    Parameters
+    ----------
+
+    warpx_inject_from_embedded_boundary: bool
+        When true, the flux is injected from the embedded boundaries instead
+        of a plane.
+    """
+
+    def init(self, kw):
+        FluxDistributionBase.init(self, kw)
+
+    def initialize_flux_profile_func(self, species, density_scale, source_name):
+        species.add_new_group_attr(source_name, "flux_profile", "constant")
+        species.add_new_group_attr(source_name, "flux", self.flux)
+        if density_scale is not None:
+            species.add_new_group_attr(source_name, "flux", density_scale)
 
 
 class AnalyticDistribution(
@@ -1880,14 +1953,24 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
     warpx_self_fields_verbosity: integer, default=2
         Level of verbosity for the lab frame solver
 
-    warpx_dt_update_interval: string, optional (default = -1)
+    warpx_magnetostatic: bool, default=False
+        Whether to use the magnetostatic solver
+
+    warpx_effective_potential: bool, default=False
+        Whether to use the effective potential Poisson solver (EP-PIC)
+
+    warpx_effective_potential_factor: float, default=4
+        If the effective potential Poisson solver is used, this sets the value
+        of C_EP (the method is marginally stable at C_EP = 1)
+
+    warpx_dt_update_interval: integer, optional (default = -1)
         How frequently the timestep is updated. Adaptive timestepping is disabled when this is <= 0.
 
     warpx_cfl: float, optional
-        Fraction of the CFL condition for particle velocity vs grid size, used to set the timestep when `dt_update_interval > 0`.
+        Fraction of the CFL condition for particle velocity vs grid size, used to set the timestep when `warpx_dt_update_interval > 0`.
 
     warpx_max_dt: float, optional
-        The maximum allowable timestep when `dt_update_interval > 0`.
+        The maximum allowable timestep when `warpx_dt_update_interval > 0`.
 
     """
 
@@ -1896,8 +1979,12 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         self.absolute_tolerance = kw.pop("warpx_absolute_tolerance", None)
         self.self_fields_verbosity = kw.pop("warpx_self_fields_verbosity", None)
         self.magnetostatic = kw.pop("warpx_magnetostatic", False)
+        self.effective_potential = kw.pop("warpx_effective_potential", False)
+        self.effective_potential_factor = kw.pop(
+            "warpx_effective_potential_factor", None
+        )
         self.cfl = kw.pop("warpx_cfl", None)
-        self.dt_update_interval = kw.pop("dt_update_interval", None)
+        self.dt_update_interval = kw.pop("warpx_dt_update_interval", None)
         self.max_dt = kw.pop("warpx_max_dt", None)
 
     def solver_initialize_inputs(self):
@@ -1916,6 +2003,11 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         else:
             if self.magnetostatic:
                 pywarpx.warpx.do_electrostatic = "labframe-electromagnetostatic"
+            elif self.effective_potential:
+                pywarpx.warpx.do_electrostatic = "labframe-effective-potential"
+                pywarpx.warpx.effective_potential_factor = (
+                    self.effective_potential_factor
+                )
             else:
                 pywarpx.warpx.do_electrostatic = "labframe"
             pywarpx.warpx.self_fields_required_precision = self.required_precision
@@ -2464,7 +2556,7 @@ class EmbeddedBoundary(picmistandard.base._ClassWithInit):
         **kw,
     ):
         assert stl_file is None or implicit_function is None, Exception(
-            "Only one between implicit_function and " "stl_file can be specified"
+            "Only one between implicit_function and stl_file can be specified"
         )
 
         self.implicit_function = implicit_function
@@ -2574,9 +2666,9 @@ class PlasmaLens(picmistandard.base._ClassWithInit):
         self.strengths_E = strengths_E
         self.strengths_B = strengths_B
 
-        assert (self.strengths_E is not None) or (
-            self.strengths_B is not None
-        ), Exception("One of strengths_E or strengths_B must be supplied")
+        assert (self.strengths_E is not None) or (self.strengths_B is not None), (
+            Exception("One of strengths_E or strengths_B must be supplied")
+        )
 
         self.handle_init(kw)
 
@@ -2756,6 +2848,21 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     warpx_used_inputs_file: string, optional
         The name of the text file that the used input parameters is written to,
+
+    warpx_reduced_diags_path: string, optional
+        Sets the default path for reduced diagnostic output files
+
+    warpx_reduced_diags_extension: string, optional
+        Sets the default extension for reduced diagnostic output files
+
+    warpx_reduced_diags_intervals: string, optional
+        Sets the default intervals for reduced diagnostic output files
+
+    warpx_reduced_diags_separator: string, optional
+        Sets the default separator for reduced diagnostic output files
+
+    warpx_reduced_diags_precision: integer, optional
+        Sets the default precision for reduced diagnostic output files
     """
 
     # Set the C++ WarpX interface (see _libwarpx.LibWarpX) as an extension to
@@ -2821,6 +2928,12 @@ class Simulation(picmistandard.PICMI_Simulation):
         self.break_signals = kw.pop("warpx_break_signals", None)
         self.checkpoint_signals = kw.pop("warpx_checkpoint_signals", None)
         self.numprocs = kw.pop("warpx_numprocs", None)
+
+        self.reduced_diags_path = kw.pop("warpx_reduced_diags_path", None)
+        self.reduced_diags_extension = kw.pop("warpx_reduced_diags_extension", None)
+        self.reduced_diags_intervals = kw.pop("warpx_reduced_diags_intervals", None)
+        self.reduced_diags_separator = kw.pop("warpx_reduced_diags_separator", None)
+        self.reduced_diags_precision = kw.pop("warpx_reduced_diags_precision", None)
 
         self.inputs_initialized = False
         self.warpx_initialized = False
@@ -2888,12 +3001,19 @@ class Simulation(picmistandard.PICMI_Simulation):
 
         pywarpx.warpx.numprocs = self.numprocs
 
+        reduced_diags = pywarpx.warpx.get_bucket("reduced_diags")
+        reduced_diags.path = self.reduced_diags_path
+        reduced_diags.extension = self.reduced_diags_extension
+        reduced_diags.intervals = self.reduced_diags_intervals
+        reduced_diags.separator = self.reduced_diags_separator
+        reduced_diags.precision = self.reduced_diags_precision
+
         particle_shape = self.particle_shape
         for s in self.species:
             if s.particle_shape is not None:
-                assert (
-                    particle_shape is None or particle_shape == s.particle_shape
-                ), Exception("WarpX only supports one particle shape for all species")
+                assert particle_shape is None or particle_shape == s.particle_shape, (
+                    Exception("WarpX only supports one particle shape for all species")
+                )
                 # --- If this was set for any species, use that value.
                 particle_shape = s.particle_shape
 
@@ -3269,6 +3389,57 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
 
 
 ElectrostaticFieldDiagnostic = FieldDiagnostic
+
+
+class TimeAveragedFieldDiagnostic(FieldDiagnostic):
+    """
+    See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
+
+    Parameters
+    ----------
+    warpx_time_average_mode: str
+        Type of time averaging diagnostic
+        Supported values include ``"none"``, ``"fixed_start"``, and ``"dynamic_start"``
+
+            * ``"none"`` for no averaging (instantaneous fields)
+            * ``"fixed_start"`` for a diagnostic that averages all fields between the current output step and a fixed point in time
+            * ``"dynamic_start"`` for a constant averaging period and output at different points in time (non-overlapping)
+
+    warpx_average_period_steps: int, optional
+        Configures the number of time steps in an averaging period.
+        Set this only in the ``"dynamic_start"`` mode and only if ``warpx_average_period_time`` has not already been set.
+        Will be ignored in the ``"fixed_start"`` mode (with warning).
+
+    warpx_average_period_time: float, optional
+        Configures the time (SI units) in an averaging period.
+        Set this only in the ``"dynamic_start"`` mode and only if ``average_period_steps`` has not already been set.
+        Will be ignored in the ``"fixed_start"`` mode (with warning).
+
+    warpx_average_start_steps: int, optional
+        Configures the time step at which time-averaging begins.
+        Set this only in the ``"fixed_start"`` mode.
+        Will be ignored in the ``"dynamic_start"`` mode (with warning).
+    """
+
+    def init(self, kw):
+        super().init(kw)
+        self.time_average_mode = kw.pop("warpx_time_average_mode", None)
+        self.average_period_steps = kw.pop("warpx_average_period_steps", None)
+        self.average_period_time = kw.pop("warpx_average_period_time", None)
+        self.average_start_step = kw.pop("warpx_average_start_step", None)
+
+    def diagnostic_initialize_inputs(self):
+        super().diagnostic_initialize_inputs()
+
+        self.diagnostic.set_or_replace_attr("diag_type", "TimeAveraged")
+
+        if "write_species" not in self.diagnostic.argvattrs:
+            self.diagnostic.write_species = False
+
+        self.diagnostic.time_average_mode = self.time_average_mode
+        self.diagnostic.average_period_steps = self.average_period_steps
+        self.diagnostic.average_period_time = self.average_period_time
+        self.diagnostic.average_start_step = self.average_start_step
 
 
 class Checkpoint(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
@@ -3878,7 +4049,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
         self,
         diag_type,
         name=None,
-        period=1,
+        period=None,
         path=None,
         extension=None,
         separator=None,
@@ -3931,7 +4102,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
             kw = self._handle_charge_on_eb(**kw)
         else:
             raise RuntimeError(
-                f"{self.type} reduced diagnostic is not yet supported " "in pywarpx."
+                f"{self.type} reduced diagnostic is not yet supported in pywarpx."
             )
 
         self.handle_init(kw)

@@ -2,20 +2,7 @@
 
 # 2023 TAE Technologies
 
-import os
-import sys
-
 import numpy as np
-
-sys.path.append("../../../../warpx/Regression/Checksum/")
-
-import checksumAPI
-
-# this will be the name of the plot file
-fn = sys.argv[1]
-test_name = os.path.split(os.getcwd())[1]
-
-my_check = checksumAPI.evaluate_checksum(test_name, fn, do_particles=True)
 
 # fmt: off
 ref_density = np.array([

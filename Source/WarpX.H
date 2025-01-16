@@ -12,6 +12,7 @@
 #ifndef WARPX_H_
 #define WARPX_H_
 
+#include "BoundaryConditions/PEC_Insulator_fwd.H"
 #include "BoundaryConditions/PML_fwd.H"
 #include "Diagnostics/MultiDiagnostics_fwd.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags_fwd.H"
@@ -113,6 +114,16 @@ public:
 
     [[nodiscard]] int Verbose () const { return verbose; }
 
+    [[nodiscard]] const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& GetFieldBoundaryLo () const
+    {
+        return field_boundary_lo;
+    }
+
+    [[nodiscard]] const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& GetFieldBoundaryHi () const
+    {
+        return field_boundary_hi;
+    }
+
     void InitData ();
 
     void Evolve (int numsteps = -1);
@@ -125,21 +136,21 @@ public:
     //
     // Functions used by implicit solvers
     //
-    void ImplicitPreRHSOp ( amrex::Real  cur_time,
-                            amrex::Real  a_full_dt,
-                            int          a_nl_iter,
-                            bool         a_from_jacobian );
+    void ImplicitPreRHSOp ( amrex::Real cur_time,
+                            amrex::Real a_full_dt,
+                            int         a_nl_iter,
+                            bool        a_from_jacobian );
     void SaveParticlesAtImplicitStepStart ();
     void FinishImplicitParticleUpdate ();
-    void SetElectricFieldAndApplyBCs ( const WarpXSolverVec&  a_E );
-    void UpdateMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const&  a_Bn,
-                                          amrex::Real  a_thetadt );
-    void ApplyMagneticFieldBCs ();
-    void FinishMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const&  a_Bn,
-                                          amrex::Real  a_theta );
-    void FinishImplicitField ( const ablastr::fields::MultiLevelVectorField&  Field_fp,
-                               const ablastr::fields::MultiLevelVectorField&  Field_n,
-                               amrex::Real  theta );
+    void SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time );
+    void UpdateMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const& a_Bn,
+                                          amrex::Real a_thetadt, amrex::Real start_time );
+    void SpectralSourceFreeFieldAdvance ( amrex::Real start_time);
+    void FinishMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const& a_Bn,
+                                          amrex::Real a_theta, amrex::Real a_time );
+    void FinishImplicitField ( const ablastr::fields::MultiLevelVectorField& Field_fp,
+                               const ablastr::fields::MultiLevelVectorField& Field_n,
+                               amrex::Real theta );
     void ImplicitComputeRHSE (         amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
     void ImplicitComputeRHSE (int lev, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
     void ImplicitComputeRHSE (int lev, PatchType patch_type, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
@@ -380,7 +391,6 @@ public:
     //! Specifies the type of grid used for the above sorting, i.e. cell-centered, nodal, or mixed
     static amrex::IntVect sort_idx_type;
 
-    static bool do_subcycling;
     static bool do_multi_J;
     static int do_multi_J_n_depositions;
 
@@ -402,31 +412,6 @@ public:
 
     // Global rho nodal flag to know about rho index type when rho MultiFab is not allocated
     amrex::IntVect m_rho_nodal_flag;
-
-    /**
-     * \brief
-     * Allocate and optionally initialize the MultiFab. This also adds the MultiFab
-     * to the map of MultiFabs (used to ease the access to MultiFabs from the Python
-     * interface
-     *
-     * \param[out] mf The MultiFab unique pointer to be allocated
-     * \param[in] ba The BoxArray describing the MultiFab
-     * \param[in] dm The DistributionMapping describing the MultiFab
-     * \param[in] ncomp The number of components in the MultiFab
-     * \param[in] ngrow The number of guard cells in the MultiFab
-     * \param[in] level The refinement level
-     * \param[in] name The name of the MultiFab to use in the map
-     * \param[in] initial_value The optional initial value
-     */
-    static void AllocInitMultiFab (
-        std::unique_ptr<amrex::MultiFab>& mf,
-        const amrex::BoxArray& ba,
-        const amrex::DistributionMapping& dm,
-        int ncomp,
-        const amrex::IntVect& ngrow,
-        int level,
-        const std::string& name,
-        std::optional<const amrex::Real> initial_value = {});
 
     /**
      * \brief
@@ -453,30 +438,9 @@ public:
         const std::string& name,
         std::optional<const int> initial_value = {});
 
-    /**
-     * \brief
-     * Create an alias of a MultiFab, adding the alias to the MultiFab map
-     * \param[out] mf The MultiFab to create
-     * \param[in] mf_to_alias The MultiFab to alias
-     * \param[in] scomp The starting component to be aliased
-     * \param[in] ncomp The number of components to alias
-     * \param[in] level The refinement level
-     * \param[in] name The name of the MultiFab to use in the map
-     * \param[in] initial_value optional initial value for MultiFab
-     */
-    static void AliasInitMultiFab (
-        std::unique_ptr<amrex::MultiFab>& mf,
-        const amrex::MultiFab& mf_to_alias,
-        int scomp,
-        int ncomp,
-        int level,
-        const std::string& name,
-        std::optional<const amrex::Real> initial_value);
-
-    // Maps of all of the MultiFabs and iMultiFabs used (this can include MFs from other classes)
-    // This is a convenience for the Python interface, allowing all MultiFabs
+    // Maps of all of the iMultiFabs used (this can include MFs from other classes)
+    // This is a convenience for the Python interface, allowing all iMultiFabs
     // to be easily referenced from Python.
-    static std::map<std::string, amrex::MultiFab *> multifab_map;
     static std::map<std::string, amrex::iMultiFab *> imultifab_map;
 
     /**
@@ -577,22 +541,22 @@ public:
     void UpdateInjectionPosition (amrex::Real dt);
 
     void ResetProbDomain (const amrex::RealBox& rb);
-    void EvolveE (         amrex::Real dt);
-    void EvolveE (int lev, amrex::Real dt);
-    void EvolveB (         amrex::Real dt, DtType dt_type);
-    void EvolveB (int lev, amrex::Real dt, DtType dt_type);
+    void EvolveE (         amrex::Real dt, amrex::Real start_time);
+    void EvolveE (int lev, amrex::Real dt, amrex::Real start_time);
+    void EvolveB (         amrex::Real dt, DtType dt_type, amrex::Real start_time);
+    void EvolveB (int lev, amrex::Real dt, DtType dt_type, amrex::Real start_time);
     void EvolveF (         amrex::Real dt, DtType dt_type);
     void EvolveF (int lev, amrex::Real dt, DtType dt_type);
     void EvolveG (         amrex::Real dt, DtType dt_type);
     void EvolveG (int lev, amrex::Real dt, DtType dt_type);
-    void EvolveB (int lev, PatchType patch_type, amrex::Real dt, DtType dt_type);
-    void EvolveE (int lev, PatchType patch_type, amrex::Real dt);
+    void EvolveB (int lev, PatchType patch_type, amrex::Real dt, DtType dt_type, amrex::Real start_time);
+    void EvolveE (int lev, PatchType patch_type, amrex::Real dt, amrex::Real start_time);
     void EvolveF (int lev, PatchType patch_type, amrex::Real dt, DtType dt_type);
     void EvolveG (int lev, PatchType patch_type, amrex::Real dt, DtType dt_type);
 
-    void MacroscopicEvolveE (         amrex::Real dt);
-    void MacroscopicEvolveE (int lev, amrex::Real dt);
-    void MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real dt);
+    void MacroscopicEvolveE (         amrex::Real dt, amrex::Real start_time);
+    void MacroscopicEvolveE (int lev, amrex::Real dt, amrex::Real start_time);
+    void MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real dt, amrex::Real start_time);
 
     /**
      * \brief Hybrid-PIC field evolve function.
@@ -707,8 +671,8 @@ public:
                               amrex::MultiFab* Jy, amrex::MultiFab* Jz,
                               PatchType patch_type);
 
-    void ApplyEfieldBoundary (int lev, PatchType patch_type);
-    void ApplyBfieldBoundary (int lev, PatchType patch_type, DtType dt_type);
+    void ApplyEfieldBoundary (int lev, PatchType patch_type, amrex::Real cur_time);
+    void ApplyBfieldBoundary (int lev, PatchType patch_type, DtType dt_type, amrex::Real cur_time);
 
 #ifdef WARPX_DIM_RZ
     // Applies the boundary conditions that are specific to the axis when in RZ.
@@ -735,7 +699,7 @@ public:
     void DampJPML (int lev, PatchType patch_type);
 
     void CopyJPML ();
-    bool isAnyBoundaryPML();
+
     /** True if any of the particle boundary condition type is Thermal */
     static bool isAnyParticleBoundaryThermal();
 
@@ -937,6 +901,7 @@ public:
 
     // Magnetostatic Solver Interface
     MagnetostaticSolver::VectorPoissonBoundaryHandler m_vector_poisson_boundary_handler;
+    int magnetostatic_solver_max_iters = 200;
     void ComputeMagnetostaticField ();
     void AddMagnetostaticFieldLabFrame ();
     void computeVectorPotential (ablastr::fields::MultiLevelVectorField const& curr,
@@ -950,34 +915,31 @@ public:
 
     /**
      * \brief
-     * This function initializes the E and B fields on each level
+     * This function computes the E, B, and J fields on each level
      * using the parser and the user-defined function for the external fields.
      * The subroutine will parse the x_/y_z_external_grid_function and
      * then, the field multifab is initialized based on the (x,y,z) position
      * on the staggered yee-grid or cell-centered grid, in the interior cells
      * and guard cells.
      *
-     * \param[in] mfx x-component of the field to be initialized
-     * \param[in] mfy y-component of the field to be initialized
-     * \param[in] mfz z-component of the field to be initialized
-     * \param[in] xfield_parser parser function to initialize x-field
-     * \param[in] yfield_parser parser function to initialize y-field
-     * \param[in] zfield_parser parser function to initialize z-field
+     * \param[in] field FieldType
+     * \param[in] fx_parser parser function to initialize x-field
+     * \param[in] fy_parser parser function to initialize y-field
+     * \param[in] fz_parser parser function to initialize z-field
      * \param[in] edge_lengths edge lengths information
      * \param[in] face_areas face areas information
-     * \param[in] field flag indicating which field is being initialized ('E' for electric, 'B' for magnetic)
+     * \param[in] topology flag indicating if field is edge-based or face-based
      * \param[in] lev level of the Multifabs that is initialized
      * \param[in] patch_type PatchType on which the field is initialized (fine or coarse)
      */
-    void InitializeExternalFieldsOnGridUsingParser (
-         amrex::MultiFab *mfx, amrex::MultiFab *mfy, amrex::MultiFab *mfz,
-         amrex::ParserExecutor<3> const& xfield_parser,
-         amrex::ParserExecutor<3> const& yfield_parser,
-         amrex::ParserExecutor<3> const& zfield_parser,
-         ablastr::fields::VectorField const& edge_lengths,
-         ablastr::fields::VectorField const& face_areas,
-         [[maybe_unused]] char field,
-         int lev, PatchType patch_type);
+    void ComputeExternalFieldOnGridUsingParser (
+        warpx::fields::FieldType field,
+        amrex::ParserExecutor<4> const& fx_parser,
+        amrex::ParserExecutor<4> const& fy_parser,
+        amrex::ParserExecutor<4> const& fz_parser,
+        int lev, PatchType patch_type, [[maybe_unused]] char topology,
+        std::optional<ablastr::fields::VectorField> const& edge_lengths = std::nullopt,
+        std::optional<ablastr::fields::VectorField> const& face_areas = std::nullopt);
 
     /**
      * \brief Load field values from a user-specified openPMD file,
@@ -1254,12 +1216,12 @@ private:
         int lev);
     void StoreCurrent (int lev);
     void RestoreCurrent (int lev);
-    void ApplyFilterJ (
-        const ablastr::fields::MultiLevelVectorField& current,
+    void ApplyFilterMF (
+        const ablastr::fields::MultiLevelVectorField& mfvec,
         int lev,
         int idim);
-    void ApplyFilterJ (
-        const ablastr::fields::MultiLevelVectorField& current,
+    void ApplyFilterMF (
+        const ablastr::fields::MultiLevelVectorField& mfvec,
         int lev);
     void SumBoundaryJ (
         const ablastr::fields::MultiLevelVectorField& current,
@@ -1474,6 +1436,9 @@ private:
 #endif
     amrex::Real v_particle_pml;
 
+    // Insulator boundary conditions
+    std::unique_ptr<PEC_Insulator> pec_insulator_boundary;
+
     // External fields parameters
     std::unique_ptr<ExternalFieldParams> m_p_ext_field_params;
 
@@ -1487,6 +1452,9 @@ private:
     // Timestepping parameters
     std::optional<amrex::Real> m_const_dt;
     std::optional<amrex::Real> m_max_dt;
+
+    // whether to use subcycling
+    bool m_do_subcycling = false;
 
     // Macroscopic properties
     std::unique_ptr<MacroscopicProperties> m_macroscopic_properties;
@@ -1632,8 +1600,6 @@ private:
      */
     void HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num_moved);
 
-    void ScrapeParticles ();
-
     /** Update the E and B fields in the explicit em PIC scheme.
      *
      * At the beginning, we have B^{n} and E^{n}.
@@ -1641,7 +1607,7 @@ private:
      */
     void ExplicitFillBoundaryEBUpdateAux ();
 
-    void PushPSATD ();
+    void PushPSATD (amrex::Real start_time);
 
 #ifdef WARPX_USE_FFT
 

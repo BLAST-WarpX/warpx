@@ -16,14 +16,10 @@
 # tolerance: 1.0e-8
 # Possible running time: 0.327827743 s
 
-import os
 import sys
 
 import numpy as np
 import yt
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
 
 tolerance = 4e-3
 
@@ -72,6 +68,3 @@ error = np.sqrt((divB[1:-1, 1:-1] ** 2).sum())
 print("error = ", error)
 print("tolerance = ", tolerance)
 assert error < tolerance
-
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename)

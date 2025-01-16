@@ -65,7 +65,7 @@ Finally, since Leonardo does not yet provide software modules for some of our de
 
 .. code-block:: bash
 
-   bash $HOME/src/warpx/Tools/machines/leonardo_cineca/install_gpu_dependencies.sh
+   bash $HOME/src/warpx/Tools/machines/leonardo-cineca/install_gpu_dependencies.sh
    source $HOME/sw/venvs/warpx/bin/activate
 
 .. dropdown:: Script Details

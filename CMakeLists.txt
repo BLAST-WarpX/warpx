@@ -1,7 +1,7 @@
 # Preamble ####################################################################
 #
 cmake_minimum_required(VERSION 3.24.0)
-project(WarpX VERSION 24.09)
+project(WarpX VERSION 25.01)
 
 include(${WarpX_SOURCE_DIR}/cmake/WarpXFunctions.cmake)
 
@@ -73,7 +73,6 @@ option(WarpX_LIB           "Build WarpX as a library"                   OFF)
 option(WarpX_MPI           "Multi-node support (message-passing)"       ON)
 option(WarpX_OPENPMD       "openPMD I/O (HDF5, ADIOS)"                  ON)
 option(WarpX_FFT           "FFT-based solvers"                          OFF)
-option(WarpX_HEFFTE        "Multi-node FFT-based solvers"               OFF)
 option(WarpX_PYTHON        "Python bindings"                            OFF)
 option(WarpX_SENSEI        "SENSEI in situ diagnostics"                 OFF)
 option(WarpX_QED           "QED support (requires PICSAR)"              ON)
@@ -89,6 +88,13 @@ mark_as_advanced(WarpX_TEST_CLEANUP)
 # Advanced option to run CI tests with FPE-trapping runtime parameters
 option(WarpX_TEST_FPETRAP "Run CI tests with FPE-trapping runtime parameters" OFF)
 mark_as_advanced(WarpX_TEST_FPETRAP)
+
+# Advanced option to run CI tests with the -g compile option
+option(WarpX_TEST_DEBUG "Run CI tests with the -g compile option" OFF)
+mark_as_advanced(WarpX_TEST_DEBUG)
+if(WarpX_TEST_DEBUG)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g1")
+endif()
 
 set(WarpX_DIMS_VALUES 1 2 3 RZ)
 set(WarpX_DIMS 3 CACHE STRING "Simulation dimensionality <1;2;3;RZ>")
@@ -139,10 +145,6 @@ mark_as_advanced(WarpX_MPI_THREAD_MULTIPLE)
 
 option(WarpX_amrex_internal                    "Download & build AMReX" ON)
 
-if(WarpX_HEFFTE AND NOT WarpX_MPI)
-    message(FATAL_ERROR "WarpX_HEFFTE (${WarpX_HEFFTE}) can only be used if WarpX_MPI is ON.")
-endif()
-
 # change the default build type to Release (or RelWithDebInfo) instead of Debug
 set_default_build_type("Release")
 
@@ -190,10 +192,6 @@ option(ABLASTR_FFT "compile AnyFFT wrappers" ${WarpX_FFT})
 if(WarpX_FFT)
     set(ABLASTR_FFT ON CACHE STRING "FFT-based solvers" FORCE)
 endif()
-option(ABLASTR_HEFFTE "compile AnyFFT wrappers" ${WarpX_HEFFTE})
-if(WarpX_HEFFTE)
-    set(ABLASTR_HEFFTE ON CACHE STRING "Multi-Node FFT-based solvers" FORCE)
-endif()
 
 # this defined the variable BUILD_TESTING which is ON by default
 include(CTest)
@@ -235,26 +233,9 @@ if(WarpX_FFT)
     endif()
 endif()
 
-# multi-node FFT
-if(WarpX_HEFFTE)
-    if(WarpX_COMPUTE STREQUAL CUDA)
-        set(_heFFTe_COMPS CUDA)
-    elseif(WarpX_COMPUTE STREQUAL HIP)
-        set(_heFFTe_COMPS ROCM)
-    elseif(WarpX_COMPUTE STREQUAL SYCL)
-        set(_heFFTe_COMPS ONEAPI)
-    else()  # NOACC, OMP
-        set(_heFFTe_COMPS FFTW)  # or MKL
-    endif()
-    # note: we could also enforce GPUAWARE for CUDA and HIP, which can still be
-    #       disabled at runtime
-
-    find_package(Heffte REQUIRED COMPONENTS ${_heFFTe_COMPS})
-endif()
-
 # Python
 if(WarpX_PYTHON)
-    find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+    find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)
 
     # default installation directories: Python
     warpx_set_default_install_dirs_python()
@@ -492,10 +473,6 @@ foreach(D IN LISTS WarpX_DIMS)
         endif()
     endif()
 
-    if(ABLASTR_HEFFTE)
-        target_link_libraries(ablastr_${SD} PUBLIC Heffte::Heffte)
-    endif()
-
     if(WarpX_PYTHON)
         target_link_libraries(pyWarpX_${SD} PRIVATE pybind11::module pybind11::windows_extras)
         if(WarpX_PYTHON_IPO)
@@ -503,7 +480,7 @@ foreach(D IN LISTS WarpX_DIMS)
                 warpx_enable_IPO(pyWarpX_${SD})
             else()
                 # conditionally defined target in pybind11
-                # https://github.com/pybind/pybind11/blob/v2.12.0/tools/pybind11Common.cmake#L397-L403
+                # https://github.com/pybind/pybind11/blob/v2.13.0/tools/pybind11Common.cmake#L407-L413
                 target_link_libraries(pyWarpX_${SD} PRIVATE pybind11::lto)
             endif()
         endif()
@@ -584,13 +561,6 @@ foreach(D IN LISTS WarpX_DIMS)
     if(ABLASTR_FFT)
         # We need to enable FFT support in ABLASTR for PSATD solver
         target_compile_definitions(ablastr_${SD} PUBLIC ABLASTR_USE_FFT)
-    endif()
-
-    if(WarpX_HEFFTE)
-        target_compile_definitions(ablastr_${SD} PUBLIC WARPX_USE_HEFFTE)
-    endif()
-    if(ABLASTR_HEFFTE)
-        target_compile_definitions(ablastr_${SD} PUBLIC ABLASTR_USE_HEFFTE)
     endif()
 
     if(WarpX_PYTHON AND pyWarpX_VERSION_INFO)
@@ -714,9 +684,9 @@ endforeach()
 #
 if(WarpX_PYTHON)
     set(PY_PIP_OPTIONS "-v" CACHE STRING
-        "Additional parameters to pass to `pip`")
+        "Additional parameters to pass to `pip` as ; separated list")
     set(PY_PIP_INSTALL_OPTIONS "" CACHE STRING
-        "Additional parameters to pass to `pip install`")
+        "Additional parameters to pass to `pip install` as ; separated list")
 
     # ensure all targets are built before we package them in a wheel
     set(pyWarpX_INSTALL_TARGET_NAMES)
@@ -739,7 +709,8 @@ if(WarpX_PYTHON)
         ${CMAKE_COMMAND} -E rm -f -r warpx-whl
         COMMAND
             ${CMAKE_COMMAND} -E env PYWARPX_LIB_DIR=$<TARGET_FILE_DIR:pyWarpX_${WarpX_DIMS_LAST}>
-                ${Python_EXECUTABLE} -m pip ${PY_PIP_OPTIONS} wheel --no-build-isolation --no-deps --wheel-dir=warpx-whl ${WarpX_SOURCE_DIR}
+                ${Python_EXECUTABLE} -m pip ${PY_PIP_OPTIONS} wheel --no-build-isolation --no-deps --wheel-dir=warpx-whl "${WarpX_SOURCE_DIR}"
+        COMMAND_EXPAND_LISTS VERBATIM
         WORKING_DIRECTORY
             ${WarpX_BINARY_DIR}
         DEPENDS
@@ -754,6 +725,7 @@ if(WarpX_PYTHON)
     endif()
     add_custom_target(${WarpX_CUSTOM_TARGET_PREFIX}pip_install_requirements
         ${Python_EXECUTABLE} -m pip ${PY_PIP_OPTIONS} install ${PY_PIP_INSTALL_OPTIONS} -r "${WarpX_SOURCE_DIR}/${pyWarpX_REQUIREMENT_FILE}"
+        COMMAND_EXPAND_LISTS VERBATIM
         WORKING_DIRECTORY
             ${WarpX_BINARY_DIR}
     )
@@ -771,6 +743,7 @@ if(WarpX_PYTHON)
     add_custom_target(${WarpX_CUSTOM_TARGET_PREFIX}pip_install
         ${CMAKE_COMMAND} -E env WARPX_MPI=${WarpX_MPI}
             ${Python_EXECUTABLE} -m pip ${PY_PIP_OPTIONS} install --force-reinstall --no-index --no-deps ${PY_PIP_INSTALL_OPTIONS} --find-links=warpx-whl pywarpx
+        COMMAND_EXPAND_LISTS VERBATIM
         WORKING_DIRECTORY
             ${WarpX_BINARY_DIR}
         DEPENDS
@@ -784,6 +757,7 @@ if(WarpX_PYTHON)
     add_custom_target(${WarpX_CUSTOM_TARGET_PREFIX}pip_install_nodeps
         ${CMAKE_COMMAND} -E env WARPX_MPI=${WarpX_MPI}
             ${Python_EXECUTABLE} -m pip ${PY_PIP_OPTIONS} install --force-reinstall --no-index --no-deps ${PY_PIP_INSTALL_OPTIONS} --find-links=warpx-whl pywarpx
+        COMMAND_EXPAND_LISTS VERBATIM
         WORKING_DIRECTORY
             ${WarpX_BINARY_DIR}
         DEPENDS

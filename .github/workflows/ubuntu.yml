@@ -5,6 +5,9 @@ on:
     branches:
       - "development"
   pull_request:
+    paths-ignore:
+      - "Docs/**"
+      - "**.rst"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-ubuntu
@@ -86,7 +89,7 @@ jobs:
           -DWarpX_QED_TOOLS=ON
 
         cmake --build build -j 4
-        ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_test_1d_laser_acceleration
+        ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d
         ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d
 
         ccache -s

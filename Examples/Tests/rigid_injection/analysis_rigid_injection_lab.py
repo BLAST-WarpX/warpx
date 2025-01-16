@@ -23,15 +23,12 @@ Additionally, this script tests that runtime attributes are correctly initialize
 with the gaussian_beam injection style.
 """
 
-import os
 import sys
 
 import numpy as np
 import yt
 
 yt.funcs.mylog.setLevel(0)
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
 
 filename = sys.argv[1]
 
@@ -101,6 +98,3 @@ orig_z = ad_start["beam", "particle_orig_z"]
 center = ad_start["beam", "particle_center"]
 assert np.array_equal(z, orig_z)
 assert np.array_equal(1 * (np.abs(x) < 5.0e-7), center)
-
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename)

@@ -28,7 +28,7 @@ class BTDiagnostics final : public Diagnostics
 {
 public:
 
-    BTDiagnostics (int i, const std::string& name);
+    BTDiagnostics (int i, const std::string& name, DiagTypes diag_type);
 
 private:
     /** Whether to plot raw (i.e., NOT cell-centered) fields */
@@ -161,6 +161,7 @@ private:
      *  in z-direction for both 2D and 3D simulations in the Cartesian frame of reference.
      */
     int m_moving_window_dir;
+    amrex::Real m_moving_window_beta;
 
     /** Number of back-transformed snapshots in the lab-frame requested by the user */
     int m_num_snapshots_lab = std::numeric_limits<int>::lowest();

@@ -15,7 +15,6 @@ The final positions are compared to the analytic solutions.
 The motion is slow enough that relativistic effects are ignored.
 """
 
-import os
 import sys
 
 import numpy as np
@@ -23,8 +22,6 @@ import yt
 from scipy.constants import c, e, m_e
 
 yt.funcs.mylog.setLevel(0)
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
 
 filename = sys.argv[1]
 ds = yt.load(filename)
@@ -121,15 +118,14 @@ vx = ux / gamma
 xx = xx + dt * vx
 
 # Compare the analytic to the simulated final values
-print(f"Error in x position is {abs(np.abs((xx - xx_sim)/xx))}, which should be < 0.01")
 print(
-    f"Error in x velocity is {abs(np.abs((ux - ux_sim)/ux))}, which should be < 0.002"
+    f"Error in x position is {abs(np.abs((xx - xx_sim) / xx))}, which should be < 0.01"
+)
+print(
+    f"Error in x velocity is {abs(np.abs((ux - ux_sim) / ux))}, which should be < 0.002"
 )
 
 assert abs(np.abs((xx - xx_sim) / xx)) < 0.01, Exception("error in x particle position")
 assert abs(np.abs((ux - ux_sim) / ux)) < 0.002, Exception(
     "error in x particle velocity"
 )
-
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename)

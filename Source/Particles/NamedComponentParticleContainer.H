@@ -159,7 +159,7 @@ public:
      * @param name Name of the new component
      * @param comm Whether to communicate this component, in the particle Redistribute
      */
-    void AddRealComp (const std::string& name, bool comm=true)
+    void NewRealComp (const std::string& name, bool comm=true)
     {
         auto search = particle_comps.find(name);
         if (search == particle_comps.end()) {
@@ -177,7 +177,7 @@ public:
      * @param name Name of the new component
      * @param comm Whether to communicate this component, in the particle Redistribute
      */
-    void AddIntComp (const std::string& name, bool comm=true)
+    void NewIntComp (const std::string& name, bool comm=true)
     {
         auto search = particle_icomps.find(name);
         if (search == particle_icomps.end()) {

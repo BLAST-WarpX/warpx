@@ -68,8 +68,7 @@ void WarpX::HybridPICEvolveFields ()
     const int sub_steps = m_hybrid_pic_model->m_substeps;
 
     // Get the external current
-    m_hybrid_pic_model->GetCurrentExternal(
-        m_fields.get_mr_levels_alldirs(FieldType::edge_lengths, finest_level));
+    m_hybrid_pic_model->GetCurrentExternal();
 
     // Reference hybrid-PIC multifabs
     ablastr::fields::MultiLevelScalarField rho_fp_temp = m_fields.get_mr_levels(FieldType::hybrid_rho_fp_temp, finest_level);
@@ -188,6 +187,18 @@ void WarpX::HybridPICEvolveFields ()
         for (int idim = 0; idim < 3; ++idim) {
             MultiFab::Copy(*current_fp_temp[lev][idim], *m_fields.get(FieldType::current_fp, Direction{idim}, lev),
                            0, 0, 1, current_fp_temp[lev][idim]->nGrowVect());
+        }
+    }
+
+    // Check that the E-field does not have nan or inf values, otherwise print a clear message
+    ablastr::fields::MultiLevelVectorField Efield_fp = m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level);
+    for (int lev = 0; lev <= finest_level; ++lev)
+    {
+        for (int idim = 0; idim < 3; ++idim) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                Efield_fp[lev][idim]->is_finite(),
+                "Non-finite value detected in E-field; this indicates more substeps should be used in the field solver."
+            );
         }
     }
 }

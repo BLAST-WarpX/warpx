@@ -221,167 +221,32 @@ void HybridPICModel::InitData ()
     // if the current is time dependent which is what needs to be done to
     // write time independent fields on the first step.
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
-        auto edge_lengths = std::array<std::unique_ptr<amrex::MultiFab>, 3>();
-#ifdef AMREX_USE_EB
-        if (EB::enabled()) {
-            using ablastr::fields::Direction;
-            auto const & edge_lengths_x = *warpx.m_fields.get(FieldType::edge_lengths, Direction{0}, lev);
-            auto const & edge_lengths_y = *warpx.m_fields.get(FieldType::edge_lengths, Direction{1}, lev);
-            auto const & edge_lengths_z = *warpx.m_fields.get(FieldType::edge_lengths, Direction{2}, lev);
-
-            edge_lengths = std::array< std::unique_ptr<amrex::MultiFab>, 3 >{
-                std::make_unique<amrex::MultiFab>(
-                    edge_lengths_x, amrex::make_alias, 0, edge_lengths_x.nComp()),
-                std::make_unique<amrex::MultiFab>(
-                    edge_lengths_y, amrex::make_alias, 0, edge_lengths_y.nComp()),
-                std::make_unique<amrex::MultiFab>(
-                    edge_lengths_z, amrex::make_alias, 0, edge_lengths_z.nComp())
-            };
-        }
-#endif
-        GetCurrentExternal(ablastr::fields::a2m(edge_lengths), lev);
+        warpx.ComputeExternalFieldOnGridUsingParser(
+            FieldType::hybrid_current_fp_external,
+            m_J_external[0],
+            m_J_external[1],
+            m_J_external[2],
+            lev, PatchType::fine, 'e',
+            warpx.m_fields.get_alldirs(FieldType::edge_lengths, lev),
+            warpx.m_fields.get_alldirs(FieldType::face_areas, lev));
     }
 }
 
-void HybridPICModel::GetCurrentExternal (
-    ablastr::fields::MultiLevelVectorField const& edge_lengths)
+void HybridPICModel::GetCurrentExternal ()
 {
     if (!m_external_field_has_time_dependence) { return; }
 
     auto& warpx = WarpX::GetInstance();
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
     {
-        GetCurrentExternal(edge_lengths[lev], lev);
-    }
-}
-
-
-void HybridPICModel::GetCurrentExternal (
-    ablastr::fields::VectorField const& edge_lengths,
-    int lev)
-{
-    // This logic matches closely to WarpX::InitializeExternalFieldsOnGridUsingParser
-    // except that the parsers include time dependence.
-    auto & warpx = WarpX::GetInstance();
-
-    auto t = warpx.gett_new(lev);
-
-    auto dx_lev = warpx.Geom(lev).CellSizeArray();
-    const RealBox& real_box = warpx.Geom(lev).ProbDomain();
-
-    using ablastr::fields::Direction;
-    amrex::MultiFab * mfx = warpx.m_fields.get(FieldType::hybrid_current_fp_external, Direction{0}, lev);
-    amrex::MultiFab * mfy = warpx.m_fields.get(FieldType::hybrid_current_fp_external, Direction{1}, lev);
-    amrex::MultiFab * mfz = warpx.m_fields.get(FieldType::hybrid_current_fp_external, Direction{2}, lev);
-
-    const amrex::IntVect x_nodal_flag = mfx->ixType().toIntVect();
-    const amrex::IntVect y_nodal_flag = mfy->ixType().toIntVect();
-    const amrex::IntVect z_nodal_flag = mfz->ixType().toIntVect();
-
-    // avoid implicit lambda capture
-    auto Jx_external = m_J_external[0];
-    auto Jy_external = m_J_external[1];
-    auto Jz_external = m_J_external[2];
-
-    for ( MFIter mfi(*mfx, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-    {
-        const amrex::Box& tbx = mfi.tilebox( x_nodal_flag, mfx->nGrowVect() );
-        const amrex::Box& tby = mfi.tilebox( y_nodal_flag, mfy->nGrowVect() );
-        const amrex::Box& tbz = mfi.tilebox( z_nodal_flag, mfz->nGrowVect() );
-
-        auto const& mfxfab = mfx->array(mfi);
-        auto const& mfyfab = mfy->array(mfi);
-        auto const& mfzfab = mfz->array(mfi);
-
-        amrex::Array4<amrex::Real> lx, ly, lz;
-        if (EB::enabled()) {
-            lx = edge_lengths[0]->array(mfi);
-            ly = edge_lengths[1]->array(mfi);
-            lz = edge_lengths[2]->array(mfi);
-        }
-
-        amrex::ParallelFor (tbx, tby, tbz,
-            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                // skip if node is covered by an embedded boundary
-                if (lx && lx(i, j, k) <= 0) { return; }
-
-                // Shift required in the x-, y-, or z- position
-                // depending on the index type of the multifab
-#if defined(WARPX_DIM_1D_Z)
-                const amrex::Real x = 0._rt;
-                const amrex::Real y = 0._rt;
-                const amrex::Real fac_z = (1._rt - x_nodal_flag[0]) * dx_lev[0] * 0.5_rt;
-                const amrex::Real z = j*dx_lev[0] + real_box.lo(0) + fac_z;
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                const amrex::Real fac_x = (1._rt - x_nodal_flag[0]) * dx_lev[0] * 0.5_rt;
-                const amrex::Real x = i*dx_lev[0] + real_box.lo(0) + fac_x;
-                const amrex::Real y = 0._rt;
-                const amrex::Real fac_z = (1._rt - x_nodal_flag[1]) * dx_lev[1] * 0.5_rt;
-                const amrex::Real z = j*dx_lev[1] + real_box.lo(1) + fac_z;
-#else
-                const amrex::Real fac_x = (1._rt - x_nodal_flag[0]) * dx_lev[0] * 0.5_rt;
-                const amrex::Real x = i*dx_lev[0] + real_box.lo(0) + fac_x;
-                const amrex::Real fac_y = (1._rt - x_nodal_flag[1]) * dx_lev[1] * 0.5_rt;
-                const amrex::Real y = j*dx_lev[1] + real_box.lo(1) + fac_y;
-                const amrex::Real fac_z = (1._rt - x_nodal_flag[2]) * dx_lev[2] * 0.5_rt;
-                const amrex::Real z = k*dx_lev[2] + real_box.lo(2) + fac_z;
-#endif
-                // Initialize the x-component of the field.
-                mfxfab(i,j,k) = Jx_external(x,y,z,t);
-            },
-            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                // skip if node is covered by an embedded boundary
-                if (ly && ly(i, j, k) <= 0) { return; }
-
-#if defined(WARPX_DIM_1D_Z)
-                const amrex::Real x = 0._rt;
-                const amrex::Real y = 0._rt;
-                const amrex::Real fac_z = (1._rt - y_nodal_flag[0]) * dx_lev[0] * 0.5_rt;
-                const amrex::Real z = j*dx_lev[0] + real_box.lo(0) + fac_z;
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                const amrex::Real fac_x = (1._rt - y_nodal_flag[0]) * dx_lev[0] * 0.5_rt;
-                const amrex::Real x = i*dx_lev[0] + real_box.lo(0) + fac_x;
-                const amrex::Real y = 0._rt;
-                const amrex::Real fac_z = (1._rt - y_nodal_flag[1]) * dx_lev[1] * 0.5_rt;
-                const amrex::Real z = j*dx_lev[1] + real_box.lo(1) + fac_z;
-#elif defined(WARPX_DIM_3D)
-                const amrex::Real fac_x = (1._rt - y_nodal_flag[0]) * dx_lev[0] * 0.5_rt;
-                const amrex::Real x = i*dx_lev[0] + real_box.lo(0) + fac_x;
-                const amrex::Real fac_y = (1._rt - y_nodal_flag[1]) * dx_lev[1] * 0.5_rt;
-                const amrex::Real y = j*dx_lev[1] + real_box.lo(1) + fac_y;
-                const amrex::Real fac_z = (1._rt - y_nodal_flag[2]) * dx_lev[2] * 0.5_rt;
-                const amrex::Real z = k*dx_lev[2] + real_box.lo(2) + fac_z;
-#endif
-                // Initialize the y-component of the field.
-                mfyfab(i,j,k) = Jy_external(x,y,z,t);
-            },
-            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                // skip if node is covered by an embedded boundary
-                if (lz && lz(i, j, k) <= 0) { return; }
-
-#if defined(WARPX_DIM_1D_Z)
-                const amrex::Real x = 0._rt;
-                const amrex::Real y = 0._rt;
-                const amrex::Real fac_z = (1._rt - z_nodal_flag[0]) * dx_lev[0] * 0.5_rt;
-                const amrex::Real z = j*dx_lev[0] + real_box.lo(0) + fac_z;
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                const amrex::Real fac_x = (1._rt - z_nodal_flag[0]) * dx_lev[0] * 0.5_rt;
-                const amrex::Real x = i*dx_lev[0] + real_box.lo(0) + fac_x;
-                const amrex::Real y = 0._rt;
-                const amrex::Real fac_z = (1._rt - z_nodal_flag[1]) * dx_lev[1] * 0.5_rt;
-                const amrex::Real z = j*dx_lev[1] + real_box.lo(1) + fac_z;
-#elif defined(WARPX_DIM_3D)
-                const amrex::Real fac_x = (1._rt - z_nodal_flag[0]) * dx_lev[0] * 0.5_rt;
-                const amrex::Real x = i*dx_lev[0] + real_box.lo(0) + fac_x;
-                const amrex::Real fac_y = (1._rt - z_nodal_flag[1]) * dx_lev[1] * 0.5_rt;
-                const amrex::Real y = j*dx_lev[1] + real_box.lo(1) + fac_y;
-                const amrex::Real fac_z = (1._rt - z_nodal_flag[2]) * dx_lev[2] * 0.5_rt;
-                const amrex::Real z = k*dx_lev[2] + real_box.lo(2) + fac_z;
-#endif
-                // Initialize the z-component of the field.
-                mfzfab(i,j,k) = Jz_external(x,y,z,t);
-            }
-        );
+        warpx.ComputeExternalFieldOnGridUsingParser(
+            FieldType::hybrid_current_fp_external,
+            m_J_external[0],
+            m_J_external[1],
+            m_J_external[2],
+            lev, PatchType::fine, 'e',
+            warpx.m_fields.get_alldirs(FieldType::edge_lengths, lev),
+            warpx.m_fields.get_alldirs(FieldType::face_areas, lev));
     }
 }
 
@@ -483,7 +348,8 @@ void HybridPICModel::HybridPICSolveE (
         Efield, current_fp_plasma, Jfield, Bfield, rhofield,
         *electron_pressure_fp, edge_lengths, lev, this, solve_for_Faraday
     );
-    warpx.ApplyEfieldBoundary(lev, patch_type);
+    amrex::Real const time = warpx.gett_old(0) + warpx.getdt(0);
+    warpx.ApplyEfieldBoundary(lev, patch_type, time);
 }
 
 void HybridPICModel::CalculateElectronPressure() const
@@ -691,6 +557,7 @@ void HybridPICModel::FieldPush (
     HybridPICSolveE(Efield, Jfield, Bfield, rhofield, edge_lengths, true);
     warpx.FillBoundaryE(ng, nodal_sync);
     // Push forward the B-field using Faraday's law
-    warpx.EvolveB(dt, dt_type);
+    amrex::Real const t_old = warpx.gett_old(0);
+    warpx.EvolveB(dt, dt_type, t_old);
     warpx.FillBoundaryB(ng, nodal_sync);
 }

@@ -53,13 +53,7 @@ public:
      * external current multifab. Note the external current can be a function
      * of time and therefore this should be re-evaluated at every step.
      */
-    void GetCurrentExternal (
-        ablastr::fields::MultiLevelVectorField const& edge_lengths
-    );
-    void GetCurrentExternal (
-        ablastr::fields::VectorField const& edge_lengths,
-        int lev
-    );
+    void GetCurrentExternal ();
 
     /**
      * \brief

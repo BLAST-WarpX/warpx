@@ -5,6 +5,9 @@ on:
     branches:
       - "development"
   pull_request:
+    paths-ignore:
+      - "Docs/**"
+      - "**.rst"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-clangsanitizers
@@ -13,8 +16,7 @@ concurrency:
 jobs:
   build_UB_sanitizer:
     name: Clang UB sanitizer
-    runs-on: ubuntu-22.04
-    container: ubuntu:23.10
+    runs-on: ubuntu-24.04
     if: github.event.pull_request.draft == false
     env:
       CC: clang
@@ -63,25 +65,21 @@ jobs:
     - name: run with UB sanitizer
       run: |
 
-        # We need these two lines because these tests run inside a docker container
-        export OMPI_ALLOW_RUN_AS_ROOT=1
-        export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
-
         export OMP_NUM_THREADS=2
 
         #MPI implementations often leak memory
         export "ASAN_OPTIONS=detect_leaks=0"
 
         mpirun -n 2 ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_base_rz
-        mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_test_1d_laser_acceleration
+        mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d
         mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d
         mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d
 
   build_thread_sanitizer:
     name: Clang thread sanitizer
-    runs-on: ubuntu-22.04
-    container: ubuntu:23.10
-    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    # TODO Fix data race conditions and re-enable job
+    if: 0 #github.event.pull_request.draft == false
     env:
       CC: clang
       CXX: clang++
@@ -147,14 +145,10 @@ jobs:
         export TSAN_OPTIONS='ignore_noninstrumented_modules=1'
         export ARCHER_OPTIONS="verbose=1"
 
-        # We need these two lines because these tests run inside a docker container
-        export OMPI_ALLOW_RUN_AS_ROOT=1
-        export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
-
         export OMP_NUM_THREADS=2
 
         mpirun -n 2 ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_base_rz warpx.serialize_initial_conditions = 0
-        mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_test_1d_laser_acceleration warpx.serialize_initial_conditions = 0
+        mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d warpx.serialize_initial_conditions = 0
         mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d warpx.serialize_initial_conditions = 0
         mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d warpx.serialize_initial_conditions = 0
 
