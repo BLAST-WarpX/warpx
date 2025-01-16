@@ -963,12 +963,14 @@ WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real sta
                                         lev,
                                         patch_type,
                                         m_fields.get_alldirs(FieldType::Efield_fp, lev),
+                                        m_eb_update_E[lev],
                                         a_dt );
     } else {
         m_fdtd_solver_cp[lev]->EvolveE( m_fields,
                                         lev,
                                         patch_type,
                                         m_fields.get_alldirs(FieldType::Efield_cp, lev),
+                                        m_eb_update_E[lev],
                                         a_dt );
     }
 
@@ -1155,7 +1157,7 @@ WarpX::MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amre
         m_fields.get_alldirs(FieldType::Efield_fp, lev),
         m_fields.get_alldirs(FieldType::Bfield_fp, lev),
         m_fields.get_alldirs(FieldType::current_fp, lev),
-        m_fields.get_alldirs(FieldType::edge_lengths, lev),
+        m_eb_update_E[lev],
         a_dt, m_macroscopic_properties);
 
     if (do_pml && pml[lev]->ok()) {
