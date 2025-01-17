@@ -179,7 +179,6 @@ amrex::IntVect WarpX::sort_idx_type(AMREX_D_DECL(0,0,0));
 
 bool WarpX::do_dynamic_scheduling = true;
 
-bool WarpX::do_subcycling = false;
 bool WarpX::do_multi_J = false;
 int WarpX::do_multi_J_n_depositions;
 bool WarpX::safe_guard_cells = false;
@@ -448,7 +447,7 @@ WarpX::WarpX ()
     // (e.g., use_fdtd_nci_corr)
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
         AMREX_ALWAYS_ASSERT(use_fdtd_nci_corr == 0);
-        AMREX_ALWAYS_ASSERT(do_subcycling == 0);
+        AMREX_ALWAYS_ASSERT(m_do_subcycling == 0);
     }
 
     if (WarpX::current_deposition_algo != CurrentDepositionAlgo::Esirkepov) {
@@ -622,7 +621,7 @@ WarpX::ReadParameters ()
         utils::parser::queryWithParser(pp_warpx, "cfl", cfl);
         pp_warpx.query("verbose", verbose);
         utils::parser::queryWithParser(pp_warpx, "regrid_int", regrid_int);
-        pp_warpx.query("do_subcycling", do_subcycling);
+        pp_warpx.query("do_subcycling", m_do_subcycling);
         pp_warpx.query("do_multi_J", do_multi_J);
         if (do_multi_J)
         {
@@ -636,7 +635,7 @@ WarpX::ReadParameters ()
         override_sync_intervals =
             utils::parser::IntervalsParser(override_sync_intervals_string_vec);
 
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(do_subcycling != 1 || max_level <= 1,
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_do_subcycling != 1 || max_level <= 1,
                                          "Subcycling method 1 only works for 2 levels.");
 
         ReadBoostedFrameParameters(gamma_boost, beta_boost, boost_direction);
@@ -684,6 +683,7 @@ WarpX::ReadParameters ()
         poisson_solver_id!=PoissonSolverAlgo::IntegratedGreenFunction,
         "To use the FFT Poisson solver, compile with WARPX_USE_FFT=ON.");
 #endif
+        utils::parser::queryWithParser(pp_warpx, "self_fields_max_iters", magnetostatic_solver_max_iters);
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         (
@@ -2044,7 +2044,7 @@ WarpX::AllocLevelData (int lev, const BoxArray& ba, const DistributionMapping& d
     guard_cells.Init(
         dt[lev],
         dx,
-        do_subcycling,
+        m_do_subcycling,
         WarpX::use_fdtd_nci_corr,
         grid_type,
         do_moving_window,
@@ -2100,7 +2100,7 @@ WarpX::AllocLevelData (int lev, const BoxArray& ba, const DistributionMapping& d
                   guard_cells.ng_alloc_Rho, guard_cells.ng_alloc_F, guard_cells.ng_alloc_G, aux_is_nodal);
 
     m_accelerator_lattice[lev] = std::make_unique<AcceleratorLattice>();
-    m_accelerator_lattice[lev]->InitElementFinder(lev, ba, dm);
+    m_accelerator_lattice[lev]->InitElementFinder(lev, gamma_boost, ba, dm);
 
 }
 
@@ -2407,7 +2407,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
                              ncomps, ngPhi, 0.0_rt );
     }
 
-    if (do_subcycling && lev == 0)
+    if (m_do_subcycling && lev == 0)
     {
         m_fields.alloc_init(FieldType::current_store, Direction{0}, lev, amrex::convert(ba,jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
         m_fields.alloc_init(FieldType::current_store, Direction{1}, lev, amrex::convert(ba,jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);

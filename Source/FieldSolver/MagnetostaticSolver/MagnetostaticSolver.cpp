@@ -128,22 +128,22 @@ WarpX::AddMagnetostaticFieldLabFrame()
 
     // const amrex::Real magnetostatic_absolute_tolerance = self_fields_absolute_tolerance*PhysConst::c;
     // temporary fix!!!
-    const amrex::Real magnetostatic_absolute_tolerance = 0.0;
-    amrex::Real self_fields_required_precision;
+    const amrex::Real absolute_tolerance = 0.0;
+    amrex::Real required_precision;
     if constexpr (std::is_same<Real, float>::value) {
-        self_fields_required_precision = 1e-5;
+        required_precision = 1e-5;
     }
     else {
-        self_fields_required_precision = 1e-11;
+        required_precision = 1e-11;
     }
-    const int self_fields_max_iters = 200;
-    const int self_fields_verbosity = 2;
+    const int verbosity = 2;
 
     computeVectorPotential(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::vector_potential_fp_nodal, finest_level),
-        self_fields_required_precision, magnetostatic_absolute_tolerance, self_fields_max_iters,
-        self_fields_verbosity);
+        required_precision, absolute_tolerance, magnetostatic_solver_max_iters,
+        verbosity
+    );
 }
 
 /* Compute the vector potential `A` by solving the Poisson equation with `J` as

@@ -94,7 +94,7 @@ WarpX::ComputeDt ()
     dt.resize(0);
     dt.resize(max_level+1,deltat);
 
-    if (do_subcycling) {
+    if (m_do_subcycling) {
         for (int lev = max_level-1; lev >= 0; --lev) {
             dt[lev] = dt[lev+1] * refRatio(lev)[0];
         }
