@@ -66,11 +66,11 @@ public:
      */
     void CalculatePlasmaCurrent (
         ablastr::fields::MultiLevelVectorField const& Bfield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > eb_update_E
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E
     );
     void CalculatePlasmaCurrent (
         ablastr::fields::VectorField const& Bfield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > eb_update_E,
+        std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
         int lev
     );
 
@@ -83,7 +83,7 @@ public:
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelVectorField const& Bfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > eb_update_E,
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
         bool solve_for_Faraday) const;
 
     void HybridPICSolveE (
@@ -91,14 +91,15 @@ public:
         ablastr::fields::VectorField const& Jfield,
         ablastr::fields::VectorField const& Bfield,
         amrex::MultiFab const& rhofield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > eb_update_E,        int lev, bool solve_for_Faraday) const;
+        std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
+        int lev, bool solve_for_Faraday) const;
 
     void HybridPICSolveE (
         ablastr::fields::VectorField const& Efield,
         ablastr::fields::VectorField const& Jfield,
         ablastr::fields::VectorField const& Bfield,
         amrex::MultiFab const& rhofield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > eb_update_E,
+        std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
         int lev, PatchType patch_type, bool solve_for_Faraday) const;
 
     void BfieldEvolveRK (
@@ -106,7 +107,7 @@ public:
         ablastr::fields::MultiLevelVectorField const& Efield,
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > eb_update_E,
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
         amrex::Real dt, DtType a_dt_type,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
@@ -115,7 +116,7 @@ public:
         ablastr::fields::MultiLevelVectorField const& Efield,
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > eb_update_E,
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
         amrex::Real dt, int lev, DtType dt_type,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
@@ -124,7 +125,7 @@ public:
         ablastr::fields::MultiLevelVectorField const& Efield,
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > eb_update_E,
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
         amrex::Real dt, DtType dt_type,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
