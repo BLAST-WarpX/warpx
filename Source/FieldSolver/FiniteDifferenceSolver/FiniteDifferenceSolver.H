@@ -329,7 +329,7 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField Efield,
             std::array< amrex::MultiFab*, 3 > Bfield,
             std::array< amrex::MultiFab*, 3 > Jfield,
-            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
+            std::array< amrex::MultiFab*, 3 > edge_lengths,
             amrex::MultiFab* Ffield,
             MultiSigmaBox const& sigba,
             amrex::Real dt, bool pml_has_particles );
