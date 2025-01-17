@@ -296,6 +296,108 @@ storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
 }
 
 void 
-storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp ) {
+storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp, 
+    ElectromagneticSolverAlgo electromagnetic_solver_id, bool is_full_diagnostic  ) {
+    
+    using PinnedParIter = typename PinnedMemoryParticleContainer::ParIterType;
+    using Dir = ablastr::fields::Direction;
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        electromagnetic_solver_id != ElectromagneticSolverAlgo::None , 
+        "output of the electromagnetic fields on the particles was requested, "
+        "but this is only available with an electromagnetic solver.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        is_full_diagnostic,
+        "Output of the electromagnetic fields on the particles was requested, "
+        "but this is only available with `diag_type = Full`.");
+    
+
+    tmp.NewRealComp("Ex");
+    tmp.NewRealComp("Ey");
+    tmp.NewRealComp("Ez");
+    tmp.NewRealComp("Bx");
+    tmp.NewRealComp("By");
+    tmp.NewRealComp("Bz");
+
+    int const Ex_index = tmp.getParticleComps().at("Ex");
+    int const Ey_index = tmp.getParticleComps().at("Ey");
+    int const Ez_index = tmp.getParticleComps().at("Ez");
+    int const Bx_index = tmp.getParticleComps().at("Bx");
+    int const By_index = tmp.getParticleComps().at("By");
+    int const Bz_index = tmp.getParticleComps().at("Bz");
+
+    auto& warpx = WarpX::GetInstance();
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        warpx.finestLevel() ==0, 
+        "output of the electromagnetic fields on particles only works without mesh refinement"
+    );
+    
+    constexpr auto lev0=0;
+
+    const amrex::Geometry& geom = warpx.Geom(lev0);
+    auto plo = geom.ProbLoArray();
+    auto dxi = geom.InvCellSizeArray();
+    amrex::MultiFab const& Ex = *warpx.m_fields.get(FieldType::Efield_fp, Dir{0}, lev0);
+    amrex::MultiFab const& Ey = *warpx.m_fields.get(FieldType::Efield_fp, Dir{1}, lev0);
+    amrex::MultiFab const& Ez = *warpx.m_fields.get(FieldType::Efield_fp, Dir{2}, lev0);
+    amrex::MultiFab const& Bx = *warpx.m_fields.get(FieldType::Bfield_fp, Dir{0}, lev0);
+    amrex::MultiFab const& By = *warpx.m_fields.get(FieldType::Bfield_fp, Dir{1}, lev0);
+    amrex::MultiFab const& Bz = *warpx.m_fields.get(FieldType::Bfield_fp, Dir{2}, lev0);
+
+    const amrex::XDim3 dinv = WarpX::InvCellSize(lev0);
+    const bool galerkin_interpolation = WarpX::galerkin_interpolation;
+    const int nox = WarpX::nox;
+    const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (PinnedParIter pti(tmp, lev0); pti.isValid(); ++pti) {
+        
+        const auto Ex_grid = Ex[pti].array();
+        const auto Ey_grid = Ey[pti].array();
+        const auto Ez_grid = Ez[pti].array();
+        const auto Bx_grid = Bx[pti].array();
+        const auto By_grid = By[pti].array();
+        const auto Bz_grid = Bz[pti].array();
+
+        const auto ex_type = Ex.ixType();
+        const auto ey_type = Ey.ixType();
+        const auto ez_type = Ez.ixType();
+        const auto bx_type = Bx.ixType();
+        const auto by_type = By.ixType();
+        const auto bz_type = Bz.ixType();
+
+        const auto getPosition = GetParticlePosition<PIdx>(pti);
+        amrex::ParticleReal* Ex_particle_arr = pti.GetStructOfArrays().GetRealData(Ex_index).dataPtr();
+        amrex::ParticleReal* Ey_particle_arr = pti.GetStructOfArrays().GetRealData(Ey_index).dataPtr();
+        amrex::ParticleReal* Ez_particle_arr = pti.GetStructOfArrays().GetRealData(Ez_index).dataPtr();
+        amrex::ParticleReal* Bx_particle_arr = pti.GetStructOfArrays().GetRealData(Bx_index).dataPtr();
+        amrex::ParticleReal* By_particle_arr = pti.GetStructOfArrays().GetRealData(By_index).dataPtr();
+        amrex::ParticleReal* Bz_particle_arr = pti.GetStructOfArrays().GetRealData(Bz_index).dataPtr();
+
+        const auto box = pti.tilebox();
+        const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev0, 0._rt);
+        const Dim3 lo = lbound(box);
+
+        // Loop over the particles and update their position
+        amrex::ParallelFor( pti.numParticles(),
+            [=] AMREX_GPU_DEVICE (long ip) {
+               // !!!!!!!!!! pas fini  
+               amrex::ParticleReal xp, yp, zp;
+               getPosition(ip, xp, yp, zp);
+               
+               doGatherShapeN(
+                    xp, yp, zp, 
+                    Ex_particle_arr[ip], Ey_particle_arr[ip], Ez_particle_arr[ip], 
+                    Bx_particle_arr[ip], By_particle_arr[ip], Bz_particle_arr[ip],
+                    Ex_grid, Ey_grid, Ez_grid, 
+                    Bx_grid, By_grid, Bz_grid,
+                    ex_type, ey_type, ez_type, 
+                    bx_type, by_type, bz_type,
+                    dinv, xyzmin, lo, n_rz_azimuthal_modes, nox, galerkin_interpolation);
+            });
+    }
     
 }
