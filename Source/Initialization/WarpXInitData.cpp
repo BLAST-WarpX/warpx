@@ -1264,22 +1264,13 @@ void WarpX::InitializeEBGridData (int lev)
                 // Compute additional quantities required for the ECT solver
                 MarkExtensionCells();
                 ComputeFaceExtensions();
-                // Mark on which grid points E should be updated
-                MarkUpdateECellsECT( m_eb_update_E[lev], edge_lengths_lev );
-                // Mark on which grid points B should be updated
-                MarkUpdateBCellsECT( m_eb_update_B[lev], face_areas_lev, edge_lengths_lev);
-            } else {
-                // Mark on which grid points E should be updated (stair-case approximation)
-                MarkUpdateCellsStairCase(
-                    m_eb_update_E[lev],
-                    m_fields.get_alldirs(FieldType::Efield_fp, lev),
-                    eb_fact );
-                // Mark on which grid points B should be updated (stair-case approximation)
-                MarkUpdateCellsStairCase(
-                    m_eb_update_B[lev],
-                    m_fields.get_alldirs(FieldType::Bfield_fp, lev),
-                    eb_fact );
             }
+
+            // Mark on which grid points E should be updated
+            MarkUpdateECellsECT( m_eb_update_E[lev], edge_lengths_lev );
+            // Mark on which grid points B should be updated
+            MarkUpdateBCellsECT( m_eb_update_B[lev], face_areas_lev, edge_lengths_lev);
+
         }
 
         ComputeDistanceToEB();
