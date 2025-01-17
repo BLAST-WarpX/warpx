@@ -1583,13 +1583,6 @@ private:
     [[nodiscard]]
     bool checkStopSimulation (amrex::Real cur_time);
 
-    /** Print Unused Parameter Warnings after Step 1
-     *
-     * Instead of waiting for a simulation to end, we already do an early "unused parameter check"
-     * after step 1 to inform users early of potential issues with their simulation setup.
-     */
-    void checkEarlyUnusedParams ();
-
     /** Perform essential particle house keeping at boundaries
      *
      * Inject, communicate, scrape and sort particles.
