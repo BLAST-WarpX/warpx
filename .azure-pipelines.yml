@@ -158,8 +158,9 @@ jobs:
       # determine if the build was triggered by a push to the development branch
       if [[ "$(Build.SourceBranch)" == "refs/heads/development" ]]; then
         # run tests (exclude pytest.AMReX when running Python tests)
-        # and submit results to CDash as Continuous
-        ctest --test-dir build --output-on-failure -E AMReX -D Continuous
+        # and submit results to CDash as Experimental
+        ctest --test-dir build --output-on-failure -E AMReX \
+          -D ExperimentalTest -D ExperimentalSubmit
       else
         # run tests (exclude pytest.AMReX when running Python tests)
         ctest --test-dir build --output-on-failure -E AMReX
