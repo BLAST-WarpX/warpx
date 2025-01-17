@@ -496,12 +496,7 @@ public:
                                        TmpIdx::nattribs>;
     using TmpParticles = amrex::Vector<std::map<PairIndex, TmpParticleTile> >;
 
-    TmpParticles getTmpParticleData () const noexcept {return tmp_particle_data;}
-
     int getIonizationInitialLevel () const noexcept {return ionization_initial_level;}
-
-protected:
-    TmpParticles tmp_particle_data;
 
 private:
     void particlePostLocate(ParticleType& p, const amrex::ParticleLocData& pld, int lev) override;
