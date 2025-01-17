@@ -272,12 +272,6 @@ WarpX::WarpX ()
 
     istep.resize(nlevs_max, 0);
     nsubsteps.resize(nlevs_max, 1);
-#if 0
-    // no subcycling yet
-    for (int lev = 1; lev < nlevs_max; ++lev) {
-        nsubsteps[lev] = MaxRefRatio(lev-1);
-    }
-#endif
 
     t_new.resize(nlevs_max, 0.0);
     t_old.resize(nlevs_max, std::numeric_limits<Real>::lowest());
