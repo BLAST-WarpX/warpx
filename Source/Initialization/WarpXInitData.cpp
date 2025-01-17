@@ -977,7 +977,6 @@ WarpX::InitLevelData (int lev, Real /*time*/)
     if ((m_p_ext_field_params->B_ext_grid_type == ExternalFieldType::parse_ext_grid_function)
          && (lev > 0) && (lev <= maxlevel_extEMfield_init)) {
 
-        // TODO: raise error when EB is activated
         ComputeExternalFieldOnGridUsingParser(
             FieldType::Bfield_aux,
             m_p_ext_field_params->Bxfield_parser->compile<4>(),
@@ -990,7 +989,7 @@ WarpX::InitLevelData (int lev, Real /*time*/)
             m_p_ext_field_params->Bxfield_parser->compile<4>(),
             m_p_ext_field_params->Byfield_parser->compile<4>(),
             m_p_ext_field_params->Bzfield_parser->compile<4>(),
-            lev, PatchType::coarse, m_eb_update_E);
+            lev, PatchType::coarse, m_eb_update_B);
     }
 
     // if the input string for the E-field is "parse_e_ext_grid_function",
