@@ -1,6 +1,0 @@
-# base input parameters
-FILE = inputs_base_2d
-
-# test input parameters
-# Order of particle shape factors
-algo.particle_shape = 2
