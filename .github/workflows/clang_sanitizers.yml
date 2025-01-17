@@ -121,7 +121,7 @@ jobs:
           -DWarpX_EB=OFF                    \
           -DWarpX_PRECISION=DOUBLE          \
           -DWarpX_PARTICLE_PRECISION=DOUBLE
-        cmake --build build -j 4
+        cmake --build build -j 4 --verbose
 
         #cmake -S . -B build_EB              \
         #  -GNinja                           \
