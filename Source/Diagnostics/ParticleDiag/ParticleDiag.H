@@ -24,6 +24,7 @@ public:
     [[nodiscard]] std::string getSpeciesName() const { return m_name; }
     amrex::Vector<int> m_plot_flags;
     bool m_plot_phi = false; // Whether to output the potential phi on the particles
+    bool m_plot_EM = false; // Whether to output the E and B fields on the particles
 
     bool m_do_random_filter  = false;
     bool m_do_uniform_filter = false;

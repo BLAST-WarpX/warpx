@@ -42,11 +42,14 @@ ParticleDiag::ParticleDiag (
             existing_variable_names["y"] = PIdx::theta;
 #endif
             for (const auto& var : variables){
+                // User can request phi and/or EM fields on particles. These are *not* part of the variables that
+                // the particle container carries, and are only added to particles during output.
+                // Therefore, these cases need to be treated specifically.
                 if (var == "phi") {
-                    // User requests phi on particle. This is *not* part of the variables that
-                    // the particle container carries, and is only added to particles during output.
-                    // Therefore, this case needs to be treated specifically.
                     m_plot_phi = true;
+                } else if (var=="EM") {
+                    m_plot_EM = true;
+                }
                 } else {
                     const auto search = existing_variable_names.find(var);
                     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
