@@ -92,4 +92,6 @@ void
 storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
     ElectrostaticSolverAlgo electrostatic_solver_id, bool is_full_diagnostic );
 
+void
+storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp );
 #endif /* WARPX_PARTICLEIO_H_ */

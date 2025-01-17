@@ -7,11 +7,12 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#include "Fields.H"
 #include "Particles/ParticleIO.H"
+
+#include "Fields.H"
+#include "Particles/LaserParticleContainer.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/PhysicalParticleContainer.H"
-#include "Particles/LaserParticleContainer.H"
 #include "Particles/RigidInjectedParticleContainer.H"
 #include "Particles/SpeciesPhysicalProperties.H"
 #include "Particles/WarpXParticleContainer.H"
@@ -292,4 +293,9 @@ storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
             );
         }
     }
+}
+
+void 
+storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp ) {
+    
 }

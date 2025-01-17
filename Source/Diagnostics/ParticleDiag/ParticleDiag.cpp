@@ -49,7 +49,6 @@ ParticleDiag::ParticleDiag (
                     m_plot_phi = true;
                 } else if (var=="EM") {
                     m_plot_EM = true;
-                }
                 } else {
                     const auto search = existing_variable_names.find(var);
                     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(

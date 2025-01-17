@@ -590,6 +590,9 @@ for (unsigned i = 0, n = particle_diags.size(); i < n; ++i) {
     if ( particle_diags[i].m_plot_phi ) {
         storePhiOnParticles( tmp, WarpX::electrostatic_solver_id, !use_pinned_pc );
     }
+    if ( particle_diags[i].m_plot_EM ) {
+        storeEMFieldsOnParticles( tmp );
+    }
 
     // names of amrex::Real and int particle attributes in SoA data
     amrex::Vector<std::string> real_names;
