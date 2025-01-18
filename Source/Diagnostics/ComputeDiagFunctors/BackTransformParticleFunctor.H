@@ -27,12 +27,12 @@ struct SelectParticles
      * \brief Constructor of SelectParticles functor.
      *
      * @param[in] a_pti              WarpX particle iterator
-     * @param[in] tmp_particle_data  temporary particle data
      * @param[in] current_z_boost    current z-position of the slice in boosted frame
      * @param[in] old_z_boost        previous z-position of the slice in boosted frame
      * @param[in] a_offset           index offset for particles to be selected
      */
-    SelectParticles( const WarpXParIter& a_pti, TmpParticles& tmp_particle_data,
+    SelectParticles (const WarpXParticleContainer& pc,
+                     const WarpXParIter& a_pti,
                      amrex::Real current_z_boost, amrex::Real old_z_boost,
                      int a_offset = 0);
 
@@ -83,15 +83,15 @@ struct LorentzTransformParticles
      * \brief Constructor of the LorentzTransformParticles functor.
      *
      * @param[in] a_pti              WarpX particle iterator
-     * @param[in] tmp_particle_data  temporary particle data
      * @param[in] t_boost            time in boosted frame
      * @param[in] dt                 timestep in boosted-frame
      * @param[in] t_lab              time in lab-frame
      * @param[in] a_offset           index offset for particles to be transformed
      */
-    LorentzTransformParticles ( const WarpXParIter& a_pti, TmpParticles& tmp_particle_data,
-                                amrex::Real t_boost, amrex::Real dt,
-                                amrex::Real t_lab, int a_offset = 0);
+    LorentzTransformParticles (const WarpXParticleContainer& pc,
+                               const WarpXParIter& a_pti,
+                               amrex::Real t_boost, amrex::Real dt,
+                               amrex::Real t_lab, int a_offset = 0);
 
     /**
      * \brief Functor call. This method computes the Lorentz-transform for particle
