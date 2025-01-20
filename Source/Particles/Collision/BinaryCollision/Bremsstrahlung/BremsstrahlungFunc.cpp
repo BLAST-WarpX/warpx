@@ -62,7 +62,7 @@ BremsstrahlungFunc::UploadCrossSection (int Z)
     std::vector<std::vector<amrex::ParticleReal>> & kdsigdk = m_kdsigdk_map.at(Z);
 
     // kdsigdk at the default cutoff
-    int i0_cut = 0;
+    int const i0_cut = 0;
     amrex::ParticleReal const koT1_cut = m_exe.m_koT1_cut_default;
     amrex::ParticleReal const w00 = (m_exe.m_koT1_grid[i0_cut+1] - koT1_cut)/(m_exe.m_koT1_grid[i0_cut+1] - m_exe.m_koT1_grid[i0_cut]);
 
