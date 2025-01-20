@@ -427,8 +427,8 @@ public:
                 amrex::ParticleReal const KE_after = m_e_eV*gbp1sq_prime/(1.0_prt + gammap1_prime);
 
                 // update energy lost to bremsstrahlung
-                amrex::ParticleReal const deltaE_eV = KE_after - KE_before;
-                /* m_deltaE_bremsstrahlung -= deltaE_eV*weight1*PhysConst::q_e; // Joules */
+                amrex::ParticleReal const deltaE_eV = KE_before - KE_after;
+                /* m_deltaE_bremsstrahlung += deltaE_eV*weight1*PhysConst::q_e; // Joules */
 
                 if (m_create_photons) {
                     // compute photon energy in lab frame
