@@ -237,10 +237,6 @@ public:
             amrex::ParticleReal const w01 = 1.0_prt - w00;
             kdsigdk_cut = (  w00*(w0*m_kdsigdk[index][i0_cut  ] + (1.0_prt - w0)*m_kdsigdk[index+1][i0_cut])
                            + w01*(w0*m_kdsigdk[index][i0_cut+1] + (1.0_prt - w0)*m_kdsigdk[index+1][i0_cut+1]));
-            if (i0_cut == 0) {
-                // Scale kdsigdk_cut by the centered k to mitigate divergence effect for k->0
-                kdsigdk_cut *= koT1_cut/((m_koT1_grid[i0_cut+1] + koT1_cut)*0.5_prt);
-            }
 
             amrex::ParticleReal sigma_total;
             if (KEcut_eV/KErel_eV <= m_koT1_cut_default) {
@@ -252,9 +248,10 @@ public:
                 amrex::ParticleReal kdsigdk_im1 = kdsigdk_cut;
                 amrex::ParticleReal sigma = 0.0_prt;
                 for (int i=i0_cut+1; i < nkoT1; i++) {
-                    amrex::ParticleReal const dk = (m_koT1_grid[i] - koT1_grid_im1);
                     amrex::ParticleReal const kdsigdk_i = w0*m_kdsigdk[index][i] + (1.0_prt - w0)*m_kdsigdk[index+1][i];
-                    amrex::ParticleReal const dsigdk = (kdsigdk_i/m_koT1_grid[i] + kdsigdk_im1/koT1_grid_im1)*0.5_prt;
+                    amrex::ParticleReal const dk = (m_koT1_grid[i] - koT1_grid_im1);
+                    amrex::ParticleReal const k_ave = (m_koT1_grid[i] + koT1_grid_im1)*0.5_prt;
+                    amrex::ParticleReal const dsigdk = (kdsigdk_i + kdsigdk_im1)*0.5_prt/k_ave;
                     sigma = sigma + dsigdk*dk;
                     koT1_grid_im1 = m_koT1_grid[i];
                     kdsigdk_im1 = kdsigdk_i;
@@ -287,11 +284,13 @@ public:
             amrex::ParticleReal sigma = 0._prt;
             amrex::ParticleReal kdsigdk_i;
             amrex::ParticleReal dk;
+            amrex::ParticleReal k_ave;
             int i;
             for (i=i0_cut+1; i < nkoT1; i++) {
                 dk = (m_koT1_grid[i] - koT1_grid_im1);
+                k_ave = (m_koT1_grid[i] + koT1_grid_im1)*0.5_prt;
                 kdsigdk_i = w0*m_kdsigdk[index][i] + (1.0_prt - w0)*m_kdsigdk[index+1][i];
-                amrex::ParticleReal const dsigdk = (kdsigdk_i/m_koT1_grid[i] + kdsigdk_im1/koT1_grid_im1)*0.5_prt;
+                amrex::ParticleReal const dsigdk = (kdsigdk_i + kdsigdk_im1)*0.5_prt/k_ave;
                 amrex::ParticleReal const next_sigma = sigma + dsigdk*dk;
                 if (random_number*sigma_total > next_sigma) {
                     sigma = next_sigma;
@@ -303,8 +302,8 @@ public:
             }
 
             // k will be between k_im1 and k_i
-            amrex::ParticleReal const f_im1 = kdsigdk_im1/koT1_grid_im1;
-            amrex::ParticleReal const f_i = kdsigdk_i/m_koT1_grid[i];
+            amrex::ParticleReal const f_im1 = kdsigdk_im1/k_ave;
+            amrex::ParticleReal const f_i = kdsigdk_i/k_ave;
             amrex::ParticleReal const x = (std::sqrt(f_im1*f_im1 + 2._prt*(f_i - f_im1)*(random_number*sigma_total - sigma)/dk)
                                            - f_im1)/(f_i - f_im1);
             amrex::ParticleReal const result = x*dk + koT1_grid_im1;

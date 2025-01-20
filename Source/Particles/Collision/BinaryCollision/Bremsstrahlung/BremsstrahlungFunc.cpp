@@ -80,14 +80,15 @@ BremsstrahlungFunc::UploadCrossSection (int Z)
 
         // Calculate the total cross section using the default k-cutoff
         amrex::ParticleReal const kdsigdk_cut = w00*m_exe.m_kdsigdk[iee][i0_cut] + (1.0_prt - w00)*m_exe.m_kdsigdk[iee][i0_cut+1];
-        amrex::ParticleReal kdsigdk_im1 = kdsigdk_cut*koT1_cut/((m_exe.m_koT1_grid[i0_cut+1] + koT1_cut)*0.5_prt);
+        amrex::ParticleReal kdsigdk_im1 = kdsigdk_cut;
         amrex::ParticleReal koT1_im1 = koT1_cut;
         amrex::ParticleReal sigma = 0.0_prt;
         for (int i=i0_cut+1; i < Executor::nkoT1; i++) {
             amrex::ParticleReal const koT1_i = m_exe.m_koT1_grid[i];
-            amrex::ParticleReal const dk = (koT1_i - koT1_im1);
             amrex::ParticleReal const kdsigdk_i = m_exe.m_kdsigdk[iee][i];
-            amrex::ParticleReal const dsigdk = (kdsigdk_i/koT1_i + kdsigdk_im1/koT1_im1)*0.5_prt;
+            amrex::ParticleReal const dk = (koT1_i - koT1_im1);
+            amrex::ParticleReal const k_ave = (koT1_i + koT1_im1)*0.5_prt;
+            amrex::ParticleReal const dsigdk = (kdsigdk_i + kdsigdk_im1)*0.5_prt/k_ave;
             sigma = sigma + dsigdk*dk;
             koT1_im1 = koT1_i;
             kdsigdk_im1 = kdsigdk_i;
