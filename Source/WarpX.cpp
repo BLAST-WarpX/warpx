@@ -210,6 +210,29 @@ namespace
             std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(), is_pml);
         return is_any_pml;
     }
+
+    /**
+     * \brief Re-orders the Fornberg coefficients so that they can be used more conveniently for
+     * finite-order centering operations. For example, for finite-order centering of order 6,
+     * the Fornberg coefficients \c (c_0,c_1,c_2) are re-ordered as \c (c_2,c_1,c_0,c_0,c_1,c_2).
+     *
+     * \param[in,out] ordered_coeffs host vector where the re-ordered Fornberg coefficients will be stored
+     * \param[in] unordered_coeffs host vector storing the original sequence of Fornberg coefficients
+     * \param[in] order order of the finite-order centering along a given direction
+     */
+    void ReorderFornbergCoefficients (
+        amrex::Vector<amrex::Real>& ordered_coeffs,
+        const amrex::Vector<amrex::Real>& unordered_coeffs,
+        const int order)
+        {
+            const int n = order / 2;
+            for (int i = 0; i < n; i++) {
+                ordered_coeffs[i] = unordered_coeffs[n-1-i];
+            }
+            for (int i = n; i < order; i++) {
+                ordered_coeffs[i] = unordered_coeffs[i-n];
+            }
+        }
 }
 
 void WarpX::MakeWarpX ()
@@ -3192,19 +3215,6 @@ amrex::Vector<amrex::Real> WarpX::getFornbergStencilCoefficients (const int n_or
     return coeffs;
 }
 
-void WarpX::ReorderFornbergCoefficients (amrex::Vector<amrex::Real>& ordered_coeffs,
-                                         amrex::Vector<amrex::Real>& unordered_coeffs,
-                                         const int order)
-{
-    const int n = order / 2;
-    for (int i = 0; i < n; i++) {
-        ordered_coeffs[i] = unordered_coeffs[n-1-i];
-    }
-    for (int i = n; i < order; i++) {
-        ordered_coeffs[i] = unordered_coeffs[i-n];
-    }
-}
-
 void WarpX::AllocateCenteringCoefficients (amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_x,
                                            amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_y,
                                            amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_z,
@@ -3233,11 +3243,11 @@ void WarpX::AllocateCenteringCoefficients (amrex::Gpu::DeviceVector<amrex::Real>
 
     // Re-order Fornberg stencil coefficients:
     // example for order 6: (c_0,c_1,c_2) becomes (c_2,c_1,c_0,c_0,c_1,c_2)
-    ReorderFornbergCoefficients(host_centering_stencil_coeffs_x,
+    ::ReorderFornbergCoefficients(host_centering_stencil_coeffs_x,
                                 Fornberg_stencil_coeffs_x, centering_nox);
-    ReorderFornbergCoefficients(host_centering_stencil_coeffs_y,
+    ::ReorderFornbergCoefficients(host_centering_stencil_coeffs_y,
                                 Fornberg_stencil_coeffs_y, centering_noy);
-    ReorderFornbergCoefficients(host_centering_stencil_coeffs_z,
+    ::ReorderFornbergCoefficients(host_centering_stencil_coeffs_z,
                                 Fornberg_stencil_coeffs_z, centering_noz);
 
     // Device vectors of stencil coefficients used for finite-order centering
