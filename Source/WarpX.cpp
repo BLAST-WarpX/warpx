@@ -256,6 +256,8 @@ WarpX::Finalize()
 
 WarpX::WarpX ()
 {
+    warpx::initialization::initialize_warning_manager();
+
     ReadParameters();
 
     BackwardCompatibility();
@@ -465,6 +467,8 @@ WarpX::~WarpX ()
 void
 WarpX::ReadParameters ()
 {
+    namespace winit = warpx::initialization;
+
     // Ensure that geometry.dims is set properly.
     CheckDims();
 
@@ -492,32 +496,6 @@ WarpX::ReadParameters ()
 
     {
         ParmParse const pp_warpx("warpx");
-
-        //"Synthetic" warning messages may be injected in the Warning Manager via
-        // inputfile for debug&testing purposes.
-        ablastr::warn_manager::GetWMInstance().debug_read_warnings_from_input(pp_warpx);
-
-        // Set the flag to control if WarpX has to emit a warning message as soon as a warning is recorded
-        bool always_warn_immediately = false;
-        pp_warpx.query("always_warn_immediately", always_warn_immediately);
-        ablastr::warn_manager::GetWMInstance().SetAlwaysWarnImmediately(always_warn_immediately);
-
-        // Set the WarnPriority threshold to decide if WarpX has to abort when a warning is recorded
-        if(std::string str_abort_on_warning_threshold;
-            pp_warpx.query("abort_on_warning_threshold", str_abort_on_warning_threshold)){
-            std::optional<ablastr::warn_manager::WarnPriority> abort_on_warning_threshold = std::nullopt;
-            if (str_abort_on_warning_threshold == "high") {
-                abort_on_warning_threshold = ablastr::warn_manager::WarnPriority::high;
-            } else if (str_abort_on_warning_threshold == "medium" ) {
-                abort_on_warning_threshold = ablastr::warn_manager::WarnPriority::medium;
-            } else if (str_abort_on_warning_threshold == "low") {
-                abort_on_warning_threshold = ablastr::warn_manager::WarnPriority::low;
-            } else {
-                WARPX_ABORT_WITH_MESSAGE(str_abort_on_warning_threshold
-                    +"is not a valid option for warpx.abort_on_warning_threshold (use: low, medium or high)");
-            }
-            ablastr::warn_manager::GetWMInstance().SetAbortThreshold(abort_on_warning_threshold);
-        }
 
         std::vector<int> numprocs_in;
         utils::parser::queryArrWithParser(
