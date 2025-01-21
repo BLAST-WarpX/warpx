@@ -468,8 +468,6 @@ WarpX::~WarpX ()
 void
 WarpX::ReadParameters ()
 {
-    namespace winit = warpx::initialization;
-
     // Ensure that geometry.dims is set properly.
     CheckDims();
 
