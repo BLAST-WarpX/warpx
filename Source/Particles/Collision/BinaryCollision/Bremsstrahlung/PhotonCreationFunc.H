@@ -163,13 +163,13 @@ public:
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
                 soa_products_data[0].m_rdata[PIdx::w][product_index] = p_pair_reaction_weight[i];
 
-                auto& ux1 = soa_products_data[0].m_rdata[PIdx::ux][product_index];
-                auto& uy1 = soa_products_data[0].m_rdata[PIdx::uy][product_index];
-                auto& uz1 = soa_products_data[0].m_rdata[PIdx::uz][product_index];
+                amrex::ParticleReal & ux1 = soa_products_data[0].m_rdata[PIdx::ux][product_index];
+                amrex::ParticleReal & uy1 = soa_products_data[0].m_rdata[PIdx::uy][product_index];
+                amrex::ParticleReal & uz1 = soa_products_data[0].m_rdata[PIdx::uz][product_index];
 
                 // Normalize out the electron velocity and multiply by the photon momentum, E/c
                 // Also, the photon momentum is normalized by m_e
-                auto u1 = std::sqrt(ux1*ux1 + uy1*uy1 + uz1*uz1);
+                amrex::ParticleReal const u1 = std::sqrt(ux1*ux1 + uy1*uy1 + uz1*uz1);
                 ux1 *= (p_product_data[i]/PhysConst::c)/u1/PhysConst::m_e;
                 uy1 *= (p_product_data[i]/PhysConst::c)/u1/PhysConst::m_e;
                 uz1 *= (p_product_data[i]/PhysConst::c)/u1/PhysConst::m_e;
