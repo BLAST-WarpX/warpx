@@ -610,6 +610,9 @@ WarpX::InitData ()
             AddExternalFields(lev);
         }
     }
+    else {
+        ExecutePythonCallback("afterInitatRestart");
+    }
 
     if (restart_chkfile.empty() || write_diagnostics_on_restart) {
         // Write full diagnostics before the first iteration.
@@ -688,21 +691,7 @@ WarpX::InitFromScratch ()
         m_implicit_solver->Define(this);
         m_implicit_solver->GetParticleSolverParams( max_particle_its_in_implicit_scheme,
                                                     particle_tol_in_implicit_scheme );
-
-        // Add space to save the positions and velocities at the start of the time steps
-        for (auto const& pc : *mypc) {
-#if (AMREX_SPACEDIM >= 2)
-            pc->NewRealComp("x_n");
-#endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-            pc->NewRealComp("y_n");
-#endif
-            pc->NewRealComp("z_n");
-            pc->NewRealComp("ux_n");
-            pc->NewRealComp("uy_n");
-            pc->NewRealComp("uz_n");
-        }
-
+        m_implicit_solver->CreateParticleAttributes();
     }
 
     mypc->AllocData();
@@ -850,7 +839,7 @@ WarpX::computeMaxStepBoostAccelerator() {
     const Real interaction_time_boost = (len_plasma_boost-zmin_domain_boost_step_0)/
         (moving_window_v-v_plasma_boost);
     // Divide by dt, and update value of max_step.
-    const auto computed_max_step = (do_subcycling)?
+    const auto computed_max_step = (m_do_subcycling)?
         static_cast<int>(interaction_time_boost/dt[0]):
         static_cast<int>(interaction_time_boost/dt[maxLevel()]);
     max_step = computed_max_step;
@@ -977,7 +966,6 @@ WarpX::InitLevelData (int lev, Real /*time*/)
     if ((m_p_ext_field_params->B_ext_grid_type == ExternalFieldType::parse_ext_grid_function)
          && (lev > 0) && (lev <= maxlevel_extEMfield_init)) {
 
-        // TODO: raise error when EB is activated
         ComputeExternalFieldOnGridUsingParser(
             FieldType::Bfield_aux,
             m_p_ext_field_params->Bxfield_parser->compile<4>(),
@@ -990,7 +978,7 @@ WarpX::InitLevelData (int lev, Real /*time*/)
             m_p_ext_field_params->Bxfield_parser->compile<4>(),
             m_p_ext_field_params->Byfield_parser->compile<4>(),
             m_p_ext_field_params->Bzfield_parser->compile<4>(),
-            lev, PatchType::coarse, m_eb_update_E);
+            lev, PatchType::coarse, m_eb_update_B);
     }
 
     // if the input string for the E-field is "parse_e_ext_grid_function",
@@ -1262,16 +1250,13 @@ void WarpX::InitializeEBGridData (int lev)
             ScaleAreas(face_areas_lev, CellSize(lev));
 
             if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
-
+                // Compute additional quantities required for the ECT solver
+                MarkExtensionCells();
+                ComputeFaceExtensions();
                 // Mark on which grid points E should be updated
                 MarkUpdateECellsECT( m_eb_update_E[lev], edge_lengths_lev );
                 // Mark on which grid points B should be updated
                 MarkUpdateBCellsECT( m_eb_update_B[lev], face_areas_lev, edge_lengths_lev);
-
-                // Compute additional quantities required for the ECT solver
-                MarkExtensionCells();
-                ComputeFaceExtensions();
-
             } else {
 
                 // Mark on which grid points E should be updated (stair-case approximation)
@@ -1286,6 +1271,12 @@ void WarpX::InitializeEBGridData (int lev)
                     eb_fact );
 
             }
+
+            // Mark on which grid points E should be updated
+            MarkUpdateECellsECT( m_eb_update_E[lev], edge_lengths_lev );
+            // Mark on which grid points B should be updated
+            MarkUpdateBCellsECT( m_eb_update_B[lev], face_areas_lev, edge_lengths_lev);
+
         }
 
         ComputeDistanceToEB();

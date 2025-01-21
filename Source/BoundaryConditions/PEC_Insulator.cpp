@@ -69,7 +69,7 @@ namespace
         bool GuardCell = false;
         bool isInsulatorBoundary = false;
         amrex::Real sign = +1._rt;
-        bool is_normal_to_boundary;
+        bool is_normal_to_boundary = false;
         amrex::Real field_value = 0._rt;
         bool set_field = false;
         // Loop over all dimensions

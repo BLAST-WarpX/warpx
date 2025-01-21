@@ -22,11 +22,6 @@ This relies on the function ``evaluate_checksum``:
 
 .. autofunction:: checksumAPI.evaluate_checksum
 
-Here's an example:
-
-.. literalinclude:: ../../../Examples/Tests/embedded_circle/analysis.py
-   :language: python
-
 This can also be included as part of an existing analysis script.
 
 How to evaluate checksums from the command line

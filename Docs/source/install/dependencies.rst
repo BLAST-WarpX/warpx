@@ -37,7 +37,7 @@ Optional dependencies include:
 - `SENSEI 4.0.0+ <https://sensei-insitu.org>`__: for in situ analysis and visualization
 - `CCache <https://ccache.dev>`__: to speed up rebuilds (For CUDA support, needs version 3.7.9+ and 4.2+ is recommended)
 - `Ninja <https://ninja-build.org>`__: for faster parallel compiles
-- `Python 3.8+ <https://www.python.org>`__
+- `Python 3.9+ <https://www.python.org>`__
 
   - `mpi4py <https://mpi4py.readthedocs.io>`__
   - `numpy <https://numpy.org>`__
