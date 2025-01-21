@@ -1013,6 +1013,12 @@ public:
     void InitEB ();
 
 #ifdef AMREX_USE_EB
+
+    /** TODO */
+    void MarkReducedShapeCells (
+        std::unique_ptr<amrex::iMultiFab> & eb_reduce_particle_shape,
+        amrex::EBFArrayBoxFactory const & eb_fact );
+
     /** \brief Set a flag to indicate on which grid points the field `field`
      *  should be updated, depending on their position relative to the embedded boundary.
      *

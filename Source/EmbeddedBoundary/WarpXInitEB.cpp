@@ -292,6 +292,92 @@ WarpX::ScaleAreas (ablastr::fields::VectorField& face_areas,
 }
 
 void
+WarpX::MarkReducedShapeCells (
+    std::unique_ptr<amrex::iMultiFab> & eb_reduce_particle_shape,
+    amrex::EBFArrayBoxFactory const & eb_fact )
+{
+
+    // TODO: handle guard cells:
+    // - Allocate as many cells as rho/J
+    // - Initialize to 1
+    // - Call Redistribute
+
+    // Extract structures for embedded boundaries
+    amrex::FabArray<amrex::EBCellFlagFab> const& eb_flag = eb_fact.getMultiEBCellFlagFab();
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(*eb_reduce_particle_shape); mfi.isValid(); ++mfi) {
+
+        const amrex::Box& box = mfi.tilebox();
+        amrex::Array4<int> const & eb_reduce_particle_shape_arr = eb_reduce_particle_shape->array(mfi);
+
+        // Check if the box (including one layer of guard cells) contains a mix of covered and regular cells
+        const amrex::Box& eb_info_box = mfi.tilebox(amrex::IntVect::TheCellVector()).grow(1);
+        amrex::FabType const fab_type = eb_flag[mfi].getType( eb_info_box );
+
+        if (fab_type == amrex::FabType::regular) { // All cells in the box are regular
+
+            // Every cell in box is regular: do not reduce particle shape in any cell
+            amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                eb_reduce_particle_shape_arr(i, j, k) = 0;
+            });
+
+        } else if (fab_type == amrex::FabType::covered) { // All cells in the box are covered
+
+            // Every cell in box is fully covered: reduce particle shape
+            amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                eb_reduce_particle_shape_arr(i, j, k) = 1;
+            });
+
+        } else { // The box contains a mix of covered and regular cells
+
+            auto const & flag = eb_flag[mfi].array();
+
+            amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+
+                // Check if any of the neighboring cells are either partially or fully covered
+                // In this case, reduce particle shape to order 1
+                // (This ensures that the particle never deposits any charge in a partially or
+                // fully covered cell, even with higher-order shapes)
+                int const i_start = i-1;
+                int const i_end = i+1;
+#if AMREX_SPACEDIM > 1
+                int const j_start = j-1;
+                int const j_end = j+1;
+#else
+                int const j_start = j;
+                int const j_end = j;
+#endif
+#if AMREX_SPACEDIM > 2
+                int const k_start = k-1;
+                int const k_end = k+1;
+#else
+                int const k_start = k;
+                int const k_end = k;
+#endif
+                int reduce_shape = 0;
+                for (int i_cell = i_start; i_cell <= i_end; ++i_cell) {
+                    for (int j_cell = j_start; j_cell <= j_end; ++j_cell) {
+                        for (int k_cell = k_start; k_cell <= k_end; ++k_cell) {
+                            // `isRegular` returns `false` if the cell is either partially or fully covered.
+                            if ( !flag(i_cell, j_cell, k_cell).isRegular() ) {
+                                reduce_shape = 1;
+                            }
+                        }
+                    }
+                }
+                eb_reduce_particle_shape_arr(i, j, k) = reduce_shape;
+            });
+
+        }
+
+    }
+
+}
+
+void
 WarpX::MarkUpdateCellsStairCase (
     std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update,
     ablastr::fields::VectorField const& field,
