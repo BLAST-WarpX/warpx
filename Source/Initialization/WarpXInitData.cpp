@@ -1270,11 +1270,6 @@ void WarpX::InitializeEBGridData (int lev)
                     eb_fact );
             }
 
-            // Mark on which grid points E should be updated
-            MarkUpdateECellsECT( m_eb_update_E[lev], edge_lengths_lev );
-            // Mark on which grid points B should be updated
-            MarkUpdateBCellsECT( m_eb_update_B[lev], face_areas_lev, edge_lengths_lev);
-
         }
 
         ComputeDistanceToEB();
