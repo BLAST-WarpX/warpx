@@ -118,44 +118,6 @@ bool WriteBinaryDataOnFile(const std::string& filename, const amrex::Vector<char
 
 }
 
-namespace WarpXUtilAlgo{
-
-/** \brief Compute physical coordinates (x,y,z) that correspond to a given (i,j,k) and
- *  the corresponding staggering, mf_type.
- *
- * \param[in] i    index along x
- * \param[in] j    index along y
- * \param[in] k    index along z
- * \param[in] mf_type GpuArray containing the staggering type to convert (i,j,k) to (x,y,z)
- * \param[in] domain_lo Physical coordinates of the lowest corner of the simulation domain
- * \param[in] dx   Cell size of the simulation domain
- *
- * \param[out] x   physical coordinate along x
- * \param[out] y   physical coordinate along y
- * \param[out] z   physical coordinate along z
- */
-AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void getCellCoordinates (int i, int j, int k,
-                         amrex::GpuArray<int, 3> const mf_type,
-                         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const domain_lo,
-                         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const dx,
-                         amrex::Real &x, amrex::Real &y, amrex::Real &z)
-{
-    using namespace amrex::literals;
-    x = domain_lo[0] + i*dx[0] + (1._rt - mf_type[0]) * dx[0]*0.5_rt;
-#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-    amrex::ignore_unused(j);
-    y = 0._rt;
-    z = domain_lo[1] + k*dx[1] + (1._rt - mf_type[1]) * dx[1]*0.5_rt;
-#else
-    y = domain_lo[1] + j*dx[1] + (1._rt - mf_type[1]) * dx[1]*0.5_rt;
-    z = domain_lo[2] + k*dx[2] + (1._rt - mf_type[2]) * dx[2]*0.5_rt;
-#endif
-}
-
-}
-
-
 namespace WarpXUtilLoadBalance
 {
     /** \brief We only want to update the cost data if the grids we are working on
