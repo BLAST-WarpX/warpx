@@ -25,6 +25,10 @@ namespace warpx::initialization
      * - the MPI library through the mpi_finalize helper function in ablastr
      */
     void finalize_external_libraries();
+
+    /** Check that warpx.dims matches the binary name
+    */
+    void check_dims ();
 }
 
 #endif //WARPX_INIT_H_

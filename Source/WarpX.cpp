@@ -36,6 +36,7 @@
 #include "FieldSolver/WarpX_FDTD.H"
 #include "Filter/NCIGodfreyFilter.H"
 #include "Initialization/ExternalField.H"
+#include "Initialization/WarpXInit.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
@@ -214,7 +215,7 @@ namespace
 
 void WarpX::MakeWarpX ()
 {
-    ParseGeometryInput();
+    warpx::initialization::check_dims();
 
     ReadMovingWindowParameters(
         do_moving_window, start_moving_window_step, end_moving_window_step,
@@ -467,8 +468,6 @@ WarpX::~WarpX ()
 void
 WarpX::ReadParameters ()
 {
-    // Ensure that geometry.dims is set properly.
-    CheckDims();
 
     {
         const ParmParse pp;// Traditionally, max_step and stop_time do not have prefix.
@@ -489,6 +488,19 @@ WarpX::ReadParameters ()
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT && !EB::enabled()) {
             throw std::runtime_error("ECP Solver requires to enable embedded boundaries at runtime.");
         }
+#ifdef WARPX_DIM_RZ
+        if (electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD)
+        {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(Geom(0).ProbLo(0) == 0.,
+                "Lower bound of radial coordinate (prob_lo[0]) with RZ PSATD solver must be zero");
+        }
+        else
+        {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(Geom(0).ProbLo(0) >= 0.,
+            "Lower bound of radial coordinate (prob_lo[0]) with RZ FDTD solver must be non-negative");
+        }
+#endif
+
         pp_algo.query_enum_sloppy("evolve_scheme", evolve_scheme, "-_");
     }
 
@@ -3333,14 +3345,6 @@ WarpX::isAnyParticleBoundaryThermal ()
     return false;
 }
 
-std::string
-TagWithLevelSuffix (std::string name, int const level)
-{
-    // Add the suffix "[level=level]"
-    name.append("[level=").append(std::to_string(level)).append("]");
-    return name;
-}
-
 void
 WarpX::AllocInitMultiFab (
     std::unique_ptr<amrex::iMultiFab>& mf,
@@ -3352,7 +3356,8 @@ WarpX::AllocInitMultiFab (
     const std::string& name,
     std::optional<const int> initial_value)
 {
-    const auto name_with_suffix = TagWithLevelSuffix(name, level);
+    // Add the suffix "[level=level]"
+    const auto name_with_suffix = name + "[level=" + std::to_string(level) + "]";
     const auto tag = amrex::MFInfo().SetTag(name_with_suffix);
     mf = std::make_unique<amrex::iMultiFab>(ba, dm, ncomp, ngrow, tag);
     if (initial_value) {
