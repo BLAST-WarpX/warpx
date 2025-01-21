@@ -197,7 +197,7 @@ def secondary_emission():
                 Ne_sec = (
                     sigma_int + 1
                 )  # number of the secondary electrons to be emitted
-                for i_elec in [0, Ne_sec - 1]:
+                for _ in range(Ne_sec):
                     xe = np.array([])
                     ye = np.array([])
                     ze = np.array([])
