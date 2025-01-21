@@ -1446,6 +1446,12 @@ private:
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_E;
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_B;
 
+    /** EB: Flag to indicate whether particles should use order-1 shape factor in a given cell,
+     * when depositing charge/current. This is needed with the EM solver, in order to avoid
+     * error in charge conservation when a particle is too close to the embedded boundary.
+     */
+    amrex::Vector<  std::unique_ptr<amrex::iMultiFab> > m_eb_reduce_particle_shape;
+
     /** EB: for every mesh face flag_info_face contains a:
      *          * 0 if the face needs to be extended
      *          * 1 if the face is large enough to lend area to other faces
