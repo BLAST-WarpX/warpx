@@ -93,7 +93,10 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
 
         // Extract structures indicating where the fields
-        // should be updated, given the position of the embedded boundaries
+        // should be updated, given the position of the embedded boundaries.
+        // The plasma current is stored at the same locations as the E-field,
+        // therefore the `eb_update_E` multifab also appropriately specifies
+        // where the plasma current should be calculated.
         amrex::Array4<int> update_Jr_arr, update_Jt_arr, update_Jz_arr;
         if (EB::enabled()) {
             update_Jr_arr = eb_update_E[0]->array(mfi);
@@ -281,7 +284,10 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
         Array4<Real const> const &Bz = Bfield[2]->const_array(mfi);
 
         // Extract structures indicating where the fields
-        // should be updated, given the position of the embedded boundaries
+        // should be updated, given the position of the embedded boundaries.
+        // The plasma current is stored at the same locations as the E-field,
+        // therefore the `eb_update_E` multifab also appropriately specifies
+        // where the plasma current should be calculated.
         amrex::Array4<int> update_Jx_arr, update_Jy_arr, update_Jz_arr;
         if (EB::enabled()) {
             update_Jx_arr = eb_update_E[0]->array(mfi);
