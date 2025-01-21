@@ -160,13 +160,17 @@ vy = uy / gamma
 xx = xx + dt0 * vx
 yy = yy + dt1 * vy
 
-print(f"Error in x position is {abs(np.abs((xx - xx_sim)/xx))}, which should be < 0.02")
-print(f"Error in y position is {abs(np.abs((yy - yy_sim)/yy))}, which should be < 0.02")
 print(
-    f"Error in x velocity is {abs(np.abs((ux - ux_sim)/ux))}, which should be < 0.002"
+    f"Error in x position is {abs(np.abs((xx - xx_sim) / xx))}, which should be < 0.02"
 )
 print(
-    f"Error in y velocity is {abs(np.abs((uy - uy_sim)/uy))}, which should be < 0.002"
+    f"Error in y position is {abs(np.abs((yy - yy_sim) / yy))}, which should be < 0.02"
+)
+print(
+    f"Error in x velocity is {abs(np.abs((ux - ux_sim) / ux))}, which should be < 0.002"
+)
+print(
+    f"Error in y velocity is {abs(np.abs((uy - uy_sim) / uy))}, which should be < 0.002"
 )
 
 if plasma_lens_lengths[0] < 0.01:

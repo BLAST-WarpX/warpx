@@ -101,9 +101,9 @@ zza[1] = do_periodic(zza[1])
 assert len(a_id) == 1, "Absorbing particles not absorbed"
 assert np.all(vx == -vx0), "Reflecting particle velocity not correct"
 assert np.all(vz == +vz0), "Periodic particle velocity not correct"
-assert np.all(
-    np.abs((xx - xxa) / xx) < 1.0e-15
-), "Reflecting particle position not correct"
-assert np.all(
-    np.abs((zz - zza) / zz) < 1.0e-15
-), "Periodic particle position not correct"
+assert np.all(np.abs((xx - xxa) / xx) < 1.0e-15), (
+    "Reflecting particle position not correct"
+)
+assert np.all(np.abs((zz - zza) / zz) < 1.0e-15), (
+    "Periodic particle position not correct"
+)

@@ -69,7 +69,7 @@ And since Lawrencium does not yet provide a module for them, install ADIOS2, BLA
    cmake -S src/lapackpp -B src/lapackpp-v100-build -DCMAKE_CXX_STANDARD=17 -Dgpu_backend=cuda -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=$HOME/sw/v100/lapackpp-master -Duse_cmake_find_lapack=ON -DBLAS_LIBRARIES=${LAPACK_DIR}/lib/libblas.a -DLAPACK_LIBRARIES=${LAPACK_DIR}/lib/liblapack.a
    cmake --build src/lapackpp-v100-build --target install --parallel 12
 
-Optionally, download and install Python packages for :ref:`PICMI <usage-picmi>` or dynamic ensemble optimizations (:ref:`libEnsemble <libensemble>`):
+Optionally, download and install Python packages for :ref:`PICMI <usage-picmi>` or dynamic ensemble optimizations (`libEnsemble <https://libensemble.readthedocs.io/en/main/>`__):
 
 .. code-block:: bash
 

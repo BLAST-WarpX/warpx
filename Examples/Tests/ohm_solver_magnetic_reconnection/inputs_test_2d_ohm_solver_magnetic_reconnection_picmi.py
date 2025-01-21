@@ -83,14 +83,14 @@ class ForceFreeSheetReconnection(object):
         self.Bg *= self.B0
         self.dB *= self.B0
         self.Bx = (
-            f"{self.B0}*tanh(z*{1.0/self.l_i})"
-            f"+{-self.dB*self.Lx/(2.0*self.Lz)}*cos({2.0*np.pi/self.Lx}*x)"
-            f"*sin({np.pi/self.Lz}*z)"
+            f"{self.B0}*tanh(z*{1.0 / self.l_i})"
+            f"+{-self.dB * self.Lx / (2.0 * self.Lz)}*cos({2.0 * np.pi / self.Lx}*x)"
+            f"*sin({np.pi / self.Lz}*z)"
         )
         self.By = (
-            f"sqrt({self.Bg**2 + self.B0**2}-" f"({self.B0}*tanh(z*{1.0/self.l_i}))**2)"
+            f"sqrt({self.Bg**2 + self.B0**2}-({self.B0}*tanh(z*{1.0 / self.l_i}))**2)"
         )
-        self.Bz = f"{self.dB}*sin({2.0*np.pi/self.Lx}*x)*cos({np.pi/self.Lz}*z)"
+        self.Bz = f"{self.dB}*sin({2.0 * np.pi / self.Lx}*x)*cos({np.pi / self.Lz}*z)"
 
         self.J0 = self.B0 / constants.mu0 / self.l_i
 
@@ -103,7 +103,7 @@ class ForceFreeSheetReconnection(object):
         if comm.rank == 0:
             print(
                 f"Initializing simulation with input parameters:\n"
-                f"\tTi = {self.Ti*1e-3:.1f} keV\n"
+                f"\tTi = {self.Ti * 1e-3:.1f} keV\n"
                 f"\tn0 = {self.n_plasma:.1e} m^-3\n"
                 f"\tB0 = {self.B0:.2f} T\n"
                 f"\tM/m = {self.m_ion:.0f}\n"
@@ -117,7 +117,7 @@ class ForceFreeSheetReconnection(object):
             )
             print(
                 f"Numerical parameters:\n"
-                f"\tdz = {self.Lz/self.NZ:.1e} m\n"
+                f"\tdz = {self.Lz / self.NZ:.1e} m\n"
                 f"\tdt = {self.dt:.1e} s\n"
                 f"\tdiag steps = {self.diag_steps:d}\n"
                 f"\ttotal steps = {self.total_steps:d}\n"

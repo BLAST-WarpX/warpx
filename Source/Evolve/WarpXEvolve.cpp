@@ -187,7 +187,7 @@ WarpX::Evolve (int numsteps)
             OneStep_multiJ(cur_time);
         }
         // Electromagnetic case: no subcycling or no mesh refinement
-        else if ( !do_subcycling || (finest_level == 0))
+        else if ( !m_do_subcycling || (finest_level == 0))
         {
             OneStep_nosub(cur_time);
             // E: guard cells are up-to-date
@@ -195,14 +195,14 @@ WarpX::Evolve (int numsteps)
             // F: guard cells are NOT up-to-date
         }
         // Electromagnetic case: subcycling with one level of mesh refinement
-        else if (do_subcycling && (finest_level == 1))
+        else if (m_do_subcycling && (finest_level == 1))
         {
             OneStep_sub1(cur_time);
         }
         else
         {
             WARPX_ABORT_WITH_MESSAGE(
-                "do_subcycling = " + std::to_string(do_subcycling)
+                "do_subcycling = " + std::to_string(m_do_subcycling)
                 + " is an unsupported do_subcycling type.");
         }
 
