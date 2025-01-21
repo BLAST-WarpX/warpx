@@ -186,7 +186,7 @@ def secondary_emission():
             buffer.get_particle_boundary_buffer("ions", "eb", "deltaTimeScraped", lev)
         )
         energy_ions = 0.5 * proton_mass * w * (ux**2 + uy**2 + uz**2)
-        energy_ions_in_kEv = energy_ions / (1.602176634e-19 * 1000)
+        energy_ions_in_kEv = energy_ions / (e * 1000)
         sigma_nascap_ions = sigma_nascap(energy_ions_in_kEv, delta_H, E_HMax)
         # Loop over all ions in the EB buffer
         for i in range(0, n):
@@ -197,7 +197,7 @@ def secondary_emission():
                 Ne_sec = (
                     sigma_int + 1
                 )  # number of the secondary electrons to be emitted
-                for j in [0, Ne_sec - 1]:
+                for i_elec in [0, Ne_sec - 1]:
                     xe = np.array([])
                     ye = np.array([])
                     ze = np.array([])
