@@ -346,7 +346,7 @@ WarpX::MarkUpdateCellsStairCase (
                     // of the `eb_update_arr` in each direction.
                     // If `eb_update_arr` is nodal in a given direction, we need to check the cells
                     // to the left and right of this nodal gridpoint.
-                    // For instance, if `eb_update_arr` is nodal in the first dimension, we
+                    // For instance, if `eb_update_arr` is nodal in the first dimension, we need
                     // to check the cells at index i-1 and at index i, since, with AMReX indexing conventions,
                     // these are the neighboring cells for the nodal gripoint at index i.
                     // If `eb_update_arr` is cell-centerd in a given direction, we only need to check
