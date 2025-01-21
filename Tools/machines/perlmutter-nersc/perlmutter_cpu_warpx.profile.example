@@ -7,7 +7,7 @@ if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in yo
 
 # required dependencies
 module load cpu
-module load cmake/3.24.3
+module load cmake/3.30.2
 module load cray-fftw/3.3.10.6
 
 # optional: for QED support with detailed tables

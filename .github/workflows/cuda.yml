@@ -7,6 +7,7 @@ on:
   pull_request:
     paths-ignore:
       - "Docs/**"
+      - "**.rst"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-cuda
@@ -126,7 +127,7 @@ jobs:
         which nvcc || echo "nvcc not in PATH!"
 
         git clone https://github.com/AMReX-Codes/amrex.git ../amrex
-        cd ../amrex && git checkout --detach b3f67385e62f387b548389222840486c0fffca57 && cd -
+        cd ../amrex && git checkout --detach e761abff95afbfa442cbe108027094bbddef5b11 && cd -
         make COMP=gcc QED=FALSE USE_MPI=TRUE USE_GPU=TRUE USE_OMP=FALSE USE_FFT=TRUE USE_CCACHE=TRUE -j 4
 
         ccache -s

@@ -3,7 +3,9 @@ FILE = inputs_base_3d
 
 # Test with electrons/positrons: use parse_density_function
 
-beam1.species_type = electron
+particles.photon_species = beam1 beam2
+
+beam1.species_type = photon
 beam1.injection_style = "NUniformPerCell"
 beam1.num_particles_per_cell_each_dim = 1 1 1
 beam1.profile = parse_density_function
@@ -15,7 +17,7 @@ beam1.ymax =  4*sigmay
 beam1.zmin =-muz-4*sigmaz
 beam1.zmax =-muz+4*sigmaz
 
-beam2.species_type = positron
+beam2.species_type = photon
 beam2.injection_style = "NUniformPerCell"
 beam2.num_particles_per_cell_each_dim = 1 1 1
 beam2.profile = parse_density_function
