@@ -188,31 +188,49 @@ FlushFormatCheckpoint::CheckpointParticles (
 
         Vector<std::string> real_names;
         Vector<std::string> int_names;
+        Vector<int> write_real_comps;
+        Vector<int> write_int_comps;
 
         // note: positions skipped here, since we reconstruct a plotfile SoA from them
-        real_names.push_back("weight");
-        real_names.push_back("momentum_x");
-        real_names.push_back("momentum_y");
-        real_names.push_back("momentum_z");
-
+        std::vector<std::string> const fixed_names = {"weight",
+                                                      "momentum_x",
+                                                      "momentum_y",
+                                                      "momentum_z"
 #ifdef WARPX_DIM_RZ
-        real_names.push_back("theta");
+                                                      ,"theta"
 #endif
+                                                      };
+
+        for (auto const& name : fixed_names) {
+            real_names.push_back(name);
+            write_real_comps.push_back(1);
+        }
+
+        int const compile_time_comps = static_cast<int>(real_names.size());
 
         // get the names of the real comps
         //   note: skips the mandatory AMREX_SPACEDIM positions for pure SoA
         real_names.resize(pc->NumRealComps() - AMREX_SPACEDIM);
+        write_real_comps.resize(pc->NumRealComps() - AMREX_SPACEDIM);
         auto runtime_rnames = pc->getParticleRuntimeComps();
         for (auto const& x : runtime_rnames) {
-            real_names[x.second + PIdx::nattribs - AMREX_SPACEDIM] = x.first;
+            int const i = x.second + PIdx::nattribs - AMREX_SPACEDIM;
+            real_names[i] = x.first;
+            write_real_comps[i] = pc->h_redistribute_real_comp[i + compile_time_comps];
         }
 
         // and the int comps
         int_names.resize(pc->NumIntComps());
+        write_int_comps.resize(pc->NumIntComps());
         auto runtime_inames = pc->getParticleRuntimeiComps();
-        for (auto const& x : runtime_inames) { int_names[x.second+0] = x.first; }
+        for (auto const& x : runtime_inames) {
+            int const i = x.second + 0;
+            int_names[i] = x.first;
+            write_int_comps[i] = pc->h_redistribute_int_comp[i+AMREX_SPACEDIM];
+        }
 
-        pc->Checkpoint(dir, part_diag.getSpeciesName(), true,
+        pc->Checkpoint(dir, part_diag.getSpeciesName(),
+                       write_real_comps, write_int_comps,
                        real_names, int_names);
     }
 }
