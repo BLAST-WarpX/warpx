@@ -388,6 +388,13 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                amrex::ParticleReal xp, yp, zp;
                getPosition(ip, xp, yp, zp);
                
+                Ex_particle_arr[ip] = 0._rt;
+                Ey_particle_arr[ip] = 0._rt;
+                Ez_particle_arr[ip] = 0._rt;
+                Bx_particle_arr[ip] = 0._rt;
+                By_particle_arr[ip] = 0._rt;
+                Bz_particle_arr[ip] = 0._rt;
+
                doGatherShapeN(
                     xp, yp, zp, 
                     Ex_particle_arr[ip], Ey_particle_arr[ip], Ez_particle_arr[ip], 
