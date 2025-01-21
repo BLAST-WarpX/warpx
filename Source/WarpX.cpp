@@ -3314,14 +3314,6 @@ WarpX::isAnyParticleBoundaryThermal ()
     return false;
 }
 
-std::string
-TagWithLevelSuffix (std::string name, int const level)
-{
-    // Add the suffix "[level=level]"
-    name.append("[level=").append(std::to_string(level)).append("]");
-    return name;
-}
-
 void
 WarpX::AllocInitMultiFab (
     std::unique_ptr<amrex::iMultiFab>& mf,
@@ -3333,7 +3325,8 @@ WarpX::AllocInitMultiFab (
     const std::string& name,
     std::optional<const int> initial_value)
 {
-    const auto name_with_suffix = TagWithLevelSuffix(name, level);
+    // Add the suffix "[level=level]"
+    const auto name_with_suffix = name + "[level=" + std::to_string(level) + "]";
     const auto tag = amrex::MFInfo().SetTag(name_with_suffix);
     mf = std::make_unique<amrex::iMultiFab>(ba, dm, ncomp, ngrow, tag);
     if (initial_value) {
