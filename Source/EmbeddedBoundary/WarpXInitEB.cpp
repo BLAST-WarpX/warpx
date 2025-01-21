@@ -339,30 +339,39 @@ WarpX::MarkUpdateCellsStairCase (
 
                 amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
 
-                    // Stair-case approximation: If neighboring cells are either partially
-                    // or fully covered: do not update field
+                    // Stair-case approximation: If neighboring cells of this gridpoint
+                    // are either partially or fully covered: do not update field
 
-                    // Check neighbors in the each spatial direction
-                    // If nodal in a given direction, we need to start from -1 (left-neighboring cell)
-                    int const i_start = ( index_type.nodeCentered(0) )? -1 : 0;
+                    // The number of cells that we need to check depend on the index type
+                    // of the `eb_update_arr` in each direction.
+                    // If `eb_update_arr` is nodal in a given direction, we need to check the cells
+                    // to the left and right of this nodal gridpoint.
+                    // For instance, if `eb_update_arr` is nodal in the first dimension, we
+                    // to check the cells at index i-1 and at index i, since, with AMReX indexing conventions,
+                    // these are the neighboring cells for the nodal gripoint at index i.
+                    // If `eb_update_arr` is cell-centerd in a given direction, we only need to check
+                    // the cell at the same position (e.g., in the first dimension: the cell at index i).
+                    int const i_start = ( index_type.nodeCentered(0) )? i-1 : i;
 #if AMREX_SPACEDIM > 1
-                    int const j_start = ( index_type.nodeCentered(1) )? -1 : 0;
+                    int const j_start = ( index_type.nodeCentered(1) )? j-1 : j;
 #else
-                    int const j_start = 0;
+                    int const j_start = j;
 #endif
 #if AMREX_SPACEDIM > 2
-                    int const k_start = ( index_type.nodeCentered(2) )? -1 : 0;
+                    int const k_start = ( index_type.nodeCentered(2) )? k-1 : k;
 #else
-                    int const k_start = 0;
+                    int const k_start = k;
 #endif
                     // Loop over neighboring cells
                     int eb_update = 1;
-                    for (int i_shift = i_start; i_shift <= 0; ++i_shift) {
-                        for (int j_shift = j_start; j_shift <= 0; ++j_shift) {
-                            for (int k_shift = k_start; k_shift <= 0; ++k_shift) {
+                    for (int i_cell = i_start; i_cell <= i; ++i_cell) {
+                        for (int j_cell = j_start; j_cell <= j; ++j_cell) {
+                            for (int k_cell = k_start; k_cell <= k; ++k_cell) {
                                 // If one of the neighboring is either partially or fully covered
                                 // (i.e. if they are not regular cells), do not update field
-                                if ( !flag(i+i_shift, j+j_shift, k+k_shift).isRegular() ) {
+                                // (Note that `flag` is a cell-centered object, and `isRegular`
+                                // returns `false` if the cell is either partially or fully covered.)
+                                if ( !flag(i_cell, j_cell, k_cell).isRegular() ) {
                                     eb_update = 0;
                                 }
                             }
