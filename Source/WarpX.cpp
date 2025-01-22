@@ -3250,8 +3250,11 @@ void WarpX::AllocateCenteringCoefficients (amrex::Gpu::DeviceVector<amrex::Real>
     );
     ::ReorderFornbergCoefficients(host_centering_stencil_coeffs_y,
                                 Fornberg_stencil_coeffs_y, centering_noy);
-    ::ReorderFornbergCoefficients(host_centering_stencil_coeffs_z,
-                                Fornberg_stencil_coeffs_z, centering_noz);
+    ::ReorderFornbergCoefficients(
+        host_centering_stencil_coeffs_z,
+        Fornberg_stencil_coeffs_z,
+        centering_noz
+    );
 
     // Device vectors of stencil coefficients used for finite-order centering
 
