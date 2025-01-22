@@ -173,7 +173,7 @@ struct CopyAndTimestamp {
     int m_delta_index;
     int m_normal_index;
     int m_step;
-    const amrex::Real m_dt;
+    amrex::Real m_dt;
     int m_idim;
     int m_iside;
 
