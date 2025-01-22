@@ -145,16 +145,7 @@ def sigma_nascap(energy_kEv, delta_H, E_HMax):
     Returns:
     - numpy array, computed probability sigma_nascap
     """
-    sigma_nascap = np.array(
-        [
-            (
-                delta_H * (E_HMax + 1.0) / (E_HMax + energy) * np.sqrt(energy)
-                if energy > 0.0
-                else 0.0
-            )
-            for energy in energy_kEv
-        ]
-    )
+    sigma_nascap = np.array([(delta_H * (E_HMax + 1.0) / (E_HMax + energy) * np.sqrt(energy) if energy > 0.0 else 0.0) for energy in energy_kEv])
     return sigma_nascap
 
 
