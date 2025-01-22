@@ -162,6 +162,12 @@ public:
     HybridPICModel& GetHybridPICModel () { return *m_hybrid_pic_model; }
     [[nodiscard]] HybridPICModel * get_pointer_HybridPICModel () const { return m_hybrid_pic_model.get(); }
     MultiDiagnostics& GetMultiDiags () {return *multi_diags;}
+#ifdef AMREX_USE_EB
+    ablastr::fields::MultiLevelScalarField GetDistanceToEB () {
+        using warpx::fields::FieldType;
+        return m_fields.get_mr_levels(FieldType::distance_to_eb, finestLevel());
+    }
+#endif
     ParticleBoundaryBuffer& GetParticleBoundaryBuffer () { return *m_particle_boundary_buffer; }
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag() { return m_eb_update_E; }
 

@@ -1233,8 +1233,6 @@ void WarpX::InitializeEBGridData (int lev)
         {
             using warpx::fields::FieldType;
 
-            auto const eb_fact = fieldEBFactory(lev);
-
             if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
 
                 auto edge_lengths_lev = m_fields.get_alldirs(FieldType::edge_lengths, lev);
