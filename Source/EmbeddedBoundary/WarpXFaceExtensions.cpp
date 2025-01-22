@@ -73,7 +73,6 @@ namespace
     }
 
 
-#ifdef AMREX_USE_EB
     /**
     * \brief Compute the minimal area for stability for the face i, j, k with normal 'dim'.
     * (wrapper to allow using ComputeSStab as a non-templated function, by passing 'dim' as an argument)
@@ -83,7 +82,7 @@ namespace
     * \param[in] dx, dy, dz the mesh with in each direction
     * \param[in] dim normal direction to the plane in consideration (0 for x, 1 for y, 2 for z)
     */
-   [[nodiscard]]
+   [[nodiscard]] [[maybe_unused]]
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     amrex::Real
     ComputeSStab(const int i, const int j, const int k,
@@ -104,8 +103,6 @@ namespace
         }
         return -1;
     }
-
-#endif
 
 
     /**
