@@ -744,24 +744,25 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             bool close_to_eb_new = false;
 #ifdef AMREX_USE_EB
             // Check whether the particle is close to the EB at the old and new position
-            // TODO: abstract in a separate function (doGatherScalarFieldNodal)
-            // TODO: check calculation for RZ
-            {
-                WarpXParticleContainer::SuperParticleType p;
-                set_particle_position( p, x_old, y_old, z_old);
-                close_to_eb_old = eb_reduce_particle_shape(
-                    lo.x + int(p.pos(0)),
-                    lo.y + int(p.pos(1)),
-                    lo.z + int(p.pos(2)));
-            }
-            {
-                WarpXParticleContainer::SuperParticleType p;
-                set_particle_position( p, x_new, y_new, z_new);
-                close_to_eb_new = eb_reduce_particle_shape(
-                    lo.x + int(p.pos(0)),
-                    lo.y + int(p.pos(1)),
-                    lo.z + int(p.pos(2)));
-            }
+#if defined(WARPX_DIM_3D)
+            close_to_eb_old = eb_reduce_particle_shape(
+                lo.x + int(x_old),
+                lo.y + int(y_old),
+                lo.z + int(z_old));
+            close_to_eb_new = eb_reduce_particle_shape(
+                lo.x + int(x_new),
+                lo.y + int(y_new),
+                lo.z + int(z_new));
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+            close_to_eb_old = eb_reduce_particle_shape(
+                lo.x + int(x_old),
+                lo.y + int(z_old),
+                0);
+            close_to_eb_new = eb_reduce_particle_shape(
+                lo.x + int(x_new),
+                lo.y + int(z_new),
+                0);
+#endif
 #endif
 
 #if defined(WARPX_DIM_RZ)
