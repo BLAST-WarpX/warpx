@@ -29,7 +29,7 @@ y_analytic = 0.00000
 z_analytic = -0.20531
 
 print("NUMERICAL coordinates of the point of contact:")
-print(f"x={x:5.5f}, y={y:5.5f}, z={z:5.5f}")
+print(f"x={x[0]:5.5f}, y={y[0]:5.5f}, z={z[0]:5.5f}")
 print("\n")
 print("ANALYTICAL coordinates of the point of contact:")
 print(f"x={x_analytic:5.5f}, y={y_analytic:5.5f}, z={z_analytic:5.5f}")
