@@ -53,6 +53,24 @@ void get_particle_position (const WarpXParticleContainer::SuperParticleType& p,
 #endif
 }
 
+template<typename T_PIdx = PIdx>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void set_particle_position (WarpXParticleContainer::SuperParticleType& p,
+                            amrex::ParticleReal const& x,
+                            amrex::ParticleReal const& y,
+                            amrex::ParticleReal const& z) noexcept
+{
+#if defined(WARPX_DIM_RZ)
+    p.pos(PIdx::x) = std::sqrt(x*x + y*y);
+#elif defined(WARPX_DIM_3D)
+    p.pos(PIdx::x) = x;
+    p.pos(PIdx::y) = y;
+#elif defined(WARPX_DIM_XZ)
+    p.pos(PIdx::x) = x;
+#endif
+    p.pos(PIdx::z) = z;
+}
+
 /** \brief Functor that can be used to extract the positions of the macroparticles
  *         inside a ParallelFor kernel
  *

@@ -658,7 +658,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                   amrex::Dim3 lo,
                                   amrex::Real q,
 #ifdef AMREX_USE_EB
-                                  const amrex::Array4<const amrex::Real>& distance_to_eb_arr,
+                                  const amrex::Array4<const int>& eb_reduce_particle_shape,
                                   const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& eb_dxi,
                                   const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& eb_plo,
 #endif
@@ -749,20 +749,22 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             // TODO: abstract in a separate function (doGatherScalarFieldNodal)
             // TODO: check calculation for RZ
             {
-                const amrex::Real distance = ablastr::particles::doGatherScalarFieldNodal(
+                WarpXParticleContainer::SuperParticleType p;
+                set_particle_position( p,
                     xp + (relative_time - 0.5_rt*dt)*uxp[ip]*gaminv,
                     yp + (relative_time - 0.5_rt*dt)*uyp[ip]*gaminv,
-                    zp + (relative_time - 0.5_rt*dt)*uzp[ip]*gaminv,
-                    distance_to_eb_arr, eb_dxi, eb_plo );
-                close_to_eb_old = (distance < 1.0_rt); // TODO: tune depth
+                    zp + (relative_time - 0.5_rt*dt)*uzp[ip]*gaminv );
+                const auto [ii, jj, kk] = amrex::getParticleCell(p, eb_plo, eb_dxi).dim3();
+                close_to_eb_old = (eb_reduce_particle_shape(ii,jj,kk) == 1);
             }
             {
-                const amrex::Real distance = ablastr::particles::doGatherScalarFieldNodal(
+                WarpXParticleContainer::SuperParticleType p;
+                set_particle_position( p,
                     xp + (relative_time + 0.5_rt*dt)*uxp[ip]*gaminv,
                     yp + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv,
-                    zp + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv,
-                    distance_to_eb_arr, eb_dxi, eb_plo );
-                close_to_eb_new = (distance < 1.0_rt); // TODO: tune depth
+                    zp + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv );
+                const auto [ii, jj, kk] = amrex::getParticleCell(p, eb_plo, eb_dxi).dim3();
+                close_to_eb_new = (eb_reduce_particle_shape(ii,jj,kk) == 1);
             }
 #endif
 
