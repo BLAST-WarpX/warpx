@@ -168,11 +168,7 @@ class FiniteDifferenceSolver
           *
           * \param[out] Jfield  vector of current MultiFabs at a given level
           * \param[in] Bfield   vector of magnetic field MultiFabs at a given level
-<<<<<<< HEAD
           * \param[in] eb_update_E indicate in which cell E should be updated (related to embedded boundaries)
-=======
-          * \param[in] eb_update_E indicate in which cell E should be udpated (related to embedded boundaries)
->>>>>>> 8136934a5 (Remove edge_length and faces)
           * \param[in] lev  level number for the calculation
           */
         void CalculateCurrentAmpere (
