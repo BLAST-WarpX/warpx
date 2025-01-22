@@ -590,9 +590,6 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                     {
                     // signed distance function
                     auto const eb_reduce_particle_shape = (*warpx.GetEBReduceParticleShapeFlag()[lev])[pti].array();
-                    const Geometry& geom = Geom(lev);
-                    const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> eb_dxi = geom.InvCellSizeArray();
-                    const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> eb_plo = geom.ProbLoArray();
 
                     if      (WarpX::nox == 1){
                         doEsirkepovDepositionShapeN<1>(
@@ -600,7 +597,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
                         jx_arr, jy_arr, jz_arr,
                         np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
-                        eb_reduce_particle_shape, eb_dxi, eb_plo,
+                        eb_reduce_particle_shape,
                         WarpX::n_rz_azimuthal_modes);
                     } else if (WarpX::nox == 2){
                         doEsirkepovDepositionShapeN<2>(
@@ -608,7 +605,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                             uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
                             jx_arr, jy_arr, jz_arr,
                             np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
-                            eb_reduce_particle_shape, eb_dxi, eb_plo,
+                            eb_reduce_particle_shape,
                             WarpX::n_rz_azimuthal_modes);
                     } else if (WarpX::nox == 3){
                         doEsirkepovDepositionShapeN<3>(
@@ -616,7 +613,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                             uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
                             jx_arr, jy_arr, jz_arr,
                             np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
-                            eb_reduce_particle_shape, eb_dxi, eb_plo,
+                            eb_reduce_particle_shape,
                             WarpX::n_rz_azimuthal_modes);
                     } else if (WarpX::nox == 4){
                         doEsirkepovDepositionShapeN<4>(
@@ -624,7 +621,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                             uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
                             jx_arr, jy_arr, jz_arr,
                             np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
-                            eb_reduce_particle_shape, eb_dxi, eb_plo,
+                            eb_reduce_particle_shape,
                             WarpX::n_rz_azimuthal_modes);
                     }
                 }

@@ -659,8 +659,6 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                   amrex::Real q,
 #ifdef AMREX_USE_EB
                                   const amrex::Array4<const int>& eb_reduce_particle_shape,
-                                  const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& eb_dxi,
-                                  const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& eb_plo,
 #endif
                                   [[maybe_unused]]int n_rz_azimuthal_modes
                                   )
@@ -750,21 +748,19 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             // TODO: check calculation for RZ
             {
                 WarpXParticleContainer::SuperParticleType p;
-                set_particle_position( p,
-                    xp + (relative_time - 0.5_rt*dt)*uxp[ip]*gaminv,
-                    yp + (relative_time - 0.5_rt*dt)*uyp[ip]*gaminv,
-                    zp + (relative_time - 0.5_rt*dt)*uzp[ip]*gaminv );
-                const auto [ii, jj, kk] = amrex::getParticleCell(p, eb_plo, eb_dxi).dim3();
-                close_to_eb_old = (eb_reduce_particle_shape(ii,jj,kk) == 1);
+                set_particle_position( p, x_old, y_old, z_old);
+                close_to_eb_old = eb_reduce_particle_shape(
+                    lo.x + int(p.pos(0)),
+                    lo.y + int(p.pos(1)),
+                    lo.z + int(p.pos(2)));
             }
             {
                 WarpXParticleContainer::SuperParticleType p;
-                set_particle_position( p,
-                    xp + (relative_time + 0.5_rt*dt)*uxp[ip]*gaminv,
-                    yp + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv,
-                    zp + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv );
-                const auto [ii, jj, kk] = amrex::getParticleCell(p, eb_plo, eb_dxi).dim3();
-                close_to_eb_new = (eb_reduce_particle_shape(ii,jj,kk) == 1);
+                set_particle_position( p, x_new, y_new, z_new);
+                close_to_eb_new = eb_reduce_particle_shape(
+                    lo.x + int(p.pos(0)),
+                    lo.y + int(p.pos(1)),
+                    lo.z + int(p.pos(2)));
             }
 #endif
 
