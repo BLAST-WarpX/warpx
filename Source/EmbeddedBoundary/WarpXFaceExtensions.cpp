@@ -72,6 +72,8 @@ namespace
         return -1;
     }
 
+
+#ifdef AMREX_USE_EB
     /**
     * \brief Compute the minimal area for stability for the face i, j, k with normal 'dim'.
     * (wrapper to allow using ComputeSStab as a non-templated function, by passing 'dim' as an argument)
@@ -102,6 +104,8 @@ namespace
         }
         return -1;
     }
+
+#endif
 
 
     /**
