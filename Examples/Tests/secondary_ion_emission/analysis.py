@@ -43,20 +43,20 @@ for i in range(0, N_sec_e):
     print("\n")
     print(f"Electron # {i}:")
     print("NUMERICAL coordinates of the emitted electrons:")
-    print("x=%5.5f, y=%5.5f, z=%5.5f" % (x[i], y[i], z[i]))
+    print(f"x={x[i]:5.5f}, y={y[i]:5.5f}, z={z[i]:5.5f}")
     print("\n")
     print("ANALYTICAL coordinates of the point of contact:")
-    print("x=%5.5f, y=%5.5f, z=%5.5f" % (x_analytic[i], y_analytic[i], z_analytic[i]))
+    print(f"x={x_analytic[i]:5.5f}, y={y_analytic[i]:5.5f}, z={z_analytic[i]:5.5f}")
 
-    diff_x = np.abs((x[i] - x_analytic[i]) / x_analytic[i])
-    diff_y = np.abs((y[i] - y_analytic[i]) / y_analytic[i])
-    diff_z = np.abs((z[i] - z_analytic[i]) / z_analytic[i])
+    rel_err_x = np.abs((x[i] - x_analytic[i]) / x_analytic[i])
+    rel_err_y = np.abs((y[i] - y_analytic[i]) / y_analytic[i])
+    rel_err_z = np.abs((z[i] - z_analytic[i]) / z_analytic[i])
 
     print("\n")
-    print("percentage error for x = %5.4f %%" % (diff_x * 100))
-    print("percentage error for y = %5.4f %%" % (diff_y * 100))
-    print("percentage error for z = %5.4f %%" % (diff_z * 100))
+    print(f"Relative percentage error for x = {rel_err_x * 100:5.4f} %")
+    print(f"Relative percentage error for y = {rel_err_y * 100:5.4f} %")
+    print(f"Relative percentage error for z = {rel_err_z * 100:5.4f} %")
 
-    assert (diff_x < tolerance) and (diff_y < tolerance) and (diff_z < tolerance), (
-        "Test particle_boundary_interaction did not pass"
-    )
+    assert (
+        (rel_err_x < tolerance) and (rel_err_y < tolerance) and (rel_err_x < tolerance)
+    ), "Test particle_boundary_interaction did not pass"

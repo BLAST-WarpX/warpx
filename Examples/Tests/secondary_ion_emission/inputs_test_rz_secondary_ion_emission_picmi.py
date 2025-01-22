@@ -95,8 +95,7 @@ part_diag = picmi.ParticleDiagnostic(
 ##########################
 # simulation setup
 ##########################
-# num_procs = [1, 1]
-# warpx_numprocs=num_procs,
+
 sim = picmi.Simulation(
     solver=solver,
     time_step_size=dt,
@@ -147,7 +146,6 @@ def sigma_nascap(energy_kEv, delta_H, E_HMax):
     - numpy array, computed probability sigma_nascap
     """
     sigma_nascap = np.array([])
-    # Loop through each energy value
     for energy in energy_kEv:
         if energy > 0.0:
             sigma = (
