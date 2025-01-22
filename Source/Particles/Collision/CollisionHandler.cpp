@@ -16,6 +16,9 @@
 #include "Particles/Collision/BinaryCollision/ParticleCreationFunc.H"
 #include "Utils/TextMsg.H"
 
+#include "Particles/ParticleCreation/SmartCopy.H"
+#include "Particles/Collision/BinaryCollision/VirtualPhotonCreation.H"
+
 #include <AMReX_ParmParse.H>
 
 #include <vector>
@@ -84,6 +87,7 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
  */
 void CollisionHandler::doCollisions ( amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
 {
+    collision::binarycollision::virtualphotons::GenerateVirtualPhotons(mypc);
 
     for (auto& collision : allcollisions) {
         int const ndt = collision->get_ndt();
