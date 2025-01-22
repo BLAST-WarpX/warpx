@@ -927,10 +927,9 @@ public:
      * \param[in] fx_parser parser function to initialize x-field
      * \param[in] fy_parser parser function to initialize y-field
      * \param[in] fz_parser parser function to initialize z-field
-     * \param[in] eb_update_field flag indicating which gridpoints should be modified by this functions
-     * \param[in] topology flag indicating if field is edge-based or face-based
      * \param[in] lev level of the Multifabs that is initialized
      * \param[in] patch_type PatchType on which the field is initialized (fine or coarse)
+     * \param[in] eb_update_field flag indicating which gridpoints should be modified by this functions
      */
     void ComputeExternalFieldOnGridUsingParser (
         warpx::fields::FieldType field,
