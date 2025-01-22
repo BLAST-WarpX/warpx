@@ -17,7 +17,7 @@
 
 SelectParticles::SelectParticles (
     const WarpXParticleContainer& pc,
-    const WarpXParIter& a_pti,
+    WarpXParIter& a_pti,
     amrex::Real current_z_boost,
     amrex::Real old_z_boost,
     int a_offset
@@ -33,7 +33,7 @@ SelectParticles::SelectParticles (
 
 LorentzTransformParticles::LorentzTransformParticles (
     const WarpXParticleContainer& pc,
-    const WarpXParIter& a_pti,
+    WarpXParIter& a_pti,
     amrex::Real t_boost,
     amrex::Real dt,
     amrex::Real t_lab,
