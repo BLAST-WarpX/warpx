@@ -90,7 +90,7 @@ public:
             amrex::ParticleReal const n1, amrex::ParticleReal const n2,
             amrex::ParticleReal const /*T1*/, amrex::ParticleReal const /*T2*/,
             amrex::ParticleReal const  /*q1*/, amrex::ParticleReal const  /*q2*/,
-            amrex::ParticleReal const m1, amrex::ParticleReal const /*m2*/,
+            amrex::ParticleReal const m1, amrex::ParticleReal const m2,
             amrex::Real const dt, amrex::Real const /*dV*/, index_type coll_idx,
             index_type const cell_start_pair, index_type* AMREX_RESTRICT p_mask,
             index_type* AMREX_RESTRICT p_pair_indices_1, index_type* AMREX_RESTRICT p_pair_indices_2,
@@ -150,7 +150,7 @@ public:
                 BremsstrahlungEvent(
                     u1x[ I1[i1] ], u1y[ I1[i1] ], u1z[ I1[i1] ],
                     u2x[ I2[i2] ], u2y[ I2[i2] ], u2z[ I2[i2] ],
-                    m1, weight1[ I1[i1] ], weight2[ I2[i2] ],
+                    m1, m2, weight1[ I1[i1] ], weight2[ I2[i2] ],
                     n1, n2, dt, static_cast<int>(pair_index), p_mask,
                     p_pair_reaction_weight, p_product_data,
                     engine);
@@ -315,7 +315,7 @@ public:
          *
          * \param[in] u1x, u1y, u1z the gamma*velocity of the first species, the electrons
          * \param[in] u2x, u2y, u2z the gamma*velocity of the second species, the atoms
-         * \param[in] m1 the mass of the electrons
+         * \param[in] m1, m2 the mass of the electrons and ions
          * \param[in] weight1 the particle weight of the electrons
          * \param[in] weight2 the particle weight of the target (unused)
          * \param[in] n1 the number density of the electrons
@@ -329,10 +329,10 @@ public:
          */
         AMREX_GPU_HOST_DEVICE AMREX_INLINE
         void BremsstrahlungEvent (amrex::ParticleReal & u1x, amrex::ParticleReal & u1y,
-                                  amrex::ParticleReal & u1z, amrex::ParticleReal const& u2x,
-                                  amrex::ParticleReal const& u2y, amrex::ParticleReal const& u2z,
-                                  amrex::ParticleReal m1,
-                                  amrex::ParticleReal weight1, amrex::ParticleReal /*weight2*/,
+                                  amrex::ParticleReal & u1z, amrex::ParticleReal & u2x,
+                                  amrex::ParticleReal & u2y, amrex::ParticleReal & u2z,
+                                  amrex::ParticleReal m1, amrex::ParticleReal m2,
+                                  amrex::ParticleReal weight1, amrex::ParticleReal weight2,
                                   amrex::ParticleReal n1, amrex::ParticleReal n2,
                                   amrex::Real dt, int pair_index,
                                   index_type* AMREX_RESTRICT p_mask,
@@ -343,13 +343,12 @@ public:
             using namespace amrex::literals;
 
             constexpr auto c2 = PhysConst::c * PhysConst::c;
-            amrex::ParticleReal const m_e_eV = m1*PhysConst::c*PhysConst::c/PhysConst::q_e; // 0.511e6
 
             // compute gamma for particles 1 (electron) and 2 (ion)
-            amrex::ParticleReal const gbp1sq = (u1x*u1x + u1y*u1y + u1z*u1z)/c2;
-            amrex::ParticleReal const gbp2sq = (u2x*u2x + u2y*u2y + u2z*u2z)/c2;
-            amrex::ParticleReal const gammap1 = std::sqrt(1.0_prt + gbp1sq);
-            amrex::ParticleReal const gammap2 = std::sqrt(1.0_prt + gbp2sq);
+            amrex::ParticleReal const u1sq = (u1x*u1x + u1y*u1y + u1z*u1z);
+            amrex::ParticleReal const u2sq = (u2x*u2x + u2y*u2y + u2z*u2z);
+            amrex::ParticleReal const gamma1 = std::sqrt(1.0_prt + u1sq/c2);
+            amrex::ParticleReal const gamma2 = std::sqrt(1.0_prt + u2sq/c2);
 
             // transform electron to frame where ion is at rest
             amrex::ParticleReal u1x_rel = u1x;
@@ -358,9 +357,9 @@ public:
             ParticleUtils::doLorentzTransformWithU(u1x_rel, u1y_rel, u1z_rel, u2x, u2y, u2z);
 
             // compute electron KE in frame where ion is at rest
-            amrex::ParticleReal const gbp1sq_rel = (u1x_rel*u1x_rel + u1y_rel*u1y_rel + u1z_rel*u1z_rel)/c2;
-            amrex::ParticleReal const gammap1_rel = std::sqrt(1.0_prt + gbp1sq_rel);
-            amrex::ParticleReal const KE_eV = m_e_eV*gbp1sq_rel/(1.0_prt + gammap1_rel);
+            amrex::ParticleReal const u1sq_rel = (u1x_rel*u1x_rel + u1y_rel*u1y_rel + u1z_rel*u1z_rel);
+            amrex::ParticleReal const gamma1_rel = std::sqrt(1.0_prt + u1sq_rel/c2);
+            amrex::ParticleReal const KE_eV = m1*u1sq_rel/(1.0_prt + gamma1_rel)/PhysConst::q_e;
 
             int i0_cut, index;
             amrex::ParticleReal koT1_cut, kdsigdk_cut;
@@ -372,13 +371,13 @@ public:
 
             // determine if the pair collide and then do the collision
             amrex::ParticleReal fmulti = m_multiplier; // >= 1.0
-            amrex::ParticleReal const gamma_factor = gammap1_rel/(gammap1*gammap2);
-            amrex::ParticleReal const beta1 = std::sqrt(gbp1sq_rel)/gammap1_rel; // magnitude electron beta
-            amrex::ParticleReal arg = fmulti*beta1*PhysConst::c*sigma_total*n2*dt*gamma_factor;
+            amrex::ParticleReal const gamma_factor = gamma1_rel/(gamma1*gamma2);
+            amrex::ParticleReal const v1 = std::sqrt(u1sq_rel)/gamma1_rel; // magnitude electron velocity
+            amrex::ParticleReal arg = fmulti*v1*sigma_total*n2*dt*gamma_factor;
             if (arg > 1.0_prt) {
 #ifndef AMREX_USE_GPU
                 amrex::Print() << "Notice: arg = " << arg << " in interSpeciesBremsstrahlung" << "\n";
-                amrex::Print() << "        beta1 = " << beta1 << "\n";
+                amrex::Print() << "        v1 = " << v1 << "\n";
                 amrex::Print() << "        n2 = " << n2 << "\n";
                 amrex::Print() << "        sigma_total = " << sigma_total << "\n";
 #endif
@@ -396,43 +395,60 @@ public:
                 // compute weight for photon
                  amrex::ParticleReal const w_photon = weight1/fmulti;
 
-                // compute lab-frame electron kinetic energy before emission
-                amrex::ParticleReal const KE_before = m_e_eV*gbp1sq/(1.0_prt + gammap1);
-
                 // get energy of photon (hbar*omega)
                 amrex::ParticleReal const random_number2 = amrex::Random(engine);
                 amrex::ParticleReal const EphotonoT1 = Photon_energy(index, i0_cut, koT1_cut, kdsigdk_cut,
                                                                      w0, sigma_total, random_number2);
-                amrex::ParticleReal const Ephoton_eV = EphotonoT1*KE_eV;
+                amrex::ParticleReal const Ephoton = EphotonoT1*KE_eV*PhysConst::q_e;
 
-                // adjust electron gamma and beta
-                amrex::ParticleReal const KE_prime_eV = KE_eV - Ephoton_eV*w_photon/weight1;
-                amrex::ParticleReal const gamma_prime = 1.0_prt + KE_prime_eV/m_e_eV;
+                // Calculate electron and ion energy and momentum using conservation
+                amrex::ParticleReal const u1_rel = std::sqrt(u1sq_rel);
+                amrex::ParticleReal const A = u1_rel/PhysConst::c - Ephoton*w_photon/(weight1*m1*c2);
+                amrex::ParticleReal const B = gamma1_rel + m2/m1 - Ephoton*w_photon/(weight1*m1*c2);
+                amrex::ParticleReal const D = m2*m2/(m1*m1) + A*A - B*B - 1.0_prt;
+                amrex::ParticleReal const a = 4.0_prt*(B*B - A*A);
+                amrex::ParticleReal const b = 4.0_prt*A*D;
+                amrex::ParticleReal const c = 4.0_prt*B*B - D*D;
+                // Use the "plus" solution since it keeps the electon motion forward
+                amrex::ParticleReal const u1_rel_after = (-b + std::sqrt(b*b - 4.0_prt*a*c))/(2.0_prt*a)*PhysConst::c;
+                amrex::ParticleReal const u2_rel_after = (A - u1_rel_after/PhysConst::c)*m1/m2*PhysConst::c;
 
-                // rescale electron beta in frame where ion is at rest
-                amrex::ParticleReal const u_rel_ratio = std::sqrt((gamma_prime + 1.0_prt)*KE_prime_eV/m_e_eV/gbp1sq_rel);
-                u1x_rel *= u_rel_ratio;
-                u1y_rel *= u_rel_ratio;
-                u1z_rel *= u_rel_ratio;
+                u1x_rel *= u1_rel_after/u1_rel;
+                u1y_rel *= u1_rel_after/u1_rel;
+                u1z_rel *= u1_rel_after/u1_rel;
+                amrex::ParticleReal u2x_rel = u2_rel_after*u1x_rel/u1_rel_after;
+                amrex::ParticleReal u2y_rel = u2_rel_after*u1y_rel/u1_rel_after;
+                amrex::ParticleReal u2z_rel = u2_rel_after*u1z_rel/u1_rel_after;
 
-                // Lorentz transform electron back to lab frame
+                // Lorentz transform electron and ion back to lab frame
                 ParticleUtils::doLorentzTransformWithU(u1x_rel, u1y_rel, u1z_rel, -u2x, -u2y, -u2z);
+                ParticleUtils::doLorentzTransformWithU(u2x_rel, u2y_rel, u2z_rel, -u2x, -u2y, -u2z);
                 u1x = u1x_rel;
                 u1y = u1y_rel;
                 u1z = u1z_rel;
+                u2x = u2x_rel;
+                u2y = u2y_rel;
+                u2z = u2z_rel;
 
-                // compute electron kinetic energy after emission
-                amrex::ParticleReal const gbp1sq_prime = (u1x*u1x + u1y*u1y + u1z*u1z)/c2;
-                amrex::ParticleReal const gammap1_prime = std::sqrt(1.0_prt + gbp1sq_prime);
-                amrex::ParticleReal const KE_after = m_e_eV*gbp1sq_prime/(1.0_prt + gammap1_prime);
+                // compute lab-frame electron kinetic energy before emission
+                amrex::ParticleReal const KE1_before = weight1*m1*u1sq/(1.0_prt + gamma1);
+                amrex::ParticleReal const KE2_before = weight2*m2*u2sq/(1.0_prt + gamma2);
+
+                // compute electron and ion kinetic energy after emission
+                amrex::ParticleReal const u1sq_after = (u1x*u1x + u1y*u1y + u1z*u1z);
+                amrex::ParticleReal const u2sq_after = (u2x*u2x + u2y*u2y + u2z*u2z);
+                amrex::ParticleReal const gamma1_after = std::sqrt(1.0_prt + u1sq_after/c2);
+                amrex::ParticleReal const gamma2_after = std::sqrt(1.0_prt + u2sq_after/c2);
+                amrex::ParticleReal const KE1_after = weight1*m1*u1sq_after/(1.0_prt + gamma1_after);
+                amrex::ParticleReal const KE2_after = weight2*m2*u2sq_after/(1.0_prt + gamma2_after);
 
                 // update energy lost to bremsstrahlung
-                amrex::ParticleReal const deltaE_eV = KE_before - KE_after;
-                /* m_deltaE_bremsstrahlung += deltaE_eV*weight1*PhysConst::q_e; // Joules */
+                amrex::ParticleReal const deltaE = KE1_before + KE2_before - KE1_after - KE2_after;
+                /* m_deltaE_bremsstrahlung += deltaE*weight1; // Joules */
 
                 if (m_create_photons) {
                     // compute photon energy in lab frame
-                    amrex::ParticleReal const Ephoton_lab = deltaE_eV*weight1/w_photon*PhysConst::q_e; // Joules
+                    amrex::ParticleReal const Ephoton_lab = deltaE/w_photon; // Joules
 
                     p_mask[pair_index] = true;
                     p_pair_reaction_weight[pair_index] = w_photon;
