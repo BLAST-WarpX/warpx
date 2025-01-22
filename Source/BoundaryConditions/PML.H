@@ -112,7 +112,7 @@ public:
     }
 
 private:
-    const amrex::BoxArray& m_grids;
+    amrex::BoxArray m_grids;
     const amrex::Real* m_dx;
     amrex::IntVect m_ncell;
     amrex::IntVect m_delta;
@@ -204,8 +204,8 @@ private:
     bool m_dive_cleaning;
     bool m_divb_cleaning;
 
-    const amrex::IntVect m_fill_guards_fields;
-    const amrex::IntVect m_fill_guards_current;
+    amrex::IntVect m_fill_guards_fields;
+    amrex::IntVect m_fill_guards_current;
 
     const amrex::Geometry* m_geom;
     const amrex::Geometry* m_cgeom;
