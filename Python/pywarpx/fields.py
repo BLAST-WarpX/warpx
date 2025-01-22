@@ -303,6 +303,10 @@ class _MultiFABWrapper(object):
         # Note: transposing creates a view and not a copy.
         device_arr4 = self.mf.array(mfi)
         if libwarpx.libwarpx_so.Config.have_gpu:
+            xp, cupy_status = load_cupy()
+            if cupy_status is not None:
+                libwarpx.amr.Print(cupy_status)
+
             if cp is not None:
                 device_arr = device_arr4.to_cupy(copy=False)
             else:
