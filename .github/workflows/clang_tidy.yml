@@ -20,7 +20,7 @@ jobs:
         dim: [1, 2, RZ, 3]
     name: clang-tidy-${{ matrix.dim }}D
     runs-on: ubuntu-22.04
-    timeout-minutes: 180
+    timeout-minutes: 220
     if: github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
