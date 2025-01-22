@@ -14,7 +14,7 @@ along the embedded boundary, due to electromagnetic waves reflecting on this bou
 When checking for static, spurious charge build-up, we average div(E) in time to remove this component.
 
 The test is performed in 2D, 3D and RZ.
-(In 2D, the cylindrical embeded boundary becomes two parallel plates)
+(In 2D, the cylindrical embedded boundary becomes two parallel plates)
 """
 
 from openpmd_viewer import OpenPMDTimeSeries
