@@ -6,8 +6,8 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_particle_attr_access_picmi.py  # inputs
-    analysis.py  # analysis
-    diags/diag1000010  # output
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
     OFF  # dependency
 )
 
@@ -16,8 +16,8 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     "inputs_test_2d_particle_attr_access_picmi.py --unique"  # inputs
-    analysis.py  # analysis
-    diags/diag1000010  # output
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
     OFF  # dependency
 )
 
@@ -26,7 +26,7 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_prev_positions_picmi.py  # inputs
-    analysis_default_regression.py  # analysis
-    diags/diag1000010  # output
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
     OFF  # dependency
 )

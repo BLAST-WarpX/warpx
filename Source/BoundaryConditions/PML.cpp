@@ -1234,7 +1234,7 @@ PML::CheckPoint (
 {
     using ablastr::fields::Direction;
 
-    if (fields.has(FieldType::pml_E_fp, Direction{0}, 0))
+    if (fields.has_vector(FieldType::pml_E_fp, 0))
     {
         ablastr::fields::VectorField pml_E_fp = fields.get_alldirs(FieldType::pml_E_fp, 0);
         ablastr::fields::VectorField pml_B_fp = fields.get_alldirs(FieldType::pml_B_fp, 0);
@@ -1246,7 +1246,7 @@ PML::CheckPoint (
         VisMF::AsyncWrite(*pml_B_fp[2], dir+"_Bz_fp");
     }
 
-    if (fields.has(FieldType::pml_E_cp, Direction{0}, 0))
+    if (fields.has_vector(FieldType::pml_E_cp, 0))
     {
         ablastr::fields::VectorField pml_E_cp = fields.get_alldirs(FieldType::pml_E_cp, 0);
         ablastr::fields::VectorField pml_B_cp = fields.get_alldirs(FieldType::pml_B_cp, 0);
@@ -1267,7 +1267,7 @@ PML::Restart (
 {
     using ablastr::fields::Direction;
 
-    if (fields.has(FieldType::pml_E_fp, Direction{0}, 0))
+    if (fields.has_vector(FieldType::pml_E_fp, 0))
     {
         ablastr::fields::VectorField pml_E_fp = fields.get_alldirs(FieldType::pml_E_fp, 0);
         ablastr::fields::VectorField pml_B_fp = fields.get_alldirs(FieldType::pml_B_fp, 0);
@@ -1279,7 +1279,7 @@ PML::Restart (
         VisMF::Read(*pml_B_fp[2], dir+"_Bz_fp");
     }
 
-    if (fields.has(FieldType::pml_E_cp, Direction{0}, 0))
+    if (fields.has_vector(FieldType::pml_E_cp, 0))
     {
         ablastr::fields::VectorField pml_E_cp = fields.get_alldirs(FieldType::pml_E_cp, 0);
         ablastr::fields::VectorField pml_B_cp = fields.get_alldirs(FieldType::pml_B_cp, 0);

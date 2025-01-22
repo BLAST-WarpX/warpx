@@ -1,4 +1,4 @@
-/* Copyright 2022 S. Eric Clark, LLNL
+/* Copyright 2022-2024 S. Eric Clark (Helion Energy, formerly LLNL)
  *
  * This file is part of WarpX.
  *
@@ -110,11 +110,6 @@ computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > co
         rel_ref_ratio = amrex::Vector<amrex::IntVect>{{amrex::IntVect(AMREX_D_DECL(1, 1, 1))}};
     }
 
-#if !defined(AMREX_USE_EB)
-    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(!eb_enabled,
-                                       "Embedded boundary solve requested but not compiled in");
-#endif
-
     auto const finest_level = static_cast<int>(curr.size()) - 1;
 
     // scale J appropriately; also determine if current is zero everywhere
@@ -137,10 +132,41 @@ computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > co
         );
     }
 
-    const amrex::LPInfo& info = amrex::LPInfo();
-
     // Loop over dimensions of A to solve each component individually
     for (int lev=0; lev<=finest_level; lev++) {
+        amrex::LPInfo info;
+
+#ifdef WARPX_DIM_RZ
+        constexpr bool is_rz = true;
+#else
+        constexpr bool is_rz = false;
+#endif
+
+        amrex::Array<amrex::Real,AMREX_SPACEDIM> const dx
+            {AMREX_D_DECL(geom[lev].CellSize(0),
+                          geom[lev].CellSize(1),
+                          geom[lev].CellSize(2))};
+
+
+        if (!eb_enabled && !is_rz) {
+            // Determine whether to use semi-coarsening
+            int max_semicoarsening_level = 0;
+            int semicoarsening_direction = -1;
+            const auto min_dir = static_cast<int>(std::distance(dx.begin(),
+                                                                std::min_element(dx.begin(), dx.end())));
+            const auto max_dir = static_cast<int>(std::distance(dx.begin(),
+                                                                std::max_element(dx.begin(), dx.end())));
+            if (dx[max_dir] > dx[min_dir]) {
+                semicoarsening_direction = max_dir;
+                max_semicoarsening_level = static_cast<int>(std::log2(dx[max_dir] / dx[min_dir]));
+            }
+            if (max_semicoarsening_level > 0) {
+                info.setSemicoarsening(true);
+                info.setMaxSemicoarseningLevel(max_semicoarsening_level);
+                info.setSemicoarseningDirection(semicoarsening_direction);
+            }
+        }
+
         amrex::MLEBNodeFDLaplacian linopx, linopy, linopz;
         if (eb_enabled) {
 #ifdef AMREX_USE_EB

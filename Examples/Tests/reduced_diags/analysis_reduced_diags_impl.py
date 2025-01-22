@@ -11,7 +11,6 @@
 # Various particle and field quantities are written to file using the reduced diagnostics
 # and compared with the corresponding quantities computed from the data in the plotfiles.
 
-import os
 import sys
 
 import numpy as np
@@ -19,9 +18,6 @@ import yt
 from scipy.constants import c, m_e, m_p
 from scipy.constants import epsilon_0 as eps0
 from scipy.constants import mu_0 as mu0
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
 
 # gamma threshold to switch between the relativistic expression of
 # the kinetic energy and its Taylor expansion.
@@ -375,8 +371,3 @@ def do_analysis(single_precision=False):
         tol = field_energy_tolerance if (k == "field energy") else tolerance
         assert error[k] < tol
         print()
-
-    test_name = os.path.split(os.getcwd())[1]
-
-    checksum_rtol = 2e-9 if single_precision else 1e-9
-    checksumAPI.evaluate_checksum(test_name, fn, rtol=checksum_rtol)

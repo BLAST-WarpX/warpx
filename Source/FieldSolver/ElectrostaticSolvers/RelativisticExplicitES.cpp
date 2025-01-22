@@ -130,7 +130,7 @@ void RelativisticExplicitES::AddSpaceChargeField (
     computePhi( amrex::GetVecOfPtrs(rho), amrex::GetVecOfPtrs(phi),
                 beta, pc.self_fields_required_precision,
                 pc.self_fields_absolute_tolerance, pc.self_fields_max_iters,
-                pc.self_fields_verbosity );
+                pc.self_fields_verbosity, is_igf_2d_slices);
 
     // Compute the corresponding electric and magnetic field, from the potential phi
     computeE( Efield_fp, amrex::GetVecOfPtrs(phi), beta );
@@ -168,7 +168,7 @@ void RelativisticExplicitES::AddBoundaryField (ablastr::fields::MultiLevelVector
     computePhi( amrex::GetVecOfPtrs(rho), amrex::GetVecOfPtrs(phi),
                 beta, self_fields_required_precision,
                 self_fields_absolute_tolerance, self_fields_max_iters,
-                self_fields_verbosity );
+                self_fields_verbosity, is_igf_2d_slices);
 
     // Compute the corresponding electric field, from the potential phi.
     computeE( Efield_fp, amrex::GetVecOfPtrs(phi), beta );

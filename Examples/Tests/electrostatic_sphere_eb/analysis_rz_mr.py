@@ -12,14 +12,10 @@
 # Thus the analytical solution has the form:
 # phi(r) = A+B*log(r), Er(r) = -B/r.
 
-import os
 import sys
 
 import numpy as np
 from openpmd_viewer import OpenPMDTimeSeries
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
 
 tolerance = 0.004
 print(f"tolerance = {tolerance}")
@@ -109,6 +105,3 @@ level_fields = [field for field in ts.avail_fields if "lvl" in field]
 nlevels = 0 if level_fields == [] else int(level_fields[-1][-1])
 for level in range(nlevels + 1):
     get_error_per_lev(ts, level)
-
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn, output_format="openpmd")

@@ -16,8 +16,6 @@ import scipy.constants as scc
 import yt
 
 yt.funcs.mylog.setLevel(0)
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
 
 filename = sys.argv[1]
 
@@ -74,6 +72,3 @@ print("reflectivity     = " + str(reflectivity))
 print("reflectivity_max = " + str(reflectivity_max))
 
 assert reflectivity < reflectivity_max
-
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename)

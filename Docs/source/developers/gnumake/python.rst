@@ -3,7 +3,7 @@
 Installing WarpX as a Python package
 ====================================
 
-A full Python installation of WarpX can be done, which includes a build of all of the C++ code, or a pure Python version can be made which only installs the Python scripts. WarpX requires Python version 3.8 or newer.
+A full Python installation of WarpX can be done, which includes a build of all of the C++ code, or a pure Python version can be made which only installs the Python scripts. WarpX requires Python version 3.9 or newer.
 
 For a full Python installation of WarpX
 ---------------------------------------

@@ -1,0 +1,84 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 100
+amr.n_cell =  256
+amr.max_grid_size = 64   # maximum size of each AMReX box, used to decompose the domain
+amr.blocking_factor = 32 # minimum size of each AMReX box, used to decompose the domain
+geometry.dims = 1
+geometry.prob_lo     =  -56.e-6    # physical domain
+geometry.prob_hi     =   12.e-6
+amr.max_level = 0 # Maximum level in hierarchy (1 might be unstable, >1 is not supported)
+
+#################################
+####### Boundary condition ######
+#################################
+boundary.field_lo = pec
+boundary.field_hi = pec
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.verbose = 1
+warpx.do_dive_cleaning = 0
+warpx.use_filter = 1
+warpx.cfl = 0.9 # if 1., the time step is set to its CFL limit
+warpx.do_moving_window = 1
+warpx.moving_window_dir = z
+warpx.moving_window_v = 1.0 # units of speed of light
+warpx.do_dynamic_scheduling = 0
+warpx.serialize_initial_conditions = 1
+
+# Order of particle shape factors
+algo.particle_shape = 3
+
+#################################
+############ PLASMA #############
+#################################
+particles.species_names = electrons
+
+electrons.species_type = electron
+electrons.injection_style = "NUniformPerCell"
+electrons.num_particles_per_cell_each_dim = 10
+electrons.zmin =  10.e-6
+electrons.profile = constant
+electrons.density = 2.e23  # number of electrons per m^3
+electrons.momentum_distribution_type = "at_rest"
+electrons.do_continuous_injection = 1
+electrons.addRealAttributes = orig_z
+electrons.attribute.orig_z(x,y,z,ux,uy,uz,t) = "z"
+electrons.addIntegerAttributes = regionofinterest
+electrons.attribute.regionofinterest(x,y,z,ux,uy,uz,t) = " (z>12.0e-6) * (z<13.0e-6)"
+
+#################################
+############ LASER ##############
+#################################
+lasers.names        = laser1
+laser1.profile      = Gaussian
+laser1.position     = 0. 0. 9.e-6        # This point is on the laser plane
+laser1.direction    = 0. 0. 1.           # The plane normal direction
+laser1.polarization = 0. 1. 0.           # The main polarization vector
+laser1.e_max        = 16.e12             # Maximum amplitude of the laser field (in V/m)
+laser1.profile_waist = 5.e-6             # The waist of the laser (in m)
+laser1.profile_duration = 15.e-15        # The duration of the laser (in s)
+laser1.profile_t_peak = 30.e-15          # Time at which the laser reaches its peak (in s)
+laser1.profile_focal_distance = 100.e-6  # Focal distance from the antenna (in m)
+laser1.wavelength = 0.8e-6               # The wavelength of the laser (in m)
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 100
+diag1.diag_type = Full
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho
+
+# Reduced Diagnostics
+warpx.reduced_diags_names               = FP
+
+FP.type = FieldProbe
+FP.intervals = 10
+FP.integrate = 0
+FP.probe_geometry = Line
+FP.z_probe = -56e-6
+FP.z1_probe = 12e-6
+FP.resolution = 100
+FP.do_moving_window_FP = 1

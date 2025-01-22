@@ -147,29 +147,6 @@ namespace
         return z0;
     }
 
-    struct PDim3 {
-        ParticleReal x, y, z;
-
-        AMREX_GPU_HOST_DEVICE
-        PDim3(const amrex::XDim3& a):
-            x{static_cast<ParticleReal>(a.x)},
-            y{static_cast<ParticleReal>(a.y)},
-            z{static_cast<ParticleReal>(a.z)}
-        {}
-
-        AMREX_GPU_HOST_DEVICE
-        ~PDim3() = default;
-
-        AMREX_GPU_HOST_DEVICE
-        PDim3(PDim3 const &)            = default;
-        AMREX_GPU_HOST_DEVICE
-        PDim3& operator=(PDim3 const &) = default;
-        AMREX_GPU_HOST_DEVICE
-        PDim3(PDim3&&)                  = default;
-        AMREX_GPU_HOST_DEVICE
-        PDim3& operator=(PDim3&&)       = default;
-    };
-
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     XDim3 getCellCoords (const GpuArray<Real, AMREX_SPACEDIM>& lo_corner,
                          const GpuArray<Real, AMREX_SPACEDIM>& dx,
@@ -365,12 +342,12 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
 #ifdef WARPX_QED
     pp_species_name.query("do_qed_quantum_sync", m_do_qed_quantum_sync);
     if (m_do_qed_quantum_sync) {
-        AddRealComp("opticalDepthQSR");
+        NewRealComp("opticalDepthQSR");
     }
 
     pp_species_name.query("do_qed_breit_wheeler", m_do_qed_breit_wheeler);
     if (m_do_qed_breit_wheeler) {
-        AddRealComp("opticalDepthBW");
+        NewRealComp("opticalDepthBW");
     }
 
     if(m_do_qed_quantum_sync){
@@ -391,7 +368,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
             str_int_attrib_function.at(i));
         m_user_int_attrib_parser.at(i) = std::make_unique<amrex::Parser>(
             utils::parser::makeParser(str_int_attrib_function.at(i),{"x","y","z","ux","uy","uz","t"}));
-        AddIntComp(m_user_int_attribs.at(i));
+        NewIntComp(m_user_int_attribs.at(i));
     }
 
     // User-defined real attributes
@@ -406,19 +383,19 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
             str_real_attrib_function.at(i));
         m_user_real_attrib_parser.at(i) = std::make_unique<amrex::Parser>(
             utils::parser::makeParser(str_real_attrib_function.at(i),{"x","y","z","ux","uy","uz","t"}));
-        AddRealComp(m_user_real_attribs.at(i));
+        NewRealComp(m_user_real_attribs.at(i));
     }
 
     // If old particle positions should be saved add the needed components
     pp_species_name.query("save_previous_position", m_save_previous_position);
     if (m_save_previous_position) {
 #if (AMREX_SPACEDIM >= 2)
-        AddRealComp("prev_x");
+        NewRealComp("prev_x");
 #endif
 #if defined(WARPX_DIM_3D)
-        AddRealComp("prev_y");
+        NewRealComp("prev_y");
 #endif
-        AddRealComp("prev_z");
+        NewRealComp("prev_z");
 #ifdef WARPX_DIM_RZ
       amrex::Abort("Saving previous particle positions not yet implemented in RZ");
 #endif
@@ -1371,6 +1348,22 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
     const auto dx = geom.CellSizeArray();
     const auto problo = geom.ProbLoArray();
 
+#ifdef AMREX_USE_EB
+    bool const inject_from_eb = plasma_injector.m_inject_from_eb; // whether to inject from EB or from a plane
+    // Extract data structures for embedded boundaries
+    amrex::FabArray<amrex::EBCellFlagFab> const* eb_flag = nullptr;
+    amrex::MultiCutFab const* eb_bnd_area = nullptr;
+    amrex::MultiCutFab const* eb_bnd_normal = nullptr;
+    amrex::MultiCutFab const* eb_bnd_cent = nullptr;
+    if (inject_from_eb) {
+        amrex::EBFArrayBoxFactory const& eb_box_factory = WarpX::GetInstance().fieldEBFactory(0);
+        eb_flag = &eb_box_factory.getMultiEBCellFlagFab();
+        eb_bnd_area = &eb_box_factory.getBndryArea();
+        eb_bnd_normal = &eb_box_factory.getBndryNormal();
+        eb_bnd_cent = &eb_box_factory.getBndryCent();
+    }
+#endif
+
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(0);
 
     // Create temporary particle container to which particles will be added;
@@ -1428,9 +1421,20 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
         RealBox overlap_realbox;
         Box overlap_box;
         IntVect shifted;
-        const bool no_overlap = find_overlap_flux(tile_realbox, part_realbox, dx, problo, plasma_injector, overlap_realbox, overlap_box, shifted);
-        if (no_overlap) {
-            continue; // Go to the next tile
+#ifdef AMREX_USE_EB
+        if (inject_from_eb) {
+            // Injection from EB
+            const amrex::FabType fab_type = (*eb_flag)[mfi].getType(tile_box);
+            if (fab_type == amrex::FabType::regular) { continue; } // Go to the next tile
+            if (fab_type == amrex::FabType::covered) { continue; } // Go to the next tile
+            overlap_box = tile_box;
+            overlap_realbox = part_realbox;
+        } else
+#endif
+        {
+            // Injection from a plane
+            const bool no_overlap = find_overlap_flux(tile_realbox, part_realbox, dx, problo, plasma_injector, overlap_realbox, overlap_box, shifted);
+            if (no_overlap) { continue; } // Go to the next tile
         }
 
         const int grid_id = mfi.index();
@@ -1450,24 +1454,54 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
         if (refine_injection) {
             fine_overlap_box = overlap_box & amrex::shift(fine_injection_box, -shifted);
         }
+
+#ifdef AMREX_USE_EB
+        // Extract data structures for embedded boundaries
+        amrex::Array4<const typename FabArray<EBCellFlagFab>::value_type> eb_flag_arr;
+        amrex::Array4<const amrex::Real> eb_bnd_area_arr;
+        amrex::Array4<const amrex::Real> eb_bnd_normal_arr;
+        amrex::Array4<const amrex::Real> eb_bnd_cent_arr;
+        if (inject_from_eb) {
+            eb_flag_arr = eb_flag->array(mfi);
+            eb_bnd_area_arr = eb_bnd_area->array(mfi);
+            eb_bnd_normal_arr = eb_bnd_normal->array(mfi);
+            eb_bnd_cent_arr = eb_bnd_cent->array(mfi);
+        }
+#endif
+
         amrex::ParallelForRNG(overlap_box, [=] AMREX_GPU_DEVICE (int i, int j, int k, amrex::RandomEngine const& engine) noexcept
         {
             const IntVect iv(AMREX_D_DECL(i, j, k));
             amrex::ignore_unused(j,k);
 
+            // Determine the number of macroparticles to inject in this cell (num_ppc_int)
+#ifdef AMREX_USE_EB
+            amrex::Real num_ppc_real_in_this_cell = num_ppc_real; // user input: number of macroparticles per cell
+            if (inject_from_eb) {
+                // Injection from EB
+                // Skip cells that are not partially covered by the EB
+                if (eb_flag_arr(i,j,k).isRegular() || eb_flag_arr(i,j,k).isCovered()) { return; }
+                // Scale by the (normalized) area of the EB surface in this cell
+                num_ppc_real_in_this_cell *= eb_bnd_area_arr(i,j,k);
+            }
+#else
+            amrex::Real const num_ppc_real_in_this_cell = num_ppc_real; // user input: number of macroparticles per cell
+#endif
+            // Skip cells that do not overlap with the bounds specified by the user (xmin/xmax, ymin/ymax, zmin/zmax)
             auto lo = getCellCoords(overlap_corner, dx, {0._rt, 0._rt, 0._rt}, iv);
             auto hi = getCellCoords(overlap_corner, dx, {1._rt, 1._rt, 1._rt}, iv);
+            if (!flux_pos->overlapsWith(lo, hi)) { return; }
 
-            if (flux_pos->overlapsWith(lo, hi))
-            {
-                auto index = overlap_box.index(iv);
-                int r = 1;
-                if (fine_overlap_box.ok() && fine_overlap_box.contains(iv)) {
-                    r = compute_area_weights(rrfac, flux_normal_axis);
-                }
-                const int num_ppc_int = static_cast<int>(num_ppc_real*r + amrex::Random(engine));
-                pcounts[index] = num_ppc_int;
+            auto index = overlap_box.index(iv);
+            // Take into account refined injection region
+            int r = 1;
+            if (fine_overlap_box.ok() && fine_overlap_box.contains(iv)) {
+                r = compute_area_weights(rrfac, flux_normal_axis);
             }
+            const int num_ppc_int = static_cast<int>(num_ppc_real_in_this_cell*r + amrex::Random(engine));
+            pcounts[index] = num_ppc_int;
+
+            amrex::ignore_unused(j,k);
         });
 
         // Max number of new particles. All of them are created,
@@ -1537,7 +1571,15 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
             amrex::ignore_unused(j,k);
             const auto index = overlap_box.index(iv);
 
-            Real scale_fac = compute_scale_fac_area(dx, num_ppc_real, flux_normal_axis);
+            Real scale_fac;
+#ifdef AMREX_USE_EB
+            if (inject_from_eb) {
+                scale_fac = compute_scale_fac_area_eb(dx, num_ppc_real, eb_bnd_normal_arr, i, j, k );
+            } else
+#endif
+            {
+                scale_fac = compute_scale_fac_area_plane(dx, num_ppc_real, flux_normal_axis);
+            }
 
             if (fine_overlap_box.ok() && fine_overlap_box.contains(iv)) {
                 scale_fac /= compute_area_weights(rrfac, flux_normal_axis);
@@ -1548,13 +1590,32 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 const long ip = poffset[index] + i_part;
                 pa_idcpu[ip] = amrex::SetParticleIDandCPU(pid+ip, cpuid);
 
-                // This assumes the flux_pos is of type InjectorPositionRandomPlane
-                const XDim3 r = (fine_overlap_box.ok() && fine_overlap_box.contains(iv)) ?
-                  // In the refined injection region: use refinement ratio `rrfac`
-                  flux_pos->getPositionUnitBox(i_part, rrfac, engine) :
-                  // Otherwise: use 1 as the refinement ratio
-                  flux_pos->getPositionUnitBox(i_part, amrex::IntVect::TheUnitVector(), engine);
-                auto pos = getCellCoords(overlap_corner, dx, r, iv);
+                // Determine the position of the particle within the cell
+                XDim3 pos;
+                XDim3 r;
+#ifdef AMREX_USE_EB
+                if (inject_from_eb) {
+#if defined(WARPX_DIM_3D)
+                    pos.x = overlap_corner[0] + (iv[0] + 0.5_rt + eb_bnd_cent_arr(i,j,k,0))*dx[0];
+                    pos.y = overlap_corner[1] + (iv[1] + 0.5_rt + eb_bnd_cent_arr(i,j,k,1))*dx[1];
+                    pos.z = overlap_corner[2] + (iv[2] + 0.5_rt + eb_bnd_cent_arr(i,j,k,2))*dx[2];
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                    pos.x = overlap_corner[0] + (iv[0] + 0.5_rt + eb_bnd_cent_arr(i,j,k,0))*dx[0];
+                    pos.y = 0.0_rt;
+                    pos.z = overlap_corner[1] + (iv[1] + 0.5_rt + eb_bnd_cent_arr(i,j,k,1))*dx[1];
+#endif
+                } else
+#endif
+                {
+                    // Injection from a plane
+                    // This assumes the flux_pos is of type InjectorPositionRandomPlane
+                    r = (fine_overlap_box.ok() && fine_overlap_box.contains(iv)) ?
+                        // In the refined injection region: use refinement ratio `rrfac`
+                        flux_pos->getPositionUnitBox(i_part, rrfac, engine) :
+                        // Otherwise: use 1 as the refinement ratio
+                        flux_pos->getPositionUnitBox(i_part, amrex::IntVect::TheUnitVector(), engine);
+                    pos = getCellCoords(overlap_corner, dx, r, iv);
+                }
                 auto ppos = PDim3(pos);
 
                 // inj_mom would typically be InjectorMomentumGaussianFlux
@@ -1595,6 +1656,15 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                     continue;
                 }
 
+#ifdef AMREX_USE_EB
+                if (inject_from_eb) {
+                    // Injection from EB: rotate momentum according to the normal of the EB surface
+                    // (The above code initialized the momentum by assuming that z is the direction
+                    // normal to the EB surface. Thus we need to rotate from z to the normal.)
+                    rotate_momentum_eb(pu, eb_bnd_normal_arr, i, j , k);
+                }
+#endif
+
 #ifdef WARPX_DIM_RZ
                 // Conversion from cylindrical to Cartesian coordinates
                 // Replace the x and y, setting an angle theta.
@@ -1610,7 +1680,11 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 const amrex::Real radial_position = ppos.x;
                 ppos.x = radial_position*cos_theta;
                 ppos.y = radial_position*sin_theta;
-                if (loc_flux_normal_axis != 2) {
+                if ((loc_flux_normal_axis != 2)
+#ifdef AMREX_USE_EB
+                    || (inject_from_eb)
+#endif
+                    ) {
                     // Rotate the momentum
                     // This because, when the flux direction is e.g. "r"
                     // the `inj_mom` objects generates a v*Gaussian distribution
@@ -1753,9 +1827,9 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     const iMultiFab* gather_masks = WarpX::GatherBufferMasks(lev);
 
     const bool has_rho = fields.has(FieldType::rho_fp, lev);
-    const bool has_cjx = fields.has(FieldType::current_buf, Direction{0}, lev);
-    const bool has_cEx = fields.has(FieldType::Efield_cax, Direction{0}, lev);
-    const bool has_buffer = has_cEx || has_cjx;
+    const bool has_J_buf = fields.has_vector(FieldType::current_buf, lev);
+    const bool has_E_cax = fields.has_vector(FieldType::Efield_cax, lev);
+    const bool has_buffer = has_E_cax || has_J_buf;
 
     amrex::MultiFab & Ex = *fields.get(FieldType::Efield_aux, Direction{0}, lev);
     amrex::MultiFab & Ey = *fields.get(FieldType::Efield_aux, Direction{1}, lev);
@@ -1850,7 +1924,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                     pti, lev, current_masks, gather_masks );
             }
 
-            const long np_current = has_cjx ? nfine_current : np;
+            const long np_current = has_J_buf ? nfine_current : np;
 
             if (has_rho && ! skip_deposition && ! do_not_deposit) {
                 // Deposit charge before particle push, in component 0 of MultiFab rho.
@@ -1870,7 +1944,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
             if (! do_not_push)
             {
-                const long np_gather = has_cEx ? nfine_gather : np;
+                const long np_gather = has_E_cax ? nfine_gather : np;
 
                 int e_is_nodal = Ex.is_nodal() and Ey.is_nodal() and Ez.is_nodal();
 
@@ -3044,7 +3118,7 @@ PhysicalParticleContainer::InitIonizationModule ()
         physical_element == "H" || !do_adk_correction,
         "Correction to ADK by Zhang et al., PRA 90, 043410 (2014) only works with Hydrogen");
     // Add runtime integer component for ionization level
-    AddIntComp("ionizationLevel");
+    NewIntComp("ionizationLevel");
     // Get atomic number and ionization energies from file
     const int ion_element_id = utils::physics::ion_map_ids.at(physical_element);
     ion_atomic_number = utils::physics::ion_atomic_numbers[ion_element_id];

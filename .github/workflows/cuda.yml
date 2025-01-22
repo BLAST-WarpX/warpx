@@ -1,6 +1,13 @@
 name: 🐧 CUDA
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    paths-ignore:
+      - "Docs/**"
+      - "**.rst"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-cuda
@@ -56,16 +63,6 @@ jobs:
           -DBUILD_CLI_TOOLS=OFF       \
           -DCMAKE_CXX_COMPILER_LAUNCHER=$(which ccache) \
           -DCMAKE_VERBOSE_MAKEFILE=ON
-        cmake-easyinstall --prefix=/usr/local                    \
-          git+https://github.com/icl-utk-edu/heffte.git@v2.4.0   \
-          -DCMAKE_CXX_COMPILER_LAUNCHER=$(which ccache)          \
-          -DCMAKE_CXX_STANDARD=17 -DHeffte_ENABLE_DOXYGEN=OFF    \
-          -DHeffte_ENABLE_FFTW=OFF -DHeffte_ENABLE_TESTING=OFF   \
-          -DHeffte_ENABLE_CUDA=ON -DHeffte_ENABLE_ROCM=OFF       \
-          -DHeffte_ENABLE_ONEAPI=OFF -DHeffte_ENABLE_MKL=OFF     \
-          -DHeffte_ENABLE_PYTHON=OFF -DHeffte_ENABLE_FORTRAN=OFF \
-          -DHeffte_ENABLE_MAGMA=OFF                              \
-          -DCMAKE_VERBOSE_MAKEFILE=ON
     - name: build WarpX
       run: |
         export CCACHE_COMPRESS=1
@@ -86,7 +83,6 @@ jobs:
           -DWarpX_openpmd_internal=OFF \
           -DWarpX_PRECISION=SINGLE     \
           -DWarpX_FFT=ON               \
-          -DWarpX_HEFFTE=ON            \
           -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON \
           -DAMReX_CUDA_ERROR_CAPTURE_THIS=ON
         cmake --build build_sp -j 4
@@ -131,7 +127,7 @@ jobs:
         which nvcc || echo "nvcc not in PATH!"
 
         git clone https://github.com/AMReX-Codes/amrex.git ../amrex
-        cd ../amrex && git checkout --detach 3734079379bb6b2a3850d197241f6b2c3b3bfa7d && cd -
+        cd ../amrex && git checkout --detach e761abff95afbfa442cbe108027094bbddef5b11 && cd -
         make COMP=gcc QED=FALSE USE_MPI=TRUE USE_GPU=TRUE USE_OMP=FALSE USE_FFT=TRUE USE_CCACHE=TRUE -j 4
 
         ccache -s

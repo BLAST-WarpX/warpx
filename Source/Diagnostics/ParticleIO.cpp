@@ -173,7 +173,7 @@ MultiParticleContainer::Restart (const std::string& dir)
                     + " was found in the checkpoint file, but it has not been added yet. "
                     + " Adding it now."
                 );
-                pc->AddRealComp(comp_name);
+                pc->NewRealComp(comp_name);
             }
         }
 
@@ -206,7 +206,7 @@ MultiParticleContainer::Restart (const std::string& dir)
                     + " was found in the checkpoint file, but it has not been added yet. "
                     + " Adding it now."
                 );
-                pc->AddIntComp(comp_name);
+                pc->NewIntComp(comp_name);
             }
         }
 
@@ -258,18 +258,18 @@ storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
         is_full_diagnostic,
         "Output of the electrostatic potential (phi) on the particles was requested, "
         "but this is only available with `diag_type = Full`.");
-    tmp.AddRealComp("phi");
+    tmp.NewRealComp("phi");
     int const phi_index = tmp.getParticleComps().at("phi");
     auto& warpx = WarpX::GetInstance();
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
     for (int lev=0; lev<=warpx.finestLevel(); lev++) {
         const amrex::Geometry& geom = warpx.Geom(lev);
         auto plo = geom.ProbLoArray();
         auto dxi = geom.InvCellSizeArray();
         amrex::MultiFab const& phi = *warpx.m_fields.get(FieldType::phi_fp, lev);
 
+#ifdef AMREX_USE_OMP
+        #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
         for (PinnedParIter pti(tmp, lev); pti.isValid(); ++pti) {
 
             auto phi_grid = phi[pti].array();

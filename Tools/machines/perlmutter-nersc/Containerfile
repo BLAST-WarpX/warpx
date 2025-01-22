@@ -1,0 +1,167 @@
+# Build this container from its current directory:
+#   podman build --build-arg NJOBS=6 -t warpx-perlmutter-dev .
+# Adjust NJOBS to the number of processes to use for parallel compilation.
+#
+# Run from the via WarpX source directory
+#   podman run -v ${PWD}:/opt/warpx -it warpx-perlmutter-dev
+# then
+#   cd /opt/warpx
+# and compile.
+
+# Base System and Essential Tools Installation
+FROM nvidia/cuda:12.6.0-devel-ubuntu22.04 AS base
+
+# parallel builds
+ARG NJOBS
+ENV NJOBS=$NJOBS
+
+# Set up environment variables
+ENV DEBIAN_FRONTEND=noninteractive \
+    SW_DIR=/opt/software           \
+    FORCE_UNSAFE_CONFIGURE=1
+
+# Perlmutter A100 compilation optimization
+ENV AMREX_CUDA_ARCH=8.0        \
+    CUDAARCHS=80               \
+    CXXFLAGS="-march=znver3"   \
+    CFLAGS="-march=znver3"
+
+# Install essential system dependencies including MPI libraries
+RUN apt-get update && \
+   apt-get install -y --no-install-recommends  \
+    autoconf            \
+    build-essential     \
+    ca-certificates     \
+    coreutils           \
+    curl                \
+    environment-modules \
+    gfortran            \
+    git                 \
+    openssh-server      \
+    python3             \
+    python3-pip         \
+    python3-dev         \
+    python3-venv        \
+    unzip               \
+    vim                 \
+    libmpich-dev        \
+    cmake               \
+    libblas-dev         \
+    liblapack-dev       \
+    g++                 \
+    pkg-config          \
+    libbz2-dev          \
+    zlib1g-dev          \
+    libpng-dev          \
+    libzstd-dev         \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install c-blosc from source
+FROM base AS c-blosc
+
+RUN git clone -b v1.21.1 https://github.com/Blosc/c-blosc.git /tmp/c-blosc && \
+    cmake                                \
+      -S /tmp/c-blosc                    \
+      -B /tmp/c-blosc-build              \
+      -DCMAKE_INSTALL_PREFIX=/usr .. &&  \
+    cmake --build /tmp/c-blosc-build     \
+          --target install               \
+          -j${NJOBS} &&                  \
+    rm -rf /tmp/c-blosc*
+
+# Install ADIOS2 from source
+FROM base AS adios2
+
+# Ensure c-blosc is installed before ADIOS2
+COPY --from=c-blosc /usr /usr
+
+# Verify the location of Blosc library
+RUN find /usr -name 'libblosc*'
+
+# Ensure Blosc library paths are correctly configured
+ENV BLOSC_LIBRARY=/usr/lib/libblosc.so.1.21.1
+ENV BLOSC_INCLUDE_DIR=/usr/include
+
+# Install ADIOS2
+RUN git clone -b v2.8.3 https://github.com/ornladios/ADIOS2.git /tmp/adios2 && \
+    cd /tmp/adios2 &&           \
+    cmake -S . -B build         \
+          -DADIOS2_USE_Blosc=ON \
+          -DBLOSC_LIBRARY=${BLOSC_LIBRARY}         \
+          -DBLOSC_INCLUDE_DIR=${BLOSC_INCLUDE_DIR} \
+          -DADIOS2_USE_Fortran=OFF \
+          -DADIOS2_USE_Python=OFF  \
+          -DADIOS2_USE_ZeroMQ=OFF  \
+          -DADIOS2_USE_BZip2=ON    \
+          -DADIOS2_USE_ZFP=OFF     \
+          -DADIOS2_USE_SZ=OFF      \
+          -DADIOS2_USE_MGARD=OFF   \
+          -DADIOS2_USE_PNG=ON      \
+          -DCMAKE_INSTALL_PREFIX=/usr .. && \
+    cmake --build build --target install -j${NJOBS} && \
+    rm -rf /tmp/adios2
+
+# Install BLAS++ and LAPACK++
+FROM base AS blaspp_lapackpp
+
+RUN git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git /tmp/blaspp && \
+    cd /tmp/blaspp &&          \
+    cmake -S . -B build        \
+       -Duse_openmp=OFF        \
+       -Dgpu_backend=cuda      \
+       -DCMAKE_CXX_STANDARD=17 \
+       -DCMAKE_INSTALL_PREFIX=/usr \
+       -DBLAS_LIBRARIES=/usr/lib/x86_64-linux-gnu/libblas.so \
+       -DLAPACK_LIBRARIES=/usr/lib/x86_64-linux-gnu/liblapack.so .. && \
+    cmake --build build        \
+          --target install     \
+          -j${NJOBS} &&        \
+    rm -rf /tmp/blaspp
+
+RUN git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git /tmp/lapackpp && \
+    cd /tmp/lapackpp &&           \
+    cmake -S . -B build           \
+      -DCMAKE_CXX_STANDARD=17     \
+      -Dbuild_tests=OFF           \
+      -DCMAKE_INSTALL_PREFIX=/usr \
+      -DLAPACK_LIBRARIES=/usr/lib/x86_64-linux-gnu/liblapack.so .. && \
+    cmake --build build \
+          --target install -j${NJOBS} && \
+    rm -rf /tmp/lapackpp
+
+# Final Image
+FROM base AS final
+
+# Copy installed software from previous stages
+COPY --from=c-blosc /usr /usr
+COPY --from=adios2 /usr /usr
+COPY --from=blaspp_lapackpp /usr /usr
+
+# Create and activate Python virtual environment
+RUN python3 -m venv /opt/venv && \
+    /opt/venv/bin/pip install --no-cache-dir \
+    wheel \
+    numpy \
+    pandas \
+    scipy \
+    matplotlib \
+    jupyter \
+    scikit-learn \
+    openpmd-api \
+    yt \
+    cupy-cuda12x \
+    torch \
+    optimas[all] \
+    cython \
+    packaging \
+    build \
+    setuptools
+
+# Set up the environment for the virtual environment
+ENV PATH="/opt/venv/bin:${PATH}"
+
+# Set up entrypoint
+ENTRYPOINT ["/bin/bash", "-c"]
+
+# Default command
+CMD ["/bin/bash"]

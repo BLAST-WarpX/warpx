@@ -7,6 +7,7 @@
 
 #include <WarpX.H>
 // see WarpX.cpp - full includes for _fwd.H headers
+#include <BoundaryConditions/PEC_Insulator.H>
 #include <BoundaryConditions/PML.H>
 #include <Diagnostics/MultiDiagnostics.H>
 #include <Diagnostics/ReducedDiags/MultiReducedDiags.H>
@@ -112,13 +113,6 @@ void init_WarpX (py::module& m)
             //py::overload_cast< int >(&WarpX::boxArray, py::const_),
             py::arg("lev")
         )
-        .def("field",
-             [](WarpX const & wx) {
-                 return wx.multifab_map;
-             },
-             py::return_value_policy::reference_internal,
-             R"doc(Registry to all WarpX MultiFab (fields).)doc"
-        )
         .def("multifab",
              [](WarpX & wx, std::string internal_name) {
                  if (wx.m_fields.internal_has(internal_name)) {
@@ -148,7 +142,7 @@ where 'prefix' is the part of 'internal_name';'  before the [])doc"
             py::arg("scalar_name"),
             py::arg("level"),
             py::return_value_policy::reference_internal,
-            R"doc(Return scalar fields (MultiFabs) by name and level, e.g., ``\"rho_fp\"``, ``\"phi_fp"``, ...
+            R"doc(Return scalar fields (MultiFabs) by name and level. The name is in the form like``\"rho_fp\"``, ``\"phi_fp"``. The level is an integer with 0 being the lowest level.
 
 The physical fields in WarpX have the following naming:
 
@@ -170,7 +164,30 @@ The physical fields in WarpX have the following naming:
             py::arg("dir"),
             py::arg("level"),
             py::return_value_policy::reference_internal,
-            R"doc(Return the component of a vector field (MultiFab) by name, direction, and level, e.g., ``\"Efield_aux\"``, ``\"Efield_fp"``, ...
+            R"doc(Return the component of a vector field (MultiFab) by name, direction, and level. The name is in the form like ``\"Efield_aux\"``, ``\"Efield_fp"``, etc. The direction is a Direction instance, Direction(idir) where idir is an integer 0, 1, or 2. The level is an integer with 0 being the lowest level.
+
+The physical fields in WarpX have the following naming:
+
+- ``_fp`` are the "fine" patches, the regular resolution of a current mesh-refinement level
+- ``_aux`` are temporary (auxiliar) patches at the same resolution as ``_fp``.
+  They usually include contributions from other levels and can be interpolated for gather routines of particles.
+- ``_cp`` are "coarse" patches, at the same resolution (but not necessary values) as the ``_fp`` of ``level - 1``
+  (only for level 1 and higher).)doc"
+        )
+        .def("multifab",
+            [](WarpX & wx, std::string vector_name, int idir, int level) {
+                Direction const dir{idir};
+                if (wx.m_fields.has(vector_name, dir, level)) {
+                    return wx.m_fields.get(vector_name, dir, level);
+                } else {
+                    throw std::runtime_error("The vector field '" + vector_name + "' is unknown or is not allocated!");
+                }
+            },
+            py::arg("vector_name"),
+            py::arg("idir"),
+            py::arg("level"),
+            py::return_value_policy::reference_internal,
+            R"doc(Return the component of a vector field (MultiFab) by name, direction, and level. The name is in the form like ``\"Efield_aux\"``, ``\"Efield_fp"``, etc. The direction is an integer 0, 1, or 2. The level is an integer with 0 being the lowest level.
 
 The physical fields in WarpX have the following naming:
 
@@ -252,6 +269,10 @@ The physical fields in WarpX have the following naming:
         .def_static("run_div_cleaner",
             [] () { WarpX::ProjectionCleanDivB(); },
             "Executes projection based divergence cleaner on loaded Bfield_fp_external."
+        )
+        .def("synchronize",
+            [] (WarpX& wx) { wx.Synchronize(); },
+            "Synchronize particle velocities and positions."
         )
     ;
 

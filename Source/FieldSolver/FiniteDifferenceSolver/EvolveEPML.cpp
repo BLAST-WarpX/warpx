@@ -69,7 +69,7 @@ void FiniteDifferenceSolver::EvolveEPML (
     const ablastr::fields::VectorField Jfield = (patch_type == PatchType::fine) ?
         fields.get_alldirs(FieldType::pml_j_fp, level) : fields.get_alldirs(FieldType::pml_j_cp, level);
     ablastr::fields::VectorField edge_lengths;
-    if (fields.has(FieldType::pml_edge_lengths, Direction{0}, level)) {
+    if (fields.has_vector(FieldType::pml_edge_lengths, level)) {
         edge_lengths = fields.get_alldirs(FieldType::pml_edge_lengths, level);
     }
     amrex::MultiFab * Ffield = nullptr;

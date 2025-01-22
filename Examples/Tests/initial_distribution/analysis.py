@@ -18,18 +18,10 @@
 # 9 denotes gaussian_parser distribution w/ spatially-varying mean and thermal velocity
 # The distribution is obtained through reduced diagnostic ParticleHistogram.
 
-import os
-import sys
-
 import numpy as np
 import scipy.constants as scc
 import scipy.special as scs
 from read_raw_data import read_reduced_diags, read_reduced_diags_histogram
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
-
-filename = sys.argv[1]
 
 # print tolerance
 tolerance = 0.02
@@ -450,7 +442,3 @@ f9_error = (
 print("gaussian_parse_momentum_function velocity difference:", f9_error)
 
 assert f9_error < tolerance
-
-
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename)

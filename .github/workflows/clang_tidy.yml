@@ -1,6 +1,13 @@
 name: 🧹 clang-tidy
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    paths-ignore:
+      - "Docs/**"
+      - "**.rst"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-clangtidy
@@ -19,7 +26,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/clang15.sh
+        .github/workflows/dependencies/clang.sh 15
     - name: set up cache
       uses: actions/cache@v4
       with:

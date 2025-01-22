@@ -153,7 +153,7 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
          cd $HOME/src/warpx
          rm -rf build_pm_gpu
 
-         cmake -S . -B build_pm_gpu -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_HEFFTE=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
+         cmake -S . -B build_pm_gpu -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
          cmake --build build_pm_gpu -j 16
 
       The WarpX application executables are now in ``$HOME/src/warpx/build_pm_gpu/bin/``.
@@ -164,7 +164,7 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
          cd $HOME/src/warpx
          rm -rf build_pm_gpu_py
 
-         cmake -S . -B build_pm_gpu_py -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_HEFFTE=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+         cmake -S . -B build_pm_gpu_py -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
          cmake --build build_pm_gpu_py -j 16 --target pip_install
 
    .. tab-item:: CPU Nodes
@@ -174,7 +174,7 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
          cd $HOME/src/warpx
          rm -rf build_pm_cpu
 
-         cmake -S . -B build_pm_cpu -DWarpX_COMPUTE=OMP -DWarpX_FFT=ON -DWarpX_HEFFTE=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
+         cmake -S . -B build_pm_cpu -DWarpX_COMPUTE=OMP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
          cmake --build build_pm_cpu -j 16
 
       The WarpX application executables are now in ``$HOME/src/warpx/build_pm_cpu/bin/``.
@@ -184,7 +184,7 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
 
          rm -rf build_pm_cpu_py
 
-         cmake -S . -B build_pm_cpu_py -DWarpX_COMPUTE=OMP -DWarpX_FFT=ON -DWarpX_HEFFTE=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+         cmake -S . -B build_pm_cpu_py -DWarpX_COMPUTE=OMP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
          cmake --build build_pm_cpu_py -j 16 --target pip_install
 
 Now, you can :ref:`submit Perlmutter compute jobs <running-cpp-perlmutter>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).

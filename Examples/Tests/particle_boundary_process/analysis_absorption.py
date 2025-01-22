@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
-import sys
-
-import yt
-
 # This test shoots a beam of electrons at cubic embedded boundary geometry
 # At time step 40, none of the particles have hit the boundary yet. At time
 # step 60, all of them should have been absorbed by the boundary. In the
 # absence of the cube, none of the particles would have had time to exit
 # the problem domain yet.
+
+import sys
+
+import yt
 
 # all particles are still there
 ds40 = yt.load("diags/diag1000040")

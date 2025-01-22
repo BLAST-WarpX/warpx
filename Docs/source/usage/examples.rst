@@ -44,7 +44,8 @@ Particle Accelerator & Beam Physics
 
    examples/gaussian_beam/README.rst
    examples/beam_beam_collision/README.rst
-
+   examples/free_electron_laser/README.rst
+   examples/thomson_parabola_spectrometer/README.rst
 
 High Energy Astrophysical Plasma Physics
 ----------------------------------------
@@ -62,14 +63,6 @@ Microelectronics
 
 * `ARTEMIS examples <https://github.com/AMReX-Microelectronics/artemis/tree/development/Examples>`__
 * `ARTEMIS manual <https://artemis-em.readthedocs.io>`__
-
-
-Nuclear Fusion
---------------
-
-.. note::
-
-   TODO
 
 
 Fundamental Plasma Physics

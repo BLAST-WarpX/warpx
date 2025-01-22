@@ -20,15 +20,11 @@
 # tolerance: 0
 # Possible running time: < 1 s
 
-import os
 import sys
 
 import numpy as np
 import yt
 from openpmd_viewer import OpenPMDTimeSeries
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
 
 tolerance = 0
 
@@ -82,7 +78,3 @@ id_final = np.concatenate((id_final_scrape, id_final_box))
 assert np.all(
     np.sort(id_initial) == np.sort(id_final)
 )  # Sort because particles may not be in the same order
-
-# Checksum test
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn, do_particles=False)
