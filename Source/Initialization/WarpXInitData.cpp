@@ -1241,23 +1241,27 @@ void WarpX::InitializeEBGridData (int lev)
 
             auto const eb_fact = fieldEBFactory(lev);
 
-            auto edge_lengths_lev = m_fields.get_alldirs(FieldType::edge_lengths, lev);
-            ComputeEdgeLengths(edge_lengths_lev, eb_fact);
-            ScaleEdges(edge_lengths_lev, CellSize(lev));
-
-            auto face_areas_lev = m_fields.get_alldirs(FieldType::face_areas, lev);
-            ComputeFaceAreas(face_areas_lev, eb_fact);
-            ScaleAreas(face_areas_lev, CellSize(lev));
-
             if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
+
+                auto edge_lengths_lev = m_fields.get_alldirs(FieldType::edge_lengths, lev);
+                ComputeEdgeLengths(edge_lengths_lev, eb_fact);
+                ScaleEdges(edge_lengths_lev, CellSize(lev));
+
+                auto face_areas_lev = m_fields.get_alldirs(FieldType::face_areas, lev);
+                ComputeFaceAreas(face_areas_lev, eb_fact);
+                ScaleAreas(face_areas_lev, CellSize(lev));
+
                 // Compute additional quantities required for the ECT solver
                 MarkExtensionCells();
                 ComputeFaceExtensions();
+
                 // Mark on which grid points E should be updated
                 MarkUpdateECellsECT( m_eb_update_E[lev], edge_lengths_lev );
                 // Mark on which grid points B should be updated
                 MarkUpdateBCellsECT( m_eb_update_B[lev], face_areas_lev, edge_lengths_lev);
+
             } else {
+
                 // Mark on which grid points E should be updated (stair-case approximation)
                 MarkUpdateCellsStairCase(
                     m_eb_update_E[lev],
@@ -1268,6 +1272,7 @@ void WarpX::InitializeEBGridData (int lev)
                     m_eb_update_B[lev],
                     m_fields.get_alldirs(FieldType::Bfield_fp, lev),
                     eb_fact );
+
             }
 
         }
