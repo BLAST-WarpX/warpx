@@ -36,6 +36,7 @@
 #include "FieldSolver/WarpX_FDTD.H"
 #include "Filter/NCIGodfreyFilter.H"
 #include "Initialization/ExternalField.H"
+#include "Initialization/WarpXInit.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
@@ -210,11 +211,34 @@ namespace
             std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(), is_pml);
         return is_any_pml;
     }
+
+    /**
+     * \brief Re-orders the Fornberg coefficients so that they can be used more conveniently for
+     * finite-order centering operations. For example, for finite-order centering of order 6,
+     * the Fornberg coefficients \c (c_0,c_1,c_2) are re-ordered as \c (c_2,c_1,c_0,c_0,c_1,c_2).
+     *
+     * \param[in,out] ordered_coeffs host vector where the re-ordered Fornberg coefficients will be stored
+     * \param[in] unordered_coeffs host vector storing the original sequence of Fornberg coefficients
+     * \param[in] order order of the finite-order centering along a given direction
+     */
+    void ReorderFornbergCoefficients (
+        amrex::Vector<amrex::Real>& ordered_coeffs,
+        const amrex::Vector<amrex::Real>& unordered_coeffs,
+        const int order)
+        {
+            const int n = order / 2;
+            for (int i = 0; i < n; i++) {
+                ordered_coeffs[i] = unordered_coeffs[n-1-i];
+            }
+            for (int i = n; i < order; i++) {
+                ordered_coeffs[i] = unordered_coeffs[i-n];
+            }
+        }
 }
 
 void WarpX::MakeWarpX ()
 {
-    ParseGeometryInput();
+    warpx::initialization::check_dims();
 
     ReadMovingWindowParameters(
         do_moving_window, start_moving_window_step, end_moving_window_step,
@@ -272,12 +296,6 @@ WarpX::WarpX ()
 
     istep.resize(nlevs_max, 0);
     nsubsteps.resize(nlevs_max, 1);
-#if 0
-    // no subcycling yet
-    for (int lev = 1; lev < nlevs_max; ++lev) {
-        nsubsteps[lev] = MaxRefRatio(lev-1);
-    }
-#endif
 
     t_new.resize(nlevs_max, 0.0);
     t_old.resize(nlevs_max, std::numeric_limits<Real>::lowest());
@@ -475,8 +493,6 @@ WarpX::~WarpX ()
 void
 WarpX::ReadParameters ()
 {
-    // Ensure that geometry.dims is set properly.
-    CheckDims();
 
     {
         const ParmParse pp;// Traditionally, max_step and stop_time do not have prefix.
@@ -497,6 +513,19 @@ WarpX::ReadParameters ()
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT && !EB::enabled()) {
             throw std::runtime_error("ECP Solver requires to enable embedded boundaries at runtime.");
         }
+#ifdef WARPX_DIM_RZ
+        if (electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD)
+        {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(Geom(0).ProbLo(0) == 0.,
+                "Lower bound of radial coordinate (prob_lo[0]) with RZ PSATD solver must be zero");
+        }
+        else
+        {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(Geom(0).ProbLo(0) >= 0.,
+            "Lower bound of radial coordinate (prob_lo[0]) with RZ FDTD solver must be non-negative");
+        }
+#endif
+
         pp_algo.query_enum_sloppy("evolve_scheme", evolve_scheme, "-_");
     }
 
@@ -688,6 +717,7 @@ WarpX::ReadParameters ()
         "To use the FFT Poisson solver, compile with WARPX_USE_FFT=ON.");
 #endif
         utils::parser::queryWithParser(pp_warpx, "self_fields_max_iters", magnetostatic_solver_max_iters);
+        utils::parser::queryWithParser(pp_warpx, "self_fields_verbosity", magnetostatic_solver_verbosity);
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         (
@@ -2323,6 +2353,8 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
                                   guard_cells.ng_FieldSolver, lev, "m_eb_update_B[y]");
                 AllocInitMultiFab(m_eb_update_B[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
                                   guard_cells.ng_FieldSolver, lev, "m_eb_update_B[z]");
+            }
+            if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
 
                 //! EB: Lengths of the mesh edges
                 m_fields.alloc_init(FieldType::edge_lengths, Direction{0}, lev, amrex::convert(ba, Ex_nodal_flag),
@@ -2339,8 +2371,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
                     dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
                 m_fields.alloc_init(FieldType::face_areas, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag),
                     dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
-            }
-            if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
+
                 AllocInitMultiFab(m_flag_info_face[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
                                   guard_cells.ng_FieldSolver, lev, "m_flag_info_face[x]");
                 AllocInitMultiFab(m_flag_info_face[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
@@ -3221,19 +3252,6 @@ amrex::Vector<amrex::Real> WarpX::getFornbergStencilCoefficients (const int n_or
     return coeffs;
 }
 
-void WarpX::ReorderFornbergCoefficients (amrex::Vector<amrex::Real>& ordered_coeffs,
-                                         amrex::Vector<amrex::Real>& unordered_coeffs,
-                                         const int order)
-{
-    const int n = order / 2;
-    for (int i = 0; i < n; i++) {
-        ordered_coeffs[i] = unordered_coeffs[n-1-i];
-    }
-    for (int i = n; i < order; i++) {
-        ordered_coeffs[i] = unordered_coeffs[i-n];
-    }
-}
-
 void WarpX::AllocateCenteringCoefficients (amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_x,
                                            amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_y,
                                            amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_z,
@@ -3262,12 +3280,21 @@ void WarpX::AllocateCenteringCoefficients (amrex::Gpu::DeviceVector<amrex::Real>
 
     // Re-order Fornberg stencil coefficients:
     // example for order 6: (c_0,c_1,c_2) becomes (c_2,c_1,c_0,c_0,c_1,c_2)
-    ReorderFornbergCoefficients(host_centering_stencil_coeffs_x,
-                                Fornberg_stencil_coeffs_x, centering_nox);
-    ReorderFornbergCoefficients(host_centering_stencil_coeffs_y,
-                                Fornberg_stencil_coeffs_y, centering_noy);
-    ReorderFornbergCoefficients(host_centering_stencil_coeffs_z,
-                                Fornberg_stencil_coeffs_z, centering_noz);
+    ::ReorderFornbergCoefficients(
+        host_centering_stencil_coeffs_x,
+        Fornberg_stencil_coeffs_x,
+        centering_nox
+    );
+    ::ReorderFornbergCoefficients(
+        host_centering_stencil_coeffs_y,
+        Fornberg_stencil_coeffs_y,
+        centering_noy
+    );
+    ::ReorderFornbergCoefficients(
+        host_centering_stencil_coeffs_z,
+        Fornberg_stencil_coeffs_z,
+        centering_noz
+    );
 
     // Device vectors of stencil coefficients used for finite-order centering
 
@@ -3343,14 +3370,6 @@ WarpX::isAnyParticleBoundaryThermal ()
     return false;
 }
 
-std::string
-TagWithLevelSuffix (std::string name, int const level)
-{
-    // Add the suffix "[level=level]"
-    name.append("[level=").append(std::to_string(level)).append("]");
-    return name;
-}
-
 void
 WarpX::AllocInitMultiFab (
     std::unique_ptr<amrex::iMultiFab>& mf,
@@ -3362,7 +3381,8 @@ WarpX::AllocInitMultiFab (
     const std::string& name,
     std::optional<const int> initial_value)
 {
-    const auto name_with_suffix = TagWithLevelSuffix(name, level);
+    // Add the suffix "[level=level]"
+    const auto name_with_suffix = name + "[level=" + std::to_string(level) + "]";
     const auto tag = amrex::MFInfo().SetTag(name_with_suffix);
     mf = std::make_unique<amrex::iMultiFab>(ba, dm, ncomp, ngrow, tag);
     if (initial_value) {

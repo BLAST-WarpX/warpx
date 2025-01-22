@@ -406,14 +406,14 @@ WarpX::MarkUpdateCellsStairCase (
 
             if (fab_type == amrex::FabType::regular) { // All cells in the box are regular
 
-                // Every cell in box is all regular: update field in every cell
+                // Every cell in box is regular: update field in every cell
                 amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                     eb_update_arr(i, j, k) = 1;
                 });
 
             } else if (fab_type == amrex::FabType::covered) { // All cells in the box are covered
 
-                // Every cell in box is all covered: do not update field
+                // Every cell in box is fully covered: do not update field
                 amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                     eb_update_arr(i, j, k) = 0;
                 });
@@ -432,7 +432,7 @@ WarpX::MarkUpdateCellsStairCase (
                     // of the `eb_update_arr` in each direction.
                     // If `eb_update_arr` is nodal in a given direction, we need to check the cells
                     // to the left and right of this nodal gridpoint.
-                    // For instance, if `eb_update_arr` is nodal in the first dimension, we
+                    // For instance, if `eb_update_arr` is nodal in the first dimension, we need
                     // to check the cells at index i-1 and at index i, since, with AMReX indexing conventions,
                     // these are the neighboring cells for the nodal gripoint at index i.
                     // If `eb_update_arr` is cell-centerd in a given direction, we only need to check
@@ -449,21 +449,20 @@ WarpX::MarkUpdateCellsStairCase (
                     int const k_start = k;
 #endif
                     // Loop over neighboring cells
-                    int eb_update = 1;
+                    int eb_update_flag = 1;
                     for (int i_cell = i_start; i_cell <= i; ++i_cell) {
                         for (int j_cell = j_start; j_cell <= j; ++j_cell) {
                             for (int k_cell = k_start; k_cell <= k; ++k_cell) {
                                 // If one of the neighboring is either partially or fully covered
                                 // (i.e. if they are not regular cells), do not update field
-                                // (Note that `flag` is a cell-centered object, and `isRegular`
-                                // returns `false` if the cell is either partially or fully covered.)
+                                // (`isRegular` returns `false` if the cell is either partially or fully covered.)
                                 if ( !flag(i_cell, j_cell, k_cell).isRegular() ) {
-                                    eb_update = 0;
+                                    eb_update_flag = 0;
                                 }
                             }
                         }
                     }
-                    eb_update_arr(i, j, k) = eb_update;
+                    eb_update_arr(i, j, k) = eb_update_flag;
                 });
 
             }
