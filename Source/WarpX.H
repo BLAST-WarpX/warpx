@@ -162,12 +162,7 @@ public:
     HybridPICModel& GetHybridPICModel () { return *m_hybrid_pic_model; }
     [[nodiscard]] HybridPICModel * get_pointer_HybridPICModel () const { return m_hybrid_pic_model.get(); }
     MultiDiagnostics& GetMultiDiags () {return *multi_diags;}
-#ifdef AMREX_USE_EB
-    ablastr::fields::MultiLevelScalarField GetDistanceToEB () {
-        using warpx::fields::FieldType;
-        return m_fields.get_mr_levels(FieldType::distance_to_eb, finestLevel());
-    }
-#endif
+
     ParticleBoundaryBuffer& GetParticleBoundaryBuffer () { return *m_particle_boundary_buffer; }
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag() { return m_eb_update_E; }
 
@@ -903,6 +898,7 @@ public:
     // Magnetostatic Solver Interface
     MagnetostaticSolver::VectorPoissonBoundaryHandler m_vector_poisson_boundary_handler;
     int magnetostatic_solver_max_iters = 200;
+    int magnetostatic_solver_verbosity = 2;
     void ComputeMagnetostaticField ();
     void AddMagnetostaticFieldLabFrame ();
     void computeVectorPotential (ablastr::fields::MultiLevelVectorField const& curr,
@@ -927,11 +923,9 @@ public:
      * \param[in] fx_parser parser function to initialize x-field
      * \param[in] fy_parser parser function to initialize y-field
      * \param[in] fz_parser parser function to initialize z-field
-     * \param[in] edge_lengths edge lengths information
-     * \param[in] face_areas face areas information
-     * \param[in] topology flag indicating if field is edge-based or face-based
      * \param[in] lev level of the Multifabs that is initialized
      * \param[in] patch_type PatchType on which the field is initialized (fine or coarse)
+     * \param[in] eb_update_field flag indicating which gridpoints should be modified by this functions
      */
     void ComputeExternalFieldOnGridUsingParser (
         warpx::fields::FieldType field,
@@ -1356,18 +1350,6 @@ private:
         return gather_buffer_masks[lev].get();
     }
 
-    /**
-     * \brief Re-orders the Fornberg coefficients so that they can be used more conveniently for
-     * finite-order centering operations. For example, for finite-order centering of order 6,
-     * the Fornberg coefficients \c (c_0,c_1,c_2) are re-ordered as \c (c_2,c_1,c_0,c_0,c_1,c_2).
-     *
-     * \param[in,out] ordered_coeffs host vector where the re-ordered Fornberg coefficients will be stored
-     * \param[in] unordered_coeffs host vector storing the original sequence of Fornberg coefficients
-     * \param[in] order order of the finite-order centering along a given direction
-     */
-    void ReorderFornbergCoefficients (amrex::Vector<amrex::Real>& ordered_coeffs,
-                                      amrex::Vector<amrex::Real>& unordered_coeffs,
-                                      int order);
     /**
      * \brief Allocates and initializes the stencil coefficients used for the finite-order centering
      * of fields and currents, and stores them in the given device vectors.
