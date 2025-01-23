@@ -658,7 +658,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                   amrex::Dim3 lo,
                                   amrex::Real q,
                                   [[maybe_unused]]int n_rz_azimuthal_modes,
-                                  const amrex::Array4<const int> eb_reduce_particle_shape,
+                                  const amrex::Array4<const int>& eb_reduce_particle_shape,
                                   bool embedded_boundary_enabled
                                   )
 {

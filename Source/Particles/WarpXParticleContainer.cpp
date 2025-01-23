@@ -586,7 +586,10 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
         if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov) {
             if (push_type == PushType::Explicit) {
 
-                auto const eb_reduce_particle_shape = (*warpx.GetEBReduceParticleShapeFlag()[lev])[pti].array();
+                amrex::Array4<const int> eb_reduce_particle_shape;
+                if (EB::enabled()) {
+                    eb_reduce_particle_shape = (*warpx.GetEBReduceParticleShapeFlag()[lev])[pti].array();
+                }
 
                 if      (WarpX::nox == 1){
                     doEsirkepovDepositionShapeN<1>(
