@@ -5,4 +5,4 @@
 # License: BSD-3-Clause-LBNL
 
 # keep this entry for GitHub's dependency graph
-openPMD-api>=0.15.1
+openPMD-api>=0.16.1

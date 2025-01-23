@@ -423,7 +423,7 @@ class CapacitiveDischargeExample(object):
             assert hasattr(self.solver, "phi")
 
         if libwarpx.amr.ParallelDescriptor.MyProc() == 0:
-            np.save(f"ion_density_case_{self.n+1}.npy", self.ion_density_array)
+            np.save(f"ion_density_case_{self.n + 1}.npy", self.ion_density_array)
 
         # query the particle z-coordinates if this is run during CI testing
         # to cover that functionality

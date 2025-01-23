@@ -30,7 +30,7 @@
 #include <fstream>
 #include <vector>
 
-using namespace amrex;
+using namespace amrex::literals;
 using warpx::fields::FieldType;
 
 // constructor
@@ -40,7 +40,7 @@ FieldEnergy::FieldEnergy (const std::string& rd_name)
 
     // read number of levels
     int nLevel = 0;
-    const ParmParse pp_amr("amr");
+    amrex::ParmParse const pp_amr("amr");
     pp_amr.query("max_level", nLevel);
     nLevel += 1;
 
@@ -48,7 +48,7 @@ FieldEnergy::FieldEnergy (const std::string& rd_name)
     // resize data array
     m_data.resize(noutputs*nLevel, 0.0_rt);
 
-    if (ParallelDescriptor::IOProcessor())
+    if (amrex::ParallelDescriptor::IOProcessor())
     {
         if ( m_write_header )
         {
@@ -84,10 +84,10 @@ void FieldEnergy::ComputeDiags (int step)
     if (!m_intervals.contains(step+1)) { return; }
 
     // get a reference to WarpX instance
-    auto & warpx = WarpX::GetInstance();
+    auto const & warpx = WarpX::GetInstance();
 
     // get number of level
-    const auto nLevel = warpx.finestLevel() + 1;
+    int const nLevel = warpx.finestLevel() + 1;
 
     using ablastr::fields::Direction;
 
@@ -95,42 +95,29 @@ void FieldEnergy::ComputeDiags (int step)
     for (int lev = 0; lev < nLevel; ++lev)
     {
         // get MultiFab data at lev
-        const MultiFab & Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
-        const MultiFab & Ey = *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, lev);
-        const MultiFab & Ez = *warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, lev);
-        const MultiFab & Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, lev);
-        const MultiFab & By = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, lev);
-        const MultiFab & Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, lev);
+        amrex::MultiFab const & Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
+        amrex::MultiFab const & Ey = *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, lev);
+        amrex::MultiFab const & Ez = *warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, lev);
+        amrex::MultiFab const & Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, lev);
+        amrex::MultiFab const & By = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, lev);
+        amrex::MultiFab const & Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, lev);
 
         // get cell volume
-        const std::array<Real, 3> &dx = WarpX::CellSize(lev);
-        const amrex::Real dV = dx[0]*dx[1]*dx[2];
-
-#if defined(WARPX_DIM_RZ)
-        amrex::Real const tmpEx = ComputeNorm2RZ(Ex, lev);
-        amrex::Real const tmpEy = ComputeNorm2RZ(Ey, lev);
-        amrex::Real const tmpEz = ComputeNorm2RZ(Ez, lev);
-        amrex::Real const Es = tmpEx + tmpEy + tmpEz;
-
-        amrex::Real const tmpBx = ComputeNorm2RZ(Bx, lev);
-        amrex::Real const tmpBy = ComputeNorm2RZ(By, lev);
-        amrex::Real const tmpBz = ComputeNorm2RZ(Bz, lev);
-        amrex::Real const Bs = tmpBx + tmpBy + tmpBz;
-#else
-        Geometry const & geom = warpx.Geom(lev);
+        std::array<amrex::Real, 3> const &dx = WarpX::CellSize(lev);
+        amrex::Real const dV = dx[0]*dx[1]*dx[2];
 
         // compute E squared
-        Real const tmpEx = Ex.norm2(0,geom.periodicity());
-        Real const tmpEy = Ey.norm2(0,geom.periodicity());
-        Real const tmpEz = Ez.norm2(0,geom.periodicity());
-        Real const Es = tmpEx*tmpEx + tmpEy*tmpEy + tmpEz*tmpEz;
+        amrex::Real const tmpEx = ComputeNorm2(Ex, lev);
+        amrex::Real const tmpEy = ComputeNorm2(Ey, lev);
+        amrex::Real const tmpEz = ComputeNorm2(Ez, lev);
 
         // compute B squared
-        Real const tmpBx = Bx.norm2(0,geom.periodicity());
-        Real const tmpBy = By.norm2(0,geom.periodicity());
-        Real const tmpBz = Bz.norm2(0,geom.periodicity());
-        Real const Bs = tmpBx*tmpBx + tmpBy*tmpBy + tmpBz*tmpBz;
-#endif
+        amrex::Real const tmpBx = ComputeNorm2(Bx, lev);
+        amrex::Real const tmpBy = ComputeNorm2(By, lev);
+        amrex::Real const tmpBz = ComputeNorm2(Bz, lev);
+
+        amrex::Real const Es = tmpEx + tmpEy + tmpEz;
+        amrex::Real const Bs = tmpBx + tmpBy + tmpBz;
 
         constexpr int noutputs = 3; // total energy, E-field energy and B-field energy
         constexpr int index_total = 0;
@@ -156,15 +143,13 @@ void FieldEnergy::ComputeDiags (int step)
 }
 // end void FieldEnergy::ComputeDiags
 
-// Function that computes the sum of the field squared in RZ
+// Function that computes the sum of the field squared.
+// This takes into account the fraction of the cell volumes within the domain
+// and the cell volumes in cylindrical coordinates.
 amrex::Real
-FieldEnergy::ComputeNorm2RZ(const amrex::MultiFab& field, const int lev)
+FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, [[maybe_unused]]int lev)
 {
-    // get a reference to WarpX instance
-    auto & warpx = WarpX::GetInstance();
-
-    Geometry const & geom = warpx.Geom(lev);
-    const amrex::Real dr = geom.CellSize(0);
+    amrex::IntVect const is_nodal = field.ixType().toIntVect();
 
     amrex::ReduceOps<amrex::ReduceOpSum> reduce_ops;
     amrex::ReduceData<amrex::Real> reduce_data(reduce_ops);
@@ -178,45 +163,63 @@ FieldEnergy::ComputeNorm2RZ(const amrex::MultiFab& field, const int lev)
 
         amrex::Array4<const amrex::Real> const& field_arr = field.array(mfi);
 
-        const amrex::Box tilebox = mfi.tilebox();
-        amrex::Box tb = convert(tilebox, field.ixType().toIntVect());
+        amrex::Box const tilebox = mfi.tilebox();
+        amrex::Box const tb = convert(tilebox, is_nodal);
+        amrex::IntVect const tb_lo = tb.smallEnd();
+        amrex::IntVect const tb_hi = tb.bigEnd();
 
+#if defined(WARPX_DIM_RZ)
         // Lower corner of tile box physical domain
-        const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
-        const Dim3 lo = lbound(tilebox);
-        const Dim3 hi = ubound(tilebox);
-        const Real rmin = xyzmin.x + (tb.ixType().nodeCentered(0) ? 0._rt : 0.5_rt*dr);
-        const int irmin = lo.x;
-        const int irmax = hi.x;
+        auto const & warpx = WarpX::GetInstance();
+        amrex::Geometry const & geom = warpx.Geom(lev);
+        amrex::Real const dr = geom.CellSize(0);
+        amrex::XDim3 const xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
+        amrex::Real const rmin = xyzmin.x + (is_nodal[0] ? 0._rt : 0.5_rt*dr);
+#endif
+
+        // On the boundaries, if the grid is nodal, use half of the volume.
+        // This applies to all boundary conditions, and to the overlap of
+        // boxes within the domain.
+        // Previously, the code used MultiFab::norm2, but that does not do
+        // the half-volume scaling for the domain boundaries when not periodic.
+
+        auto volume_factor = [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+            amrex::ignore_unused(i,j,k,n);
+#if defined WARPX_DIM_RZ
+            amrex::Real const r = rmin + (i - tb_lo[0])*dr;
+            amrex::Real v_factor = 2._rt*r;
+            if (i == tb_lo[0] && is_nodal[0]) { v_factor = r + dr/4._rt; }
+            if (i == tb_hi[0] && is_nodal[0]) { v_factor = r - dr/4._rt; }
+            if (j == tb_lo[1] && is_nodal[1]) { v_factor *= 0.5_rt; }
+            if (j == tb_hi[1] && is_nodal[1]) { v_factor *= 0.5_rt; }
+            amrex::Real const theta_integral = (n == 0 ? 1._rt : 0.5_rt);
+            return MathConst::pi*v_factor*theta_integral;
+#else
+            amrex::Real v_factor = 1._rt;
+            AMREX_D_TERM(
+            if (i == tb_lo[0] && is_nodal[0]) { v_factor *= 0.5_rt; },
+            if (j == tb_lo[1] && is_nodal[1]) { v_factor *= 0.5_rt; },
+            if (k == tb_lo[2] && is_nodal[2]) { v_factor *= 0.5_rt; })
+            AMREX_D_TERM(
+            if (i == tb_hi[0] && is_nodal[0]) { v_factor *= 0.5_rt; },
+            if (j == tb_hi[1] && is_nodal[1]) { v_factor *= 0.5_rt; },
+            if (k == tb_hi[2] && is_nodal[2]) { v_factor *= 0.5_rt; })
+            return v_factor;
+#endif
+        };
 
         int const ncomp = field.nComp();
-
-        for (int idir=0 ; idir < AMREX_SPACEDIM ; idir++) {
-            if (WarpX::field_boundary_hi[idir] == FieldBoundaryType::Periodic) {
-                // For periodic boundaries, do not include the data in the nodes
-                // on the upper edge of the domain
-                tb.enclosedCells(idir);
-            }
-        }
 
         reduce_ops.eval(tb, ncomp, reduce_data,
             [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) -> ReduceTuple
             {
-                const amrex::Real r = rmin + (i - irmin)*dr;
-                amrex::Real volume_factor = r;
-                if (r == 0._rt) {
-                    volume_factor = dr/8._rt;
-                } else if (rmin == 0._rt && i == irmax) {
-                    volume_factor = r/2._rt - dr/8._rt;
-                }
-                const amrex::Real theta_integral = (n == 0 ? 2._rt : 1._rt);
-                return theta_integral*field_arr(i,j,k,n)*field_arr(i,j,k,n)*volume_factor;
+                return field_arr(i,j,k,n)*field_arr(i,j,k,n)*volume_factor(i,j,k,n);
             });
 
     }
 
-    const amrex::Real field_sum = amrex::get<0>(reduce_data.value());
-    const amrex::Real result = MathConst::pi*field_sum;
+    amrex::Real result = amrex::get<0>(reduce_data.value());
+    amrex::ParallelDescriptor::ReduceRealSum(result);
+
     return result;
 }
-// end Real FieldEnergy::ComputeNorm2RZ

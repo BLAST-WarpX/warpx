@@ -169,7 +169,6 @@ private:
                   const Vec&         a_U,
                   const Vec&         a_b,
                         amrex::Real  a_time,
-                        amrex::Real  a_dt,
                         int          a_iter ) const;
 
 };
@@ -252,7 +251,7 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
     for (iter = 0; iter < m_maxits;) {
 
         // Compute residual: F(U) = U - b - R(U)
-        EvalResidual(m_F, a_U, a_b, a_time, a_dt, iter);
+        EvalResidual(m_F, a_U, a_b, a_time, iter);
 
         // Compute norm of the residual
         norm_abs = m_F.norm2();
@@ -329,11 +328,10 @@ void NewtonSolver<Vec,Ops>::EvalResidual ( Vec&         a_F,
                                      const Vec&         a_U,
                                      const Vec&         a_b,
                                            amrex::Real  a_time,
-                                           amrex::Real  a_dt,
                                            int          a_iter ) const
 {
 
-    m_ops->ComputeRHS( m_R, a_U, a_time, a_dt, a_iter, false );
+    m_ops->ComputeRHS( m_R, a_U, a_time, a_iter, false );
 
     // set base U and R(U) for matrix-free Jacobian action calculation
     m_linear_function->setBaseSolution(a_U);

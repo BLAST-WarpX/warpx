@@ -15,15 +15,11 @@
 # Both populations belong to the same carbon12 ion species.
 # See test T1b from JCP 413 (2020) by D. Higginson, et al.
 #
-import os
 import sys
 
 import numpy as np
 import yt
 from scipy.constants import e
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 # this will be the name of the plot file
 last_fn = sys.argv[1]
@@ -123,9 +119,3 @@ tolerance = 0.02
 print("TApar at 30ps error = ", error)
 print("tolerance = ", tolerance)
 assert error < tolerance
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

@@ -14,13 +14,7 @@ thermal boundary condition. We do not expect the particle energy to increase
 beyond 2% in the time that it takes all particles to cross the domain boundary
 """
 
-import os
-import sys
-
 import numpy as np
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 FE_rdiag = "./diags/reducedfiles/EF.txt"
 init_Fenergy = np.loadtxt(FE_rdiag)[1, 2]
@@ -32,9 +26,3 @@ PE_rdiag = "./diags/reducedfiles/EN.txt"
 init_Penergy = np.loadtxt(PE_rdiag)[0, 2]
 final_Penergy = np.loadtxt(PE_rdiag)[-1, 2]
 assert abs(final_Penergy - init_Penergy) / init_Penergy < 0.02
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

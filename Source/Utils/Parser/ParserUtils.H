@@ -88,6 +88,20 @@ namespace utils::parser
         std::string& stored_string);
 
 
+    /**
+    * \brief If the input is provided, parse the string (typically a mathematical expression) from the
+    * input file and store it into a variable, replacing its contents.
+    *
+    * \param pp used to read the query_string `pp.<function>=string`
+    * \param query_string ParmParse.query will look for this string
+    * \param stored_string variable in which the string to parse is stored
+    */
+    bool Query_parserString(
+        amrex::ParmParse const& pp,
+        std::string const& query_string,
+        std::string& stored_string);
+
+
     /** Parse a string and return as a double precision floating point number
     *
     * In case the string cannot be interpreted as a double,

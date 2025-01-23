@@ -278,6 +278,10 @@ WarpX::PrintMainPICparameters ()
       amrex::Print() << "Operation mode:       | Electrostatic" << "\n";
       amrex::Print() << "                      | - laboratory frame, electrostatic + magnetostatic" << "\n";
     }
+    else if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameEffectivePotential){
+      amrex::Print() << "Operation mode:       | Electrostatic" << "\n";
+      amrex::Print() << "                      | - laboratory frame, effective potential scheme" << "\n";
+    }
     else{
       amrex::Print() << "Operation mode:       | Electromagnetic" << "\n";
     }
@@ -606,6 +610,9 @@ WarpX::InitData ()
             AddExternalFields(lev);
         }
     }
+    else {
+        ExecutePythonCallback("afterInitatRestart");
+    }
 
     if (restart_chkfile.empty() || write_diagnostics_on_restart) {
         // Write full diagnostics before the first iteration.
@@ -684,21 +691,7 @@ WarpX::InitFromScratch ()
         m_implicit_solver->Define(this);
         m_implicit_solver->GetParticleSolverParams( max_particle_its_in_implicit_scheme,
                                                     particle_tol_in_implicit_scheme );
-
-        // Add space to save the positions and velocities at the start of the time steps
-        for (auto const& pc : *mypc) {
-#if (AMREX_SPACEDIM >= 2)
-            pc->NewRealComp("x_n");
-#endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-            pc->NewRealComp("y_n");
-#endif
-            pc->NewRealComp("z_n");
-            pc->NewRealComp("ux_n");
-            pc->NewRealComp("uy_n");
-            pc->NewRealComp("uz_n");
-        }
-
+        m_implicit_solver->CreateParticleAttributes();
     }
 
     mypc->AllocData();
@@ -846,7 +839,7 @@ WarpX::computeMaxStepBoostAccelerator() {
     const Real interaction_time_boost = (len_plasma_boost-zmin_domain_boost_step_0)/
         (moving_window_v-v_plasma_boost);
     // Divide by dt, and update value of max_step.
-    const auto computed_max_step = (do_subcycling)?
+    const auto computed_max_step = (m_do_subcycling)?
         static_cast<int>(interaction_time_boost/dt[0]):
         static_cast<int>(interaction_time_boost/dt[maxLevel()]);
     max_step = computed_max_step;
@@ -972,23 +965,20 @@ WarpX::InitLevelData (int lev, Real /*time*/)
     // The default maxlevel_extEMfield_init value is the total number of levels in the simulation
     if ((m_p_ext_field_params->B_ext_grid_type == ExternalFieldType::parse_ext_grid_function)
          && (lev > 0) && (lev <= maxlevel_extEMfield_init)) {
+
         ComputeExternalFieldOnGridUsingParser(
             FieldType::Bfield_aux,
             m_p_ext_field_params->Bxfield_parser->compile<4>(),
             m_p_ext_field_params->Byfield_parser->compile<4>(),
             m_p_ext_field_params->Bzfield_parser->compile<4>(),
-            lev, PatchType::fine, 'f',
-            m_fields.get_alldirs(FieldType::edge_lengths, lev),
-            m_fields.get_alldirs(FieldType::face_areas, lev));
+            lev, PatchType::fine, m_eb_update_B);
 
         ComputeExternalFieldOnGridUsingParser(
             FieldType::Bfield_cp,
             m_p_ext_field_params->Bxfield_parser->compile<4>(),
             m_p_ext_field_params->Byfield_parser->compile<4>(),
             m_p_ext_field_params->Bzfield_parser->compile<4>(),
-            lev, PatchType::coarse, 'f',
-            m_fields.get_alldirs(FieldType::edge_lengths, lev),
-            m_fields.get_mr_levels_alldirs(FieldType::face_areas, max_level)[lev]);
+            lev, PatchType::coarse, m_eb_update_B);
     }
 
     // if the input string for the E-field is "parse_e_ext_grid_function",
@@ -1019,18 +1009,14 @@ WarpX::InitLevelData (int lev, Real /*time*/)
                 m_p_ext_field_params->Exfield_parser->compile<4>(),
                 m_p_ext_field_params->Eyfield_parser->compile<4>(),
                 m_p_ext_field_params->Ezfield_parser->compile<4>(),
-                lev, PatchType::fine, 'e',
-                m_fields.get_alldirs(FieldType::edge_lengths, lev),
-                m_fields.get_alldirs(FieldType::face_areas, lev));
+                lev, PatchType::fine, m_eb_update_E);
 
             ComputeExternalFieldOnGridUsingParser(
                 FieldType::Efield_cp,
                 m_p_ext_field_params->Exfield_parser->compile<4>(),
                 m_p_ext_field_params->Eyfield_parser->compile<4>(),
                 m_p_ext_field_params->Ezfield_parser->compile<4>(),
-                lev, PatchType::coarse, 'e',
-                m_fields.get_alldirs(FieldType::edge_lengths, lev),
-                m_fields.get_alldirs(FieldType::face_areas, lev));
+                lev, PatchType::coarse, m_eb_update_E);
 #ifdef AMREX_USE_EB
             if (eb_enabled) {
                 if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
@@ -1064,9 +1050,8 @@ void WarpX::ComputeExternalFieldOnGridUsingParser (
     amrex::ParserExecutor<4> const& fx_parser,
     amrex::ParserExecutor<4> const& fy_parser,
     amrex::ParserExecutor<4> const& fz_parser,
-    int lev, PatchType patch_type, [[maybe_unused]] const char topology,
-    std::optional<ablastr::fields::VectorField> const& edge_lengths,
-    std::optional<ablastr::fields::VectorField> const& face_areas)
+    int lev, PatchType patch_type,
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field)
 {
     auto t = gett_new(lev);
 
@@ -1089,8 +1074,6 @@ void WarpX::ComputeExternalFieldOnGridUsingParser (
     const amrex::IntVect y_nodal_flag = mfy->ixType().toIntVect();
     const amrex::IntVect z_nodal_flag = mfz->ixType().toIntVect();
 
-    const bool eb_enabled = EB::enabled();
-
     for ( MFIter mfi(*mfx, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
         const amrex::Box& tbx = mfi.tilebox( x_nodal_flag, mfx->nGrowVect() );
         const amrex::Box& tby = mfi.tilebox( y_nodal_flag, mfy->nGrowVect() );
@@ -1100,44 +1083,19 @@ void WarpX::ComputeExternalFieldOnGridUsingParser (
         auto const& mfyfab = mfy->array(mfi);
         auto const& mfzfab = mfz->array(mfi);
 
-        amrex::Array4<amrex::Real> lx, ly, lz, Sx, Sy, Sz;
-        if (eb_enabled) {
-            if (edge_lengths.has_value()) {
-                const auto& edge_lengths_array = edge_lengths.value();
-                lx = edge_lengths_array[0]->array(mfi);
-                ly = edge_lengths_array[1]->array(mfi);
-                lz = edge_lengths_array[2]->array(mfi);
-            }
-            if (face_areas.has_value()) {
-                const auto& face_areas_array = face_areas.value();
-                Sx = face_areas_array[0]->array(mfi);
-                Sy = face_areas_array[1]->array(mfi);
-                Sz = face_areas_array[2]->array(mfi);
-            }
-        }
-
-#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-        amrex::Dim3 lx_lo, lx_hi, lz_lo, lz_hi;
-#endif
-        if (eb_enabled) {
-#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-            lx_lo = amrex::lbound(lx);
-            lx_hi = amrex::ubound(lx);
-            lz_lo = amrex::lbound(lz);
-            lz_hi = amrex::ubound(lz);
-#endif
+        amrex::Array4<int> update_fx_arr, update_fy_arr, update_fz_arr;
+        if (EB::enabled()) {
+            update_fx_arr = eb_update_field[lev][0]->array(mfi);
+            update_fy_arr = eb_update_field[lev][1]->array(mfi);
+            update_fz_arr = eb_update_field[lev][2]->array(mfi);
         }
 
         amrex::ParallelFor (tbx, tby, tbz,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-#ifdef AMREX_USE_EB
-#ifdef WARPX_DIM_3D
-                if(lx && ((topology=='e' and lx(i, j, k)<=0) or (topology=='f' and Sx(i, j, k)<=0))) { return; }
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                //In XZ and RZ Ex is associated with a x-edge, while Bx is associated with a z-edge
-                if(lx && ((topology=='e' and lx(i, j, k)<=0) or (topology=='f' and lz(i, j, k)<=0))) { return; }
-#endif
-#endif
+
+                // Do not set fields inside the embedded boundary
+                if (update_fx_arr && update_fx_arr(i,j,k) == 0) { return; }
+
                 // Shift required in the x-, y-, or z- position
                 // depending on the index type of the multifab
 #if defined(WARPX_DIM_1D_Z)
@@ -1163,19 +1121,10 @@ void WarpX::ComputeExternalFieldOnGridUsingParser (
                 mfxfab(i,j,k) = fx_parser(x,y,z,t);
             },
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-#ifdef AMREX_USE_EB
-#ifdef WARPX_DIM_3D
-                if(ly && ((topology=='e' and ly(i, j, k)<=0) or (topology=='f' and Sy(i, j, k)<=0))) { return; }
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                //In XZ and RZ Ey is associated with a mesh node, so we need to check if  the mesh node is covered
-                if(lx &&
-                  ((topology=='e' and (lx(std::min(i  , lx_hi.x), std::min(j  , lx_hi.y), k)<=0
-                                 || lx(std::max(i-1, lx_lo.x), std::min(j  , lx_hi.y), k)<=0
-                                 || lz(std::min(i  , lz_hi.x), std::min(j  , lz_hi.y), k)<=0
-                                 || lz(std::min(i  , lz_hi.x), std::max(j-1, lz_lo.y), k)<=0)) or
-                   (topology=='f' and Sy(i,j,k)<=0))) { return; }
-#endif
-#endif
+
+                // Do not set fields inside the embedded boundary
+                if (update_fy_arr && update_fy_arr(i,j,k) == 0) { return; }
+
 #if defined(WARPX_DIM_1D_Z)
                 const amrex::Real x = 0._rt;
                 const amrex::Real y = 0._rt;
@@ -1199,14 +1148,10 @@ void WarpX::ComputeExternalFieldOnGridUsingParser (
                 mfyfab(i,j,k) = fy_parser(x,y,z,t);
             },
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-#ifdef AMREX_USE_EB
-#ifdef WARPX_DIM_3D
-                if(lz && ((topology=='e' and lz(i, j, k)<=0) or (topology=='f' and Sz(i, j, k)<=0))) { return; }
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                //In XZ and RZ Ez is associated with a z-edge, while Bz is associated with a x-edge
-                if(lz && ((topology=='e' and lz(i, j, k)<=0) or (topology=='f' and lx(i, j, k)<=0))) { return; }
-#endif
-#endif
+
+                // Do not set fields inside the embedded boundary
+                if (update_fz_arr && update_fz_arr(i,j,k) == 0) { return; }
+
 #if defined(WARPX_DIM_1D_Z)
                 const amrex::Real x = 0._rt;
                 const amrex::Real y = 0._rt;
@@ -1296,18 +1241,40 @@ void WarpX::InitializeEBGridData (int lev)
 
             auto const eb_fact = fieldEBFactory(lev);
 
-            auto edge_lengths_lev = m_fields.get_alldirs(FieldType::edge_lengths, lev);
-            ComputeEdgeLengths(edge_lengths_lev, eb_fact);
-            ScaleEdges(edge_lengths_lev, CellSize(lev));
-
-            auto face_areas_lev = m_fields.get_alldirs(FieldType::face_areas, lev);
-            ComputeFaceAreas(face_areas_lev, eb_fact);
-            ScaleAreas(face_areas_lev, CellSize(lev));
-
             if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
-                MarkCells();
+
+                auto edge_lengths_lev = m_fields.get_alldirs(FieldType::edge_lengths, lev);
+                ComputeEdgeLengths(edge_lengths_lev, eb_fact);
+                ScaleEdges(edge_lengths_lev, CellSize(lev));
+
+                auto face_areas_lev = m_fields.get_alldirs(FieldType::face_areas, lev);
+                ComputeFaceAreas(face_areas_lev, eb_fact);
+                ScaleAreas(face_areas_lev, CellSize(lev));
+
+                // Compute additional quantities required for the ECT solver
+                MarkExtensionCells();
                 ComputeFaceExtensions();
+
+                // Mark on which grid points E should be updated
+                MarkUpdateECellsECT( m_eb_update_E[lev], edge_lengths_lev );
+                // Mark on which grid points B should be updated
+                MarkUpdateBCellsECT( m_eb_update_B[lev], face_areas_lev, edge_lengths_lev);
+
+            } else {
+
+                // Mark on which grid points E should be updated (stair-case approximation)
+                MarkUpdateCellsStairCase(
+                    m_eb_update_E[lev],
+                    m_fields.get_alldirs(FieldType::Efield_fp, lev),
+                    eb_fact );
+                // Mark on which grid points B should be updated (stair-case approximation)
+                MarkUpdateCellsStairCase(
+                    m_eb_update_B[lev],
+                    m_fields.get_alldirs(FieldType::Bfield_fp, lev),
+                    eb_fact );
+
             }
+
         }
 
         ComputeDistanceToEB();
@@ -1391,9 +1358,7 @@ WarpX::LoadExternalFields (int const lev)
             m_p_ext_field_params->Bxfield_parser->compile<4>(),
             m_p_ext_field_params->Byfield_parser->compile<4>(),
             m_p_ext_field_params->Bzfield_parser->compile<4>(),
-            lev, PatchType::fine, 'f',
-            m_fields.get_alldirs(FieldType::edge_lengths, lev),
-            m_fields.get_alldirs(FieldType::face_areas, lev));
+            lev, PatchType::fine, m_eb_update_B);
     }
     else if (m_p_ext_field_params->B_ext_grid_type == ExternalFieldType::read_from_file) {
 #if defined(WARPX_DIM_RZ)
@@ -1416,9 +1381,7 @@ WarpX::LoadExternalFields (int const lev)
             m_p_ext_field_params->Exfield_parser->compile<4>(),
             m_p_ext_field_params->Eyfield_parser->compile<4>(),
             m_p_ext_field_params->Ezfield_parser->compile<4>(),
-            lev, PatchType::fine, 'e',
-            m_fields.get_alldirs(FieldType::edge_lengths, lev),
-            m_fields.get_alldirs(FieldType::face_areas, lev));
+            lev, PatchType::fine, m_eb_update_E );
     }
     else if (m_p_ext_field_params->E_ext_grid_type == ExternalFieldType::read_from_file) {
 #if defined(WARPX_DIM_RZ)

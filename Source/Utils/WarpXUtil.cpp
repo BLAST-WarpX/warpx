@@ -43,74 +43,6 @@
 
 using namespace amrex;
 
-void PreparseAMReXInputIntArray(amrex::ParmParse& a_pp, char const * const input_str, const bool replace)
-{
-    const int cnt = a_pp.countval(input_str);
-    if (cnt > 0) {
-        Vector<int> input_array;
-        utils::parser::getArrWithParser(a_pp, input_str, input_array);
-        if (replace) {
-            a_pp.remove(input_str);
-        }
-        a_pp.addarr(input_str, input_array);
-    }
-}
-
-void ParseGeometryInput()
-{
-    // Ensure that geometry.dims is set properly.
-    CheckDims();
-
-    // Parse prob_lo and hi, evaluating any expressions since geometry does not
-    // parse its input
-    ParmParse pp_geometry("geometry");
-
-    Vector<Real> prob_lo(AMREX_SPACEDIM);
-    Vector<Real> prob_hi(AMREX_SPACEDIM);
-
-    utils::parser::getArrWithParser(
-        pp_geometry, "prob_lo", prob_lo, 0, AMREX_SPACEDIM);
-    AMREX_ALWAYS_ASSERT(prob_lo.size() == AMREX_SPACEDIM);
-    utils::parser::getArrWithParser(
-        pp_geometry, "prob_hi", prob_hi, 0, AMREX_SPACEDIM);
-    AMREX_ALWAYS_ASSERT(prob_hi.size() == AMREX_SPACEDIM);
-
-#ifdef WARPX_DIM_RZ
-    const ParmParse pp_algo("algo");
-    auto electromagnetic_solver_id = ElectromagneticSolverAlgo::Default;
-    pp_algo.query_enum_sloppy("maxwell_solver", electromagnetic_solver_id, "-_");
-    if (electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD)
-    {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(prob_lo[0] == 0.,
-            "Lower bound of radial coordinate (prob_lo[0]) with RZ PSATD solver must be zero");
-    }
-    else
-    {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(prob_lo[0] >= 0.,
-            "Lower bound of radial coordinate (prob_lo[0]) with RZ FDTD solver must be non-negative");
-    }
-#endif
-
-    pp_geometry.addarr("prob_lo", prob_lo);
-    pp_geometry.addarr("prob_hi", prob_hi);
-
-    // Parse amr input, evaluating any expressions since amr does not parse its input
-    ParmParse pp_amr("amr");
-
-    // Note that n_cell is replaced so that only the parsed version is written out to the
-    // warpx_job_info file. This must be done since yt expects to be able to parse
-    // the value of n_cell from that file. For the rest, this doesn't matter.
-    PreparseAMReXInputIntArray(pp_amr, "n_cell", true);
-    PreparseAMReXInputIntArray(pp_amr, "max_grid_size", false);
-    PreparseAMReXInputIntArray(pp_amr, "max_grid_size_x", false);
-    PreparseAMReXInputIntArray(pp_amr, "max_grid_size_y", false);
-    PreparseAMReXInputIntArray(pp_amr, "max_grid_size_z", false);
-    PreparseAMReXInputIntArray(pp_amr, "blocking_factor", false);
-    PreparseAMReXInputIntArray(pp_amr, "blocking_factor_x", false);
-    PreparseAMReXInputIntArray(pp_amr, "blocking_factor_y", false);
-    PreparseAMReXInputIntArray(pp_amr, "blocking_factor_z", false);
-}
-
 void ReadBoostedFrameParameters(Real& gamma_boost, Real& beta_boost,
                                 Vector<int>& boost_direction)
 {
@@ -352,40 +284,9 @@ namespace WarpXUtilIO{
     }
 }
 
-void CheckDims ()
-{
-    // Ensure that geometry.dims is set properly.
-#if defined(WARPX_DIM_3D)
-    std::string const dims_compiled = "3";
-#elif defined(WARPX_DIM_XZ)
-    std::string const dims_compiled = "2";
-#elif defined(WARPX_DIM_1D_Z)
-    std::string const dims_compiled = "1";
-#elif defined(WARPX_DIM_RZ)
-    std::string const dims_compiled = "RZ";
-#endif
-    const ParmParse pp_geometry("geometry");
-    std::string dims;
-    std::string dims_error = "The selected WarpX executable was built as '";
-    dims_error.append(dims_compiled).append("'-dimensional, but the ");
-    if (pp_geometry.contains("dims")) {
-        pp_geometry.get("dims", dims);
-        dims_error.append("inputs file declares 'geometry.dims = ").append(dims).append("'.\n");
-        dims_error.append("Please re-compile with a different WarpX_DIMS option or select the right executable name.");
-    } else {
-        dims = "Not specified";
-        dims_error.append("inputs file does not declare 'geometry.dims'. Please add 'geometry.dims = ");
-        dims_error.append(dims_compiled).append("' to inputs file.");
-    }
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(dims == dims_compiled, dims_error);
-}
-
 void CheckGriddingForRZSpectral ()
 {
 #ifdef WARPX_DIM_RZ
-    // Ensure that geometry.dims is set properly.
-    CheckDims();
-
     const ParmParse pp_algo("algo");
     auto electromagnetic_solver_id = ElectromagneticSolverAlgo::Default;
     pp_algo.query_enum_sloppy("maxwell_solver", electromagnetic_solver_id, "-_");
