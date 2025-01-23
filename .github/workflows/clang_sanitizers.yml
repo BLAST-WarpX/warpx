@@ -70,6 +70,10 @@ jobs:
         #MPI implementations often leak memory
         export "ASAN_OPTIONS=detect_leaks=0"
 
+        echo "=================================================================================================== "
+        echo "========================  Examples/Physics_applications/laser_acceleration ======================== "
+        echo "=================================================================================================== "
+
         mpirun -n 2 ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_base_rz
         rm -rf ./diags
         mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d
@@ -79,14 +83,30 @@ jobs:
         mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d
         rm -rf ./diags
 
+        echo "=================================================================================================== "
+        echo "=======================  Examples/Physics_applications/capacitive_discharge ======================= "
+        echo "=================================================================================================== "
+
         mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/capacitive_discharge/inputs_test_2d_background_mcc
         rm -rf ./diags
+
+        echo "=================================================================================================== "
+        echo "=======================  Examples/Physics_applications/free_electron_laser ======================== "
+        echo "=================================================================================================== "
 
         mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/free_electron_laser/inputs_test_1d_fel
         rm -rf ./diags
 
+        echo "=================================================================================================== "
+        echo "============================  Examples/Physics_applications/laser_ion ============================= "
+        echo "=================================================================================================== "
+
         mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/laser_ion/inputs_test_2d_laser_ion_acc
         rm -rf ./diags
+
+        echo "=================================================================================================== "
+        echo "======================  Examples/Physics_applications/plasma_acceleration/ ======================== "
+        echo "=================================================================================================== "
 
         cd Examples/Physics_applications/plasma_acceleration/
         mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_plasma_acceleration_mr
@@ -101,11 +121,23 @@ jobs:
         rm -rf ./diags
         cd -
 
+        echo "=================================================================================================== "
+        echo "==========================  Examples/Physics_applications/plasma_mirror =========================== "
+        echo "=================================================================================================== "
+
         mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/plasma_mirror/inputs_test_2d_plasma_mirror
         rm -rf ./diags
 
+        echo "=================================================================================================== "
+        echo "==================  Examples/Physics_applications/thomson_parabola_spectrometer =================== "
+        echo "=================================================================================================== "
+
         mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/thomson_parabola_spectrometer/inputs_test_3d_thomson_parabola_spectrometer
         rm -rf ./diags
+
+        echo "=================================================================================================== "
+        echo "=========================  Examples/Physics_applications/uniform_plasma =========================== "
+        echo "=================================================================================================== "
 
         cd Examples/Physics_applications/uniform_plasma
         mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_uniform_plasma
@@ -170,6 +202,10 @@ jobs:
 
         #MPI implementations often leak memory
         export "ASAN_OPTIONS=detect_leaks=0"
+
+        echo "=================================================================================================== "
+        echo "=======================  Examples/Physics_applications/beam_beam_collision ======================== "
+        echo "=================================================================================================== "
 
         mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/beam_beam_collision/inputs_test_3d_beam_beam_collision
         rm -rf ./diags
