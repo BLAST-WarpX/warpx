@@ -18,7 +18,6 @@ from mpi4py import MPI as mpi
 
 from pywarpx import picmi
 from pywarpx.callbacks import installafterEsolve, installafterInitEsolve
-from pywarpx.fields import PhiFPWrapper, RhoFPWrapper
 from pywarpx.particle_containers import ParticleBoundaryBufferWrapper
 
 
@@ -49,13 +48,13 @@ class SpaceChargeFieldCorrector(object):
             q = compute_actual_charge_on_spacecraft()
 
         # Correct fields so as to recover the actual charge
-        # TODO: add guard cells
         Er = sim.extension.warpx.multifab("Efield_fp[x][level=0]")
         Er.saxpy(Er, (q - q_v), self.normalized_Er, 0, 0, 1, 0)
         Ez = sim.extension.warpx.multifab("Efield_fp[z][level=0]")
         Ez.saxpy(Ez, (q - q_v), self.normalized_Ez, 0, 0, 1, 0)
-        phi = PhiFPWrapper(include_ghosts=True)
-        phi[...] += (q - q_v) * self.normalized_phi
+        phi = sim.extension.warpx.multifab("phi_fp[level=0]")
+        phi.saxpy(Ez, (q - q_v), self.normalized_phi, 0, 0, 1, 0)
+
         self.spacecraft_potential += (q - q_v) * self.spacecraft_capacitance
         sim.extension.warpx.set_potential_on_eb("%f" % self.spacecraft_potential)
         print("Setting potential to %f" % self.spacecraft_potential)
@@ -71,16 +70,7 @@ class SpaceChargeFieldCorrector(object):
         q_v = compute_virtual_charge_on_spacecraft()
         self.spacecraft_capacitance = 1.0 / q_v  # the potential was set to 1V
 
-        # Check that this iteration corresponded to a vacuum solve
-        rho = RhoFPWrapper(include_ghosts=False)
-
-        # In principle, we should check that `rho` is exactly 0
-        # However, due to machine precision errors when adding the charge
-        # of ions and electrons, this can be slightly different than 0
-        assert np.all(abs(rho[...]) < 1.0e-11)
-
         # Record fields
-        # TODO: add guard cells
         self.normalized_Er = sim.extension.warpx.multifab(
             "Efield_fp[x][level=0]"
         ).copy()
@@ -89,8 +79,8 @@ class SpaceChargeFieldCorrector(object):
             "Efield_fp[z][level=0]"
         ).copy()
         self.normalized_Ez.mult(1 / q_v, 0)
-        phi = PhiFPWrapper(include_ghosts=True)[:, :]
-        self.normalized_phi = phi[...] / q_v
+        self.normalized_phi = sim.extension.warpx.multifab("phi_fp[level=0]").copy()
+        self.normalized_phi.mult(1 / q_v, 0)
 
         self.saved_first_iteration_fields = True
         self.correct_space_charge_fields(q=0)
@@ -103,13 +93,8 @@ def compute_virtual_charge_on_spacecraft():
     on the boundary of the domain, compute the charge
     that WarpX thinks there should be on the spacecraft.
     """
-    # Get global array for the whole domain (across MPI ranks)
-    phi = PhiFPWrapper(include_ghosts=False)[:, :]
-    rho = RhoFPWrapper(include_ghosts=False)[:, :]
-
-    # Check that this codes correspond to the global size of the box
-    assert phi.shape == (nr + 1, nz + 1)
-    assert rho.shape == (nr + 1, nz + 1)
+    rho = sim.extension.warpx.multifab("rho_fp[level=0]")
+    phi = sim.extension.warpx.multifab("phi_fp[level=0]")
 
     dr, dz = sim.extension.warpx.Geom(lev=0).data().CellSize()
 
