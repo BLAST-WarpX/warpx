@@ -694,7 +694,8 @@ WarpX::InitFromScratch ()
         m_implicit_solver->CreateParticleAttributes();
     }
 
-    if (m_do_back_transformed_particles)
+    // FIXME Is mypc->m_do_back_transformed_particles up-to-date here?
+    if (mypc->getDoBackTransformedParticles())
     {
         // Set comm to false so that the attributes are not communicated
         // nor written to the checkpoint files
