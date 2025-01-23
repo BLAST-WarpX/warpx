@@ -701,7 +701,7 @@ WarpX::InitFromScratch ()
         int const comm = 0;
 
         // Add space to save the positions and velocities at the start of the time steps
-        for (auto const& pc : m_WarpX->GetPartContainer())
+        for (auto const& pc : *mypc)
         {
 #if (AMREX_SPACEDIM >= 2)
             pc->NewRealComp("x_n_btd", comm);
