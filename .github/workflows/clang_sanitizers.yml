@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build_UB_sanitizer:
-    name: Clang UB sanitizer
+  build_UB_sanitizer_single_precision:
+    name: Clang UB sanitizer (SP)
     runs-on: ubuntu-24.04
     if: github.event.pull_request.draft == false
     env:
@@ -79,10 +79,6 @@ jobs:
         mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d
         rm -rf ./diags
 
-        # TEMPORARY: SHOULD BE RE-ENABLED
-        #mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/beam_beam_collision/inputs_test_3d_beam_beam_collision
-        #rm -rf ./diags
-
         mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/capacitive_discharge/inputs_test_2d_background_mcc
         rm -rf ./diags
 
@@ -117,6 +113,65 @@ jobs:
         mpirun -n 2 ../../../build/bin/warpx.3d inputs_test_3d_uniform_plasma
         # not clearing diags here is intentional!
         mpirun -n 2 ../../../build/bin/warpx.3d inputs_test_3d_uniform_plasma_restart amr.restart = "./diags/chk000006"
+        rm -rf ./diags
+
+  build_UB_sanitizer_double_precision:
+    name: Clang UB sanitizer (DP)
+    runs-on: ubuntu-24.04
+    if: github.event.pull_request.draft == false
+    env:
+      CC: clang
+      CXX: clang++
+      # On CI for this test, Ninja is slower than the default:
+      #CMAKE_GENERATOR: Ninja
+    steps:
+    - uses: actions/checkout@v4
+    - name: install dependencies
+      run: |
+        .github/workflows/dependencies/clang.sh 17
+    - name: CCache Cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ccache
+        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
+        restore-keys: |
+             ccache-${{ github.workflow }}-${{ github.job }}-git-
+    - name: build WarpX
+      run: |
+        export CCACHE_COMPRESS=1
+        export CCACHE_COMPRESSLEVEL=10
+        export CCACHE_MAXSIZE=100M
+        ccache -z
+
+        export CXX=$(which clang++-17)
+        export CC=$(which clang-17)
+        export CXXFLAGS="-fsanitize=undefined,address,pointer-compare -fno-sanitize-recover=all"
+
+        cmake -S . -B build                 \
+          -GNinja                           \
+          -DCMAKE_VERBOSE_MAKEFILE=ON       \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DWarpX_DIMS="3"           \
+          -DWarpX_FFT=ON                    \
+          -DWarpX_QED=ON                    \
+          -DWarpX_QED_TABLE_GEN=ON          \
+          -DWarpX_OPENPMD=ON                \
+          -DWarpX_PRECISION=DOUBLE          \
+          -DWarpX_PARTICLE_PRECISION=DOUBLE
+        cmake --build build -j 4
+
+        ccache -s
+        du -hs ~/.cache/ccache
+
+    - name: run with UB sanitizer
+      run: |
+
+        export OMP_NUM_THREADS=2
+
+        #MPI implementations often leak memory
+        export "ASAN_OPTIONS=detect_leaks=0"
+
+        mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/beam_beam_collision/inputs_test_3d_beam_beam_collision
         rm -rf ./diags
 
   build_thread_sanitizer:
