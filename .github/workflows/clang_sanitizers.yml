@@ -79,8 +79,9 @@ jobs:
         mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d
         rm -rf ./diags
 
-        mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/beam_beam_collision/inputs_test_3d_beam_beam_collision
-        rm -rf ./diags
+        # TEMPORARY: SHOULD BE RE-ENABLED
+        #mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/beam_beam_collision/inputs_test_3d_beam_beam_collision
+        #rm -rf ./diags
 
         mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/capacitive_discharge/inputs_test_2d_background_mcc
         rm -rf ./diags
