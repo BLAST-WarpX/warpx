@@ -761,6 +761,13 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                 lo.x + int(x_new),
                 lo.y + int(z_new),
                 0);
+#elif defined(WARPX_DIM_1D_Z)
+            close_to_eb_old = eb_reduce_particle_shape(
+                lo.x + int(z_old),
+                0, 0);
+            close_to_eb_new = eb_reduce_particle_shape(
+                lo.x + int(z_new),
+                0, 0);
 #endif
 #endif
 
