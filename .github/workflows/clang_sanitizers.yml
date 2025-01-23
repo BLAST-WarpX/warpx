@@ -71,9 +71,52 @@ jobs:
         export "ASAN_OPTIONS=detect_leaks=0"
 
         mpirun -n 2 ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_base_rz
+        rm -rf ./diags
         mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d
+        rm -rf ./diags
         mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d
+        rm -rf ./diags
         mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d
+        rm -rf ./diags
+
+        mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/beam_beam_collision/inputs_test_3d_beam_beam_collision
+        rm -rf ./diags
+
+        mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/capacitive_discharge/inputs_test_2d_background_mcc
+        rm -rf ./diags
+
+        mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/free_electron_laser/inputs_test_1d_fel
+        rm -rf ./diags
+
+        mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/laser_ion/inputs_test_2d_laser_ion_acc
+        rm -rf ./diags
+
+        cd Examples/Physics_applications/plasma_acceleration/
+        mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_plasma_acceleration_mr
+        rm -rf ./diags
+        mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_plasma_acceleration_mr_momentum_conserving
+        rm -rf ./diags
+        mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_plasma_acceleration_boosted
+        rm -rf ./diags
+        mpirun -n 2 ../../../build/bin/warpx.3d inputs_test_3d_plasma_acceleration_boosted
+        rm -rf ./diags
+        mpirun -n 2 ../../../build/bin/warpx.3d inputs_test_3d_plasma_acceleration_boosted_hybrid
+        rm -rf ./diags
+        cd -
+
+        mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/plasma_mirror/inputs_test_2d_plasma_mirror
+        rm -rf ./diags
+
+        mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/thomson_parabola_spectrometer/inputs_test_3d_thomson_parabola_spectrometer
+        rm -rf ./diags
+
+        cd Examples/Physics_applications/plasma_acceleration/uniform_plasma
+        mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_uniform_plasma
+        rm -rf ./diags
+        mpirun -n 2 ../../../build/bin/warpx.3d inputs_test_3d_uniform_plasma
+        rm -rf ./diags
+        mpirun -n 2 ../../../build/bin/warpx.3d inputs_test_3d_uniform_plasma_restart
+        rm -rf ./diags
 
   build_thread_sanitizer:
     name: Clang thread sanitizer
