@@ -110,12 +110,12 @@ jobs:
         mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/thomson_parabola_spectrometer/inputs_test_3d_thomson_parabola_spectrometer
         rm -rf ./diags
 
-        cd Examples/Physics_applications/plasma_acceleration/uniform_plasma
+        cd Examples/Physics_applications/uniform_plasma
         mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_uniform_plasma
         rm -rf ./diags
         mpirun -n 2 ../../../build/bin/warpx.3d inputs_test_3d_uniform_plasma
-        rm -rf ./diags
-        mpirun -n 2 ../../../build/bin/warpx.3d inputs_test_3d_uniform_plasma_restart
+        # not clearing diags here is intentional!
+        mpirun -n 2 ../../../build/bin/warpx.3d inputs_test_3d_uniform_plasma_restart amr.restart = "./diags/chk000006"
         rm -rf ./diags
 
   build_thread_sanitizer:
