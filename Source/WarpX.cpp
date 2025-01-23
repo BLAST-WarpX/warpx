@@ -2333,7 +2333,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         m_fields.alloc_init(FieldType::distance_to_eb, lev, amrex::convert(ba, IntVect::TheNodeVector()), dm, nc_ls, ng_ls, 0.0_rt);
         // Whether to reduce the particle shape to order 1 when close to the EB
         AllocInitMultiFab(m_eb_reduce_particle_shape[lev], amrex::convert(ba, IntVect::TheCellVector()), dm, ncomps,
-                            guard_cells.ng_FieldSolver, lev, "m_eb_reduce_particle_shape");
+            ngRho, lev, "m_eb_reduce_particle_shape");
 
         // EB info are needed only at the finest level
         if (lev == maxLevel()) {
