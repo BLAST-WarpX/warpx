@@ -480,11 +480,6 @@ public:
 
     amrex::Vector<amrex::Real> m_v_comoving = amrex::Vector<amrex::Real>(3, amrex::Real(0.));
 
-    static int num_mirrors;
-    amrex::Vector<amrex::Real> mirror_z;
-    amrex::Vector<amrex::Real> mirror_z_width;
-    amrex::Vector<int> mirror_z_npoints;
-
     /// object with all reduced diagnostics, similar to MultiParticleContainer for species.
     std::unique_ptr<MultiReducedDiags> reduced_diags;
 
@@ -1478,6 +1473,12 @@ private:
     std::unique_ptr<ExternalFieldParams> m_p_ext_field_params;
 
     amrex::Real moving_window_x = std::numeric_limits<amrex::Real>::max();
+
+    // Mirrors
+    int m_num_mirrors = 0;
+    amrex::Vector<amrex::Real> m_mirror_z;
+    amrex::Vector<amrex::Real> m_mirror_z_width;
+    amrex::Vector<int> m_mirror_z_npoints;
 
     // Plasma injection parameters
     int warpx_do_continuous_injection = 0;

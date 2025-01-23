@@ -1190,16 +1190,16 @@ WarpX::applyMirrors (Real time)
     using ablastr::fields::Direction;
 
     // something to do?
-    if (num_mirrors == 0) {
+    if (m_num_mirrors == 0) {
         return;
     }
 
     // Loop over the mirrors
-    for(int i_mirror=0; i_mirror<num_mirrors; ++i_mirror)
+    for(int i_mirror=0; i_mirror<m_num_mirrors; ++i_mirror)
     {
         // Get mirror properties (lower and upper z bounds)
-        amrex::Real z_min = mirror_z[i_mirror];
-        amrex::Real z_max_tmp = z_min + mirror_z_width[i_mirror];
+        amrex::Real z_min = m_mirror_z[i_mirror];
+        amrex::Real z_max_tmp = z_min + m_mirror_z_width[i_mirror];
 
         // Boost quantities for boosted frame simulations
         if (gamma_boost>1)
@@ -1211,9 +1211,9 @@ WarpX::applyMirrors (Real time)
         // Loop over levels
         for(int lev=0; lev<=finest_level; lev++)
         {
-            // Mirror must contain at least mirror_z_npoints[i_mirror] cells
+            // Mirror must contain at least m_mirror_z_npoints[i_mirror] cells
             const amrex::Real dz = WarpX::CellSize(lev)[2];
-            const amrex::Real z_max = std::max(z_max_tmp, z_min+mirror_z_npoints[i_mirror]*dz);
+            const amrex::Real z_max = std::max(z_max_tmp, z_min+m_mirror_z_npoints[i_mirror]*dz);
 
             // Set each field on the fine patch to zero between z_min and z_max
             NullifyMF(m_fields, "Efield_fp", Direction{0}, lev, z_min, z_max);

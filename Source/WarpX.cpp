@@ -165,8 +165,6 @@ bool WarpX::use_filter_compensation = false;
 bool WarpX::serialize_initial_conditions = false;
 bool WarpX::refine_plasma     = false;
 
-int WarpX::num_mirrors = 0;
-
 utils::parser::IntervalsParser WarpX::sort_intervals;
 amrex::IntVect WarpX::sort_bin_size(AMREX_D_DECL(1,1,1));
 
@@ -789,17 +787,17 @@ WarpX::ReadParameters ()
 #endif
 
         utils::parser::queryWithParser(
-            pp_warpx, "num_mirrors", num_mirrors);
-        if (num_mirrors>0){
-            mirror_z.resize(num_mirrors);
+            pp_warpx, "num_mirrors", m_num_mirrors);
+        if (m_num_mirrors>0){
+            m_mirror_z.resize(m_num_mirrors);
             utils::parser::getArrWithParser(
-                pp_warpx, "mirror_z", mirror_z, 0, num_mirrors);
-            mirror_z_width.resize(num_mirrors);
+                pp_warpx, "mirror_z", m_mirror_z, 0, m_num_mirrors);
+            m_mirror_z_width.resize(m_num_mirrors);
             utils::parser::getArrWithParser(
-                pp_warpx, "mirror_z_width", mirror_z_width, 0, num_mirrors);
-            mirror_z_npoints.resize(num_mirrors);
+                pp_warpx, "mirror_z_width", m_mirror_z_width, 0, m_num_mirrors);
+            m_mirror_z_npoints.resize(m_num_mirrors);
             utils::parser::getArrWithParser(
-                pp_warpx, "mirror_z_npoints", mirror_z_npoints, 0, num_mirrors);
+                pp_warpx, "mirror_z_npoints", m_mirror_z_npoints, 0, m_num_mirrors);
         }
 
         pp_warpx.query("do_single_precision_comms", do_single_precision_comms);
@@ -1175,7 +1173,7 @@ WarpX::ReadParameters ()
         // implicit evolve schemes not setup to use mirrors
         if (evolve_scheme == EvolveScheme::SemiImplicitEM ||
             evolve_scheme == EvolveScheme::ThetaImplicitEM) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( num_mirrors == 0,
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( m_num_mirrors == 0,
                 "Mirrors cannot be used with Implicit evolve schemes.");
         }
 
