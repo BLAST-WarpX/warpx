@@ -58,5 +58,5 @@ for i in range(0, N_sec_e):
     print(f"Relative percentage error for z = {rel_err_z * 100:5.4f} %")
 
     assert (
-        (rel_err_x < tolerance) and (rel_err_y < tolerance) and (rel_err_x < tolerance)
+        (rel_err_x < tolerance) and (rel_err_y < tolerance) and (rel_err_z < tolerance)
     ), "Test particle_boundary_interaction did not pass"
