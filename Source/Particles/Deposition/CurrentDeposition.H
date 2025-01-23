@@ -790,6 +790,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             // [ijk]_new: leftmost grid point that the particle touches
             const Compute_shape_factor< depos_order > compute_shape_factor;
             const Compute_shifted_shape_factor< depos_order > compute_shifted_shape_factor;
+            // When using special treatment close to the embedded boundary, we need order 1 deposition
             const Compute_shifted_shape_factor< 1 > compute_shifted_shape_factor_order1;
 
             // Shape factor arrays
@@ -803,13 +804,15 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const int i_new = compute_shape_factor(sx_new+1, x_new );
             const int i_old = compute_shifted_shape_factor(sx_old, x_old, i_new);
             // If particle is close to the embedded boundary, recompute deposition with order 1 shape
-            if (close_to_eb_new) {
-                for (int i=0; i<depos_order+3; i++) sx_new[i] = 0.; // Erase previous deposition
-                compute_shifted_shape_factor_order1( sx_new+1, x_new, i_new+1 ); // Redeposit with order 1
-            }
-            if (close_to_eb_old) {
-                for (int i=0; i<depos_order+3; i++) sx_old[i] = 0.; // Erase previous deposition
-                compute_shifted_shape_factor_order1( sx_old+1, x_old, i_new+1 ); // Redeposit with order 1
+            if constexpr (eb_control == has_eb) {
+                if (close_to_eb_new) {
+                    for (int i=0; i<depos_order+3; i++) sx_new[i] = 0.; // Erase previous deposition
+                    compute_shifted_shape_factor_order1( sx_new+1, x_new, i_new+1 ); // Redeposit with order 1
+                }
+                if (close_to_eb_old) {
+                    for (int i=0; i<depos_order+3; i++) sx_old[i] = 0.; // Erase previous deposition
+                    compute_shifted_shape_factor_order1( sx_old+1, x_old, i_new+1 ); // Redeposit with order 1
+                }
             }
 #endif
 #if defined(WARPX_DIM_3D)
@@ -818,13 +821,15 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const int j_new = compute_shape_factor(sy_new+1, y_new);
             const int j_old = compute_shifted_shape_factor(sy_old, y_old, j_new);
             // If particle is close to the embedded boundary, recompute deposition with order 1 shape
-            if (close_to_eb_new) {
-                for (int j=0; j<depos_order+3; j++) sy_new[j] = 0.; // Erase previous deposition
-                compute_shifted_shape_factor_order1( sy_new+1, y_new, j_new+1 ); // Redeposit with order 1
-            }
-            if (close_to_eb_old) {
-                for (int j=0; j<depos_order+3; j++) sy_old[j] = 0.; // Erase previous deposition
-                compute_shifted_shape_factor_order1( sy_old+1, y_old, j_new+1 ); // Redeposit with order 1
+            if constexpr (eb_control == has_eb) {
+                if (close_to_eb_new) {
+                    for (int j=0; j<depos_order+3; j++) sy_new[j] = 0.; // Erase previous deposition
+                    compute_shifted_shape_factor_order1( sy_new+1, y_new, j_new+1 ); // Redeposit with order 1
+                }
+                if (close_to_eb_old) {
+                    for (int j=0; j<depos_order+3; j++) sy_old[j] = 0.; // Erase previous deposition
+                    compute_shifted_shape_factor_order1( sy_old+1, y_old, j_new+1 ); // Redeposit with order 1
+                }
             }
 #endif
             double sz_new[depos_order + 3] = {0.};
@@ -832,13 +837,15 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const int k_new = compute_shape_factor(sz_new+1, z_new );
             const int k_old = compute_shifted_shape_factor(sz_old, z_old, k_new );
             // If particle is close to the embedded boundary, recompute deposition with order 1 shape
-            if (close_to_eb_new) {
-                for (int k=0; k<depos_order+3; k++) sz_new[k] = 0.; // Erase previous deposition
-                compute_shifted_shape_factor_order1( sz_new+1, z_new, k_new+1 ); // Redeposit with order 1
-            }
-            if (close_to_eb_old) {
-                for (int k=0; k<depos_order+3; k++) sz_old[k] = 0.; // Erase previous deposition
-                compute_shifted_shape_factor_order1( sz_old+1, z_old, k_new+1 ); // Redeposit with order 1
+            if constexpr (eb_control == has_eb) {
+                if (close_to_eb_new) {
+                    for (int k=0; k<depos_order+3; k++) sz_new[k] = 0.; // Erase previous deposition
+                    compute_shifted_shape_factor_order1( sz_new+1, z_new, k_new+1 ); // Redeposit with order 1
+                }
+                if (close_to_eb_old) {
+                    for (int k=0; k<depos_order+3; k++) sz_old[k] = 0.; // Erase previous deposition
+                    compute_shifted_shape_factor_order1( sz_old+1, z_old, k_new+1 ); // Redeposit with order 1
+                }
             }
 
             // computes min/max positions of current contributions
