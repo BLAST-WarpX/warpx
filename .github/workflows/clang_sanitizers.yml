@@ -84,13 +84,6 @@ jobs:
         rm -rf ./diags
 
         echo "=================================================================================================== "
-        echo "=======================  Examples/Physics_applications/capacitive_discharge ======================= "
-        echo "=================================================================================================== "
-
-        mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/capacitive_discharge/inputs_test_2d_background_mcc
-        rm -rf ./diags
-
-        echo "=================================================================================================== "
         echo "=======================  Examples/Physics_applications/free_electron_laser ======================== "
         echo "=================================================================================================== "
 
@@ -183,7 +176,7 @@ jobs:
           -GNinja                           \
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-          -DWarpX_DIMS="3"           \
+          -DWarpX_DIMS="2;3"           \
           -DWarpX_FFT=ON                    \
           -DWarpX_QED=ON                    \
           -DWarpX_QED_TABLE_GEN=ON          \
@@ -209,6 +202,16 @@ jobs:
 
         mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/beam_beam_collision/inputs_test_3d_beam_beam_collision
         rm -rf ./diags
+
+        echo "=================================================================================================== "
+        echo "=======================  Examples/Physics_applications/capacitive_discharge ======================= "
+        echo "=================================================================================================== "
+
+        git clone https://github.com/ECP-WarpX/warpx-data ../warpx-data
+        cd Examples/Physics_applications/capacitive_discharge
+        mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_background_mcc
+        rm -rf ./diags
+        cd -
 
   build_thread_sanitizer:
     name: Clang thread sanitizer
