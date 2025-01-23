@@ -296,11 +296,9 @@ WarpX::MarkReducedShapeCells (
     std::unique_ptr<amrex::iMultiFab> & eb_reduce_particle_shape,
     amrex::EBFArrayBoxFactory const & eb_fact )
 {
-
-    // TODO: handle guard cells:
-    // - Allocate as many cells as rho/J
-    // - Initialize to 1
-    // - Call Redistribute
+    // Pre-fill array with 1, including in the ghost cells outside of the domain.
+    // (The guard cells in the domain will be updated by `FillBoundary` at the end of this function.)
+    eb_reduce_particle_shape->setVal(1, eb_reduce_particle_shape->nGrow());
 
     // Extract structures for embedded boundaries
     amrex::FabArray<amrex::EBCellFlagFab> const& eb_flag = eb_fact.getMultiEBCellFlagFab();
@@ -374,6 +372,9 @@ WarpX::MarkReducedShapeCells (
         }
 
     }
+
+    // FillBoundary to set the values in the guard cells
+    eb_reduce_particle_shape->FillBoundary(Geom(0).periodicity());
 
 }
 
