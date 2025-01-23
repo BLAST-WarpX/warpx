@@ -10,7 +10,6 @@
 
 #include "Particles/Deposition/SharedDepositionUtils.H"
 #include "ablastr/parallelization/KernelTimer.H"
-#include "ablastr/particles/NodalFieldGather.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/ShapeFactors.H"
 #include "Utils/TextMsg.H"
