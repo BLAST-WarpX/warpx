@@ -139,6 +139,49 @@ jobs:
         # not clearing diags here is intentional!
         mpirun -n 2 ../../../build/bin/warpx.3d inputs_test_3d_uniform_plasma_restart amr.restart = "./diags/chk000006"
         rm -rf ./diags
+        cd -
+
+        echo "=================================================================================================== "
+        echo "==================  Examples/Physics_applications/uniform_plasma (3D, variant) ==================== "
+        echo "=================================================================================================== "
+        # test different algorithm settings
+        cd Examples/Physics_applications/uniform_plasma
+        mpirun -n 2 ../../../build/bin/warpx.3d inputs_test_3d_uniform_plasma warpx.cfl=0.98 algo.particle_shape=2
+        rm -rf ./diags
+        mpirun -n 2 ../../../build/bin/warpx.3d inputs_test_3d_uniform_plasma warpx.cfl=0.98 algo.particle_shape=3
+        rm -rf ./diags
+        mpirun -n 2 ../../../build/bin/warpx.3d inputs_test_3d_uniform_plasma warpx.cfl=0.98 algo.particle_shape=4
+        rm -rf ./diags
+        mpirun -n 2 ../../../build/bin/warpx.3d inputs_test_3d_uniform_plasma warpx.cfl=0.98 algo.particle_shape=4 algo.current_deposition=direct
+        rm -rf ./diags
+        mpirun -n 2 ../../../build/bin/warpx.3d inputs_test_3d_uniform_plasma warpx.cfl=0.98 algo.particle_shape=4 algo.field_gathering=momentum-conserving
+        rm -rf ./diags
+        mpirun -n 2 ../../../build/bin/warpx.3d inputs_test_3d_uniform_plasma warpx.cfl=0.98 algo.particle_shape=4 algo.particle_pusher=vay
+        rm -rf ./diags
+        mpirun -n 2 ../../../build/bin/warpx.3d inputs_test_3d_uniform_plasma warpx.cfl=0.98 algo.particle_shape=4 algo.particle_pusher=higuera
+        rm -rf ./diags
+        cd -
+
+        echo "=================================================================================================== "
+        echo "==================  Examples/Physics_applications/uniform_plasma (2D, variant) ==================== "
+        echo "=================================================================================================== "
+        # test different algorithm settings
+        cd Examples/Physics_applications/uniform_plasma
+        mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_uniform_plasma warpx.cfl=0.98 algo.particle_shape=2
+        rm -rf ./diags
+        mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_uniform_plasma warpx.cfl=0.98 algo.particle_shape=3
+        rm -rf ./diags
+        mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_uniform_plasma warpx.cfl=0.98 algo.particle_shape=4
+        rm -rf ./diags
+        mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_uniform_plasma warpx.cfl=0.98 algo.particle_shape=4 algo.current_deposition=direct
+        rm -rf ./diags
+        mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_uniform_plasma warpx.cfl=0.98 algo.particle_shape=4 algo.field_gathering=momentum-conserving
+        rm -rf ./diags
+        mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_uniform_plasma warpx.cfl=0.98 algo.particle_shape=4 algo.particle_pusher=vay
+        rm -rf ./diags
+        mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_uniform_plasma warpx.cfl=0.98 algo.particle_shape=4 algo.particle_pusher=higuera
+        rm -rf ./diags
+        cd -
 
   build_UB_sanitizer_double_precision:
     name: Clang UB sanitizer (DP)
