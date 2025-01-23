@@ -687,7 +687,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
     // (Compile 2 versions of the kernel: with and without embedded boundaries)
     enum eb_flags : int { has_eb, no_eb };
-    const int eb_runtime_flag = embedded_boundary_enabled ? has_eb : no_eb;
+    const int eb_runtime_flag = (embedded_boundary_enabled && (depos_order>1))? has_eb : no_eb;
 
     amrex::ParallelFor( TypeList<CompileTimeOptions<has_eb,no_eb>>{},
         {eb_runtime_flag},
@@ -744,11 +744,10 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             double const z_new = (zp - xyzmin.z + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv)*dinv.z;
             double const z_old = z_new - dt*dinv.z*uzp[ip]*gaminv;
 
+            // Check whether the particle is close to the EB at the old and new position
             bool close_to_eb_old = false;
             bool close_to_eb_new = false;
-
             if constexpr (eb_control == has_eb) {
-            // Check whether the particle is close to the EB at the old and new position
 #if defined(WARPX_DIM_3D)
                 close_to_eb_old = eb_reduce_particle_shape(
                     lo.x + int(x_old),
