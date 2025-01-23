@@ -790,6 +790,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             // [ijk]_new: leftmost grid point that the particle touches
             const Compute_shape_factor< depos_order > compute_shape_factor;
             const Compute_shifted_shape_factor< depos_order > compute_shifted_shape_factor;
+            const Compute_shifted_shape_factor< 1 > compute_shifted_shape_factor_order1;
 
             // Shape factor arrays
             // Note that there are extra values above and below
@@ -799,8 +800,17 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 #if !defined(WARPX_DIM_1D_Z)
             double sx_new[depos_order + 3] = {0.};
             double sx_old[depos_order + 3] = {0.};
-            const int i_new = compute_shape_factor(sx_new+1, x_new, close_to_eb_new);
-            const int i_old = compute_shifted_shape_factor(sx_old, x_old, i_new, close_to_eb_old);
+            const int i_new = compute_shape_factor(sx_new+1, x_new );
+            const int i_old = compute_shifted_shape_factor(sx_old, x_old, i_new);
+            // If particle is close to the embedded boundary, recompute deposition with order 1 shape
+            if (close_to_eb_new) {
+                for (int i=0; i<depos_order+2; i++) sx_new[i] = 0.; // Erase previous deposition
+                compute_shifted_shape_factor_order1( sx_new+1, x_new, i_new+1 ); // Redeposit with order 1
+            }
+            if (close_to_eb_old) {
+                for (int i=0; i<depos_order+2; i++) sx_old[i] = 0.; // Erase previous deposition
+                compute_shifted_shape_factor_order1( sx_old+1, x_old, i_new+1 ); // Redeposit with order 1
+            }
 #endif
 #if defined(WARPX_DIM_3D)
             double sy_new[depos_order + 3] = {0.};
