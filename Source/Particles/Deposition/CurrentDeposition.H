@@ -638,6 +638,7 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * \param lo           Index lower bounds of domain.
  * \param q            species charge.
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
+ * TODO: add documentation for eb_reduce_particle_shape
  */
 template <int depos_order>
 void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
@@ -656,10 +657,9 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                   const amrex::XDim3 & xyzmin,
                                   amrex::Dim3 lo,
                                   amrex::Real q,
-#ifdef AMREX_USE_EB
-                                  const amrex::Array4<const int>& eb_reduce_particle_shape,
-#endif
-                                  [[maybe_unused]]int n_rz_azimuthal_modes
+                                  [[maybe_unused]]int n_rz_azimuthal_modes,
+                                  const amrex::Array4<const int> eb_reduce_particle_shape,
+                                  bool embedded_boundary_enabled
                                   )
 {
     using namespace amrex;
@@ -684,9 +684,14 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 #endif
 
     // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
-    amrex::ParallelFor(
-        np_to_deposit,
-        [=] AMREX_GPU_DEVICE (long const ip) {
+
+    // (Compile 2 versions of the kernel: with and without embedded boundaries)
+    enum eb_flags : int { has_eb, no_eb };
+    const int eb_runtime_flag = embedded_boundary_enabled ? has_eb : no_eb;
+
+    amrex::ParallelFor( TypeList<CompileTimeOptions<has_eb,no_eb>>{},
+        {eb_runtime_flag},
+        np_to_deposit, [=] AMREX_GPU_DEVICE (long ip, auto eb_control) {
             // --- Get particle quantities
             Real const gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*clightsq
                                                  + uyp[ip]*uyp[ip]*clightsq
@@ -741,35 +746,36 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
             bool close_to_eb_old = false;
             bool close_to_eb_new = false;
-#ifdef AMREX_USE_EB
+
+            if constexpr (eb_control == has_eb) {
             // Check whether the particle is close to the EB at the old and new position
 #if defined(WARPX_DIM_3D)
-            close_to_eb_old = eb_reduce_particle_shape(
-                lo.x + int(x_old),
-                lo.y + int(y_old),
-                lo.z + int(z_old));
-            close_to_eb_new = eb_reduce_particle_shape(
-                lo.x + int(x_new),
-                lo.y + int(y_new),
-                lo.z + int(z_new));
+                close_to_eb_old = eb_reduce_particle_shape(
+                    lo.x + int(x_old),
+                    lo.y + int(y_old),
+                    lo.z + int(z_old));
+                close_to_eb_new = eb_reduce_particle_shape(
+                    lo.x + int(x_new),
+                    lo.y + int(y_new),
+                    lo.z + int(z_new));
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-            close_to_eb_old = eb_reduce_particle_shape(
-                lo.x + int(x_old),
-                lo.y + int(z_old),
-                0);
-            close_to_eb_new = eb_reduce_particle_shape(
-                lo.x + int(x_new),
-                lo.y + int(z_new),
-                0);
+                close_to_eb_old = eb_reduce_particle_shape(
+                    lo.x + int(x_old),
+                    lo.y + int(z_old),
+                    0);
+                close_to_eb_new = eb_reduce_particle_shape(
+                    lo.x + int(x_new),
+                    lo.y + int(z_new),
+                    0);
 #elif defined(WARPX_DIM_1D_Z)
-            close_to_eb_old = eb_reduce_particle_shape(
-                lo.x + int(z_old),
-                0, 0);
-            close_to_eb_new = eb_reduce_particle_shape(
-                lo.x + int(z_new),
-                0, 0);
+                close_to_eb_old = eb_reduce_particle_shape(
+                    lo.x + int(z_old),
+                    0, 0);
+                close_to_eb_new = eb_reduce_particle_shape(
+                    lo.x + int(z_new),
+                    0, 0);
 #endif
-#endif
+            }
 
 #if defined(WARPX_DIM_RZ)
             Real const vy = (-uxp[ip]*sintheta_mid + uyp[ip]*costheta_mid)*gaminv;

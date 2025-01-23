@@ -585,79 +585,43 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
     else {
         if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov) {
             if (push_type == PushType::Explicit) {
-#ifdef AMREX_USE_EB
-                if (EB::enabled())
-                    {
-                    // signed distance function
-                    auto const eb_reduce_particle_shape = (*warpx.GetEBReduceParticleShapeFlag()[lev])[pti].array();
 
-                    if      (WarpX::nox == 1){
-                        doEsirkepovDepositionShapeN<1>(
+                auto const eb_reduce_particle_shape = (*warpx.GetEBReduceParticleShapeFlag()[lev])[pti].array();
+
+                if      (WarpX::nox == 1){
+                    doEsirkepovDepositionShapeN<1>(
+                    GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
+                    uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
+                    jx_arr, jy_arr, jz_arr,
+                    np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
+                    WarpX::n_rz_azimuthal_modes,
+                    eb_reduce_particle_shape, EB::enabled() );
+                } else if (WarpX::nox == 2){
+                    doEsirkepovDepositionShapeN<2>(
                         GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
                         uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
                         jx_arr, jy_arr, jz_arr,
                         np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
-                        eb_reduce_particle_shape,
-                        WarpX::n_rz_azimuthal_modes);
-                    } else if (WarpX::nox == 2){
-                        doEsirkepovDepositionShapeN<2>(
-                            GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
-                            uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                            jx_arr, jy_arr, jz_arr,
-                            np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
-                            eb_reduce_particle_shape,
-                            WarpX::n_rz_azimuthal_modes);
-                    } else if (WarpX::nox == 3){
-                        doEsirkepovDepositionShapeN<3>(
-                            GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
-                            uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                            jx_arr, jy_arr, jz_arr,
-                            np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
-                            eb_reduce_particle_shape,
-                            WarpX::n_rz_azimuthal_modes);
-                    } else if (WarpX::nox == 4){
-                        doEsirkepovDepositionShapeN<4>(
-                            GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
-                            uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                            jx_arr, jy_arr, jz_arr,
-                            np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
-                            eb_reduce_particle_shape,
-                            WarpX::n_rz_azimuthal_modes);
-                    }
-                }
-#else
-                {
-                    if      (WarpX::nox == 1){
-                        doEsirkepovDepositionShapeN<1>(
+                        WarpX::n_rz_azimuthal_modes,
+                        eb_reduce_particle_shape, EB::enabled() );
+                } else if (WarpX::nox == 3){
+                    doEsirkepovDepositionShapeN<3>(
                         GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
                         uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
                         jx_arr, jy_arr, jz_arr,
                         np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
-                        WarpX::n_rz_azimuthal_modes);
-                    } else if (WarpX::nox == 2){
-                        doEsirkepovDepositionShapeN<2>(
-                            GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
-                            uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                            jx_arr, jy_arr, jz_arr,
-                            np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
-                            WarpX::n_rz_azimuthal_modes);
-                    } else if (WarpX::nox == 3){
-                        doEsirkepovDepositionShapeN<3>(
-                            GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
-                            uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                            jx_arr, jy_arr, jz_arr,
-                            np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
-                            WarpX::n_rz_azimuthal_modes);
-                    } else if (WarpX::nox == 4){
-                        doEsirkepovDepositionShapeN<4>(
-                            GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
-                            uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                            jx_arr, jy_arr, jz_arr,
-                            np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
-                            WarpX::n_rz_azimuthal_modes);
-                    }
+                        WarpX::n_rz_azimuthal_modes,
+                        eb_reduce_particle_shape, EB::enabled() );
+                } else if (WarpX::nox == 4){
+                    doEsirkepovDepositionShapeN<4>(
+                        GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
+                        uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
+                        jx_arr, jy_arr, jz_arr,
+                        np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
+                        WarpX::n_rz_azimuthal_modes,
+                        eb_reduce_particle_shape, EB::enabled() );
                 }
-#endif //AMREX_USE_EB
+
             } else if (push_type == PushType::Implicit) {
 #if (AMREX_SPACEDIM >= 2)
                 auto& xp_n = pti.GetAttribs(particle_comps["x_n"]);
