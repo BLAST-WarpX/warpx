@@ -129,7 +129,7 @@ specified ``x``. The data will be scattered appropriately to the underlying FABs
    Jy = fields.JyFPWrapper()
    Jy[5,6:20,8:30] = 7.
 
-In this example, seven is added to all of the values along ``x``, including both valid and ghost cells (specified by using the empty tuple), the first ghost cell at the lower boundary in ``y``, and the last valid cell and fist upper guard cell in ``z``.
+In this example, seven is added to all of the values along ``x``, including both valid and ghost cells (specified by using the empty tuple), the first ghost cell at the lower boundary in ``y``, and the last valid cell and first upper guard cell in ``z``.
 Note that the ``+=`` will be a global operation.
 
 .. code-block:: python
