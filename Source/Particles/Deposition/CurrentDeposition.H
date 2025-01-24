@@ -747,6 +747,8 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             // Check whether the particle is close to the EB at the old and new position
             bool close_to_eb_old = false;
             bool close_to_eb_new = false;
+            amrex::ignore_unused(eb_reduce_particle_shape); // Needed to avoid compilation error with nvcc
+            amrex::ignore_unused(lo); // Needed to avoid compilation error with nvcc
             if constexpr (eb_control == has_eb) {
 #if defined(WARPX_DIM_3D)
                 close_to_eb_old = eb_reduce_particle_shape(
