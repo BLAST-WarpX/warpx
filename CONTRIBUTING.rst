@@ -19,24 +19,24 @@ What to do when
 Issues
 """"""
 
-Issues are used to track tasks that the contributors and/or maintainers can work on.
+`Issues <https://github.com/ECP-WarpX/WarpX/issues>`__ are used to track tasks that the contributors and/or maintainers can work on.
 Use issues for reporting bugs or installation problems and for requesting new features.
 
-If you've found a bug and wish to report it, first search the open issues and pull requests to see if someone else has already reported the same thing.
+If you've found a bug and wish to report it, first search the open issues and `pull requests <https://github.com/ECP-WarpX/WarpX/pulls>`__ to see if someone else has already reported the same thing.
 If it's something new, open an issue using a template.
 We'll use the issue to address the problem you've encountered.
 
 Discussions
 """""""""""
 
-Discussions are for open-ended conversations, general questions, brainstorming ideas.
+`Discussions <https://github.com/ECP-WarpX/WarpX/discussions>`__ are for open-ended conversations, general questions, brainstorming ideas.
 Please, use discussions if you want to ask us something that is not technically a bug or a feature.
 Feel free to ping us there!
 
 Pull Requests (PRs)
 """""""""""""""""""
 
-Open a pull request if you want to add a new feature yourself.
+Open a `pull request <https://github.com/ECP-WarpX/WarpX/pulls>`__ if you want to add a new feature yourself.
 Follow the guide below for more details.
 
 
