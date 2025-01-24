@@ -810,12 +810,14 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             if constexpr (reduce_shape_control == has_reduced_shape) {
                 if (reduce_shape_new) {
                     for (int i=0; i<depos_order+3; i++) sx_new[i] = 0.; // Erase previous deposition
-                    compute_shifted_shape_factor_order1( sx_new+1, x_new, i_new+1 ); // Redeposit with order 1
+                    compute_shifted_shape_factor_order1( sx_new+depos_order/2, x_new, i_new+depos_order/2 ); // Redeposit with order 1
                 }
                 if (reduce_shape_old) {
                     for (int i=0; i<depos_order+3; i++) sx_old[i] = 0.; // Erase previous deposition
-                    compute_shifted_shape_factor_order1( sx_old+1, x_old, i_new+1 ); // Redeposit with order 1
+                    compute_shifted_shape_factor_order1( sx_old+depos_order/2, x_old, i_new+depos_order/2 ); // Redeposit with order 1
                 }
+                // Note: depos_order/2 in the above code corresponds to the shift between the index of the lowest point
+                // to which the particle can deposit, with shape of order `depos_order` vs with shape of order 1
             }
 #endif
 #if defined(WARPX_DIM_3D)
@@ -827,12 +829,14 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             if constexpr (reduce_shape_control == has_reduced_shape) {
                 if (reduce_shape_new) {
                     for (int j=0; j<depos_order+3; j++) sy_new[j] = 0.; // Erase previous deposition
-                    compute_shifted_shape_factor_order1( sy_new+1, y_new, j_new+1 ); // Redeposit with order 1
+                    compute_shifted_shape_factor_order1( sy_new+depos_order/2, y_new, j_new+depos_order/2 ); // Redeposit with order 1
                 }
                 if (reduce_shape_old) {
                     for (int j=0; j<depos_order+3; j++) sy_old[j] = 0.; // Erase previous deposition
-                    compute_shifted_shape_factor_order1( sy_old+1, y_old, j_new+1 ); // Redeposit with order 1
+                    compute_shifted_shape_factor_order1( sy_old+depos_order/2, y_old, j_new+depos_order/2 ); // Redeposit with order 1
                 }
+                // Note: depos_order/2 in the above code corresponds to the shift between the index of the lowest point
+                // to which the particle can deposit, with shape of order `depos_order` vs with shape of order 1
             }
 #endif
             double sz_new[depos_order + 3] = {0.};
@@ -843,12 +847,14 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             if constexpr (reduce_shape_control == has_reduced_shape) {
                 if (reduce_shape_new) {
                     for (int k=0; k<depos_order+3; k++) sz_new[k] = 0.; // Erase previous deposition
-                    compute_shifted_shape_factor_order1( sz_new+1, z_new, k_new+1 ); // Redeposit with order 1
+                    compute_shifted_shape_factor_order1( sz_new+depos_order/2, z_new, k_new+depos_order/2 ); // Redeposit with order 1
                 }
                 if (reduce_shape_old) {
                     for (int k=0; k<depos_order+3; k++) sz_old[k] = 0.; // Erase previous deposition
-                    compute_shifted_shape_factor_order1( sz_old+1, z_old, k_new+1 ); // Redeposit with order 1
+                    compute_shifted_shape_factor_order1( sz_old+depos_order/2, z_old, k_new+depos_order/2 ); // Redeposit with order 1
                 }
+                // Note: depos_order/2 in the above code corresponds to the shift between the index of the lowest point
+                // to which the particle can deposit, with shape of order `depos_order` vs with shape of order 1
             }
 
             // computes min/max positions of current contributions
