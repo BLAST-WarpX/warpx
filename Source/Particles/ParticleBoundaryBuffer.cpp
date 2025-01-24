@@ -174,6 +174,8 @@ struct CopyAndTimestamp {
     int m_normal_index;
     int m_step;
     const amrex::Real m_dt;
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_plo;
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_phi;
     int m_idim;
     int m_iside;
 
@@ -194,8 +196,62 @@ struct CopyAndTimestamp {
             dst.m_runtime_idata[j][dst_i] = src.m_runtime_idata[j][src_i];
         }
 
+        amrex::ParticleReal const ux = dst.m_rdata[PIdx::ux][dst_i];
+        amrex::ParticleReal const uy = dst.m_rdata[PIdx::uy][dst_i];
+        amrex::ParticleReal const uz = dst.m_rdata[PIdx::uz][dst_i];
+
+        //storage of `stepScraped`
         dst.m_runtime_idata[m_step_index][dst_i] = m_step;
-        dst.m_runtime_rdata[m_delta_index][dst_i] = 0._rt; //delta_fraction is initialized to zero
+
+        //calculation and storage of `deltaTimeScraped`
+        amrex::Real delta_t;
+        amrex::Real exit_velocity = 0; //the i_dim component of the velocity
+        if (m_idim == 0) {
+            exit_velocity = ux;
+#if (defined WARPX_DIM_RZ)
+            exit_velocity = std::sqrt(std::pow(ux, 2) + std::pow(uy, 2)); // u_r
+#endif
+        } else if (m_idim == 1) {
+            exit_velocity = uy;
+#if (defined WARPX_DIM_RZ)
+            exit_velocity = std::atan2(uy, ux); // u_theta
+#endif
+        } else {
+            exit_velocity = uz;
+        }
+
+        if (m_iside==1){ //iside=1, we are in the right side
+            delta_t = std::abs(dst.m_rdata[m_idim][dst_i]-m_phi[m_idim])/exit_velocity;
+        } else{
+            delta_t = std::abs(dst.m_rdata[m_idim][dst_i]-m_plo[m_idim])/exit_velocity;
+        }
+        dst.m_runtime_rdata[m_delta_index][dst_i] = delta_t;
+
+        //calculation and storage of the exact position where the particle hits the boundary
+#if (defined WARPX_DIM_3D)
+        dst.m_rdata[PIdx::x][dst_i]-=(m_dt-delta_t)*ux;
+        dst.m_rdata[PIdx::y][dst_i]-=(m_dt-delta_t)*uy;
+        dst.m_rdata[PIdx::z][dst_i]-=(m_dt-delta_t)*uz;
+#elif (defined WARPX_DIM_XZ)
+        dst.m_rdata[PIdx::x][dst_i]-=(m_dt-delta_t)*ux;
+        dst.m_rdata[PIdx::z][dst_i]-=(m_dt-delta_t)*uz;
+#elif (defined WARPX_DIM_RZ)
+        amrex::ParticleReal theta_temp=dst.m_rdata[PIdx::theta][dst_i];
+        amrex::ParticleReal x_temp=dst.m_rdata[PIdx::x][dst_i]*std::cos(theta_temp);
+        amrex::ParticleReal y_temp=dst.m_rdata[PIdx::x][dst_i]*std::sin(theta_temp);
+        amrex::ParticleReal z_temp=dst.m_rdata[PIdx::z][dst_i];
+        x_temp -=(m_dt-delta_t)*ux;
+        y_temp -=(m_dt-delta_t)*uy;
+        z_temp -=(m_dt-delta_t)*uz;
+        theta_temp= std::atan2(y_temp, x_temp);
+        dst.m_rdata[PIdx::theta][dst_i] = theta_temp;
+        dst.m_rdata[PIdx::x][dst_i] =x_temp/std::cos(theta_temp);
+        dst.m_rdata[PIdx::z][dst_i] =z_temp/std::sin(theta_temp);
+#elif (defined WARPX_DIM_1D_Z)
+        dst.m_rdata[PIdx::z][dst_i] -=(m_dt-delta_t)*uz;
+#else
+        amrex::ignore_unused(delta_t);
+#endif
 
         //calculation of the normal to the boundary
         std::array<double, 3> n = {0.0, 0.0, 0.0};
@@ -451,7 +507,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
                           const int step = warpx_instance.getistep(0);
                           amrex::filterAndTransformParticles(ptile_buffer, ptile,
                                                              predicate,
-                                                             CopyAndTimestamp{step_scraped_index, delta_index, normal_index, step, dt, idim, iside},
+                                                             CopyAndTimestamp{step_scraped_index, delta_index, normal_index, step, dt, plo, phi, idim, iside},
                                                              0, dst_index);
                         }
                     }
