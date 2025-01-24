@@ -182,7 +182,6 @@ bool WarpX::do_dynamic_scheduling = true;
 
 bool WarpX::do_multi_J = false;
 int WarpX::do_multi_J_n_depositions;
-bool WarpX::safe_guard_cells = false;
 
 utils::parser::IntervalsParser WarpX::dt_update_interval;
 
@@ -660,7 +659,7 @@ WarpX::ReadParameters ()
                 pp_warpx, "do_multi_J_n_depositions", do_multi_J_n_depositions);
         }
         pp_warpx.query("use_hybrid_QED", use_hybrid_QED);
-        pp_warpx.query("safe_guard_cells", safe_guard_cells);
+        pp_warpx.query("safe_guard_cells", m_safe_guard_cells);
         std::vector<std::string> override_sync_intervals_string_vec = {"1"};
         pp_warpx.queryarr("override_sync_intervals", override_sync_intervals_string_vec);
         override_sync_intervals =
@@ -2088,7 +2087,7 @@ WarpX::AllocLevelData (int lev, const BoxArray& ba, const DistributionMapping& d
         maxLevel(),
         WarpX::m_v_galilean,
         WarpX::m_v_comoving,
-        safe_guard_cells,
+        m_safe_guard_cells,
         WarpX::do_multi_J,
         WarpX::fft_do_time_averaging,
         ::isAnyBoundaryPML(field_boundary_lo, field_boundary_hi),

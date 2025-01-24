@@ -446,7 +446,7 @@ WarpX::OneStep_nosub (Real cur_time)
 
         // E and B are up-to-date in the domain, but all guard cells are
         // outdated.
-        if (safe_guard_cells) {
+        if (m_safe_guard_cells) {
             FillBoundaryB(guard_cells.ng_alloc_EB);
         }
     } // !PSATD
@@ -978,7 +978,7 @@ WarpX::OneStep_sub1 (Real cur_time)
         FillBoundaryE(fine_lev, PatchType::fine, guard_cells.ng_FieldSolver);
     }
 
-    if ( safe_guard_cells ) {
+    if ( m_safe_guard_cells ) {
         FillBoundaryF(fine_lev, PatchType::fine, guard_cells.ng_FieldSolver);
     }
     FillBoundaryB(fine_lev, PatchType::fine, guard_cells.ng_FieldSolver);
@@ -1034,12 +1034,12 @@ WarpX::OneStep_sub1 (Real cur_time)
                           WarpX::sync_nodal_points);
         }
         DampPML(coarse_lev, PatchType::fine);
-        if ( safe_guard_cells ) {
+        if ( m_safe_guard_cells ) {
             FillBoundaryE(coarse_lev, PatchType::fine, guard_cells.ng_FieldSolver,
                           WarpX::sync_nodal_points);
         }
     }
-    if ( safe_guard_cells ) {
+    if ( m_safe_guard_cells ) {
         FillBoundaryB(coarse_lev, PatchType::fine, guard_cells.ng_FieldSolver,
                       WarpX::sync_nodal_points);
     }

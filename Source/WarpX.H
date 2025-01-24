@@ -168,6 +168,7 @@ public:
 
     static void shiftMF (amrex::MultiFab& mf, const amrex::Geometry& geom,
                          int num_shift, int dir, int lev, bool update_cost_flag,
+                         bool safe_guard_cells,
                          amrex::Real external_field=0.0, bool useparser = false,
                          amrex::ParserExecutor<3> const& field_parser={});
 
@@ -391,7 +392,6 @@ public:
     static int do_multi_J_n_depositions;
 
     static bool do_device_synchronize;
-    static bool safe_guard_cells;
 
     //! With mesh refinement, particles located inside a refinement patch, but within
     //! #n_field_gather_buffer cells of the edge of the patch, will gather the fields
@@ -1402,6 +1402,8 @@ private:
     amrex::Vector<amrex::Real> t_old;
     amrex::Vector<amrex::Real> dt;
     static utils::parser::IntervalsParser dt_update_interval; // How often to update the timestep when using adaptive timestepping
+
+    bool m_safe_guard_cells = false;
 
     // Particle container
     std::unique_ptr<MultiParticleContainer> mypc;
