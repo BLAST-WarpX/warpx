@@ -1502,14 +1502,14 @@ WarpX::ReadParameters ()
         // Integer that corresponds to the order of the PSATD solution
         // (whether the PSATD equations are derived from first-order or
         // second-order solution)
-        pp_psatd.query_enum_sloppy("solution_type", psatd_solution_type, "-_");
+        pp_psatd.query_enum_sloppy("solution_type", m_psatd_solution_type, "-_");
 
         // Integers that correspond to the time dependency of J (constant, linear)
         // and rho (linear, quadratic) for the PSATD algorithm
         pp_psatd.query_enum_sloppy("J_in_time", J_in_time, "-_");
         pp_psatd.query_enum_sloppy("rho_in_time", rho_in_time, "-_");
 
-        if (psatd_solution_type != PSATDSolutionType::FirstOrder || !do_multi_J)
+        if (m_psatd_solution_type != PSATDSolutionType::FirstOrder || !do_multi_J)
         {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 rho_in_time == RhoInTime::Linear,
@@ -2904,7 +2904,7 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
                                                 fft_periodic_single_box,
                                                 update_with_rho,
                                                 fft_do_time_averaging,
-                                                psatd_solution_type,
+                                                m_psatd_solution_type,
                                                 J_in_time,
                                                 rho_in_time,
                                                 do_dive_cleaning,

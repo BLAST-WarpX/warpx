@@ -244,11 +244,6 @@ public:
                                            ParticleBoundaryType::Default,
                                            ParticleBoundaryType::Default)};
 
-    //! Integer that corresponds to the order of the PSATD solution
-    //! (whether the PSATD equations are derived from first-order or
-    //! second-order solution)
-    static inline auto psatd_solution_type = PSATDSolutionType::Default;
-
     //! Integers that correspond to the time dependency of J (constant, linear)
     //! and rho (linear, quadratic) for the PSATD algorithm
     static inline auto J_in_time = JInTime::Default;
@@ -1641,6 +1636,11 @@ private:
      * Particles have p^{n} and x^{n}.
      */
     void ExplicitFillBoundaryEBUpdateAux ();
+
+    //! Integer that corresponds to the order of the PSATD solution
+    //! (whether the PSATD equations are derived from first-order or
+    //! second-order solution)
+    PSATDSolutionType m_psatd_solution_type = PSATDSolutionType::Default;
 
     void PushPSATD (amrex::Real start_time);
 
