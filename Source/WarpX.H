@@ -294,10 +294,6 @@ public:
     //! Solve additional Maxwell equation for G in order to control errors in magnetic Gauss' law
     static bool do_divb_cleaning;
 
-    //! Solve Poisson equation when loading an external magnetic field to clean divergence
-    //! This is useful to remove errors that could lead to non-zero B field divergence
-    static bool do_divb_cleaning_external;
-
     //! Order of the particle shape factors (splines) along x
     static int nox;
     //! Order of the particle shape factors (splines) along y
@@ -1586,6 +1582,10 @@ private:
     int nox_fft = 16;
     int noy_fft = 16;
     int noz_fft = 16;
+
+    //! Solve Poisson equation when loading an external magnetic field to clean divergence
+    //! This is useful to remove errors that could lead to non-zero B field divergence
+    bool m_do_divb_cleaning_external = false;
 
     //! Domain decomposition on Level 0
     amrex::IntVect numprocs{0};
