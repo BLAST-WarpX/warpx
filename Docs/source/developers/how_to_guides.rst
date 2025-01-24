@@ -1,6 +1,6 @@
 .. _development-howtoguides:
 
-How-to guides
+How-To Guides
 =============
 
 .. toctree::
