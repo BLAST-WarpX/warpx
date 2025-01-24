@@ -26,7 +26,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/clang.sh 16
+        .github/workflows/dependencies/clang.sh 17
     - name: set up cache
       uses: actions/cache@v4
       with:
@@ -43,8 +43,8 @@ jobs:
         export CCACHE_LOGFILE=${{ github.workspace }}/ccache.log.txt
         ccache -z
 
-        export CXX=$(which clang++-16)
-        export CC=$(which clang-16)
+        export CXX=$(which clang++-17)
+        export CC=$(which clang-17)
 
         cmake -S . -B build_clang_tidy      \
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
@@ -62,7 +62,7 @@ jobs:
 
         ${{github.workspace}}/.github/workflows/source/makeMakefileForClangTidy.py --input ${{github.workspace}}/ccache.log.txt
         make -j4 --keep-going -f clang-tidy-ccache-misses.mak \
-            CLANG_TIDY=clang-tidy-16 \
+            CLANG_TIDY=clang-tidy-17 \
             CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
 
         ccache -s
