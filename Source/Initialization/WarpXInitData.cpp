@@ -530,7 +530,7 @@ WarpX::InitData ()
     // WarpX::computeMaxStepBoostAccelerator
     // needs to start from the initial zmin_domain_boost,
     // even if restarting from a checkpoint file
-    if (do_compute_max_step_from_zmax) {
+    if (m_zmax_plasma_to_compute_max_step.has_value()) {
         zmin_domain_boost_step_0 = geom[0].ProbLo(WARPX_ZINDEX);
     }
     if (restart_chkfile.empty())
@@ -798,7 +798,7 @@ WarpX::ComputePMLFactors ()
 void
 WarpX::ComputeMaxStep ()
 {
-    if (do_compute_max_step_from_zmax) {
+    if (m_zmax_plasma_to_compute_max_step.has_value()) {
         computeMaxStepBoostAccelerator();
     }
 }
@@ -831,7 +831,7 @@ WarpX::computeMaxStepBoostAccelerator() {
 
     // End of the plasma: Transform input argument
     // zmax_plasma_to_compute_max_step to boosted frame.
-    const Real len_plasma_boost = zmax_plasma_to_compute_max_step/gamma_boost;
+    const Real len_plasma_boost = m_zmax_plasma_to_compute_max_step.value()/gamma_boost;
     // Plasma velocity
     const Real v_plasma_boost = -beta_boost * PhysConst::c;
     // Get time at which the lower end of the simulation domain passes the

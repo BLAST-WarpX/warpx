@@ -111,9 +111,7 @@ amrex::IntVect WarpX::m_fill_guards_current = amrex::IntVect(0);
 Real WarpX::gamma_boost = 1._rt;
 Real WarpX::beta_boost = 0._rt;
 Vector<int> WarpX::boost_direction = {0,0,0};
-bool WarpX::do_compute_max_step_from_zmax = false;
 bool WarpX::compute_max_step_from_btd = false;
-Real WarpX::zmax_plasma_to_compute_max_step = 0._rt;
 Real WarpX::zmin_domain_boost_step_0 = 0._rt;
 
 int WarpX::max_particle_its_in_implicit_scheme = 21;
@@ -491,7 +489,6 @@ WarpX::~WarpX ()
 void
 WarpX::ReadParameters ()
 {
-
     {
         const ParmParse pp;// Traditionally, max_step and stop_time do not have prefix.
         utils::parser::queryWithParser(pp, "max_step", max_step);
@@ -673,9 +670,9 @@ WarpX::ReadParameters ()
 
         // queryWithParser returns 1 if argument zmax_plasma_to_compute_max_step is
         // specified by the user, 0 otherwise.
-        do_compute_max_step_from_zmax = utils::parser::queryWithParser(
-            pp_warpx, "zmax_plasma_to_compute_max_step",
-            zmax_plasma_to_compute_max_step);
+        if(auto temp = 0.0_rt; utils::parser::queryWithParser(pp_warpx, "zmax_plasma_to_compute_max_step",temp)){
+            m_zmax_plasma_to_compute_max_step = temp;
+        }
 
         pp_warpx.query("compute_max_step_from_btd",
             compute_max_step_from_btd);

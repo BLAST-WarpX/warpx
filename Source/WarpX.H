@@ -361,14 +361,7 @@ public:
     static amrex::Real beta_boost;
     //! Direction of the Lorentz transform that defines the boosted frame of the simulation
     static amrex::Vector<int> boost_direction;
-    //! If specified, the maximum number of iterations is computed automatically so that
-    //! the lower end of the simulation domain along z reaches #zmax_plasma_to_compute_max_step
-    //! in the boosted frame
-    static amrex::Real zmax_plasma_to_compute_max_step;
-    //! Set to true if #zmax_plasma_to_compute_max_step is specified, in which case
-    //! the maximum number of iterations is computed automatically so that the lower end of the
-    //! simulation domain along z reaches #zmax_plasma_to_compute_max_step in the boosted frame
-    static bool do_compute_max_step_from_zmax;
+
     //! store initial value of zmin_domain_boost because WarpX::computeMaxStepBoostAccelerator
     //! needs the initial value of zmin_domain_boost, even if restarting from a checkpoint file
     static amrex::Real zmin_domain_boost_step_0;
@@ -1545,6 +1538,11 @@ private:
 
     int max_step   = std::numeric_limits<int>::max();
     amrex::Real stop_time = std::numeric_limits<amrex::Real>::max();
+
+    //! If specified, the maximum number of iterations is computed automatically so that
+    //! the lower end of the simulation domain along z reaches #zmax_plasma_to_compute_max_step
+    //! in the boosted frame
+    std::optional<amrex::Real> m_zmax_plasma_to_compute_max_step = std::nullopt;
 
     int regrid_int = -1;
 
