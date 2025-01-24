@@ -1401,7 +1401,7 @@ private:
     amrex::Vector<amrex::Real> t_new;
     amrex::Vector<amrex::Real> t_old;
     amrex::Vector<amrex::Real> dt;
-    static utils::parser::IntervalsParser dt_update_interval; // How often to update the timestep when using adaptive timestepping
+    utils::parser::IntervalsParser m_dt_update_interval = utils::parser::IntervalsParser{}; // How often to update the timestep when using adaptive timestepping
 
     // Particle container
     std::unique_ptr<MultiParticleContainer> mypc;

@@ -130,7 +130,7 @@ WarpX::Evolve (int numsteps)
         // Update timestep for electrostatic solver if a constant dt is not provided
         // This first synchronizes the position and velocity before setting the new timestep
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None &&
-            !m_const_dt.has_value() && dt_update_interval.contains(step+1)) {
+            !m_const_dt.has_value() && m_dt_update_interval.contains(step+1)) {
             if (verbose) {
                 amrex::Print() << Utils::TextMsg::Info("updating timestep");
             }

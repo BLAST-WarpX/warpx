@@ -184,8 +184,6 @@ bool WarpX::do_multi_J = false;
 int WarpX::do_multi_J_n_depositions;
 bool WarpX::safe_guard_cells = false;
 
-utils::parser::IntervalsParser WarpX::dt_update_interval;
-
 std::map<std::string, amrex::iMultiFab *> WarpX::imultifab_map;
 
 IntVect WarpX::filter_npass_each_dir(1);
@@ -743,7 +741,7 @@ WarpX::ReadParameters ()
         utils::parser::queryWithParser(pp_warpx, "max_dt", m_max_dt);
         std::vector<std::string> dt_interval_vec = {"-1"};
         pp_warpx.queryarr("dt_update_interval", dt_interval_vec);
-        dt_update_interval = utils::parser::IntervalsParser(dt_interval_vec);
+        m_dt_update_interval = utils::parser::IntervalsParser(dt_interval_vec);
 
         // Filter defaults to true for the explicit scheme, and false for the implicit schemes
         if (evolve_scheme != EvolveScheme::Explicit) {
