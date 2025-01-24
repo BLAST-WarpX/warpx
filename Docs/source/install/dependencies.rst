@@ -52,20 +52,12 @@ For all other systems, we recommend to use a **package dependency manager**:
 Pick *one* of the installation methods below to install all dependencies for WarpX development in a consistent manner.
 
 
-Conda (Linux/macOS/Windows)
----------------------------
+Conda-Forge (Linux/macOS/Windows)
+---------------------------------
 
-`Conda <https://conda.io>`__/`Mamba <https://mamba.readthedocs.io>`__ are cross-compatible, user-level package managers.
+`Conda-Forge <https://conda-forge.org/download/>`__ is a repository for cross-compatible, user-level packages.
 
 .. tip::
-
-   We recommend to configure your conda to use the faster ``libmamba`` `dependency solver <https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community>`__.
-
-   .. code-block:: bash
-
-      conda update -y -n base conda
-      conda install -y -n base conda-libmamba-solver
-      conda config --set solver libmamba
 
    We recommend to deactivate that conda self-activates its ``base`` environment.
    This `avoids interference with the system and other package managers <https://collegeville.github.io/CW20/WorkshopResources/WhitePapers/huebl-working-with-multiple-pkg-mgrs.pdf>`__.
@@ -111,19 +103,19 @@ For OpenMP support, you will further need:
 
       .. code-block:: bash
 
-         conda install -c conda-forge libgomp
+         mamba install -c conda-forge libgomp
 
    .. tab-item:: macOS or Windows
 
       .. code-block:: bash
 
-         conda install -c conda-forge llvm-openmp
+         mamba install -c conda-forge llvm-openmp
 
 For Nvidia CUDA GPU support, you will need to have `a recent CUDA driver installed <https://developer.nvidia.com/cuda-downloads>`__ or you can lower the CUDA version of `the Nvidia cuda package <https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#conda-installation>`__ and `conda-forge to match your drivers <https://docs.cupy.dev/en/stable/install.html#install-cupy-from-conda-forge>`__ and then add these packages:
 
 .. code-block:: bash
 
-   conda install -c nvidia -c conda-forge cuda cuda-nvtx-dev cupy
+   mamba install -c nvidia -c conda-forge cuda cuda-nvtx-dev cupy
 
 More info for `CUDA-enabled ML packages <https://twitter.com/jeremyphoward/status/1697435241152127369>`__.
 
