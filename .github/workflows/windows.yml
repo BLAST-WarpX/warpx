@@ -7,6 +7,7 @@ on:
   pull_request:
     paths-ignore:
       - "Docs/**"
+      - "**.rst"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-windows

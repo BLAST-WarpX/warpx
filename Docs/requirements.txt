@@ -13,7 +13,7 @@ openpmd-viewer  # for checksumAPI
 
 # PICMI API docs
 # note: keep in sync with version in ../requirements.txt
-picmistandard==0.31.0
+picmistandard==0.33.0
 # for development against an unreleased PICMI version, use:
 # picmistandard @ git+https://github.com/picmi-standard/picmi.git#subdirectory=PICMI_Python
 

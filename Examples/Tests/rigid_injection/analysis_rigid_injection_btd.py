@@ -20,7 +20,6 @@ The simulation runs in a boosted frame, and the analysis is done in the lab
 frame, i.e., on the back-transformed diagnostics.
 """
 
-import os
 import sys
 
 import numpy as np
@@ -28,9 +27,6 @@ import openpmd_api as io
 import yt
 
 yt.funcs.mylog.setLevel(0)
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 filename = sys.argv[1]
 
@@ -80,9 +76,3 @@ tol = 1e-2
 print(f"error = {err}")
 print(f"tolerance = {tol}")
 assert err < tol
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

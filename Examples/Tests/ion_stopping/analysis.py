@@ -11,15 +11,11 @@
 # is used in the C++ to check the resulting
 # particle energies.
 
-import os
 import sys
 
 import numpy as np
 import yt
 from scipy.constants import e, epsilon_0, k, m_e, m_p
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 # Define constants using the WarpX names for the evals below
 q_e = e
@@ -193,9 +189,3 @@ assert np.all(error1 < tolerance)
 assert np.all(error2 < tolerance)
 assert np.all(error3 < tolerance)
 assert np.all(error4 < tolerance)
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

@@ -12,7 +12,7 @@ module load craype
 module load craype-x86-milan
 module load craype-accel-nvidia80
 module load cudatoolkit
-module load cmake/3.24.3
+module load cmake/3.30.2
 
 # optional: for QED support with detailed tables
 export BOOST_ROOT=/global/common/software/spackecp/perlmutter/e4s-23.08/default/spack/opt/spack/linux-sles15-zen3/gcc-12.3.0/boost-1.83.0-nxqk3hnci5g3wqv75wvsmuke3w74mzxi

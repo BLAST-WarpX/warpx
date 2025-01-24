@@ -1091,7 +1091,7 @@ BTDiagnostics::Flush (int i_buffer, bool force_flush)
         m_varnames, m_mf_output.at(i_buffer), m_geom_output.at(i_buffer), warpx.getistep(),
         labtime,
         m_output_species.at(i_buffer), nlev_output, file_name, m_file_min_digits,
-        m_plot_raw_fields, m_plot_raw_fields_guards,
+        m_plot_raw_fields, m_plot_raw_fields_guards, m_verbose,
         use_pinned_pc, isBTD, i_buffer, m_buffer_flush_counter.at(i_buffer),
         m_max_buffer_multifabs.at(i_buffer), m_geom_snapshot.at(i_buffer).at(0), isLastBTDFlush);
 

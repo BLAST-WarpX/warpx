@@ -18,14 +18,11 @@ PML, this test fails, since the particles leave a spurious
 charge, with associated fields, behind them.
 """
 
-import os
 import sys
 
 import yt
 
 yt.funcs.mylog.setLevel(0)
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 # Open plotfile specified in command line
 filename = sys.argv[1]
@@ -66,9 +63,3 @@ else:
 
 print("tolerance_abs: " + str(tolerance_abs))
 assert max_Efield < tolerance_abs
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

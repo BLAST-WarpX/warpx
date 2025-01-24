@@ -1483,17 +1483,14 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 if (eb_flag_arr(i,j,k).isRegular() || eb_flag_arr(i,j,k).isCovered()) { return; }
                 // Scale by the (normalized) area of the EB surface in this cell
                 num_ppc_real_in_this_cell *= eb_bnd_area_arr(i,j,k);
-            } else
+            }
 #else
             amrex::Real const num_ppc_real_in_this_cell = num_ppc_real; // user input: number of macroparticles per cell
 #endif
-            {
-                // Injection from a plane
-                auto lo = getCellCoords(overlap_corner, dx, {0._rt, 0._rt, 0._rt}, iv);
-                auto hi = getCellCoords(overlap_corner, dx, {1._rt, 1._rt, 1._rt}, iv);
-                // Skip cells that do not overlap with the plane
-                if (!flux_pos->overlapsWith(lo, hi)) { return; }
-            }
+            // Skip cells that do not overlap with the bounds specified by the user (xmin/xmax, ymin/ymax, zmin/zmax)
+            auto lo = getCellCoords(overlap_corner, dx, {0._rt, 0._rt, 0._rt}, iv);
+            auto hi = getCellCoords(overlap_corner, dx, {1._rt, 1._rt, 1._rt}, iv);
+            if (!flux_pos->overlapsWith(lo, hi)) { return; }
 
             auto index = overlap_box.index(iv);
             // Take into account refined injection region

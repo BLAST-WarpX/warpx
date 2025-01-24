@@ -152,6 +152,9 @@ class SpectralSolverRZ
 
         SpectralFieldIndex m_spectral_index;
 
+        // Solve time step size
+        amrex::Real m_dt;
+
     private:
 
         SpectralKSpaceRZ k_space; // Save the instance to initialize filtering
