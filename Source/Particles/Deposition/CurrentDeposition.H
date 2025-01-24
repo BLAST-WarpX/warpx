@@ -638,7 +638,9 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * \param lo           Index lower bounds of domain.
  * \param q            species charge.
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
- * TODO: add documentation for reduced_particle_shape_mask
+ * \param reduced_particle_shape_mask  Array4 of int, Mask that indicates whether a particle
+ * should use its regular shape factor or a reduced, order-1 shape factor instead in a given cell.
+ * \param enable_reduced_shape Flag to indicate whether to use the reduced shape factor
  */
 template <int depos_order>
 void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
@@ -685,7 +687,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
     // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
 
-    // (Compile 2 versions of the kernel: with and without embedded boundaries)
+    // (Compile 2 versions of the kernel: with and without reduced shape)
     enum eb_flags : int { has_reduced_shape, no_reduced_shape };
     const int reduce_shape_runtime_flag = (enable_reduced_shape && (depos_order>1))? has_reduced_shape : no_reduced_shape;
 

@@ -1008,7 +1008,20 @@ public:
 
 #ifdef AMREX_USE_EB
 
-    /** TODO */
+    /** \brief Set a flag to indicate in which cells a particle should deposit charge/current
+     *  with a reduced, order 1 shape.
+     *
+     * More specifically, the flag is set to 1 if any of the neighboring cells over which the
+     * particle shape might extend are either partially or fully covered by an embedded boundary.
+     * This ensures that a particle in this cell deposits with an order 1 shape, which in turn
+     * makes sure that the particle never deposits any charge in a partially or fully covered cell.
+     *
+     * \param[in] eb_reduce_particle_shape multifab to be filled with 1s and 0s
+     * \param[in] eb_fact EB factory
+     * \param[in] particle_shape_order order of the particle shape function
+     */
+
+
     void MarkReducedShapeCells (
         std::unique_ptr<amrex::iMultiFab> & eb_reduce_particle_shape,
         amrex::EBFArrayBoxFactory const & eb_fact,
@@ -1435,9 +1448,10 @@ private:
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_E;
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_B;
 
-    /** EB: Flag to indicate whether particles should use order-1 shape factor in a given cell,
-     * when depositing charge/current. This is needed with the EM solver, in order to avoid
-     * error in charge conservation when a particle is too close to the embedded boundary.
+    /** EB: Mask that indicates whether a particle should use its regular shape factor (mask set to 0)
+     *  or a reduced, order-1 shape factor instead (mask set to 1) in a given cell, when depositing charge/current.
+     *  The flag is typically set to 1 in cells that are close to the embedded boundary, in order to avoid
+     *  errors in charge conservation when a particle is too close to the embedded boundary.
      */
     amrex::Vector<  std::unique_ptr<amrex::iMultiFab> > m_eb_reduce_particle_shape;
 
