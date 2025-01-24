@@ -20,8 +20,6 @@
 */
 struct CopyParticleAttribs
 {
-    using TmpParticles = WarpXParticleContainer::TmpParticles;
-
     GetParticlePosition<PIdx> m_get_position;
 
     const amrex::ParticleReal* AMREX_RESTRICT uxp = nullptr;
@@ -41,15 +39,17 @@ struct CopyParticleAttribs
     /** \brief Construct a new functor
      *
      * \param a_pti iterator to the tile containing the macroparticles
-     * \param tmp_particle_data holder for the temporary particle data
      * \param a_offset offset to apply when reading / writing particle data
      *        This is needed because when we use field gather buffers we don't
      *        always start at the particle with index 0.
      */
-    CopyParticleAttribs (const WarpXParIter& a_pti, TmpParticles& tmp_particle_data,
-                         long a_offset = 0) noexcept
+    CopyParticleAttribs (
+        const WarpXParticleContainer& pc,
+        WarpXParIter& a_pti,
+        long a_offset = 0) noexcept
     {
-        if (tmp_particle_data.empty()) { return; }
+        // FIXME
+        //if (tmp_particle_data.empty()) { return; }
 
         const auto& attribs = a_pti.GetAttribs();
 
@@ -57,14 +57,13 @@ struct CopyParticleAttribs
         uyp = attribs[PIdx::uy].dataPtr() + a_offset;
         uzp = attribs[PIdx::uz].dataPtr() + a_offset;
 
-        const auto lev = a_pti.GetLevel();
-        const auto index = a_pti.GetPairIndex();
-        xpold  = tmp_particle_data[lev].at(index)[TmpIdx::xold ].dataPtr() + a_offset;
-        ypold  = tmp_particle_data[lev].at(index)[TmpIdx::yold ].dataPtr() + a_offset;
-        zpold  = tmp_particle_data[lev].at(index)[TmpIdx::zold ].dataPtr() + a_offset;
-        uxpold = tmp_particle_data[lev].at(index)[TmpIdx::uxold].dataPtr() + a_offset;
-        uypold = tmp_particle_data[lev].at(index)[TmpIdx::uyold].dataPtr() + a_offset;
-        uzpold = tmp_particle_data[lev].at(index)[TmpIdx::uzold].dataPtr() + a_offset;
+        auto particle_comps = pc.getParticleComps();
+        xpold = a_pti.GetAttribs(particle_comps["x_n_btd"]).dataPtr();
+        ypold = a_pti.GetAttribs(particle_comps["y_n_btd"]).dataPtr();
+        zpold = a_pti.GetAttribs(particle_comps["z_n_btd"]).dataPtr();
+        uxpold = a_pti.GetAttribs(particle_comps["ux_n_btd"]).dataPtr();
+        uypold = a_pti.GetAttribs(particle_comps["uy_n_btd"]).dataPtr();
+        uzpold = a_pti.GetAttribs(particle_comps["uz_n_btd"]).dataPtr();
 
         m_get_position = GetParticlePosition<PIdx>(a_pti, a_offset);
     }
