@@ -294,7 +294,8 @@ WarpX::ScaleAreas (ablastr::fields::VectorField& face_areas,
 void
 WarpX::MarkReducedShapeCells (
     std::unique_ptr<amrex::iMultiFab> & eb_reduce_particle_shape,
-    amrex::EBFArrayBoxFactory const & eb_fact )
+    amrex::EBFArrayBoxFactory const & eb_fact,
+    int const particle_shape_order )
 {
     // Pre-fill array with 0, including in the ghost cells outside of the domain.
     // (The guard cells in the domain will be updated by `FillBoundary` at the end of this function.)
@@ -335,22 +336,25 @@ WarpX::MarkReducedShapeCells (
 
             amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
 
-                // Check if any of the neighboring cells are either partially or fully covered
-                // In this case, reduce particle shape to order 1
+                // Check if any of the neighboring cells over which the particle shape might extend
+                // are either partially or fully covered. In this case, set eb_reduce_particle_shape_arr
+                // to one for this cell, to indicate that the particle should use an order 1 shape
                 // (This ensures that the particle never deposits any charge in a partially or
                 // fully covered cell, even with higher-order shapes)
-                int const i_start = i-1;
-                int const i_end = i+1;
+                // Note: in the code below `particle_shape_order/2` corresponds to the number of neighboring cells
+                // over which the shape factor could extend, in each direction.
+                int const i_start = i-particle_shape_order/2;
+                int const i_end = i+particle_shape_order/2;
 #if AMREX_SPACEDIM > 1
-                int const j_start = j-1;
-                int const j_end = j+1;
+                int const j_start = j-particle_shape_order/2;
+                int const j_end = j+particle_shape_order/2;
 #else
                 int const j_start = j;
                 int const j_end = j;
 #endif
 #if AMREX_SPACEDIM > 2
-                int const k_start = k-1;
-                int const k_end = k+1;
+                int const k_start = k-particle_shape_order/2;
+                int const k_end = k+particle_shape_order/2;
 #else
                 int const k_start = k;
                 int const k_end = k;

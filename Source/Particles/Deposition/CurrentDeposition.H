@@ -747,33 +747,34 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             // Check whether the particle is close to the EB at the old and new position
             bool reduce_shape_old = false;
             bool reduce_shape_new = false;
-            amrex::ignore_unused(reduced_particle_shape_mask); // Needed to avoid compilation error with nvcc
-            amrex::ignore_unused(lo); // Needed to avoid compilation error with nvcc
+#ifdef AMREX_USE_CUDA
+            amrex::ignore_unused(reduced_particle_shape_mask, lo); // Needed to avoid compilation error with nvcc
+#endif
             if constexpr (reduce_shape_control == has_reduced_shape) {
 #if defined(WARPX_DIM_3D)
                 reduce_shape_old = reduced_particle_shape_mask(
-                    lo.x + int(x_old),
-                    lo.y + int(y_old),
-                    lo.z + int(z_old));
+                    lo.x + int(amrex::Math::floor(x_old)),
+                    lo.y + int(amrex::Math::floor(y_old)),
+                    lo.z + int(amrex::Math::floor(z_old)));
                 reduce_shape_new = reduced_particle_shape_mask(
-                    lo.x + int(x_new),
-                    lo.y + int(y_new),
-                    lo.z + int(z_new));
+                    lo.x + int(amrex::Math::floor(x_new)),
+                    lo.y + int(amrex::Math::floor(y_new)),
+                    lo.z + int(amrex::Math::floor(z_new)));
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                 reduce_shape_old = reduced_particle_shape_mask(
-                    lo.x + int(x_old),
-                    lo.y + int(z_old),
+                    lo.x + int(amrex::Math::floor(x_old)),
+                    lo.y + int(amrex::Math::floor(z_old)),
                     0);
                 reduce_shape_new = reduced_particle_shape_mask(
-                    lo.x + int(x_new),
-                    lo.y + int(z_new),
+                    lo.x + int(amrex::Math::floor(x_new)),
+                    lo.y + int(amrex::Math::floor(z_new)),
                     0);
 #elif defined(WARPX_DIM_1D_Z)
                 reduce_shape_old = reduced_particle_shape_mask(
-                    lo.x + int(z_old),
+                    lo.x + int(amrex::Math::floor(z_old)),
                     0, 0);
                 reduce_shape_new = reduced_particle_shape_mask(
-                    lo.x + int(z_new),
+                    lo.x + int(amrex::Math::floor(z_new)),
                     0, 0);
 #endif
             }

@@ -1268,7 +1268,7 @@ void WarpX::InitializeEBGridData (int lev)
         }
 
         ComputeDistanceToEB();
-        MarkReducedShapeCells( m_eb_reduce_particle_shape[lev], eb_fact );
+        MarkReducedShapeCells( m_eb_reduce_particle_shape[lev], eb_fact, WarpX::nox );
 
     }
 #else
