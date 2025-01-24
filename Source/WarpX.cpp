@@ -120,7 +120,6 @@ int WarpX::max_particle_its_in_implicit_scheme = 21;
 ParticleReal WarpX::particle_tol_in_implicit_scheme = 1.e-10;
 bool WarpX::do_dive_cleaning = false;
 bool WarpX::do_divb_cleaning = false;
-bool WarpX::do_divb_cleaning_external = false;
 bool WarpX::do_single_precision_comms = false;
 
 bool WarpX::do_shared_mem_charge_deposition = false;
@@ -1070,9 +1069,9 @@ WarpX::ReadParameters ()
                 || WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic)
                 && WarpX::poisson_solver_id == PoissonSolverAlgo::Multigrid)))
         {
-            do_divb_cleaning_external = true;
+            m_do_divb_cleaning_external = true;
         }
-        pp_warpx.query("do_divb_cleaning_external", do_divb_cleaning_external);
+        pp_warpx.query("do_divb_cleaning_external", m_do_divb_cleaning_external);
 
         // If true, the current is deposited on a nodal grid and centered onto
         // a staggered grid. Setting warpx.do_current_centering=1 makes sense
