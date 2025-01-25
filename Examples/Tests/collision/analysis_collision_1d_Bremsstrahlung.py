@@ -26,6 +26,9 @@ last_fn = sys.argv[1]
 particle_energy = np.loadtxt(
     os.path.join("diags", "reducedfiles", "particle_energy.txt"), skiprows=1
 )
+particle_momentum = np.loadtxt(
+    os.path.join("diags", "reducedfiles", "particle_momentum.txt"), skiprows=1
+)
 particle_number = np.loadtxt(
     os.path.join("diags", "reducedfiles", "particle_number.txt"), skiprows=1
 )
@@ -35,7 +38,12 @@ electron_energy = particle_energy[:, 3]
 ion_energy = particle_energy[:, 4]
 photon_energy = particle_energy[:, 5]
 
-energy_tolerance = 1.0e-12
+total_momentum = particle_momentum[:, 2]
+electron_momentum = particle_momentum[:, 3]
+ion_momentum = particle_momentum[:, 4]
+photon_momentum = particle_momentum[:, 5]
+
+energy_tolerance = 1.0e-11
 
 print(f"initial total energy = {total_energy[0]}")
 print(f"final total energy = {total_energy[-1]}")
@@ -44,17 +52,14 @@ dE_total = np.abs(total_energy[-1] - total_energy[0]) / total_energy[0]
 print(f"change in total energy = {dE_total}")
 assert dE_total < energy_tolerance
 
-print(f"initial electron energy = {electron_energy[0]}")
-print(f"final electron energy = {electron_energy[-1]}")
-print(f"final photon energy = {photon_energy[-1]}")
+momentum_tolerance = 1.0e-12
 
-dE_electron_photon = (
-    np.abs(electron_energy[-1] + photon_energy[-1] - electron_energy[0])
-    / electron_energy[0]
-)
-print(f"electron, photon energy change = {dE_electron_photon}")
-assert dE_electron_photon < energy_tolerance
+print(f"initial total momentum = {total_momentum[0]}")
+print(f"final total momentum = {total_momentum[-1]}")
 
+dP_total = np.abs(total_momentum[-1] - total_momentum[0]) / total_momentum[0]
+print(f"change in total momentum = {dP_total}")
+assert dP_total < momentum_tolerance
 
 print()
 

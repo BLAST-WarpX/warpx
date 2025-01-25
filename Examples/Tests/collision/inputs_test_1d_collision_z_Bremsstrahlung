@@ -94,10 +94,13 @@ diagnostics.diags_names = diag1
 diag1.intervals = 100
 diag1.diag_type = Full
 
-warpx.reduced_diags_names = particle_energy particle_number
+warpx.reduced_diags_names = particle_energy particle_momentum particle_number
 particle_energy.type = ParticleEnergy
 particle_energy.intervals = 10
 particle_energy.precision = 18
+particle_momentum.type = ParticleMomentum
+particle_momentum.intervals = 10
+particle_momentum.precision = 18
 particle_number.type = ParticleNumber
 particle_number.intervals = 10
 particle_number.precision = 18

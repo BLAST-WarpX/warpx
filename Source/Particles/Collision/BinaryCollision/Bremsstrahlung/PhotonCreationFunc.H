@@ -13,6 +13,7 @@
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Utils/ParticleUtils.H"
 
 #include <AMReX_DenseBins.H>
 #include <AMReX_GpuAtomic.H>
@@ -90,17 +91,17 @@ public:
     AMREX_INLINE
     amrex::Vector<int> operator() (
                     const index_type& n_total_pairs,
-                    ParticleTileType& ptile1, ParticleTileType& /*ptile2*/,
+                    ParticleTileType& ptile1, ParticleTileType& ptile2,
                     const amrex::Vector<WarpXParticleContainer*>& pc_products,
                     ParticleTileType** AMREX_RESTRICT tile_products,
-                    const amrex::ParticleReal& /*m1*/, const amrex::ParticleReal& /*m2*/,
+                    const amrex::ParticleReal& m1, const amrex::ParticleReal& m2,
                     const amrex::Vector<amrex::ParticleReal>& /*products_mass*/,
                     const index_type* AMREX_RESTRICT p_mask,
                     const amrex::Vector<index_type>& products_np,
                     const SmartCopy* AMREX_RESTRICT copy_species1,
                     const SmartCopy* AMREX_RESTRICT /*copy_species2*/,
                     const index_type* AMREX_RESTRICT p_pair_indices_1,
-                    const index_type* AMREX_RESTRICT /*p_pair_indices_2*/,
+                    const index_type* AMREX_RESTRICT p_pair_indices_2,
                     const amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
                     const amrex::ParticleReal* AMREX_RESTRICT p_product_data
                     ) const
@@ -111,8 +112,14 @@ public:
 
         // Compute offset array and allocate memory for the produced species
         amrex::Gpu::DeviceVector<index_type> offsets(n_total_pairs);
-        const auto total = amrex::Scan::ExclusiveSum(n_total_pairs, p_mask, offsets.data());
         const index_type* AMREX_RESTRICT p_offsets = offsets.dataPtr();
+
+        int total;
+        if (m_create_photons) {
+            total = amrex::Scan::ExclusiveSum(n_total_pairs, p_mask, offsets.data());
+        } else {
+            total = 0;
+        }
 
         amrex::Vector<int> num_added_vec(m_num_product_species);
         for (int i = 0; i < m_num_product_species; i++)
@@ -123,6 +130,7 @@ public:
         }
 
         const auto soa_1 = ptile1.getParticleTileData();
+        const auto soa_2 = ptile2.getParticleTileData();
 
         // Create necessary GPU vectors, that will be used in the kernel below
         amrex::Vector<SoaData_type> soa_products;
@@ -149,30 +157,92 @@ public:
         const index_type* AMREX_RESTRICT products_np_data = products_np.data();
 #endif
 
+        bool create_photons = m_create_photons;
+
         amrex::ParallelForRNG(n_total_pairs,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
         {
             if (p_mask[i])
             {
-                const auto product_index = products_np_data[0] + p_offsets[i];
+                constexpr auto c2 = PhysConst::c * PhysConst::c;
 
-                // Create product particle at position of particle 1
-                copy_species1[0](soa_products_data[0], soa_1, static_cast<int>(p_pair_indices_1[i]),
-                                 static_cast<int>(product_index), engine);
+                int const i1 = static_cast<int>(p_pair_indices_1[i]);
+                int const i2 = static_cast<int>(p_pair_indices_2[i]);
 
-                // Set the weight of the new particle to p_pair_reaction_weight[i]
-                soa_products_data[0].m_rdata[PIdx::w][product_index] = p_pair_reaction_weight[i];
+                // Move to the ion rest frame and calculate the momentum and energy of the three particles
+                // This is done here to avoid having to save the photon momentum components
+                amrex::ParticleReal & u1x = soa_1.m_rdata[PIdx::ux][i1];
+                amrex::ParticleReal & u1y = soa_1.m_rdata[PIdx::uy][i1];
+                amrex::ParticleReal & u1z = soa_1.m_rdata[PIdx::uz][i1];
+                amrex::ParticleReal & w1 = soa_1.m_rdata[PIdx::w][i1];
+                amrex::ParticleReal & u2x = soa_2.m_rdata[PIdx::ux][i2];
+                amrex::ParticleReal & u2y = soa_2.m_rdata[PIdx::uy][i2];
+                amrex::ParticleReal & u2z = soa_2.m_rdata[PIdx::uz][i2];
+                amrex::ParticleReal & w2 = soa_2.m_rdata[PIdx::w][i2];
 
-                amrex::ParticleReal & ux1 = soa_products_data[0].m_rdata[PIdx::ux][product_index];
-                amrex::ParticleReal & uy1 = soa_products_data[0].m_rdata[PIdx::uy][product_index];
-                amrex::ParticleReal & uz1 = soa_products_data[0].m_rdata[PIdx::uz][product_index];
+                amrex::ParticleReal u1x_rel = u1x;
+                amrex::ParticleReal u1y_rel = u1y;
+                amrex::ParticleReal u1z_rel = u1z;
+                ParticleUtils::doLorentzTransformWithU(u1x_rel, u1y_rel, u1z_rel, u2x, u2y, u2z);
 
-                // Normalize out the electron velocity and multiply by the photon momentum, E/c
-                // Also, the photon momentum is normalized by m_e
-                amrex::ParticleReal const u1 = std::sqrt(ux1*ux1 + uy1*uy1 + uz1*uz1);
-                ux1 *= (p_product_data[i]/PhysConst::c)/u1/PhysConst::m_e;
-                uy1 *= (p_product_data[i]/PhysConst::c)/u1/PhysConst::m_e;
-                uz1 *= (p_product_data[i]/PhysConst::c)/u1/PhysConst::m_e;
+                amrex::ParticleReal const u1sq_rel = (u1x_rel*u1x_rel + u1y_rel*u1y_rel + u1z_rel*u1z_rel);
+                amrex::ParticleReal const gamma1_rel = std::sqrt(1.0_prt + u1sq_rel/c2);
+
+                amrex::ParticleReal const Ephoton = p_product_data[i];
+                amrex::ParticleReal const wp = p_pair_reaction_weight[i];
+
+                // Calculate electron and ion energy and momentum using conservation
+                amrex::ParticleReal const u1_rel = std::sqrt(u1sq_rel);
+                amrex::ParticleReal const A = u1_rel/PhysConst::c - Ephoton*wp/(w1*m1*c2);
+                amrex::ParticleReal const B = gamma1_rel + w2*m2/(w1*m1) - Ephoton*wp/(w1*m1*c2);
+                amrex::ParticleReal const D = w2*m2*w2*m2/(w1*m1*w1*m1) + A*A - B*B - 1.0_prt;
+                amrex::ParticleReal const a = 4.0_prt*(B*B - A*A);
+                amrex::ParticleReal const b = 4.0_prt*A*D;
+                amrex::ParticleReal const c = 4.0_prt*B*B - D*D;
+                // Use the "plus" solution since it keeps the electon motion forward
+                amrex::ParticleReal const u1_rel_after = (-b + std::sqrt(b*b - 4.0_prt*a*c))/(2.0_prt*a)*PhysConst::c;
+                amrex::ParticleReal const u2_rel_after = (A*PhysConst::c - u1_rel_after)*w1*m1/(w2*m2);
+
+                u1x_rel *= u1_rel_after/u1_rel;
+                u1y_rel *= u1_rel_after/u1_rel;
+                u1z_rel *= u1_rel_after/u1_rel;
+                amrex::ParticleReal u2x_rel = u2_rel_after*u1x_rel/u1_rel_after;
+                amrex::ParticleReal u2y_rel = u2_rel_after*u1y_rel/u1_rel_after;
+                amrex::ParticleReal u2z_rel = u2_rel_after*u1z_rel/u1_rel_after;
+                amrex::ParticleReal p3x_rel = (Ephoton/PhysConst::c)*u1x_rel/u1_rel_after;
+                amrex::ParticleReal p3y_rel = (Ephoton/PhysConst::c)*u1y_rel/u1_rel_after;
+                amrex::ParticleReal p3z_rel = (Ephoton/PhysConst::c)*u1z_rel/u1_rel_after;
+
+                // Lorentz transform electron and ion back to lab frame
+                ParticleUtils::doLorentzTransformWithU(u1x_rel, u1y_rel, u1z_rel, -u2x, -u2y, -u2z);
+                ParticleUtils::doLorentzTransformWithU(u2x_rel, u2y_rel, u2z_rel, -u2x, -u2y, -u2z);
+                ParticleUtils::doLorentzTransformWithP(p3x_rel, p3y_rel, p3z_rel, 0.0_prt, -u2x, -u2y, -u2z);
+                u1x = u1x_rel;
+                u1y = u1y_rel;
+                u1z = u1z_rel;
+                u2x = u2x_rel;
+                u2y = u2y_rel;
+                u2z = u2z_rel;
+
+                if (create_photons) {
+
+                    // Create product particle at position of particle 1
+                    const auto product_index = products_np_data[0] + p_offsets[i];
+                    copy_species1[0](soa_products_data[0], soa_1, i1,
+                                     static_cast<int>(product_index), engine);
+
+                    // Set the weight of the new particle to p_pair_reaction_weight[i]
+                    soa_products_data[0].m_rdata[PIdx::w][product_index] = wp;
+
+                    amrex::ParticleReal & upx = soa_products_data[0].m_rdata[PIdx::ux][product_index];
+                    amrex::ParticleReal & upy = soa_products_data[0].m_rdata[PIdx::uy][product_index];
+                    amrex::ParticleReal & upz = soa_products_data[0].m_rdata[PIdx::uz][product_index];
+
+                    // Lorentz transform to lab frame (from ion rest frame)
+                    upx = p3x_rel/PhysConst::m_e;
+                    upy = p3y_rel/PhysConst::m_e;
+                    upz = p3z_rel/PhysConst::m_e;
+                }
             }
         });
 
@@ -205,6 +275,9 @@ public:
 private:
     // How many different type of species the collision produces
     int m_num_product_species;
+
+    // Whether photons are created
+    bool m_create_photons;
 
     CollisionType m_collision_type;
 

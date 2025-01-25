@@ -32,4 +32,10 @@ PhotonCreationFunc::PhotonCreationFunc (const std::string& collision_name,
         WARPX_ABORT_WITH_MESSAGE("Unknown collision type in PhotonCreationFunc");
     }
 
+    const amrex::ParmParse pp_collision_name(collision_name);
+
+    bool create_photons = true;
+    pp_collision_name.query("create_photons", create_photons);
+    m_create_photons = create_photons;
+
 }

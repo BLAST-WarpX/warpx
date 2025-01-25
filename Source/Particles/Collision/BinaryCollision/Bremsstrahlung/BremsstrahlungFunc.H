@@ -331,8 +331,8 @@ public:
         void BremsstrahlungEvent (amrex::ParticleReal & u1x, amrex::ParticleReal & u1y,
                                   amrex::ParticleReal & u1z, amrex::ParticleReal & u2x,
                                   amrex::ParticleReal & u2y, amrex::ParticleReal & u2z,
-                                  amrex::ParticleReal m1, amrex::ParticleReal m2,
-                                  amrex::ParticleReal weight1, amrex::ParticleReal weight2,
+                                  amrex::ParticleReal m1, amrex::ParticleReal /*m2*/,
+                                  amrex::ParticleReal weight1, amrex::ParticleReal /*weight2*/,
                                   amrex::ParticleReal n1, amrex::ParticleReal n2,
                                   amrex::Real dt, int pair_index,
                                   index_type* AMREX_RESTRICT p_mask,
@@ -401,59 +401,12 @@ public:
                                                                      w0, sigma_total, random_number2);
                 amrex::ParticleReal const Ephoton = EphotonoT1*KE_eV*PhysConst::q_e;
 
-                // Calculate electron and ion energy and momentum using conservation
-                amrex::ParticleReal const u1_rel = std::sqrt(u1sq_rel);
-                amrex::ParticleReal const A = u1_rel/PhysConst::c - Ephoton*w_photon/(weight1*m1*c2);
-                amrex::ParticleReal const B = gamma1_rel + m2/m1 - Ephoton*w_photon/(weight1*m1*c2);
-                amrex::ParticleReal const D = m2*m2/(m1*m1) + A*A - B*B - 1.0_prt;
-                amrex::ParticleReal const a = 4.0_prt*(B*B - A*A);
-                amrex::ParticleReal const b = 4.0_prt*A*D;
-                amrex::ParticleReal const c = 4.0_prt*B*B - D*D;
-                // Use the "plus" solution since it keeps the electon motion forward
-                amrex::ParticleReal const u1_rel_after = (-b + std::sqrt(b*b - 4.0_prt*a*c))/(2.0_prt*a)*PhysConst::c;
-                amrex::ParticleReal const u2_rel_after = (A - u1_rel_after/PhysConst::c)*m1/m2*PhysConst::c;
+                // The electron and ion momentum are updated in the same place where the photon is created,
+                // in PhotonCreationFunc.
 
-                u1x_rel *= u1_rel_after/u1_rel;
-                u1y_rel *= u1_rel_after/u1_rel;
-                u1z_rel *= u1_rel_after/u1_rel;
-                amrex::ParticleReal u2x_rel = u2_rel_after*u1x_rel/u1_rel_after;
-                amrex::ParticleReal u2y_rel = u2_rel_after*u1y_rel/u1_rel_after;
-                amrex::ParticleReal u2z_rel = u2_rel_after*u1z_rel/u1_rel_after;
-
-                // Lorentz transform electron and ion back to lab frame
-                ParticleUtils::doLorentzTransformWithU(u1x_rel, u1y_rel, u1z_rel, -u2x, -u2y, -u2z);
-                ParticleUtils::doLorentzTransformWithU(u2x_rel, u2y_rel, u2z_rel, -u2x, -u2y, -u2z);
-                u1x = u1x_rel;
-                u1y = u1y_rel;
-                u1z = u1z_rel;
-                u2x = u2x_rel;
-                u2y = u2y_rel;
-                u2z = u2z_rel;
-
-                // compute lab-frame electron kinetic energy before emission
-                amrex::ParticleReal const KE1_before = weight1*m1*u1sq/(1.0_prt + gamma1);
-                amrex::ParticleReal const KE2_before = weight2*m2*u2sq/(1.0_prt + gamma2);
-
-                // compute electron and ion kinetic energy after emission
-                amrex::ParticleReal const u1sq_after = (u1x*u1x + u1y*u1y + u1z*u1z);
-                amrex::ParticleReal const u2sq_after = (u2x*u2x + u2y*u2y + u2z*u2z);
-                amrex::ParticleReal const gamma1_after = std::sqrt(1.0_prt + u1sq_after/c2);
-                amrex::ParticleReal const gamma2_after = std::sqrt(1.0_prt + u2sq_after/c2);
-                amrex::ParticleReal const KE1_after = weight1*m1*u1sq_after/(1.0_prt + gamma1_after);
-                amrex::ParticleReal const KE2_after = weight2*m2*u2sq_after/(1.0_prt + gamma2_after);
-
-                // update energy lost to bremsstrahlung
-                amrex::ParticleReal const deltaE = KE1_before + KE2_before - KE1_after - KE2_after;
-                /* m_deltaE_bremsstrahlung += deltaE*weight1; // Joules */
-
-                if (m_create_photons) {
-                    // compute photon energy in lab frame
-                    amrex::ParticleReal const Ephoton_lab = deltaE/w_photon; // Joules
-
-                    p_mask[pair_index] = true;
-                    p_pair_reaction_weight[pair_index] = w_photon;
-                    p_product_data[pair_index] = Ephoton_lab;
-                }
+                p_product_data[pair_index] = Ephoton;
+                p_pair_reaction_weight[pair_index] = w_photon;
+                p_mask[pair_index] = 1;
 
             }
 
@@ -461,7 +414,6 @@ public:
 
         bool m_computeSpeciesDensities = true;
         bool m_computeSpeciesTemperatures = false;
-        bool m_create_photons = true;
         bool m_need_product_data = true;
         amrex::ParticleReal m_multiplier;
         amrex::ParticleReal m_koT1_cut_default;
