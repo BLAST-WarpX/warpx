@@ -32,7 +32,7 @@ FindEmbeddedBoundaryMapAndCounter::FindEmbeddedBoundaryMapAndCounter (const amre
        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> dxi,
        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> plo,
        amrex::Array4<const int> ivec_map_arr,
-       int* incident_np)
+       double* incident_np)
     : m_dt(dt), m_phi_arr(phi_arr), m_dxi(dxi), m_plo(plo), m_ivec_map_arr(ivec_map_arr), m_incident_np(incident_np)
 {
 }
@@ -51,7 +51,7 @@ SurfacePhysicsBase::countParticlesFromEmbeddedBoundaries (
     {
         amrex::Print() << " influx sp name " << mypc.GetSpeciesNames()[0] << " " << mypc.GetSpeciesNames()[1] << "\n";
         const auto& pc = mypc.GetParticleContainer(i);
-        int* const AMREX_RESTRICT dptr_incident_np = num_in_particles[i].dataPtr();
+        double* const AMREX_RESTRICT dptr_incident_np = num_in_particles[i].dataPtr();
         for (int lev = 0; lev < pc.numLevels(); ++lev)
         {
             const auto& plevel = pc.GetParticles(lev);

@@ -1357,6 +1357,14 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
         eb_factory = &(WarpX::GetInstance().fieldEBFactory(0));
         eb_flag = &(eb_factory->getMultiEBCellFlagFab());
     }
+
+#ifdef WARPX_SURFACE_PHYSICS
+    auto & warpx = WarpX::GetInstance();
+    auto & surface_physics = warpx.GetSurfacePhysicsModel();
+    auto & ivect_map = surface_physics.ivect_map;
+    amrex::Vector<amrex::Real> surface_outflux = surface_physics.bnd_outflux[this->getSpeciesId()];
+#endif
+
 #endif
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(0);
@@ -1453,6 +1461,9 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 #ifdef AMREX_USE_EB
         auto eb_flag_arr = eb_flag ? eb_flag->const_array(mfi) : Array4<EBCellFlag const>{};
         auto eb_data = eb_factory ? eb_factory->getEBData(mfi) : EBData{};
+#endif
+#ifdef WARPX_SURFACE_PHYSICS
+        amrex::Array4<const int> ivect_map_arr = ivect_map->array(mfi);
 #endif
 
         amrex::ParallelForRNG(overlap_box, [=] AMREX_GPU_DEVICE (int i, int j, int k, amrex::RandomEngine const& engine) noexcept
@@ -1688,7 +1699,13 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                     pu.y = sin_theta*ur + cos_theta*ut;
                 }
 #endif
+
+#ifdef WARPX_SURFACE_PHYSICS
+                int surface_ivect = ivect_map_arr(i,j,k);
+                const Real flux = surface_outflux[surface_ivect];
+#else
                 const Real flux = inj_flux->getFlux(ppos.x, ppos.y, ppos.z, t);
+#endif
                 // Remove particle if flux is negative or 0
                 if (flux <= 0) {
                     pa_idcpu[ip] = amrex::ParticleIdCpus::Invalid;
