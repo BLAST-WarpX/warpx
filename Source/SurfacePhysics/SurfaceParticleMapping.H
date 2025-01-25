@@ -32,7 +32,7 @@ struct FindEmbeddedBoundaryMapAndCounter
        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> dxi,
        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> plo,
        amrex::Array4<const int> ivec_map_arr,
-       int* incident_np);
+       double* incident_np);
 
     template <typename SrcData>
     AMREX_GPU_HOST_DEVICE
@@ -84,7 +84,7 @@ struct FindEmbeddedBoundaryMapAndCounter
          kc = static_cast<int>(floor( (zc - plo[AMREX_SPACEDIM-1])*dxi[AMREX_SPACEDIM-1] ) );
 #endif
          int ivec = m_ivec_map_arr(ic,jc,kc);
-         amrex::HostDevice::Atomic::Add(&m_incident_np[ivec], 1);
+         amrex::HostDevice::Atomic::Add(&m_incident_np[ivec], static_cast<double>(1.0));
          return;
     }
 
@@ -93,7 +93,7 @@ struct FindEmbeddedBoundaryMapAndCounter
     amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_dxi;
     amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_plo;
     amrex::Array4<const int> m_ivec_map_arr;
-    int* m_incident_np;
+    double* m_incident_np;
 };
 
 #endif

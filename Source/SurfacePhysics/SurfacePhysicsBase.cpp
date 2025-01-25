@@ -76,7 +76,6 @@ SurfacePhysicsBase::initializeMapping ()
 
         auto const& eb_flag_arr = eb_flag.array(mfi);
         const amrex::Array4<const amrex::Real> & eb_bnd_normal_arr = eb_bnd_normal.array(mfi);
-        const amrex::Array4<const amrex::Real> & eb_bnd_cent_arr = eb_bnd_cent.array(mfi);
         auto const ivect_arr = ivect_map->array(mfi);
 
         amrex::LoopOnCpu( box,
