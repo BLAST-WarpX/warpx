@@ -99,9 +99,9 @@ def compute_virtual_charge_on_spacecraft():
     dr, dz = sim.extension.warpx.Geom(lev=0).data().CellSize()
 
     # Compute integral of grad phi over surfaces of the domain
-    n_blocks = phi.size
-    r = np.linspace(rmin, rmax, n_blocks, endpoint=False) + (rmax - rmin) / (
-        2 * n_blocks
+    nr = phi.shape[0]
+    r = np.linspace(rmin, rmax, nr, endpoint=False) + (rmax - rmin) / (
+        2 * nr
     )  # shift of the r points because the derivaties are calculated in the middle
     face_z0 = (
         2 * np.pi * 1.0 / dz * ((phi[:, 0] - phi[:, 1]) * r).sum() * dr
