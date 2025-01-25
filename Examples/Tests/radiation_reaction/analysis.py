@@ -30,14 +30,10 @@
 # 3) H. Spohn, Dynamics of charged particles and their radiation field
 #   (Cambridge University Press, Cambridge, 2004)
 
-import os
 import sys
 
 import numpy as np
 import yt
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 # Input filename
 inputname = "inputs"
@@ -162,12 +158,6 @@ def check():
         print("tolerance_rel: " + str(tolerance_rel))
 
         assert error_rel < tolerance_rel
-
-    # compare checksums
-    evaluate_checksum(
-        test_name=os.path.split(os.getcwd())[1],
-        output_file=sys.argv[1],
-    )
 
 
 def generate():

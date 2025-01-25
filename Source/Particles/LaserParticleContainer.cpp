@@ -917,11 +917,13 @@ LaserParticleContainer::update_laser_particle (WarpXParIter& pti,
             puyp[i] = gamma * vy;
             puzp[i] = gamma * vz;
 
-            // Push the the particle positions
+            // Push the particle positions
 
             // When using the implicit solver, this function is called multiple times per timestep
             // (within the linear and nonlinear solver). Thus, the position of the particles needs to be reset
-            // to the initial position (at the beginning of the timestep), before updating the particle position
+            // to the initial position (at the beginning of the timestep), before updating the particle position.
+            // Also, the current deposition schemes expect the particle positions to be time centered
+            // (cur_time + 0.5*dt) for PushType::Implicit.
 
             ParticleReal x=0., y=0., z=0.;
             if (push_type == PushType::Explicit) {
@@ -930,20 +932,26 @@ LaserParticleContainer::update_laser_particle (WarpXParIter& pti,
 
 #if !defined(WARPX_DIM_1D_Z)
             if (push_type == PushType::Implicit) {
-                x = x_n[i];
+                x = x_n[i] + vx * dt*0.5_prt;
             }
-            x += vx * dt;
+            else {
+                x += vx * dt;
+            }
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
             if (push_type == PushType::Implicit) {
-                y = y_n[i];
+                y = y_n[i] + vy * dt*0.5_prt;
             }
-            y += vy * dt;
+            else {
+                y += vy * dt;
+            }
 #endif
             if (push_type == PushType::Implicit) {
-                z = z_n[i];
+                z = z_n[i] + vz * dt*0.5_prt;
             }
-            z += vz * dt;
+            else {
+                z += vz * dt;
+            }
 
             SetPosition(i, x, y, z);
         }

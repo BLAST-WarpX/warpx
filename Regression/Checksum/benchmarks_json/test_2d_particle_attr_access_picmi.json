@@ -1,0 +1,14 @@
+{
+  "lev=0": {
+    "phi": 0.0023065875621041164
+  },
+  "electrons": {
+    "particle_momentum_x": 1.1623026977941542e-25,
+    "particle_momentum_y": 1.0012020618770149e-25,
+    "particle_momentum_z": 1.0768794697418634e-25,
+    "particle_newPid": 750.0,
+    "particle_position_x": 2.4984316660445582,
+    "particle_position_y": 2.498475649375752,
+    "particle_weight": 300.0
+  }
+}

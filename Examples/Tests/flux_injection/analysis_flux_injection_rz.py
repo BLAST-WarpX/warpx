@@ -25,14 +25,10 @@ This script tests that:
 - The total number of electrons corresponds to the expected flux.
 """
 
-import os
 import sys
 
 import numpy as np
 import yt
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 yt.funcs.mylog.setLevel(0)
 
@@ -56,9 +52,3 @@ w = ad["particle_weight"].to_ndarray()
 assert np.allclose(w.sum(), n_tot, rtol=0.05)
 # Check that the particles are at the right radius
 assert np.all((r >= 1.48) & (r <= 1.92))
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

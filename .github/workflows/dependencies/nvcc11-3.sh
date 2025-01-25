@@ -41,7 +41,8 @@ sudo apt-get install -y          \
     cuda-nvml-dev-11-3           \
     cuda-nvtx-11-3               \
     libcufft-dev-11-3            \
-    libcurand-dev-11-3
+    libcurand-dev-11-3           \
+    libcusparse-dev-11-3
 sudo ln -s cuda-11.3 /usr/local/cuda
 
 # if we run out of temporary storage in CI:

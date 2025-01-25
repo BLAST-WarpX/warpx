@@ -61,6 +61,23 @@
 using namespace amrex;
 using ablastr::utils::SignalHandling;
 
+namespace
+{
+    /** Print Unused Parameter Warnings after Step 1
+     *
+     * Instead of waiting for a simulation to end, we already do an early "unused parameter check"
+     * after step 1 to inform users early of potential issues with their simulation setup.
+     */
+    void checkEarlyUnusedParams ()
+    {
+        amrex::Print() << "\n"; // better: conditional \n based on return value
+        amrex::ParmParse::QueryUnusedInputs();
+
+        // Print the warning list right after the first step.
+        amrex::Print() << ablastr::warn_manager::GetWMInstance().PrintGlobalWarnings("FIRST STEP");
+    }
+}
+
 void
 WarpX::Synchronize () {
     using ablastr::fields::Direction;
@@ -130,7 +147,7 @@ WarpX::Evolve (int numsteps)
         // Update timestep for electrostatic solver if a constant dt is not provided
         // This first synchronizes the position and velocity before setting the new timestep
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None &&
-            !m_const_dt.has_value() && dt_update_interval.contains(step+1)) {
+            !m_const_dt.has_value() && m_dt_update_interval.contains(step+1)) {
             if (verbose) {
                 amrex::Print() << Utils::TextMsg::Info("updating timestep");
             }
@@ -187,7 +204,7 @@ WarpX::Evolve (int numsteps)
             OneStep_multiJ(cur_time);
         }
         // Electromagnetic case: no subcycling or no mesh refinement
-        else if ( !do_subcycling || (finest_level == 0))
+        else if ( !m_do_subcycling || (finest_level == 0))
         {
             OneStep_nosub(cur_time);
             // E: guard cells are up-to-date
@@ -195,14 +212,14 @@ WarpX::Evolve (int numsteps)
             // F: guard cells are NOT up-to-date
         }
         // Electromagnetic case: subcycling with one level of mesh refinement
-        else if (do_subcycling && (finest_level == 1))
+        else if (m_do_subcycling && (finest_level == 1))
         {
             OneStep_sub1(cur_time);
         }
         else
         {
             WARPX_ABORT_WITH_MESSAGE(
-                "do_subcycling = " + std::to_string(do_subcycling)
+                "do_subcycling = " + std::to_string(m_do_subcycling)
                 + " is an unsupported do_subcycling type.");
         }
 
@@ -310,7 +327,7 @@ WarpX::Evolve (int numsteps)
 
         // inputs: unused parameters (e.g. typos) check after step 1 has finished
         if (!early_params_checked) {
-            checkEarlyUnusedParams();
+            ::checkEarlyUnusedParams();
             early_params_checked = true;
         }
 
@@ -390,7 +407,7 @@ WarpX::OneStep_nosub (Real cur_time)
             WarpX::Hybrid_QED_Push(dt);
             FillBoundaryE(guard_cells.ng_alloc_EB);
         }
-        PushPSATD();
+        PushPSATD(cur_time);
 
         if (do_pml) {
             DampPML();
@@ -418,15 +435,15 @@ WarpX::OneStep_nosub (Real cur_time)
         FillBoundaryF(guard_cells.ng_FieldSolverF);
         FillBoundaryG(guard_cells.ng_FieldSolverG);
 
-        EvolveB(0.5_rt * dt[0], DtType::FirstHalf); // We now have B^{n+1/2}
+        EvolveB(0.5_rt * dt[0], DtType::FirstHalf, cur_time); // We now have B^{n+1/2}
         FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
         if (WarpX::em_solver_medium == MediumForEM::Vacuum) {
             // vacuum medium
-            EvolveE(dt[0]); // We now have E^{n+1}
+            EvolveE(dt[0], cur_time); // We now have E^{n+1}
         } else if (WarpX::em_solver_medium == MediumForEM::Macroscopic) {
             // macroscopic medium
-            MacroscopicEvolveE(dt[0]); // We now have E^{n+1}
+            MacroscopicEvolveE(dt[0], cur_time); // We now have E^{n+1}
         } else {
             WARPX_ABORT_WITH_MESSAGE("Medium for EM is unknown");
         }
@@ -434,7 +451,7 @@ WarpX::OneStep_nosub (Real cur_time)
 
         EvolveF(0.5_rt * dt[0], DtType::SecondHalf);
         EvolveG(0.5_rt * dt[0], DtType::SecondHalf);
-        EvolveB(0.5_rt * dt[0], DtType::SecondHalf); // We now have B^{n+1}
+        EvolveB(0.5_rt * dt[0], DtType::SecondHalf, cur_time + 0.5_rt * dt[0]); // We now have B^{n+1}
 
         if (do_pml) {
             DampPML();
@@ -446,7 +463,7 @@ WarpX::OneStep_nosub (Real cur_time)
 
         // E and B are up-to-date in the domain, but all guard cells are
         // outdated.
-        if (safe_guard_cells) {
+        if (m_safe_guard_cells) {
             FillBoundaryB(guard_cells.ng_alloc_EB);
         }
     } // !PSATD
@@ -459,15 +476,6 @@ bool WarpX::checkStopSimulation (amrex::Real cur_time)
     m_exit_loop_due_to_interrupt_signal = SignalHandling::TestAndResetActionRequestFlag(SignalHandling::SIGNAL_REQUESTS_BREAK);
     return (cur_time >= stop_time - 1.e-3*dt[0])  ||
         m_exit_loop_due_to_interrupt_signal;
-}
-
-void WarpX::checkEarlyUnusedParams ()
-{
-    amrex::Print() << "\n"; // better: conditional \n based on return value
-    amrex::ParmParse::QueryUnusedInputs();
-
-    // Print the warning list right after the first step.
-    amrex::Print() << ablastr::warn_manager::GetWMInstance().PrintGlobalWarnings("FIRST STEP");
 }
 
 void WarpX::ExplicitFillBoundaryEBUpdateAux ()
@@ -616,7 +624,7 @@ void WarpX::SyncCurrentAndRho ()
                 // TODO This works only without mesh refinement
                 const int lev = 0;
                 if (use_filter) {
-                    ApplyFilterJ(m_fields.get_mr_levels_alldirs(FieldType::current_fp_vay, finest_level), lev);
+                    ApplyFilterMF(m_fields.get_mr_levels_alldirs(FieldType::current_fp_vay, finest_level), lev);
                 }
             }
         }
@@ -810,10 +818,10 @@ WarpX::OneStep_multiJ (const amrex::Real cur_time)
         {
             pml[lev]->PushPSATD(m_fields, lev);
         }
-        ApplyEfieldBoundary(lev, PatchType::fine);
-        if (lev > 0) { ApplyEfieldBoundary(lev, PatchType::coarse); }
-        ApplyBfieldBoundary(lev, PatchType::fine, DtType::FirstHalf);
-        if (lev > 0) { ApplyBfieldBoundary(lev, PatchType::coarse, DtType::FirstHalf); }
+        ApplyEfieldBoundary(lev, PatchType::fine, cur_time + dt[0]);
+        if (lev > 0) { ApplyEfieldBoundary(lev, PatchType::coarse, cur_time + dt[0]); }
+        ApplyBfieldBoundary(lev, PatchType::fine, DtType::FirstHalf, cur_time + dt[0]);
+        if (lev > 0) { ApplyBfieldBoundary(lev, PatchType::coarse, DtType::FirstHalf, cur_time + dt[0]); }
     }
 
     // Damp fields in PML before exchanging guard cells
@@ -879,7 +887,7 @@ WarpX::OneStep_sub1 (Real cur_time)
         m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_level_0), fine_lev);
     RestrictRhoFromFineToCoarsePatch(fine_lev);
     if (use_filter) {
-        ApplyFilterJ( m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), fine_lev);
+        ApplyFilterMF( m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), fine_lev);
     }
     SumBoundaryJ(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
@@ -890,17 +898,17 @@ WarpX::OneStep_sub1 (Real cur_time)
         m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_level_0),
         fine_lev, PatchType::fine, 0, 2*ncomps);
 
-    EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::FirstHalf);
+    EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::FirstHalf, cur_time);
     EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::FirstHalf);
     FillBoundaryB(fine_lev, PatchType::fine, guard_cells.ng_FieldSolver,
                   WarpX::sync_nodal_points);
     FillBoundaryF(fine_lev, PatchType::fine, guard_cells.ng_alloc_F,
                   WarpX::sync_nodal_points);
 
-    EvolveE(fine_lev, PatchType::fine, dt[fine_lev]);
+    EvolveE(fine_lev, PatchType::fine, dt[fine_lev], cur_time);
     FillBoundaryE(fine_lev, PatchType::fine, guard_cells.ng_FieldGather);
 
-    EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::SecondHalf);
+    EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::SecondHalf, cur_time + 0.5_rt * dt[fine_lev]);
     EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::SecondHalf);
 
     if (do_pml) {
@@ -926,22 +934,22 @@ WarpX::OneStep_sub1 (Real cur_time)
         m_fields.get_mr_levels(FieldType::rho_buf, finest_level, skip_level_0),
         coarse_lev, 0, ncomps);
 
-    EvolveB(fine_lev, PatchType::coarse, dt[fine_lev], DtType::FirstHalf);
+    EvolveB(fine_lev, PatchType::coarse, dt[fine_lev], DtType::FirstHalf, cur_time);
     EvolveF(fine_lev, PatchType::coarse, dt[fine_lev], DtType::FirstHalf);
     FillBoundaryB(fine_lev, PatchType::coarse, guard_cells.ng_FieldGather);
     FillBoundaryF(fine_lev, PatchType::coarse, guard_cells.ng_FieldSolverF);
 
-    EvolveE(fine_lev, PatchType::coarse, dt[fine_lev]);
+    EvolveE(fine_lev, PatchType::coarse, dt[fine_lev], cur_time);
     FillBoundaryE(fine_lev, PatchType::coarse, guard_cells.ng_FieldGather);
 
-    EvolveB(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], DtType::FirstHalf);
+    EvolveB(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], DtType::FirstHalf, cur_time);
     EvolveF(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], DtType::FirstHalf);
     FillBoundaryB(coarse_lev, PatchType::fine, guard_cells.ng_FieldGather,
                     WarpX::sync_nodal_points);
     FillBoundaryF(coarse_lev, PatchType::fine, guard_cells.ng_FieldSolverF,
                     WarpX::sync_nodal_points);
 
-    EvolveE(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev]);
+    EvolveE(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], cur_time);
     FillBoundaryE(coarse_lev, PatchType::fine, guard_cells.ng_FieldGather);
 
     // TODO Remove call to FillBoundaryAux before UpdateAuxilaryData?
@@ -957,7 +965,7 @@ WarpX::OneStep_sub1 (Real cur_time)
         m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_level_0), fine_lev);
     RestrictRhoFromFineToCoarsePatch(fine_lev);
     if (use_filter) {
-        ApplyFilterJ( m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), fine_lev);
+        ApplyFilterMF( m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), fine_lev);
     }
     SumBoundaryJ( m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), fine_lev, Geom(fine_lev).periodicity());
     ApplyFilterandSumBoundaryRho(
@@ -965,16 +973,16 @@ WarpX::OneStep_sub1 (Real cur_time)
         m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_level_0),
         fine_lev, PatchType::fine, 0, ncomps);
 
-    EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::FirstHalf);
+    EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::FirstHalf, cur_time + dt[fine_lev]);
     EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::FirstHalf);
     FillBoundaryB(fine_lev, PatchType::fine, guard_cells.ng_FieldSolver);
     FillBoundaryF(fine_lev, PatchType::fine, guard_cells.ng_FieldSolverF);
 
-    EvolveE(fine_lev, PatchType::fine, dt[fine_lev]);
+    EvolveE(fine_lev, PatchType::fine, dt[fine_lev], cur_time + dt[fine_lev]);
     FillBoundaryE(fine_lev, PatchType::fine, guard_cells.ng_FieldSolver,
                     WarpX::sync_nodal_points);
 
-    EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::SecondHalf);
+    EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::SecondHalf, cur_time + 1.5_rt*dt[fine_lev]);
     EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::SecondHalf);
 
     if (do_pml) {
@@ -982,7 +990,7 @@ WarpX::OneStep_sub1 (Real cur_time)
         FillBoundaryE(fine_lev, PatchType::fine, guard_cells.ng_FieldSolver);
     }
 
-    if ( safe_guard_cells ) {
+    if ( m_safe_guard_cells ) {
         FillBoundaryF(fine_lev, PatchType::fine, guard_cells.ng_FieldSolver);
     }
     FillBoundaryB(fine_lev, PatchType::fine, guard_cells.ng_FieldSolver);
@@ -1001,11 +1009,11 @@ WarpX::OneStep_sub1 (Real cur_time)
         m_fields.get_mr_levels(FieldType::rho_buf, finest_level, skip_level_0),
         coarse_lev, ncomps, ncomps);
 
-    EvolveE(fine_lev, PatchType::coarse, dt[fine_lev]);
+    EvolveE(fine_lev, PatchType::coarse, dt[fine_lev], cur_time + 0.5_rt * dt[fine_lev]);
     FillBoundaryE(fine_lev, PatchType::coarse, guard_cells.ng_FieldSolver,
                   WarpX::sync_nodal_points);
 
-    EvolveB(fine_lev, PatchType::coarse, dt[fine_lev], DtType::SecondHalf);
+    EvolveB(fine_lev, PatchType::coarse, dt[fine_lev], DtType::SecondHalf, cur_time + 0.5_rt * dt[fine_lev]);
     EvolveF(fine_lev, PatchType::coarse, dt[fine_lev], DtType::SecondHalf);
 
     if (do_pml) {
@@ -1020,11 +1028,11 @@ WarpX::OneStep_sub1 (Real cur_time)
     FillBoundaryF(fine_lev, PatchType::coarse, guard_cells.ng_FieldSolverF,
                   WarpX::sync_nodal_points);
 
-    EvolveE(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev]);
+    EvolveE(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], cur_time + 0.5_rt*dt[coarse_lev]);
     FillBoundaryE(coarse_lev, PatchType::fine, guard_cells.ng_FieldSolver,
                   WarpX::sync_nodal_points);
 
-    EvolveB(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], DtType::SecondHalf);
+    EvolveB(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], DtType::SecondHalf, cur_time + 0.5_rt*dt[coarse_lev]);
     EvolveF(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], DtType::SecondHalf);
 
     if (do_pml) {
@@ -1038,12 +1046,12 @@ WarpX::OneStep_sub1 (Real cur_time)
                           WarpX::sync_nodal_points);
         }
         DampPML(coarse_lev, PatchType::fine);
-        if ( safe_guard_cells ) {
+        if ( m_safe_guard_cells ) {
             FillBoundaryE(coarse_lev, PatchType::fine, guard_cells.ng_FieldSolver,
                           WarpX::sync_nodal_points);
         }
     }
-    if ( safe_guard_cells ) {
+    if ( m_safe_guard_cells ) {
         FillBoundaryB(coarse_lev, PatchType::fine, guard_cells.ng_FieldSolver,
                       WarpX::sync_nodal_points);
     }
@@ -1194,16 +1202,16 @@ WarpX::applyMirrors (Real time)
     using ablastr::fields::Direction;
 
     // something to do?
-    if (num_mirrors == 0) {
+    if (m_num_mirrors == 0) {
         return;
     }
 
     // Loop over the mirrors
-    for(int i_mirror=0; i_mirror<num_mirrors; ++i_mirror)
+    for(int i_mirror=0; i_mirror<m_num_mirrors; ++i_mirror)
     {
         // Get mirror properties (lower and upper z bounds)
-        amrex::Real z_min = mirror_z[i_mirror];
-        amrex::Real z_max_tmp = z_min + mirror_z_width[i_mirror];
+        amrex::Real z_min = m_mirror_z[i_mirror];
+        amrex::Real z_max_tmp = z_min + m_mirror_z_width[i_mirror];
 
         // Boost quantities for boosted frame simulations
         if (gamma_boost>1)
@@ -1215,9 +1223,9 @@ WarpX::applyMirrors (Real time)
         // Loop over levels
         for(int lev=0; lev<=finest_level; lev++)
         {
-            // Mirror must contain at least mirror_z_npoints[i_mirror] cells
+            // Mirror must contain at least m_mirror_z_npoints[i_mirror] cells
             const amrex::Real dz = WarpX::CellSize(lev)[2];
-            const amrex::Real z_max = std::max(z_max_tmp, z_min+mirror_z_npoints[i_mirror]*dz);
+            const amrex::Real z_max = std::max(z_max_tmp, z_min+m_mirror_z_npoints[i_mirror]*dz);
 
             // Set each field on the fine patch to zero between z_min and z_max
             NullifyMF(m_fields, "Efield_fp", Direction{0}, lev, z_min, z_max);

@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 
 import os
-import sys
 
 import numpy as np
 from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import epsilon_0, pi
 from scipy.special import erf
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 sigmaz = 300e-6
 sigmax = 516e-9
@@ -60,11 +56,3 @@ for k, z in enumerate(grid_z, start=1):
 
     assert np.allclose(Ex_warpx, Ex_theory, rtol=0.032, atol=0)
     assert np.allclose(Ey_warpx, Ey_theory, rtol=0.029, atol=0)
-
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-    rtol=1e-2,
-)
