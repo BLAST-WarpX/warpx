@@ -298,7 +298,7 @@ void ParticleHistogram2D::WriteToFile (int step) const
     data.setPosition<amrex::Real>({0.5, 0.5});
 
     auto dataset = io::Dataset(
-            io::determineDatatype<amrex::Real>(),
+            io::determineDatatype<amrex::ParticleReal>(),
             {static_cast<unsigned long>(m_bin_num_ord), static_cast<unsigned long>(m_bin_num_abs)});
     data.resetDataset(dataset);
 
