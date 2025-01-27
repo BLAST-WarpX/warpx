@@ -1504,7 +1504,7 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
 }
 
 void
-WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev)
+WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev) const
 {
     const amrex::IntVect ngRho = Rho->nGrowVect();
     const std::array<Real,3>& dx = WarpX::CellSize(lev);

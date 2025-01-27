@@ -643,7 +643,7 @@ public:
                                                    int lev) const;
 
     void ApplyInverseVolumeScalingToChargeDensity(amrex::MultiFab* Rho,
-                                                  int lev);
+                                                  int lev) const;
 #endif
 
     /**
