@@ -166,12 +166,6 @@ public:
     ParticleBoundaryBuffer& GetParticleBoundaryBuffer () { return *m_particle_boundary_buffer; }
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag() { return m_eb_update_E; }
 
-    static void shiftMF (amrex::MultiFab& mf, const amrex::Geometry& geom,
-                         int num_shift, int dir, int lev, bool update_cost_flag,
-                         bool safe_guard_cells,
-                         amrex::Real external_field=0.0, bool useparser = false,
-                         amrex::ParserExecutor<3> const& field_parser={});
-
     /**
      * \brief
      * If an authors' string is specified in the inputfile, this method returns that string.
