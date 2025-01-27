@@ -659,7 +659,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                   const amrex::XDim3 & xyzmin,
                                   amrex::Dim3 lo,
                                   amrex::Real q,
-                                  [[maybe_unused]]int n_rz_azimuthal_modes,
+                                  [[maybe_unused]] int n_rz_azimuthal_modes,
                                   const amrex::Array4<const int>& reduced_particle_shape_mask,
                                   bool enable_reduced_shape
                                   )
@@ -747,8 +747,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             double const z_old = z_new - dt*dinv.z*uzp[ip]*gaminv;
 
             // Check whether the particle is close to the EB at the old and new position
-            bool reduce_shape_old = false;
-            bool reduce_shape_new = false;
+            bool reduce_shape_old, reduce_shape_new;
 #ifdef AMREX_USE_CUDA
             amrex::ignore_unused(reduced_particle_shape_mask, lo); // Needed to avoid compilation error with nvcc
 #endif
@@ -779,6 +778,9 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                     lo.x + int(amrex::Math::floor(z_new)),
                     0, 0);
 #endif
+            } else {
+                reduce_shape_old = false;
+                reduce_shape_new = false;
             }
 
 #if defined(WARPX_DIM_RZ)
@@ -812,11 +814,11 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             // If particle is close to the embedded boundary, recompute deposition with order 1 shape
             if constexpr (reduce_shape_control == has_reduced_shape) {
                 if (reduce_shape_new) {
-                    for (int i=0; i<depos_order+3; i++) sx_new[i] = 0.; // Erase previous deposition
+                    for (int i=0; i<depos_order+3; i++) {sx_new[i] = 0.;} // Erase previous deposition
                     compute_shifted_shape_factor_order1( sx_new+depos_order/2, x_new, i_new+depos_order/2 ); // Redeposit with order 1
                 }
                 if (reduce_shape_old) {
-                    for (int i=0; i<depos_order+3; i++) sx_old[i] = 0.; // Erase previous deposition
+                    for (int i=0; i<depos_order+3; i++) {sx_old[i] = 0.;} // Erase previous deposition
                     compute_shifted_shape_factor_order1( sx_old+depos_order/2, x_old, i_new+depos_order/2 ); // Redeposit with order 1
                 }
                 // Note: depos_order/2 in the above code corresponds to the shift between the index of the lowest point
@@ -831,11 +833,11 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             // If particle is close to the embedded boundary, recompute deposition with order 1 shape
             if constexpr (reduce_shape_control == has_reduced_shape) {
                 if (reduce_shape_new) {
-                    for (int j=0; j<depos_order+3; j++) sy_new[j] = 0.; // Erase previous deposition
+                    for (int j=0; j<depos_order+3; j++) {sy_new[j] = 0.;} // Erase previous deposition
                     compute_shifted_shape_factor_order1( sy_new+depos_order/2, y_new, j_new+depos_order/2 ); // Redeposit with order 1
                 }
                 if (reduce_shape_old) {
-                    for (int j=0; j<depos_order+3; j++) sy_old[j] = 0.; // Erase previous deposition
+                    for (int j=0; j<depos_order+3; j++) {sy_old[j] = 0.;} // Erase previous deposition
                     compute_shifted_shape_factor_order1( sy_old+depos_order/2, y_old, j_new+depos_order/2 ); // Redeposit with order 1
                 }
                 // Note: depos_order/2 in the above code corresponds to the shift between the index of the lowest point
@@ -849,11 +851,11 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             // If particle is close to the embedded boundary, recompute deposition with order 1 shape
             if constexpr (reduce_shape_control == has_reduced_shape) {
                 if (reduce_shape_new) {
-                    for (int k=0; k<depos_order+3; k++) sz_new[k] = 0.; // Erase previous deposition
+                    for (int k=0; k<depos_order+3; k++) {sz_new[k] = 0.;} // Erase previous deposition
                     compute_shifted_shape_factor_order1( sz_new+depos_order/2, z_new, k_new+depos_order/2 ); // Redeposit with order 1
                 }
                 if (reduce_shape_old) {
-                    for (int k=0; k<depos_order+3; k++) sz_old[k] = 0.; // Erase previous deposition
+                    for (int k=0; k<depos_order+3; k++) {sz_old[k] = 0.;} // Erase previous deposition
                     compute_shifted_shape_factor_order1( sz_old+depos_order/2, z_old, k_new+depos_order/2 ); // Redeposit with order 1
                 }
                 // Note: depos_order/2 in the above code corresponds to the shift between the index of the lowest point
