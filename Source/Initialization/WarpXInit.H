@@ -30,6 +30,10 @@ namespace warpx::initialization
      * Initializes the Warning manager in ablastr
      */
     void initialize_warning_manager ();
+
+    /** Check that warpx.dims matches the binary name
+    */
+    void check_dims ();
 }
 
 #endif //WARPX_INIT_H_
