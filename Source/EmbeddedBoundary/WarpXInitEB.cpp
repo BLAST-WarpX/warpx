@@ -363,7 +363,7 @@ WarpX::MarkUpdateCellsStairCase (
                     int const k_start = k;
 #endif
                     // Loop over neighboring cells
-                    int eb_update = 1;
+                    int eb_update_flag = 1;
                     for (int i_cell = i_start; i_cell <= i; ++i_cell) {
                         for (int j_cell = j_start; j_cell <= j; ++j_cell) {
                             for (int k_cell = k_start; k_cell <= k; ++k_cell) {
@@ -371,12 +371,12 @@ WarpX::MarkUpdateCellsStairCase (
                                 // (i.e. if they are not regular cells), do not update field
                                 // (`isRegular` returns `false` if the cell is either partially or fully covered.)
                                 if ( !flag(i_cell, j_cell, k_cell).isRegular() ) {
-                                    eb_update = 0;
+                                    eb_update_flag = 0;
                                 }
                             }
                         }
                     }
-                    eb_update_arr(i, j, k) = eb_update;
+                    eb_update_arr(i, j, k) = eb_update_flag;
                 });
 
             }

@@ -1,7 +1,7 @@
 .. _developers-profiling:
 
-Profiling the Code
-==================
+How to profile the code
+=======================
 
 Profiling allows us to find the bottle-necks of the code as it is currently implemented.
 Bottle-necks are the parts of the code that may delay the simulation, making it more computationally expensive.

@@ -162,17 +162,13 @@ public:
     HybridPICModel& GetHybridPICModel () { return *m_hybrid_pic_model; }
     [[nodiscard]] HybridPICModel * get_pointer_HybridPICModel () const { return m_hybrid_pic_model.get(); }
     MultiDiagnostics& GetMultiDiags () {return *multi_diags;}
-#ifdef AMREX_USE_EB
-    ablastr::fields::MultiLevelScalarField GetDistanceToEB () {
-        using warpx::fields::FieldType;
-        return m_fields.get_mr_levels(FieldType::distance_to_eb, finestLevel());
-    }
-#endif
+
     ParticleBoundaryBuffer& GetParticleBoundaryBuffer () { return *m_particle_boundary_buffer; }
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag() { return m_eb_update_E; }
 
     static void shiftMF (amrex::MultiFab& mf, const amrex::Geometry& geom,
                          int num_shift, int dir, int lev, bool update_cost_flag,
+                         bool safe_guard_cells,
                          amrex::Real external_field=0.0, bool useparser = false,
                          amrex::ParserExecutor<3> const& field_parser={});
 
@@ -249,11 +245,6 @@ public:
                                            ParticleBoundaryType::Default,
                                            ParticleBoundaryType::Default)};
 
-    //! Integer that corresponds to the order of the PSATD solution
-    //! (whether the PSATD equations are derived from first-order or
-    //! second-order solution)
-    static inline auto psatd_solution_type = PSATDSolutionType::Default;
-
     //! Integers that correspond to the time dependency of J (constant, linear)
     //! and rho (linear, quadratic) for the PSATD algorithm
     static inline auto J_in_time = JInTime::Default;
@@ -298,10 +289,6 @@ public:
     static bool do_dive_cleaning;
     //! Solve additional Maxwell equation for G in order to control errors in magnetic Gauss' law
     static bool do_divb_cleaning;
-
-    //! Solve Poisson equation when loading an external magnetic field to clean divergence
-    //! This is useful to remove errors that could lead to non-zero B field divergence
-    static bool do_divb_cleaning_external;
 
     //! Order of the particle shape factors (splines) along x
     static int nox;
@@ -366,14 +353,7 @@ public:
     static amrex::Real beta_boost;
     //! Direction of the Lorentz transform that defines the boosted frame of the simulation
     static amrex::Vector<int> boost_direction;
-    //! If specified, the maximum number of iterations is computed automatically so that
-    //! the lower end of the simulation domain along z reaches #zmax_plasma_to_compute_max_step
-    //! in the boosted frame
-    static amrex::Real zmax_plasma_to_compute_max_step;
-    //! Set to true if #zmax_plasma_to_compute_max_step is specified, in which case
-    //! the maximum number of iterations is computed automatically so that the lower end of the
-    //! simulation domain along z reaches #zmax_plasma_to_compute_max_step in the boosted frame
-    static bool do_compute_max_step_from_zmax;
+
     //! store initial value of zmin_domain_boost because WarpX::computeMaxStepBoostAccelerator
     //! needs the initial value of zmin_domain_boost, even if restarting from a checkpoint file
     static amrex::Real zmin_domain_boost_step_0;
@@ -396,7 +376,6 @@ public:
     static int do_multi_J_n_depositions;
 
     static bool do_device_synchronize;
-    static bool safe_guard_cells;
 
     //! With mesh refinement, particles located inside a refinement patch, but within
     //! #n_field_gather_buffer cells of the edge of the patch, will gather the fields
@@ -484,11 +463,6 @@ public:
     amrex::Array<amrex::Real,3> m_galilean_shift = {{0}};
 
     amrex::Vector<amrex::Real> m_v_comoving = amrex::Vector<amrex::Real>(3, amrex::Real(0.));
-
-    static int num_mirrors;
-    amrex::Vector<amrex::Real> mirror_z;
-    amrex::Vector<amrex::Real> mirror_z_width;
-    amrex::Vector<int> mirror_z_npoints;
 
     /// object with all reduced diagnostics, similar to MultiParticleContainer for species.
     std::unique_ptr<MultiReducedDiags> reduced_diags;
@@ -1356,18 +1330,6 @@ private:
     }
 
     /**
-     * \brief Re-orders the Fornberg coefficients so that they can be used more conveniently for
-     * finite-order centering operations. For example, for finite-order centering of order 6,
-     * the Fornberg coefficients \c (c_0,c_1,c_2) are re-ordered as \c (c_2,c_1,c_0,c_0,c_1,c_2).
-     *
-     * \param[in,out] ordered_coeffs host vector where the re-ordered Fornberg coefficients will be stored
-     * \param[in] unordered_coeffs host vector storing the original sequence of Fornberg coefficients
-     * \param[in] order order of the finite-order centering along a given direction
-     */
-    void ReorderFornbergCoefficients (amrex::Vector<amrex::Real>& ordered_coeffs,
-                                      amrex::Vector<amrex::Real>& unordered_coeffs,
-                                      int order);
-    /**
      * \brief Allocates and initializes the stencil coefficients used for the finite-order centering
      * of fields and currents, and stores them in the given device vectors.
      *
@@ -1418,7 +1380,9 @@ private:
     amrex::Vector<amrex::Real> t_new;
     amrex::Vector<amrex::Real> t_old;
     amrex::Vector<amrex::Real> dt;
-    static utils::parser::IntervalsParser dt_update_interval; // How often to update the timestep when using adaptive timestepping
+    utils::parser::IntervalsParser m_dt_update_interval = utils::parser::IntervalsParser{}; // How often to update the timestep when using adaptive timestepping
+
+    bool m_safe_guard_cells = false;
 
     // Particle container
     std::unique_ptr<MultiParticleContainer> mypc;
@@ -1496,6 +1460,12 @@ private:
 
     amrex::Real moving_window_x = std::numeric_limits<amrex::Real>::max();
 
+    // Mirrors
+    int m_num_mirrors = 0;
+    amrex::Vector<amrex::Real> m_mirror_z;
+    amrex::Vector<amrex::Real> m_mirror_z_width;
+    amrex::Vector<int> m_mirror_z_npoints;
+
     // Plasma injection parameters
     int warpx_do_continuous_injection = 0;
     int num_injected_species = -1;
@@ -1563,6 +1533,11 @@ private:
     int max_step   = std::numeric_limits<int>::max();
     amrex::Real stop_time = std::numeric_limits<amrex::Real>::max();
 
+    //! If specified, the maximum number of iterations is computed automatically so that
+    //! the lower end of the simulation domain along z reaches #zmax_plasma_to_compute_max_step
+    //! in the boosted frame
+    std::optional<amrex::Real> m_zmax_plasma_to_compute_max_step = std::nullopt;
+
     int regrid_int = -1;
 
     amrex::Real cfl = amrex::Real(0.999);
@@ -1604,6 +1579,10 @@ private:
     int noy_fft = 16;
     int noz_fft = 16;
 
+    //! Solve Poisson equation when loading an external magnetic field to clean divergence
+    //! This is useful to remove errors that could lead to non-zero B field divergence
+    bool m_do_divb_cleaning_external = false;
+
     //! Domain decomposition on Level 0
     amrex::IntVect numprocs{0};
 
@@ -1635,13 +1614,6 @@ private:
     [[nodiscard]]
     bool checkStopSimulation (amrex::Real cur_time);
 
-    /** Print Unused Parameter Warnings after Step 1
-     *
-     * Instead of waiting for a simulation to end, we already do an early "unused parameter check"
-     * after step 1 to inform users early of potential issues with their simulation setup.
-     */
-    void checkEarlyUnusedParams ();
-
     /** Perform essential particle house keeping at boundaries
      *
      * Inject, communicate, scrape and sort particles.
@@ -1658,6 +1630,11 @@ private:
      * Particles have p^{n} and x^{n}.
      */
     void ExplicitFillBoundaryEBUpdateAux ();
+
+    //! Integer that corresponds to the order of the PSATD solution
+    //! (whether the PSATD equations are derived from first-order or
+    //! second-order solution)
+    PSATDSolutionType m_psatd_solution_type = PSATDSolutionType::Default;
 
     void PushPSATD (amrex::Real start_time);
 
