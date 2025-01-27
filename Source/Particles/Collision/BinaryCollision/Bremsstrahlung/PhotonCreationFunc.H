@@ -195,12 +195,32 @@ public:
                 amrex::ParticleReal const u1_rel = std::sqrt(u1sq_rel);
                 amrex::ParticleReal const A = u1_rel/PhysConst::c - Ephoton*wp/(w1*m1*c2);
                 amrex::ParticleReal const B = gamma1_rel + w2*m2/(w1*m1) - Ephoton*wp/(w1*m1*c2);
-                amrex::ParticleReal const D = w2*m2*w2*m2/(w1*m1*w1*m1) + A*A - B*B - 1.0_prt;
-                amrex::ParticleReal const a = 4.0_prt*(B*B - A*A);
+
+                // Expanding A**2 - B**2 cancels some terms and reduces the round off error
+                amrex::ParticleReal const AAmBB = -1.0_prt - 2.0_prt*gamma1_rel*w2*m2/(w1*m1) - w2*m2/(w1*m1)*w2*m2/(w1*m1)
+                                                  +2.0_prt*(gamma1_rel + w2*m2/(w1*m1) - u1_rel/PhysConst::c)*Ephoton*wp/(w1*m1*c2);
+                amrex::ParticleReal const D = w2*m2*w2*m2/(w1*m1*w1*m1) + AAmBB - 1.0_prt;
+
+                amrex::ParticleReal const a = 4.0_prt*(-AAmBB);
                 amrex::ParticleReal const b = 4.0_prt*A*D;
                 amrex::ParticleReal const c = 4.0_prt*B*B - D*D;
+
+                // c could also be expanded but it doesn't seem to improve the round off
+                // u = u1_rel/PhysConst::c
+                // E = Ephoton*wp/(w1*m1*c2)
+                // w = w2*m2/(w1*m1)
+                // g = gamma1_rel
+                // cc1 = w*w*(- 4.0_prt*u*u + 8.0_prt*E*g - 4.0_prt*E*E)
+                // cc2 = w*(+ 8.0_prt*E*u*u - 8.0_prt*E*u*g + 8.0_prt*E + 8.0_prt*E*E*u - 8.0_prt*E*E*g)
+                // cc3 = (- 8.0_prt*E*u + 4.0_prt*u*u - 8.0_prt*E*E*u*u + 8.0_prt*E*E*u*g)
+                // c = cc1 + cc2 + cc3
+
                 // Use the "plus" solution since it keeps the electon motion forward
                 amrex::ParticleReal const u1_rel_after = (-b + std::sqrt(b*b - 4.0_prt*a*c))/(2.0_prt*a)*PhysConst::c;
+
+                // The terms inside the sqrt can also be expanded but doesn't seem to improve the round off error
+                // u1_rel_after = (-b + 4.0_prt*std::sqrt(B*B*D*D + 4.0_prt*A*A*B*B - 4.0_prt*B*B*B*B))/(2.0_prt*a)*PhysConst::c
+
                 amrex::ParticleReal const u2_rel_after = (A*PhysConst::c - u1_rel_after)*w1*m1/(w2*m2);
 
                 u1x_rel *= u1_rel_after/u1_rel;
