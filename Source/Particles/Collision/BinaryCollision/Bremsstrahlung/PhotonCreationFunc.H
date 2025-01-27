@@ -157,7 +157,7 @@ public:
         const index_type* AMREX_RESTRICT products_np_data = products_np.data();
 #endif
 
-        bool create_photons = m_create_photons;
+        bool const create_photons = m_create_photons;
 
         amrex::ParallelForRNG(n_total_pairs,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
@@ -174,11 +174,11 @@ public:
                 amrex::ParticleReal & u1x = soa_1.m_rdata[PIdx::ux][i1];
                 amrex::ParticleReal & u1y = soa_1.m_rdata[PIdx::uy][i1];
                 amrex::ParticleReal & u1z = soa_1.m_rdata[PIdx::uz][i1];
-                amrex::ParticleReal & w1 = soa_1.m_rdata[PIdx::w][i1];
+                amrex::ParticleReal const & w1 = soa_1.m_rdata[PIdx::w][i1];
                 amrex::ParticleReal & u2x = soa_2.m_rdata[PIdx::ux][i2];
                 amrex::ParticleReal & u2y = soa_2.m_rdata[PIdx::uy][i2];
                 amrex::ParticleReal & u2z = soa_2.m_rdata[PIdx::uz][i2];
-                amrex::ParticleReal & w2 = soa_2.m_rdata[PIdx::w][i2];
+                amrex::ParticleReal const & w2 = soa_2.m_rdata[PIdx::w][i2];
 
                 amrex::ParticleReal u1x_rel = u1x;
                 amrex::ParticleReal u1y_rel = u1y;
