@@ -640,7 +640,7 @@ public:
     void ApplyInverseVolumeScalingToCurrentDensity(amrex::MultiFab* Jx,
                                                    amrex::MultiFab* Jy,
                                                    amrex::MultiFab* Jz,
-                                                   int lev);
+                                                   int lev) const;
 
     void ApplyInverseVolumeScalingToChargeDensity(amrex::MultiFab* Rho,
                                                   int lev);
