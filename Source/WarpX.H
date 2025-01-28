@@ -1269,6 +1269,8 @@ private:
 
     void InitFromScratch ();
 
+    void InitRuntimeComps ();
+
     void AllocLevelData (int lev, const amrex::BoxArray& ba,
                          const amrex::DistributionMapping& dm);
 

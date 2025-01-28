@@ -539,6 +539,7 @@ WarpX::InitData ()
         WarpX::PrintDtDxDyDz();
         InitFromScratch();
         InitDiagnostics();
+        InitRuntimeComps();
     }
     else
     {
@@ -694,7 +695,15 @@ WarpX::InitFromScratch ()
         m_implicit_solver->CreateParticleAttributes();
     }
 
-    // FIXME Is mypc->m_do_back_transformed_particles up-to-date here?
+    mypc->AllocData();
+    mypc->InitData();
+
+    InitPML();
+
+}
+
+void WarpX::InitRuntimeComps ()
+{
     if (mypc->getDoBackTransformedParticles())
     {
         // Set comm to false so that the attributes are not communicated
@@ -716,12 +725,6 @@ WarpX::InitFromScratch ()
             pc->NewRealComp("uz_n_btd", comm);
         }
     }
-
-    mypc->AllocData();
-    mypc->InitData();
-
-    InitPML();
-
 }
 
 void
