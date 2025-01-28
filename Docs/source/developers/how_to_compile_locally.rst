@@ -1,7 +1,7 @@
 .. _developers-local-compile:
 
-Fast, Local Compilation
-=======================
+How to compile locally and fast
+===============================
 
 For simplicity, WarpX :ref:`compilation with CMake <building-cmake>` by default downloads, configures and compiles compatible versions of :ref:`central dependencies <install-dependencies>` such as:
 

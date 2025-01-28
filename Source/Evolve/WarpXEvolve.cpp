@@ -61,6 +61,23 @@
 using namespace amrex;
 using ablastr::utils::SignalHandling;
 
+namespace
+{
+    /** Print Unused Parameter Warnings after Step 1
+     *
+     * Instead of waiting for a simulation to end, we already do an early "unused parameter check"
+     * after step 1 to inform users early of potential issues with their simulation setup.
+     */
+    void checkEarlyUnusedParams ()
+    {
+        amrex::Print() << "\n"; // better: conditional \n based on return value
+        amrex::ParmParse::QueryUnusedInputs();
+
+        // Print the warning list right after the first step.
+        amrex::Print() << ablastr::warn_manager::GetWMInstance().PrintGlobalWarnings("FIRST STEP");
+    }
+}
+
 void
 WarpX::Synchronize () {
     using ablastr::fields::Direction;
@@ -130,7 +147,7 @@ WarpX::Evolve (int numsteps)
         // Update timestep for electrostatic solver if a constant dt is not provided
         // This first synchronizes the position and velocity before setting the new timestep
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None &&
-            !m_const_dt.has_value() && dt_update_interval.contains(step+1)) {
+            !m_const_dt.has_value() && m_dt_update_interval.contains(step+1)) {
             if (verbose) {
                 amrex::Print() << Utils::TextMsg::Info("updating timestep");
             }
@@ -310,7 +327,7 @@ WarpX::Evolve (int numsteps)
 
         // inputs: unused parameters (e.g. typos) check after step 1 has finished
         if (!early_params_checked) {
-            checkEarlyUnusedParams();
+            ::checkEarlyUnusedParams();
             early_params_checked = true;
         }
 
@@ -446,7 +463,7 @@ WarpX::OneStep_nosub (Real cur_time)
 
         // E and B are up-to-date in the domain, but all guard cells are
         // outdated.
-        if (safe_guard_cells) {
+        if (m_safe_guard_cells) {
             FillBoundaryB(guard_cells.ng_alloc_EB);
         }
     } // !PSATD
@@ -459,15 +476,6 @@ bool WarpX::checkStopSimulation (amrex::Real cur_time)
     m_exit_loop_due_to_interrupt_signal = SignalHandling::TestAndResetActionRequestFlag(SignalHandling::SIGNAL_REQUESTS_BREAK);
     return (cur_time >= stop_time - 1.e-3*dt[0])  ||
         m_exit_loop_due_to_interrupt_signal;
-}
-
-void WarpX::checkEarlyUnusedParams ()
-{
-    amrex::Print() << "\n"; // better: conditional \n based on return value
-    amrex::ParmParse::QueryUnusedInputs();
-
-    // Print the warning list right after the first step.
-    amrex::Print() << ablastr::warn_manager::GetWMInstance().PrintGlobalWarnings("FIRST STEP");
 }
 
 void WarpX::ExplicitFillBoundaryEBUpdateAux ()
@@ -978,7 +986,7 @@ WarpX::OneStep_sub1 (Real cur_time)
         FillBoundaryE(fine_lev, PatchType::fine, guard_cells.ng_FieldSolver);
     }
 
-    if ( safe_guard_cells ) {
+    if ( m_safe_guard_cells ) {
         FillBoundaryF(fine_lev, PatchType::fine, guard_cells.ng_FieldSolver);
     }
     FillBoundaryB(fine_lev, PatchType::fine, guard_cells.ng_FieldSolver);
@@ -1034,12 +1042,12 @@ WarpX::OneStep_sub1 (Real cur_time)
                           WarpX::sync_nodal_points);
         }
         DampPML(coarse_lev, PatchType::fine);
-        if ( safe_guard_cells ) {
+        if ( m_safe_guard_cells ) {
             FillBoundaryE(coarse_lev, PatchType::fine, guard_cells.ng_FieldSolver,
                           WarpX::sync_nodal_points);
         }
     }
-    if ( safe_guard_cells ) {
+    if ( m_safe_guard_cells ) {
         FillBoundaryB(coarse_lev, PatchType::fine, guard_cells.ng_FieldSolver,
                       WarpX::sync_nodal_points);
     }
@@ -1190,16 +1198,16 @@ WarpX::applyMirrors (Real time)
     using ablastr::fields::Direction;
 
     // something to do?
-    if (num_mirrors == 0) {
+    if (m_num_mirrors == 0) {
         return;
     }
 
     // Loop over the mirrors
-    for(int i_mirror=0; i_mirror<num_mirrors; ++i_mirror)
+    for(int i_mirror=0; i_mirror<m_num_mirrors; ++i_mirror)
     {
         // Get mirror properties (lower and upper z bounds)
-        amrex::Real z_min = mirror_z[i_mirror];
-        amrex::Real z_max_tmp = z_min + mirror_z_width[i_mirror];
+        amrex::Real z_min = m_mirror_z[i_mirror];
+        amrex::Real z_max_tmp = z_min + m_mirror_z_width[i_mirror];
 
         // Boost quantities for boosted frame simulations
         if (gamma_boost>1)
@@ -1211,9 +1219,9 @@ WarpX::applyMirrors (Real time)
         // Loop over levels
         for(int lev=0; lev<=finest_level; lev++)
         {
-            // Mirror must contain at least mirror_z_npoints[i_mirror] cells
+            // Mirror must contain at least m_mirror_z_npoints[i_mirror] cells
             const amrex::Real dz = WarpX::CellSize(lev)[2];
-            const amrex::Real z_max = std::max(z_max_tmp, z_min+mirror_z_npoints[i_mirror]*dz);
+            const amrex::Real z_max = std::max(z_max_tmp, z_min+m_mirror_z_npoints[i_mirror]*dz);
 
             // Set each field on the fine patch to zero between z_min and z_max
             NullifyMF(m_fields, "Efield_fp", Direction{0}, lev, z_min, z_max);

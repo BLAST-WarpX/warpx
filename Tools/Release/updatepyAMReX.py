@@ -77,8 +77,8 @@ print(
 print(f"pyAMReX HEAD commit (development branch): {pyamrex_HEAD}")
 pyamrex_new_branch = input("Update pyAMReX commit/branch/sha: ").strip()
 if not pyamrex_new_branch:
-    pyamrex_new_branch = pyamrex_branch
-    print(f"--> Nothing entered, will keep: {pyamrex_branch}")
+    pyamrex_new_branch = pyamrex_HEAD
+    print(f"--> Nothing entered, will use: {pyamrex_HEAD}")
 print()
 
 print(
