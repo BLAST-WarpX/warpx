@@ -12,8 +12,8 @@ bool Contains (const ContainerType& container, const ElementType& el)
 
 void AbortWithMessage(const std::string& msg)
 {
-    std::cout << "### ABORT : " << msg << "\n";
-    std::cout << "___________________________\n" << std::flush;
+    std::cerr << "### ABORT : " << msg << "\n";
+    std::cerr << "___________________________\n";
     exit(1);
 }
 
