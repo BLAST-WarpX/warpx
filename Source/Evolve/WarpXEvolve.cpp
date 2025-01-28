@@ -893,10 +893,13 @@ WarpX::OneStep_sub1 (Real cur_time)
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         fine_lev, Geom(fine_lev).periodicity());
 
-    ApplyFilterandSumBoundaryRho(
-        m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
-        m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_level_0),
-        fine_lev, PatchType::fine, 0, 2*ncomps);
+    if (m_fields.has(FieldType::rho_fp, finest_level) &&
+        m_fields.has(FieldType::rho_cp, finest_level)) {
+        ApplyFilterandSumBoundaryRho(
+            m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
+            m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_level_0),
+            fine_lev, PatchType::fine, 0, 2*ncomps);
+    }
 
     EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::FirstHalf, cur_time);
     EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::FirstHalf);
@@ -928,11 +931,16 @@ WarpX::OneStep_sub1 (Real cur_time)
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_level_0),
         m_fields.get_mr_levels_alldirs(FieldType::current_buf, finest_level, skip_level_0), coarse_lev);
-    AddRhoFromFineLevelandSumBoundary(
-        m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
-        m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_level_0),
-        m_fields.get_mr_levels(FieldType::rho_buf, finest_level, skip_level_0),
-        coarse_lev, 0, ncomps);
+
+    if (m_fields.has(FieldType::rho_fp, finest_level) &&
+        m_fields.has(FieldType::rho_cp, finest_level) &&
+        m_fields.has(FieldType::rho_buf, finest_level)) {
+        AddRhoFromFineLevelandSumBoundary(
+            m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
+            m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_level_0),
+            m_fields.get_mr_levels(FieldType::rho_buf, finest_level, skip_level_0),
+            coarse_lev, 0, ncomps);
+    }
 
     EvolveB(fine_lev, PatchType::coarse, dt[fine_lev], DtType::FirstHalf, cur_time);
     EvolveF(fine_lev, PatchType::coarse, dt[fine_lev], DtType::FirstHalf);
@@ -968,10 +976,14 @@ WarpX::OneStep_sub1 (Real cur_time)
         ApplyFilterMF( m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), fine_lev);
     }
     SumBoundaryJ( m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), fine_lev, Geom(fine_lev).periodicity());
-    ApplyFilterandSumBoundaryRho(
-        m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
-        m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_level_0),
-        fine_lev, PatchType::fine, 0, ncomps);
+
+    if (m_fields.has(FieldType::rho_fp, finest_level) &&
+        m_fields.has(FieldType::rho_cp, finest_level)) {
+        ApplyFilterandSumBoundaryRho(
+            m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
+            m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_level_0),
+            fine_lev, PatchType::fine, 0, ncomps);
+    }
 
     EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::FirstHalf, cur_time + dt[fine_lev]);
     EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::FirstHalf);
@@ -1003,11 +1015,16 @@ WarpX::OneStep_sub1 (Real cur_time)
         m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_level_0),
         m_fields.get_mr_levels_alldirs(FieldType::current_buf, finest_level, skip_level_0),
         coarse_lev);
-    AddRhoFromFineLevelandSumBoundary(
-        m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
-        m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_level_0),
-        m_fields.get_mr_levels(FieldType::rho_buf, finest_level, skip_level_0),
-        coarse_lev, ncomps, ncomps);
+
+    if (m_fields.has(FieldType::rho_fp, finest_level) &&
+        m_fields.has(FieldType::rho_cp, finest_level) &&
+        m_fields.has(FieldType::rho_buf, finest_level)) {
+        AddRhoFromFineLevelandSumBoundary(
+            m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
+            m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_level_0),
+            m_fields.get_mr_levels(FieldType::rho_buf, finest_level, skip_level_0),
+            coarse_lev, ncomps, ncomps);
+    }
 
     EvolveE(fine_lev, PatchType::coarse, dt[fine_lev], cur_time + 0.5_rt * dt[fine_lev]);
     FillBoundaryE(fine_lev, PatchType::coarse, guard_cells.ng_FieldSolver,
