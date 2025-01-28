@@ -333,10 +333,6 @@ public:
     //! small time steps.
     static bool galerkin_interpolation;
 
-    //! Flag whether the Verboncoeur correction is applied to the current and charge density
-    //! on the axis when using RZ.
-    static bool verboncoeur_axis_correction;
-
     //! If true, a bilinear filter is used to smooth charge and currents
     static bool use_filter;
     //! If true, the bilinear filtering of charge and currents is done in Fourier space
@@ -623,10 +619,10 @@ public:
     void ApplyInverseVolumeScalingToCurrentDensity(amrex::MultiFab* Jx,
                                                    amrex::MultiFab* Jy,
                                                    amrex::MultiFab* Jz,
-                                                   int lev);
+                                                   int lev) const;
 
     void ApplyInverseVolumeScalingToChargeDensity(amrex::MultiFab* Rho,
-                                                  int lev);
+                                                  int lev) const;
 #endif
 
     /**
@@ -1477,6 +1473,10 @@ private:
 
     // whether to use subcycling
     bool m_do_subcycling = false;
+
+    //! Flag whether the Verboncoeur correction is applied to the current and charge density
+    //! on the axis when using RZ.
+    bool m_verboncoeur_axis_correction = true;
 
     // Macroscopic properties
     std::unique_ptr<MacroscopicProperties> m_macroscopic_properties;
