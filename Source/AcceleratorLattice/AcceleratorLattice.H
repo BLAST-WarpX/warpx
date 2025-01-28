@@ -42,10 +42,15 @@ public:
      * \brief Initialize the element finder instance at the given level of refinement
      *
      * @param[in] lev the level of refinement
+     * @param[in] gamma_boost the Lorentz factor of the boosted frame
      * @param[in] ba the box array at the level of refinement
      * @param[in] dm the distribution map at the level of refinement
      */
-    void InitElementFinder (int lev, amrex::BoxArray const & ba, amrex::DistributionMapping const & dm);
+    void InitElementFinder (
+        int lev,
+        amrex::Real gamma_boost,
+        amrex::BoxArray const & ba,
+        amrex::DistributionMapping const & dm);
 
     /**
      * \brief Update the element finder, needed when the simulation frame has moved relative to the lab frame

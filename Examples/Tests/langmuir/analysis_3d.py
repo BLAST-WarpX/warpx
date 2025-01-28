@@ -26,9 +26,6 @@ yt.funcs.mylog.setLevel(50)
 import numpy as np
 from scipy.constants import c, e, epsilon_0, m_e
 
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
-
 # test name
 test_name = os.path.split(os.getcwd())[1]
 
@@ -211,9 +208,3 @@ if div_cleaning:
     print("error_rel = {}".format(error_rel))
     print("tolerance = {}".format(tolerance))
     assert error_rel < tolerance
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

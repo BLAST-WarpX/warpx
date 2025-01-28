@@ -12,10 +12,6 @@ import sys
 import analysis_breit_wheeler_core as ac
 import openpmd_api as io
 
-# sys.path.insert(1, '../../../../warpx/Regression/Checksum/')
-# from checksumAPI import evaluate_checksum
-
-
 # This script is a frontend for the analysis routines
 # in analysis_breit_wheeler_core.py (please refer to this file for
 # a full description). It reads output files in openPMD
@@ -71,13 +67,6 @@ def main():
         particle_data[spec_name] = data
 
     ac.check(dt, particle_data)
-
-    # compare checksums
-    # evaluate_checksum(
-    #    test_name=os.path.split(os.getcwd())[1],
-    #    output_file=sys.argv[1],
-    #    output_format="openpmd",
-    # )
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 # Preamble ####################################################################
 #
 cmake_minimum_required(VERSION 3.24.0)
-project(WarpX VERSION 24.11)
+project(WarpX VERSION 25.01)
 
 include(${WarpX_SOURCE_DIR}/cmake/WarpXFunctions.cmake)
 
@@ -73,7 +73,6 @@ option(WarpX_LIB           "Build WarpX as a library"                   OFF)
 option(WarpX_MPI           "Multi-node support (message-passing)"       ON)
 option(WarpX_OPENPMD       "openPMD I/O (HDF5, ADIOS)"                  ON)
 option(WarpX_FFT           "FFT-based solvers"                          OFF)
-option(WarpX_HEFFTE        "Multi-node FFT-based solvers"               OFF)
 option(WarpX_PYTHON        "Python bindings"                            OFF)
 option(WarpX_SENSEI        "SENSEI in situ diagnostics"                 OFF)
 option(WarpX_QED           "QED support (requires PICSAR)"              ON)
@@ -146,10 +145,6 @@ mark_as_advanced(WarpX_MPI_THREAD_MULTIPLE)
 
 option(WarpX_amrex_internal                    "Download & build AMReX" ON)
 
-if(WarpX_HEFFTE AND NOT WarpX_MPI)
-    message(FATAL_ERROR "WarpX_HEFFTE (${WarpX_HEFFTE}) can only be used if WarpX_MPI is ON.")
-endif()
-
 # change the default build type to Release (or RelWithDebInfo) instead of Debug
 set_default_build_type("Release")
 
@@ -197,12 +192,9 @@ option(ABLASTR_FFT "compile AnyFFT wrappers" ${WarpX_FFT})
 if(WarpX_FFT)
     set(ABLASTR_FFT ON CACHE STRING "FFT-based solvers" FORCE)
 endif()
-option(ABLASTR_HEFFTE "compile AnyFFT wrappers" ${WarpX_HEFFTE})
-if(WarpX_HEFFTE)
-    set(ABLASTR_HEFFTE ON CACHE STRING "Multi-Node FFT-based solvers" FORCE)
-endif()
 
-# this defined the variable BUILD_TESTING which is ON by default
+# Define the variable BUILD_TESTING (ON by default),
+# include CDash dashboard testing module
 include(CTest)
 
 
@@ -240,23 +232,6 @@ if(WarpX_FFT)
         find_package(lapackpp CONFIG REQUIRED)
         find_package(OpenMP REQUIRED)  # pulled by the two above
     endif()
-endif()
-
-# multi-node FFT
-if(WarpX_HEFFTE)
-    if(WarpX_COMPUTE STREQUAL CUDA)
-        set(_heFFTe_COMPS CUDA)
-    elseif(WarpX_COMPUTE STREQUAL HIP)
-        set(_heFFTe_COMPS ROCM)
-    elseif(WarpX_COMPUTE STREQUAL SYCL)
-        set(_heFFTe_COMPS ONEAPI)
-    else()  # NOACC, OMP
-        set(_heFFTe_COMPS FFTW)  # or MKL
-    endif()
-    # note: we could also enforce GPUAWARE for CUDA and HIP, which can still be
-    #       disabled at runtime
-
-    find_package(Heffte REQUIRED COMPONENTS ${_heFFTe_COMPS})
 endif()
 
 # Python
@@ -499,10 +474,6 @@ foreach(D IN LISTS WarpX_DIMS)
         endif()
     endif()
 
-    if(ABLASTR_HEFFTE)
-        target_link_libraries(ablastr_${SD} PUBLIC Heffte::Heffte)
-    endif()
-
     if(WarpX_PYTHON)
         target_link_libraries(pyWarpX_${SD} PRIVATE pybind11::module pybind11::windows_extras)
         if(WarpX_PYTHON_IPO)
@@ -510,7 +481,7 @@ foreach(D IN LISTS WarpX_DIMS)
                 warpx_enable_IPO(pyWarpX_${SD})
             else()
                 # conditionally defined target in pybind11
-                # https://github.com/pybind/pybind11/blob/v2.12.0/tools/pybind11Common.cmake#L397-L403
+                # https://github.com/pybind/pybind11/blob/v2.13.0/tools/pybind11Common.cmake#L407-L413
                 target_link_libraries(pyWarpX_${SD} PRIVATE pybind11::lto)
             endif()
         endif()
@@ -591,13 +562,6 @@ foreach(D IN LISTS WarpX_DIMS)
     if(ABLASTR_FFT)
         # We need to enable FFT support in ABLASTR for PSATD solver
         target_compile_definitions(ablastr_${SD} PUBLIC ABLASTR_USE_FFT)
-    endif()
-
-    if(WarpX_HEFFTE)
-        target_compile_definitions(ablastr_${SD} PUBLIC WARPX_USE_HEFFTE)
-    endif()
-    if(ABLASTR_HEFFTE)
-        target_compile_definitions(ablastr_${SD} PUBLIC ABLASTR_USE_HEFFTE)
     endif()
 
     if(WarpX_PYTHON AND pyWarpX_VERSION_INFO)

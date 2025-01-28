@@ -33,6 +33,7 @@ AMREX_ENUM(EvolveScheme,
            Explicit,
            ThetaImplicitEM,
            SemiImplicitEM,
+           StrangImplicitSpectralEM,
            Default = Explicit);
 
 /**
@@ -61,6 +62,7 @@ AMREX_ENUM(ElectrostaticSolverAlgo,
            Relativistic,
            LabFrameElectroMagnetostatic,
            LabFrame,
+           LabFrameEffectivePotential,
            Default = None);
 
 AMREX_ENUM(PoissonSolverAlgo,

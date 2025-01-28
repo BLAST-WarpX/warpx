@@ -188,6 +188,14 @@ Scientific works in High-Performance Computing, applied mathematics and numerics
 
 Please see :ref:`this section <acknowledge_warpx_all_refs>`.
 
+Related works using WarpX:
+
+#. Yan Y., Du F., Tang J., Yu D and Zhao Y.,
+   **Numerical study on wave attenuation via 1D fully kinetic electromagnetic particle-in-cell simulations**.
+   Plasma Sources Sci. Technol. **33** 115013, 2024
+   `DOI:10.1088/1361-6595/ad8c7c <https://doi.org/10.1088/1361-6595/ad8c7c>`__
+
+
 Nuclear Fusion and Plasma Confinement
 *************************************
 
