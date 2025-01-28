@@ -129,7 +129,7 @@ namespace
 #endif
         for (amrex::MFIter mfi(tmpmf, TilingIfNotGPU()); mfi.isValid(); ++mfi )
         {
-            if (!cost)
+            if (cost)
             {
                 amrex::Gpu::synchronize();
             }
@@ -194,7 +194,7 @@ namespace
                 dstfab(i,j,k,n) = srcfab(i+shift.x,j+shift.y,k+shift.z,n);
             })
 
-            if (!cost)
+            if (cost)
             {
                 amrex::Gpu::synchronize();
                 wt = static_cast<amrex::Real>(amrex::second()) - wt;
