@@ -1025,7 +1025,7 @@ public:
     void MarkReducedShapeCells (
         std::unique_ptr<amrex::iMultiFab> & eb_reduce_particle_shape,
         amrex::EBFArrayBoxFactory const & eb_fact,
-        int const particle_shape_order );
+        int particle_shape_order );
 
     /** \brief Set a flag to indicate on which grid points the field `field`
      *  should be updated, depending on their position relative to the embedded boundary.
