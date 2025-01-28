@@ -34,8 +34,7 @@ void ExecutePythonCallback ( const std::string& name )
             warpx_callback_py_map[name]();
         } catch (std::exception &e) {
             std::cerr << "Python callback '" << name << "' failed!" << "\n";
-            std::cerr << e.what() << "\n";
-            std::cerr.flush();
+            std::cerr << e.what() << "\n" << std::flush;
             std::exit(3);  // note: NOT amrex::Abort(), to avoid hangs with MPI
 
             // future note:
