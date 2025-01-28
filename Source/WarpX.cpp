@@ -153,8 +153,6 @@ int WarpX::current_centering_noz = 2;
 bool WarpX::use_fdtd_nci_corr = false;
 bool WarpX::galerkin_interpolation = true;
 
-bool WarpX::verboncoeur_axis_correction = true;
-
 bool WarpX::use_filter = true;
 bool WarpX::use_kspace_filter       = true;
 bool WarpX::use_filter_compensation = false;
@@ -726,7 +724,7 @@ WarpX::ReadParameters ()
 
 #ifdef WARPX_DIM_RZ
         const ParmParse pp_boundary("boundary");
-        pp_boundary.query("verboncoeur_axis_correction", verboncoeur_axis_correction);
+        pp_boundary.query("verboncoeur_axis_correction", m_verboncoeur_axis_correction);
 #endif
 
         // Read timestepping options
