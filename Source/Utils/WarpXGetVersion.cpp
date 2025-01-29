@@ -1,4 +1,4 @@
-/* Copyright 2022 Axel Huebl
+/* Copyright 2025 Axel Huebl, Luca Fedeli
  *
  * This file is part of WarpX.
  *
