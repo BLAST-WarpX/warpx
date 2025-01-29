@@ -404,7 +404,7 @@ public:
      * \param[in] name The name of the iMultiFab to use in the map
      * \param[in] initial_value The optional initial value
      */
-    static void AllocInitMultiFab (
+    void AllocInitMultiFab (
         std::unique_ptr<amrex::iMultiFab>& mf,
         const amrex::BoxArray& ba,
         const amrex::DistributionMapping& dm,
@@ -417,7 +417,7 @@ public:
     // Maps of all of the iMultiFabs used (this can include MFs from other classes)
     // This is a convenience for the Python interface, allowing all iMultiFabs
     // to be easily referenced from Python.
-    static std::map<std::string, amrex::iMultiFab *> imultifab_map;
+    std::map<std::string, amrex::iMultiFab *> imultifab_map;
 
     /**
      * \brief
