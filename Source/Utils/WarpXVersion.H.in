@@ -15,13 +15,4 @@
 #   define PICSAR_GIT_VERSION "@PXRMP_QED_GIT_VERSION@"
 #endif
 
-#include <string>
-
-namespace warpx
-{
-    [[nodiscard]] std::string Version () noexcept; //!< Version of WarpX executable
-
-    [[nodiscard]] std::string PicsarVersion () noexcept; //!< Version of PICSAR dependency
-}
-
 #endif // WARPX_VERSION_H_

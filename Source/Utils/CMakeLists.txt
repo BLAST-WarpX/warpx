@@ -9,7 +9,7 @@ foreach(D IN LISTS WarpX_DIMS)
         WarpXMovingWindow.cpp
         WarpXTagging.cpp
         WarpXUtil.cpp
-        WarpXVersion.cpp
+        WarpXGetVersion.cpp
     )
 endforeach()
 

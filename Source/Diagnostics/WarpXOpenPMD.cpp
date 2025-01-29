@@ -16,7 +16,7 @@
 #include "Utils/RelativeCellPosition.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXProfilerWrapper.H"
-#include "Utils/WarpXVersion.H"
+#include "Utils/WarpXGetVersion.H"
 #include "WarpX.H"
 #include "OpenPMDHelpFunction.H"
 

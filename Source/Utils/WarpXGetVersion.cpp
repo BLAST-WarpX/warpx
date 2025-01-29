@@ -4,6 +4,9 @@
  *
  * License: BSD-3-Clause-LBNL
  */
+
+#include "Utils/WarpXGetVersion.H"
+
 #include "Utils/WarpXVersion.H"
 
 std::string warpx::Version () noexcept
