@@ -27,9 +27,17 @@ print("x", x)
 print("y", y)
 print("z", z)
 # Analytical results calculated
-x_analytic = [0.004028, 0.003193]
-y_analytic = [-0.0001518, -0.0011041]
-z_analytic = [-0.19967, -0.19926]
+# x_analytic = [0.004028, 0.003193]
+# y_analytic = [-0.0001518, -0.0011041]
+# z_analytic = [-0.19967, -0.19926]
+
+x_analytic = [-0.091696, 0.011599]
+y_analytic = [-0.002282, -0.0111624]
+z_analytic = [-0.200242, -0.201728]
+
+# x_analytic = [-0.09169647,  0.01159922]
+# y_analytic  = [-0.00228188, -0.01116237]
+# z_analytic = [-0.20024175, -0.20172786]
 
 N_sec_e = np.size(z)  # number of the secondary electrons
 

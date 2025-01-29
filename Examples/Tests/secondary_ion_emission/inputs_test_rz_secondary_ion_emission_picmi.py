@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-# --- Input file for secondary-ion emission testing in RZ via callback function.
+# This is the script that tests secondary ion emission when ions hit an embedded boundary
+# with a specified secondary emission yield of delta_H = 0.4. Specifically, a callback
+# function at each time step ensures that the correct number of secondary electrons is
+# emitted when ions impact the embedded boundary, following the given secondary emission
+# model defined in sigma_nescap function. This distribution depends on the ion's energy and
+# suggests that for an ion incident with 1 keV energy, an average of 0.4 secondary
+# electrons will be emitted.
+# Simulation is initialized with four ions with i_dist distribution and spherical
+# embedded boundary given by implicit function.
 import numpy as np
 from scipy.constants import e, elementary_charge, m_e, proton_mass
 
@@ -9,7 +17,7 @@ from pywarpx import callbacks, particle_containers, picmi
 # numerics parameters
 ##########################
 
-dt = 0.000000015
+dt = 0.000000075
 
 # --- Nb time steps
 Te = 0.0259  # in eV
@@ -56,10 +64,21 @@ embedded_boundary = picmi.EmbeddedBoundary(
 ##########################
 # physics components
 ##########################
-
 i_dist = picmi.ParticleListDistribution(
-    x=0.0, y=0.0, z=-0.25, ux=0.1e6, uy=0.0, uz=1.50e6, weight=1
+    x=[
+        0.025,
+        0.0,
+        -0.1,
+        -0.14,
+    ],
+    y=[0.0, 0.0, 0.0, 0],
+    z=[-0.26, -0.29, -0.25, -0.23],
+    ux=[0.18e6, 0.1e6, 0.15e6, 0.21e6],
+    uy=[0.0, 0.0, 0.0, 0.0],
+    uz=[8.00e5, 7.20e5, 6.40e5, 5.60e5],
+    weight=[1, 1, 1, 1],
 )
+
 electrons = picmi.Species(
     particle_type="electron",  # Specify the particle type
     name="electrons",  # Name of the species
@@ -67,7 +86,7 @@ electrons = picmi.Species(
 
 ions = picmi.Species(
     name="ions",
-    mass=proton_mass,
+    particle_type="proton",
     charge=e,
     initial_distribution=i_dist,
     warpx_save_particles_at_eb=1,
@@ -81,7 +100,7 @@ field_diag = picmi.FieldDiagnostic(
     name="diag1",
     grid=grid,
     period=diagnostic_interval,
-    data_list=["Er", "Ez", "phi", "rho"],  # , "rho_electrons"],
+    data_list=["Er", "Ez", "phi", "rho"],
     warpx_format="openpmd",
 )
 
@@ -190,60 +209,56 @@ def secondary_emission():
         # Loop over all ions in the EB buffer
         for i in range(0, n):
             sigma = sigma_nascap_ions[i]
-            sigma_int = int(sigma)
-            rn = np.random.uniform(sigma_int, sigma_int + 1 + np.finfo(float).eps)
-            if rn < sigma:
-                Ne_sec = (
-                    sigma_int + 1
-                )  # number of the secondary electrons to be emitted
-                for _ in range(Ne_sec):
-                    xe = np.array([])
-                    ye = np.array([])
-                    ze = np.array([])
-                    we = np.array([])
-                    delta_te = np.array([])
-                    uxe = np.array([])
-                    uye = np.array([])
-                    uze = np.array([])
+            # Ne_sec is number of the secondary electrons to be emitted
+            Ne_sec = int(sigma + np.random.uniform())
+            for _ in range(Ne_sec):
+                xe = np.array([])
+                ye = np.array([])
+                ze = np.array([])
+                we = np.array([])
+                delta_te = np.array([])
+                uxe = np.array([])
+                uye = np.array([])
+                uze = np.array([])
 
-                    # Random thermal momenta distribution
-                    ux_th = np.random.normal(0, dist_th)
-                    uy_th = np.random.normal(0, dist_th)
-                    uz_th = np.random.normal(0, dist_th)
+                # Random thermal momenta distribution
+                ux_th = np.random.normal(0, dist_th)
+                uy_th = np.random.normal(0, dist_th)
+                uz_th = np.random.normal(0, dist_th)
 
-                    un_th = nx[i] * ux_th + ny[i] * uy_th + nz[i] * uz_th
+                un_th = nx[i] * ux_th + ny[i] * uy_th + nz[i] * uz_th
 
-                    if un_th < 0:
-                        ux_th_reflect = (
-                            -2 * un_th * nx[i] + ux_th
-                        )  # for a "mirror reflection" u(sym)=-2(u.n)n+u
-                        uy_th_reflect = -2 * un_th * ny[i] + uy_th
-                        uz_th_reflect = -2 * un_th * nz[i] + uz_th
+                if un_th < 0:
+                    ux_th_reflect = (
+                        -2 * un_th * nx[i] + ux_th
+                    )  # for a "mirror reflection" u(sym)=-2(u.n)n+u
+                    uy_th_reflect = -2 * un_th * ny[i] + uy_th
+                    uz_th_reflect = -2 * un_th * nz[i] + uz_th
 
-                        uxe = np.append(uxe, ux_th_reflect)
-                        uye = np.append(uye, uy_th_reflect)
-                        uze = np.append(uze, uz_th_reflect)
-                    else:
-                        uxe = np.append(uxe, ux_th)
-                        uye = np.append(uye, uy_th)
-                        uze = np.append(uze, uz_th)
+                    uxe = np.append(uxe, ux_th_reflect)
+                    uye = np.append(uye, uy_th_reflect)
+                    uze = np.append(uze, uz_th_reflect)
+                else:
+                    uxe = np.append(uxe, ux_th)
+                    uye = np.append(uye, uy_th)
+                    uze = np.append(uze, uz_th)
 
-                    xe = np.append(xe, x[i])
-                    ye = np.append(ye, y[i])
-                    ze = np.append(ze, z[i])
-                    we = np.append(we, w[i])
-                    delta_te = np.append(delta_te, delta_t[i])
+                xe = np.append(xe, x[i])
+                ye = np.append(ye, y[i])
+                ze = np.append(ze, z[i])
+                we = np.append(we, w[i])
+                delta_te = np.append(delta_te, delta_t[i])
 
-                    elect_pc.add_particles(
-                        x=xe + (dt - delta_te) * uxe,
-                        y=ye + (dt - delta_te) * uye,
-                        z=ze + (dt - delta_te) * uze,
-                        ux=uxe,
-                        uy=uye,
-                        uz=uze,
-                        w=we,
-                    )
-            buffer.clear_buffer()  # reinitialise the boundary buffer
+                elect_pc.add_particles(
+                    x=xe + (dt - delta_te) * uxe,
+                    y=ye + (dt - delta_te) * uye,
+                    z=ze + (dt - delta_te) * uze,
+                    ux=uxe,
+                    uy=uye,
+                    uz=uze,
+                    w=we,
+                )
+        buffer.clear_buffer()  # reinitialise the boundary buffer
 
 
 # using the new particle container modified at the last step
