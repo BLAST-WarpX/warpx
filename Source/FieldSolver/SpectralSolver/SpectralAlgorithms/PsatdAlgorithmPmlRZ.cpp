@@ -13,26 +13,24 @@
 
 #include <cmath>
 
-using amrex::operator""_rt;
-
+using namespace amrex::literals;
 
 /* \brief Initialize coefficients for the update equation */
 PsatdAlgorithmPmlRZ::PsatdAlgorithmPmlRZ (SpectralKSpaceRZ const & spectral_kspace,
                                           amrex::DistributionMapping const & dm,
                                           const SpectralFieldIndex& spectral_index,
-                                          int const n_rz_azimuthal_modes, int const norder_z,
-                                          short const grid_type, amrex::Real const dt)
-     // Initialize members of base class
-     : SpectralBaseAlgorithmRZ(spectral_kspace, dm, spectral_index, norder_z, grid_type),
-       m_spectral_index(spectral_index),
-       m_dt(dt)
+                                          int const n_rz_azimuthal_modes,
+                                          int const norder_z,
+                                          ablastr::utils::enums::GridType grid_type,
+                                          amrex::Real const dt):
+    // Initialize members of base class and member variables
+    SpectralBaseAlgorithmRZ{spectral_kspace, dm, spectral_index, norder_z, grid_type},
+    m_dt{dt}
 {
     // Allocate the arrays of coefficients
     amrex::BoxArray const & ba = spectral_kspace.spectralspace_ba;
     C_coef = SpectralRealCoefficients(ba, dm, n_rz_azimuthal_modes, 0);
     S_ck_coef = SpectralRealCoefficients(ba, dm, n_rz_azimuthal_modes, 0);
-
-    coefficients_initialized = false;
 }
 
 /* Advance the E and B field in spectral space (stored in `f`)
@@ -163,13 +161,13 @@ void PsatdAlgorithmPmlRZ::InitializeSpectralCoefficients (SpectralFieldDataRZ co
 void
 PsatdAlgorithmPmlRZ::CurrentCorrection (SpectralFieldDataRZ& /* field_data */)
 {
-    amrex::Abort(Utils::TextMsg::Err(
-        "Current correction not implemented in RZ geometry PML"));
+    WARPX_ABORT_WITH_MESSAGE(
+        "Current correction not implemented in RZ geometry PML");
 }
 
 void
 PsatdAlgorithmPmlRZ::VayDeposition (SpectralFieldDataRZ& /*field_data*/)
 {
-    amrex::Abort(Utils::TextMsg::Err(
-        "Vay deposition not implemented in RZ geometry PML"));
+    WARPX_ABORT_WITH_MESSAGE(
+        "Vay deposition not implemented in RZ geometry PML");
 }

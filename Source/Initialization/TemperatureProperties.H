@@ -6,8 +6,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef TEMPERATURE_PROPERTIES_H_
-#define TEMPERATURE_PROPERTIES_H_
+#ifndef WARPX_TEMPERATURE_PROPERTIES_H_
+#define WARPX_TEMPERATURE_PROPERTIES_H_
 
 #include <AMReX_ParmParse.H>
 #include <AMReX_Parser.H>
@@ -30,8 +30,9 @@ struct TemperatureProperties
      * information
      *
      * \param[in] pp: Reference to the parameter parser object for the species being initialized
+     * \param[in] source_name: Optional group name of the input parameters
      */
-    TemperatureProperties (amrex::ParmParse& pp);
+    TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name);
 
     /* Type of temperature initialization */
     TemperatureInitType m_type;
@@ -42,4 +43,4 @@ struct TemperatureProperties
     std::unique_ptr<amrex::Parser> m_ptr_temperature_parser;
 };
 
-#endif
+#endif //WARPX_TEMPERATURE_PROPERTIES_H_

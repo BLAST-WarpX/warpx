@@ -1,0 +1,30 @@
+max_step = 1
+amr.n_cell = 64 64
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 128
+boundary.field_lo = none periodic
+boundary.field_hi = pec periodic
+boundary.potential_lo_x = 0
+boundary.potential_hi_x = 0
+boundary.potential_lo_y = 0
+boundary.potential_hi_y = 0
+boundary.potential_lo_z = 0
+boundary.potential_hi_z = 0
+geometry.dims = RZ
+geometry.prob_lo     = 0.0 -0.5
+geometry.prob_hi     = 0.5  0.5
+warpx.const_dt = 1e-6
+
+warpx.do_electrostatic = labframe
+warpx.eb_implicit_function = "-(x**2-0.1**2)"
+warpx.eb_potential(x,y,z,t) = "1."
+warpx.self_fields_required_precision = 1.e-7
+warpx.abort_on_warning_threshold = medium
+
+algo.field_gathering = momentum-conserving
+
+diagnostics.diags_names = diag1
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.fields_to_plot = Er phi

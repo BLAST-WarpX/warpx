@@ -1,12 +1,17 @@
 # please set your project account
-#export proj=APH114-frontier
+export proj=""  # change me!
+
+# remembers the location of this script
+export MY_PROFILE=$(cd $(dirname $BASH_SOURCE) && pwd)"/"$(basename $BASH_SOURCE)
+if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your $MY_PROFILE file! Please edit its line 2 to continue!"; return; fi
 
 # required dependencies
-module load cmake/3.22.2
+module load cmake/3.27.9
 module load craype-accel-amd-gfx90a
-module load rocm/5.1.0
-module load cray-mpich
-module load cce/14.0.1  # must be loaded after rocm
+module load rocm/5.7.1
+module load cray-mpich/8.1.28
+module load cce/17.0.0  # must be loaded after rocm
+# https://docs.olcf.ornl.gov/systems/frontier_user_guide.html#compatible-compiler-rocm-toolchain-versions
 
 # optional: faster builds
 module load ccache
@@ -15,20 +20,26 @@ module load ninja
 # optional: just an additional text editor
 module load nano
 
-# optional: for PSATD in RZ geometry support (not yet available)
-#module load cray-libsci_acc/22.06.1.2
-#module load blaspp
-#module load lapackpp
+# optional: for PSATD in RZ geometry support
+export CMAKE_PREFIX_PATH=${HOME}/sw/frontier/gpu/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${HOME}/sw/frontier/gpu/lapackpp-2024.05.31:$CMAKE_PREFIX_PATH
+export LD_LIBRARY_PATH=${HOME}/sw/frontier/gpu/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${HOME}/sw/frontier/gpu/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
 
 # optional: for QED lookup table generation support
-module load boost/1.79.0-cxx17
+module load boost/1.85.0
 
 # optional: for openPMD support
-#module load adios2/2.7.1
-module load cray-hdf5-parallel/1.12.1.1
+module load adios2/2.10.0-mpi
+module load hdf5/1.14.3-mpi
 
 # optional: for Python bindings or libEnsemble
-module load cray-python/3.9.12.1
+module load cray-python/3.11.5
+
+if [ -d "${HOME}/sw/frontier/gpu/venvs/warpx-frontier" ]
+then
+  source ${HOME}/sw/frontier/gpu/venvs/warpx-frontier/bin/activate
+fi
 
 # fix system defaults: do not escape $ with a \ on tab completion
 shopt -s direxpand
@@ -38,21 +49,21 @@ umask 0027
 
 # an alias to request an interactive batch node for one hour
 #   for paralle execution, start on the batch node: srun <command>
-alias getNode="salloc -A $proj -J warpx -t 01:00:00 -p batch -N 1 --ntasks-per-node=8 --gpus-per-task=1 --gpu-bind=closest"
+alias getNode="salloc -A $proj -J warpx -t 01:00:00 -p batch -N 1"
 # an alias to run a command on a batch node for up to 30min
 #   usage: runNode <command>
-alias runNode="srun -A $proj -J warpx -t 00:30:00 -p batch -N 1 --ntasks-per-node=8 --gpus-per-task=1 --gpu-bind=closest"
+alias runNode="srun -A $proj -J warpx -t 00:30:00 -p batch -N 1"
 
 # GPU-aware MPI
 export MPICH_GPU_SUPPORT_ENABLED=1
 
-# optimize CUDA compilation for MI250X
+# optimize ROCm/HIP compilation for MI250X
 export AMREX_AMD_ARCH=gfx90a
 
 # compiler environment hints
-export CC=$(which cc)
-export CXX=$(which CC)
+export CC=$(which hipcc)
+export CXX=$(which hipcc)
 export FC=$(which ftn)
 export CFLAGS="-I${ROCM_PATH}/include"
 export CXXFLAGS="-I${ROCM_PATH}/include -Wno-pass-failed"
-export LDFLAGS="-L${ROCM_PATH}/lib -lamdhip64"
+export LDFLAGS="-L${ROCM_PATH}/lib -lamdhip64 ${PE_MPICH_GTL_DIR_amd_gfx90a} -lmpi_gtl_hsa"

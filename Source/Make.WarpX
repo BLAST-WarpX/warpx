@@ -76,7 +76,9 @@ include $(WARPX_HOME)/Source/BoundaryConditions/Make.package
 include $(WARPX_HOME)/Source/Diagnostics/Make.package
 include $(WARPX_HOME)/Source/EmbeddedBoundary/Make.package
 include $(WARPX_HOME)/Source/FieldSolver/Make.package
+include $(WARPX_HOME)/Source/NonlinearSolvers/Make.package
 include $(WARPX_HOME)/Source/Filter/Make.package
+include $(WARPX_HOME)/Source/Fluids/Make.package
 include $(WARPX_HOME)/Source/Initialization/Make.package
 include $(WARPX_HOME)/Source/Laser/Make.package
 include $(WARPX_HOME)/Source/Parallelization/Make.package
@@ -89,7 +91,7 @@ include $(AMREX_HOME)/Src/Base/Make.package
 include $(AMREX_HOME)/Src/Particle/Make.package
 include $(AMREX_HOME)/Src/Boundary/Make.package
 include $(AMREX_HOME)/Src/AmrCore/Make.package
-include $(AMREX_HOME)/Src/LinearSolvers/MLMG/Make.package
+include $(AMREX_HOME)/Src/LinearSolvers/Make.package
 
 ifeq ($(USE_SENSEI_INSITU),TRUE)
   include $(AMREX_HOME)/Src/Amr/Make.package
@@ -120,7 +122,7 @@ ifeq ($(QED),TRUE)
     CFLAGS   += -DWARPX_QED_TABLE_GEN
     FFLAGS   += -DWARPX_QED_TABLE_GEN
     F90FLAGS += -DWARPX_QED_TABLE_GEN
-     USERSuffix := $(USERSuffix).GENTABLES
+    USERSuffix := $(USERSuffix).GENTABLES
   endif
 endif
 
@@ -148,31 +150,31 @@ ifeq ($(USE_OPENBC_POISSON),TRUE)
 endif
 
 ifeq ($(USE_OPENPMD), TRUE)
-   # try pkg-config query
-   ifeq (0, $(shell pkg-config "openPMD >= 0.14.2"; echo $$?))
-       CXXFLAGS += $(shell pkg-config --cflags openPMD)
-       LIBRARY_LOCATIONS += $(shell pkg-config --variable=libdir openPMD)
-       libraries += $(shell pkg-config --libs-only-l openPMD)
-   # fallback to manual settings
-   else
-       OPENPMD_LIB_PATH ?= NOT_SET
-       ifneq ($(OPENPMD_LIB_PATH),NOT_SET)
-         LIBRARY_LOCATIONS += $(OPENPMD_LIB_PATH)
-       endif
-       OPENPMD_INCLUDE_PATH ?= NOT_SET
-       ifneq ($(OPENPMD_INCLUDE_PATH),NOT_SET)
-         INCLUDE_LOCATIONS += $(OPENPMD_INCLUDE_PATH)
-       endif
-       libraries += -lopenPMD
-   endif
-   DEFINES += -DWARPX_USE_OPENPMD
-   USERSuffix := $(USERSuffix).OPMD
+  # try pkg-config query
+  ifeq (0, $(shell pkg-config "openPMD >= 0.16.1"; echo $$?))
+    CXXFLAGS += $(shell pkg-config --cflags openPMD)
+    LIBRARY_LOCATIONS += $(shell pkg-config --variable=libdir openPMD)
+    libraries += $(shell pkg-config --libs-only-l openPMD)
+  # fallback to manual settings
+  else
+    OPENPMD_LIB_PATH ?= NOT_SET
+    ifneq ($(OPENPMD_LIB_PATH),NOT_SET)
+      LIBRARY_LOCATIONS += $(OPENPMD_LIB_PATH)
+    endif
+    OPENPMD_INCLUDE_PATH ?= NOT_SET
+    ifneq ($(OPENPMD_INCLUDE_PATH),NOT_SET)
+      INCLUDE_LOCATIONS += $(OPENPMD_INCLUDE_PATH)
+    endif
+    libraries += -lopenPMD
+  endif
+  DEFINES += -DWARPX_USE_OPENPMD
+  USERSuffix := $(USERSuffix).OPMD
 endif
 
 
-ifeq ($(USE_PSATD),TRUE)
+ifeq ($(USE_FFT),TRUE)
   USERSuffix := $(USERSuffix).PSATD
-  DEFINES += -DWARPX_USE_PSATD
+  DEFINES += -DWARPX_USE_FFT -DABLASTR_USE_FFT
   ifeq ($(USE_CUDA),TRUE)
     # Use cuFFT
     libraries += -lcufft
@@ -181,19 +183,21 @@ ifeq ($(USE_PSATD),TRUE)
     INCLUDE_LOCATIONS += $(ROC_PATH)/rocfft/include
     LIBRARY_LOCATIONS += $(ROC_PATH)/rocfft/lib
     libraries += -lrocfft
+  else ifeq ($(USE_SYCL),TRUE)
+    # nothing
   else # Running on CPU
-     # Use FFTW
-     ifeq ($(PRECISION),FLOAT)
-          libraries += -lfftw3f_mpi -lfftw3f -lfftw3f_threads
-     else
-          libraries += -lfftw3_mpi -lfftw3 -lfftw3_threads
-     endif
-     FFTW_HOME ?= NOT_SET
-     ifneq ($(FFTW_HOME),NOT_SET)
-       VPATH_LOCATIONS += $(FFTW_HOME)/include
-       INCLUDE_LOCATIONS += $(FFTW_HOME)/include
-       LIBRARY_LOCATIONS += $(FFTW_HOME)/lib
-     endif
+    # Use FFTW
+    ifeq ($(PRECISION),FLOAT)
+      libraries += -lfftw3f_mpi -lfftw3f -lfftw3f_threads
+    else
+      libraries += -lfftw3_mpi -lfftw3 -lfftw3_threads
+    endif
+    FFTW_HOME ?= NOT_SET
+    ifneq ($(FFTW_HOME),NOT_SET)
+      VPATH_LOCATIONS += $(FFTW_HOME)/include
+      INCLUDE_LOCATIONS += $(FFTW_HOME)/include
+      LIBRARY_LOCATIONS += $(FFTW_HOME)/lib
+    endif
   endif
   ifeq ($(USE_RZ),TRUE)
     # Use blas and lapack
@@ -206,16 +210,11 @@ ifeq ($(USE_PSATD),TRUE)
 endif
 
 ifeq ($(USE_RZ),TRUE)
-  USERSuffix := $(USERSuffix).RZ
+  USERSuffix := $(USERSuffix).rz
 endif
 
 ifeq ($(USE_HDF5),TRUE)
-    DEFINES += -DWARPX_USE_HDF5
-endif
-
-ifeq ($(USE_GPUCLOCK),TRUE)
-  USERSuffix := $(USERSuffix).GPUCLOCK
-  DEFINES += -DWARPX_USE_GPUCLOCK
+  DEFINES += -DWARPX_USE_HDF5
 endif
 
 # job_info support
@@ -292,6 +291,7 @@ AMReX_buildInfo.cpp:
           --link_flags "$(LDFLAGS)" --libraries "$(libraries)" \
           --GIT ". $(AMREX_HOME) $(PICSAR_HOME)"
 
+# Generate WarpXVersion.H
 vpath WarpXVersion.H $(srcTempDir)/Utils
 
 AUTO_BUILD_SOURCES += $(srcTempDir)/Utils/WarpXVersion.H
@@ -301,8 +301,34 @@ $(srcTempDir)/Utils/WarpXVersion.H:
 	@if [ ! -d $(srcTempDir)/Utils ]; then mkdir -p $(srcTempDir)/Utils; fi
 	@ $(MKVERSIONHEADER) --code="WARPX" --defines="$(WARPX_DEFINES)" > $@
 
+# Generate ablastr/export.H
+vpath export.H $(srcTempDir)/ablastr
+
+AUTO_BUILD_SOURCES += $(srcTempDir)/ablastr/export.H
+
+$(srcTempDir)/ablastr/export.H:
+	@echo Generating ablastr/export.H ...
+	@if [ ! -d $(srcTempDir)/ablastr ]; then mkdir -p $(srcTempDir)/ablastr; fi
+	@echo "#ifndef ABLASTR_EXPORT_H_" > $@
+	@echo "#define ABLASTR_EXPORT_H_" >> $@
+	@echo "#define ABLASTR_EXPORT" >> $@
+	@echo "#endif" >> $@
+
+# Generate Utils/export.H
+vpath export.H $(srcTempDir)/Utils
+
+AUTO_BUILD_SOURCES += $(srcTempDir)/Utils/export.H
+
+$(srcTempDir)/Utils/export.H:
+	@echo Generating Utils/export.H ...
+	@if [ ! -d $(srcTempDir)/Utils ]; then mkdir -p $(srcTempDir)/Utils; fi
+	@echo "#ifndef WARPX_EXPORT_H_" > $@
+	@echo "#define WARPX_EXPORT_H_" >> $@
+	@echo "#define WARPX_EXPORT" >> $@
+	@echo "#endif" >> $@
+
 cleanconfig::
-	$(SILENT) $(RM) -r $(srcTempDir)/Utils
+	$(SILENT) $(RM) -r $(srcTempDir)/Utils $(srcTempDir)/ablastr
 
 include $(AMREX_HOME)/Tools/GNUMake/Make.rules
 

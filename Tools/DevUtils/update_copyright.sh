@@ -102,10 +102,9 @@ do
         truncate -s 0 tmp.txt
     fi
     # Write copyright
-    echo "$pattern1 Copyright $year_string $authors_list
+    echo "$pattern1 This file is part of WarpX.
 $pattern2
-$pattern2 This file is part of WarpX.
-$pattern2
+$pattern2 Authors: $authors_list
 $pattern2 License: BSD-3-Clause-LBNL$pattern3" >> tmp.txt
     # If no shebang, put first line after Copyright
     if [ "${first_line:0:2}" != "#!" ]; then

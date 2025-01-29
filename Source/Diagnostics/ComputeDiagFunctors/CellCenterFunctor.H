@@ -8,8 +8,7 @@
 /**
  * \brief Functor to cell-center MF and store result in mf_out.
  */
-class
-CellCenterFunctor final : public ComputeDiagFunctor
+class CellCenterFunctor final : public ComputeDiagFunctor
 {
 public:
     /** Constructor.
@@ -22,8 +21,8 @@ public:
      *            sum all modes in mf_src before cell-centering into dst multifab.
      * \param[in] ncomp Number of component of mf_src to cell-center in dst multifab.
      */
-    CellCenterFunctor(const amrex::MultiFab * const mf_src, const int lev,
-                      const amrex::IntVect crse_ratio,
+    CellCenterFunctor(const amrex::MultiFab * mf_src, int lev,
+                      amrex::IntVect crse_ratio,
                       bool convertRZmodes2cartesian=true, int ncomp=1);
     /** \brief Cell-center m_mf_src and write the result in mf_dst.
      *
@@ -34,7 +33,7 @@ public:
      * \param[in] dcomp first component of mf_dst in which cell-centered
      *            data is stored
      */
-    virtual void operator()(amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer=0*/) const override;
+    void operator()(amrex::MultiFab& mf_dst, int dcomp, int /*i_buffer=0*/) const override;
 private:
     /** pointer to source multifab (can be multi-component) */
     amrex::MultiFab const * const m_mf_src = nullptr;

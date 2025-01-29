@@ -28,22 +28,27 @@ public:
 
     /** Flush fields and particles to plotfile */
     void WriteToFile (
-        const amrex::Vector<std::string> varnames,
+        const amrex::Vector<std::string>& varnames,
         const amrex::Vector<amrex::MultiFab>& mf,
         amrex::Vector<amrex::Geometry>& geom,
-        const amrex::Vector<int> iteration, const double time,
+        amrex::Vector<int> iteration, double time,
         const amrex::Vector<ParticleDiag>& particle_diags, int output_levels,
-        const std::string prefix, int file_min_digits,
+        std::string prefix, int file_min_digits,
         bool plot_raw_fields,
         bool plot_raw_fields_guards,
-        const bool use_pinned_pc = false,
+        int verbose,
+        bool use_pinned_pc = false,
         bool isBTD = false, int snapshotID = -1,
         int bufferID = 1, int numBuffers = 1,
         const amrex::Geometry& full_BTD_snapshot = amrex::Geometry(),
-        bool isLastBTDFlush = false,
-        const amrex::Vector<int>& totalParticlesFlushedAlready = amrex::Vector<int>() ) const override;
+        bool isLastBTDFlush = false) const override;
 
     ~FlushFormatOpenPMD () override = default;
+
+    FlushFormatOpenPMD ( FlushFormatOpenPMD const &)             = delete;
+    FlushFormatOpenPMD& operator= ( FlushFormatOpenPMD const & ) = delete;
+    FlushFormatOpenPMD ( FlushFormatOpenPMD&& )                  = default;
+    FlushFormatOpenPMD& operator= ( FlushFormatOpenPMD&& )       = default;
 
 private:
     /** This is responsible for dumping to file */

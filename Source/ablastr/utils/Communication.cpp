@@ -6,14 +6,20 @@
  */
 #include "Communication.H"
 
-#include <AMReX.H>
 #include <AMReX_BaseFab.H>
 #include <AMReX_BLProfiler.H>
 #include <AMReX_IntVect.H>
 #include <AMReX_FabArray.H>
+#include <AMReX_FabArrayUtility.H>
+#include <AMReX_FabFactory.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_iMultiFab.H>
+#include <AMReX_IndexType.H>
 #include <AMReX_ParmParse.H>
+
+#include <algorithm>
+#include <memory>
+#include <vector>
 
 
 namespace ablastr::utils::communication
@@ -72,9 +78,9 @@ void FillBoundary (amrex::MultiFab &mf,
 
     // allow developers to always enforce nodal sync, independent of the
     // nodal_sync argument
-    bool do_nodal_sync_arg = nodal_sync.value_or(false);
+    const bool do_nodal_sync_arg = nodal_sync.value_or(false);
 
-    amrex::ParmParse pp_ablastr("ablastr");
+    const amrex::ParmParse pp_ablastr("ablastr");
     bool do_nodal_sync_input = false;
     pp_ablastr.query("fillboundary_always_sync", do_nodal_sync_input);
 
@@ -108,18 +114,18 @@ void FillBoundary (amrex::MultiFab &mf,
     }
 }
 
-void FillBoundary (amrex::MultiFab &mf, bool do_single_precision_comms, const amrex::Periodicity &period)
+void FillBoundary (amrex::MultiFab &mf, bool do_single_precision_comms, const amrex::Periodicity &period, std::optional<bool> nodal_sync)
 {
     amrex::IntVect const ng = mf.n_grow;
-    FillBoundary(mf, ng, do_single_precision_comms, period);
+    FillBoundary(mf, ng, do_single_precision_comms, period, nodal_sync);
 }
 
 void
 FillBoundary (amrex::Vector<amrex::MultiFab *> const &mf, bool do_single_precision_comms,
-             const amrex::Periodicity &period)
+             const amrex::Periodicity &period, std::optional<bool> nodal_sync)
 {
-    for (auto x : mf) {
-        ablastr::utils::communication::FillBoundary(*x, do_single_precision_comms, period);
+    for (auto *x : mf) {
+        ablastr::utils::communication::FillBoundary(*x, do_single_precision_comms, period, nodal_sync);
     }
 }
 
@@ -137,56 +143,6 @@ void FillBoundary (amrex::iMultiFab&         imf,
     BL_PROFILE("ablastr::utils::communication::FillBoundary::iMultiFab");
 
     imf.FillBoundary(ng, period);
-}
-
-void SumBoundary (amrex::MultiFab &mf, bool do_single_precision_comms, const amrex::Periodicity &period)
-{
-    BL_PROFILE("ablastr::utils::communication::SumBoundary");
-
-    if (do_single_precision_comms)
-    {
-        amrex::FabArray<amrex::BaseFab<comm_float_type> > mf_tmp(mf.boxArray(),
-                                                                 mf.DistributionMap(),
-                                                                 mf.nComp(),
-                                                                 mf.nGrowVect());
-
-        mixedCopy(mf_tmp, mf, 0, 0, mf.nComp(), mf.nGrowVect());
-
-        mf_tmp.SumBoundary(period);
-
-        mixedCopy(mf, mf_tmp, 0, 0, mf.nComp(), mf.nGrowVect());
-    }
-    else
-    {
-        mf.SumBoundary(period);
-    }
-}
-
-void SumBoundary(amrex::MultiFab &mf,
-                 int start_comp,
-                 int num_comps,
-                 amrex::IntVect ng,
-                 bool do_single_precision_comms,
-                 const amrex::Periodicity &period)
-{
-    BL_PROFILE("ablastr::utils::communication::SumBoundary");
-
-    if (do_single_precision_comms)
-    {
-        amrex::FabArray<amrex::BaseFab<comm_float_type> > mf_tmp(mf.boxArray(),
-                                                                 mf.DistributionMap(),
-                                                                 num_comps,
-                                                                 ng);
-        mixedCopy(mf_tmp, mf, start_comp, 0, num_comps, ng);
-
-        mf_tmp.SumBoundary(0, num_comps, ng, period);
-
-        mixedCopy(mf, mf_tmp, 0, start_comp, num_comps, ng);
-    }
-    else
-    {
-        mf.SumBoundary(start_comp, num_comps, ng, period);
-    }
 }
 
 void
@@ -224,7 +180,7 @@ void OverrideSync (amrex::MultiFab &mf,
 {
     BL_PROFILE("ablastr::utils::communication::OverrideSync");
 
-    if (mf.ixType().cellCentered()) return;
+    if (mf.ixType().cellCentered()) { return; }
 
     if (do_single_precision_comms)
     {

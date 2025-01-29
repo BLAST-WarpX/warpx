@@ -17,10 +17,11 @@ WarpX::Version ()
 #ifdef WARPX_GIT_VERSION
     version = std::string(WARPX_GIT_VERSION);
 #endif
-    if( version.empty() )
-        return std::string("Unknown");
-    else
+    if( version.empty() ) {
+        return {"Unknown"};
+    } else {
         return version;
+    }
 }
 
 std::string
@@ -30,8 +31,9 @@ WarpX::PicsarVersion ()
 #ifdef PICSAR_GIT_VERSION
     version = std::string(PICSAR_GIT_VERSION);
 #endif
-    if( version.empty() )
-        return std::string("Unknown");
-    else
+    if( version.empty() ) {
+        return {"Unknown"};
+    } else {
         return version;
+    }
 }

@@ -53,11 +53,11 @@ Then, ``cd`` into the directory ``$HOME/src/warpx`` and use the following comman
    cd $HOME/src/warpx
    rm -rf build
 
-   cmake -S . -B build -DWarpX_COMPUTE=OMP
+   cmake -S . -B build -DWarpX_COMPUTE=OMP -DWarpX_DIMS="1;2;3"
    cmake --build build -j 10
 
    # or (currently better performance)
-   cmake -S . -B build -DWarpX_COMPUTE=NOACC
+   cmake -S . -B build -DWarpX_COMPUTE=NOACC -DWarpX_DIMS="1;2;3"
    cmake --build build -j 10
 
 The general :ref:`cmake compile-time options <building-cmake>` apply as usual.

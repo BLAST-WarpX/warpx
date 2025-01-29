@@ -13,9 +13,13 @@
 #include <AMReX_IntVect.H>
 #include <AMReX_MultiFab.H>
 
-DivEFunctor::DivEFunctor(const std::array<const amrex::MultiFab* const, 3> arr_mf_src, const int lev,
-                         const amrex::IntVect crse_ratio,
-                         bool convertRZmodes2cartesian, const int ncomp)
+DivEFunctor::DivEFunctor (
+    ablastr::fields::VectorField const & arr_mf_src,
+    const int lev,
+    const amrex::IntVect crse_ratio,
+    bool convertRZmodes2cartesian,
+    const int ncomp
+)
     : ComputeDiagFunctor(ncomp, crse_ratio), m_arr_mf_src(arr_mf_src), m_lev(lev),
       m_convertRZmodes2cartesian(convertRZmodes2cartesian)
 {
@@ -30,16 +34,20 @@ DivEFunctor::operator()(amrex::MultiFab& mf_dst, const int dcomp, const int /*i_
     // output Multifab, mf_dst, the guard-cell data is not needed especially considering
     // the operations performend in the CoarsenAndInterpolate function.
     constexpr int ng = 1;
+
+#ifndef WARPX_DIM_RZ
     // For staggered and nodal calculations, divE is computed on the nodes.
     // The temporary divE MultiFab is generated to comply with the location of divE.
-    amrex::IntVect cell_type = amrex::IntVect::TheNodeVector();
-#ifdef WARPX_DIM_RZ
-    // For RZ spectral, all quantities are cell centered.
-    if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD)
-        cell_type = amrex::IntVect::TheCellVector();
+    const auto cell_type = amrex::IntVect::TheNodeVector();
+#else
+    // For RZ spectral, all quantities are cell centered
+    const auto cell_type =
+        (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD)?
+        amrex::IntVect::TheCellVector():amrex::IntVect::TheNodeVector();
 #endif
+
     const amrex::BoxArray& ba = amrex::convert(warpx.boxArray(m_lev), cell_type);
-    amrex::MultiFab divE(ba, warpx.DistributionMap(m_lev), warpx.ncomps, ng );
+    amrex::MultiFab divE(ba, warpx.DistributionMap(m_lev), WarpX::ncomps, ng );
     warpx.ComputeDivE(divE, m_lev);
 
 #ifdef WARPX_DIM_RZ

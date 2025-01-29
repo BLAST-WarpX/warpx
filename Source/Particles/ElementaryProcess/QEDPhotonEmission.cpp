@@ -27,15 +27,26 @@ PhotonEmissionTransformFunc (QuantumSynchrotronGetOpticalDepth opt_depth_functor
                              amrex::FArrayBox const& bxfab,
                              amrex::FArrayBox const& byfab,
                              amrex::FArrayBox const& bzfab,
-                             int a_offset)
-:m_opt_depth_functor{opt_depth_functor},
- m_opt_depth_runtime_comp{opt_depth_runtime_comp},
- m_emission_functor{emission_functor}
+                             amrex::Vector<amrex::ParticleReal>& E_external_particle,
+                             amrex::Vector<amrex::ParticleReal>& B_external_particle,
+                             int a_offset):
+    m_opt_depth_functor{opt_depth_functor},
+    m_opt_depth_runtime_comp{opt_depth_runtime_comp},
+    m_emission_functor{emission_functor},
+    m_Ex_external_particle{E_external_particle[0]},
+    m_Ey_external_particle{E_external_particle[1]},
+    m_Ez_external_particle{E_external_particle[2]},
+    m_Bx_external_particle{B_external_particle[0]},
+    m_By_external_particle{B_external_particle[1]},
+    m_Bz_external_particle{B_external_particle[2]},
+    m_galerkin_interpolation{WarpX::galerkin_interpolation},
+    m_nox{WarpX::nox},
+    m_n_rz_azimuthal_modes{WarpX::n_rz_azimuthal_modes}
 {
 
     using namespace amrex::literals;
 
-    m_get_position  = GetParticlePosition(a_pti, a_offset);
+    m_get_position  = GetParticlePosition<PIdx>(a_pti, a_offset);
     m_get_externalEB = GetExternalEBField(a_pti, a_offset);
 
     m_ex_arr = exfab.array();
@@ -56,15 +67,10 @@ PhotonEmissionTransformFunc (QuantumSynchrotronGetOpticalDepth opt_depth_functor
     box.grow(ngEB);
 
     const std::array<amrex::Real,3>& dx = WarpX::CellSize(std::max(lev, 0));
-    m_dx_arr = {dx[0], dx[1], dx[2]};
+    m_dinv = amrex::XDim3{1._rt/dx[0], 1._rt/dx[1], 1._rt/dx[2]};
 
     // Lower corner of tile box physical domain (take into account Galilean shift)
-    const std::array<amrex::Real, 3>& xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
-    m_xyzmin_arr = {xyzmin[0], xyzmin[1], xyzmin[2]};
-
-    m_galerkin_interpolation = WarpX::galerkin_interpolation;
-    m_nox = WarpX::nox;
-    m_n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
+    m_xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
 
     m_lo = amrex::lbound(box);
 }

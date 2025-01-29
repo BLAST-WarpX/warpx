@@ -7,7 +7,6 @@
  */
 #include "InjectorDensity.H"
 
-#include "Initialization/CustomDensityProb.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 
@@ -28,11 +27,6 @@ void InjectorDensity::clear ()
     {
         break;
     }
-    case Type::custom:
-    {
-        object.custom.clear();
-        break;
-    }
     case Type::predefined:
     {
         object.predefined.clear();
@@ -45,9 +39,8 @@ void InjectorDensity::clear ()
 
 InjectorDensityPredefined::InjectorDensityPredefined (
     std::string const& a_species_name) noexcept
-    : profile(Profile::null)
 {
-    ParmParse pp_species_name(a_species_name);
+    const ParmParse pp_species_name(a_species_name);
 
     std::vector<amrex::Real> v;
     // Read parameters for the predefined plasma profile.

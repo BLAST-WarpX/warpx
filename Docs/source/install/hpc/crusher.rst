@@ -4,7 +4,8 @@ Crusher (OLCF)
 ==============
 
 The `Crusher cluster <https://docs.olcf.ornl.gov/systems/crusher_quick_start_guide.html>`_ is located at OLCF.
-Each node contains 4 AMD MI250X GPUs, each with 2 Graphics Compute Dies (GCDs) for a total of 8 GCDs per node.
+
+On Crusher, each compute node provides four AMD MI250X GPUs, each with two Graphics Compute Dies (GCDs) for a total of 8 GCDs per node.
 You can think of the 8 GCDs as 8 separate GPUs, each having 64 GB of high-bandwidth memory (HBM2E).
 
 
@@ -17,65 +18,134 @@ If you are new to this system, **please see the following resources**:
 * Batch system: `Slurm <https://docs.olcf.ornl.gov/systems/crusher_quick_start_guide.html#running-jobs>`_
 * `Production directories <https://docs.olcf.ornl.gov/data/index.html#data-storage-and-transfers>`_:
 
-  * ``$PROJWORK/$proj/``: shared with all members of a project, purged every 90 days (recommended)
-  * ``$MEMBERWORK/$proj/``: single user, purged every 90 days (usually smaller quota)
-  * ``$WORLDWORK/$proj/``: shared with all users, purged every 90 days
-  * Note that the ``$HOME`` directory is mounted as read-only on compute nodes.
-    That means you cannot run in your ``$HOME``.
+  * ``$HOME``: per-user directory, use only for inputs, source and scripts; backed up; mounted as read-only on compute nodes, that means you cannot run in it (50 GB quota)
+  * ``$PROJWORK/$proj/``: shared with all members of a project, purged every 90 days, Lustre (recommended)
+  * ``$MEMBERWORK/$proj/``: single user, purged every 90 days, Lustre (usually smaller quota, 50TB default quota)
+  * ``$WORLDWORK/$proj/``: shared with all users, purged every 90 days, Lustre (50TB default quota)
+
+Note: the Orion Lustre filesystem on Frontier and Crusher, and the older Alpine GPFS filesystem on Summit are not mounted on each others machines.
+Use `Globus <https://www.globus.org>`__ to transfer data between them if needed.
 
 
-Installation
-------------
+.. _building-crusher-preparation:
 
-Use the following commands to download the WarpX source code and switch to the correct branch:
+Preparation
+-----------
+
+Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
    git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
 
-We use the following modules and environments on the system (``$HOME/crusher_warpx.profile``).
-
-.. literalinclude:: ../../../../Tools/machines/crusher-olcf/crusher_warpx.profile.example
-   :language: bash
-   :caption: You can copy this file from ``Tools/machines/crusher-olcf/crusher_warpx.profile.example``.
-
-We recommend to store the above lines in a file, such as ``$HOME/crusher_warpx.profile``, and load it into your shell after a login:
+We use system software modules, add environment hints and further dependencies via the file ``$HOME/crusher_warpx.profile``.
+Create it now:
 
 .. code-block:: bash
 
-   source $HOME/crusher_warpx.profile
+   cp $HOME/src/warpx/Tools/machines/crusher-olcf/crusher_warpx.profile.example $HOME/crusher_warpx.profile
 
-And since Crusher does not yet provide a module for them, install BLAS++ and LAPACK++:
+.. dropdown:: Script Details
+   :color: light
+   :icon: info
+   :animate: fade-in-slide-down
+
+   .. literalinclude:: ../../../../Tools/machines/crusher-olcf/crusher_warpx.profile.example
+      :language: bash
+
+Edit the 2nd line of this script, which sets the ``export proj=""`` variable.
+For example, if you are member of the project ``aph114``, then run ``vi $HOME/crusher_warpx.profile``.
+Enter the edit mode by typing ``i`` and edit line 2 to read:
 
 .. code-block:: bash
 
-   # BLAS++ (for PSATD+RZ)
-   git clone https://github.com/icl-utk-edu/blaspp.git src/blaspp
-   rm -rf src/blaspp-crusher-build
-   cmake -S src/blaspp -B src/blaspp-crusher-build -Duse_openmp=OFF -Dgpu_backend=hip -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=$HOME/sw/crusher/blaspp-master
-   cmake --build src/blaspp-crusher-build --target install --parallel 10
+   export proj="aph114"
 
-   # LAPACK++ (for PSATD+RZ)
-   git clone https://github.com/icl-utk-edu/lapackpp.git src/lapackpp
-   rm -rf src/lapackpp-crusher-build
-   cmake -S src/lapackpp -B src/lapackpp-crusher-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=$HOME/sw/crusher/lapackpp-master
-   cmake --build src/lapackpp-crusher-build --target install --parallel 10
+Exit the ``vi`` editor with ``Esc`` and then type ``:wq`` (write & quit).
 
-Then, ``cd`` into the directory ``$HOME/src/warpx`` and use the following commands to compile:
+.. important::
+
+   Now, and as the first step on future logins to Crusher, activate these environment settings:
+
+   .. code-block:: bash
+
+      source $HOME/crusher_warpx.profile
+
+Finally, since Crusher does not yet provide software modules for some of our dependencies, install them once:
+
+.. code-block:: bash
+
+   bash $HOME/src/warpx/Tools/machines/crusher-olcf/install_dependencies.sh
+   source $HOME/sw/crusher/gpu/venvs/warpx-crusher/bin/activate
+
+.. dropdown:: Script Details
+   :color: light
+   :icon: info
+   :animate: fade-in-slide-down
+
+   .. literalinclude:: ../../../../Tools/machines/crusher-olcf/install_dependencies.sh
+      :language: bash
+
+
+.. _building-crusher-compilation:
+
+Compilation
+-----------
+
+Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
 
 .. code-block:: bash
 
    cd $HOME/src/warpx
-   rm -rf build
+   rm -rf build_crusher
 
-   cmake -S . -B build -DWarpX_DIMS=3 -DWarpX_COMPUTE=HIP -DWarpX_PSATD=ON
-   cmake --build build -j 10
+   cmake -S . -B build_crusher -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake --build build_crusher -j 16
 
-The general :ref:`cmake compile-time options <building-cmake>` apply as usual.
+The WarpX application executables are now in ``$HOME/src/warpx/build_crusher/bin/``.
+Additionally, the following commands will install WarpX as a Python module:
 
-**That's it!**
-A 3D WarpX executable is now in ``build/bin/`` and :ref:`can be run <running-cpp-crusher-MI100-GPUs>` with a :ref:`3D example inputs file <usage-examples>`.
-Most people execute the binary directly or copy it out to a location in ``$PROJWORK/$proj/``.
+.. code-block:: bash
+
+   rm -rf build_crusher_py
+
+   cmake -S . -B build_crusher_py -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake --build build_crusher_py -j 16 --target pip_install
+
+Now, you can :ref:`submit Crusher compute jobs <running-cpp-crusher>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).
+Or, you can use the WarpX executables to submit Crusher jobs (:ref:`example inputs <usage-examples>`).
+For executables, you can reference their location in your :ref:`job script <running-cpp-crusher>` or copy them to a location in ``$PROJWORK/$proj/``.
+
+
+.. _building-crusher-update:
+
+Update WarpX & Dependencies
+---------------------------
+
+If you already installed WarpX in the past and want to update it, start by getting the latest source code:
+
+.. code-block:: bash
+
+   cd $HOME/src/warpx
+
+   # read the output of this command - does it look ok?
+   git status
+
+   # get the latest WarpX source code
+   git fetch
+   git pull
+
+   # read the output of these commands - do they look ok?
+   git status
+   git log     # press q to exit
+
+And, if needed,
+
+- :ref:`update the crusher_warpx.profile file <building-crusher-preparation>`,
+- log out and into the system, activate the now updated environment profile as usual,
+- :ref:`execute the dependency install scripts <building-crusher-preparation>`.
+
+As a last step, clean the build directory ``rm -rf $HOME/src/warpx/build_crusher`` and rebuild WarpX.
 
 
 .. _running-cpp-crusher:
@@ -83,12 +153,10 @@ Most people execute the binary directly or copy it out to a location in ``$PROJW
 Running
 -------
 
-.. _running-cpp-crusher-MI100-GPUs:
+.. _running-cpp-crusher-MI250X-GPUs:
 
 MI250X GPUs (2x64 GB)
 ^^^^^^^^^^^^^^^^^^^^^
-
-ECP WarpX project members, use the ``aph114`` project ID.
 
 After requesting an interactive node with the ``getNode`` alias above, run a simulation like this, here using 8 MPI ranks and a single node:
 
@@ -100,7 +168,7 @@ Or in non-interactive runs:
 
 .. literalinclude:: ../../../../Tools/machines/crusher-olcf/submit.sh
    :language: bash
-   :caption: You can copy this file from ``Tools/machines/crusher-olcf/submit.sh``.
+   :caption: You can copy this file from ``$HOME/src/warpx/Tools/machines/crusher-olcf/submit.sh``.
 
 
 .. _post-processing-crusher:
@@ -117,33 +185,6 @@ Please follow the same guidance as for :ref:`OLCF Summit post-processing <post-p
 Known System Issues
 -------------------
 
-.. warning::
+.. note::
 
-   May 16th, 2022 (OLCFHELP-6888):
-   There is a caching bug in Libfrabric that causes WarpX simulations to occasionally hang on Crusher on more than 1 node.
-
-   As a work-around, please export the following environment variable in your job scripts until the issue is fixed:
-
-   .. code-block:: bash
-
-      #export FI_MR_CACHE_MAX_COUNT=0  # libfabric disable caching
-      # or, less invasive:
-      export FI_MR_CACHE_MONITOR=memhooks  # alternative cache monitor
-
-.. warning::
-
-   Sep 2nd, 2022 (OLCFDEV-1079):
-   rocFFT in ROCm 5.1+ tries to `write to a cache <https://rocfft.readthedocs.io/en/latest/library.html#runtime-compilation>`__ in the home area by default.
-   This does not scale, disable it via:
-
-   .. code-block:: bash
-
-      export ROCFFT_RTC_CACHE_PATH=/dev/null
-
-.. warning::
-
-   January, 2023 (OLCFDEV-1284, AMD Ticket: ORNLA-130):
-   We discovered a regression in AMD ROCm, leading to 2x slower current deposition (and other slowdowns) in ROCm 5.3 and 5.4.
-   Reported to AMD and investigating.
-
-   Stay with the ROCm 5.2 module to avoid.
+    Please see the :ref:`Frontier Known System Issues <known-frontier-issues>` due to the similarity of the two systems.

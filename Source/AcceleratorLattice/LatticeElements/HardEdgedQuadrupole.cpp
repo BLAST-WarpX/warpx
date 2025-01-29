@@ -5,8 +5,7 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "HardEdgedQuadrupole.H"
-#include "Utils/WarpXUtil.H"
-#include "Utils/TextMsg.H"
+#include "Utils/Parser/ParserUtils.H"
 
 #include <AMReX_ParmParse.H>
 #include <AMReX_REAL.H>
@@ -27,8 +26,8 @@ HardEdgedQuadrupole::AddElement (amrex::ParmParse & pp_element, amrex::ParticleR
 
     amrex::ParticleReal dEdx = 0._prt;
     amrex::ParticleReal dBdx = 0._prt;
-    pp_element.query("dEdx", dEdx);
-    pp_element.query("dBdx", dBdx);
+    utils::parser::queryWithParser(pp_element, "dEdx", dEdx);
+    utils::parser::queryWithParser(pp_element, "dBdx", dBdx);
 
     h_dEdx.push_back(dEdx);
     h_dBdx.push_back(dBdx);
@@ -59,7 +58,7 @@ HardEdgedQuadrupoleDevice::InitHardEdgedQuadrupoleDevice (HardEdgedQuadrupole co
 
     nelements = h_quad.nelements;
 
-    if (nelements == 0) return;
+    if (nelements == 0) { return; }
 
     d_zs_arr = h_quad.d_zs.data();
     d_ze_arr = h_quad.d_ze.data();

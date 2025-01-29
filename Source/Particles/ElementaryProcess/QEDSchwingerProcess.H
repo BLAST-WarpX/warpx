@@ -5,10 +5,11 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef QED_SCHWINGER_PROCESS_H_
-#define QED_SCHWINGER_PROCESS_H_
+#ifndef WARPX_QED_SCHWINGER_PROCESS_H_
+#define WARPX_QED_SCHWINGER_PROCESS_H_
 
 #include "Particles/ElementaryProcess/QEDInternals/SchwingerProcessWrapper.H"
+#include "Utils/TextMsg.H"
 
 /**
  * This structure is a functor which calls getSchwingerProductionNumber to
@@ -94,4 +95,4 @@ struct SchwingerTransformFunc
     }
 };
 
-#endif // QED_SCHWINGER_PROCESS_H_
+#endif // WARPX_QED_SCHWINGER_PROCESS_H_

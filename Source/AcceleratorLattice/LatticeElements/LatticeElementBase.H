@@ -25,8 +25,6 @@ struct LatticeElementBase
      */
     LatticeElementBase (std::string const& element_name);
 
-    ~LatticeElementBase () = default;
-
     /**
      * \brief Read in an element base data and add it to the lists
      *

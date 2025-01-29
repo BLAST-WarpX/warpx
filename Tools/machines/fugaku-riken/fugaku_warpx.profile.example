@@ -1,0 +1,31 @@
+. /vol0004/apps/oss/spack/share/spack/setup-env.sh
+
+# required dependencies
+spack load cmake@3.24.3%fj@4.10.0 arch=linux-rhel8-a64fx
+
+# avoid harmless warning messages "[WARN] xos LPG [...]"
+export LD_LIBRARY_PATH=/lib64:$LD_LIBRARY_PATH
+
+# optional: faster builds
+spack load ninja@1.11.1%fj@4.10.0
+
+# optional: for PSATD
+spack load fujitsu-fftw@1.1.0%fj@4.10.0
+
+# optional: for QED lookup table generation support
+spack load boost@1.80.0%fj@4.8.1/zc5pwgc
+
+# optional: for openPMD support
+spack load hdf5@1.12.2%fj@4.8.1/im6lxev
+export CMAKE_PREFIX_PATH=${HOME}/sw/fugaku/a64fx/c-blosc-1.21.1-install:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${HOME}/sw/fugaku/a64fx/adios2-2.8.3-install:$CMAKE_PREFIX_PATH
+
+# compiler environment hints
+export CC=$(which mpifcc)
+export CXX=$(which mpiFCC)
+export FC=$(which mpifrt)
+export CFLAGS="-O3 -Nclang -Nlibomp -Klib -g -DNDEBUG"
+export CXXFLAGS="-O3 -Nclang -Nlibomp -Klib -g -DNDEBUG"
+
+# avoid harmless warning messages "[WARN] xos LPG [...]"
+export LD_LIBRARY_PATH=/lib64:$LD_LIBRARY_PATH

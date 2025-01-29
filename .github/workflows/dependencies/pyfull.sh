@@ -16,7 +16,6 @@ sudo apt-get -qqq update
 sudo apt-get install -y \
     build-essential     \
     ca-certificates     \
-    ccache              \
     clang               \
     cmake               \
     gnupg               \
@@ -34,6 +33,9 @@ sudo apt-get install -y \
     python3-pip         \
     python3-setuptools  \
     wget
+
+# ccache
+$(dirname "$0")/ccache.sh
 
 # cmake-easyinstall
 #

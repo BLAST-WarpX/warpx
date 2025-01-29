@@ -1,0 +1,83 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 500
+amr.n_cell =  8 8
+amr.max_level = 0
+geometry.dims = 2
+
+warpx.do_electrostatic = labframe
+algo.field_gathering = energy-conserving
+algo.particle_shape = 2
+warpx.use_filter = 0
+
+#################################
+############ CONSTANTS #############
+#################################
+my_constants.n0 = 1.e30          # plasma density, m^-3
+my_constants.Ti = 100.           # ion temperature, eV
+my_constants.Te = 100.           # electron temperature, eV
+my_constants.wpe = q_e*sqrt(n0/(m_e*epsilon0))  # electron plasma frequency, radians/s
+my_constants.de0 = clight/wpe    # skin depth, m
+my_constants.dt = ( 0.2 )/wpe        # time step size, s
+warpx.const_dt = dt
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+geometry.dims = 2
+geometry.prob_lo = 0.0 0.0
+geometry.prob_hi = 10.*de0 10.*de0
+warpx.serialize_initial_conditions = 1
+warpx.verbose = 1
+
+#################################
+###### BOUNDARY CONDITIONS ######
+#################################
+boundary.field_lo = periodic periodic
+boundary.field_hi = periodic periodic
+boundary.particle_lo = periodic periodic
+boundary.particle_hi = periodic periodic
+
+#################################
+############ PLASMA #############
+#################################
+particles.species_names = electrons protons
+
+electrons.species_type = electron
+electrons.injection_style = "NUniformPerCell"
+electrons.num_particles_per_cell_each_dim = 2 2
+electrons.profile = constant
+electrons.density = n0
+electrons.momentum_distribution_type = gaussian
+electrons.ux_th = sqrt(Te*q_e/m_e)/clight
+electrons.uy_th = sqrt(Te*q_e/m_e)/clight
+electrons.uz_th = sqrt(Te*q_e/m_e)/clight
+electrons.xmin = 0
+electrons.xmax = 10.*de0
+electrons.zmin =  0
+electrons.zmax =10.*de0
+
+protons.species_type = proton
+protons.injection_style = "NUniformPerCell"
+protons.num_particles_per_cell_each_dim = 2 2
+protons.profile = constant
+protons.density = n0
+protons.momentum_distribution_type = gaussian
+protons.ux_th = sqrt(Ti*q_e/m_p)/clight
+protons.uy_th = sqrt(Ti*q_e/m_p)/clight
+protons.uz_th = sqrt(Ti*q_e/m_p)/clight
+protons.xmin = 0
+protons.xmax = 10.*de0
+protons.zmin =  0
+protons.zmax =10.*de0
+
+diagnostics.diags_names = diag1
+diag1.intervals = 500
+diag1.diag_type = Full
+
+warpx.reduced_diags_names = EP EF
+EP.type = ParticleEnergy
+EP.intervals = 100
+EF.type = FieldEnergy
+EF.intervals =100

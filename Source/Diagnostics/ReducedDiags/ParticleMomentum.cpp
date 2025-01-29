@@ -32,7 +32,7 @@
 
 using namespace amrex;
 
-ParticleMomentum::ParticleMomentum (std::string rd_name)
+ParticleMomentum::ParticleMomentum (const std::string& rd_name)
     : ReducedDiags{rd_name}
 {
     // Get a reference to WarpX instance
@@ -52,7 +52,7 @@ ParticleMomentum::ParticleMomentum (std::string rd_name)
 
     if (ParallelDescriptor::IOProcessor())
     {
-        if (m_IsNotRestart)
+        if (m_write_header)
         {
             // Open file
             std::ofstream ofs{m_path + m_rd_name + "." + m_extension, std::ofstream::out};
@@ -107,7 +107,7 @@ ParticleMomentum::ParticleMomentum (std::string rd_name)
                 ofs << species_names[i] + "_mean_z(kg*m/s)";
             }
 
-            ofs << std::endl;
+            ofs << "\n";
             ofs.close();
         }
     }
@@ -116,19 +116,13 @@ ParticleMomentum::ParticleMomentum (std::string rd_name)
 void ParticleMomentum::ComputeDiags (int step)
 {
     // Check if the diags should be done
-    if (m_intervals.contains(step+1) == false)
-    {
-        return;
-    }
+    if (!m_intervals.contains(step+1)) { return; }
 
     // Get MultiParticleContainer class object
     const auto & mypc = WarpX::GetInstance().GetPartContainer();
 
     // Get number of species
     const int nSpecies = mypc.nSpecies();
-
-    // Some useful offsets to fill m_data below
-    int offset_total_species, offset_mean_species, offset_mean_all;
 
     amrex::Real Wtot = 0.0_rt;
 
@@ -167,10 +161,7 @@ void ParticleMomentum::ComputeDiags (int step)
         amrex::Real Ws = amrex::get<3>(r);
 
         // Reduced sum over MPI ranks
-        ParallelDescriptor::ReduceRealSum(Px, ParallelDescriptor::IOProcessorNumber());
-        ParallelDescriptor::ReduceRealSum(Py, ParallelDescriptor::IOProcessorNumber());
-        ParallelDescriptor::ReduceRealSum(Pz, ParallelDescriptor::IOProcessorNumber());
-        ParallelDescriptor::ReduceRealSum(Ws, ParallelDescriptor::IOProcessorNumber());
+        ParallelDescriptor::ReduceRealSum({Px,Py,Pz,Ws}, ParallelDescriptor::IOProcessorNumber());
 
         // Accumulate sum of weights over all species (must come after MPI reduction of Ws)
         Wtot += Ws;
@@ -180,7 +171,7 @@ void ParticleMomentum::ComputeDiags (int step)
         // Offset:
         // 3 values of total momentum for all  species +
         // 3 values of total momentum for each species
-        offset_total_species = 3 + i_s*3;
+        const int offset_total_species = 3 + i_s*3;
         m_data[offset_total_species+0] = Px;
         m_data[offset_total_species+1] = Py;
         m_data[offset_total_species+2] = Pz;
@@ -190,7 +181,7 @@ void ParticleMomentum::ComputeDiags (int step)
         // 3 values of total momentum for each species +
         // 3 values of mean  momentum for all  species +
         // 3 values of mean  momentum for each species
-        offset_mean_species = 3 + nSpecies*3 + 3 + i_s*3;
+        const int offset_mean_species = 3 + nSpecies*3 + 3 + i_s*3;
         if (Ws > std::numeric_limits<Real>::min())
         {
             m_data[offset_mean_species+0] = Px / Ws;
@@ -216,7 +207,7 @@ void ParticleMomentum::ComputeDiags (int step)
         // Offset:
         // 3 values of total momentum for all  species +
         // 3 values of total momentum for each species
-        offset_total_species = 3 + i_s*3;
+        const int offset_total_species = 3 + i_s*3;
         m_data[0] += m_data[offset_total_species+0];
         m_data[1] += m_data[offset_total_species+1];
         m_data[2] += m_data[offset_total_species+2];
@@ -225,7 +216,7 @@ void ParticleMomentum::ComputeDiags (int step)
     // Total mean momentum. Offset:
     // 3 values of total momentum for all  species +
     // 3 values of total momentum for each species
-    offset_mean_all = 3 + nSpecies*3;
+    const int offset_mean_all = 3 + nSpecies*3;
     if (Wtot > std::numeric_limits<Real>::min())
     {
         m_data[offset_mean_all+0] = m_data[0] / Wtot;

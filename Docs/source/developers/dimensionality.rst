@@ -17,6 +17,8 @@ Dimensions  CMake Option
 **RZ**      ``WarpX_DIMS=RZ``
 ==========  ==========================
 
+Note that one can :ref:`build multiple WarpX dimensions at once <building-cmake-options>` via ``-DWarpX_DIMS="1;2;RZ;3"``.
+
 See :ref:`building from source <install-developers>` for further details.
 
 Defines
@@ -47,12 +49,12 @@ WarpX axis labels     ``x, y, z``   ``x, z``    ``z``        ``x, z``
 --------------------  -----------  -----------  -----------  -----------
 *Particles*
 ------------------------------------------------------------------------
-AMReX AoS ``.pos()``  ``0, 1, 2``  ``0, 1``     ``0``        ``0, 1``
+AMReX ``.pos()``      ``0, 1, 2``  ``0, 1``     ``0``        ``0, 1``
 WarpX position names  ``x, y, z``  ``x, z``     ``z``        ``r, z``
 extra SoA attribute                                          ``theta``
 ====================  ===========  ===========  ===========  ===========
 
-Please see the following sections for particle AoS and SoA details.
+Please see the following sections for particle SoA details.
 
 Conventions
 -----------

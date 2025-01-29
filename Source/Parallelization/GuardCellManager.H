@@ -4,8 +4,11 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef GUARDCELLMANAGER_H_
-#define GUARDCELLMANAGER_H_
+#ifndef WARPX_GUARDCELLMANAGER_H_
+#define WARPX_GUARDCELLMANAGER_H_
+
+#include <Utils/WarpXAlgorithmSelection.H>
+#include <ablastr/utils/Enums.H>
 
 #include <AMReX_Array.H>
 #include <AMReX_IntVect.H>
@@ -51,28 +54,28 @@ public:
      * \param bilinear_filter_stencil_length the size of the stencil for filtering
      */
     void Init(
-        const amrex::Real dt,
-        const amrex::RealVect dx,
-        const bool do_subcycling,
-        const bool do_fdtd_nci_corr,
-        const short grid_type,
-        const bool do_moving_window,
-        const int moving_window_dir,
-        const int nox,
-        const int nox_fft, const int noy_fft, const int noz_fft,
-        const int nci_corr_stencil,
-        const int electromagnetic_solver_id,
-        const int max_level,
-        const amrex::Vector<amrex::Real> v_galilean,
-        const amrex::Vector<amrex::Real> v_comoving,
-        const bool safe_guard_cells,
-        const int do_multi_J,
-        const bool fft_do_time_averaging,
-        const bool do_pml,
-        const int do_pml_in_domain,
-        const int pml_ncell,
+        amrex::Real dt,
+        const amrex::Real * dx,
+        bool do_subcycling,
+        bool do_fdtd_nci_corr,
+        ablastr::utils::enums::GridType grid_type,
+        bool do_moving_window,
+        int moving_window_dir,
+        int nox,
+        int nox_fft, int noy_fft, int noz_fft,
+        int nci_corr_stencil,
+        ElectromagneticSolverAlgo electromagnetic_solver_id,
+        int max_level,
+        const amrex::Vector<amrex::Real>& v_galilean,
+        const amrex::Vector<amrex::Real>& v_comoving,
+        bool safe_guard_cells,
+        int do_multi_J,
+        bool fft_do_time_averaging,
+        bool do_pml,
+        int do_pml_in_domain,
+        int pml_ncell,
         const amrex::Vector<amrex::IntVect>& ref_ratios,
-        const bool use_filter,
+        bool use_filter,
         const amrex::IntVect& bilinear_filter_stencil_length);
 
     // Guard cells allocated for MultiFabs E and B
@@ -100,7 +103,7 @@ public:
     amrex::IntVect ng_UpdateAux = amrex::IntVect::TheZeroVector();
     // Number of guard cells of all MultiFabs that must exchanged before moving window
     amrex::IntVect ng_MovingWindow = amrex::IntVect::TheZeroVector();
-    // Number of guard cells of E and B that are exchanged immediatly after the main PSATD push
+    // Number of guard cells of E and B that are exchanged immediately after the main PSATD push
     amrex::IntVect ng_afterPushPSATD = amrex::IntVect::TheZeroVector();
 
     // Number of guard cells for local deposition of J and rho
@@ -108,4 +111,4 @@ public:
     amrex::IntVect ng_depos_rho = amrex::IntVect::TheZeroVector();
 };
 
-#endif // GUARDCELLMANAGER_H_
+#endif // WARPX_GUARDCELLMANAGER_H_

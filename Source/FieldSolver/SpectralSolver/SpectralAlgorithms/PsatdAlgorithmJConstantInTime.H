@@ -11,6 +11,8 @@
 #include "FieldSolver/SpectralSolver/SpectralKSpace.H"
 #include "SpectralBaseAlgorithm.H"
 
+#include <ablastr/utils/Enums.H>
+
 #include <AMReX_Array.H>
 #include <AMReX_Config.H>
 #include <AMReX_REAL.H>
@@ -20,7 +22,7 @@
 #include <array>
 #include <memory>
 
-#if WARPX_USE_PSATD
+#if WARPX_USE_FFT
 /* \brief Class that updates the field in spectral space
  * and stores the coefficients of the corresponding update equation.
  */
@@ -49,23 +51,23 @@ class PsatdAlgorithmJConstantInTime : public SpectralBaseAlgorithm
             const SpectralKSpace& spectral_kspace,
             const amrex::DistributionMapping& dm,
             const SpectralFieldIndex& spectral_index,
-            const int norder_x,
-            const int norder_y,
-            const int norder_z,
-            const short grid_type,
+            int norder_x,
+            int norder_y,
+            int norder_z,
+            ablastr::utils::enums::GridType grid_type,
             const amrex::Vector<amrex::Real>& v_galilean,
-            const amrex::Real dt,
-            const bool update_with_rho,
-            const bool time_averaging,
-            const bool dive_cleaning,
-            const bool divb_cleaning);
+            amrex::Real dt,
+            bool update_with_rho,
+            bool time_averaging,
+            bool dive_cleaning,
+            bool divb_cleaning);
 
         /**
          * \brief Updates the E and B fields in spectral space, according to the relevant PSATD equations
          *
          * \param[in,out] f all the fields in spectral space
          */
-        virtual void pushSpectralFields (SpectralFieldData& f) const override final;
+        void pushSpectralFields (SpectralFieldData& f) const final;
 
         /**
          * \brief Initializes the coefficients used in \c pushSpectralFields to update the E and B fields
@@ -77,7 +79,7 @@ class PsatdAlgorithmJConstantInTime : public SpectralBaseAlgorithm
         void InitializeSpectralCoefficients (
             const SpectralKSpace& spectral_kspace,
             const amrex::DistributionMapping& dm,
-            const amrex::Real dt);
+            amrex::Real dt);
 
         /**
          * \brief Initializes additional coefficients used in \c pushSpectralFields to update the E and B fields,
@@ -90,7 +92,7 @@ class PsatdAlgorithmJConstantInTime : public SpectralBaseAlgorithm
         void InitializeSpectralCoefficientsAveraging (
             const SpectralKSpace& spectral_kspace,
             const amrex::DistributionMapping& dm,
-            const amrex::Real dt);
+            amrex::Real dt);
 
         /**
          * \brief Virtual function for current correction in Fourier space
@@ -101,7 +103,7 @@ class PsatdAlgorithmJConstantInTime : public SpectralBaseAlgorithm
          *
          * \param[in,out] field_data All fields in Fourier space
          */
-        virtual void CurrentCorrection (SpectralFieldData& field_data) override final;
+        void CurrentCorrection (SpectralFieldData& field_data) final;
 
         /**
          * \brief Virtual function for Vay current deposition in Fourier space
@@ -112,7 +114,7 @@ class PsatdAlgorithmJConstantInTime : public SpectralBaseAlgorithm
          *
          * \param[in,out] field_data All fields in Fourier space
          */
-        virtual void VayDeposition (SpectralFieldData& field_data) override final;
+        void VayDeposition (SpectralFieldData& field_data) final;
 
     private:
 
@@ -122,8 +124,6 @@ class PsatdAlgorithmJConstantInTime : public SpectralBaseAlgorithm
 
         // These real and complex coefficients are allocated only with averaged Galilean PSATD
         SpectralComplexCoefficients Psi1_coef, Psi2_coef, Y1_coef, Y2_coef, Y3_coef, Y4_coef;
-
-        SpectralFieldIndex m_spectral_index;
 
         // Centered modified finite-order k vectors
         KVectorComponent modified_kx_vec_centered;
@@ -141,5 +141,5 @@ class PsatdAlgorithmJConstantInTime : public SpectralBaseAlgorithm
         bool m_divb_cleaning;
         bool m_is_galilean;
 };
-#endif // WARPX_USE_PSATD
+#endif // WARPX_USE_FFT
 #endif // WARPX_PSATD_ALGORITHM_J_CONSTANT_IN_TIME_H_

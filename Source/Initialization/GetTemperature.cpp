@@ -8,8 +8,9 @@
 
 #include "GetTemperature.H"
 
-GetTemperature::GetTemperature (TemperatureProperties const& temp) noexcept {
-    m_type = temp.m_type;
+GetTemperature::GetTemperature (TemperatureProperties const& temp) noexcept :
+    m_type{temp.m_type}
+{
     if (m_type == TempConstantValue) {
         m_temperature = temp.m_temperature;
     }

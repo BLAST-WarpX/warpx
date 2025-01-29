@@ -1,0 +1,67 @@
+# please set your project account
+export proj=""  # change me!
+
+# remembers the location of this script
+export MY_PROFILE=$(cd $(dirname $BASH_SOURCE) && pwd)"/"$(basename $BASH_SOURCE)
+# early access: not yet used
+# if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your $MY_PROFILE file! Please edit its line 2 to continue!"; return; fi
+
+# required dependencies
+module purge
+module load PrgEnv-cray-amd/8.5.0
+# module load rocmcc/6.1.2-cce-18.0.0-magic
+module load craype-x86-genoa         # CPU
+module load craype-accel-amd-gfx942  # GPU
+module load cmake/3.29.2
+module load cray-mpich
+module load cray-libsci
+module load rocm/6.1.2
+
+# optional: faster builds
+# ccache is system provided
+module load ninja/1.10.2
+
+# optional: for QED support with detailed tables
+# TODO: no Boost module found
+
+# optional: for openPMD and PSATD+RZ support
+SW_DIR="/p/lustre1/${USER}/tioga/warpx/mi300a"
+module load cray-hdf5-parallel/1.12.2.11
+export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-2.15.1:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.10.1:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/lapackpp-2024.05.31:$CMAKE_PREFIX_PATH
+
+export LD_LIBRARY_PATH=${SW_DIR}/c-blosc-2.15.1/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/adios2-2.10.1/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
+
+export PATH=${SW_DIR}/adios2-2.10.1/bin:${PATH}
+
+# python
+module load cray-python/3.11.7
+
+if [ -d "${SW_DIR}/venvs/warpx-trioga-mi300a" ]
+then
+  source ${SW_DIR}/venvs/warpx-trioga-mi300a/bin/activate
+fi
+
+# an alias to request an interactive batch node for one hour
+#   for parallel execution, start on the batch node: srun <command>
+alias getNode="salloc -N 1 -p mi300a -t 1:00:00"
+# an alias to run a command on a batch node for up to 30min
+#   usage: runNode <command>
+alias runNode="srun -N 1 --ntasks-per-node=4 -t 0:30:00 -p mi300a"
+
+# GPU-aware MPI
+export MPICH_GPU_SUPPORT_ENABLED=1
+
+# optimize ROCm/HIP compilation for MI300A
+export AMREX_AMD_ARCH=gfx942
+
+# compiler environment hints
+export CC=$(which cc)
+export CXX=$(which CC)
+export FC=$(which ftn)
+export HIPCXX=${CXX}

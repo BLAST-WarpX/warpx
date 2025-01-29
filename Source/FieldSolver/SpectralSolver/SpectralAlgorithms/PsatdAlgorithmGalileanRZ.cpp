@@ -15,24 +15,21 @@
 
 using namespace amrex::literals;
 
-
 /* \brief Initialize coefficients for the update equation */
 PsatdAlgorithmGalileanRZ::PsatdAlgorithmGalileanRZ (SpectralKSpaceRZ const & spectral_kspace,
                                                     amrex::DistributionMapping const & dm,
                                                     const SpectralFieldIndex& spectral_index,
                                                     int const n_rz_azimuthal_modes, int const norder_z,
-                                                    short const grid_type,
+                                                    ablastr::utils::enums::GridType grid_type,
                                                     const amrex::Vector<amrex::Real>& v_galilean,
                                                     amrex::Real const dt,
-                                                    bool const update_with_rho)
-     // Initialize members of base class
-     : SpectralBaseAlgorithmRZ(spectral_kspace, dm, spectral_index, norder_z, grid_type),
-       m_spectral_index(spectral_index),
-       m_dt(dt),
-       m_v_galilean(v_galilean),
-       m_update_with_rho(update_with_rho)
+                                                    bool const update_with_rho):
+    // Initialize members of base class
+    SpectralBaseAlgorithmRZ{spectral_kspace, dm, spectral_index, norder_z, grid_type},
+    m_dt{dt},
+    m_v_galilean{v_galilean},
+    m_update_with_rho{update_with_rho}
 {
-
     // Allocate the arrays of coefficients
     amrex::BoxArray const & ba = spectral_kspace.spectralspace_ba;
     C_coef = SpectralRealCoefficients(ba, dm, n_rz_azimuthal_modes, 0);
@@ -43,8 +40,6 @@ PsatdAlgorithmGalileanRZ::PsatdAlgorithmGalileanRZ (SpectralKSpaceRZ const & spe
     X4_coef = SpectralComplexCoefficients(ba, dm, n_rz_azimuthal_modes, 0);
     Theta2_coef = SpectralComplexCoefficients(ba, dm, n_rz_azimuthal_modes, 0);
     T_rho_coef = SpectralComplexCoefficients(ba, dm, n_rz_azimuthal_modes, 0);
-
-    coefficients_initialized = false;
 }
 
 /* Advance the E and B field in spectral space (stored in `f`)
@@ -201,7 +196,7 @@ void PsatdAlgorithmGalileanRZ::InitializeSpectralCoefficients (SpectralFieldData
         amrex::Array4<Complex> const& T_rho = T_rho_coef[mfi].array();
 
         // Extract real (for portability on GPU)
-        amrex::Real vz = m_v_galilean[2];
+        const amrex::Real vz = m_v_galilean[2];
 
         auto const & kr_modes = f.getKrArray(mfi);
         amrex::Real const* kr_arr = kr_modes.dataPtr();
@@ -252,7 +247,7 @@ void PsatdAlgorithmGalileanRZ::InitializeSpectralCoefficients (SpectralFieldData
                     // update equation have been modified accordingly so that
                     // the expressions below (with the update equations)
                     // are mathematically equivalent to those of the paper.
-                    Complex x1 = 1._rt/(1._rt-nu*nu) *
+                    const Complex x1 = 1._rt/(1._rt-nu*nu) *
                         (theta_star - C(i,j,k,mode)*theta + I*kv*S_ck(i,j,k,mode)*theta);
                     // x1, above, is identical to the original paper
                     X1(i,j,k,mode) = theta*x1/(ep0*c*c*k_norm*k_norm);
@@ -305,7 +300,7 @@ PsatdAlgorithmGalileanRZ::CurrentCorrection (SpectralFieldDataRZ& field_data)
         amrex::Box const & bx = field_data.fields[mfi].box();
 
         // Extract arrays for the fields to be updated
-        amrex::Array4<Complex> fields = field_data.fields[mfi].array();
+        const amrex::Array4<Complex> fields = field_data.fields[mfi].array();
 
         // Extract pointers for the k vectors
         auto const & kr_modes = field_data.getKrArray(mfi);
@@ -314,8 +309,8 @@ PsatdAlgorithmGalileanRZ::CurrentCorrection (SpectralFieldDataRZ& field_data)
         int const nr = bx.length(0);
 
         // Local copy of member variables before GPU loop
-        amrex::Real vz = m_v_galilean[2];
-        amrex::Real const dt = m_dt;
+        const amrex::Real vz = m_v_galilean[2];
+        const amrex::Real dt = m_dt;
 
         // Loop over indices within one box
         int const modes = field_data.n_rz_azimuthal_modes;
@@ -364,6 +359,6 @@ PsatdAlgorithmGalileanRZ::CurrentCorrection (SpectralFieldDataRZ& field_data)
 void
 PsatdAlgorithmGalileanRZ::VayDeposition (SpectralFieldDataRZ& /*field_data*/)
 {
-    amrex::Abort(Utils::TextMsg::Err(
-        "Vay deposition not implemented in RZ geometry"));
+    WARPX_ABORT_WITH_MESSAGE(
+        "Vay deposition not implemented in RZ geometry");
 }

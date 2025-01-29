@@ -22,24 +22,28 @@
 #include <AMReX_REAL.H>
 #include <AMReX_SPACE.H>
 
-namespace ParticleUtils {
+namespace ParticleUtils
+{
 
     using namespace amrex;
+
     // Define shortcuts for frequently-used type names
-    using ParticleType = WarpXParticleContainer::ParticleType;
-    using ParticleTileType = WarpXParticleContainer::ParticleTileType;
-    using ParticleBins = DenseBins<ParticleType>;
-    using index_type = ParticleBins::index_type;
+    using ParticleType = typename WarpXParticleContainer::ParticleType;
+    using ParticleTileType = typename WarpXParticleContainer::ParticleTileType;
+    using ParticleTileDataType = typename ParticleTileType::ParticleTileDataType;
+    using ParticleBins = DenseBins<ParticleTileDataType>;
+    using index_type = typename ParticleBins::index_type;
 
     /* Find the particles and count the particles that are in each cell.
        Note that this does *not* rearrange particle arrays */
     ParticleBins
-    findParticlesInEachCell( int const lev, MFIter const& mfi,
-                             ParticleTileType const& ptile) {
+    findParticlesInEachCell (int lev,
+                             MFIter const & mfi,
+                             ParticleTileType & ptile) {
 
         // Extract particle structures for this tile
         int const np = ptile.numParticles();
-        ParticleType const* particle_ptr = ptile.GetArrayOfStructs()().data();
+        auto ptd = ptile.getParticleTileData();
 
         // Extract box properties
         Geometry const& geom = WarpX::GetInstance().Geom(lev);
@@ -51,17 +55,17 @@ namespace ParticleUtils {
         // Find particles that are in each cell;
         // results are stored in the object `bins`.
         ParticleBins bins;
-        bins.build(np, particle_ptr, cbx,
+        bins.build(np, ptd, cbx,
             // Pass lambda function that returns the cell index
-            [=] AMREX_GPU_DEVICE (const ParticleType& p) noexcept -> IntVect
+            [=] AMREX_GPU_DEVICE (ParticleType const & p) noexcept -> amrex::IntVect
             {
-                return IntVect(AMREX_D_DECL(
+                return IntVect{AMREX_D_DECL(
                                    static_cast<int>((p.pos(0)-plo[0])*dxi[0] - lo.x),
                                    static_cast<int>((p.pos(1)-plo[1])*dxi[1] - lo.y),
-                                   static_cast<int>((p.pos(2)-plo[2])*dxi[2] - lo.z)));
+                                   static_cast<int>((p.pos(2)-plo[2])*dxi[2] - lo.z))};
             });
 
         return bins;
     }
 
-}
+} // namespace ParticleUtils

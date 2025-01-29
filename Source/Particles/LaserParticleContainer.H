@@ -10,6 +10,7 @@
 #define WARPX_LaserParticleContainer_H_
 
 #include "Evolve/WarpXDtType.H"
+#include "Evolve/WarpXPushType.H"
 #include "Laser/LaserProfiles.H"
 #include "WarpXParticleContainer.H"
 
@@ -42,36 +43,34 @@ class LaserParticleContainer
 {
 public:
     LaserParticleContainer (amrex::AmrCore* amr_core, int ispecies, const std::string& name);
-    virtual ~LaserParticleContainer () {}
+    ~LaserParticleContainer () override = default;
 
-    virtual void InitData () final;
+    LaserParticleContainer ( LaserParticleContainer const &)             = delete;
+    LaserParticleContainer& operator= ( LaserParticleContainer const & ) = delete;
+    LaserParticleContainer ( LaserParticleContainer&& )                  = default;
+    LaserParticleContainer& operator= ( LaserParticleContainer&& )       = default;
+
+    void InitData () final;
 
     /**
      * \brief Method to initialize runtime attributes. Does nothing for LaserParticleContainer.
      */
-    virtual void DefaultInitializeRuntimeAttributes (
-                        amrex::ParticleTile<NStructReal, NStructInt, NArrayReal,
-                                            NArrayInt,amrex::PinnedArenaAllocator>& /*pinned_tile*/,
-                        const int /*n_external_attr_real*/,
-                        const int /*n_external_attr_int*/,
-                        const amrex::RandomEngine& /*engine*/) override final {}
+    void DefaultInitializeRuntimeAttributes (
+        typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType& /*pinned_tile*/,
+        int /*n_external_attr_real*/,
+        int /*n_external_attr_int*/) final {}
 
-    virtual void ReadHeader (std::istream& is) final;
+    void ReadHeader (std::istream& is) final;
 
-    virtual void WriteHeader (std::ostream& os) const final;
+    void WriteHeader (std::ostream& os) const final;
 
-    virtual void Evolve (int lev,
-                         const amrex::MultiFab&, const amrex::MultiFab&, const amrex::MultiFab&,
-                         const amrex::MultiFab&, const amrex::MultiFab&, const amrex::MultiFab&,
-                         amrex::MultiFab& jx, amrex::MultiFab& jy, amrex::MultiFab& jz,
-                         amrex::MultiFab*, amrex::MultiFab*, amrex::MultiFab*,
-                         amrex::MultiFab* rho, amrex::MultiFab* crho,
-                         const amrex::MultiFab*, const amrex::MultiFab*, const amrex::MultiFab*,
-                         const amrex::MultiFab*, const amrex::MultiFab*, const amrex::MultiFab*,
-                         amrex::Real t, amrex::Real dt, DtType a_dt_type=DtType::Full,
-                         bool skip_deposition=false) final;
+    void Evolve (ablastr::fields::MultiFabRegister& fields,
+                 int lev,
+                 const std::string& current_fp_string,
+                 amrex::Real t, amrex::Real dt, DtType a_dt_type=DtType::Full,
+                 bool skip_deposition=false, PushType push_type=PushType::Explicit) final;
 
-    virtual void PushP (int lev, amrex::Real dt,
+    void PushP (int lev, amrex::Real dt,
                         const amrex::MultiFab& ,
                         const amrex::MultiFab& ,
                         const amrex::MultiFab& ,
@@ -79,18 +78,18 @@ public:
                         const amrex::MultiFab& ,
                         const amrex::MultiFab& ) final;
 
-    virtual void PostRestart () final;
+    void PostRestart () final;
 
-    void calculate_laser_plane_coordinates (const WarpXParIter& pti, const int np,
-                                            amrex::Real * AMREX_RESTRICT const pplane_Xp,
-                                            amrex::Real * AMREX_RESTRICT const pplane_Yp);
+    void calculate_laser_plane_coordinates (const WarpXParIter& pti, int np,
+                                            amrex::Real * AMREX_RESTRICT pplane_Xp,
+                                            amrex::Real * AMREX_RESTRICT pplane_Yp);
 
-    void update_laser_particle (WarpXParIter& pti, const int np, amrex::ParticleReal * AMREX_RESTRICT const puxp,
-                                amrex::ParticleReal * AMREX_RESTRICT const puyp,
-                                amrex::ParticleReal * AMREX_RESTRICT const puzp,
-                                amrex::ParticleReal const * AMREX_RESTRICT const pwp,
-                                amrex::Real const * AMREX_RESTRICT const amplitude,
-                                const amrex::Real dt);
+    void update_laser_particle (WarpXParIter& pti, int np, amrex::ParticleReal * AMREX_RESTRICT puxp,
+                                amrex::ParticleReal * AMREX_RESTRICT puyp,
+                                amrex::ParticleReal * AMREX_RESTRICT puzp,
+                                amrex::ParticleReal const * AMREX_RESTRICT pwp,
+                                amrex::Real const * AMREX_RESTRICT amplitude,
+                                amrex::Real dt, PushType push_type=PushType::Explicit);
 
 protected:
 
@@ -129,8 +128,12 @@ private:
     // Inject the laser antenna during the simulation, if it started
     // outside of the simulation domain and enters it.
     void ContinuousInjection(const amrex::RealBox& injection_box) override;
-    // Update position of the antenna
-    void UpdateContinuousInjectionPosition(amrex::Real dt) override;
+
+    /**
+     * \brief  Update antenna position for continuous injection of lasers
+     *         in a boosted frame
+     */
+    void UpdateAntennaPosition (amrex::Real dt) override;
 
     // Unique (smart) pointer to the laser profile
     std::unique_ptr<WarpXLaserProfiles::ILaserProfile> m_up_laser_profile;

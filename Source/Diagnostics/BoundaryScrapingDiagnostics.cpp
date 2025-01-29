@@ -6,10 +6,12 @@
  */
 
 #include "BoundaryScrapingDiagnostics.H"
+#include "EmbeddedBoundary/Enabled.H"
 #include "ComputeDiagFunctors/ComputeDiagFunctor.H"
 #include "Diagnostics/Diagnostics.H"
 #include "Diagnostics/FlushFormats/FlushFormat.H"
 #include "Particles/ParticleBoundaryBuffer.H"
+#include "Utils/TextMsg.H"
 #include "WarpX.H"
 
 #include <AMReX.H>
@@ -20,8 +22,8 @@
 
 using namespace amrex::literals;
 
-BoundaryScrapingDiagnostics::BoundaryScrapingDiagnostics (int i, std::string name)
-    : Diagnostics(i, name)
+BoundaryScrapingDiagnostics::BoundaryScrapingDiagnostics (int i, const std::string& name, DiagTypes diag_type)
+    : Diagnostics{i, name, diag_type}
 {
     ReadParameters();
 }
@@ -38,19 +40,19 @@ BoundaryScrapingDiagnostics::ReadParameters ()
 
     // num_buffers corresponds to the number of boundaries
     // (upper/lower domain boundary in each dimension)
-    // + the EB boundary if available
     m_num_buffers = AMREX_SPACEDIM*2;
-#ifdef AMREX_USE_EB
-    m_num_buffers += 1;
-#endif
+
+    // + the EB boundary if available
+    bool const eb_enabled = EB::enabled();
+    if (eb_enabled) { m_num_buffers += 1; }
 
     // Do a few checks
 #ifndef WARPX_USE_OPENPMD
-    amrex::Abort("You need to compile WarpX with openPMD support, in order to use BoundaryScrapingDiagnostic: -DWarpX_OPENPMD=ON");
+    WARPX_ABORT_WITH_MESSAGE("You need to compile WarpX with openPMD support, in order to use BoundaryScrapingDiagnostic: -DWarpX_OPENPMD=ON");
 #endif
 
     // Check that the output format is openPMD
-    std::string error_string = std::string("You need to set `")
+    const std::string error_string = std::string("You need to set `")
         .append(m_diag_name)
         .append(".format=openpmd` for the BoundaryScrapingDiagnostic.");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -58,7 +60,7 @@ BoundaryScrapingDiagnostics::ReadParameters ()
         error_string);
 
     // Check for the optional intervals parameter
-    amrex::ParmParse pp_diag_name(m_diag_name);
+    const amrex::ParmParse pp_diag_name(m_diag_name);
     std::vector<std::string> intervals_string_vec = {"0"};
     pp_diag_name.queryarr("intervals", intervals_string_vec);
     m_intervals = utils::parser::IntervalsParser(intervals_string_vec);
@@ -101,15 +103,6 @@ BoundaryScrapingDiagnostics::InitializeParticleBuffer ()
             m_output_species[i_buffer].push_back(ParticleDiag(m_diag_name, species_name, pc, bnd_buffer));
         }
     }
-    // Initialize total number of particles flushed
-    m_totalParticles_flushed_already.resize(m_num_buffers);
-    for (int i_buffer = 0; i_buffer < m_num_buffers; ++i_buffer) {
-        int const n_species = m_output_species_names.size();
-        m_totalParticles_flushed_already[i_buffer].resize(n_species);
-        for (int i_species=0; i_species<n_species; i_species++) {
-            m_totalParticles_flushed_already[i_buffer][i_species] = 0;
-        }
-    }
 }
 
 bool
@@ -129,7 +122,7 @@ BoundaryScrapingDiagnostics::DoDump (int step, int /*i_buffer*/, bool force_flus
 }
 
 void
-BoundaryScrapingDiagnostics::Flush (int i_buffer)
+BoundaryScrapingDiagnostics::Flush (int i_buffer, bool /* force_flush */)
 {
     auto & warpx = WarpX::GetInstance();
     ParticleBoundaryBuffer& particle_buffer = warpx.GetParticleBoundaryBuffer();
@@ -141,7 +134,7 @@ BoundaryScrapingDiagnostics::Flush (int i_buffer)
 
     // If the saving of the particles was not set up for any of the species for this boundary
     // or if no particles have been lost, then don't write anything out.
-    if (n_particles == 0) return;
+    if (n_particles == 0) { return; }
 
     // This is not a backtransform diagnostics
     bool const isBTD = false;
@@ -153,14 +146,16 @@ BoundaryScrapingDiagnostics::Flush (int i_buffer)
     const amrex::Geometry& geom = warpx.Geom(0); // For compatibility with `WriteToFile` ; not used
 
     // The data for each boundary is written out to a separate directory with the boundary name
-    std::string file_prefix = m_file_prefix + "/particles_at_" + particle_buffer.boundaryName(i_buffer);
+    const std::string file_prefix = m_file_prefix + "/particles_at_" + particle_buffer.boundaryName(i_buffer);
 
     m_flush_format->WriteToFile(
-        m_varnames, m_mf_output[i_buffer], m_geom_output[i_buffer], warpx.getistep(),
-        warpx.gett_new(0), m_output_species[i_buffer], nlev_output, file_prefix,
-        m_file_min_digits, false, false, use_pinned_pc, isBTD,
+        m_varnames, m_mf_output.at(i_buffer), m_geom_output.at(i_buffer), warpx.getistep(),
+        warpx.gett_new(0),
+        m_output_species.at(i_buffer),
+        nlev_output, file_prefix,
+        m_file_min_digits, false, false, m_verbose, use_pinned_pc, isBTD,
         warpx.getistep(0), bufferID, numBTDBuffers, geom,
-        isLastBTD, m_totalParticles_flushed_already[i_buffer]);
+        isLastBTD);
 
     // Now that the data has been written out, clear out the buffer
     particle_buffer.clearParticles(i_buffer);

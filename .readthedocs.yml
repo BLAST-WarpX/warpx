@@ -4,7 +4,22 @@
 #
 # License: BSD-3-Clause-LBNL
 
-requirements_file: Docs/requirements.txt
+version: 2
+
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "mambaforge-latest"
+    # python: "3.11"
+
+sphinx:
+  configuration: Docs/source/conf.py
+
+conda:
+  environment: Docs/conda.yml
+# python:
+#   install:
+#   - requirements: Docs/requirements.txt
 
 formats:
   - htmlzip

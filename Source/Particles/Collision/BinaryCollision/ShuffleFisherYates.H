@@ -12,7 +12,7 @@
 /* \brief Shuffle array according to Fisher-Yates algorithm.
  *        Only shuffle the part between is <= i < ie, n = ie-is.
  *        T_index shall be
- *        amrex::DenseBins<WarpXParticleContainer::ParticleType>::index_type
+ *        amrex::DenseBins<WarpXParticleContainer::ParticleTileType::ParticleTileDataType>::index_type
 */
 
 template <typename T_index>
@@ -20,13 +20,12 @@ AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void ShuffleFisherYates (T_index *array, T_index const is, T_index const ie,
                          amrex::RandomEngine const& engine)
 {
-    int     j;
     T_index buf;
     for (int i = ie-1; i >= static_cast<int>(is+1); --i)
     {
         // get random number j: is <= j <= i
-        j = amrex::Random_int(i-is+1, engine) + is;
-        // swop the ith array element with the jth
+        const int j = amrex::Random_int(i-is+1, engine) + is;
+        // swap the ith array element with the jth
         buf      = array[i];
         array[i] = array[j];
         array[j] = buf;

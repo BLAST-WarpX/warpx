@@ -45,7 +45,7 @@ PartPerGridFunctor::operator()(amrex::MultiFab& mf_dst, const int dcomp, const i
 #pragma omp parallel
 #endif
     for (amrex::MFIter mfi(ppg_mf); mfi.isValid(); ++mfi) {
-        ppg_mf[mfi].setVal<amrex::RunOn::Host>(static_cast<amrex::Real>(npart_in_grid[mfi.index()]));
+        ppg_mf[mfi].setVal<amrex::RunOn::Device>(static_cast<amrex::Real>(npart_in_grid[mfi.index()]));
     }
 
     // Coarsen and interpolate from ppg_mf to the output diagnostic MultiFab, mf_dst.

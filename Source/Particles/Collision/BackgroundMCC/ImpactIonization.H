@@ -4,10 +4,10 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef WARPX_PARTICLES_COLLISION_MCC_SCATTERING_H_
-#define WARPX_PARTICLES_COLLISION_MCC_SCATTERING_H_
+#ifndef WARPX_PARTICLES_COLLISION_IMPACT_IONIZATION_H_
+#define WARPX_PARTICLES_COLLISION_IMPACT_IONIZATION_H_
 
-#include "MCCProcess.H"
+#include "Particles/Collision/ScatteringProcess.H"
 
 #include "Utils/ParticleUtils.H"
 #include "Utils/WarpXConst.H"
@@ -39,7 +39,7 @@ public:
     * ensure accurate energy calculations (otherwise errors occur with single
     * or mixed precision builds of WarpX).
     *
-    * @param[in] mcc_process an MCCProcess object associated with the ionization
+    * @param[in] mcc_process an ScatteringProcess object associated with the ionization
     * @param[in] mass colliding particle's mass (could also assume electron)
     * @param[in] total_collision_prob total probability for a collision to occur
     * @param[in] nu_max maximum collision frequency
@@ -48,7 +48,7 @@ public:
     * @param[in] t the current simulation time
     */
     ImpactIonizationFilterFunc(
-        MCCProcess const& mcc_process,
+        ScatteringProcess const& mcc_process,
         double const mass,
         amrex::ParticleReal const total_collision_prob,
         amrex::ParticleReal const nu_max,
@@ -77,7 +77,7 @@ public:
         using std::sqrt;
 
         // determine if this particle should collide
-        if (Random(engine) > m_total_collision_prob) return false;
+        if (Random(engine) > m_total_collision_prob) { return false; }
 
         // get references to the particle to get its position
         const auto& p = ptd.getSuperParticle(i);
@@ -98,7 +98,7 @@ public:
         ParticleUtils::getEnergy(u_coll2, m_mass, E_coll);
 
         // get collision cross-section
-        const ParticleReal sigma_E = m_mcc_process.getCrossSection(E_coll);
+        const ParticleReal sigma_E = m_mcc_process.getCrossSection(static_cast<amrex::ParticleReal>(E_coll));
 
         // calculate normalized collision frequency
         const ParticleReal nu_i = n_a * sigma_E * sqrt(u_coll2) / m_nu_max;
@@ -108,7 +108,7 @@ public:
     }
 
 private:
-    MCCProcess::Executor m_mcc_process;
+    ScatteringProcess::Executor m_mcc_process;
     double m_mass;
     amrex::ParticleReal m_total_collision_prob = 0;
     amrex::ParticleReal m_nu_max;
@@ -182,7 +182,7 @@ public:
 
         // calculate standard deviation in neutral velocity distribution using
         // the local temperature
-        const ParticleReal ion_vel_std = m_sqrt_kb_m * sqrt(m_T_a_func(x, y, z, m_t));
+        const ParticleReal ion_vel_std = m_sqrt_kb_m * std::sqrt(m_T_a_func(x, y, z, m_t));
 
         // get references to the original particle's velocity
         auto& ux = src.m_rdata[PIdx::ux][i_src];
@@ -202,13 +202,13 @@ public:
         ParticleUtils::getEnergy(u_coll2, m_mass1, E_coll);
 
         // each electron gets half the energy (could change this later)
-        amrex::ParticleReal E_out = (E_coll - m_energy_cost) / 2.0_prt * PhysConst::q_e;
+        const auto E_out = static_cast<amrex::ParticleReal>((E_coll - m_energy_cost) / 2.0_prt * PhysConst::q_e);
 
         // precalculate often used value
         constexpr auto c2 = PhysConst::c * PhysConst::c;
         const auto mc2 = m_mass1*c2;
 
-        amrex::ParticleReal up = sqrt(E_out * (E_out + 2.0_prt*mc2) / c2) / m_mass1;
+        const amrex::ParticleReal up = sqrt(E_out * (E_out + 2.0_prt*mc2) / c2) / m_mass1;
 
         // isotropically scatter electrons
         ParticleUtils::RandomizeVelocity(ux, uy, uz, up, engine);
@@ -227,4 +227,4 @@ private:
     amrex::ParserExecutor<4> m_T_a_func;
     amrex::Real m_t;
 };
-#endif // WARPX_PARTICLES_COLLISION_MCC_SCATTERING_H_
+#endif // WARPX_PARTICLES_COLLISION_IMPACT_IONIZATION_H_

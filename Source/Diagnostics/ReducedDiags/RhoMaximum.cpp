@@ -29,7 +29,7 @@
 using namespace amrex::literals;
 
 // constructor
-RhoMaximum::RhoMaximum (std::string rd_name)
+RhoMaximum::RhoMaximum (const std::string& rd_name)
 : ReducedDiags{rd_name}
 {
     // RZ coordinate is not working
@@ -40,7 +40,7 @@ RhoMaximum::RhoMaximum (std::string rd_name)
 
     // read number of levels
     int nLevel = 0;
-    amrex::ParmParse pp_amr("amr");
+    const amrex::ParmParse pp_amr("amr");
     pp_amr.query("max_level", nLevel);
     nLevel += 1;
     m_rho_functors.resize(nLevel);
@@ -76,7 +76,7 @@ RhoMaximum::RhoMaximum (std::string rd_name)
             for (int lev = 0; lev < nLevel; ++lev)
             {
                 // Initialize functors for the charge density of each charged species
-                m_rho_functors[lev].push_back(std::make_unique<RhoFunctor>(lev, crse_ratio, i));
+                m_rho_functors[lev].push_back(std::make_unique<RhoFunctor>(lev, crse_ratio, false, i));
             }
         }
     }
@@ -90,7 +90,7 @@ RhoMaximum::RhoMaximum (std::string rd_name)
 
     if (amrex::ParallelDescriptor::IOProcessor())
     {
-        if ( m_IsNotRestart )
+        if ( m_write_header )
         {
             // open file
             std::ofstream ofs{m_path + m_rd_name + "." + m_extension, std::ofstream::out};
@@ -113,7 +113,7 @@ RhoMaximum::RhoMaximum (std::string rd_name)
                                          + "_|rho|_lev" + std::to_string(lev) + "(C/m^3)";
                 }
             }
-            ofs << std::endl;
+            ofs << "\n";
             // close file
             ofs.close();
         }
@@ -133,7 +133,7 @@ void RhoMaximum::ComputeDiags (int step)
     // get number of levels
     const auto nLevel = warpx.finestLevel() + 1;
 
-    const int n_charged_species = m_rho_functors[0].size() - 1;
+    const auto n_charged_species = static_cast<int>(m_rho_functors[0].size() - 1);
     // Min and max of total rho + max of |rho| for each species
     const int noutputs_per_level = 2+n_charged_species;
 
@@ -141,8 +141,8 @@ void RhoMaximum::ComputeDiags (int step)
     for (int lev = 0; lev < nLevel; ++lev)
     {
         // Declare a temporary MultiFAB to store the charge densities.
-        amrex::BoxArray ba = warpx.boxArray(lev);
-        amrex::DistributionMapping dmap = warpx.DistributionMap(lev);
+        const amrex::BoxArray ba = warpx.boxArray(lev);
+        const amrex::DistributionMapping dmap = warpx.DistributionMap(lev);
         constexpr int ncomp = 1;
         constexpr int ngrow = 0;
         amrex::MultiFab mf_temp(ba, dmap, ncomp, ngrow);

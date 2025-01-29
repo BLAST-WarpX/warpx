@@ -28,24 +28,25 @@
 
 /* This function initializes the stencil coefficients for the chosen finite-difference algorithm */
 FiniteDifferenceSolver::FiniteDifferenceSolver (
-    int const fdtd_algo,
+    ElectromagneticSolverAlgo const fdtd_algo,
     std::array<amrex::Real,3> cell_size,
-    short grid_type) {
-
+    ablastr::utils::enums::GridType grid_type):
     // Register the type of finite-difference algorithm
-    m_fdtd_algo = fdtd_algo;
-    m_grid_type = grid_type;
-
+    m_fdtd_algo{fdtd_algo},
+    m_grid_type{grid_type}
+{
     // return if not FDTD
-    if (fdtd_algo == ElectromagneticSolverAlgo::None || fdtd_algo == ElectromagneticSolverAlgo::PSATD)
+    if (fdtd_algo == ElectromagneticSolverAlgo::None || fdtd_algo == ElectromagneticSolverAlgo::PSATD) {
         return;
+    }
 
     // Calculate coefficients of finite-difference stencil
 #ifdef WARPX_DIM_RZ
     m_dr = cell_size[0];
-    m_nmodes = WarpX::GetInstance().n_rz_azimuthal_modes;
+    m_nmodes = WarpX::n_rz_azimuthal_modes;
     m_rmin = WarpX::GetInstance().Geom(0).ProbLo(0);
-    if (fdtd_algo == ElectromagneticSolverAlgo::Yee) {
+    if (fdtd_algo == ElectromagneticSolverAlgo::Yee ||
+        fdtd_algo == ElectromagneticSolverAlgo::HybridPIC ) {
         CylindricalYeeAlgorithm::InitializeStencilCoefficients( cell_size,
             m_h_stencil_coefs_r, m_h_stencil_coefs_z );
         m_stencil_coefs_r.resize(m_h_stencil_coefs_r.size());
@@ -58,16 +59,18 @@ FiniteDifferenceSolver::FiniteDifferenceSolver (
                               m_stencil_coefs_z.begin());
         amrex::Gpu::synchronize();
     } else {
-        amrex::Abort(Utils::TextMsg::Err(
-            "FiniteDifferenceSolver: Unknown algorithm"));
+        WARPX_ABORT_WITH_MESSAGE(
+            "FiniteDifferenceSolver: Unknown algorithm");
     }
 #else
-    if (grid_type == GridType::Collocated) {
+    if (grid_type == ablastr::utils::enums::GridType::Collocated) {
 
         CartesianNodalAlgorithm::InitializeStencilCoefficients( cell_size,
             m_h_stencil_coefs_x, m_h_stencil_coefs_y, m_h_stencil_coefs_z );
 
-    } else if (fdtd_algo == ElectromagneticSolverAlgo::Yee || fdtd_algo == ElectromagneticSolverAlgo::ECT) {
+    } else if (fdtd_algo == ElectromagneticSolverAlgo::Yee ||
+               fdtd_algo == ElectromagneticSolverAlgo::ECT ||
+               fdtd_algo == ElectromagneticSolverAlgo::HybridPIC) {
 
         CartesianYeeAlgorithm::InitializeStencilCoefficients( cell_size,
             m_h_stencil_coefs_x, m_h_stencil_coefs_y, m_h_stencil_coefs_z );
@@ -78,8 +81,8 @@ FiniteDifferenceSolver::FiniteDifferenceSolver (
             m_h_stencil_coefs_x, m_h_stencil_coefs_y, m_h_stencil_coefs_z );
 
     } else {
-        amrex::Abort(Utils::TextMsg::Err(
-            "FiniteDifferenceSolver: Unknown algorithm"));
+        WARPX_ABORT_WITH_MESSAGE(
+            "FiniteDifferenceSolver: Unknown algorithm");
     }
 
     m_stencil_coefs_x.resize(m_h_stencil_coefs_x.size());

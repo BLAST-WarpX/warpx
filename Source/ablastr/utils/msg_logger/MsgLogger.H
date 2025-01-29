@@ -8,7 +8,7 @@
 #ifndef ABLASTR_MSG_LOGGER_H_
 #define ABLASTR_MSG_LOGGER_H_
 
-#include <AMReX.H>
+#include <AMReX_Config.H>
 
 #include <cstdint>
 #include <map>
@@ -65,7 +65,7 @@ namespace ablastr::utils::msg_logger
         *
         * @return a byte vector
         */
-        std::vector<char> serialize() const;
+        [[nodiscard]] std::vector<char> serialize() const;
 
         /**
         * \brief This function generates a Msg struct from a byte vector
@@ -101,7 +101,7 @@ namespace ablastr::utils::msg_logger
         *
         * @return a byte vector
         */
-        std::vector<char> serialize() const;
+        [[nodiscard]] std::vector<char> serialize() const;
 
         /**
         * \brief This function generates a MsgWithCounter struct from a byte vector
@@ -140,7 +140,7 @@ namespace ablastr::utils::msg_logger
         *
         * @return a byte vector
         */
-        std::vector<char> serialize() const;
+        [[nodiscard]] std::vector<char> serialize() const;
 
         /**
         * \brief This function generates a MsgWithCounterAndRanks struct from a byte vector
@@ -196,14 +196,14 @@ namespace ablastr::utils::msg_logger
         *
         * @param[in] msg a Msg struct
         */
-        void record_msg(Msg msg);
+        void record_msg(const Msg& msg);
 
         /**
         * \brief This function returns a vector containing the recorded messages
         *
         * @return a vector of the recorded messages
         */
-        std::vector<Msg> get_msgs() const;
+        [[nodiscard]] std::vector<Msg> get_msgs() const;
 
         /**
         * \brief This function returns a vector containing the recorded messages
@@ -211,7 +211,8 @@ namespace ablastr::utils::msg_logger
         *
         * @return a vector of the recorded messages with counters
         */
-        std::vector<MsgWithCounter> get_msgs_with_counter() const;
+        [[nodiscard]] std::vector<MsgWithCounter>
+        get_msgs_with_counter() const;
 
         /**
         * \brief This collective function generates a vector containing the messages
@@ -220,7 +221,7 @@ namespace ablastr::utils::msg_logger
         *
         * @return a vector of messages with counters and ranks if I/O rank, an empty vector otherwise
         */
-        std::vector<MsgWithCounterAndRanks>
+        [[nodiscard]] std::vector<MsgWithCounterAndRanks>
         collective_gather_msgs_with_counter_and_ranks() const;
 
         private:
@@ -231,7 +232,7 @@ namespace ablastr::utils::msg_logger
         *
         * @return a vector of messages with counters and ranks
         */
-        std::vector<MsgWithCounterAndRanks>
+        [[nodiscard]] std::vector<MsgWithCounterAndRanks>
         one_rank_gather_msgs_with_counter_and_ranks() const;
 
 #ifdef AMREX_USE_MPI
@@ -243,8 +244,8 @@ namespace ablastr::utils::msg_logger
         * @param[in] how_many_msgs the number of messages that the current rank has
         * @return a pair containing the ID of the "gather rank" and its number of messages
         */
-        std::pair<int, int> find_gather_rank_and_its_msgs(
-            int how_many_msgs) const;
+        [[nodiscard]] std::pair<int, int>
+        find_gather_rank_and_its_msgs(int how_many_msgs) const;
 
         /**
         * \brief This function uses data gathered on the "gather rank" to generate
@@ -256,12 +257,12 @@ namespace ablastr::utils::msg_logger
         * @param[in] gather_rank the ID of the "gather rank"
         * @return if gather_rank==m_rank a vector of messages with global counters and emitting rank lists, dummy data otherwise
         */
-        std::vector<MsgWithCounterAndRanks>
+        [[nodiscard]] std::vector<MsgWithCounterAndRanks>
         compute_msgs_with_counter_and_ranks(
             const std::map<Msg,std::int64_t>& my_msg_map,
             const std::vector<char>& all_data,
             const std::vector<int>& displacements,
-            const int gather_rank
+            int gather_rank
         ) const;
 
 

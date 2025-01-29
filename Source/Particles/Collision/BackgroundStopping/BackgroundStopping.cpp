@@ -16,7 +16,7 @@
 
 #include <string>
 
-BackgroundStopping::BackgroundStopping (std::string const collision_name)
+BackgroundStopping::BackgroundStopping (std::string const& collision_name)
     : CollisionBase(collision_name)
 {
     using namespace amrex::literals;
@@ -24,7 +24,7 @@ BackgroundStopping::BackgroundStopping (std::string const collision_name)
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(m_species_names.size() == 1,
                                      "Background stopping must have exactly one species.");
 
-    amrex::ParmParse pp_collision_name(collision_name);
+    const amrex::ParmParse pp_collision_name(collision_name);
 
     std::string background_type_str;
     pp_collision_name.get("background_type", background_type_str);
@@ -98,13 +98,13 @@ BackgroundStopping::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiPar
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(species_mass > 0_prt, "Error: With background stopping, the species mass must be > 0");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(species_charge != 0_prt, "Error: With background stopping, the species charge must be nonzero");
 
-    BackgroundStoppingType background_type = m_background_type;
+    const BackgroundStoppingType background_type = m_background_type;
 
     // Loop over refinement levels
     auto const flvl = species.finestLevel();
     for (int lev = 0; lev <= flvl; ++lev) {
 
-        auto cost = WarpX::getCosts(lev);
+        auto *cost = WarpX::getCosts(lev);
 
         // loop over particles box by box
 #ifdef _OPENMP
@@ -115,7 +115,7 @@ BackgroundStopping::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiPar
             {
                 amrex::Gpu::synchronize();
             }
-            amrex::Real wt = amrex::second();
+            auto wt = static_cast<amrex::Real>(amrex::second());
 
             if (background_type == BackgroundStoppingType::ELECTRONS) {
                 doBackgroundStoppingOnElectronsWithinTile(pti, dt, cur_time, species_mass, species_charge);
@@ -126,7 +126,7 @@ BackgroundStopping::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiPar
             if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
             {
                 amrex::Gpu::synchronize();
-                wt = amrex::second() - wt;
+                wt = static_cast<amrex::Real>(amrex::second()) - wt;
                 amrex::HostDevice::Atomic::Add(&(*cost)[pti.index()], wt);
             }
         }
@@ -159,7 +159,7 @@ void BackgroundStopping::doBackgroundStoppingOnElectronsWithinTile (WarpXParIter
     amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
     // May be needed to evaluate the density and/or temperature functions
-    auto const GetPosition = GetParticlePosition(pti);
+    auto const GetPosition = GetParticlePosition<PIdx>(pti);
 
     amrex::ParallelFor(np,
         [=] AMREX_GPU_HOST_DEVICE (long ip)
@@ -234,7 +234,7 @@ void BackgroundStopping::doBackgroundStoppingOnIonsWithinTile (WarpXParIter& pti
     amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
     // May be needed to evaluate the density function
-    auto const GetPosition = GetParticlePosition(pti);
+    auto const GetPosition = GetParticlePosition<PIdx>(pti);
 
     amrex::ParallelFor(np,
         [=] AMREX_GPU_HOST_DEVICE (long ip)

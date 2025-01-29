@@ -12,7 +12,6 @@
 
 #include <AMReX_REAL.H>
 #include <AMReX_ParmParse.H>
-#include <AMReX_Vector.H>
 #include <AMReX_GpuContainers.H>
 
 #include <string>
@@ -27,8 +26,6 @@ struct HardEdgedQuadrupole
 {
 
     HardEdgedQuadrupole ();
-
-    ~HardEdgedQuadrupole () = default;
 
     /**
      * \brief Read in an element and add it to the lists
@@ -56,8 +53,8 @@ struct HardEdgedQuadrupole
     /**
      * \brief Returns the device level instance with the lattice information
      */
-    HardEdgedQuadrupoleDevice GetDeviceInstance () const;
-
+    [[nodiscard]] HardEdgedQuadrupoleDevice
+    GetDeviceInstance () const;
 
 };
 
@@ -105,8 +102,8 @@ struct HardEdgedQuadrupoleDevice
         // spends inside the hard edged element.
         amrex::ParticleReal const frac = hard_edged_fraction(z, zpvdt, d_zs_arr[ielement], d_ze_arr[ielement]);
 
-        amrex::ParticleReal dEdx = frac*d_dEdx_arr[ielement];
-        amrex::ParticleReal dBdx = frac*d_dBdx_arr[ielement];
+        const amrex::ParticleReal dEdx = frac*d_dEdx_arr[ielement];
+        const amrex::ParticleReal dBdx = frac*d_dBdx_arr[ielement];
 
         Ex = +x*dEdx;
         Ey = -y*dEdx;

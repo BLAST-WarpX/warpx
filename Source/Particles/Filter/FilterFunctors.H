@@ -4,13 +4,12 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef FILTERFUNCTORS_H
-#define FILTERFUNCTORS_H
+#ifndef WARPX_FILTERFUNCTORS_H
+#define WARPX_FILTERFUNCTORS_H
 
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/WarpXConst.H"
-#include "WarpX.H"
 
 #include <AMReX_Gpu.H>
 #include <AMReX_Parser.H>
@@ -48,9 +47,7 @@ struct RandomFilter
     {
         amrex::ignore_unused(p);
 
-        if ( !m_is_active ) return 1;
-        else if ( amrex::Random(engine) < m_fraction ) return 1;
-        else return 0;
+        return ( (!m_is_active) || (amrex::Random(engine) < m_fraction) );
     }
 private:
     const bool m_is_active; //! select all particles if false
@@ -77,9 +74,7 @@ struct UniformFilter
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     bool operator () (const SuperParticleType& p, const amrex::RandomEngine&) const noexcept
     {
-        if ( !m_is_active ) return 1;
-        else if ( p.id()%m_stride == 0 ) return 1;
-        else return 0;
+        return ( (!m_is_active) || ( p.id()%m_stride == 0 ) );
     }
 private:
     const bool m_is_active; //! select all particles if false
@@ -95,14 +90,15 @@ struct ParserFilter
      * \param a_is_active whether the test is active
      * \param a_filter_parser parser taking t, x, y, z, ux, uy, and uz, and returning a boolean for selected particle
      * \param a_mass mass of the particle species
+     * \param time simulation time on the coarsest level
      */
     ParserFilter(bool a_is_active, amrex::ParserExecutor<7> const& a_filter_parser,
-                 amrex::Real a_mass)
-        : m_is_active(a_is_active), m_function_partparser(a_filter_parser), m_mass(a_mass)
-    {
-        m_t = WarpX::GetInstance().gett_new(0);
-        m_units = InputUnits::WarpX;
-    }
+        const amrex::ParticleReal a_mass, const amrex::Real time):
+            m_is_active{a_is_active},
+            m_function_partparser{a_filter_parser},
+            m_mass{a_mass},
+            m_t{time}
+    {}
 
     /**
      * \brief return 1 if the particle is selected by the parser
@@ -112,21 +108,29 @@ struct ParserFilter
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     bool operator () (const SuperParticleType& p, const amrex::RandomEngine&) const noexcept
     {
-        if ( !m_is_active ) return 1;
-        amrex::ParticleReal x, y, z;
-        get_particle_position(p, x, y, z);
-        amrex::Real ux = p.rdata(PIdx::ux)/PhysConst::c;
-        amrex::Real uy = p.rdata(PIdx::uy)/PhysConst::c;
-        amrex::Real uz = p.rdata(PIdx::uz)/PhysConst::c;
-        if (m_units == InputUnits::SI)
-        {
-            ux /= m_mass;
-            uy /= m_mass;
-            uz /= m_mass;
+        using namespace amrex::literals;
+
+        if (!m_is_active){
+            return true;
         }
-        // ux, uy, uz are now in beta*gamma
-        if ( m_function_partparser(m_t,x,y,z,ux,uy,uz)) return 1;
-        else return 0;
+        else{
+            amrex::ParticleReal x, y, z;
+            get_particle_position(p, x, y, z);
+            amrex::Real ux = p.rdata(PIdx::ux)/PhysConst::c;
+            amrex::Real uy = p.rdata(PIdx::uy)/PhysConst::c;
+            amrex::Real uz = p.rdata(PIdx::uz)/PhysConst::c;
+            if (m_units == InputUnits::SI)
+            {
+                ux /= m_mass;
+                uy /= m_mass;
+                uz /= m_mass;
+            }
+            // ux, uy, uz are now in beta*gamma
+
+            // This is actually a binary true/false (1/0) check,
+            // but the parser returns floating point types
+            return (m_function_partparser(m_t,x,y,z,ux,uy,uz) != 0.0_rt);
+        }
     }
 private:
     /** Whether this diagnostics is activated. Select all particles if false */
@@ -134,12 +138,12 @@ private:
 public:
     /** Parser function with 7 input variables, t,x,y,z,ux,uy,uz */
     amrex::ParserExecutor<7> const m_function_partparser;
-    /** Store physical time. */
-    amrex::ParticleReal m_t;
     /** Mass of particle species */
     amrex::ParticleReal m_mass;
+    /** Store physical time on the coarsest level. */
+    amrex::Real m_t;
     /** keep track of momentum units particles will come in with **/
-    InputUnits m_units;
+    InputUnits m_units{InputUnits::WarpX};
 };
 
 
@@ -153,17 +157,17 @@ struct GeometryFilter
     GeometryFilter(bool a_is_active, amrex::RealBox a_domain)
         : m_is_active(a_is_active), m_domain(a_domain) {}
     /**
-     * \brief return 1 if the partcile is within the region described by the RealBox
+     * \brief return 1 if the particle is within the region described by the RealBox
      * \param p one particle
      * \return whether or not the particle is inside the region defined by m_domain
      */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     bool operator () (const SuperParticleType& p, const amrex::RandomEngine&) const noexcept
     {
-        if ( !m_is_active ) return 1;
-        return ! (AMREX_D_TERM( (p.pos(0) < m_domain.lo(0)) || (p.pos(0) > m_domain.hi(0) ),
-                            ||  (p.pos(1) < m_domain.lo(1)) || (p.pos(1) > m_domain.hi(1) ),
-                            ||  (p.pos(2) < m_domain.lo(2)) || (p.pos(2) > m_domain.hi(2) )));
+        if ( !m_is_active ) { return true; }
+        return AMREX_D_TERM(    (p.pos(0) >= m_domain.lo(0)) && (p.pos(0) <= m_domain.hi(0) ),
+                            &&  (p.pos(1) >= m_domain.lo(1)) && (p.pos(1) <= m_domain.hi(1) ),
+                            &&  (p.pos(2) >= m_domain.lo(2)) && (p.pos(2) <= m_domain.hi(2) ));
     }
 private:
     /** Whether this diagnostics is activated. Select all particles if false */
@@ -172,4 +176,4 @@ private:
     const amrex::RealBox m_domain;
 };
 
-#endif // FILTERFUNCTORS_H
+#endif // WARPX_FILTERFUNCTORS_H

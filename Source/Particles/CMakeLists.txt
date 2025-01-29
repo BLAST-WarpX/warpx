@@ -1,15 +1,19 @@
-target_sources(WarpX
-  PRIVATE
-    MultiParticleContainer.cpp
-    ParticleBoundaries.cpp
-    PhotonParticleContainer.cpp
-    PhysicalParticleContainer.cpp
-    RigidInjectedParticleContainer.cpp
-    WarpXParticleContainer.cpp
-    LaserParticleContainer.cpp
-    ParticleBoundaryBuffer.cpp
-    SpeciesPhysicalProperties.cpp
-)
+foreach(D IN LISTS WarpX_DIMS)
+    warpx_set_suffix_dims(SD ${D})
+    target_sources(lib_${SD}
+      PRIVATE
+        AddPlasmaUtilities.cpp
+        MultiParticleContainer.cpp
+        ParticleBoundaries.cpp
+        PhotonParticleContainer.cpp
+        PhysicalParticleContainer.cpp
+        RigidInjectedParticleContainer.cpp
+        WarpXParticleContainer.cpp
+        LaserParticleContainer.cpp
+        ParticleBoundaryBuffer.cpp
+        SpeciesPhysicalProperties.cpp
+    )
+endforeach()
 
 #add_subdirectory(Algorithms)
 add_subdirectory(Collision)

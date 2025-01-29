@@ -8,7 +8,7 @@ Repo Organization
 
 All the WarpX source code is located in ``Source/``.
 All sub-directories have a pretty straightforward name.
-The PIC loop is part of the WarpX class, in function ``WarpX::EvolveEM`` implemented in ``Source/WarpXEvolveEM.cpp``.
+The PIC loop is part of the WarpX class, in function ``WarpX::Evolve`` implemented in ``Source/WarpXEvolve.cpp``.
 The core of the PIC loop (i.e., without diagnostics etc.) is in ``WarpX::OneStep_nosub`` (when subcycling is OFF) or ``WarpX::OneStep_sub1`` (when subcycling is ON, with method 1).
 Here is a `visual representation <https://mango-dune-07a8b7110.1.azurestaticapps.net/?repo=ECP-WarpX%2FWarpX>`__ of the repository structure.
 
@@ -41,7 +41,7 @@ All WarpX header files need to be specified relative to the ``Source/`` director
 By default, in a ``MyName.cpp`` source file we do not include headers already included in ``MyName.H``. Besides this exception, if a function or a class
 is used in a source file, the header file containing its declaration must be included, unless the inclusion of a facade header is more appropriate. This is
 sometimes the case for AMReX headers. For instance ``AMReX_GpuLaunch.H`` is a façade header for ``AMReX_GpuLaunchFunctsC.H`` and ``AMReX_GpuLaunchFunctsG.H``, which
-contain respectively the CPU and the GPU implemetation of some methods, and which should not be included directly.
+contain respectively the CPU and the GPU implementation of some methods, and which should not be included directly.
 Whenever possible, forward declarations headers are included instead of the actual headers, in order to save compilation time (see dedicated section below). In WarpX forward
 declaration headers have the suffix ``*_fwd.H``, while in AMReX they have the suffix ``*Fwd.H``.
 The include order (see `PR #874 <https://github.com/ECP-WarpX/WarpX/pull/874#issuecomment-607038803>`__ and `PR #1947 <https://github.com/ECP-WarpX/WarpX/pull/1947>`__) and `proper quotation marks <https://gcc.gnu.org/onlinedocs/cpp/Include-Syntax.html>`__ are:

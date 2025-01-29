@@ -7,6 +7,7 @@
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 
 #include "BoundaryConditions/PMLComponent.H"
+#include "Fields.H"
 
 #ifndef WARPX_DIM_RZ
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
@@ -41,19 +42,28 @@ using namespace amrex;
  * \brief Update the B field, over one timestep
  */
 void FiniteDifferenceSolver::EvolveBPML (
-    std::array< amrex::MultiFab*, 3 > Bfield,
-    std::array< amrex::MultiFab*, 3 > const Efield,
+    ablastr::fields::MultiFabRegister& fields,
+    PatchType patch_type,
+    int level,
     amrex::Real const dt,
-    const bool dive_cleaning) {
+    const bool dive_cleaning
+)
+{
+    using warpx::fields::FieldType;
 
-   // Select algorithm (The choice of algorithm is a runtime option,
-   // but we compile code for each algorithm, using templates)
+    // Select algorithm (The choice of algorithm is a runtime option,
+    // but we compile code for each algorithm, using templates)
 #ifdef WARPX_DIM_RZ
-    amrex::ignore_unused(Bfield, Efield, dt, dive_cleaning);
-    amrex::Abort(Utils::TextMsg::Err(
-        "PML are not implemented in cylindrical geometry."));
+    amrex::ignore_unused(fields, patch_type, level, dt, dive_cleaning);
+    WARPX_ABORT_WITH_MESSAGE(
+        "PML are not implemented in cylindrical geometry.");
 #else
-    if (m_grid_type == GridType::Collocated) {
+    const ablastr::fields::VectorField Bfield = (patch_type == PatchType::fine) ?
+        fields.get_alldirs(FieldType::pml_B_fp, level) : fields.get_alldirs(FieldType::pml_B_cp, level);
+    const ablastr::fields::VectorField Efield = (patch_type == PatchType::fine) ?
+        fields.get_alldirs(FieldType::pml_E_fp, level) : fields.get_alldirs(FieldType::pml_E_cp, level);
+
+    if (m_grid_type == ablastr::utils::enums::GridType::Collocated) {
 
         EvolveBPMLCartesian <CartesianNodalAlgorithm> (Bfield, Efield, dt, dive_cleaning);
 
@@ -66,8 +76,8 @@ void FiniteDifferenceSolver::EvolveBPML (
         EvolveBPMLCartesian <CartesianCKCAlgorithm> (Bfield, Efield, dt, dive_cleaning);
 
     } else {
-        amrex::Abort(Utils::TextMsg::Err(
-            "EvolveBPML: Unknown algorithm"));
+        WARPX_ABORT_WITH_MESSAGE(
+            "EvolveBPML: Unknown algorithm");
     }
 #endif
 }
@@ -78,7 +88,7 @@ void FiniteDifferenceSolver::EvolveBPML (
 template<typename T_Algo>
 void FiniteDifferenceSolver::EvolveBPMLCartesian (
     std::array< amrex::MultiFab*, 3 > Bfield,
-    std::array< amrex::MultiFab*, 3 > const Efield,
+    ablastr::fields::VectorField const Efield,
     amrex::Real const dt,
     const bool dive_cleaning) {
 
@@ -98,11 +108,11 @@ void FiniteDifferenceSolver::EvolveBPMLCartesian (
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
-        int const n_coefs_x = m_stencil_coefs_x.size();
+        auto const n_coefs_x = static_cast<int>(m_stencil_coefs_x.size());
         Real const * const AMREX_RESTRICT coefs_y = m_stencil_coefs_y.dataPtr();
-        int const n_coefs_y = m_stencil_coefs_y.size();
+        auto const n_coefs_y = static_cast<int>(m_stencil_coefs_y.size());
         Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
-        int const n_coefs_z = m_stencil_coefs_z.size();
+        auto const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
 
         // Extract tileboxes for which to loop
         Box const& tbx  = mfi.tilebox(Bfield[0]->ixType().ixType());

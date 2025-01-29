@@ -7,12 +7,14 @@
 
 #include "TextMsg.H"
 
+#include "ablastr/utils/text/StringUtils.H"
+
 #include <AMReX.H>
 
 #include <algorithm>
 #include <iterator>
 #include <sstream>
-#include <string>
+#include <vector>
 
 
 namespace
@@ -35,7 +37,7 @@ namespace
             return msg_prefix + msg + "\n";
         }
 
-        const auto wrapped_text = ablastr::utils::automatic_text_wrap(
+        const auto wrapped_text = ablastr::utils::text::automatic_text_wrap(
             msg, msg_line_length);
 
         std::stringstream ss_out;
@@ -78,45 +80,9 @@ ablastr::utils::TextMsg::Assert (const char* ex, const char* file, const int lin
     amrex::Assert(ex , file, line , n_msg.c_str());
 }
 
-std::vector< std::string >
-ablastr::utils::automatic_text_wrap (
-    const std::string& text, const int max_line_length)
+void
+ablastr::utils::TextMsg::Abort (const char* file, const int line, const std::string& msg)
 {
-
-    auto ss_text = std::stringstream{text};
-    auto wrapped_text_lines = std::vector< std::string >{};
-
-    std::string line;
-    while(std::getline(ss_text, line,'\n')){
-
-        auto ss_line = std::stringstream{line};
-        int counter = 0;
-        std::stringstream ss_line_out;
-        std::string word;
-
-        while (ss_line >> word){
-            const auto wlen = static_cast<int>(word.length());
-
-            if(counter == 0){
-                ss_line_out << word;
-                counter += wlen;
-            }
-            else{
-                if (counter + wlen < max_line_length){
-                    ss_line_out << " " << word;
-                    counter += (wlen+1);
-                }
-                else{
-                    wrapped_text_lines.push_back(ss_line_out.str());
-                    ss_line_out.str("");
-                    ss_line_out << word;
-                    counter = wlen;
-                }
-            }
-        }
-
-        wrapped_text_lines.push_back(ss_line_out.str());
-    }
-
-    return wrapped_text_lines;
+    const auto n_msg =  "\n" +  Err(msg + "\n(" + file + ":" + std::to_string(line) + ")");
+    amrex::Abort(n_msg);
 }

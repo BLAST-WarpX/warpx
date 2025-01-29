@@ -3,7 +3,7 @@
 WarpX
 -----
 
-WarpX is an advanced, time-based, **electromagnetic & electrostatic Particle-In-Cell** code.
+WarpX is an advanced **electromagnetic & electrostatic Particle-In-Cell** code.
 
 It supports many features including:
 
@@ -22,7 +22,7 @@ In addition, WarpX is also a *multi-platform code* and runs on Linux, macOS and 
 Contact us
 ^^^^^^^^^^
 
-If you are starting using WarpX, or if you have a user question, please pop in our `Gitter chat room <https://gitter.im/ECP-WarpX/community>`__ and get in touch with the community.
+If you are starting using WarpX, or if you have a user question, please pop in our `discussions page <https://github.com/ECP-WarpX/WarpX/discussions>`__ and get in touch with the community.
 
 The `WarpX GitHub repo <https://github.com/ECP-WarpX/WarpX>`__ is the main communication platform.
 Have a look at the action icons on the top right of the web page: feel free to watch the repo if you want to receive updates, or to star the repo to support the project.
@@ -75,11 +75,9 @@ Usage
    :hidden:
 
    usage/how_to_run
-   usage/domain_decomposition
-   usage/parameters
-   usage/python
    usage/examples
-   usage/pwfa
+   usage/python
+   usage/parameters
    usage/workflows
    usage/faq
 
@@ -99,6 +97,7 @@ Data Analysis
    dataanalysis/visualpic
    dataanalysis/picviewer
    dataanalysis/reduced_diags
+   dataanalysis/workflows
 
 Theory
 ------
@@ -108,12 +107,13 @@ Theory
    :hidden:
 
    theory/intro
-   theory/picsar_theory
+   theory/pic
    theory/amr
-   theory/PML
+   theory/boundary_conditions
    theory/boosted_frame
-   theory/input_output
-   theory/collisions
+   theory/multiphysics_extensions
+   theory/kinetic_fluid_hybrid_model
+   theory/cold_fluid_model
 
 Development
 -----------
@@ -123,10 +123,10 @@ Development
    :hidden:
 
    developers/contributing
-   developers/workflows
    developers/developers
    developers/doxygen
    developers/gnumake
+   developers/how_to_guides
    developers/faq
 .. good to have in the future:
 ..   developers/repostructure
@@ -139,7 +139,6 @@ Maintenance
    :hidden:
 
    maintenance/release
-   maintenance/performance_tests
 
 Epilogue
 --------
@@ -149,4 +148,5 @@ Epilogue
    :hidden:
 
    glossary
+   governance
    acknowledgements

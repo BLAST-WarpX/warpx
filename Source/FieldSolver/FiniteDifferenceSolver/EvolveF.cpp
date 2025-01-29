@@ -44,14 +44,14 @@ using namespace amrex;
  * \brief Update the F field, over one timestep
  */
 void FiniteDifferenceSolver::EvolveF (
-    std::unique_ptr<amrex::MultiFab>& Ffield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Efield,
-    std::unique_ptr<amrex::MultiFab> const& rhofield,
+    amrex::MultiFab* Ffield,
+    ablastr::fields::VectorField const& Efield,
+    amrex::MultiFab* const rhofield,
     int const rhocomp,
     amrex::Real const dt ) {
 
-   // Select algorithm (The choice of algorithm is a runtime option,
-   // but we compile code for each algorithm, using templates)
+    // Select algorithm (The choice of algorithm is a runtime option,
+    // but we compile code for each algorithm, using templates)
 #ifdef WARPX_DIM_RZ
     if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee){
 
@@ -72,7 +72,7 @@ void FiniteDifferenceSolver::EvolveF (
 
 #endif
     } else {
-        amrex::Abort(Utils::TextMsg::Err("EvolveF: Unknown algorithm"));
+        WARPX_ABORT_WITH_MESSAGE("EvolveF: Unknown algorithm");
     }
 
 }
@@ -82,9 +82,9 @@ void FiniteDifferenceSolver::EvolveF (
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::EvolveFCartesian (
-    std::unique_ptr<amrex::MultiFab>& Ffield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Efield,
-    std::unique_ptr<amrex::MultiFab> const& rhofield,
+    amrex::MultiFab* Ffield,
+    ablastr::fields::VectorField const Efield,
+    amrex::MultiFab* const rhofield,
     int const rhocomp,
     amrex::Real const dt ) {
 
@@ -103,11 +103,11 @@ void FiniteDifferenceSolver::EvolveFCartesian (
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
-        int const n_coefs_x = m_stencil_coefs_x.size();
+        auto const n_coefs_x = static_cast<int>(m_stencil_coefs_x.size());
         Real const * const AMREX_RESTRICT coefs_y = m_stencil_coefs_y.dataPtr();
-        int const n_coefs_y = m_stencil_coefs_y.size();
+        auto const n_coefs_y = static_cast<int>(m_stencil_coefs_y.size());
         Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
-        int const n_coefs_z = m_stencil_coefs_z.size();
+        auto const n_coefs_z =static_cast<int>(m_stencil_coefs_z.size());
 
         // Extract tileboxes for which to loop
         Box const& tf  = mfi.tilebox(Ffield->ixType().toIntVect());
@@ -135,9 +135,9 @@ void FiniteDifferenceSolver::EvolveFCartesian (
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::EvolveFCylindrical (
-    std::unique_ptr<amrex::MultiFab>& Ffield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Efield,
-    std::unique_ptr<amrex::MultiFab> const& rhofield,
+    amrex::MultiFab* Ffield,
+    ablastr::fields::VectorField const & Efield,
+    amrex::MultiFab* const rhofield,
     int const rhocomp,
     amrex::Real const dt ) {
 
@@ -148,7 +148,7 @@ void FiniteDifferenceSolver::EvolveFCylindrical (
     for ( MFIter mfi(*Ffield, TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
 
         // Extract field data for this grid/tile
-        Array4<Real> F = Ffield->array(mfi);
+        const Array4<Real> F = Ffield->array(mfi);
         Array4<Real> const& Er = Efield[0]->array(mfi);
         Array4<Real> const& Et = Efield[1]->array(mfi);
         Array4<Real> const& Ez = Efield[2]->array(mfi);
@@ -156,9 +156,9 @@ void FiniteDifferenceSolver::EvolveFCylindrical (
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
-        int const n_coefs_r = m_stencil_coefs_r.size();
+        auto const n_coefs_r = static_cast<int>(m_stencil_coefs_r.size());
         Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
-        int const n_coefs_z = m_stencil_coefs_z.size();
+        auto const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
 
         // Extract cylindrical specific parameters
         Real const dr = m_dr;

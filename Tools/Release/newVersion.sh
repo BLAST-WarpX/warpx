@@ -104,40 +104,26 @@ sed -i -E "s/"\
 
 # setup.py: version = '21.02',
 sed -i -E "s/"\
-"([[:blank:]]*version[[:blank:]]*=[[:blank:]]*')(.*)('.+)/"\
+"([[:blank:]]*version[[:blank:]]*=[[:blank:]]*\")(.*)(\".+)/"\
 "\1${VERSION_STR}\3/g" \
     ${REPO_DIR}/setup.py
 
 # Python/setup.py: version = '21.02',
 sed -i -E "s/"\
-"([[:blank:]]*version[[:blank:]]*=[[:blank:]]*')(.*)('.+)/"\
+"([[:blank:]]*version[[:blank:]]*=[[:blank:]]*\")(.*)(\".+)/"\
 "\1${VERSION_STR}\3/g" \
     ${REPO_DIR}/Python/setup.py
 
 # sphinx / RTD
 #   docs/source/conf.py
 sed -i "s/"\
-"[[:blank:]]*version[[:blank:]]*=[[:blank:]]*u.*/"\
-"version = u'${VERSION_STR_NOSUFFIX}'/g" \
+"[[:blank:]]*version[[:blank:]]*=[[:blank:]]*.*/"\
+"version = \"${VERSION_STR_NOSUFFIX}\"/g" \
     ${REPO_DIR}/Docs/source/conf.py
 sed -i "s/"\
-"[[:blank:]]*release[[:blank:]]*=[[:blank:]]*u.*/"\
-"release = u'${VERSION_STR}'/g" \
+"[[:blank:]]*release[[:blank:]]*=[[:blank:]]*.*/"\
+"release = \"${VERSION_STR}\"/g" \
     ${REPO_DIR}/Docs/source/conf.py
-
-# LICENSE
-#   LICENSE.txt: WarpX vYY.MM Copyright (c) 20YY, The Regents of ...
-sed -i -E "s/"\
-"(WarpX v)(.*)([[:blank:]]+Copyright \(c\) 2018-)(.*)(, The Regents of.*)/"\
-"\1${VERSION_STR_NOSUFFIX}\3$(date +%Y)\5/g" \
-    ${REPO_DIR}/LICENSE.txt
-
-# README.md
-#   README.md: WarpX Copyright (c) 2018-2021, The Regents of ...
-sed -i -E "s/"\
-"(WarpX Copyright \(c\) 2018-)(.*)(, The Regents of.*)/"\
-"\1$(date +%Y)\3/g" \
-    ${REPO_DIR}/README.md
 
 
 # Epilog ######################################################################

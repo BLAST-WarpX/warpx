@@ -14,9 +14,9 @@
 
 #include <vector>
 
-ResamplingTrigger::ResamplingTrigger (const std::string species_name)
+ResamplingTrigger::ResamplingTrigger (const std::string& species_name)
 {
-    amrex::ParmParse pp_species_name(species_name);
+    const amrex::ParmParse pp_species_name(species_name);
 
     std::vector<std::string> resampling_trigger_int_string_vec = {"0"};
     pp_species_name.queryarr("resampling_trigger_intervals", resampling_trigger_int_string_vec);

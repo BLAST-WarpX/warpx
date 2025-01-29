@@ -19,7 +19,7 @@ When using the AMReX `plotfile` format, users can set the ``amrex.async_out=1``
 option to perform the IO in a non-blocking fashion, meaning that the simulation
 will continue to run while an IO thread controls writing the data to disk.
 This can significantly reduce the overall time spent in IO. This is primarily intended for
-large runs on supercomputers such as Summit and Cori; depending on the MPI
+large runs on supercomputers (e.g. at OLCF or NERSC); depending on the MPI
 implementation you are using, you may not see a benefit on your workstation.
 
 When writing plotfiles, each rank will write to a separate file, up to some maximum number
@@ -41,8 +41,9 @@ files to disk).
 .. toctree::
    :maxdepth: 1
 
-   sensei
    ascent
+   catalyst
+   sensei
 
 If you like the 3D rendering of laser wakefield acceleration
 on the WarpX documentation front page (which is

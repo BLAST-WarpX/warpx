@@ -54,3 +54,9 @@ Plotfiles (AMReX)
 
 ParaView also supports visualizing AMReX plotfiles.
 Please see `the AMReX documentation <https://amrex-codes.github.io/amrex/docs_html/Visualization.html#paraview>`__ for more details.
+
+
+In Situ Analysis with Catalyst 2
+--------------------------------
+
+Continue reading :ref:`here <visualization-catalyst>`.

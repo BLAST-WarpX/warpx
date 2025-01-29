@@ -4,8 +4,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef BTD_PLOTFILE_HEADER_IMPL_H
-#define BTD_PLOTFILE_HEADER_IMPL_H
+#ifndef WARPX_BTD_PLOTFILE_HEADER_IMPL_H
+#define WARPX_BTD_PLOTFILE_HEADER_IMPL_H
 
 #include <AMReX_Array.H>
 #include <AMReX_Box.H>
@@ -31,48 +31,46 @@ public:
      * \param[in] Headerfile_path string containing path of Headerfile
      */
     BTDPlotfileHeaderImpl (std::string const& Headerfile_path);
-    /** Destructor */
-    ~BTDPlotfileHeaderImpl () = default;
 
     /** Returns the Header file version for plotfile */
-    std::string fileVersion () const noexcept {return m_file_version; }
+    [[nodiscard]] std::string fileVersion () const noexcept {return m_file_version; }
     /** Returns the number of components written in the Headerfile */
-    int ncomp () const noexcept {return m_nComp; }
+    [[nodiscard]] int ncomp () const noexcept {return m_nComp; }
     /** Returns the names of components in the Headerfile */
-    const amrex::Vector<std::string>& varnames () const noexcept {return m_varnames; }
+    [[nodiscard]] const amrex::Vector<std::string>& varnames () const noexcept {return m_varnames; }
     /** Returns the number of dimensions in the Headerfile */
-    int spaceDim () const noexcept {return m_spacedim; }
+    [[nodiscard]] int spaceDim () const noexcept {return m_spacedim; }
     /** Returns the physical time in the simulation in the boosted-frame */
-    amrex::Real time () const noexcept {return m_time; }
+    [[nodiscard]] amrex::Real time () const noexcept {return m_time; }
     /** Returns finest level output in the Headerfile */
-    int finestLevel () const noexcept { return m_finest_level; }
+    [[nodiscard]] int finestLevel () const noexcept { return m_finest_level; }
     /** Returns the physical co-ordinates of the lower corner in dimension, idim,
      *  that corresponds the to the respective plotfile data
      */
-    amrex::Real problo (int dim) const noexcept {return m_prob_lo[dim]; }
+    [[nodiscard]] amrex::Real problo (int dim) const noexcept {return m_prob_lo[dim]; }
     /** Returns the physical co-ordinates of the upper corner in dimension, idim,
      *  that corresponds the to the respective plotfile data.
      */
-    amrex::Real probhi (int dim) const noexcept {return m_prob_hi[dim]; }
+    [[nodiscard]] amrex::Real probhi (int dim) const noexcept {return m_prob_hi[dim]; }
 
     /** Returns the bounding box of the domain spanned in the plotfile */
-    amrex::Box probDomain () const noexcept {return m_prob_domain; }
+    [[nodiscard]] amrex::Box probDomain () const noexcept {return m_prob_domain; }
     /** Returns timestep at which the plotfile was written */
-    int timestep () const noexcept {return m_timestep; }
-    int numFabs () const noexcept {return m_numFabs; }
+    [[nodiscard]] int timestep () const noexcept {return m_timestep; }
+    [[nodiscard]] int numFabs () const noexcept {return m_numFabs; }
 
     /** Returns physical co-ordinates of the lower-corner for the i-th Fab.
      *  \param[in] iFab id of the ith Fab in the list of Multifabs
      *  \returns   Array of lower-corner physical co-ordinates corresponding to the ith Fab
      */
-    amrex::Array<amrex::Real, AMREX_SPACEDIM> FabLo (int iFab) const noexcept {return m_glo[iFab]; }
+    [[nodiscard]] amrex::Array<amrex::Real, AMREX_SPACEDIM> FabLo (int iFab) const noexcept {return m_glo[iFab]; }
     /** Returns physical co-ordinates of the lower-corner for the i-th Fab.
      *  \param[in] iFab id of the ith Fab in the list of Multifabs
      *  \returns   Array of lower-corner physical co-ordinates corresponding to the ith Fab
      */
-    amrex::Array<amrex::Real, AMREX_SPACEDIM> FabHi (int iFab) const noexcept {return m_ghi[iFab]; }
+    [[nodiscard]] amrex::Array<amrex::Real, AMREX_SPACEDIM> FabHi (int iFab) const noexcept {return m_ghi[iFab]; }
     /** Returns path to location of multifabs */
-    std::string CellPath () const noexcept {return m_CellPath; }
+    [[nodiscard]] std::string CellPath () const noexcept {return m_CellPath; }
 
     /** Reads the Header file data for BTD */
     void ReadHeaderData ();
@@ -146,9 +144,9 @@ private:
     /** Number of Fabs in the plotfile. */
     int m_numFabs;
     /** Lower corner physical coordinates of each fab in the plotfile. */
-    amrex::Vector<amrex::Array<amrex::Real, AMREX_SPACEDIM> > m_glo {{AMREX_D_DECL(0.,0.,0.)}};
+    amrex::Vector<amrex::Array<amrex::Real, AMREX_SPACEDIM> > m_glo;
     /** Upper corner physical coordinates of each fab in the plotfile. */
-    amrex::Vector<amrex::Array<amrex::Real, AMREX_SPACEDIM> > m_ghi {{AMREX_D_DECL(1.,1.,1.)}};
+    amrex::Vector<amrex::Array<amrex::Real, AMREX_SPACEDIM> > m_ghi;
     std::string m_CellPath;
 
 };
@@ -166,18 +164,18 @@ class BTDMultiFabHeaderImpl
      * \param[in] Headerfile_path string containing path of Headerfile
      */
     BTDMultiFabHeaderImpl (std::string const& Headerfile_path);
-    ~BTDMultiFabHeaderImpl () = default;
+
     /** Reads the Multifab Header file and stores its data. */
     void ReadMultiFabHeader ();
     /** Writes the meta-data of the Multifab in a header file, with path, m_Header_path. */
     void WriteMultiFabHeader ();
 
     /** Returns size, m_ba_size, of the Box Array, m_ba.*/
-    int ba_size () {return m_ba_size;}
+    [[nodiscard]] int ba_size () const {return m_ba_size;}
     /** Returns box corresponding to the ith box in the BoxArray, m_ba.
      *  \param[in] ibox index of the box in the BoxArray.
      */
-    amrex::Box ba_box (int ibox) {return m_ba[ibox]; }
+    [[nodiscard]] amrex::Box ba_box (int ibox) const {return m_ba[ibox]; }
     /** Returns prefix of the ith-fab on disk, i.e., ith fab of the MultiFab data.
      *  \param[in] ifab index of the ith fab in the MultiFab data.
      */
@@ -202,12 +200,12 @@ class BTDMultiFabHeaderImpl
      */
     void SetBox (int ibox, amrex::Box ba_box) { m_ba.set(ibox, ba_box); }
     /** Set Fab name of the ith fab to be written in the multifab Header file.*/
-    void SetFabName (int ifab, std::string fodPrefix, std::string FabName,
+    void SetFabName (int ifab, const std::string& fodPrefix, const std::string& FabName,
                      int FabHead);
     /** Set minimum value of all the components for the ith fab. */
-    void SetMinVal (int ifab, amrex::Vector<amrex::Real> minval);
+    void SetMinVal (int ifab, const amrex::Vector<amrex::Real>& minval);
     /** Set maximum value of all the components for the ith fab. */
-    void SetMaxVal (int ifab, amrex::Vector<amrex::Real> maxval);
+    void SetMaxVal (int ifab, const amrex::Vector<amrex::Real>& maxval);
     private:
     /** Header file path */
     std::string m_Header_path;
@@ -249,13 +247,13 @@ public:
      * \param[in] species_name string containing species name
      */
     BTDSpeciesHeaderImpl (std::string const& Headerfile_path, std::string const& species_name);
-    ~BTDSpeciesHeaderImpl () = default;
+
     /** Reads the Header file for BTD species*/
     void ReadHeader ();
     /** Writes the meta-data of species Header file, with path, m_Header_path*/
     void WriteHeader ();
     /** Set data Index of the data-file, DATAXXXXX, that the particles belong to*/
-    void set_DataIndex (const int lev, const int box_id, const int data_index);
+    void set_DataIndex (int lev, int box_id, int data_index);
     /** Add new_particles to existing to obtain the total number of particles of the species.
         \param[in] new_particles total particles in the new buffer
      */
@@ -265,7 +263,7 @@ public:
     /** Append particle info of the newly added box, namely,
         m_which_data, m_particles_per_box, m_offset_per_box.
      */
-    void AppendParticleInfoForNewBox (const int data_index, const int particles_per_box, const int offset);
+    void AppendParticleInfoForNewBox (int data_index, int particles_per_box, int offset);
     /** Vector of data indices of all particle data for each level*/
     amrex::Vector< amrex::Vector<int> > m_which_data;
     /** Vector of particles per box for each level*/
@@ -314,14 +312,13 @@ public:
      * \param[in] Headerfile_path containing path of Headerfile
      */
     BTDParticleDataHeaderImpl (std::string const& Headerfile_path);
-    /** Destructor */
-    ~BTDParticleDataHeaderImpl () = default;
+
     /** Reads the particle header file at m_Header_path and stores its data*/
     void ReadHeader ();
     /** Writes the meta-data of particle box array in header file, with path, m_Header_path*/
-    void WriteHeader ();
+    void WriteHeader () const;
     /** Returns the size of the box array, m_ba_size */
-    int ba_size () {return m_ba_size; }
+    [[nodiscard]] int ba_size () const {return m_ba_size; }
     /** Increases Box array size, m_ba_size, by add_size
      *  \param[in] add_size
      */
@@ -329,7 +326,7 @@ public:
     /** Returns box corresponding to the ith box in the BoxArray, m_ba.
      *  \param[in] ibox index of the box in the BoxArray.
      */
-    amrex::Box ba_box (int ibox) {return m_ba[ibox]; }
+    [[nodiscard]] amrex::Box ba_box (int ibox) const {return m_ba[ibox]; }
     /** Resize boxArray, m_ba, to size, m_ba_size. */
     void ResizeBoxArray () { m_ba.resize(m_ba_size); }
     /** Set Box indices of the ith-box in Box Array, m_ba, to the new Box, ba_box.
@@ -345,4 +342,4 @@ public:
     std::string m_Header_path;
 };
 
-#endif
+#endif //WARPX_BTD_PLOTFILE_HEADER_IMPL_H

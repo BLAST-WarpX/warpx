@@ -1,0 +1,69 @@
+# Maximum number of time steps
+max_step = 80
+
+# number of grid points
+amr.n_cell =   128  128
+
+# Maximum allowable size of each subdomain in the problem domain;
+#    this is used to decompose the domain for parallel calculations.
+amr.max_grid_size = 64
+
+# Maximum level in hierarchy (for now must be 0, i.e., one level in total)
+amr.max_level = 0
+
+# Geometry
+geometry.dims = 2
+geometry.prob_lo     = -20.e-6   -20.e-6    # physical domain
+geometry.prob_hi     =  20.e-6    20.e-6
+
+# Boundary condition
+boundary.field_lo = periodic periodic
+boundary.field_hi = periodic periodic
+
+warpx.serialize_initial_conditions = 1
+
+# Verbosity
+warpx.verbose = 1
+
+# Algorithms
+algo.field_gathering = energy-conserving
+warpx.use_filter = 0
+
+# CFL
+warpx.cfl = 1.0
+
+# Parameters for the plasma wave
+my_constants.epsilon = 0.01
+my_constants.n0 = 2.e24  # electron and positron densities, #/m^3
+my_constants.wp = sqrt(2.*n0*q_e**2/(epsilon0*m_e))  # plasma frequency
+my_constants.kp = wp/clight  # plasma wavenumber
+my_constants.k = 2.*pi/20.e-6  # perturbation wavenumber
+# Note: kp is calculated in SI for a density of 4e24 (i.e. 2e24 electrons + 2e24 positrons)
+# k is calculated so as to have 2 periods within the 40e-6 wide box.
+
+# Fluids
+fluids.species_names = electrons positrons
+
+electrons.charge = -q_e
+electrons.mass = m_e
+electrons.profile = constant
+electrons.density = n0   # number of electrons per m^3
+electrons.momentum_distribution_type = parse_momentum_function
+electrons.momentum_function_ux(x,y,z) = "epsilon * k/kp * sin(k*x) * cos(k*y) * cos(k*z)"
+electrons.momentum_function_uy(x,y,z) = "epsilon * k/kp * cos(k*x) * sin(k*y) * cos(k*z)"
+electrons.momentum_function_uz(x,y,z) = "epsilon * k/kp * cos(k*x) * cos(k*y) * sin(k*z)"
+
+positrons.charge = q_e
+positrons.mass = m_e
+positrons.profile = constant
+positrons.density = n0   # number of positrons per m^3
+positrons.momentum_distribution_type = parse_momentum_function
+positrons.momentum_function_ux(x,y,z) = "-epsilon * k/kp * sin(k*x) * cos(k*y) * cos(k*z)"
+positrons.momentum_function_uy(x,y,z) = "-epsilon * k/kp * cos(k*x) * sin(k*y) * cos(k*z)"
+positrons.momentum_function_uz(x,y,z) = "-epsilon * k/kp * cos(k*x) * cos(k*y) * sin(k*z)"
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 40
+diag1.diag_type = Full
+diag1.fields_to_plot = Ex Ez jx jz rho

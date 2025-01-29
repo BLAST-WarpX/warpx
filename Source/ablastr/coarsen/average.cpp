@@ -9,15 +9,16 @@
 #include "ablastr/utils/TextMsg.H"
 
 #include <AMReX_BLProfiler.H>
-#include <AMReX_BLassert.H>
 #include <AMReX_BoxArray.H>
 #include <AMReX_Config.H>
 #include <AMReX_GpuControl.H>
 #include <AMReX_GpuLaunch.H>
+#include <AMReX_IndexType.H>
 #include <AMReX_IntVect.H>
 #include <AMReX_MFIter.H>
 #include <AMReX_MultiFab.H>
 
+#include <memory>
 
 namespace ablastr::coarsen::average
 {
@@ -35,45 +36,15 @@ namespace ablastr::coarsen::average
         amrex::IntVect const stag_dst = mf_dst.boxArray().ixType().toIntVect();
 
         // Auxiliary integer arrays (always 3D)
-        amrex::GpuArray<int, 3> sf; // staggering of source fine MultiFab
-        amrex::GpuArray<int, 3> sc; // staggering of destination coarse MultiFab
-        amrex::GpuArray<int, 3> cr; // coarsening ratio
-
-        sf[0] = stag_src[0];
-#if   defined(WARPX_DIM_1D_Z)
-        sf[1] = 0;
-#else
-        sf[1] = stag_src[1];
-#endif
-#if   (AMREX_SPACEDIM <= 2)
-        sf[2] = 0;
-#elif defined(WARPX_DIM_3D)
-        sf[2] = stag_src[2];
-#endif
-
-        sc[0] = stag_dst[0];
-#if   defined(WARPX_DIM_1D_Z)
-        sc[1] = 0;
-#else
-        sc[1] = stag_dst[1];
-#endif
-#if   (AMREX_SPACEDIM <= 2)
-        sc[2] = 0;
-#elif defined(WARPX_DIM_3D)
-        sc[2] = stag_dst[2];
-#endif
-
-        cr[0] = crse_ratio[0];
-#if   defined(WARPX_DIM_1D_Z)
-        cr[1] = 1;
-#else
-        cr[1] = crse_ratio[1];
-#endif
-#if   (AMREX_SPACEDIM <= 2)
-        cr[2] = 1;
-#elif defined(WARPX_DIM_3D)
-        cr[2] = crse_ratio[2];
-#endif
+        auto sf = amrex::GpuArray<int,3>{0,0,0}; // staggering of source fine MultiFab
+        auto sc = amrex::GpuArray<int,3>{0,0,0}; // staggering of destination coarse MultiFab
+        auto cr = amrex::GpuArray<int,3>{1,1,1}; // coarsening ratio
+        for (int i=0; i<AMREX_SPACEDIM; ++i)
+        {
+             sf[i] = stag_src[i];
+             sc[i] = stag_dst[i];
+             cr[i] = crse_ratio[i];
+        }
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())

@@ -32,21 +32,21 @@ class HankelTransform
         using RealVector = amrex::Gpu::DeviceVector<amrex::Real>;
 
         // Constructor
-        HankelTransform(const int hankel_order,
-                        const int azimuthal_mode,
-                        const int nr,
-                        const amrex::Real rmax);
+        HankelTransform(int hankel_order,
+                        int azimuthal_mode,
+                        int nr,
+                        amrex::Real rmax);
 
         const RealVector & getSpectralWavenumbers() {return m_kr;}
 
-        void HankelForwardTransform(amrex::FArrayBox const& F, int const F_icomp,
-                                    amrex::FArrayBox      & G, int const G_icomp);
+        void HankelForwardTransform(amrex::FArrayBox const& F, int F_icomp,
+                                    amrex::FArrayBox      & G, int G_icomp);
 
-        void HankelInverseTransform(amrex::FArrayBox const& G, int const G_icomp,
-                                    amrex::FArrayBox      & F, int const F_icomp);
+        void HankelInverseTransform(amrex::FArrayBox const& G, int G_icomp,
+                                    amrex::FArrayBox      & F, int F_icomp);
 
     private:
-        // Even though nk == nr always, use a seperate variable for clarity.
+        // Even though nk == nr always, use a separate variable for clarity.
         int m_nr, m_nk;
 
         RealVector m_kr;

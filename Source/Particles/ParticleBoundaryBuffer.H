@@ -4,50 +4,59 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef PARTICLEBOUNDARYBUFFER_H_
-#define PARTICLEBOUNDARYBUFFER_H_
+#ifndef WARPX_PARTICLEBOUNDARYBUFFER_H_
+#define WARPX_PARTICLEBOUNDARYBUFFER_H_
 
 #include "Particles/MultiParticleContainer_fwd.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Particles/PinnedMemoryParticleContainer.H"
+#include "Utils/export.H"
+
+#include <ablastr/fields/MultiFabRegister.H>
 
 #include <vector>
+
 
 /**
  *  This stores particles that have left / been absorbed by domain and embedded boundaries.
  */
-class ParticleBoundaryBuffer
+class WARPX_EXPORT ParticleBoundaryBuffer
 {
 public:
     ParticleBoundaryBuffer ();
 
-    int numSpecies() const { return getSpeciesNames().size(); }
+    ~ParticleBoundaryBuffer() = default;
 
-    const std::vector<std::string>& getSpeciesNames() const {
-        static bool initialized = false;
-        if (!initialized)
-        {
-            amrex::ParmParse pp_particles("particles");
-            pp_particles.queryarr("species_names", m_species_names);
-            initialized = true;
-        }
-        return m_species_names;
-    }
+    /** Copy constructor for ParticleBoundaryBuffer */
+    ParticleBoundaryBuffer ( const ParticleBoundaryBuffer &) = delete;
+    /** Copy operator for ParticleBoundaryBuffer */
+    ParticleBoundaryBuffer& operator= ( const ParticleBoundaryBuffer & ) = delete;
 
-    void gatherParticles (MultiParticleContainer& mypc,
-                          const amrex::Vector<const amrex::MultiFab*>& distance_to_eb);
+    /** Move constructor for NamedComponentParticleContainer */
+    ParticleBoundaryBuffer ( ParticleBoundaryBuffer && ) = default;
+    /** Move operator for NamedComponentParticleContainer */
+    ParticleBoundaryBuffer& operator= ( ParticleBoundaryBuffer && ) = default;
+
+    int numSpecies() const { return static_cast<int>(getSpeciesNames().size()); }
+
+    const std::vector<std::string>& getSpeciesNames() const;
+
+    void gatherParticlesFromDomainBoundaries (MultiParticleContainer& mypc);
+    void gatherParticlesFromEmbeddedBoundaries (
+        MultiParticleContainer& mypc, ablastr::fields::MultiLevelScalarField const& distance_to_eb
+    );
 
     void redistribute ();
     void clearParticles ();
-    void clearParticles (int const i);
+    void clearParticles (int i);
 
     void printNumParticles () const;
 
-    int getNumParticlesInContainer(const std::string species_name, int boundary, bool local);
+    int getNumParticlesInContainer(const std::string& species_name, int boundary, bool local);
 
-    PinnedMemoryParticleContainer& getParticleBuffer(const std::string species_name, int boundary);
+    PinnedMemoryParticleContainer& getParticleBuffer(const std::string& species_name, int boundary);
 
-    PinnedMemoryParticleContainer* getParticleBufferPointer(const std::string species_name, int boundary);
+    PinnedMemoryParticleContainer* getParticleBufferPointer(const std::string& species_name, int boundary);
 
     static constexpr int numBoundaries () {
         return AMREX_SPACEDIM*2
@@ -75,4 +84,4 @@ private:
     mutable std::vector<std::string> m_species_names;
 };
 
-#endif /*PARTICLEBOUNDARYBUFFER_H_*/
+#endif /*WARPX_PARTICLEBOUNDARYBUFFER_H_*/

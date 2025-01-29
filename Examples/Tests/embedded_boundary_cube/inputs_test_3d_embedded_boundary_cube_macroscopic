@@ -1,0 +1,8 @@
+# base input parameters
+FILE = inputs_base_3d
+
+# test input parameters
+algo.em_solver_medium = macroscopic
+macroscopic.epsilon = 1.5*8.8541878128e-12
+macroscopic.mu = 1.25663706212e-06
+macroscopic.sigma = 0

@@ -1,0 +1,55 @@
+# This case has very short plasma lenses to test the residence
+# correction when the particles step over the lenses without
+# landing in them.
+
+# Maximum number of time steps
+max_step = 84
+
+# number of grid points
+amr.n_cell =  16 16 16
+
+amr.max_level = 0
+
+# Geometry
+geometry.dims = 3
+geometry.prob_lo     = -1.0  -1.0   0.0   # physical domain
+geometry.prob_hi     =  1.0   1.0   2.0
+
+boundary.field_lo = pec pec pec
+boundary.field_hi = pec pec pec
+boundary.particle_lo = absorbing absorbing absorbing
+boundary.particle_hi = absorbing absorbing absorbing
+
+# Algorithms
+algo.particle_shape = 1
+warpx.cfl = 0.7
+
+my_constants.vel_z = 0.5*clight
+
+# particles
+particles.species_names = electrons
+
+electrons.charge = -q_e
+electrons.mass = m_e
+electrons.injection_style = "MultipleParticles"
+electrons.multiple_particles_pos_x = 0.05 0.
+electrons.multiple_particles_pos_y = 0. 0.04
+electrons.multiple_particles_pos_z = 0.05 0.05
+electrons.multiple_particles_ux = 0. 0.
+electrons.multiple_particles_uy = 0. 0.
+electrons.multiple_particles_uz = vel_z/clight vel_z/clight
+electrons.multiple_particles_weight = 1. 1.
+
+particles.E_ext_particle_init_style = repeated_plasma_lens
+particles.B_ext_particle_init_style = repeated_plasma_lens
+particles.repeated_plasma_lens_period = 0.5
+particles.repeated_plasma_lens_starts = 0.1 0.11 0.12 0.13
+particles.repeated_plasma_lens_lengths = 0.001 0.0011 0.0012 0.0013
+particles.repeated_plasma_lens_strengths_E = 60000000. 80000000. 60000000. 20000000.
+particles.repeated_plasma_lens_strengths_B = 0.0 0.0 0.0 0.0
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 1 #84
+diag1.diag_type = Full
+diag1.electrons.variables = x y z ux uy uz

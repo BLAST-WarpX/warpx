@@ -29,8 +29,7 @@
  * lab-frame field data is then stored in mf_dst.
  */
 
-class
-BackTransformFunctor final : public ComputeDiagFunctor
+class BackTransformFunctor final : public ComputeDiagFunctor
 {
 public:
     /** Constructor description
@@ -45,11 +44,11 @@ public:
      * \param[in] varnames_fields base names of field-components for the RZ modes
      * \param[in] crse_ratio the coarsening ratio for fields
      */
-    BackTransformFunctor ( const amrex::MultiFab * const mf_src, const int lev,
-                           const int ncomp, const int num_buffers,
+    BackTransformFunctor ( const amrex::MultiFab * mf_src, int lev,
+                           int ncomp, int num_buffers,
                            amrex::Vector< std::string > varnames,
                            amrex::Vector< std::string > varnames_fields,
-                           const amrex::IntVect crse_ratio= amrex::IntVect(1));
+                           amrex::IntVect crse_ratio= amrex::IntVect(1));
 
     /** \brief Lorentz-transform mf_src for the ith buffer and write the result in mf_dst.
      *
@@ -59,12 +58,12 @@ public:
      * The data is then lorentz-transformed in-place using LorenzTransformZ ().
      * The user-requested fields are then copied to mf_dst.
      *
-     * \param[out] mf_dst output MuliFab where the back-transformed data is written
+     * \param[out] mf_dst output MultiFab where the back-transformed data is written
      * \param[in] dcomp first component of mf_dst in which the back-transformed
      *            lab-frame data for the user-request fields is written.
      * \param[in] i_buffer buffer index for which the data is transformed.
      */
-    void operator ()(amrex::MultiFab& mf_dst, int dcomp, const int i_buffer) const override;
+    void operator ()(amrex::MultiFab& mf_dst, int dcomp, int i_buffer) const override;
 
     /** \brief Prepare data required to back-transform fields for lab-frame snapshot, i_buffer
      *
@@ -76,15 +75,14 @@ public:
      * \param[in] buffer_box        Box with index-space in lab-frame for the ith buffer
      * \param[in] k_index_zlab      k-index in the lab-frame corresponding to the
      *            current z co-ordinate in the lab-frame for the ith buffer.
-     * \param[in] max_box_size      maximum box size for the multifab to generate box arrays
      * \param[in] snapshot_full     if the current snapshot, with index, i_buffer, is full (1)
                   or not (0). If it is full, then Lorentz-transform is not performed
                   by setting m_perform_backtransform to 0.
      */
     void PrepareFunctorData ( int i_buffer, bool z_slice_in_domain,
                               amrex::Real current_z_boost,
-                              amrex::Box buffer_box, const int k_index_zlab,
-                              const int max_box_size, const int snapshot_full ) override;
+                              amrex::Box buffer_box, int k_index_zlab,
+                              int snapshot_full ) override;
     /** Allocate and initialize member variables and arrays required to back-transform
      *  field-data from boosted-frame to lab-frame.
      */
@@ -123,8 +121,6 @@ private:
     /** Vector of user-defined field names without modifications for rz modes */
     amrex::Vector< std::string > m_varnames_fields;
 
-    /** max grid size used to generate BoxArray to define output MultiFabs */
-    int m_max_box_size = 256;
     /** Indices that map user-defined fields to plot to the fields
      *  stored in the cell-centered MultiFab, m_mf_src.
      *  The cell-centered MultiFab stores Ex, Ey, Ez, Bx, By, Bz, jx, jy, jz, and rho.

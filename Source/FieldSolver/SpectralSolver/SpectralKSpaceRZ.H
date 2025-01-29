@@ -22,7 +22,7 @@ class SpectralKSpaceRZ
     public:
         SpectralKSpaceRZ(const amrex::BoxArray& realspace_ba,
                          const amrex::DistributionMapping& dm,
-                         const amrex::RealVect realspace_dx);
+                         amrex::RealVect realspace_dx);
 
         KVectorComponent const & getKzArray () const {return k_vec[1];}
         amrex::RealVect const & getCellSize () const {return dx;}

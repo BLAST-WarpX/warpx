@@ -223,6 +223,6 @@ AverageAndPackScalarField (MultiFab& mf_avg,
         // - Fully nodal
         ablastr::coarsen::sample::Coarsen(mf_avg, *scalar_total, dcomp, 0, 1, ngrow );
     } else {
-        amrex::Abort(Utils::TextMsg::Err("Unknown staggering."));
+        WARPX_ABORT_WITH_MESSAGE("Unknown staggering.");
     }
 }

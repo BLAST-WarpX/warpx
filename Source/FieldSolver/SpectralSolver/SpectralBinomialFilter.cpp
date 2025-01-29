@@ -21,7 +21,7 @@ SpectralBinomialFilter::InitFilterArray (HankelTransform::RealVector const & kve
                                          bool const compensation,
                                          KFilterArray & filter)
 {
-    const int N = kvec.size();
+    const auto N = static_cast<int>(kvec.size());
     filter.resize(N);
     amrex::Real* p_filter = filter.data();
     amrex::Real const* p_kvec = kvec.data();
@@ -30,7 +30,7 @@ SpectralBinomialFilter::InitFilterArray (HankelTransform::RealVector const & kve
     {
         amrex::Real const ss = std::sin(0.5_rt*p_kvec[i]*dels);
         amrex::Real const ss2 = ss*ss;
-        amrex::Real filt = std::pow(1._rt - ss2, npasses);
+        auto filt = static_cast<amrex::Real>(std::pow(1._rt - ss2, npasses));
         if (compensation) {
             filt *= (1._rt + npasses*ss2);
         }

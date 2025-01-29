@@ -1,0 +1,4 @@
+CEXE_sources += MultiFluidContainer.cpp
+CEXE_sources += WarpXFluidContainer.cpp
+
+VPATH_LOCATIONS   += $(WARPX_HOME)/Source/Fluids

@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef TWO_PRODUCT_FUSION_INITIALIZE_MOMENTUM_H
-#define TWO_PRODUCT_FUSION_INITIALIZE_MOMENTUM_H
+#ifndef WARPX_TWO_PRODUCT_FUSION_INITIALIZE_MOMENTUM_H
+#define WARPX_TWO_PRODUCT_FUSION_INITIALIZE_MOMENTUM_H
 
 #include "TwoProductFusionUtil.H"
 #include "Particles/WarpXParticleContainer.H"
@@ -24,7 +24,9 @@ namespace {
     // Define shortcuts for frequently-used type names
     using SoaData_type = WarpXParticleContainer::ParticleTileType::ParticleTileDataType;
     using ParticleType = WarpXParticleContainer::ParticleType;
-    using ParticleBins = amrex::DenseBins<ParticleType>;
+    using ParticleTileType = WarpXParticleContainer::ParticleTileType;
+    using ParticleTileDataType = ParticleTileType::ParticleTileDataType;
+    using ParticleBins = amrex::DenseBins<ParticleTileDataType>;
     using index_type = ParticleBins::index_type;
 
     /**
@@ -94,4 +96,4 @@ namespace {
     }
 }
 
-#endif // TWO_PRODUCT_FUSION_INITIALIZE_MOMENTUM_H
+#endif // WARPX_TWO_PRODUCT_FUSION_INITIALIZE_MOMENTUM_H

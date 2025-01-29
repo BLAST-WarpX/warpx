@@ -21,6 +21,7 @@ Please `report installation problems <https://github.com/ECP-WarpX/WarpX/issues/
 
 Choose **one** of the installation methods below to get started:
 
+
 .. only:: html
 
    .. image:: hpc.svg
@@ -30,23 +31,43 @@ HPC Systems
 
 If want to use WarpX on a specific high-performance computing (HPC) systems, jump directly to our :ref:`HPC system-specific documentation <install-hpc>`.
 
+
 .. _install-conda:
 
 .. only:: html
 
    .. image:: conda.svg
 
-Using the Conda Package
------------------------
+Using the Conda-Forge Package
+-----------------------------
 
-A package for WarpX is available via the `Conda <https://conda.io>`_ package manager.
+A package for WarpX is available via `Conda-Forge <https://conda-forge.org/download/>`__.
+
+.. tip::
+
+   We recommend to deactivate that conda self-activates its ``base`` environment.
+   This `avoids interference with the system and other package managers <https://collegeville.github.io/CW20/WorkshopResources/WhitePapers/huebl-working-with-multiple-pkg-mgrs.pdf>`__.
+
+   .. code-block:: bash
+
+      conda config --set auto_activate_base false
+
+   In order to make sure that the conda configuration uses ``conda-forge`` as the only channel, which will help avoid issues with blocked ``defaults`` or ``anaconda`` repositories, please set the following configurations:
+
+   .. code-block:: bash
+
+      conda config --add channels conda-forge
+      conda config --set channel_priority strict
 
 .. code-block:: bash
 
-   conda create -n warpx -c conda-forge warpx
-   conda activate warpx
+   mamba create -n warpx -c conda-forge warpx
+   mamba activate warpx
 
-Note: the ``warpx`` `conda package <https://anaconda.org/conda-forge/warpx>`__ does not yet provide GPU support.
+.. note::
+
+   The ``warpx`` package on conda-forge does not yet provide `GPU support <https://github.com/conda-forge/warpx-feedstock/issues/89>`__.
+
 
 .. _install-spack:
 
@@ -73,6 +94,7 @@ The package ``warpx`` installs executables and the package ``py-warpx`` includes
 
 See ``spack info warpx`` or ``spack info py-warpx`` and `the official Spack tutorial <https://spack-tutorial.readthedocs.io>`__ for more information.
 
+
 .. _install-pypi:
 
 .. only:: html
@@ -86,16 +108,16 @@ Given that you have the :ref:`WarpX dependencies <install-dependencies>` install
 
 .. code-block:: bash
 
-   # optional:                                    --user
-   python3 -m pip install -U pip setuptools wheel
+   python3 -m pip install -U pip
+   python3 -m pip install -U build packaging setuptools wheel
    python3 -m pip install -U cmake
 
    python3 -m pip wheel -v git+https://github.com/ECP-WarpX/WarpX.git
-   # optional:                 --user
    python3 -m pip install *whl
 
 In the future, will publish pre-compiled binary packages on `PyPI <https://pypi.org/>`__ for faster installs.
 (Consider using :ref:`conda <install-conda>` in the meantime.)
+
 
 .. _install-brew:
 
@@ -109,6 +131,7 @@ Using the Brew Package
 .. note::
 
    Coming soon.
+
 
 .. _install-cmake:
 
@@ -140,6 +163,9 @@ After installing the :ref:`WarpX dependencies <install-dependencies>`, you can a
    # executables for WarpX are now in build/bin/
 
 We document the details in the :ref:`developer installation <install-developers>`.
+
+
+.. _install-users-macos:
 
 Tips for macOS Users
 --------------------

@@ -27,13 +27,7 @@ Usage
 -----
 
 openPMD-viewer can be used either in simple Python scripts or in `Jupyter <https://jupyter.org>`__.
-For interactive plots in Jupyter notebook, add this `"cell magic" <https://ipython.readthedocs.io/en/stable/interactive/magics.html>`__ to the first line of your notebook:
-
-.. code-block:: python
-
-   %matplotlib notebook
-
-and for Jupyter Lab use this instead:
+For interactive plots in Jupyter notebook or Jupyter Lab, add this `"cell magic" <https://ipython.readthedocs.io/en/stable/interactive/magics.html>`__ to the first line of your notebook:
 
 .. code-block:: python
 
@@ -65,4 +59,4 @@ by using the command:
     ts.slider()
 
 You can also access the particle and field data as numpy arrays with the methods ``ts.get_field`` and ``ts.get_particle``.
-See the openPMD-viewer tutorials `here <https://github.com/openPMD/openPMD-viewer/tree/master/tutorials>`_ for more info.
+See the openPMD-viewer tutorials `here <https://github.com/openPMD/openPMD-viewer/tree/dev/docs/source/tutorials>`_ for more info.

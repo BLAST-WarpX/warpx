@@ -1,0 +1,211 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+## With these parameters, each cell has a size of exactly 1 by 1
+max_step = 1
+amr.n_cell = 8 16
+amr.max_grid_size = 8
+amr.blocking_factor = 8
+amr.max_level = 0
+geometry.dims   = 2
+geometry.prob_lo     = 0.    0.
+geometry.prob_hi     = 8.   16.
+
+#################################
+###### Boundary Condition #######
+#################################
+boundary.field_lo = periodic periodic
+boundary.field_hi = periodic periodic
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.verbose = 1
+warpx.cfl = 1.0
+
+# Order of particle shape factors
+algo.particle_shape = 1
+
+#################################
+############ PLASMA #############
+#################################
+particles.species_names = proton1 boron1 alpha1 proton2 boron2 alpha2 proton3 boron3 alpha3 \
+                          proton4 boron4 alpha4 proton5 boron5 alpha5
+
+my_constants.m_b11 =  11.00930536*m_u # Boron 11 mass
+my_constants.m_h = 1.00782503223*m_u # Hydrogen 1 mass
+my_constants.m_reduced = m_h*m_b11/(m_h+m_b11)
+my_constants.keV_to_J = 1.e3*q_e
+my_constants.Energy_step = 22. * keV_to_J
+
+proton1.species_type = hydrogen1
+proton1.injection_style = "NRandomPerCell"
+proton1.num_particles_per_cell = 80000
+proton1.profile = constant
+proton1.density = 1.
+proton1.momentum_distribution_type = "parse_momentum_function"
+proton1.momentum_function_ux(x,y,z) = 0.
+proton1.momentum_function_uy(x,y,z) = 0.
+## Thanks to the floor, all particles in the same cell have the exact same momentum
+proton1.momentum_function_uz(x,y,z) = sqrt(2*m_reduced*Energy_step*(floor(z)**2))/(m_h*clight)
+proton1.do_not_push = 1
+proton1.do_not_deposit = 1
+
+boron1.species_type = boron11
+boron1.injection_style = "NRandomPerCell"
+boron1.num_particles_per_cell = 80000
+boron1.profile = constant
+boron1.density = 1.
+boron1.momentum_distribution_type = "parse_momentum_function"
+boron1.momentum_function_ux(x,y,z) = 0.
+boron1.momentum_function_uy(x,y,z) = 0.
+## Thanks to the floor, all particles in the same cell have the exact same momentum
+boron1.momentum_function_uz(x,y,z) = -sqrt(2*m_reduced*Energy_step*(floor(z)**2))/(m_b11*clight)
+boron1.do_not_push = 1
+boron1.do_not_deposit = 1
+
+alpha1.species_type = helium4
+alpha1.do_not_push = 1
+alpha1.do_not_deposit = 1
+
+my_constants.background_dens = 1.e26
+my_constants.beam_dens = 1.e20
+
+proton2.species_type = hydrogen1
+proton2.injection_style = "NRandomPerCell"
+proton2.num_particles_per_cell = 8000
+proton2.profile = "parse_density_function"
+## A tenth of the macroparticles in each cell is made of immobile high-density background protons.
+## The other nine tenths are made of fast low-density beam protons.
+proton2.density_function(x,y,z) = if(x - floor(x) < 0.1, 10.*background_dens, 10./9.*beam_dens)
+proton2.momentum_distribution_type = "parse_momentum_function"
+proton2.momentum_function_ux(x,y,z) = 0.
+proton2.momentum_function_uy(x,y,z) = 0.
+proton2.momentum_function_uz(x,y,z) = "if(x - floor(x) < 0.1,
+                                          0., sqrt(2*m_h*Energy_step*(floor(z)**2))/(m_h*clight))"
+proton2.do_not_push = 1
+proton2.do_not_deposit = 1
+
+boron2.species_type = boron11
+boron2.injection_style = "NRandomPerCell"
+boron2.num_particles_per_cell = 800
+boron2.profile = constant
+boron2.density = background_dens
+boron2.momentum_distribution_type = "constant"
+boron2.do_not_push = 1
+boron2.do_not_deposit = 1
+
+alpha2.species_type = helium4
+alpha2.do_not_push = 1
+alpha2.do_not_deposit = 1
+
+my_constants.temperature = 44. * keV_to_J
+
+proton3.species_type = hydrogen1
+proton3.injection_style = "NRandomPerCell"
+proton3.num_particles_per_cell = 4800
+proton3.profile = constant
+proton3.density = 1.e28
+proton3.momentum_distribution_type = "maxwell_boltzmann"
+proton3.theta = temperature/(m_h*clight**2)
+proton3.do_not_push = 1
+proton3.do_not_deposit = 1
+
+boron3.species_type = boron11
+boron3.injection_style = "NRandomPerCell"
+boron3.num_particles_per_cell = 8000
+boron3.profile = constant
+boron3.density = 5.e28
+boron3.momentum_distribution_type = "maxwell_boltzmann"
+boron3.theta = temperature/(m_b11*clight**2)
+boron3.do_not_push = 1
+boron3.do_not_deposit = 1
+
+alpha3.species_type = helium4
+alpha3.do_not_push = 1
+alpha3.do_not_deposit = 1
+
+my_constants.proton4_energy = 550*keV_to_J
+
+proton4.species_type = hydrogen1
+proton4.injection_style = "NRandomPerCell"
+proton4.num_particles_per_cell = 800
+proton4.profile = "constant"
+proton4.density = 1.e35
+proton4.momentum_distribution_type = "constant"
+proton4.uz = sqrt(2*m_h*proton4_energy)/(m_h*clight)
+proton4.do_not_push = 1
+proton4.do_not_deposit = 1
+
+boron4.species_type = boron11
+boron4.injection_style = "NRandomPerCell"
+boron4.num_particles_per_cell = 800
+boron4.profile = constant
+boron4.density = 1.
+boron4.momentum_distribution_type = "constant"
+boron4.do_not_push = 1
+boron4.do_not_deposit = 1
+
+alpha4.species_type = helium4
+alpha4.do_not_push = 1
+alpha4.do_not_deposit = 1
+
+proton5.species_type = hydrogen1
+proton5.injection_style = "NRandomPerCell"
+proton5.num_particles_per_cell = 800
+proton5.profile = "constant"
+proton5.density = 1.e35
+proton5.momentum_distribution_type = "constant"
+proton5.uz = sqrt(2*m_h*proton4_energy)/(m_h*clight)
+proton5.do_not_push = 1
+proton5.do_not_deposit = 1
+
+boron5.species_type = boron11
+boron5.injection_style = "NRandomPerCell"
+boron5.num_particles_per_cell = 800
+boron5.profile = constant
+boron5.density = 1.
+boron5.momentum_distribution_type = "constant"
+boron5.do_not_push = 1
+boron5.do_not_deposit = 1
+
+alpha5.species_type = helium4
+alpha5.do_not_push = 1
+alpha5.do_not_deposit = 1
+
+#################################
+############ COLLISION ##########
+#################################
+collisions.collision_names = PBF1 PBF2 PBF3 PBF4 PBF5
+PBF1.species = proton1 boron1
+PBF1.product_species = alpha1
+PBF1.type = nuclearfusion
+PBF1.fusion_multiplier = 1.e50
+
+PBF2.species = proton2 boron2
+PBF2.product_species = alpha2
+PBF2.type = nuclearfusion
+PBF2.fusion_multiplier = 1.e15
+PBF2.fusion_probability_target_value = 0.02
+
+PBF3.species = proton3 boron3
+PBF3.product_species = alpha3
+PBF3.type = nuclearfusion
+PBF3.fusion_multiplier = 1.e15
+
+PBF4.species = proton4 boron4
+PBF4.product_species = alpha4
+PBF4.type = nuclearfusion
+PBF4.fusion_multiplier = 1.e21
+
+PBF5.species = proton5 boron5
+PBF5.product_species = alpha5
+PBF5.type = nuclearfusion
+PBF5.fusion_multiplier = 1.e21
+PBF5.fusion_probability_threshold = 1e123
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.fields_to_plot = rho

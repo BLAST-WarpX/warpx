@@ -16,6 +16,8 @@
 #   include "FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
 #endif
 
+#include <ablastr/fields/MultiFabRegister.H>
+
 #include <AMReX.H>
 #include <AMReX_Array4.H>
 #include <AMReX_Config.H>
@@ -40,22 +42,25 @@ using namespace amrex;
  * \brief Update the F field, over one timestep
  */
 void FiniteDifferenceSolver::ComputeDivE (
-    const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
-    amrex::MultiFab& divEfield ) {
-
-   // Select algorithm (The choice of algorithm is a runtime option,
-   // but we compile code for each algorithm, using templates)
+    ablastr::fields::VectorField const & Efield,
+    amrex::MultiFab& divEfield
+)
+{
+    // Select algorithm (The choice of algorithm is a runtime option,
+    // but we compile code for each algorithm, using templates)
 #ifdef WARPX_DIM_RZ
-    if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee){
+    if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee ||
+        m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC){
 
         ComputeDivECylindrical <CylindricalYeeAlgorithm> ( Efield, divEfield );
 
 #else
-    if (m_grid_type == GridType::Collocated) {
+    if (m_grid_type == ablastr::utils::enums::GridType::Collocated) {
 
         ComputeDivECartesian <CartesianNodalAlgorithm> ( Efield, divEfield );
 
-    } else if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee) {
+    } else if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee ||
+               m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC) {
 
         ComputeDivECartesian <CartesianYeeAlgorithm> ( Efield, divEfield );
 
@@ -65,7 +70,7 @@ void FiniteDifferenceSolver::ComputeDivE (
 
 #endif
     } else {
-        amrex::Abort(Utils::TextMsg::Err("ComputeDivE: Unknown algorithm"));
+        WARPX_ABORT_WITH_MESSAGE("ComputeDivE: Unknown algorithm");
     }
 
 }
@@ -75,7 +80,7 @@ void FiniteDifferenceSolver::ComputeDivE (
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::ComputeDivECartesian (
-    const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
+    ablastr::fields::VectorField const & Efield,
     amrex::MultiFab& divEfield ) {
 
     // Loop through the grids, and over the tiles within each grid
@@ -92,11 +97,11 @@ void FiniteDifferenceSolver::ComputeDivECartesian (
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
-        int const n_coefs_x = m_stencil_coefs_x.size();
+        auto const n_coefs_x = static_cast<int>(m_stencil_coefs_x.size());
         Real const * const AMREX_RESTRICT coefs_y = m_stencil_coefs_y.dataPtr();
-        int const n_coefs_y = m_stencil_coefs_y.size();
+        auto const n_coefs_y = static_cast<int>(m_stencil_coefs_y.size());
         Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
-        int const n_coefs_z = m_stencil_coefs_z.size();
+        auto const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
 
         // Extract tileboxes for which to loop
         Box const& tdive = mfi.tilebox(divEfield.ixType().toIntVect());
@@ -121,9 +126,10 @@ void FiniteDifferenceSolver::ComputeDivECartesian (
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::ComputeDivECylindrical (
-    const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
-    amrex::MultiFab& divEfield ) {
-
+    ablastr::fields::VectorField const & Efield,
+    amrex::MultiFab& divEfield
+)
+{
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -131,16 +137,16 @@ void FiniteDifferenceSolver::ComputeDivECylindrical (
     for ( MFIter mfi(divEfield, TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
 
         // Extract field data for this grid/tile
-        Array4<Real> divE = divEfield.array(mfi);
+        const Array4<Real> divE = divEfield.array(mfi);
         Array4<Real> const& Er = Efield[0]->array(mfi);
         Array4<Real> const& Et = Efield[1]->array(mfi);
         Array4<Real> const& Ez = Efield[2]->array(mfi);
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
-        int const n_coefs_r = m_stencil_coefs_r.size();
+        auto const n_coefs_r = static_cast<int>(m_stencil_coefs_r.size());
         Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
-        int const n_coefs_z = m_stencil_coefs_z.size();
+        auto const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
 
         // Extract cylindrical specific parameters
         Real const dr = m_dr;

@@ -6,23 +6,29 @@
  */
 #include "Resampling.H"
 
+#include "VelocityCoincidenceThinning.H"
 #include "LevelingThinning.H"
+#include "Utils/TextMsg.H"
 
 #include <AMReX.H>
 #include <AMReX_ParmParse.H>
 
-Resampling::Resampling (const std::string species_name)
+Resampling::Resampling (const std::string& species_name)
 {
-    amrex::ParmParse pp_species_name(species_name);
+    const amrex::ParmParse pp_species_name(species_name);
     std::string resampling_algorithm_string = "leveling_thinning"; // default resampling algorithm
     pp_species_name.query("resampling_algorithm", resampling_algorithm_string);
 
-    if (resampling_algorithm_string.compare("leveling_thinning") == 0)
+    if (resampling_algorithm_string == "leveling_thinning")
     {
         m_resampling_algorithm = std::make_unique<LevelingThinning>(species_name);
     }
+    else if (resampling_algorithm_string == "velocity_coincidence_thinning")
+    {
+        m_resampling_algorithm = std::make_unique<VelocityCoincidenceThinning>(species_name);
+    }
     else
-    { amrex::Abort("Unknown resampling algorithm."); }
+    { WARPX_ABORT_WITH_MESSAGE("Unknown resampling algorithm."); }
 
     m_resampling_trigger = ResamplingTrigger(species_name);
 }

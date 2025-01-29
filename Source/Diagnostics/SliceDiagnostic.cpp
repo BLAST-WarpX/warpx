@@ -7,9 +7,11 @@
  */
 #include "SliceDiagnostic.H"
 
-#include "WarpX.H"
+#include "Fields.H"
 #include "Utils/TextMsg.H"
+#include "WarpX.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -40,11 +42,11 @@
 #include <sstream>
 
 using namespace amrex;
-
+using warpx::fields::FieldType;
 
 /* \brief
  *  The functions creates the slice for diagnostics based on the user-input.
- *  The slice can be 1D, 2D, or 3D and it inherts the index type of the underlying data.
+ *  The slice can be 1D, 2D, or 3D and it inherits the index type of the underlying data.
  *  The implementation assumes that the slice is aligned with the coordinate axes.
  *  The input parameters are modified if the user-input does not comply with requirements of coarsenability or if the slice extent is not contained within the simulation domain.
  *  First a slice multifab (smf) with cell size equal to that of the simulation grid is created such that it extends from slice.dim_lo to slice.dim_hi and shares the same index space as the source multifab (mf)
@@ -67,9 +69,9 @@ CreateSlice( const MultiFab& mf, const Vector<Geometry> &dom_geom,
     std::unique_ptr<MultiFab> cs_mf;
 
     Vector<int> slice_ncells(AMREX_SPACEDIM);
-    int nghost = 1;
+    const int nghost = 1;
     auto nlevels = static_cast<int>(dom_geom.size());
-    int ncomp = (mf).nComp();
+    const int ncomp = (mf).nComp();
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( nlevels==1,
        "Slice diagnostics does not work with mesh refinement yet (TO DO).");
@@ -101,31 +103,31 @@ CreateSlice( const MultiFab& mf, const Vector<Geometry> &dom_geom,
     // Determine if interpolation is required and number of cells in slice //
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
 
-       // Flag for interpolation if required //
-       if ( interp_lo[idim] == 1) {
-          interpolate = 1;
-       }
+        // Flag for interpolation if required //
+        if ( interp_lo[idim] == 1) {
+            interpolate = true;
+        }
 
-       // For the case when a dimension is reduced //
-       if ( ( slice_hi[idim] - slice_lo[idim]) == 1) {
-          slice_ncells[idim] = 1;
-       }
-       else {
-          slice_ncells[idim] = ( slice_hi[idim] - slice_lo[idim] + 1 )
-                                / slice_cr_ratio[idim];
+        // For the case when a dimension is reduced //
+        if ( ( slice_hi[idim] - slice_lo[idim]) == 1) {
+            slice_ncells[idim] = 1;
+        }
+        else {
+            slice_ncells[idim] = ( slice_hi[idim] - slice_lo[idim] + 1 )
+                                    / slice_cr_ratio[idim];
 
-          int refined_ncells = slice_hi[idim] - slice_lo[idim] + 1 ;
-          if ( slice_cr_ratio[idim] > 1) {
-             coarsen = true;
+            const int refined_ncells = slice_hi[idim] - slice_lo[idim] + 1 ;
+            if ( slice_cr_ratio[idim] > 1) {
+                coarsen = true;
 
-             // modify slice_grid_size if >= refines_cells //
-             if ( slice_grid_size >= refined_ncells ) {
-                slice_grid_size = refined_ncells - 1;
-             }
+                // modify slice_grid_size if >= refines_cells //
+                if ( slice_grid_size >= refined_ncells ) {
+                    slice_grid_size = refined_ncells - 1;
+                }
 
-          }
-          configuration_dim += 1;
-       }
+            }
+            configuration_dim += 1;
+        }
     }
     if (configuration_dim==1) {
       ablastr::warn_manager::WMRecordWarning("Diagnostics",
@@ -133,7 +135,7 @@ CreateSlice( const MultiFab& mf, const Vector<Geometry> &dom_geom,
     }
 
     // Slice generation with index type inheritance //
-    Box slice(slice_lo, slice_hi);
+    const Box slice(slice_lo, slice_hi);
 
     Vector<BoxArray> sba(1);
     sba[0].define(slice);
@@ -148,91 +150,89 @@ CreateSlice( const MultiFab& mf, const Vector<Geometry> &dom_geom,
 
     // Copy data from domain to slice that has same cell size as that of //
     // the domain mf. src and dst have the same number of ghost cells    //
-    amrex::IntVect nghost_vect(AMREX_D_DECL(nghost, nghost, nghost));
+    const amrex::IntVect nghost_vect(AMREX_D_DECL(nghost, nghost, nghost));
     ablastr::utils::communication::ParallelCopy(*smf, mf, 0, 0, ncomp, nghost_vect, nghost_vect, WarpX::do_single_precision_comms);
 
-    // inteprolate if required on refined slice //
-    if (interpolate == 1 ) {
+    // interpolate if required on refined slice //
+    if (interpolate) {
        InterpolateSliceValues( *smf, interp_lo, slice_cc_nd_box, dom_geom,
                                ncomp, nghost, slice_lo, slice_hi, SliceType, real_box);
     }
 
 
-    if (coarsen == false) {
+    if (!coarsen) {
        return smf;
     }
-    else if ( coarsen == true ) {
-       Vector<BoxArray> crse_ba(1);
-       crse_ba[0] = sba[0];
-       crse_ba[0].coarsen(slice_cr_ratio);
+    else {
+        Vector<BoxArray> crse_ba(1);
+        crse_ba[0] = sba[0];
+        crse_ba[0].coarsen(slice_cr_ratio);
 
-       AMREX_ALWAYS_ASSERT(crse_ba[0].size() == sba[0].size());
+        AMREX_ALWAYS_ASSERT(crse_ba[0].size() == sba[0].size());
 
-       cs_mf = std::make_unique<MultiFab>(amrex::convert(crse_ba[0],SliceType),
-                    sdmap[0], ncomp,nghost);
+        cs_mf = std::make_unique<MultiFab>(amrex::convert(crse_ba[0],SliceType),
+                                           sdmap[0], ncomp,nghost);
 
-       MultiFab& mfSrc = *smf;
-       MultiFab& mfDst = *cs_mf;
+        const MultiFab& mfSrc = *smf;
+        MultiFab& mfDst = *cs_mf;
 
-       MFIter mfi_dst(mfDst);
-       for (MFIter mfi(mfSrc); mfi.isValid(); ++mfi) {
+        auto & warpx = WarpX::GetInstance();
 
-           Array4<Real const> const& Src_fabox = mfSrc.const_array(mfi);
+        using ablastr::fields::Direction;
 
-           const Box& Dst_bx = mfi_dst.validbox();
-           Array4<Real> const& Dst_fabox = mfDst.array(mfi_dst);
+        MFIter mfi_dst(mfDst);
+        for (MFIter mfi(mfSrc); mfi.isValid(); ++mfi) {
 
-           int scomp = 0;
-           int dcomp = 0;
+            Array4<Real const> const& Src_fabox = mfSrc.const_array(mfi);
 
-           IntVect cctype(AMREX_D_DECL(0,0,0));
-           if( SliceType==cctype ) {
-              amrex::amrex_avgdown(Dst_bx, Dst_fabox, Src_fabox, dcomp, scomp,
-                                   ncomp, slice_cr_ratio);
-           }
-           IntVect ndtype(AMREX_D_DECL(1,1,1));
-           if( SliceType == ndtype ) {
-              amrex::amrex_avgdown_nodes(Dst_bx, Dst_fabox, Src_fabox, dcomp,
-                                         scomp, ncomp, slice_cr_ratio);
-           }
-           if( SliceType == WarpX::GetInstance().getEfield(0,0).ixType().toIntVect() ) {
-              amrex::amrex_avgdown_edges(Dst_bx, Dst_fabox, Src_fabox, dcomp,
-                                         scomp, ncomp, slice_cr_ratio, 0);
-           }
-           if( SliceType == WarpX::GetInstance().getEfield(0,1).ixType().toIntVect() ) {
-              amrex::amrex_avgdown_edges(Dst_bx, Dst_fabox, Src_fabox, dcomp,
-                                         scomp, ncomp, slice_cr_ratio, 1);
-           }
-           if( SliceType == WarpX::GetInstance().getEfield(0,2).ixType().toIntVect() ) {
-              amrex::amrex_avgdown_edges(Dst_bx, Dst_fabox, Src_fabox, dcomp,
-                                         scomp, ncomp, slice_cr_ratio, 2);
-           }
-           if( SliceType == WarpX::GetInstance().getBfield(0,0).ixType().toIntVect() ) {
-              amrex::amrex_avgdown_faces(Dst_bx, Dst_fabox, Src_fabox, dcomp,
-                                         scomp, ncomp, slice_cr_ratio, 0);
-           }
-           if( SliceType == WarpX::GetInstance().getBfield(0,1).ixType().toIntVect() ) {
-              amrex::amrex_avgdown_faces(Dst_bx, Dst_fabox, Src_fabox, dcomp,
-                                         scomp, ncomp, slice_cr_ratio, 1);
-           }
-           if( SliceType == WarpX::GetInstance().getBfield(0,2).ixType().toIntVect() ) {
-              amrex::amrex_avgdown_faces(Dst_bx, Dst_fabox, Src_fabox, dcomp,
-                                         scomp, ncomp, slice_cr_ratio, 2);
-           }
+            const Box& Dst_bx = mfi_dst.validbox();
+            Array4<Real> const& Dst_fabox = mfDst.array(mfi_dst);
 
-           if ( mfi_dst.isValid() ) {
-              ++mfi_dst;
-           }
+            const int scomp = 0;
+            const int dcomp = 0;
 
-       }
-       return cs_mf;
+            const IntVect cctype(AMREX_D_DECL(0,0,0));
+            if( SliceType==cctype ) {
+                amrex::amrex_avgdown(Dst_bx, Dst_fabox, Src_fabox, dcomp, scomp,
+                                     ncomp, slice_cr_ratio);
+            }
+            const IntVect ndtype(AMREX_D_DECL(1,1,1));
+            if( SliceType == ndtype ) {
+                amrex::amrex_avgdown_nodes(Dst_bx, Dst_fabox, Src_fabox, dcomp,
+                                           scomp, ncomp, slice_cr_ratio);
+            }
+            if( SliceType == warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, 0)->ixType().toIntVect() ) {
+                amrex::amrex_avgdown_edges(Dst_bx, Dst_fabox, Src_fabox, dcomp,
+                                           scomp, ncomp, slice_cr_ratio, 0);
+            }
+            if( SliceType == warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, 0)->ixType().toIntVect() ) {
+                amrex::amrex_avgdown_edges(Dst_bx, Dst_fabox, Src_fabox, dcomp,
+                                           scomp, ncomp, slice_cr_ratio, 1);
+            }
+            if( SliceType == warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, 0)->ixType().toIntVect() ) {
+                amrex::amrex_avgdown_edges(Dst_bx, Dst_fabox, Src_fabox, dcomp,
+                                           scomp, ncomp, slice_cr_ratio, 2);
+            }
+            if( SliceType == warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, 0)->ixType().toIntVect() ) {
+                amrex::amrex_avgdown_faces(Dst_bx, Dst_fabox, Src_fabox, dcomp,
+                                           scomp, ncomp, slice_cr_ratio, 0);
+            }
+            if( SliceType == warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, 0)->ixType().toIntVect() ) {
+                amrex::amrex_avgdown_faces(Dst_bx, Dst_fabox, Src_fabox, dcomp,
+                                           scomp, ncomp, slice_cr_ratio, 1);
+            }
+            if( SliceType == warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, 0)->ixType().toIntVect() ) {
+                amrex::amrex_avgdown_faces(Dst_bx, Dst_fabox, Src_fabox, dcomp,
+                                           scomp, ncomp, slice_cr_ratio, 2);
+            }
 
+            if ( mfi_dst.isValid() ) {
+                ++mfi_dst;
+            }
+
+        }
+        return cs_mf;
     }
-
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-       false, "Should not hit this return statement.");
-
-    return smf;
 }
 
 
@@ -276,7 +276,7 @@ CheckSliceInput( const RealBox real_box, RealBox &slice_cc_nd_box,
     {
         // Modify coarsening ratio if the input value is not an exponent of 2 for AMR //
         if ( slice_cr_ratio[idim] > 0 ) {
-            int log_cr_ratio =
+            const int log_cr_ratio =
                static_cast<int>(floor ( log2( double(slice_cr_ratio[idim]))));
             slice_cr_ratio[idim] =
                static_cast<int> (exp2( double(log_cr_ratio) ));
@@ -305,17 +305,17 @@ CheckSliceInput( const RealBox real_box, RealBox &slice_cc_nd_box,
                warnMsg.str(), ablastr::warn_manager::WarnPriority::low);
         }
 
-         const auto very_small_number = 1E-10;
+        const auto very_small_number = 1E-10;
 
         // Factor to ensure index values computation depending on index type //
-        double fac = ( 1.0 - SliceType[idim] )*dom_geom[0].CellSize(idim)*0.5;
+        const double fac = ( 1.0 - SliceType[idim] )*dom_geom[0].CellSize(idim)*0.5;
         // if dimension is reduced to one cell length //
         if ( slice_realbox.hi(idim) - slice_realbox.lo(idim) <= 0)
         {
             slice_cc_nd_box.setLo( idim, slice_realbox.lo(idim) );
             slice_cc_nd_box.setHi( idim, slice_realbox.hi(idim) );
 
-            if ( slice_cr_ratio[idim] > 1) slice_cr_ratio[idim] = 1;
+            if ( slice_cr_ratio[idim] > 1) { slice_cr_ratio[idim] = 1; }
 
             // check for interpolation -- compute index lo with floor and ceil
             if ( slice_cc_nd_box.lo(idim) - real_box.lo(idim) >= fac ) {
@@ -355,7 +355,7 @@ CheckSliceInput( const RealBox real_box, RealBox &slice_cc_nd_box,
         }
         else
         {
-            // moving realbox.lo and reabox.hi to nearest coarsenable grid point //
+            // moving realbox.lo and realbox.hi to nearest coarsenable grid point //
             auto index_lo = static_cast<int>(floor(((slice_realbox.lo(idim) +  very_small_number
                             - (real_box.lo(idim))) / dom_geom[0].CellSize(idim))) );
             auto index_hi = static_cast<int>(ceil(((slice_realbox.hi(idim)  - very_small_number
@@ -363,11 +363,11 @@ CheckSliceInput( const RealBox real_box, RealBox &slice_cc_nd_box,
 
             bool modify_cr = true;
 
-            while ( modify_cr == true) {
+            while ( modify_cr ) {
                 int lo_new = index_lo;
                 int hi_new = index_hi;
-                int mod_lo = index_lo % slice_cr_ratio[idim];
-                int mod_hi = index_hi % slice_cr_ratio[idim];
+                const int mod_lo = index_lo % slice_cr_ratio[idim];
+                const int mod_hi = index_hi % slice_cr_ratio[idim];
                 modify_cr = false;
 
                 // To ensure that the index.lo is coarsenable //
@@ -400,7 +400,7 @@ CheckSliceInput( const RealBox real_box, RealBox &slice_cc_nd_box,
                     modify_cr = true;
                 }
 
-                if ( modify_cr == false ) {
+                if ( !modify_cr ) {
                    index_lo = lo_new;
                    index_hi = hi_new;
                 }
@@ -425,21 +425,21 @@ CheckSliceInput( const RealBox real_box, RealBox &slice_cc_nd_box,
  */
 void
 InterpolateSliceValues(MultiFab& smf, IntVect interp_lo, RealBox slice_realbox,
-                       Vector<Geometry> geom, int ncomp, int nghost,
+                       const Vector<Geometry>& geom, int ncomp, int nghost,
                        IntVect slice_lo, IntVect /*slice_hi*/, IntVect SliceType,
                        const RealBox real_box)
 {
     for (MFIter mfi(smf); mfi.isValid(); ++mfi)
     {
-         const Box& bx = mfi.tilebox();
-         FArrayBox& fabox = smf[mfi];
+        const Box& bx = mfi.tilebox();
+        FArrayBox& fabox = smf[mfi];
 
-         for ( int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-             if ( interp_lo[idim] == 1 ) {
+        for ( int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            if ( interp_lo[idim] == 1 ) {
                 InterpolateLo( bx, fabox, slice_lo, geom, idim, SliceType,
                                slice_realbox, 0, ncomp, nghost, real_box);
-             }
-         }
+            }
+        }
     }
 
 }
@@ -453,11 +453,11 @@ InterpolateLo(const Box& bx, FArrayBox &fabox, IntVect slice_lo,
     auto fabarr = fabox.array();
     const auto lo = amrex::lbound(bx);
     const auto hi = amrex::ubound(bx);
-    double fac = ( 1.0-IndType[idir] )*geom[0].CellSize(idir) * 0.5;
-    int imin = slice_lo[idir];
-    double minpos = imin*geom[0].CellSize(idir) + fac + real_box.lo(idir);
-    double maxpos = (imin+1)*geom[0].CellSize(idir) + fac + real_box.lo(idir);
-    double slice_minpos = slice_realbox.lo(idir) ;
+    const double fac = ( 1.0-IndType[idir] )*geom[0].CellSize(idir) * 0.5;
+    const int imin = slice_lo[idir];
+    const double minpos = imin*geom[0].CellSize(idir) + fac + real_box.lo(idir);
+    const double maxpos = (imin+1)*geom[0].CellSize(idir) + fac + real_box.lo(idir);
+    const double slice_minpos = slice_realbox.lo(idir) ;
 
     switch (idir) {
     case 0:
@@ -467,11 +467,11 @@ InterpolateLo(const Box& bx, FArrayBox &fabox, IntVect slice_lo,
               for (int k = lo.z; k <= hi.z; ++k) {
                  for (int j = lo.y; j <= hi.y; ++j) {
                      for (int i = lo.x; i <= hi.x; ++i) {
-                           double minval = fabarr(i,j,k,n);
-                           double maxval = fabarr(i+1,j,k,n);
-                           double ratio  = (maxval - minval) / (maxpos - minpos);
-                           double xdiff  = slice_minpos - minpos;
-                           double newval = minval + xdiff * ratio;
+                           const double minval = fabarr(i,j,k,n);
+                           const double maxval = fabarr(i+1,j,k,n);
+                           const double ratio  = (maxval - minval) / (maxpos - minpos);
+                           const double xdiff  = slice_minpos - minpos;
+                           const double newval = minval + xdiff * ratio;
                            fabarr(i,j,k,n) = static_cast<Real>(newval);
                      }
                  }
@@ -487,11 +487,11 @@ InterpolateLo(const Box& bx, FArrayBox &fabox, IntVect slice_lo,
               for (int k = lo.z; k <= hi.z; ++k) {
                  for (int j = lo.y; j <= hi.y; ++j) {
                     for (int i = lo.x; i <= hi.x; ++i) {
-                        double minval = fabarr(i,j,k,n);
-                        double maxval = fabarr(i,j+1,k,n);
-                        double ratio  = (maxval - minval) / (maxpos - minpos);
-                        double xdiff  = slice_minpos - minpos;
-                        double newval = minval + xdiff * ratio;
+                        const double minval = fabarr(i,j,k,n);
+                        const double maxval = fabarr(i,j+1,k,n);
+                        const double ratio  = (maxval - minval) / (maxpos - minpos);
+                        const double xdiff  = slice_minpos - minpos;
+                        const double newval = minval + xdiff * ratio;
                         fabarr(i,j,k,n) = static_cast<Real>(newval);
                     }
                  }
@@ -507,11 +507,11 @@ InterpolateLo(const Box& bx, FArrayBox &fabox, IntVect slice_lo,
               for (int k = lo.z; k <= hi.z; ++k) {
                  for (int j = lo.y; j <= hi.y; ++j) {
                     for (int i = lo.x; i <= hi.x; ++i) {
-                        double minval = fabarr(i,j,k,n);
-                        double maxval = fabarr(i,j,k+1,n);
-                        double ratio  = (maxval - minval) / (maxpos - minpos);
-                        double xdiff  = slice_minpos - minpos;
-                        double newval = minval + xdiff * ratio;
+                        const double minval = fabarr(i,j,k,n);
+                        const double maxval = fabarr(i,j,k+1,n);
+                        const double ratio  = (maxval - minval) / (maxpos - minpos);
+                        const double xdiff  = slice_minpos - minpos;
+                        const double newval = minval + xdiff * ratio;
                         fabarr(i,j,k,n) = static_cast<Real>(newval);
                     }
                  }

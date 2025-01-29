@@ -3,8 +3,9 @@
 Frontier (OLCF)
 ===============
 
-The `Frontier cluster (see: Crusher) <https://docs.olcf.ornl.gov/systems/crusher_quick_start_guide.html>`_ is located at OLCF.
-Each node contains 4 AMD MI250X GPUs, each with 2 Graphics Compute Dies (GCDs) for a total of 8 GCDs per node.
+The `Frontier cluster <https://www.olcf.ornl.gov/frontier/>`_ is located at OLCF.
+
+On Frontier, each compute node provides four AMD MI250X GPUs, each with two Graphics Compute Dies (GCDs) for a total of 8 GCDs per node.
 You can think of the 8 GCDs as 8 separate GPUs, each having 64 GB of high-bandwidth memory (HBM2E).
 
 
@@ -13,65 +14,138 @@ Introduction
 
 If you are new to this system, **please see the following resources**:
 
-* `Crusher user guide <https://docs.olcf.ornl.gov/systems/frontier_user_guide.html>`_
+* `Frontier user guide <https://docs.olcf.ornl.gov/systems/frontier_user_guide.html>`_
 * Batch system: `Slurm <https://docs.olcf.ornl.gov/systems/frontier_user_guide.html#running-jobs>`_
-* `Production directories <https://docs.olcf.ornl.gov/systems/frontier_user_guide.html#data-and-storage>`_:
+* `Filesystems <https://docs.olcf.ornl.gov/systems/frontier_user_guide.html#data-and-storage>`_:
 
-  * ``$PROJWORK/$proj/``: shared with all members of a project, purged every 90 days (recommended)
-  * ``$MEMBERWORK/$proj/``: single user, purged every 90 days (usually smaller quota, 50TB default quota)
-  * ``$WORLDWORK/$proj/``: shared with all users, purged every 90 days (50TB default quota)
-  * Note that the ``$HOME`` directory is mounted as read-only on compute nodes.
-    That means you cannot run in your ``$HOME``.
-    It's default quota is 50GB.
+  * ``$HOME``: per-user directory, use only for inputs, source and scripts; backed up; mounted as read-only on compute nodes, that means you cannot run in it (50 GB quota)
+  * ``$PROJWORK/$proj/``: shared with all members of a project, purged every 90 days, Lustre (recommended)
+  * ``$MEMBERWORK/$proj/``: single user, purged every 90 days, Lustre (usually smaller quota, 50TB default quota)
+  * ``$WORLDWORK/$proj/``: shared with all users, purged every 90 days, Lustre (50TB default quota)
 
-Note: the Orion lustre filesystem on Frontier and the older Alpine GPFS filesystem on Summit are not mounted on each others machines.
+Note: the Orion Lustre filesystem on Frontier and the older Alpine GPFS filesystem on Summit are not mounted on each others machines.
 Use `Globus <https://www.globus.org>`__ to transfer data between them if needed.
 
 
-Installation
-------------
+.. _building-frontier-preparation:
 
-Use the following commands to download the WarpX source code and switch to the correct branch:
+Preparation
+-----------
+
+Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
    git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
 
-To enable HDF5, work-around the broken ``HDF5_VERSION`` variable (empty) in the Cray PE by commenting out the following lines in ``$HOME/src/openPMD-api/CMakeLists.txt``:
-https://github.com/openPMD/openPMD-api/blob/0.14.5/CMakeLists.txt#L216-L220
-
-We use the following modules and environments on the system (``$HOME/frontier_warpx.profile``).
-
-.. literalinclude:: ../../../../Tools/machines/frontier-olcf/frontier_warpx.profile.example
-   :language: bash
-   :caption: You can copy this file from ``Tools/machines/frontier-olcf/frontier_warpx.profile.example``.
-
-We recommend to store the above lines in a file, such as ``$HOME/frontier_warpx.profile``, and load it into your shell after a login:
+We use system software modules, add environment hints and further dependencies via the file ``$HOME/frontier_warpx.profile``.
+Create it now:
 
 .. code-block:: bash
 
-   source $HOME/frontier_warpx.profile
+   cp $HOME/src/warpx/Tools/machines/frontier-olcf/frontier_warpx.profile.example $HOME/frontier_warpx.profile
+
+.. dropdown:: Script Details
+   :color: light
+   :icon: info
+   :animate: fade-in-slide-down
+
+   .. literalinclude:: ../../../../Tools/machines/frontier-olcf/frontier_warpx.profile.example
+      :language: bash
+
+Edit the 2nd line of this script, which sets the ``export proj=""`` variable.
+For example, if you are member of the project ``aph114``, then run ``vi $HOME/frontier_warpx.profile``.
+Enter the edit mode by typing ``i`` and edit line 2 to read:
+
+.. code-block:: bash
+
+   export proj="aph114"
+
+Exit the ``vi`` editor with ``Esc`` and then type ``:wq`` (write & quit).
+
+.. important::
+
+   Now, and as the first step on future logins to Frontier, activate these environment settings:
+
+   .. code-block:: bash
+
+      source $HOME/frontier_warpx.profile
+
+Finally, since Frontier does not yet provide software modules for some of our dependencies, install them once:
+
+.. code-block:: bash
+
+   bash $HOME/src/warpx/Tools/machines/frontier-olcf/install_dependencies.sh
+   source $HOME/sw/frontier/gpu/venvs/warpx-frontier/bin/activate
+
+.. dropdown:: Script Details
+   :color: light
+   :icon: info
+   :animate: fade-in-slide-down
+
+   .. literalinclude:: ../../../../Tools/machines/frontier-olcf/install_dependencies.sh
+      :language: bash
 
 
-Then, ``cd`` into the directory ``$HOME/src/warpx`` and use the following commands to compile:
+.. _building-frontier-compilation:
+
+Compilation
+-----------
+
+Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
 
 .. code-block:: bash
 
    cd $HOME/src/warpx
-   rm -rf build
+   rm -rf build_frontier
 
-   cmake -S . -B build   \
-     -DWarpX_COMPUTE=HIP \
-     -DWarpX_amrex_src=$HOME/src/amrex \
-     -DWarpX_picsar_src=$HOME/src/picsar \
-     -DWarpX_openpmd_src=$HOME/src/openPMD-api
-   cmake --build build -j 32
+   cmake -S . -B build_frontier -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake --build build_frontier -j 16
 
-The general :ref:`cmake compile-time options <building-cmake>` apply as usual.
+The WarpX application executables are now in ``$HOME/src/warpx/build_frontier/bin/``.
+Additionally, the following commands will install WarpX as a Python module:
 
-**That's it!**
-A 3D WarpX executable is now in ``build/bin/`` and :ref:`can be run <running-cpp-frontier>` with a :ref:`3D example inputs file <usage-examples>`.
-Most people execute the binary directly or copy it out to a location in ``$PROJWORK/$proj/``.
+.. code-block:: bash
+
+   rm -rf build_frontier_py
+
+   cmake -S . -B build_frontier_py -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake --build build_frontier_py -j 16 --target pip_install
+
+Now, you can :ref:`submit Frontier compute jobs <running-cpp-frontier>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).
+Or, you can use the WarpX executables to submit Frontier jobs (:ref:`example inputs <usage-examples>`).
+For executables, you can reference their location in your :ref:`job script <running-cpp-frontier>` or copy them to a location in ``$PROJWORK/$proj/``.
+
+
+.. _building-frontier-update:
+
+Update WarpX & Dependencies
+---------------------------
+
+If you already installed WarpX in the past and want to update it, start by getting the latest source code:
+
+.. code-block:: bash
+
+   cd $HOME/src/warpx
+
+   # read the output of this command - does it look ok?
+   git status
+
+   # get the latest WarpX source code
+   git fetch
+   git pull
+
+   # read the output of these commands - do they look ok?
+   git status
+   git log     # press q to exit
+
+And, if needed,
+
+- :ref:`update the frontier_warpx.profile file <building-frontier-preparation>`,
+- log out and into the system, activate the now updated environment profile as usual,
+- :ref:`execute the dependency install scripts <building-frontier-preparation>`.
+
+As a last step, clean the build directory ``rm -rf $HOME/src/warpx/build_frontier`` and rebuild WarpX.
 
 
 .. _running-cpp-frontier:
@@ -94,7 +168,7 @@ Or in non-interactive runs:
 
 .. literalinclude:: ../../../../Tools/machines/frontier-olcf/submit.sh
    :language: bash
-   :caption: You can copy this file from ``Tools/machines/frontier-olcf/submit.sh``.
+   :caption: You can copy this file from ``$HOME/src/warpx/Tools/machines/frontier-olcf/submit.sh``.
 
 
 .. _post-processing-frontier:
@@ -127,7 +201,7 @@ Known System Issues
 .. warning::
 
    Sep 2nd, 2022 (OLCFDEV-1079):
-   rocFFT in ROCm 5.1+ tries to `write to a cache <https://rocfft.readthedocs.io/en/latest/library.html#runtime-compilation>`__ in the home area by default.
+   rocFFT in ROCm 5.1-5.3 tries to `write to a cache <https://rocfft.readthedocs.io/en/latest/#runtime-compilation>`__ in the home area by default.
    This does not scale, disable it via:
 
    .. code-block:: bash
@@ -138,6 +212,44 @@ Known System Issues
 
    January, 2023 (OLCFDEV-1284, AMD Ticket: ORNLA-130):
    We discovered a regression in AMD ROCm, leading to 2x slower current deposition (and other slowdowns) in ROCm 5.3 and 5.4.
-   Reported to AMD and investigating.
 
-   Stay with the ROCm 5.2 module to avoid.
+   June, 2023:
+   Although a fix was planned for ROCm 5.5, we still see the same issue in this release and continue to exchange with AMD and HPE on the issue.
+
+   Stay with the ROCm 5.2 module to avoid a 2x slowdown.
+
+.. warning::
+
+   August, 2023 (OLCFDEV-1597, OLCFHELP-12850, OLCFHELP-14253):
+   With runs above 500 nodes, we observed issues in ``MPI_Waitall`` calls of the kind ``OFI Poll Failed UNDELIVERABLE``.
+   According to the system known issues entry `OLCFDEV-1597 <https://docs.olcf.ornl.gov/systems/frontier_user_guide.html#olcfdev-1597-ofi-poll-failed-undeliverable-errors>`__, we work around this by setting this environment variable in job scripts:
+
+   .. code-block:: bash
+
+      export MPICH_SMP_SINGLE_COPY_MODE=NONE
+      export FI_CXI_RX_MATCH_MODE=software
+
+.. warning::
+
+   Checkpoints and I/O at scale seem to be slow with the default Lustre filesystem configuration.
+   Please test checkpointing and I/O with short ``#SBATCH -q debug`` runs before running the full simulation.
+   Execute ``lfs getstripe -d <dir>`` to show the default progressive file layout.
+   Consider using ``lfs setstripe`` to change the `striping <https://wiki.lustre.org/Configuring_Lustre_File_Striping>`__ for new files **before** you submit the run.
+
+   .. code-block:: bash
+
+      mkdir /lustre/orion/proj-shared/<your-project>/<path/to/new/sim/dir>
+      cd <new/sim/dir/above>
+      # create your diagnostics directory first
+      mkdir diags
+      # change striping for new files before you submit the simulation
+      #   this is an example, striping 10 MB blocks onto 32 nodes
+      lfs setstripe -S 10M -c 32 diags
+
+   Additionally, other AMReX users reported good performance for plotfile checkpoint/restart when using
+
+   .. code-block:: ini
+
+      amr.plot_nfiles = -1
+      amr.checkpoint_nfiles = -1
+      amrex.async_out_nfiles = 4096  # set to number of GPUs used

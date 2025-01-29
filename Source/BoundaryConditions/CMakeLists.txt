@@ -1,14 +1,18 @@
-target_sources(WarpX
-  PRIVATE
-    PML.cpp
-    WarpXEvolvePML.cpp
-    WarpXFieldBoundaries.cpp
-    WarpX_PEC.cpp
-)
-
-if(WarpX_DIMS STREQUAL RZ)
-    target_sources(WarpX
+foreach(D IN LISTS WarpX_DIMS)
+    warpx_set_suffix_dims(SD ${D})
+    target_sources(lib_${SD}
       PRIVATE
-        PML_RZ.cpp
+        PEC_Insulator.cpp
+        PML.cpp
+        WarpXEvolvePML.cpp
+        WarpXFieldBoundaries.cpp
+        WarpX_PEC.cpp
     )
-endif()
+
+    if(D STREQUAL "RZ")
+        target_sources(lib_${SD}
+          PRIVATE
+            PML_RZ.cpp
+        )
+    endif()
+endforeach()

@@ -2,6 +2,9 @@ function(find_picsar)
     if(WarpX_picsar_src)
         message(STATUS "Compiling local PICSAR ...")
         message(STATUS "PICSAR source path: ${WarpX_picsar_src}")
+        if(NOT IS_DIRECTORY ${WarpX_picsar_src})
+            message(FATAL_ERROR "Specified directory WarpX_picsar_src='${WarpX_picsar_src}' does not exist!")
+        endif()
     elseif(WarpX_picsar_internal)
         message(STATUS "Downloading PICSAR ...")
         message(STATUS "PICSAR repository: ${WarpX_picsar_repo} (${WarpX_picsar_branch})")
@@ -11,18 +14,27 @@ function(find_picsar)
         set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
         # Enable or disable QED lookup tables generation
-
-        # If table generation is enabled, enable or disable
-        # openMP support depending on WarpX_COMPUTE
-        if(WarpX_QED_TABLE_GEN)
+        if(WarpX_QED_TABLE_GEN OR WarpX_QED_TOOLS)
             set(PXRMP_QED_TABLEGEN ON CACHE INTERNAL "")
-            if(WarpX_COMPUTE STREQUAL OMP)
-                set(PXRMP_QED_OMP ON CACHE INTERNAL "")
-            else()
-                set(PXRMP_QED_OMP OFF CACHE INTERNAL "")
-            endif()
         else()
             set(PXRMP_QED_TABLEGEN OFF CACHE INTERNAL "")
+        endif()
+
+        # Enable or disable OpenMP for lookup tables generation
+        if(PXRMP_QED_TABLEGEN)
+            if(WarpX_QED_TABLES_GEN_OMP STREQUAL AUTO)
+                find_package(OpenMP REQUIRED CXX)
+                if(OpenMP_CXX_FOUND)
+                    set(PXRMP_QED_OMP ON CACHE INTERNAL "")
+                else()
+                    set(PXRMP_QED_OMP OFF CACHE INTERNAL "")
+                endif()
+            elseif(WarpX_QED_TABLES_GEN_OMP STREQUAL ON)
+                    set(PXRMP_QED_OMP ON CACHE INTERNAL "")
+            else()
+                    set(PXRMP_QED_OMP OFF CACHE INTERNAL "")
+            endif()
+        else()
             set(PXRMP_QED_OMP OFF CACHE INTERNAL "")
         endif()
 
@@ -41,19 +53,13 @@ function(find_picsar)
             get_source_version(PXRMP_QED ${WarpX_picsar_src})
         else()
             FetchContent_Declare(fetchedpicsar
-                GIT_REPOSITORY ${WarpX_picsar_repo}
-                GIT_TAG        ${WarpX_picsar_branch}
+                GIT_REPOSITORY  ${WarpX_picsar_repo}
+                GIT_TAG         ${WarpX_picsar_branch}
                 BUILD_IN_SOURCE 0
+                SOURCE_SUBDIR   multi_physics/QED
             )
-            FetchContent_GetProperties(fetchedpicsar)
+            FetchContent_MakeAvailable(fetchedpicsar)
 
-            if(NOT fetchedpicsar_POPULATED)
-                FetchContent_Populate(fetchedpicsar)
-                add_subdirectory(
-                    ${fetchedpicsar_SOURCE_DIR}/multi_physics/QED
-                    ${fetchedpicsar_BINARY_DIR}
-                )
-            endif()
             get_source_version(PXRMP_QED ${fetchedpicsar_SOURCE_DIR})
             if(NOT PXRMP_QED_GIT_VERSION)
                 set(PXRMP_QED_GIT_VERSION "${WarpX_picsar_branch}" CACHE INTERNAL "")
@@ -82,7 +88,7 @@ function(find_picsar)
         #message(STATUS "PICSAR: Using version '${PICSAR_VERSION}'")
     else()
         # not supported by PICSAR (yet)
-        #find_package(PICSAR 23.04 CONFIG REQUIRED QED)
+        #find_package(PICSAR 24.09 CONFIG REQUIRED QED)
         #message(STATUS "PICSAR: Found version '${PICSAR_VERSION}'")
         message(FATAL_ERROR "PICSAR: Cannot be used as externally installed "
             "library yet. "
@@ -103,7 +109,7 @@ if(WarpX_QED)
     set(WarpX_picsar_repo "https://github.com/ECP-WarpX/picsar.git"
         CACHE STRING
         "Repository URI to pull and build PICSAR from if(WarpX_picsar_internal)")
-    set(WarpX_picsar_branch "1903ecfff51a31a321d39790af90d8520c10537e"
+    set(WarpX_picsar_branch "47b393993f860943e387b4b5d79407ee7f52d1ab"
         CACHE STRING
         "Repository branch for WarpX_picsar_repo if(WarpX_picsar_internal)")
 

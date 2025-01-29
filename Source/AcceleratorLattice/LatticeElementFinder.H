@@ -30,10 +30,12 @@ struct LatticeElementFinder
      * \brief Initialize the element finder at the level and grid
      *
      * @param[in] lev the refinement level
+     * @param[in] gamma_boost the Lorentz factor of the boosted frame
      * @param[in] a_mfi specifies the grid where the finder is defined
      * @param[in] accelerator_lattice a reference to the accelerator lattice at the refinement level
      */
-    void InitElementFinder (int const lev, amrex::MFIter const& a_mfi,
+    void InitElementFinder (int lev, amrex::Real gamma_boost,
+                            amrex::MFIter const& a_mfi,
                             AcceleratorLattice const& accelerator_lattice);
 
     /**
@@ -50,7 +52,7 @@ struct LatticeElementFinder
      * @param[in] a_mfi specifies the grid where the finder is defined
      * @param[in] accelerator_lattice a reference to the accelerator lattice at the refinement level
      */
-    void UpdateIndices (int const lev, amrex::MFIter const& a_mfi,
+    void UpdateIndices (int lev, amrex::MFIter const& a_mfi,
                         AcceleratorLattice const& accelerator_lattice);
 
     /* Define the location and size of the index lookup table */
@@ -72,8 +74,8 @@ struct LatticeElementFinder
      * @param[in] a_offset particle index offset needed to access particle info
      * @param[in] accelerator_lattice a reference to the accelerator lattice at the refinement level
      */
-    LatticeElementFinderDevice GetFinderDeviceInstance (WarpXParIter const& a_pti, int const a_offset,
-                                                        AcceleratorLattice const& accelerator_lattice);
+    [[nodiscard]] LatticeElementFinderDevice GetFinderDeviceInstance (
+        WarpXParIter const& a_pti, int a_offset, AcceleratorLattice const& accelerator_lattice) const;
 
     /* The index lookup tables for each lattice element type */
     amrex::Gpu::DeviceVector<int> d_quad_indices;
@@ -89,60 +91,7 @@ struct LatticeElementFinder
      */
     void setup_lattice_indices (amrex::Gpu::DeviceVector<amrex::ParticleReal> const & zs,
                                 amrex::Gpu::DeviceVector<amrex::ParticleReal> const & ze,
-                                amrex::Gpu::DeviceVector<int> & indices)
-    {
-
-        using namespace amrex::literals;
-
-        int nelements = static_cast<int>(zs.size());
-        amrex::ParticleReal const * zs_arr = zs.data();
-        amrex::ParticleReal const * ze_arr = ze.data();
-        int * indices_arr = indices.data();
-
-        amrex::Real const zmin = m_zmin;
-        amrex::Real const dz = m_dz;
-
-        amrex::ParticleReal const gamma_boost = m_gamma_boost;
-        amrex::ParticleReal const uz_boost = m_uz_boost;
-        amrex::Real const time = m_time;
-
-        amrex::ParallelFor( m_nz,
-            [=] AMREX_GPU_DEVICE (int iz) {
-
-                // Get the location of the grid node
-                amrex::Real z_node = zmin + iz*dz;
-
-                if (gamma_boost > 1._prt) {
-                    // Transform to lab frame
-                    z_node = gamma_boost*z_node + uz_boost*time;
-                }
-
-                // Find the index to the element that is closest to the grid cell.
-                // For now, this assumes that there is no overlap among elements of the same type.
-                for (int ie = 0 ; ie < nelements ; ie++) {
-                    // Find the mid points between element ie and the ones before and after it.
-                    // The first and last element need special handling.
-                    amrex::ParticleReal zcenter_left, zcenter_right;
-                    if (ie == 0) {
-                        zcenter_left = std::numeric_limits<amrex::ParticleReal>::lowest();
-                    } else {
-                        zcenter_left = 0.5_prt*(ze_arr[ie-1] + zs_arr[ie]);
-                    }
-                    if (ie < nelements - 1) {
-                        zcenter_right = 0.5_prt*(ze_arr[ie] + zs_arr[ie+1]);
-                    } else {
-                        zcenter_right = std::numeric_limits<amrex::ParticleReal>::max();
-                    }
-
-                    if (zcenter_left <= z_node && z_node < zcenter_right) {
-                        indices_arr[iz] = ie;
-                    }
-
-                }
-            }
-        );
-    }
-
+                                amrex::Gpu::DeviceVector<int> & indices) const;
 };
 
 /**
@@ -161,7 +110,7 @@ struct LatticeElementFinderDevice
      * @param[in] h_finder The host level instance of the element finder that this is associated with
      */
     void
-    InitLatticeElementFinderDevice (WarpXParIter const& a_pti, int const a_offset,
+    InitLatticeElementFinderDevice (WarpXParIter const& a_pti, int a_offset,
                                     AcceleratorLattice const& accelerator_lattice,
                                     LatticeElementFinder const & h_finder);
 
@@ -175,7 +124,7 @@ struct LatticeElementFinderDevice
     amrex::ParticleReal m_uz_boost;
     amrex::Real m_time;
 
-    GetParticlePosition m_get_position;
+    GetParticlePosition<PIdx> m_get_position;
     const amrex::ParticleReal* AMREX_RESTRICT m_ux = nullptr;
     const amrex::ParticleReal* AMREX_RESTRICT m_uy = nullptr;
     const amrex::ParticleReal* AMREX_RESTRICT m_uz = nullptr;
@@ -227,14 +176,14 @@ struct LatticeElementFinderDevice
 
         amrex::ParticleReal Ex_sum = 0._prt;
         amrex::ParticleReal Ey_sum = 0._prt;
-        amrex::ParticleReal Ez_sum = 0._prt;
+        const amrex::ParticleReal Ez_sum = 0._prt;
         amrex::ParticleReal Bx_sum = 0._prt;
         amrex::ParticleReal By_sum = 0._prt;
-        amrex::ParticleReal Bz_sum = 0._prt;
+        const amrex::ParticleReal Bz_sum = 0._prt;
 
         if (d_quad.nelements > 0) {
             if (d_quad_indices_arr[iz] > -1) {
-                int ielement = d_quad_indices_arr[iz];
+                const auto ielement = d_quad_indices_arr[iz];
                 amrex::ParticleReal Ex, Ey, Bx, By;
                 d_quad.get_field(ielement, x, y, z, zpvdt, Ex, Ey, Bx, By);
                 Ex_sum += Ex;
@@ -246,7 +195,7 @@ struct LatticeElementFinderDevice
 
         if (d_plasmalens.nelements > 0) {
             if (d_plasmalens_indices_arr[iz] > -1) {
-                int ielement = d_plasmalens_indices_arr[iz];
+                const auto ielement = d_plasmalens_indices_arr[iz];
                 amrex::ParticleReal Ex, Ey, Bx, By;
                 d_plasmalens.get_field(ielement, x, y, z, zpvdt, Ex, Ey, Bx, By);
                 Ex_sum += Ex;

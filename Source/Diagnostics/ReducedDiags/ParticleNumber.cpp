@@ -27,7 +27,7 @@
 using namespace amrex::literals;
 
 // constructor
-ParticleNumber::ParticleNumber (std::string rd_name)
+ParticleNumber::ParticleNumber (const std::string& rd_name)
 : ReducedDiags{rd_name}
 {
     // get a reference to WarpX instance
@@ -48,7 +48,7 @@ ParticleNumber::ParticleNumber (std::string rd_name)
 
     if (amrex::ParallelDescriptor::IOProcessor())
     {
-        if ( m_IsNotRestart )
+        if ( m_write_header )
         {
             // open file
             std::ofstream ofs{m_path + m_rd_name + "." + m_extension, std::ofstream::out};
@@ -75,7 +75,7 @@ ParticleNumber::ParticleNumber (std::string rd_name)
                 ofs << m_sep;
                 ofs << "[" << c++ << "]" << species_names[i] + "_weight()";
             }
-            ofs << std::endl;
+            ofs << "\n";
             // close file
             ofs.close();
         }
@@ -112,27 +112,13 @@ void ParticleNumber::ComputeDiags (int step)
     for (int i_s = 0; i_s < nSpecies; ++i_s)
     {
         // get WarpXParticleContainer class object
-        const auto & myspc = mypc.GetParticleContainer(i_s);
+        auto & myspc = mypc.GetParticleContainer(i_s);
 
         // Save total number of macroparticles for this species
         m_data[idx_first_species_macroparticles + i_s] = myspc.TotalNumberOfParticles();
 
-        using PType = typename WarpXParticleContainer::SuperParticleType;
-
-        // Reduction to compute sum of weights for this species
-        auto Wtot = ReduceSum( myspc,
-        [=] AMREX_GPU_HOST_DEVICE (const PType& p) -> amrex::Real
-        {
-            return p.rdata(PIdx::w);
-        });
-
-        // MPI reduction
-        amrex::ParallelDescriptor::ReduceRealSum
-            (Wtot, amrex::ParallelDescriptor::IOProcessorNumber());
-
         // Save sum of particles weight for this species
-        m_data[idx_first_species_sum_weight + i_s] = Wtot;
-
+        m_data[idx_first_species_sum_weight + i_s] = myspc.sumParticleWeight(false);
 
         // Increase total number of macroparticles and total weight (all species)
         m_data[idx_total_macroparticles] += m_data[idx_first_species_macroparticles + i_s];

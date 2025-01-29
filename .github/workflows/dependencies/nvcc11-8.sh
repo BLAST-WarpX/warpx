@@ -26,6 +26,9 @@ sudo apt-get install -y \
     pkg-config          \
     wget
 
+# ccache
+$(dirname "$0")/ccache.sh
+
 wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb
 sudo dpkg -i cuda-keyring_1.0-1_all.deb
 
@@ -38,7 +41,8 @@ sudo apt-get install -y          \
     cuda-nvml-dev-11-8           \
     cuda-nvtx-11-8               \
     libcufft-dev-11-8            \
-    libcurand-dev-11-8
+    libcurand-dev-11-8           \
+    libcusparse-dev-11-8
 sudo ln -s cuda-11.8 /usr/local/cuda
 
 # if we run out of temporary storage in CI:
@@ -55,12 +59,3 @@ sudo curl -L -o /usr/local/bin/cmake-easyinstall https://raw.githubusercontent.c
 sudo chmod a+x /usr/local/bin/cmake-easyinstall
 export CEI_SUDO="sudo"
 export CEI_TMP="/tmp/cei"
-
-# ccache 4.2+
-#
-CXXFLAGS="" cmake-easyinstall --prefix=/usr/local \
-    git+https://github.com/ccache/ccache.git@v4.6 \
-    -DCMAKE_BUILD_TYPE=Release        \
-    -DENABLE_DOCUMENTATION=OFF        \
-    -DENABLE_TESTING=OFF              \
-    -DWARNINGS_AS_ERRORS=OFF

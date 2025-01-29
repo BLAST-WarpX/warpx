@@ -5,11 +5,12 @@
 #SBATCH -o %x-%j.out
 #SBATCH -t 00:10:00
 #SBATCH -p batch
-# Currently not configured on Frontier:
-#S BATCH --ntasks-per-node=8
-#S BATCH --cpus-per-task=8
-#S BATCH --gpus-per-task=1
-#S BATCH --gpu-bind=closest
+#SBATCH --ntasks-per-node=8
+# Due to Frontier's Low-Noise Mode Layout only 7 instead of 8 cores are available per process
+# https://docs.olcf.ornl.gov/systems/frontier_user_guide.html#low-noise-mode-layout
+#SBATCH --cpus-per-task=7
+#SBATCH --gpus-per-task=1
+#SBATCH --gpu-bind=closest
 #SBATCH -N 20
 
 # load cray libs and ROCm libs
@@ -29,6 +30,12 @@
 #export FI_MR_CACHE_MAX_COUNT=0  # libfabric disable caching
 # or, less invasive:
 export FI_MR_CACHE_MONITOR=memhooks  # alternative cache monitor
+
+# Seen since August 2023
+# OLCFDEV-1597: OFI Poll Failed UNDELIVERABLE Errors
+# https://docs.olcf.ornl.gov/systems/frontier_user_guide.html#olcfdev-1597-ofi-poll-failed-undeliverable-errors
+export MPICH_SMP_SINGLE_COPY_MODE=NONE
+export FI_CXI_RX_MATCH_MODE=software
 
 # note (9-2-22, OLCFDEV-1079)
 # this environment setting is needed to avoid that rocFFT writes a cache in

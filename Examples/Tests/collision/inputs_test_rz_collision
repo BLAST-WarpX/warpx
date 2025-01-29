@@ -1,0 +1,59 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 150
+amr.n_cell = 8 8
+amr.max_grid_size = 8
+amr.blocking_factor = 8
+amr.max_level = 0
+geometry.dims = RZ
+geometry.prob_lo = 0.    0.
+geometry.prob_hi = 4.154046151855669e2  4.154046151855669e2
+
+#################################
+###### Boundary Condition #######
+#################################
+boundary.field_lo = none periodic
+boundary.field_hi = none periodic
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.serialize_initial_conditions = 1
+warpx.verbose = 1
+warpx.const_dt = 1.224744871e-07
+
+# Do not evolve the E and B fields
+algo.maxwell_solver = none
+
+# Order of particle shape factors
+algo.particle_shape = 1
+
+#################################
+############ PLASMA #############
+#################################
+particles.species_names = electron
+
+electron.charge = -q_e
+electron.mass = m_e
+electron.injection_style = "NUniformPerCell"
+electron.num_particles_per_cell_each_dim = 1 10 1
+electron.profile = constant
+electron.density = 1.0e21
+electron.momentum_distribution_type = parse_momentum_function
+electron.momentum_function_ux(x,y,z) = "if(x*x+y*y>0.0, 1.0*x/sqrt(x*x+y*y), 0.0)"
+electron.momentum_function_uy(x,y,z) = "if(x*x+y*y>0.0, 1.0*y/sqrt(x*x+y*y), 0.0)"
+electron.momentum_function_uz(x,y,z) = "0"
+electron.do_not_push = 1
+
+#################################
+############ COLLISION ##########
+#################################
+collisions.collision_names = collision
+collision.species = electron electron
+collision.CoulombLog = 15.9
+
+diagnostics.diags_names = diag1
+diag1.intervals = 10
+diag1.diag_type = Full
+diag1.fields_to_plot = Er Et Ez Br Bt Bz

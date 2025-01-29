@@ -38,8 +38,8 @@
 using namespace amrex;
 
 void FiniteDifferenceSolver::EvolveG (
-    std::unique_ptr<amrex::MultiFab>& Gfield,
-    std::array<std::unique_ptr<amrex::MultiFab>,3> const& Bfield,
+    amrex::MultiFab* Gfield,
+    ablastr::fields::VectorField const& Bfield,
     amrex::Real const dt)
 {
 #ifdef WARPX_DIM_RZ
@@ -61,7 +61,7 @@ void FiniteDifferenceSolver::EvolveG (
     }
     else
     {
-        amrex::Abort(Utils::TextMsg::Err("EvolveG: unknown FDTD algorithm"));
+        WARPX_ABORT_WITH_MESSAGE("EvolveG: unknown FDTD algorithm");
     }
 #endif
 }
@@ -70,8 +70,8 @@ void FiniteDifferenceSolver::EvolveG (
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::EvolveGCartesian (
-    std::unique_ptr<amrex::MultiFab>& Gfield,
-    std::array<std::unique_ptr<amrex::MultiFab>,3> const& Bfield,
+    amrex::MultiFab* Gfield,
+    ablastr::fields::VectorField const& Bfield,
     amrex::Real const dt)
 {
 
@@ -95,9 +95,9 @@ void FiniteDifferenceSolver::EvolveGCartesian (
         amrex::Real const* const AMREX_RESTRICT coefs_y = m_stencil_coefs_y.dataPtr();
         amrex::Real const* const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
 
-        const int n_coefs_x = m_stencil_coefs_x.size();
-        const int n_coefs_y = m_stencil_coefs_y.size();
-        const int n_coefs_z = m_stencil_coefs_z.size();
+        const auto n_coefs_x = static_cast<int>(m_stencil_coefs_x.size());
+        const auto n_coefs_y = static_cast<int>(m_stencil_coefs_y.size());
+        const auto n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
 
         // Extract tilebox to loop over
         amrex::Box const& tf = mfi.tilebox(Gfield->ixType().toIntVect());

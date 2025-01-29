@@ -17,17 +17,17 @@
  * If temperature is a constant, store value. If a parser, make and
  * store the parser function
  */
-TemperatureProperties::TemperatureProperties (amrex::ParmParse& pp) {
+TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name) {
     // Set defaults
     amrex::Real theta;
     std::string temp_dist_s = "constant";
     std::string mom_dist_s;
 
-    pp.query("theta_distribution_type", temp_dist_s);
-    pp.query("momentum_distribution_type", mom_dist_s);
+    utils::parser::query(pp, source_name, "theta_distribution_type", temp_dist_s);
+    utils::parser::query(pp, source_name, "momentum_distribution_type", mom_dist_s);
     if (temp_dist_s == "constant") {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            utils::parser::queryWithParser(pp, "theta", theta),
+            utils::parser::queryWithParser(pp, source_name, "theta", theta),
             "Temperature parameter theta not specified");
 
         // Do validation on theta value
@@ -58,7 +58,7 @@ TemperatureProperties::TemperatureProperties (amrex::ParmParse& pp) {
     }
     else if (temp_dist_s == "parser") {
         std::string str_theta_function;
-        utils::parser::Store_parserString(pp, "theta_function(x,y,z)", str_theta_function);
+        utils::parser::Store_parserString(pp, source_name, "theta_function(x,y,z)", str_theta_function);
         m_ptr_temperature_parser =
             std::make_unique<amrex::Parser>(
                 utils::parser::makeParser(str_theta_function,{"x","y","z"}));
@@ -69,6 +69,6 @@ TemperatureProperties::TemperatureProperties (amrex::ParmParse& pp) {
         std::string string;
         stringstream << "Temperature distribution type '" << temp_dist_s << "' not recognized.";
         string = stringstream.str();
-        amrex::Abort(Utils::TextMsg::Err(string.c_str()));
+        WARPX_ABORT_WITH_MESSAGE(string);
     }
 }

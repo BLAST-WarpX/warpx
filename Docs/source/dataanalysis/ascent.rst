@@ -274,7 +274,7 @@ Example Actions
 A visualization of the electric field component :math:`E_x` (variable: ``Ex``) with a contour plot and with added particles can be obtained with the following Ascent Action.
 This action can be used both in replay as well as in situ runs.
 
-.. literalinclude:: examples/Physics_applications/laser_acceleration/ascent_actions.yaml
+.. literalinclude:: ../../../Examples/Physics_applications/laser_acceleration/ascent_actions.yaml
    :language: yaml
 
 There are more `Ascent Actions examples available <https://ascent.readthedocs.io/en/latest/Actions/Examples.html#yaml-examples>`_ for you to play.

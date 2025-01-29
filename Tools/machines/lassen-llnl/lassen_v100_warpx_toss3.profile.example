@@ -1,0 +1,56 @@
+# please set your project account
+#export proj="<yourProjectNameHere>"  # edit this and comment in
+
+# required dependencies
+module load cmake/3.29.2
+module load gcc/11.2.1
+module load cuda/12.0.0
+
+# optional: for QED lookup table generation support
+module load boost/1.70.0
+
+# optional: for openPMD support
+SRC_DIR="/usr/workspace/${USER}/lassen/src"
+SW_DIR="/usr/workspace/${USER}/lassen-toss3/gpu"
+export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-1.21.1:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/hdf5-1.14.1.2:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.8.3:$CMAKE_PREFIX_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/c-blosc-1.21.1/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/hdf5-1.14.1.2/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/adios2-2.8.3/lib64:$LD_LIBRARY_PATH
+export PATH=${SW_DIR}/hdf5-1.14.1.2/bin:${PATH}
+export PATH=${SW_DIR}/adios2-2.8.3/bin:${PATH}
+
+# optional: for PSATD in RZ geometry support
+export CMAKE_PREFIX_PATH=${SW_DIR}/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/lapackpp-2024.05.31:$CMAKE_PREFIX_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
+
+# optional: for Python bindings
+module load python/3.11.5
+
+if [ -d "${SW_DIR}/venvs/warpx-lassen-toss3" ]
+then
+    source ${SW_DIR}/venvs/warpx-lassen-toss3/bin/activate
+fi
+
+# optional: an alias to request an interactive node for two hours
+alias getNode="bsub -G $proj -W 2:00 -nnodes 1 -Is /bin/bash"
+# an alias to run a command on a batch node for up to 30min
+#   usage: runNode <command>
+alias runNode="bsub -q debug -P $proj -W 2:00 -nnodes 1 -I"
+
+# fix system defaults: do not escape $ with a \ on tab completion
+shopt -s direxpand
+
+# optimize CUDA compilation for V100
+export AMREX_CUDA_ARCH=7.0
+export CUDAARCHS=70
+
+# compiler environment hints
+export CC=$(which gcc)
+export CXX=$(which g++)
+export FC=$(which gfortran)
+export CUDACXX=$(which nvcc)
+export CUDAHOSTCXX=${CXX}

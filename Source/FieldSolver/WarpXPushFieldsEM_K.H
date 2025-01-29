@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef WarpXPushFieldsEM_K_h
-#define WarpXPushFieldsEM_K_h
+#ifndef WARPX_PushFieldsEM_K_h
+#define WARPX_PushFieldsEM_K_h
 
 #include "Utils/WarpXConst.H"
 
@@ -94,7 +94,7 @@ void damp_field_in_guards(
         // Apply damping factor in guards cells below the lower end of the domain
         const int n_guard = -tb_smallEnd;
 
-        const amrex::Real cell = static_cast<amrex::Real>(idx + n_guard);
+        const auto cell = static_cast<amrex::Real>(idx + n_guard);
 
         const amrex::Real phase = MathConst::pi * cell / n_guard;
         const amrex::Real sin_phase = std::sin(phase);
@@ -107,7 +107,7 @@ void damp_field_in_guards(
         // Apply damping factor in guards cells above the upper end of the domain
         const int n_guard = tb_bigEnd - n_domain;
 
-        const amrex::Real cell = static_cast<amrex::Real>(tb_bigEnd - idx);
+        const auto cell = static_cast<amrex::Real>(tb_bigEnd - idx);
 
         const amrex::Real phase = MathConst::pi * cell / n_guard;
         const amrex::Real sin_phase = std::sin(phase);
@@ -117,4 +117,4 @@ void damp_field_in_guards(
     }
 }
 
-#endif
+#endif //WARPX_PushFieldsEM_K_h

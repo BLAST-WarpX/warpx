@@ -10,9 +10,7 @@
 #ifndef WARPX_GODFREY_COEFF_TABLE_H_
 #define WARPX_GODFREY_COEFF_TABLE_H_
 
-namespace warpx
-{
-namespace nci_godfrey
+namespace warpx::nci_godfrey
 {
     using namespace amrex::literals;
 
@@ -453,8 +451,6 @@ namespace nci_godfrey
         {-2.30207_rt,1.69438_rt,-0.391629_rt,0.000683629_rt}
     };
 
-} //namespace warpx
-
-} //namespace nci_godfrey
+} // namespace warpx::nci_godfrey
 
 #endif // #ifndef WARPX_GODFREY_COEFF_TABLE_H_

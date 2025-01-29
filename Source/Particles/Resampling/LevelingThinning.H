@@ -36,7 +36,13 @@ public:
      *
      * @param[in] species_name the name of the resampled species
      */
-    LevelingThinning (const std::string species_name);
+    LevelingThinning (const std::string& species_name);
+
+    /**
+     * This function queries deprecated input parameters and aborts
+     * the run if one of them is specified.
+     */
+    void BackwardCompatibility (const std::string& species_name );
 
     /**
      * \brief A method that performs leveling thinning for the considered species.
@@ -45,7 +51,7 @@ public:
      * @param[in] lev the index of the refinement level.
      * @param[in] pc a pointer to the particle container.
      */
-    void operator() (WarpXParIter& pti, const int lev, WarpXParticleContainer * const pc) const override final;
+    void operator() (WarpXParIter& pti, int lev, WarpXParticleContainer* pc) const final;
 
 private:
     amrex::Real m_target_ratio = amrex::Real(1.5);

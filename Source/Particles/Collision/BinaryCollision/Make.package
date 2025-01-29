@@ -1,4 +1,6 @@
 CEXE_sources += BinaryCollisionUtils.cpp
 CEXE_sources += ParticleCreationFunc.cpp
 
+include $(WARPX_HOME)/Source/Particles/Collision/BinaryCollision/DSMC/Make.package
+
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/Particles/Collision/BinaryCollision

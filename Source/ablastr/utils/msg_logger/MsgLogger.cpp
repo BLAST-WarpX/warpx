@@ -10,18 +10,15 @@
 #include "ablastr/utils/TextMsg.H"
 #include "ablastr/utils/Serialization.H"
 
-#ifdef AMREX_USE_MPI
-#   include <AMReX_ParallelDescriptor.H>
-#endif
-#include <AMReX_Print.H>
+#include <AMReX_ParallelDescriptor.H>
 
-#include <iostream>
-#include <sstream>
+#include <algorithm>
+#include <array>
+#include <memory>
 #include <numeric>
 
 namespace abl_msg_logger = ablastr::utils::msg_logger;
 namespace abl_ser = ablastr::utils::serialization;
-namespace abl_utils = ablastr::utils;
 
 using namespace abl_msg_logger;
 
@@ -41,8 +38,8 @@ namespace
     std::vector<char>
     get_serialized_gather_rank_msgs(
         const std::vector<Msg>& my_msgs,
-        const int gather_rank,
-        const int my_rank);
+        int gather_rank,
+        int my_rank);
 
     /**
     * \brief This function generates data to send back to the "gather rank"
@@ -56,9 +53,9 @@ namespace
     std::vector<char>
     compute_package_for_gather_rank(
         const std::vector<char>& serialized_gather_rank_msgs,
-        const std::int64_t gather_rank_how_many_msgs,
+        std::int64_t gather_rank_how_many_msgs,
         const std::map<Msg, std::int64_t>& my_msg_map,
-        const bool is_gather_rank
+        bool is_gather_rank
     );
 
     /**
@@ -77,7 +74,7 @@ namespace
     std::pair<std::vector<char>, std::vector<int>>
     gather_all_data(
         const std::vector<char>& package_for_gather_rank,
-        const int gather_rank, const int my_rank);
+        int gather_rank, int my_rank);
 
     /**
     * \brief This function converts a vector of Msg struct into a byte array
@@ -101,25 +98,27 @@ namespace
 
 std::string abl_msg_logger::PriorityToString(const Priority& priority)
 {
-    if(priority == Priority::high)
+    if(priority == Priority::high) {
         return "high";
-    else if (priority == Priority::medium)
+    } else if (priority == Priority::medium) {
         return "medium";
-    else
+    } else {
         return "low";
+    }
 }
 
 Priority abl_msg_logger::StringToPriority(const std::string& priority_string)
 {
-    if(priority_string == "high")
+    if(priority_string == "high") {
         return Priority::high;
-    else if (priority_string == "medium")
+    } else if (priority_string == "medium") {
         return Priority::medium;
-    else if (priority_string == "low")
+    } else if (priority_string == "low") {
         return Priority::low;
-    else
-        amrex::Abort(abl_utils::TextMsg::Err(
-            "Priority string '" + priority_string + "' not recognized"));
+    } else {
+        ABLASTR_ABORT_WITH_MESSAGE(
+            "Priority string '" + priority_string + "' not recognized");
+    }
 
     //this silences a "non-void function does not return a value in all control paths" warning
     return Priority::low;
@@ -217,7 +216,7 @@ Logger::Logger() :
     m_io_rank{amrex::ParallelDescriptor::IOProcessorNumber()}
 {}
 
-void Logger::record_msg(Msg msg)
+void Logger::record_msg(const Msg& msg)
 {
     m_messages[msg]++;
 }
@@ -226,8 +225,10 @@ std::vector<Msg> Logger::get_msgs() const
 {
     auto res = std::vector<Msg>{};
 
-    for (const auto& msg_w_counter : m_messages)
+    res.reserve(m_messages.size());
+    for (const auto& msg_w_counter : m_messages) {
         res.emplace_back(msg_w_counter.first);
+    }
 
     return res;
 }
@@ -236,8 +237,10 @@ std::vector<MsgWithCounter> Logger::get_msgs_with_counter() const
 {
     auto res = std::vector<MsgWithCounter>{};
 
-    for (const auto& msg : m_messages)
+    res.reserve(m_messages.size());
+    for (const auto& msg : m_messages) {
         res.emplace_back(MsgWithCounter{msg.first, msg.second});
+    }
 
     return res;
 }
@@ -249,8 +252,9 @@ Logger::collective_gather_msgs_with_counter_and_ranks() const
 #ifdef AMREX_USE_MPI
 
     // Trivial case of only one rank
-    if (m_num_procs == 1)
+    if (m_num_procs == 1) {
         return one_rank_gather_msgs_with_counter_and_ranks();
+    }
 
     // Find out who is the "gather rank" and how many messages it has
     const auto my_msgs = get_msgs();
@@ -259,8 +263,9 @@ Logger::collective_gather_msgs_with_counter_and_ranks() const
         find_gather_rank_and_its_msgs(how_many_msgs);
 
     // If the "gather rank" has zero messages there are no messages at all
-    if(gather_rank_how_many_msgs == 0)
+    if(gather_rank_how_many_msgs == 0) {
         return std::vector<MsgWithCounterAndRanks>{};
+    }
 
     // All the ranks receive the msgs of the "gather rank" as a byte array
     const auto serialized_gather_rank_msgs =
@@ -306,6 +311,7 @@ std::vector<MsgWithCounterAndRanks>
 Logger::one_rank_gather_msgs_with_counter_and_ranks() const
 {
     std::vector<MsgWithCounterAndRanks> res;
+    res.reserve(m_messages.size());
     for (const auto& el : m_messages)
     {
         res.emplace_back(
@@ -350,11 +356,12 @@ Logger::compute_msgs_with_counter_and_ranks(
     const std::vector<int>& displacements,
     const int gather_rank) const
 {
-    if(m_rank != gather_rank) return std::vector<MsgWithCounterAndRanks>{};
+    if(m_rank != gather_rank) { return std::vector<MsgWithCounterAndRanks>{}; }
 
     std::vector<MsgWithCounterAndRanks> msgs_with_counter_and_ranks;
 
     // Put messages of the gather rank in msgs_with_counter_and_ranks
+    msgs_with_counter_and_ranks.reserve(my_msg_map.size());
     for (const auto& el : my_msg_map)
     {
         msgs_with_counter_and_ranks.emplace_back(
@@ -371,8 +378,9 @@ Logger::compute_msgs_with_counter_and_ranks(
     #pragma omp parallel for
 #endif
     for(int rr = 0; rr < m_num_procs; ++rr){ //for each rank
-        if(rr == gather_rank) // (skip gather_rank)
+        if(rr == gather_rank) { // (skip gather_rank)
             continue;
+        }
 
         // get counters generated by rank rr
         auto it = all_data.begin() + displacements[rr];
@@ -463,13 +471,14 @@ void Logger::swap_with_io_rank(
     if (gather_rank != m_io_rank){
         if(m_rank == gather_rank){
             auto package = std::vector<char>{};
-            for (const auto& el: msgs_with_counter_and_ranks)
+            for (const auto& el: msgs_with_counter_and_ranks) {
                 abl_ser::put_in_vec<char>(el.serialize(), package);
+            }
 
             auto package_size = static_cast<int>(package.size());
             amrex::ParallelDescriptor::Send(&package_size, 1, m_io_rank, 0);
             amrex::ParallelDescriptor::Send(package, m_io_rank, 1);
-            int list_size = static_cast<int>(msgs_with_counter_and_ranks.size());
+            const auto list_size = static_cast<int>(msgs_with_counter_and_ranks.size());
             amrex::ParallelDescriptor::Send(&list_size, 1, m_io_rank, 2);
         }
         else if (m_rank == m_io_rank){
@@ -512,9 +521,10 @@ get_serialized_gather_rank_msgs(
     amrex::ParallelDescriptor::Bcast(
         &size_serialized_gather_rank_msgs, 1, gather_rank);
 
-    if (!is_gather_rank)
+    if (!is_gather_rank) {
         serialized_gather_rank_msgs.resize(
             size_serialized_gather_rank_msgs);
+    }
 
     amrex::ParallelDescriptor::Bcast(
         serialized_gather_rank_msgs.data(),
@@ -556,9 +566,10 @@ compute_package_for_gather_rank(
 
         // Add the additional messages seen by the current rank to the package
         abl_ser::put_in(static_cast<int>(msgs_to_send.size()), package);
-        for (const auto& el : msgs_to_send)
+        for (const auto& el : msgs_to_send) {
             abl_ser::put_in_vec<char>(
                 MsgWithCounter{el.first, el.second}.serialize(), package);
+        }
 
         return package;
     }

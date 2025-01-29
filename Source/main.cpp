@@ -8,61 +8,35 @@
  */
 #include "WarpX.H"
 
-#include "Initialization/WarpXAMReXInit.H"
-#include "Utils/MPIInitHelpers.H"
+#include "Initialization/WarpXInit.H"
 #include "Utils/WarpXProfilerWrapper.H"
-#include "Utils/WarpXrocfftUtil.H"
-#include "Utils/WarpXUtil.H"
 
-#include <ablastr/warn_manager/WarnManager.H>
 #include <ablastr/utils/timer/Timer.H>
 
 #include <AMReX_Print.H>
 
 int main(int argc, char* argv[])
 {
-    utils::warpx_mpi_init(argc, argv);
-
-    warpx_amrex_init(argc, argv);
-
-    utils::rocfft::setup();
-
-    ParseGeometryInput();
-
-    ConvertLabParamsToBoost();
-    ReadBCParams();
-
-#ifdef WARPX_DIM_RZ
-    CheckGriddingForRZSpectral();
-#endif
-
+    warpx::initialization::initialize_external_libraries(argc, argv);
     {
         WARPX_PROFILE_VAR("main()", pmain);
 
         auto timer = ablastr::utils::timer::Timer{};
         timer.record_start_time();
 
-        WarpX warpx;
-
+        auto& warpx = WarpX::GetInstance();
         warpx.InitData();
-
         warpx.Evolve();
-
-        //Print warning messages at the end of the simulation
-        ablastr::warn_manager::GetWMInstance().PrintGlobalWarnings("THE END");
+        const auto is_warpx_verbose = warpx.Verbose();
+        WarpX::Finalize();
 
         timer.record_stop_time();
-        if (warpx.Verbose()) {
+        if (is_warpx_verbose){
             amrex::Print() << "Total Time                     : "
-                    << timer.get_global_duration() << '\n';
+                           << timer.get_global_duration() << '\n';
         }
 
         WARPX_PROFILE_VAR_STOP(pmain);
     }
-
-    utils::rocfft::cleanup();
-
-    amrex::Finalize();
-
-    utils::warpx_mpi_finalize ();
+    warpx::initialization::finalize_external_libraries();
 }

@@ -10,7 +10,7 @@
 
 #include "ablastr/utils/msg_logger/MsgLogger_fwd.H"
 
-#include <AMReX_ParmParse.H>
+#include <AMReX_BaseFwd.H>
 
 #include <memory>
 #include <optional>
@@ -52,12 +52,27 @@ namespace ablastr::warn_manager
         /**
         * A singleton class should not be cloneable.
         */
-        WarnManager(WarnManager &other) = delete;
+        WarnManager( const WarnManager& ) = delete;
+
+        /**
+        * A singleton class should not be cloneable.
+        */
+        WarnManager( WarnManager&& ) = delete;
 
         /**
         * A singleton class should not be assignable.
         */
-        void operator=(const WarnManager &) = delete;
+        WarnManager& operator=( const WarnManager & ) = delete;
+
+        /**
+        * A singleton class should not be assignable.
+        */
+        WarnManager& operator=( const WarnManager&& ) = delete;
+
+        /**
+        * Default destructor
+        */
+        ~WarnManager() = default;
 
         static WarnManager& GetInstance();
 
@@ -69,9 +84,9 @@ namespace ablastr::warn_manager
         * @param[in] priority priority of the warning message ("medium" by default)
          */
         void RecordWarning(
-            std::string topic,
-            std::string text,
-            WarnPriority priority = WarnPriority::medium);
+            const std::string& topic,
+            const std::string& text,
+            const WarnPriority& priority = WarnPriority::medium);
 
         /**
         * \brief This function prints all the warning messages collected on the present MPI rank
@@ -80,7 +95,7 @@ namespace ablastr::warn_manager
         * @param[in] when a string to mark when the warnings are printed out (it appears in the warning list)
         * @return a string containing the "local" warning list
         */
-        std::string PrintLocalWarnings(
+        [[nodiscard]] std::string PrintLocalWarnings(
             const std::string& when) const;
 
         /**
@@ -90,7 +105,7 @@ namespace ablastr::warn_manager
         * @param[in] when a string to mark when the warnings are printed out (it appears in the warning list)
         * @return a string containing the "global" warning list
         */
-        std::string PrintGlobalWarnings(
+        [[nodiscard]] std::string PrintGlobalWarnings(
             const std::string& when) const;
 
         /**
@@ -105,7 +120,7 @@ namespace ablastr::warn_manager
         *
         * @return the m_always_warn_immediately flag
         */
-        bool GetAlwaysWarnImmediatelyFlag() const;
+        [[nodiscard]] bool GetAlwaysWarnImmediatelyFlag() const;
 
         /**
         * \brief Setter for the m_abort_on_warning_threshold flag
@@ -120,7 +135,7 @@ namespace ablastr::warn_manager
         *
         * @return the m_abort_on_warning_threshold flag
         */
-        std::optional<WarnPriority> GetAbortThreshold() const;
+        [[nodiscard]] std::optional<WarnPriority> GetAbortThreshold() const;
 
         /**
         * \brief This function reads warning messages from the inputfile. It is intended for
@@ -128,7 +143,7 @@ namespace ablastr::warn_manager
         *
         * @param[in, out] params the inputfile parser
         */
-        void debug_read_warnings_from_input(amrex::ParmParse& params);
+        void debug_read_warnings_from_input(const amrex::ParmParse& params);
 
         static const int warn_line_size = 80 /*! Maximum line length to be used in formatting warning list*/;
         static const int warn_tab_size = 5 /*! Tabulation size to be used in formatting warning list*/;
@@ -148,7 +163,7 @@ namespace ablastr::warn_manager
         * @param[in] msg_with_counter a MessageWithCounter
         * @return a string containing the warning message
         */
-        std::string PrintWarnMsg(
+        [[nodiscard]] std::string PrintWarnMsg(
             const ablastr::utils::msg_logger::MsgWithCounter& msg_with_counter) const;
 
         /**
@@ -159,7 +174,7 @@ namespace ablastr::warn_manager
         * @param[in] msg_with_counter_and_ranks a MsgWithCounterAndRanks
         * @return a string containing the warning message
         */
-        std::string PrintWarnMsg(
+        [[nodiscard]] std::string PrintWarnMsg(
             const ablastr::utils::msg_logger::MsgWithCounterAndRanks& msg_with_counter_and_ranks) const;
 
         /**
@@ -172,8 +187,8 @@ namespace ablastr::warn_manager
         */
         static std::string GetHeader(
             const std::string& when,
-            const int line_size,
-            const bool is_global);
+            int line_size,
+            bool is_global);
 
         /**
         * \brief This function formats each line of a warning message text
@@ -185,8 +200,8 @@ namespace ablastr::warn_manager
         */
         static std::string MsgFormatter(
             const std::string& msg,
-            const int line_size,
-            const int tab_size);
+            int line_size,
+            int tab_size);
 
         int m_rank = 0 /*! MPI rank (appears in the warning list)*/;
         std::unique_ptr<ablastr::utils::msg_logger::Logger> m_p_logger /*! The Logger stores all the warning messages*/;
@@ -210,9 +225,9 @@ namespace ablastr::warn_manager
     * @param[in] priority priority of the warning message ("medium" by default)
     */
     void WMRecordWarning(
-        std::string topic,
-        std::string text,
-        WarnPriority priority = WarnPriority::medium);
+        const std::string& topic,
+        const std::string& text,
+        const WarnPriority& priority = WarnPriority::medium);
 }
 
 #endif //ABLASTR_WARN_MANAGER_H_

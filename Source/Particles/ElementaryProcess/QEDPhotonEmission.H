@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef QED_PHOTON_EMISSION_H_
-#define QED_PHOTON_EMISSION_H_
+#ifndef WARPX_QED_PHOTON_EMISSION_H_
+#define WARPX_QED_PHOTON_EMISSION_H_
 
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/Gather/GetExternalFields.H"
@@ -22,6 +22,7 @@
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_IndexType.H>
+#include <AMReX_ParticleTile.H>
 #include <AMReX_REAL.H>
 
 #include <AMReX_BaseFwd.H>
@@ -109,8 +110,8 @@ public:
     */
     PhotonEmissionTransformFunc (
         QuantumSynchrotronGetOpticalDepth opt_depth_functor,
-        int const opt_depth_runtime_comp,
-        QuantumSynchrotronPhotonEmission const emission_functor,
+        int opt_depth_runtime_comp,
+        QuantumSynchrotronPhotonEmission emission_functor,
         const WarpXParIter& a_pti, int lev, amrex::IntVect ngEB,
         amrex::FArrayBox const& exfab,
         amrex::FArrayBox const& eyfab,
@@ -118,6 +119,8 @@ public:
         amrex::FArrayBox const& bxfab,
         amrex::FArrayBox const& byfab,
         amrex::FArrayBox const& bzfab,
+        amrex::Vector<amrex::ParticleReal>& E_external_particle,
+        amrex::Vector<amrex::ParticleReal>& B_external_particle,
         int a_offset = 0);
 
     /**
@@ -141,14 +144,19 @@ public:
         amrex::ParticleReal xp, yp, zp;
         m_get_position(i_src, xp, yp, zp);
 
-        amrex::ParticleReal ex = 0._rt, ey = 0._rt, ez = 0._rt;
-        amrex::ParticleReal bx = 0._rt, by = 0._rt, bz = 0._rt;
+        amrex::ParticleReal ex = m_Ex_external_particle;
+        amrex::ParticleReal ey = m_Ey_external_particle;
+        amrex::ParticleReal ez = m_Ez_external_particle;
+        amrex::ParticleReal bx = m_Bx_external_particle;
+        amrex::ParticleReal by = m_By_external_particle;
+        amrex::ParticleReal bz = m_Bz_external_particle;
+
         m_get_externalEB(i_src, ex, ey, ez, bx, by, bz);
 
         doGatherShapeN(xp, yp, zp, ex, ey, ez, bx, by, bz,
                        m_ex_arr, m_ey_arr, m_ez_arr, m_bx_arr, m_by_arr, m_bz_arr,
                        m_ex_type, m_ey_type, m_ez_type, m_bx_type, m_by_type, m_bz_type,
-                       m_dx_arr, m_xyzmin_arr, m_lo, m_n_rz_azimuthal_modes,
+                       m_dinv, m_xyzmin, m_lo, m_n_rz_azimuthal_modes,
                        m_nox, m_galerkin_interpolation);
 
         auto& ux = src.m_rdata[PIdx::ux][i_src];
@@ -178,8 +186,14 @@ private:
     const QuantumSynchrotronPhotonEmission
         m_emission_functor;  /*!< A copy of the functor to generate photons. It contains only pointers to the lookup tables.*/
 
-    GetParticlePosition m_get_position;
+    GetParticlePosition<PIdx> m_get_position;
     GetExternalEBField m_get_externalEB;
+    amrex::ParticleReal m_Ex_external_particle;
+    amrex::ParticleReal m_Ey_external_particle;
+    amrex::ParticleReal m_Ez_external_particle;
+    amrex::ParticleReal m_Bx_external_particle;
+    amrex::ParticleReal m_By_external_particle;
+    amrex::ParticleReal m_Bz_external_particle;
 
     amrex::Array4<const amrex::Real> m_ex_arr;
     amrex::Array4<const amrex::Real> m_ey_arr;
@@ -195,8 +209,8 @@ private:
     amrex::IndexType m_by_type;
     amrex::IndexType m_bz_type;
 
-    amrex::GpuArray<amrex::Real, 3> m_dx_arr;
-    amrex::GpuArray<amrex::Real, 3> m_xyzmin_arr;
+    amrex::XDim3 m_dinv;
+    amrex::XDim3 m_xyzmin;
 
     bool m_galerkin_interpolation;
     int m_nox;
@@ -224,12 +238,11 @@ void cleanLowEnergyPhotons(
     const int old_size, const int num_added,
     const amrex::ParticleReal energy_threshold)
 {
-    auto pp = ptile.GetArrayOfStructs()().data() + old_size;
-
-    const auto& soa = ptile.GetStructOfArrays();
+    auto& soa = ptile.GetStructOfArrays();
+    auto p_idcpu = soa.GetIdCPUData().data() + old_size;
     const auto p_ux = soa.GetRealData(PIdx::ux).data() + old_size;
-    const auto  p_uy = soa.GetRealData(PIdx::uy).data() + old_size;
-    const auto  p_uz = soa.GetRealData(PIdx::uz).data() + old_size;
+    const auto p_uy = soa.GetRealData(PIdx::uy).data() + old_size;
+    const auto p_uz = soa.GetRealData(PIdx::uz).data() + old_size;
 
     //The square of the energy threshold
     const auto energy_threshold2 = std::max(
@@ -238,8 +251,6 @@ void cleanLowEnergyPhotons(
 
     amrex::ParallelFor(num_added, [=] AMREX_GPU_DEVICE (int ip) noexcept
     {
-        auto& p = pp[ip];
-
         const auto ux = p_ux[ip];
         const auto uy = p_uy[ip];
         const auto uz = p_uz[ip];
@@ -249,11 +260,11 @@ void cleanLowEnergyPhotons(
         constexpr amrex::ParticleReal me_c = PhysConst::m_e*PhysConst::c;
         const auto phot_energy2 = (ux*ux + uy*uy + uz*uz)*me_c*me_c;
 
-        if (phot_energy2 < energy_threshold2){
-            p.id() = - 1;
+        if (phot_energy2 < energy_threshold2) {
+            p_idcpu[ip] = amrex::ParticleIdCpus::Invalid;
         }
     });
 }
 
 
-#endif //QED_PHOTON_EMISSION_H_
+#endif //WARPX_QED_PHOTON_EMISSION_H_

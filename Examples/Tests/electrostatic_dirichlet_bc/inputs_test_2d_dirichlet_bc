@@ -1,0 +1,23 @@
+max_step = 100
+warpx.verbose = 0
+warpx.abort_on_warning_threshold = medium
+warpx.const_dt = 7.5e-10
+warpx.do_electrostatic = labframe
+warpx.self_fields_required_precision = 1e-06
+warpx.use_filter = 0
+amr.n_cell = 64 8
+amr.max_grid_size = 32
+amr.max_level = 0
+
+geometry.dims = 2
+geometry.prob_lo = 0.0 0.0
+geometry.prob_hi = 0.032 0.004
+boundary.field_lo = pec periodic
+boundary.field_hi = pec periodic
+boundary.potential_lo_x = 150.0*sin(2*pi*6.78e+06*t)
+boundary.potential_hi_x = 450.0*sin(2*pi*13.56e+06*t)
+
+diagnostics.diags_names = diag1
+diag1.diag_type = Full
+diag1.intervals = ::4
+diag1.fields_to_plot = phi

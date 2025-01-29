@@ -30,7 +30,7 @@ and bridge code making it easy to use in AMReX based simulation codes.
 SENSEI provides a *configurable analysis adaptor* which uses an XML file to
 select and configure one or more back ends at run time. Run time selection of
 the back end via XML means one user can access Catalyst, another Libsim, yet
-another Python with no changes to the code.  This is depicted in figure
+another Python with no changes to the code.  This is depicted in
 :numref:`sensei_arch`. On the left side of the figure AMReX produces data, the
 bridge code pushes the data through the configurable analysis adaptor to the
 back end that was selected at run time.
@@ -99,7 +99,7 @@ The back end is selected and configured at run time using the SENSEI XML file.
 The XML sets parameters specific to SENSEI and to the chosen back end. Many of
 the back ends have sophisticated configuration mechanisms which SENSEI makes
 use of.  For example the following XML configuration was used on NERSC's Cori
-with WarpX to render 10 iso surfaces, shown in figure :numref:`lpa_visit`, using
+with WarpX to render 10 iso surfaces, shown in :numref:`lpa_visit`, using
 VisIt Libsim.
 
 .. code-block:: xml
@@ -123,7 +123,7 @@ run of the desired simulation.
    quadrant has been clipped away to reveal innner structure.
 
 The same run and visualization was repeated using ParaView Catalyst, shown in
-figure :numref:`lpa_pv`, by providing the following XML configuration.
+:numref:`lpa_pv`, by providing the following XML configuration.
 
 .. code-block:: xml
 

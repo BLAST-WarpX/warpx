@@ -10,7 +10,6 @@
 
 #include "Particles/WarpXParticleContainer.H"
 #include "Diagnostics/FlushFormats/FlushFormat.H"
-#include "Utils/TextMsg.H"
 
 #include "Diagnostics/ParticleDiag/ParticleDiag_fwd.H"
 
@@ -37,35 +36,15 @@
 #include <vector>
 
 //
-// helper class
-//
-class Timer
-{
-public:
-  Timer (const char* tag) {m_Tag = tag; m_Start = amrex::second();}
-  ~Timer () {
-      m_End = amrex::second();
-      amrex::ParallelDescriptor::ReduceRealMax(m_End, amrex::ParallelDescriptor::IOProcessorNumber());
-      amrex::Print() << Utils::TextMsg::Info(
-        m_Tag + " took: "+ std::to_string(m_End - m_Start) + " seconds");
-  }
-private:
-  amrex::Real m_Start;
-  amrex::Real m_End;
-  std::string m_Tag;
-};
-
-
-//
 //
 class WarpXParticleCounter
 {
 public:
   using ParticleContainer = typename WarpXParticleContainer::ContainerLike<amrex::PinnedArenaAllocator>;
-  using ParticleIter = typename amrex::ParIter<0, 0, PIdx::nattribs, 0, amrex::PinnedArenaAllocator>;
+  using ParticleIter = typename amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PinnedArenaAllocator>;
 
   WarpXParticleCounter (ParticleContainer* pc);
-  unsigned long GetTotalNumParticles () {return m_Total;}
+  [[nodiscard]] unsigned long GetTotalNumParticles () const {return m_Total;}
 
   std::vector<unsigned long long> m_ParticleOffsetAtRank;
   std::vector<unsigned long long> m_ParticleSizeAtRank;
@@ -98,7 +77,7 @@ class WarpXOpenPMDPlot
 {
 public:
   using ParticleContainer = typename WarpXParticleContainer::ContainerLike<amrex::PinnedArenaAllocator>;
-  using ParticleIter = typename amrex::ParConstIter<0, 0, PIdx::nattribs, 0, amrex::PinnedArenaAllocator>;
+  using ParticleIter = typename amrex::ParConstIterSoA<PIdx::nattribs, 0, amrex::PinnedArenaAllocator>;
 
   /** Initialize openPMD I/O routines
    *
@@ -109,16 +88,23 @@ public:
    * @param engine_type ADIOS engine for output
    * @param engine_parameters map of parameters for the engine
    * @param fieldPMLdirections PML field solver, @see WarpX::getPMLdirections()
+   * @param authors a string specifying the authors of the simulation (can be empty)
    */
   WarpXOpenPMDPlot (openPMD::IterationEncoding ie,
-                    std::string filetype,
-                    std::string operator_type,
-                    std::map< std::string, std::string > operator_parameters,
-                    std::string engine_type,
-                    std::map< std::string, std::string > engine_parameters,
-                    std::vector<bool> fieldPMLdirections);
+                    const std::string& filetype,
+                    const std::string& operator_type,
+                    const std::map< std::string, std::string >& operator_parameters,
+                    const std::string& engine_type,
+                    const std::map< std::string, std::string >& engine_parameters,
+                    const std::vector<bool>& fieldPMLdirections,
+                    const std::string& authors);
 
   ~WarpXOpenPMDPlot ();
+
+  WarpXOpenPMDPlot ( WarpXOpenPMDPlot const &)             = delete;
+  WarpXOpenPMDPlot& operator= ( WarpXOpenPMDPlot const & ) = delete;
+  WarpXOpenPMDPlot ( WarpXOpenPMDPlot&& )                  = default;
+  WarpXOpenPMDPlot& operator= ( WarpXOpenPMDPlot&& )       = default;
 
   /** Set Iteration Step for the series
    *
@@ -136,10 +122,10 @@ public:
 
   void WriteOpenPMDParticles (
               const amrex::Vector<ParticleDiag>& particle_diags,
-              const bool use_pinned_pc = false,
-              const bool isBTD = false,
-              const bool isLastBTDFlush = false,
-              const amrex::Vector<int>& totalParticlesFlushedAlready = amrex::Vector<int>());
+              amrex::Real time,
+              bool use_pinned_pc = false,
+              bool isBTD = false,
+              bool isLastBTDFlush = false);
 
   /** Write out all openPMD fields for all active MR levels
    *
@@ -158,8 +144,8 @@ public:
               const amrex::Vector<amrex::MultiFab>& mf,
               amrex::Vector<amrex::Geometry>& geom,
               int output_levels,
-              const int iteration,
-              const double time,
+              int iteration,
+              double time,
               bool isBTD = false,
               const amrex::Geometry& full_BTD_snapshot=amrex::Geometry() ) const;
 
@@ -180,7 +166,7 @@ private:
    * @param[in] isBTD is this a backtransformed diagnostics write?
    * @return the iteration object
    */
-  inline openPMD::Iteration GetIteration (int const iteration, bool const isBTD) const
+  [[nodiscard]] inline openPMD::Iteration GetIteration (int const iteration, bool const isBTD) const
   {
     if (isBTD)
     {
@@ -202,9 +188,9 @@ private:
 
   void SetupMeshComp (
       openPMD::Mesh& mesh,
-      amrex::Geometry& full_geom,
-      std::string comp_name,
-      std::string field_name,
+      amrex::Geometry const& full_geom,
+      std::string const& comp_name,
+      std::string const& field_name,
       amrex::MultiFab const& mf,
       bool var_in_theta_mode
   ) const;
@@ -218,42 +204,46 @@ private:
    * @param[in] varname       name from WarpX
    * @param[out] field_name   field name for openPMD-api output
    * @param[in] comp_name     comp name for openPMD-api output
-   * @param[in] is_theta_mode indicate if this field will be output with theta
-   *                          modes (instead of a reconstructed 2D slice)
+   * @param[in] var_in_theta_mode indicate if this field will be output with theta
+   *                              modes (instead of a reconstructed 2D slice)
    */
   void GetMeshCompNames (
       int meshLevel,
       const std::string& varname,
       std::string& field_name,
       std::string& comp_name,
-      bool is_theta_mode
+      bool var_in_theta_mode
   ) const;
 
   /** This function sets up the entries for storing the particle positions and global IDs
   *
   * @param[in] currSpecies Corresponding openPMD species
+  * @param[in] positionComponents user-selected components of the particle position
   * @param[in] np          Number of particles
   * @param[in] isBTD       Is this a back-transformed diagnostics output?
   */
   void SetupPos (
         openPMD::ParticleSpecies& currSpecies,
+        std::vector<std::string> const & positionComponents,
         const unsigned long long& np,
-        bool const isBTD = false);
+        bool isBTD = false);
 
   /** This function sets constant particle records and ED-PIC attributes.
    *
    * Sets the entries for storing particle position offset, constant records (charge, mass) and ED-PIC attributes.
    *
    * @param[in] currSpecies Corresponding openPMD species
+   * @param[in] positionComponents user-selected components of the particle position
    * @param[in] np          Number of particles
    * @param[in] charge      Charge of the particles (note: fix for ions)
    * @param[in] mass        Mass of the particles
    */
   void SetConstParticleRecordsEDPIC (
         openPMD::ParticleSpecies& currSpecies,
+        std::vector<std::string> const & positionComponents,
         const unsigned long long& np,
-        amrex::ParticleReal const charge,
-        amrex::ParticleReal const mass);
+        amrex::ParticleReal charge,
+        amrex::ParticleReal mass);
 
   /** This function sets up the entries for particle properties
    *
@@ -272,7 +262,7 @@ private:
                const amrex::Vector<std::string>& real_comp_names,
                const amrex::Vector<int>& write_int_comp,
                const amrex::Vector<std::string>& int_comp_names,
-               const unsigned long long np, bool const isBTD = false) const;
+               unsigned long long np, bool isBTD = false) const;
 
   /** This function saves the values of the entries for particle properties
    *
@@ -298,14 +288,14 @@ private:
    * @param[in] name species name
    * @param[in] iteration timestep
    * @param[in] write_real_comp The real attribute ids, from WarpX
-   * @param[in] real_comp_names The real attribute names, from WarpX
    * @param[in] write_int_comp The int attribute ids, from WarpX
+   * @param[in] real_comp_names The real attribute names, from WarpX
    * @param[in] int_comp_names The int attribute names, from WarpX
    * @param[in] charge         Charge of the particles (note: fix for ions)
    * @param[in] mass           Mass of the particles
+   * @param[inout] ParticleFlushOffset previously flushed number of particles in BTD
    * @param[in] isBTD is this a backtransformed diagnostics (BTD) write?
    * @param[in] isLastBTDFlush is this the last time we will flush this BTD station?
-   * @param[in] ParticleFlushOffset previously flushed number of particles in BTD
    */
   void DumpToFile (ParticleContainer* pc,
             const std::string& name,
@@ -314,11 +304,10 @@ private:
             const amrex::Vector<int>& write_int_comp,
             const amrex::Vector<std::string>& real_comp_names,
             const amrex::Vector<std::string>&  int_comp_names,
-            amrex::ParticleReal const charge,
-            amrex::ParticleReal const mass,
-            const bool isBTD = false,
-            const bool isLastBTDFlush = false,
-            int ParticleFlushOffset = 0);
+            amrex::ParticleReal charge,
+            amrex::ParticleReal mass,
+            bool isBTD = false,
+            bool isLastBTDFlush = false);
 
   /** Get the openPMD-api filename for openPMD::Series
    *
@@ -354,6 +343,9 @@ private:
 
   // meta data
   std::vector< bool > m_fieldPMLdirections; //! @see WarpX::getPMLdirections()
+
+  // The authors' string
+  std::string m_authors;
 };
 #endif // WARPX_USE_OPENPMD
 

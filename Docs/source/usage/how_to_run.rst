@@ -25,7 +25,7 @@ Where ``<run_directory>`` by the actual path to the run directory.
 -------------
 
 If you installed warpX with a :ref:`package manager <install-users>`, a ``warpx``-prefixed executable will be available as a regular system command to you.
-Depending on the choosen build options, the name is suffixed with more details.
+Depending on the chosen build options, the name is suffixed with more details.
 Try it like this:
 
 .. code-block:: bash

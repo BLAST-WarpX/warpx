@@ -8,6 +8,7 @@ CEXE_sources += SliceDiagnostic.cpp
 CEXE_sources += BTDiagnostics.cpp
 CEXE_sources += BoundaryScrapingDiagnostics.cpp
 CEXE_sources += BTD_Plotfile_Header_Impl.cpp
+CEXE_sources += OpenPMDHelpFunction.cpp
 
 ifeq ($(USE_OPENPMD), TRUE)
   CEXE_sources += WarpXOpenPMD.cpp

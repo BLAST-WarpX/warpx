@@ -6,4 +6,5 @@ CEXE_sources += UsedInputsFile.cpp
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/ablastr/utils
 
 include $(WARPX_HOME)/Source/ablastr/utils/msg_logger/Make.package
+include $(WARPX_HOME)/Source/ablastr/utils/text/Make.package
 include $(WARPX_HOME)/Source/ablastr/utils/timer/Make.package

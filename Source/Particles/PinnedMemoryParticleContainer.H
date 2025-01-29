@@ -1,8 +1,8 @@
-#ifndef PinnedMemoryParticleContainer_H_
-#define PinnedMemoryParticleContainer_H_
+#ifndef WARPX_PinnedMemoryParticleContainer_H_
+#define WARPX_PinnedMemoryParticleContainer_H_
 
 #include "NamedComponentParticleContainer.H"
 
 using PinnedMemoryParticleContainer = NamedComponentParticleContainer<amrex::PinnedArenaAllocator>;
 
-#endif
+#endif //WARPX_PinnedMemoryParticleContainer_H_

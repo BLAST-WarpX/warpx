@@ -1,19 +1,16 @@
 CEXE_sources += WarpXMovingWindow.cpp
 CEXE_sources += WarpXTagging.cpp
 CEXE_sources += WarpXUtil.cpp
-CEXE_sources += WarpXrocfftUtil.cpp
 CEXE_sources += WarpXVersion.cpp
-CEXE_sources += WarpXAlgorithmSelection.cpp
 CEXE_sources += Interpolate.cpp
 CEXE_sources += IntervalsParser.cpp
-CEXE_sources += MPIInitHelpers.cpp
 CEXE_sources += RelativeCellPosition.cpp
 CEXE_sources += ParticleUtils.cpp
+CEXE_sources += SpeciesUtils.cpp
 
 include $(WARPX_HOME)/Source/Utils/Algorithms/Make.package
 include $(WARPX_HOME)/Source/Utils/Logo/Make.package
 include $(WARPX_HOME)/Source/Utils/Parser/Make.package
 include $(WARPX_HOME)/Source/Utils/Physics/Make.package
-include $(WARPX_HOME)/Source/Utils/Strings/Make.package
 
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/Utils

@@ -3,9 +3,12 @@ CEXE_sources += PartPerCellFunctor.cpp
 CEXE_sources += PartPerGridFunctor.cpp
 CEXE_sources += DivBFunctor.cpp
 CEXE_sources += DivEFunctor.cpp
+CEXE_sources += JFunctor.cpp
+CEXE_sources += JdispFunctor.cpp
 CEXE_sources += RhoFunctor.cpp
 CEXE_sources += BackTransformFunctor.cpp
 CEXE_sources += BackTransformParticleFunctor.cpp
 CEXE_sources += ParticleReductionFunctor.cpp
+CEXE_sources += TemperatureFunctor.cpp
 
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/Diagnostics/ComputeDiagFunctors

@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <iterator>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -72,8 +73,9 @@ namespace ablastr::utils::serialization
                 ", except vectors of std::string.");
 
             put_in(static_cast<int>(val.size()), vec);
-            for (const auto &el : val)
+            for (const auto &el : val) {
                 put_in(el, vec);
+            }
         }
     }
 
@@ -93,7 +95,7 @@ namespace ablastr::utils::serialization
         if constexpr (std::is_same<T, std::string>())
         {
             const auto length = get_out<int>(it);
-            const auto str = std::string{it, it + length};
+            auto str = std::string{it, it + length};
             it += length;
 
             return str;
@@ -144,8 +146,9 @@ namespace ablastr::utils::serialization
 
             const auto length = get_out<int>(it);
             std::vector<T> res(length);
-            for (int i = 0; i < length; ++i)
+            for (int i = 0; i < length; ++i) {
                 res[i] = get_out<T>(it);
+            }
 
             return res;
         }

@@ -16,7 +16,6 @@ sudo apt-get -qqq update
 sudo apt-get install -y \
     build-essential     \
     ca-certificates     \
-    ccache              \
     cmake               \
     g++-12              \
     gnupg               \
@@ -28,3 +27,6 @@ sudo apt-get install -y \
     ninja-build         \
     pkg-config          \
     wget
+
+# ccache
+$(dirname "$0")/ccache.sh

@@ -1,5 +1,5 @@
 /* Copyright 2019-2020 Luca Fedeli, Maxence Thevenet
- *
+ * Ilian Kara-Mostefa
  * This file is part of WarpX.
  *
  * License: BSD-3-Clause-LBNL
@@ -12,6 +12,8 @@
 #include <AMReX_Parser.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
+#include <AMReX_Box.H>
+#include <AMReX_FArrayBox.H>
 
 #include <functional>
 #include <limits>
@@ -20,6 +22,7 @@
 #include <string>
 #include <utility>
 
+#include "Utils/WarpX_Complex.H"
 
 namespace WarpXLaserProfiles {
 
@@ -88,13 +91,19 @@ public:
      */
     virtual void
     fill_amplitude (
-        const int np,
-        amrex::Real const * AMREX_RESTRICT const Xp,
-        amrex::Real const * AMREX_RESTRICT const Yp,
+        int np,
+        amrex::Real const * AMREX_RESTRICT Xp,
+        amrex::Real const * AMREX_RESTRICT Yp,
         amrex::Real t,
-        amrex::Real * AMREX_RESTRICT const amplitude) const = 0;
+        amrex::Real* AMREX_RESTRICT amplitude) const = 0;
 
-    virtual ~ILaserProfile(){}
+    ILaserProfile () = default;
+    virtual ~ILaserProfile() = default;
+
+    ILaserProfile ( ILaserProfile const &)             = default;
+    ILaserProfile& operator= ( ILaserProfile const & ) = default;
+    ILaserProfile ( ILaserProfile&& )                  = default;
+    ILaserProfile& operator= ( ILaserProfile&& )       = default;
 };
 
 /**
@@ -107,19 +116,19 @@ public:
     void
     init (
         const amrex::ParmParse& ppl,
-        CommonLaserParameters params) override final;
+        CommonLaserParameters params) final;
 
     //No update needed
     void
-    update (amrex::Real /*t */) override final {}
+    update (amrex::Real /*t */) final {}
 
     void
     fill_amplitude (
-        const int np,
-        amrex::Real const * AMREX_RESTRICT const Xp,
-        amrex::Real const * AMREX_RESTRICT const Yp,
+        int np,
+        amrex::Real const * AMREX_RESTRICT Xp,
+        amrex::Real const * AMREX_RESTRICT Yp,
         amrex::Real t,
-        amrex::Real * AMREX_RESTRICT const amplitude) const override final;
+        amrex::Real * AMREX_RESTRICT amplitude) const final;
 
 private:
     struct {
@@ -140,40 +149,6 @@ private:
 };
 
 /**
- * Harris laser profile
- */
-class HarrisLaserProfile : public ILaserProfile
-{
-
-public:
-    void
-    init (
-        const amrex::ParmParse& ppl,
-        CommonLaserParameters params) override final;
-
-    //No update needed
-    void
-    update (amrex::Real /*t */) override final {}
-
-    void
-    fill_amplitude (
-        const int np,
-        amrex::Real const * AMREX_RESTRICT const Xp,
-        amrex::Real const * AMREX_RESTRICT const Yp,
-        amrex::Real t,
-        amrex::Real * AMREX_RESTRICT const amplitude) const override final;
-
-private:
-    struct {
-        amrex::Real waist          = std::numeric_limits<amrex::Real>::quiet_NaN();
-        amrex::Real duration       = std::numeric_limits<amrex::Real>::quiet_NaN();
-        amrex::Real focal_distance = std::numeric_limits<amrex::Real>::quiet_NaN();
-    } m_params;
-
-    CommonLaserParameters m_common_params;
-};
-
-/**
  * Laser profile defined by the used with an analytical expression
  */
 class FieldFunctionLaserProfile : public ILaserProfile
@@ -183,19 +158,19 @@ public:
     void
     init (
         const amrex::ParmParse& ppl,
-        CommonLaserParameters params) override final;
+        CommonLaserParameters params) final;
 
     //No update needed
     void
-    update (amrex::Real /*t */) override final {}
+    update (amrex::Real /*t */) final {}
 
     void
     fill_amplitude (
-        const int np,
-        amrex::Real const * AMREX_RESTRICT const Xp,
-        amrex::Real const * AMREX_RESTRICT const Yp,
+        int np,
+        amrex::Real const * AMREX_RESTRICT Xp,
+        amrex::Real const * AMREX_RESTRICT Yp,
         amrex::Real t,
-        amrex::Real * AMREX_RESTRICT const amplitude) const override final;
+        amrex::Real * AMREX_RESTRICT amplitude) const final;
 
 private:
     struct{
@@ -206,26 +181,26 @@ private:
 };
 
 /**
- * Laser profile read from an 'TXYE' file
+ * Laser profile read from a file (lasy or binary)
  * The binary file must contain:
  * - 3 unsigned integers (4 bytes): nt (points along t), nx (points along x) and ny (points along y)
  * - nt*nx*ny doubles (8 bytes) in row major order : field amplitude
  */
-class FromTXYEFileLaserProfile : public ILaserProfile
+class FromFileLaserProfile : public ILaserProfile
 {
 
 public:
     void
     init (
         const amrex::ParmParse& ppl,
-        CommonLaserParameters params) override final;
+        CommonLaserParameters params) final;
 
     /** \brief Reads new field data chunk from file if needed
     *
     * @param[in] t simulation time (seconds)
     */
     void
-    update (amrex::Real t) override final;
+    update (amrex::Real t) final;
 
     /** \brief compute field amplitude at particles' position for a laser beam
     * loaded from an E(x,y,t) file.
@@ -242,13 +217,13 @@ public:
     */
     void
     fill_amplitude (
-        const int np,
-        amrex::Real const * AMREX_RESTRICT const Xp,
-        amrex::Real const * AMREX_RESTRICT const Yp,
+        int np,
+        amrex::Real const * AMREX_RESTRICT Xp,
+        amrex::Real const * AMREX_RESTRICT Yp,
         amrex::Real t,
-        amrex::Real * AMREX_RESTRICT const amplitude) const override final;
+        amrex::Real * AMREX_RESTRICT amplitude) const final;
 
-    /** \brief Function to fill the amplitude in case of a uniform grid.
+    /** \brief Function to fill the amplitude in case of a uniform grid and for the lasy format in 3D Cartesian.
     * This function cannot be private due to restrictions related to
     * the use of extended __device__ lambda
     *
@@ -259,15 +234,15 @@ public:
     * \param t: Current physical time
     * \param amplitude: pointer to array of field amplitude.
     */
-    void internal_fill_amplitude_uniform(
-        const int idx_t_left,
-        const int np,
-        amrex::Real const * AMREX_RESTRICT const Xp,
-        amrex::Real const * AMREX_RESTRICT const Yp,
+    void internal_fill_amplitude_uniform_cartesian(
+        int idx_t_left,
+        int np,
+        amrex::Real const * AMREX_RESTRICT Xp,
+        amrex::Real const * AMREX_RESTRICT Yp,
         amrex::Real t,
-        amrex::Real * AMREX_RESTRICT const amplitude) const;
+        amrex::Real * AMREX_RESTRICT amplitude) const;
 
-    /** \brief Function to fill the amplitude in case of a non-uniform grid.
+    /** \brief Function to fill the amplitude in case of a uniform grid and for the lasy format in RZ geometry.
     * This function cannot be private due to restrictions related to
     * the use of extended __device__ lambda
     *
@@ -278,84 +253,128 @@ public:
     * \param t: Current physical time
     * \param amplitude: pointer to array of field amplitude.
     */
-    void internal_fill_amplitude_nonuniform(
-        const int idx_t_left,
-        const int np,
-        amrex::Real const * AMREX_RESTRICT const Xp,
-        amrex::Real const * AMREX_RESTRICT const Yp,
+    void internal_fill_amplitude_uniform_cylindrical(
+        int idx_t_left,
+        int np,
+        amrex::Real const * AMREX_RESTRICT Xp,
+        amrex::Real const * AMREX_RESTRICT Yp,
         amrex::Real t,
-        amrex::Real * AMREX_RESTRICT const amplitude) const;
+        amrex::Real * AMREX_RESTRICT amplitude) const;
+
+
+
+    /** \brief Function to fill the amplitude in case of a uniform grid and for the binary format.
+    * This function cannot be private due to restrictions related to
+    * the use of extended __device__ lambda
+    *
+    * \param idx_t_left index of the last time coordinate < t
+    * \param np: number of laser particles
+    * \param Xp: pointer to first component of positions of laser particles
+    * \param Yp: pointer to second component of positions of laser particles
+    * \param t: Current physical time
+    * \param amplitude: pointer to array of field amplitude.
+    */
+        void internal_fill_amplitude_uniform_binary(
+        int idx_t_left,
+        int np,
+        amrex::Real const * AMREX_RESTRICT Xp,
+        amrex::Real const * AMREX_RESTRICT Yp,
+        amrex::Real t,
+        amrex::Real * AMREX_RESTRICT amplitude) const;
 
 private:
-    /** \brief parse a field file in the binary 'txye' format (whose details are given below).
+    /** \brief parse a field file in the HDF5 'lasy' format
+    * \param lasy_file_name: name of the lasy file to parse
+    */
+    void parse_lasy_file(const std::string& lasy_file_name);
+
+    /** \brief parse a field file in the binary 'binary' format (whose details are given below).
     *
-    * A 'txye' file should be a binary file with the following format:
-    * -flag to indicate if the grid is uniform or not (1 byte, 0 means non-uniform, !=0 means uniform)
+    * A 'binary' file should be a binary file with the following format:
     * -np, number of timesteps (uint32_t, must be >=2)
     * -nx, number of points along x (uint32_t, must be >=2)
     * -ny, number of points along y (uint32_t, must be 1 for 2D simulations and >=2 for 3D simulations)
-    * -timesteps (double[2] if grid is uniform, double[np] otherwise)
-    * -x_coords (double[2] if grid is uniform, double[nx] otherwise)
-    * -y_coords (double[1] if 2D, double[2] if 3D & uniform grid, double[ny] if 3D & non uniform grid)
+    * -timesteps (double[2])
+    * -x_coords (double[2])
+    * -y_coords (double[1] if 2D, double[2] if 3D
     * -field_data (double[nt * nx * ny], with nt being the slowest coordinate).
-    * The spatiotemporal grid must be rectangular.
-    *
-    * \param txye_file_name: name of the file to parse
+    * The spatiotemporal grid must be rectangular and uniform.
+    * \param binary_file_name: name of the binary file to parse
     */
-    void parse_txye_file(std::string txye_file_name);
+    void parse_binary_file(const std::string& binary_file_name);
 
     /** \brief Finds left and right time indices corresponding to time t
     *
     *
     * \param t: simulation time
     */
-    std::pair<int,int> find_left_right_time_indices(amrex::Real t) const;
+    [[nodiscard]] std::pair<int,int> find_left_right_time_indices(amrex::Real t) const;
 
-    /** \brief Load field data within the temporal range [t_begin, t_end)
+    /** \brief Load field data within the temporal range [t_begin, t_end]
     *
-    * Must be called after having parsed a data file with parse_txye_file.
+    * Must be called after having parsed a lasy data file with the 'parse_lasy_file' function.
     *
     * \param t_begin: left limit of the timestep range to read
     * \param t_end: right limit of the timestep range to read (t_end is not read)
     */
-    void read_data_t_chuck(int t_begin, int t_end);
+    void read_data_t_chunk(int t_begin, int t_end);
+
+        /** \brief Load field data within the temporal range [t_begin, t_end]
+    *
+    * Must be called after having parsed a binary data file with the 'parse_binary_file' function.
+    *
+    * \param t_begin: left limit of the timestep range to read
+    * \param t_end: right limit of the timestep range to read (t_end is not read)
+    */
+    void read_binary_data_t_chunk(int t_begin, int t_end);
 
     /**
      * \brief m_params contains all the internal parameters
      * used by this laser profile
      */
     struct{
-        /** Name of the file containing the data */
-        std::string txye_file_name;
-        /** Flag to store if the grid is uniform */
-        bool is_grid_uniform = false;
-        /** Dimensions of E_data. nt, nx must be >=2.
+
+        /** Name of the binary file containing the data */
+        std::string binary_file_name;
+        /** Name of the lasy file containing the data */
+        std::string lasy_file_name;
+        /** true if the file is in the lasy format, false if it is in the binary format */
+        bool file_in_lasy_format;
+        /** lasy file geometry ("cartesian" for 3D cartesian or "thetaMode" for RZ) */
+        int file_in_cartesian_geom;
+        /** Dimensions of E_binary_data or E_lasy_data. nt, nx must be >=2.
          * If DIM=3, ny must be >=2 as well.
          * If DIM=2, ny must be 1 */
         int nt, nx, ny;
-        /** Vector of temporal coordinates. For a non-uniform grid, it contains
-         * all values of time. For a uniform grid, it contains only the start and stop
-         * times and intermediate times are obtained with nt */
-        amrex::Vector<amrex::Real> t_coords;
-        /** Vector or x coordinates. For a non-uniform grid, it contains all values
-         * of space dimension x. For a uniform grid, it contains only the min and max
-         * x coordinates, and intermediate positions are obtained with nx */
-        amrex::Vector<amrex::Real> h_x_coords;
-        amrex::Gpu::DeviceVector<amrex::Real> d_x_coords;
-        /** Vector or y coordinates. For a non-uniform grid, it contains all values
-         * of space dimension y. For a uniform grid, it contains only the min and max
-         * y coordinates, and intermediate positions are obtained with ny */
-        amrex::Vector<amrex::Real> h_y_coords;
-        amrex::Gpu::DeviceVector<amrex::Real> d_y_coords;
+        /** Dimensions of E_lasy_data in RZ */
+        int nr;
+        /** Number of azimuthal components (2 per mode, 1 for mode 0) */
+        int n_rz_azimuthal_components;
+        /** Start time*/
+        amrex::Real t_min;
+        /** Stop time*/
+        amrex::Real t_max;
+        /** min of x coordinates*/
+        amrex::Real x_min;
+        /** max of x coordinates*/
+        amrex::Real x_max;
+        /** min of y coordinates*/
+        amrex::Real y_min;
+        /** max of y coordinates*/
+        amrex::Real y_max;
+        amrex::Real r_min;
+        amrex::Real r_max;
         /** Size of the timestep range to load */
         int time_chunk_size;
         /** Index of the first timestep in memory */
         int first_time_index;
         /** Index of the last timestep in memory */
         int last_time_index;
-        /** Field data */
-        amrex::Gpu::DeviceVector<amrex::Real> E_data;
-        /** This parameter is subtracted to simulation time before interpolating field data in txye file.
+        /** lasy field data */
+        amrex::Gpu::DeviceVector<Complex> E_lasy_data;
+        /** binary field data */
+        amrex::Gpu::DeviceVector<amrex::Real> E_binary_data;
+        /** This parameter is subtracted to simulation time before interpolating field data in file (either lasy or binary).
         *   If t_delay > 0, the laser is delayed, otherwise it is anticipated. */
         amrex::Real t_delay = amrex::Real(0.0);
 
@@ -377,12 +396,10 @@ laser_profiles_dictionary =
 {
     {"gaussian",
         [] () {return std::make_unique<GaussianLaserProfile>();} },
-    {"harris",
-        [] () {return std::make_unique<HarrisLaserProfile>();} },
     {"parse_field_function",
         [] () {return std::make_unique<FieldFunctionLaserProfile>();} },
-    {"from_txye_file",
-        [] () {return std::make_unique<FromTXYEFileLaserProfile>();} }
+    {"from_file",
+        [] () {return std::make_unique<FromFileLaserProfile>();} }
 };
 
 } //WarpXLaserProfiles

@@ -19,8 +19,8 @@
 #include <set>
 
 void utils::parser::Store_parserString(
-    const amrex::ParmParse& pp,
-    std::string query_string,
+    amrex::ParmParse const& pp,
+    std::string const& query_string,
     std::string& stored_string)
 {
     std::vector<std::string> f;
@@ -32,18 +32,80 @@ void utils::parser::Store_parserString(
     f.clear();
 }
 
+void utils::parser::Store_parserString(
+    amrex::ParmParse const& a_pp,
+    std::string const& group,
+    std::string const& query_string,
+    std::string& stored_string)
+{
+    const bool is_specified_without_group = a_pp.contains(query_string.c_str());
+    const std::string grp_str = group + "." + query_string;
+    const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str.c_str()));
+
+    if (is_specified_without_group && !is_specified_with_group) {
+        // If found without the group but not with the group, then use the one without the group.
+        utils::parser::Store_parserString(a_pp, query_string, stored_string);
+    } else {
+        // Otherwise, use the one with the group even if not found, in which case an exception may be raised.
+        utils::parser::Store_parserString(a_pp, grp_str, stored_string);
+    }
+}
+
+bool utils::parser::Query_parserString(
+    amrex::ParmParse const& pp,
+    std::string const& query_string,
+    std::string& stored_string)
+{
+    bool const input_specified = pp.contains(query_string.c_str());
+    if (input_specified) {
+        stored_string.clear();
+        utils::parser::Store_parserString(pp, query_string, stored_string);
+    }
+    return input_specified;
+}
+
+int utils::parser::query (const amrex::ParmParse& a_pp, std::string const& group, char const * str, std::string& val)
+{
+    const bool is_specified_without_group = a_pp.contains(str);
+    const std::string grp_str = group + "." + std::string(str);
+    const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str.c_str()));
+
+    if (is_specified_without_group && !is_specified_with_group) {
+        // If found without the group but not with the group, then use the one without the group.
+        return a_pp.query(str, val);
+    } else {
+        // Otherwise, use the one with the group even if not found, in which case an exception may be raised.
+        return a_pp.query(grp_str.c_str(), val);
+    }
+}
+
+void utils::parser::get (const amrex::ParmParse& a_pp, std::string const& group, char const * str, std::string& val)
+{
+    const bool is_specified_without_group = a_pp.contains(str);
+    const std::string grp_str = group + "." + std::string(str);
+    const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str.c_str()));
+
+    if (is_specified_without_group && !is_specified_with_group) {
+        // If found without the group but not with the group, then use the one without the group.
+        a_pp.get(str, val);
+    } else {
+        // Otherwise, use the one with the group even if not found, in which case an exception may be raised.
+        a_pp.get(grp_str.c_str(), val);
+    }
+}
 
 namespace {
     template< typename int_type >
     AMREX_FORCE_INLINE
     int_type safeCastTo(const amrex::Real x, const std::string& real_name) {
-        int_type result = int_type(0);
+        auto result = int_type(0);
         bool error_detected = false;
         std::string assert_msg;
         // (2.0*(numeric_limits<int>::max()/2+1)) converts numeric_limits<int>::max()+1 to a real ensuring accuracy to all digits
         // This accepts x = 2**31-1 but rejects 2**31.
         using namespace amrex::literals;
-        constexpr amrex::Real max_range = (2.0_rt*static_cast<amrex::Real>(std::numeric_limits<int_type>::max()/2+1));
+        constexpr int_type half_max_plus_one = std::numeric_limits<int_type>::max()/2+1;
+        constexpr amrex::Real max_range = (2.0_rt*static_cast<amrex::Real>(half_max_plus_one));
         if (x < max_range) {
             if (std::ceil(x) >= std::numeric_limits<int_type>::min()) {
                 result = static_cast<int_type>(x);
@@ -86,7 +148,7 @@ amrex::Parser utils::parser::makeParser (
     parser.registerVariables(varnames);
 
     std::set<std::string> symbols = parser.symbols();
-    for (auto const& v : varnames) symbols.erase(v.c_str());
+    for (auto const& v : varnames) { symbols.erase(v); }
 
     // User can provide inputs under this name, through which expressions
     // can be provided for arbitrary variables. PICMI inputs are aware of
@@ -96,7 +158,7 @@ amrex::Parser utils::parser::makeParser (
     // system of units or some form of quasi-physical behavior in the
     // simulation. Thus, this needs to override any built-in
     // constants.
-    amrex::ParmParse pp_my_constants("my_constants");
+    const amrex::ParmParse pp_my_constants("my_constants");
 
     // Physical / Numerical Constants available to parsed expressions
     static std::map<std::string, amrex::Real> warpx_constants =
@@ -115,7 +177,7 @@ amrex::Parser utils::parser::makeParser (
     for (auto it = symbols.begin(); it != symbols.end(); ) {
         // Always parsing in double precision avoids potential overflows that may occur when parsing
         // user's expressions because of the limited range of exponentials in single precision
-        double v;
+        double v = 0.0;
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             recursive_symbols.count(*it)==0,
@@ -132,15 +194,15 @@ amrex::Parser utils::parser::makeParser (
 
         const auto constant = warpx_constants.find(*it);
         if (constant != warpx_constants.end()) {
-          parser.setConstant(*it, constant->second);
-          it = symbols.erase(it);
-          continue;
+            parser.setConstant(*it, constant->second);
+            it = symbols.erase(it);
+            continue;
         }
 
         ++it;
     }
     for (auto const& s : symbols) {
-        amrex::Abort(Utils::TextMsg::Err("makeParser::Unknown symbol "+s));
+        WARPX_ABORT_WITH_MESSAGE("makeParser::Unknown symbol "+s);
     }
     return parser;
 }

@@ -24,25 +24,25 @@
 
 #include <cmath>
 
-#if WARPX_USE_PSATD
+#if WARPX_USE_FFT
 
 using namespace amrex::literals;
 
-PsatdAlgorithmFirstOrder::PsatdAlgorithmFirstOrder(
+PsatdAlgorithmFirstOrder::PsatdAlgorithmFirstOrder (
     const SpectralKSpace& spectral_kspace,
     const amrex::DistributionMapping& dm,
     const SpectralFieldIndex& spectral_index,
     const int norder_x,
     const int norder_y,
     const int norder_z,
-    const short grid_type,
+    ablastr::utils::enums::GridType grid_type,
     const amrex::Real dt,
     const bool div_cleaning,
-    const int J_in_time,
-    const int rho_in_time)
+    const JInTime J_in_time,
+    const RhoInTime rho_in_time
+)
     // Initializer list
     : SpectralBaseAlgorithm(spectral_kspace, dm, spectral_index, norder_x, norder_y, norder_z, grid_type),
-    m_spectral_index(spectral_index),
     m_dt(dt),
     m_div_cleaning(div_cleaning),
     m_J_in_time(J_in_time),
@@ -54,10 +54,10 @@ PsatdAlgorithmFirstOrder::pushSpectralFields (SpectralFieldData& f) const
 {
     const bool div_cleaning = m_div_cleaning;
 
-    const bool J_constant = (m_J_in_time == JInTime::Constant) ? true : false;
-    const bool J_linear   = (m_J_in_time == JInTime::Linear  ) ? true : false;
-    const bool rho_constant = (m_rho_in_time == RhoInTime::Constant) ? true : false;
-    const bool rho_linear   = (m_rho_in_time == RhoInTime::Linear  ) ? true : false;
+    const bool J_constant = (m_J_in_time == JInTime::Constant);
+    const bool J_linear   = (m_J_in_time == JInTime::Linear);
+    const bool rho_constant = (m_rho_in_time == RhoInTime::Constant);
+    const bool rho_linear   = (m_rho_in_time == RhoInTime::Linear);
 
     const amrex::Real dt = m_dt;
     const amrex::Real dt2 = dt*dt;
@@ -70,7 +70,7 @@ PsatdAlgorithmFirstOrder::pushSpectralFields (SpectralFieldData& f) const
         const amrex::Box& bx = f.fields[mfi].box();
 
         // Extract arrays for the fields to be updated
-        amrex::Array4<Complex> fields = f.fields[mfi].array();
+        const amrex::Array4<Complex> fields = f.fields[mfi].array();
 
         // Extract pointers for the k vectors
         const amrex::Real* modified_kx_arr = modified_kx_vec[mfi].dataPtr();
@@ -185,7 +185,7 @@ PsatdAlgorithmFirstOrder::pushSpectralFields (SpectralFieldData& f) const
                 C10 = (div_cleaning) ? 0._rt : mu0*c*kx*ky*(knorm*S-dt*c*knorm2)*inv_knorm4;
                 C11 = (div_cleaning) ? 0._rt : mu0*c*kx*kz*(knorm*S-dt*c*knorm2)*inv_knorm4;
                 C12 = 0._rt; // This is not redundant, do not remove this
-                if (J_linear) C12 = (div_cleaning) ? mu0*(C-1._rt)*inv_knorm2 : mu0*(2._rt*ky2*(C-1._rt)+2._rt*kz2*(C-1._rt)-dt2*c2*kx2*knorm2)*inv_knorm4*0.5_rt;
+                if (J_linear) { C12 = (div_cleaning) ? mu0*(C-1._rt)*inv_knorm2 : mu0*(2._rt*ky2*(C-1._rt)+2._rt*kz2*(C-1._rt)-dt2*c2*kx2*knorm2)*inv_knorm4*0.5_rt; }
                 C13 = (J_linear && !div_cleaning) ? mu0*kx*ky*(2._rt*(1._rt-C)-dt2*c2*knorm2)*inv_knorm4*0.5_rt : 0._rt;
                 C14 = (J_linear && !div_cleaning) ? mu0*kx*kz*(2._rt*(1._rt-C)-dt2*c2*knorm2)*inv_knorm4*0.5_rt : 0._rt;
                 C15 = (div_cleaning) ? I*mu0*c2*kx*(C-1._rt)*inv_knorm2 : 0._rt;
@@ -212,7 +212,7 @@ PsatdAlgorithmFirstOrder::pushSpectralFields (SpectralFieldData& f) const
                 C11 = (div_cleaning) ? 0._rt : mu0*c*ky*kz*(knorm*S-dt*c*knorm2)*inv_knorm4;
                 C12 = (J_linear && !div_cleaning) ? mu0*kx*ky*(2._rt*(1._rt-C)-dt2*c2*knorm2)*inv_knorm4*0.5_rt : 0._rt;
                 C13 = 0._rt; // This is not redundant, do not remove this
-                if (J_linear) C13 = (div_cleaning) ? mu0*(C-1._rt)*inv_knorm2 : mu0*(2._rt*kx2*(C-1._rt)+2._rt*kz2*(C-1._rt)-dt2*c2*ky2*knorm2)*inv_knorm4*0.5_rt;
+                if (J_linear) { C13 = (div_cleaning) ? mu0*(C-1._rt)*inv_knorm2 : mu0*(2._rt*kx2*(C-1._rt)+2._rt*kz2*(C-1._rt)-dt2*c2*ky2*knorm2)*inv_knorm4*0.5_rt; }
                 C14 = (J_linear && !div_cleaning) ? mu0*ky*kz*(2._rt*(1._rt-C)-dt2*c2*knorm2)*inv_knorm4*0.5_rt : 0._rt;
                 C15 = (div_cleaning) ? I*mu0*c2*ky*(C-1._rt)*inv_knorm2 : 0._rt;
                 C16 = (div_cleaning && rho_linear) ? I*mu0*c*ky*(knorm*S-dt*c*knorm2)*inv_knorm4 : 0._rt;
@@ -239,7 +239,7 @@ PsatdAlgorithmFirstOrder::pushSpectralFields (SpectralFieldData& f) const
                 C12 = (J_linear && !div_cleaning) ? mu0*kx*kz*(2._rt*(1._rt-C)-dt2*c2*knorm2)*inv_knorm4*0.5_rt : 0._rt;
                 C13 = (J_linear && !div_cleaning) ? mu0*ky*kz*(2._rt*(1._rt-C)-dt2*c2*knorm2)*inv_knorm4*0.5_rt : 0._rt;
                 C14 = 0._rt; // This is not redundant, do not remove this
-                if (J_linear) C14 = (div_cleaning) ? mu0*(C-1._rt)*inv_knorm2 : mu0*(2._rt*kx2*(C-1._rt)+2._rt*ky2*(C-1._rt)-dt2*c2*kz2*knorm2)*inv_knorm4*0.5_rt;
+                if (J_linear) { C14 = (div_cleaning) ? mu0*(C-1._rt)*inv_knorm2 : mu0*(2._rt*kx2*(C-1._rt)+2._rt*ky2*(C-1._rt)-dt2*c2*kz2*knorm2)*inv_knorm4*0.5_rt; }
                 C15 = (div_cleaning) ? I*mu0*c2*kz*(C-1._rt)*inv_knorm2 : 0._rt;
                 C16 = (div_cleaning && rho_linear) ? I*mu0*c*kz*(knorm*S-dt*c*knorm2)*inv_knorm4 : 0._rt;
 
@@ -357,8 +357,8 @@ void PsatdAlgorithmFirstOrder::CurrentCorrection (SpectralFieldData& field_data)
     BL_PROFILE("PsatdAlgorithmFirstOrder::CurrentCorrection");
 
     amrex::ignore_unused(field_data);
-    amrex::Abort(Utils::TextMsg::Err(
-        "Current correction not implemented for first-order PSATD equations"));
+    WARPX_ABORT_WITH_MESSAGE(
+        "Current correction not implemented for first-order PSATD equations");
 }
 
 void
@@ -368,8 +368,8 @@ PsatdAlgorithmFirstOrder::VayDeposition (SpectralFieldData& field_data)
     BL_PROFILE("PsatdAlgorithmFirstOrder::VayDeposition()");
 
     amrex::ignore_unused(field_data);
-    amrex::Abort(Utils::TextMsg::Err(
-        "Vay deposition not implemented for first-order PSATD equations"));
+    WARPX_ABORT_WITH_MESSAGE(
+        "Vay deposition not implemented for first-order PSATD equations");
 }
 
-#endif // WARPX_USE_PSATD
+#endif // WARPX_USE_FFT

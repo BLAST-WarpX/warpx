@@ -62,7 +62,7 @@ struct SelectParticles
     }
 
     /** Object to extract the positions of the macroparticles inside a ParallelFor kernel */
-    GetParticlePosition m_get_position;
+    GetParticlePosition<PIdx> m_get_position;
     /** Z coordinate in boosted frame that corresponds to a give snapshot*/
     amrex::Real m_current_z_boost;
     /** Previous Z coordinate in boosted frame that corresponds to a give snapshot*/
@@ -143,19 +143,19 @@ struct LorentzTransformParticles
         const amrex::ParticleReal uzp = uz_old_p * weight_old
                                       + uz_new_p * weight_new;
 #if defined (WARPX_DIM_3D)
-        dst.m_aos[i_dst].pos(0) = xp;
-        dst.m_aos[i_dst].pos(1) = yp;
-        dst.m_aos[i_dst].pos(2) = zp;
+        dst.m_rdata[PIdx::x][i_dst] = xp;
+        dst.m_rdata[PIdx::y][i_dst] = yp;
+        dst.m_rdata[PIdx::z][i_dst] = zp;
 #elif defined (WARPX_DIM_RZ)
-        dst.m_aos[i_dst].pos(0) = std::sqrt(xp*xp + yp*yp);
-        dst.m_aos[i_dst].pos(1) = zp;
+        dst.m_rdata[PIdx::x][i_dst] = std::sqrt(xp*xp + yp*yp);
+        dst.m_rdata[PIdx::z][i_dst] = zp;
         dst.m_rdata[PIdx::theta][i_dst] = std::atan2(yp, xp);
 #elif defined (WARPX_DIM_XZ)
-        dst.m_aos[i_dst].pos(0) = xp;
-        dst.m_aos[i_dst].pos(1) = zp;
+        dst.m_rdata[PIdx::x][i_dst] = xp;
+        dst.m_rdata[PIdx::z][i_dst] = zp;
         amrex::ignore_unused(yp);
-#elif defined (WARPX_DIM_1D)
-        dst.m_aos[i_dst].pos(0) = zp;
+#elif defined (WARPX_DIM_1D_Z)
+        dst.m_rdata[PIdx::z][i_dst] = zp;
         amrex::ignore_unused(xp, yp);
 #else
         amrex::ignore_unused(xp, yp, zp);
@@ -166,7 +166,7 @@ struct LorentzTransformParticles
         dst.m_rdata[PIdx::uz][i_dst] = uzp;
     }
 
-    GetParticlePosition m_get_position;
+    GetParticlePosition<PIdx> m_get_position;
 
     amrex::ParticleReal* AMREX_RESTRICT m_xpold = nullptr;
     amrex::ParticleReal* AMREX_RESTRICT m_ypold = nullptr;
@@ -195,15 +195,14 @@ struct LorentzTransformParticles
  * \brief BackTransform functor to select particles and Lorentz Transform them
  *  and store in particle buffers
  */
-class
-BackTransformParticleFunctor final : public ComputeParticleDiagFunctor
+class BackTransformParticleFunctor final : public ComputeParticleDiagFunctor
 {
 public:
     BackTransformParticleFunctor(WarpXParticleContainer *pc_src, std::string species_name, int num_buffers);
     /** Computes the Lorentz transform of source particles to obtain lab-frame data in pc_dst*/
     void operator () (PinnedMemoryParticleContainer& pc_dst, int &TotalParticleCounter, int i_buffer) const override;
     void InitData() override;
-    /** \brief Prepare data required to back-transform particle attribtutes for lab-frame snapshot, i_buffer
+    /** \brief Prepare data required to back-transform particle attributes for lab-frame snapshot, i_buffer
      *
      * \param[in] i_buffer           index of the snapshot
      * \param[in] z_slice_in_domain  if the z-slice at current_z_boost is within the bounds of

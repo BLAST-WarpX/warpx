@@ -34,8 +34,9 @@ class Benchmark:
         """
 
         self.test_name = test_name
-        self.json_file = os.path.join(config.benchmark_location,
-                                      self.test_name + '.json')
+        self.json_file = os.path.join(
+            config.benchmark_location, self.test_name + ".json"
+        )
         if data is None:
             self.data = self.get()
         else:
@@ -45,7 +46,7 @@ class Benchmark:
         """
         Update the benchmark (overwrites reference json file).
         """
-        with open(self.json_file, 'w') as outfile:
+        with open(self.json_file, "w") as outfile:
             json.dump(self.data, outfile, sort_keys=True, indent=2)
 
     def get(self):

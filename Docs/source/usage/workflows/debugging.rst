@@ -23,6 +23,9 @@ Try the following steps to debug a simulation:
    Do you spot numerical artifacts or instabilities that could point to missing resolution or unexpected/incompatible numerical parameters?
 #. Did the job output files indicate a crash? Check the ``Backtrace.<mpirank>`` files for the location of the code that triggered the crash.
    Backtraces are read from bottom (high-level) to top (most specific line that crashed).
+
+   #. Was this a segmentation fault in C++, but the run was controlled from Python (PICMI)?
+      To get the last called Python line for the backtrace, run again and add the Python ``faulthandler``, e.g., with ``python3 -X faulthandler PICMI_your_script_here.py``.
 #. Try to make the reproducible scenario as small as possible by modifying the inputs file.
    Reduce number of cells, particles and MPI processes to something as small and as quick to execute as possible.
    The next steps in debugging will increase runtime, so you will benefit from a fast reproducer.

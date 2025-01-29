@@ -1,7 +1,10 @@
-/* Copyright 2022 David Grote
+/* Copyright 2022-2023 The Regents of the University of California, through Lawrence
+ *           Berkeley National Laboratory (subject to receipt of any required
+ *           approvals from the U.S. Dept. of Energy). All rights reserved.
  *
  * This file is part of WarpX.
  *
+ * Authors: David Grote, Axel HUebl
  * License: BSD-3-Clause-LBNL
  */
 #include "AcceleratorLattice.H"
@@ -10,6 +13,9 @@
 #include "LatticeElements/HardEdgedPlasmaLens.H"
 
 #include <AMReX_REAL.H>
+
+#include <algorithm>
+
 
 AcceleratorLattice::AcceleratorLattice ()
 {
@@ -35,6 +41,13 @@ AcceleratorLattice::ReadLattice (std::string const & root_name, amrex::ParticleR
         m_lattice_defined = true;
     }
 
+    bool reverse = false;
+    pp_lattice.queryAdd("reverse", reverse);
+
+    if (reverse) {
+        std::reverse(lattice_elements.begin(), lattice_elements.end());
+    }
+
     // Loop through lattice elements
     for (std::string const & element_name : lattice_elements) {
         // Check the element type
@@ -52,7 +65,7 @@ AcceleratorLattice::ReadLattice (std::string const & root_name, amrex::ParticleR
         else if (element_type == "plasmalens") {
             h_plasmalens.AddElement(pp_element, z_location);
         }
-        else if (element_type == "lattice") {
+        else if (element_type == "line") {
             ReadLattice(element_name, z_location);
         }
         else {
@@ -63,20 +76,23 @@ AcceleratorLattice::ReadLattice (std::string const & root_name, amrex::ParticleR
 }
 
 void
-AcceleratorLattice::InitElementFinder (int const lev, amrex::BoxArray const & ba, amrex::DistributionMapping const & dm)
+AcceleratorLattice::InitElementFinder (
+    int const lev, amrex::Real const gamma_boost,
+    amrex::BoxArray const & ba, amrex::DistributionMapping const & dm)
 {
     if (m_lattice_defined) {
         m_element_finder = std::make_unique<amrex::LayoutData<LatticeElementFinder>>(ba, dm);
         for (amrex::MFIter mfi(*m_element_finder); mfi.isValid(); ++mfi)
         {
-            (*m_element_finder)[mfi].InitElementFinder(lev, mfi, *this);
+            (*m_element_finder)[mfi].InitElementFinder(lev, gamma_boost, mfi, *this);
         }
     }
 }
 
 void
-AcceleratorLattice::UpdateElementFinder (int const lev)
-{
+AcceleratorLattice::UpdateElementFinder (int const lev) // NOLINT(readability-make-member-function-const)
+{                                                       // Techniquely clang-tidy is correct because
+                                                        // m_element_finder is unique_ptr, not const*.
     if (m_lattice_defined) {
         for (amrex::MFIter mfi(*m_element_finder); mfi.isValid(); ++mfi)
         {
@@ -88,6 +104,6 @@ AcceleratorLattice::UpdateElementFinder (int const lev)
 LatticeElementFinderDevice
 AcceleratorLattice::GetFinderDeviceInstance (WarpXParIter const& a_pti, int const a_offset) const
 {
-    LatticeElementFinder & finder = (*m_element_finder)[a_pti];
+    const LatticeElementFinder & finder = (*m_element_finder)[a_pti];
     return finder.GetFinderDeviceInstance(a_pti, a_offset, *this);
 }

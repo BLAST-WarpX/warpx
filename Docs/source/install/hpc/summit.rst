@@ -5,6 +5,8 @@ Summit (OLCF)
 
 The `Summit cluster <https://www.olcf.ornl.gov/summit/>`_ is located at OLCF.
 
+On Summit, each compute node provides six V100 GPUs (16GB) and two Power9 CPUs.
+
 
 Introduction
 ------------
@@ -14,112 +16,161 @@ If you are new to this system, **please see the following resources**:
 * `Summit user guide <https://docs.olcf.ornl.gov/systems/summit_user_guide.html>`_
 * Batch system: `LSF <https://docs.olcf.ornl.gov/systems/summit_user_guide.html#running-jobs>`_
 * `Jupyter service <https://jupyter.olcf.ornl.gov>`__
-* `Production directories <https://docs.olcf.ornl.gov/data/index.html#data-storage-and-transfers>`_:
+* `Filesystems <https://docs.olcf.ornl.gov/data/index.html#data-storage-and-transfers>`_:
 
+  * ``$HOME``: per-user directory, use only for inputs, source and scripts; backed up; mounted as read-only on compute nodes, that means you cannot run in it (50 GB quota)
   * ``$PROJWORK/$proj/``: shared with all members of a project, purged every 90 days, GPFS (recommended)
   * ``$MEMBERWORK/$proj/``: single user, purged every 90 days, GPFS (usually smaller quota)
   * ``$WORLDWORK/$proj/``: shared with all users, purged every 90 days, GPFS
-  * ``/ccs/$proj/``: another, non-GPFS, file system for software and smaller data.
-  * Note that the ``$HOME`` directory is mounted as read-only on compute nodes.
-    That means you cannot run in your ``$HOME``.
+  * ``/ccs/proj/$proj/``: another, non-GPFS, file system for software and smaller data.
+
+Note: the Alpine GPFS filesystem on Summit and the new Orion Lustre filesystem on Frontier are not mounted on each others machines.
+Use `Globus <https://www.globus.org>`__ to transfer data between them if needed.
 
 
-Installation
-------------
+.. _building-summit-preparation:
 
-Use the following commands to download the WarpX source code and switch to the correct branch:
+Preparation
+-----------
+
+Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
    git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
 
-We use the following modules and environments on the system (``$HOME/summit_warpx.profile``).
-
-.. literalinclude:: ../../../../Tools/machines/summit-olcf/summit_warpx.profile.example
-   :language: bash
-   :caption: You can copy this file from ``Tools/machines/summit-olcf/summit_warpx.profile.example``.
-
-
-We recommend to store the above lines in a file, such as ``$HOME/summit_warpx.profile``, and load it into your shell after a login:
+We use system software modules, add environment hints and further dependencies via the file ``$HOME/summit_warpx.profile``.
+Create it now:
 
 .. code-block:: bash
 
-   source $HOME/summit_warpx.profile
+   cp $HOME/src/warpx/Tools/machines/summit-olcf/summit_warpx.profile.example $HOME/summit_warpx.profile
 
-For PSATD+RZ simulations, you will need to build BLAS++ and LAPACK++:
+.. dropdown:: Script Details
+   :color: light
+   :icon: info
+   :animate: fade-in-slide-down
 
-.. code-block:: bash
+   .. literalinclude:: ../../../../Tools/machines/summit-olcf/summit_warpx.profile.example
+      :language: bash
 
-  # BLAS++ (for PSATD+RZ)
-  git clone https://github.com/icl-utk-edu/blaspp.git src/blaspp
-  rm -rf src/blaspp-summit-build
-  cmake -S src/blaspp -B src/blaspp-summit-build -Duse_openmp=OFF -Dgpu_backend=cuda -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=$HOME/sw/summit/blaspp-master
-  cmake --build src/blaspp-summit-build --target install --parallel 10
-
-  # LAPACK++ (for PSATD+RZ)
-  git clone https://github.com/icl-utk-edu/lapackpp.git src/lapackpp
-  rm -rf src/lapackpp-summit-build
-  cmake -S src/lapackpp -B src/lapackpp-summit-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=$HOME/sw/summit/lapackpp-master
-  cmake --build src/lapackpp-summit-build --target install --parallel 10
-
-Optionally, download and install Python packages for :ref:`PICMI <usage-picmi>` or dynamic ensemble optimizations (:ref:`libEnsemble <libensemble>`):
+Edit the 2nd line of this script, which sets the ``export proj=""`` variable.
+For example, if you are member of the project ``aph114``, then run ``vi $HOME/summit_warpx.profile``.
+Enter the edit mode by typing ``i`` and edit line 2 to read:
 
 .. code-block:: bash
 
-   python3 -m pip install --user --upgrade pip
-   python3 -m pip install --user virtualenv
-   python3 -m pip cache purge
-   rm -rf $HOME/sw/venvs/warpx
-   python3 -m venv $HOME/sw/venvs/warpx
-   source $HOME/sw/venvs/warpx/bin/activate
-   python3 -m pip install --upgrade pip
-   python3 -m pip install --upgrade wheel
-   python3 -m pip install --upgrade cython
-   python3 -m pip install --upgrade numpy
-   python3 -m pip install --upgrade pandas
-   python3 -m pip install --upgrade scipy
-   python3 -m pip install --upgrade mpi4py --no-binary mpi4py
-   python3 -m pip install --upgrade openpmd-api
-   python3 -m pip install --upgrade matplotlib==3.2.2  # does not try to build freetype itself
-   python3 -m pip install --upgrade yt
-   # WIP: issues with nlopt
-   # python3 -m pip install -r $HOME/src/warpx/Tools/LibEnsemble/requirements.txt
+   export proj="aph114"
 
-Then, ``cd`` into the directory ``$HOME/src/warpx`` and use the following commands to compile:
+Exit the ``vi`` editor with ``Esc`` and then type ``:wq`` (write & quit).
+
+.. important::
+
+   Now, and as the first step on future logins to Summit, activate these environment settings:
+
+   .. code-block:: bash
+
+      source $HOME/summit_warpx.profile
+
+Finally, since Summit does not yet provide software modules for some of our dependencies, install them once:
+
+.. code-block:: bash
+
+   bash $HOME/src/warpx/Tools/machines/summit-olcf/install_gpu_dependencies.sh
+   source /ccs/proj/$proj/${USER}/sw/summit/gpu/venvs/warpx-summit/bin/activate
+
+.. dropdown:: Script Details
+   :color: light
+   :icon: info
+   :animate: fade-in-slide-down
+
+   .. literalinclude:: ../../../../Tools/machines/summit-olcf/install_gpu_dependencies.sh
+      :language: bash
+
+.. dropdown:: AI/ML Dependencies (Optional)
+   :animate: fade-in-slide-down
+
+   If you plan to run AI/ML workflows depending on pyTorch, run the next step as well.
+   This will take a while and should be skipped if not needed.
+
+   .. code-block:: bash
+
+      runNode bash $HOME/src/warpx/Tools/machines/summit-olcf/install_gpu_ml.sh
+
+   .. dropdown:: Script Details
+      :color: light
+      :icon: info
+      :animate: fade-in-slide-down
+
+      .. literalinclude:: ../../../../Tools/machines/summit-olcf/install_gpu_ml.sh
+         :language: bash
+
+   For `optimas dependencies <https://github.com/optimas-org/optimas>`__ (incl. scikit-learn), plan another hour of build time:
+
+   .. code-block:: bash
+
+      python3 -m pip install -r $HOME/src/warpx/Tools/optimas/requirements.txt
+
+
+.. _building-summit-compilation:
+
+Compilation
+-----------
+
+Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
 
 .. code-block:: bash
 
    cd $HOME/src/warpx
-   rm -rf build
+   rm -rf build_summit
 
-   cmake -S . -B build -DWarpX_DIMS=3 -DWarpX_COMPUTE=CUDA
-   cmake --build build -j 6
+   cmake -S . -B build_summit -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake --build build_summit -j 8
 
-The general :ref:`cmake compile-time options <building-cmake>` apply as usual.
-
-For a full PICMI install, follow the :ref:`instructions for Python (PICMI) bindings <building-cmake-python>`.
-We only prefix it to request a node for the compilation (``runNode``), so we can compile faster:
+The WarpX application executables are now in ``$HOME/src/warpx/build_summit/bin/``.
+Additionally, the following commands will install WarpX as a Python module:
 
 .. code-block:: bash
 
-   # PICMI build
+   rm -rf build_summit_py
+
+   cmake -S . -B build_summit_py -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake --build build_summit_py -j 8 --target pip_install
+
+Now, you can :ref:`submit Summit compute jobs <running-cpp-summit>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).
+Or, you can use the WarpX executables to submit Summit jobs (:ref:`example inputs <usage-examples>`).
+For executables, you can reference their location in your :ref:`job script <running-cpp-summit>` or copy them to a location in ``$PROJWORK/$proj/``.
+
+
+.. _building-summit-update:
+
+Update WarpX & Dependencies
+---------------------------
+
+If you already installed WarpX in the past and want to update it, start by getting the latest source code:
+
+.. code-block:: bash
+
    cd $HOME/src/warpx
 
-   # install or update dependencies
-   python3 -m pip install -r requirements.txt
+   # read the output of this command - does it look ok?
+   git status
 
-   # compile parallel PICMI interfaces in 3D, 2D, 1D and RZ
-   runNode WARPX_MPI=ON WARPX_COMPUTE=CUDA WARPX_PSATD=ON BUILD_PARALLEL=32 python3 -m pip install --force-reinstall --no-deps -v .
+   # get the latest WarpX source code
+   git fetch
+   git pull
 
-Or, if you are *developing*, do a quick PICMI install of a *single geometry* (see: :ref:`WarpX_DIMS <building-cmake-options>`) using:
+   # read the output of these commands - do they look ok?
+   git status
+   git log     # press q to exit
 
-.. code-block:: bash
+And, if needed,
 
-   # find dependencies & configure
-   cmake -S . -B build -DWarpX_COMPUTE=CUDA -DWarpX_PSATD=ON -DWarpX_LIB=ON -DWarpX_DIMS=RZ
+- :ref:`update the summit_warpx.profile file <building-summit-preparation>`,
+- log out and into the system, activate the now updated environment profile as usual,
+- :ref:`execute the dependency install scripts <building-summit-preparation>`.
 
-   # build and then call "python3 -m pip install ..."
-   cmake --build build --target pip_install -j 6
+As a last step, clean the build directory ``rm -rf $HOME/src/warpx/build_summit`` and rebuild WarpX.
 
 
 .. _running-cpp-summit:

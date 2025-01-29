@@ -25,7 +25,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    ParticleEnergy(std::string rd_name);
+    ParticleEnergy(const std::string& rd_name);
 
     /**
      * This function computes the particle relativistic kinetic energy (EP).
@@ -35,7 +35,7 @@ public:
      *
      * @param[in] step current time step
      */
-    virtual void ComputeDiags(int step) override final;
+    void ComputeDiags(int step) final;
 
 };
 

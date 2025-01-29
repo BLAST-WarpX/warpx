@@ -10,6 +10,10 @@
 #include "FieldSolver/SpectralSolver/SpectralKSpaceRZ.H"
 #include "FieldSolver/SpectralSolver/SpectralFieldDataRZ.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/utils/Enums.H>
+
+
 /* \brief Class that updates the field in spectral space
  * and stores the coefficients of the corresponding update equation.
  *
@@ -26,7 +30,28 @@ class SpectralBaseAlgorithmRZ
         // The destructor should also be a virtual function, so that
         // a pointer to subclass of `SpectraBaseAlgorithm` actually
         // calls the subclass's destructor.
-        virtual ~SpectralBaseAlgorithmRZ() {}
+        virtual ~SpectralBaseAlgorithmRZ() = default;
+
+        /**
+         * \brief Default Copy constructor
+         */
+        SpectralBaseAlgorithmRZ ( SpectralBaseAlgorithmRZ const &) = default;
+
+        /**
+         * \brief Default Copy operator
+         */
+        SpectralBaseAlgorithmRZ& operator= ( SpectralBaseAlgorithmRZ const & ) = default;
+
+
+        /**
+         * \brief Default Move constructor
+         */
+        SpectralBaseAlgorithmRZ ( SpectralBaseAlgorithmRZ&& ) = default;
+
+        /**
+         * \brief Default Move operator
+         */
+        SpectralBaseAlgorithmRZ& operator= ( SpectralBaseAlgorithmRZ&& ) = default;
 
         /**
          * \brief Virtual function for current correction in Fourier space
@@ -40,9 +65,9 @@ class SpectralBaseAlgorithmRZ
         /**
          * \brief Compute spectral divergence of E
          */
-        void ComputeSpectralDivE ( const int lev,
+        void ComputeSpectralDivE ( int lev,
                                    SpectralFieldDataRZ& field_data,
-                                   const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
+                                   ablastr::fields::VectorField const & Efield,
                                    amrex::MultiFab& divE );
 
         /**
@@ -63,11 +88,12 @@ class SpectralBaseAlgorithmRZ
         SpectralBaseAlgorithmRZ(SpectralKSpaceRZ const & spectral_kspace,
                                 amrex::DistributionMapping const & dm,
                                 const SpectralFieldIndex& spectral_index,
-                                int const norder_z, short const grid_type)
+                                int const norder_z,
+                                ablastr::utils::enums::GridType grid_type)
           // Compute and assign the modified k vectors
           : m_spectral_index(spectral_index),
             modified_kz_vec(spectral_kspace.getModifiedKComponent(dm, 1, norder_z, grid_type))
-          {}
+        {}
 
         SpectralFieldIndex m_spectral_index;
 

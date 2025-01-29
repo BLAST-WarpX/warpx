@@ -1,0 +1,50 @@
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 250
+amr.n_cell =  672 672
+amr.max_grid_size = 512
+amr.blocking_factor = 32
+amr.max_level = 0
+geometry.dims = 2
+geometry.prob_lo     = -25.e-6  -25.0e-6     # physical domain
+geometry.prob_hi     =  25.e-6   25.e-6
+warpx.verbose = 1
+warpx.serialize_initial_conditions = 1
+
+#################################
+####### Boundary condition ######
+#################################
+boundary.field_lo = periodic periodic
+boundary.field_hi = periodic periodic
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.cfl = 0.98
+warpx.use_filter = 0
+algo.maxwell_solver = ckc
+algo.load_balance_intervals = -1
+
+# Order of particle shape factors
+algo.particle_shape = 3
+
+#################################
+############# LASER #############
+#################################
+lasers.names        = binary_laser
+binary_laser.position     = 0. 0. 0. # This point is on the laser plane
+binary_laser.direction    = 1. 0. 1.     # The plane normal direction
+binary_laser.polarization = 0. 1. 0.     # The main polarization vector
+binary_laser.e_max        = 1.e12        # Maximum amplitude of the laser field (in V/m)
+binary_laser.wavelength = 1.0e-6         # The wavelength of the laser (in meters)
+binary_laser.profile      = from_file
+binary_laser.binary_file_name = "../test_2d_laser_injection_from_binary_file_prepare/gauss_2d"
+binary_laser.time_chunk_size = 50
+binary_laser.delay = 0.0
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 250
+diag1.diag_type = Full

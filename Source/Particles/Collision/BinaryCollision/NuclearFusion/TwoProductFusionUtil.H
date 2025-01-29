@@ -5,12 +5,13 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef TWO_PRODUCT_FUSION_UTIL_H
-#define TWO_PRODUCT_FUSION_UTIL_H
+#ifndef WARPX_TWO_PRODUCT_FUSION_UTIL_H
+#define WARPX_TWO_PRODUCT_FUSION_UTIL_H
 
 #include "Utils/ParticleUtils.H"
 #include "Utils/WarpXConst.H"
 
+#include <AMReX_Math.H>
 #include <AMReX_Random.H>
 #include <AMReX_REAL.H>
 
@@ -65,6 +66,7 @@ namespace {
                             const amrex::RandomEngine& engine )
     {
         using namespace amrex::literals;
+        using namespace amrex::Math;
 
         constexpr amrex::ParticleReal c_sq = PhysConst::c * PhysConst::c;
         constexpr amrex::ParticleReal inv_csq = 1._prt / ( c_sq );
@@ -87,10 +89,9 @@ namespace {
         const amrex::ParticleReal p2y_in = u2y_in * m2_in;
         const amrex::ParticleReal p2z_in = u2z_in * m2_in;
         // Square norm of the total (sum between the two particles) momenta in the lab frame
-        auto constexpr pow2 = [](double const x) { return x*x; };
-        const amrex::ParticleReal p_total_sq =  pow2(p1x_in+p2x_in) +
-                                                pow2(p1y_in+p2y_in) +
-                                                pow2(p1z_in+p2z_in);
+        const amrex::ParticleReal p_total_sq =  powi<2>(p1x_in+p2x_in) +
+                                                powi<2>(p1y_in+p2y_in) +
+                                                powi<2>(p1z_in+p2z_in);
 
         // Total energy of incident macroparticles in the lab frame
         const amrex::ParticleReal E_lab = (m1_in * g1_in + m2_in * g2_in) * c_sq;
@@ -103,7 +104,7 @@ namespace {
         // due to possible inconsistencies in how the mass is defined in the code, it is
         // probably more robust to subtract the rest masses and to add the fusion energy to the
         // total kinetic energy.
-        const amrex::ParticleReal E_star_f_sq = pow2(std::sqrt(E_star_sq)
+        const amrex::ParticleReal E_star_f_sq = powi<2>(std::sqrt(E_star_sq)
                                                          - E_rest_in + E_rest_out + E_fusion);
 
         // Square of the norm of the momentum of the products in the center of mass frame
@@ -111,8 +112,8 @@ namespace {
         // The expression below is specifically written in a form that avoids returning
         // small negative numbers due to machine precision errors, for low-energy particles
         const amrex::ParticleReal E_ratio = std::sqrt(E_star_f_sq)/((m1_out + m2_out)*c_sq);
-        const amrex::ParticleReal p_star_f_sq = m1_out*m2_out*c_sq * ( pow2(E_ratio) - 1._prt )
-                + pow2(m1_out - m2_out)*c_sq*0.25_prt * pow2( E_ratio - 1._prt/E_ratio );
+        const amrex::ParticleReal p_star_f_sq = m1_out*m2_out*c_sq * ( powi<2>(E_ratio) - 1._prt )
+                + powi<2>(m1_out - m2_out)*c_sq*0.25_prt * powi<2>( E_ratio - 1._prt/E_ratio );
 
         // Compute momentum of first product in the center of mass frame, assuming isotropic
         // distribution
@@ -164,4 +165,4 @@ namespace {
     }
 }
 
-#endif // TWO_PRODUCT_FUSION_UTIL_H
+#endif // WARPX_TWO_PRODUCT_FUSION_UTIL_H

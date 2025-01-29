@@ -7,16 +7,13 @@
 #ifndef ABLASTR_COARSEN_AVERAGE_H_
 #define ABLASTR_COARSEN_AVERAGE_H_
 
-
 #include <AMReX_Array.H>
 #include <AMReX_Array4.H>
 #include <AMReX_BLassert.H>
 #include <AMReX_Extension.H>
 #include <AMReX_GpuQualifiers.H>
-#include <AMReX_IntVect.H>
 #include <AMReX_Math.H>
 #include <AMReX_REAL.H>
-
 #include <AMReX_BaseFwd.H>
 
 #include <cstdlib>
@@ -75,20 +72,22 @@ namespace ablastr::coarsen::average
 
         // Compute number of points
         for (int l = 0; l < 3; ++l) {
-            if (cr[l] == 1)
+            if (cr[l] == 1) {
                 np[l] = 1; // no coarsening
-            else
+            } else {
                 np[l] = cr[l] * (1 - sf[l]) * (1 - sc[l])        // cell-centered
                         + (2 * (cr[l] - 1) + 1) * sf[l] * sc[l]; // nodal
+            }
         }
 
         // Compute starting indices of source array (fine)
         for (int l = 0; l < 3; ++l) {
-            if (cr[l] == 1)
+            if (cr[l] == 1) {
                 idx_min[l] = ic[l]; // no coarsening
-            else
+            } else {
                 idx_min[l] = ic[l] * cr[l] * (1 - sf[l]) * (1 - sc[l])      // cell-centered
                              + (ic[l] * cr[l] - cr[l] + 1) * sf[l] * sc[l]; // nodal
+            }
         }
 
         // Auxiliary integer variables
@@ -107,8 +106,6 @@ namespace ablastr::coarsen::average
         int const crx = cr[0];
         int const cry = cr[1];
         int const crz = cr[2];
-        int ii, jj, kk;
-        amrex::Real wx, wy, wz;
 
         // Add neutral elements (=0) beyond guard cells in source array (fine)
         auto const arr_src_safe = [arr_src]
@@ -128,16 +125,16 @@ namespace ablastr::coarsen::average
         for (int kref = 0; kref < numz; ++kref) {
             for (int jref = 0; jref < numy; ++jref) {
                 for (int iref = 0; iref < numx; ++iref) {
-                    ii = imin + iref;
-                    jj = jmin + jref;
-                    kk = kmin + kref;
-                    wx = (1.0_rt / static_cast<amrex::Real>(numx)) * (1 - sfx) * (1 - scx) // if cell-centered
+                    const int ii = imin + iref;
+                    const int jj = jmin + jref;
+                    const int kk = kmin + kref;
+                    const amrex::Real wx = (1.0_rt / static_cast<amrex::Real>(numx)) * (1 - sfx) * (1 - scx) // if cell-centered
                          + ((amrex::Math::abs(crx - amrex::Math::abs(ii - i * crx))) /
                             static_cast<amrex::Real>(crx * crx)) * sfx * scx; // if nodal
-                    wy = (1.0_rt / static_cast<amrex::Real>(numy)) * (1 - sfy) * (1 - scy) // if cell-centered
+                    const amrex::Real wy = (1.0_rt / static_cast<amrex::Real>(numy)) * (1 - sfy) * (1 - scy) // if cell-centered
                          + ((amrex::Math::abs(cry - amrex::Math::abs(jj - j * cry))) /
                             static_cast<amrex::Real>(cry * cry)) * sfy * scy; // if nodal
-                    wz = (1.0_rt / static_cast<amrex::Real>(numz)) * (1 - sfz) * (1 - scz) // if cell-centered
+                    const amrex::Real wz = (1.0_rt / static_cast<amrex::Real>(numz)) * (1 - sfz) * (1 - scz) // if cell-centered
                          + ((amrex::Math::abs(crz - amrex::Math::abs(kk - k * crz))) /
                             static_cast<amrex::Real>(crz * crz)) * sfz * scz; // if nodal
                     c += wx * wy * wz * arr_src_safe(ii, jj, kk, comp);
@@ -164,9 +161,9 @@ namespace ablastr::coarsen::average
     Loop (
         amrex::MultiFab & mf_dst,
         amrex::MultiFab const & mf_src,
-        int const ncomp,
-        amrex::IntVect const ngrow,
-        amrex::IntVect const crse_ratio
+        int ncomp,
+        amrex::IntVect ngrow,
+        amrex::IntVect crse_ratio
     );
 
     /**
@@ -183,7 +180,7 @@ namespace ablastr::coarsen::average
     Coarsen (
         amrex::MultiFab & mf_dst,
         amrex::MultiFab const & mf_src,
-        amrex::IntVect const crse_ratio
+        amrex::IntVect crse_ratio
     );
 
 } // namespace ablastr::coarsen::average

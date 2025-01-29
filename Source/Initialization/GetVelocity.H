@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef GET_VELOCITY_H_
-#define GET_VELOCITY_H_
+#ifndef WARPX_GET_VELOCITY_H_
+#define WARPX_GET_VELOCITY_H_
 
 #include "VelocityProperties.H"
 
@@ -27,7 +27,7 @@ struct GetVelocity
     int m_sign_dir; //! Sign of the velocity direction positive=1, negative=-1
 
     /** Constant velocity value, if m_type == VelConstantValue */
-    amrex::Real m_velocity;
+    amrex::Real m_velocity{0};
     /** Velocity parser function, if m_type == VelParserFunction */
     amrex::ParserExecutor<3> m_velocity_parser;
 
@@ -79,10 +79,11 @@ struct GetVelocity
      *        1: y
      *        2: z
      */
+    [[nodiscard]]
     AMREX_GPU_HOST_DEVICE
     int direction () const noexcept
     {
         return m_dir;
     }
 };
-#endif
+#endif //WARPX_GET_VELOCITY_H_

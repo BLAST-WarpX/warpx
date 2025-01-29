@@ -6,8 +6,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef GET_TEMPERATURE_H_
-#define GET_TEMPERATURE_H_
+#ifndef WARPX_GET_TEMPERATURE_H_
+#define WARPX_GET_TEMPERATURE_H_
 
 #include "TemperatureProperties.H"
 
@@ -69,4 +69,4 @@ struct GetTemperature
         }
     }
 };
-#endif
+#endif //WARPX_GET_TEMPERATURE_H_

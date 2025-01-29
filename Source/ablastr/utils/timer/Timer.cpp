@@ -11,8 +11,6 @@
 
 using namespace ablastr::utils::timer;
 
-Timer::Timer(){}
-
 void
 Timer::record_start_time() noexcept
 {
@@ -25,14 +23,14 @@ Timer::record_stop_time() noexcept
     m_stop_time = amrex::ParallelDescriptor::second();
 }
 
-amrex::Real
-Timer::get_duration () noexcept
+double
+Timer::get_duration () const noexcept
 {
     return m_stop_time - m_start_time;
 }
 
-amrex::Real
-Timer::get_global_duration ()
+double
+Timer::get_global_duration () const
 {
     auto duration = this->get_duration();
     amrex::ParallelDescriptor::ReduceRealMax(

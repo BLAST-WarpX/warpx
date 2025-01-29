@@ -39,3 +39,7 @@ another Python function is available:
     bin_value[i]
     # 2-D array of the jth bin data at the ith time
     bin_data[i][j]
+
+Another available reduced diagnostic is ``ParticleHistogram2D``.
+It computes a 2D histogram of particle data with user-specified axes and value functions.
+The output data is stored in openPMD files gathered in a ``hist2D/`` folder.

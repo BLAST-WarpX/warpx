@@ -1,19 +1,16 @@
 #include "MacroscopicProperties.H"
 
+#include "Fields.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
-#include "WarpX.H"
 
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX_Array4.H>
-#include <AMReX_BoxArray.H>
 #include <AMReX_Config.H>
-#include <AMReX_DistributionMapping.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_IndexType.H>
-#include <AMReX_IntVect.H>
 #include <AMReX_MFIter.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_Print.H>
@@ -35,7 +32,7 @@ MacroscopicProperties::MacroscopicProperties ()
 void
 MacroscopicProperties::ReadParameters ()
 {
-    ParmParse pp_macroscopic("macroscopic");
+    const ParmParse pp_macroscopic("macroscopic");
     // Since macroscopic maxwell solve is turned on,
     // user-defined sigma, mu, and epsilon are queried.
     // The vacuum values are used as default for the macroscopic parameters
@@ -66,6 +63,7 @@ MacroscopicProperties::ReadParameters ()
             utils::parser::makeParser(m_str_sigma_function,{"x","y","z"}));
     }
 
+    // Query input for material permittivity, epsilon.
     bool epsilon_specified = false;
     if (utils::parser::queryWithParser(pp_macroscopic, "epsilon", m_epsilon)) {
         m_epsilon_s = "constant";
@@ -91,7 +89,7 @@ MacroscopicProperties::ReadParameters ()
             utils::parser::makeParser(m_str_epsilon_function,{"x","y","z"}));
     }
 
-    // Query input for material permittivity, epsilon.
+    // Query input for material permeability, mu.
     bool mu_specified = false;
     if (utils::parser::queryWithParser(pp_macroscopic, "mu", m_mu)) {
         m_mu_s = "constant";
@@ -120,23 +118,26 @@ MacroscopicProperties::ReadParameters ()
 }
 
 void
-MacroscopicProperties::InitData ()
+MacroscopicProperties::AllocateLevelMFs (
+    const amrex::BoxArray& ba,
+    const amrex::DistributionMapping& dmap,
+    const amrex::IntVect& ng_EB_alloc )
 {
-    amrex::Print() << Utils::TextMsg::Info("we are in init data of macro");
-    auto & warpx = WarpX::GetInstance();
-
-    // Get BoxArray and DistributionMap of warpx instance.
-    int lev = 0;
-    amrex::BoxArray ba = warpx.boxArray(lev);
-    amrex::DistributionMapping dmap = warpx.DistributionMap(lev);
-    const amrex::IntVect ng_EB_alloc = warpx.getngEB();
-    // Define material property multifabs using ba and dmap from WarpX instance
     // sigma is cell-centered MultiFab
     m_sigma_mf = std::make_unique<amrex::MultiFab>(ba, dmap, 1, ng_EB_alloc);
     // epsilon is cell-centered MultiFab
     m_eps_mf = std::make_unique<amrex::MultiFab>(ba, dmap, 1, ng_EB_alloc);
     // mu is cell-centered MultiFab
     m_mu_mf = std::make_unique<amrex::MultiFab>(ba, dmap, 1, ng_EB_alloc);
+}
+
+void
+MacroscopicProperties::InitData (
+    const amrex::Geometry& geom,
+    const amrex::IntVect& Ex_stag,
+    const amrex::IntVect& Ey_stag,
+    const amrex::IntVect& Ez_stag)
+{
     // Initialize sigma
     if (m_sigma_s == "constant") {
 
@@ -144,7 +145,8 @@ MacroscopicProperties::InitData ()
 
     } else if (m_sigma_s == "parse_sigma_function") {
 
-        InitializeMacroMultiFabUsingParser(m_sigma_mf.get(), m_sigma_parser->compile<3>(), lev);
+        InitializeMacroMultiFabUsingParser(m_sigma_mf.get(), m_sigma_parser->compile<3>(),
+            geom.CellSizeArray(), geom.ProbDomain());
     }
     // Initialize epsilon
     if (m_epsilon_s == "constant") {
@@ -153,7 +155,8 @@ MacroscopicProperties::InitData ()
 
     } else if (m_epsilon_s == "parse_epsilon_function") {
 
-        InitializeMacroMultiFabUsingParser(m_eps_mf.get(), m_epsilon_parser->compile<3>(), lev);
+        InitializeMacroMultiFabUsingParser(m_eps_mf.get(), m_epsilon_parser->compile<3>(),
+        geom.CellSizeArray(), geom.ProbDomain());
 
     }
     // In the Maxwell solver, `epsilon` is used in the denominator.
@@ -169,16 +172,15 @@ MacroscopicProperties::InitData ()
 
     } else if (m_mu_s == "parse_mu_function") {
 
-        InitializeMacroMultiFabUsingParser(m_mu_mf.get(), m_mu_parser->compile<3>(), lev);
+        InitializeMacroMultiFabUsingParser(m_mu_mf.get(), m_mu_parser->compile<3>(),
+            geom.CellSizeArray(), geom.ProbDomain());
 
     }
 
-    amrex::IntVect sigma_stag = m_sigma_mf->ixType().toIntVect();
-    amrex::IntVect epsilon_stag = m_eps_mf->ixType().toIntVect();
-    amrex::IntVect mu_stag = m_mu_mf->ixType().toIntVect();
-    amrex::IntVect Ex_stag = warpx.getEfield_fp(0,0).ixType().toIntVect();
-    amrex::IntVect Ey_stag = warpx.getEfield_fp(0,1).ixType().toIntVect();
-    amrex::IntVect Ez_stag = warpx.getEfield_fp(0,2).ixType().toIntVect();
+    const amrex::IntVect sigma_stag = m_sigma_mf->ixType().toIntVect();
+    const amrex::IntVect epsilon_stag = m_eps_mf->ixType().toIntVect();
+    const amrex::IntVect mu_stag = m_mu_mf->ixType().toIntVect();
+
 
     for ( int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
         sigma_IndexType[idim]   = sigma_stag[idim];
@@ -204,12 +206,10 @@ void
 MacroscopicProperties::InitializeMacroMultiFabUsingParser (
                        amrex::MultiFab *macro_mf,
                        amrex::ParserExecutor<3> const& macro_parser,
-                       const int lev)
+                       const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dx_lev,
+                       const amrex::RealBox& prob_domain_lev)
 {
-    WarpX& warpx = WarpX::GetInstance();
-    const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> dx_lev = warpx.Geom(lev).CellSizeArray();
-    const amrex::RealBox& real_box = warpx.Geom(lev).ProbDomain();
-    amrex::IntVect iv = macro_mf->ixType().toIntVect();
+    const amrex::IntVect iv = macro_mf->ixType().toIntVect();
     for ( amrex::MFIter mfi(*macro_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
         // Initialize ghost cells in addition to valid cells
 
@@ -223,20 +223,20 @@ MacroscopicProperties::InitializeMacroMultiFabUsingParser (
                 const amrex::Real x = 0._rt;
                 const amrex::Real y = 0._rt;
                 const amrex::Real fac_z = (1._rt - iv[0]) * dx_lev[0] * 0.5_rt;
-                const amrex::Real z = j * dx_lev[0] + real_box.lo(0) + fac_z;
+                const amrex::Real z = j * dx_lev[0] + prob_domain_lev.lo(0) + fac_z;
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                 const amrex::Real fac_x = (1._rt - iv[0]) * dx_lev[0] * 0.5_rt;
-                const amrex::Real x = i * dx_lev[0] + real_box.lo(0) + fac_x;
+                const amrex::Real x = i * dx_lev[0] + prob_domain_lev.lo(0) + fac_x;
                 const amrex::Real y = 0._rt;
                 const amrex::Real fac_z = (1._rt - iv[1]) * dx_lev[1] * 0.5_rt;
-                const amrex::Real z = j * dx_lev[1] + real_box.lo(1) + fac_z;
+                const amrex::Real z = j * dx_lev[1] + prob_domain_lev.lo(1) + fac_z;
 #else
                 const amrex::Real fac_x = (1._rt - iv[0]) * dx_lev[0] * 0.5_rt;
-                const amrex::Real x = i * dx_lev[0] + real_box.lo(0) + fac_x;
+                const amrex::Real x = i * dx_lev[0] + prob_domain_lev.lo(0) + fac_x;
                 const amrex::Real fac_y = (1._rt - iv[1]) * dx_lev[1] * 0.5_rt;
-                const amrex::Real y = j * dx_lev[1] + real_box.lo(1) + fac_y;
+                const amrex::Real y = j * dx_lev[1] + prob_domain_lev.lo(1) + fac_y;
                 const amrex::Real fac_z = (1._rt - iv[2]) * dx_lev[2] * 0.5_rt;
-                const amrex::Real z = k * dx_lev[2] + real_box.lo(2) + fac_z;
+                const amrex::Real z = k * dx_lev[2] + prob_domain_lev.lo(2) + fac_z;
 #endif
                 // initialize the macroparameter
                 macro_fab(i,j,k) = macro_parser(x,y,z);

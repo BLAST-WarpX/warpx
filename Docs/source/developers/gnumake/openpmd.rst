@@ -3,13 +3,13 @@
 Building WarpX with support for openPMD output
 ==============================================
 
-WarpX can dump data in the `openPMD format <https://github.com/openPMD>`_.
+WarpX can dump data in the `openPMD format <https://github.com/openPMD>`__.
 This feature currently requires to have a parallel version of HDF5 installed ;
 therefore we recommend to use `spack <https://
 spack.io>`__ in order to facilitate the installation.
 
 More specifically, we recommend that you try installing the
-`openPMD-api library 0.14.2 or newer <https://openpmd-api.readthedocs.io/en/0.14.2/>`_
+`openPMD-api library 0.16.1 or newer <https://openpmd-api.readthedocs.io/en/0.16.1/>`__
 using spack (first section below). If this fails, a back-up solution
 is to install parallel HDF5 with spack, and then install the openPMD-api
 library from source.

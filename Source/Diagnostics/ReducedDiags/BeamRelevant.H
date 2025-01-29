@@ -23,17 +23,17 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    BeamRelevant(std::string rd_name);
+    BeamRelevant(const std::string& rd_name);
 
     /// name of beam species
     std::string m_beam_name;
 
     /**
-     * This function computes beam relevant quantites.
+     * This function computes beam relevant quantities.
      *
      * @param[in] step current time step
      */
-    virtual void ComputeDiags(int step) override final;
+    void ComputeDiags(int step) final;
 
 };
 

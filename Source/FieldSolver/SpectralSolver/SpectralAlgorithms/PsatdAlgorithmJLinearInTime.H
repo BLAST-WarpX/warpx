@@ -11,6 +11,8 @@
 #include "FieldSolver/SpectralSolver/SpectralKSpace.H"
 #include "SpectralBaseAlgorithm.H"
 
+#include <ablastr/utils/Enums.H>
+
 #include <AMReX_Array.H>
 #include <AMReX_Config.H>
 #include <AMReX_REAL.H>
@@ -20,7 +22,7 @@
 #include <array>
 #include <memory>
 
-#if WARPX_USE_PSATD
+#if WARPX_USE_FFT
 /*
  * \brief Class that updates the fields in spectral space according to the multi-J algorithm
  *        and stores the coefficients of the corresponding update equations. J is assumed to be
@@ -50,21 +52,22 @@ class PsatdAlgorithmJLinearInTime : public SpectralBaseAlgorithm
             const SpectralKSpace& spectral_kspace,
             const amrex::DistributionMapping& dm,
             const SpectralFieldIndex& spectral_index,
-            const int norder_x,
-            const int norder_y,
-            const int norder_z,
-            const short grid_type,
-            const amrex::Real dt,
-            const bool time_averaging,
-            const bool dive_cleaning,
-            const bool divb_cleaning);
+            int norder_x,
+            int norder_y,
+            int norder_z,
+            ablastr::utils::enums::GridType grid_type,
+            amrex::Real dt,
+            bool time_averaging,
+            bool dive_cleaning,
+            bool divb_cleaning
+        );
 
         /**
          * \brief Updates the E and B fields in spectral space, according to the multi-J PSATD equations
          *
          * \param[in,out] f all the fields in spectral space
          */
-        virtual void pushSpectralFields (SpectralFieldData& f) const override final;
+        void pushSpectralFields (SpectralFieldData& f) const final;
 
         /**
          * \brief Initializes the coefficients used in \c pushSpectralFields to update the E and B fields
@@ -76,7 +79,7 @@ class PsatdAlgorithmJLinearInTime : public SpectralBaseAlgorithm
         void InitializeSpectralCoefficients (
             const SpectralKSpace& spectral_kspace,
             const amrex::DistributionMapping& dm,
-            const amrex::Real dt);
+            amrex::Real dt);
 
         /**
          * \brief Initialize additional coefficients used in \c pushSpectralFields to update E,B,
@@ -89,7 +92,7 @@ class PsatdAlgorithmJLinearInTime : public SpectralBaseAlgorithm
         void InitializeSpectralCoefficientsAveraging (
             const SpectralKSpace& spectral_kspace,
             const amrex::DistributionMapping& dm,
-            const amrex::Real dt);
+            amrex::Real dt);
 
         /**
          * \brief Virtual function for current correction in Fourier space
@@ -100,7 +103,7 @@ class PsatdAlgorithmJLinearInTime : public SpectralBaseAlgorithm
          *
          * \param[in,out] field_data All fields in Fourier space
          */
-        virtual void CurrentCorrection (SpectralFieldData& field_data) override final;
+        void CurrentCorrection (SpectralFieldData& field_data) final;
 
         /**
          * \brief Virtual function for Vay current deposition in Fourier space
@@ -111,7 +114,7 @@ class PsatdAlgorithmJLinearInTime : public SpectralBaseAlgorithm
          *
          * \param[in,out] field_data All fields in Fourier space
          */
-        virtual void VayDeposition (SpectralFieldData& field_data) override final;
+        void VayDeposition (SpectralFieldData& field_data) final;
 
     private:
 
@@ -119,13 +122,11 @@ class PsatdAlgorithmJLinearInTime : public SpectralBaseAlgorithm
         SpectralRealCoefficients C_coef, S_ck_coef;
         SpectralRealCoefficients X1_coef, X2_coef, X3_coef, X5_coef, X6_coef;
 
-        SpectralFieldIndex m_spectral_index;
-
         // Other member variables
         amrex::Real m_dt;
         bool m_time_averaging;
         bool m_dive_cleaning;
         bool m_divb_cleaning;
 };
-#endif // WARPX_USE_PSATD
+#endif // WARPX_USE_FFT
 #endif // WARPX_PSATD_ALGORITHM_J_LINEAR_IN_TIME_H_

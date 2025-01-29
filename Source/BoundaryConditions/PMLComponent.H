@@ -9,7 +9,7 @@
 
 /* In WarpX, the split fields of the PML (e.g. Eyx, Eyz) are stored as
  * components of a MultiFab (e.g. component 0 and 1 of the MultiFab for Ey)
- * The correspondance between the component index (0,1) and its meaning
+ * The correspondence between the component index (0,1) and its meaning
  * (yx, yz, etc.) is defined in the present file */
 
  struct PMLComp {

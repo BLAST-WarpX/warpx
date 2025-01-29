@@ -10,7 +10,9 @@ CEXE_sources += EvolveBPML.cpp
 CEXE_sources += EvolveEPML.cpp
 CEXE_sources += EvolveFPML.cpp
 CEXE_sources += ApplySilverMuellerBoundary.cpp
+CEXE_sources += HybridPICSolveE.cpp
 
+include $(WARPX_HOME)/Source/FieldSolver/FiniteDifferenceSolver/HybridPICModel/Make.package
 include $(WARPX_HOME)/Source/FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/Make.package
 
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/FieldSolver/FiniteDifferenceSolver

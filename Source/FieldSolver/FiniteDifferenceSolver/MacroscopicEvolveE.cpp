@@ -7,6 +7,7 @@
 #   include "FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
 #   include "FiniteDifferenceAlgorithms/FieldAccessorFunctors.H"
 #endif
+#include "EmbeddedBoundary/Enabled.H"
 #include "MacroscopicProperties/MacroscopicProperties.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -33,22 +34,23 @@
 #include <memory>
 
 using namespace amrex;
+using namespace ablastr::fields;
 
 void FiniteDifferenceSolver::MacroscopicEvolveE (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Efield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
+    ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField const& Bfield,
+    ablastr::fields::VectorField const& Jfield,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     amrex::Real const dt,
     std::unique_ptr<MacroscopicProperties> const& macroscopic_properties)
 {
 
-   // Select algorithm (The choice of algorithm is a runtime option,
-   // but we compile code for each algorithm, using templates)
+    // Select algorithm (The choice of algorithm is a runtime option,
+    // but we compile code for each algorithm, using templates)
 #ifdef WARPX_DIM_RZ
-    amrex::ignore_unused(Efield, Bfield, Jfield, edge_lengths, dt, macroscopic_properties);
-    amrex::Abort(Utils::TextMsg::Err(
-        "currently macro E-push does not work for RZ"));
+    amrex::ignore_unused(Efield, Bfield, Jfield, eb_update_E, dt, macroscopic_properties);
+
+    WARPX_ABORT_WITH_MESSAGE("currently macro E-push does not work for RZ");
 #else
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_grid_type != GridType::Collocated, "Macroscopic E field solver does not work on collocated grids");
@@ -59,13 +61,13 @@ void FiniteDifferenceSolver::MacroscopicEvolveE (
         if (WarpX::macroscopic_solver_algo == MacroscopicSolverAlgo::LaxWendroff) {
 
             MacroscopicEvolveECartesian <CartesianYeeAlgorithm, LaxWendroffAlgo>
-                       ( Efield, Bfield, Jfield, edge_lengths, dt, macroscopic_properties);
+                       ( Efield, Bfield, Jfield, eb_update_E, dt, macroscopic_properties);
 
         }
         if (WarpX::macroscopic_solver_algo == MacroscopicSolverAlgo::BackwardEuler) {
 
             MacroscopicEvolveECartesian <CartesianYeeAlgorithm, BackwardEulerAlgo>
-                       ( Efield, Bfield, Jfield, edge_lengths, dt, macroscopic_properties);
+                       ( Efield, Bfield, Jfield, eb_update_E, dt, macroscopic_properties);
 
         }
 
@@ -76,18 +78,18 @@ void FiniteDifferenceSolver::MacroscopicEvolveE (
         if (WarpX::macroscopic_solver_algo == MacroscopicSolverAlgo::LaxWendroff) {
 
             MacroscopicEvolveECartesian <CartesianCKCAlgorithm, LaxWendroffAlgo>
-                       ( Efield, Bfield, Jfield, edge_lengths, dt, macroscopic_properties);
+                       ( Efield, Bfield, Jfield, eb_update_E, dt, macroscopic_properties);
 
         } else if (WarpX::macroscopic_solver_algo == MacroscopicSolverAlgo::BackwardEuler) {
 
             MacroscopicEvolveECartesian <CartesianCKCAlgorithm, BackwardEulerAlgo>
-                       ( Efield, Bfield, Jfield, edge_lengths, dt, macroscopic_properties);
+                       ( Efield, Bfield, Jfield, eb_update_E, dt, macroscopic_properties);
 
         }
 
     } else {
-        amrex::Abort(Utils::TextMsg::Err(
-            "MacroscopicEvolveE: Unknown algorithm"));
+        WARPX_ABORT_WITH_MESSAGE(
+            "MacroscopicEvolveE: Unknown algorithm");
     }
 #endif
 
@@ -98,17 +100,13 @@ void FiniteDifferenceSolver::MacroscopicEvolveE (
 
 template<typename T_Algo, typename T_MacroAlgo>
 void FiniteDifferenceSolver::MacroscopicEvolveECartesian (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Efield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
+    ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField const& Bfield,
+    ablastr::fields::VectorField const& Jfield,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     amrex::Real const dt,
     std::unique_ptr<MacroscopicProperties> const& macroscopic_properties)
 {
-#ifndef AMREX_USE_EB
-    amrex::ignore_unused(edge_lengths);
-#endif
-
     amrex::MultiFab& sigma_mf = macroscopic_properties->getsigma_mf();
     amrex::MultiFab& epsilon_mf = macroscopic_properties->getepsilon_mf();
     amrex::MultiFab& mu_mf = macroscopic_properties->getmu_mf();
@@ -139,11 +137,12 @@ void FiniteDifferenceSolver::MacroscopicEvolveECartesian (
         Array4<Real> const& jy = Jfield[1]->array(mfi);
         Array4<Real> const& jz = Jfield[2]->array(mfi);
 
-#ifdef AMREX_USE_EB
-        amrex::Array4<amrex::Real> const& lx = edge_lengths[0]->array(mfi);
-        amrex::Array4<amrex::Real> const& ly = edge_lengths[1]->array(mfi);
-        amrex::Array4<amrex::Real> const& lz = edge_lengths[2]->array(mfi);
-#endif
+        amrex::Array4<int> update_Ex_arr, update_Ey_arr, update_Ez_arr;
+        if (EB::enabled()) {
+            update_Ex_arr = eb_update_E[0]->array(mfi);
+            update_Ey_arr = eb_update_E[1]->array(mfi);
+            update_Ez_arr = eb_update_E[2]->array(mfi);
+        }
 
         // material prop //
         amrex::Array4<amrex::Real> const& sigma_arr = sigma_mf.array(mfi);
@@ -152,11 +151,11 @@ void FiniteDifferenceSolver::MacroscopicEvolveECartesian (
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
-        int const n_coefs_x = m_stencil_coefs_x.size();
+        auto const n_coefs_x = static_cast<int>(m_stencil_coefs_x.size());
         Real const * const AMREX_RESTRICT coefs_y = m_stencil_coefs_y.dataPtr();
-        int const n_coefs_y = m_stencil_coefs_y.size();
+        auto const n_coefs_y = static_cast<int>(m_stencil_coefs_y.size());
         Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
-        int const n_coefs_z = m_stencil_coefs_z.size();
+        auto const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
 
         // This functor computes Hx = Bx/mu
         // Note that mu is cell-centered here and will be interpolated/averaged
@@ -174,18 +173,18 @@ void FiniteDifferenceSolver::MacroscopicEvolveECartesian (
         // Loop over the cells and update the fields
         amrex::ParallelFor(tex, tey, tez,
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-#ifdef AMREX_USE_EB
-                // Skip field push if this cell is fully covered by embedded boundaries
-                if (lx(i, j, k) <= 0) return;
-#endif
+
+                // Skip field push in the embedded boundaries
+                if (update_Ex_arr && update_Ex_arr(i, j, k) == 0) { return; }
+
                 // Interpolate conductivity, sigma, to Ex position on the grid
                 amrex::Real const sigma_interp = ablastr::coarsen::sample::Interp(sigma_arr, sigma_stag,
                                                                                   Ex_stag, macro_cr, i, j, k, scomp);
                 // Interpolated permittivity, epsilon, to Ex position on the grid
                 amrex::Real const epsilon_interp = ablastr::coarsen::sample::Interp(eps_arr, epsilon_stag,
                                                                                     Ex_stag, macro_cr, i, j, k, scomp);
-                amrex::Real alpha = T_MacroAlgo::alpha( sigma_interp, epsilon_interp, dt);
-                amrex::Real beta = T_MacroAlgo::beta( sigma_interp, epsilon_interp, dt);
+                const amrex::Real alpha = T_MacroAlgo::alpha( sigma_interp, epsilon_interp, dt);
+                const amrex::Real beta = T_MacroAlgo::beta( sigma_interp, epsilon_interp, dt);
                 Ex(i, j, k) = alpha * Ex(i, j, k)
                             + beta * ( - T_Algo::DownwardDz(Hy, coefs_z, n_coefs_z, i, j, k,0)
                                        + T_Algo::DownwardDy(Hz, coefs_y, n_coefs_y, i, j, k,0)
@@ -193,23 +192,18 @@ void FiniteDifferenceSolver::MacroscopicEvolveECartesian (
             },
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-#ifdef AMREX_USE_EB
-#ifdef WARPX_DIM_3D
-                if (ly(i,j,k) <= 0) return;
-#elif defined(WARPX_DIM_XZ)
-                //In XZ Ey is associated with a mesh node, so we need to check if the mesh node is covered
-                amrex::ignore_unused(ly);
-                if (lx(i, j, k)<=0 || lx(i-1, j, k)<=0 || lz(i, j, k)<=0 || lz(i, j-1, k)<=0) return;
-#endif
-#endif
+
+                // Skip field push in the embedded boundaries
+                if (update_Ey_arr && update_Ey_arr(i, j, k) == 0) { return; }
+
                 // Interpolate conductivity, sigma, to Ey position on the grid
                 amrex::Real const sigma_interp = ablastr::coarsen::sample::Interp(sigma_arr, sigma_stag,
                                                                                   Ey_stag, macro_cr, i, j, k, scomp);
                 // Interpolated permittivity, epsilon, to Ey position on the grid
                 amrex::Real const epsilon_interp = ablastr::coarsen::sample::Interp(eps_arr, epsilon_stag,
                                                                                     Ey_stag, macro_cr, i, j, k, scomp);
-                amrex::Real alpha = T_MacroAlgo::alpha( sigma_interp, epsilon_interp, dt);
-                amrex::Real beta = T_MacroAlgo::beta( sigma_interp, epsilon_interp, dt);
+                const amrex::Real alpha = T_MacroAlgo::alpha( sigma_interp, epsilon_interp, dt);
+                const amrex::Real beta = T_MacroAlgo::beta( sigma_interp, epsilon_interp, dt);
 
                 Ey(i, j, k) = alpha * Ey(i, j, k)
                             + beta * ( - T_Algo::DownwardDx(Hz, coefs_x, n_coefs_x, i, j, k,0)
@@ -218,18 +212,18 @@ void FiniteDifferenceSolver::MacroscopicEvolveECartesian (
             },
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-#ifdef AMREX_USE_EB
-                // Skip field push if this cell is fully covered by embedded boundaries
-                if (lz(i,j,k) <= 0) return;
-#endif
+
+                // Skip field push in the embedded boundaries
+                if (update_Ez_arr && update_Ez_arr(i, j, k) == 0) { return; }
+
                 // Interpolate conductivity, sigma, to Ez position on the grid
                 amrex::Real const sigma_interp = ablastr::coarsen::sample::Interp(sigma_arr, sigma_stag,
                                                                                   Ez_stag, macro_cr, i, j, k, scomp);
                 // Interpolated permittivity, epsilon, to Ez position on the grid
                 amrex::Real const epsilon_interp = ablastr::coarsen::sample::Interp(eps_arr, epsilon_stag,
                                                                                     Ez_stag, macro_cr, i, j, k, scomp);
-                amrex::Real alpha = T_MacroAlgo::alpha( sigma_interp, epsilon_interp, dt);
-                amrex::Real beta = T_MacroAlgo::beta( sigma_interp, epsilon_interp, dt);
+                const amrex::Real alpha = T_MacroAlgo::alpha( sigma_interp, epsilon_interp, dt);
+                const amrex::Real beta = T_MacroAlgo::beta( sigma_interp, epsilon_interp, dt);
 
                 Ez(i, j, k) = alpha * Ez(i, j, k)
                             + beta * ( - T_Algo::DownwardDy(Hx, coefs_y, n_coefs_y, i, j, k,0)

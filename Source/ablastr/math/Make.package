@@ -1,0 +1,3 @@
+include $(WARPX_HOME)/Source/ablastr/math/fft/Make.package
+
+VPATH_LOCATIONS   += $(WARPX_HOME)/Source/ablastr

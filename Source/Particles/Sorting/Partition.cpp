@@ -10,7 +10,6 @@
 #include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
-#include <AMReX_ArrayOfStructs.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_GpuDevice.H>
 #include <AMReX_GpuLaunch.H>
@@ -61,7 +60,7 @@ PhysicalParticleContainer::PartitionParticlesInBuffers(
     // Initialize temporary arrays
     Gpu::DeviceVector<int> inexflag;
     inexflag.resize(np);
-    Gpu::DeviceVector<long> pid;
+    Gpu::DeviceVector<int> pid;
     pid.resize(np);
 
     // First, partition particles into the larger buffer
@@ -76,7 +75,7 @@ PhysicalParticleContainer::PartitionParticlesInBuffers(
     // - Find the indices that reorder particles so that the last particles
     //   are in the larger buffer
     fillWithConsecutiveIntegers( pid );
-    auto const sep = stablePartition( pid.begin(), pid.end(), inexflag );
+    auto *const sep = stablePartition( pid.begin(), pid.end(), inexflag );
     // At the end of this step, `pid` contains the indices that should be used to
     // reorder the particles, and `sep` is the position in the array that
     // separates the particles that deposit/gather on the fine patch (first part)
@@ -109,8 +108,8 @@ PhysicalParticleContainer::PartitionParticlesInBuffers(
             // - For each particle in the large buffer, find whether it is in
             // the smaller buffer, by looking up the mask. Store the answer in `inexflag`.
             amrex::ParallelFor( np - n_fine,
-               fillBufferFlagRemainingParticles(pti, bmasks, inexflag, Geom(lev), pid, n_fine) );
-            auto const sep2 = stablePartition( sep, pid.end(), inexflag );
+               fillBufferFlagRemainingParticles(pti, bmasks, inexflag, Geom(lev), pid, int(n_fine)) );
+            auto *const sep2 = stablePartition( sep, pid.end(), inexflag );
 
             if (bmasks == gather_masks) {
                 nfine_gather = iteratorDistance(pid.begin(), sep2);

@@ -1,5 +1,9 @@
 # please set your project account
-#export proj=<yourProject>
+export proj=""  # change me!
+
+# remembers the location of this script
+export MY_PROFILE=$(cd $(dirname $BASH_SOURCE) && pwd)"/"$(basename $BASH_SOURCE)
+if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your $MY_PROFILE file! Please edit its line 2 to continue!"; return; fi
 
 # optional: just an additional text editor
 module load nano
@@ -7,28 +11,29 @@ module load nano
 # required dependencies
 module load cmake/3.20.2
 module load gcc/9.3.0
-module load cuda/11.3.1
+module load cuda/11.7.1
 
 # optional: faster re-builds
 module load ccache
+module load ninja
 
 # optional: for PSATD in RZ geometry support
-export CMAKE_PREFIX_PATH=$HOME/sw/summit/blaspp-master:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=$HOME/sw/summit/lapackpp-master:$CMAKE_PREFIX_PATH
-export LD_LIBRARY_PATH=$HOME/sw/summit/blaspp-master/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=$HOME/sw/summit/lapackpp-master/lib64:$LD_LIBRARY_PATH
+export CMAKE_PREFIX_PATH=/ccs/proj/$proj/${USER}/sw/summit/gpu/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=/ccs/proj/$proj/${USER}/sw/summit/gpu/lapackpp-2024.05.31:$CMAKE_PREFIX_PATH
+export LD_LIBRARY_PATH=/ccs/proj/$proj/${USER}/sw/summit/gpu/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/ccs/proj/$proj/${USER}/sw/summit/gpu/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
 
 # optional: for QED lookup table generation support
 module load boost/1.76.0
 
 # optional: for openPMD support
-module load adios2/2.7.1
-module load hdf5/1.10.7
+module load adios2/2.8.1
+module load hdf5/1.12.2
 
 # optional: for openPMD support (GNUmake only)
 #module load ums
 #module load ums-aph114
-#module load openpmd-api/0.14.2
+#module load openpmd-api/0.15.1
 
 # often unstable at runtime with dependencies
 module unload darshan-runtime
@@ -46,17 +51,20 @@ module load openblas/0.3.5-omp
 export BLAS=${OLCF_OPENBLAS_ROOT}/lib/libopenblas.so
 export LAPACK=${OLCF_OPENBLAS_ROOT}/lib/libopenblas.so
 
-if [ -d "$HOME/sw/venvs/warpx" ]
+# dependency for pyTorch
+module load magma
+
+if [ -d "/ccs/proj/$proj/${USER}/sw/summit/gpu/venvs/warpx-summit" ]
 then
-  source $HOME/sw/venvs/warpx/bin/activate
+  source /ccs/proj/$proj/${USER}/sw/summit/gpu/venvs/warpx-summit/bin/activate
 fi
 
 # an alias to request an interactive batch node for two hours
 #   for paralle execution, start on the batch node: jsrun <command>
 alias getNode="bsub -q debug -P $proj -W 2:00 -nnodes 1 -Is /bin/bash"
 # an alias to run a command on a batch node for up to 30min
-#   usage: nrun <command>
-alias runNode="bsub -q debug -P $proj -W 0:30 -nnodes 1 -I"
+#   usage: runNode <command>
+alias runNode="bsub -q debug -P $proj -W 2:00 -nnodes 1 -I"
 
 # fix system defaults: do not escape $ with a \ on tab completion
 shopt -s direxpand

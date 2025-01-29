@@ -8,19 +8,23 @@
 
 #include "BeamRelevant.H"
 #include "ChargeOnEB.H"
+#include "ColliderRelevant.H"
+#include "DifferentialLuminosity.H"
 #include "FieldEnergy.H"
 #include "FieldMaximum.H"
-#include "FieldProbe.H"
 #include "FieldMomentum.H"
+#include "FieldProbe.H"
 #include "FieldReduction.H"
 #include "LoadBalanceCosts.H"
 #include "LoadBalanceEfficiency.H"
 #include "ParticleEnergy.H"
 #include "ParticleExtrema.H"
 #include "ParticleHistogram.H"
+#include "ParticleHistogram2D.H"
 #include "ParticleMomentum.H"
 #include "ParticleNumber.H"
 #include "RhoMaximum.H"
+#include "Timestep.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXProfilerWrapper.H"
 
@@ -40,7 +44,7 @@ using namespace amrex;
 MultiReducedDiags::MultiReducedDiags ()
 {
     // read reduced diags names
-    ParmParse pp_warpx("warpx");
+    const ParmParse pp_warpx("warpx");
     m_plot_rd = pp_warpx.queryarr("reduced_diags_names", m_rd_names);
 
     // if names are not given, reduced diags will not be done
@@ -49,26 +53,30 @@ MultiReducedDiags::MultiReducedDiags ()
     using CS = const std::string& ;
     const auto reduced_diags_dictionary =
         std::map<std::string, std::function<std::unique_ptr<ReducedDiags>(CS)>>{
+            {"BeamRelevant",          [](CS s){return std::make_unique<BeamRelevant>(s);}},
+            {"ChargeOnEB",            [](CS s){return std::make_unique<ChargeOnEB>(s);}},
+            {"ColliderRelevant",      [](CS s){return std::make_unique<ColliderRelevant>(s);}},
+            {"DifferentialLuminosity",[](CS s){return std::make_unique<DifferentialLuminosity>(s);}},
             {"ParticleEnergy",        [](CS s){return std::make_unique<ParticleEnergy>(s);}},
+            {"ParticleExtrema",       [](CS s){return std::make_unique<ParticleExtrema>(s);}},
+            {"ParticleHistogram",     [](CS s){return std::make_unique<ParticleHistogram>(s);}},
+            {"ParticleHistogram2D",   [](CS s){return std::make_unique<ParticleHistogram2D>(s);}},
             {"ParticleMomentum",      [](CS s){return std::make_unique<ParticleMomentum>(s);}},
+            {"ParticleNumber",        [](CS s){return std::make_unique<ParticleNumber>(s);}},
             {"FieldEnergy",           [](CS s){return std::make_unique<FieldEnergy>(s);}},
-            {"FieldMomentum",         [](CS s){return std::make_unique<FieldMomentum>(s);}},
             {"FieldMaximum",          [](CS s){return std::make_unique<FieldMaximum>(s);}},
+            {"FieldMomentum",         [](CS s){return std::make_unique<FieldMomentum>(s);}},
             {"FieldProbe",            [](CS s){return std::make_unique<FieldProbe>(s);}},
             {"FieldReduction",        [](CS s){return std::make_unique<FieldReduction>(s);}},
-            {"RhoMaximum",            [](CS s){return std::make_unique<RhoMaximum>(s);}},
-            {"BeamRelevant",          [](CS s){return std::make_unique<BeamRelevant>(s);}},
             {"LoadBalanceCosts",      [](CS s){return std::make_unique<LoadBalanceCosts>(s);}},
             {"LoadBalanceEfficiency", [](CS s){return std::make_unique<LoadBalanceEfficiency>(s);}},
-            {"ParticleHistogram",     [](CS s){return std::make_unique<ParticleHistogram>(s);}},
-            {"ParticleNumber",        [](CS s){return std::make_unique<ParticleNumber>(s);}},
-            {"ParticleExtrema",       [](CS s){return std::make_unique<ParticleExtrema>(s);}},
-            {"ChargeOnEB",  [](CS s){return std::make_unique<ChargeOnEB>(s);}}
+            {"RhoMaximum",            [](CS s){return std::make_unique<RhoMaximum>(s);}},
+            {"Timestep",              [](CS s){return std::make_unique<Timestep>(s);}}
     };
     // loop over all reduced diags and fill m_multi_rd with requested reduced diags
     std::transform(m_rd_names.begin(), m_rd_names.end(), std::back_inserter(m_multi_rd),
         [&](const auto& rd_name){
-            ParmParse pp_rd_name(rd_name);
+            const ParmParse pp_rd_name(rd_name);
 
             // read reduced diags type
             std::string rd_type;

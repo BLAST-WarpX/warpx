@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef BOSCH_HALE_FUSION_CROSS_SECTION_H
-#define BOSCH_HALE_FUSION_CROSS_SECTION_H
+#ifndef WARPX_BOSCH_HALE_FUSION_CROSS_SECTION_H
+#define WARPX_BOSCH_HALE_FUSION_CROSS_SECTION_H
 
 #include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
 #include "Utils/WarpXConst.H"
@@ -100,7 +100,7 @@ amrex::ParticleReal BoschHaleFusionCrossSection (
         B4 = 0_prt;
     }
 
-    amrex::ParticleReal astrophysical_factor =
+    const amrex::ParticleReal astrophysical_factor =
         (A1 + E_keV*(A2 + E_keV*(A3 + E_keV*(A4 + E_keV*A5)))) /
         (1_prt + E_keV*(B1 + E_keV*(B2 + E_keV*(B3 + E_keV*B4))));
 
@@ -110,4 +110,4 @@ amrex::ParticleReal BoschHaleFusionCrossSection (
     return millibarn_to_sqm * astrophysical_factor/E_keV * std::exp(-B_G/std::sqrt(E_keV));
 }
 
-#endif // BOSCH_HALE_FUSION_CROSS_SECTION_H
+#endif // WARPX_BOSCH_HALE_FUSION_CROSS_SECTION_H

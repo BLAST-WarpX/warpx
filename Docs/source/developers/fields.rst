@@ -37,10 +37,17 @@ The ``MultiFab`` constructor (for, e.g., ``Ex`` on level ``lev``) is called in `
 
 By default, the ``MultiFab`` are set to ``0`` at initialization. They can be assigned a different value in ``WarpX::InitLevelData``.
 
+Field Names
+-----------
+
+The commonly used WarpX field names are defined in:
+
+.. doxygenenum:: warpx::fields::FieldType
+
 Field solver
 ------------
 
-The field solver is performed in ``WarpX::EvolveE`` for the electric field and ``WarpX::EvolveB`` for the magnetic field, called from ``WarpX::OneStep_nosub`` in ``WarpX::EvolveEM``. This section describes the FDTD field push. It is implemented in ``Source/FieldSolver/FiniteDifferenceSolver/``.
+The field solver is performed in ``WarpX::EvolveE`` for the electric field and ``WarpX::EvolveB`` for the magnetic field, called from ``WarpX::OneStep_nosub`` in ``WarpX::Evolve``. This section describes the FDTD field push. It is implemented in ``Source/FieldSolver/FiniteDifferenceSolver/``.
 
 As all cell-wise operation, the field push is done as follows (this is split in multiple functions in the actual implementation to avoid code duplication)
 :
@@ -112,9 +119,9 @@ Bilinear filter
 
 The multi-pass bilinear filter (applied on the current density) is implemented in ``Source/Filter/``, and class ``WarpX`` holds an instance of this class in member variable ``WarpX::bilinear_filter``. For performance reasons (to avoid creating too many guard cells), this filter is directly applied in communication routines, see ``WarpX::AddCurrentFromFineLevelandSumBoundary`` above and
 
-.. doxygenfunction:: WarpX::ApplyFilterJ(const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>, 3>> &current, const int lev, const int idim)
+.. doxygenfunction:: WarpX::ApplyFilterMF(const ablastr::fields::MultiLevelVectorField &mfvec, int lev, int idim)
 
-.. doxygenfunction:: WarpX::SumBoundaryJ(const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>, 3>> &current, const int lev, const int idim, const amrex::Periodicity &period)
+.. doxygenfunction:: WarpX::SumBoundaryJ(const ablastr::fields::MultiLevelVectorField &current, int lev, int idim, const amrex::Periodicity &period)
 
 Godfrey's anti-NCI filter for FDTD simulations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

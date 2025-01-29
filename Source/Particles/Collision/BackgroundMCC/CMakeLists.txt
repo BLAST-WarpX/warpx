@@ -1,5 +1,7 @@
-target_sources(WarpX
-  PRIVATE
-    BackgroundMCCCollision.cpp
-    MCCProcess.cpp
-)
+foreach(D IN LISTS WarpX_DIMS)
+    warpx_set_suffix_dims(SD ${D})
+    target_sources(lib_${SD}
+      PRIVATE
+        BackgroundMCCCollision.cpp
+    )
+endforeach()

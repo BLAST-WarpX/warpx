@@ -1,0 +1,103 @@
+#################################
+########## MY CONSTANTS #########
+#################################
+my_constants.mc2_eV = m_e*clight*clight/q_e
+
+# BEAMS
+my_constants.beam_energy_eV = 125.e9
+my_constants.beam_gamma = beam_energy_eV/(mc2_eV)
+my_constants.beam_N = 1.2e10
+my_constants.sigmax = 500e-9
+my_constants.sigmay = 10e-9
+my_constants.sigmaz = 300e-3
+my_constants.muz = 4*sigmaz
+
+# BOX
+my_constants.Lx = 8*sigmax
+my_constants.Ly = 8*sigmay
+my_constants.Lz = 16*sigmaz
+
+my_constants.nx = 64
+my_constants.ny = 64
+my_constants.nz = 128
+
+# TIME
+my_constants.T = 0.5*Lz/clight
+my_constants.dt = sigmaz/clight/10.
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+stop_time = T
+amr.n_cell = nx ny nz
+amr.max_grid_size = 128
+amr.blocking_factor = 2
+amr.max_level = 0
+geometry.dims = 3
+geometry.prob_lo = -0.5*Lx -0.5*Ly -0.5*Lz
+geometry.prob_hi =  0.5*Lx  0.5*Ly  0.5*Lz
+
+#################################
+######## BOUNDARY CONDITION #####
+#################################
+boundary.field_lo = open open open
+boundary.field_hi = open open open
+boundary.particle_lo = Absorbing Absorbing Absorbing
+boundary.particle_hi = Absorbing Absorbing Absorbing
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.do_electrostatic = relativistic
+warpx.const_dt = dt
+warpx.grid_type = collocated
+algo.particle_shape = 3
+algo.load_balance_intervals=100
+algo.particle_pusher = vay
+warpx.poisson_solver = fft
+
+#################################
+########### PARTICLES ###########
+#################################
+particles.species_names = beam1 beam2
+
+beam1.momentum_distribution_type = gaussian
+beam1.uz_m = beam_gamma
+beam1.uy_m = 0.0
+beam1.ux_m = 0.0
+beam1.ux_th = 0
+beam1.uy_th = 0
+beam1.uz_th = 0.02*beam_gamma
+beam1.do_not_deposit = 1
+
+beam2.momentum_distribution_type = gaussian
+beam2.uz_m = -beam_gamma
+beam2.uy_m = 0.0
+beam2.ux_m = 0.0
+beam2.ux_th = 0
+beam2.uy_th = 0
+beam2.uz_th = 0.03*beam_gamma
+beam2.do_not_deposit = 1
+
+#################################
+######### DIAGNOSTICS ###########
+#################################
+# FULL
+diagnostics.diags_names = diag1
+
+diag1.intervals = 80
+diag1.diag_type = Full
+diag1.write_species = 1
+diag1.fields_to_plot = rho_beam1 rho_beam2
+diag1.dump_last_timestep = 1
+diag1.species = beam1 beam2
+
+# REDUCED
+warpx.reduced_diags_names = DifferentialLuminosity_beam1_beam2
+
+DifferentialLuminosity_beam1_beam2.type = DifferentialLuminosity
+DifferentialLuminosity_beam1_beam2.intervals = 5
+DifferentialLuminosity_beam1_beam2.species = beam1 beam2
+DifferentialLuminosity_beam1_beam2.bin_number = 128
+DifferentialLuminosity_beam1_beam2.bin_max = 2.1*beam_energy_eV
+DifferentialLuminosity_beam1_beam2.bin_min = 1.9*beam_energy_eV

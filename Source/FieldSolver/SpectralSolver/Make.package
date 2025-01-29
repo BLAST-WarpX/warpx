@@ -1,13 +1,6 @@
 CEXE_sources += SpectralSolver.cpp
 CEXE_sources += SpectralFieldData.cpp
 CEXE_sources += SpectralKSpace.cpp
-ifeq ($(USE_CUDA),TRUE)
-  CEXE_sources += WrapCuFFT.cpp
-else ifeq ($(USE_HIP),TRUE)
-  CEXE_sources += WrapRocFFT.cpp
-else
-  CEXE_sources += WrapFFTW.cpp
-endif
 
 ifeq ($(USE_RZ),TRUE)
   CEXE_sources += SpectralSolverRZ.cpp

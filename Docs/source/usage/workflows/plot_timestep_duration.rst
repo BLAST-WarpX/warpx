@@ -4,7 +4,7 @@ Plot timestep duration
 ======================
 We provide a simple python script to generate plots of the timestep duration
 from the stdandard output of WarpX (provided that ``warpx.verbose`` is set to 1):
-`plot_timestep_duration.py <../../../../Tools/PostProcessing/plot_timestep_duration.py>`__ .
+:download:`plot_timestep_duration.py <../../../../Tools/PostProcessing/plot_timestep_duration.py>`.
 
 If the standard output of a simulation has been redirected to a file named ``log_file``,
 the script can be used as follows:

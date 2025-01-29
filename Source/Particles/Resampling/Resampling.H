@@ -24,12 +24,21 @@ struct ResamplingAlgorithm
     /**
      * \brief Virtual operator() of the abstract ResamplingAlgorithm class
      */
-    virtual void operator() (WarpXParIter& /*pti*/, const int /*lev*/, WarpXParticleContainer* /*pc*/) const = 0;
+    virtual void operator() (WarpXParIter& /*pti*/, int /*lev*/, WarpXParticleContainer* /*pc*/) const = 0;
 
     /**
      * \brief Virtual destructor of the abstract ResamplingAlgorithm class
      */
     virtual ~ResamplingAlgorithm () =  default;
+
+    /** Default constructor */
+    ResamplingAlgorithm () = default;
+
+
+    ResamplingAlgorithm ( ResamplingAlgorithm const &)             = default;
+    ResamplingAlgorithm& operator= ( ResamplingAlgorithm const & ) = default;
+    ResamplingAlgorithm ( ResamplingAlgorithm&& )                  = default;
+    ResamplingAlgorithm& operator= ( ResamplingAlgorithm&& )       = default;
 };
 
 /**
@@ -53,7 +62,7 @@ public:
      *
      * @param[in] species_name the name of the resampled species
      */
-    Resampling (const std::string species_name);
+    Resampling (const std::string& species_name);
 
     /**
      * \brief A method that returns true if resampling should be done for the considered species
@@ -62,7 +71,7 @@ public:
      * @param[in] timestep the current timestep
      * @param[in] global_numparts the total number of particles of the considered species
      */
-    bool triggered (const int timestep, const amrex::Real global_numparts) const;
+    bool triggered (int timestep, amrex::Real global_numparts) const;
 
     /**
      * \brief A method that uses the ResamplingAlgorithm object to perform resampling.
@@ -71,7 +80,7 @@ public:
      * @param[in] lev the index of the refinement level.
      * @param[in] pc a pointer to the particle container.
      */
-    void operator() (WarpXParIter& pti, const int lev, WarpXParticleContainer * const pc) const;
+    void operator() (WarpXParIter& pti, int lev, WarpXParticleContainer* pc) const;
 
 private:
     ResamplingTrigger m_resampling_trigger;

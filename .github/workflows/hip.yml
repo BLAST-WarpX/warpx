@@ -1,6 +1,13 @@
 name: 🐧 HIP
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    paths-ignore:
+      - "Docs/**"
+      - "**.rst"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-hip
@@ -15,25 +22,25 @@ jobs:
       CMAKE_GENERATOR: Ninja
     if: github.event.pull_request.draft == false
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: install dependencies
       shell: bash
       run: .github/workflows/dependencies/hip.sh
     - name: CCache Cache
-      uses: actions/cache@v3
-      # - once stored under a key, they become immutable (even if local cache path content changes)
-      # - for a refresh the key has to change, e.g., hash of a tracked file in the key
+      uses: actions/cache@v4
       with:
-        path: |
-          ~/.ccache
-          ~/.cache/ccache
-        key: ccache-hip-3dsp-${{ hashFiles('.github/workflows/hip.yml') }}-${{ hashFiles('cmake/dependencies/AMReX.cmake') }}
+        path: ~/.cache/ccache
+        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
-          ccache-hip-3dsp-${{ hashFiles('.github/workflows/hip.yml') }}-
-          ccache-hip-3dsp-
+             ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: build WarpX
       shell: bash
       run: |
+        export CCACHE_COMPRESS=1
+        export CCACHE_COMPRESSLEVEL=10
+        export CCACHE_MAXSIZE=100M
+        ccache -z
+
         source /etc/profile.d/rocm.sh
         hipcc --version
         which clang
@@ -51,16 +58,20 @@ jobs:
           -DAMReX_AMD_ARCH=gfx900     \
           -DWarpX_COMPUTE=HIP         \
           -DWarpX_EB=ON               \
-          -DWarpX_LIB=ON              \
+          -DWarpX_PYTHON=ON           \
           -DWarpX_MPI=ON              \
           -DWarpX_OPENPMD=ON          \
           -DWarpX_PRECISION=SINGLE    \
-          -DWarpX_PSATD=ON
-        cmake --build build_sp -j 2
+          -DWarpX_FFT=ON
+        cmake --build build_sp -j 4
 
         export WARPX_MPI=OFF
-        PYWARPX_LIB_DIR=$PWD/build_sp/lib python3 -m pip wheel .
+        export PYWARPX_LIB_DIR=$PWD/build_sp/lib/site-packages/pywarpx/
+        python3 -m pip wheel .
         python3 -m pip install *.whl
+
+        ccache -s
+        du -hs ~/.cache/ccache
 
   build_hip_2d_dp:
     name: HIP 2D DP
@@ -70,25 +81,25 @@ jobs:
       CMAKE_GENERATOR: Ninja
     if: github.event.pull_request.draft == false
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: install dependencies
       shell: bash
       run: .github/workflows/dependencies/hip.sh
     - name: CCache Cache
-      uses: actions/cache@v3
-      # - once stored under a key, they become immutable (even if local cache path content changes)
-      # - for a refresh the key has to change, e.g., hash of a tracked file in the key
+      uses: actions/cache@v4
       with:
-        path: |
-          ~/.ccache
-          ~/.cache/ccache
-        key: ccache-hip-2ddp-${{ hashFiles('.github/workflows/hip.yml') }}-${{ hashFiles('cmake/dependencies/AMReX.cmake') }}
+        path: ~/.cache/ccache
+        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
-          ccache-hip-2ddp-${{ hashFiles('.github/workflows/hip.yml') }}-
-          ccache-hip-2ddp-
+             ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: build WarpX
       shell: bash
       run: |
+        export CCACHE_COMPRESS=1
+        export CCACHE_COMPRESSLEVEL=10
+        export CCACHE_MAXSIZE=100M
+        ccache -z
+
         source /etc/profile.d/rocm.sh
         hipcc --version
         which clang
@@ -107,13 +118,17 @@ jobs:
           -DWarpX_DIMS=2              \
           -DWarpX_COMPUTE=HIP         \
           -DWarpX_EB=ON               \
-          -DWarpX_LIB=ON              \
+          -DWarpX_PYTHON=ON           \
           -DWarpX_MPI=ON              \
           -DWarpX_OPENPMD=ON          \
           -DWarpX_PRECISION=DOUBLE    \
-          -DWarpX_PSATD=ON
-        cmake --build build_2d -j 2
+          -DWarpX_FFT=ON
+        cmake --build build_2d -j 4
 
         export WARPX_MPI=OFF
-        PYWARPX_LIB_DIR=$PWD/build_2d/lib python3 -m pip wheel .
+        export PYWARPX_LIB_DIR=$PWD/build_2d/lib/site-packages/pywarpx/
+        python3 -m pip wheel .
         python3 -m pip install *.whl
+
+        ccache -s
+        du -hs ~/.cache/ccache

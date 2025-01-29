@@ -8,15 +8,15 @@
 #include "SignalHandling.H"
 #include "TextMsg.H"
 
-#include <AMReX.H>
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_IParser.H>
 
 #include <cctype>
+#include <stdexcept>
 
 // For sigaction() et al.
 #if defined(__linux__) || defined(__APPLE__)
-#   include <signal.h>
+#   include <csignal>
 #endif
 
 namespace ablastr::utils {
@@ -35,7 +35,7 @@ SignalHandling::parseSignalNameToNumber (const std::string &str)
     amrex::IParser signals_parser(str);
 
 #if defined(__linux__) || defined(__APPLE__)
-    struct {
+    const struct {
         const char* abbrev;
         const int value;
     } signals_to_parse[] = {
@@ -87,24 +87,24 @@ SignalHandling::parseSignalNameToNumber (const std::string &str)
     };
 
     for (const auto& sp : signals_to_parse) {
-        std::string name_upper = sp.abbrev;
+        const std::string name_upper = sp.abbrev;
         std::string name_lower = name_upper;
         for (char &c : name_lower) {
-            c = std::tolower(c);
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         }
 
         signals_parser.setConstant(name_upper, sp.value);
         signals_parser.setConstant(name_lower, sp.value);
-        name_upper = "SIG" + name_upper;
-        name_lower = "sig" + name_lower;
-        signals_parser.setConstant(name_upper, sp.value);
-        signals_parser.setConstant(name_lower, sp.value);
+        const auto sig_name_upper = "SIG" + name_upper;
+        const auto sig_name_lower = "sig" + name_lower;
+        signals_parser.setConstant(sig_name_upper, sp.value);
+        signals_parser.setConstant(sig_name_lower, sp.value);
     }
 #endif // #if defined(__linux__) || defined(__APPLE__)
 
     auto spf = signals_parser.compileHost<0>();
 
-    int sig = spf();
+    const auto sig = int(spf());
     ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(sig < NUM_SIGNALS,
                                        "Parsed signal value is outside the supported range of [1, 31]");
 
@@ -121,8 +121,8 @@ SignalHandling::InitSignalHandling ()
         signal_received_flags[signal_number] = false;
 
         bool signal_active = false;
-        for (int signal_request = 0; signal_request < SIGNAL_REQUESTS_SIZE; ++signal_request) {
-            signal_active |= signal_conf_requests[signal_request][signal_number];
+        for (const auto& request : signal_conf_requests) {
+            signal_active |= request[signal_number];
         }
         if (signal_active) {
             // at least one signal action is configured
@@ -133,7 +133,7 @@ SignalHandling::InitSignalHandling ()
             } else {
                 sa.sa_handler = SIG_IGN;
             }
-            int result = sigaction(signal_number, &sa, nullptr);
+            const int result = sigaction(signal_number, &sa, nullptr);
             ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(result == 0,
                                                "Failed to install signal handler for a configured signal");
         }
@@ -146,8 +146,9 @@ SignalHandling::CheckSignals ()
 {
     // Is any signal handling action configured?
     // If not, we can skip all handling and the MPI communication as well.
-    if (!m_any_signal_action_active)
+    if (!m_any_signal_action_active) {
         return;
+    }
 
     // We assume that signals will definitely be delivered to rank 0,
     // and may be delivered to other ranks as well. For coordination,
@@ -159,23 +160,24 @@ SignalHandling::CheckSignals ()
             // unset the flag without risking loss of a signal - if a
             // signal arrives after this, it will be handled the next
             // time this function is called.
-            bool signal_received = signal_received_flags[signal_number].exchange(false);
+            const bool signal_received = signal_received_flags[signal_number].exchange(false);
 
             if (signal_received) {
-                for (int signal_request = 0; signal_request < SIGNAL_REQUESTS_SIZE; ++signal_request) {
-                    signal_actions_requested[signal_request] |= signal_conf_requests[signal_request][signal_number];
+                int signal_request = 0;
+                for (const auto& request : signal_conf_requests) {
+                    signal_actions_requested[signal_request++] |= request[signal_number];
                 }
             }
         }
     }
 
 #if defined(AMREX_USE_MPI)
-    auto comm = amrex::ParallelDescriptor::Communicator();
     // Due to a bug in Cray's MPICH 8.1.13 implementation (CUDA builds on Perlmutter@NERSC in 2022),
     // we cannot use the MPI_CXX_BOOL C++ datatype here. See WarpX PR #3029 and NERSC INC0183281
     static_assert(sizeof(bool) == 1, "We communicate bools as 1 byte-sized type in MPI");
     BL_MPI_REQUIRE(MPI_Ibcast(signal_actions_requested, SIGNAL_REQUESTS_SIZE,
-                              MPI_BYTE, 0, comm,&signal_mpi_ibcast_request));
+                              MPI_BYTE, 0, amrex::ParallelDescriptor::Communicator(),
+                              &signal_mpi_ibcast_request));
 #endif
 }
 
@@ -184,8 +186,9 @@ SignalHandling::WaitSignals ()
 {
     // Is any signal handling action configured?
     // If not, we can skip all handling and the MPI communication as well.
-    if (!m_any_signal_action_active)
+    if (!m_any_signal_action_active) {
         return;
+    }
 
 #if defined(AMREX_USE_MPI)
     BL_MPI_REQUIRE(MPI_Wait(&signal_mpi_ibcast_request, MPI_STATUS_IGNORE));
@@ -195,7 +198,7 @@ SignalHandling::WaitSignals ()
 bool
 SignalHandling::TestAndResetActionRequestFlag (int action_to_test)
 {
-    bool retval = signal_actions_requested[action_to_test];
+    const bool retval = signal_actions_requested[action_to_test];
     signal_actions_requested[action_to_test] = false;
     return retval;
 }

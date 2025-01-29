@@ -9,6 +9,7 @@
 #define WARPX_DIAGNOSTICS_REDUCEDDIAGS_FIELDREDUCTION_H_
 
 #include "ReducedDiags.H"
+#include "Fields.H"
 #include "WarpX.H"
 
 #include <ablastr/coarsen/sample.H>
@@ -36,7 +37,6 @@
 #include <type_traits>
 #include <vector>
 
-
 /**
  * This class contains a function that computes an arbitrary reduction of the fields. The function
  * used in the reduction is defined by an input file parser expression and the reduction operation
@@ -50,7 +50,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    FieldReduction(std::string rd_name);
+    FieldReduction(const std::string& rd_name);
 
     /**
      * This function is called at every time step, and if necessary calls the templated function
@@ -58,16 +58,22 @@ public:
      *
      * @param[in] step the timestep
      */
-    virtual void ComputeDiags(int step) override final;
+    void ComputeDiags(int step) final;
+
+    /**
+     * This function queries deprecated input parameters and aborts
+     * the run if one of them is specified.
+     */
+    void BackwardCompatibility();
 
 private:
     /// Parser to read expression to be reduced from the input file.
-    /// 9 elements are x, y, z, Ex, Ey, Ez, Bx, By, Bz
-    static constexpr int m_nvars = 9;
+    /// 12 elements are x, y, z, Ex, Ey, Ez, Bx, By, Bz, jx, jy, jz
+    static constexpr int m_nvars = 12;
     std::unique_ptr<amrex::Parser> m_parser;
 
     // Type of reduction (e.g. Maximum, Minimum or Sum)
-    int m_reduction_type;
+    ReductionType m_reduction_type;
 
 public:
 
@@ -81,7 +87,9 @@ public:
     template<typename ReduceOp>
     void ComputeFieldReduction()
     {
+        using ablastr::fields::Direction;
         using namespace amrex::literals;
+        using warpx::fields::FieldType;
 
         // get a reference to WarpX instance
         auto & warpx = WarpX::GetInstance();
@@ -93,12 +101,16 @@ public:
         const auto dx = geom.CellSizeArray();
 
         // get MultiFab data
-        const amrex::MultiFab & Ex = warpx.getEfield(lev,0);
-        const amrex::MultiFab & Ey = warpx.getEfield(lev,1);
-        const amrex::MultiFab & Ez = warpx.getEfield(lev,2);
-        const amrex::MultiFab & Bx = warpx.getBfield(lev,0);
-        const amrex::MultiFab & By = warpx.getBfield(lev,1);
-        const amrex::MultiFab & Bz = warpx.getBfield(lev,2);
+        const amrex::MultiFab & Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
+        const amrex::MultiFab & Ey = *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, lev);
+        const amrex::MultiFab & Ez = *warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, lev);
+        const amrex::MultiFab & Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, lev);
+        const amrex::MultiFab & By = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, lev);
+        const amrex::MultiFab & Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, lev);
+        const amrex::MultiFab & jx = *warpx.m_fields.get(FieldType::current_fp, Direction{0},lev);
+        const amrex::MultiFab & jy = *warpx.m_fields.get(FieldType::current_fp, Direction{1},lev);
+        const amrex::MultiFab & jz = *warpx.m_fields.get(FieldType::current_fp, Direction{2},lev);
+
 
         // General preparation of interpolation and reduction operations
         const amrex::GpuArray<int,3> cellCenteredtype{0,0,0};
@@ -118,6 +130,9 @@ public:
         auto Bxtype = amrex::GpuArray<int,3>{0,0,0};
         auto Bytype = amrex::GpuArray<int,3>{0,0,0};
         auto Bztype = amrex::GpuArray<int,3>{0,0,0};
+        auto jxtype = amrex::GpuArray<int,3>{0,0,0};
+        auto jytype = amrex::GpuArray<int,3>{0,0,0};
+        auto jztype = amrex::GpuArray<int,3>{0,0,0};
         for (int i = 0; i < AMREX_SPACEDIM; ++i){
             Extype[i] = Ex.ixType()[i];
             Eytype[i] = Ey.ixType()[i];
@@ -125,6 +140,10 @@ public:
             Bxtype[i] = Bx.ixType()[i];
             Bytype[i] = By.ixType()[i];
             Bztype[i] = Bz.ixType()[i];
+            jxtype[i] = jx.ixType()[i];
+            jytype[i] = jy.ixType()[i];
+            jztype[i] = jz.ixType()[i];
+
         }
 
         // get parser
@@ -145,6 +164,9 @@ public:
             const auto& arrBx = Bx[mfi].array();
             const auto& arrBy = By[mfi].array();
             const auto& arrBz = Bz[mfi].array();
+            const auto& arrjx = jx[mfi].array();
+            const auto& arrjy = jy[mfi].array();
+            const auto& arrjz = jz[mfi].array();
 
             reduce_op.eval(box, reduce_data,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
@@ -176,23 +198,31 @@ public:
                                                                                reduction_coarsening_ratio, i, j, k, reduction_comp);
                 const amrex::Real Bz_interp = ablastr::coarsen::sample::Interp(arrBz, Bztype, cellCenteredtype,
                                                                                reduction_coarsening_ratio, i, j, k, reduction_comp);
+                const amrex::Real jx_interp = ablastr::coarsen::sample::Interp(arrjx, jxtype, cellCenteredtype,
+                                                                               reduction_coarsening_ratio, i, j, k, reduction_comp);
+                const amrex::Real jy_interp = ablastr::coarsen::sample::Interp(arrjy, jytype, cellCenteredtype,
+                                                                               reduction_coarsening_ratio, i, j, k, reduction_comp);
+                const amrex::Real jz_interp = ablastr::coarsen::sample::Interp(arrjz, jztype, cellCenteredtype,
+                                                                               reduction_coarsening_ratio, i, j, k, reduction_comp);
+
                 return reduction_function_parser(x, y, z, Ex_interp, Ey_interp, Ez_interp,
-                                                          Bx_interp, By_interp, Bz_interp);
+                        Bx_interp, By_interp, Bz_interp,
+                        jx_interp, jy_interp, jz_interp);
             });
         }
 
         amrex::Real reduce_value = amrex::get<0>(reduce_data.value());
 
         // MPI reduce
-        if (std::is_same<ReduceOp, amrex::ReduceOpMax>::value)
+        if (std::is_same_v<ReduceOp, amrex::ReduceOpMax>)
         {
             amrex::ParallelDescriptor::ReduceRealMax(reduce_value);
         }
-        if (std::is_same<ReduceOp, amrex::ReduceOpMin>::value)
+        if (std::is_same_v<ReduceOp, amrex::ReduceOpMin>)
         {
             amrex::ParallelDescriptor::ReduceRealMin(reduce_value);
         }
-        if (std::is_same<ReduceOp, amrex::ReduceOpSum>::value)
+        if (std::is_same_v<ReduceOp, amrex::ReduceOpSum>)
         {
             amrex::ParallelDescriptor::ReduceRealSum(reduce_value);
         // If reduction operation is a sum, multiply the value by the cell volume so that the

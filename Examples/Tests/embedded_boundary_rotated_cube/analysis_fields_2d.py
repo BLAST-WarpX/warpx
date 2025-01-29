@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
 
-import os
 import sys
 
 import numpy as np
-from scipy.constants import c, mu_0, pi
 import yt
-
-sys.path.insert(1, '../../../../warpx/Regression/Checksum/')
-import checksumAPI
+from scipy.constants import c, mu_0, pi
 
 # This is a script that analyses the simulation results from
 # the script `inputs_3d`. This simulates a TMmnp mode in a PEC cubic resonator.
@@ -32,14 +28,16 @@ Lz = 1.06
 # Open the right plot file
 filename = sys.argv[1]
 ds = yt.load(filename)
-data = ds.covering_grid(level=0, left_edge=ds.domain_left_edge, dims=ds.domain_dimensions)
+data = ds.covering_grid(
+    level=0, left_edge=ds.domain_left_edge, dims=ds.domain_dimensions
+)
 my_grid = ds.index.grids[0]
 
-By_sim = my_grid['By'].squeeze().v
+By_sim = my_grid["By"].squeeze().v
 
 t = ds.current_time.to_value()
 
-theta = np.pi/8
+theta = np.pi / 8
 
 # Compute the analytic solution
 By_th = np.zeros(ncells)
@@ -47,19 +45,21 @@ for i in range(ncells[0]):
     for j in range(ncells[1]):
         x = i * dx + lo[0]
         z = j * dz + lo[1]
-        xr = x*np.cos(-theta) + z*np.sin(-theta)
-        zr = -x*np.sin(-theta) + z*np.cos(-theta)
+        xr = x * np.cos(-theta) + z * np.sin(-theta)
+        zr = -x * np.sin(-theta) + z * np.cos(-theta)
 
-        By_th[i, j] = mu_0 * (np.cos(m * pi / Lx * (xr - Lx / 2)) *
-                              np.cos(n * pi / Lz * (zr - Lz / 2)) *
-                              np.cos(np.pi / Lx * c * t))*(By_sim[i, j] != 0)
+        By_th[i, j] = (
+            mu_0
+            * (
+                np.cos(m * pi / Lx * (xr - Lx / 2))
+                * np.cos(n * pi / Lz * (zr - Lz / 2))
+                * np.cos(np.pi / Lx * c * t)
+            )
+            * (By_sim[i, j] != 0)
+        )
 
 rel_tol_err = 1e-1
 
 # Compute relative l^2 error on By
 rel_err_y = np.sqrt(np.sum(np.square(By_sim - By_th)) / np.sum(np.square(By_th)))
-assert (rel_err_y < rel_tol_err)
-
-test_name = os.path.split(os.getcwd())[1]
-
-checksumAPI.evaluate_checksum(test_name, filename)
+assert rel_err_y < rel_tol_err

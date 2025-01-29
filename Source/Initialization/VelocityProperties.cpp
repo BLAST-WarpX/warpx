@@ -11,42 +11,41 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 
-VelocityProperties::VelocityProperties (amrex::ParmParse& pp) {
+VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string const& source_name)
+{
     // Set defaults
     std::string vel_dist_s = "constant";
     std::string vel_dir_s = "x";
-    m_velocity = 0;
 
-    pp.query("bulk_vel_dir", vel_dir_s);
-    if(vel_dir_s[0] == '-'){
-        m_sign_dir = -1;
-    }
-    else {
-        m_sign_dir = 1;
+    utils::parser::query(pp, source_name, "bulk_vel_dir", vel_dir_s);
+
+    if(vel_dir_s.empty()){
+        WARPX_ABORT_WITH_MESSAGE("'<s_name>.bulk_vel_dir input ' can't be empty.");
     }
 
-    if ((vel_dir_s == "x" || vel_dir_s[1] == 'x') ||
-       (vel_dir_s == "X" || vel_dir_s[1] == 'X')){
+    m_sign_dir = (vel_dir_s[0] == '-') ? -1 : 1;
+
+    const auto dir = std::tolower(vel_dir_s.back());
+
+    if (dir == 'x'){
         m_dir = 0;
     }
-    else if ((vel_dir_s == "y" || vel_dir_s[1] == 'y') ||
-               (vel_dir_s == "Y" || vel_dir_s[1] == 'Y')){
+    else if (dir == 'y'){
         m_dir = 1;
     }
-    else if ((vel_dir_s == "z" || vel_dir_s[1] == 'z') ||
-            (vel_dir_s == "Z" || vel_dir_s[1] == 'Z')) {
+    else if (dir == 'z'){
         m_dir = 2;
     }
-    else {
-        amrex::Abort(Utils::TextMsg::Err(
+    else{
+        WARPX_ABORT_WITH_MESSAGE(
             "Cannot interpret <s_name>.bulk_vel_dir input '" + vel_dir_s +
             "'. Please enter +/- x, y, or z with no whitespace between the sign and"+
-            " other character."));
+            " other character.");
     }
 
-    pp.query("beta_distribution_type", vel_dist_s);
+    utils::parser::query(pp, source_name, "beta_distribution_type", vel_dist_s);
     if (vel_dist_s == "constant") {
-        utils::parser::queryWithParser(pp, "beta", m_velocity);
+        utils::parser::queryWithParser(pp, source_name, "beta", m_velocity);
         m_type = VelConstantValue;
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             m_velocity > -1 && m_velocity < 1,
@@ -56,14 +55,14 @@ VelocityProperties::VelocityProperties (amrex::ParmParse& pp) {
     }
     else if (vel_dist_s == "parser") {
         std::string str_beta_function;
-        utils::parser::Store_parserString(pp, "beta_function(x,y,z)", str_beta_function);
+        utils::parser::Store_parserString(pp, source_name, "beta_function(x,y,z)", str_beta_function);
         m_ptr_velocity_parser =
             std::make_unique<amrex::Parser>(
                 utils::parser::makeParser(str_beta_function,{"x","y","z"}));
         m_type = VelParserFunction;
     }
     else {
-        amrex::Abort(Utils::TextMsg::Err(
-            "Velocity distribution type '" + vel_dist_s + "' not recognized."));
+        WARPX_ABORT_WITH_MESSAGE(
+            "Velocity distribution type '" + vel_dist_s + "' not recognized.");
     }
 }

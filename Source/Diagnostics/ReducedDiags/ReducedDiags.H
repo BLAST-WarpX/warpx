@@ -36,11 +36,14 @@ public:
     /// output intervals
     utils::parser::IntervalsParser m_intervals;
 
-    /// check if it is a restart run
-    int m_IsNotRestart = 1;
+    /// check if header should be written
+    bool m_write_header = false;
 
     /// separator in the output file
     std::string m_sep = " ";
+
+    /// precision for data in the output file
+    int m_precision = 14;
 
     /// output data
     std::vector<amrex::Real> m_data;
@@ -49,12 +52,19 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    ReducedDiags (std::string rd_name);
+    ReducedDiags (const std::string& rd_name);
 
     /**
      * Virtual destructor for polymorphism
      */
     virtual ~ReducedDiags () = default;
+
+    // Default move and copy operations
+    ReducedDiags(const ReducedDiags&) = default;
+    ReducedDiags& operator=(const ReducedDiags&) = default;
+    ReducedDiags(ReducedDiags&&) = default;
+    ReducedDiags& operator=(ReducedDiags&&) = default;
+
 
     /**
      * function to initialize data after amr
@@ -87,7 +97,7 @@ public:
      * This function queries deprecated input parameters and aborts
      * the run if one of them is specified.
      */
-    void BackwardCompatibility ();
+    void BackwardCompatibility () const;
 
 };
 

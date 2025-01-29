@@ -28,9 +28,10 @@ namespace ParticleUtils {
      * @param[in] mfi the MultiFAB iterator.
      * @param[in] ptile the particle tile.
      */
-    amrex::DenseBins<WarpXParticleContainer::ParticleType>
-    findParticlesInEachCell( int const lev, amrex::MFIter const& mfi,
-                             WarpXParticleContainer::ParticleTileType const& ptile);
+    amrex::DenseBins<typename WarpXParticleContainer::ParticleTileType::ParticleTileDataType>
+    findParticlesInEachCell (int lev,
+                             amrex::MFIter const & mfi,
+                             WarpXParticleContainer::ParticleTileType & ptile);
 
     /**
      * \brief Return (relativistic) particle energy given velocity and mass.
@@ -94,11 +95,13 @@ namespace ParticleUtils {
                               amrex::ParticleReal const Vx, amrex::ParticleReal const Vy,
                               amrex::ParticleReal const Vz )
     {
+        using namespace amrex::literals;
+
         // precompute repeatedly used quantities
         constexpr auto c2 = PhysConst::c * PhysConst::c;
         const auto V2 = (Vx*Vx + Vy*Vy + Vz*Vz);
-        const auto gamma_V = 1.0_prt / sqrt(1.0_prt - V2 / c2);
-        const auto gamma_u = sqrt(1.0_prt + (ux*ux + uy*uy + uz*uz) / c2);
+        const auto gamma_V = 1.0_prt / std::sqrt(1.0_prt - V2 / c2);
+        const auto gamma_u = std::sqrt(1.0_prt + (ux*ux + uy*uy + uz*uz) / c2);
 
         // copy velocity vector values
         const auto vx = ux;
@@ -179,8 +182,8 @@ namespace ParticleUtils {
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     bool containsInclusive (amrex::RealBox const& tilebox, amrex::XDim3 const point) {
-        const auto xlo = tilebox.lo();
-        const auto xhi = tilebox.hi();
+        const auto *const xlo = tilebox.lo();
+        const auto *const xhi = tilebox.hi();
         return  AMREX_D_TERM((xlo[0] <= point.x) && (point.x <= xhi[0]),
                           && (xlo[1] <= point.y) && (point.y <= xhi[1]),
                           && (xlo[2] <= point.z) && (point.z <= xhi[2]));

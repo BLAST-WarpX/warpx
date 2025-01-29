@@ -25,6 +25,11 @@ A very common tape filesystem is HPSS, e.g., on `NERSC <https://docs.nersc.gov/f
   * This *copies* all files over to the tape filesystem and stores them as a single ``.tar`` archive
   * The first argument here will be the new archive ``.tar`` file on the archive file system, all following arguments (can be multiple, separated by a space) are locations to directories and files on the parallel file system.
   * Don't be confused, these tools also create an index ``.tar.idx`` file along it; just leave that file be and don't interact with it
+* **Change permissions** of your archive, so your team can read your files:
+
+  * Check the unix permissions via ``hsi ls -al 2021/`` and ``hsi ls -al 2021/reproduce_paper/``
+  * *Files* must be group (g) readable (r): ``hsi chmod g+r 2021/reproduce_paper/sim_042.tar``
+  * *Directories* must be group (g) readable (r) and group accessible (x): ``hsi chmod -R g+rx 2021``
 * **Restore** things:
 
   * ``mkdir here_we_restore``

@@ -1,0 +1,60 @@
+Checks: '
+    -*,
+    bugprone-*,
+        -bugprone-easily-swappable-parameters,
+        -bugprone-implicit-widening-of-multiplication-result,
+        -bugprone-misplaced-widening-cast,
+        -bugprone-unchecked-optional-access,
+    cert-*,
+        -cert-err58-cpp,
+    clang-analyzer-*,
+        -clang-analyzer-optin.performance.Padding,
+        -clang-analyzer-optin.mpi.MPI-Checker,
+        -clang-analyzer-osx.*,
+        -clang-analyzer-optin.osx.*,
+    clang-diagnostic-*,
+    cppcoreguidelines-*,
+        -cppcoreguidelines-avoid-c-arrays,
+        -cppcoreguidelines-avoid-magic-numbers,
+        -cppcoreguidelines-avoid-non-const-global-variables,
+        -cppcoreguidelines-init-variables,
+        -cppcoreguidelines-macro-usage,
+        -cppcoreguidelines-narrowing-conversions,
+        -cppcoreguidelines-non-private-member-variables-in-classes,
+        -cppcoreguidelines-owning-memory,
+        -cppcoreguidelines-pro-*,
+    google-build-explicit-make-pair,
+    google-build-namespaces,
+    google-global-names-in-headers,
+    misc-*,
+        -misc-no-recursion,
+        -misc-non-private-member-variables-in-classes,
+    modernize-*,
+        -modernize-avoid-c-arrays,
+        -modernize-return-braced-init-list,
+        -modernize-use-trailing-return-type,
+    mpi-*,
+    performance-*,
+    portability-*,
+    readability-*,
+        -readability-convert-member-functions-to-static,
+        -readability-else-after-return,
+        -readability-function-cognitive-complexity,
+        -readability-identifier-length,
+        -readability-implicit-bool-conversion,
+        -readability-isolate-declaration,
+        -readability-magic-numbers,
+        -readability-named-parameter,
+        -readability-uppercase-literal-suffix
+    '
+
+CheckOptions:
+- key:          bugprone-narrowing-conversions.WarnOnIntegerToFloatingPointNarrowingConversion
+  value:        "false"
+- key:          misc-definitions-in-headers.HeaderFileExtensions
+  value:        "H,"
+- key:          modernize-pass-by-value.ValuesOnly
+  value:        "true"
+
+
+HeaderFilterRegex: 'Source[a-z_A-Z0-9\/]+\.H$'

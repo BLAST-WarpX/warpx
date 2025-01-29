@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# Copyright 2020-2023 Axel Huebl
+#
+# This file is part of WarpX.
+#
+# License: BSD-3-Clause-LBNL
+#
+# Refs.:
+#   https://jsrunvisualizer.olcf.ornl.gov/?s4f0o11n6c7g1r11d1b1l0=
+#   https://hpc.llnl.gov/training/tutorials/using-lcs-sierra-system#quick16
+
+#BSUB -G <allocation ID>
+#BSUB -W 00:10
+#BSUB -nnodes 2
+#BSUB -alloc_flags smt4
+#BSUB -J WarpX
+#BSUB -o WarpXo.%J
+#BSUB -e WarpXe.%J
+
+# Work-around OpenMPI bug with chunked HDF5
+#   https://github.com/open-mpi/ompi/issues/7795
+export OMPI_MCA_io=ompio
+
+# Work-around for broken IBM "libcollectives" MPI_Allgatherv
+#   https://github.com/ECP-WarpX/WarpX/pull/2874
+export OMPI_MCA_coll_ibm_skip_allgatherv=true
+
+# ROMIO has a hint for GPFS named IBM_largeblock_io which optimizes I/O with operations on large blocks
+export IBM_largeblock_io=true
+
+# MPI-I/O: ROMIO hints for parallel HDF5 performance
+export ROMIO_HINTS=./romio-hints
+#   number of hosts: unique node names minus batch node
+NUM_HOSTS=$(( $(echo $LSB_HOSTS | tr ' ' '\n' | uniq | wc -l) - 1 ))
+cat > romio-hints << EOL
+   romio_cb_write enable
+   romio_ds_write enable
+   cb_buffer_size 16777216
+   cb_nodes ${NUM_HOSTS}
+EOL
+
+# OpenMPI file locks are slow and not needed
+# https://github.com/open-mpi/ompi/issues/10053
+export OMPI_MCA_sharedfp=^lockedfile,individual
+
+# HDF5: disable slow locks (promise not to open half-written files)
+export HDF5_USE_FILE_LOCKING=FALSE
+
+# OpenMP: 1 thread per MPI rank
+export OMP_NUM_THREADS=1
+
+# store out task host mapping: helps identify broken nodes at scale
+jsrun -r 4 -a1 -g 1 -c 7 -e prepended hostname > task_host_mapping.txt
+
+# run WarpX
+jsrun -r 4 -a 1 -g 1 -c 7 -l GPU-CPU -d packed -b rs -e prepended -M "-gpu" <path/to/executable> <input file> > output.txt

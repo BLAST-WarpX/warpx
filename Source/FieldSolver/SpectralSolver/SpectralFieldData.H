@@ -10,9 +10,11 @@
 
 #include "SpectralFieldData_fwd.H"
 
-#include "AnyFFT.H"
 #include "SpectralKSpace.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpX_Complex.H"
+
+#include <ablastr/math/fft/AnyFFT.H>
 
 #include <AMReX_BaseFab.H>
 #include <AMReX_Config.H>
@@ -56,14 +58,14 @@ class SpectralFieldIndex
          * \param[in] pml_rz          whether the indices are used to access spectral data
          *                            for the RZ PML spectral solver
          */
-        SpectralFieldIndex (const bool update_with_rho,
-                            const bool time_averaging,
-                            const int J_in_time,
-                            const int rho_in_time,
-                            const bool dive_cleaning,
-                            const bool divb_cleaning,
-                            const bool pml,
-                            const bool pml_rz = false);
+        SpectralFieldIndex (bool update_with_rho,
+                            bool time_averaging,
+                            JInTime J_in_time,
+                            RhoInTime rho_in_time,
+                            bool dive_cleaning,
+                            bool divb_cleaning,
+                            bool pml,
+                            bool pml_rz = false);
 
         /**
          * \brief Default constructor
@@ -74,6 +76,26 @@ class SpectralFieldIndex
          * \brief Default destructor
          */
         ~SpectralFieldIndex () = default;
+
+        /**
+         * \brief Default Copy constructor
+         */
+        SpectralFieldIndex ( SpectralFieldIndex const &) = default;
+
+        /**
+         * \brief Default Copy operator
+         */
+        SpectralFieldIndex& operator= ( SpectralFieldIndex const & ) = default;
+
+        /**
+         * \brief Default Move constructor
+         */
+        SpectralFieldIndex ( SpectralFieldIndex&& ) = default;
+
+        /**
+         * \brief Default Move operator
+         */
+        SpectralFieldIndex& operator= ( SpectralFieldIndex&& ) = default;
 
     // Total number of fields that are actually allocated
     int n_fields;
@@ -122,22 +144,27 @@ class SpectralFieldData
 {
 
     public:
-        SpectralFieldData( const int lev,
+        SpectralFieldData( int lev,
                            const amrex::BoxArray& realspace_ba,
                            const SpectralKSpace& k_space,
                            const amrex::DistributionMapping& dm,
-                           const int n_field_required,
-                           const bool periodic_single_box);
+                           int n_field_required,
+                           bool periodic_single_box);
         SpectralFieldData() = default; // Default constructor
-        SpectralFieldData& operator=(SpectralFieldData&& field_data) = default;
         ~SpectralFieldData();
 
-        void ForwardTransform (const int lev,
-                               const amrex::MultiFab& mf, const int field_index,
-                               const int i_comp);
+        // default move and copy operations
+        SpectralFieldData(const SpectralFieldData&) = delete;
+        SpectralFieldData& operator=(const SpectralFieldData&) = delete;
+        SpectralFieldData(SpectralFieldData&&) = default;
+        SpectralFieldData& operator=(SpectralFieldData&& field_data) = default;
 
-        void BackwardTransform (const int lev, amrex::MultiFab& mf, const int field_index,
-                                const amrex::IntVect& fill_guards, const int i_comp);
+        void ForwardTransform (int lev,
+                               const amrex::MultiFab& mf, int field_index,
+                               int i_comp);
+
+        void BackwardTransform (int lev, amrex::MultiFab& mf, int field_index,
+                                const amrex::IntVect& fill_guards, int i_comp);
 
         // `fields` stores fields in spectral space, as multicomponent FabArray
         SpectralField fields;
@@ -147,14 +174,13 @@ class SpectralFieldData
         // right before/after the Fourier transform
         SpectralField tmpSpectralField; // contains Complexs
         amrex::MultiFab tmpRealField; // contains Reals
-        AnyFFT::FFTplans forward_plan, backward_plan;
+        ablastr::math::anyfft::FFTplans forward_plan, backward_plan;
         // Correcting "shift" factors when performing FFT from/to
         // a cell-centered grid in real space, instead of a nodal grid
-        SpectralShiftFactor xshift_FFTfromCell, xshift_FFTtoCell,
-                            zshift_FFTfromCell, zshift_FFTtoCell;
-#if defined(WARPX_DIM_3D)
-        SpectralShiftFactor yshift_FFTfromCell, yshift_FFTtoCell;
-#endif
+        // (0,1,2) is the dimension number
+        SpectralShiftFactor shift0_FFTfromCell, shift0_FFTtoCell,
+                            shift1_FFTfromCell, shift1_FFTtoCell,
+                            shift2_FFTfromCell, shift2_FFTtoCell;
 
         bool m_periodic_single_box;
 };

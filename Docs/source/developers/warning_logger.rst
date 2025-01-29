@@ -47,15 +47,15 @@ Each entry of warning list respects the following format:
 .. code-block:: sh
 
    * --> [PRIORITY] [TOPIC] [raised COUNTER]
-   *     MULTILINE MESSAGGE
-   *     MULTILINE MESSAGGE
+   *     MULTILINE MESSAGE
+   *     MULTILINE MESSAGE
    *     @ Raised by: WHICH_RANKS
 
 where:
 
 * ``[PRIORITY]`` can be ``[!  ]`` (low priority), ``[!! ]`` (medium priority) or ``[!!!]`` (high priority). It indicates the importance of the warning.
 * ``[TOPIC]`` indicates which part of the code is concerned by the warning (e.g., particles, laser, parallelization...)
-* ``MULTILINE MESSAGGE`` is an arbitrary text message. It can span multiple-lines. Text is wrapped automatically.
+* ``MULTILINE MESSAGE`` is an arbitrary text message. It can span multiple-lines. Text is wrapped automatically.
 * ``COUNTER`` indicates the number of times the warning was raised **across all the MPI ranks**. This means that if we run WarpX with 2048 MPI ranks and each rank raises the same warning once, the displayed message will be ``[raised 2048 times]``. Possible values are ``once``, ``twice``, ``XX times``
 * ``WHICH_RANKS`` can be either ``ALL`` or a sequence of rank IDs. It is the list of the MPI ranks which have raised the warning message.
 

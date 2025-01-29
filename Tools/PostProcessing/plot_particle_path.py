@@ -9,7 +9,7 @@ import numpy as np
 
 
 class AMReXParticleHeader(object):
-    '''
+    """
 
     This class is designed to parse and store the information
     contained in an AMReX particle header file.
@@ -22,19 +22,18 @@ class AMReXParticleHeader(object):
 
     etc...
 
-    '''
+    """
 
     def __init__(self, header_filename):
-
         self.real_component_names = []
         self.int_component_names = []
         with open(header_filename, "r") as f:
             self.version_string = f.readline().strip()
 
-            particle_real_type = self.version_string.split('_')[-1]
-            if particle_real_type == 'double':
+            particle_real_type = self.version_string.split("_")[-1]
+            if particle_real_type == "double":
                 self.real_type = np.float64
-            elif particle_real_type == 'single':
+            elif particle_real_type == "single":
                 self.real_type = np.float32
             else:
                 raise RuntimeError("Did not recognize particle real type.")
@@ -62,7 +61,7 @@ class AMReXParticleHeader(object):
                 self.num_int_extra = 0
                 self.num_int = 0
 
-            self.grids_per_level = np.zeros(self.num_levels, dtype='int64')
+            self.grids_per_level = np.zeros(self.num_levels, dtype="int64")
             self.grids = []
             for level_num in range(self.num_levels):
                 self.grids_per_level[level_num] = int(f.readline().strip())
@@ -75,7 +74,7 @@ class AMReXParticleHeader(object):
 
 
 def read_particle_data(fn, ptype="particle0"):
-    '''
+    """
 
     This function returns the particle data stored in a particular
     plot file and particle type. It returns two numpy arrays, the
@@ -89,7 +88,7 @@ def read_particle_data(fn, ptype="particle0"):
 
         idata, rdata = read_particle_data("plt00000", "particle0")
 
-    '''
+    """
     base_fn = fn + "/" + ptype
     header = AMReXParticleHeader(base_fn + "/Header")
 
@@ -99,22 +98,23 @@ def read_particle_data(fn, ptype="particle0"):
     elif header.real_type == np.float32:
         fdtype = "(%d,)f4" % header.num_real
 
-    idata = np.empty((header.num_particles, header.num_int ))
+    idata = np.empty((header.num_particles, header.num_int))
     rdata = np.empty((header.num_particles, header.num_real))
 
     ip = 0
     for lvl, level_grids in enumerate(header.grids):
-        for (which, count, where) in level_grids:
-            if count == 0: continue
+        for which, count, where in level_grids:
+            if count == 0:
+                continue
             fn = base_fn + "/Level_%d/DATA_%04d" % (lvl, which)
 
-            with open(fn, 'rb') as f:
+            with open(fn, "rb") as f:
                 f.seek(where)
-                ints   = np.fromfile(f, dtype = idtype, count=count)
-                floats = np.fromfile(f, dtype = fdtype, count=count)
+                ints = np.fromfile(f, dtype=idtype, count=count)
+                floats = np.fromfile(f, dtype=fdtype, count=count)
 
-            idata[ip:ip+count] = ints
-            rdata[ip:ip+count] = floats
+            idata[ip : ip + count] = ints
+            rdata[ip : ip + count] = floats
             ip += count
 
     return idata, rdata
@@ -143,10 +143,10 @@ if __name__ == "__main__":
 
     fig = plt.gcf()
     fig.set_size_inches(8, 8)
-    plt.plot(x0, y0, 'r.')
-    plt.plot(x1, y1, 'b.')
-    plt.axis((-2., 2., -2., 2.))
+    plt.plot(x0, y0, "r.")
+    plt.plot(x1, y1, "b.")
+    plt.axis((-2.0, 2.0, -2.0, 2.0))
     ax = plt.gca()
-    ax.set_xlabel(r'$x$')
-    ax.set_ylabel(r'$y$')
-    plt.savefig('particles.png')
+    ax.set_xlabel(r"$x$")
+    ax.set_ylabel(r"$y$")
+    plt.savefig("particles.png")

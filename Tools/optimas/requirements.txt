@@ -1,0 +1,8 @@
+# optimas
+# https://github.com/optimas-org/optimas/blob/main/requirements.txt
+ax-platform >= 0.2.9
+jinja2
+libensemble >= 0.9.2
+pandas
+# https://pytorch.org/get-started/locally/
+torch

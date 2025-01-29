@@ -1,7 +1,9 @@
-target_sources(WarpX
-  PRIVATE
-    LaserProfileFieldFunction.cpp
-    LaserProfileFromTXYEFile.cpp
-    LaserProfileGaussian.cpp
-    LaserProfileHarris.cpp
-)
+foreach(D IN LISTS WarpX_DIMS)
+    warpx_set_suffix_dims(SD ${D})
+    target_sources(lib_${SD}
+      PRIVATE
+        LaserProfileFieldFunction.cpp
+        LaserProfileFromFile.cpp
+        LaserProfileGaussian.cpp
+    )
+endforeach()

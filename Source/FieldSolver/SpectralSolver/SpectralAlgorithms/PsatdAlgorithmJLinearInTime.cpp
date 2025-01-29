@@ -18,12 +18,13 @@
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_IntVect.H>
+#include <AMReX_Math.H>
 #include <AMReX_MFIter.H>
 #include <AMReX_PODVector.H>
 
 #include <cmath>
 
-#if WARPX_USE_PSATD
+#if WARPX_USE_FFT
 
 using namespace amrex::literals;
 
@@ -34,14 +35,13 @@ PsatdAlgorithmJLinearInTime::PsatdAlgorithmJLinearInTime(
     const int norder_x,
     const int norder_y,
     const int norder_z,
-    const short grid_type,
+    ablastr::utils::enums::GridType grid_type,
     const amrex::Real dt,
     const bool time_averaging,
     const bool dive_cleaning,
     const bool divb_cleaning)
     // Initializer list
     : SpectralBaseAlgorithm(spectral_kspace, dm, spectral_index, norder_x, norder_y, norder_z, grid_type),
-    m_spectral_index(spectral_index),
     m_dt(dt),
     m_time_averaging(time_averaging),
     m_dive_cleaning(dive_cleaning),
@@ -84,14 +84,14 @@ PsatdAlgorithmJLinearInTime::pushSpectralFields (SpectralFieldData& f) const
         const amrex::Box& bx = f.fields[mfi].box();
 
         // Extract arrays for the fields to be updated
-        amrex::Array4<Complex> fields = f.fields[mfi].array();
+        const amrex::Array4<Complex> fields = f.fields[mfi].array();
 
         // These coefficients are always allocated
-        amrex::Array4<const amrex::Real> C_arr = C_coef[mfi].array();
-        amrex::Array4<const amrex::Real> S_ck_arr = S_ck_coef[mfi].array();
-        amrex::Array4<const amrex::Real> X1_arr = X1_coef[mfi].array();
-        amrex::Array4<const amrex::Real> X2_arr = X2_coef[mfi].array();
-        amrex::Array4<const amrex::Real> X3_arr = X3_coef[mfi].array();
+        const amrex::Array4<const amrex::Real> C_arr = C_coef[mfi].array();
+        const amrex::Array4<const amrex::Real> S_ck_arr = S_ck_coef[mfi].array();
+        const amrex::Array4<const amrex::Real> X1_arr = X1_coef[mfi].array();
+        const amrex::Array4<const amrex::Real> X2_arr = X2_coef[mfi].array();
+        const amrex::Array4<const amrex::Real> X3_arr = X3_coef[mfi].array();
 
         amrex::Array4<const amrex::Real> X5_arr;
         amrex::Array4<const amrex::Real> X6_arr;
@@ -130,8 +130,8 @@ PsatdAlgorithmJLinearInTime::pushSpectralFields (SpectralFieldData& f) const
             const Complex rho_new = fields(i,j,k,Idx.rho_new);
 
             Complex F_old, G_old;
-            if (dive_cleaning) F_old = fields(i,j,k,Idx.F);
-            if (divb_cleaning) G_old = fields(i,j,k,Idx.G);
+            if (dive_cleaning) { F_old = fields(i,j,k,Idx.F); }
+            if (divb_cleaning) { G_old = fields(i,j,k,Idx.G); }
 
             // k vector values
             const amrex::Real kx = modified_kx_arr[i];
@@ -280,32 +280,32 @@ void PsatdAlgorithmJLinearInTime::InitializeSpectralCoefficients (
         const amrex::Real* kz_s = modified_kz_vec[mfi].dataPtr();
 
         // Coefficients always allocated
-        amrex::Array4<amrex::Real> C = C_coef[mfi].array();
-        amrex::Array4<amrex::Real> S_ck = S_ck_coef[mfi].array();
-        amrex::Array4<amrex::Real> X1 = X1_coef[mfi].array();
-        amrex::Array4<amrex::Real> X2 = X2_coef[mfi].array();
-        amrex::Array4<amrex::Real> X3 = X3_coef[mfi].array();
+        const amrex::Array4<amrex::Real> C = C_coef[mfi].array();
+        const amrex::Array4<amrex::Real> S_ck = S_ck_coef[mfi].array();
+        const amrex::Array4<amrex::Real> X1 = X1_coef[mfi].array();
+        const amrex::Array4<amrex::Real> X2 = X2_coef[mfi].array();
+        const amrex::Array4<amrex::Real> X3 = X3_coef[mfi].array();
 
         // Loop over indices within one box
         amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
         {
             // Calculate norm of k vector
             const amrex::Real knorm_s = std::sqrt(
-                std::pow(kx_s[i], 2) +
+                amrex::Math::powi<2>(kx_s[i]) +
 #if defined(WARPX_DIM_3D)
-                std::pow(ky_s[j], 2) + std::pow(kz_s[k], 2));
+                amrex::Math::powi<2>(ky_s[j]) + amrex::Math::powi<2>(kz_s[k]));
 #else
-                std::pow(kz_s[j], 2));
+                amrex::Math::powi<2>(kz_s[j]));
 #endif
             // Physical constants and imaginary unit
             constexpr amrex::Real c = PhysConst::c;
             constexpr amrex::Real ep0 = PhysConst::ep0;
 
-            const amrex::Real c2 = std::pow(c, 2);
-            const amrex::Real dt2 = std::pow(dt, 2);
+            const amrex::Real c2 = amrex::Math::powi<2>(c);
+            const amrex::Real dt2 = amrex::Math::powi<2>(dt);
 
             const amrex::Real om_s = c * knorm_s;
-            const amrex::Real om2_s = std::pow(om_s, 2);
+            const amrex::Real om2_s = amrex::Math::powi<2>(om_s);
 
             // C
             C(i,j,k) = std::cos(om_s * dt);
@@ -372,22 +372,22 @@ void PsatdAlgorithmJLinearInTime::InitializeSpectralCoefficientsAveraging (
 #endif
         const amrex::Real* kz_s = modified_kz_vec[mfi].dataPtr();
 
-        amrex::Array4<amrex::Real const> C = C_coef[mfi].array();
-        amrex::Array4<amrex::Real const> S_ck = S_ck_coef[mfi].array();
+        const amrex::Array4<amrex::Real const> C = C_coef[mfi].array();
+        const amrex::Array4<amrex::Real const> S_ck = S_ck_coef[mfi].array();
 
-        amrex::Array4<amrex::Real> X5 = X5_coef[mfi].array();
-        amrex::Array4<amrex::Real> X6 = X6_coef[mfi].array();
+        const amrex::Array4<amrex::Real> X5 = X5_coef[mfi].array();
+        const amrex::Array4<amrex::Real> X6 = X6_coef[mfi].array();
 
         // Loop over indices within one box
         amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
         {
             // Calculate norm of k vector
             const amrex::Real knorm_s = std::sqrt(
-                std::pow(kx_s[i], 2) +
+                amrex::Math::powi<2>(kx_s[i]) +
 #if defined(WARPX_DIM_3D)
-                std::pow(ky_s[j], 2) + std::pow(kz_s[k], 2));
+                amrex::Math::powi<2>(ky_s[j]) + amrex::Math::powi<2>(kz_s[k]));
 #else
-                std::pow(kz_s[j], 2));
+                amrex::Math::powi<2>(kz_s[j]));
 #endif
             // Physical constants and imaginary unit
             constexpr amrex::Real c = PhysConst::c;
@@ -429,8 +429,8 @@ void PsatdAlgorithmJLinearInTime::CurrentCorrection (SpectralFieldData& field_da
     BL_PROFILE("PsatdAlgorithmJLinearInTime::CurrentCorrection");
 
     amrex::ignore_unused(field_data);
-    amrex::Abort(Utils::TextMsg::Err(
-        "Current correction not implemented for multi-J PSATD algorithm"));
+    WARPX_ABORT_WITH_MESSAGE(
+        "Current correction not implemented for multi-J PSATD algorithm");
 }
 
 void
@@ -440,8 +440,8 @@ PsatdAlgorithmJLinearInTime::VayDeposition (SpectralFieldData& field_data)
     BL_PROFILE("PsatdAlgorithmJLinearInTime::VayDeposition()");
 
     amrex::ignore_unused(field_data);
-    amrex::Abort(Utils::TextMsg::Err(
-        "Vay deposition not implemented for multi-J PSATD algorithm"));
+    WARPX_ABORT_WITH_MESSAGE(
+        "Vay deposition not implemented for multi-J PSATD algorithm");
 }
 
-#endif // WARPX_USE_PSATD
+#endif // WARPX_USE_FFT

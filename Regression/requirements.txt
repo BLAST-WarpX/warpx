@@ -1,8 +1,12 @@
+-r ../requirements.txt
+dill
+lasy>=0.5.0
 matplotlib
 mpi4py
 numpy
 openpmd-api
 openpmd-viewer
 pandas
+periodictable
 scipy
 yt
