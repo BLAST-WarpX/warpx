@@ -267,7 +267,7 @@ The physical fields in WarpX have the following naming:
             "Sets the EB potential string and updates the function parser."
         )
         .def("run_div_cleaner",
-            [] () { wx.ProjectionCleanDivB(); },
+            [] (WarpX& wx) { wx.ProjectionCleanDivB(); },
             "Executes projection based divergence cleaner on loaded Bfield_fp_external."
         )
         .def("synchronize",
