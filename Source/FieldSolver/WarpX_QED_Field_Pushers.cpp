@@ -7,6 +7,7 @@
 #include "WarpX.H"
 
 #include "Fields.H"
+#include "Parallelization/TimeTracker.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXProfilerWrapper.H"
@@ -107,19 +108,13 @@ WarpX::Hybrid_QED_Push (int lev, PatchType patch_type, amrex::Real a_dt)
         Jz = m_fields.get(FieldType::current_cp, Direction{2}, lev);
     }
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
     for ( MFIter mfi(*Bx, TilingIfNotGPU()); mfi.isValid(); ++mfi )
     {
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-        }
-        Real wt = static_cast<Real>(amrex::second());
+        const auto tracker = warpx::parallelization::track_time_until_out_of_scope(lev, mfi.index());
 
         // Get boxes for E, B, and J
 
@@ -187,12 +182,5 @@ WarpX::Hybrid_QED_Push (int lev, PatchType patch_type, amrex::Real a_dt)
                     a_dt, xi_c2);
             }
         );
-
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-            wt = static_cast<Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
     }
 }

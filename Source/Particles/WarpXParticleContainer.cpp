@@ -17,6 +17,7 @@
 #include "Fields.H"
 #include "Pusher/GetAndSetPosition.H"
 #include "Pusher/UpdatePosition.H"
+#include "Parallelization/TimeTracker.H"
 #include "ParticleBoundaries_K.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -1492,8 +1493,6 @@ WarpXParticleContainer::PushX (int lev, amrex::Real dt)
 
     if (do_not_push) { return; }
 
-    amrex::LayoutData<amrex::Real>* costs = WarpX::getCosts(lev);
-
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -1501,16 +1500,11 @@ WarpXParticleContainer::PushX (int lev, amrex::Real dt)
 
         for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
         {
-            if (costs && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-            {
-                amrex::Gpu::synchronize();
-            }
-            auto wt = static_cast<amrex::Real>(amrex::second());
+            const auto tracker = warpx::parallelization::track_time_until_out_of_scope(lev, mfi.index());
 
             //
             // Particle Push
             //
-
             const auto GetPosition = GetParticlePosition<PIdx>(pti);
                   auto SetPosition = SetParticlePosition<PIdx>(pti);
 
@@ -1530,12 +1524,6 @@ WarpXParticleContainer::PushX (int lev, amrex::Real dt)
                 }
             );
 
-            if (costs && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-            {
-                amrex::Gpu::synchronize();
-                wt = static_cast<amrex::Real>(amrex::second()) - wt;
-                amrex::HostDevice::Atomic::Add( &(*costs)[pti.index()], wt);
-            }
         }
     }
 }

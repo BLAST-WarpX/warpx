@@ -7,6 +7,7 @@
 #ifndef WARPX_PARTICLES_COLLISION_BINARYCOLLISION_H_
 #define WARPX_PARTICLES_COLLISION_BINARYCOLLISION_H_
 
+#include "Parallelization/TimeTracker.H"
 #include "Particles/Collision/BinaryCollision/Coulomb/PairWiseCoulombCollisionFunc.H"
 #include "Particles/Collision/BinaryCollision/Coulomb/ComputeTemperature.H"
 #include "Particles/Collision/BinaryCollision/DSMC/DSMCFunc.H"
@@ -184,29 +185,16 @@ public:
         // Loop over refinement levels
         for (int lev = 0; lev <= species1.finestLevel(); ++lev){
 
-        amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
         // Loop over all grids/tiles at this level
 #ifdef AMREX_USE_OMP
             info.SetDynamic(true);
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
             for (amrex::MFIter mfi = species1.MakeMFIter(lev, info); mfi.isValid(); ++mfi){
-                if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-                {
-                    amrex::Gpu::synchronize();
-                }
-                auto wt = static_cast<amrex::Real>(amrex::second());
+                const auto tracker = warpx::parallelization::track_time_until_out_of_scope(lev, mfi.index());
 
                 doCollisionsWithinTile( dt, lev, mfi, species1, species2, product_species_vector,
                                         copy_species1_data, copy_species2_data);
-
-                if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-                {
-                    amrex::Gpu::synchronize();
-                    wt = static_cast<amrex::Real>(amrex::second()) - wt;
-                    amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-                }
             }
 
             if (m_have_product_species) {
