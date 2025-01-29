@@ -472,6 +472,7 @@ namespace ablastr::fields
          *
          * @param name the name of the field
          * @param finest_level the highest MR level to return
+         * @param skip_level_0 return a nullptr for level 0
          * @return non-owning pointers to the MultiFab (field) on all levels
          */
         //@{
@@ -547,6 +548,7 @@ namespace ablastr::fields
          *
          * @param name the name of the field
          * @param finest_level the highest MR level to return
+         * @param skip_level_0 return a nullptr for level 0
          * @return non-owning pointers to all components of a vector field on all MR levels
          */
         //@{
