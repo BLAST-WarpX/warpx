@@ -99,7 +99,7 @@ public:
                     }
                     // if parent is smaller than child, swap parent with child having higher value
                     if (index < i && bin_array[index_array[j+start]] < bin_array[index_array[index+start]]) {
-                        amrex::swap(index_array[j+start], index_array[index+start]);
+                        amrex::Swap(index_array[j+start], index_array[index+start]);
                     }
                     j = index;
                 }
