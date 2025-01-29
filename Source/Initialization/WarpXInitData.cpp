@@ -1227,19 +1227,11 @@ void WarpX::InitializeEBGridData (int lev)
 #ifdef AMREX_USE_EB
     if (lev == maxLevel()) {
 
-        // Throw a warning if EB is on and particle_shape > 1
-        if ((nox > 1 or noy > 1 or noz > 1) and EB::enabled())
-        {
-            ablastr::warn_manager::WMRecordWarning("Particles",
-              "when algo.particle_shape > 1, numerical artifacts will be present when\n"
-              "particles are close to embedded boundaries");
-        }
+        auto const eb_fact = fieldEBFactory(lev);
 
         if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD )
         {
             using warpx::fields::FieldType;
-
-            auto const eb_fact = fieldEBFactory(lev);
 
             if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
 
@@ -1261,7 +1253,6 @@ void WarpX::InitializeEBGridData (int lev)
                 MarkUpdateBCellsECT( m_eb_update_B[lev], face_areas_lev, edge_lengths_lev);
 
             } else {
-
                 // Mark on which grid points E should be updated (stair-case approximation)
                 MarkUpdateCellsStairCase(
                     m_eb_update_E[lev],
@@ -1272,12 +1263,12 @@ void WarpX::InitializeEBGridData (int lev)
                     m_eb_update_B[lev],
                     m_fields.get_alldirs(FieldType::Bfield_fp, lev),
                     eb_fact );
-
             }
 
         }
 
         ComputeDistanceToEB();
+        MarkReducedShapeCells( m_eb_reduce_particle_shape[lev], eb_fact, WarpX::nox );
 
     }
 #else

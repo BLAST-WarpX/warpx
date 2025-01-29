@@ -332,6 +332,8 @@ WarpX::WarpX ()
 
     m_eb_update_E.resize(nlevs_max);
     m_eb_update_B.resize(nlevs_max);
+    m_eb_reduce_particle_shape.resize(nlevs_max);
+
     m_flag_info_face.resize(nlevs_max);
     m_flag_ext_face.resize(nlevs_max);
     m_borrowing.resize(nlevs_max);
@@ -2318,9 +2320,13 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         amrex::IntVect const ng_ls(2);
         //EB level set
         m_fields.alloc_init(FieldType::distance_to_eb, lev, amrex::convert(ba, IntVect::TheNodeVector()), dm, nc_ls, ng_ls, 0.0_rt);
+        // Whether to reduce the particle shape to order 1 when close to the EB
+        AllocInitMultiFab(m_eb_reduce_particle_shape[lev], amrex::convert(ba, IntVect::TheCellVector()), dm, ncomps,
+            ngRho, lev, "m_eb_reduce_particle_shape");
 
         // EB info are needed only at the finest level
         if (lev == maxLevel()) {
+
             if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
 
                 AllocInitMultiFab(m_eb_update_E[lev][0], amrex::convert(ba, Ex_nodal_flag), dm, ncomps,
