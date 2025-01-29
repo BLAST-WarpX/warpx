@@ -756,7 +756,7 @@ WarpX::FillBoundaryE (const int lev, const PatchType patch_type, const amrex::In
             ng.allLE(mf[i]->nGrowVect()),
             "Error: in FillBoundaryE, requested more guard cells than allocated");
 
-        const amrex::IntVect nghost = (safe_guard_cells) ? mf[i]->nGrowVect() : ng;
+        const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
         ablastr::utils::communication::FillBoundary(*mf[i], nghost, WarpX::do_single_precision_comms, period, nodal_sync);
     }
 }
@@ -821,7 +821,7 @@ WarpX::FillBoundaryB (const int lev, const PatchType patch_type, const amrex::In
             ng.allLE(mf[i]->nGrowVect()),
             "Error: in FillBoundaryB, requested more guard cells than allocated");
 
-        const amrex::IntVect nghost = (safe_guard_cells) ? mf[i]->nGrowVect() : ng;
+        const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
         ablastr::utils::communication::FillBoundary(*mf[i], nghost, WarpX::do_single_precision_comms, period, nodal_sync);
     }
 }
@@ -846,7 +846,7 @@ WarpX::FillBoundaryE_avg (int lev, PatchType patch_type, IntVect ng)
         ablastr::fields::MultiLevelVectorField Efield_avg_fp = m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_fp, finest_level);
 
         const amrex::Periodicity& period = Geom(lev).periodicity();
-        if ( safe_guard_cells ){
+        if ( m_safe_guard_cells ){
             const Vector<MultiFab*> mf{Efield_avg_fp[lev][0],Efield_avg_fp[lev][1],Efield_avg_fp[lev][2]};
             ablastr::utils::communication::FillBoundary(mf, WarpX::do_single_precision_comms, period);
         } else {
@@ -868,7 +868,7 @@ WarpX::FillBoundaryE_avg (int lev, PatchType patch_type, IntVect ng)
         ablastr::fields::MultiLevelVectorField Efield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_cp, finest_level);
 
         const amrex::Periodicity& cperiod = Geom(lev-1).periodicity();
-        if ( safe_guard_cells ) {
+        if ( m_safe_guard_cells ) {
             const Vector<MultiFab*> mf{Efield_avg_cp[lev][0],Efield_avg_cp[lev][1],Efield_avg_cp[lev][2]};
             ablastr::utils::communication::FillBoundary(mf, WarpX::do_single_precision_comms, cperiod);
 
@@ -906,7 +906,7 @@ WarpX::FillBoundaryB_avg (int lev, PatchType patch_type, IntVect ng)
         ablastr::fields::MultiLevelVectorField Bfield_avg_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_fp, finest_level);
 
         const amrex::Periodicity& period = Geom(lev).periodicity();
-        if ( safe_guard_cells ) {
+        if ( m_safe_guard_cells ) {
             const Vector<MultiFab*> mf{Bfield_avg_fp[lev][0],Bfield_avg_fp[lev][1],Bfield_avg_fp[lev][2]};
             ablastr::utils::communication::FillBoundary(mf, WarpX::do_single_precision_comms, period);
         } else {
@@ -928,7 +928,7 @@ WarpX::FillBoundaryB_avg (int lev, PatchType patch_type, IntVect ng)
         ablastr::fields::MultiLevelVectorField Bfield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_cp, finest_level);
 
         const amrex::Periodicity& cperiod = Geom(lev-1).periodicity();
-        if ( safe_guard_cells ){
+        if ( m_safe_guard_cells ){
             const Vector<MultiFab*> mf{Bfield_avg_cp[lev][0],Bfield_avg_cp[lev][1],Bfield_avg_cp[lev][2]};
             ablastr::utils::communication::FillBoundary(mf, WarpX::do_single_precision_comms, cperiod);
         } else {
@@ -967,7 +967,7 @@ WarpX::FillBoundaryF (int lev, PatchType patch_type, IntVect ng, std::optional<b
         if (m_fields.has(FieldType::F_fp, lev))
         {
             const amrex::Periodicity& period = Geom(lev).periodicity();
-            const amrex::IntVect& nghost = (safe_guard_cells) ? m_fields.get(FieldType::F_fp, lev)->nGrowVect() : ng;
+            const amrex::IntVect& nghost = (m_safe_guard_cells) ? m_fields.get(FieldType::F_fp, lev)->nGrowVect() : ng;
             ablastr::utils::communication::FillBoundary(*m_fields.get(FieldType::F_fp, lev), nghost, WarpX::do_single_precision_comms, period, nodal_sync);
         }
     }
@@ -986,7 +986,7 @@ WarpX::FillBoundaryF (int lev, PatchType patch_type, IntVect ng, std::optional<b
         if (m_fields.has(FieldType::F_cp, lev))
         {
             const amrex::Periodicity& period = Geom(lev-1).periodicity();
-            const amrex::IntVect& nghost = (safe_guard_cells) ? m_fields.get(FieldType::F_cp, lev)->nGrowVect() : ng;
+            const amrex::IntVect& nghost = (m_safe_guard_cells) ? m_fields.get(FieldType::F_cp, lev)->nGrowVect() : ng;
             ablastr::utils::communication::FillBoundary(*m_fields.get(FieldType::F_cp, lev), nghost, WarpX::do_single_precision_comms, period, nodal_sync);
         }
     }
@@ -1020,7 +1020,7 @@ void WarpX::FillBoundaryG (int lev, PatchType patch_type, IntVect ng, std::optio
         {
             const amrex::Periodicity& period = Geom(lev).periodicity();
             MultiFab* G_fp = m_fields.get(FieldType::G_fp,lev);
-            const amrex::IntVect& nghost = (safe_guard_cells) ? G_fp->nGrowVect() : ng;
+            const amrex::IntVect& nghost = (m_safe_guard_cells) ? G_fp->nGrowVect() : ng;
             ablastr::utils::communication::FillBoundary(*G_fp, nghost, WarpX::do_single_precision_comms, period, nodal_sync);
         }
     }
@@ -1040,7 +1040,7 @@ void WarpX::FillBoundaryG (int lev, PatchType patch_type, IntVect ng, std::optio
         {
             const amrex::Periodicity& period = Geom(lev-1).periodicity();
             MultiFab* G_cp = m_fields.get(FieldType::G_cp,lev);
-            const amrex::IntVect& nghost = (safe_guard_cells) ? G_cp->nGrowVect() : ng;
+            const amrex::IntVect& nghost = (m_safe_guard_cells) ? G_cp->nGrowVect() : ng;
             ablastr::utils::communication::FillBoundary(*G_cp, nghost, WarpX::do_single_precision_comms, period, nodal_sync);
         }
     }

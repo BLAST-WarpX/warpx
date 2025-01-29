@@ -38,20 +38,12 @@ If want to use WarpX on a specific high-performance computing (HPC) systems, jum
 
    .. image:: conda.svg
 
-Using the Conda Package
------------------------
+Using the Conda-Forge Package
+-----------------------------
 
-A package for WarpX is available via the `Conda <https://conda.io>`_ package manager.
+A package for WarpX is available via `Conda-Forge <https://conda-forge.org/download/>`__.
 
 .. tip::
-
-   We recommend to configure your conda to use the faster ``libmamba`` `dependency solver <https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community>`__.
-
-   .. code-block:: bash
-
-      conda update -y -n base conda
-      conda install -y -n base conda-libmamba-solver
-      conda config --set solver libmamba
 
    We recommend to deactivate that conda self-activates its ``base`` environment.
    This `avoids interference with the system and other package managers <https://collegeville.github.io/CW20/WorkshopResources/WhitePapers/huebl-working-with-multiple-pkg-mgrs.pdf>`__.
@@ -60,14 +52,21 @@ A package for WarpX is available via the `Conda <https://conda.io>`_ package man
 
       conda config --set auto_activate_base false
 
+   In order to make sure that the conda configuration uses ``conda-forge`` as the only channel, which will help avoid issues with blocked ``defaults`` or ``anaconda`` repositories, please set the following configurations:
+
+   .. code-block:: bash
+
+      conda config --add channels conda-forge
+      conda config --set channel_priority strict
+
 .. code-block:: bash
 
-   conda create -n warpx -c conda-forge warpx
-   conda activate warpx
+   mamba create -n warpx -c conda-forge warpx
+   mamba activate warpx
 
 .. note::
 
-   The ``warpx`` `conda package <https://anaconda.org/conda-forge/warpx>`__ does not yet provide GPU support.
+   The ``warpx`` package on conda-forge does not yet provide `GPU support <https://github.com/conda-forge/warpx-feedstock/issues/89>`__.
 
 
 .. _install-spack:

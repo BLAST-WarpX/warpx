@@ -1,7 +1,7 @@
 # Preamble ####################################################################
 #
 cmake_minimum_required(VERSION 3.24.0)
-project(WarpX VERSION 24.12)
+project(WarpX VERSION 25.01)
 
 include(${WarpX_SOURCE_DIR}/cmake/WarpXFunctions.cmake)
 
@@ -193,7 +193,8 @@ if(WarpX_FFT)
     set(ABLASTR_FFT ON CACHE STRING "FFT-based solvers" FORCE)
 endif()
 
-# this defined the variable BUILD_TESTING which is ON by default
+# Define the variable BUILD_TESTING (ON by default),
+# include CDash dashboard testing module
 include(CTest)
 
 
@@ -480,7 +481,7 @@ foreach(D IN LISTS WarpX_DIMS)
                 warpx_enable_IPO(pyWarpX_${SD})
             else()
                 # conditionally defined target in pybind11
-                # https://github.com/pybind/pybind11/blob/v2.12.0/tools/pybind11Common.cmake#L397-L403
+                # https://github.com/pybind/pybind11/blob/v2.13.0/tools/pybind11Common.cmake#L407-L413
                 target_link_libraries(pyWarpX_${SD} PRIVATE pybind11::lto)
             endif()
         endif()

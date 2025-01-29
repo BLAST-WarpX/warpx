@@ -385,12 +385,14 @@ WarpX::ImplicitComputeRHSE (int lev, PatchType patch_type, amrex::Real a_dt, War
                                         lev,
                                         patch_type,
                                         a_Erhs_vec.getArrayVec()[lev],
+                                        m_eb_update_E[lev],
                                         a_dt );
     } else {
         m_fdtd_solver_cp[lev]->EvolveE( m_fields,
                                         lev,
                                         patch_type,
                                         a_Erhs_vec.getArrayVec()[lev],
+                                        m_eb_update_E[lev],
                                         a_dt );
     }
 

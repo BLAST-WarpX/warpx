@@ -75,8 +75,8 @@ print(f"Currently, WarpX builds against this AMReX commit/branch/sha: {amrex_bra
 print(f"AMReX HEAD commit (development branch): {amrex_HEAD}")
 amrex_new_branch = input("Update AMReX commit/branch/sha: ").strip()
 if not amrex_new_branch:
-    amrex_new_branch = amrex_branch
-    print(f"--> Nothing entered, will keep: {amrex_branch}")
+    amrex_new_branch = amrex_HEAD
+    print(f"--> Nothing entered, use: {amrex_HEAD}")
 print()
 
 print(
