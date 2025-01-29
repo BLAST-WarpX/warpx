@@ -34,7 +34,7 @@ struct CartesianCustomCoefAlgorithm {
         amrex::Vector<amrex::Real>& stencil_coefs_z) {
 
         using namespace amrex;
-        
+
         Real const inv_dx = 1._rt/cell_size[0];
         Real const inv_dy = 1._rt/cell_size[1];
         Real const inv_dz = 1._rt/cell_size[2];
@@ -53,16 +53,16 @@ struct CartesianCustomCoefAlgorithm {
         Vector<Real> upward_coefs_z, downward_coefs_z;
 
         // Check for custom coefficients and override defaults if found
-        if (pp_algo.queryarr("custom_coef_upward_stencil_x", upward_coefs_x) && 
+        if (pp_algo.queryarr("custom_coef_upward_stencil_x", upward_coefs_x) &&
             pp_algo.queryarr("custom_coef_downward_stencil_x", downward_coefs_x)) {
-            
+
             if (upward_coefs_x.size() != downward_coefs_x.size()) {
                 amrex::Abort("Upward and downward stencils must have the same size");
             }
 
             int stencil_size = upward_coefs_x.size();
             stencil_coefs_x.resize(2 * stencil_size);
-            
+
             // Upward coefficients in first half
             for (int i = 0; i < stencil_size; ++i) {
                 stencil_coefs_x[i] = upward_coefs_x[i] * inv_dx;
@@ -75,14 +75,14 @@ struct CartesianCustomCoefAlgorithm {
 
         if (pp_algo.queryarr("custom_coef_upward_stencil_y", upward_coefs_y) &&
             pp_algo.queryarr("custom_coef_downward_stencil_y", downward_coefs_y)) {
-            
+
             if (upward_coefs_y.size() != downward_coefs_y.size()) {
                 amrex::Abort("Upward and downward stencils must have the same size");
             }
 
             int stencil_size = upward_coefs_y.size();
             stencil_coefs_y.resize(2 * stencil_size);
-            
+
             for (int i = 0; i < stencil_size; ++i) {
                 stencil_coefs_y[i] = upward_coefs_y[i] * inv_dy;
             }
@@ -93,14 +93,14 @@ struct CartesianCustomCoefAlgorithm {
 
         if (pp_algo.queryarr("custom_coef_upward_stencil_z", upward_coefs_z) &&
             pp_algo.queryarr("custom_coef_downward_stencil_z", downward_coefs_z)) {
-            
+
             if (upward_coefs_z.size() != downward_coefs_z.size()) {
                 amrex::Abort("Upward and downward stencils must have the same size");
             }
 
             int stencil_size = upward_coefs_z.size();
             stencil_coefs_z.resize(2 * stencil_size);
-            
+
             for (int i = 0; i < stencil_size; ++i) {
                 stencil_coefs_z[i] = upward_coefs_z[i] * inv_dz;
             }
@@ -142,7 +142,7 @@ struct CartesianCustomCoefAlgorithm {
         if (n_coefs_x == 1) {
             return coefs_x[0] * (F(i+1,j,k,ncomp) - F(i,j,k,ncomp));
         }
-        
+
         amrex::Real derivative = 0;
         int stencil_size = n_coefs_x / 2;
         for (int l = 0; l < stencil_size; l++) {
@@ -169,7 +169,7 @@ struct CartesianCustomCoefAlgorithm {
         if (n_coefs_x == 1) {
             return coefs_x[0] * (F(i,j,k,ncomp) - F(i-1,j,k,ncomp));
         }
-        
+
         amrex::Real derivative = 0;
         int stencil_size = n_coefs_x / 2;
         for (int l = 0; l < stencil_size; l++) {
@@ -195,7 +195,7 @@ struct CartesianCustomCoefAlgorithm {
         if (n_coefs_y == 1) {
             return coefs_y[0] * (F(i,j+1,k,ncomp) - F(i,j,k,ncomp));
         }
-        
+
         amrex::Real derivative = 0;
         int stencil_size = n_coefs_y / 2;
         for (int l = 0; l < stencil_size; l++) {
@@ -222,7 +222,7 @@ struct CartesianCustomCoefAlgorithm {
         if (n_coefs_y == 1) {
             return coefs_y[0] * (F(i,j,k,ncomp) - F(i,j-1,k,ncomp));
         }
-        
+
         amrex::Real derivative = 0;
         int stencil_size = n_coefs_y / 2;
         for (int l = 0; l < stencil_size; l++) {
@@ -248,7 +248,7 @@ struct CartesianCustomCoefAlgorithm {
         if (n_coefs_z == 1) {
             return coefs_z[0] * (F(i,j,k+1,ncomp) - F(i,j,k,ncomp));
         }
-        
+
         amrex::Real derivative = 0;
         int stencil_size = n_coefs_z / 2;
         for (int l = 0; l < stencil_size; l++) {

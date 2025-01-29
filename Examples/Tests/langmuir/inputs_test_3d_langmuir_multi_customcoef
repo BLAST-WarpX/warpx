@@ -11,5 +11,3 @@ algo.custom_coef_downward_stencil_x = 1 0
 
 algo.custom_coef_upward_stencil_y = 0.5 0.1666666
 algo.custom_coef_downward_stencil_y = 1 0
-
-
