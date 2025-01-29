@@ -5,37 +5,23 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef WARPX_PARALLELIZATION_COST_TRACKER_H_
-#define WARPX_PARALLELIZATION_COST_TRACKER_H_
+#ifndef WARPX_PARALLELIZATION_TIME_TRACKER_H_
+#define WARPX_PARALLELIZATION_TIME_TRACKER_H_
 
 #include <AMReX_REAL.H>
+#include <AMReX_Vector.H>
 
 #include <cstddef>
-#include <map>
-#include <memory>
-#include <utility>
 
 namespace warpx::parallelization
 {
     class WarpX;
-    class TimeTracker;
-
-    using LevelIndex = std::pair<int, std::size_t>;
-
-    [[nodiscard]]
-    TimeTracker track_time_until_out_of_scope (int lev, std::size_t index);
-
-    [[nodiscard]]
-    std::map<LevelIndex,amrex::Real> get_tracked_times ();
-
-    [[nodiscard]]
-    bool is_time_tracking_enabled ();
 
     class TimeTrackerWarpXInterface
     {
         private:
         static void toggle_tracking (bool do_tracking);
-        static void reset ();
+        static void resize (const amrex::Vector<std::size_t>& max_index_per_level);
         static void reset_values ();
 
         friend class WarpX;
@@ -43,7 +29,13 @@ namespace warpx::parallelization
 
     class TimeTracker
     {
-        public:
+
+    public:
+        [[nodiscard]]
+        static const amrex::Vector<amrex::Vector<amrex::Real>>& view_tracked_times ();
+
+        [[nodiscard]]
+        static bool enabled ();
 
         TimeTracker(int lev, std::size_t mfi_iter_index);
         ~TimeTracker();
@@ -54,39 +46,23 @@ namespace warpx::parallelization
         TimeTracker& operator=(const TimeTracker&) = delete;
         TimeTracker& operator=(TimeTracker&&) = delete;
 
-        private:
-
-        LevelIndex m_lev_index;
-        amrex::Real m_start_time;
-    };
-
-    class AllTimes
-    {
-    public:
-        [[nodiscard]] static AllTimes& get_instance ();
-
-        [[nodiscard]] std::map<LevelIndex, amrex::Real> get_times () const ;
-        [[nodiscard]] bool enabled () const;
-
-        //AllTimes is a singleton, so it  must be uncopyable and unmovable
-        AllTimes(const AllTimes&) = delete;
-        AllTimes(AllTimes&&) = delete;
-        AllTimes& operator=(const AllTimes&) = delete;
-        AllTimes& operator=(AllTimes&&) = delete;
-
-        friend class TimeTracker;
         friend class TimeTrackerWarpXInterface;
 
     private:
-        AllTimes();
+        static void toggle_tracking (bool do_tracking_flag);
+        static void resize (const amrex::Vector<std::size_t>& max_index_per_level);
+        static void reset_values ();
 
-        void toggle_tracking(bool do_tracking);
-        void reset();
-        void reset_values();
+        static bool do_tracking;
+        static amrex::Vector<amrex::Vector<amrex::Real>> all_times;
 
-        bool m_do_tracking = false;
-        std::map<LevelIndex, amrex::Real> m_all_times;
+        int m_lev;
+        std::size_t m_index;
+        amrex::Real m_start_time;
     };
+
+    [[nodiscard]]
+    TimeTracker track_time_until_out_of_scope (int lev, std::size_t index);
 }
 
-#endif //WARPX_PARALLELIZATION_COST_TRACKER_H_
+#endif //WARPX_PARALLELIZATION_TIME_TRACKER_H_

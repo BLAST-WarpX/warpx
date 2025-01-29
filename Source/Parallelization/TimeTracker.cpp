@@ -7,8 +7,8 @@
 
 #include "TimeTracker.H"
 
-#include <AMReX_GpuAtomic.H>
 #include <AMReX_GpuDevice.H>
+#include <AMReX_GpuAtomic.H>
 #include <AMReX_Utility.H>
 
 using namespace warpx::parallelization;
@@ -19,70 +19,49 @@ TimeTracker track_time_until_out_of_scope (const int lev, const std::size_t inde
     return TimeTracker{lev, index};
 }
 
-[[nodiscard]]
-std::map<LevelIndex,amrex::Real> get_tracked_times ()
-{
-    return AllTimes::get_instance().get_times();
-}
-
-[[nodiscard]]
-bool is_time_tracking_enabled ()
-{
-    return AllTimes::get_instance().enabled();
-}
-
 void TimeTrackerWarpXInterface::toggle_tracking (const bool do_tracking)
 {
-    AllTimes::get_instance().toggle_tracking(do_tracking);
+    TimeTracker::toggle_tracking(do_tracking);
 }
 
-void TimeTrackerWarpXInterface::reset ()
+void TimeTrackerWarpXInterface::resize (const amrex::Vector<std::size_t>& max_index_per_level)
 {
-    AllTimes::get_instance().reset();
+    TimeTracker::resize(max_index_per_level);
 }
 
 void TimeTrackerWarpXInterface::reset_values ()
 {
-    AllTimes::get_instance().reset_values();
+    TimeTracker::reset_values();
 }
 
-[[nodiscard]]
-AllTimes& AllTimes::get_instance()
+void TimeTracker::toggle_tracking(const bool do_tracking_flag)
 {
-    static auto the_unique_instance = AllTimes{};
-    return the_unique_instance;
+    TimeTracker::do_tracking = do_tracking_flag;
 }
 
-[[nodiscard]]
-std::map<LevelIndex,amrex::Real> AllTimes::get_times () const
+void TimeTracker::resize (const amrex::Vector<std::size_t>& max_index_per_level)
 {
-    return m_all_times;
+    const auto max_index_per_level_size = max_index_per_level.size();
+    all_times.resize(max_index_per_level_size);
+    for (int i = 0; i < max_index_per_level_size; ++i)
+    {
+        all_times[i].resize(max_index_per_level[i]);
+    }
 }
 
-AllTimes::AllTimes()
-{}
-
-void AllTimes::toggle_tracking(const bool do_tracking)
+void TimeTracker::reset_values()
 {
-    m_do_tracking = do_tracking;
-}
-
-void AllTimes::reset()
-{
-    m_all_times.clear();
-}
-
-void AllTimes::reset_values()
-{
-    for (auto& el : m_all_times){
-        el.second = 0.0;
+    for (auto& lev_data : TimeTracker::all_times){
+        for (auto& lev_index_data : lev_data){
+            lev_index_data = 0.0;
+        }
     }
 }
 
 TimeTracker::TimeTracker(const int lev, const std::size_t mfi_iter_index)
-    :m_lev_index{lev, mfi_iter_index}
+    :m_lev{lev}, m_index{mfi_iter_index}
 {
-    if (AllTimes::get_instance().enabled())
+    if (TimeTracker::do_tracking)
     {
         amrex::Gpu::synchronize();
         m_start_time = static_cast<amrex::Real>(amrex::second());
@@ -91,11 +70,11 @@ TimeTracker::TimeTracker(const int lev, const std::size_t mfi_iter_index)
 
 TimeTracker::~TimeTracker()
 {
-    if (auto& all_times = AllTimes::get_instance(); all_times.enabled())
+    if (TimeTracker::do_tracking)
     {
         amrex::Gpu::synchronize();
         const auto end_time = static_cast<amrex::Real>(amrex::second());
         const auto wall_time = end_time - m_start_time;
-        amrex::HostDevice::Atomic::Add( &all_times.m_all_times[m_lev_index], wall_time);
+        amrex::HostDevice::Atomic::Add(&all_times[m_lev][m_index], wall_time);
     }
 }
