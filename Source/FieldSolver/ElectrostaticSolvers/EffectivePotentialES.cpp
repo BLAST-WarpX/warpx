@@ -34,9 +34,11 @@ void EffectivePotentialES::ComputeSpaceChargeField (
     using ablastr::fields::MultiLevelVectorField;
     using warpx::fields::FieldType;
 
+    bool const skip_level_0 = true;
+
     // grab the simulation fields
     const MultiLevelScalarField rho_fp = fields.get_mr_levels(FieldType::rho_fp, max_level);
-    const MultiLevelScalarField rho_cp = fields.get_mr_levels(FieldType::rho_cp, max_level);
+    const MultiLevelScalarField rho_cp = fields.get_mr_levels(FieldType::rho_cp, max_level, skip_level_0);
     const MultiLevelScalarField phi_fp = fields.get_mr_levels(FieldType::phi_fp, max_level);
     const MultiLevelVectorField Efield_fp = fields.get_mr_levels_alldirs(FieldType::Efield_fp, max_level);
 
