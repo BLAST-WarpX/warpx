@@ -197,7 +197,7 @@ public:
     //! Integer that corresponds to the type of Maxwell solver (Yee, CKC, PSATD, ECT)
     static inline auto electromagnetic_solver_id = ElectromagneticSolverAlgo::Default;
     //! Integer that corresponds to the evolve scheme (explicit, semi_implicit_em, theta_implicit_em)
-    static inline auto evolve_scheme = EvolveScheme::Default;
+    EvolveScheme evolve_scheme = EvolveScheme::Default;
     //! Maximum iterations used for self-consistent particle update in implicit particle-suppressed evolve schemes
     static int max_particle_its_in_implicit_scheme;
     //! Relative tolerance used for self-consistent particle update in implicit particle-suppressed evolve schemes
