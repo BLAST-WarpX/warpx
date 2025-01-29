@@ -849,7 +849,7 @@ public:
 
     void ComputeDivE(amrex::MultiFab& divE, int lev);
 
-    static void ProjectionCleanDivB ();
+    void ProjectionCleanDivB ();
 
     [[nodiscard]] amrex::IntVect getngEB() const { return guard_cells.ng_alloc_EB; }
     [[nodiscard]] amrex::IntVect getngF() const { return guard_cells.ng_alloc_F; }
