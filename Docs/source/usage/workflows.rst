@@ -1,7 +1,8 @@
+.. _usage-how-to:
 .. _usage-workflows:
 
-Workflows
-=========
+How-To Guides
+=============
 
 This section collects typical user workflows and best practices for WarpX.
 

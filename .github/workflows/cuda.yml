@@ -56,7 +56,7 @@ jobs:
         which nvcc || echo "nvcc not in PATH!"
 
         cmake-easyinstall --prefix=/usr/local \
-          git+https://github.com/openPMD/openPMD-api.git@0.15.1 \
+          git+https://github.com/openPMD/openPMD-api.git@0.16.1 \
           -DopenPMD_USE_PYTHON=OFF    \
           -DBUILD_TESTING=OFF         \
           -DBUILD_EXAMPLES=OFF        \
@@ -127,7 +127,7 @@ jobs:
         which nvcc || echo "nvcc not in PATH!"
 
         git clone https://github.com/AMReX-Codes/amrex.git ../amrex
-        cd ../amrex && git checkout --detach e761abff95afbfa442cbe108027094bbddef5b11 && cd -
+        cd ../amrex && git checkout --detach 0f46a1615c17f0bbeaedb20c27a97c9f6e439781 && cd -
         make COMP=gcc QED=FALSE USE_MPI=TRUE USE_GPU=TRUE USE_OMP=FALSE USE_FFT=TRUE USE_CCACHE=TRUE -j 4
 
         ccache -s

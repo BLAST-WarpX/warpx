@@ -13,8 +13,8 @@ boundary.field_lo = pec pec pec
 boundary.field_hi = pec pec pec
 
 eb2.geom_type = box
-eb2.box_lo = -0.5 -0.5 -0.5
-eb2.box_hi = 0.5 0.5 0.5
+eb2.box_lo = -0.501 -0.501 -0.501 # Ensures that the stair-case EB is exactly at -0.5
+eb2.box_hi =  0.501  0.501  0.501 # Ensures that the stair-case EB is exactly at  0.5
 eb2.box_has_fluid_inside = true
 # Alternatively one could use parser to build EB
 # Note that for amrex EB implicit function, >0 is covered, =0 is boundary and <0 is regular.

@@ -162,16 +162,13 @@ public:
     HybridPICModel& GetHybridPICModel () { return *m_hybrid_pic_model; }
     [[nodiscard]] HybridPICModel * get_pointer_HybridPICModel () const { return m_hybrid_pic_model.get(); }
     MultiDiagnostics& GetMultiDiags () {return *multi_diags;}
-#ifdef AMREX_USE_EB
-    ablastr::fields::MultiLevelScalarField GetDistanceToEB () {
-        using warpx::fields::FieldType;
-        return m_fields.get_mr_levels(FieldType::distance_to_eb, finestLevel());
-    }
-#endif
     ParticleBoundaryBuffer& GetParticleBoundaryBuffer () { return *m_particle_boundary_buffer; }
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag() { return m_eb_update_E; }
+    amrex::Vector< std::unique_ptr<amrex::iMultiFab> > const & GetEBReduceParticleShapeFlag() const { return m_eb_reduce_particle_shape; }
 
     static void shiftMF (amrex::MultiFab& mf, const amrex::Geometry& geom,
                          int num_shift, int dir, int lev, bool update_cost_flag,
+                         bool safe_guard_cells,
                          amrex::Real external_field=0.0, bool useparser = false,
                          amrex::ParserExecutor<3> const& field_parser={});
 
@@ -248,11 +245,6 @@ public:
                                            ParticleBoundaryType::Default,
                                            ParticleBoundaryType::Default)};
 
-    //! Integer that corresponds to the order of the PSATD solution
-    //! (whether the PSATD equations are derived from first-order or
-    //! second-order solution)
-    static inline auto psatd_solution_type = PSATDSolutionType::Default;
-
     //! Integers that correspond to the time dependency of J (constant, linear)
     //! and rho (linear, quadratic) for the PSATD algorithm
     static inline auto J_in_time = JInTime::Default;
@@ -298,10 +290,6 @@ public:
     //! Solve additional Maxwell equation for G in order to control errors in magnetic Gauss' law
     static bool do_divb_cleaning;
 
-    //! Solve Poisson equation when loading an external magnetic field to clean divergence
-    //! This is useful to remove errors that could lead to non-zero B field divergence
-    static bool do_divb_cleaning_external;
-
     //! Order of the particle shape factors (splines) along x
     static int nox;
     //! Order of the particle shape factors (splines) along y
@@ -345,10 +333,6 @@ public:
     //! small time steps.
     static bool galerkin_interpolation;
 
-    //! Flag whether the Verboncoeur correction is applied to the current and charge density
-    //! on the axis when using RZ.
-    static bool verboncoeur_axis_correction;
-
     //! If true, a bilinear filter is used to smooth charge and currents
     static bool use_filter;
     //! If true, the bilinear filtering of charge and currents is done in Fourier space
@@ -365,14 +349,7 @@ public:
     static amrex::Real beta_boost;
     //! Direction of the Lorentz transform that defines the boosted frame of the simulation
     static amrex::Vector<int> boost_direction;
-    //! If specified, the maximum number of iterations is computed automatically so that
-    //! the lower end of the simulation domain along z reaches #zmax_plasma_to_compute_max_step
-    //! in the boosted frame
-    static amrex::Real zmax_plasma_to_compute_max_step;
-    //! Set to true if #zmax_plasma_to_compute_max_step is specified, in which case
-    //! the maximum number of iterations is computed automatically so that the lower end of the
-    //! simulation domain along z reaches #zmax_plasma_to_compute_max_step in the boosted frame
-    static bool do_compute_max_step_from_zmax;
+
     //! store initial value of zmin_domain_boost because WarpX::computeMaxStepBoostAccelerator
     //! needs the initial value of zmin_domain_boost, even if restarting from a checkpoint file
     static amrex::Real zmin_domain_boost_step_0;
@@ -395,7 +372,6 @@ public:
     static int do_multi_J_n_depositions;
 
     static bool do_device_synchronize;
-    static bool safe_guard_cells;
 
     //! With mesh refinement, particles located inside a refinement patch, but within
     //! #n_field_gather_buffer cells of the edge of the patch, will gather the fields
@@ -483,11 +459,6 @@ public:
     amrex::Array<amrex::Real,3> m_galilean_shift = {{0}};
 
     amrex::Vector<amrex::Real> m_v_comoving = amrex::Vector<amrex::Real>(3, amrex::Real(0.));
-
-    static int num_mirrors;
-    amrex::Vector<amrex::Real> mirror_z;
-    amrex::Vector<amrex::Real> mirror_z_width;
-    amrex::Vector<int> mirror_z_npoints;
 
     /// object with all reduced diagnostics, similar to MultiParticleContainer for species.
     std::unique_ptr<MultiReducedDiags> reduced_diags;
@@ -648,10 +619,10 @@ public:
     void ApplyInverseVolumeScalingToCurrentDensity(amrex::MultiFab* Jx,
                                                    amrex::MultiFab* Jy,
                                                    amrex::MultiFab* Jz,
-                                                   int lev);
+                                                   int lev) const;
 
     void ApplyInverseVolumeScalingToChargeDensity(amrex::MultiFab* Rho,
-                                                  int lev);
+                                                  int lev) const;
 #endif
 
     /**
@@ -902,6 +873,7 @@ public:
     // Magnetostatic Solver Interface
     MagnetostaticSolver::VectorPoissonBoundaryHandler m_vector_poisson_boundary_handler;
     int magnetostatic_solver_max_iters = 200;
+    int magnetostatic_solver_verbosity = 2;
     void ComputeMagnetostaticField ();
     void AddMagnetostaticFieldLabFrame ();
     void computeVectorPotential (ablastr::fields::MultiLevelVectorField const& curr,
@@ -926,20 +898,17 @@ public:
      * \param[in] fx_parser parser function to initialize x-field
      * \param[in] fy_parser parser function to initialize y-field
      * \param[in] fz_parser parser function to initialize z-field
-     * \param[in] edge_lengths edge lengths information
-     * \param[in] face_areas face areas information
-     * \param[in] topology flag indicating if field is edge-based or face-based
      * \param[in] lev level of the Multifabs that is initialized
      * \param[in] patch_type PatchType on which the field is initialized (fine or coarse)
+     * \param[in] eb_update_field flag indicating which gridpoints should be modified by this functions
      */
     void ComputeExternalFieldOnGridUsingParser (
         warpx::fields::FieldType field,
         amrex::ParserExecutor<4> const& fx_parser,
         amrex::ParserExecutor<4> const& fy_parser,
         amrex::ParserExecutor<4> const& fz_parser,
-        int lev, PatchType patch_type, [[maybe_unused]] char topology,
-        std::optional<ablastr::fields::VectorField> const& edge_lengths = std::nullopt,
-        std::optional<ablastr::fields::VectorField> const& face_areas = std::nullopt);
+        int lev, PatchType patch_type,
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field);
 
     /**
      * \brief Load field values from a user-specified openPMD file,
@@ -1013,6 +982,73 @@ public:
     void InitEB ();
 
 #ifdef AMREX_USE_EB
+
+    /** \brief Set a flag to indicate in which cells a particle should deposit charge/current
+     *  with a reduced, order 1 shape.
+     *
+     * More specifically, the flag is set to 1 if any of the neighboring cells over which the
+     * particle shape might extend are either partially or fully covered by an embedded boundary.
+     * This ensures that a particle in this cell deposits with an order 1 shape, which in turn
+     * makes sure that the particle never deposits any charge in a partially or fully covered cell.
+     *
+     * \param[in] eb_reduce_particle_shape multifab to be filled with 1s and 0s
+     * \param[in] eb_fact EB factory
+     * \param[in] particle_shape_order order of the particle shape function
+     */
+
+
+    void MarkReducedShapeCells (
+        std::unique_ptr<amrex::iMultiFab> & eb_reduce_particle_shape,
+        amrex::EBFArrayBoxFactory const & eb_fact,
+        int particle_shape_order );
+
+    /** \brief Set a flag to indicate on which grid points the field `field`
+     *  should be updated, depending on their position relative to the embedded boundary.
+     *
+     * This function is used by all finite-difference solvers, except the
+     * ECT solver, which instead uses `MarkUpdateECellsECT` and `MarkUpdateBCellsECT`.
+     * It uses a stair-case approximation of the embedded boundary:
+     * If a grid point touches cells that are either partially or fully covered
+     * by the embedded boundary: the corresponding field is not updated.
+     *
+     * More specifically, this function fills the iMultiFabs in `eb_update`
+     * (which have the same indexType as the MultiFabs in `field`) with 1
+     * or 0, depending on whether the grid point should be updated or not.
+     */
+    void MarkUpdateCellsStairCase (
+        std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update,
+        ablastr::fields::VectorField const & field,
+        amrex::EBFArrayBoxFactory const & eb_fact );
+
+    /** \brief Set a flag to indicate on which grid points the E field
+     *  should be updated, depending on their position relative to the embedded boundary.
+     *
+     * This function is used by ECT solver. The E field is not updated if
+     * the edge on which it is defined is fully covered by the embedded boundary.
+     *
+     * More specifically, this function fills the iMultiFabs in `eb_update_E`
+     * (which have the same indexType as the E field) with 1 or 0, depending
+     * on whether the grid point should be updated or not.
+     */
+    void MarkUpdateECellsECT (
+        std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update_E,
+        ablastr::fields::VectorField const& edge_lengths );
+
+    /** \brief Set a flag to indicate on which grid points the B field
+     *  should be updated, depending on their position relative to the embedded boundary.
+     *
+     * This function is used by ECT solver. The B field is not updated if
+     * the face on which it is defined is fully covered by the embedded boundary.
+     *
+     * More specifically, this function fills the iMultiFabs in `eb_update_B`
+     * (which have the same indexType as the B field) with 1 or 0, depending
+     * on whether the grid point should be updated or not.
+     */
+    void MarkUpdateBCellsECT (
+        std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update_B,
+        ablastr::fields::VectorField const& face_areas,
+        ablastr::fields::VectorField const& edge_lengths );
+
     /**
     * \brief Compute the length of the mesh edges. Here the length is a value in [0, 1].
     *        An edge of length 0 is fully covered.
@@ -1044,7 +1080,7 @@ public:
     *          - 2 for stable cells which have been intruded
     *        Here we cannot know if a cell is intruded or not so we initialize all stable cells with 1
     */
-    void MarkCells();
+    void MarkExtensionCells();
 #endif
 
     /**
@@ -1310,18 +1346,6 @@ private:
     }
 
     /**
-     * \brief Re-orders the Fornberg coefficients so that they can be used more conveniently for
-     * finite-order centering operations. For example, for finite-order centering of order 6,
-     * the Fornberg coefficients \c (c_0,c_1,c_2) are re-ordered as \c (c_2,c_1,c_0,c_0,c_1,c_2).
-     *
-     * \param[in,out] ordered_coeffs host vector where the re-ordered Fornberg coefficients will be stored
-     * \param[in] unordered_coeffs host vector storing the original sequence of Fornberg coefficients
-     * \param[in] order order of the finite-order centering along a given direction
-     */
-    void ReorderFornbergCoefficients (amrex::Vector<amrex::Real>& ordered_coeffs,
-                                      amrex::Vector<amrex::Real>& unordered_coeffs,
-                                      int order);
-    /**
      * \brief Allocates and initializes the stencil coefficients used for the finite-order centering
      * of fields and currents, and stores them in the given device vectors.
      *
@@ -1372,7 +1396,9 @@ private:
     amrex::Vector<amrex::Real> t_new;
     amrex::Vector<amrex::Real> t_old;
     amrex::Vector<amrex::Real> dt;
-    static utils::parser::IntervalsParser dt_update_interval; // How often to update the timestep when using adaptive timestepping
+    utils::parser::IntervalsParser m_dt_update_interval = utils::parser::IntervalsParser{}; // How often to update the timestep when using adaptive timestepping
+
+    bool m_safe_guard_cells = false;
 
     // Particle container
     std::unique_ptr<MultiParticleContainer> mypc;
@@ -1393,17 +1419,30 @@ private:
     mutable amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > Afield_dotMask;
     mutable amrex::Vector<            std::unique_ptr<amrex::iMultiFab>     > phi_dotMask;
 
+    /** EB: Flag to indicate whether a gridpoint is inside the embedded boundary and therefore
+     * whether the E or B should not be updated. (One array per level and per direction, due to staggering)
+     */
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_E;
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_B;
+
+    /** EB: Mask that indicates whether a particle should use its regular shape factor (mask set to 0)
+     *  or a reduced, order-1 shape factor instead (mask set to 1) in a given cell, when depositing charge/current.
+     *  The flag is typically set to 1 in cells that are close to the embedded boundary, in order to avoid
+     *  errors in charge conservation when a particle is too close to the embedded boundary.
+     */
+    amrex::Vector<  std::unique_ptr<amrex::iMultiFab> > m_eb_reduce_particle_shape;
+
     /** EB: for every mesh face flag_info_face contains a:
      *          * 0 if the face needs to be extended
      *          * 1 if the face is large enough to lend area to other faces
      *          * 2 if the face is actually intruded by other face
-     * It is initialized in WarpX::MarkCells
+     * It is initialized in WarpX::MarkExtensionCells
      * This is only used for the ECT solver.*/
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>, 3 > > m_flag_info_face;
     /** EB: for every mesh face face flag_ext_face contains a:
      *          * 1 if the face needs to be extended
      *          * 0 otherwise
-     * It is initialized in WarpX::MarkCells and then modified in WarpX::ComputeOneWayExtensions
+     * It is initialized in WarpX::MarkExtensionCells and then modified in WarpX::ComputeOneWayExtensions
      * and in WarpX::ComputeEightWaysExtensions
      * This is only used for the ECT solver.*/
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>, 3 > > m_flag_ext_face;
@@ -1444,6 +1483,12 @@ private:
 
     amrex::Real moving_window_x = std::numeric_limits<amrex::Real>::max();
 
+    // Mirrors
+    int m_num_mirrors = 0;
+    amrex::Vector<amrex::Real> m_mirror_z;
+    amrex::Vector<amrex::Real> m_mirror_z_width;
+    amrex::Vector<int> m_mirror_z_npoints;
+
     // Plasma injection parameters
     int warpx_do_continuous_injection = 0;
     int num_injected_species = -1;
@@ -1455,6 +1500,10 @@ private:
 
     // whether to use subcycling
     bool m_do_subcycling = false;
+
+    //! Flag whether the Verboncoeur correction is applied to the current and charge density
+    //! on the axis when using RZ.
+    bool m_verboncoeur_axis_correction = true;
 
     // Macroscopic properties
     std::unique_ptr<MacroscopicProperties> m_macroscopic_properties;
@@ -1511,6 +1560,11 @@ private:
     int max_step   = std::numeric_limits<int>::max();
     amrex::Real stop_time = std::numeric_limits<amrex::Real>::max();
 
+    //! If specified, the maximum number of iterations is computed automatically so that
+    //! the lower end of the simulation domain along z reaches #zmax_plasma_to_compute_max_step
+    //! in the boosted frame
+    std::optional<amrex::Real> m_zmax_plasma_to_compute_max_step = std::nullopt;
+
     int regrid_int = -1;
 
     amrex::Real cfl = amrex::Real(0.999);
@@ -1552,6 +1606,10 @@ private:
     int noy_fft = 16;
     int noz_fft = 16;
 
+    //! Solve Poisson equation when loading an external magnetic field to clean divergence
+    //! This is useful to remove errors that could lead to non-zero B field divergence
+    bool m_do_divb_cleaning_external = false;
+
     //! Domain decomposition on Level 0
     amrex::IntVect numprocs{0};
 
@@ -1583,13 +1641,6 @@ private:
     [[nodiscard]]
     bool checkStopSimulation (amrex::Real cur_time);
 
-    /** Print Unused Parameter Warnings after Step 1
-     *
-     * Instead of waiting for a simulation to end, we already do an early "unused parameter check"
-     * after step 1 to inform users early of potential issues with their simulation setup.
-     */
-    void checkEarlyUnusedParams ();
-
     /** Perform essential particle house keeping at boundaries
      *
      * Inject, communicate, scrape and sort particles.
@@ -1606,6 +1657,11 @@ private:
      * Particles have p^{n} and x^{n}.
      */
     void ExplicitFillBoundaryEBUpdateAux ();
+
+    //! Integer that corresponds to the order of the PSATD solution
+    //! (whether the PSATD equations are derived from first-order or
+    //! second-order solution)
+    PSATDSolutionType m_psatd_solution_type = PSATDSolutionType::Default;
 
     void PushPSATD (amrex::Real start_time);
 

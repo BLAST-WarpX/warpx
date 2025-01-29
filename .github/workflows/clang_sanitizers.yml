@@ -27,7 +27,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/clang17.sh
+        .github/workflows/dependencies/clang.sh 17
     - name: CCache Cache
       uses: actions/cache@v4
       with:
@@ -89,7 +89,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/clang17.sh
+        .github/workflows/dependencies/clang.sh 17
     - name: CCache Cache
       uses: actions/cache@v4
       with:
