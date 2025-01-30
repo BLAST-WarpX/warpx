@@ -6,12 +6,12 @@ export MY_PROFILE=$(cd $(dirname $BASH_SOURCE) && pwd)"/"$(basename $BASH_SOURCE
 if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your $MY_PROFILE file! Please edit its line 2 to continue!"; return; fi
 
 # required dependencies
-module switch Core Core/24.07
 module load cmake/3.27.9
 module load craype-accel-amd-gfx90a
 module load rocm/5.7.1
 module load cray-mpich/8.1.28
 module load cce/17.0.0  # must be loaded after rocm
+# https://docs.olcf.ornl.gov/systems/frontier_user_guide.html#compatible-compiler-rocm-toolchain-versions
 
 # optional: faster builds
 module load ccache
@@ -27,11 +27,11 @@ export LD_LIBRARY_PATH=${HOME}/sw/frontier/gpu/blaspp-2024.05.31/lib64:$LD_LIBRA
 export LD_LIBRARY_PATH=${HOME}/sw/frontier/gpu/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
 
 # optional: for QED lookup table generation support
-module load boost/1.79.0
+module load boost/1.85.0
 
 # optional: for openPMD support
-module load adios2/2.8.3-mpi
-module load hdf5/1.12.1-mpi
+module load adios2/2.10.0-mpi
+module load hdf5/1.14.3-mpi
 
 # optional: for Python bindings or libEnsemble
 module load cray-python/3.11.5

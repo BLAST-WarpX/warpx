@@ -75,8 +75,8 @@ print(f"Currently, WarpX builds against this PICSAR commit/branch/sha: {PICSAR_b
 print(f"PICSAR HEAD commit (development branch): {PICSAR_HEAD}")
 PICSAR_new_branch = input("Update PICSAR commit/branch/sha: ").strip()
 if not PICSAR_new_branch:
-    PICSAR_new_branch = PICSAR_branch
-    print(f"--> Nothing entered, will keep: {PICSAR_branch}")
+    PICSAR_new_branch = PICSAR_HEAD
+    print(f"--> Nothing entered, will use: {PICSAR_HEAD}")
 print()
 
 print(

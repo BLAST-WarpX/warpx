@@ -50,11 +50,11 @@ struct IsOutsideDomainBoundary {
 };
 
 struct FindEmbeddedBoundaryIntersection {
-    const int m_step_index;
-    const int m_delta_index;
-    const int m_normal_index;
-    const int m_step;
-    const amrex::Real m_dt;
+    int m_step_index;
+    int m_delta_index;
+    int m_normal_index;
+    int m_step;
+    amrex::Real m_dt;
     amrex::Array4<const amrex::Real> m_phiarr;
     amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_dxi;
     amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_plo;
@@ -173,7 +173,7 @@ struct CopyAndTimestamp {
     int m_delta_index;
     int m_normal_index;
     int m_step;
-    const amrex::Real m_dt;
+    amrex::Real m_dt;
     int m_idim;
     int m_iside;
 

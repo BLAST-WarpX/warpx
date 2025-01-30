@@ -76,13 +76,15 @@ AcceleratorLattice::ReadLattice (std::string const & root_name, amrex::ParticleR
 }
 
 void
-AcceleratorLattice::InitElementFinder (int const lev, amrex::BoxArray const & ba, amrex::DistributionMapping const & dm)
+AcceleratorLattice::InitElementFinder (
+    int const lev, amrex::Real const gamma_boost,
+    amrex::BoxArray const & ba, amrex::DistributionMapping const & dm)
 {
     if (m_lattice_defined) {
         m_element_finder = std::make_unique<amrex::LayoutData<LatticeElementFinder>>(ba, dm);
         for (amrex::MFIter mfi(*m_element_finder); mfi.isValid(); ++mfi)
         {
-            (*m_element_finder)[mfi].InitElementFinder(lev, mfi, *this);
+            (*m_element_finder)[mfi].InitElementFinder(lev, gamma_boost, mfi, *this);
         }
     }
 }

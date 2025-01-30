@@ -102,13 +102,13 @@ if comm.rank == 0:
     print(
         f"Plasma parameters:\n"
         f"\tlambda_e = {lambda_e:.1e} m\n"
-        f"\tt_pe = {1.0/f_pe:.1e} s\n"
+        f"\tt_pe = {1.0 / f_pe:.1e} s\n"
         f"\tv_ti = {v_ti:.1e} m/s\n"
     )
     print(
         f"Numerical parameters:\n"
-        f"\tdz/lambda_e = {dz/lambda_e:.2f}\n"
-        f"\tdt*w_pe = {dt*f_pe*2.0*np.pi:.2f}\n"
+        f"\tdz/lambda_e = {dz / lambda_e:.2f}\n"
+        f"\tdt*w_pe = {dt * f_pe * 2.0 * np.pi:.2f}\n"
         f"\tdiag steps = {diag_steps:d}\n"
         f"\ttotal steps = {total_steps:d}\n"
     )

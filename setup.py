@@ -318,7 +318,7 @@ setup(
     # },
     extras_require={
         "all": [
-            "openPMD-api~=0.15.1",
+            "openPMD-api>=0.16.1",
             "openPMD-viewer~=1.1",
             "yt>=4.1.0",
             "matplotlib",
@@ -342,7 +342,7 @@ setup(
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
         (
-            "License :: OSI Approved :: " "BSD License"
+            "License :: OSI Approved :: BSD License"
         ),  # TODO: use real SPDX: BSD-3-Clause-LBNL
     ],
     # new PEP 639 format

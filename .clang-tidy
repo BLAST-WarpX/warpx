@@ -44,6 +44,7 @@ Checks: '
         -readability-implicit-bool-conversion,
         -readability-isolate-declaration,
         -readability-magic-numbers,
+        -readability-misleading-indentation,
         -readability-named-parameter,
         -readability-uppercase-literal-suffix
     '
@@ -55,6 +56,8 @@ CheckOptions:
   value:        "H,"
 - key:          modernize-pass-by-value.ValuesOnly
   value:        "true"
+- key:          misc-use-anonymous-namespace.HeaderFileExtensions
+  value:        "H,"
 
 
 HeaderFilterRegex: 'Source[a-z_A-Z0-9\/]+\.H$'

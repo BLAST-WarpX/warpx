@@ -171,7 +171,7 @@ subprocess.run(
         "--title",
         f"Release {WarpX_version}",
         "--body",
-        f"""Prepare the {datetime.now().strftime('%B')} release of WarpX:
+        f"""Prepare the {datetime.now().strftime("%B")} release of WarpX:
 ```bash
 # update dependencies
 ./Tools/Release/updateAMReX.py
