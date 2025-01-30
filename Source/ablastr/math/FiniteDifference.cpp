@@ -9,14 +9,12 @@
 
 #include "ablastr/utils/TextMsg.H"
 
-using namespace ablastr::utils::enums;
 using namespace amrex;
 
 namespace ablastr::math
 {
-
     amrex::Vector<amrex::Real>
-    getFornbergStencilCoefficients (const int n_order, GridType a_grid_type)
+    getFornbergStencilCoefficients (const int n_order, ablastr::utils::enums::GridType::GridType a_grid_type)
     {
         ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(n_order % 2 == 0, "n_order must be even");
 
@@ -29,7 +27,7 @@ namespace ablastr::math
         // to calculate the coefficients by recurrence.
 
         // Coefficients for collocated (nodal) finite-difference approximation
-        if (a_grid_type == GridType::Collocated)
+        if (a_grid_type == ablastr::utils::enums::GridType::Collocated)
         {
             // First coefficient
             coeffs.at(0) = m * 2._rt / (m+1);
