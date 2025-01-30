@@ -377,7 +377,7 @@ WarpX::WarpX ()
     {
         namespace warpx::parallelization = wpar;
 
-        
+
 
         wpar::TimeTracker::enabled(true);
         wpar::TimeTracker::resize();
