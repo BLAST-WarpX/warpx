@@ -2,9 +2,9 @@
 """
 This script checks that electron secondary emission (implemented by a callback function) works as intended.
 
-In this test, four ions hit a spherical embedded boundary, and produce secondary 
-electrons with a probability of `0.4`. We thus expect ~2 electrons to be produced. 
-This script tests the number of electrons emitted and checks that their position is 
+In this test, four ions hit a spherical embedded boundary, and produce secondary
+electrons with a probability of `0.4`. We thus expect ~2 electrons to be produced.
+This script tests the number of electrons emitted and checks that their position is
 close to the embedded boundary.
 """
 
