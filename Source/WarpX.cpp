@@ -40,6 +40,7 @@
 #include "Particles/MultiParticleContainer.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
+#include "Parallelization/TimeTracker.H"
 #include "Particles/ParticleBoundaryBuffer.H"
 #include "AcceleratorLattice/AcceleratorLattice.H"
 #include "Utils/TextMsg.H"
@@ -371,6 +372,20 @@ WarpX::WarpX ()
 
     costs.resize(nlevs_max);
     load_balance_efficiency.resize(nlevs_max);
+
+    if (WarpX::load_balance_costs_update_algo==LoadBalanceCostsUpdateAlgo::Timers)
+    {
+        namespace warpx::parallelization = wpar;
+
+        
+
+        wpar::TimeTracker::enabled(true);
+        wpar::TimeTracker::resize();
+        wpar::TimeTracker::reset();
+    }
+    else{
+        wpar::TimeTracker::enabled(false);
+    }
 
     m_field_factory.resize(nlevs_max);
 

@@ -11,13 +11,14 @@
 #include <AMReX_GpuAtomic.H>
 #include <AMReX_Utility.H>
 
+bool warpx::parallelization::TimeTracker::do_tracking =
+    false;
+amrex::Vector<amrex::Vector<amrex::Real>> warpx::parallelization::TimeTracker::all_times =
+    amrex::Vector<amrex::Vector<amrex::Real>>{};
+
 namespace warpx::parallelization
 {
-
-    auto TimeTracker::do_tracking = false;
-    auto TimeTracker::all_times = amrex::Vector<amrex::Vector<amrex::Real>>{};
-
-    [[nodiscard]]
+     [[nodiscard]]
     TimeTracker track_time_until_out_of_scope (const int lev, const std::size_t index, const bool enabled_local)
     {
         return TimeTracker{lev, index, enabled_local};
