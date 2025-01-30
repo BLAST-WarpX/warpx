@@ -128,6 +128,14 @@ Excitation
 
 The process is also the same as for elastic scattering except the excitation energy cost is subtracted from the particle energy. This is done by reducing the velocity before a scattering angle is chosen.
 
+Forward scattering
+^^^^^^^^^^^^^^^^^^
+
+This process operates in two ways:
+
+1. If an excitation energy cost is provided, the energy cost is subtracted from the particle energy and no scattering is performed.
+2. If an excitation energy cost is not provided, the particle is not scattered and the velocity is unchanged (corresponding to a scattering angle of :math:`0` in the elastic scattering process above).
+
 Benchmarks
 ----------
 
