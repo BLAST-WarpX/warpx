@@ -59,6 +59,21 @@ using namespace amrex;
 
 namespace
 {
+
+    /** This function shifts a MultiFab in a given direction
+    *
+    * \param[in,out] mf the MultiFab to be shifted
+    * \param[in] geom the Geometry object associated to the level of the MultiFab mf
+    * \param[in] num_shift magnitude of the shift (cell number)
+    * \param[in] dir direction of the shift
+    * \param[in] safe_guard_cells flag to enable "safe mode" data exchanges with more guard cells
+    * \param[in] do_single_precision_comms flag to enable single precision communications
+    * \param[in,out] cost the pointer to the data structure holding costs for timer-based load-balance
+    * \param[in] external_field the external field (used to initialize EM fields)
+    * \param[in] useparser flag to enable the use of a field parser to initialize EM fields
+    * \param[in] field_parser the field parser
+    * \param[in] PMLRZ_flag flag to enable a special treatment for PML in RZ simulations
+    */
     void shiftMF (
         amrex::MultiFab& mf, const amrex::Geometry& geom,
         int num_shift, int dir,
@@ -75,7 +90,7 @@ namespace
         const int nc = mf.nComp();
         const amrex::IntVect& ng = mf.nGrowVect();
 
-        AMREX_ALWAYS_ASSERT(ng[dir] >= num_shift);
+        AMREX_ALWAYS_ASSERT(ng[dir] >= std::abs(num_shift));
 
         amrex::MultiFab tmpmf(ba, dm, nc, ng);
         amrex::MultiFab::Copy(tmpmf, mf, 0, 0, nc, ng);
@@ -86,7 +101,7 @@ namespace
         } else {
             amrex::IntVect ng_mw = amrex::IntVect::TheUnitVector();
             // Enough guard cells in the MW direction
-            ng_mw[dir] = num_shift;
+            ng_mw[dir] = std::abs(num_shift);
             // Make sure we don't exceed number of guard cells allocated
             ng_mw = ng_mw.min(ng);
             // Fill guard cells.
