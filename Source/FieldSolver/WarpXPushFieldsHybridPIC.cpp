@@ -154,6 +154,23 @@ void WarpX::HybridPICEvolveFields ()
         hybrid_electron_fl->HybridInitializeKe(m_fields, m_hybrid_pic_model->m_gamma, m_hybrid_pic_model->m_n_floor, finest_level);
     }
 
+   
+    if(m_hybrid_pic_model->m_solve_electron_energy_equation)
+    {
+        // Calculate plasma current at n+1/2 using Ampere's law
+        // using B field at t=n+1/2
+        m_hybrid_pic_model->CalculatePlasmaCurrent(
+            m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
+            m_fields.get_mr_levels_alldirs(FieldType::edge_lengths, finest_level));
+
+        // Calculates Ue using Jtot at n+1/2 and Ji at n+1/2
+        hybrid_electron_fl->HybridInitializeUe(m_fields,
+                m_fields.get_alldirs(FieldType::current_fp, finest_level),
+                m_hybrid_pic_model.get(),
+                finest_level);
+    }
+
+
     // Now push the B field from t=n+1/2 to t=n+1 using the n+1/2 quantities
     for (int sub_step = 0; sub_step < sub_steps; sub_step++)
     {
@@ -200,12 +217,6 @@ void WarpX::HybridPICEvolveFields ()
         //        current_fp_temp[finest_level],
         //        m_hybrid_pic_model.get(),
         //        finest_level);
-
-        // Calculates Ue using Jtot at n+1/2 and Ji at n+1/2
-        hybrid_electron_fl->HybridInitializeUe(m_fields,
-                current_fp_temp[finest_level],
-                m_hybrid_pic_model.get(),
-                finest_level);
 
         // Reset qdsmc particles positions to x0,y0,z0 and rest of attributes to 0 and redistribute
         qdsmc_hybrid_electron_pc->ResetParticles(finest_level);
