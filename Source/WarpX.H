@@ -197,7 +197,7 @@ public:
     //! Integer that corresponds to the type of Maxwell solver (Yee, CKC, PSATD, ECT)
     static inline auto electromagnetic_solver_id = ElectromagneticSolverAlgo::Default;
     //! Integer that corresponds to the evolve scheme (explicit, semi_implicit_em, theta_implicit_em)
-    static inline auto evolve_scheme = EvolveScheme::Default;
+    EvolveScheme evolve_scheme = EvolveScheme::Default;
     //! Maximum iterations used for self-consistent particle update in implicit particle-suppressed evolve schemes
     static int max_particle_its_in_implicit_scheme;
     //! Relative tolerance used for self-consistent particle update in implicit particle-suppressed evolve schemes
@@ -404,7 +404,7 @@ public:
      * \param[in] name The name of the iMultiFab to use in the map
      * \param[in] initial_value The optional initial value
      */
-    static void AllocInitMultiFab (
+    void AllocInitMultiFab (
         std::unique_ptr<amrex::iMultiFab>& mf,
         const amrex::BoxArray& ba,
         const amrex::DistributionMapping& dm,
@@ -417,7 +417,7 @@ public:
     // Maps of all of the iMultiFabs used (this can include MFs from other classes)
     // This is a convenience for the Python interface, allowing all iMultiFabs
     // to be easily referenced from Python.
-    static std::map<std::string, amrex::iMultiFab *> imultifab_map;
+    std::map<std::string, amrex::iMultiFab *> imultifab_map;
 
     /**
      * \brief
@@ -849,7 +849,7 @@ public:
 
     void ComputeDivE(amrex::MultiFab& divE, int lev);
 
-    static void ProjectionCleanDivB ();
+    void ProjectionCleanDivB ();
 
     [[nodiscard]] amrex::IntVect getngEB() const { return guard_cells.ng_alloc_EB; }
     [[nodiscard]] amrex::IntVect getngF() const { return guard_cells.ng_alloc_F; }
