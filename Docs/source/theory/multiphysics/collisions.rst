@@ -121,7 +121,7 @@ The particle velocity in the COM frame is then isotropically scattered using the
 Back scattering
 ^^^^^^^^^^^^^^^
 
-The process is the same as for elastic scattering above expect the scattering angle is fixed at :math:`\pi`, meaning the particle velocity in the COM frame is updated to :math:`-\vec{u}_c`.
+The process is the same as for elastic scattering above except the scattering angle is fixed at :math:`\pi`, meaning the particle velocity in the COM frame is updated to :math:`-\vec{u}_c`.
 
 Excitation
 ^^^^^^^^^^
