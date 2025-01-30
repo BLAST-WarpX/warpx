@@ -13,6 +13,8 @@ set(CTEST_SUBMIT_URL https://my.cdash.org/submit.php?project=WarpX)
 
 set(CTEST_DROP_SITE_CDASH TRUE)
 
-# Additional settings
-set(CTEST_SITE "Azure-Pipelines")
-set(CTEST_BUILD_NAME "CI-Development")
+# Set site and build names
+# - CTest script variables: CTEST_SITE, CTEST_BUILD_NAME
+# - CTest module variables: SITE, BUILDNAME
+set(SITE "Azure-Pipelines")
+set(BUILDNAME "CI-Development")

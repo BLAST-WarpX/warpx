@@ -28,8 +28,8 @@ public:
      */
     void operator()(amrex::MultiFab& mf_dst, int dcomp, int /*i_buffer=0*/) const override;
 private:
-    int const m_lev; /**< level on which mf_src is defined */
-    int const m_ispec; /**< index of species to average over */
+    int m_lev; /**< level on which mf_src is defined */
+    int m_ispec; /**< index of species to average over */
 };
 
 #endif // WARPX_TEMPERATUREFUNCTOR_H_

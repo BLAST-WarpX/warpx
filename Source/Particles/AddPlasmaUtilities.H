@@ -334,8 +334,8 @@ struct QEDHelper
     amrex::ParticleReal* p_optical_depth_QSR = nullptr;
     amrex::ParticleReal* p_optical_depth_BW  = nullptr;
 
-    const bool has_quantum_sync;
-    const bool has_breit_wheeler;
+    bool has_quantum_sync;
+    bool has_breit_wheeler;
 
     QuantumSynchrotronGetOpticalDepth quantum_sync_get_opt;
     BreitWheelerGetOpticalDepth breit_wheeler_get_opt;
