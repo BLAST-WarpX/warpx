@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 """
-This script tests the last coordinates of the emitted secondary electrons.
-The EB sphere is centered on O and has a radius of 0.2.
-The proton is initially at: (0,0,-0.25) and moves with a velocity:
-(0.1e6,0,1.5e6) with a time step of dt = 0.000000015.
-The simulation uses a fixed random seed (np.random.seed(10025015))
-to ensure the emission of secodnary electrons.
-An input file inputs_test_rz_secondary_ion_emission_picmi.py is used.
+This script checks that electron secondary emission (implemented by a callback function) works as intended.
+
+In this test, four ions hit a spherical embedded boundary, and produce secondary 
+electrons with a probability of `0.4`. We thus expect ~2 electrons to be produced. 
+This script tests the number of electrons emitted and checks that their position is 
+close to the embedded boundary.
 """
 
 import sys
@@ -23,21 +22,10 @@ ts = OpenPMDTimeSeries(filename)
 
 it = ts.iterations
 x, y, z = ts.get_particle(["x", "y", "z"], species="electrons", iteration=it[-1])
-print("x", x)
-print("y", y)
-print("z", z)
-# Analytical results calculated
-# x_analytic = [0.004028, 0.003193]
-# y_analytic = [-0.0001518, -0.0011041]
-# z_analytic = [-0.19967, -0.19926]
 
 x_analytic = [-0.091696, 0.011599]
 y_analytic = [-0.002282, -0.0111624]
 z_analytic = [-0.200242, -0.201728]
-
-# x_analytic = [-0.09169647,  0.01159922]
-# y_analytic  = [-0.00228188, -0.01116237]
-# z_analytic = [-0.20024175, -0.20172786]
 
 N_sec_e = np.size(z)  # number of the secondary electrons
 
