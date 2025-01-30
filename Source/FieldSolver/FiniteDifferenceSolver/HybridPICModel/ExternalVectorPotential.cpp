@@ -225,7 +225,7 @@ ExternalVectorPotential::InitData ()
 }
 
 
-void 
+void
 ExternalVectorPotential::CalculateExternalCurlA ()
 {
     for (auto fname : m_field_names) {
@@ -233,7 +233,7 @@ ExternalVectorPotential::CalculateExternalCurlA ()
     }
 }
 
-void 
+void
 ExternalVectorPotential::CalculateExternalCurlA (std::string& coil_name)
 {
     using ablastr::fields::Direction;
