@@ -7,9 +7,10 @@
  */
 #include "SpectralKSpace.H"
 
-#include "WarpX.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
+
+#include <ablastr/math/FiniteDifference.H>
 
 #include <AMReX_BLassert.H>
 #include <AMReX_Box.H>
@@ -211,7 +212,8 @@ SpectralKSpace::getModifiedKComponent (const DistributionMapping& dm,
     } else {
 
         // Compute real-space stencil coefficients
-        Vector<Real> h_stencil_coef = WarpX::getFornbergStencilCoefficients(n_order, grid_type);
+        Vector<Real> h_stencil_coef =
+            ablastr::math::getFornbergStencilCoefficients(n_order, grid_type);
         Gpu::DeviceVector<Real> d_stencil_coef(h_stencil_coef.size());
         Gpu::copyAsync(Gpu::hostToDevice, h_stencil_coef.begin(), h_stencil_coef.end(),
                        d_stencil_coef.begin());

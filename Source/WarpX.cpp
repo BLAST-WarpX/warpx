@@ -50,6 +50,7 @@
 
 #include "FieldSolver/ImplicitSolvers/ImplicitSolverLibrary.H"
 
+#include <ablastr/math/FiniteDifference.H>
 #include <ablastr/utils/SignalHandling.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -199,29 +200,6 @@ namespace
             std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(), is_pml);
         return is_any_pml;
     }
-
-    /**
-     * \brief Re-orders the Fornberg coefficients so that they can be used more conveniently for
-     * finite-order centering operations. For example, for finite-order centering of order 6,
-     * the Fornberg coefficients \c (c_0,c_1,c_2) are re-ordered as \c (c_2,c_1,c_0,c_0,c_1,c_2).
-     *
-     * \param[in,out] ordered_coeffs host vector where the re-ordered Fornberg coefficients will be stored
-     * \param[in] unordered_coeffs host vector storing the original sequence of Fornberg coefficients
-     * \param[in] order order of the finite-order centering along a given direction
-     */
-    void ReorderFornbergCoefficients (
-        amrex::Vector<amrex::Real>& ordered_coeffs,
-        const amrex::Vector<amrex::Real>& unordered_coeffs,
-        const int order)
-        {
-            const int n = order / 2;
-            for (int i = 0; i < n; i++) {
-                ordered_coeffs[i] = unordered_coeffs[n-1-i];
-            }
-            for (int i = n; i < order; i++) {
-                ordered_coeffs[i] = unordered_coeffs[i-n];
-            }
-        }
 }
 
 void WarpX::MakeWarpX ()
@@ -3196,49 +3174,6 @@ WarpX::BuildBufferMasksInBox ( const amrex::Box tbx, amrex::IArrayBox &buffer_ma
     });
 }
 
-amrex::Vector<amrex::Real> WarpX::getFornbergStencilCoefficients (const int n_order, ablastr::utils::enums::GridType a_grid_type)
-{
-    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(n_order % 2 == 0, "n_order must be even");
-
-    const int m = n_order / 2;
-    amrex::Vector<amrex::Real> coeffs;
-    coeffs.resize(m);
-
-    // There are closed-form formula for these coefficients, but they result in
-    // an overflow when evaluated numerically. One way to avoid the overflow is
-    // to calculate the coefficients by recurrence.
-
-    // Coefficients for collocated (nodal) finite-difference approximation
-    if (a_grid_type == GridType::Collocated)
-    {
-        // First coefficient
-        coeffs.at(0) = m * 2._rt / (m+1);
-        // Other coefficients by recurrence
-        for (int n = 1; n < m; n++)
-        {
-            coeffs.at(n) = - (m-n) * 1._rt / (m+n+1) * coeffs.at(n-1);
-        }
-    }
-    // Coefficients for staggered finite-difference approximation
-    else
-    {
-        Real prod = 1.;
-        for (int k = 1; k < m+1; k++)
-        {
-            prod *= (m + k) / (4._rt * k);
-        }
-        // First coefficient
-        coeffs.at(0) = 4_rt * m * prod * prod;
-        // Other coefficients by recurrence
-        for (int n = 1; n < m; n++)
-        {
-            coeffs.at(n) = - ((2_rt*n-1) * (m-n)) * 1._rt / ((2_rt*n+1) * (m+n)) * coeffs.at(n-1);
-        }
-    }
-
-    return coeffs;
-}
-
 void WarpX::AllocateCenteringCoefficients (amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_x,
                                            amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_y,
                                            amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_z,
@@ -3257,9 +3192,9 @@ void WarpX::AllocateCenteringCoefficients (amrex::Gpu::DeviceVector<amrex::Real>
     amrex::Vector<amrex::Real> host_centering_stencil_coeffs_y;
     amrex::Vector<amrex::Real> host_centering_stencil_coeffs_z;
 
-    Fornberg_stencil_coeffs_x = getFornbergStencilCoefficients(centering_nox, a_grid_type);
-    Fornberg_stencil_coeffs_y = getFornbergStencilCoefficients(centering_noy, a_grid_type);
-    Fornberg_stencil_coeffs_z = getFornbergStencilCoefficients(centering_noz, a_grid_type);
+    Fornberg_stencil_coeffs_x = ablastr::math::getFornbergStencilCoefficients(centering_nox, a_grid_type);
+    Fornberg_stencil_coeffs_y = ablastr::math::getFornbergStencilCoefficients(centering_noy, a_grid_type);
+    Fornberg_stencil_coeffs_z = ablastr::math::getFornbergStencilCoefficients(centering_noz, a_grid_type);
 
     host_centering_stencil_coeffs_x.resize(centering_nox);
     host_centering_stencil_coeffs_y.resize(centering_noy);
@@ -3267,17 +3202,17 @@ void WarpX::AllocateCenteringCoefficients (amrex::Gpu::DeviceVector<amrex::Real>
 
     // Re-order Fornberg stencil coefficients:
     // example for order 6: (c_0,c_1,c_2) becomes (c_2,c_1,c_0,c_0,c_1,c_2)
-    ::ReorderFornbergCoefficients(
+    ablastr::math::ReorderFornbergCoefficients(
         host_centering_stencil_coeffs_x,
         Fornberg_stencil_coeffs_x,
         centering_nox
     );
-    ::ReorderFornbergCoefficients(
+    ablastr::math::ReorderFornbergCoefficients(
         host_centering_stencil_coeffs_y,
         Fornberg_stencil_coeffs_y,
         centering_noy
     );
-    ::ReorderFornbergCoefficients(
+    ablastr::math::ReorderFornbergCoefficients(
         host_centering_stencil_coeffs_z,
         Fornberg_stencil_coeffs_z,
         centering_noz
