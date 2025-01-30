@@ -238,6 +238,7 @@ void HybridPICModel::InitData ()
 
     // Initialize electron temperature multifab
     // This assumes an uniform electron temperature in the domain
+    // change this to Te0*(ne/ne0)**(gamma-1) ?
     warpx.m_fields.get("fluid_temperature_electrons_hybrid",  warpx.finestLevel())->setVal(elec_temp);
 
     // Fill Boundaries in electron temperature multifab

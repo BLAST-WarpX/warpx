@@ -110,7 +110,7 @@ public:
     // then calls Redistribute()
     void ResetParticles(int lev);
 
-    // REMOVE
+    // Remove DepositK and generalize this function for a particle scalar quantity passed as argument
     void DepositField(int lev, amrex::MultiFab &Field);
 
 };

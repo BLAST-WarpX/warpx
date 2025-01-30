@@ -1492,7 +1492,6 @@ void WarpXFluidContainer::HybridInitializeUe (
                     auto const jiz_interp = ablastr::coarsen::sample::Interp(Jiz, Jz_stag, nodal, coarsen, i, j, k, 0);
 
                     // this needs to be rewritten for multiple ion species when implemented :
-
                     Uex(i, j, k) = -(jx_interp - jix_interp)/rho_val;
                     Uey(i, j, k) = -(jy_interp - jiy_interp)/rho_val;
                     Uez(i, j, k) = -(jz_interp - jiz_interp)/rho_val;

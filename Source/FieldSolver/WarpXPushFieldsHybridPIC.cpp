@@ -81,16 +81,16 @@ void WarpX::HybridPICEvolveFields ()
     // in `current_fp`.
 
     // Calculate Ke using rho^{n+1} in rho_fp  //  before: Calculate Ke using rho^{n} in rho_fp_temp
-    if(m_hybrid_pic_model->m_solve_electron_energy_equation)
-    {
+    //if(m_hybrid_pic_model->m_solve_electron_energy_equation)
+    //{
         // copy rho_fp_temp to hybrid_electron_fl->name_mf_N
-        m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->setVal(0);
-       MultiFab::Copy( *m_fields.get(hybrid_electron_fl->name_mf_N, finest_level),
-                        *m_fields.get(FieldType::rho_fp, finest_level), //*m_fields.get(FieldType::hybrid_rho_fp_temp, finest_level),
-                        0, 0, 1, m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->nGrowVect());
+    //    m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->setVal(0);
+    //    MultiFab::Copy( *m_fields.get(hybrid_electron_fl->name_mf_N, finest_level),
+    //                    *m_fields.get(FieldType::rho_fp, finest_level), //*m_fields.get(FieldType::hybrid_rho_fp_temp, finest_level),
+    //                   0, 0, 1, m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->nGrowVect());
         // Calculate Ke
-        hybrid_electron_fl->HybridInitializeKe(m_fields, m_hybrid_pic_model->m_gamma, m_hybrid_pic_model->m_n_floor, finest_level);
-    }
+    //    hybrid_electron_fl->HybridInitializeKe(m_fields, m_hybrid_pic_model->m_gamma, m_hybrid_pic_model->m_n_floor, finest_level);
+    //}
 
 
     // Note: E^{n} is recalculated with the accurate J_i^{n} since at the end
@@ -141,6 +141,19 @@ void WarpX::HybridPICEvolveFields ()
         );
     }
 
+
+    // Calculate Ke using rho^{n+1/2} in rho_fp_temp
+    if(m_hybrid_pic_model->m_solve_electron_energy_equation)
+    {
+        // copy rho_fp_temp to hybrid_electron_fl->name_mf_N
+        m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->setVal(0);
+        MultiFab::Copy( *m_fields.get(hybrid_electron_fl->name_mf_N, finest_level),
+                        *m_fields.get(FieldType::hybrid_rho_fp_temp, finest_level),
+                        0, 0, 1, m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->nGrowVect());
+        // Calculate Ke
+        hybrid_electron_fl->HybridInitializeKe(m_fields, m_hybrid_pic_model->m_gamma, m_hybrid_pic_model->m_n_floor, finest_level);
+    }
+
     // Now push the B field from t=n+1/2 to t=n+1 using the n+1/2 quantities
     for (int sub_step = 0; sub_step < sub_steps; sub_step++)
     {
@@ -155,15 +168,6 @@ void WarpX::HybridPICEvolveFields ()
             WarpX::sync_nodal_points
         );
     }
-
-    // Here current_fp_temp has Ji^{n}
-    // Calculating Ue at step n
-    //if(m_hybrid_pic_model->m_solve_electron_energy_equation){
-    //    hybrid_electron_fl->HybridInitializeUe(m_fields,
-    //        current_fp_temp[finest_level],
-    //        m_hybrid_pic_model.get(),
-    //        finest_level);
-    //}
 
     // Extrapolate the ion current density to t=n+1 using
     // J_i^{n+1} = 1/2 * J_i^{n-1/2} + 3/2 * J_i^{n+1/2}, and recalling that
@@ -183,7 +187,7 @@ void WarpX::HybridPICEvolveFields ()
         }
     }
 
-    // Update the E field to t=n+1 using the extrapolated J_i^n+1 value
+    // calculate plasma current at n+1
     m_hybrid_pic_model->CalculatePlasmaCurrent(
         m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::edge_lengths, finest_level));
@@ -192,11 +196,16 @@ void WarpX::HybridPICEvolveFields ()
     if(m_hybrid_pic_model->m_solve_electron_energy_equation){
 
         // Calculates Ue using Jtot at n+1 and Ji at n+1
+        //hybrid_electron_fl->HybridInitializeUe(m_fields,
+        //        current_fp_temp[finest_level],
+        //        m_hybrid_pic_model.get(),
+        //        finest_level);
+
+        // Calculates Ue using Jtot at n+1/2 and Ji at n+1/2
         hybrid_electron_fl->HybridInitializeUe(m_fields,
                 current_fp_temp[finest_level],
                 m_hybrid_pic_model.get(),
                 finest_level);
-
 
         // Reset qdsmc particles positions to x0,y0,z0 and rest of attributes to 0 and redistribute
         qdsmc_hybrid_electron_pc->ResetParticles(finest_level);
@@ -235,6 +244,7 @@ void WarpX::HybridPICEvolveFields ()
     // Calculate the electron pressure at t=n+1
     m_hybrid_pic_model->CalculateElectronPressure();
 
+    // Update the E field to t=n+1 using the extrapolated J_i^n+1 value
     m_hybrid_pic_model->HybridPICSolveE(
         m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
         current_fp_temp,

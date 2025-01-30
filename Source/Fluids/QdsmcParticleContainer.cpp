@@ -478,7 +478,6 @@ QdsmcParticleContainer::DepositK(int lev, amrex::MultiFab &Kfield)
 }
 
 
-
 // Auxiliary function, should generalize the function above
 // to deposit a particle property (passed as argument)
 // to a multifab passed as argument
