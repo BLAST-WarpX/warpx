@@ -254,7 +254,7 @@ SpectralKSpace::getModifiedKComponent (const DistributionMapping& dm,
                 // (i.e. highest *real* k) is 0. However, the above calculation
                 // based on stencil coefficients does not give 0 to machine precision.
                 // Therefore, we need to enforce the fact that the modified k be 0 here.
-                if (grid_type == ablastr::utils::enums::GridType::GridType::Collocated){
+                if (grid_type == ablastr::utils::enums::GridType::Collocated){
                     if (i_dim == 0){
                         // Because of the real-to-complex FFTs, the first axis (idim=0)
                         // contains only the positive k, and the Nyquist frequency is
