@@ -416,14 +416,14 @@ namespace ablastr::fields
     MultiFabRegister::internal_get_mr_levels (
         std::string const & name,
         int finest_level,
-        bool skip_level_0
+        bool skip_lev0_coarse_patch
     )
     {
         MultiLevelScalarField field_on_level;
         field_on_level.reserve(finest_level+1);
         for (int lvl = 0; lvl <= finest_level; lvl++)
         {
-            if (lvl == 0 && skip_level_0)
+            if (lvl == 0 && skip_lev0_coarse_patch)
             {
                 field_on_level.push_back(nullptr);
             }
@@ -439,14 +439,14 @@ namespace ablastr::fields
     MultiFabRegister::internal_get_mr_levels (
         std::string const & name,
         int finest_level,
-        bool skip_level_0
+        bool skip_lev0_coarse_patch
     ) const
     {
         ConstMultiLevelScalarField field_on_level;
         field_on_level.reserve(finest_level+1);
         for (int lvl = 0; lvl <= finest_level; lvl++)
         {
-            if (lvl == 0 && skip_level_0)
+            if (lvl == 0 && skip_lev0_coarse_patch)
             {
                 field_on_level.push_back(nullptr);
             }
@@ -496,7 +496,7 @@ namespace ablastr::fields
     MultiFabRegister::internal_get_mr_levels_alldirs (
         std::string const & name,
         int finest_level,
-        bool skip_level_0
+        bool skip_lev0_coarse_patch
     )
     {
         MultiLevelVectorField field_on_level;
@@ -510,7 +510,7 @@ namespace ablastr::fields
             // insert components
             for (Direction const & dir : m_all_dirs)
             {
-                if (lvl == 0 && skip_level_0)
+                if (lvl == 0 && skip_lev0_coarse_patch)
                 {
                     field_on_level[lvl][dir] = nullptr;
                 }
@@ -527,7 +527,7 @@ namespace ablastr::fields
     MultiFabRegister::internal_get_mr_levels_alldirs (
         std::string const & name,
         int finest_level,
-        bool skip_level_0
+        bool skip_lev0_coarse_patch
     ) const
     {
         ConstMultiLevelVectorField field_on_level;
@@ -541,7 +541,7 @@ namespace ablastr::fields
             // insert components
             for (Direction const & dir : m_all_dirs)
             {
-                if (lvl == 0 && skip_level_0)
+                if (lvl == 0 && skip_lev0_coarse_patch)
                 {
                     field_on_level[lvl][dir] = nullptr;
                 }
