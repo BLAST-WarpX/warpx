@@ -33,6 +33,11 @@ ExternalVectorPotential::ReadParameters ()
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_field_names.empty(),
         "No external field names defined in external_vector_potential.fields");
 
+// #if defined(WARPX_DIM_RZ)
+//     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(false,
+//         "External Time Varying Fields in the Hybrid module is currently not supported. Coming Soon!");
+// #endif
+
     m_nFields = m_field_names.size();
 
     // Resize vectors and set defaults
@@ -349,12 +354,14 @@ ExternalVectorPotential::UpdateHybridExternalFields (const amrex::Real t, const 
                     0, 1, 0);
             }
 
-            ZeroFieldinEB(B_ext[lev], EB::CoverTopology::face, lev);
-            ZeroFieldinEB(E_ext[lev], EB::CoverTopology::edge, lev);
-
             for (int idir = 0; idir < 3; ++idir) {
                 E_ext[lev][Direction{idir}]->FillBoundary(warpx.Geom(lev).periodicity());
                 B_ext[lev][Direction{idir}]->FillBoundary(warpx.Geom(lev).periodicity());
+            }
+
+            if (EB::enabled()) {
+                ZeroFieldinEB(B_ext[lev], EB::CoverTopology::face, lev);
+                ZeroFieldinEB(E_ext[lev], EB::CoverTopology::edge, lev);
             }
         }
     }

@@ -166,12 +166,12 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
                 }
             },
 
-            // Jz calculation
+            // Bz calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
                 if (cov_ptr.isCovered(2, EB::CoverTopology::face, i, j, 0)) { return; }
 
                 Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bz is cell-centered in r)
-                Bz(i, j, 0, 0) = - ( - T_Algo::UpwardDrr_over_r(At, r, dr, coefs_r, n_coefs_r, i, j, 0, 0));
+                Bz(i, j, 0, 0) =  T_Algo::UpwardDrr_over_r(At, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
                 for (int m=1 ; m<nmodes ; m++) { // Higher-order modes
                     Bz(i, j, 0, 2*m-1) = - ( m * Ar(i, j, 0, 2*m  )/r
                         - T_Algo::UpwardDrr_over_r(At, r, dr, coefs_r, n_coefs_r, i, j, 0, 2*m-1)); // Real part

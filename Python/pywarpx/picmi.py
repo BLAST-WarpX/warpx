@@ -1783,8 +1783,30 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
     Jx/y/z_external_function: str
         Function of space and time specifying external (non-plasma) currents.
 
-    Ax/y/z_external_function: str
+    A_external: dict
         Function of space and time specifying external (non-plasma) vector potential fields.
+        It is expected that a nested dicitonary will be passed
+        into picmi for each field that has different timings
+        e.g.
+        A_external = {
+            '<field_name1>': {
+                'Ax_external_function': <implicit function with (x,y,z) dependence>,
+                'Ax_external_function': <implicit function with (x,y,z) dependence>,
+                'Ax_external_function': <implicit function with (x,y,z) dependence>,
+                'A_time_external_function': <implicit function with (t) dependence>
+            },
+            '<field_name2>: {...}'
+        }
+
+        or if fields are to be loaded from an OpenPMD file
+        A_external = {
+            '<field_name1>': {
+                'load_from_file': True,
+                'path': <path to OpenPMD file>,
+                'A_time_external_function': <implicit function with (t) dependence>
+            },
+            '<field_name2>: {...}'
+        }
     """
 
     def __init__(
@@ -1820,19 +1842,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.Jz_external_function = Jz_external_function
 
         self.add_external_fields = None
-
-        # It is expected that a nested dicitonary will be passed
-        # into picmi for each field that has different timings
-        # e.g.
-        # A_external = {
-        #     '<field_name1>': {
-        #         'Ax_external_function': ...,
-        #         'Ax_external_function': ...,
-        #         'Ax_external_function': ...,
-        #         'A_time_external_function': ...
-        #     },
-        #     '<field_name2>: {...}'
-        # }
         self.A_external = A_external
 
         if A_external is not None:
@@ -1895,24 +1904,34 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                 ),
             )
             for field_name, field_dict in self.A_external.items():
-                pywarpx.external_vector_potential.__setattr__(
-                    f"{field_name}.Ax_external_grid_function(x,y,z)",
-                    pywarpx.my_constants.mangle_expression(
-                        field_dict["Ax_external_function"], self.mangle_dict
-                    ),
-                )
-                pywarpx.external_vector_potential.__setattr__(
-                    f"{field_name}.Ay_external_grid_function(x,y,z)",
-                    pywarpx.my_constants.mangle_expression(
-                        field_dict["Ay_external_function"], self.mangle_dict
-                    ),
-                )
-                pywarpx.external_vector_potential.__setattr__(
-                    f"{field_name}.Az_external_grid_function(x,y,z)",
-                    pywarpx.my_constants.mangle_expression(
-                        field_dict["Az_external_function"], self.mangle_dict
-                    ),
-                )
+                if "read_from_file" in field_dict.keys() and field_dict["read_from_file"]:
+                    pywarpx.external_vector_potential.__setattr__(
+                        f"{field_name}.read_from_file",
+                        field_dict["read_from_file"]
+                    )
+                    pywarpx.external_vector_potential.__setattr__(
+                        f"{field_name}.path",
+                        field_dict["path"]
+                    )
+                else:
+                    pywarpx.external_vector_potential.__setattr__(
+                        f"{field_name}.Ax_external_grid_function(x,y,z)",
+                        pywarpx.my_constants.mangle_expression(
+                            field_dict["Ax_external_function"], self.mangle_dict
+                        ),
+                    )
+                    pywarpx.external_vector_potential.__setattr__(
+                        f"{field_name}.Ay_external_grid_function(x,y,z)",
+                        pywarpx.my_constants.mangle_expression(
+                            field_dict["Ay_external_function"], self.mangle_dict
+                        ),
+                    )
+                    pywarpx.external_vector_potential.__setattr__(
+                        f"{field_name}.Az_external_grid_function(x,y,z)",
+                        pywarpx.my_constants.mangle_expression(
+                            field_dict["Az_external_function"], self.mangle_dict
+                        ),
+                    )
                 pywarpx.external_vector_potential.__setattr__(
                     f"{field_name}.A_time_external_function(t)",
                     pywarpx.my_constants.mangle_expression(

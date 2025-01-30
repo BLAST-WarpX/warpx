@@ -150,7 +150,7 @@ void WarpX::HybridPICEvolveFields ()
     }
 
     if (add_external_fields) {
-        // Get the external fields
+        // Get the external fields at E^{n+1/2}
         m_hybrid_pic_model->m_external_vector_potential->UpdateHybridExternalFields(
             gett_old(0) + 0.5_rt*dt[0],
             0.5_rt*dt[0]);
@@ -209,6 +209,7 @@ void WarpX::HybridPICEvolveFields ()
         false);
 
     FillBoundaryE(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
+    // ApplyEfieldBoundary(0, PatchType::fine);
 
     // Handle field splitting for Hybrid field push
     if (add_external_fields) {

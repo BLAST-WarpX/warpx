@@ -734,7 +734,7 @@ WarpX::ReadParameters ()
             use_kspace_filter = use_filter;
             use_filter = false;
         }
-        else // FDTD
+        else if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::HybridPIC)
         {
             // Filter currently not working with FDTD solver in RZ geometry along R
             // (see https://github.com/ECP-WarpX/WarpX/issues/1943)

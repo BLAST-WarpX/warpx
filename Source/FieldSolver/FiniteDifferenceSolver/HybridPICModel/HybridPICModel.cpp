@@ -578,9 +578,12 @@ void HybridPICModel::FieldPush (
     // Calculate the E-field from Ohm's law
     HybridPICSolveE(Efield, Jfield, Bfield, rhofield, true);
     warpx.FillBoundaryE(ng, nodal_sync);
+    warpx.ApplyEfieldBoundary(0, PatchType::fine);
+
     // Push forward the B-field using Faraday's law
     warpx.EvolveB(dt, dt_type);
     warpx.FillBoundaryB(ng, nodal_sync);
+    warpx.ApplyBfieldBoundary(0, PatchType::fine, dt_type);
 }
 
 void
