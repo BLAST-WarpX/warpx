@@ -15,18 +15,6 @@
 
 namespace warpx::parallelization
 {
-    class WarpX;
-
-    class TimeTrackerWarpXInterface
-    {
-        private:
-        static void toggle_tracking (bool do_tracking);
-        static void resize (const amrex::Vector<std::size_t>& max_index_per_level);
-        static void reset_values ();
-
-        friend class WarpX;
-    };
-
     class TimeTracker
     {
 
@@ -37,7 +25,7 @@ namespace warpx::parallelization
         [[nodiscard]]
         static bool enabled ();
 
-        TimeTracker(int lev, std::size_t mfi_iter_index);
+        TimeTracker(int lev, std::size_t mfi_iter_index, bool enabled_local = true);
         ~TimeTracker();
 
         //TimeTracker must be uncopyable and unmovable
@@ -46,7 +34,7 @@ namespace warpx::parallelization
         TimeTracker& operator=(const TimeTracker&) = delete;
         TimeTracker& operator=(TimeTracker&&) = delete;
 
-        friend class TimeTrackerWarpXInterface;
+        friend class WarpX;
 
     private:
         static void toggle_tracking (bool do_tracking_flag);
@@ -59,10 +47,11 @@ namespace warpx::parallelization
         int m_lev;
         std::size_t m_index;
         amrex::Real m_start_time;
+        bool m_enabled_local;
     };
 
     [[nodiscard]]
-    TimeTracker track_time_until_out_of_scope (int lev, std::size_t index);
+    TimeTracker track_time_until_out_of_scope (int lev, std::size_t index, bool enabled_local = true);
 }
 
 #endif //WARPX_PARALLELIZATION_TIME_TRACKER_H_

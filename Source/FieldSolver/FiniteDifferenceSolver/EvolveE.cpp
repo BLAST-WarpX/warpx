@@ -32,6 +32,7 @@
 #include <AMReX_GpuDevice.H>
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_GpuQualifiers.H>
+#include <AMReX_iMultiFab.H>
 #include <AMReX_IndexType.H>
 #include <AMReX_LayoutData.H>
 #include <AMReX_MFIter.H>

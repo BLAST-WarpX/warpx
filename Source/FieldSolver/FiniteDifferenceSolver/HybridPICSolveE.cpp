@@ -19,6 +19,8 @@
 #include "Parallelization/TimeTracker.H"
 #include "Utils/TextMsg.H"
 
+#include <AMReX_iMultiFab.H>
+
 #include <ablastr/coarsen/sample.H>
 
 using namespace amrex;

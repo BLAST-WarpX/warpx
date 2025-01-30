@@ -294,7 +294,7 @@ BackgroundMCCCollision::doCollisions (amrex::Real cur_time, amrex::Real dt, Mult
 
         // secondly perform ionization through the SmartCopyFactory if needed
         if (ionization_flag) {
-            doBackgroundIonization(lev, cost, species1, species2, cur_time);
+            doBackgroundIonization(lev, species1, species2, cur_time);
         }
     }
 }
@@ -453,8 +453,7 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
 
 
 void BackgroundMCCCollision::doBackgroundIonization
-( int lev, amrex::LayoutData<amrex::Real>* cost,
-  WarpXParticleContainer& species1, WarpXParticleContainer& species2, amrex::Real t)
+( int lev, WarpXParticleContainer& species1, WarpXParticleContainer& species2, amrex::Real t)
 {
     WARPX_PROFILE("BackgroundMCCCollision::doBackgroundIonization()");
 

@@ -1500,7 +1500,7 @@ WarpXParticleContainer::PushX (int lev, amrex::Real dt)
 
         for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
         {
-            const auto tracker = warpx::parallelization::track_time_until_out_of_scope(lev, mfi.index());
+            const auto tracker = warpx::parallelization::track_time_until_out_of_scope(lev, pti.index());
 
             //
             // Particle Push

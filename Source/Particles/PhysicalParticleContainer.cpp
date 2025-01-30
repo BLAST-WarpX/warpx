@@ -1382,6 +1382,8 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                                                      m_user_int_attrib_parser,
                                                      m_user_real_attrib_parser);
 
+    const auto lev_0 = 0;
+
     MFItInfo info;
     if (do_tiling && Gpu::notInLaunchRegion()) {
         info.EnableTiling(tile_size);
@@ -1390,9 +1392,9 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
     info.SetDynamic(true);
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-    for (MFIter mfi = MakeMFIter(0, info); mfi.isValid(); ++mfi)
+    for (MFIter mfi = MakeMFIter(lev_0, info); mfi.isValid(); ++mfi)
     {
-        const auto tracker = warpx::parallelization::track_time_until_out_of_scope(lev, mfi.index());
+        const auto tracker = warpx::parallelization::track_time_until_out_of_scope(lev_0, mfi.index());
 
         const Box& tile_box = mfi.tilebox();
         const RealBox tile_realbox = WarpX::getRealBox(tile_box, 0);
@@ -1838,7 +1840,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
         for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
         {
-            const auto tracker = warpx::parallelization::track_time_until_out_of_scope(lev, mfi.index());
+            const auto tracker = warpx::parallelization::track_time_until_out_of_scope(lev, pti.index());
 
             const Box& box = pti.validbox();
 

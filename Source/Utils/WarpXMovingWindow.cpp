@@ -544,7 +544,7 @@ WarpX::shiftMF (amrex::MultiFab& mf, const amrex::Geometry& geom,
 #endif
     for (amrex::MFIter mfi(tmpmf, TilingIfNotGPU()); mfi.isValid(); ++mfi )
     {
-        const auto tracker = warpx::parallelization::track_time_until_out_of_scope(lev, mfi.index());
+        const auto tracker = warpx::parallelization::track_time_until_out_of_scope(lev, mfi.index(), update_cost_flag);
 
         auto const& dstfab = mf.array(mfi);
         auto const& srcfab = tmpmf.array(mfi);

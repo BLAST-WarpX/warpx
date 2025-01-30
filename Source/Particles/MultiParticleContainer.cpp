@@ -1587,7 +1587,7 @@ void MultiParticleContainer::doQedQuantumSync (int lev,
 #endif
         for (WarpXParIter pti(*pc_source, lev, info); pti.isValid(); ++pti)
         {
-            const auto tracker = warpx::parallelization::track_time_until_out_of_scope(lev, mfi.index());
+            const auto tracker = warpx::parallelization::track_time_until_out_of_scope(lev, pti.index());
 
             auto Transform = PhotonEmissionTransformFunc(
                   m_shr_p_qs_engine->build_optical_depth_functor(),
