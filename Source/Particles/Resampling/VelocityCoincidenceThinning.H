@@ -86,7 +86,7 @@ public:
             for (int i = n - 1; i > 0; i--)
             {
                 // swap value of first (now the largest value) to the new end point
-                amrex::swap(index_array[start], index_array[i+start]);
+                amrex::Swap(index_array[start], index_array[i+start]);
 
                 // remake the max heap
                 int j = 0, index;
