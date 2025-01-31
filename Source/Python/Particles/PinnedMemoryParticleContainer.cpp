@@ -19,7 +19,7 @@ void init_PinnedMemoryParticleContainer (py::module& m)
         .def_property_readonly("real_comp_names",
             [](PinnedMemoryParticleContainer& pc)
             {
-                return pc.getParticleComps();
+                return pc.GetRealSoANames();
             }
         )
         .def_property_readonly("int_comp_names",

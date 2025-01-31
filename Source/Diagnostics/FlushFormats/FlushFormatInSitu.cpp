@@ -37,7 +37,7 @@ FlushFormatInSitu::WriteParticles(const amrex::Vector<ParticleDiag>& particle_di
         WarpXParticleContainer* pc = particle_diag.getParticleContainer();
 
         // get names of real comps
-        std::map<std::string, int> real_comps_map = pc->getParticleComps();
+        std::map<std::string, int> real_comps_map = pc->GetRealSoANames();
 
         // WarpXParticleContainer compile-time extra AoS attributes (Real): 0
         // WarpXParticleContainer compile-time extra AoS attributes (int): 0
