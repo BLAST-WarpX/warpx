@@ -69,20 +69,20 @@ struct PIdx
     };
 
     //! component names
-    static constexpr auto names_s = {
+    static constexpr auto names = {
 #if !defined (WARPX_DIM_1D_Z)
-                                    "x",
+                                   "x",
 #endif
 #if defined (WARPX_DIM_3D)
-                                    "y",
+                                   "y",
 #endif
-                                    "z",
-                                    "w",
-                                    "ux",
-                                    "uy",
-                                    "uz",
+                                   "z",
+                                   "w",
+                                   "ux",
+                                   "uy",
+                                   "uz",
 #ifdef WARPX_DIM_RZ
-          "theta"
+                                   "theta"
 #endif
     };
 
