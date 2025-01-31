@@ -2629,12 +2629,12 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     ParticleReal* z_old = nullptr;
     if (save_previous_position) {
 #if (AMREX_SPACEDIM >= 2)
-        x_old = pti.GetAttribs(particle_comps["prev_x"]).dataPtr() + offset;
+        x_old = pti.GetAttribs("prev_x").dataPtr() + offset;
 #endif
 #if defined(WARPX_DIM_3D)
-        y_old = pti.GetAttribs(particle_comps["prev_y"]).dataPtr() + offset;
+        y_old = pti.GetAttribs("prev_y").dataPtr() + offset;
 #endif
-        z_old = pti.GetAttribs(particle_comps["prev_z"]).dataPtr() + offset;
+        z_old = pti.GetAttribs("prev_z").dataPtr() + offset;
         amrex::ignore_unused(x_old, y_old);
     }
 
@@ -2654,7 +2654,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     const bool local_has_quantum_sync = has_quantum_sync();
     if (local_has_quantum_sync) {
         evolve_opt = m_shr_p_qs_engine->build_evolve_functor();
-        p_optical_depth_QSR = pti.GetAttribs(particle_comps["opticalDepthQSR"]).dataPtr()  + offset;
+        p_optical_depth_QSR = pti.GetAttribs("opticalDepthQSR").dataPtr()  + offset;
     }
 #endif
 
@@ -2859,15 +2859,15 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
     ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr() + offset;
 
 #if (AMREX_SPACEDIM >= 2)
-    ParticleReal* x_n = pti.GetAttribs(particle_comps["x_n"]).dataPtr();
+    ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr();
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-    ParticleReal* y_n = pti.GetAttribs(particle_comps["y_n"]).dataPtr();
+    ParticleReal* y_n = pti.GetAttribs("y_n").dataPtr();
 #endif
-    ParticleReal* z_n = pti.GetAttribs(particle_comps["z_n"]).dataPtr();
-    ParticleReal* ux_n = pti.GetAttribs(particle_comps["ux_n"]).dataPtr();
-    ParticleReal* uy_n = pti.GetAttribs(particle_comps["uy_n"]).dataPtr();
-    ParticleReal* uz_n = pti.GetAttribs(particle_comps["uz_n"]).dataPtr();
+    ParticleReal* z_n = pti.GetAttribs("z_n").dataPtr();
+    ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
+    ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
+    ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
 
     const int do_copy = (m_do_back_transformed_particles && (a_dt_type!=DtType::SecondHalf) );
     CopyParticleAttribs copyAttribs;
@@ -2896,7 +2896,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
     const bool local_has_quantum_sync = has_quantum_sync();
     if (local_has_quantum_sync) {
         evolve_opt = m_shr_p_qs_engine->build_evolve_functor();
-        p_optical_depth_QSR = pti.GetAttribs(particle_comps["opticalDepthQSR"]).dataPtr()  + offset;
+        p_optical_depth_QSR = pti.GetAttribs("opticalDepthQSR").dataPtr()  + offset;
     }
 #endif
 
