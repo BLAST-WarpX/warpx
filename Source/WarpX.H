@@ -1061,18 +1061,7 @@ public:
     */
     static void ComputeFaceAreas (ablastr::fields::VectorField& face_areas,
                                   const amrex::EBFArrayBoxFactory& eb_fact);
-
-    /**
-    * \brief Scale the edges lengths by the mesh width to obtain the real lengths.
-    */
-    static void ScaleEdges (ablastr::fields::VectorField& edge_lengths,
-                            const std::array<amrex::Real,3>& cell_size);
-    /**
-    * \brief Scale the edges areas by the mesh width to obtain the real areas.
-    */
-    static void ScaleAreas (ablastr::fields::VectorField& face_areas,
-                            const std::array<amrex::Real,3>& cell_size);
-    /**
+   /**
     * \brief Initialize information for cell extensions.
     *        The flags convention for m_flag_info_face is as follows
     *          - 0 for unstable cells
