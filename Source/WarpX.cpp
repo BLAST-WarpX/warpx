@@ -173,9 +173,6 @@ amrex::IntVect WarpX::sort_idx_type(AMREX_D_DECL(0,0,0));
 
 bool WarpX::do_dynamic_scheduling = true;
 
-bool WarpX::do_multi_J = false;
-int WarpX::do_multi_J_n_depositions;
-
 IntVect WarpX::filter_npass_each_dir(1);
 
 int WarpX::n_field_gather_buffer = -1;
@@ -642,11 +639,11 @@ WarpX::ReadParameters ()
         pp_warpx.query("verbose", verbose);
         utils::parser::queryWithParser(pp_warpx, "regrid_int", regrid_int);
         pp_warpx.query("do_subcycling", m_do_subcycling);
-        pp_warpx.query("do_multi_J", do_multi_J);
-        if (do_multi_J)
+        pp_warpx.query("do_multi_J", m_do_multi_J);
+        if (m_do_multi_J)
         {
             utils::parser::getWithParser(
-                pp_warpx, "do_multi_J_n_depositions", do_multi_J_n_depositions);
+                pp_warpx, "do_multi_J_n_depositions", m_do_multi_J_n_depositions);
         }
         pp_warpx.query("use_hybrid_QED", use_hybrid_QED);
         pp_warpx.query("safe_guard_cells", m_safe_guard_cells);
@@ -1198,7 +1195,7 @@ WarpX::ReadParameters ()
 
         if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Vay) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                do_multi_J == false,
+                m_do_multi_J == false,
                 "Vay deposition not implemented with multi-J algorithm");
         }
 
@@ -1498,7 +1495,7 @@ WarpX::ReadParameters ()
         pp_psatd.query_enum_sloppy("J_in_time", J_in_time, "-_");
         pp_psatd.query_enum_sloppy("rho_in_time", rho_in_time, "-_");
 
-        if (m_psatd_solution_type != PSATDSolutionType::FirstOrder || !do_multi_J)
+        if (m_psatd_solution_type != PSATDSolutionType::FirstOrder || !m_do_multi_J)
         {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 rho_in_time == RhoInTime::Linear,
@@ -1519,7 +1516,7 @@ WarpX::ReadParameters ()
 
         // TODO Remove this default when current correction will
         // be implemented for the multi-J algorithm as well.
-        if (do_multi_J) { current_correction = false; }
+        if (m_do_multi_J) { current_correction = false; }
 
         pp_psatd.query("current_correction", current_correction);
 
@@ -1658,7 +1655,7 @@ WarpX::ReadParameters ()
             "psatd.update_with_rho must be equal to 1 for comoving PSATD"
         );
 
-        if (do_multi_J)
+        if (m_do_multi_J)
         {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 v_galilean_is_zero,
@@ -2078,7 +2075,7 @@ WarpX::AllocLevelData (int lev, const BoxArray& ba, const DistributionMapping& d
         WarpX::m_v_galilean,
         WarpX::m_v_comoving,
         m_safe_guard_cells,
-        WarpX::do_multi_J,
+        m_do_multi_J,
         WarpX::fft_do_time_averaging,
         ::isAnyBoundaryPML(field_boundary_lo, field_boundary_hi),
         WarpX::do_pml_in_domain,
@@ -2429,7 +2426,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
         if (do_dive_cleaning || update_with_rho || current_correction) {
             // For the multi-J algorithm we can allocate only one rho component (no distinction between old and new)
-            rho_ncomps = (WarpX::do_multi_J) ? ncomps : 2*ncomps;
+            rho_ncomps = (m_do_multi_J) ? ncomps : 2*ncomps;
         }
     }
     if (rho_ncomps > 0)
@@ -2819,7 +2816,7 @@ void WarpX::AllocLevelSpectralSolverRZ (amrex::Vector<std::unique_ptr<SpectralSo
     const RealVect dx_vect(dx[0], dx[2]);
 
     amrex::Real solver_dt = dt[lev];
-    if (WarpX::do_multi_J) { solver_dt /= static_cast<amrex::Real>(WarpX::do_multi_J_n_depositions); }
+    if (m_do_multi_J) { solver_dt /= static_cast<amrex::Real>(m_do_multi_J_n_depositions); }
     if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
         // The step is Strang split into two half steps
         solver_dt /= 2.;
@@ -2876,7 +2873,7 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
 #endif
 
     amrex::Real solver_dt = dt[lev];
-    if (WarpX::do_multi_J) { solver_dt /= static_cast<amrex::Real>(WarpX::do_multi_J_n_depositions); }
+    if (m_do_multi_J) { solver_dt /= static_cast<amrex::Real>(m_do_multi_J_n_depositions); }
     if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
         // The step is Strang split into two half steps
         solver_dt /= 2.;

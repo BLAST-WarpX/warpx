@@ -368,9 +368,6 @@ public:
     //! Specifies the type of grid used for the above sorting, i.e. cell-centered, nodal, or mixed
     static amrex::IntVect sort_idx_type;
 
-    static bool do_multi_J;
-    static int do_multi_J_n_depositions;
-
     static bool do_device_synchronize;
 
     //! With mesh refinement, particles located inside a refinement patch, but within
@@ -1605,6 +1602,9 @@ private:
     int nox_fft = 16;
     int noy_fft = 16;
     int noz_fft = 16;
+
+    bool m_do_multi_J = false;
+    int m_do_multi_J_n_depositions;
 
     //! Solve Poisson equation when loading an external magnetic field to clean divergence
     //! This is useful to remove errors that could lead to non-zero B field divergence
