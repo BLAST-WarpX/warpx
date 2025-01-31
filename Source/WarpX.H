@@ -1049,18 +1049,6 @@ public:
         ablastr::fields::VectorField const& face_areas,
         ablastr::fields::VectorField const& edge_lengths );
 
-    /**
-    * \brief Compute the length of the mesh edges. Here the length is a value in [0, 1].
-    *        An edge of length 0 is fully covered.
-    */
-    static void ComputeEdgeLengths (ablastr::fields::VectorField& edge_lengths,
-                                    const amrex::EBFArrayBoxFactory& eb_fact);
-    /**
-    * \brief Compute the area of the mesh faces. Here the area is a value in [0, 1].
-    *        An edge of area 0 is fully covered.
-    */
-    static void ComputeFaceAreas (ablastr::fields::VectorField& face_areas,
-                                  const amrex::EBFArrayBoxFactory& eb_fact);
    /**
     * \brief Initialize information for cell extensions.
     *        The flags convention for m_flag_info_face is as follows
