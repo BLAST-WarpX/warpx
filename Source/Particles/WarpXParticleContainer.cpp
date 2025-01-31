@@ -631,22 +631,22 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
 
             } else if (push_type == PushType::Implicit) {
 #if (AMREX_SPACEDIM >= 2)
-                auto& xp_n = pti.GetAttribs(particle_comps["x_n"]);
+                auto& xp_n = pti.GetAttribs("x_n");
                 const ParticleReal* xp_n_data = xp_n.dataPtr() + offset;
 #else
                 const ParticleReal* xp_n_data = nullptr;
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-                auto& yp_n = pti.GetAttribs(particle_comps["y_n"]);
+                auto& yp_n = pti.GetAttribs("y_n");
                 const ParticleReal* yp_n_data = yp_n.dataPtr() + offset;
 #else
                 const ParticleReal* yp_n_data = nullptr;
 #endif
-                auto& zp_n = pti.GetAttribs(particle_comps["z_n"]);
+                auto& zp_n = pti.GetAttribs("z_n");
                 const ParticleReal* zp_n_data = zp_n.dataPtr() + offset;
-                auto& uxp_n = pti.GetAttribs(particle_comps["ux_n"]);
-                auto& uyp_n = pti.GetAttribs(particle_comps["uy_n"]);
-                auto& uzp_n = pti.GetAttribs(particle_comps["uz_n"]);
+                auto& uxp_n = pti.GetAttribs("ux_n");
+                auto& uyp_n = pti.GetAttribs("uy_n");
+                auto& uzp_n = pti.GetAttribs("uz_n");
                 if        (WarpX::nox == 1){
                     doChargeConservingDepositionShapeNImplicit<1>(
                         xp_n_data, yp_n_data, zp_n_data,
@@ -684,22 +684,22 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
         } else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
             if (push_type == PushType::Implicit) {
 #if (AMREX_SPACEDIM >= 2)
-                auto& xp_n = pti.GetAttribs(particle_comps["x_n"]);
+                auto& xp_n = pti.GetAttribs("x_n");
                 const ParticleReal* xp_n_data = xp_n.dataPtr() + offset;
 #else
                 const ParticleReal* xp_n_data = nullptr;
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-                auto& yp_n = pti.GetAttribs(particle_comps["y_n"]);
+                auto& yp_n = pti.GetAttribs("y_n");
                 const ParticleReal* yp_n_data = yp_n.dataPtr() + offset;
 #else
                 const ParticleReal* yp_n_data = nullptr;
 #endif
-                auto& zp_n = pti.GetAttribs(particle_comps["z_n"]);
+                auto& zp_n = pti.GetAttribs("z_n");
                 const ParticleReal* zp_n_data = zp_n.dataPtr() + offset;
-                auto& uxp_n = pti.GetAttribs(particle_comps["ux_n"]);
-                auto& uyp_n = pti.GetAttribs(particle_comps["uy_n"]);
-                auto& uzp_n = pti.GetAttribs(particle_comps["uz_n"]);
+                auto& uxp_n = pti.GetAttribs("ux_n");
+                auto& uyp_n = pti.GetAttribs("uy_n");
+                auto& uzp_n = pti.GetAttribs("uz_n");
                 if (WarpX::nox == 1){
                     doVillasenorDepositionShapeNImplicit<1>(
                         xp_n_data, yp_n_data, zp_n_data,
@@ -794,9 +794,9 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
                 }
             } else if (push_type == PushType::Implicit) {
-                auto& uxp_n = pti.GetAttribs(particle_comps["ux_n"]);
-                auto& uyp_n = pti.GetAttribs(particle_comps["uy_n"]);
-                auto& uzp_n = pti.GetAttribs(particle_comps["uz_n"]);
+                auto& uxp_n = pti.GetAttribs("ux_n");
+                auto& uyp_n = pti.GetAttribs("uy_n");
+                auto& uzp_n = pti.GetAttribs("uz_n");
                 if        (WarpX::nox == 1){
                     doDepositionShapeNImplicit<1>(
                         GetPosition, wp.dataPtr() + offset,
