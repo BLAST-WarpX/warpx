@@ -97,7 +97,7 @@ class SmartCreateFactory
 public:
     template <class PartTileData>
     SmartCreateFactory (const PartTileData& part) noexcept:
-        m_policy_real{getPolicies(part.getParticleComps())},
+        m_policy_real{getPolicies(part.GetRealSoANames())},
         m_policy_int{getPolicies(part.getParticleiComps())},
         m_defined{true}
     {}
