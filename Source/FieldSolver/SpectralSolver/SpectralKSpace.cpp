@@ -143,7 +143,7 @@ SpectralKSpace::getKComponent( const DistributionMapping& dm,
 SpectralShiftFactor
 SpectralKSpace::getSpectralShiftFactor( const DistributionMapping& dm,
                                         const int i_dim,
-                                        const int shift_type ) const
+                                        const ShiftType shift_type ) const
 {
     // Initialize an empty DeviceVector in each box
     SpectralShiftFactor shift_factor( spectralspace_ba, dm );

@@ -70,7 +70,7 @@ class SpectralKSpace
 
         SpectralShiftFactor getSpectralShiftFactor(
             const amrex::DistributionMapping& dm, int i_dim,
-            int shift_type ) const;
+            ShiftType shift_type ) const;
 
     protected:
         amrex::Array<KVectorComponent, AMREX_SPACEDIM> k_vec;
