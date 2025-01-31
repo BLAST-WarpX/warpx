@@ -10,7 +10,6 @@
 #include "Diagnostics/ParticleDiag/ParticleDiag.H"
 #include "FieldIO.H"
 #include "Particles/Filter/FilterFunctors.H"
-#include "Particles/NamedComponentParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/RelativeCellPosition.H"
