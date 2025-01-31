@@ -67,6 +67,35 @@ struct PIdx
 #endif
         nattribs    ///< number of compile-time attributes
     };
+
+    //! component names
+    static constexpr auto names_s = {
+#if !defined (WARPX_DIM_1D_Z)
+                                    "x",
+#endif
+#if defined (WARPX_DIM_3D)
+                                    "y",
+#endif
+                                    "z",
+                                    "w",
+                                    "ux",
+                                    "uy",
+                                    "uz",
+#ifdef WARPX_DIM_RZ
+          "theta"
+#endif
+    };
+
+    static_assert(names.size() == nattribs);
+};
+
+struct IntIdx {
+    enum
+        {
+            nattribs ///< the number of attributes above (always last)
+        };
+
+    static constexpr std::initializer_list<char const *> names = {};
 };
 
 class WarpXParIter
