@@ -89,10 +89,14 @@ WarpXParIter::WarpXParIter (ContainerType& pc, int level, MFItInfo& info)
 }
 
 WarpXParticleContainer::WarpXParticleContainer (AmrCore* amr_core, int ispecies)
-    : NamedComponentParticleContainer<DefaultAllocator>(amr_core->GetParGDB())
+    : amrex::ParticleContainerPureSoA<PIdx::nattribs, 0>(amr_core->GetParGDB())
     , species_id(ispecies)
 {
     SetParticleSize();
+    SetSoACompileTimeNames(
+                           {RealSoA::names_s.begin(), RealSoA::names_s.end()},
+                           {IntSoA::names_s.begin(), IntSoA::names_s.end()}
+                           );
     ReadParameters();
 
     // Reading the external fields needs to be here since ReadParameters
