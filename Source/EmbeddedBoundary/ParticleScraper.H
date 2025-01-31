@@ -173,7 +173,7 @@ scrapeParticlesAtEB (PC& pc, ablastr::fields::MultiLevelScalarField const& dista
             const auto np = tile.numParticles();
             auto phi = (*distance_to_eb[lev])[pti].array();  // signed distance function
             amrex::ParallelForRNG( np,
-            [=,&f] AMREX_GPU_DEVICE (const int ip, amrex::RandomEngine const& engine) noexcept
+            [=] AMREX_GPU_DEVICE (const int ip, amrex::RandomEngine const& engine) noexcept
             {
                 // skip particles that are already flagged for removal
                 if (!amrex::ParticleIDWrapper{ptd.m_idcpu[ip]}.is_valid()) { return; }

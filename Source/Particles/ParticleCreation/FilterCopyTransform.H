@@ -74,7 +74,7 @@ Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src,
     const auto dst_data = dst.getParticleTileData();
 
     amrex::ParallelForRNG(np,
-    [=,&copy,&transform] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
+    [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
     {
         if (mask[i])
         {
@@ -157,7 +157,7 @@ Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src, Index
     const auto src_data = src.getParticleTileData();
 
     amrex::ParallelForRNG(np,
-    [=,&filter] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
+    [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
     {
         p_mask[i] = filter(src_data, i, engine);
     });
@@ -239,7 +239,7 @@ Index filterCopyTransformParticles (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTi
     const auto dst2_data = dst2.getParticleTileData();
 
     amrex::ParallelForRNG(np,
-    [=,&copy1,&copy2,&transform] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
+    [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
     {
         if (mask[i])
         {
@@ -348,7 +348,7 @@ Index filterCopyTransformParticles (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTi
     const auto src_data = src.getParticleTileData();
 
     amrex::ParallelForRNG(np,
-    [=,&filter] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine)
+    [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine)
     {
         p_mask[i] = filter(src_data, i, engine);
     });
