@@ -371,8 +371,6 @@ public:
     static bool do_multi_J;
     static int do_multi_J_n_depositions;
 
-    static bool do_device_synchronize;
-
     //! With mesh refinement, particles located inside a refinement patch, but within
     //! #n_field_gather_buffer cells of the edge of the patch, will gather the fields
     //! from the lower refinement level instead of the refinement patch itself
