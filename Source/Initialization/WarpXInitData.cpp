@@ -1239,11 +1239,11 @@ void WarpX::InitializeEBGridData (int lev)
             if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
 
                 auto edge_lengths_lev = m_fields.get_alldirs(FieldType::edge_lengths, lev);
-                ComputeEdgeLengths(edge_lengths_lev, eb_fact);
+                warpx::embedded_boundary::ComputeEdgeLengths(edge_lengths_lev, eb_fact);
                 warpx::embedded_boundary::ScaleEdges(edge_lengths_lev, CellSize(lev));
 
                 auto face_areas_lev = m_fields.get_alldirs(FieldType::face_areas, lev);
-                ComputeFaceAreas(face_areas_lev, eb_fact);
+                warpx::embedded_boundary::ComputeFaceAreas(face_areas_lev, eb_fact);
                 warpx::embedded_boundary::ScaleAreas(face_areas_lev, CellSize(lev));
 
                 // Compute additional quantities required for the ECT solver
