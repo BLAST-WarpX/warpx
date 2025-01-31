@@ -162,9 +162,9 @@ public:
     HybridPICModel& GetHybridPICModel () { return *m_hybrid_pic_model; }
     [[nodiscard]] HybridPICModel * get_pointer_HybridPICModel () const { return m_hybrid_pic_model.get(); }
     MultiDiagnostics& GetMultiDiags () {return *multi_diags;}
-
     ParticleBoundaryBuffer& GetParticleBoundaryBuffer () { return *m_particle_boundary_buffer; }
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag() { return m_eb_update_E; }
+    amrex::Vector< std::unique_ptr<amrex::iMultiFab> > const & GetEBReduceParticleShapeFlag() const { return m_eb_reduce_particle_shape; }
 
     static void shiftMF (amrex::MultiFab& mf, const amrex::Geometry& geom,
                          int num_shift, int dir, int lev, bool update_cost_flag,
@@ -197,7 +197,7 @@ public:
     //! Integer that corresponds to the type of Maxwell solver (Yee, CKC, PSATD, ECT)
     static inline auto electromagnetic_solver_id = ElectromagneticSolverAlgo::Default;
     //! Integer that corresponds to the evolve scheme (explicit, semi_implicit_em, theta_implicit_em)
-    static inline auto evolve_scheme = EvolveScheme::Default;
+    EvolveScheme evolve_scheme = EvolveScheme::Default;
     //! Maximum iterations used for self-consistent particle update in implicit particle-suppressed evolve schemes
     static int max_particle_its_in_implicit_scheme;
     //! Relative tolerance used for self-consistent particle update in implicit particle-suppressed evolve schemes
@@ -371,8 +371,6 @@ public:
     static bool do_multi_J;
     static int do_multi_J_n_depositions;
 
-    static bool do_device_synchronize;
-
     //! With mesh refinement, particles located inside a refinement patch, but within
     //! #n_field_gather_buffer cells of the edge of the patch, will gather the fields
     //! from the lower refinement level instead of the refinement patch itself
@@ -404,7 +402,7 @@ public:
      * \param[in] name The name of the iMultiFab to use in the map
      * \param[in] initial_value The optional initial value
      */
-    static void AllocInitMultiFab (
+    void AllocInitMultiFab (
         std::unique_ptr<amrex::iMultiFab>& mf,
         const amrex::BoxArray& ba,
         const amrex::DistributionMapping& dm,
@@ -417,7 +415,7 @@ public:
     // Maps of all of the iMultiFabs used (this can include MFs from other classes)
     // This is a convenience for the Python interface, allowing all iMultiFabs
     // to be easily referenced from Python.
-    static std::map<std::string, amrex::iMultiFab *> imultifab_map;
+    std::map<std::string, amrex::iMultiFab *> imultifab_map;
 
     /**
      * \brief
@@ -849,7 +847,7 @@ public:
 
     void ComputeDivE(amrex::MultiFab& divE, int lev);
 
-    static void ProjectionCleanDivB ();
+    void ProjectionCleanDivB ();
 
     [[nodiscard]] amrex::IntVect getngEB() const { return guard_cells.ng_alloc_EB; }
     [[nodiscard]] amrex::IntVect getngF() const { return guard_cells.ng_alloc_F; }
@@ -982,6 +980,26 @@ public:
     void InitEB ();
 
 #ifdef AMREX_USE_EB
+
+    /** \brief Set a flag to indicate in which cells a particle should deposit charge/current
+     *  with a reduced, order 1 shape.
+     *
+     * More specifically, the flag is set to 1 if any of the neighboring cells over which the
+     * particle shape might extend are either partially or fully covered by an embedded boundary.
+     * This ensures that a particle in this cell deposits with an order 1 shape, which in turn
+     * makes sure that the particle never deposits any charge in a partially or fully covered cell.
+     *
+     * \param[in] eb_reduce_particle_shape multifab to be filled with 1s and 0s
+     * \param[in] eb_fact EB factory
+     * \param[in] particle_shape_order order of the particle shape function
+     */
+
+
+    void MarkReducedShapeCells (
+        std::unique_ptr<amrex::iMultiFab> & eb_reduce_particle_shape,
+        amrex::EBFArrayBoxFactory const & eb_fact,
+        int particle_shape_order );
+
     /** \brief Set a flag to indicate on which grid points the field `field`
      *  should be updated, depending on their position relative to the embedded boundary.
      *
@@ -1404,6 +1422,13 @@ private:
      */
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_E;
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_B;
+
+    /** EB: Mask that indicates whether a particle should use its regular shape factor (mask set to 0)
+     *  or a reduced, order-1 shape factor instead (mask set to 1) in a given cell, when depositing charge/current.
+     *  The flag is typically set to 1 in cells that are close to the embedded boundary, in order to avoid
+     *  errors in charge conservation when a particle is too close to the embedded boundary.
+     */
+    amrex::Vector<  std::unique_ptr<amrex::iMultiFab> > m_eb_reduce_particle_shape;
 
     /** EB: for every mesh face flag_info_face contains a:
      *          * 0 if the face needs to be extended

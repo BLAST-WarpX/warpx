@@ -111,28 +111,24 @@ AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::Real compute_scale_fac_area_eb (
     const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dx,
     const amrex::Real num_ppc_real,
-    amrex::Array4<const amrex::Real> const& eb_bnd_normal_arr,
-    int i, int j, int k ) {
+    AMREX_D_DECL(const amrex::Real n0,
+                 const amrex::Real n1,
+                 const amrex::Real n2)) {
     using namespace amrex::literals;
     // Scale particle weight by the area of the emitting surface, within one cell
     // By definition, eb_bnd_area_arr is normalized (unitless).
     // Here we undo the normalization (i.e. multiply by the surface used for normalization in amrex:
     // see https://amrex-codes.github.io/amrex/docs_html/EB.html#embedded-boundary-data-structures)
 #if defined(WARPX_DIM_3D)
-    const amrex::Real nx = eb_bnd_normal_arr(i,j,k,0);
-    const amrex::Real ny = eb_bnd_normal_arr(i,j,k,1);
-    const amrex::Real nz = eb_bnd_normal_arr(i,j,k,2);
-    amrex::Real scale_fac = std::sqrt(amrex::Math::powi<2>(nx*dx[1]*dx[2]) +
-                  amrex::Math::powi<2>(ny*dx[0]*dx[2]) +
-                  amrex::Math::powi<2>(nz*dx[0]*dx[1]));
+    amrex::Real scale_fac = std::sqrt(amrex::Math::powi<2>(n0*dx[1]*dx[2]) +
+                                      amrex::Math::powi<2>(n1*dx[0]*dx[2]) +
+                                      amrex::Math::powi<2>(n2*dx[0]*dx[1]));
 
 #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
-    const amrex::Real nx = eb_bnd_normal_arr(i,j,k,0);
-    const amrex::Real nz = eb_bnd_normal_arr(i,j,k,1);
-    amrex::Real scale_fac = std::sqrt(amrex::Math::powi<2>(nx*dx[1]) +
-                  amrex::Math::powi<2>(nz*dx[0]));
+    amrex::Real scale_fac = std::sqrt(amrex::Math::powi<2>(n0*dx[1]) +
+                                      amrex::Math::powi<2>(n1*dx[0]));
 #else
-    amrex::ignore_unused(dx, eb_bnd_normal_arr, i, j, k);
+    amrex::ignore_unused(dx, AMREX_D_DECL(n0,n1,n2));
     amrex::Real scale_fac = 0.0_rt;
 #endif
     // Do not multiply by eb_bnd_area_arr(i,j,k) here because this
@@ -159,8 +155,9 @@ amrex::Real compute_scale_fac_area_eb (
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void rotate_momentum_eb (
     PDim3 & pu,
-    amrex::Array4<const amrex::Real> const& eb_bnd_normal_arr,
-    int i, int j, int k )
+    AMREX_D_DECL(const amrex::Real n0,
+                 const amrex::Real n1,
+                 const amrex::Real n2))
 {
     using namespace amrex::literals;
 
@@ -168,9 +165,9 @@ void rotate_momentum_eb (
     // The minus sign below takes into account the fact that eb_bnd_normal_arr
     // points towards the covered region, while particles are to be emitted
     // *away* from the covered region.
-    amrex::Real const nx = -eb_bnd_normal_arr(i,j,k,0);
-    amrex::Real const ny = -eb_bnd_normal_arr(i,j,k,1);
-    amrex::Real const nz = -eb_bnd_normal_arr(i,j,k,2);
+    amrex::Real const nx = -n0;
+    amrex::Real const ny = -n1;
+    amrex::Real const nz = -n2;
 
     // Rotate the momentum in theta and phi
     amrex::Real const cos_theta = nz;
@@ -194,14 +191,14 @@ void rotate_momentum_eb (
     // The minus sign below takes into account the fact that eb_bnd_normal_arr
     // points towards the covered region, while particles are to be emitted
     // *away* from the covered region.
-    amrex::Real const sin_theta = -eb_bnd_normal_arr(i,j,k,0);
-    amrex::Real const cos_theta = -eb_bnd_normal_arr(i,j,k,1);
+    amrex::Real const sin_theta = -n0;
+    amrex::Real const cos_theta = -n1;
     amrex::Real const uz = pu.z*cos_theta - pu.x*sin_theta;
     amrex::Real const ux = pu.x*cos_theta + pu.z*sin_theta;
     pu.x = ux;
     pu.z = uz;
 #else
-    amrex::ignore_unused(pu, eb_bnd_normal_arr, i, j, k);
+    amrex::ignore_unused(pu, AMREX_D_DECL(n0,n1,n2));
 #endif
 }
 #endif //AMREX_USE_EB
@@ -334,8 +331,8 @@ struct QEDHelper
     amrex::ParticleReal* p_optical_depth_QSR = nullptr;
     amrex::ParticleReal* p_optical_depth_BW  = nullptr;
 
-    const bool has_quantum_sync;
-    const bool has_breit_wheeler;
+    bool has_quantum_sync;
+    bool has_breit_wheeler;
 
     QuantumSynchrotronGetOpticalDepth quantum_sync_get_opt;
     BreitWheelerGetOpticalDepth breit_wheeler_get_opt;
