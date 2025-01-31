@@ -1546,8 +1546,16 @@ WarpXParticleContainer::PushX (int lev, amrex::Real dt)
 // without runtime component).
 void WarpXParticleContainer::defineAllParticleTiles () noexcept
 {
-    // Call the parent class's method
-    NamedComponentParticleContainer<amrex::DefaultAllocator>::defineAllParticleTiles();
+        for (int lev = 0; lev <= amrex::ParticleContainerPureSoA<PIdx::nattribs,0,T_Allocator>::finestLevel(); ++lev)
+        {
+            for (auto mfi = amrex::ParticleContainerPureSoA<PIdx::nattribs,0,T_Allocator>::MakeMFIter(lev); mfi.isValid(); ++mfi)
+            {
+                const int grid_id = mfi.index();
+                const int tile_id = mfi.LocalTileIndex();
+                amrex::ParticleContainerPureSoA<PIdx::nattribs,0,T_Allocator>::DefineAndReturnParticleTile(lev, grid_id, tile_id);
+            }
+        }
+
 
     // Resize the tmp_particle_data (no present in parent class)
     tmp_particle_data.resize(finestLevel()+1);
