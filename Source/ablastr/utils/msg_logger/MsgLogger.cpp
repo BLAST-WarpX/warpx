@@ -149,7 +149,7 @@ Msg Msg::deserialize (std::vector<char>::const_iterator& it)
 
 Msg Msg::deserialize (std::vector<char>::const_iterator&& it)
 {
-    return Msg::deserialize(it);
+    return Msg::deserialize(std::move(it));
 }
 
 std::vector<char> MsgWithCounter::serialize() const
@@ -176,7 +176,7 @@ MsgWithCounter MsgWithCounter::deserialize (std::vector<char>::const_iterator& i
 
 MsgWithCounter MsgWithCounter::deserialize (std::vector<char>::const_iterator&& it)
 {
-    return MsgWithCounter::deserialize(it);
+    return MsgWithCounter::deserialize(std::move(it));
 }
 
 std::vector<char> MsgWithCounterAndRanks::serialize() const
@@ -207,7 +207,7 @@ MsgWithCounterAndRanks::deserialize (std::vector<char>::const_iterator& it)
 MsgWithCounterAndRanks
 MsgWithCounterAndRanks::deserialize (std::vector<char>::const_iterator&& it)
 {
-    return MsgWithCounterAndRanks::deserialize(it);
+    return MsgWithCounterAndRanks::deserialize(std::move(it));
 }
 
 Logger::Logger() :
