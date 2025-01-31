@@ -612,20 +612,20 @@ for (const auto & particle_diag : particle_diags) {
     real_names.push_back("momentum_z");
     // get the names of the real comps
     real_names.resize(tmp.NumRealComps());
-    auto runtime_rnames = tmp.getParticleRuntimeComps();
-    for (auto const& x : runtime_rnames)
+    auto rnames = tmp.GetRealSoANames();
+    for (std::size_t index = PIdx::nattribs; index < rnames.size(); ++index)
     {
-        real_names[x.second+PIdx::nattribs] = detail::snakeToCamel(x.first);
+        real_names[index+PIdx::nattribs] = detail::snakeToCamel(rnames[index]);
     }
     // plot any "extra" fields by default
     real_flags = particle_diag.m_plot_flags;
     real_flags.resize(tmp.NumRealComps(), 1);
     // and the names
     int_names.resize(tmp.NumIntComps());
-    auto runtime_inames = tmp.getParticleRuntimeiComps();
-    for (auto const& x : runtime_inames)
+    auto inames = tmp.GetIntSoANames();
+    for (std::size_t index = 0; index < inames.size(); ++index)
     {
-        int_names[x.second+0] = detail::snakeToCamel(x.first);
+        int_names[index] = detail::snakeToCamel(inames[index]);
     }
     // plot by default
     int_flags.resize(tmp.NumIntComps(), 1);
