@@ -18,6 +18,7 @@
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_MFIter.H>
+#include <AMReX_MultiCutFab.H>
 
 namespace web = warpx::embedded_boundary;
 
