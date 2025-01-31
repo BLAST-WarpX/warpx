@@ -157,7 +157,7 @@ public:
  * derived classes, e.g., Evolve) or actual functions (e.g. CurrentDeposition).
  */
 class WarpXParticleContainer
-    : public amrex::ParticleContainerPureSoA<PIdx::nattribs, 0>
+    : public amrex::ParticleContainerPureSoA<PIdx::nattribs, 0, amrex::DefaultAllocator>
 {
 public:
     friend MultiParticleContainer;

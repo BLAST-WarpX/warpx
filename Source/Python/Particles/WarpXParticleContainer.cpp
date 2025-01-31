@@ -30,7 +30,7 @@ void init_WarpXParticleContainer (py::module& m)
     > wpc (m, "WarpXParticleContainer");
     wpc
         .def("add_real_comp",
-            [](WarpXParticleContainer& pc, const std::string& name, bool comm) { pc.NewRealComp(name, comm); },
+            [](WarpXParticleContainer& pc, const std::string& name, bool comm) { pc.AddRealComp(name, comm); },
             py::arg("name"), py::arg("comm")
         )
         .def("add_n_particles",
@@ -88,7 +88,7 @@ void init_WarpXParticleContainer (py::module& m)
         .def("get_comp_index",
             [](WarpXParticleContainer& pc, std::string comp_name)
             {
-                auto particle_comps = pc.getParticleComps();
+                auto particle_comps = pc.GetRealSoANames();
                 return particle_comps.at(comp_name);
             },
             py::arg("comp_name")

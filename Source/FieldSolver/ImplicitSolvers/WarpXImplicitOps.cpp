@@ -169,7 +169,7 @@ WarpX::SaveParticlesAtImplicitStepStart ( )
 #endif
             {
 
-            auto particle_comps = pc->getParticleComps();
+            auto particle_comps = pc->GetRealSoANames();
 
             for (WarpXParIter pti(*pc, lev); pti.isValid(); ++pti) {
 
@@ -239,7 +239,7 @@ WarpX::FinishImplicitParticleUpdate ()
 #endif
             {
 
-            auto particle_comps = pc->getParticleComps();
+            auto particle_comps = pc->GetRealSoANames();
 
             for (WarpXParIter pti(*pc, lev); pti.isValid(); ++pti) {
 
