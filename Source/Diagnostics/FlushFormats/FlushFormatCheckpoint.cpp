@@ -206,8 +206,6 @@ FlushFormatCheckpoint::CheckpointParticles (
             write_real_comps.push_back(1);
         }
 
-        int const compile_time_comps = static_cast<int>(real_names.size());
-
         // get the names of the real comps
         //   note: skips the mandatory AMREX_SPACEDIM positions for pure SoA
         real_names.resize(pc->NumRealComps() - AMREX_SPACEDIM);
