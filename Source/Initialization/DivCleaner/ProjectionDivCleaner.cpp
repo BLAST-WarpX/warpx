@@ -141,6 +141,7 @@ ProjectionDivCleaner::solve ()
 
     std::map<FieldBoundaryType, LinOpBCType> bcmap{
         {FieldBoundaryType::PEC, LinOpBCType::Dirichlet},
+        {FieldBoundaryType::PMC, LinOpBCType::Dirichlet},
         {FieldBoundaryType::Neumann, LinOpBCType::Neumann},
         {FieldBoundaryType::Periodic, LinOpBCType::Periodic},
         {FieldBoundaryType::None, LinOpBCType::Neumann}
@@ -151,7 +152,7 @@ ProjectionDivCleaner::solve ()
         auto ithi = bcmap.find(WarpX::field_boundary_hi[idim]);
         if (itlo == bcmap.end() || ithi == bcmap.end()) {
             WARPX_ABORT_WITH_MESSAGE(
-                "Field boundary conditions have to be either periodic, PEC or neumann "
+                "Field boundary conditions have to be either periodic, PEC, PMC, or neumann "
                 "when using the MLMG projection based divergence cleaner solver."
             );
         }
