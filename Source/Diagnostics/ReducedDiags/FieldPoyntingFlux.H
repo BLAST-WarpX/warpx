@@ -13,7 +13,8 @@
 #include <string>
 
 /**
- * \brief This class mainly contains a function that computes the field Poynting flux.
+ * \brief This class mainly contains a function that computes the field Poynting flux,
+ *        S = E cross B, integrated over each face of the domain.
  */
 class FieldPoyntingFlux : public ReducedDiags
 {
