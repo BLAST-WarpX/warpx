@@ -679,10 +679,12 @@ PEC::ApplyReflectiveBoundarytoRhofield (
         is_tangent_to_bndy[idim] = true;
 
         psign[idim][0] = ((particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
-                        ||(particle_boundary_lo[idim] == ParticleBoundaryType::Thermal))
+                        ||(particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
+                        ||(field_boundary_hi[idim] == FieldBoundaryType::PMC))
                          ? 1._rt : -1._rt;
         psign[idim][1] = ((particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
-                        ||(particle_boundary_hi[idim] == ParticleBoundaryType::Thermal))
+                        ||(particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
+                        ||(field_boundary_hi[idim] == FieldBoundaryType::PMC))
                          ? 1._rt : -1._rt;
         mirrorfac[idim][0] = 2*domain_lo[idim] - (1 - rho_nodal[idim]);
         mirrorfac[idim][1] = 2*domain_hi[idim] + (1 - rho_nodal[idim]);
