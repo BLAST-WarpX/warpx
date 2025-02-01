@@ -790,18 +790,22 @@ PEC::ApplyReflectiveBoundarytoJfield(
 
             if (is_tangent_to_bndy[icomp][idim]){
                 psign[icomp][idim][0] = ( (particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
-                                        ||(particle_boundary_lo[idim] == ParticleBoundaryType::Thermal))
+                                        ||(particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
+                                        ||(field_boundary_lo[idim] == FieldBoundaryType::PMC))
                                         ? 1._rt : -1._rt;
                 psign[icomp][idim][1] = ( (particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
-                                        ||(particle_boundary_hi[idim] == ParticleBoundaryType::Thermal))
+                                        ||(particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
+                                        ||(field_boundary_lo[idim] == FieldBoundaryType::PMC))
                                         ? 1._rt : -1._rt;
             }
             else {
                 psign[icomp][idim][0] = ( (particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
-                                        ||(particle_boundary_lo[idim] == ParticleBoundaryType::Thermal))
+                                        ||(particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
+                                        ||(field_boundary_lo[idim] == FieldBoundaryType::PMC))
                                         ? -1._rt : 1._rt;
                 psign[icomp][idim][1] = ( (particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
-                                        ||(particle_boundary_hi[idim] == ParticleBoundaryType::Thermal))
+                                        ||(particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
+                                        ||(field_boundary_lo[idim] == FieldBoundaryType::PMC))
                                         ? -1._rt : 1._rt;
             }
         }
