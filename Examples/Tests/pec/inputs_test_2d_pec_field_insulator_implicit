@@ -23,6 +23,8 @@ insulator.By_x_hi(y,z,t) = min(t/1.0e-12,1)*1.e1*3.3e-4
 warpx.serialize_initial_conditions = 1
 
 # Implicit setup
+# Note that this is the CFL step size for the explicit simulation, over 2.
+# This value allows quick convergence of the Picard solver.
 warpx.const_dt = 7.37079480234276e-13/2.
 
 algo.maxwell_solver = Yee
