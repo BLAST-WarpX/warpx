@@ -6,6 +6,7 @@
  */
 #include "Fields.H"
 #include "StrangImplicitSpectralEM.H"
+#include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "WarpX.H"
 
 using namespace warpx::fields;
@@ -84,6 +85,7 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real start_time,
 
     // Update WarpX owned Efield_fp and Bfield_fp to t_{n+1/2}
     UpdateWarpXFields( m_E, half_time );
+    m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
     // Advance particles from time n+1/2 to time n+1
     m_WarpX->FinishImplicitParticleUpdate();
