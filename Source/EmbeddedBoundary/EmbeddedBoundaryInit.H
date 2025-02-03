@@ -89,6 +89,16 @@ namespace warpx::embedded_boundary
         ablastr::fields::VectorField const& face_areas,
         ablastr::fields::VectorField const& edge_lengths );
 
+   /**
+    * \brief Initialize information for cell extensions.
+    *        The flags convention for m_flag_info_face is as follows
+    *          - 0 for unstable cells
+    *          - 1 for stable cells which have not been intruded
+    *          - 2 for stable cells which have been intruded
+    *        Here we cannot know if a cell is intruded or not so we initialize all stable cells with 1
+    */
+    void MarkExtensionCells();
+
     /**
     * \brief Compute the length of the mesh edges. Here the length is a value in [0, 1].
     *        An edge of length 0 is fully covered.
