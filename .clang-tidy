@@ -46,7 +46,6 @@ Checks: '
         -readability-implicit-bool-conversion,
         -readability-isolate-declaration,
         -readability-magic-numbers,
-        -readability-misleading-indentation,
         -readability-named-parameter,
         -readability-uppercase-literal-suffix
     '
