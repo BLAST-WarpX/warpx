@@ -199,6 +199,11 @@ Related works using WarpX:
 Nuclear Fusion and Plasma Confinement
 *************************************
 
+#. Tyushev M., Papahn Zadeh M., Chopra N. S., Raitses Y., Romadanov I., Likhanskii A., Fubiani G., Garrigues L., Groenewald R. and Smolyakov A.
+   **Mode transitions and spoke structures in  E×B Penning discharge**.
+   Physics of Plasmas **32**, 013511, 2025.
+   `DOI:10.1063/5.0238577 <https://doi.org/10.1063/5.0238577>`__
+
 #. Scheffel J. and Jäderberg J. and Bendtz K. and Holmberg R. and Lindvall K.,
    **Axial Confinement in the Novatron Mirror Machine**.
    arXiv 2410.20134
