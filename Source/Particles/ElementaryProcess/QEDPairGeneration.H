@@ -172,7 +172,7 @@ public:
 
 private:
 
-    const BreitWheelerGeneratePairs
+    BreitWheelerGeneratePairs
     m_generate_functor; /*!< A copy of the functor to generate pairs. It contains only pointers to the lookup tables.*/
 
     GetParticlePosition<PIdx> m_get_position;

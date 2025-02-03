@@ -7,6 +7,7 @@ CEXE_sources += DifferentialLuminosity.cpp
 CEXE_sources += FieldEnergy.cpp
 CEXE_sources += FieldMaximum.cpp
 CEXE_sources += FieldMomentum.cpp
+CEXE_sources += FieldPoyntingFlux.cpp
 CEXE_sources += FieldProbe.cpp
 CEXE_sources += FieldProbeParticleContainer.cpp
 CEXE_sources += FieldReduction.cpp

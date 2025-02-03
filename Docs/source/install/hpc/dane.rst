@@ -3,7 +3,7 @@
 Dane (LLNL)
 =============
 
-The `Dane Intel CPU cluster <https://hpc.llnl.gov/hardware/compute-platforms/dane>`_ is located at LLNL.
+The `Dane Intel CPU cluster <https://hpc.llnl.gov/hardware/compute-platforms/dane>`__ is located at LLNL.
 
 
 Introduction
@@ -11,9 +11,9 @@ Introduction
 
 If you are new to this system, **please see the following resources**:
 
-* `LLNL user account <https://lc.llnl.gov`__ (login required)
+* `LLNL user account <https://lc.llnl.gov>`__ (login required)
 * `Jupyter service <https://lc.llnl.gov/jupyter>`__ (`documentation <https://lc.llnl.gov/confluence/display/LC/JupyterHub+and+Jupyter+Notebook>`__, login required)
-* `Production directories <https://hpc.llnl.gov/hardware/file-systems>`_:
+* `Production directories <https://hpc.llnl.gov/hardware/file-systems>`__:
 
   * ``/p/lustre1/$(whoami)`` and ``/p/lustre2/$(whoami)``: personal directory on the parallel filesystem
   * Note that the ``$HOME`` directory and the ``/usr/workspace/$(whoami)`` space are NFS mounted and *not* suitable for production quality data generation.

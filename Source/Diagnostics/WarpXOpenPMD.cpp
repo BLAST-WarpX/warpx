@@ -531,10 +531,10 @@ WarpXOpenPMDPlot::WriteOpenPMDParticles (const amrex::Vector<ParticleDiag>& part
 {
 WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDParticles()");
 
-for (unsigned i = 0, n = particle_diags.size(); i < n; ++i) {
+for (const auto & particle_diag : particle_diags) {
 
-    WarpXParticleContainer* pc = particle_diags[i].getParticleContainer();
-    PinnedMemoryParticleContainer* pinned_pc = particle_diags[i].getPinnedParticleContainer();
+    WarpXParticleContainer* pc = particle_diag.getParticleContainer();
+    PinnedMemoryParticleContainer* pinned_pc = particle_diag.getPinnedParticleContainer();
     if (isBTD || use_pinned_pc) {
         if (!pinned_pc->isDefined()) {
             continue;  // Skip to the next particle container
@@ -546,17 +546,17 @@ for (unsigned i = 0, n = particle_diags.size(); i < n; ++i) {
         pc->make_alike<amrex::PinnedArenaAllocator>();
 
     const auto mass = pc->AmIA<PhysicalSpecies::photon>() ? PhysConst::m_e : pc->getMass();
-    RandomFilter const random_filter(particle_diags[i].m_do_random_filter,
-                                     particle_diags[i].m_random_fraction);
-    UniformFilter const uniform_filter(particle_diags[i].m_do_uniform_filter,
-                                       particle_diags[i].m_uniform_stride);
-    ParserFilter parser_filter(particle_diags[i].m_do_parser_filter,
+    RandomFilter const random_filter(particle_diag.m_do_random_filter,
+                                     particle_diag.m_random_fraction);
+    UniformFilter const uniform_filter(particle_diag.m_do_uniform_filter,
+                                       particle_diag.m_uniform_stride);
+    ParserFilter parser_filter(particle_diag.m_do_parser_filter,
                                utils::parser::compileParser<ParticleDiag::m_nvars>
-                                     (particle_diags[i].m_particle_filter_parser.get()),
+                                     (particle_diag.m_particle_filter_parser.get()),
                                  pc->getMass(), time);
     parser_filter.m_units = InputUnits::SI;
-    GeometryFilter const geometry_filter(particle_diags[i].m_do_geom_filter,
-                                           particle_diags[i].m_diag_domain);
+    GeometryFilter const geometry_filter(particle_diag.m_do_geom_filter,
+                                           particle_diag.m_diag_domain);
 
     if (isBTD || use_pinned_pc) {
         particlesConvertUnits(ConvertDirection::WarpX_to_SI, pinned_pc, mass);
@@ -587,7 +587,7 @@ for (unsigned i = 0, n = particle_diags.size(); i < n; ++i) {
     }
 
     // Gather the electrostatic potential (phi) on the macroparticles
-    if ( particle_diags[i].m_plot_phi ) {
+    if ( particle_diag.m_plot_phi ) {
         storePhiOnParticles( tmp, WarpX::electrostatic_solver_id, !use_pinned_pc );
     }
 
@@ -619,7 +619,7 @@ for (unsigned i = 0, n = particle_diags.size(); i < n; ++i) {
         real_names[x.second+PIdx::nattribs] = detail::snakeToCamel(x.first);
     }
     // plot any "extra" fields by default
-    real_flags = particle_diags[i].m_plot_flags;
+    real_flags = particle_diag.m_plot_flags;
     real_flags.resize(tmp.NumRealComps(), 1);
     // and the names
     int_names.resize(tmp.NumIntComps());
@@ -634,7 +634,7 @@ for (unsigned i = 0, n = particle_diags.size(); i < n; ++i) {
     // real_names contains a list of all real particle attributes.
     // real_flags is 1 or 0, whether quantity is dumped or not.
     DumpToFile(&tmp,
-        particle_diags.at(i).getSpeciesName(),
+        particle_diag.getSpeciesName(),
         m_CurrentStep,
         real_flags,
         int_flags,

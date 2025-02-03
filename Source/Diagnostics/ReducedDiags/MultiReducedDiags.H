@@ -49,10 +49,21 @@ public:
      *  @param[in] step current iteration time */
     void ComputeDiags (int step);
 
+    /** Loop over all ReducedDiags and call their ComputeDiagsMidStep
+     *  @param[in] step current iteration time */
+    void ComputeDiagsMidStep (int step);
+
     /** Loop over all ReducedDiags and call their WriteToFile
      *  @param[in] step current iteration time */
     void WriteToFile (int step);
 
+    /** \brief Loop over all ReducedDiags and call their WriteCheckpointData
+     *  @param[in] dir checkpoint directory */
+    void WriteCheckpointData (std::string const & dir);
+
+    /** \brief Loop over all ReducedDiags and call their ReadCheckpointData
+     *  @param[in] dir checkpoint directory */
+    void ReadCheckpointData (std::string const & dir);
 };
 
 #endif

@@ -290,13 +290,20 @@ Overall simulation parameters
         In electromagnetic mode, this solver can be used to initialize the species' self fields
         (``<species_name>.initialize_self_fields=1``) provided that the field BCs are PML (``boundary.field_lo,hi = PML``).
 
-          * ``warpx.use_2d_slices_fft_solver`` (`bool`, default: 0): Select the type of Integrated Green Function solver.
+          * ``warpx.use_2d_slices_fft_solver`` (`bool`) optional (default: 0): Select the type of Integrated Green Function solver.
             If 0, solve Poisson equation in full 3D geometry.
             If 1, solve Poisson equation in a quasi 3D geometry, neglecting the :math:`z` derivatives in the Laplacian of the Poisson equation.
             In practice, in this case, the code performes many 2D Poisson solves on all :math:`(x,y)` slices, each slice at a given :math:`z`.
             This is often a good approximation for ultra-relativistic beams propagating along the :math:`z` direction, with the relativistic solver.
             As a consequence, this solver does not need to do an FFT along the :math:`z` direction,
             and instead uses only transverse FFTs (along :math:`x` and :math:`y`) at each :math:`z` position (or :math:`z` "slice").
+
+          * ``ablastr.nprocs_igf_fft`` (`int`) optional (default: number of MPI ranks): Number of MPI ranks used to parallalelize the FFT solver.
+            This can be less or equal than then number of MPI ranks that are used to run the overall simulation.
+            It can be useful if the auxiliary simulation boxes fit within a single process, so to avoid extra communications.
+            The auxiliary boxes are extended boxes in real and spectral space that are used to perform the necessary FFTs.
+            The extended simulation box size in real space is :math:`2n_x-1, 2n_y-1, 2n_z-1` with the 3D solver, :math:`2n_x-1, 2n_y -1, n_z` with the 2D solver.
+            The extended simulation box size in spectral space is :math:`n_x, 2n_y-1, 2n_z-1` with the 3D solver, :math:`n_x, 2n_y-1, n_z` with the 2D solver.
 
 * ``warpx.self_fields_required_precision`` (`float`, default: 1.e-11)
     The relative precision with which the electrostatic space-charge fields should
@@ -2773,18 +2780,18 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     When WarpX is compiled with openPMD support, the first available backend in the order given above is taken.
 
 * ``<diag_name>.openpmd_encoding`` (optional, ``v`` (variable based), ``f`` (file based) or ``g`` (group based) ) only read if ``<diag_name>.format = openpmd``.
-     openPMD `file output encoding <https://openpmd-api.readthedocs.io/en/0.15.2/usage/concepts.html#iteration-and-series>`__.
+     openPMD `file output encoding <https://openpmd-api.readthedocs.io/en/0.16.1/usage/concepts.html#iteration-and-series>`__.
      File based: one file per timestep (slower), group/variable based: one file for all steps (faster)).
-     ``variable based`` is an `experimental feature with ADIOS2 <https://openpmd-api.readthedocs.io/en/0.15.2/backends/adios2.html#experimental-new-adios2-schema>`__ and not supported for back-transformed diagnostics.
+     ``variable based`` is an `experimental feature with ADIOS2 <https://openpmd-api.readthedocs.io/en/0.16.1/backends/adios2.html#experimental-new-adios2-schema>`__ and not supported for back-transformed diagnostics.
      Default: ``f`` (full diagnostics)
 
 * ``<diag_name>.adios2_operator.type`` (``zfp``, ``blosc``) optional,
-    `ADIOS2 I/O operator type <https://openpmd-api.readthedocs.io/en/0.15.2/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.
+    `ADIOS2 I/O operator type <https://openpmd-api.readthedocs.io/en/0.16.1/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.
 
 * ``<diag_name>.adios2_operator.parameters.*`` optional,
-    `ADIOS2 I/O operator parameters <https://openpmd-api.readthedocs.io/en/0.15.2/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.
+    `ADIOS2 I/O operator parameters <https://openpmd-api.readthedocs.io/en/0.16.1/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.
 
-    A typical example for `ADIOS2 output using lossless compression <https://openpmd-api.readthedocs.io/en/0.15.2/details/backendconfig.html#adios2>`__ with ``blosc`` using the ``zstd`` compressor and 6 CPU treads per MPI Rank (e.g. for a `GPU run with spare CPU resources <https://arxiv.org/abs/1706.00522>`__):
+    A typical example for `ADIOS2 output using lossless compression <https://openpmd-api.readthedocs.io/en/0.16.1/details/backendconfig.html#adios2>`__ with ``blosc`` using the ``zstd`` compressor and 6 CPU treads per MPI Rank (e.g. for a `GPU run with spare CPU resources <https://arxiv.org/abs/1706.00522>`__):
 
     .. code-block:: text
 
@@ -2803,11 +2810,11 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
         <diag_name>.adios2_operator.parameters.precision = 3
 
 * ``<diag_name>.adios2_engine.type`` (``bp4``, ``sst``, ``ssc``, ``dataman``) optional,
-    `ADIOS2 Engine type <https://openpmd-api.readthedocs.io/en/0.15.2/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.
+    `ADIOS2 Engine type <https://openpmd-api.readthedocs.io/en/0.16.1/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.
     See full list of engines at `ADIOS2 readthedocs <https://adios2.readthedocs.io/en/latest/engines/engines.html>`__
 
 * ``<diag_name>.adios2_engine.parameters.*`` optional,
-    `ADIOS2 Engine parameters <https://openpmd-api.readthedocs.io/en/0.15.2/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.
+    `ADIOS2 Engine parameters <https://openpmd-api.readthedocs.io/en/0.16.1/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.
 
     An example for parameters for the BP engine are setting the number of writers (``NumAggregators``), transparently redirecting data to burst buffers etc.
     A detailed list of engine-specific parameters are available at the official `ADIOS2 documentation <https://adios2.readthedocs.io/en/latest/engines/engines.html>`__
@@ -3174,6 +3181,12 @@ This shifts analysis from post-processing to runtime calculation of reduction op
 
         Note that the fields are averaged on the cell centers before their maximum values are
         computed.
+
+    * ``FieldPoyntingFlux``
+        Integrates the normal Poynting flux over each domain boundary surface and also integrates the flux over time.
+        This provides the power and total energy loss into or out of the simulation domain.
+        The output columns are the flux for each dimension on the lower boundaries, then the higher boundaries,
+        then the integrated energy loss for each dimension on the the lower and higher boundaries.
 
     * ``FieldProbe``
         This type computes the value of each component of the electric and magnetic fields
