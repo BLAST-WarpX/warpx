@@ -18,7 +18,7 @@
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "EmbeddedBoundary/Enabled.H"
 #ifdef AMREX_USE_EB
-#   include "EmbeddedBoundary/EmbeddedBoundary.H"
+#   include "EmbeddedBoundary/EmbeddedBoundaryInit.H"
 #endif
 #include "Fields.H"
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver.H"
@@ -1251,18 +1251,18 @@ void WarpX::InitializeEBGridData (int lev)
                 ComputeFaceExtensions();
 
                 // Mark on which grid points E should be updated
-                MarkUpdateECellsECT( m_eb_update_E[lev], edge_lengths_lev );
+                warpx::embedded_boundary::MarkUpdateECellsECT( m_eb_update_E[lev], edge_lengths_lev );
                 // Mark on which grid points B should be updated
-                MarkUpdateBCellsECT( m_eb_update_B[lev], face_areas_lev, edge_lengths_lev);
+                warpx::embedded_boundary::MarkUpdateBCellsECT( m_eb_update_B[lev], face_areas_lev, edge_lengths_lev);
 
             } else {
                 // Mark on which grid points E should be updated (stair-case approximation)
-                MarkUpdateCellsStairCase(
+                warpx::embedded_boundary::MarkUpdateCellsStairCase(
                     m_eb_update_E[lev],
                     m_fields.get_alldirs(FieldType::Efield_fp, lev),
                     eb_fact );
                 // Mark on which grid points B should be updated (stair-case approximation)
-                MarkUpdateCellsStairCase(
+                warpx::embedded_boundary::MarkUpdateCellsStairCase(
                     m_eb_update_B[lev],
                     m_fields.get_alldirs(FieldType::Bfield_fp, lev),
                     eb_fact );
@@ -1271,7 +1271,7 @@ void WarpX::InitializeEBGridData (int lev)
         }
 
         ComputeDistanceToEB();
-        MarkReducedShapeCells( m_eb_reduce_particle_shape[lev], eb_fact, WarpX::nox );
+        warpx::embedded_boundary::MarkReducedShapeCells( m_eb_reduce_particle_shape[lev], eb_fact, nox, Geom(0).periodicity());
 
     }
 #else

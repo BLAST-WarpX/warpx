@@ -12,7 +12,7 @@
 #include "BoundaryConditions/PMLComponent.H"
 #include "Fields.H"
 #ifdef AMREX_USE_EB
-#   include "EmbeddedBoundary/EmbeddedBoundary.H"
+#   include "EmbeddedBoundary/EmbeddedBoundaryInit.H"
 #endif
 #ifdef WARPX_USE_FFT
 #   include "FieldSolver/SpectralSolver/SpectralFieldData.H"
