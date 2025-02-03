@@ -60,6 +60,7 @@ CheckOptions:
   value:        "true"
 - key:          misc-use-anonymous-namespace.HeaderFileExtensions
   value:        "H,"
-
+- key:          performance-move-const-arg.CheckTriviallyCopyableMove
+  value:        "false,"
 
 HeaderFilterRegex: 'Source[a-z_A-Z0-9\/]+\.H$'
