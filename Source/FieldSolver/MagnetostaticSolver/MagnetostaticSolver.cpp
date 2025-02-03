@@ -136,13 +136,12 @@ WarpX::AddMagnetostaticFieldLabFrame()
     else {
         required_precision = 1e-11;
     }
-    const int verbosity = 2;
 
     computeVectorPotential(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::vector_potential_fp_nodal, finest_level),
         required_precision, absolute_tolerance, magnetostatic_solver_max_iters,
-        verbosity
+        magnetostatic_solver_verbosity
     );
 }
 

@@ -1,7 +1,7 @@
 .. _developers-docs:
 
-Documentation
-=============
+How to write documentation
+==========================
 
 Doxygen documentation
 ---------------------

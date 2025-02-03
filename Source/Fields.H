@@ -61,8 +61,8 @@ namespace warpx::fields
         E_external_particle_field, /**< Stores external particle fields provided by the user as  through an openPMD file */
         B_external_particle_field, /**< Stores external particle fields provided by the user as  through an openPMD file */
         distance_to_eb, /**< Only used with embedded boundaries (EB). Stores the distance to the nearest EB */
-        edge_lengths,   /**< Only used with embedded boundaries (EB). Indicates the length of the cell edge that is covered by the EB, in SI units */
-        face_areas,     /**< Only used with embedded boundaries (EB). Indicates the area of the cell face that is covered by the EB, in SI units */
+        edge_lengths,   /**< Only used with the ECT solver. Indicates the length of the cell edge that is covered by the EB, in SI units */
+        face_areas,     /**< Only used with the ECT solver. Indicates the area of the cell face that is covered by the EB, in SI units */
         area_mod,
         pml_E_fp,
         pml_B_fp,

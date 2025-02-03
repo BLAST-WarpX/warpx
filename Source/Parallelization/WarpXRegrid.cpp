@@ -174,6 +174,14 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
+    const auto RemakeMultiFab = [&](auto& mf){
+        if (mf == nullptr) { return; }
+        const IntVect& ng = mf->nGrowVect();
+        auto pmf = std::remove_reference_t<decltype(mf)>{};
+        AllocInitMultiFab(pmf, mf->boxArray(), dm, mf->nComp(), ng, lev, mf->tags()[0]);
+        mf = std::move(pmf);
+    };
+
     bool const eb_enabled = EB::enabled();
     if (ba == boxArray(lev))
     {
@@ -186,7 +194,10 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
         for (int idim=0; idim < 3; ++idim)
         {
             if (eb_enabled) {
+                RemakeMultiFab( m_eb_reduce_particle_shape[lev] );
                 if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
+                    RemakeMultiFab( m_eb_update_E[lev][idim] );
+                    RemakeMultiFab( m_eb_update_B[lev][idim] );
                     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
                         m_borrowing[lev][idim] = std::make_unique<amrex::LayoutData<FaceInfoBox>>(amrex::convert(ba, Bfield_fp[lev][idim]->ixType().toIntVect()), dm);
                     }
