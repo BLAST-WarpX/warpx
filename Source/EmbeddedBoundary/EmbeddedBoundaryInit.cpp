@@ -14,6 +14,8 @@
 #include "Fields.H"
 #include "Utils/TextMsg.H"
 
+#include <AMReX.H>
+#include <AMReX_Array.H>
 #include <AMReX_Array4.H>
 #include <AMReX_BLProfiler.H>
 #include <AMReX_Box.H>
@@ -21,9 +23,11 @@
 #include <AMReX_FabArray.H>
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_GpuQualifiers.H>
+#include <AMReX_IndexType.H>
+#include <AMReX_IntVect.H>
+#include <AMReX_Math.H>
 #include <AMReX_MFIter.H>
 #include <AMReX_MultiCutFab.H>
-#include <AMReX_iMultiFab.H>
 
 namespace web = warpx::embedded_boundary;
 
@@ -333,40 +337,51 @@ web::MarkUpdateBCellsECT (
 }
 
 void
-web::MarkExtensionCells ()
+web::MarkExtensionCells (
+    const std::array<amrex::Real,3>& cell_size,
+    std::array< std::unique_ptr<amrex::iMultiFab>, 3 > & flag_info_face,
+    std::array< std::unique_ptr<amrex::iMultiFab>, 3 > & flag_ext_face,
+    const ablastr::fields::VectorField& b_field,
+    const ablastr::fields::VectorField& face_areas,
+    const ablastr::fields::VectorField& edge_lengths,
+    const ablastr::fields::VectorField& area_mod)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-#ifndef WARPX_DIM_RZ
-    auto const &cell_size = CellSize(maxLevel());
-
-#if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ)
+#ifdef WARPX_DIM_RZ
+    return;
+#elif !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ)
     WARPX_ABORT_WITH_MESSAGE("MarkExtensionCells only implemented in 2D and 3D");
 #endif
 
-    for (int idim = 0; idim < 3; ++idim) {
 #if defined(WARPX_DIM_XZ)
-        if (idim == 0 || idim == 2) {
-            m_flag_info_face[maxLevel()][idim]->setVal(0.);
-            m_flag_ext_face[maxLevel()][idim]->setVal(0.);
-            continue;
-        }
+    constexpr bool flag_dim_xz = true;
+#else
+    constexpr bool flag_dim_xz = false;
 #endif
-        for (amrex::MFIter mfi(*m_fields.get(FieldType::Bfield_fp, Direction{idim}, maxLevel())); mfi.isValid(); ++mfi) {
-            auto* face_areas_idim_max_lev =
-                m_fields.get(FieldType::face_areas, Direction{idim}, maxLevel());
+
+    for (int idim = 0; idim < 3; ++idim) {
+        if constexpr (flag_dim_xz){
+            if (idim == 0 || idim == 2) {
+                flag_info_face[idim]->setVal(0.);
+                flag_ext_face[idim]->setVal(0.);
+                continue;
+            }
+        }
+        for (amrex::MFIter mfi(*b_field[idim]); mfi.isValid(); ++mfi) {
+            auto* face_areas_idim_max_lev = face_areas[idim];
 
             const amrex::Box& box = mfi.tilebox(face_areas_idim_max_lev->ixType().toIntVect(),
                                                 face_areas_idim_max_lev->nGrowVect() );
 
-            auto const &S = face_areas_idim_max_lev->array(mfi);
-            auto const &flag_info_face = m_flag_info_face[maxLevel()][idim]->array(mfi);
-            auto const &flag_ext_face = m_flag_ext_face[maxLevel()][idim]->array(mfi);
-            const auto &lx = m_fields.get(FieldType::edge_lengths, Direction{0}, maxLevel())->array(mfi);
-            const auto &ly = m_fields.get(FieldType::edge_lengths, Direction{1}, maxLevel())->array(mfi);
-            const auto &lz = m_fields.get(FieldType::edge_lengths, Direction{2}, maxLevel())->array(mfi);
-            auto const &mod_areas_dim = m_fields.get(FieldType::area_mod, Direction{idim}, maxLevel())->array(mfi);
+            auto const& S = face_areas_idim_max_lev->array(mfi);
+            auto const& flag_info_face_data = flag_info_face[idim]->array(mfi);
+            auto const& flag_ext_face_data = flag_ext_face[idim]->array(mfi);
+            auto const& lx = edge_lengths[0]->array(mfi);
+            auto const& ly = edge_lengths[1]->array(mfi);
+            auto const& lz = edge_lengths[2]->array(mfi);
+            auto const& mod_areas_dim_data = area_mod[idim]->array(mfi);
 
             const amrex::Real dx = cell_size[0];
             const amrex::Real dy = cell_size[1];
@@ -374,19 +389,21 @@ web::MarkExtensionCells ()
 
             amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                 // Minimal area for this cell to be stable
-                mod_areas_dim(i, j, k) = S(i, j, k);
+                mod_areas_dim_data(i, j, k) = S(i, j, k);
                 double S_stab;
                 if (idim == 0){
                     S_stab = 0.5 * std::max({ly(i, j, k) * dz, ly(i, j, k + 1) * dz,
                                                     lz(i, j, k) * dy, lz(i, j + 1, k) * dy});
                 }else if (idim == 1){
-#ifdef WARPX_DIM_XZ
-                    S_stab = 0.5 * std::max({lx(i, j, k) * dz, lx(i, j + 1, k) * dz,
-                                             lz(i, j, k) * dx, lz(i + 1, j, k) * dx});
-#elif defined(WARPX_DIM_3D)
-                    S_stab = 0.5 * std::max({lx(i, j, k) * dz, lx(i, j, k + 1) * dz,
-                                             lz(i, j, k) * dx, lz(i + 1, j, k) * dx});
-#endif
+
+                    if constexpr (flag_dim_xz){
+                        S_stab = 0.5 * std::max({lx(i, j, k) * dz, lx(i, j + 1, k) * dz,
+                                                lz(i, j, k) * dx, lz(i + 1, j, k) * dx});
+                    }
+                    else{
+                        S_stab = 0.5 * std::max({lx(i, j, k) * dz, lx(i, j, k + 1) * dz,
+                                                lz(i, j, k) * dx, lz(i + 1, j, k) * dx});
+                    }
                 }else {
                     S_stab = 0.5 * std::max({lx(i, j, k) * dy, lx(i, j + 1, k) * dy,
                                              ly(i, j, k) * dx, ly(i + 1, j, k) * dx});
@@ -406,19 +423,18 @@ web::MarkExtensionCells ()
                 //       In the function ComputeFaceExtensions, after the cells are extended, the
                 //       corresponding entries in flag_ext_face are set to zero. This helps to keep
                 //       track of which cells could not be extended
-                flag_ext_face(i, j, k) = int(S(i, j, k) < S_stab && S(i, j, k) > 0);
-                if(flag_ext_face(i, j, k)){
-                    flag_info_face(i, j, k) = 0;
+                flag_ext_face_data(i, j, k) = int(S(i, j, k) < S_stab && S(i, j, k) > 0);
+                if(flag_ext_face_data(i, j, k)){
+                    flag_info_face_data(i, j, k) = 0;
                 }
                 // Is this face available to lend area to other faces?
                 // The criterion is that the face has to be interior and not already unstable itself
-                if(int(S(i, j, k) > 0 && !flag_ext_face(i, j, k))) {
-                    flag_info_face(i, j, k) = 1;
+                if(int(S(i, j, k) > 0 && !flag_ext_face_data(i, j, k))) {
+                    flag_info_face_data(i, j, k) = 1;
                 }
             });
         }
     }
-#endif
 }
 
 void

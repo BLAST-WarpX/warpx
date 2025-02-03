@@ -15,6 +15,7 @@
 #include <ablastr/fields/MultiFabRegister.H>
 
 #include <AMReX_EBFabFactory.H>
+#include <AMReX_iMultiFab.H>
 #include <AMReX_Periodicity.H>
 #include <AMReX_REAL.H>
 
@@ -97,7 +98,14 @@ namespace warpx::embedded_boundary
     *          - 2 for stable cells which have been intruded
     *        Here we cannot know if a cell is intruded or not so we initialize all stable cells with 1
     */
-    void MarkExtensionCells();
+    void MarkExtensionCells(
+        const std::array<amrex::Real,3>& cell_size,
+        std::array< std::unique_ptr<amrex::iMultiFab>, 3 > & flag_info_face,
+        std::array< std::unique_ptr<amrex::iMultiFab>, 3 > & flag_ext_face,
+        const ablastr::fields::VectorField& b_field,
+        const ablastr::fields::VectorField& face_areas,
+        const ablastr::fields::VectorField& edge_lengths,
+        const ablastr::fields::VectorField& area_mod);
 
     /**
     * \brief Compute the length of the mesh edges. Here the length is a value in [0, 1].

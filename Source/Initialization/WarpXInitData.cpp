@@ -1247,7 +1247,12 @@ void WarpX::InitializeEBGridData (int lev)
                 warpx::embedded_boundary::ScaleAreas(face_areas_lev, CellSize(lev));
 
                 // Compute additional quantities required for the ECT solver
-                MarkExtensionCells();
+                const auto& area_mod = m_fields.get_alldirs(FieldType::area_mod, maxLevel());
+                warpx::embedded_boundary::MarkExtensionCells(
+                    CellSize(maxLevel()), m_flag_info_face[maxLevel()], m_flag_ext_face[maxLevel()],
+                    m_fields.get_alldirs(FieldType::Bfield_fp, maxLevel()),
+                    face_areas_lev,
+                    edge_lengths_lev, area_mod);
                 ComputeFaceExtensions();
 
                 // Mark on which grid points E should be updated
