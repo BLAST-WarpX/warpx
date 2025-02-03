@@ -259,7 +259,7 @@ public:
 
     /** Get value of private member m_do_back_transformed_particles
      */
-    bool getDoBackTransformedParticles () const
+    [[nodiscard]] bool getDoBackTransformedParticles () const
     {
         return m_do_back_transformed_particles;
     }
