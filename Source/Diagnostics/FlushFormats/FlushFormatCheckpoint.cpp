@@ -5,6 +5,7 @@
 #   include "BoundaryConditions/PML_RZ.H"
 #endif
 #include "Diagnostics/ParticleDiag/ParticleDiag.H"
+#include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "Fields.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/TextMsg.H"
@@ -174,6 +175,8 @@ FlushFormatCheckpoint::WriteToFile (
 
     WriteDMaps(checkpointname, nlev);
 
+    WriteReducedDiagsData(checkpointname);
+
     VisMF::SetHeaderVersion(current_version);
 
 }
@@ -261,5 +264,14 @@ FlushFormatCheckpoint::WriteDMaps (const std::string& dir, int nlev) const
                 "FlushFormatCheckpoint::WriteDMaps: problem writing DMFile"
             );
         }
+    }
+}
+
+void
+FlushFormatCheckpoint::WriteReducedDiagsData (std::string const & dir) const
+{
+    if (ParallelDescriptor::IOProcessor()) {
+        auto & warpx = WarpX::GetInstance();
+        warpx.reduced_diags->WriteCheckpointData(dir);
     }
 }

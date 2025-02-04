@@ -10,6 +10,7 @@
 #include "HybridPICModel.H"
 
 #include "EmbeddedBoundary/Enabled.H"
+#include "Python/callbacks.H"
 #include "Fields.H"
 #include "WarpX.H"
 
@@ -304,6 +305,8 @@ void HybridPICModel::HybridPICSolveE (
             eb_update_E[lev], lev, solve_for_Faraday
         );
     }
+    // Allow execution of Python callback after E-field push
+    ExecutePythonCallback("afterEpush");
 }
 
 void HybridPICModel::HybridPICSolveE (
