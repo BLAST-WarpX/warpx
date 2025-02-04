@@ -571,9 +571,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
                 // Interpolate current to appropriate staggering to match E field
                 Real jtot_val = 0._rt;
-                Real jr_val = 0._rt;
                 if (solve_for_Faraday && resistivity_has_J_dependence) {
-                    jr_val = Interp(Jr, Jr_stag, Er_stag, coarsen, i, j, 0, 0);
+                    const Real jr_val = Interp(Jr, Jr_stag, Er_stag, coarsen, i, j, 0, 0);
                     const Real jt_val = Interp(Jt, Jt_stag, Er_stag, coarsen, i, j, 0, 0);
                     const Real jz_val = Interp(Jz, Jz_stag, Er_stag, coarsen, i, j, 0, 0);
                     jtot_val = std::sqrt(jr_val*jr_val + jt_val*jt_val + jz_val*jz_val);
@@ -601,7 +600,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
                 if (include_hyper_resistivity_term) {
                     // r on cell-centered point (Jr is cell-centered in r)
-                    Real const r = rmin + (i + 0.5_rt)*dr;
+                    const Real r = rmin + (i + 0.5_rt)*dr;
+                    const Real jr_val = Interp(Jr, Jr_stag, Er_stag, coarsen, i, j, 0, 0);
 
                     auto nabla2Jr = T_Algo::Dr_rDr_over_r(Jr, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
                         + T_Algo::Dzz(Jr, coefs_z, n_coefs_z, i, j, 0, 0) - jr_val/(r*r);
@@ -631,10 +631,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
                 // Interpolate current to appropriate staggering to match E field
                 Real jtot_val = 0._rt;
-                Real jt_val = 0._rt;
                 if (solve_for_Faraday && resistivity_has_J_dependence) {
                     const Real jr_val = Interp(Jr, Jr_stag, Et_stag, coarsen, i, j, 0, 0);
-                    jt_val = Interp(Jt, Jt_stag, Et_stag, coarsen, i, j, 0, 0);
+                    const Real jt_val = Interp(Jt, Jt_stag, Et_stag, coarsen, i, j, 0, 0);
                     const Real jz_val = Interp(Jz, Jz_stag, Et_stag, coarsen, i, j, 0, 0);
                     jtot_val = std::sqrt(jr_val*jr_val + jt_val*jt_val + jz_val*jz_val);
                 }
@@ -659,15 +658,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 if (solve_for_Faraday) { Et(i, j, 0) += eta(rho_val, jtot_val) * Jt(i, j, 0); }
 
                 if (include_hyper_resistivity_term) {
-                    // r on nodal point (Jt is nodal in r)
-                    Real const r = rmin + i*dr;
-
-                    // Do not apply hyper-resistivity at r=0
-                    auto nabla2Jt = 0._rt;
-                    if (r > 0.5_rt*dr) {
-                        nabla2Jt = T_Algo::Dr_rDr_over_r(Jt, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
-                            + T_Algo::Dzz(Jt, coefs_z, n_coefs_z, i, j, 0, 0) - jt_val/(r*r);
-                    }
+                    const Real jt_val = Interp(Jt, Jt_stag, Et_stag, coarsen, i, j, 0, 0);
+                    auto nabla2Jt = T_Algo::Dr_rDr_over_r(Jt, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
+                        + T_Algo::Dzz(Jt, coefs_z, n_coefs_z, i, j, 0, 0) - jt_val/(r*r);
                     Et(i, j, 0) -= eta_h * nabla2Jt;
                 }
 
