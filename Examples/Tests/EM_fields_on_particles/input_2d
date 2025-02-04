@@ -1,0 +1,86 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+
+# Parameters
+max_step = 400
+amr.n_cell = 256 256
+warpx.numprocs = 2 1
+amr.max_level = 0
+geometry.dims = 2
+geometry.prob_lo = 0 0   # physical domain
+geometry.prob_hi = 5e-6 2.5e-5
+
+# BC
+
+boundary.field_lo = pml pml
+boundary.field_hi = pml pml
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.serialize_initial_conditions = 1
+warpx.verbose = 1
+warpx.cfl = 0.99
+warpx.use_filter = 0
+
+# Order of particle shape factors
+algo.particle_shape = 2 
+
+#################################
+########### "PLASMA" ############
+#################################
+
+particles.species_names = electron
+
+electron.species_type = electron
+electron.injection_style = "SingleParticle"
+electron.single_particle_pos = 2.5e-6 0 1.25e-5
+electron.single_particle_u = 0 0 0
+electron.single_particle_weight = 0
+
+electron.do_not_push = 1
+electron.do_not_deposit = 1
+
+#################################
+######### LASER #################
+#################################
+
+lasers.names = las1
+
+las1.position = 0.9e-6 326 1.25e-5
+las1.polarization = 0 1 2
+las1.direction = 1 0 0
+las1.e_max = 3.26e10
+las1.wavelength = 800e-9
+las1.profile = "Gaussian"
+las1.profile_t_peak = 10e-15
+las1.profile_duration = 5e-15
+las1.profile_waist = 5e-6
+las1.profile_focal_distance = 1.6e-6 
+
+#################################
+############# DIAGS #############
+#################################
+
+diagnostics.diags_names = diag1 diag_checksum 
+
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.format = openpmd
+diag1.openpmd_backend = bp
+diag1.openpmd_encoding = v
+diag1.fields_to_plot = none
+diag1.write_species = 1
+diag1.species = electron
+diag1.electron.variables = EM # will emit a warning because no position
+
+diag_checksum.intervals = 400:400
+diag_checksum.diag_type = Full
+diag_checksum.format = openpmd
+diag_checksum.openpmd_backend = bp
+diag_checksum.fields_to_plot = Ex Ey Ez Bx By Bz
+diag_checksum.write_species = 1
+diag_checksum.species = electron
+diag_checksum.electron.variables = x z ux uy uz w EM # will emit a warning because no position
+
