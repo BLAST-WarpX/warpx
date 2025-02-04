@@ -23,8 +23,10 @@ bx_t = np.zeros((n_diags,))
 by_t = np.zeros((n_diags,))
 bz_t = np.zeros((n_diags,))
 
+
 def elec_d(x):
     return f"/data/particles/electron/{x}/__data__"
+
 
 # Here we use adios2.Stream instead of openpmd_viewer.OpenPMDTimeSeries
 # This is because the variable based encoding is still experimental
