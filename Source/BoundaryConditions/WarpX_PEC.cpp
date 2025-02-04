@@ -376,11 +376,9 @@ namespace
                 amrex::IntVect iv_mirror = ijk_vec;
                 iv_mirror[idim] = mirrorfac[idim][iside] - ijk_vec[idim];
 
-                // On the PEC boundary the charge/current density is set to 0
-                if (ijk_vec == iv_mirror) {
-                    field(ijk_vec, n) = 0._rt;
-                // otherwise update the internal cell if the mirror guard cell exists
-                } else if (fabbox.contains(iv_mirror)) {
+                // Update the cell if the mirror guard cell exists
+                // Note that this includes the cells on the boundary, where ijk_vec == iv_mirror
+                if (fabbox.contains(iv_mirror)) {
                     field(ijk_vec,n) += psign[idim][iside] * field(iv_mirror,n);
                 }
             }
