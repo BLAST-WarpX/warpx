@@ -141,7 +141,7 @@ ProjectionDivCleaner::solve ()
 
     std::map<FieldBoundaryType, LinOpBCType> bcmap{
         {FieldBoundaryType::PEC, LinOpBCType::Dirichlet},
-        {FieldBoundaryType::PMC, LinOpBCType::Dirichlet},
+        {FieldBoundaryType::PMC, LinOpBCType::Neumann},
         {FieldBoundaryType::Neumann, LinOpBCType::Neumann},
         {FieldBoundaryType::Periodic, LinOpBCType::Periodic},
         {FieldBoundaryType::None, LinOpBCType::Neumann}
