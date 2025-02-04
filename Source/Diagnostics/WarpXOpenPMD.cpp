@@ -54,40 +54,6 @@
 namespace detail
 {
 #ifdef WARPX_USE_OPENPMD
-
-    /** \brief Convert a snake_case string to a camelCase one.
-     *
-     *  WarpX uses snake_case internally for some component
-     *  names, but OpenPMD assumes "_" indicates vector or
-     *  tensor fields.
-     *
-     * @return camelCase version of input
-     */
-    inline std::string
-    snakeToCamel (const std::string& snake_string)
-    {
-        std::string camelString = snake_string;
-        const auto n = static_cast<int>(camelString.length());
-        for (int x = 0; x < n; x++)
-        {
-            if (x == 0)
-            {
-                std::transform(camelString.begin(), camelString.begin()+1, camelString.begin(),
-                               [](unsigned char c){ return std::tolower(c); });
-            }
-            if (camelString[x] == '_')
-            {
-                std::string tempString = camelString.substr(x + 1, 1);
-                std::transform(tempString.begin(), tempString.end(), tempString.begin(),
-                               [](unsigned char c){ return std::toupper(c); });
-                camelString.erase(x, 2);
-                camelString.insert(x, tempString);
-            }
-        }
-
-        return camelString;
-    }
-
     /** Create the option string
      *
      * @return JSON option string for openPMD::Series
@@ -590,44 +556,38 @@ for (const auto & particle_diag : particle_diags) {
         storePhiOnParticles( tmp, WarpX::electrostatic_solver_id, !use_pinned_pc );
     }
 
-    // names of amrex::Real and int particle attributes in SoA data
-    amrex::Vector<std::string> real_names;
-    amrex::Vector<std::string> int_names;
-    amrex::Vector<int> int_flags;
-    amrex::Vector<int> real_flags;
-    // see openPMD ED-PIC extension for namings
-    // note: an underscore separates the record name from its component
-    //       for non-scalar records
-    // note: in RZ, we reconstruct x,y,z positions from r,z,theta in WarpX
+    // names of amrex::ParticleReal and int particle attributes in SoA data
+    auto const rn = tmp.GetRealSoANames();
+    auto const in = tmp.GetIntSoANames();
+    amrex::Vector<std::string> real_names(rn.begin(), rn.end());
+    amrex::Vector<std::string> int_names(in.begin(), in.end());
+
+    // transform names to openPMD, separated by underscores
+    {
+        // see openPMD ED-PIC extension for namings
+        // note: an underscore separates the record name from its component
+        //       for non-scalar records
+        // note: in RZ, we reconstruct x,y,z positions from r,z,theta in WarpX
 #if !defined (WARPX_DIM_1D_Z)
-    real_names.push_back("position_x");
+        real_names[tmp.GetRealCompIndex("x")] = "position_x";
 #endif
-#if defined (WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-    real_names.push_back("position_y");
+#if defined (WARPX_DIM_3D)
+        real_names[tmp.GetRealCompIndex("y")] = "position_y";
 #endif
-    real_names.push_back("position_z");
-    real_names.push_back("weighting");
-    real_names.push_back("momentum_x");
-    real_names.push_back("momentum_y");
-    real_names.push_back("momentum_z");
-    // get the names of the real comps
-    real_names.resize(tmp.NumRealComps());
-    auto rnames = tmp.GetRealSoANames();
-    for (std::size_t index = PIdx::nattribs; index < rnames.size(); ++index)
-    {
-        real_names[index+PIdx::nattribs] = detail::snakeToCamel(rnames[index]);
+#if defined(WARPX_DIM_RZ)
+        real_names[tmp.GetRealCompIndex("theta")] = "position_y";
+#endif
+        real_names[tmp.GetRealCompIndex("z")] = "position_z";
+        real_names[tmp.GetRealCompIndex("ux")] = "momentum_x";
+        real_names[tmp.GetRealCompIndex("uy")] = "momentum_y";
+        real_names[tmp.GetRealCompIndex("uz")] = "momentum_z";
     }
+
     // plot any "extra" fields by default
-    real_flags = particle_diag.m_plot_flags;
+    amrex::Vector<int> real_flags = particle_diag.m_plot_flags;
     real_flags.resize(tmp.NumRealComps(), 1);
-    // and the names
-    int_names.resize(tmp.NumIntComps());
-    auto inames = tmp.GetIntSoANames();
-    for (std::size_t index = 0; index < inames.size(); ++index)
-    {
-        int_names[index] = detail::snakeToCamel(inames[index]);
-    }
     // plot by default
+    amrex::Vector<int> int_flags;
     int_flags.resize(tmp.NumIntComps(), 1);
 
     // real_names contains a list of all real particle attributes.
