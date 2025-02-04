@@ -54,7 +54,7 @@ web::MarkReducedShapeCells (
         amrex::Array4<int> const & eb_reduce_particle_shape_arr = eb_reduce_particle_shape->array(mfi);
 
         // Check if the box (including one layer of guard cells) contains a mix of covered and regular cells
-        const amrex::Box& eb_info_box = mfi.tilebox(amrex::IntVect::TheCellVector()).grow(1);
+        const amrex::Box eb_info_box = mfi.tilebox(amrex::IntVect::TheCellVector()).grow(1);
         amrex::FabType const fab_type = eb_flag[mfi].getType( eb_info_box );
 
         if (fab_type == amrex::FabType::regular) { // All cells in the box are regular
@@ -145,7 +145,7 @@ web::MarkUpdateCellsStairCase (
             amrex::Array4<int> const & eb_update_arr = eb_update[idim]->array(mfi);
 
             // Check if the box (including one layer of guard cells) contains a mix of covered and regular cells
-            const amrex::Box& eb_info_box = mfi.tilebox(amrex::IntVect::TheCellVector()).grow(1);
+            const amrex::Box eb_info_box = mfi.tilebox(amrex::IntVect::TheCellVector()).grow(1);
             amrex::FabType const fab_type = eb_flag[mfi].getType( eb_info_box );
 
             if (fab_type == amrex::FabType::regular) { // All cells in the box are regular
@@ -355,20 +355,15 @@ web::MarkExtensionCells (
     WARPX_ABORT_WITH_MESSAGE("MarkExtensionCells only implemented in 2D and 3D");
 #endif
 
-#if defined(WARPX_DIM_XZ)
-    constexpr bool flag_dim_xz = true;
-#else
-    constexpr bool flag_dim_xz = false;
-#endif
-
     for (int idim = 0; idim < 3; ++idim) {
-        if constexpr (flag_dim_xz){
-            if (idim == 0 || idim == 2) {
-                flag_info_face[idim]->setVal(0.);
-                flag_ext_face[idim]->setVal(0.);
-                continue;
-            }
+
+#if defined(WARPX_DIM_XZ)
+        if (idim == 0 || idim == 2) {
+            flag_info_face[idim]->setVal(0.);
+            flag_ext_face[idim]->setVal(0.);
+            continue;
         }
+#endif
         for (amrex::MFIter mfi(*b_field[idim]); mfi.isValid(); ++mfi) {
             auto* face_areas_idim_max_lev = face_areas[idim];
 
@@ -396,14 +391,13 @@ web::MarkExtensionCells (
                                                     lz(i, j, k) * dy, lz(i, j + 1, k) * dy});
                 }else if (idim == 1){
 
-                    if constexpr (flag_dim_xz){
-                        S_stab = 0.5 * std::max({lx(i, j, k) * dz, lx(i, j + 1, k) * dz,
-                                                lz(i, j, k) * dx, lz(i + 1, j, k) * dx});
-                    }
-                    else{
-                        S_stab = 0.5 * std::max({lx(i, j, k) * dz, lx(i, j, k + 1) * dz,
-                                                lz(i, j, k) * dx, lz(i + 1, j, k) * dx});
-                    }
+#if defined(WARPX_DIM_XZ)
+                    S_stab = 0.5 * std::max({lx(i, j, k) * dz, lx(i, j + 1, k) * dz,
+                                            lz(i, j, k) * dx, lz(i + 1, j, k) * dx});
+#else
+                    S_stab = 0.5 * std::max({lx(i, j, k) * dz, lx(i, j, k + 1) * dz,
+                                            lz(i, j, k) * dx, lz(i + 1, j, k) * dx});
+#endif
                 }else {
                     S_stab = 0.5 * std::max({lx(i, j, k) * dy, lx(i, j + 1, k) * dy,
                                              ly(i, j, k) * dx, ly(i + 1, j, k) * dx});
