@@ -128,7 +128,7 @@ AMREX_ENUM(FieldBoundaryType,
                      //in the moving window direction
            Absorbing_SilverMueller, // Silver-Mueller boundary condition
            absorbingsilvermueller = Absorbing_SilverMueller,
-           Neumann, // For electrostatic, the normal E is set to zero
+           Neumann = PMC, // For electrostatic, the normal E is set to zero
            None,    // The fields values at the boundary are not updated. This is
                     // useful for RZ simulations, at r=0.
            Open,    // Used in the Integrated Green Function Poisson solver
