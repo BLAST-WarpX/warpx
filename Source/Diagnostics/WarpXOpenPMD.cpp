@@ -590,7 +590,7 @@ for (const auto & particle_diag : particle_diags) {
     if ( particle_diag.m_plot_phi ) {
         storePhiOnParticles( tmp, WarpX::electrostatic_solver_id, !use_pinned_pc );
     }
-    if ( particle_diags.m_plot_EM ) {
+    if ( particle_diag.m_plot_EM ) {
         storeEMFieldsOnParticles( tmp, WarpX::electromagnetic_solver_id, !use_pinned_pc ); // !!!!!!!!!!!!! why use_pinned_pc here? and not full_diag ????
     }
 
