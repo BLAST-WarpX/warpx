@@ -443,9 +443,10 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
                           WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::filterAndTransform");
                           auto& warpx = WarpX::GetInstance();
                           const auto dt = warpx.getdt(pti.GetLevel());
-                          const int step_scraped_index = buffer[i].GetIntCompIndex("stepScraped");
-                          const int delta_index = buffer[i].GetRealCompIndex("deltaTimeScraped");
-                          const int normal_index = buffer[i].GetRealCompIndex("nx");
+                          auto & buf = buffer[i];
+                          const int step_scraped_index = buf.GetIntCompIndex("stepScraped") - buf.NArrayInt;
+                          const int delta_index = buf.GetRealCompIndex("deltaTimeScraped") - buf.NArrayReal;
+                          const int normal_index = buf.GetRealCompIndex("nx") - buf.NArrayReal;
                           const int step = warpx_instance.getistep(0);
                           amrex::filterAndTransformParticles(ptile_buffer, ptile,
                                                              predicate,
@@ -544,9 +545,10 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
                     }
                     auto &warpx = WarpX::GetInstance();
                     const auto dt = warpx.getdt(pti.GetLevel());
-                    const int step_scraped_index = buffer[i].GetIntCompIndex("stepScraped");
-                    const int delta_index = buffer[i].GetRealCompIndex("deltaTimeScraped");
-                    const int normal_index = buffer[i].GetRealCompIndex("nx");
+                    auto & buf = buffer[i];
+                    const int step_scraped_index = buf.GetIntCompIndex("stepScraped") - buf.NArrayInt;
+                    const int delta_index = buf.GetRealCompIndex("deltaTimeScraped") - buf.NArrayReal;
+                    const int normal_index = buf.GetRealCompIndex("nx") - buf.NArrayReal;
                     const int step = warpx_instance.getistep(0);
 
                     {
