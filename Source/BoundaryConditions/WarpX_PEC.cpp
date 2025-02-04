@@ -359,7 +359,7 @@ namespace
                                 amrex::Array4<amrex::Real> const& field,
                                 amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> const& mirrorfac,
                                 amrex::GpuArray<GpuArray<amrex::Real, 2>, AMREX_SPACEDIM> const& psign,
-                                amrex::GpuArray<GpuArray<bool, 2>, AMREX_SPACEDIM> const& is_reflective,
+                                amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> const& is_reflective,
                                 amrex::GpuArray<bool, AMREX_SPACEDIM> const& tangent_to_bndy,
                                 amrex::Box const& fabbox)
     {
@@ -377,8 +377,10 @@ namespace
                 iv_mirror[idim] = mirrorfac[idim][iside] - ijk_vec[idim];
 
                 // Update the cell if the mirror guard cell exists
-                // Note that this includes the cells on the boundary, where ijk_vec == iv_mirror
-                if (fabbox.contains(iv_mirror)) {
+                if (ijk_vec == iv_mirror && is_reflective[idim][iside] == 1) {
+                    field(ijk_vec,n) = 0._rt;
+                } else if (fabbox.contains(iv_mirror)) {
+                    // Note that this includes the cells on the boundary for PMC
                     field(ijk_vec,n) += psign[idim][iside] * field(iv_mirror,n);
                 }
             }
@@ -656,19 +658,19 @@ PEC::ApplyReflectiveBoundarytoRhofield (
     // cells for boundaries that are NOT PEC
     amrex::Box grown_domain_box = domain_box;
 
-    amrex::GpuArray<GpuArray<bool,2>, AMREX_SPACEDIM> is_reflective;
+    amrex::GpuArray<GpuArray<int,2>, AMREX_SPACEDIM> is_reflective;
     amrex::GpuArray<bool, AMREX_SPACEDIM> is_tangent_to_bndy;
     amrex::GpuArray<GpuArray<amrex::Real,2>, AMREX_SPACEDIM> psign;
     amrex::GpuArray<GpuArray<int,2>, AMREX_SPACEDIM> mirrorfac;
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
         is_reflective[idim][0] = ( particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
                               || ( particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
-                              || ( field_boundary_lo[idim] == FieldBoundaryType::PEC)
-                              || ( field_boundary_lo[idim] == FieldBoundaryType::PMC);
+                              || ( field_boundary_lo[idim] == FieldBoundaryType::PEC);
+        if (field_boundary_lo[idim] == FieldBoundaryType::PMC) { is_reflective[idim][0] = 2; }
         is_reflective[idim][1] = ( particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
                               || ( particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
-                              || ( field_boundary_hi[idim] == FieldBoundaryType::PEC)
-                              || ( field_boundary_hi[idim] == FieldBoundaryType::PMC);
+                              || ( field_boundary_hi[idim] == FieldBoundaryType::PEC);
+        if (field_boundary_hi[idim] == FieldBoundaryType::PMC) { is_reflective[idim][1] = 2; }
         if (!is_reflective[idim][0]) { grown_domain_box.growLo(idim, ng_fieldgather[idim]); }
         if (!is_reflective[idim][1]) { grown_domain_box.growHi(idim, ng_fieldgather[idim]); }
 
@@ -756,7 +758,7 @@ PEC::ApplyReflectiveBoundarytoJfield(
     // directions of the current density multifab
     const amrex::IntVect ng_fieldgather = Jx->nGrowVect();
 
-    amrex::GpuArray<GpuArray<bool, 2>, AMREX_SPACEDIM> is_reflective;
+    amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> is_reflective;
     amrex::GpuArray<GpuArray<bool, AMREX_SPACEDIM>, 3> is_tangent_to_bndy;
     amrex::GpuArray<GpuArray<GpuArray<amrex::Real, 2>, AMREX_SPACEDIM>, 3> psign;
     amrex::GpuArray<GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM>, 3> mirrorfac;
@@ -765,10 +767,12 @@ PEC::ApplyReflectiveBoundarytoJfield(
                               || ( particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
                               || ( field_boundary_lo[idim] == FieldBoundaryType::PEC)
                               || ( field_boundary_lo[idim] == FieldBoundaryType::PMC);
+        if (field_boundary_lo[idim] == FieldBoundaryType::PMC) { is_reflective[idim][0] = 2; }
         is_reflective[idim][1] = ( particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
                               || ( particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
                               || ( field_boundary_hi[idim] == FieldBoundaryType::PEC)
                               || ( field_boundary_hi[idim] == FieldBoundaryType::PMC);
+        if (field_boundary_hi[idim] == FieldBoundaryType::PMC) { is_reflective[idim][1] = 2; }
         if (!is_reflective[idim][0]) { grown_domain_box.growLo(idim, ng_fieldgather[idim]); }
         if (!is_reflective[idim][1]) { grown_domain_box.growHi(idim, ng_fieldgather[idim]); }
 
