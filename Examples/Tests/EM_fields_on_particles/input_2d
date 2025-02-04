@@ -25,7 +25,7 @@ warpx.cfl = 0.99
 warpx.use_filter = 0
 
 # Order of particle shape factors
-algo.particle_shape = 2 
+algo.particle_shape = 2
 
 #################################
 ########### "PLASMA" ############
@@ -57,13 +57,13 @@ las1.profile = "Gaussian"
 las1.profile_t_peak = 10e-15
 las1.profile_duration = 5e-15
 las1.profile_waist = 5e-6
-las1.profile_focal_distance = 1.6e-6 
+las1.profile_focal_distance = 1.6e-6
 
 #################################
 ############# DIAGS #############
 #################################
 
-diagnostics.diags_names = diag1 diag_checksum 
+diagnostics.diags_names = diag1 diag_checksum
 
 diag1.intervals = 1
 diag1.diag_type = Full
@@ -83,4 +83,3 @@ diag_checksum.fields_to_plot = Ex Ey Ez Bx By Bz
 diag_checksum.write_species = 1
 diag_checksum.species = electron
 diag_checksum.electron.variables = x z ux uy uz w EM # will emit a warning because no position
-

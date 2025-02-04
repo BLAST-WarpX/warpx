@@ -295,22 +295,22 @@ storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
     }
 }
 
-void 
-storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp, 
+void
+storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
     ElectromagneticSolverAlgo electromagnetic_solver_id, bool is_full_diagnostic  ) {
-    
+
     using PinnedParIter = typename PinnedMemoryParticleContainer::ParIterType;
     using Dir = ablastr::fields::Direction;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        electromagnetic_solver_id != ElectromagneticSolverAlgo::None , 
+        electromagnetic_solver_id != ElectromagneticSolverAlgo::None ,
         "output of the electromagnetic fields on the particles was requested, "
         "but this is only available with an electromagnetic solver.");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         is_full_diagnostic,
         "Output of the electromagnetic fields on the particles was requested, "
         "but this is only available with `diag_type = Full`.");
-    
+
 
     tmp.NewRealComp("Ex");
     tmp.NewRealComp("Ey");
@@ -329,10 +329,10 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
     auto& warpx = WarpX::GetInstance();
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        warpx.finestLevel() ==0, 
+        warpx.finestLevel() ==0,
         "output of the electromagnetic fields on particles only works without mesh refinement"
     );
-    
+
     constexpr auto lev0=0;
 
     const amrex::Geometry& geom = warpx.Geom(lev0);
@@ -354,7 +354,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
     for (PinnedParIter pti(tmp, lev0); pti.isValid(); ++pti) {
-        
+
         const auto Ex_grid = Ex[pti].array();
         const auto Ey_grid = Ey[pti].array();
         const auto Ez_grid = Ez[pti].array();
@@ -384,10 +384,10 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
         // Loop over the particles and update their position
         amrex::ParallelFor( pti.numParticles(),
             [=] AMREX_GPU_DEVICE (long ip) {
-               // !!!!!!!!!! pas fini  
+               // !!!!!!!!!! pas fini
                amrex::ParticleReal xp, yp, zp;
                getPosition(ip, xp, yp, zp);
-               
+
                 Ex_particle_arr[ip] = 0._rt;
                 Ey_particle_arr[ip] = 0._rt;
                 Ez_particle_arr[ip] = 0._rt;
@@ -396,15 +396,15 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                 Bz_particle_arr[ip] = 0._rt;
 
                doGatherShapeN(
-                    xp, yp, zp, 
-                    Ex_particle_arr[ip], Ey_particle_arr[ip], Ez_particle_arr[ip], 
+                    xp, yp, zp,
+                    Ex_particle_arr[ip], Ey_particle_arr[ip], Ez_particle_arr[ip],
                     Bx_particle_arr[ip], By_particle_arr[ip], Bz_particle_arr[ip],
-                    Ex_grid, Ey_grid, Ez_grid, 
+                    Ex_grid, Ey_grid, Ez_grid,
                     Bx_grid, By_grid, Bz_grid,
-                    ex_type, ey_type, ez_type, 
+                    ex_type, ey_type, ez_type,
                     bx_type, by_type, bz_type,
                     dinv, xyzmin, lo, n_rz_azimuthal_modes, nox, galerkin_interpolation);
             });
     }
-    
+
 }

@@ -9,5 +9,3 @@ add_warpx_test(
     "analysis_default_regression.py --path diags/diag_checksum/" # checksum
     OFF # dependency
 )
-
-
