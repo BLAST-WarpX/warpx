@@ -284,10 +284,10 @@ class _MultiFABWrapper(object):
             iistart = ii
             iistop = ii + 1
         assert imin <= iistart <= imax, Exception(
-            f"Dimension {d+1} lower index is out of bounds"
+            f"Dimension {d + 1} lower index is out of bounds"
         )
         assert imin <= iistop <= imax, Exception(
-            f"Dimension {d+1} upper index is out of bounds"
+            f"Dimension {d + 1} upper index is out of bounds"
         )
         return iistart, iistop
 

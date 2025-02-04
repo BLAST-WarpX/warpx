@@ -13,7 +13,6 @@ We check that the embedded boundary emits the correct number of particles, and t
 the particle distributions are consistent with the expected distributions.
 """
 
-import os
 import re
 import sys
 
@@ -23,16 +22,13 @@ import yt
 from scipy.constants import c, m_e
 from scipy.special import erf
 
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
-
 yt.funcs.mylog.setLevel(0)
 
 # Open plotfile specified in command line
 fn = sys.argv[1]
 ds = yt.load(fn)
 ad = ds.all_data()
-t_max = ds.current_time.item()  # time of simulation
+t_inj = 0.5e-8  # duration for which the flux injection was active
 
 # Extract the dimensionality of the simulation
 with open("./warpx_used_inputs", "r") as f:
@@ -52,7 +48,7 @@ if dims == "3D" or dims == "RZ":
     emission_surface = 4 * np.pi * R**2  # in m^2
 elif dims == "2D":
     emission_surface = 2 * np.pi * R  # in m
-Ntot = flux * emission_surface * t_max
+Ntot = flux * emission_surface * t_inj
 
 # Parameters of the histogram
 hist_bins = 50
@@ -151,11 +147,8 @@ wx = ny * vz - nz * vy
 wy = nz * vx - nx * vz
 wz = nx * vy - ny * vx
 u_perp2 = ux * wx + uy * wy + uz * wz
-compare_gaussian(u_perp2, w, u_th=0.01, label="u_perp")
+compare_gaussian(u_perp2, w, u_th=0.01, label="u_perp2")
 
+plt.legend()
 plt.tight_layout()
 plt.savefig("Distribution.png")
-
-# Verify checksum
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn)

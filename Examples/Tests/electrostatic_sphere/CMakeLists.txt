@@ -6,8 +6,8 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_electrostatic_sphere  # inputs
-    analysis_electrostatic_sphere.py  # analysis
-    diags/diag1000030  # output
+    "analysis_electrostatic_sphere.py diags/diag1000030"  # analysis
+    "analysis_default_regression.py --path diags/diag1000030"  # checksum
     OFF  # dependency
 )
 
@@ -16,8 +16,8 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_electrostatic_sphere_lab_frame  # inputs
-    analysis_electrostatic_sphere.py  # analysis
-    diags/diag1000030  # output
+    "analysis_electrostatic_sphere.py diags/diag1000030"  # analysis
+    "analysis_default_regression.py --path diags/diag1000030"  # checksum
     OFF  # dependency
 )
 
@@ -26,8 +26,8 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_electrostatic_sphere_lab_frame_mr_emass_10  # inputs
-    analysis_electrostatic_sphere.py  # analysis
-    diags/diag1000002  # output
+    "analysis_electrostatic_sphere.py diags/diag1000002"  # analysis
+    "analysis_default_regression.py --path diags/diag1000002"  # checksum
     OFF  # dependency
 )
 
@@ -36,8 +36,8 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_electrostatic_sphere_rel_nodal  # inputs
-    analysis_electrostatic_sphere.py  # analysis
-    diags/diag1000030  # output
+    "analysis_electrostatic_sphere.py diags/diag1000030"  # analysis
+    "analysis_default_regression.py --path diags/diag1000030"  # checksum
     OFF  # dependency
 )
 
@@ -46,8 +46,8 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_electrostatic_sphere_adaptive  # inputs
-    analysis_electrostatic_sphere.py  # analysis
-    diags/diag1000054  # output
+    "analysis_electrostatic_sphere.py diags/diag1000054"  # analysis
+    "analysis_default_regression.py --path diags/diag1000054"  # checksum
     OFF  # dependency
 )
 
@@ -56,7 +56,7 @@ add_warpx_test(
     RZ  # dims
     2  # nprocs
     inputs_test_rz_electrostatic_sphere  # inputs
-    analysis_electrostatic_sphere.py  # analysis
-    diags/diag1000030  # output
+    "analysis_electrostatic_sphere.py diags/diag1000030"  # analysis
+    "analysis_default_regression.py --path diags/diag1000030"  # checksum
     OFF  # dependency
 )

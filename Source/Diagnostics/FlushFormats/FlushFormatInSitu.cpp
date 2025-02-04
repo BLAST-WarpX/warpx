@@ -27,14 +27,14 @@ FlushFormatInSitu::WriteParticles(const amrex::Vector<ParticleDiag>& particle_di
     // we prefix the fields with "particle_{species_name}" b/c we
     // want to to uniquely name all the fields that can be plotted
 
-    for (unsigned i = 0, n = particle_diags.size(); i < n; ++i) {
+    for (const auto & particle_diag : particle_diags) {
         Vector<std::string> particle_varnames;
         Vector<std::string> particle_int_varnames;
-        std::string prefix = "particle_" + particle_diags[i].getSpeciesName();
+        std::string prefix = "particle_" + particle_diag.getSpeciesName();
 
         // Get pc for species
         // auto& pc = mypc->GetParticleContainer(i);
-        WarpXParticleContainer* pc = particle_diags[i].getParticleContainer();
+        WarpXParticleContainer* pc = particle_diag.getParticleContainer();
 
         // get names of real comps
         std::map<std::string, int> real_comps_map = pc->getParticleComps();

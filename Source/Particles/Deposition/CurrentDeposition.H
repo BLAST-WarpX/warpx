@@ -638,6 +638,9 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * \param lo           Index lower bounds of domain.
  * \param q            species charge.
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
+ * \param reduced_particle_shape_mask  Array4 of int, Mask that indicates whether a particle
+ * should use its regular shape factor or a reduced, order-1 shape factor instead in a given cell.
+ * \param enable_reduced_shape Flag to indicate whether to use the reduced shape factor
  */
 template <int depos_order>
 void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
@@ -656,7 +659,10 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                   const amrex::XDim3 & xyzmin,
                                   amrex::Dim3 lo,
                                   amrex::Real q,
-                                  [[maybe_unused]]int n_rz_azimuthal_modes)
+                                  [[maybe_unused]] int n_rz_azimuthal_modes,
+                                  const amrex::Array4<const int>& reduced_particle_shape_mask,
+                                  bool enable_reduced_shape
+                                  )
 {
     using namespace amrex;
     using namespace amrex::literals;
@@ -680,9 +686,14 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 #endif
 
     // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
-    amrex::ParallelFor(
-        np_to_deposit,
-        [=] AMREX_GPU_DEVICE (long const ip) {
+
+    // (Compile 2 versions of the kernel: with and without reduced shape)
+    enum eb_flags : int { has_reduced_shape, no_reduced_shape };
+    const int reduce_shape_runtime_flag = (enable_reduced_shape && (depos_order>1))? has_reduced_shape : no_reduced_shape;
+
+    amrex::ParallelFor( TypeList<CompileTimeOptions<has_reduced_shape,no_reduced_shape>>{},
+        {reduce_shape_runtime_flag},
+        np_to_deposit, [=] AMREX_GPU_DEVICE (long ip, auto reduce_shape_control) {
             // --- Get particle quantities
             Real const gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*clightsq
                                                  + uyp[ip]*uyp[ip]*clightsq
@@ -735,6 +746,43 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             double const z_new = (zp - xyzmin.z + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv)*dinv.z;
             double const z_old = z_new - dt*dinv.z*uzp[ip]*gaminv;
 
+            // Check whether the particle is close to the EB at the old and new position
+            bool reduce_shape_old, reduce_shape_new;
+#ifdef AMREX_USE_CUDA
+            amrex::ignore_unused(reduced_particle_shape_mask, lo); // Needed to avoid compilation error with nvcc
+#endif
+            if constexpr (reduce_shape_control == has_reduced_shape) {
+#if defined(WARPX_DIM_3D)
+                reduce_shape_old = reduced_particle_shape_mask(
+                    lo.x + int(amrex::Math::floor(x_old)),
+                    lo.y + int(amrex::Math::floor(y_old)),
+                    lo.z + int(amrex::Math::floor(z_old)));
+                reduce_shape_new = reduced_particle_shape_mask(
+                    lo.x + int(amrex::Math::floor(x_new)),
+                    lo.y + int(amrex::Math::floor(y_new)),
+                    lo.z + int(amrex::Math::floor(z_new)));
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                reduce_shape_old = reduced_particle_shape_mask(
+                    lo.x + int(amrex::Math::floor(x_old)),
+                    lo.y + int(amrex::Math::floor(z_old)),
+                    0);
+                reduce_shape_new = reduced_particle_shape_mask(
+                    lo.x + int(amrex::Math::floor(x_new)),
+                    lo.y + int(amrex::Math::floor(z_new)),
+                    0);
+#elif defined(WARPX_DIM_1D_Z)
+                reduce_shape_old = reduced_particle_shape_mask(
+                    lo.x + int(amrex::Math::floor(z_old)),
+                    0, 0);
+                reduce_shape_new = reduced_particle_shape_mask(
+                    lo.x + int(amrex::Math::floor(z_new)),
+                    0, 0);
+#endif
+            } else {
+                reduce_shape_old = false;
+                reduce_shape_new = false;
+            }
+
 #if defined(WARPX_DIM_RZ)
             Real const vy = (-uxp[ip]*sintheta_mid + uyp[ip]*costheta_mid)*gaminv;
 #elif defined(WARPX_DIM_XZ)
@@ -749,6 +797,9 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             // [ijk]_new: leftmost grid point that the particle touches
             const Compute_shape_factor< depos_order > compute_shape_factor;
             const Compute_shifted_shape_factor< depos_order > compute_shifted_shape_factor;
+            // In cells marked by reduced_particle_shape_mask, we need order 1 deposition
+            const Compute_shifted_shape_factor< 1 > compute_shifted_shape_factor_order1;
+            amrex::ignore_unused(compute_shifted_shape_factor_order1); // unused for `no_reduced_shape`
 
             // Shape factor arrays
             // Note that there are extra values above and below
@@ -758,19 +809,58 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 #if !defined(WARPX_DIM_1D_Z)
             double sx_new[depos_order + 3] = {0.};
             double sx_old[depos_order + 3] = {0.};
-            const int i_new = compute_shape_factor(sx_new+1, x_new);
+            const int i_new = compute_shape_factor(sx_new+1, x_new );
             const int i_old = compute_shifted_shape_factor(sx_old, x_old, i_new);
+            // If particle is close to the embedded boundary, recompute deposition with order 1 shape
+            if constexpr (reduce_shape_control == has_reduced_shape) {
+                if (reduce_shape_new) {
+                    for (int i=0; i<depos_order+3; i++) {sx_new[i] = 0.;} // Erase previous deposition
+                    compute_shifted_shape_factor_order1( sx_new+depos_order/2, x_new, i_new+depos_order/2 ); // Redeposit with order 1
+                }
+                if (reduce_shape_old) {
+                    for (int i=0; i<depos_order+3; i++) {sx_old[i] = 0.;} // Erase previous deposition
+                    compute_shifted_shape_factor_order1( sx_old+depos_order/2, x_old, i_new+depos_order/2 ); // Redeposit with order 1
+                }
+                // Note: depos_order/2 in the above code corresponds to the shift between the index of the lowest point
+                // to which the particle can deposit, with shape of order `depos_order` vs with shape of order 1
+            }
 #endif
 #if defined(WARPX_DIM_3D)
             double sy_new[depos_order + 3] = {0.};
             double sy_old[depos_order + 3] = {0.};
             const int j_new = compute_shape_factor(sy_new+1, y_new);
             const int j_old = compute_shifted_shape_factor(sy_old, y_old, j_new);
+            // If particle is close to the embedded boundary, recompute deposition with order 1 shape
+            if constexpr (reduce_shape_control == has_reduced_shape) {
+                if (reduce_shape_new) {
+                    for (int j=0; j<depos_order+3; j++) {sy_new[j] = 0.;} // Erase previous deposition
+                    compute_shifted_shape_factor_order1( sy_new+depos_order/2, y_new, j_new+depos_order/2 ); // Redeposit with order 1
+                }
+                if (reduce_shape_old) {
+                    for (int j=0; j<depos_order+3; j++) {sy_old[j] = 0.;} // Erase previous deposition
+                    compute_shifted_shape_factor_order1( sy_old+depos_order/2, y_old, j_new+depos_order/2 ); // Redeposit with order 1
+                }
+                // Note: depos_order/2 in the above code corresponds to the shift between the index of the lowest point
+                // to which the particle can deposit, with shape of order `depos_order` vs with shape of order 1
+            }
 #endif
             double sz_new[depos_order + 3] = {0.};
             double sz_old[depos_order + 3] = {0.};
-            const int k_new = compute_shape_factor(sz_new+1, z_new);
-            const int k_old = compute_shifted_shape_factor(sz_old, z_old, k_new);
+            const int k_new = compute_shape_factor(sz_new+1, z_new );
+            const int k_old = compute_shifted_shape_factor(sz_old, z_old, k_new );
+            // If particle is close to the embedded boundary, recompute deposition with order 1 shape
+            if constexpr (reduce_shape_control == has_reduced_shape) {
+                if (reduce_shape_new) {
+                    for (int k=0; k<depos_order+3; k++) {sz_new[k] = 0.;} // Erase previous deposition
+                    compute_shifted_shape_factor_order1( sz_new+depos_order/2, z_new, k_new+depos_order/2 ); // Redeposit with order 1
+                }
+                if (reduce_shape_old) {
+                    for (int k=0; k<depos_order+3; k++) {sz_old[k] = 0.;} // Erase previous deposition
+                    compute_shifted_shape_factor_order1( sz_old+depos_order/2, z_old, k_new+depos_order/2 ); // Redeposit with order 1
+                }
+                // Note: depos_order/2 in the above code corresponds to the shift between the index of the lowest point
+                // to which the particle can deposit, with shape of order `depos_order` vs with shape of order 1
+            }
 
             // computes min/max positions of current contributions
 #if !defined(WARPX_DIM_1D_Z)

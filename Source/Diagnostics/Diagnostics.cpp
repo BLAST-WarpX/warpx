@@ -38,8 +38,8 @@
 
 using namespace amrex::literals;
 
-Diagnostics::Diagnostics (int i, std::string name)
-    : m_diag_name(std::move(name)), m_diag_index(i)
+Diagnostics::Diagnostics (int i, std::string name, DiagTypes diag_type)
+    : m_diag_type(diag_type), m_diag_name(std::move(name)), m_diag_index(i)
 {
 }
 
@@ -62,6 +62,9 @@ Diagnostics::BaseReadParameters ()
     std::string dims;
     pp_geometry.get("dims", dims);
 
+    const amrex::ParmParse pp_warpx("warpx");
+    pp_warpx.query("verbose", m_verbose);
+
     // Query list of grid fields to write to output
     const bool varnames_specified = pp_diag_name.queryarr("fields_to_plot", m_varnames_fields);
     if (!varnames_specified){
@@ -77,8 +80,9 @@ Diagnostics::BaseReadParameters ()
     if (utils::algorithms::is_in(m_varnames_fields, "phi")){
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrame ||
-            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic,
-            "plot phi only works if do_electrostatic = labframe or do_electrostatic = labframe-electromagnetostatic");
+            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic ||
+            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameEffectivePotential,
+            "plot phi only works if do_electrostatic = labframe, do_electrostatic = labframe-electromagnetostatic or do_electrostatic = labframe-effective-potential");
     }
 
     // Sanity check if user requests to plot A
@@ -536,6 +540,14 @@ Diagnostics::InitBaseData ()
         m_mf_output[i].resize( nmax_lev );
     }
 
+    // allocate vector of buffers and vector of levels for each buffer for summation multifab for TimeAveragedDiagnostics
+    if (m_diag_type == DiagTypes::TimeAveraged) {
+        m_sum_mf_output.resize(m_num_buffers);
+        for (int i = 0; i < m_num_buffers; ++i) {
+            m_sum_mf_output[i].resize( nmax_lev );
+        }
+    }
+
     // allocate vector of geometry objects corresponding to each output multifab.
     m_geom_output.resize( m_num_buffers );
     for (int i = 0; i < m_num_buffers; ++i) {
@@ -574,6 +586,15 @@ Diagnostics::ComputeAndPack ()
             }
             // Check that the proper number of components of mf_avg were updated.
             AMREX_ALWAYS_ASSERT( icomp_dst == m_varnames.size() );
+
+            if (m_diag_type == DiagTypes::TimeAveraged) {
+
+                const amrex::Real real_a = 1.0;
+                // Compute m_sum_mf_output += real_a*m_mf_output
+                amrex::MultiFab::Saxpy(
+                        m_sum_mf_output[i_buffer][lev], real_a, m_mf_output[i_buffer][lev],
+                        0, 0, m_mf_output[i_buffer][lev].nComp(), m_mf_output[i_buffer][lev].nGrowVect());
+            }
 
             // needed for contour plots of rho, i.e. ascent/sensei
             if (m_format == "sensei" || m_format == "ascent") {

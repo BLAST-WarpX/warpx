@@ -17,6 +17,9 @@
 #include "Diagnostics/MultiDiagnostics.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "EmbeddedBoundary/Enabled.H"
+#ifdef AMREX_USE_EB
+#   include "EmbeddedBoundary/EmbeddedBoundary.H"
+#endif
 #include "Fields.H"
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver.H"
 #include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H"
@@ -278,6 +281,10 @@ WarpX::PrintMainPICparameters ()
       amrex::Print() << "Operation mode:       | Electrostatic" << "\n";
       amrex::Print() << "                      | - laboratory frame, electrostatic + magnetostatic" << "\n";
     }
+    else if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameEffectivePotential){
+      amrex::Print() << "Operation mode:       | Electrostatic" << "\n";
+      amrex::Print() << "                      | - laboratory frame, effective potential scheme" << "\n";
+    }
     else{
       amrex::Print() << "Operation mode:       | Electromagnetic" << "\n";
     }
@@ -526,7 +533,7 @@ WarpX::InitData ()
     // WarpX::computeMaxStepBoostAccelerator
     // needs to start from the initial zmin_domain_boost,
     // even if restarting from a checkpoint file
-    if (do_compute_max_step_from_zmax) {
+    if (m_zmax_plasma_to_compute_max_step.has_value()) {
         zmin_domain_boost_step_0 = geom[0].ProbLo(WARPX_ZINDEX);
     }
     if (restart_chkfile.empty())
@@ -586,7 +593,7 @@ WarpX::InitData ()
     WriteUsedInputsFile();
 
     // Run div cleaner here on loaded external fields
-    if (WarpX::do_divb_cleaning_external) {
+    if (m_do_divb_cleaning_external) {
         WarpX::ProjectionCleanDivB();
     }
 
@@ -605,6 +612,9 @@ WarpX::InitData ()
         for (int lev = 0; lev <= max_level; ++lev) {
             AddExternalFields(lev);
         }
+    }
+    else {
+        ExecutePythonCallback("afterInitatRestart");
     }
 
     if (restart_chkfile.empty() || write_diagnostics_on_restart) {
@@ -684,21 +694,7 @@ WarpX::InitFromScratch ()
         m_implicit_solver->Define(this);
         m_implicit_solver->GetParticleSolverParams( max_particle_its_in_implicit_scheme,
                                                     particle_tol_in_implicit_scheme );
-
-        // Add space to save the positions and velocities at the start of the time steps
-        for (auto const& pc : *mypc) {
-#if (AMREX_SPACEDIM >= 2)
-            pc->NewRealComp("x_n");
-#endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-            pc->NewRealComp("y_n");
-#endif
-            pc->NewRealComp("z_n");
-            pc->NewRealComp("ux_n");
-            pc->NewRealComp("uy_n");
-            pc->NewRealComp("uz_n");
-        }
-
+        m_implicit_solver->CreateParticleAttributes();
     }
 
     mypc->AllocData();
@@ -737,7 +733,7 @@ WarpX::InitPML ()
             pml_ncell, pml_delta, amrex::IntVect::TheZeroVector(),
             dt[0], nox_fft, noy_fft, noz_fft, grid_type,
             do_moving_window, pml_has_particles, do_pml_in_domain,
-            psatd_solution_type, J_in_time, rho_in_time,
+            m_psatd_solution_type, J_in_time, rho_in_time,
             do_pml_dive_cleaning, do_pml_divb_cleaning,
             amrex::IntVect(0), amrex::IntVect(0),
             eb_enabled,
@@ -778,7 +774,7 @@ WarpX::InitPML ()
                 pml_ncell, pml_delta, refRatio(lev-1),
                 dt[lev], nox_fft, noy_fft, noz_fft, grid_type,
                 do_moving_window, pml_has_particles, do_pml_in_domain,
-                psatd_solution_type, J_in_time, rho_in_time, do_pml_dive_cleaning, do_pml_divb_cleaning,
+                m_psatd_solution_type, J_in_time, rho_in_time, do_pml_dive_cleaning, do_pml_divb_cleaning,
                 amrex::IntVect(0), amrex::IntVect(0),
                 eb_enabled,
                 guard_cells.ng_FieldSolver.max(),
@@ -805,7 +801,7 @@ WarpX::ComputePMLFactors ()
 void
 WarpX::ComputeMaxStep ()
 {
-    if (do_compute_max_step_from_zmax) {
+    if (m_zmax_plasma_to_compute_max_step.has_value()) {
         computeMaxStepBoostAccelerator();
     }
 }
@@ -838,7 +834,7 @@ WarpX::computeMaxStepBoostAccelerator() {
 
     // End of the plasma: Transform input argument
     // zmax_plasma_to_compute_max_step to boosted frame.
-    const Real len_plasma_boost = zmax_plasma_to_compute_max_step/gamma_boost;
+    const Real len_plasma_boost = m_zmax_plasma_to_compute_max_step.value()/gamma_boost;
     // Plasma velocity
     const Real v_plasma_boost = -beta_boost * PhysConst::c;
     // Get time at which the lower end of the simulation domain passes the
@@ -846,7 +842,7 @@ WarpX::computeMaxStepBoostAccelerator() {
     const Real interaction_time_boost = (len_plasma_boost-zmin_domain_boost_step_0)/
         (moving_window_v-v_plasma_boost);
     // Divide by dt, and update value of max_step.
-    const auto computed_max_step = (do_subcycling)?
+    const auto computed_max_step = (m_do_subcycling)?
         static_cast<int>(interaction_time_boost/dt[0]):
         static_cast<int>(interaction_time_boost/dt[maxLevel()]);
     max_step = computed_max_step;
@@ -972,19 +968,20 @@ WarpX::InitLevelData (int lev, Real /*time*/)
     // The default maxlevel_extEMfield_init value is the total number of levels in the simulation
     if ((m_p_ext_field_params->B_ext_grid_type == ExternalFieldType::parse_ext_grid_function)
          && (lev > 0) && (lev <= maxlevel_extEMfield_init)) {
+
         ComputeExternalFieldOnGridUsingParser(
             FieldType::Bfield_aux,
             m_p_ext_field_params->Bxfield_parser->compile<4>(),
             m_p_ext_field_params->Byfield_parser->compile<4>(),
             m_p_ext_field_params->Bzfield_parser->compile<4>(),
-            lev, PatchType::fine, EB::CoverTopology::face);
+            lev, PatchType::fine, m_eb_update_B);
 
         ComputeExternalFieldOnGridUsingParser(
             FieldType::Bfield_cp,
             m_p_ext_field_params->Bxfield_parser->compile<4>(),
             m_p_ext_field_params->Byfield_parser->compile<4>(),
             m_p_ext_field_params->Bzfield_parser->compile<4>(),
-            lev, PatchType::coarse, EB::CoverTopology::face);
+            lev, PatchType::coarse, m_eb_update_B);
     }
 
     // if the input string for the E-field is "parse_e_ext_grid_function",
@@ -1015,14 +1012,14 @@ WarpX::InitLevelData (int lev, Real /*time*/)
                 m_p_ext_field_params->Exfield_parser->compile<4>(),
                 m_p_ext_field_params->Eyfield_parser->compile<4>(),
                 m_p_ext_field_params->Ezfield_parser->compile<4>(),
-                lev, PatchType::fine, EB::CoverTopology::edge);
+                lev, PatchType::fine, m_eb_update_E);
 
             ComputeExternalFieldOnGridUsingParser(
                 FieldType::Efield_cp,
                 m_p_ext_field_params->Exfield_parser->compile<4>(),
                 m_p_ext_field_params->Eyfield_parser->compile<4>(),
                 m_p_ext_field_params->Ezfield_parser->compile<4>(),
-                lev, PatchType::coarse, EB::CoverTopology::edge);
+                lev, PatchType::coarse, m_eb_update_E);
 #ifdef AMREX_USE_EB
             if (eb_enabled) {
                 if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
@@ -1057,7 +1054,8 @@ void ComputeExternalFieldOnGridUsingParser_template (
     amrex::ParserExecutor<4> const& fx_parser,
     amrex::ParserExecutor<4> const& fy_parser,
     amrex::ParserExecutor<4> const& fz_parser,
-    int lev, PatchType patch_type, EB::CoverTopology topology)
+    int lev, PatchType patch_type,
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field)
 {
     auto &warpx = WarpX::GetInstance();
     auto const &geom = warpx.Geom(lev);
@@ -1092,11 +1090,18 @@ void ComputeExternalFieldOnGridUsingParser_template (
         auto const& mfyfab = mfy->array(mfi);
         auto const& mfzfab = mfz->array(mfi);
 
-        EB::Covered const& cov_ptr = EB::Covered(mfi, lev);
+        amrex::Array4<int> update_fx_arr, update_fy_arr, update_fz_arr;
+        if (EB::enabled()) {
+            update_fx_arr = eb_update_field[lev][0]->array(mfi);
+            update_fy_arr = eb_update_field[lev][1]->array(mfi);
+            update_fz_arr = eb_update_field[lev][2]->array(mfi);
+        }
 
         amrex::ParallelFor (tbx, tby, tbz,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                if (cov_ptr.isCovered(0, topology, i, j, k)) { return; }
+
+                // Do not set fields inside the embedded boundary
+                if (update_fx_arr && update_fx_arr(i,j,k) == 0) { return; }
 
                 // Shift required in the x-, y-, or z- position
                 // depending on the index type of the multifab
@@ -1123,7 +1128,10 @@ void ComputeExternalFieldOnGridUsingParser_template (
                 mfxfab(i,j,k) = fx_parser(x,y,z,t);
             },
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                if (cov_ptr.isCovered(1, topology, i, j, k)) { return; }
+
+                // Do not set fields inside the embedded boundary
+                if (update_fy_arr && update_fy_arr(i,j,k) == 0) { return; }
+
 #if defined(WARPX_DIM_1D_Z)
                 const amrex::Real x = 0._rt;
                 const amrex::Real y = 0._rt;
@@ -1147,7 +1155,10 @@ void ComputeExternalFieldOnGridUsingParser_template (
                 mfyfab(i,j,k) = fy_parser(x,y,z,t);
             },
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                if (cov_ptr.isCovered(2, topology, i, j, k)) { return; }
+
+                // Do not set fields inside the embedded boundary
+                if (update_fz_arr && update_fz_arr(i,j,k) == 0) { return; }
+
 #if defined(WARPX_DIM_1D_Z)
                 const amrex::Real x = 0._rt;
                 const amrex::Real y = 0._rt;
@@ -1248,35 +1259,48 @@ void WarpX::InitializeEBGridData (int lev)
 #ifdef AMREX_USE_EB
     if (lev == maxLevel()) {
 
-        // Throw a warning if EB is on and particle_shape > 1
-        if ((nox > 1 or noy > 1 or noz > 1) and EB::enabled())
-        {
-            ablastr::warn_manager::WMRecordWarning("Particles",
-              "when algo.particle_shape > 1, numerical artifacts will be present when\n"
-              "particles are close to embedded boundaries");
-        }
+        auto const eb_fact = fieldEBFactory(lev);
 
         if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD )
         {
             using warpx::fields::FieldType;
 
-            auto const eb_fact = fieldEBFactory(lev);
-
-            auto edge_lengths_lev = m_fields.get_alldirs(FieldType::edge_lengths, lev);
-            ComputeEdgeLengths(edge_lengths_lev, eb_fact);
-            ScaleEdges(edge_lengths_lev, CellSize(lev));
-
-            auto face_areas_lev = m_fields.get_alldirs(FieldType::face_areas, lev);
-            ComputeFaceAreas(face_areas_lev, eb_fact);
-            ScaleAreas(face_areas_lev, CellSize(lev));
-
             if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
-                MarkCells();
+
+                auto edge_lengths_lev = m_fields.get_alldirs(FieldType::edge_lengths, lev);
+                warpx::embedded_boundary::ComputeEdgeLengths(edge_lengths_lev, eb_fact);
+                warpx::embedded_boundary::ScaleEdges(edge_lengths_lev, CellSize(lev));
+
+                auto face_areas_lev = m_fields.get_alldirs(FieldType::face_areas, lev);
+                warpx::embedded_boundary::ComputeFaceAreas(face_areas_lev, eb_fact);
+                warpx::embedded_boundary::ScaleAreas(face_areas_lev, CellSize(lev));
+
+                // Compute additional quantities required for the ECT solver
+                MarkExtensionCells();
                 ComputeFaceExtensions();
+
+                // Mark on which grid points E should be updated
+                MarkUpdateECellsECT( m_eb_update_E[lev], edge_lengths_lev );
+                // Mark on which grid points B should be updated
+                MarkUpdateBCellsECT( m_eb_update_B[lev], face_areas_lev, edge_lengths_lev);
+
+            } else {
+                // Mark on which grid points E should be updated (stair-case approximation)
+                MarkUpdateCellsStairCase(
+                    m_eb_update_E[lev],
+                    m_fields.get_alldirs(FieldType::Efield_fp, lev),
+                    eb_fact );
+                // Mark on which grid points B should be updated (stair-case approximation)
+                MarkUpdateCellsStairCase(
+                    m_eb_update_B[lev],
+                    m_fields.get_alldirs(FieldType::Bfield_fp, lev),
+                    eb_fact );
             }
+
         }
 
         ComputeDistanceToEB();
+        MarkReducedShapeCells( m_eb_reduce_particle_shape[lev], eb_fact, WarpX::nox );
 
     }
 #else
@@ -1359,7 +1383,7 @@ WarpX::LoadExternalFields (int const lev)
             m_p_ext_field_params->Bxfield_parser->compile<4>(),
             m_p_ext_field_params->Byfield_parser->compile<4>(),
             m_p_ext_field_params->Bzfield_parser->compile<4>(),
-            lev, PatchType::fine, EB::CoverTopology::face);
+            lev, PatchType::fine, m_eb_update_B);
     }
     else if (m_p_ext_field_params->B_ext_grid_type == ExternalFieldType::read_from_file) {
 #if defined(WARPX_DIM_RZ)
@@ -1382,7 +1406,7 @@ WarpX::LoadExternalFields (int const lev)
             m_p_ext_field_params->Exfield_parser->compile<4>(),
             m_p_ext_field_params->Eyfield_parser->compile<4>(),
             m_p_ext_field_params->Ezfield_parser->compile<4>(),
-            lev, PatchType::fine, EB::CoverTopology::edge);
+            lev, PatchType::fine, m_eb_update_E );
     }
     else if (m_p_ext_field_params->E_ext_grid_type == ExternalFieldType::read_from_file) {
 #if defined(WARPX_DIM_RZ)

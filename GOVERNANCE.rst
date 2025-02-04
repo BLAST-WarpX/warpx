@@ -54,7 +54,9 @@ Technical Committee
 Current Roster
 ^^^^^^^^^^^^^^
 
+- Justin Ray Angus
 - Luca Fedeli
+- Arianna Formenti
 - Roelof Groenewald
 - David Grote
 - Axel Huebl

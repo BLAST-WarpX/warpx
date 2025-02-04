@@ -81,10 +81,10 @@ class SigmaBoxFactory
     : public amrex::FabFactory<SigmaBox>
 {
 public:
-    SigmaBoxFactory (const amrex::BoxArray& grid_ba, const amrex::Real* dx,
+    SigmaBoxFactory (const amrex::BoxArray* grid_ba, const amrex::Real* dx,
                      const amrex::IntVect& ncell, const amrex::IntVect& delta,
                      const amrex::Box& regular_domain, const amrex::Real v_sigma_sb)
-        : m_grids(grid_ba), m_dx(dx), m_ncell(ncell), m_delta(delta), m_regdomain(regular_domain), m_v_sigma_sb(v_sigma_sb) {}
+        : m_grids{grid_ba}, m_dx(dx), m_ncell(ncell), m_delta(delta), m_regdomain(regular_domain), m_v_sigma_sb(v_sigma_sb) {}
     ~SigmaBoxFactory () override = default;
 
     SigmaBoxFactory (const SigmaBoxFactory&) = default;
@@ -97,7 +97,7 @@ public:
     [[nodiscard]] SigmaBox* create (const amrex::Box& box, int /*ncomps*/,
         const amrex::FabInfo& /*info*/, int /*box_index*/) const final
     {
-        return new SigmaBox(box, m_grids, m_dx, m_ncell, m_delta, m_regdomain, m_v_sigma_sb);
+        return new SigmaBox(box, *m_grids, m_dx, m_ncell, m_delta, m_regdomain, m_v_sigma_sb);
     }
 
     void destroy (SigmaBox* fab) const final
@@ -112,7 +112,7 @@ public:
     }
 
 private:
-    const amrex::BoxArray& m_grids;
+    const amrex::BoxArray* m_grids;
     const amrex::Real* m_dx;
     amrex::IntVect m_ncell;
     amrex::IntVect m_delta;
@@ -125,7 +125,7 @@ class MultiSigmaBox
 {
 public:
     MultiSigmaBox(const amrex::BoxArray& ba, const amrex::DistributionMapping& dm,
-                  const amrex::BoxArray& grid_ba, const amrex::Real* dx,
+                  const amrex::BoxArray* grid_ba, const amrex::Real* dx,
                   const amrex::IntVect& ncell, const amrex::IntVect& delta,
                   const amrex::Box& regular_domain, amrex::Real v_sigma_sb);
     void ComputePMLFactorsB (const amrex::Real* dx, amrex::Real dt);
@@ -204,8 +204,8 @@ private:
     bool m_dive_cleaning;
     bool m_divb_cleaning;
 
-    const amrex::IntVect m_fill_guards_fields;
-    const amrex::IntVect m_fill_guards_current;
+    amrex::IntVect m_fill_guards_fields;
+    amrex::IntVect m_fill_guards_current;
 
     const amrex::Geometry* m_geom;
     const amrex::Geometry* m_cgeom;

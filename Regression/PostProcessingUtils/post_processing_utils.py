@@ -164,6 +164,6 @@ def check_random_filter(fn, filtered_fn, random_fraction, dim, species_name):
     ## Dirty trick to find particles with the same ID + same CPU (does not work with more than 10
     ## MPI ranks)
     random_filter_expression = (
-        "np.isin(ids + 0.1*cpus," "ids_filtered_warpx + 0.1*cpus_filtered_warpx)"
+        "np.isin(ids + 0.1*cpus,ids_filtered_warpx + 0.1*cpus_filtered_warpx)"
     )
     check_particle_filter(fn, filtered_fn, random_filter_expression, dim, species_name)

@@ -11,8 +11,6 @@
 #include <string>
 #include <vector>
 
-/** All types of diagnostics. */
-enum struct DiagTypes {Full, BackTransformed, BoundaryScraping};
 
 /**
  * \brief This class contains a vector of all diagnostics in the simulation.

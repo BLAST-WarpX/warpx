@@ -40,7 +40,7 @@ SpectralSolverRZ::SpectralSolverRZ (const int lev,
                                     const RhoInTime rho_in_time,
                                     const bool dive_cleaning,
                                     const bool divb_cleaning)
-    : k_space(realspace_ba, dm, dx)
+    : m_dt(dt), k_space(realspace_ba, dm, dx)
 {
     // Initialize all structures using the same distribution mapping dm
 
