@@ -88,16 +88,14 @@ void init_WarpXParticleContainer (py::module& m)
         .def("get_comp_index",
             [](WarpXParticleContainer& pc, std::string comp_name)
             {
-                auto particle_comps = pc.GetRealSoANames();
-                return particle_comps.at(comp_name);
+                return pc.GetRealCompIndex(comp_name);
             },
             py::arg("comp_name")
         )
         .def("get_icomp_index",
             [](WarpXParticleContainer& pc, std::string comp_name)
             {
-                auto particle_comps = pc.GetIntSoANames();
-                return particle_comps.at(comp_name);
+                return pc.GetIntCompIndex(comp_name);
             },
             py::arg("comp_name")
         )

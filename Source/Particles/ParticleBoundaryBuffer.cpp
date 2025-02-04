@@ -443,11 +443,9 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
                           WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::filterAndTransform");
                           auto& warpx = WarpX::GetInstance();
                           const auto dt = warpx.getdt(pti.GetLevel());
-                          auto string_to_index_intcomp = buffer[i].getParticleRuntimeiComps();
-                          const int step_scraped_index = string_to_index_intcomp.at("stepScraped");
-                          auto string_to_index_realcomp = buffer[i].getParticleRuntimeComps();
-                          const int delta_index = string_to_index_realcomp.at("deltaTimeScraped");
-                          const int normal_index = string_to_index_realcomp.at("nx");
+                          const int step_scraped_index = buffer[i].GetIntCompIndex("stepScraped");
+                          const int delta_index = buffer[i].GetRealCompIndex("deltaTimeScraped");
+                          const int normal_index = buffer[i].GetRealCompIndex("nx");
                           const int step = warpx_instance.getistep(0);
                           amrex::filterAndTransformParticles(ptile_buffer, ptile,
                                                              predicate,
@@ -546,11 +544,9 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
                     }
                     auto &warpx = WarpX::GetInstance();
                     const auto dt = warpx.getdt(pti.GetLevel());
-                    auto string_to_index_intcomp = buffer[i].getParticleRuntimeiComps();
-                    const int step_scraped_index = string_to_index_intcomp.at("stepScraped");
-                    auto string_to_index_realcomp = buffer[i].getParticleRuntimeComps();
-                    const int delta_index = string_to_index_realcomp.at("deltaTimeScraped");
-                    const int normal_index = string_to_index_realcomp.at("nx");
+                    const int step_scraped_index = buffer[i].GetIntCompIndex("stepScraped");
+                    const int delta_index = buffer[i].GetRealCompIndex("deltaTimeScraped");
+                    const int normal_index = buffer[i].GetRealCompIndex("nx");
                     const int step = warpx_instance.getistep(0);
 
                     {
