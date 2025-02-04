@@ -147,7 +147,7 @@ WarpX::MarkReducedShapeCells (
         amrex::Array4<int> const & eb_reduce_particle_shape_arr = eb_reduce_particle_shape->array(mfi);
 
         // Check if the box (including one layer of guard cells) contains a mix of covered and regular cells
-        const amrex::Box& eb_info_box = mfi.tilebox(amrex::IntVect::TheCellVector()).grow(1);
+        const amrex::Box eb_info_box = mfi.tilebox(amrex::IntVect::TheCellVector()).grow(1);
         amrex::FabType const fab_type = eb_flag[mfi].getType( eb_info_box );
 
         if (fab_type == amrex::FabType::regular) { // All cells in the box are regular
@@ -240,7 +240,7 @@ WarpX::MarkUpdateCellsStairCase (
             amrex::Array4<int> const & eb_update_arr = eb_update[idim]->array(mfi);
 
             // Check if the box (including one layer of guard cells) contains a mix of covered and regular cells
-            const amrex::Box& eb_info_box = mfi.tilebox(amrex::IntVect::TheCellVector()).grow(1);
+            const amrex::Box eb_info_box = mfi.tilebox(amrex::IntVect::TheCellVector()).grow(1);
             amrex::FabType const fab_type = eb_flag[mfi].getType( eb_info_box );
 
             if (fab_type == amrex::FabType::regular) { // All cells in the box are regular
