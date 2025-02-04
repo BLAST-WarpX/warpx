@@ -158,7 +158,7 @@ MultiParticleContainer::Restart (const std::string& dir)
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 search != real_comp_names.end(),
                 "Species " + species_names[i]
-                + "needs runtime real component " +  comp
+                + " needs runtime real component " +  comp
                 + ", but it was not found in the checkpoint file."
             );
         }
@@ -189,7 +189,7 @@ MultiParticleContainer::Restart (const std::string& dir)
             auto search = std::find(int_comp_names.begin(), int_comp_names.end(), comp);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 search != int_comp_names.end(),
-                "Species " + species_names[i] + "needs runtime int component " + comp
+                "Species " + species_names[i] + " needs runtime int component " + comp
                 + ", but it was not found in the checkpoint file."
             );
         }
