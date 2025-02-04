@@ -68,7 +68,7 @@ photons.uz_th = 0.2
 #################################
 ###### REDUCED DIAGS ############
 #################################
-warpx.reduced_diags_names = EP NP EF PP PF MF MR FP FP_integrate FP_line FP_plane FR_Max FR_Min FR_Integral Edotj
+warpx.reduced_diags_names = EP NP EF PP PF MF PX MR FP FP_integrate FP_line FP_plane FR_Max FR_Min FR_Integral Edotj
 EP.type = ParticleEnergy
 EP.intervals = 200
 EF.type = FieldEnergy
@@ -79,6 +79,8 @@ PF.type = FieldMomentum
 PF.intervals = 200
 MF.type = FieldMaximum
 MF.intervals = 200
+PX.type = FieldPoyntingFlux
+PX.intervals = 200
 FP.type = FieldProbe
 FP.intervals = 200
 #The probe is placed at a cell center to match the value in the plotfile

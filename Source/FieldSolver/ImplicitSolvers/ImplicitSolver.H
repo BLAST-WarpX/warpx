@@ -57,6 +57,8 @@ public:
         a_particle_tol = m_particle_tolerance;
     }
 
+    void CreateParticleAttributes () const;
+
     /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
      */

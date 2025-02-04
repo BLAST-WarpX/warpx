@@ -261,15 +261,15 @@ storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
     tmp.NewRealComp("phi");
     int const phi_index = tmp.getParticleComps().at("phi");
     auto& warpx = WarpX::GetInstance();
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
     for (int lev=0; lev<=warpx.finestLevel(); lev++) {
         const amrex::Geometry& geom = warpx.Geom(lev);
         auto plo = geom.ProbLoArray();
         auto dxi = geom.InvCellSizeArray();
         amrex::MultiFab const& phi = *warpx.m_fields.get(FieldType::phi_fp, lev);
 
+#ifdef AMREX_USE_OMP
+        #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
         for (PinnedParIter pti(tmp, lev); pti.isValid(); ++pti) {
 
             auto phi_grid = phi[pti].array();

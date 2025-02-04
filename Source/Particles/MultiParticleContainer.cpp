@@ -88,7 +88,7 @@ namespace
     /** A little collection to transport six Array4 that point to the EM fields */
     struct MyFieldList
     {
-        Array4< amrex::Real const > const Ex, Ey, Ez, Bx, By, Bz;
+        Array4< amrex::Real const > Ex, Ey, Ez, Bx, By, Bz;
     };
 }
 
@@ -223,7 +223,7 @@ MultiParticleContainer::ReadParameters ()
                 pp_particles, "repeated_plasma_lens_lengths",
                 h_repeated_plasma_lens_lengths);
 
-            const int n_lenses = static_cast<int>(h_repeated_plasma_lens_starts.size());
+            const auto n_lenses = static_cast<int>(h_repeated_plasma_lens_starts.size());
             d_repeated_plasma_lens_starts.resize(n_lenses);
             d_repeated_plasma_lens_lengths.resize(n_lenses);
             amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,

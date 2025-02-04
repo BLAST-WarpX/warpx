@@ -4,7 +4,6 @@ CEXE_sources += FullDiagnostics.cpp
 CEXE_sources += WarpXIO.cpp
 CEXE_sources += ParticleIO.cpp
 CEXE_sources += FieldIO.cpp
-CEXE_sources += SliceDiagnostic.cpp
 CEXE_sources += BTDiagnostics.cpp
 CEXE_sources += BoundaryScrapingDiagnostics.cpp
 CEXE_sources += BTD_Plotfile_Header_Impl.cpp
