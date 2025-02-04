@@ -336,8 +336,6 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
     constexpr auto lev0=0;
 
     const amrex::Geometry& geom = warpx.Geom(lev0);
-    auto plo = geom.ProbLoArray();
-    auto dxi = geom.InvCellSizeArray();
     amrex::MultiFab const& Ex = *warpx.m_fields.get(FieldType::Efield_fp, Dir{0}, lev0);
     amrex::MultiFab const& Ey = *warpx.m_fields.get(FieldType::Efield_fp, Dir{1}, lev0);
     amrex::MultiFab const& Ez = *warpx.m_fields.get(FieldType::Efield_fp, Dir{2}, lev0);
