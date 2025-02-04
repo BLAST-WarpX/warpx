@@ -242,7 +242,7 @@ private:
      *  will be used by all snapshots to obtain lab-frame data at the respective
      *  z slice location.
      */
-    std::string const m_cell_centered_data_name;
+    std::string m_cell_centered_data_name;
     /** Vector of pointers to compute cell-centered data, per level, per component
      *  using the coarsening-ratio provided by the user.
      */

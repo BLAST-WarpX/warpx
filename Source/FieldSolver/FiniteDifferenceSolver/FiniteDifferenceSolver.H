@@ -63,6 +63,7 @@ class FiniteDifferenceSolver
                        int lev,
                        PatchType patch_type,
                        ablastr::fields::VectorField const& Efield,
+                       std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
                        amrex::Real dt );
 
         void EvolveF ( amrex::MultiFab* Ffield,
@@ -102,7 +103,7 @@ class FiniteDifferenceSolver
           * \param[out] Efield  vector of electric field MultiFabs updated at a given level
           * \param[in] Bfield   vector of magnetic field MultiFabs at a given level
           * \param[in] Jfield   vector of current density MultiFabs at a given level
-          * \param[in] edge_lengths length of edges along embedded boundaries
+          * \param[in] eb_update_E indicate in which cell E should be updated (related to embedded boundaries)
           * \param[in] dt       timestep of the simulation
           * \param[in] macroscopic_properties contains user-defined properties of the medium.
           */
@@ -110,7 +111,7 @@ class FiniteDifferenceSolver
                       ablastr::fields::VectorField const& Efield,
                       ablastr::fields::VectorField const& Bfield,
                       ablastr::fields::VectorField const& Jfield,
-                      ablastr::fields::VectorField const& edge_lengths,
+                      std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
                       amrex::Real dt,
                       std::unique_ptr<MacroscopicProperties> const& macroscopic_properties);
 
@@ -146,7 +147,7 @@ class FiniteDifferenceSolver
           * \param[in] Bfield   vector of magnetic field MultiFabs at a given level
           * \param[in] rhofield scalar ion charge density Multifab at a given level
           * \param[in] Pefield  scalar electron pressure MultiFab at a given level
-          * \param[in] edge_lengths length of edges along embedded boundaries
+          * \param[in] eb_update_E indicate in which cell E should be updated (related to embedded boundaries)
           * \param[in] lev  level number for the calculation
           * \param[in] hybrid_model instance of the hybrid-PIC model
           * \param[in] solve_for_Faraday boolean flag for whether the E-field is solved to be used in Faraday's equation
@@ -157,7 +158,7 @@ class FiniteDifferenceSolver
                                ablastr::fields::VectorField const& Bfield,
                                amrex::MultiFab const& rhofield,
                                amrex::MultiFab const& Pefield,
-                               ablastr::fields::VectorField const& edge_lengths,
+                               std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
                                int lev, HybridPICModel const* hybrid_model,
                                bool solve_for_Faraday );
 
@@ -167,13 +168,13 @@ class FiniteDifferenceSolver
           *
           * \param[out] Jfield  vector of current MultiFabs at a given level
           * \param[in] Bfield   vector of magnetic field MultiFabs at a given level
-          * \param[in] edge_lengths length of edges along embedded boundaries
+          * \param[in] eb_update_E indicate in which cell E should be updated (related to embedded boundaries)
           * \param[in] lev  level number for the calculation
           */
         void CalculateCurrentAmpere (
                       ablastr::fields::VectorField& Jfield,
                       ablastr::fields::VectorField const& Bfield,
-                      ablastr::fields::VectorField const& edge_lengths,
+                      std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
                       int lev );
 
     private:
@@ -215,7 +216,7 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField const& Efield,
             ablastr::fields::VectorField const& Bfield,
             ablastr::fields::VectorField const& Jfield,
-            ablastr::fields::VectorField const& edge_lengths,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
             amrex::MultiFab const* Ffield,
             int lev,
             amrex::Real dt );
@@ -242,7 +243,7 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField const& Bfield,
             amrex::MultiFab const& rhofield,
             amrex::MultiFab const& Pefield,
-            ablastr::fields::VectorField const& edge_lengths,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
             int lev, HybridPICModel const* hybrid_model,
             bool solve_for_Faraday );
 
@@ -250,7 +251,7 @@ class FiniteDifferenceSolver
         void CalculateCurrentAmpereCylindrical (
             ablastr::fields::VectorField& Jfield,
             ablastr::fields::VectorField const& Bfield,
-            ablastr::fields::VectorField const& edge_lengths,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
             int lev
         );
 
@@ -267,7 +268,7 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField const& Efield,
             ablastr::fields::VectorField const& Bfield,
             ablastr::fields::VectorField const& Jfield,
-            ablastr::fields::VectorField const& edge_lengths,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
             amrex::MultiFab const* Ffield,
             int lev, amrex::Real dt );
 
@@ -312,7 +313,7 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField const& Efield,
             ablastr::fields::VectorField const& Bfield,
             ablastr::fields::VectorField const& Jfield,
-            ablastr::fields::VectorField const& edge_lengths,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
             amrex::Real dt,
             std::unique_ptr<MacroscopicProperties> const& macroscopic_properties);
 
@@ -346,7 +347,7 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField const& Bfield,
             amrex::MultiFab const& rhofield,
             amrex::MultiFab const& Pefield,
-            ablastr::fields::VectorField const& edge_lengths,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
             int lev, HybridPICModel const* hybrid_model,
             bool solve_for_Faraday );
 
@@ -354,7 +355,7 @@ class FiniteDifferenceSolver
         void CalculateCurrentAmpereCartesian (
             ablastr::fields::VectorField& Jfield,
             ablastr::fields::VectorField const& Bfield,
-            ablastr::fields::VectorField const& edge_lengths,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
             int lev
         );
 #endif

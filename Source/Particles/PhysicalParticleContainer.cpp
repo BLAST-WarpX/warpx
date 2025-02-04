@@ -1351,16 +1351,11 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 #ifdef AMREX_USE_EB
     bool const inject_from_eb = plasma_injector.m_inject_from_eb; // whether to inject from EB or from a plane
     // Extract data structures for embedded boundaries
+    amrex::EBFArrayBoxFactory const* eb_factory = nullptr;
     amrex::FabArray<amrex::EBCellFlagFab> const* eb_flag = nullptr;
-    amrex::MultiCutFab const* eb_bnd_area = nullptr;
-    amrex::MultiCutFab const* eb_bnd_normal = nullptr;
-    amrex::MultiCutFab const* eb_bnd_cent = nullptr;
     if (inject_from_eb) {
-        amrex::EBFArrayBoxFactory const& eb_box_factory = WarpX::GetInstance().fieldEBFactory(0);
-        eb_flag = &eb_box_factory.getMultiEBCellFlagFab();
-        eb_bnd_area = &eb_box_factory.getBndryArea();
-        eb_bnd_normal = &eb_box_factory.getBndryNormal();
-        eb_bnd_cent = &eb_box_factory.getBndryCent();
+        eb_factory = &(WarpX::GetInstance().fieldEBFactory(0));
+        eb_flag = &(eb_factory->getMultiEBCellFlagFab());
     }
 #endif
 
@@ -1456,17 +1451,8 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
         }
 
 #ifdef AMREX_USE_EB
-        // Extract data structures for embedded boundaries
-        amrex::Array4<const typename FabArray<EBCellFlagFab>::value_type> eb_flag_arr;
-        amrex::Array4<const amrex::Real> eb_bnd_area_arr;
-        amrex::Array4<const amrex::Real> eb_bnd_normal_arr;
-        amrex::Array4<const amrex::Real> eb_bnd_cent_arr;
-        if (inject_from_eb) {
-            eb_flag_arr = eb_flag->array(mfi);
-            eb_bnd_area_arr = eb_bnd_area->array(mfi);
-            eb_bnd_normal_arr = eb_bnd_normal->array(mfi);
-            eb_bnd_cent_arr = eb_bnd_cent->array(mfi);
-        }
+        auto eb_flag_arr = eb_flag ? eb_flag->const_array(mfi) : Array4<EBCellFlag const>{};
+        auto eb_data = eb_factory ? eb_factory->getEBData(mfi) : EBData{};
 #endif
 
         amrex::ParallelForRNG(overlap_box, [=] AMREX_GPU_DEVICE (int i, int j, int k, amrex::RandomEngine const& engine) noexcept
@@ -1482,7 +1468,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 // Skip cells that are not partially covered by the EB
                 if (eb_flag_arr(i,j,k).isRegular() || eb_flag_arr(i,j,k).isCovered()) { return; }
                 // Scale by the (normalized) area of the EB surface in this cell
-                num_ppc_real_in_this_cell *= eb_bnd_area_arr(i,j,k);
+                num_ppc_real_in_this_cell *= eb_data.get<amrex::EBData_t::bndryarea>(i,j,k);
             }
 #else
             amrex::Real const num_ppc_real_in_this_cell = num_ppc_real; // user input: number of macroparticles per cell
@@ -1574,7 +1560,10 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
             Real scale_fac;
 #ifdef AMREX_USE_EB
             if (inject_from_eb) {
-                scale_fac = compute_scale_fac_area_eb(dx, num_ppc_real, eb_bnd_normal_arr, i, j, k );
+                scale_fac = compute_scale_fac_area_eb(dx, num_ppc_real,
+                                                      AMREX_D_DECL(eb_data.get<amrex::EBData_t::bndrynorm>(i,j,k,0),
+                                                                   eb_data.get<amrex::EBData_t::bndrynorm>(i,j,k,1),
+                                                                   eb_data.get<amrex::EBData_t::bndrynorm>(i,j,k,2)));
             } else
 #endif
             {
@@ -1595,14 +1584,15 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 XDim3 r;
 #ifdef AMREX_USE_EB
                 if (inject_from_eb) {
+                    auto const& pt = eb_data.randomPointOnEB(i,j,k,engine);
 #if defined(WARPX_DIM_3D)
-                    pos.x = overlap_corner[0] + (iv[0] + 0.5_rt + eb_bnd_cent_arr(i,j,k,0))*dx[0];
-                    pos.y = overlap_corner[1] + (iv[1] + 0.5_rt + eb_bnd_cent_arr(i,j,k,1))*dx[1];
-                    pos.z = overlap_corner[2] + (iv[2] + 0.5_rt + eb_bnd_cent_arr(i,j,k,2))*dx[2];
+                    pos.x = overlap_corner[0] + (iv[0] + 0.5_rt + pt[0])*dx[0];
+                    pos.y = overlap_corner[1] + (iv[1] + 0.5_rt + pt[1])*dx[1];
+                    pos.z = overlap_corner[2] + (iv[2] + 0.5_rt + pt[2])*dx[2];
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                    pos.x = overlap_corner[0] + (iv[0] + 0.5_rt + eb_bnd_cent_arr(i,j,k,0))*dx[0];
+                    pos.x = overlap_corner[0] + (iv[0] + 0.5_rt + pt[0])*dx[0];
                     pos.y = 0.0_rt;
-                    pos.z = overlap_corner[1] + (iv[1] + 0.5_rt + eb_bnd_cent_arr(i,j,k,1))*dx[1];
+                    pos.z = overlap_corner[1] + (iv[1] + 0.5_rt + pt[1])*dx[1];
 #endif
                 } else
 #endif
@@ -1661,7 +1651,9 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                     // Injection from EB: rotate momentum according to the normal of the EB surface
                     // (The above code initialized the momentum by assuming that z is the direction
                     // normal to the EB surface. Thus we need to rotate from z to the normal.)
-                    rotate_momentum_eb(pu, eb_bnd_normal_arr, i, j , k);
+                    rotate_momentum_eb(pu, AMREX_D_DECL(eb_data.get<amrex::EBData_t::bndrynorm>(i,j,k,0),
+                                                        eb_data.get<amrex::EBData_t::bndrynorm>(i,j,k,1),
+                                                        eb_data.get<amrex::EBData_t::bndrynorm>(i,j,k,2)));
                 }
 #endif
 

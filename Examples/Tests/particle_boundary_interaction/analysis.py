@@ -29,20 +29,20 @@ y_analytic = 0.00000
 z_analytic = -0.20531
 
 print("NUMERICAL coordinates of the point of contact:")
-print("x=%5.5f, y=%5.5f, z=%5.5f" % (x[0], y[0], z[0]))
+print(f"x={x[0]:5.5f}, y={y[0]:5.5f}, z={z[0]:5.5f}")
 print("\n")
 print("ANALYTICAL coordinates of the point of contact:")
-print("x=%5.5f, y=%5.5f, z=%5.5f" % (x_analytic, y_analytic, z_analytic))
+print(f"x={x_analytic:5.5f}, y={y_analytic:5.5f}, z={z_analytic:5.5f}")
 
 tolerance = 1e-5
 
-diff_x = np.abs((x[0] - x_analytic) / x_analytic)
-diff_z = np.abs((z[0] - z_analytic) / z_analytic)
+rel_err_x = np.abs((x[0] - x_analytic) / x_analytic)
+rel_err_z = np.abs((z[0] - z_analytic) / z_analytic)
 
 print("\n")
-print("percentage error for x = %5.4f %%" % (diff_x * 100))
-print("percentage error for z = %5.4f %%" % (diff_z * 100))
+print(f"Relative percentage error for x = {rel_err_x * 100:5.4f} %")
+print(f"Relative percentage error for z = {rel_err_z * 100:5.4f} %")
 
-assert (diff_x < tolerance) and (y[0] < 1e-8) and (diff_z < tolerance), (
+assert (rel_err_x < tolerance) and (y[0] < 1e-8) and (rel_err_z < tolerance), (
     "Test particle_boundary_interaction did not pass"
 )

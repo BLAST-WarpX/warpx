@@ -81,18 +81,19 @@ option(WarpX_QED_TABLE_GEN "QED table generation (requires PICSAR and Boost)"
 option(WarpX_QED_TOOLS     "Build external tool to generate QED lookup tables (requires PICSAR and Boost)"
                                                                         OFF)
 
-# Advanced option to automatically clean up CI test directories
-option(WarpX_TEST_CLEANUP "Clean up CI test directories" OFF)
+# Advanced option to run tests
+option(WarpX_TEST_CLEANUP "Clean up automated test directories" OFF)
+option(WarpX_TEST_DEBUGGER "Run automated tests without AMReX signal handling (to attach debuggers)" OFF)
+option(WarpX_TEST_FPETRAP "Run automated tests with FPE-trapping runtime parameters" OFF)
 mark_as_advanced(WarpX_TEST_CLEANUP)
-
-# Advanced option to run CI tests with FPE-trapping runtime parameters
-option(WarpX_TEST_FPETRAP "Run CI tests with FPE-trapping runtime parameters" OFF)
+mark_as_advanced(WarpX_TEST_DEBUGGER)
 mark_as_advanced(WarpX_TEST_FPETRAP)
 
-# Advanced option to run CI tests with the -g compile option
-option(WarpX_TEST_DEBUG "Run CI tests with the -g compile option" OFF)
-mark_as_advanced(WarpX_TEST_DEBUG)
-if(WarpX_TEST_DEBUG)
+# Advanced option to compile with the -g1 option for minimal debug symbols
+# (useful to see, e.g., line numbers in backtraces)
+option(WarpX_BACKTRACE_INFO "Compile with -g1 for minimal debug symbols (currently used in CI tests)" OFF)
+mark_as_advanced(WarpX_BACKTRACE_INFO)
+if(WarpX_BACKTRACE_INFO)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g1")
 endif()
 
@@ -193,7 +194,8 @@ if(WarpX_FFT)
     set(ABLASTR_FFT ON CACHE STRING "FFT-based solvers" FORCE)
 endif()
 
-# this defined the variable BUILD_TESTING which is ON by default
+# Define the variable BUILD_TESTING (ON by default),
+# include CDash dashboard testing module
 include(CTest)
 
 

@@ -42,9 +42,9 @@ struct FieldAccessorMacroscopic
     }
 private:
     /** Array4 of the source field to be scaled and returned by the operator() */
-    amrex::Array4<amrex::Real const> const m_field;
+    amrex::Array4<amrex::Real const> m_field;
     /** Array4 of the macroscopic parameter used to divide m_field in the operator() */
-    amrex::Array4<amrex::Real const> const m_parameter;
+    amrex::Array4<amrex::Real const> m_parameter;
 };
 
 
