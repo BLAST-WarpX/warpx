@@ -624,9 +624,9 @@ void WarpX::UpdateCurrentNodalToStag (amrex::MultiFab& dst, amrex::MultiFab cons
         amrex::Array4<amrex::Real>       const& dst_arr = dst.array(mfi);
 
         // Order of finite-order centering of currents
-        const int cc_nox = WarpX::current_centering_nox;
-        const int cc_noy = WarpX::current_centering_noy;
-        const int cc_noz = WarpX::current_centering_noz;
+        const int cc_nox = m_current_centering_nox;
+        const int cc_noy = m_current_centering_noy;
+        const int cc_noz = m_current_centering_noz;
 
         // Device vectors of stencil coefficients used for finite-order centering of currents
         amrex::Real const * stencil_coeffs_x = WarpX::device_current_centering_stencil_coeffs_x.data();
@@ -1406,14 +1406,14 @@ void WarpX::SumBoundaryJ (
     if (do_current_centering)
     {
 #if   defined(WARPX_DIM_1D_Z)
-        ng_depos_J[0] += WarpX::current_centering_noz / 2;
+        ng_depos_J[0] += m_current_centering_noz / 2;
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-        ng_depos_J[0] += WarpX::current_centering_nox / 2;
-        ng_depos_J[1] += WarpX::current_centering_noz / 2;
+        ng_depos_J[0] += m_current_centering_nox / 2;
+        ng_depos_J[1] += m_current_centering_noz / 2;
 #elif defined(WARPX_DIM_3D)
-        ng_depos_J[0] += WarpX::current_centering_nox / 2;
-        ng_depos_J[1] += WarpX::current_centering_noy / 2;
-        ng_depos_J[2] += WarpX::current_centering_noz / 2;
+        ng_depos_J[0] += m_current_centering_nox / 2;
+        ng_depos_J[1] += m_current_centering_noy / 2;
+        ng_depos_J[2] += m_current_centering_noz / 2;
 #endif
     }
 

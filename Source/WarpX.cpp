@@ -145,11 +145,6 @@ int WarpX::field_centering_nox = 2;
 int WarpX::field_centering_noy = 2;
 int WarpX::field_centering_noz = 2;
 
-// Order of finite-order centering of currents (nodal to staggered)
-int WarpX::current_centering_nox = 2;
-int WarpX::current_centering_noy = 2;
-int WarpX::current_centering_noz = 2;
-
 bool WarpX::use_fdtd_nci_corr = false;
 bool WarpX::galerkin_interpolation = true;
 
@@ -1036,9 +1031,9 @@ WarpX::ReadParameters ()
             field_centering_noz = 8;
             // Finite-order centering of currents (nodal to staggered)
             do_current_centering = true;
-            current_centering_nox = 8;
-            current_centering_noy = 8;
-            current_centering_noz = 8;
+            m_current_centering_nox = 8;
+            m_current_centering_noy = 8;
+            m_current_centering_noz = 8;
         }
 
 #ifdef WARPX_DIM_RZ
@@ -1076,18 +1071,18 @@ WarpX::ReadParameters ()
                 "warpx.do_current_centering=1 can be used only with warpx.grid_type=hybrid");
 
             utils::parser::queryWithParser(
-                pp_warpx, "current_centering_nox", current_centering_nox);
+                pp_warpx, "current_centering_nox", m_current_centering_nox);
             utils::parser::queryWithParser(
-                pp_warpx, "current_centering_noy", current_centering_noy);
+                pp_warpx, "current_centering_noy", m_current_centering_noy);
             utils::parser::queryWithParser(
-                pp_warpx, "current_centering_noz", current_centering_noz);
+                pp_warpx, "current_centering_noz", m_current_centering_noz);
 
             AllocateCenteringCoefficients(device_current_centering_stencil_coeffs_x,
                                           device_current_centering_stencil_coeffs_y,
                                           device_current_centering_stencil_coeffs_z,
-                                          current_centering_nox,
-                                          current_centering_noy,
-                                          current_centering_noz,
+                                          m_current_centering_nox,
+                                          m_current_centering_noy,
+                                          m_current_centering_noz,
                                           grid_type);
         }
 
