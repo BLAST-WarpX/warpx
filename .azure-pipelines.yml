@@ -141,7 +141,7 @@ jobs:
       df -h
       # configure
       export AMReX_CMAKE_FLAGS="-DAMReX_ASSERTIONS=ON -DAMReX_TESTING=ON"
-      export WARPX_TEST_FLAGS="-DWarpX_TEST_CLEANUP=ON -DWarpX_TEST_FPETRAP=ON -DWarpX_TEST_DEBUG=ON"
+      export WARPX_TEST_FLAGS="-DWarpX_TEST_CLEANUP=ON -DWarpX_TEST_FPETRAP=ON -DWarpX_BACKTRACE_INFO=ON"
       cmake -S . -B build    \
         ${AMReX_CMAKE_FLAGS} \
         ${WARPX_CMAKE_FLAGS} \

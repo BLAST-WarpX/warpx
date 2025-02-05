@@ -35,6 +35,8 @@ class FlushFormatCheckpoint final : public FlushFormatPlotfile
                               const amrex::Vector<ParticleDiag>& particle_diags) const;
 
     void WriteDMaps (const std::string& dir, int nlev) const;
+
+    void WriteReducedDiagsData (std::string const & dir) const;
 };
 
 #endif // WARPX_FLUSHFORMATCHECKPOINT_H_

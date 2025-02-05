@@ -19,6 +19,7 @@
 #include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 #include "Diagnostics/MultiDiagnostics.H"
+#include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 
 #include <ablastr/utils/Communication.H>
 #include <ablastr/utils/text/StreamUtils.H>
@@ -399,6 +400,8 @@ WarpX::InitFromCheckpoint ()
     }
 
     if (EB::enabled()) { InitializeEBGridData(maxLevel()); }
+
+    reduced_diags->ReadCheckpointData(restart_chkfile);
 
     // Initialize particles
     mypc->AllocData();

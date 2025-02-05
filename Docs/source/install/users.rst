@@ -79,7 +79,7 @@ Using the Spack Package
 -----------------------
 
 Packages for WarpX are available via the `Spack <https://spack.readthedocs.io>`__ package manager.
-The package ``warpx`` installs executables and the package ``py-warpx`` includes Python bindings, i.e. `PICMI <https://github.com/picmi-standard/picmi>`_.
+The package ``warpx`` installs executables and the variant ``warpx +python`` also includes Python bindings, i.e. `PICMI <https://github.com/picmi-standard/picmi>`__.
 
 .. code-block:: bash
 
@@ -88,11 +88,11 @@ The package ``warpx`` installs executables and the package ``py-warpx`` includes
    spack buildcache keys --install --trust
 
    # see `spack info py-warpx` for build options.
-   # optional arguments:  -mpi ^warpx dims=2 compute=cuda
-   spack install py-warpx
-   spack load py-warpx
+   # optional arguments:       -mpi compute=cuda
+   spack install warpx +python
+   spack load warpx +python
 
-See ``spack info warpx`` or ``spack info py-warpx`` and `the official Spack tutorial <https://spack-tutorial.readthedocs.io>`__ for more information.
+See ``spack info warpx`` and `the official Spack tutorial <https://spack-tutorial.readthedocs.io>`__ for more information.
 
 
 .. _install-pypi:

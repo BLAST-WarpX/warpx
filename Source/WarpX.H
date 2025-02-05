@@ -197,7 +197,7 @@ public:
     //! Integer that corresponds to the type of Maxwell solver (Yee, CKC, PSATD, ECT)
     static inline auto electromagnetic_solver_id = ElectromagneticSolverAlgo::Default;
     //! Integer that corresponds to the evolve scheme (explicit, semi_implicit_em, theta_implicit_em)
-    static inline auto evolve_scheme = EvolveScheme::Default;
+    EvolveScheme evolve_scheme = EvolveScheme::Default;
     //! Maximum iterations used for self-consistent particle update in implicit particle-suppressed evolve schemes
     static int max_particle_its_in_implicit_scheme;
     //! Relative tolerance used for self-consistent particle update in implicit particle-suppressed evolve schemes
@@ -371,8 +371,6 @@ public:
     static bool do_multi_J;
     static int do_multi_J_n_depositions;
 
-    static bool do_device_synchronize;
-
     //! With mesh refinement, particles located inside a refinement patch, but within
     //! #n_field_gather_buffer cells of the edge of the patch, will gather the fields
     //! from the lower refinement level instead of the refinement patch itself
@@ -404,7 +402,7 @@ public:
      * \param[in] name The name of the iMultiFab to use in the map
      * \param[in] initial_value The optional initial value
      */
-    static void AllocInitMultiFab (
+    void AllocInitMultiFab (
         std::unique_ptr<amrex::iMultiFab>& mf,
         const amrex::BoxArray& ba,
         const amrex::DistributionMapping& dm,
@@ -417,7 +415,7 @@ public:
     // Maps of all of the iMultiFabs used (this can include MFs from other classes)
     // This is a convenience for the Python interface, allowing all iMultiFabs
     // to be easily referenced from Python.
-    static std::map<std::string, amrex::iMultiFab *> imultifab_map;
+    std::map<std::string, amrex::iMultiFab *> imultifab_map;
 
     /**
      * \brief
@@ -849,7 +847,7 @@ public:
 
     void ComputeDivE(amrex::MultiFab& divE, int lev);
 
-    static void ProjectionCleanDivB ();
+    void ProjectionCleanDivB ();
 
     [[nodiscard]] amrex::IntVect getngEB() const { return guard_cells.ng_alloc_EB; }
     [[nodiscard]] amrex::IntVect getngF() const { return guard_cells.ng_alloc_F; }
@@ -1049,30 +1047,7 @@ public:
         ablastr::fields::VectorField const& face_areas,
         ablastr::fields::VectorField const& edge_lengths );
 
-    /**
-    * \brief Compute the length of the mesh edges. Here the length is a value in [0, 1].
-    *        An edge of length 0 is fully covered.
-    */
-    static void ComputeEdgeLengths (ablastr::fields::VectorField& edge_lengths,
-                                    const amrex::EBFArrayBoxFactory& eb_fact);
-    /**
-    * \brief Compute the area of the mesh faces. Here the area is a value in [0, 1].
-    *        An edge of area 0 is fully covered.
-    */
-    static void ComputeFaceAreas (ablastr::fields::VectorField& face_areas,
-                                  const amrex::EBFArrayBoxFactory& eb_fact);
-
-    /**
-    * \brief Scale the edges lengths by the mesh width to obtain the real lengths.
-    */
-    static void ScaleEdges (ablastr::fields::VectorField& edge_lengths,
-                            const std::array<amrex::Real,3>& cell_size);
-    /**
-    * \brief Scale the edges areas by the mesh width to obtain the real areas.
-    */
-    static void ScaleAreas (ablastr::fields::VectorField& face_areas,
-                            const std::array<amrex::Real,3>& cell_size);
-    /**
+   /**
     * \brief Initialize information for cell extensions.
     *        The flags convention for m_flag_info_face is as follows
     *          - 0 for unstable cells

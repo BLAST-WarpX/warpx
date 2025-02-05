@@ -84,6 +84,13 @@ public:
     virtual void ComputeDiags (int step) = 0;
 
     /**
+     * function to compute diags at the mid step time level
+     *
+     * @param[in] step current time step
+     */
+    virtual void ComputeDiagsMidStep (int step);
+
+    /**
      * write to file function
      *
      * @param[in] step current time step
@@ -92,6 +99,20 @@ public:
 
     /** Check if diag should be done */
     [[nodiscard]] bool DoDiags(int step) const { return m_intervals.contains(step+1); }
+
+    /**
+     * \brief Write out checkpoint related data
+     *
+     * \param[in] dir Directory where checkpoint data is written
+     */
+    virtual void WriteCheckpointData (std::string const & dir);
+
+    /**
+     * \brief Read in checkpoint related data
+     *
+     * \param[in] dir Directory where checkpoint data was written
+     */
+    virtual void ReadCheckpointData (std::string const & dir);
 
     /**
      * This function queries deprecated input parameters and aborts

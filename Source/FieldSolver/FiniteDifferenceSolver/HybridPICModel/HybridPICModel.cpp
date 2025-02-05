@@ -10,6 +10,7 @@
 #include "HybridPICModel.H"
 
 #include "EmbeddedBoundary/Enabled.H"
+#include "Python/callbacks.H"
 #include "Fields.H"
 #include "WarpX.H"
 
@@ -304,6 +305,8 @@ void HybridPICModel::HybridPICSolveE (
             eb_update_E[lev], lev, solve_for_Faraday
         );
     }
+    // Allow execution of Python callback after E-field push
+    ExecutePythonCallback("afterEpush");
 }
 
 void HybridPICModel::HybridPICSolveE (
@@ -339,7 +342,7 @@ void HybridPICModel::HybridPICSolveE (
     auto& warpx = WarpX::GetInstance();
 
     ablastr::fields::VectorField current_fp_plasma = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
-    const ablastr::fields::ScalarField electron_pressure_fp = warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
+    auto* const electron_pressure_fp = warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
 
     // Solve E field in regular cells
     warpx.get_pointer_fdtd_solver_fp(lev)->HybridPICSolveE(
