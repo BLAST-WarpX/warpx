@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 
 import numpy as np
-from adios2 import Stream
+from openpmd_viewer import OpenPMDTimeSeries
 from scipy.interpolate import interp1d
 from scipy.optimize import minimize
 from scipy.signal import hilbert
-from openpmd_viewer import OpenPMDTimeSeries
 
 c = 3e8
 lambda_laser = 800e-9
@@ -18,7 +17,9 @@ delta_t = 1.6e-6 / c  # time for the laser to reach the particle
 
 ts_particle = OpenPMDTimeSeries("diags/diag1/")
 
-ex_t, ey_t, ez_t, bx_t, by_t, bz_t = ts_particle.iterate(ts_particle.get_particle, ['ex', 'ey', 'ez', 'bx', 'by', 'bz'], species='electron')
+ex_t, ey_t, ez_t, bx_t, by_t, bz_t = ts_particle.iterate(
+    ts_particle.get_particle, ["ex", "ey", "ez", "bx", "by", "bz"], species="electron"
+)
 
 ex_t = np.squeeze(ex_t)
 ey_t = np.squeeze(ey_t)
@@ -50,7 +51,7 @@ def elec_d(x):
 #
 # This example should be updated in the future when OpenPMDTimeSeries
 # supports variable-based encoding
-""" 
+"""
 with Stream("diags/diag1/openpmd.bp", "r") as s:
     for _ in s.steps():
         i = s.current_step()
