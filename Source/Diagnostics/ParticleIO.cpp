@@ -378,7 +378,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
         const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev0, 0._rt);
         const Dim3 lo = lbound(box);
 
-        // Loop over the particles and update their position
+        // Loop over the particles and compute the EM field using the doGatherShapeN function
         amrex::ParallelFor( pti.numParticles(),
             [=] AMREX_GPU_DEVICE (long ip) {
                amrex::ParticleReal xp, yp, zp;
