@@ -591,7 +591,7 @@ for (const auto & particle_diag : particle_diags) {
         storePhiOnParticles( tmp, WarpX::electrostatic_solver_id, !use_pinned_pc );
     }
     if ( particle_diag.m_plot_EM ) {
-        storeEMFieldsOnParticles( tmp, WarpX::electromagnetic_solver_id, !use_pinned_pc ); // !!!!!!!!!!!!! why use_pinned_pc here? and not full_diag ????
+        storeEMFieldsOnParticles( tmp, WarpX::electromagnetic_solver_id, !use_pinned_pc );
     }
 
     // names of amrex::Real and int particle attributes in SoA data
