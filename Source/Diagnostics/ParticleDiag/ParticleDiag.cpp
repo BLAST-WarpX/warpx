@@ -36,7 +36,11 @@ ParticleDiag::ParticleDiag (
         std::fill(m_plot_flags.begin(), m_plot_flags.end(), 0);
         bool contains_positions = false;
         if (variables[0] != "none"){
-            for (const auto& var : variables){
+            for (auto& var : variables){
+#ifdef WARPX_DIM_RZ
+                // we reconstruct to Cartesian x,y,z for RZ particle output
+                if (var == "y") { var = "theta"; }
+#endif
                 if (var == "phi") {
                     // User requests phi on particle. This is *not* part of the variables that
                     // the particle container carries, and is only added to particles during output.
@@ -48,7 +52,7 @@ ParticleDiag::ParticleDiag (
                         +"' is not an existing attribute for this species");
                     m_plot_flags[pc->GetRealCompIndex(var)] = 1;
 
-                    if (var == "x" || var == "y" || var == "z") {
+                    if (var == "x" || var == "y" || var == "z" || var == "theta") {
                         contains_positions = true;
                     }
                 }
@@ -68,7 +72,7 @@ ParticleDiag::ParticleDiag (
     // Always write out theta, whether or not it's requested,
     // to be consistent with always writing out r and z.
     // TODO: openPMD does a reconstruction to Cartesian, so we can now skip force-writing this
-    m_plot_flags[pc->GetRealSoANames().at("theta")] = 1;
+    m_plot_flags[pc->GetRealCompIndex("theta")] = 1;
 #endif
 
     // build filter functors

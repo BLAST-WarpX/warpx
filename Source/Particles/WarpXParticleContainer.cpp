@@ -94,8 +94,8 @@ WarpXParticleContainer::WarpXParticleContainer (AmrCore* amr_core, int ispecies)
 {
     SetParticleSize();
     SetSoACompileTimeNames(
-                           {RealSoA::names_s.begin(), RealSoA::names_s.end()},
-                           {IntSoA::names_s.begin(), IntSoA::names_s.end()}
+                           {PIdx::names.begin(), PIdx::names.end()},
+                           {IntIdx::names.begin(), IntIdx::names.end()}
                            );
     ReadParameters();
 
@@ -873,7 +873,7 @@ WarpXParticleContainer::DepositCurrent (
             int* AMREX_RESTRICT ion_lev = nullptr;
             if (do_field_ionization)
             {
-                ion_lev = pti.GetiAttribs(particle_icomps["ionizationLevel"]).dataPtr();
+                ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
             }
 
             DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev,
@@ -1266,7 +1266,7 @@ WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
         int* AMREX_RESTRICT ion_lev = nullptr;
         if (do_field_ionization)
         {
-            ion_lev = pti.GetiAttribs(particle_icomps["ionizationLevel"]).dataPtr();
+            ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
         }
 
         DepositCharge(pti, wp, ion_lev, rho, icomp, 0, np, thread_num, lev, lev);
@@ -1550,13 +1550,13 @@ WarpXParticleContainer::PushX (int lev, amrex::Real dt)
 // without runtime component).
 void WarpXParticleContainer::defineAllParticleTiles () noexcept
 {
-        for (int lev = 0; lev <= amrex::ParticleContainerPureSoA<PIdx::nattribs,0,T_Allocator>::finestLevel(); ++lev)
+        for (int lev = 0; lev <= finestLevel(); ++lev)
         {
-            for (auto mfi = amrex::ParticleContainerPureSoA<PIdx::nattribs,0,T_Allocator>::MakeMFIter(lev); mfi.isValid(); ++mfi)
+            for (auto mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
             {
                 const int grid_id = mfi.index();
                 const int tile_id = mfi.LocalTileIndex();
-                amrex::ParticleContainerPureSoA<PIdx::nattribs,0,T_Allocator>::DefineAndReturnParticleTile(lev, grid_id, tile_id);
+                DefineAndReturnParticleTile(lev, grid_id, tile_id);
             }
         }
 
@@ -1582,7 +1582,7 @@ WarpXParticleContainer::particlePostLocate(ParticleType& p,
 {
     if (not do_splitting) { return; }
 
-    // Tag particle if goes to higher level.
+    // Tag particle if it goes to a higher level.
     // It will be split later in the loop
     if (pld.m_lev == lev+1
         and p.id() != amrex::LongParticleIds::NoSplitParticleID

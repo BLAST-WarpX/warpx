@@ -722,6 +722,8 @@ WarpX::PushPSATD (amrex::Real start_time)
         "PushFieldsEM: PSATD solver selected but not built");
 #else
 
+    bool const skip_lev0_coarse_patch = true;
+
     const int rho_old = spectral_solver_fp[0]->m_spectral_index.rho_old;
     const int rho_new = spectral_solver_fp[0]->m_spectral_index.rho_new;
 
@@ -853,8 +855,8 @@ WarpX::PushPSATD (amrex::Real start_time)
     if (WarpX::fft_do_time_averaging) {
         auto Efield_avg_fp = m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_fp, finest_level);
         auto Bfield_avg_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_fp, finest_level);
-        auto Efield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_cp, finest_level);
-        auto Bfield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_cp, finest_level);
+        auto Efield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_cp, finest_level, skip_lev0_coarse_patch);
+        auto Bfield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_cp, finest_level, skip_lev0_coarse_patch);
         PSATDBackwardTransformEBavg(Efield_avg_fp, Bfield_avg_fp, Efield_avg_cp, Bfield_avg_cp);
     }
     if (WarpX::do_dive_cleaning) { PSATDBackwardTransformF(); }
@@ -1105,6 +1107,8 @@ WarpX::EvolveG (int lev, PatchType patch_type, amrex::Real a_dt, DtType /*a_dt_t
 
     WARPX_PROFILE("WarpX::EvolveG()");
 
+    bool const skip_lev0_coarse_patch = true;
+
     // Evolve G field in regular cells
     if (patch_type == PatchType::fine)
     {
@@ -1115,7 +1119,7 @@ WarpX::EvolveG (int lev, PatchType patch_type, amrex::Real a_dt, DtType /*a_dt_t
     }
     else // coarse patch
     {
-        ablastr::fields::MultiLevelVectorField const& Bfield_cp_new = m_fields.get_mr_levels_alldirs(FieldType::Bfield_cp, finest_level);
+        ablastr::fields::MultiLevelVectorField const& Bfield_cp_new = m_fields.get_mr_levels_alldirs(FieldType::Bfield_cp, finest_level, skip_lev0_coarse_patch);
         m_fdtd_solver_cp[lev]->EvolveG(
             m_fields.get(FieldType::G_cp, lev),
             Bfield_cp_new[lev], a_dt);
