@@ -39,7 +39,7 @@ namespace ParticleUtils
     amrex::DenseBins<ParticleTileDataType>
     findParticlesInEachCell (int lev,
                              const amrex::MFIter & mfi,
-                             ParticleTileType & ptile) {
+                             WarpXParticleContainer::ParticleTileType & ptile) {
 
         // Extract particle structures for this tile
         int const np = ptile.numParticles();

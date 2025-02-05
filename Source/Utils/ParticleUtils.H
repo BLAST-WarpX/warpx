@@ -35,7 +35,7 @@ namespace ParticleUtils {
     amrex::DenseBins<ParticleTileDataType>
     findParticlesInEachCell (int lev,
                              const amrex::MFIter & mfi,
-                             ParticleTileType & ptile);
+                             WarpXParticleContainer::ParticleTileType & ptile);
 
     /**
      * \brief Return (relativistic) particle energy given velocity and mass.
