@@ -29,7 +29,7 @@ constants = picmi.constants
 
 comm = mpi.COMM_WORLD
 
-simulation = picmi.Simulation(warpx_serialize_initial_conditions=True, verbose=0)
+simulation = picmi.Simulation(warpx_serialize_initial_conditions=True, verbose=False, warpx_amrex_use_gpu_aware_mpi=True)
 
 
 class PlasmaCylinderCompression(object):

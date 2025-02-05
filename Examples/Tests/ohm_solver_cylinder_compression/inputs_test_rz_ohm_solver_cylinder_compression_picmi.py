@@ -3,10 +3,8 @@
 # --- Test script for the kinetic-fluid hybrid model in WarpX wherein ions are
 # --- treated as kinetic particles and electrons as an isothermal, inertialess
 # --- background fluid. The script demonstrates the use of this model to
-# --- simulate adiabatic compression of a plasma cylinder initializaed from an 
+# --- simulate adiabatic compression of a plasma cylinder initialized from an 
 # --- analytical Grad-Shafranov solution.
-
-# NOTE: Currently radial boundary is broken and requires further investigation
 
 import argparse
 import shutil
@@ -30,7 +28,7 @@ constants = picmi.constants
 
 comm = mpi.COMM_WORLD
 
-simulation = picmi.Simulation(warpx_serialize_initial_conditions=True, verbose=0)
+simulation = picmi.Simulation(warpx_serialize_initial_conditions=True, verbose=False, warpx_amrex_use_gpu_aware_mpi=True)
 
 
 class PlasmaCylinderCompression(object):
@@ -64,7 +62,7 @@ class PlasmaCylinderCompression(object):
     NZ = 32
 
     # Starting number of particles per cell
-    NPPC = 100
+    NPPC = 500
 
     # Number of substeps used to update B
     substeps = 25

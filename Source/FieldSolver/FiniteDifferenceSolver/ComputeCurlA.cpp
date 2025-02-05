@@ -10,7 +10,6 @@
 #include "FiniteDifferenceSolver.H"
 
 #include "EmbeddedBoundary/Enabled.H"
-#include "EmbeddedBoundary/Covered.H"
 #ifdef WARPX_DIM_RZ
 #   include "FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
 #else
@@ -28,6 +27,7 @@ using warpx::fields::FieldType;
 void FiniteDifferenceSolver::ComputeCurlA (
     ablastr::fields::VectorField& Bfield,
     ablastr::fields::VectorField const& Afield,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_B,
     int lev )
 {
     // Select algorithm (The choice of algorithm is a runtime option,
@@ -35,12 +35,12 @@ void FiniteDifferenceSolver::ComputeCurlA (
     if (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC) {
 #ifdef WARPX_DIM_RZ
         ComputeCurlACylindrical <CylindricalYeeAlgorithm> (
-            Bfield, Afield, lev
+            Bfield, Afield, eb_update_B, lev
         );
 
 #else
         ComputeCurlACartesian <CartesianYeeAlgorithm> (
-            Bfield, Afield, lev
+            Bfield, Afield, eb_update_B, lev
         );
 
 #endif
@@ -62,6 +62,7 @@ template<typename T_Algo>
 void FiniteDifferenceSolver::ComputeCurlACylindrical (
     ablastr::fields::VectorField& Bfield,
     ablastr::fields::VectorField const& Afield,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_B,
     int lev
 )
 {
@@ -92,7 +93,14 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
         Array4<Real> const& Bt = Bfield[1]->array(mfi);
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
 
-        EB::Covered const& cov_ptr = EB::Covered(mfi, lev);
+        // Extract structures indicating where the fields
+        // should be updated, given the position of the embedded boundaries.
+        amrex::Array4<int> update_Br_arr, update_Bt_arr, update_Bz_arr;
+        if (EB::enabled()) {
+            update_Br_arr = eb_update_B[0]->array(mfi);
+            update_Bt_arr = eb_update_B[1]->array(mfi);
+            update_Bz_arr = eb_update_B[2]->array(mfi);
+        }
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
@@ -115,7 +123,8 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
 
             // Br calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                if (cov_ptr.isCovered(0, EB::CoverTopology::face, i, j, 0)) { return; }
+                // Skip field update in the embedded boundaries
+                if (update_Br_arr && update_Br_arr(i, j, 0) == 0) { return; }
 
                 Real const r = rmin + i*dr; // r on nodal point (Br is nodal in r)
                 if (r != 0) { // Off-axis, regular Maxwell equations
@@ -151,7 +160,8 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
 
             // Bt calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                if (cov_ptr.isCovered(1, EB::CoverTopology::face, i, j, 0)) { return; }
+                // Skip field update in the embedded boundaries
+                if (update_Bt_arr && update_Bt_arr(i, j, 0) == 0) { return; }
 
                 Bt(i, j, 0, 0) = - (
                     T_Algo::UpwardDr(Az, coefs_r, n_coefs_r, i, j, 0, 0)
@@ -168,7 +178,8 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
 
             // Bz calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                if (cov_ptr.isCovered(2, EB::CoverTopology::face, i, j, 0)) { return; }
+                // Skip field update in the embedded boundaries
+                if (update_Bz_arr && update_Bz_arr(i, j, 0) == 0) { return; }
 
                 Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bz is cell-centered in r)
                 Bz(i, j, 0, 0) =  T_Algo::UpwardDrr_over_r(At, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
@@ -196,6 +207,7 @@ template<typename T_Algo>
 void FiniteDifferenceSolver::ComputeCurlACartesian (
     ablastr::fields::VectorField & Bfield,
     ablastr::fields::VectorField const& Afield,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_B,
     int lev
 )
 {
@@ -227,7 +239,14 @@ void FiniteDifferenceSolver::ComputeCurlACartesian (
         Array4<Real const> const &Ay = Afield[1]->const_array(mfi);
         Array4<Real const> const &Az = Afield[2]->const_array(mfi);
 
-        EB::Covered const& cov_ptr = EB::Covered(mfi, lev);
+        // Extract structures indicating where the fields
+        // should be updated, given the position of the embedded boundaries.
+        amrex::Array4<int> update_Bx_arr, update_By_arr, update_Bz_arr;
+        if (EB::enabled()) {
+            update_Bx_arr = eb_update_B[0]->array(mfi);
+            update_By_arr = eb_update_B[1]->array(mfi);
+            update_Bz_arr = eb_update_B[2]->array(mfi);
+        }
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
@@ -247,8 +266,8 @@ void FiniteDifferenceSolver::ComputeCurlACartesian (
 
             // Bx calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                // Skip if this cell is fully covered by embedded boundaries
-                if (cov_ptr.isCovered(0, EB::CoverTopology::face, i, j, k)) { return; }
+                // Skip field update in the embedded boundaries
+                if (update_Bx_arr && update_Bx_arr(i, j, k) == 0) { return; }
 
                 Bx(i, j, k) =  (
                     - T_Algo::UpwardDz(Ay, coefs_z, n_coefs_z, i, j, k)
@@ -258,8 +277,8 @@ void FiniteDifferenceSolver::ComputeCurlACartesian (
 
             // By calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                // Skip if this cell is fully covered by embedded boundaries
-                if (cov_ptr.isCovered(1, EB::CoverTopology::face, i, j, k)) { return; }
+                // Skip field update in the embedded boundaries
+                if (update_By_arr && update_By_arr(i, j, k) == 0) { return; }
 
                 By(i, j, k) = (
                     - T_Algo::UpwardDx(Az, coefs_x, n_coefs_x, i, j, k)
@@ -269,8 +288,8 @@ void FiniteDifferenceSolver::ComputeCurlACartesian (
 
             // Bz calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                // Skip if this cell is fully covered by embedded boundaries
-                if (cov_ptr.isCovered(2, EB::CoverTopology::face, i, j, k)) { return; }
+                // Skip field update in the embedded boundaries
+                if (update_Bz_arr && update_Bz_arr(i, j, k) == 0) { return; }
 
                 Bz(i, j, k) = (
                     - T_Algo::UpwardDy(Ax, coefs_y, n_coefs_y, i, j, k)

@@ -8,7 +8,6 @@
  */
 
 #include "ExternalVectorPotential.H"
-#include "EmbeddedBoundary/Covered.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "Fields.H"
 #include "WarpX.H"
@@ -201,7 +200,9 @@ ExternalVectorPotential::InitData ()
                     m_A_external[i][0],
                     m_A_external[i][1],
                     m_A_external[i][2],
-                    lev, PatchType::fine, EB::CoverTopology::none);
+                    lev, PatchType::fine,
+                    warpx.GetEBUpdateEFlag(),
+                    false);
 
                 for (int idir = 0; idir < 3; ++idir) {
                     warpx.m_fields.get(Aext_field, Direction{idir}, lev)->
@@ -252,6 +253,7 @@ ExternalVectorPotential::CalculateExternalCurlA (std::string& coil_name)
         warpx.get_pointer_fdtd_solver_fp(lev)->ComputeCurlA(
             curlA_ext[lev],
             A_ext[lev],
+            warpx.GetEBUpdateBFlag()[lev],
             lev);
 
         for (int idir = 0; idir < 3; ++idir) {
@@ -263,7 +265,9 @@ ExternalVectorPotential::CalculateExternalCurlA (std::string& coil_name)
 
 AMREX_FORCE_INLINE
 void
-ExternalVectorPotential::ZeroFieldinEB (ablastr::fields::VectorField const& Field, EB::CoverTopology topology, const int lev)
+ExternalVectorPotential::ZeroFieldinEB (
+    ablastr::fields::VectorField const& Field,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update)
 {
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
@@ -275,7 +279,14 @@ ExternalVectorPotential::ZeroFieldinEB (ablastr::fields::VectorField const& Fiel
         Array4<Real> const& Fy = Field[1]->array(mfi);
         Array4<Real> const& Fz = Field[2]->array(mfi);
 
-        EB::Covered const& cov_ptr = EB::Covered(mfi, lev);
+        // Extract structures indicating where the fields
+        // should be updated, given the position of the embedded boundaries.
+        amrex::Array4<int> update_Fx_arr, update_Fy_arr, update_Fz_arr;
+        if (EB::enabled()) {
+            update_Fx_arr = eb_update[0]->array(mfi);
+            update_Fy_arr = eb_update[1]->array(mfi);
+            update_Fz_arr = eb_update[2]->array(mfi);
+        }
 
         // Extract tileboxes for which to loop
         Box const& tbx  = mfi.tilebox(Field[0]->ixType().toIntVect());
@@ -286,15 +297,16 @@ ExternalVectorPotential::ZeroFieldinEB (ablastr::fields::VectorField const& Fiel
         amrex::ParallelFor(tbx, tby, tbz,
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                if (cov_ptr.isCovered(0, topology, i, j, k)) Fx(i, j, k) = 0_rt;
+                // Skip field update in the embedded boundaries
+                if (update_Fx_arr && update_Fx_arr(i, j, k) == 0) Fx(i, j, k) = 0_rt;
             },
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                if (cov_ptr.isCovered(1, topology, i, j, k)) Fy(i, j, k) = 0_rt;
+                if (update_Fy_arr && update_Fy_arr(i, j, k) == 0) Fy(i, j, k) = 0_rt;
             },
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                if (cov_ptr.isCovered(2, topology, i, j, k)) Fz(i, j, k) = 0_rt;
+                if (update_Fz_arr && update_Fz_arr(i, j, k) == 0) Fz(i, j, k) = 0_rt;
             }
         );
     }
@@ -360,8 +372,8 @@ ExternalVectorPotential::UpdateHybridExternalFields (const amrex::Real t, const 
             }
 
             if (EB::enabled()) {
-                ZeroFieldinEB(B_ext[lev], EB::CoverTopology::face, lev);
-                ZeroFieldinEB(E_ext[lev], EB::CoverTopology::edge, lev);
+                ZeroFieldinEB(B_ext[lev], warpx.GetEBUpdateBFlag()[lev]);
+                ZeroFieldinEB(E_ext[lev], warpx.GetEBUpdateEFlag()[lev]);
             }
         }
     }

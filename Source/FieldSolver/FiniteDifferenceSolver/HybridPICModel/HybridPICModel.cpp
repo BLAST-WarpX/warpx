@@ -586,18 +586,19 @@ void HybridPICModel::FieldPush (
 {
     auto& warpx = WarpX::GetInstance();
 
+    amrex::Real const t_old = warpx.gett_old(0);
+
     // Calculate J = curl x B / mu0 - J_ext
     CalculatePlasmaCurrent(Bfield, eb_update_E);
     // Calculate the E-field from Ohm's law
     HybridPICSolveE(Efield, Jfield, Bfield, rhofield, eb_update_E, true);
     warpx.FillBoundaryE(ng, nodal_sync);
-    warpx.ApplyEfieldBoundary(0, PatchType::fine);
+    warpx.ApplyEfieldBoundary(0, PatchType::fine, t_old);
 
     // Push forward the B-field using Faraday's law
-    amrex::Real const t_old = warpx.gett_old(0);
     warpx.EvolveB(dt, dt_type, t_old);
     warpx.FillBoundaryB(ng, nodal_sync);
-    warpx.ApplyBfieldBoundary(0, PatchType::fine, dt_type);
+    warpx.ApplyBfieldBoundary(0, PatchType::fine, dt_type, t_old);
 }
 
 void

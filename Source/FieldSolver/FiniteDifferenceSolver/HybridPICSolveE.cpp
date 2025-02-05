@@ -579,15 +579,14 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
             update_Er_arr = eb_update_E[0]->array(mfi);
             update_Et_arr = eb_update_E[1]->array(mfi);
             update_Ez_arr = eb_update_E[2]->array(mfi);
-        Array4<Real> Er_ext, Et_ext, Ez_ext;
+        }
 
+        Array4<Real> Er_ext, Et_ext, Ez_ext;
         if (include_external_fields) {
             Er_ext = Efield_external[0]->array(mfi);
             Et_ext = Efield_external[1]->array(mfi);
             Ez_ext = Efield_external[2]->array(mfi);
         }
-
-        EB::Covered const& cov_ptr = EB::Covered(mfi, lev);
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
@@ -649,7 +648,6 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     // r on cell-centered point (Jr is cell-centered in r)
                     const Real r = rmin + (i + 0.5_rt)*dr;
                     const Real jr_val = Interp(Jr, Jr_stag, Er_stag, coarsen, i, j, 0, 0);
-
                     auto nabla2Jr = T_Algo::Dr_rDr_over_r(Jr, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
                         + T_Algo::Dzz(Jr, coefs_z, n_coefs_z, i, j, 0, 0) - jr_val/(r*r);
                     Er(i, j, 0) -= eta_h * nabla2Jr;
@@ -957,15 +955,14 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             update_Ex_arr = eb_update_E[0]->array(mfi);
             update_Ey_arr = eb_update_E[1]->array(mfi);
             update_Ez_arr = eb_update_E[2]->array(mfi);
-        Array4<Real> Ex_ext, Ey_ext, Ez_ext;
+        }
 
+        Array4<Real> Ex_ext, Ey_ext, Ez_ext;
         if (include_external_fields) {
             Ex_ext = Efield_external[0]->array(mfi);
             Ey_ext = Efield_external[1]->array(mfi);
             Ez_ext = Efield_external[2]->array(mfi);
         }
-
-        EB::Covered const& cov_ptr = EB::Covered(mfi, lev);
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();

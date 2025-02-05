@@ -14,7 +14,7 @@
 
 #include "Utils/WarpXAlgorithmSelection.H"
 
-#include "EmbeddedBoundary/Covered.H"
+#include "EmbeddedBoundary/Enabled.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXConst.H"
@@ -88,8 +88,7 @@ public:
     AMREX_FORCE_INLINE
     void ZeroFieldinEB (
         ablastr::fields::VectorField const& Field,
-        EB::CoverTopology topology,
-        int lev);
+        std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update);
 
     void UpdateHybridExternalFields (
         const amrex::Real t,
