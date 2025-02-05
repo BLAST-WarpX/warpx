@@ -29,8 +29,6 @@ namespace ParticleUtils
 
     // Define shortcuts for frequently-used type names
     using ParticleType = typename WarpXParticleContainer::ParticleType;
-    using ParticleTileType = typename WarpXParticleContainer::ParticleTileType;
-    using ParticleTileDataType = typename ParticleTileType::ParticleTileDataType;
     using ParticleBins = DenseBins<ParticleTileDataType>;
     using index_type = typename ParticleBins::index_type;
 
