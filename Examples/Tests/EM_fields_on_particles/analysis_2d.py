@@ -5,6 +5,7 @@ from adios2 import Stream
 from scipy.interpolate import interp1d
 from scipy.optimize import minimize
 from scipy.signal import hilbert
+from openpmd_viewer import OpenPMDTimeSeries
 
 c = 3e8
 lambda_laser = 800e-9
@@ -15,7 +16,19 @@ T_peak = 10e-15
 tau = 5e-15
 delta_t = 1.6e-6 / c  # time for the laser to reach the particle
 
+ts_particle = OpenPMDTimeSeries("diags/diag1/")
+
+ex_t, ey_t, ez_t, bx_t, by_t, bz_t = ts_particle.iterate(ts_particle.get_particle, ['ex', 'ey', 'ez', 'bx', 'by', 'bz'], species='electron')
+
+ex_t = np.squeeze(ex_t)
+ey_t = np.squeeze(ey_t)
+ez_t = np.squeeze(ez_t)
+bx_t = np.squeeze(bx_t)
+by_t = np.squeeze(by_t)
+bz_t = np.squeeze(bz_t)
+
 n_diags = 401
+"""
 ex_t = np.zeros((n_diags,))
 ey_t = np.zeros((n_diags,))
 ez_t = np.zeros((n_diags,))
@@ -26,7 +39,7 @@ bz_t = np.zeros((n_diags,))
 
 def elec_d(x):
     return f"/data/particles/electron/{x}/__data__"
-
+ """
 
 # Here we use adios2.Stream instead of openpmd_viewer.OpenPMDTimeSeries
 # This is because the variable based encoding is still experimental
@@ -37,6 +50,7 @@ def elec_d(x):
 #
 # This example should be updated in the future when OpenPMDTimeSeries
 # supports variable-based encoding
+""" 
 with Stream("diags/diag1/openpmd.bp", "r") as s:
     for _ in s.steps():
         i = s.current_step()
@@ -45,7 +59,7 @@ with Stream("diags/diag1/openpmd.bp", "r") as s:
         ez_t[i] = s.read(elec_d("ez")).item()
         bx_t[i] = s.read(elec_d("bx")).item()
         by_t[i] = s.read(elec_d("by")).item()
-        bz_t[i] = s.read(elec_d("bz")).item()
+        bz_t[i] = s.read(elec_d("bz")).item() """
 
 DT = 6.324524234e-17  # @ CFL = 0.99
 # on pourrait juste lire l'input file....
