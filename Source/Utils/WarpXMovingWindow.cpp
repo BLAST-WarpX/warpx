@@ -464,7 +464,7 @@ WarpX::MoveWindow (const int step, bool move_j)
     }
 
     // Recompute macroscopic properties of the medium
-    if (WarpX::em_solver_medium == MediumForEM::Macroscopic) {
+    if (m_em_solver_medium == MediumForEM::Macroscopic) {
         const int lev_zero = 0;
         m_macroscopic_properties->InitData(
             Geom(lev_zero),

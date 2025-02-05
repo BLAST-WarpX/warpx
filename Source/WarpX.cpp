@@ -374,7 +374,7 @@ WarpX::WarpX ()
 
     m_field_factory.resize(nlevs_max);
 
-    if (em_solver_medium == MediumForEM::Macroscopic) {
+    if (m_em_solver_medium == MediumForEM::Macroscopic) {
         // create object for macroscopic solver
         m_macroscopic_properties = std::make_unique<MacroscopicProperties>();
     }
@@ -1270,8 +1270,8 @@ WarpX::ReadParameters ()
                 " combined with mesh refinement is currently not implemented");
         }
 
-        pp_algo.query_enum_sloppy("em_solver_medium", em_solver_medium, "-_");
-        if (em_solver_medium == MediumForEM::Macroscopic ) {
+        pp_algo.query_enum_sloppy("em_solver_medium", m_em_solver_medium, "-_");
+        if (m_em_solver_medium == MediumForEM::Macroscopic ) {
             pp_algo.query_enum_sloppy("macroscopic_sigma_method",
                                       macroscopic_solver_algo, "-_");
         }
@@ -2296,7 +2296,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
     }
 
     // Allocate extra multifabs for macroscopic properties of the medium
-    if (em_solver_medium == MediumForEM::Macroscopic) {
+    if (m_em_solver_medium == MediumForEM::Macroscopic) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE( lev==0,
             "Macroscopic properties are not supported with mesh refinement.");
         m_macroscopic_properties->AllocateLevelMFs(ba, dm, ngEB);
