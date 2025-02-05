@@ -381,7 +381,6 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
         // Loop over the particles and update their position
         amrex::ParallelFor( pti.numParticles(),
             [=] AMREX_GPU_DEVICE (long ip) {
-               // !!!!!!!!!! pas fini
                amrex::ParticleReal xp, yp, zp;
                getPosition(ip, xp, yp, zp);
 
