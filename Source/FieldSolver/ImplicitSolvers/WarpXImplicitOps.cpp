@@ -62,8 +62,9 @@ WarpX::ImplicitPreRHSOp ( amrex::Real  a_cur_time,
     // deposit currents, giving J at n+1/2
     // This uses Efield_fp and Bfield_fp, the field at n+1/2 from the previous iteration.
     const bool skip_current = false;
+    const bool deposit_mass_matrices = false;
     const PushType push_type = PushType::Implicit;
-    PushParticlesandDeposit(a_cur_time, skip_current, push_type);
+    PushParticlesandDeposit(a_cur_time, skip_current, deposit_mass_matrices, push_type);
 
     SyncCurrentAndRho();
 
