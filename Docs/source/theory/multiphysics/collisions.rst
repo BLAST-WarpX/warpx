@@ -136,6 +136,8 @@ This process operates in two ways:
 1. If an excitation energy cost is provided, the energy cost is subtracted from the particle energy and no scattering is performed.
 2. If an excitation energy cost is not provided, the particle is not scattered and the velocity is unchanged (corresponding to a scattering angle of :math:`0` in the elastic scattering process above).
 
+See :cite:t:`b-Janssen2016` for a recommended use of this process.
+
 Benchmarks
 ----------
 
