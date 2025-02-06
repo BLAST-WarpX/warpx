@@ -10,6 +10,7 @@
 #include "WarpXParticleContainer.H"
 
 #include "ablastr/particles/DepositCharge.H"
+#include "Particles/ShapeFactors.H"
 #include "Deposition/ChargeDeposition.H"
 #include "Deposition/CurrentDeposition.H"
 #include "Deposition/SharedDepositionUtils.H"
@@ -124,6 +125,9 @@ WarpXParticleContainer::WarpXParticleContainer (AmrCore* amr_core, int ispecies)
     local_jx.resize(num_threads);
     local_jy.resize(num_threads);
     local_jz.resize(num_threads);
+    local_Sx.resize(num_threads);
+    local_Sy.resize(num_threads);
+    local_Sz.resize(num_threads);
 
     // The boundary conditions are read in in ReadBCParams but a child class
     // can allow these value to be overwritten if different boundary
@@ -992,6 +996,13 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
     Array4<Real> const& jx_arr = jx->array(pti);
     Array4<Real> const& jy_arr = jy->array(pti);
     Array4<Real> const& jz_arr = jz->array(pti);
+
+    auto & Sx_fab = Sx->get(pti);
+    auto & Sy_fab = Sy->get(pti);
+    auto & Sz_fab = Sz->get(pti);
+    Array4<Real> const& Sx_arr = Sx->array(pti);
+    Array4<Real> const& Sy_arr = Sy->array(pti);
+    Array4<Real> const& Sz_arr = Sz->array(pti);
 #else
     tbx.grow(ng_J);
     tby.grow(ng_J);
@@ -1013,6 +1024,22 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
     Array4<Real> const& jx_arr = local_jx[thread_num].array();
     Array4<Real> const& jy_arr = local_jy[thread_num].array();
     Array4<Real> const& jz_arr = local_jz[thread_num].array();
+
+    // CPU, tiling: S<xyz>_arr point to the local_S<xyz>[thread_num] arrays
+    local_Sx[thread_num].resize(tbx, Sx->nComp());
+    local_Sy[thread_num].resize(tby, Sy->nComp());
+    local_Sz[thread_num].resize(tbz, Sz->nComp());
+
+    // local_Sx[thread_num] is set to zero
+    local_Sx[thread_num].setVal(0.0);
+    local_Sy[thread_num].setVal(0.0);
+    local_Sz[thread_num].setVal(0.0);
+    auto & Sx_fab = local_Sx[thread_num];
+    auto & Sy_fab = local_Sy[thread_num];
+    auto & Sz_fab = local_Sz[thread_num];
+    Array4<Real> const& Sx_arr = local_Sx[thread_num].array();
+    Array4<Real> const& Sy_arr = local_Sy[thread_num].array();
+    Array4<Real> const& Sz_arr = local_Sz[thread_num].array();
 #endif
 
     const auto GetPosition = GetParticlePosition<PIdx>(pti, offset);
@@ -1035,6 +1062,11 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
     if (WarpX::do_shared_mem_current_deposition) {
         amrex::Abort("Cannot do shared memory deposition with implicit algorithm");
     }
+
+    // Get magnetic field arrays
+    amrex::Array4<const amrex::Real> const& Bx_arr = Bx->array();
+    amrex::Array4<const amrex::Real> const& By_arr = By->array();
+    amrex::Array4<const amrex::Real> const& Bz_arr = Bz->array();
 
     WARPX_PROFILE_VAR_START(blp_deposit);
 
@@ -1106,6 +1138,10 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
     (*jx)[pti].lockAdd(local_jx[thread_num], tbx, tbx, 0, 0, jx->nComp());
     (*jy)[pti].lockAdd(local_jy[thread_num], tby, tby, 0, 0, jy->nComp());
     (*jz)[pti].lockAdd(local_jz[thread_num], tbz, tbz, 0, 0, jz->nComp());
+    // CPU, tiling: atomicAdd local_S<xyz> into S<xyz>
+    (*Sx)[pti].lockAdd(local_Sx[thread_num], tbx, tbx, 0, 0, Sx->nComp());
+    (*Sy)[pti].lockAdd(local_Sy[thread_num], tby, tby, 0, 0, Sy->nComp());
+    (*Sz)[pti].lockAdd(local_Sz[thread_num], tbz, tbz, 0, 0, Sz->nComp());
     WARPX_PROFILE_VAR_STOP(blp_accumulate);
 #endif
 }
