@@ -13,8 +13,6 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from mpi4py import MPI as mpi
-
 import openpmd_api as io
 from mpi4py import MPI as mpi
 
@@ -344,7 +342,7 @@ class PlasmaCylinderCompression(object):
                 period=self.diag_steps,
                 species=[self.ions],
                 data_list=["ux", "uy", "uz", "x", "z", "weighting"],
-                warpx_format='plotfile',
+                warpx_format="plotfile",
             )
             simulation.add_diagnostic(particle_diag)
         field_diag = picmi.FieldDiagnostic(
@@ -352,7 +350,7 @@ class PlasmaCylinderCompression(object):
             grid=self.grid,
             period=self.diag_steps,
             data_list=["B", "E", "rho", "divB", "T_ions", "J", "J_displacement"],
-            warpx_format='plotfile',
+            warpx_format="plotfile",
         )
         simulation.add_diagnostic(field_diag)
 
