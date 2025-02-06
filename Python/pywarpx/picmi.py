@@ -1977,14 +1977,15 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                 ),
             )
             for field_name, field_dict in self.A_external.items():
-                if "read_from_file" in field_dict.keys() and field_dict["read_from_file"]:
+                if (
+                    "read_from_file" in field_dict.keys()
+                    and field_dict["read_from_file"]
+                ):
                     pywarpx.external_vector_potential.__setattr__(
-                        f"{field_name}.read_from_file",
-                        field_dict["read_from_file"]
+                        f"{field_name}.read_from_file", field_dict["read_from_file"]
                     )
                     pywarpx.external_vector_potential.__setattr__(
-                        f"{field_name}.path",
-                        field_dict["path"]
+                        f"{field_name}.path", field_dict["path"]
                     )
                 else:
                     pywarpx.external_vector_potential.__setattr__(

@@ -16,6 +16,7 @@ import numpy as np
 from mpi4py import MPI as mpi
 
 import openpmd_api as io
+from mpi4py import MPI as mpi
 
 from pywarpx import fields, picmi
 
@@ -29,11 +30,11 @@ simulation = picmi.Simulation(warpx_serialize_initial_conditions=True, verbose=F
 class PlasmaCylinderCompression(object):
     # B0 is chosen with all other quantities scaled by it
     n0 = 1e20
-    T_i = 10 # eV
+    T_i = 10  # eV
     T_e = 0
-    p0 = n0*constants.q_e*T_i
+    p0 = n0 * constants.q_e * T_i
 
-    B0 = np.sqrt(2*constants.mu0*p0)  # Initial magnetic field strength (T)
+    B0 = np.sqrt(2 * constants.mu0 * p0)  # Initial magnetic field strength (T)
 
     # Do a 2x uniform B-field compression
     dB = B0
@@ -46,8 +47,8 @@ class PlasmaCylinderCompression(object):
     delta_p = 0.025
 
     # Domain parameters
-    LX = 2.*R_c*1.05  # m
-    LY = 2.*R_c*1.05
+    LX = 2.0 * R_c * 1.05  # m
+    LY = 2.0 * R_c * 1.05
     LZ = 0.5  # m
 
     LT = 20  # ion cyclotron periods
@@ -65,7 +66,15 @@ class PlasmaCylinderCompression(object):
     substeps = 20
 
     def Bz(self, r):
-        return np.sqrt(self.B0**2 - 2.*constants.mu0*self.n0*constants.q_e*self.T_i/(1. + np.exp((r - self.R_p)/self.delta_p)))
+        return np.sqrt(
+            self.B0**2
+            - 2.0
+            * constants.mu0
+            * self.n0
+            * constants.q_e
+            * self.T_i
+            / (1.0 + np.exp((r - self.R_p) / self.delta_p))
+        )
 
     def __init__(self, test, verbose):
         self.test = test
@@ -75,23 +84,22 @@ class PlasmaCylinderCompression(object):
         self.Ly = self.LY
         self.Lz = self.LZ
 
-        self.DX = self.LX/self.NX
-        self.DY = self.LY/self.NY
-        self.DZ = self.LZ/self.NZ
+        self.DX = self.LX / self.NX
+        self.DY = self.LY / self.NY
+        self.DZ = self.LZ / self.NZ
 
         if comm.rank == 0:
             # Write uniform compression dataset to OpenPMD to exercise reading openPMD data
             # for the time varying external fields
-            xvec = np.linspace(-self.LX, self.LX, num=2*self.NX)
-            yvec = np.linspace(-self.LY,self.LY, num=2*self.NY)
-            zvec = np.linspace(-self.LZ, self.LZ, num=2*self.NZ)
-            XM, YM, ZM = np.meshgrid(xvec, yvec, zvec, indexing='ij')
+            xvec = np.linspace(-self.LX, self.LX, num=2 * self.NX)
+            yvec = np.linspace(-self.LY, self.LY, num=2 * self.NY)
+            zvec = np.linspace(-self.LZ, self.LZ, num=2 * self.NZ)
+            XM, YM, ZM = np.meshgrid(xvec, yvec, zvec, indexing="ij")
 
             RM = np.sqrt(XM**2 + YM**2)
-            
 
-            Ax_data = -0.5*YM*self.dB
-            Ay_data = 0.5*XM*self.dB
+            Ax_data = -0.5 * YM * self.dB
+            Ay_data = 0.5 * XM * self.dB
             Az_data = np.zeros_like(RM)
 
             # Write vector potential to file to exercise field loading via OPenPMD
@@ -105,34 +113,27 @@ class PlasmaCylinderCompression(object):
             A.grid_unit_SI = 1.0
             A.axis_labels = ["x", "y", "z"]
             A.data_order = "C"
-            A.unit_dimension = {io.Unit_Dimension.M: 1.0,
-                                io.Unit_Dimension.T: -2.0,
-                                io.Unit_Dimension.I: -1.0,
-                                io.Unit_Dimension.L: -1.0}
+            A.unit_dimension = {
+                io.Unit_Dimension.M: 1.0,
+                io.Unit_Dimension.T: -2.0,
+                io.Unit_Dimension.I: -1.0,
+                io.Unit_Dimension.L: -1.0,
+            }
 
             Ax = A["x"]
             Ay = A["y"]
             Az = A["z"]
 
-            Ax.position = [0., 0.]
-            Ay.position = [0., 0.]
-            Az.position = [0., 0.]
+            Ax.position = [0.0, 0.0]
+            Ay.position = [0.0, 0.0]
+            Az.position = [0.0, 0.0]
 
-            Ax_dataset = io.Dataset(
-                Ax_data.dtype,
-                Ax_data.shape
-                )
+            Ax_dataset = io.Dataset(Ax_data.dtype, Ax_data.shape)
 
-            Ay_dataset = io.Dataset(
-                Ay_data.dtype,
-                Ay_data.shape
-                )
-            
-            Az_dataset = io.Dataset(
-                Az_data.dtype,
-                Az_data.shape
-                )
-            
+            Ay_dataset = io.Dataset(Ay_data.dtype, Ay_data.shape)
+
+            Az_dataset = io.Dataset(Az_data.dtype, Az_data.shape)
+
             Ax.reset_dataset(Ax_dataset)
             Ay.reset_dataset(Ay_dataset)
             Az.reset_dataset(Az_dataset)
@@ -169,8 +170,8 @@ class PlasmaCylinderCompression(object):
                 f"\tTi = {self.T_i:.1f} eV\n"
                 f"\tn0 = {self.n0:.1e} m^-3\n"
                 f"\tB0 = {self.B0:.2f} T\n",
-                f"\tDX/DY = {self.DX/self.l_i:.3f} c/w_pi\n"
-                f"\tDZ = {self.DZ/self.l_i:.3f} c/w_pi\n"
+                f"\tDX/DY = {self.DX / self.l_i:.3f} c/w_pi\n"
+                f"\tDZ = {self.DZ / self.l_i:.3f} c/w_pi\n",
             )
             print(
                 f"Plasma parameters:\n"
@@ -181,7 +182,7 @@ class PlasmaCylinderCompression(object):
             )
             print(
                 f"Numerical parameters:\n"
-                f"\tdz = {self.Lz/self.NZ:.1e} m\n"
+                f"\tdz = {self.Lz / self.NZ:.1e} m\n"
                 f"\tdt = {self.dt:.1e} s\n"
                 f"\tdiag steps = {self.diag_steps:d}\n"
                 f"\ttotal steps = {self.total_steps:d}\n"
@@ -221,14 +222,16 @@ class PlasmaCylinderCompression(object):
         By = fields.ByFPExternalWrapper(include_ghosts=False)
         Bz = fields.BzFPExternalWrapper(include_ghosts=False)
 
-        Bx[:,:] = 0.
-        By[:,:] = 0.
-        
-        XM, YM, ZM = np.meshgrid(Bz.mesh('x'), Bz.mesh('y'), Bz.mesh('z'), indexing='ij')
-        
+        Bx[:, :] = 0.0
+        By[:, :] = 0.0
+
+        XM, YM, ZM = np.meshgrid(
+            Bz.mesh("x"), Bz.mesh("y"), Bz.mesh("z"), indexing="ij"
+        )
+
         RM = np.sqrt(XM**2 + YM**2)
 
-        Bz[:,:] = self.Bz(RM)
+        Bz[:, :] = self.Bz(RM)
         comm.Barrier()
 
     def setup_run(self):
@@ -241,8 +244,8 @@ class PlasmaCylinderCompression(object):
         # Create grid
         self.grid = picmi.Cartesian3DGrid(
             number_of_cells=[self.NX, self.NY, self.NZ],
-            lower_bound=[-0.5*self.Lx, -0.5*self.Ly, -0.5*self.Lz],
-            upper_bound=[ 0.5*self.Lx,  0.5*self.Ly,  0.5*self.Lz],
+            lower_bound=[-0.5 * self.Lx, -0.5 * self.Ly, -0.5 * self.Lz],
+            upper_bound=[0.5 * self.Lx, 0.5 * self.Ly, 0.5 * self.Lz],
             lower_boundary_conditions=["dirichlet", "dirichlet", "periodic"],
             upper_boundary_conditions=["dirichlet", "dirichlet", "periodic"],
             lower_boundary_conditions_particles=["absorbing", "absorbing", "periodic"],
@@ -261,7 +264,7 @@ class PlasmaCylinderCompression(object):
         #######################################################################
         # External Field definition. Sigmoid starting around 2.5 us
         A_ext = {
-            'uniform': {
+            "uniform": {
                 "read_from_file": True,
                 "path": "Afield.h5",
                 "A_time_external_function": "1/(1+exp(5*(1-(t-t0_ramp)*sqrt(2)/tau_ramp)))",
@@ -273,22 +276,21 @@ class PlasmaCylinderCompression(object):
             gamma=1.0,
             Te=self.T_e,
             n0=self.n0,
-            n_floor=0.05*self.n0,
+            n_floor=0.05 * self.n0,
             plasma_resistivity="if(rho<=rho_floor,eta_v,eta_p)",
             plasma_hyper_resistivity=1e-8,
             substeps=self.substeps,
             A_external=A_ext,
             tau_ramp=20e-6,
             t0_ramp=5e-6,
-            rho_floor=0.01*self.n0*constants.q_e,
+            rho_floor=0.01 * self.n0 * constants.q_e,
             eta_p=1e-8,
-            eta_v=1e-3
+            eta_v=1e-3,
         )
         simulation.solver = self.solver
 
         simulation.embedded_boundary = picmi.EmbeddedBoundary(
-            implicit_function="(x**2+y**2-R_w**2)",
-            R_w=self.R_c
+            implicit_function="(x**2+y**2-R_w**2)", R_w=self.R_c
         )
 
         # Add field loader callback
@@ -296,37 +298,33 @@ class PlasmaCylinderCompression(object):
             load_from_python=self.load_fields,
             warpx_do_divb_cleaning_external=True,
             load_B=True,
-            load_E=False
+            load_E=False,
         )
         simulation.add_applied_field(B_ext)
 
         #######################################################################
         # Particle types setup                                                #
         #######################################################################
-        r_omega = '(sqrt(x*x+y*y)*q_e*B0/m_p)'
-        dlnndr = '((-1/delta_p)/(1+exp(-(sqrt(x*x+y*y)-R_p)/delta_p)))'
-        vth = f'0.5*(-{r_omega}+sqrt({r_omega}*{r_omega}+4*q_e*T_i*{dlnndr}/m_p))'
+        r_omega = "(sqrt(x*x+y*y)*q_e*B0/m_p)"
+        dlnndr = "((-1/delta_p)/(1+exp(-(sqrt(x*x+y*y)-R_p)/delta_p)))"
+        vth = f"0.5*(-{r_omega}+sqrt({r_omega}*{r_omega}+4*q_e*T_i*{dlnndr}/m_p))"
 
-        momentum_expr = [
-            f'y*{vth}',
-            f'-x*{vth}',
-            '0'
-        ]
+        momentum_expr = [f"y*{vth}", f"-x*{vth}", "0"]
 
         self.ions = picmi.Species(
             name="ions",
             charge="q_e",
             mass=self.M,
             initial_distribution=picmi.AnalyticDistribution(
-                density_expression=f"n0_p/(1+exp((sqrt(x*x+y*y)-R_p)/delta_p))",
+                density_expression="n0_p/(1+exp((sqrt(x*x+y*y)-R_p)/delta_p))",
                 momentum_expressions=momentum_expr,
-                warpx_momentum_spread_expressions=[f'{str(self.vi_th)}']*3,
-                warpx_density_min=0.01*self.n0,
+                warpx_momentum_spread_expressions=[f"{str(self.vi_th)}"] * 3,
+                warpx_density_min=0.01 * self.n0,
                 R_p=self.R_p,
                 delta_p=self.delta_p,
                 n0_p=self.n0,
                 B0=self.B0,
-                T_i=self.T_i
+                T_i=self.T_i,
             ),
         )
         simulation.add_species(
