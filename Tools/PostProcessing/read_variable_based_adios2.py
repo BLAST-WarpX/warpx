@@ -60,7 +60,6 @@ def get_particle_data(
                 n_iterations += 1
 
     data = np.zeros((len(variables), n_iterations, n_particles))
-    # really need to check that it works before commit
 
     with Stream(diag_path, "r") as s:
         for _ in s.steps():
