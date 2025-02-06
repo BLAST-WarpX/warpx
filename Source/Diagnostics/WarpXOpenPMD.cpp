@@ -578,6 +578,7 @@ for (const auto & particle_diag : particle_diags) {
         real_names[tmp.GetRealCompIndex("theta")] = "position_y";
 #endif
         real_names[tmp.GetRealCompIndex("z")] = "position_z";
+        real_names[tmp.GetRealCompIndex("w")] = "weighting";
         real_names[tmp.GetRealCompIndex("ux")] = "momentum_x";
         real_names[tmp.GetRealCompIndex("uy")] = "momentum_y";
         real_names[tmp.GetRealCompIndex("uz")] = "momentum_z";
