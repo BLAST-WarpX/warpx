@@ -8,7 +8,7 @@ from scipy.signal import hilbert
 
 c = 3e8
 lambda_laser = 800e-9
-T_laser = lambda_laser / c 
+T_laser = lambda_laser / c
 
 E_max = 3.26e10
 T_peak = 10e-15
