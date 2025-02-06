@@ -209,10 +209,11 @@ FlushFormatCheckpoint::CheckpointParticles (
             write_real_comps.push_back(1);
         }
 
-        // get the names of the real comps
-        //   note: skips the mandatory AMREX_SPACEDIM positions for pure SoA
+        // get the names of the extra real comps
         real_names.resize(pc->NumRealComps() - AMREX_SPACEDIM);
         write_real_comps.resize(pc->NumRealComps() - AMREX_SPACEDIM);
+
+        // note, skip the required compnent names here
         auto rnames = pc->GetRealSoANames();
         for (std::size_t index = PIdx::nattribs; index < rnames.size(); ++index) {
             int const i = index - AMREX_SPACEDIM;
