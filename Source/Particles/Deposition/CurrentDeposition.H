@@ -441,7 +441,8 @@ void doDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPosition,
                          ion_lev is a null pointer.
  * \param jx_fab,jy_fab,jz_fab FArrayBox of current density, either full array or tile.
  * \param np_to_deposit Number of particles for which current is deposited.
- * \param dinv          3D cell size inverse
+ * \param dt            Time step for particle.
+ * \param dinv          3D cell size inverse.
  * \param xyzmin        Physical lower bounds of domain.
  * \param lo            Index lower bounds of domain.
  * \param qs            Species charge.
@@ -467,6 +468,7 @@ void doJandSigmaDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPos
                                 const amrex::Array4<amrex::Real const>& By_arr,
                                 const amrex::Array4<amrex::Real const>& Bz_arr,
                                 const long np_to_deposit,
+                                const amrex::Real dt,
                                 const amrex::XDim3 & dinv,
                                 const amrex::XDim3 & xyzmin,
                                 const amrex::Dim3 lo,
@@ -502,6 +504,13 @@ void doJandSigmaDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPos
                                 dinv, xyzmin, lo );
 
             constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
+
+            // convert B on particle to normalized cyclotron units with dt/2.0
+            const amrex::ParticleReal gamma_bar = std::sqrt(1._prt + (uxp[ip]*uxp[ip] + uyp[ip]*uyp[ip] + uzp[ip]*uzp[ip])*inv_c2);
+            const amrex::Real alpha = qs/ms*0.5*dt/gamma_bar;
+            Bxp *= alpha;
+            Byp *= alpha;
+            Bzp *= alpha;
 
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
             // The uxp,uyp,uzp are the velocities at time level n+1/2
