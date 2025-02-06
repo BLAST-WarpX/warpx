@@ -428,6 +428,95 @@ void doDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPosition,
 }
 
 /**
+ * \brief J and mass matrix direct deposition for thread thread_num for the implicit scheme
+ * \tparam depos_order deposition order
+ * \param GetPosition  A functor for returning the particle position.
+ * \param wp           Pointer to array of particle weights.
+ * \param uxp_n,uyp_n,uzp_n  Pointer to arrays of particle momentum at time n.
+ * \param uxp,uyp,uzp  Pointer to arrays of particle momentum at time n+1/2.
+ * \param ion_lev      Pointer to array of particle ionization level. This is
+                         required to have the charge of each macroparticle
+                         since q is a scalar. For non-ionizable species,
+                         ion_lev is a null pointer.
+ * \param jx_fab,jy_fab,jz_fab FArrayBox of current density, either full array or tile.
+ * \param np_to_deposit Number of particles for which current is deposited.
+ * \param dinv         3D cell size inverse
+ * \param xyzmin       Physical lower bounds of domain.
+ * \param lo           Index lower bounds of domain.
+ * \param q            species charge.
+ * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
+ */
+template <int depos_order>
+void doJandSigmaDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPosition,
+                                const amrex::ParticleReal * const wp,
+                                const amrex::ParticleReal * const uxp_n,
+                                const amrex::ParticleReal * const uyp_n,
+                                const amrex::ParticleReal * const uzp_n,
+                                const amrex::ParticleReal * const uxp,
+                                const amrex::ParticleReal * const uyp,
+                                const amrex::ParticleReal * const uzp,
+                                amrex::FArrayBox& jx_fab,
+                                amrex::FArrayBox& jy_fab,
+                                amrex::FArrayBox& jz_fab,
+                                const amrex::Array4<amrex::Real>& Sx_arr,
+                                const amrex::Array4<amrex::Real>& Sy_arr,
+                                const amrex::Array4<amrex::Real>& Sz_arr,
+                                const amrex::Array4<amrex::Real const>& Bx_arr,
+                                const amrex::Array4<amrex::Real const>& By_arr,
+                                const amrex::Array4<amrex::Real const>& Bz_arr,
+                                const long np_to_deposit,
+                                const amrex::XDim3 & dinv,
+                                const amrex::XDim3 & xyzmin,
+                                const amrex::Dim3 lo,
+                                const amrex::Real q,
+                                [[maybe_unused]]const int n_rz_azimuthal_modes)
+{
+    using namespace amrex::literals;
+
+    const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
+
+    amrex::Array4<amrex::Real> const& jx_arr = jx_fab.array();
+    amrex::Array4<amrex::Real> const& jy_arr = jy_fab.array();
+    amrex::Array4<amrex::Real> const& jz_arr = jz_fab.array();
+    amrex::IntVect const jx_type = jx_fab.box().type();
+    amrex::IntVect const jy_type = jy_fab.box().type();
+    amrex::IntVect const jz_type = jz_fab.box().type();
+
+    // Loop over particles and deposit into jx_fab, jy_fab and jz_fab
+    amrex::ParallelFor(
+            np_to_deposit,
+            [=] AMREX_GPU_DEVICE (long ip) {
+            amrex::ParticleReal xp_nph, yp_nph, zp_nph;
+            GetPosition(ip, xp_nph, yp_nph, zp_nph);
+
+            constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
+
+            // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
+            // The uxp,uyp,uzp are the velocities at time level n+1/2
+            const amrex::ParticleReal uxp_np1 = 2._prt*uxp[ip] - uxp_n[ip];
+            const amrex::ParticleReal uyp_np1 = 2._prt*uyp[ip] - uyp_n[ip];
+            const amrex::ParticleReal uzp_np1 = 2._prt*uzp[ip] - uzp_n[ip];
+            const amrex::ParticleReal gamma_n = std::sqrt(1._prt + (uxp_n[ip]*uxp_n[ip] + uyp_n[ip]*uyp_n[ip] + uzp_n[ip]*uzp_n[ip])*inv_c2);
+            const amrex::ParticleReal gamma_np1 = std::sqrt(1._prt + (uxp_np1*uxp_np1 + uyp_np1*uyp_np1 + uzp_np1*uzp_np1)*inv_c2);
+            const amrex::ParticleReal gaminv = 2.0_prt/(gamma_n + gamma_np1);
+
+            const amrex::Real vx  = uxp[ip]*gaminv;
+            const amrex::Real vy  = uyp[ip]*gaminv;
+            const amrex::Real vz  = uzp[ip]*gaminv;
+
+            amrex::Real wq  = q*wp[ip];
+
+            const amrex::Real relative_time = 0._rt;
+            doDepositionShapeNKernel<depos_order>(xp_nph, yp_nph, zp_nph, wq, vx, vy, vz, jx_arr, jy_arr, jz_arr,
+                                                  jx_type, jy_type, jz_type,
+                                                  relative_time, dinv, xyzmin,
+                                                  invvol, lo, n_rz_azimuthal_modes);
+
+        }
+    );
+}
+
+/**
  * \brief Current Deposition for thread thread_num using shared memory
  * \tparam depos_order deposition order
  * \param GetPosition  A functor for returning the particle position.

@@ -997,9 +997,6 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
     Array4<Real> const& jy_arr = jy->array(pti);
     Array4<Real> const& jz_arr = jz->array(pti);
 
-    auto & Sx_fab = Sx->get(pti);
-    auto & Sy_fab = Sy->get(pti);
-    auto & Sz_fab = Sz->get(pti);
     Array4<Real> const& Sx_arr = Sx->array(pti);
     Array4<Real> const& Sy_arr = Sy->array(pti);
     Array4<Real> const& Sz_arr = Sz->array(pti);
@@ -1034,9 +1031,6 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
     local_Sx[thread_num].setVal(0.0);
     local_Sy[thread_num].setVal(0.0);
     local_Sz[thread_num].setVal(0.0);
-    auto & Sx_fab = local_Sx[thread_num];
-    auto & Sy_fab = local_Sy[thread_num];
-    auto & Sz_fab = local_Sz[thread_num];
     Array4<Real> const& Sx_arr = local_Sx[thread_num].array();
     Array4<Real> const& Sy_arr = local_Sy[thread_num].array();
     Array4<Real> const& Sz_arr = local_Sz[thread_num].array();
@@ -1064,9 +1058,9 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
     }
 
     // Get magnetic field arrays
-    amrex::Array4<const amrex::Real> const& Bx_arr = Bx->array();
-    amrex::Array4<const amrex::Real> const& By_arr = By->array();
-    amrex::Array4<const amrex::Real> const& Bz_arr = Bz->array();
+    const amrex::Array4<const amrex::Real>& Bx_arr = Bx->array();
+    const amrex::Array4<const amrex::Real>& By_arr = By->array();
+    const amrex::Array4<const amrex::Real>& Bz_arr = Bz->array();
 
     WARPX_PROFILE_VAR_START(blp_deposit);
 
@@ -1111,21 +1105,21 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
         }
     } else { // Direct deposition
         if        (WarpX::nox == 1){
-            doDepositionShapeNImplicit<1>(
+            doJandSigmaDepositionShapeNImplicit<1>(
                 GetPosition, wp.dataPtr() + offset,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                ion_lev,
-                jx_fab, jy_fab, jz_fab, np_to_deposit, dinv,
+                jx_fab, jy_fab, jz_fab, Sx_arr, Sy_arr, Sz_arr,
+                Bx_arr, By_arr, Bz_arr, np_to_deposit, dinv,
                 xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
         } else if (WarpX::nox == 2){
-            doDepositionShapeNImplicit<2>(
+            doJandSigmaDepositionShapeNImplicit<2>(
                 GetPosition, wp.dataPtr() + offset,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                ion_lev,
-                jx_fab, jy_fab, jz_fab, np_to_deposit, dinv,
-                        xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
+                jx_fab, jy_fab, jz_fab, Sx_arr, Sy_arr, Sz_arr,
+                Bx_arr, By_arr, Bz_arr, np_to_deposit, dinv,
+                xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
         } else {
             WARPX_ABORT_WITH_MESSAGE("mass matrices only used for shape = 1 and 2.");
         }
