@@ -422,14 +422,7 @@ public:
      * Get pointer to the amrex::MultiFab containing the dotMask for the specified field
      */
     [[nodiscard]] const amrex::iMultiFab*
-    getFieldDotMaskPointer (warpx::fields::FieldType field_type, int lev, int dir) const;
-
-    /**
-     * \brief
-     * Set the dotMask container
-     */
-    void SetDotMask( std::unique_ptr<amrex::iMultiFab>& field_dotMask,
-                     std::string const & field_name, int lev, int dir ) const;
+    getFieldDotMaskPointer (warpx::fields::FieldType field_type, int lev, ablastr::fields::Direction dir) const;
 
     [[nodiscard]] bool DoPML () const {return do_pml;}
     [[nodiscard]] bool DoFluidSpecies () const {return do_fluid_species;}

@@ -222,6 +222,27 @@ namespace
                 ordered_coeffs[i] = unordered_coeffs[i-n];
             }
         }
+
+    /**
+     * \brief
+     * Set the dotMask container
+     */
+    void SetDotMask( std::unique_ptr<amrex::iMultiFab>& field_dotMask,
+                     ablastr::fields::ConstScalarField const& field,
+                     amrex::Periodicity const& periodicity)
+
+    {
+        // Define the dot mask for this field_type needed to properly compute dotProduct()
+        // for field values that have shared locations on different MPI ranks
+        if (field_dotMask != nullptr) { return; }
+
+        const auto& this_ba = field->boxArray();
+        const auto tmp = amrex::MultiFab{
+            this_ba, field->DistributionMap(),
+            1, 0, amrex::MFInfo().SetAlloc(false)};
+
+        field_dotMask = tmp.OwnerMask(periodicity);
+    }
 }
 
 void WarpX::MakeWarpX ()
@@ -3405,40 +3426,25 @@ WarpX::MakeDistributionMap (int lev, amrex::BoxArray const& ba)
 }
 
 const amrex::iMultiFab*
-WarpX::getFieldDotMaskPointer ( FieldType field_type, int lev, int dir ) const
+WarpX::getFieldDotMaskPointer ( FieldType field_type, int lev, ablastr::fields::Direction dir ) const
 {
+    const auto periodicity = Geom(lev).periodicity();
     switch(field_type)
     {
         case FieldType::Efield_fp :
-            SetDotMask( Efield_dotMask[lev][dir], "Efield_fp", lev, dir );
+            ::SetDotMask( Efield_dotMask[lev][dir], m_fields.get("Efield_fp", dir, lev), periodicity);
             return Efield_dotMask[lev][dir].get();
         case FieldType::Bfield_fp :
-            SetDotMask( Bfield_dotMask[lev][dir], "Bfield_fp", lev, dir );
+            ::SetDotMask( Bfield_dotMask[lev][dir], m_fields.get("Bfield_fp", dir, lev), periodicity);
             return Bfield_dotMask[lev][dir].get();
         case FieldType::vector_potential_fp :
-            SetDotMask( Afield_dotMask[lev][dir], "vector_potential_fp", lev, dir );
+            ::SetDotMask( Afield_dotMask[lev][dir], m_fields.get("vector_potential_fp", dir, lev), periodicity);
             return Afield_dotMask[lev][dir].get();
         case FieldType::phi_fp :
-            SetDotMask( phi_dotMask[lev], "phi_fp", lev, 0 );
+            ::SetDotMask( phi_dotMask[lev], m_fields.get("phi_fp", dir, lev), periodicity);
             return phi_dotMask[lev].get();
         default:
             WARPX_ABORT_WITH_MESSAGE("Invalid field type for dotMask");
             return Efield_dotMask[lev][dir].get();
     }
-}
-
-void WarpX::SetDotMask( std::unique_ptr<amrex::iMultiFab>& field_dotMask,
-                        std::string const & field_name, int lev, int dir ) const
-{
-    // Define the dot mask for this field_type needed to properly compute dotProduct()
-    // for field values that have shared locations on different MPI ranks
-    if (field_dotMask != nullptr) { return; }
-
-    ablastr::fields::ConstVectorField const& this_field = m_fields.get_alldirs(field_name,lev);
-    const amrex::BoxArray& this_ba = this_field[dir]->boxArray();
-    const amrex::MultiFab tmp( this_ba, this_field[dir]->DistributionMap(),
-                               1, 0, amrex::MFInfo().SetAlloc(false) );
-    const amrex::Periodicity& period = Geom(lev).periodicity();
-    field_dotMask = tmp.OwnerMask(period);
-
 }
