@@ -1653,6 +1653,7 @@ void doGatherPicnicShapeN (
 
 #endif
 
+<<<<<<< HEAD
     // Gather magnetic field
     const int depos_order_perp = 1;
     const int depos_order_para = 1;
@@ -1662,6 +1663,186 @@ void doGatherPicnicShapeN (
                                     Bx_arr, By_arr, Bz_arr,
                                     Bx_type, By_type, Bz_type,
                                     dinv, xyzmin, lo, n_rz_azimuthal_modes );
+=======
+/**
+ * \brief Magnetic field gather for a single particle
+ *
+ * \param xp_nph,yp_nph,zp_nph    Particle position coordinates at half time level (n + half)
+ * \param Bxp,Byp,Bzp             Magnetic field on particles.
+ * \param bx_arr,by_arr,bz_arr    Array4 of the magnetic field, either full array or tile.
+ * \param dinv                    3D cell size inverse
+ * \param xyzmin                  The lower bounds of the domain
+ * \param lo                      Index lower bounds of domain.
+ */
+template <int depos_order>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void doGatherBShapeN (
+                     [[maybe_unused]] const amrex::ParticleReal xp_nph,
+                     [[maybe_unused]] const amrex::ParticleReal yp_nph,
+                     const amrex::ParticleReal zp_nph,
+                     amrex::ParticleReal& Bxp,
+                     amrex::ParticleReal& Byp,
+                     amrex::ParticleReal& Bzp,
+                     amrex::Array4<amrex::Real const> const& Bx_arr,
+                     amrex::Array4<amrex::Real const> const& By_arr,
+                     amrex::Array4<amrex::Real const> const& Bz_arr,
+                     const amrex::XDim3 & dinv,
+                     const amrex::XDim3 & xyzmin,
+                     const amrex::Dim3& lo )
+{
+    using namespace amrex;
+
+    // computes current and old position in grid units
+#if defined(WARPX_DIM_RZ)
+    amrex::Real const xp_mid = xp_nph;
+    amrex::Real const yp_mid = yp_nph;
+    amrex::Real const rp_mid = (rp_new + rp_old)/2._rt;
+    amrex::Real costheta_mid, sintheta_mid;
+    if (rp_mid > 0._rt) {
+        costheta_mid = xp_mid/rp_mid;
+        sintheta_mid = yp_mid/rp_mid;
+    } else {
+        costheta_mid = 1._rt;
+        sintheta_mid = 0._rt;
+    }
+    // Keep these double to avoid bug in single precision
+    double const x_bar = (rp_mid - xyzmin.x)*dinv.x;
+#elif !defined(WARPX_DIM_1D_Z)
+    // Keep these double to avoid bug in single precision
+    double const x_bar = (xp_nph - xyzmin.x)*dinv.x;
+#endif
+#if defined(WARPX_DIM_3D)
+    // Keep these double to avoid bug in single precision
+    double const y_bar = (yp_nph - xyzmin.y)*dinv.y;
+#endif
+    // Keep these double to avoid bug in single precision
+    double const z_bar = (zp_nph - xyzmin.z)*dinv.z;
+
+#if defined(WARPX_DIM_3D)
+
+    // gather magnetic field
+    const Compute_shape_factor< depos_order > compute_shape_factor_B;
+    double sz_bar_node[depos_order+1] = {0.};
+    double sz_bar_cell[depos_order+1] = {0.};
+    const int k_bar_node = compute_shape_factor_B(sz_bar_node, z_bar);
+    const int k_bar_cell = compute_shape_factor_B(sz_bar_cell, z_bar-0.5);
+    double sy_bar_node[depos_order+1] = {0.};
+    double sy_bar_cell[depos_order+1] = {0.};
+    const int j_bar_node = compute_shape_factor_B(sy_bar_node, y_bar);
+    const int j_bar_cell = compute_shape_factor_B(sy_bar_cell, y_bar-0.5);
+    double sx_bar_node[depos_order+1] = {0.};
+    double sx_bar_cell[depos_order+1] = {0.};
+    const int i_bar_node = compute_shape_factor_B(sx_bar_node, x_bar);
+    const int i_bar_cell = compute_shape_factor_B(sx_bar_cell, x_bar-0.5);
+
+    amrex::Real weight;
+    for (int i=0; i<=depos_order; i++) {
+        for (int j=0; j<=depos_order; j++) {
+            for (int k=0; k<=depos_order; k++) {
+                weight = static_cast<amrex::Real>(sx_bar_node[i]*sy_bar_cell[j]*sz_bar_cell[k]);
+                Bxp += Bx_arr(lo.x+i_bar_node+i, lo.y+j_bar_cell+j, lo.z+k_bar_cell+k)*weight;
+                //
+                weight = static_cast<amrex::Real>(sx_bar_cell[i]*sy_bar_node[j]*sz_bar_cell[k]);
+                Byp += By_arr(lo.x+i_bar_cell+i, lo.y+j_bar_node+j, lo.z+k_bar_cell+k)*weight;
+                //
+                weight = static_cast<amrex::Real>(sx_bar_cell[i]*sy_bar_cell[j]*sz_bar_node[k]);
+                Bzp += Bz_arr(lo.x+i_bar_cell+i, lo.y+j_bar_cell+j, lo.z+k_bar_node+k)*weight;
+            }
+        }
+    }
+
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+
+    // gather magnetic field and out-of-plane electric field
+    const Compute_shape_factor< depos_order > compute_shape_factor_B;
+    double sz_bar_node[depos_order+1] = {0.};
+    double sz_bar_cell[depos_order+1] = {0.};
+    const int k_bar_node = compute_shape_factor_B(sz_bar_node, z_bar);
+    const int k_bar_cell = compute_shape_factor_B(sz_bar_cell, z_bar-0.5);
+    double sx_bar_node[depos_order+1] = {0.};
+    double sx_bar_cell[depos_order+1] = {0.};
+    const int i_bar_node = compute_shape_factor_B(sx_bar_node, x_bar);
+    const int i_bar_cell = compute_shape_factor_B(sx_bar_cell, x_bar-0.5);
+
+    for (int i=0; i<=depos_order; i++) {
+        for (int k=0; k<=depos_order; k++) {
+            const auto weight_Bz = static_cast<amrex::Real>(sx_bar_cell[i]*sz_bar_node[k]);
+            Bzp += Bz_arr(lo.x+i_bar_cell+i, lo.y+k_bar_node+k, 0, 0)*weight_Bz;
+            //
+            const auto weight_Bx = static_cast<amrex::Real>(sx_bar_node[i]*sz_bar_cell[k]);
+            Bxp += Bx_arr(lo.x+i_bar_node+i, lo.y+k_bar_cell+k, 0, 0)*weight_Bx;
+            //
+            const auto weight_By = static_cast<amrex::Real>(sx_bar_cell[i]*sz_bar_cell[k]);
+            Byp += By_arr(lo.x+i_bar_cell+i, lo.y+k_bar_cell+k, 0, 0)*weight_By;
+        }
+    }
+
+#ifdef WARPX_DIM_RZ
+
+    // Convert Exp and Eyp (which are actually Er and Etheta) to Ex and Ey
+    const amrex::Real Bxp_save = Bxp;
+    Bxp = costheta_mid*Bxp - sintheta_mid*Byp;
+    Byp = costheta_mid*Byp + sintheta_mid*Bxp_save;
+
+#endif
+
+#elif defined(WARPX_DIM_1D_Z)
+
+    // gather magnetic field
+    const Compute_shape_factor< depos_order > compute_shape_factor_B;
+    double sz_bar_node[depos_order+1] = {0.};
+    double sz_bar_cell[depos_order+1] = {0.};
+    const int k_bar_node = compute_shape_factor_B(sz_bar_node, z_bar);
+    const int k_bar_cell = compute_shape_factor_B(sz_bar_cell, z_bar-0.5_rt);
+
+    amrex::Real weight;
+    for (int k=0; k<=depos_order; k++) {
+        weight = static_cast<amrex::Real>(sz_bar_node[k]);
+        Bzp += Bz_arr(lo.x+k_bar_node+k, 0, 0)*weight;
+        //
+        weight = static_cast<amrex::Real>(sz_bar_cell[k]);
+        Bxp += Bx_arr(lo.x+k_bar_cell+k, 0, 0)*weight;
+        Byp += By_arr(lo.x+k_bar_cell+k, 0, 0)*weight;
+    }
+
+#endif
+}
+
+/**
+ * \brief Field gather for particles
+ *
+ * \tparam depos_order         deposition order
+ * \tparam lower_in_v          lower shape order in parallel direction (Galerkin)
+ * \param getPosition          A functor for returning the particle position.
+ * \param getExternalEB        A functor for assigning the external E and B fields.
+ * \param Exp,Eyp,Ezp          Pointer to array of electric field on particles.
+ * \param Bxp,Byp,Bzp          Pointer to array of magnetic field on particles.
+ * \param exfab,eyfab,ezfab    Array4 of the electric field, either full array or tile.
+ * \param bxfab,byfab,bzfab    Array4 of the magnetic field, either full array or tile.
+ * \param np_to_gather         Number of particles for which field is gathered.
+ * \param dinv                 3D cell size inverse
+ * \param xyzmin               The lower bounds of the domain
+ * \param lo                   Index lower bounds of domain.
+ * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry
+ */
+template <int depos_order, int lower_in_v>
+void doGatherShapeN(const GetParticlePosition<PIdx>& getPosition,
+                    const GetExternalEBField& getExternalEB,
+                    amrex::ParticleReal * const Exp, amrex::ParticleReal * const Eyp,
+                    amrex::ParticleReal * const Ezp, amrex::ParticleReal * const Bxp,
+                    amrex::ParticleReal * const Byp, amrex::ParticleReal * const Bzp,
+                    amrex::FArrayBox const * const exfab,
+                    amrex::FArrayBox const * const eyfab,
+                    amrex::FArrayBox const * const ezfab,
+                    amrex::FArrayBox const * const bxfab,
+                    amrex::FArrayBox const * const byfab,
+                    amrex::FArrayBox const * const bzfab,
+                    const long np_to_gather,
+                    const amrex::XDim3 & dinv,
+                    const amrex::XDim3 & xyzmin,
+                    const amrex::Dim3 lo,
+                    const int n_rz_azimuthal_modes)
+{
 
 }
 
