@@ -350,20 +350,22 @@ web::MarkExtensionCells (
     using warpx::fields::FieldType;
 
 #ifdef WARPX_DIM_RZ
+    amrex::ignore_unused(cell_size, flag_info_face, flag_ext_face, b_field,
+        face_areas, edge_lengths, area_mod);
     return;
 #elif !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ)
     WARPX_ABORT_WITH_MESSAGE("MarkExtensionCells only implemented in 2D and 3D");
-#endif
+#else
 
     for (int idim = 0; idim < 3; ++idim) {
 
-#if defined(WARPX_DIM_XZ)
+#  if defined(WARPX_DIM_XZ)
         if (idim == 0 || idim == 2) {
             flag_info_face[idim]->setVal(0.);
             flag_ext_face[idim]->setVal(0.);
             continue;
         }
-#endif
+#  endif
         for (amrex::MFIter mfi(*b_field[idim]); mfi.isValid(); ++mfi) {
             auto* face_areas_idim_max_lev = face_areas[idim];
 
@@ -391,13 +393,13 @@ web::MarkExtensionCells (
                                                     lz(i, j, k) * dy, lz(i, j + 1, k) * dy});
                 }else if (idim == 1){
 
-#if defined(WARPX_DIM_XZ)
+#  if defined(WARPX_DIM_XZ)
                     S_stab = 0.5 * std::max({lx(i, j, k) * dz, lx(i, j + 1, k) * dz,
                                             lz(i, j, k) * dx, lz(i + 1, j, k) * dx});
-#else
+#  else
                     S_stab = 0.5 * std::max({lx(i, j, k) * dz, lx(i, j, k + 1) * dz,
                                             lz(i, j, k) * dx, lz(i + 1, j, k) * dx});
-#endif
+#  endif
                 }else {
                     S_stab = 0.5 * std::max({lx(i, j, k) * dy, lx(i, j + 1, k) * dy,
                                              ly(i, j, k) * dx, ly(i + 1, j, k) * dx});
@@ -429,6 +431,7 @@ web::MarkExtensionCells (
             });
         }
     }
+#endif
 }
 
 void
