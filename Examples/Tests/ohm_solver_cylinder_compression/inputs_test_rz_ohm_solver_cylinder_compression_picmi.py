@@ -39,7 +39,7 @@ class PlasmaCylinderCompression(object):
     # Flux Conserver radius
     R_c = 0.5
 
-    # Plasma Radius (These values match GS solution in gs_psi.csv)
+    # Plasma Radius (These values control the analytical GS solution)
     R_p = 0.25
     delta_p = 0.025
 
@@ -47,7 +47,7 @@ class PlasmaCylinderCompression(object):
     LR = R_c  # m
     LZ = 0.25 * R_c  # m
 
-    LT = 20  # ion cyclotron periods
+    LT = 10  # ion cyclotron periods
     DT = 1e-3  # ion cyclotron periods
 
     # Resolution parameters
@@ -271,6 +271,7 @@ class PlasmaCylinderCompression(object):
             plasma_resistivity="if(rho<=rho_floor,eta_v,eta_p)",
             plasma_hyper_resistivity=1e-8,
             substeps=self.substeps,
+            holmstrom_vacuum_region=True,
             A_external=A_ext,
             tau_ramp=20e-6,
             t0_ramp=5e-6,

@@ -33,6 +33,8 @@ void HybridPICModel::ReadParameters ()
     // of sub steps can be specified by the user (defaults to 50).
     utils::parser::queryWithParser(pp_hybrid, "substeps", m_substeps);
 
+    utils::parser::queryWithParser(pp_hybrid, "holmstrom_vacuum_region", m_holmstrom_vacuum_region);
+
     // The hybrid model requires an electron temperature, reference density
     // and exponent to be given. These values will be used to calculate the
     // electron pressure according to p = n0 * Te * (n/n0)^gamma

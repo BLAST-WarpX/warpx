@@ -48,13 +48,13 @@ class PlasmaCylinderCompression(object):
     LY = 2.0 * R_c * 1.05
     LZ = 0.5  # m
 
-    LT = 20  # ion cyclotron periods
+    LT = 10  # ion cyclotron periods
     DT = 1e-3  # ion cyclotron periods
 
     # Resolution parameters
-    NX = 256
-    NY = 256
-    NZ = 128
+    NX = 128
+    NY = 128
+    NZ = 64
 
     # Starting number of particles per cell
     NPPC = 100
@@ -153,9 +153,9 @@ class PlasmaCylinderCompression(object):
         if self.test:
             self.total_steps = 20
             self.diag_steps = self.total_steps // 5
-            self.NX = 128
-            self.NY = 128
-            self.NZ = 64
+            self.NX = 64
+            self.NY = 64
+            self.NZ = 32
         else:
             self.total_steps = int(self.LT / self.DT)
             self.diag_steps = 100
@@ -277,6 +277,7 @@ class PlasmaCylinderCompression(object):
             plasma_resistivity="if(rho<=rho_floor,eta_v,eta_p)",
             plasma_hyper_resistivity=1e-8,
             substeps=self.substeps,
+            holmstrom_vacuum_region=True,
             A_external=A_ext,
             tau_ramp=20e-6,
             t0_ramp=5e-6,

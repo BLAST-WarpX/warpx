@@ -175,6 +175,8 @@ public:
     /** Number of substeps to take when evolving B */
     int m_substeps = 10;
 
+    bool m_holmstrom_vacuum_region = false;
+
     /** Electron temperature in eV */
     amrex::Real m_elec_temp;
     /** Reference electron density */

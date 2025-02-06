@@ -435,6 +435,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
     const bool include_external_fields = hybrid_model->m_add_external_fields;
 
+    const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
+
     auto & warpx = WarpX::GetInstance();
     ablastr::fields::VectorField Bfield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_B_fp_external, 0); // lev=0
     ablastr::fields::VectorField Efield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_E_fp_external, 0); // lev=0
@@ -635,10 +637,10 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_r = Interp(enE, nodal, Er_stag, coarsen, i, j, 0, 0);
 
-                if (rho_val >= rho_val_limited) {
-                    Er(i, j, 0) = (enE_r - grad_Pe) / rho_val_limited;
+                if (rho_val < rho_floor && holmstrom_vacuum_region) {
+                    Er(i, j, 0) = 0._rt;
                 } else {
-                    Ez(i, j, 0) = 0._rt;
+                    Er(i, j, 0) = (enE_r - grad_Pe) / rho_val_limited;
                 }
 
                 // Add resistivity only if E field value is used to update B
@@ -653,7 +655,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     Er(i, j, 0) -= eta_h * nabla2Jr;
                 }
 
-                if (include_external_fields && rho_val >= rho_floor) {
+                if (include_external_fields && (rho_val >= rho_floor || !holmstrom_vacuum_region)) {
                     Er(i, j, 0) -= Er_ext(i, j, 0);
                 }
             },
@@ -695,10 +697,10 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_t = Interp(enE, nodal, Et_stag, coarsen, i, j, 0, 1);
 
-                if (rho_val >= rho_val_limited) {
-                    Et(i, j, 0) = (enE_t - grad_Pe) / rho_val_limited;
-                } else {
+                if (rho_val < rho_floor && holmstrom_vacuum_region) {
                     Et(i, j, 0) = 0._rt;
+                } else {
+                    Et(i, j, 0) = (enE_t - grad_Pe) / rho_val_limited;
                 }
 
                 // Add resistivity only if E field value is used to update B
@@ -711,7 +713,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     Et(i, j, 0) -= eta_h * nabla2Jt;
                 }
 
-                if (include_external_fields && rho_val >= rho_floor) {
+                if (include_external_fields && (rho_val >= rho_floor || !holmstrom_vacuum_region)) {
                     Et(i, j, 0) -= Et_ext(i, j, 0);
                 }
             },
@@ -746,10 +748,10 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, 0, 2);
 
-                if (rho_val >= rho_val_limited) {
-                    Ez(i, j, 0) = (enE_z - grad_Pe) / rho_val_limited;
-                } else {
+                if (rho_val < rho_floor && holmstrom_vacuum_region) {
                     Ez(i, j, 0) = 0._rt;
+                } else {
+                    Ez(i, j, 0) = (enE_z - grad_Pe) / rho_val_limited;
                 }
 
                 // Add resistivity only if E field value is used to update B
@@ -767,7 +769,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     Ez(i, j, 0) -= eta_h * nabla2Jz;
                 }
 
-                if (include_external_fields && rho_val >= rho_floor) {
+                if (include_external_fields && (rho_val >= rho_floor || !holmstrom_vacuum_region)) {
                     Ez(i, j, 0) -= Ez_ext(i, j, 0);
                 }
             }
@@ -810,6 +812,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const bool include_hyper_resistivity_term = (eta_h > 0.) && solve_for_Faraday;
 
     const bool include_external_fields = hybrid_model->m_add_external_fields;
+
+    const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
 
     auto & warpx = WarpX::GetInstance();
     ablastr::fields::VectorField Bfield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_B_fp_external, 0); // lev=0
@@ -1009,7 +1013,11 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_x = Interp(enE, nodal, Ex_stag, coarsen, i, j, k, 0);
 
-                Ex(i, j, k) = (enE_x - grad_Pe) / rho_val_limited;
+                if (rho_val < rho_floor && holmstrom_vacuum_region) {
+                    Ex(i, j, k) = 0._rt;
+                } else {
+                    Ex(i, j, k) = (enE_x - grad_Pe) / rho_val_limited;
+                }
 
                 // Add resistivity only if E field value is used to update B
                 if (solve_for_Faraday) { Ex(i, j, k) += eta(rho_val, jtot_val) * Jx(i, j, k); }
@@ -1021,7 +1029,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     Ex(i, j, k) -= eta_h * nabla2Jx;
                 }
 
-                if (include_external_fields && rho_val >= rho_floor) {
+                if (include_external_fields && (rho_val >= rho_floor || !holmstrom_vacuum_region)) {
                     Ex(i, j, k) -= Ex_ext(i, j, k);
                 }
             },
@@ -1056,7 +1064,11 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_y = Interp(enE, nodal, Ey_stag, coarsen, i, j, k, 1);
 
-                Ey(i, j, k) = (enE_y - grad_Pe) / rho_val_limited;
+                if (rho_val < rho_floor && holmstrom_vacuum_region) {
+                    Ey(i, j, k) = 0._rt;
+                } else {
+                    Ey(i, j, k) = (enE_y - grad_Pe) / rho_val_limited;
+                }
 
                 // Add resistivity only if E field value is used to update B
                 if (solve_for_Faraday) { Ey(i, j, k) += eta(rho_val, jtot_val) * Jy(i, j, k); }
@@ -1068,7 +1080,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     Ey(i, j, k) -= eta_h * nabla2Jy;
                 }
 
-                if (include_external_fields && rho_val >= rho_floor) {
+                if (include_external_fields && (rho_val >= rho_floor || !holmstrom_vacuum_region)) {
                     Ey(i, j, k) -= Ey_ext(i, j, k);
                 }
             },
@@ -1103,7 +1115,11 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, k, 2);
 
-                Ez(i, j, k) = (enE_z - grad_Pe) / rho_val_limited;
+                if (rho_val < rho_val_limited && holmstrom_vacuum_region) {
+                    Ez(i, j, k) = 0._rt;
+                } else {
+                    Ez(i, j, k) = (enE_z - grad_Pe) / rho_val_limited;
+                }
 
                 // Add resistivity only if E field value is used to update B
                 if (solve_for_Faraday) { Ez(i, j, k) += eta(rho_val, jtot_val) * Jz(i, j, k); }
@@ -1115,7 +1131,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     Ez(i, j, k) -= eta_h * nabla2Jz;
                 }
 
-                if (include_external_fields && rho_val >= rho_floor) {
+                if (include_external_fields && (rho_val >= rho_floor || !holmstrom_vacuum_region)) {
                     Ez(i, j, k) -= Ez_ext(i, j, k);
                 }
             }
