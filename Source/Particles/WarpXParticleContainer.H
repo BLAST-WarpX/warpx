@@ -332,6 +332,30 @@ public:
 
     std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);
 
+    virtual void DepositCurrentAndMassMatrices (WarpXParIter& pti,
+                                RealVector const & wp,
+                                RealVector const & uxp,
+                                RealVector const & uyp,
+                                RealVector const & uzp,
+                                int const* ion_lev,
+                                amrex::MultiFab* jx,
+                                amrex::MultiFab* jy,
+                                amrex::MultiFab* jz,
+                                amrex::MultiFab* Sx,
+                                amrex::MultiFab* Sy,
+                                amrex::MultiFab* Sz,
+                                amrex::FArrayBox const * bxfab,
+                                amrex::FArrayBox const * byfab,
+                                amrex::FArrayBox const * bzfab,
+                                long offset,
+                                long np_to_deposit,
+                                int thread_num,
+                                int lev,
+                                int depos_lev,
+                                amrex::Real dt,
+                                amrex::Real relative_time,
+                                PushType push_type);
+
     // If particles start outside of the domain, ContinuousInjection
     // makes sure that they are initialized when they enter the domain, and
     // NOT before. Virtual function, overriden by derived classes.

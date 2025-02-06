@@ -2012,11 +2012,11 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                     amrex::MultiFab * jy = fields.get(current_fp_string, Direction{1}, lev);
                     amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
                     if (push_type == PushType::Implicit && deposit_mass_matrices) {
-                        amrex::MultiFab * sigma_x = fields.get(FieldType::sigma_PC, Direction{0}, lev);
-                        amrex::MultiFab * sigma_y = fields.get(FieldType::sigma_PC, Direction{1}, lev);
-                        amrex::MultiFab * sigma_z = fields.get(FieldType::sigma_PC, Direction{2}, lev);
-                        DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
-                                       0, np_current, thread_num,
+                        amrex::MultiFab * Sx = fields.get(FieldType::sigma_PC, Direction{0}, lev);
+                        amrex::MultiFab * Sy = fields.get(FieldType::sigma_PC, Direction{1}, lev);
+                        amrex::MultiFab * Sz = fields.get(FieldType::sigma_PC, Direction{2}, lev);
+                        DepositCurrentAndMassMatrices(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
+                                       Sx, Sy, Sz, bxfab, byfab, bzfab, 0, np_current, thread_num,
                                        lev, lev, dt, relative_time, push_type);
                     }
                     else {
