@@ -147,7 +147,8 @@ wx = ny * vz - nz * vy
 wy = nz * vx - nx * vz
 wz = nx * vy - ny * vx
 u_perp2 = ux * wx + uy * wy + uz * wz
-compare_gaussian(u_perp2, w, u_th=0.01, label="u_perp")
+compare_gaussian(u_perp2, w, u_th=0.01, label="u_perp2")
 
+plt.legend()
 plt.tight_layout()
 plt.savefig("Distribution.png")

@@ -336,6 +336,8 @@ WarpX::MoveWindow (const int step, bool move_j)
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
+    bool const skip_lev0_coarse_patch = true;
+
     if (step == start_moving_window_step) {
         amrex::Print() << Utils::TextMsg::Info("Starting moving window");
     }
@@ -472,8 +474,8 @@ WarpX::MoveWindow (const int step, bool move_j)
                 ::shiftMF(*m_fields.get(FieldType::Bfield_aux, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
                 ::shiftMF(*m_fields.get(FieldType::Efield_aux, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
                 if (fft_do_time_averaging) {
-                    ablastr::fields::MultiLevelVectorField Efield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_cp, finest_level);
-                    ablastr::fields::MultiLevelVectorField Bfield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_cp, finest_level);
+                    ablastr::fields::MultiLevelVectorField Efield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_cp, finest_level, skip_lev0_coarse_patch);
+                    ablastr::fields::MultiLevelVectorField Bfield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_cp, finest_level, skip_lev0_coarse_patch);
                     ::shiftMF(*Bfield_avg_cp[lev][dim], geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev,
                         m_p_ext_field_params->B_external_grid[dim], use_Bparser, Bfield_parser);
                     ::shiftMF(*Efield_avg_cp[lev][dim], geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev,

@@ -3182,6 +3182,12 @@ This shifts analysis from post-processing to runtime calculation of reduction op
         Note that the fields are averaged on the cell centers before their maximum values are
         computed.
 
+    * ``FieldPoyntingFlux``
+        Integrates the normal Poynting flux over each domain boundary surface and also integrates the flux over time.
+        This provides the power and total energy loss into or out of the simulation domain.
+        The output columns are the flux for each dimension on the lower boundaries, then the higher boundaries,
+        then the integrated energy loss for each dimension on the the lower and higher boundaries.
+
     * ``FieldProbe``
         This type computes the value of each component of the electric and magnetic fields
         and of the Poynting vector (a measure of electromagnetic flux) at points in the domain.
