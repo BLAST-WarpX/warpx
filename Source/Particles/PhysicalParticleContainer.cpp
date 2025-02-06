@@ -2017,7 +2017,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * Sz = fields.get(FieldType::sigma_PC, Direction{2}, lev);
                         DepositCurrentAndMassMatrices(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
                                        Sx, Sy, Sz, bxfab, byfab, bzfab, 0, np_current, thread_num,
-                                       lev, lev, dt, relative_time, push_type);
+                                       lev, lev, dt);
                     }
                     else {
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
