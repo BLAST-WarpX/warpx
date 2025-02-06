@@ -19,16 +19,13 @@ from scipy.interpolate import PchipInterpolator
 
 import openpmd_api as io
 
-from pywarpx import callbacks, fields, libwarpx, picmi, amrex
-
-# amrex.throw_exception = 1
-# amrex.signal_handling = 0
+from pywarpx import fields, picmi
 
 constants = picmi.constants
 
 comm = mpi.COMM_WORLD
 
-simulation = picmi.Simulation(warpx_serialize_initial_conditions=True, verbose=False, warpx_amrex_use_gpu_aware_mpi=True)
+simulation = picmi.Simulation(warpx_serialize_initial_conditions=True, verbose=False)
 
 
 class PlasmaCylinderCompression(object):
@@ -62,7 +59,7 @@ class PlasmaCylinderCompression(object):
     NZ = 32
 
     # Starting number of particles per cell
-    NPPC = 500
+    NPPC = 100
 
     # Number of substeps used to update B
     substeps = 25
@@ -159,15 +156,10 @@ class PlasmaCylinderCompression(object):
             self.total_steps = 20
             self.diag_steps = self.total_steps // 5
             self.NR = 64
-            self.NZ = 128
+            self.NZ = 16
         else:
             self.total_steps = int(self.LT / self.DT)
-            self.diag_steps = 100 #self.total_steps // 200
-
-        # dump all the current attributes to a dill pickle file
-        if comm.rank == 0:
-            with open("sim_parameters.dpkl", "wb") as f:
-                dill.dump(self, f)
+            self.diag_steps = 100
 
         # print out plasma parameters
         if comm.rank == 0:
@@ -340,24 +332,21 @@ class PlasmaCylinderCompression(object):
         # Add diagnostics                                                     #
         #######################################################################
 
-        # callbacks.installafterEsolve(self.check_fields)
-
-        # particle_diag = picmi.ParticleDiagnostic(
-        #     name="particles",
-        #     period=self.diag_steps,
-        #     species=[self.ions],
-        #     data_list=["ux", "uy", "uz", "x", "z", "weighting"],
-        #     warpx_format='openpmd',
-        #     warpx_openpmd_backend='h5',
-        # )
-        # simulation.add_diagnostic(particle_diag)
+        if self.test:
+            particle_diag = picmi.ParticleDiagnostic(
+                name="diag1",
+                period=self.diag_steps,
+                species=[self.ions],
+                data_list=["ux", "uy", "uz", "x", "z", "weighting"],
+                warpx_format='plotfile',
+            )
+            simulation.add_diagnostic(particle_diag)
         field_diag = picmi.FieldDiagnostic(
-            name="fields",
+            name="diag1",
             grid=self.grid,
             period=self.diag_steps,
             data_list=["B", "E", "rho", "divB", "T_ions", "J", "J_displacement"],
-            warpx_format='openpmd',
-            warpx_openpmd_backend='h5',
+            warpx_format='plotfile',
         )
         simulation.add_diagnostic(field_diag)
 
@@ -373,27 +362,6 @@ class PlasmaCylinderCompression(object):
         # Initialize inputs and WarpX instance
         simulation.initialize_inputs()
         simulation.initialize_warpx()
-
-    # def check_fields(self):
-    #     step = simulation.extension.warpx.getistep(lev=0) - 1
-
-    #     if not (step == 1 or step % self.diag_steps == 0):
-    #         return
-
-    #     rho = fields.RhoFPWrapper(include_ghosts=False)[:, :]
-    #     Jiy = fields.JyFPWrapper(include_ghosts=False)[...] / self.J0
-    #     Jy = fields.JyFPPlasmaWrapper(include_ghosts=False)[...] / self.J0
-    #     Bx = fields.BxFPWrapper(include_ghosts=False)[...] / self.B0
-    #     By = fields.ByFPWrapper(include_ghosts=False)[...] / self.B0
-    #     Bz = fields.BzFPWrapper(include_ghosts=False)[...] / self.B0
-
-    #     if libwarpx.amr.ParallelDescriptor.MyProc() != 0:
-    #         return
-
-    #     # save the fields to file
-    #     with open(f"diags/fields/fields_{step:06d}.npz", "wb") as f:
-    #         np.savez(f, rho=rho, Jiy=Jiy, Jy=Jy, Bx=Bx, By=By, Bz=Bz)
-
 
 ##########################
 # parse input parameters

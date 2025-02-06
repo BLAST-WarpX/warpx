@@ -6,8 +6,8 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     "inputs_test_3d_ohm_solver_cylinder_compression_picmi.py --test"  # inputs
-    analysis_3d.py  # analysis
-    diags/diag1000100  # output
+    analysis_default_regression.py  # analysis
+    diags/diag1000020  # output
     OFF  # dependency
 )
 label_warpx_test(test_3d_ohm_solver_cylinder_compression_picmi slow)
@@ -16,9 +16,9 @@ add_warpx_test(
     test_rz_ohm_solver_cylinder_compression_picmi  # name
     RZ  # dims
     2  # nprocs
-    "inputs_test_3d_ohm_solver_cylinder_compression_picmi.py --test"  # inputs
-    analysis_rz.py  # analysis
-    diags/diag1000100  # output
+    "inputs_test_rz_ohm_solver_cylinder_compression_picmi.py --test"  # inputs
+    analysis_default_regression.py  # analysis
+    diags/diag1000020  # output
     OFF  # dependency
 )
 label_warpx_test(test_rz_ohm_solver_cylinder_compression_picmi slow)
