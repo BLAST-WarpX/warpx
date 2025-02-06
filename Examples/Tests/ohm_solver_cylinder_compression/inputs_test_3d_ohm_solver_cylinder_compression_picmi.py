@@ -3,9 +3,8 @@
 # --- Test script for the kinetic-fluid hybrid model in WarpX wherein ions are
 # --- treated as kinetic particles and electrons as an isothermal, inertialess
 # --- background fluid. The script demonstrates the use of this model to
-# --- simulate magnetic reconnection in a force-free sheet. The setup is based
-# --- on the problem described in Le et al. (2016)
-# --- https://aip.scitation.org/doi/10.1063/1.4943893.
+# --- simulate adiabatic compression of a plasma cylinder initialized from an
+# --- analytical Grad-Shafranov solution.
 
 import argparse
 import shutil
