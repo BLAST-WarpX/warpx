@@ -17,26 +17,12 @@ import openpmd_api as io
 from mpi4py import MPI as mpi
 
 from pywarpx import fields, picmi
-<<<<<<< HEAD
-=======
-
-# amrex.throw_exception = 1
-# amrex.signal_handling = 0
->>>>>>> 8a09559df44d91e699f973feee90cda8856f2b49
 
 constants = picmi.constants
 
 comm = mpi.COMM_WORLD
 
-<<<<<<< HEAD
 simulation = picmi.Simulation(warpx_serialize_initial_conditions=True, verbose=False)
-=======
-simulation = picmi.Simulation(
-    warpx_serialize_initial_conditions=True,
-    verbose=False,
-    warpx_amrex_use_gpu_aware_mpi=True,
-)
->>>>>>> 8a09559df44d91e699f973feee90cda8856f2b49
 
 
 class PlasmaCylinderCompression(object):
@@ -171,16 +157,7 @@ class PlasmaCylinderCompression(object):
             self.NZ = 16
         else:
             self.total_steps = int(self.LT / self.DT)
-<<<<<<< HEAD
             self.diag_steps = 100
-=======
-            self.diag_steps = 100  # self.total_steps // 200
-
-        # dump all the current attributes to a dill pickle file
-        if comm.rank == 0:
-            with open("sim_parameters.dpkl", "wb") as f:
-                dill.dump(self, f)
->>>>>>> 8a09559df44d91e699f973feee90cda8856f2b49
 
         # print out plasma parameters
         if comm.rank == 0:
@@ -363,12 +340,7 @@ class PlasmaCylinderCompression(object):
             grid=self.grid,
             period=self.diag_steps,
             data_list=["B", "E", "rho", "divB", "T_ions", "J", "J_displacement"],
-<<<<<<< HEAD
             warpx_format='plotfile',
-=======
-            warpx_format="openpmd",
-            warpx_openpmd_backend="h5",
->>>>>>> 8a09559df44d91e699f973feee90cda8856f2b49
         )
         simulation.add_diagnostic(field_diag)
 
