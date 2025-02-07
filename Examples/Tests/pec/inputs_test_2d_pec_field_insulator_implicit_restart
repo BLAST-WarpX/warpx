@@ -1,0 +1,5 @@
+# base input parameters
+FILE = inputs_test_2d_pec_field_insulator_implicit
+
+# test input parameters
+amr.restart = "../test_2d_pec_field_insulator_implicit/diags/chk000010"
