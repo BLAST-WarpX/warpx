@@ -397,8 +397,6 @@ void FiniteDifferenceSolver::HybridPICSolveE (
         amrex::Abort(Utils::TextMsg::Err(
             "HybridSolveE: The hybrid-PIC electromagnetic solver algorithm must be used"));
     }
-    // auto& warpx = WarpX::GetInstance();
-    // warpx.ApplyEfieldBoundary(lev, PatchType::fine);
 }
 
 #ifdef WARPX_DIM_RZ
@@ -438,8 +436,11 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
 
     auto & warpx = WarpX::GetInstance();
-    ablastr::fields::VectorField Bfield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_B_fp_external, 0); // lev=0
-    ablastr::fields::VectorField Efield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_E_fp_external, 0); // lev=0
+    ablastr::fields::VectorField Bfield_external, Efield_external; = 
+    if (include_external_fields) {
+        Bfield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_B_fp_external, 0); // lev=0
+        Efield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_E_fp_external, 0); // lev=0
+    }
 
     // Index type required for interpolating fields from their respective
     // staggering to the Ex, Ey, Ez locations
@@ -816,8 +817,11 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
 
     auto & warpx = WarpX::GetInstance();
-    ablastr::fields::VectorField Bfield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_B_fp_external, 0); // lev=0
-    ablastr::fields::VectorField Efield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_E_fp_external, 0); // lev=0
+    ablastr::fields::VectorField Bfield_external, Efield_external; = 
+    if (include_external_fields) {
+        Bfield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_B_fp_external, 0); // lev=0
+        Efield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_E_fp_external, 0); // lev=0
+    }
 
     // Index type required for interpolating fields from their respective
     // staggering to the Ex, Ey, Ez locations
