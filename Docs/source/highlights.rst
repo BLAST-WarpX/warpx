@@ -154,6 +154,11 @@ High Energy Astrophysical Plasma Physics
 
 Scientific works in astrophysical plasma modeling.
 
+#. Ghosh S, Bhat P.
+   **Magnetic Reconnection: An Alternative Explanation of Radio Emission in Galaxy Clusters**.
+   The Astrophysical Journal **979** 1, 2025.
+   `DOI:10.3847/2041-8213/ad9f2d <https://doi.org/10.3847/2041-8213/ad9f2d>`__
+
 #. Klion H, Jambunathan R, Rowan ME, Yang E, Willcox D, Vay J-L, Lehe R, Myers A, Huebl A, Zhang W.
    **Particle-in-Cell simulations of relativistic magnetic reconnection with advanced Maxwell solver algorithms**.
    The Astrophysical Journal **952** 8, 2023.
