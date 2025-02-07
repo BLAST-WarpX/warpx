@@ -845,7 +845,7 @@ class ParticleBoundaryBufferWrapper(object):
         data_array = []
         # loop over the real attributes
         if comp_name in part_container.real_soa_names:
-            comp_idx = self.particle_container.get_real_comp_index(comp_name)
+            comp_idx = part_container.get_real_comp_index(comp_name)
             for ii, pti in enumerate(
                 libwarpx.libwarpx_so.BoundaryBufferParIter(part_container, level)
             ):
@@ -853,7 +853,7 @@ class ParticleBoundaryBufferWrapper(object):
                 data_array.append(xp.array(soa.get_real_data(comp_idx), copy=False))
         # loop over the integer attributes
         elif comp_name in part_container.int_soa_names:
-            comp_idx = self.particle_container.get_int_comp_index(comp_name)
+            comp_idx = part_container.get_int_comp_index(comp_name)
             for ii, pti in enumerate(
                 libwarpx.libwarpx_so.BoundaryBufferParIter(part_container, level)
             ):
