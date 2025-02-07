@@ -436,7 +436,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
 
     auto & warpx = WarpX::GetInstance();
-    ablastr::fields::VectorField Bfield_external, Efield_external; =
+    ablastr::fields::VectorField Bfield_external, Efield_external;
     if (include_external_fields) {
         Bfield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_B_fp_external, 0); // lev=0
         Efield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_E_fp_external, 0); // lev=0
@@ -817,7 +817,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
 
     auto & warpx = WarpX::GetInstance();
-    ablastr::fields::VectorField Bfield_external, Efield_external; =
+    ablastr::fields::VectorField Bfield_external, Efield_external;
     if (include_external_fields) {
         Bfield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_B_fp_external, 0); // lev=0
         Efield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_E_fp_external, 0); // lev=0
