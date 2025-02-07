@@ -1092,7 +1092,7 @@ void ComputeExternalFieldOnGridUsingParser_template (
         auto const& mfzfab = mfz->array(mfi);
 
         amrex::Array4<int> update_fx_arr, update_fy_arr, update_fz_arr;
-        if (EB::enabled()) {
+        if (use_eb_flags && EB::enabled()) {
             update_fx_arr = eb_update_field[lev][0]->array(mfi);
             update_fy_arr = eb_update_field[lev][1]->array(mfi);
             update_fz_arr = eb_update_field[lev][2]->array(mfi);
