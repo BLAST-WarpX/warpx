@@ -1454,7 +1454,10 @@ void WarpXFluidContainer::HybridInitializeUe (
 #endif
     for ( MFIter mfi(*m_fields.get(name_mf_N, lev), TilingIfNotGPU()); mfi.isValid(); ++mfi )
         {
-            amrex::Array4<amrex::Real> const& rho = m_fields.get(name_mf_N, lev)->array(mfi);
+            //amrex::Array4<amrex::Real> const& rho = m_fields.get(name_mf_N, lev)->array(mfi);
+            
+            // using rho at n+1/2 in rho_fp_temp
+            amrex::Array4<amrex::Real> const& rho = m_fields.get(FieldType::hybrid_rho_fp_temp, lev)->array(mfi);
 
             amrex::Array4<amrex::Real> const& Jx = current_fp_ampere[0]->array(mfi);
             amrex::Array4<amrex::Real> const& Jy = current_fp_ampere[1]->array(mfi);
@@ -1586,16 +1589,15 @@ void WarpXFluidContainer::HybridUpdateTe (ablastr::fields::MultiFabRegister& m_f
                 if( rho(i, j, k) > 0 ){
 
                     amrex::Real ne = rho(i, j, k)/PhysConst::q_e;
-                    if(ne<n_floor){
-                        ne = n_floor;
-                    }
+                    //if(ne<n_floor){
+                    //    ne = n_floor;
+                    //}
                     amrex::Real weight = weights(i,j,k);
-                    if(weight<=0){
-                        weight = n_floor;
+                    // if(weight>0){
+                    if(weight>0 && ne>n_floor){ // maybe only do this if ne is larger than n_floor ?
+                        weight = weight*cell_volume;
+                        Te(i, j, k) = (Ke(i, j, k)*PhysConst::q_e/std::pow(ne, 1-gamma))/weight; // Te in Joules
                     }
-                    weight = weight*cell_volume;
-
-                    Te(i, j, k) = (Ke(i, j, k)*PhysConst::q_e/std::pow(ne, 1-gamma))/weight; // Te in Joules
                 }
             });
         }

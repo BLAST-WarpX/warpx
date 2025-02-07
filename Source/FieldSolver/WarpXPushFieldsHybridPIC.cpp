@@ -80,17 +80,61 @@ void WarpX::HybridPICEvolveFields ()
     // 0'th index of `rho_fp`, J_i^{n-1/2} in `current_fp_temp` and J_i^{n+1/2}
     // in `current_fp`.
 
-    // Calculate Ke using rho^{n+1} in rho_fp  //  before: Calculate Ke using rho^{n} in rho_fp_temp
+    // Calculate Ke using rho^{n+1} in rho_fp  
     //if(m_hybrid_pic_model->m_solve_electron_energy_equation)
     //{
         // copy rho_fp_temp to hybrid_electron_fl->name_mf_N
     //    m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->setVal(0);
     //    MultiFab::Copy( *m_fields.get(hybrid_electron_fl->name_mf_N, finest_level),
-    //                    *m_fields.get(FieldType::rho_fp, finest_level), //*m_fields.get(FieldType::hybrid_rho_fp_temp, finest_level),
+    //                    *m_fields.get(FieldType::rho_fp, finest_level),
     //                   0, 0, 1, m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->nGrowVect());
         // Calculate Ke
     //    hybrid_electron_fl->HybridInitializeKe(m_fields, m_hybrid_pic_model->m_gamma, m_hybrid_pic_model->m_n_floor, finest_level);
     //}
+
+    const amrex::Real cur_step = getistep(finest_level);
+    const amrex::Real Te0 = m_hybrid_pic_model->m_elec_temp;
+    const amrex::Real rho0_ref = m_hybrid_pic_model->m_n0_ref*PhysConst::q_e;
+    const amrex::Real gamma_val = m_hybrid_pic_model->m_gamma;
+
+
+    if(cur_step==1 && m_hybrid_pic_model->m_solve_electron_energy_equation){
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi(*m_fields.get("fluid_temperature_electrons_hybrid", finest_level), TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            amrex::Box const &tile_box = mfi.tilebox(m_fields.get("fluid_temperature_electrons_hybrid",  finest_level)->ixType().toIntVect());
+            amrex::Array4<Real> const &Te_arr = m_fields.get("fluid_temperature_electrons_hybrid",  finest_level)->array(mfi);
+            const amrex::Array4<amrex::Real> rho_arr = m_fields.get(FieldType::rho_fp,  finest_level)->array(mfi);
+
+            amrex::ParallelFor(tile_box,
+                [=] AMREX_GPU_DEVICE(int i, int j, int k)
+                {
+                    Te_arr(i, j, k) = Te0*std::pow(rho_arr(i, j, k)/rho0_ref,gamma_val-1);
+                }
+            );
+        }
+
+    // Fill Boundaries in electron temperature multifab
+    m_fields.get("fluid_temperature_electrons_hybrid",  finest_level)->FillBoundary(Geom(finest_level).periodicity());
+
+    }
+
+
+
+    // Calculate Ke using rho^{n} in rho_fp_temp
+    if(m_hybrid_pic_model->m_solve_electron_energy_equation)
+    {
+        // copy rho_fp_temp to hybrid_electron_fl->name_mf_N
+        m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->setVal(0);
+        MultiFab::Copy( *m_fields.get(hybrid_electron_fl->name_mf_N, finest_level),
+                        *m_fields.get(FieldType::hybrid_rho_fp_temp, finest_level),
+                       0, 0, 1, m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->nGrowVect());
+        // Calculate Ke
+        hybrid_electron_fl->HybridInitializeKe(m_fields, m_hybrid_pic_model->m_gamma, m_hybrid_pic_model->m_n_floor, finest_level);
+    }
 
 
     // Note: E^{n} is recalculated with the accurate J_i^{n} since at the end
@@ -143,16 +187,16 @@ void WarpX::HybridPICEvolveFields ()
 
 
     // Calculate Ke using rho^{n+1/2} in rho_fp_temp
-    if(m_hybrid_pic_model->m_solve_electron_energy_equation)
-    {
+    //if(m_hybrid_pic_model->m_solve_electron_energy_equation)
+    //{
         // copy rho_fp_temp to hybrid_electron_fl->name_mf_N
-        m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->setVal(0);
-        MultiFab::Copy( *m_fields.get(hybrid_electron_fl->name_mf_N, finest_level),
-                        *m_fields.get(FieldType::hybrid_rho_fp_temp, finest_level),
-                        0, 0, 1, m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->nGrowVect());
+    //    m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->setVal(0);
+    //    MultiFab::Copy( *m_fields.get(hybrid_electron_fl->name_mf_N, finest_level),
+    //                    *m_fields.get(FieldType::hybrid_rho_fp_temp, finest_level),
+    //                    0, 0, 1, m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->nGrowVect());
         // Calculate Ke
-        hybrid_electron_fl->HybridInitializeKe(m_fields, m_hybrid_pic_model->m_gamma, m_hybrid_pic_model->m_n_floor, finest_level);
-    }
+    //    hybrid_electron_fl->HybridInitializeKe(m_fields, m_hybrid_pic_model->m_gamma, m_hybrid_pic_model->m_n_floor, finest_level);
+    //}
 
    
     if(m_hybrid_pic_model->m_solve_electron_energy_equation)
@@ -164,7 +208,7 @@ void WarpX::HybridPICEvolveFields ()
             m_fields.get_mr_levels_alldirs(FieldType::edge_lengths, finest_level));
 
         // Calculates Ue using Jtot at n+1/2 and Ji at n+1/2
-        hybrid_electron_fl->HybridInitializeUe(m_fields,
+        hybrid_electron_fl->HybridInitializeUe(m_fields, // pass also rho as argument
                 m_fields.get_alldirs(FieldType::current_fp, finest_level),
                 m_hybrid_pic_model.get(),
                 finest_level);

@@ -8,6 +8,7 @@
  */
 
 #include "HybridPICModel.H"
+#include "Fluids/WarpXFluidContainer.H"
 
 #include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
@@ -236,13 +237,14 @@ void HybridPICModel::InitData ()
 
     const auto elec_temp = m_elec_temp;
 
-    // Initialize electron temperature multifab
-    // This assumes an uniform electron temperature in the domain
-    // change this to Te0*(ne/ne0)**(gamma-1) ?
-    warpx.m_fields.get("fluid_temperature_electrons_hybrid",  warpx.finestLevel())->setVal(elec_temp);
+    // Initialize electron temperature multifab (isothermal)
+    if(!m_solve_electron_energy_equation)
+    {
+        warpx.m_fields.get("fluid_temperature_electrons_hybrid",  warpx.finestLevel())->setVal(elec_temp);
+        // Fill Boundaries in electron temperature multifab
+        warpx.m_fields.get("fluid_temperature_electrons_hybrid",  warpx.finestLevel())->FillBoundary(warpx.Geom(warpx.finestLevel()).periodicity());
+    }
 
-    // Fill Boundaries in electron temperature multifab
-    warpx.m_fields.get("fluid_temperature_electrons_hybrid",  warpx.finestLevel())->FillBoundary(warpx.Geom(warpx.finestLevel()).periodicity());
 
 }
 
