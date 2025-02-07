@@ -1478,11 +1478,6 @@ WarpX::ReadParameters ()
         // second-order solution)
         pp_psatd.query_enum_sloppy("solution_type", m_psatd_solution_type, "-_");
 
-        // Integers that correspond to the time dependency of J (constant, linear)
-        // and rho (linear, quadratic) for the PSATD algorithm
-        pp_psatd.query_enum_sloppy("J_in_time", J_in_time, "-_");
-        pp_psatd.query_enum_sloppy("rho_in_time", rho_in_time, "-_");
-
         std::string JRhom_input;
         pp_psatd.query("JRhom", JRhom_input);
         if (!JRhom_input.empty()) {
