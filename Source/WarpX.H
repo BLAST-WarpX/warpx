@@ -1788,6 +1788,8 @@ private:
     // implicit solver object
     std::unique_ptr<ImplicitSolver> m_implicit_solver;
 
+    // JRhom algorithm
+    std::string m_JRhom;
 };
 
 #endif

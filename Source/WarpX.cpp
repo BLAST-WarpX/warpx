@@ -1506,6 +1506,45 @@ WarpX::ReadParameters ()
                 "except for psatd.solution_type=first-order and warpx.do_multi_J=1");
         }
 
+        pp_psatd.query("JRhom", m_JRhom);
+        if (!m_JRhom.empty()) {
+            amrex::AllPrint() << "psatd.JRhom = " << m_JRhom << std::endl;
+            do_multi_J = true;
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                m_JRhom.length() >= 3,
+                "psatd.JRhom input string is too short to parse"
+            );
+            if (m_JRhom[0] == 'C') {
+                J_in_time = JInTime::Constant;
+            }
+            else if (m_JRhom[0] == 'L') {
+                J_in_time = JInTime::Linear;
+            }
+            else {
+                WARPX_ABORT_WITH_MESSAGE(
+                    "Time dependency of J set by psatd.JRhom not implemented"
+                );
+            }
+            if (m_JRhom[1] == 'C') {
+                rho_in_time = RhoInTime::Constant;
+            }
+            else if (m_JRhom[1] == 'L') {
+                rho_in_time = RhoInTime::Linear;
+            }
+            else {
+                WARPX_ABORT_WITH_MESSAGE(
+                    "Time dependency of rho set by psatd.JRhom not implemented"
+                );
+            }
+            for (char m : m_JRhom.substr(2)) {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    std::isdigit(m),
+                    "psatd.JRhom input string does not include integer 'm'"
+                );
+            }
+            do_multi_J_n_depositions = std::stoi(m_JRhom.substr(2));
+        }
+
         // Current correction activated by default, unless a charge-conserving
         // current deposition (Esirkepov, Vay) or the div(E) cleaning scheme
         // are used
