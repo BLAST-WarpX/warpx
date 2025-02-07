@@ -199,9 +199,9 @@ WarpX::Evolve (int numsteps)
             PushParticlesandDeposit(cur_time, skip_deposition);
         }
         // Electromagnetic case: multi-J algorithm
-        else if (do_multi_J)
+        else if (m_JRhom)
         {
-            OneStep_multiJ(cur_time);
+            OneStep_JRhom(cur_time);
         }
         // Electromagnetic case: no subcycling or no mesh refinement
         else if ( !m_do_subcycling || (finest_level == 0))
@@ -660,7 +660,7 @@ void WarpX::SyncCurrentAndRho ()
 }
 
 void
-WarpX::OneStep_multiJ (const amrex::Real cur_time)
+WarpX::OneStep_JRhom (const amrex::Real cur_time)
 {
 #ifdef WARPX_USE_FFT
 
@@ -726,7 +726,7 @@ WarpX::OneStep_multiJ (const amrex::Real cur_time)
     }
 
     // Number of depositions for multi-J scheme
-    const int n_deposit = WarpX::do_multi_J_n_depositions;
+    const int n_deposit = WarpX::m_JRhom_subintervals;
     // Time sub-step for each multi-J deposition
     const amrex::Real sub_dt = dt[0] / static_cast<amrex::Real>(n_deposit);
     // Whether to perform multi-J depositions on a time interval that spans

@@ -368,9 +368,6 @@ public:
     //! Specifies the type of grid used for the above sorting, i.e. cell-centered, nodal, or mixed
     static amrex::IntVect sort_idx_type;
 
-    static bool do_multi_J;
-    static int do_multi_J_n_depositions;
-
     //! With mesh refinement, particles located inside a refinement patch, but within
     //! #n_field_gather_buffer cells of the edge of the patch, will gather the fields
     //! from the lower refinement level instead of the refinement patch itself
@@ -1214,7 +1211,7 @@ private:
     /**
      * \brief Perform one PIC iteration, with the multiple J deposition per time step
      */
-    void OneStep_multiJ (amrex::Real cur_time);
+    void OneStep_JRhom (amrex::Real cur_time);
 
     void RestrictCurrentFromFineToCoarsePatch (
         const ablastr::fields::MultiLevelVectorField& J_fp,
@@ -1789,7 +1786,8 @@ private:
     std::unique_ptr<ImplicitSolver> m_implicit_solver;
 
     // JRhom algorithm
-    std::string m_JRhom;
+    bool m_JRhom = false;
+    int m_JRhom_subintervals;
 };
 
 #endif
