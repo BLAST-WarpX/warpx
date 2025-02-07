@@ -277,7 +277,6 @@ class PlasmaCylinderCompression(object):
             plasma_resistivity="if(rho<=rho_floor,eta_v,eta_p)",
             plasma_hyper_resistivity=1e-8,
             substeps=self.substeps,
-            holmstrom_vacuum_region=True,
             A_external=A_ext,
             tau_ramp=20e-6,
             t0_ramp=5e-6,
@@ -350,7 +349,7 @@ class PlasmaCylinderCompression(object):
             name="diag1",
             grid=self.grid,
             period=self.diag_steps,
-            data_list=["B", "E", "rho", "divB", "T_ions", "J", "J_displacement"],
+            data_list=["B", "E", "rho"],
             write_dir="diags",
             warpx_format="plotfile",
         )
