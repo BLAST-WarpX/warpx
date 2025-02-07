@@ -655,7 +655,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     Er(i, j, 0) -= eta_h * nabla2Jr;
                 }
 
-                if (include_external_fields && (rho_val >= rho_floor || !holmstrom_vacuum_region)) {
+                if (include_external_fields && (rho_val >= rho_floor)) {
                     Er(i, j, 0) -= Er_ext(i, j, 0);
                 }
             },
@@ -713,7 +713,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     Et(i, j, 0) -= eta_h * nabla2Jt;
                 }
 
-                if (include_external_fields && (rho_val >= rho_floor || !holmstrom_vacuum_region)) {
+                if (include_external_fields && (rho_val >= rho_floor)) {
                     Et(i, j, 0) -= Et_ext(i, j, 0);
                 }
             },
@@ -769,7 +769,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     Ez(i, j, 0) -= eta_h * nabla2Jz;
                 }
 
-                if (include_external_fields && (rho_val >= rho_floor || !holmstrom_vacuum_region)) {
+                if (include_external_fields && (rho_val >= rho_floor)) {
                     Ez(i, j, 0) -= Ez_ext(i, j, 0);
                 }
             }
@@ -1029,7 +1029,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     Ex(i, j, k) -= eta_h * nabla2Jx;
                 }
 
-                if (include_external_fields && (rho_val >= rho_floor || !holmstrom_vacuum_region)) {
+                if (include_external_fields && (rho_val >= rho_floor)) {
                     Ex(i, j, k) -= Ex_ext(i, j, k);
                 }
             },
@@ -1080,7 +1080,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     Ey(i, j, k) -= eta_h * nabla2Jy;
                 }
 
-                if (include_external_fields && (rho_val >= rho_floor || !holmstrom_vacuum_region)) {
+                if (include_external_fields && (rho_val >= rho_floor)) {
                     Ey(i, j, k) -= Ey_ext(i, j, k);
                 }
             },
@@ -1115,7 +1115,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, k, 2);
 
-                if (rho_val < rho_val_limited && holmstrom_vacuum_region) {
+                if (rho_val < rho_floor && holmstrom_vacuum_region) {
                     Ez(i, j, k) = 0._rt;
                 } else {
                     Ez(i, j, k) = (enE_z - grad_Pe) / rho_val_limited;
@@ -1131,7 +1131,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     Ez(i, j, k) -= eta_h * nabla2Jz;
                 }
 
-                if (include_external_fields && (rho_val >= rho_floor || !holmstrom_vacuum_region)) {
+                if (include_external_fields && (rho_val >= rho_floor)) {
                     Ez(i, j, k) -= Ez_ext(i, j, k);
                 }
             }

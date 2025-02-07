@@ -58,7 +58,7 @@ class PlasmaCylinderCompression(object):
     NPPC = 100
 
     # Number of substeps used to update B
-    substeps = 25
+    substeps = 20
 
     def Bz(self, r):
         return np.sqrt(
@@ -275,7 +275,7 @@ class PlasmaCylinderCompression(object):
             A_external=A_ext,
             tau_ramp=20e-6,
             t0_ramp=5e-6,
-            rho_floor=0.01 * self.n0 * constants.q_e,
+            rho_floor=0.05 * self.n0 * constants.q_e,
             eta_p=1e-8,
             eta_v=1e-3,
         )

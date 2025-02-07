@@ -52,9 +52,9 @@ class PlasmaCylinderCompression(object):
     DT = 1e-3  # ion cyclotron periods
 
     # Resolution parameters
-    NX = 128
-    NY = 128
-    NZ = 64
+    NX = 256
+    NY = 256
+    NZ = 128
 
     # Starting number of particles per cell
     NPPC = 100
@@ -281,7 +281,7 @@ class PlasmaCylinderCompression(object):
             A_external=A_ext,
             tau_ramp=20e-6,
             t0_ramp=5e-6,
-            rho_floor=0.01 * self.n0 * constants.q_e,
+            rho_floor=0.05 * self.n0 * constants.q_e,
             eta_p=1e-8,
             eta_v=1e-3,
         )
