@@ -54,6 +54,40 @@
 namespace detail
 {
 #ifdef WARPX_USE_OPENPMD
+
+    /** \brief Convert a snake_case string to a camelCase one.
+     *
+     *  WarpX uses snake_case internally for some component
+     *  names, but OpenPMD assumes "_" indicates vector or
+     *  tensor fields.
+     *
+     * @return camelCase version of input
+     */
+    inline std::string
+    snakeToCamel (const std::string& snake_string)
+    {
+        std::string camelString = snake_string;
+        const auto n = static_cast<int>(camelString.length());
+        for (int x = 0; x < n; x++)
+        {
+            if (x == 0)
+            {
+                std::transform(camelString.begin(), camelString.begin()+1, camelString.begin(),
+                               [](unsigned char c){ return std::tolower(c); });
+            }
+            if (camelString[x] == '_')
+            {
+                std::string tempString = camelString.substr(x + 1, 1);
+                std::transform(tempString.begin(), tempString.end(), tempString.begin(),
+                               [](unsigned char c){ return std::toupper(c); });
+                camelString.erase(x, 2);
+                camelString.insert(x, tempString);
+            }
+        }
+
+        return camelString;
+    }
+
     /** Create the option string
      *
      * @return JSON option string for openPMD::Series
@@ -584,9 +618,20 @@ for (const auto & particle_diag : particle_diags) {
         real_names[tmp.GetRealCompIndex("uz")] = "momentum_z";
     }
 
+    for (size_t i = PIdx::nattribs; i < rn.size(); ++i)
+    {
+        real_names[i] = detail::snakeToCamel(rn[i]);
+    }
+
     // plot any "extra" fields by default
     amrex::Vector<int> real_flags = particle_diag.m_plot_flags;
     real_flags.resize(tmp.NumRealComps(), 1);
+
+    // and the int names
+    for (size_t i = 0; i < in.size(); ++i)
+    {
+        int_names[i] = detail::snakeToCamel(in[i]);
+    }
 
     // plot by default
     amrex::Vector<int> int_flags;
