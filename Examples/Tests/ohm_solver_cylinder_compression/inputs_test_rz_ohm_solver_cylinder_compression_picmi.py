@@ -332,7 +332,7 @@ class PlasmaCylinderCompression(object):
                 period=self.diag_steps,
                 species=[self.ions],
                 data_list=["ux", "uy", "uz", "x", "z", "weighting"],
-                write_dir='diags',
+                write_dir="diags",
                 warpx_format="plotfile",
             )
             simulation.add_diagnostic(particle_diag)
@@ -341,7 +341,7 @@ class PlasmaCylinderCompression(object):
             grid=self.grid,
             period=self.diag_steps,
             data_list=["B", "E", "rho", "divB", "T_ions", "J", "J_displacement"],
-            write_dir='diags',
+            write_dir="diags",
             warpx_format="plotfile",
         )
         simulation.add_diagnostic(field_diag)
