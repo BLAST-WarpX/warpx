@@ -25,8 +25,8 @@ PsatdAlgorithmRZ::PsatdAlgorithmRZ (SpectralKSpaceRZ const & spectral_kspace,
                                     amrex::Real const dt,
                                     bool const update_with_rho,
                                     const bool time_averaging,
-                                    const JInTime time_dependency_J,
-                                    const RhoInTime time_dependency_Rho,
+                                    const TimeDependencyJ time_dependency_J,
+                                    const TimeDependencyRho time_dependency_Rho,
                                     const bool dive_cleaning,
                                     const bool divb_cleaning):
     // Initialize members of base class and member variables
@@ -48,25 +48,25 @@ PsatdAlgorithmRZ::PsatdAlgorithmRZ (SpectralKSpaceRZ const & spectral_kspace,
     X2_coef = SpectralRealCoefficients(ba, dm, n_rz_azimuthal_modes, 0);
     X3_coef = SpectralRealCoefficients(ba, dm, n_rz_azimuthal_modes, 0);
 
-    if (time_averaging && time_dependency_J == JInTime::Linear)
+    if (time_averaging && time_dependency_J == TimeDependencyJ::Linear)
     {
         X5_coef = SpectralRealCoefficients(ba, dm, n_rz_azimuthal_modes, 0);
         X6_coef = SpectralRealCoefficients(ba, dm, n_rz_azimuthal_modes, 0);
     }
 
-    if (time_averaging && time_dependency_J != JInTime::Linear)
+    if (time_averaging && time_dependency_J != TimeDependencyJ::Linear)
     {
         WARPX_ABORT_WITH_MESSAGE(
             "RZ PSATD: psatd.do_time_averaging=1 implemented only with psatd.J_in_time=linear");
     }
 
-    if (dive_cleaning && time_dependency_J != JInTime::Linear)
+    if (dive_cleaning && time_dependency_J != TimeDependencyJ::Linear)
     {
         WARPX_ABORT_WITH_MESSAGE(
             "RZ PSATD: warpx.do_dive_cleaning=1 implemented only with psatd.J_in_time=linear");
     }
 
-    if (divb_cleaning && time_dependency_J != JInTime::Linear)
+    if (divb_cleaning && time_dependency_J != TimeDependencyJ::Linear)
     {
         WARPX_ABORT_WITH_MESSAGE(
             "RZ PSATD: warpx.do_divb_cleaning=1 implemented only with psatd.J_in_time=linear");
@@ -81,7 +81,7 @@ PsatdAlgorithmRZ::pushSpectralFields(SpectralFieldDataRZ & f)
 
     const bool update_with_rho = m_update_with_rho;
     const bool time_averaging = m_time_averaging;
-    const bool J_linear = (m_time_dependency_J == JInTime::Linear);
+    const bool J_linear = (m_time_dependency_J == TimeDependencyJ::Linear);
     const bool dive_cleaning = m_dive_cleaning;
     const bool divb_cleaning = m_divb_cleaning;
 
@@ -336,7 +336,7 @@ PsatdAlgorithmRZ::pushSpectralFields(SpectralFieldDataRZ & f)
 void PsatdAlgorithmRZ::InitializeSpectralCoefficients (SpectralFieldDataRZ const & f)
 {
     const bool time_averaging = m_time_averaging;
-    const bool J_linear = (m_time_dependency_J == JInTime::Linear);
+    const bool J_linear = (m_time_dependency_J == TimeDependencyJ::Linear);
 
     // Fill them with the right values:
     // Loop over boxes and allocate the corresponding coefficients

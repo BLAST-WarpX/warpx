@@ -87,8 +87,8 @@ class SpectralSolver
                         bool update_with_rho,
                         bool fft_do_time_averaging,
                         PSATDSolutionType psatd_solution_type,
-                        JInTime time_dependency_J,
-                        RhoInTime time_dependency_Rho,
+                        TimeDependencyJ time_dependency_J,
+                        TimeDependencyRho time_dependency_Rho,
                         bool dive_cleaning,
                         bool divb_cleaning);
 

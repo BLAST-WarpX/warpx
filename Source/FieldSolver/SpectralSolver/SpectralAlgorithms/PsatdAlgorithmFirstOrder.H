@@ -55,8 +55,8 @@ class PsatdAlgorithmFirstOrder : public SpectralBaseAlgorithm
             ablastr::utils::enums::GridType grid_type,
             amrex::Real dt,
             bool div_cleaning,
-            JInTime time_dependency_J,
-            RhoInTime time_dependency_Rho);
+            TimeDependencyJ time_dependency_J,
+            TimeDependencyRho time_dependency_Rho);
 
         /**
          * \brief Updates E, B, F, and G fields in spectral space,
@@ -93,8 +93,8 @@ class PsatdAlgorithmFirstOrder : public SpectralBaseAlgorithm
         // Other member variables
         amrex::Real m_dt;
         bool m_div_cleaning;
-        JInTime m_time_dependency_J;
-        RhoInTime m_time_dependency_Rho;
+        TimeDependencyJ m_time_dependency_J;
+        TimeDependencyRho m_time_dependency_Rho;
 };
 #endif // WARPX_USE_FFT
 #endif // WARPX_PSATD_ALGORITHM_FIRST_ORDER_H_

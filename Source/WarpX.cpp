@@ -1488,10 +1488,10 @@ WarpX::ReadParameters ()
             m_JRhom = true;
             // parse time dependency of J from first character
             if (JRhom_input[0] == 'C') {
-                time_dependency_J = JInTime::Constant;
+                time_dependency_J = TimeDependencyJ::Constant;
             }
             else if (JRhom_input[0] == 'L') {
-                time_dependency_J = JInTime::Linear;
+                time_dependency_J = TimeDependencyJ::Linear;
             }
             else {
                 WARPX_ABORT_WITH_MESSAGE(
@@ -1500,10 +1500,10 @@ WarpX::ReadParameters ()
             }
             // parse time dependency of rho from second character
             if (JRhom_input[1] == 'C') {
-                time_dependency_Rho = RhoInTime::Constant;
+                time_dependency_Rho = TimeDependencyRho::Constant;
             }
             else if (JRhom_input[1] == 'L') {
-                time_dependency_Rho = RhoInTime::Linear;
+                time_dependency_Rho = TimeDependencyRho::Linear;
             }
             else {
                 WARPX_ABORT_WITH_MESSAGE(
@@ -1529,7 +1529,7 @@ WarpX::ReadParameters ()
         if (m_psatd_solution_type != PSATDSolutionType::FirstOrder || m_JRhom == false)
         {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                time_dependency_Rho == RhoInTime::Linear,
+                time_dependency_Rho == TimeDependencyRho::Linear,
                 "psatd.rho_in_time=constant not yet implemented, "
                 "except for psatd.solution_type=first-order with JRhom algorithm");
         }
@@ -1694,7 +1694,7 @@ WarpX::ReadParameters ()
             );
         }
 
-        if (time_dependency_J == JInTime::Linear)
+        if (time_dependency_J == TimeDependencyJ::Linear)
         {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 update_with_rho,

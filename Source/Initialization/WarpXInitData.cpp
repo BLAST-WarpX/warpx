@@ -393,16 +393,16 @@ WarpX::PrintMainPICparameters ()
       amrex::Print() << "                      | - JRhom algorithm is ON \n";
       amrex::Print() << "                      |   - m_JRhom_subintervals = "
                                         << WarpX::m_JRhom_subintervals << "\n";
-      if (time_dependency_J == JInTime::Linear){
+      if (time_dependency_J == TimeDependencyJ::Linear){
         amrex::Print() << "                      |   - J time dependency is linear \n";
       }
-      if (time_dependency_J == JInTime::Constant){
+      if (time_dependency_J == TimeDependencyJ::Constant){
         amrex::Print() << "                      |   - J time dependency is constant \n";
       }
-      if (time_dependency_Rho == RhoInTime::Linear){
+      if (time_dependency_Rho == TimeDependencyRho::Linear){
         amrex::Print() << "                      |   - Rho time dependency is linear \n";
       }
-      if (time_dependency_Rho == RhoInTime::Constant){
+      if (time_dependency_Rho == TimeDependencyRho::Constant){
         amrex::Print() << "                      |   - Rho time dependency is constant \n";
       }
     }

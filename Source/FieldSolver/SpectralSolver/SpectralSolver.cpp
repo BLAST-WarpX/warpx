@@ -38,8 +38,8 @@ SpectralSolver::SpectralSolver (
                 const bool update_with_rho,
                 const bool fft_do_time_averaging,
                 const PSATDSolutionType psatd_solution_type,
-                const JInTime time_dependency_J,
-                const RhoInTime time_dependency_Rho,
+                const TimeDependencyJ time_dependency_J,
+                const TimeDependencyRho time_dependency_Rho,
                 const bool dive_cleaning,
                 const bool divb_cleaning)
     : m_dt(dt)
@@ -99,14 +99,14 @@ SpectralSolver::SpectralSolver (
         }
         else if (psatd_solution_type == PSATDSolutionType::SecondOrder)
         {
-            if (time_dependency_J == JInTime::Constant)
+            if (time_dependency_J == TimeDependencyJ::Constant)
             {
                 algorithm = std::make_unique<PsatdAlgorithmJConstantInTime>(
                     k_space, dm, m_spectral_index, norder_x, norder_y, norder_z, grid_type,
                     v_galilean, dt, update_with_rho, fft_do_time_averaging,
                     dive_cleaning, divb_cleaning);
             }
-            else if (time_dependency_J == JInTime::Linear)
+            else if (time_dependency_J == TimeDependencyJ::Linear)
             {
                 algorithm = std::make_unique<PsatdAlgorithmJLinearInTime>(
                     k_space, dm, m_spectral_index, norder_x, norder_y, norder_z, grid_type,

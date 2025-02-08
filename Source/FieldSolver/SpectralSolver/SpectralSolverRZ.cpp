@@ -36,8 +36,8 @@ SpectralSolverRZ::SpectralSolverRZ (const int lev,
                                     bool const with_pml,
                                     bool const update_with_rho,
                                     const bool fft_do_time_averaging,
-                                    const JInTime time_dependency_J,
-                                    const RhoInTime time_dependency_Rho,
+                                    const TimeDependencyJ time_dependency_J,
+                                    const TimeDependencyRho time_dependency_Rho,
                                     const bool dive_cleaning,
                                     const bool divb_cleaning)
     : m_dt(dt), k_space(realspace_ba, dm, dx)

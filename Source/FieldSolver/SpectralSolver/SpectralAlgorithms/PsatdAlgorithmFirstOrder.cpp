@@ -38,8 +38,8 @@ PsatdAlgorithmFirstOrder::PsatdAlgorithmFirstOrder (
     ablastr::utils::enums::GridType grid_type,
     const amrex::Real dt,
     const bool div_cleaning,
-    const JInTime time_dependency_J,
-    const RhoInTime time_dependency_Rho
+    const TimeDependencyJ time_dependency_J,
+    const TimeDependencyRho time_dependency_Rho
 )
     // Initializer list
     : SpectralBaseAlgorithm(spectral_kspace, dm, spectral_index, norder_x, norder_y, norder_z, grid_type),
@@ -54,10 +54,10 @@ PsatdAlgorithmFirstOrder::pushSpectralFields (SpectralFieldData& f) const
 {
     const bool div_cleaning = m_div_cleaning;
 
-    const bool J_constant = (m_time_dependency_J == JInTime::Constant);
-    const bool J_linear   = (m_time_dependency_J == JInTime::Linear);
-    const bool rho_constant = (m_time_dependency_Rho == RhoInTime::Constant);
-    const bool rho_linear   = (m_time_dependency_Rho == RhoInTime::Linear);
+    const bool J_constant = (m_time_dependency_J == TimeDependencyJ::Constant);
+    const bool J_linear   = (m_time_dependency_J == TimeDependencyJ::Linear);
+    const bool rho_constant = (m_time_dependency_Rho == TimeDependencyRho::Constant);
+    const bool rho_linear   = (m_time_dependency_Rho == TimeDependencyRho::Linear);
 
     const amrex::Real dt = m_dt;
     const amrex::Real dt2 = dt*dt;
