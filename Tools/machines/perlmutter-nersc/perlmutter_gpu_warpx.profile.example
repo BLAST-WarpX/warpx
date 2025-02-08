@@ -36,7 +36,7 @@ export LD_LIBRARY_PATH=${SW_DIR}/lapackpp-2024.05.31/lib64:${LD_LIBRARY_PATH}
 export PATH=${SW_DIR}/adios2-2.8.3/bin:${PATH}
 
 # optional: CCache
-export PATH=/global/common/software/spackecp/perlmutter/e4s-23.08/default/spack/opt/spack/linux-sles15-zen3/gcc-11.2.0/ccache-4.8.2-cvooxdw5wgvv2g3vjxjkrpv6dopginv6/bin:$PATH
+export PATH=${SW_DIR}/ccache-4.10.2:$PATH
 
 # optional: for Python bindings or libEnsemble
 module load cray-python/3.11.5

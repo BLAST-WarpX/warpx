@@ -47,6 +47,12 @@ python3 -m pip uninstall -qqq -y mpi4py 2>/dev/null || true
 # tmpfs build directory: avoids issues often seen with $HOME and is faster
 build_dir=$(mktemp -d)
 
+# CCache
+curl -Lo ccache.tar.xz https://github.com/ccache/ccache/releases/download/v4.10.2/ccache-4.10.2-linux-x86_64.tar.xz
+tar -xf ccache.tar.xz
+mv ccache-4.10.2-linux-x86_64 ${SW_DIR}/ccache-4.10.2
+rm -rf ccache.tar.xz
+
 # Boost (QED tables)
 rm -rf $HOME/src/boost-temp
 mkdir -p $HOME/src/boost-temp
