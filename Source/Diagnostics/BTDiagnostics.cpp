@@ -1460,7 +1460,7 @@ BTDiagnostics::InitializeParticleBuffer ()
         m_totalParticles_in_buffer[i].resize(m_output_species_names.size());
         for (int isp = 0; isp < m_particles_buffer[i].size(); ++isp) {
             m_totalParticles_in_buffer[i][isp] = 0;
-            m_particles_buffer[i][isp] = std::make_unique<PinnedMemoryParticleContainer>(WarpX::GetInstance().GetParGDB());
+            m_particles_buffer[i][isp] = std::make_unique<PinnedMemoryParticleContainer>(mpc.GetParticleContainer(isp).make_alike<amrex::PinnedArenaAllocator>());
             const int idx = mpc.getSpeciesID(m_output_species_names[isp]);
             m_output_species[i].push_back(ParticleDiag(m_diag_name,
                                                        m_output_species_names[isp],
