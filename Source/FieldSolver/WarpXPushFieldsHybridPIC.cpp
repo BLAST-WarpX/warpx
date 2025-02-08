@@ -287,7 +287,7 @@ void WarpX::HybridPICEvolveFields ()
                         0, 0, 1, m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->nGrowVect());
 
         // Update Te after QDSMC solver:
-        hybrid_electron_fl->HybridUpdateTe(m_fields, m_hybrid_pic_model->m_gamma, m_hybrid_pic_model->m_n_floor, finest_level);
+        hybrid_electron_fl->HybridQDSMCUpdateTe(m_fields, m_hybrid_pic_model->m_gamma, m_hybrid_pic_model->m_n_floor, finest_level);
 
         // adds Joule heating using operator splitting approach
         if(m_hybrid_pic_model->m_include_Joule_heating){

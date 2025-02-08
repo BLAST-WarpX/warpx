@@ -1556,7 +1556,7 @@ void WarpXFluidContainer::HybridInitializeKe (ablastr::fields::MultiFabRegister&
 }
 
 
-void WarpXFluidContainer::HybridUpdateTe (ablastr::fields::MultiFabRegister& m_fields, amrex::Real gamma, amrex::Real n_floor, int lev)
+void WarpXFluidContainer::HybridQDSMCUpdateTe (ablastr::fields::MultiFabRegister& m_fields, amrex::Real gamma, amrex::Real n_floor, int lev)
 {
     using warpx::fields::FieldType;
 
@@ -1605,9 +1605,10 @@ void WarpXFluidContainer::HybridUpdateTe (ablastr::fields::MultiFabRegister& m_f
 }
 
 
-// Maybe pass Te and rho as arguments too !
-// no need to fill Boundary? Hybrid_Electron_Joule_Heating should be called after filling boundary of rho and Te 
-// UPDATE eta to take Te as argument
+// To Do:
+// pass Te and rho multifabs as arguments too !
+// check: no need to fill Boundary? Hybrid_Electron_Joule_Heating should be called after filling boundary of rho and Te 
+// UPDATE eta to take Te as argument !
 void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiFabRegister& m_fields, 
                                         HybridPICModel const* hybrid_model, 
                                         amrex::Real dt, int lev)
@@ -1683,7 +1684,7 @@ void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiF
                     // UPDATE eta to take Te as argument
                     amrex::Real eta_J2 = eta(rho_val, jtot_val)*jtot_val*jtot_val;
 
-                    // Te already is in Joules so no need to divide by kb
+                    // Te already is in Joules so no need to divide eta_J2 by kb
                     Te(i, j, k) = Te_val + dt*eta_J2/(3/2*ne_val);
                 }
 

@@ -143,7 +143,7 @@ public:
 
     // UpdateTe takes the already interpolated Ke values from the grid after pushing the fictitious particles
     // and calculates Te at n+1
-    void HybridUpdateTe (ablastr::fields::MultiFabRegister& m_fields, amrex::Real gamma, amrex::Real n_floor, int lev);
+    void HybridQDSMCUpdateTe (ablastr::fields::MultiFabRegister& m_fields, amrex::Real gamma, amrex::Real n_floor, int lev);
 
     // Adds Joule heating to electrons
     // current implementation assumes only 1 ion species
