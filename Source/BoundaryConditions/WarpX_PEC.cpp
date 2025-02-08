@@ -166,8 +166,8 @@ namespace
                 const bool is_tangent_to_PEC = (icomp != idim);
 #endif
                 if (isPECBoundary) {
-                    // grid point ijk_vec is ig number of points pass the
-                    // domain boundary in direction, idim
+                    // grid point ijk_vec is ig number of points past the
+                    // domain boundary in idim direction
                     const int ig = ::get_cell_count_to_boundary(
                         dom_lo, dom_hi, ijk_vec, is_nodal, idim, iside);
 
@@ -343,25 +343,36 @@ namespace
 
 
     /**
-     * \brief Sets the rho or J field value in cells close to and on reflecting particle boundary
-     *        or PEC field boundary. The charge/current density deposited
-     *        in the guard cells are either reflected
-     *        back into the simulation domain (if a reflecting particle
-     *        boundary is used), or the opposite charge/current density is deposited
-     *        back in the domain to capture the effect of an image charge.
-     *        The charge/current density on the reflecting boundary is set to 0 while values
-     *        in the guard cells are set equal (and opposite) to their mirror
-     *        location inside the domain - representing image charges - in the
-     *        normal (tangential) direction.
+     * \brief Sets the rho or J field value near PEC and PMC boundaries by appropriately
+     *        folding in the rho or J deposited into the ghost cells.
+     *        Note that energy conservation demands that the boundary conditions for J be
+     *        consistent with those for E used to push the particles. If E_i is odd, then
+     *        J_i deposited to ghost cells should be subtracted from its mirror location
+     *        inside the domain. If E_i is even, then J_i deposited to the ghost cells should
+     *        be added to its mirror location inside the domain. If this is not done,
+     *        then artificial heating can occur at the boundaries.
+     *        PEC: The charge and current density parallel to the boundary deposited to the
+     *             guard cells is subtracted from its mirror location inside the domain.
+     *             The current density normal to the boundary deposited to the guard cells is
+     *             added to its mirror location inside the domain.
+     *             This can be interpreted as depositing the charge/current from the oppositely
+     *             charged mirror particle inside the PEC. It can also be interpreted as using
+     *             a lower order shape factor for the particles near the boundary.
+     *        PMC: The charge and current density parallel to the boundary deposited to the
+     *             guard cells is added to its mirror location inside the domain.
+     *             The current density normal to the boundary deposited to the guard cells is
+     *             subtracted from its mirror location inside the domain. Since PMC is a
+     *             symmetry boundary, this charge and current comes from the physical
+     *             mirror particle with the same charge on the other side of the boundary.
      *
-     * \param[in] n                 index of the MultiFab component being updated
-     * \param[in] ijk_vec           indices along the x(i), y(j), z(k) of the rho Array4
-     * \param[in out] field         field data to be updated
-     * \param[in] mirrorfac         mirror cell is given by mirrorfac - ijk_vec
-     * \param[in] psign             Whether the field value should be flipped across the boundary
-     * \param[in] is_reflective     Whether the given particle boundary is reflecting or field boundary is pec
-     * \param[in] is_nodal_r        Whether data is nodal along r
-     * \param[in] fabbox            multifab box including ghost cells
+     * \param[in] n                  index of the MultiFab component being updated
+     * \param[in] ijk_vec            indices along the x(i), y(j), z(k) of the rho Array4
+     * \param[in out] field          field data to be updated
+     * \param[in] mirrorfac          mirror cell is given by mirrorfac - ijk_vec
+     * \param[in] psign              Whether the field value should be flipped across the boundary
+     * \param[in] is_pec_pmc_bndy    Whether the field boundary is pec or pmc
+     * \param[in] tangent_to_bndy    Whether a given direction is perpendicular to the boundary
+     * \param[in] fabbox             multifab box including ghost cells
      */
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     void SetRhoOrJfieldFromPEC (const int n,
@@ -369,7 +380,8 @@ namespace
                                 amrex::Array4<amrex::Real> const& field,
                                 amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> const& mirrorfac,
                                 amrex::GpuArray<GpuArray<amrex::Real, 2>, AMREX_SPACEDIM> const& psign,
-                                amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> const& is_reflective,
+                                amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> const& is_pec_pmc_bndy,
+                                amrex::GpuArray<bool, AMREX_SPACEDIM> const& tangent_to_bndy,
                                 [[maybe_unused]]int const is_nodal_r,
                                 amrex::Box const& fabbox)
     {
@@ -380,14 +392,14 @@ namespace
         {
             for (int iside = 0; iside < 2; ++iside)
             {
-                if (!is_reflective[idim][iside]) { continue; }
+                if (!is_pec_pmc_bndy[idim][iside]) { continue; }
 
                 // Get the mirror guard cell index
                 amrex::IntVect iv_mirror = ijk_vec;
                 iv_mirror[idim] = mirrorfac[idim][iside] - ijk_vec[idim];
 
                 // Update the cell if the mirror guard cell exists
-                if (ijk_vec == iv_mirror && is_reflective[idim][iside] == 1) {
+                if (ijk_vec == iv_mirror && psign[idim][iside] == -1) {
                     field(ijk_vec,n) = 0._rt;
                 } else if (fabbox.contains(iv_mirror)) {
                     // Note that this includes the cells on the boundary for PMC
@@ -414,7 +426,7 @@ namespace
         {
             for (int iside = 0; iside < 2; ++iside)
             {
-                if (!is_reflective[idim][iside]) { continue; }
+                if (!is_pec_pmc_bndy[idim][iside]) { continue; }
 
                 amrex::IntVect iv_mirror = ijk_vec;
                 iv_mirror[idim] = mirrorfac[idim][iside] - ijk_vec[idim];
@@ -665,12 +677,10 @@ PEC::ApplyPECtoBfield (
  *        location inside the domain - representing image charges.
  **/
 void
-PEC::ApplyReflectiveBoundarytoRhofield (
+PEC::ApplyBoundarytoRhofield (
     amrex::MultiFab* rho,
     const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_lo,
     const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_hi,
-    const amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>& particle_boundary_lo,
-    const amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>& particle_boundary_hi,
     const amrex::Geometry& geom,
     const int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios)
 {
@@ -690,29 +700,28 @@ PEC::ApplyReflectiveBoundarytoRhofield (
     // cells for boundaries that are NOT PEC
     amrex::Box grown_domain_box = domain_box;
 
-    amrex::GpuArray<GpuArray<int,2>, AMREX_SPACEDIM> is_reflective;
+    amrex::GpuArray<GpuArray<int,2>, AMREX_SPACEDIM> is_pec_pmc_bndy;
+    amrex::GpuArray<bool, AMREX_SPACEDIM> is_tangent_to_bndy;
     amrex::GpuArray<GpuArray<amrex::Real,2>, AMREX_SPACEDIM> psign;
     amrex::GpuArray<GpuArray<int,2>, AMREX_SPACEDIM> mirrorfac;
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
-        is_reflective[idim][0] = ( particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
-                              || ( particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
-                              || ( field_boundary_lo[idim] == FieldBoundaryType::PEC);
-        if (field_boundary_lo[idim] == FieldBoundaryType::PMC) { is_reflective[idim][0] = 2; }
-        is_reflective[idim][1] = ( particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
-                              || ( particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
-                              || ( field_boundary_hi[idim] == FieldBoundaryType::PEC);
-        if (field_boundary_hi[idim] == FieldBoundaryType::PMC) { is_reflective[idim][1] = 2; }
-        if (!is_reflective[idim][0]) { grown_domain_box.growLo(idim, ng_fieldgather[idim]); }
-        if (!is_reflective[idim][1]) { grown_domain_box.growHi(idim, ng_fieldgather[idim]); }
+        is_pec_pmc_bndy[idim][0] = ( field_boundary_lo[idim] == FieldBoundaryType::PEC
+                                  || field_boundary_lo[idim] == FieldBoundaryType::PMC );
+        is_pec_pmc_bndy[idim][1] = ( field_boundary_hi[idim] == FieldBoundaryType::PEC
+                                  || field_boundary_lo[idim] == FieldBoundaryType::PMC );
+        // What are the below lines for? Why grow box to include ghosts only if not reflective?
+        // What does E and B BC routines do if the boundary is not a PEC or PMC boundary?
+        if (!is_pec_pmc_bndy[idim][0]) { grown_domain_box.growLo(idim, ng_fieldgather[idim]); }
+        if (!is_pec_pmc_bndy[idim][1]) { grown_domain_box.growHi(idim, ng_fieldgather[idim]); }
 
-        psign[idim][0] = ((particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
-                        ||(particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
-                        ||(field_boundary_lo[idim] == FieldBoundaryType::PMC))
-                         ? 1._rt : -1._rt;
-        psign[idim][1] = ((particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
-                        ||(particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
-                        ||(field_boundary_hi[idim] == FieldBoundaryType::PMC))
-                         ? 1._rt : -1._rt;
+        // rho values inside guard cells are updated the same as tangential
+        // components of the current density
+        is_tangent_to_bndy[idim] = true;
+
+        // Default is -1 for PEC boundary
+        psign[idim][0] = (field_boundary_lo[idim] == FieldBoundaryType::PMC ? 1._rt : -1._rt);
+        psign[idim][1] = (field_boundary_hi[idim] == FieldBoundaryType::PMC ? 1._rt : -1._rt);
+
         mirrorfac[idim][0] = 2*domain_lo[idim] - (1 - rho_nodal[idim]);
         mirrorfac[idim][1] = 2*domain_hi[idim] + (1 - rho_nodal[idim]);
     }
@@ -728,6 +737,7 @@ PEC::ApplyReflectiveBoundarytoRhofield (
 
         // If grown_domain_box contains fabbox it means there are no PEC
         // boundaries to handle so continue to next box
+        // Is this because it is grown above? Don't follow.
         if (grown_domain_box.contains(fabbox)) { continue; }
 
         // Extract field data
@@ -741,8 +751,8 @@ PEC::ApplyReflectiveBoundarytoRhofield (
             const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
 
             ::SetRhoOrJfieldFromPEC(
-                n, iv, rho_array, mirrorfac, psign, is_reflective,
-                rho_nodal[0], fabbox
+                n, iv, rho_array, mirrorfac, psign, is_pec_pmc_bndy,
+                is_tangent_to_bndy, fabbox
             );
         });
     }
@@ -750,12 +760,10 @@ PEC::ApplyReflectiveBoundarytoRhofield (
 
 
 void
-PEC::ApplyReflectiveBoundarytoJfield(
+PEC::ApplyBoundarytoJfield(
     amrex::MultiFab* Jx, amrex::MultiFab* Jy, amrex::MultiFab* Jz,
     const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_lo,
     const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_hi,
-    const amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>& particle_boundary_lo,
-    const amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>& particle_boundary_hi,
     const amrex::Geometry& geom,
     const int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios)
 {
@@ -785,23 +793,19 @@ PEC::ApplyReflectiveBoundarytoJfield(
     // directions of the current density multifab
     const amrex::IntVect ng_fieldgather = Jx->nGrowVect();
 
-    amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> is_reflective;
-    bool is_tangent_to_bndy;
+    amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> is_pec_pmc_bndy;
+    amrex::GpuArray<GpuArray<bool, AMREX_SPACEDIM>, 3> is_tangent_to_bndy;
     amrex::GpuArray<GpuArray<GpuArray<amrex::Real, 2>, AMREX_SPACEDIM>, 3> psign;
     amrex::GpuArray<GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM>, 3> mirrorfac;
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
-        is_reflective[idim][0] = ( particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
-                              || ( particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
-                              || ( field_boundary_lo[idim] == FieldBoundaryType::PEC)
-                              || ( field_boundary_lo[idim] == FieldBoundaryType::PMC);
-        if (field_boundary_lo[idim] == FieldBoundaryType::PMC) { is_reflective[idim][0] = 2; }
-        is_reflective[idim][1] = ( particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
-                              || ( particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
-                              || ( field_boundary_hi[idim] == FieldBoundaryType::PEC)
-                              || ( field_boundary_hi[idim] == FieldBoundaryType::PMC);
-        if (field_boundary_hi[idim] == FieldBoundaryType::PMC) { is_reflective[idim][1] = 2; }
-        if (!is_reflective[idim][0]) { grown_domain_box.growLo(idim, ng_fieldgather[idim]); }
-        if (!is_reflective[idim][1]) { grown_domain_box.growHi(idim, ng_fieldgather[idim]); }
+        is_pec_pmc_bndy[idim][0] = ( field_boundary_lo[idim] == FieldBoundaryType::PEC
+                                  || field_boundary_lo[idim] == FieldBoundaryType::PMC );
+        is_pec_pmc_bndy[idim][1] = ( field_boundary_hi[idim] == FieldBoundaryType::PEC
+                                  || field_boundary_hi[idim] == FieldBoundaryType::PMC );
+        // What are the below lines for? Why grow box to include ghosts only if not reflective?
+        // What does E and B BC routines do if the boundary is not a PEC or PMC boundary?
+        if (!is_pec_pmc_bndy[idim][0]) { grown_domain_box.growLo(idim, ng_fieldgather[idim]); }
+        if (!is_pec_pmc_bndy[idim][1]) { grown_domain_box.growHi(idim, ng_fieldgather[idim]); }
 
         for (int icomp=0; icomp < 3; ++icomp) {
             // Set the psign value correctly for each current component for each
@@ -819,25 +823,15 @@ PEC::ApplyReflectiveBoundarytoJfield(
             is_tangent_to_bndy = (icomp != idim);
 #endif
 
-            if (is_tangent_to_bndy){
-                psign[icomp][idim][0] = ( (particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
-                                        ||(particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
-                                        ||(field_boundary_lo[idim] == FieldBoundaryType::PMC))
-                                        ? 1._rt : -1._rt;
-                psign[icomp][idim][1] = ( (particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
-                                        ||(particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
-                                        ||(field_boundary_hi[idim] == FieldBoundaryType::PMC))
-                                        ? 1._rt : -1._rt;
+            if (is_tangent_to_bndy[icomp][idim]){
+                // Default is -1 for PEC boundary
+                psign[icomp][idim][0] = ( field_boundary_lo[idim] == FieldBoundaryType::PMC ? 1._rt : -1._rt );
+                psign[icomp][idim][1] = ( field_boundary_hi[idim] == FieldBoundaryType::PMC ? 1._rt : -1._rt );
             }
             else {
-                psign[icomp][idim][0] = ( (particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
-                                        ||(particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
-                                        ||(field_boundary_lo[idim] == FieldBoundaryType::PMC))
-                                        ? -1._rt : 1._rt;
-                psign[icomp][idim][1] = ( (particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
-                                        ||(particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
-                                        ||(field_boundary_hi[idim] == FieldBoundaryType::PMC))
-                                        ? -1._rt : 1._rt;
+                // Default is +1 for PEC boundary
+                psign[icomp][idim][0] = ( field_boundary_lo[idim] == FieldBoundaryType::PMC ? -1._rt : 1._rt );
+                psign[icomp][idim][1] = ( field_boundary_hi[idim] == FieldBoundaryType::PMC ? -1._rt : 1._rt );
             }
         }
         // Set the correct mirror cell calculation for each current
@@ -863,7 +857,8 @@ PEC::ApplyReflectiveBoundarytoJfield(
         Box const& fabbox = mfi.fabbox();
 
         // If grown_domain_box contains fabbox it means there are no PEC
-        // boundaries to handle so continue to next box
+        // boundaries to handle so continue to next box.
+        // Is this because it is grown above? Don't follow.
         if (grown_domain_box.contains(fabbox)) { continue; }
 
         // Extract field data
@@ -877,8 +872,8 @@ PEC::ApplyReflectiveBoundarytoJfield(
             const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
 
             ::SetRhoOrJfieldFromPEC(
-                n, iv, Jx_array, mirrorfac[0], psign[0], is_reflective,
-                Jx_nodal[0], fabbox
+                n, iv, Jx_array, mirrorfac[0], psign[0], is_pec_pmc_bndy,
+                is_tangent_to_bndy[0], fabbox
             );
         });
     }
@@ -908,8 +903,8 @@ PEC::ApplyReflectiveBoundarytoJfield(
             const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
 
             ::SetRhoOrJfieldFromPEC(
-                n, iv, Jy_array, mirrorfac[1], psign[1], is_reflective,
-                Jy_nodal[0], fabbox
+                n, iv, Jy_array, mirrorfac[1], psign[1], is_pec_pmc_bndy,
+                is_tangent_to_bndy[1], fabbox
             );
         });
     }
@@ -939,8 +934,8 @@ PEC::ApplyReflectiveBoundarytoJfield(
             const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
 
             ::SetRhoOrJfieldFromPEC(
-                n, iv, Jz_array, mirrorfac[2], psign[2], is_reflective,
-                Jz_nodal[0], fabbox
+                n, iv, Jz_array, mirrorfac[2], psign[2], is_pec_pmc_bndy,
+                is_tangent_to_bndy[2], fabbox
             );
         });
     }
