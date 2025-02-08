@@ -1467,9 +1467,9 @@ BTDiagnostics::InitializeParticleBuffer ()
             {
                 auto &pc = mpc.GetParticleContainer(idx);
                 auto rn = pc.GetRealSoANames();
-                rn.resize(pc.NArrayReal);  // strip runtime comps
+                rn.resize(WarpXParticleContainer::NArrayReal);  // strip runtime comps
                 auto in = pc.GetRealSoANames();
-                in.resize(pc.NArrayInt);  // strip runtime comps
+                in.resize(WarpXParticleContainer::NArrayInt);  // strip runtime comps
                 m_particles_buffer[i][isp]->SetSoACompileTimeNames(rn, in);
             }
 

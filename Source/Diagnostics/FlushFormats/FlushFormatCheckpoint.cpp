@@ -216,7 +216,7 @@ FlushFormatCheckpoint::CheckpointParticles (
         // note, skip the required compnent names here
         auto rnames = pc->GetRealSoANames();
         for (std::size_t index = PIdx::nattribs; index < rnames.size(); ++index) {
-            int const i = index - AMREX_SPACEDIM;
+            std::size_t const i = index - AMREX_SPACEDIM;
             real_names[i] = rnames[index];
             write_real_comps[i] = pc->h_redistribute_real_comp[index];
         }

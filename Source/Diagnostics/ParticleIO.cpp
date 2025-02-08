@@ -156,7 +156,7 @@ MultiParticleContainer::Restart (const std::string& dir)
         int n_rc = 0;
         for (auto const& comp : pc->GetRealSoANames()) {
             // skip compile-time components
-            if (n_rc < pc->NArrayReal) { continue; }
+            if (n_rc < WarpXParticleContainer::NArrayReal) { continue; }
             n_rc++;
 
             auto search = std::find(real_comp_names.begin(), real_comp_names.end(), comp);
@@ -193,7 +193,7 @@ MultiParticleContainer::Restart (const std::string& dir)
         int n_ic = 0;
         for (auto const& comp : pc->GetIntSoANames()) {
             // skip compile-time components
-            if (n_ic < pc->NArrayInt) { continue; }
+            if (n_ic < WarpXParticleContainer::NArrayInt) { continue; }
             n_ic++;
 
             auto search = std::find(int_comp_names.begin(), int_comp_names.end(), comp);
