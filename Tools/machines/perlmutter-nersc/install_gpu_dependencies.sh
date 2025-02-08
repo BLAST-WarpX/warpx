@@ -44,6 +44,9 @@ python3 -m pip uninstall -qqq -y mpi4py 2>/dev/null || true
 # General extra dependencies ##################################################
 #
 
+# build parallelism
+PARALLEL=16
+
 # tmpfs build directory: avoids issues often seen with $HOME and is faster
 build_dir=$(mktemp -d)
 
@@ -60,7 +63,7 @@ curl -Lo $HOME/src/boost-temp/boost.tar.gz https://archives.boost.io/release/1.8
 tar -xzf $HOME/src/boost-temp/boost.tar.gz -C $HOME/src/boost-temp
 cd $HOME/src/boost-temp/boost_1_82_0
 ./bootstrap.sh --with-libraries=math --prefix=${SW_DIR}/boost-1.82.0
-./b2 cxxflags="-std=c++17" install -j 16
+./b2 cxxflags="-std=c++17" install -j ${PARALLEL}
 cd -
 rm -rf $HOME/src/boost-temp
 
@@ -76,7 +79,7 @@ else
 fi
 rm -rf $HOME/src/c-blosc-pm-gpu-build
 cmake -S $HOME/src/c-blosc -B ${build_dir}/c-blosc-pm-gpu-build -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/c-blosc-1.21.1
-cmake --build ${build_dir}/c-blosc-pm-gpu-build --target install --parallel 16
+cmake --build ${build_dir}/c-blosc-pm-gpu-build --target install --parallel ${PARALLEL}
 rm -rf ${build_dir}/c-blosc-pm-gpu-build
 
 # ADIOS2
@@ -91,7 +94,7 @@ else
 fi
 rm -rf $HOME/src/adios2-pm-gpu-build
 cmake -S $HOME/src/adios2 -B ${build_dir}/adios2-pm-gpu-build -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.8.3
-cmake --build ${build_dir}/adios2-pm-gpu-build --target install -j 16
+cmake --build ${build_dir}/adios2-pm-gpu-build --target install -j ${PARALLEL}
 rm -rf ${build_dir}/adios2-pm-gpu-build
 
 # BLAS++ (for PSATD+RZ)
@@ -106,7 +109,7 @@ else
 fi
 rm -rf $HOME/src/blaspp-pm-gpu-build
 CXX=$(which CC) cmake -S $HOME/src/blaspp -B ${build_dir}/blaspp-pm-gpu-build -Duse_openmp=OFF -Dgpu_backend=cuda -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
-cmake --build ${build_dir}/blaspp-pm-gpu-build --target install --parallel 16
+cmake --build ${build_dir}/blaspp-pm-gpu-build --target install --parallel ${PARALLEL}
 rm -rf ${build_dir}/blaspp-pm-gpu-build
 
 # LAPACK++ (for PSATD+RZ)
@@ -121,7 +124,7 @@ else
 fi
 rm -rf $HOME/src/lapackpp-pm-gpu-build
 CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $HOME/src/lapackpp -B ${build_dir}/lapackpp-pm-gpu-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
-cmake --build ${build_dir}/lapackpp-pm-gpu-build --target install --parallel 16
+cmake --build ${build_dir}/lapackpp-pm-gpu-build --target install --parallel ${PARALLEL}
 rm -rf ${build_dir}/lapackpp-pm-gpu-build
 
 # Python ######################################################################
