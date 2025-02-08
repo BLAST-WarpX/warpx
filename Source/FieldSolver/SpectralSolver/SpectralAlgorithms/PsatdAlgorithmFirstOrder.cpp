@@ -38,15 +38,15 @@ PsatdAlgorithmFirstOrder::PsatdAlgorithmFirstOrder (
     ablastr::utils::enums::GridType grid_type,
     const amrex::Real dt,
     const bool div_cleaning,
-    const JInTime J_in_time,
-    const RhoInTime rho_in_time
+    const JInTime time_dependency_J,
+    const RhoInTime time_dependency_Rho
 )
     // Initializer list
     : SpectralBaseAlgorithm(spectral_kspace, dm, spectral_index, norder_x, norder_y, norder_z, grid_type),
     m_dt(dt),
     m_div_cleaning(div_cleaning),
-    m_J_in_time(J_in_time),
-    m_rho_in_time(rho_in_time)
+    m_time_dependency_J(time_dependency_J),
+    m_time_dependency_Rho(time_dependency_Rho)
 {}
 
 void
@@ -54,10 +54,10 @@ PsatdAlgorithmFirstOrder::pushSpectralFields (SpectralFieldData& f) const
 {
     const bool div_cleaning = m_div_cleaning;
 
-    const bool J_constant = (m_J_in_time == JInTime::Constant);
-    const bool J_linear   = (m_J_in_time == JInTime::Linear);
-    const bool rho_constant = (m_rho_in_time == RhoInTime::Constant);
-    const bool rho_linear   = (m_rho_in_time == RhoInTime::Linear);
+    const bool J_constant = (m_time_dependency_J == JInTime::Constant);
+    const bool J_linear   = (m_time_dependency_J == JInTime::Linear);
+    const bool rho_constant = (m_time_dependency_Rho == RhoInTime::Constant);
+    const bool rho_linear   = (m_time_dependency_Rho == RhoInTime::Linear);
 
     const amrex::Real dt = m_dt;
     const amrex::Real dt2 = dt*dt;

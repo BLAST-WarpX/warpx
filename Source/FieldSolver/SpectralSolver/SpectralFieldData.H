@@ -43,12 +43,8 @@ class SpectralFieldIndex
          *
          * \param[in] update_with_rho whether rho is used in the field update equations
          * \param[in] time_averaging  whether the time averaging algorithm is used
-         * \param[in] J_in_time       the multi-J algorithm used (hence two currents
-         *                            computed at the beginning and the end of the time interval
-         *                            instead of one current computed at half time)
-         * \param[in] rho_in_time     the multi-rho algorithm used (hence two densities
-         *                            computed at the beginning and the end of the time interval
-         *                            instead of one density computed at half time)
+         * \param[in] time_dependency_J the time dependency of J within one time interval
+         * \param[in] time_dependency_Rho the time dependency of Rho within one time interval
          * \param[in] dive_cleaning   whether to use div(E) cleaning to account for errors in
          *                            Gauss law (new field F in the update equations)
          * \param[in] divb_cleaning   whether to use div(B) cleaning to account for errors in
@@ -60,8 +56,8 @@ class SpectralFieldIndex
          */
         SpectralFieldIndex (bool update_with_rho,
                             bool time_averaging,
-                            JInTime J_in_time,
-                            RhoInTime rho_in_time,
+                            JInTime time_dependency_J,
+                            RhoInTime time_dependency_Rho,
                             bool dive_cleaning,
                             bool divb_cleaning,
                             bool pml,

@@ -247,8 +247,8 @@ public:
 
     //! Integers that correspond to the time dependency of J (constant, linear)
     //! and rho (linear, quadratic) for the PSATD algorithm
-    static inline auto J_in_time = JInTime::Default;
-    static inline auto rho_in_time = RhoInTime::Default;
+    static inline auto time_dependency_J = JInTime::Default;
+    static inline auto time_dependency_Rho = RhoInTime::Default;
 
     //! If true, the current is deposited on a nodal grid and then centered onto a staggered grid
     //! using finite centering of order given by #current_centering_nox, #current_centering_noy,

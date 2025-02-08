@@ -393,17 +393,17 @@ WarpX::PrintMainPICparameters ()
       amrex::Print() << "                      | - JRhom algorithm is ON \n";
       amrex::Print() << "                      |   - m_JRhom_subintervals = "
                                         << WarpX::m_JRhom_subintervals << "\n";
-      if (J_in_time == JInTime::Linear){
-        amrex::Print() << "                      |   - J_in_time = linear \n";
+      if (time_dependency_J == JInTime::Linear){
+        amrex::Print() << "                      |   - J time dependency is linear \n";
       }
-      if (J_in_time == JInTime::Constant){
-        amrex::Print() << "                      |   - J_in_time = constant \n";
+      if (time_dependency_J == JInTime::Constant){
+        amrex::Print() << "                      |   - J time dependency is constant \n";
       }
-      if (rho_in_time == RhoInTime::Linear){
-        amrex::Print() << "                      |   - rho_in_time = linear \n";
+      if (time_dependency_Rho == RhoInTime::Linear){
+        amrex::Print() << "                      |   - Rho time dependency is linear \n";
       }
-      if (rho_in_time == RhoInTime::Constant){
-        amrex::Print() << "                      |   - rho_in_time = constant \n";
+      if (time_dependency_Rho == RhoInTime::Constant){
+        amrex::Print() << "                      |   - Rho time dependency is constant \n";
       }
     }
     if (fft_do_time_averaging){
@@ -733,7 +733,7 @@ WarpX::InitPML ()
             pml_ncell, pml_delta, amrex::IntVect::TheZeroVector(),
             dt[0], nox_fft, noy_fft, noz_fft, grid_type,
             do_moving_window, pml_has_particles, do_pml_in_domain,
-            m_psatd_solution_type, J_in_time, rho_in_time,
+            m_psatd_solution_type, time_dependency_J, time_dependency_Rho,
             do_pml_dive_cleaning, do_pml_divb_cleaning,
             amrex::IntVect(0), amrex::IntVect(0),
             eb_enabled,
@@ -774,7 +774,7 @@ WarpX::InitPML ()
                 pml_ncell, pml_delta, refRatio(lev-1),
                 dt[lev], nox_fft, noy_fft, noz_fft, grid_type,
                 do_moving_window, pml_has_particles, do_pml_in_domain,
-                m_psatd_solution_type, J_in_time, rho_in_time, do_pml_dive_cleaning, do_pml_divb_cleaning,
+                m_psatd_solution_type, time_dependency_J, time_dependency_Rho, do_pml_dive_cleaning, do_pml_divb_cleaning,
                 amrex::IntVect(0), amrex::IntVect(0),
                 eb_enabled,
                 guard_cells.ng_FieldSolver.max(),

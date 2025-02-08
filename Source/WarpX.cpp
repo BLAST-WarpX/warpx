@@ -1488,10 +1488,10 @@ WarpX::ReadParameters ()
             m_JRhom = true;
             // parse time dependency of J from first character
             if (JRhom_input[0] == 'C') {
-                J_in_time = JInTime::Constant;
+                time_dependency_J = JInTime::Constant;
             }
             else if (JRhom_input[0] == 'L') {
-                J_in_time = JInTime::Linear;
+                time_dependency_J = JInTime::Linear;
             }
             else {
                 WARPX_ABORT_WITH_MESSAGE(
@@ -1500,10 +1500,10 @@ WarpX::ReadParameters ()
             }
             // parse time dependency of rho from second character
             if (JRhom_input[1] == 'C') {
-                rho_in_time = RhoInTime::Constant;
+                time_dependency_Rho = RhoInTime::Constant;
             }
             else if (JRhom_input[1] == 'L') {
-                rho_in_time = RhoInTime::Linear;
+                time_dependency_Rho = RhoInTime::Linear;
             }
             else {
                 WARPX_ABORT_WITH_MESSAGE(
@@ -1529,7 +1529,7 @@ WarpX::ReadParameters ()
         if (m_psatd_solution_type != PSATDSolutionType::FirstOrder || m_JRhom == false)
         {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                rho_in_time == RhoInTime::Linear,
+                time_dependency_Rho == RhoInTime::Linear,
                 "psatd.rho_in_time=constant not yet implemented, "
                 "except for psatd.solution_type=first-order with JRhom algorithm");
         }
@@ -1694,7 +1694,7 @@ WarpX::ReadParameters ()
             );
         }
 
-        if (J_in_time == JInTime::Linear)
+        if (time_dependency_J == JInTime::Linear)
         {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 update_with_rho,
@@ -2865,8 +2865,8 @@ void WarpX::AllocLevelSpectralSolverRZ (amrex::Vector<std::unique_ptr<SpectralSo
                                                   ::isAnyBoundaryPML(field_boundary_lo, field_boundary_hi),
                                                   update_with_rho,
                                                   fft_do_time_averaging,
-                                                  J_in_time,
-                                                  rho_in_time,
+                                                  time_dependency_J,
+                                                  time_dependency_Rho,
                                                   do_dive_cleaning,
                                                   do_divb_cleaning);
     spectral_solver[lev] = std::move(pss);
@@ -2926,8 +2926,8 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
                                                 update_with_rho,
                                                 fft_do_time_averaging,
                                                 m_psatd_solution_type,
-                                                J_in_time,
-                                                rho_in_time,
+                                                time_dependency_J,
+                                                time_dependency_Rho,
                                                 do_dive_cleaning,
                                                 do_divb_cleaning);
     spectral_solver[lev] = std::move(pss);

@@ -64,10 +64,8 @@ class SpectralSolver
          * \param[in] fft_do_time_averaging whether the time averaging algorithm is used
          * \param[in] psatd_solution_type whether the PSATD equations are derived
          *                                from a first-order or second-order model
-         * \param[in] J_in_time integer that corresponds to the time dependency of J
-         *                      (constant, linear) for the PSATD algorithm
-         * \param[in] rho_in_time integer that corresponds to the time dependency of rho
-         *                        (linear, quadratic) for the PSATD algorithm
+         * \param[in] time_dependency_J time dependency of J within one time interval
+         * \param[in] time_dependency_Rho time dependency of Rho within one time interval
          * \param[in] dive_cleaning whether to use div(E) cleaning to account for errors in
          *                          Gauss law (new field F in the update equations)
          * \param[in] divb_cleaning whether to use div(B) cleaning to account for errors in
@@ -89,8 +87,8 @@ class SpectralSolver
                         bool update_with_rho,
                         bool fft_do_time_averaging,
                         PSATDSolutionType psatd_solution_type,
-                        JInTime J_in_time,
-                        RhoInTime rho_in_time,
+                        JInTime time_dependency_J,
+                        RhoInTime time_dependency_Rho,
                         bool dive_cleaning,
                         bool divb_cleaning);
 
