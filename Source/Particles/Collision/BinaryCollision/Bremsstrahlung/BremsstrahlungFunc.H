@@ -331,8 +331,8 @@ public:
         void BremsstrahlungEvent (amrex::ParticleReal & u1x, amrex::ParticleReal & u1y,
                                   amrex::ParticleReal & u1z, amrex::ParticleReal & u2x,
                                   amrex::ParticleReal & u2y, amrex::ParticleReal & u2z,
-                                  amrex::ParticleReal m1, amrex::ParticleReal /*m2*/,
-                                  amrex::ParticleReal weight1, amrex::ParticleReal /*weight2*/,
+                                  amrex::ParticleReal m1, amrex::ParticleReal m2,
+                                  amrex::ParticleReal weight1, amrex::ParticleReal weight2,
                                   amrex::ParticleReal n1, amrex::ParticleReal n2,
                                   amrex::Real dt, int pair_index,
                                   index_type* AMREX_RESTRICT p_mask,
@@ -399,7 +399,14 @@ public:
                 amrex::ParticleReal const random_number2 = amrex::Random(engine);
                 amrex::ParticleReal const EphotonoT1 = Photon_energy(index, i0_cut, koT1_cut, kdsigdk_cut,
                                                                      w0, sigma_total, random_number2);
-                amrex::ParticleReal const Ephoton = EphotonoT1*KE_eV*PhysConst::q_e;
+                amrex::ParticleReal Ephoton = EphotonoT1*KE_eV*PhysConst::q_e;
+
+                // limit Ephoton to KE in weighted center-of-momentum frame
+                // This is needed for physical solution that conserves both momentum and energy
+                amrex::ParticleReal const mime = (weight2*m2)/(weight1*m1);
+                amrex::ParticleReal const u1_rel = std::sqrt(u1sq_rel);
+                amrex::ParticleReal const KE_cm = mime*(gamma1_rel - 1.0_prt)/(gamma1_rel - u1_rel/PhysConst::c + mime)*m1*c2;
+                Ephoton = std::min(Ephoton, KE_cm);
 
                 // The electron and ion momentum are updated in the same place where the photon is created,
                 // in PhotonCreationFunc.
