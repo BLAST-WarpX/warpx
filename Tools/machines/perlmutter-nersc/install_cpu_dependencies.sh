@@ -31,7 +31,7 @@ fi
 
 # Remove old dependencies #####################################################
 #
-SW_DIR="${CFS}/${proj}/${USER}/sw/perlmutter/cpu"
+SW_DIR="${PSCRATCH}/storage/sw/perlmutter/cpu"
 rm -rf ${SW_DIR}
 mkdir -p ${SW_DIR}
 

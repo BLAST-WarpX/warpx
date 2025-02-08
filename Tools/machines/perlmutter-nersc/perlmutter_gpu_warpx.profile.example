@@ -19,7 +19,7 @@ export BOOST_ROOT=/global/common/software/spackecp/perlmutter/e4s-23.08/default/
 
 # optional: for openPMD and PSATD+RZ support
 module load cray-hdf5-parallel/1.12.2.9
-export SW_DIR=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu
+export SW_DIR=${PSCRATCH}/storage/sw/perlmutter/gpu
 export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-1.21.1:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.8.3:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=${SW_DIR}/blaspp-2024.05.31:$CMAKE_PREFIX_PATH

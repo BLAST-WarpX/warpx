@@ -31,7 +31,7 @@ fi
 
 # Remove old dependencies #####################################################
 #
-SW_DIR="${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu"
+SW_DIR="${PSCRATCH}/storage/sw/perlmutter/gpu"
 rm -rf ${SW_DIR}
 mkdir -p ${SW_DIR}
 
