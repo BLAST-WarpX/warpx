@@ -47,6 +47,17 @@ python3 -m pip uninstall -qqq -y mpi4py 2>/dev/null || true
 # tmpfs build directory: avoids issues often seen with $HOME and is faster
 build_dir=$(mktemp -d)
 
+# Boost (QED tables)
+rm -rf $HOME/src/boost-temp
+mkdir -p $HOME/src/boost-temp
+curl -Lo $HOME/src/boost-temp/boost.tar.gz https://archives.boost.io/release/1.82.0/source/boost_1_82_0.tar.gz
+tar -xzf $HOME/src/boost-temp/boost.tar.gz -C $HOME/src/boost-temp
+cd $HOME/src/boost-temp/boost_1_82_0
+./bootstrap.sh --with-libraries=math --prefix=${SW_DIR}/boost-1.82.0
+./b2 cxxflags="-std=c++17" install -j 16
+cd -
+rm -rf $HOME/src/boost-temp
+
 # c-blosc (I/O compression)
 if [ -d $HOME/src/c-blosc ]
 then

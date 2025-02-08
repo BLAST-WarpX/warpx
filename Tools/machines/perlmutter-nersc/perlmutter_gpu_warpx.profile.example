@@ -18,7 +18,8 @@ module load cmake/3.30.2
 export SW_DIR=${PSCRATCH}/storage/sw/perlmutter/gpu
 
 # optional: for QED support with detailed tables
-export BOOST_ROOT=/global/common/software/spackecp/perlmutter/e4s-23.08/default/spack/opt/spack/linux-sles15-zen3/gcc-12.3.0/boost-1.83.0-nxqk3hnci5g3wqv75wvsmuke3w74mzxi
+export CMAKE_PREFIX_PATH=${SW_DIR}/boost-1.82.0:${CMAKE_PREFIX_PATH}
+export LD_LIBRARY_PATH=${SW_DIR}/boost-1.82.0/lib:${LD_LIBRARY_PATH}
 
 # optional: for openPMD and PSATD+RZ support
 module load cray-hdf5-parallel/1.12.2.9
