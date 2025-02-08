@@ -256,12 +256,6 @@ void WarpX::HybridPICEvolveFields ()
     // all the qdsmc solver functions should be in a ElectronEnergyEquationSolver class as well as other solvers like Layer method
     if(m_hybrid_pic_model->m_solve_electron_energy_equation){
 
-        // Calculates Ue using Jtot at n+1 and Ji at n+1
-        //hybrid_electron_fl->HybridInitializeUe(m_fields,
-        //        current_fp_temp[finest_level],
-        //        m_hybrid_pic_model.get(),
-        //        finest_level);
-
         // Reset qdsmc particles positions to x0,y0,z0 and rest of attributes to 0 and redistribute
         qdsmc_hybrid_electron_pc->ResetParticles(finest_level);
 
@@ -294,6 +288,11 @@ void WarpX::HybridPICEvolveFields ()
 
         // Update Te after QDSMC solver:
         hybrid_electron_fl->HybridUpdateTe(m_fields, m_hybrid_pic_model->m_gamma, m_hybrid_pic_model->m_n_floor, finest_level);
+
+        // adds Joule heating using operator splitting approach
+        if(m_hybrid_pic_model->m_include_Joule_heating){
+            hybrid_electron_fl->Hybrid_Electron_Joule_Heating(m_fields, m_hybrid_pic_model.get(), dt[0], finest_level);
+        }
     }
 
     // Calculate the electron pressure at t=n+1

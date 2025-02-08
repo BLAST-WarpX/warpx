@@ -57,6 +57,11 @@ void HybridPICModel::ReadParameters ()
 
     //bool to indicate if electron fluid equation will be solved or not
     utils::parser::queryWithParser(pp_hybrid, "solve_electron_energy_equation", m_solve_electron_energy_equation);
+
+    //bool to indicate if Joule heating is included (when m_solve_electron_energy_equation is True)
+    utils::parser::queryWithParser(pp_hybrid, "include_Joule_heating", m_include_Joule_heating);
+
+    // ADD ASSERT in case m_solve_electron_energy_equation is False and m_include_Joule_heating is True
 }
 
 void HybridPICModel::AllocateLevelMFs (ablastr::fields::MultiFabRegister & fields,

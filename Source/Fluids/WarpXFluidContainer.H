@@ -145,6 +145,13 @@ public:
     // and calculates Te at n+1
     void HybridUpdateTe (ablastr::fields::MultiFabRegister& m_fields, amrex::Real gamma, amrex::Real n_floor, int lev);
 
+    // Adds Joule heating to electrons
+    // current implementation assumes only 1 ion species
+    // only called if flag is used and compatible with QDSMC solver only
+    void Hybrid_Electron_Joule_Heating (ablastr::fields::MultiFabRegister& m_fields, 
+                                        HybridPICModel const* hybrid_model, 
+                                        amrex::Real dt, int lev);
+
     [[nodiscard]] amrex::Real getCharge () const {return charge;}
     [[nodiscard]] amrex::Real getMass () const {return mass;}
 

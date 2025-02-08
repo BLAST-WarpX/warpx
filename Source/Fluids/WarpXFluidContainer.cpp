@@ -1603,3 +1603,93 @@ void WarpXFluidContainer::HybridUpdateTe (ablastr::fields::MultiFabRegister& m_f
         }
     m_fields.get(name_mf_T, lev)->FillBoundary(m_fields.get(name_mf_T, lev)->nGrowVect(), period);
 }
+
+
+// Maybe pass Te and rho as arguments too !
+// no need to fill Boundary? Hybrid_Electron_Joule_Heating should be called after filling boundary of rho and Te 
+// UPDATE eta to take Te as argument
+void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiFabRegister& m_fields, 
+                                        HybridPICModel const* hybrid_model, 
+                                        amrex::Real dt, int lev)
+{
+    WarpX &warpx = WarpX::GetInstance();
+    const amrex::Geometry &geom = warpx.Geom(lev);
+    const amrex::Periodicity &period = geom.periodicity();
+
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    // get hybrid model parameters
+    const auto eta = hybrid_model->m_eta;
+
+    // For safety condition (divition by rho)
+    amrex::Real rho_floor = PhysConst::q_e*hybrid_model->m_n_floor;
+
+    const auto ix_type = m_fields.get(name_mf_NU, Direction{0}, lev)->ixType().toIntVect();
+
+    ablastr::fields::VectorField current_fp_ampere = m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
+
+    // Index type required for interpolating fields from their respective
+    // staggering to nodal grid
+    amrex::GpuArray<int, 3> const& Jx_stag = hybrid_model->Jx_IndexType;
+    amrex::GpuArray<int, 3> const& Jy_stag = hybrid_model->Jy_IndexType;
+    amrex::GpuArray<int, 3> const& Jz_stag = hybrid_model->Jz_IndexType;
+
+    // Parameters for 'interp' that maps from Yee to nodal mesh
+    amrex::GpuArray<int, 3> const& nodal = {1, 1, 1};
+    // The coarsingng is just 1 so no coarsening is done
+    amrex::GpuArray<int, 3> const& coarsen = {1, 1, 1};
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*m_fields.get(name_mf_N, lev), TilingIfNotGPU()); mfi.isValid(); ++mfi )
+        {
+
+            // using Te right after qdsmc update
+            amrex::Array4<amrex::Real> const& Te = m_fields.get(name_mf_T, lev)->array(mfi);
+
+            // using rho at n+1
+            amrex::Array4<amrex::Real> const& rho = m_fields.get(FieldType::rho_fp, lev)->array(mfi);
+
+            // using total plasma current at n+1
+            amrex::Array4<amrex::Real> const& Jx = current_fp_ampere[0]->array(mfi);
+            amrex::Array4<amrex::Real> const& Jy = current_fp_ampere[1]->array(mfi);
+            amrex::Array4<amrex::Real> const& Jz = current_fp_ampere[2]->array(mfi);
+
+
+            const Box& tilebox  = mfi.tilebox();
+            amrex::Box box = amrex::convert( tilebox, ix_type );
+            box.grow(m_fields.get(name_mf_K, lev)->nGrowVect());
+
+            ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+
+                if(rho(i, j, k) > rho_floor){
+
+                    amrex::Real rho_val = rho(i, j, k);
+                    amrex::Real ne_val = rho_val/PhysConst::q_e;
+                    amrex::Real Te_val = Te(i, j, k); // currently in Joules
+
+                    // Interpolate the total plasma current to a nodal grid
+                    auto const jx_interp = ablastr::coarsen::sample::Interp(Jx, Jx_stag, nodal, coarsen, i, j, k, 0);
+                    auto const jy_interp = ablastr::coarsen::sample::Interp(Jy, Jy_stag, nodal, coarsen, i, j, k, 0);
+                    auto const jz_interp = ablastr::coarsen::sample::Interp(Jz, Jz_stag, nodal, coarsen, i, j, k, 0);
+
+                    // calculate J^2 on nodal grid (since Te is nodal)
+                    amrex::Real jtot_val = std::sqrt(jx_interp*jx_interp + jy_interp*jy_interp + jz_interp*jz_interp);
+
+                    // calculate eta*J^2
+                    // what if eta does not depend on j, and rho and only on Te ?
+                    // UPDATE eta to take Te as argument
+                    amrex::Real eta_J2 = eta(rho_val, jtot_val)*jtot_val*jtot_val;
+
+                    // Te already is in Joules so no need to divide by kb
+                    Te(i, j, k) = Te_val + dt*eta_J2/(3/2*ne_val);
+                }
+
+            });
+        }
+
+    // Fill Boundary ?
+    m_fields.get(name_mf_T, lev)->FillBoundary(m_fields.get(name_mf_T, lev)->nGrowVect(), period);
+}

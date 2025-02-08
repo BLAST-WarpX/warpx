@@ -202,6 +202,8 @@ public:
 
     bool m_solve_electron_energy_equation;
 
+    bool m_include_Joule_heating;
+
 };
 
 /**
