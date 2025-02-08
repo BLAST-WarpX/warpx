@@ -14,21 +14,23 @@ module load craype-accel-nvidia80
 module load cudatoolkit
 module load cmake/3.30.2
 
+# missing modules installed here
+export SW_DIR=${PSCRATCH}/storage/sw/perlmutter/gpu
+
 # optional: for QED support with detailed tables
 export BOOST_ROOT=/global/common/software/spackecp/perlmutter/e4s-23.08/default/spack/opt/spack/linux-sles15-zen3/gcc-12.3.0/boost-1.83.0-nxqk3hnci5g3wqv75wvsmuke3w74mzxi
 
 # optional: for openPMD and PSATD+RZ support
 module load cray-hdf5-parallel/1.12.2.9
-export SW_DIR=${PSCRATCH}/storage/sw/perlmutter/gpu
-export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-1.21.1:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.8.3:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${SW_DIR}/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${SW_DIR}/lapackpp-2024.05.31:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-1.21.1:${CMAKE_PREFIX_PATH}
+export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.8.3:${CMAKE_PREFIX_PATH}
+export CMAKE_PREFIX_PATH=${SW_DIR}/blaspp-2024.05.31:${CMAKE_PREFIX_PATH}
+export CMAKE_PREFIX_PATH=${SW_DIR}/lapackpp-2024.05.31:${CMAKE_PREFIX_PATH}
 
-export LD_LIBRARY_PATH=${SW_DIR}/c-blosc-1.21.1/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=${SW_DIR}/adios2-2.8.3/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=${SW_DIR}/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=${SW_DIR}/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/c-blosc-1.21.1/lib64:${LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=${SW_DIR}/adios2-2.8.3/lib64:${LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=${SW_DIR}/blaspp-2024.05.31/lib64:${LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=${SW_DIR}/lapackpp-2024.05.31/lib64:${LD_LIBRARY_PATH}
 
 export PATH=${SW_DIR}/adios2-2.8.3/bin:${PATH}
 
