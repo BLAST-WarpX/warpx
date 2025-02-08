@@ -107,7 +107,7 @@ sim.initialize_warpx()
 np.random.seed(30025025)
 
 electron_wrapper = particle_containers.ParticleContainerWrapper("electrons")
-if sim.amr_restart:
+if not sim.amr_restart:
     electron_wrapper.add_real_comp("newPid")
 
 
