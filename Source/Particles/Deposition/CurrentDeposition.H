@@ -12,6 +12,7 @@
 #include "ablastr/parallelization/KernelTimer.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/ShapeFactors.H"
+#include "Utils/ParticleUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
@@ -1352,6 +1353,8 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
                                            const amrex::Real dt,
                                            const amrex::XDim3 & dinv,
                                            const amrex::XDim3 & xyzmin,
+                                           const amrex::XDim3 & xyzmax,
+                                           const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_absorbing,
                                            const amrex::Dim3 lo,
                                            const amrex::Real q,
                                            [[maybe_unused]] const int n_rz_azimuthal_modes)
@@ -1425,13 +1428,15 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             const Complex xy_mid0 = Complex{costheta_mid, sintheta_mid};
 
             // Keep these double to avoid bug in single precision
-            double const x_new = (rp_new - xyzmin.x)*dinv.x;
+            amrex::Real const rp_new_c = ParticleUtils::crop_at_boundary(rp_new, xyzmin.x, xyzmax.x, is_absorbing[0]);
+            double const x_new = (rp_new_c - xyzmin.x)*dinv.x;
             double const x_old = (rp_old - xyzmin.x)*dinv.x;
             amrex::Real const vx = (rp_new - rp_old)/dt;
             amrex::Real const vy = (-uxp_nph[ip]*sintheta_mid + uyp_nph[ip]*costheta_mid)*gaminv;
 #elif defined(WARPX_DIM_XZ)
             // Keep these double to avoid bug in single precision
-            double const x_new = (xp_np1 - xyzmin.x)*dinv.x;
+            amrex::Real const xp_np1_c = ParticleUtils::crop_at_boundary(xp_np1, xyzmin.x, xyzmax.x, is_absorbing[0]);
+            double const x_new = (xp_np1_c - xyzmin.x)*dinv.x;
             double const x_old = (xp_n[ip] - xyzmin.x)*dinv.x;
             amrex::Real const vx = (xp_np1 - xp_n[ip])/dt;
             amrex::Real const vy = uyp_nph[ip]*gaminv;
@@ -1440,16 +1445,19 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             amrex::Real const vy = uyp_nph[ip]*gaminv;
 #elif defined(WARPX_DIM_3D)
             // Keep these double to avoid bug in single precision
-            double const x_new = (xp_np1 - xyzmin.x)*dinv.x;
+            amrex::Real const xp_np1_c = ParticleUtils::crop_at_boundary(xp_np1, xyzmin.x, xyzmax.x, is_absorbing[0]);
+            amrex::Real const yp_np1_c = ParticleUtils::crop_at_boundary(yp_np1, xyzmin.y, xyzmax.y, is_absorbing[1]);
+            double const x_new = (xp_np1_c - xyzmin.x)*dinv.x;
             double const x_old = (xp_n[ip] - xyzmin.x)*dinv.x;
-            double const y_new = (yp_np1 - xyzmin.y)*dinv.y;
+            double const y_new = (yp_np1_c - xyzmin.y)*dinv.y;
             double const y_old = (yp_n[ip] - xyzmin.y)*dinv.y;
             amrex::Real const vx = (xp_np1 - xp_n[ip])/dt;
             amrex::Real const vy = (yp_np1 - yp_n[ip])/dt;
 #endif
 
             // Keep these double to avoid bug in single precision
-            double const z_new = (zp_np1 - xyzmin.z)*dinv.z;
+            amrex::Real const zp_np1_c = ParticleUtils::crop_at_boundary(zp_np1, xyzmin.z, xyzmax.z, is_absorbing[WARPX_ZINDEX]);
+            double const z_new = (zp_np1_c - xyzmin.z)*dinv.z;
             double const z_old = (zp_n[ip] - xyzmin.z)*dinv.z;
             amrex::Real const vz = (zp_np1 - zp_n[ip])/dt;
 

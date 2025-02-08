@@ -12,6 +12,7 @@
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/ShapeFactors.H"
 #include "Utils/WarpX_Complex.H"
+#include "Utils/ParticleUtils.H"
 
 #include <AMReX.H>
 
@@ -887,6 +888,8 @@ void doGatherPicnicShapeN (
                      [[maybe_unused]] const amrex::IndexType Bz_type,
                      const amrex::XDim3 & dinv,
                      const amrex::XDim3 & xyzmin,
+                     const amrex::XDim3 & xyzmax,
+                     const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_absorbing,
                      const amrex::Dim3& lo,
                      const int n_rz_azimuthal_modes)
 {
@@ -928,26 +931,30 @@ void doGatherPicnicShapeN (
         sintheta_mid = 0._rt;
     }
     const Complex xy_mid0 = Complex{costheta_mid, sintheta_mid};
+    amrex::Real const rp_new_c = ParticleUtils::crop_at_boundary(rp_new, xyzmin.x, xyzmax.x, is_absorbing[0]);
     // Keep these double to avoid bug in single precision
-    double const x_new = (rp_new - xyzmin.x)*dinv.x;
+    double const x_new = (rp_new_c - xyzmin.x)*dinv.x;
     double const x_old = (rp_old - xyzmin.x)*dinv.x;
-    double const x_bar = (rp_mid - xyzmin.x)*dinv.x;
+    double const x_bar = (x_new + x_old)*0.5_rt;
 #elif !defined(WARPX_DIM_1D_Z)
+    amrex::Real const xp_np1_c = ParticleUtils::crop_at_boundary(xp_np1, xyzmin.x, xyzmax.x, is_absorbing[0]);
     // Keep these double to avoid bug in single precision
-    double const x_new = (xp_np1 - xyzmin.x)*dinv.x;
+    double const x_new = (xp_np1_c - xyzmin.x)*dinv.x;
     double const x_old = (xp_n - xyzmin.x)*dinv.x;
-    double const x_bar = (xp_nph - xyzmin.x)*dinv.x;
+    double const x_bar = (x_new + x_old)*0.5_rt;
 #endif
 #if defined(WARPX_DIM_3D)
+    amrex::Real const yp_np1_c = ParticleUtils::crop_at_boundary(yp_np1, xyzmin.y, xyzmax.y, is_absorbing[1]);
     // Keep these double to avoid bug in single precision
-    double const y_new = (yp_np1 - xyzmin.y)*dinv.y;
+    double const y_new = (yp_np1_c - xyzmin.y)*dinv.y;
     double const y_old = (yp_n   - xyzmin.y)*dinv.y;
-    double const y_bar = (yp_nph - xyzmin.y)*dinv.y;
+    double const y_bar = (y_new + y_old)*0.5_rt;
 #endif
+    amrex::Real const zp_np1_c = ParticleUtils::crop_at_boundary(zp_np1, xyzmin.z, xyzmax.z, is_absorbing[WARPX_ZINDEX]);
     // Keep these double to avoid bug in single precision
-    double const z_new = (zp_np1 - xyzmin.z)*dinv.z;
+    double const z_new = (zp_np1_c - xyzmin.z)*dinv.z;
     double const z_old = (zp_n   - xyzmin.z)*dinv.z;
-    double const z_bar = (zp_nph - xyzmin.z)*dinv.z;
+    double const z_bar = (z_new + z_old)*0.5_rt;
 
     // 1) Determine the number of segments.
     // 2) Loop over segments and gather electric field.
@@ -1711,6 +1718,8 @@ void doGatherShapeNImplicit (
                      const amrex::IndexType bz_type,
                      const amrex::XDim3 & dinv,
                      const amrex::XDim3 & xyzmin,
+                     const amrex::XDim3 & xyzmax,
+                     const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_absorbing,
                      const amrex::Dim3& lo,
                      const int n_rz_azimuthal_modes,
                      const int nox,
@@ -1749,25 +1758,25 @@ void doGatherShapeNImplicit (
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, xyzmax, is_absorbing, lo, n_rz_azimuthal_modes);
         } else if (nox == 2) {
             doGatherPicnicShapeN<2>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, xyzmax, is_absorbing, lo, n_rz_azimuthal_modes);
         } else if (nox == 3) {
             doGatherPicnicShapeN<3>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, xyzmax, is_absorbing, lo, n_rz_azimuthal_modes);
         } else if (nox == 4) {
             doGatherPicnicShapeN<4>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, xyzmax, is_absorbing, lo, n_rz_azimuthal_modes);
         }
     }
     else if (depos_type == CurrentDepositionAlgo::Direct) {

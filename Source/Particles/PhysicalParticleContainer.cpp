@@ -2832,6 +2832,22 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
 
     // Lower corner of tile box physical domain (take into account Galilean shift)
     const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, gather_lev, 0._rt);
+    const amrex::XDim3 xyzmax = WarpX::UpperCorner(box, gather_lev, 0._rt);
+
+    const WarpX& warpx = WarpX::GetInstance();
+    amrex::Box const& domain_box = warpx.Geom(0).Domain();
+    auto & field_boundary_lo = warpx.GetFieldBoundaryLo();
+    auto & field_boundary_hi = warpx.GetFieldBoundaryHi();
+
+    amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> is_absorbing;
+    for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
+        is_absorbing[idim][0] = (box.smallEnd(idim) <= domain_box.smallEnd(idim) &&
+                                 (field_boundary_lo[idim] == FieldBoundaryType::PEC
+                               || field_boundary_lo[idim] == FieldBoundaryType::PMC));
+        is_absorbing[idim][1] = (box.bigEnd(idim) >= domain_box.bigEnd(idim) &&
+                                 (field_boundary_hi[idim] == FieldBoundaryType::PEC
+                               || field_boundary_hi[idim] == FieldBoundaryType::PMC));
+    }
 
     const Dim3 lo = lbound(box);
 
@@ -2986,7 +3002,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
                 doGatherShapeNImplicit(xp_n, yp_n, zp_n, xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                        ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                        ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                       dinv, xyzmin, lo, n_rz_azimuthal_modes, nox,
+                                       dinv, xyzmin, xyzmax, is_absorbing, lo, n_rz_azimuthal_modes, nox,
                                        depos_type );
             }
 

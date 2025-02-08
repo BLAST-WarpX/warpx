@@ -189,6 +189,19 @@ namespace ParticleUtils {
                           && (xlo[2] <= point.z) && (point.z <= xhi[2]));
     }
 
+    /* \brief Crops the position at the specified boundary if check is true
+     * \param[in] x The particle position
+     * \param[in] xmin The lower boundary of the domain
+     * \param[in] xmax The upper boundary of the domain
+     * \param[in] check Whether to crop at each of the boundaries
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    amrex::Real crop_at_boundary(amrex::Real x, amrex::Real xmin, amrex::Real xmax, amrex::GpuArray<bool,2> const& check) {
+        if (check[0] && x < xmin) { return xmin; }
+        if (check[1] && x > xmax) { return xmax; }
+        return x;
+    }
+
 }
 
 #endif // WARPX_PARTICLE_UTILS_H_
