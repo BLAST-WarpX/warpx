@@ -593,7 +593,7 @@ for (const auto & particle_diag : particle_diags) {
     // names of amrex::ParticleReal and int particle attributes in SoA data
     auto const rn = tmp.GetRealSoANames();
     auto const in = tmp.GetIntSoANames();
-    amrex::Vector<std::string> real_names(rn.begin(), rn.end());
+    amrex::Vector<std::string> real_names;
     amrex::Vector<std::string> int_names(in.begin(), in.end());
 
     // transform names to openPMD, separated by underscores
@@ -603,19 +603,20 @@ for (const auto & particle_diag : particle_diags) {
         //       for non-scalar records
         // note: in RZ, we reconstruct x,y,z positions from r,z,theta in WarpX
 #if !defined (WARPX_DIM_1D_Z)
-        real_names[tmp.GetRealCompIndex("x")] = "position_x";
+        real_names.push_back("position_x");
 #endif
-#if defined (WARPX_DIM_3D)
-        real_names[tmp.GetRealCompIndex("y")] = "position_y";
+#if defined (WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+        real_names.push_back("position_y");
 #endif
-#if defined(WARPX_DIM_RZ)
-        real_names[tmp.GetRealCompIndex("theta")] = "position_y";
-#endif
-        real_names[tmp.GetRealCompIndex("z")] = "position_z";
-        real_names[tmp.GetRealCompIndex("w")] = "weighting";
-        real_names[tmp.GetRealCompIndex("ux")] = "momentum_x";
-        real_names[tmp.GetRealCompIndex("uy")] = "momentum_y";
-        real_names[tmp.GetRealCompIndex("uz")] = "momentum_z";
+        real_names.push_back("position_z");
+        real_names.push_back("weighting");
+        real_names.push_back("momentum_x");
+        real_names.push_back("momentum_y");
+        real_names.push_back("momentum_z");
+    }
+    for (size_t i = real_names.size(); i < rn.size(); ++i)
+    {
+        real_names.push_back(rn[i]);
     }
 
     for (size_t i = PIdx::nattribs; i < rn.size(); ++i)
