@@ -16,7 +16,7 @@
 #include <AMReX_BaseFwd.H>
 
 SelectParticles::SelectParticles (
-    const WarpXParticleContainer& pc,
+    const WarpXParticleContainer& /*pc*/,
     WarpXParIter& a_pti,
     amrex::Real current_z_boost,
     amrex::Real old_z_boost,
@@ -26,13 +26,12 @@ SelectParticles::SelectParticles (
 {
     m_get_position = GetParticlePosition<PIdx>(a_pti, a_offset);
 
-    auto particle_comps = pc.getParticleComps();
-    zpold = a_pti.GetAttribs(particle_comps["z_n_btd"]).dataPtr();
+    zpold = a_pti.GetAttribs("z_n_btd").dataPtr();
 }
 
 
 LorentzTransformParticles::LorentzTransformParticles (
-    const WarpXParticleContainer& pc,
+    const WarpXParticleContainer& /*pc*/,
     WarpXParIter& a_pti,
     amrex::Real t_boost,
     amrex::Real dt,
@@ -54,13 +53,12 @@ LorentzTransformParticles::LorentzTransformParticles (
     m_uypnew = attribs[PIdx::uy].dataPtr();
     m_uzpnew = attribs[PIdx::uz].dataPtr();
 
-    auto particle_comps = pc.getParticleComps();
-    m_xpold = a_pti.GetAttribs(particle_comps["x_n_btd"]).dataPtr();
-    m_ypold = a_pti.GetAttribs(particle_comps["y_n_btd"]).dataPtr();
-    m_zpold = a_pti.GetAttribs(particle_comps["z_n_btd"]).dataPtr();
-    m_uxpold = a_pti.GetAttribs(particle_comps["ux_n_btd"]).dataPtr();
-    m_uypold = a_pti.GetAttribs(particle_comps["uy_n_btd"]).dataPtr();
-    m_uzpold = a_pti.GetAttribs(particle_comps["uz_n_btd"]).dataPtr();
+    m_xpold = a_pti.GetAttribs("x_n_btd").dataPtr();
+    m_ypold = a_pti.GetAttribs("y_n_btd").dataPtr();
+    m_zpold = a_pti.GetAttribs("z_n_btd").dataPtr();
+    m_uxpold = a_pti.GetAttribs("ux_n_btd").dataPtr();
+    m_uypold = a_pti.GetAttribs("uy_n_btd").dataPtr();
+    m_uzpold = a_pti.GetAttribs("uz_n_btd").dataPtr();
 
     m_betaboost = WarpX::beta_boost;
     m_gammaboost = WarpX::gamma_boost;

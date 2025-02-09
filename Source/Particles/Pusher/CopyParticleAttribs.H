@@ -44,7 +44,7 @@ struct CopyParticleAttribs
      *        always start at the particle with index 0.
      */
     CopyParticleAttribs (
-        const WarpXParticleContainer& pc,
+        const WarpXParticleContainer& /*pc*/,
         WarpXParIter& a_pti,
         long a_offset = 0) noexcept
     {
@@ -57,13 +57,12 @@ struct CopyParticleAttribs
         uyp = attribs[PIdx::uy].dataPtr() + a_offset;
         uzp = attribs[PIdx::uz].dataPtr() + a_offset;
 
-        auto particle_comps = pc.getParticleComps();
-        xpold = a_pti.GetAttribs(particle_comps["x_n_btd"]).dataPtr();
-        ypold = a_pti.GetAttribs(particle_comps["y_n_btd"]).dataPtr();
-        zpold = a_pti.GetAttribs(particle_comps["z_n_btd"]).dataPtr();
-        uxpold = a_pti.GetAttribs(particle_comps["ux_n_btd"]).dataPtr();
-        uypold = a_pti.GetAttribs(particle_comps["uy_n_btd"]).dataPtr();
-        uzpold = a_pti.GetAttribs(particle_comps["uz_n_btd"]).dataPtr();
+        xpold = a_pti.GetAttribs("x_n_btd").dataPtr();
+        ypold = a_pti.GetAttribs("y_n_btd").dataPtr();
+        zpold = a_pti.GetAttribs("z_n_btd").dataPtr();
+        uxpold = a_pti.GetAttribs("ux_n_btd").dataPtr();
+        uypold = a_pti.GetAttribs("uy_n_btd").dataPtr();
+        uzpold = a_pti.GetAttribs("uz_n_btd").dataPtr();
 
         m_get_position = GetParticlePosition<PIdx>(a_pti, a_offset);
     }
