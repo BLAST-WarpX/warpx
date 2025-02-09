@@ -665,16 +665,18 @@ PEC::ApplyPECtoBfield (
     }
 }
 
-
 /**
- * \brief Sets the rho field value in cells close to and inside a PEC boundary.
- *        The charge density deposited in the guard cells are either reflected
- *        back into the simulation domain (if a reflecting particle
- *        boundary is used), or the opposite charge density is deposited
- *        back in the domain to capture the effect of an image charge.
- *        The charge density on the PEC boundary is set to 0 while values
- *        in the guard cells are set equal and opposite to their mirror
- *        location inside the domain - representing image charges.
+ * \brief Sets the rho field value in cells close to and inside PEC/PMC boundaries.
+ *        The charge density deposited in the guard cells at PMC boundaries is added
+ *        to the mirror location in the simulation domain to capture rho from image
+ *        charge of the same sign on the other side of the symmetry boundary.
+ *        The charge density deposited in the guard cells at PEC boundaries is subtracted
+ *        from the mirror location in the simulation domain to capture rho from image
+ *        charges of the opposite sign on the conductor boundary.
+ *        For PEC boundaries, this method can also be interpretted as using a lower
+ *        order shape function for particles near the boundary.
+ *        Note that the boundary handling of rho at PEC and PMC boundaries is exactly
+ *        the same as that for the current density parallel to the boundary.
  **/
 void
 PEC::ApplyBoundarytoRhofield (
@@ -709,8 +711,6 @@ PEC::ApplyBoundarytoRhofield (
                                   || field_boundary_lo[idim] == FieldBoundaryType::PMC );
         is_pec_pmc_bndy[idim][1] = ( field_boundary_hi[idim] == FieldBoundaryType::PEC
                                   || field_boundary_lo[idim] == FieldBoundaryType::PMC );
-        // What are the below lines for? Why grow box to include ghosts only if not reflective?
-        // What does E and B BC routines do if the boundary is not a PEC or PMC boundary?
         if (!is_pec_pmc_bndy[idim][0]) { grown_domain_box.growLo(idim, ng_fieldgather[idim]); }
         if (!is_pec_pmc_bndy[idim][1]) { grown_domain_box.growHi(idim, ng_fieldgather[idim]); }
 
@@ -737,7 +737,6 @@ PEC::ApplyBoundarytoRhofield (
 
         // If grown_domain_box contains fabbox it means there are no PEC
         // boundaries to handle so continue to next box
-        // Is this because it is grown above? Don't follow.
         if (grown_domain_box.contains(fabbox)) { continue; }
 
         // Extract field data
@@ -758,7 +757,23 @@ PEC::ApplyBoundarytoRhofield (
     }
 }
 
-
+/**
+ * \brief Sets the J field value in cells close to and inside PEC/PMC boundaries.
+ *        The proper way to reflect current density deposited to ghost cells back
+ *        into the simulation domain, as determined by conservation of energy, depends
+ *        on the boundary condition used for the electric field used in the gather
+ *        to push the particles. If E_i is odd, then J_i deposited to ghost cells is
+ *        subtracted from its mirror location inside the domain. Likewise, if E_i is
+ *        even, then J_i deposited in the ghost cells is added to its mirror location
+ *        inside the domain.
+ *        For PEC boundaries, E_parallel is odd and E_perp is even.
+ *        For PMC boundaries, E_parallel is even and E_perp is odd.
+ *        For PMC boundaries, this J comes from the mirror charge of the same sign
+ *        on the other side of the symmetry boundary.
+ *        For PEC boundaries, this J comes from the mirror charge of the opposite
+ *        sign on the conductor boundary, and can also be interpretted as using a
+ *        lower order shape function for particles near the boundary.
+ **/
 void
 PEC::ApplyBoundarytoJfield(
     amrex::MultiFab* Jx, amrex::MultiFab* Jy, amrex::MultiFab* Jz,
@@ -802,8 +817,6 @@ PEC::ApplyBoundarytoJfield(
                                   || field_boundary_lo[idim] == FieldBoundaryType::PMC );
         is_pec_pmc_bndy[idim][1] = ( field_boundary_hi[idim] == FieldBoundaryType::PEC
                                   || field_boundary_hi[idim] == FieldBoundaryType::PMC );
-        // What are the below lines for? Why grow box to include ghosts only if not reflective?
-        // What does E and B BC routines do if the boundary is not a PEC or PMC boundary?
         if (!is_pec_pmc_bndy[idim][0]) { grown_domain_box.growLo(idim, ng_fieldgather[idim]); }
         if (!is_pec_pmc_bndy[idim][1]) { grown_domain_box.growHi(idim, ng_fieldgather[idim]); }
 
@@ -858,7 +871,6 @@ PEC::ApplyBoundarytoJfield(
 
         // If grown_domain_box contains fabbox it means there are no PEC
         // boundaries to handle so continue to next box.
-        // Is this because it is grown above? Don't follow.
         if (grown_domain_box.contains(fabbox)) { continue; }
 
         // Extract field data
