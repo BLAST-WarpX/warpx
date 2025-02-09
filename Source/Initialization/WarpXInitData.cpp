@@ -717,15 +717,15 @@ void WarpX::InitRuntimeComps ()
         for (auto const& pc : *mypc)
         {
 #if (AMREX_SPACEDIM >= 2)
-            pc->NewRealComp("x_n_btd", comm);
+            pc->AddRealComp("x_n_btd", comm);
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-            pc->NewRealComp("y_n_btd", comm);
+            pc->AddRealComp("y_n_btd", comm);
 #endif
-            pc->NewRealComp("z_n_btd", comm);
-            pc->NewRealComp("ux_n_btd", comm);
-            pc->NewRealComp("uy_n_btd", comm);
-            pc->NewRealComp("uz_n_btd", comm);
+            pc->AddRealComp("z_n_btd", comm);
+            pc->AddRealComp("ux_n_btd", comm);
+            pc->AddRealComp("uy_n_btd", comm);
+            pc->AddRealComp("uz_n_btd", comm);
         }
     }
 }
