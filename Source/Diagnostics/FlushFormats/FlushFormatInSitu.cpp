@@ -37,7 +37,7 @@ FlushFormatInSitu::WriteParticles(const amrex::Vector<ParticleDiag>& particle_di
         WarpXParticleContainer* pc = particle_diag.getParticleContainer();
 
         // get names of real comps
-        std::map<std::string, int> real_comps_map = pc->getParticleComps();
+        std::vector<std::string> real_comps_map = pc->GetRealSoANames();
 
         // WarpXParticleContainer compile-time extra AoS attributes (Real): 0
         // WarpXParticleContainer compile-time extra AoS attributes (int): 0
@@ -46,14 +46,7 @@ FlushFormatInSitu::WriteParticles(const amrex::Vector<ParticleDiag>& particle_di
         // not an efficient search, but N is small...
         for(int j = 0; j < PIdx::nattribs; ++j)
         {
-            auto rvn_it = real_comps_map.begin();
-            for (; rvn_it != real_comps_map.end(); ++rvn_it)
-                if (rvn_it->second == j)
-                    break;
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                rvn_it != real_comps_map.end(),
-                "WarpX In Situ: SoA real attribute not found");
-            std::string varname = rvn_it->first;
+            std::string varname = real_comps_map.at(j);
             particle_varnames.push_back(prefix + "_" + varname);
         }
         // WarpXParticleContainer compile-time extra SoA attributes (int): 0

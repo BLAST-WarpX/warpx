@@ -140,10 +140,10 @@ class SmartCopyFactory
 public:
     template <class SrcPC, class DstPC>
     SmartCopyFactory (const SrcPC& src, const DstPC& dst) noexcept :
-        m_tag_real{getSmartCopyTag(src.getParticleComps(), dst.getParticleComps())},
-        m_tag_int{getSmartCopyTag(src.getParticleiComps(), dst.getParticleiComps())},
-        m_policy_real{getPolicies(dst.getParticleComps())},
-        m_policy_int{getPolicies(dst.getParticleiComps())},
+        m_tag_real{getSmartCopyTag(src.GetRealSoANames(), dst.GetRealSoANames())},
+        m_tag_int{getSmartCopyTag(src.GetIntSoANames(), dst.GetIntSoANames())},
+        m_policy_real{getPolicies(dst.GetRealSoANames())},
+        m_policy_int{getPolicies(dst.GetIntSoANames())},
         m_defined{true}
     {}
 

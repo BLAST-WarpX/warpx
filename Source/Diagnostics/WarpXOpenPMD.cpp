@@ -10,7 +10,6 @@
 #include "Diagnostics/ParticleDiag/ParticleDiag.H"
 #include "FieldIO.H"
 #include "Particles/Filter/FilterFunctors.H"
-#include "Particles/NamedComponentParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/RelativeCellPosition.H"
@@ -591,44 +590,52 @@ for (const auto & particle_diag : particle_diags) {
         storePhiOnParticles( tmp, WarpX::electrostatic_solver_id, !use_pinned_pc );
     }
 
-    // names of amrex::Real and int particle attributes in SoA data
+    // names of amrex::ParticleReal and int particle attributes in SoA data
+    auto const rn = tmp.GetRealSoANames();
+    auto const in = tmp.GetIntSoANames();
     amrex::Vector<std::string> real_names;
-    amrex::Vector<std::string> int_names;
-    amrex::Vector<int> int_flags;
-    amrex::Vector<int> real_flags;
-    // see openPMD ED-PIC extension for namings
-    // note: an underscore separates the record name from its component
-    //       for non-scalar records
-    // note: in RZ, we reconstruct x,y,z positions from r,z,theta in WarpX
+    amrex::Vector<std::string> int_names(in.begin(), in.end());
+
+    // transform names to openPMD, separated by underscores
+    {
+        // see openPMD ED-PIC extension for namings
+        // note: an underscore separates the record name from its component
+        //       for non-scalar records
+        // note: in RZ, we reconstruct x,y,z positions from r,z,theta in WarpX
 #if !defined (WARPX_DIM_1D_Z)
-    real_names.push_back("position_x");
+        real_names.push_back("position_x");
 #endif
 #if defined (WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-    real_names.push_back("position_y");
+        real_names.push_back("position_y");
 #endif
-    real_names.push_back("position_z");
-    real_names.push_back("weighting");
-    real_names.push_back("momentum_x");
-    real_names.push_back("momentum_y");
-    real_names.push_back("momentum_z");
-    // get the names of the real comps
-    real_names.resize(tmp.NumRealComps());
-    auto runtime_rnames = tmp.getParticleRuntimeComps();
-    for (auto const& x : runtime_rnames)
-    {
-        real_names[x.second+PIdx::nattribs] = detail::snakeToCamel(x.first);
+        real_names.push_back("position_z");
+        real_names.push_back("weighting");
+        real_names.push_back("momentum_x");
+        real_names.push_back("momentum_y");
+        real_names.push_back("momentum_z");
     }
+    for (size_t i = real_names.size(); i < rn.size(); ++i)
+    {
+        real_names.push_back(rn[i]);
+    }
+
+    for (size_t i = PIdx::nattribs; i < rn.size(); ++i)
+    {
+        real_names[i] = detail::snakeToCamel(rn[i]);
+    }
+
     // plot any "extra" fields by default
-    real_flags = particle_diag.m_plot_flags;
+    amrex::Vector<int> real_flags = particle_diag.m_plot_flags;
     real_flags.resize(tmp.NumRealComps(), 1);
-    // and the names
-    int_names.resize(tmp.NumIntComps());
-    auto runtime_inames = tmp.getParticleRuntimeiComps();
-    for (auto const& x : runtime_inames)
+
+    // and the int names
+    for (size_t i = 0; i < in.size(); ++i)
     {
-        int_names[x.second+0] = detail::snakeToCamel(x.first);
+        int_names[i] = detail::snakeToCamel(in[i]);
     }
+
     // plot by default
+    amrex::Vector<int> int_flags;
     int_flags.resize(tmp.NumIntComps(), 1);
 
     // real_names contains a list of all real particle attributes.
