@@ -2836,8 +2836,8 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
 
     const WarpX& warpx = WarpX::GetInstance();
     amrex::Box const& domain_box = warpx.Geom(0).Domain();
-    auto & field_boundary_lo = warpx.GetFieldBoundaryLo();
-    auto & field_boundary_hi = warpx.GetFieldBoundaryHi();
+    auto const & field_boundary_lo = warpx.GetFieldBoundaryLo();
+    auto const & field_boundary_hi = warpx.GetFieldBoundaryHi();
 
     amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> is_absorbing;
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
