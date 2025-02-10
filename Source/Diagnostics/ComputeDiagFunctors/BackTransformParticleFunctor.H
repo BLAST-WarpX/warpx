@@ -166,6 +166,15 @@ struct LorentzTransformParticles
         dst.m_rdata[PIdx::uz][i_dst] = uzp;
     }
 
+    amrex::Real m_t_boost;
+    amrex::Real m_dt;
+    amrex::Real m_t_lab;
+    amrex::Real m_gammaboost;
+    amrex::Real m_betaboost;
+    amrex::Real m_Phys_c;
+    amrex::Real m_inv_c2;
+    amrex::Real m_uzfrm;
+
     GetParticlePosition<PIdx> m_get_position;
 
     amrex::ParticleReal* AMREX_RESTRICT m_xpold = nullptr;
@@ -180,15 +189,6 @@ struct LorentzTransformParticles
     const amrex::ParticleReal* AMREX_RESTRICT m_uypnew = nullptr;
     const amrex::ParticleReal* AMREX_RESTRICT m_uzpnew = nullptr;
     const amrex::ParticleReal* AMREX_RESTRICT m_wpnew = nullptr;
-
-    amrex::Real m_gammaboost;
-    amrex::Real m_betaboost;
-    amrex::Real m_Phys_c;
-    amrex::Real m_uzfrm;
-    amrex::Real m_inv_c2;
-    amrex::Real m_t_boost;
-    amrex::Real m_dt;
-    amrex::Real m_t_lab;
 };
 
 /**

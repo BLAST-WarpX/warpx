@@ -38,7 +38,10 @@ LorentzTransformParticles::LorentzTransformParticles (
     amrex::Real t_lab,
     int a_offset
 )
-    : m_t_boost(t_boost), m_dt(dt), m_t_lab(t_lab)
+    : m_t_boost(t_boost), m_dt(dt), m_t_lab(t_lab),
+      m_gammaboost(WarpX::gamma_boost), m_betaboost(WarpX::beta_boost),
+      m_Phys_c(PhysConst::c), m_inv_c2(amrex::Real(1.0)/(m_Phys_c * m_Phys_c)),
+      m_uzfrm(-m_gammaboost*m_betaboost*m_Phys_c)
 {
     using namespace amrex::literals;
 
@@ -59,12 +62,6 @@ LorentzTransformParticles::LorentzTransformParticles (
     m_uxpold = a_pti.GetAttribs("ux_n_btd").dataPtr();
     m_uypold = a_pti.GetAttribs("uy_n_btd").dataPtr();
     m_uzpold = a_pti.GetAttribs("uz_n_btd").dataPtr();
-
-    m_betaboost = WarpX::beta_boost;
-    m_gammaboost = WarpX::gamma_boost;
-    m_Phys_c = PhysConst::c;
-    m_inv_c2 = 1._rt/(m_Phys_c * m_Phys_c);
-    m_uzfrm = -m_gammaboost*m_betaboost*m_Phys_c;
 }
 
 /**
