@@ -28,7 +28,7 @@ In order to create a GitHub release, you need to:
  1. Create a new branch from ``development`` and update the version number in all source files.
     We usually wait for the AMReX release to be tagged first, then we also point to its tag.
 
-    There is a script for updating core dependencies of WarpX and the WarpX version:
+    There are scripts for updating core dependencies of WarpX and the WarpX version:
 
     .. code-block:: sh
 
@@ -41,6 +41,9 @@ In order to create a GitHub release, you need to:
     For a WarpX release, ideally a *git tag* of AMReX & PICSAR shall be used instead of an unnamed commit.
 
     Then open a PR, wait for tests to pass and then merge.
+
+    The maintainer script ``Tools/Release/releasePR.py`` automates the steps above.
+    Please read through the instructions in the script before running.
 
  2. **Local Commit** (Optional): at the moment, ``@ax3l`` is managing releases and signs tags (naming: ``YY.MM``) locally with his GPG key before uploading them to GitHub.
 

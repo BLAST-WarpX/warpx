@@ -124,6 +124,7 @@ namespace ablastr::fields
      * @param[out] phi the electrostatic potential amrex::MultiFab
      * @param[in] cell_size an arreay of 3 reals dx dy dz
      * @param[in] ba amrex::BoxArray with the grid of a given level
+     * @param[in] is_igf_2d boolean to select between fully 3D Poisson solver and quasi-3D, i.e. one 2D Poisson solve on every z slice (default: false)
      */
     void
     computePhiIGF (amrex::MultiFab const & rho,

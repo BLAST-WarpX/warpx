@@ -114,7 +114,7 @@ rm -rf ${SW_DIR}/venvs/warpx-lassen-toss3
 python3 -m venv ${SW_DIR}/venvs/warpx-lassen-toss3
 source ${SW_DIR}/venvs/warpx-lassen-toss3/bin/activate
 python3 -m pip install --upgrade pip
-python3 -m pip cache purge
+# python3 -m pip cache purge  # error: pip cache commands can not function since cache is disabled
 python3 -m pip install --upgrade build
 python3 -m pip install --upgrade packaging
 python3 -m pip install --upgrade wheel

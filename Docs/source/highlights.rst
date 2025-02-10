@@ -188,8 +188,21 @@ Scientific works in High-Performance Computing, applied mathematics and numerics
 
 Please see :ref:`this section <acknowledge_warpx_all_refs>`.
 
+Related works using WarpX:
+
+#. Yan Y., Du F., Tang J., Yu D and Zhao Y.,
+   **Numerical study on wave attenuation via 1D fully kinetic electromagnetic particle-in-cell simulations**.
+   Plasma Sources Sci. Technol. **33** 115013, 2024
+   `DOI:10.1088/1361-6595/ad8c7c <https://doi.org/10.1088/1361-6595/ad8c7c>`__
+
+
 Nuclear Fusion and Plasma Confinement
 *************************************
+
+#. Tyushev M., Papahn Zadeh M., Chopra N. S., Raitses Y., Romadanov I., Likhanskii A., Fubiani G., Garrigues L., Groenewald R. and Smolyakov A.
+   **Mode transitions and spoke structures in  E×B Penning discharge**.
+   Physics of Plasmas **32**, 013511, 2025.
+   `DOI:10.1063/5.0238577 <https://doi.org/10.1063/5.0238577>`__
 
 #. Scheffel J. and Jäderberg J. and Bendtz K. and Holmberg R. and Lindvall K.,
    **Axial Confinement in the Novatron Mirror Machine**.

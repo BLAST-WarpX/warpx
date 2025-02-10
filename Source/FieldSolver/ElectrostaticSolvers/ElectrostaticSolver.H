@@ -76,14 +76,15 @@ public:
      *  \f[
      *      \vec{\nabla}^2 r \phi - (\vec{\beta}\cdot\vec{\nabla})^2 r \phi = -\frac{r \rho}{\epsilon_0}
      *  \f]
-     * \param[out] phi The potential to be computed by this function
      * \param[in] rho The charge density for a given species (relativistic solver)
      *                               or total charge density (labframe solver)
+     * \param[out] phi The potential to be computed by this function
      * \param[in] beta Represents the velocity of the source of `phi`
      * \param[in] required_precision The relative convergence threshold for the MLMG solver
      * \param[in] absolute_tolerance The absolute convergence threshold for the MLMG solver
      * \param[in] max_iters The maximum number of iterations allowed for the MLMG solver
      * \param[in] verbosity The verbosity setting for the MLMG solver
+     * \param[in] is_igf_2d_slices boolean to select between fully 3D Poisson solver and quasi-3D, i.e. one 2D Poisson solve on every z slice (default: false)
      */
     void computePhi (
         ablastr::fields::MultiLevelScalarField const& rho,

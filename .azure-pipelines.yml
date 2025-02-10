@@ -13,6 +13,7 @@ pr:
   paths:
     exclude:
     - Docs
+    - '**/*.rst'
 
 jobs:
 - job:
@@ -140,7 +141,7 @@ jobs:
       df -h
       # configure
       export AMReX_CMAKE_FLAGS="-DAMReX_ASSERTIONS=ON -DAMReX_TESTING=ON"
-      export WARPX_TEST_FLAGS="-DWarpX_TEST_CLEANUP=ON -DWarpX_TEST_FPETRAP=ON -DWarpX_TEST_DEBUG=ON"
+      export WARPX_TEST_FLAGS="-DWarpX_TEST_CLEANUP=ON -DWarpX_TEST_FPETRAP=ON -DWarpX_BACKTRACE_INFO=ON"
       cmake -S . -B build    \
         ${AMReX_CMAKE_FLAGS} \
         ${WARPX_CMAKE_FLAGS} \
@@ -154,8 +155,16 @@ jobs:
   - bash: |
       # set options
       set -o nounset errexit pipefail
-      # run tests (exclude pytest.AMReX when running Python tests)
-      ctest --test-dir build --output-on-failure -E AMReX
+      # determine if the build was triggered by a push to the development branch
+      if [[ "$(Build.SourceBranch)" == "refs/heads/development" ]]; then
+        # run tests (exclude pytest.AMReX when running Python tests)
+        # and submit results to CDash as Experimental
+        ctest --test-dir build --output-on-failure -E AMReX \
+          -D ExperimentalTest -D ExperimentalSubmit
+      else
+        # run tests (exclude pytest.AMReX when running Python tests)
+        ctest --test-dir build --output-on-failure -E AMReX
+      fi
     displayName: 'Test'
 
   - bash: |

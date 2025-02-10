@@ -361,10 +361,10 @@ def run_main(
     print("\nCell size:")
     print(f"- dx = {dx_boosted}")
     if dims > 1:
-        print(f"- dx[1:]/dx[0] = {dx_boosted[1:]/dx_boosted[0]}")
+        print(f"- dx[1:]/dx[0] = {dx_boosted[1:] / dx_boosted[0]}")
     print("\nTime step:")
     print(f"- dt = {dt}")
-    print(f"- c*dt/dx = {c*dt/dx_boosted}")
+    print(f"- c*dt/dx = {c * dt / dx_boosted}")
     print("\nSpectral order:")
     print(f"- order = {psatd_order}")
     print("\nLorentz boost, Galilean velocity:")
