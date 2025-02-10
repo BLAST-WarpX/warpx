@@ -405,7 +405,9 @@ public:
                 // This is needed for physical solution that conserves both momentum and energy
                 amrex::ParticleReal const mime = (weight2*m2)/(weight1*m1);
                 amrex::ParticleReal const u1_rel = std::sqrt(u1sq_rel);
-                amrex::ParticleReal const KE_cm = mime*(gamma1_rel - 1.0_prt)/(gamma1_rel - u1_rel/PhysConst::c + mime)*m1*c2;
+                amrex::ParticleReal const gamma_m_1 = (u1sq_rel/c2)/(gamma1_rel + 1._prt);  // gamma - 1
+                amrex::ParticleReal const gamma_m_u = 1._prt/(gamma1_rel + u1_rel/PhysConst::c);  // gamma - u
+                amrex::ParticleReal const KE_cm = mime*gamma_m_1/(gamma_m_u + mime)*m1*c2;
                 Ephoton = std::min(Ephoton, KE_cm);
 
                 // The electron and ion momentum are updated in the same place where the photon is created,
