@@ -70,7 +70,7 @@ public:
     void AllocateLevelMFs (
         ablastr::fields::MultiFabRegister & fields,
         int lev, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm,
-        const int ncomps,
+        int ncomps,
         const amrex::IntVect& ngEB,
         const amrex::IntVect& Ex_nodal_flag,
         const amrex::IntVect& Ey_nodal_flag,
