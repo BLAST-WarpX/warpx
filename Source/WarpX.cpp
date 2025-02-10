@@ -1530,7 +1530,7 @@ WarpX::ReadParameters ()
         {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 time_dependency_Rho == TimeDependencyRho::Linear,
-                "psatd.rho_in_time=constant not yet implemented, "
+                "Rho constant time dependency not yet implemented, "
                 "except for psatd.solution_type=first-order with JRhom algorithm");
         }
 
@@ -1698,23 +1698,23 @@ WarpX::ReadParameters ()
         {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 update_with_rho,
-                "psatd.update_with_rho must be set to 1 when psatd.J_in_time=linear");
+                "psatd.update_with_rho must be set to 1 with J linear time dependency");
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 v_galilean_is_zero,
-                "psatd.J_in_time=linear not implemented with Galilean PSATD");
+                "J linear time dependency not implemented with Galilean PSATD");
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 v_comoving_is_zero,
-                "psatd.J_in_time=linear not implemented with comoving PSATD");
+                "J linear time dependency not implemented with comoving PSATD");
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 !current_correction,
-                "psatd.current_correction=1 not implemented with psatd.J_in_time=linear");
+                "psatd.current_correction=1 not implemented with J linear time dependency");
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 current_deposition_algo != CurrentDepositionAlgo::Vay,
-                "algo.current_deposition=vay not implemented with psatd.J_in_time=linear");
+                "algo.current_deposition=vay not implemented with J linear time dependency");
         }
 
         for (int dir = 0; dir < AMREX_SPACEDIM; dir++)

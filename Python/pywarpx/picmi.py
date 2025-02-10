@@ -1512,15 +1512,6 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
     warpx_psatd_do_time_averaging: bool, optional
         Whether to do the time averaging for the spectral solver
 
-    warpx_psatd_J_in_time: {'constant', 'linear'}, default='constant'
-        This determines whether the current density is assumed to be constant
-        or linear in time, within the time step over which the electromagnetic
-        fields are evolved.
-
-    warpx_psatd_rho_in_time: {'linear'}, default='linear'
-        This determines whether the charge density is assumed to be linear
-        in time, within the time step over which the electromagnetic fields are evolved.
-
     warpx_do_pml_in_domain: bool, default=False
         Whether to do the PML boundaries within the domain (versus
         in the guard cells)
@@ -1549,8 +1540,6 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
             self.psatd_current_correction = kw.pop("warpx_current_correction", None)
             self.psatd_update_with_rho = kw.pop("warpx_psatd_update_with_rho", None)
             self.psatd_do_time_averaging = kw.pop("warpx_psatd_do_time_averaging", None)
-            self.psatd_J_in_time = kw.pop("warpx_psatd_J_in_time", None)
-            self.psatd_rho_in_time = kw.pop("warpx_psatd_rho_in_time", None)
 
         self.do_pml_in_domain = kw.pop("warpx_do_pml_in_domain", None)
         self.pml_has_particles = kw.pop("warpx_pml_has_particles", None)
@@ -1566,8 +1555,6 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
             pywarpx.psatd.current_correction = self.psatd_current_correction
             pywarpx.psatd.update_with_rho = self.psatd_update_with_rho
             pywarpx.psatd.do_time_averaging = self.psatd_do_time_averaging
-            pywarpx.psatd.J_in_time = self.psatd_J_in_time
-            pywarpx.psatd.rho_in_time = self.psatd_rho_in_time
 
             if self.grid.guard_cells is not None:
                 pywarpx.psatd.nx_guard = self.grid.guard_cells[0]
@@ -2706,14 +2693,10 @@ class Simulation(picmistandard.PICMI_Simulation):
     warpx_use_filter: bool, optional
         Whether to use filtering. The default depends on the conditions.
 
-    warpx_do_multi_J: bool, default=0
-        Whether to use the multi-J algorithm, where current deposition and
+    warpx_JRhom: string
+        Whether to use the JRhom algorithm, where current deposition and
         field update are performed multiple times within each time step.
-
-    warpx_do_multi_J_n_depositions: integer
-        Number of sub-steps to use with the multi-J algorithm, when ``warpx_do_multi_J=1``.
-        Note that this input parameter is not optional and must always be set in all
-        input files where ``warpx.do_multi_J=1``. No default value is provided automatically.
+        This is an empty string by default.
 
     warpx_grid_type: {'collocated', 'staggered', 'hybrid'}, default='staggered'
         Whether to use a collocated grid (all fields defined at the cell nodes),
@@ -2877,8 +2860,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         self.field_gathering_algo = kw.pop("warpx_field_gathering_algo", None)
         self.particle_pusher_algo = kw.pop("warpx_particle_pusher_algo", None)
         self.use_filter = kw.pop("warpx_use_filter", None)
-        self.do_multi_J = kw.pop("warpx_do_multi_J", None)
-        self.do_multi_J_n_depositions = kw.pop("warpx_do_multi_J_n_depositions", None)
+        self.JRhom = kw.pop("warpx_JRhom", None)
         self.grid_type = kw.pop("warpx_grid_type", None)
         self.do_current_centering = kw.pop("warpx_do_current_centering", None)
         self.field_centering_order = kw.pop("warpx_field_centering_order", None)
@@ -2982,8 +2964,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         pywarpx.warpx.grid_type = self.grid_type
         pywarpx.warpx.do_current_centering = self.do_current_centering
         pywarpx.warpx.use_filter = self.use_filter
-        pywarpx.warpx.do_multi_J = self.do_multi_J
-        pywarpx.warpx.do_multi_J_n_depositions = self.do_multi_J_n_depositions
+        pywarpx.warpx.JRhom = self.JRhom
         pywarpx.warpx.serialize_initial_conditions = self.serialize_initial_conditions
         pywarpx.warpx.random_seed = self.random_seed
         pywarpx.warpx.used_inputs_file = self.used_inputs_file

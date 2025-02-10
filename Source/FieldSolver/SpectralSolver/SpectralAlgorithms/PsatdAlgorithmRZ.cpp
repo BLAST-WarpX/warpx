@@ -57,19 +57,19 @@ PsatdAlgorithmRZ::PsatdAlgorithmRZ (SpectralKSpaceRZ const & spectral_kspace,
     if (time_averaging && time_dependency_J != TimeDependencyJ::Linear)
     {
         WARPX_ABORT_WITH_MESSAGE(
-            "RZ PSATD: psatd.do_time_averaging=1 implemented only with psatd.J_in_time=linear");
+            "RZ PSATD: psatd.do_time_averaging=1 implemented only with J linear time dependency");
     }
 
     if (dive_cleaning && time_dependency_J != TimeDependencyJ::Linear)
     {
         WARPX_ABORT_WITH_MESSAGE(
-            "RZ PSATD: warpx.do_dive_cleaning=1 implemented only with psatd.J_in_time=linear");
+            "RZ PSATD: warpx.do_dive_cleaning=1 implemented only with J linear time dependency");
     }
 
     if (divb_cleaning && time_dependency_J != TimeDependencyJ::Linear)
     {
         WARPX_ABORT_WITH_MESSAGE(
-            "RZ PSATD: warpx.do_divb_cleaning=1 implemented only with psatd.J_in_time=linear");
+            "RZ PSATD: warpx.do_divb_cleaning=1 implemented only with J linear time dependency");
     }
 }
 

@@ -2449,15 +2449,9 @@ Maxwell solver: PSATD method
 
     The default value for ``psatd.update_with_rho`` is ``1`` if ``psatd.v_galilean`` is non-zero and ``0`` otherwise.
     The option ``psatd.update_with_rho=0`` is not implemented with the following algorithms:
-    comoving PSATD (``psatd.v_comoving``), time averaging (``psatd.do_time_averaging=1``), div(E) cleaning (``warpx.do_dive_cleaning=1``), and multi-J (``warpx.do_multi_J=1``).
+    comoving PSATD (``psatd.v_comoving``), time averaging (``psatd.do_time_averaging=1``), div(E) cleaning (``warpx.do_dive_cleaning=1``), and JRhom (``psatd.JRhom``).
 
     Note that the update with and without rho is also supported in RZ geometry.
-
-* ``psatd.J_in_time`` (``constant`` or ``linear``; default ``constant``)
-    This determines whether the current density is assumed to be constant or linear in time, within the time step over which the electromagnetic fields are evolved.
-
-* ``psatd.rho_in_time`` (``linear``; default ``linear``)
-    This determines whether the charge density is assumed to be linear in time, within the time step over which the electromagnetic fields are evolved.
 
 * ``psatd.v_galilean`` (`3 floats`, in units of the speed of light; default ``0. 0. 0.``)
     Defines the Galilean velocity.
@@ -2476,12 +2470,8 @@ Maxwell solver: PSATD method
 * ``psatd.do_time_averaging`` (`0` or `1`; default: 0)
     Whether to use an averaged Galilean PSATD algorithm or standard Galilean PSATD.
 
-* ``warpx.do_multi_J`` (`0` or `1`; default: `0`)
-    Whether to use the multi-J algorithm, where current deposition and field update are performed multiple times within each time step. The number of sub-steps is determined by the input parameter ``warpx.do_multi_J_n_depositions``. Unlike sub-cycling, field gathering is performed only once per time step, as in regular PIC cycles. When ``warpx.do_multi_J = 1``, we perform linear interpolation of two distinct currents deposited at the beginning and the end of the time step, instead of using one single current deposited at half time. For simulations with strong numerical Cherenkov instability (NCI), it is recommended to use the multi-J algorithm in combination with ``psatd.do_time_averaging = 1``.
-
-* ``warpx.do_multi_J_n_depositions`` (integer)
-    Number of sub-steps to use with the multi-J algorithm, when ``warpx.do_multi_J = 1``.
-    Note that this input parameter is not optional and must always be set in all input files where ``warpx.do_multi_J = 1``. No default value is provided automatically.
+* ``psatd.JRhom`` (str)
+    Whether to use the JRhom algorithm, where current deposition and fields update are performed multiple times within each time step. This is a string of the form ``CC1``, ``CL2``, etc. The first character of the string denotes the time dependency of :math:`J` (e.g., ``C`` stands for constant in time, ``L`` stands for linear in time). The second character of the string denotes the time dependency of :math:`\rho` (e.g., ``C`` stands for constant in time, ``L`` stands for linear in time). The integer after the first two characters denotes the number of sub-intervals for current deposition and fields update. Unlike sub-cycling, field gathering is performed only once per time step, as in regular PIC cycles. For simulations with strong numerical Cherenkov instability (NCI), it is recommended to use the JRhom algorithm in combination with ``psatd.do_time_averaging = 1``.
 
 Maxwell solver: macroscopic media
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
