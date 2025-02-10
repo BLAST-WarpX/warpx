@@ -342,12 +342,12 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
 #ifdef WARPX_QED
     pp_species_name.query("do_qed_quantum_sync", m_do_qed_quantum_sync);
     if (m_do_qed_quantum_sync) {
-        NewRealComp("opticalDepthQSR");
+        AddRealComp("opticalDepthQSR");
     }
 
     pp_species_name.query("do_qed_breit_wheeler", m_do_qed_breit_wheeler);
     if (m_do_qed_breit_wheeler) {
-        NewRealComp("opticalDepthBW");
+        AddRealComp("opticalDepthBW");
     }
 
     if(m_do_qed_quantum_sync){
@@ -368,7 +368,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
             str_int_attrib_function.at(i));
         m_user_int_attrib_parser.at(i) = std::make_unique<amrex::Parser>(
             utils::parser::makeParser(str_int_attrib_function.at(i),{"x","y","z","ux","uy","uz","t"}));
-        NewIntComp(m_user_int_attribs.at(i));
+        AddIntComp(m_user_int_attribs.at(i));
     }
 
     // User-defined real attributes
@@ -383,19 +383,19 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
             str_real_attrib_function.at(i));
         m_user_real_attrib_parser.at(i) = std::make_unique<amrex::Parser>(
             utils::parser::makeParser(str_real_attrib_function.at(i),{"x","y","z","ux","uy","uz","t"}));
-        NewRealComp(m_user_real_attribs.at(i));
+        AddRealComp(m_user_real_attribs.at(i));
     }
 
     // If old particle positions should be saved add the needed components
     pp_species_name.query("save_previous_position", m_save_previous_position);
     if (m_save_previous_position) {
 #if (AMREX_SPACEDIM >= 2)
-        NewRealComp("prev_x");
+        AddRealComp("prev_x");
 #endif
 #if defined(WARPX_DIM_3D)
-        NewRealComp("prev_y");
+        AddRealComp("prev_y");
 #endif
-        NewRealComp("prev_z");
+        AddRealComp("prev_z");
 #ifdef WARPX_DIM_RZ
       amrex::Abort("Saving previous particle positions not yet implemented in RZ");
 #endif
@@ -813,7 +813,7 @@ PhysicalParticleContainer::DefaultInitializeRuntimeAttributes (
     ParticleCreation::DefaultInitializeRuntimeAttributes(pinned_tile,
                                        n_external_attr_real, n_external_attr_int,
                                        m_user_real_attribs, m_user_int_attribs,
-                                       particle_comps, particle_icomps,
+                                       GetRealSoANames(), GetIntSoANames(),
                                        amrex::GetVecOfPtrs(m_user_real_attrib_parser),
                                        amrex::GetVecOfPtrs(m_user_int_attrib_parser),
 #ifdef WARPX_QED
@@ -1086,7 +1086,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
         }
         uint64_t * AMREX_RESTRICT pa_idcpu = soa.GetIdCPUData().data() + old_size;
 
-        PlasmaParserHelper plasma_parser_helper (soa, old_size, m_user_int_attribs, m_user_real_attribs, particle_icomps, particle_comps, plasma_parser_wrapper);
+        PlasmaParserHelper plasma_parser_helper(soa, old_size, m_user_int_attribs, m_user_real_attribs, plasma_parser_wrapper);
         int** pa_user_int_data = plasma_parser_helper.getUserIntDataPtrs();
         ParticleReal** pa_user_real_data = plasma_parser_helper.getUserRealDataPtrs();
         amrex::ParserExecutor<7> const* user_int_parserexec_data = plasma_parser_helper.getUserIntParserExecData();
@@ -1094,11 +1094,11 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
 
         int* pi = nullptr;
         if (do_field_ionization) {
-            pi = soa.GetIntData(particle_icomps["ionizationLevel"]).data() + old_size;
+            pi = soa.GetIntData("ionizationLevel").data() + old_size;
         }
 
 #ifdef WARPX_QED
-        const QEDHelper qed_helper(soa, old_size, particle_comps,
+        const QEDHelper qed_helper(soa, old_size,
                                    has_quantum_sync(), has_breit_wheeler(),
                                    m_shr_p_qs_engine, m_shr_p_bw_engine);
 #endif
@@ -1522,7 +1522,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
         }
         uint64_t * AMREX_RESTRICT pa_idcpu = soa.GetIdCPUData().data() + old_size;
 
-        PlasmaParserHelper plasma_parser_helper (soa, old_size, m_user_int_attribs, m_user_real_attribs, particle_icomps, particle_comps, plasma_parser_wrapper);
+        PlasmaParserHelper plasma_parser_helper(soa, old_size, m_user_int_attribs, m_user_real_attribs, plasma_parser_wrapper);
         int** pa_user_int_data = plasma_parser_helper.getUserIntDataPtrs();
         ParticleReal** pa_user_real_data = plasma_parser_helper.getUserRealDataPtrs();
         amrex::ParserExecutor<7> const* user_int_parserexec_data = plasma_parser_helper.getUserIntParserExecData();
@@ -1530,11 +1530,11 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 
         int* p_ion_level = nullptr;
         if (do_field_ionization) {
-            p_ion_level = soa.GetIntData(particle_icomps["ionizationLevel"]).data() + old_size;
+            p_ion_level = soa.GetIntData("ionizationLevel").data() + old_size;
         }
 
 #ifdef WARPX_QED
-        const QEDHelper qed_helper(soa, old_size, particle_comps,
+        const QEDHelper qed_helper(soa, old_size,
                                    has_quantum_sync(), has_breit_wheeler(),
                                    m_shr_p_qs_engine, m_shr_p_bw_engine);
 #endif
@@ -1922,7 +1922,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 // Deposit charge before particle push, in component 0 of MultiFab rho.
 
                 const int* const AMREX_RESTRICT ion_lev = (do_field_ionization)?
-                    pti.GetiAttribs(particle_icomps["ionizationLevel"]).dataPtr():nullptr;
+                    pti.GetiAttribs("ionizationLevel").dataPtr():nullptr;
 
                 amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
                 DepositCharge(pti, wp, ion_lev, rho, 0, 0,
@@ -2018,7 +2018,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                     const amrex::Real relative_time = (push_type == PushType::Explicit ? -0.5_rt * dt : 0.0_rt);
 
                     const int* const AMREX_RESTRICT ion_lev = (do_field_ionization)?
-                        pti.GetiAttribs(particle_icomps["ionizationLevel"]).dataPtr():nullptr;
+                        pti.GetiAttribs("ionizationLevel").dataPtr():nullptr;
 
                     // Deposit inside domains
                     amrex::MultiFab * jx = fields.get(current_fp_string, Direction{0}, lev);
@@ -2050,7 +2050,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         "Cannot deposit charge in rho component 1: only component 0 is allocated!");
 
                     const int* const AMREX_RESTRICT ion_lev = (do_field_ionization)?
-                        pti.GetiAttribs(particle_icomps["ionizationLevel"]).dataPtr():nullptr;
+                        pti.GetiAttribs("ionizationLevel").dataPtr():nullptr;
 
                     DepositCharge(pti, wp, ion_lev, rho, 1, 0,
                                   np_current, thread_num, lev, lev);
@@ -2424,7 +2424,7 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
 
             int* AMREX_RESTRICT ion_lev = nullptr;
             if (do_field_ionization) {
-                ion_lev = pti.GetiAttribs(particle_icomps["ionizationLevel"]).dataPtr();
+                ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
             }
 
             // Loop over the particles and update their momentum
@@ -2620,7 +2620,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 
     int* AMREX_RESTRICT ion_lev = nullptr;
     if (do_field_ionization) {
-        ion_lev = pti.GetiAttribs(particle_icomps["ionizationLevel"]).dataPtr() + offset;
+        ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr() + offset;
     }
 
     const bool save_previous_position = m_save_previous_position;
@@ -2629,12 +2629,12 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     ParticleReal* z_old = nullptr;
     if (save_previous_position) {
 #if (AMREX_SPACEDIM >= 2)
-        x_old = pti.GetAttribs(particle_comps["prev_x"]).dataPtr() + offset;
+        x_old = pti.GetAttribs("prev_x").dataPtr() + offset;
 #endif
 #if defined(WARPX_DIM_3D)
-        y_old = pti.GetAttribs(particle_comps["prev_y"]).dataPtr() + offset;
+        y_old = pti.GetAttribs("prev_y").dataPtr() + offset;
 #endif
-        z_old = pti.GetAttribs(particle_comps["prev_z"]).dataPtr() + offset;
+        z_old = pti.GetAttribs("prev_z").dataPtr() + offset;
         amrex::ignore_unused(x_old, y_old);
     }
 
@@ -2654,7 +2654,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     const bool local_has_quantum_sync = has_quantum_sync();
     if (local_has_quantum_sync) {
         evolve_opt = m_shr_p_qs_engine->build_evolve_functor();
-        p_optical_depth_QSR = pti.GetAttribs(particle_comps["opticalDepthQSR"]).dataPtr()  + offset;
+        p_optical_depth_QSR = pti.GetAttribs("opticalDepthQSR").dataPtr()  + offset;
     }
 #endif
 
@@ -2859,15 +2859,15 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
     ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr() + offset;
 
 #if (AMREX_SPACEDIM >= 2)
-    ParticleReal* x_n = pti.GetAttribs(particle_comps["x_n"]).dataPtr();
+    ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr();
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-    ParticleReal* y_n = pti.GetAttribs(particle_comps["y_n"]).dataPtr();
+    ParticleReal* y_n = pti.GetAttribs("y_n").dataPtr();
 #endif
-    ParticleReal* z_n = pti.GetAttribs(particle_comps["z_n"]).dataPtr();
-    ParticleReal* ux_n = pti.GetAttribs(particle_comps["ux_n"]).dataPtr();
-    ParticleReal* uy_n = pti.GetAttribs(particle_comps["uy_n"]).dataPtr();
-    ParticleReal* uz_n = pti.GetAttribs(particle_comps["uz_n"]).dataPtr();
+    ParticleReal* z_n = pti.GetAttribs("z_n").dataPtr();
+    ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
+    ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
+    ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
 
     const int do_copy = (m_do_back_transformed_particles && (a_dt_type!=DtType::SecondHalf) );
     CopyParticleAttribs copyAttribs;
@@ -2877,7 +2877,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
 
     int* AMREX_RESTRICT ion_lev = nullptr;
     if (do_field_ionization) {
-        ion_lev = pti.GetiAttribs(particle_icomps["ionizationLevel"]).dataPtr() + offset;
+        ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr() + offset;
     }
 
     // Loop over the particles and update their momentum
@@ -2896,7 +2896,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
     const bool local_has_quantum_sync = has_quantum_sync();
     if (local_has_quantum_sync) {
         evolve_opt = m_shr_p_qs_engine->build_evolve_functor();
-        p_optical_depth_QSR = pti.GetAttribs(particle_comps["opticalDepthQSR"]).dataPtr()  + offset;
+        p_optical_depth_QSR = pti.GetAttribs("opticalDepthQSR").dataPtr()  + offset;
     }
 #endif
 
@@ -3110,7 +3110,7 @@ PhysicalParticleContainer::InitIonizationModule ()
         physical_element == "H" || !do_adk_correction,
         "Correction to ADK by Zhang et al., PRA 90, 043410 (2014) only works with Hydrogen");
     // Add runtime integer component for ionization level
-    NewIntComp("ionizationLevel");
+    AddIntComp("ionizationLevel");
     // Get atomic number and ionization energies from file
     const int ion_element_id = utils::physics::ion_map_ids.at(physical_element);
     ion_atomic_number = utils::physics::ion_atomic_numbers[ion_element_id];
@@ -3193,7 +3193,7 @@ PhysicalParticleContainer::getIonizationFunc (const WarpXParIter& pti,
                                 adk_exp_prefactor.dataPtr(),
                                 adk_power.dataPtr(),
                                 adk_correction_factors.dataPtr(),
-                                particle_icomps["ionizationLevel"],
+                                GetIntCompIndex("ionizationLevel"),
                                 ion_atomic_number,
                                 do_adk_correction};
 }
@@ -3299,14 +3299,14 @@ PhotonEmissionFilterFunc
 PhysicalParticleContainer::getPhotonEmissionFilterFunc ()
 {
     WARPX_PROFILE("PhysicalParticleContainer::getPhotonEmissionFunc()");
-    return PhotonEmissionFilterFunc{particle_runtime_comps["opticalDepthQSR"]};
+    return PhotonEmissionFilterFunc{GetRealCompIndex("opticalDepthQSR") - NArrayReal};
 }
 
 PairGenerationFilterFunc
 PhysicalParticleContainer::getPairGenerationFilterFunc ()
 {
     WARPX_PROFILE("PhysicalParticleContainer::getPairGenerationFunc()");
-    return PairGenerationFilterFunc{particle_runtime_comps["opticalDepthBW"]};
+    return PairGenerationFilterFunc{GetRealCompIndex("opticalDepthBW") - NArrayReal};
 }
 
 #endif

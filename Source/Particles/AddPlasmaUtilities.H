@@ -251,8 +251,6 @@ struct PlasmaParserHelper
     PlasmaParserHelper (SoAType& a_soa, std::size_t old_size,
                         const std::vector<std::string>& a_user_int_attribs,
                         const std::vector<std::string>& a_user_real_attribs,
-                        std::map<std::string,int>& a_particle_icomps,
-                        std::map<std::string,int>& a_particle_comps,
                         const PlasmaParserWrapper& wrapper) :
         m_wrapper_ptr(&wrapper) {
         m_pa_user_int_pinned.resize(a_user_int_attribs.size());
@@ -266,10 +264,10 @@ struct PlasmaParserHelper
 #endif
 
         for (std::size_t ia = 0; ia < a_user_int_attribs.size(); ++ia) {
-            m_pa_user_int_pinned[ia] = a_soa.GetIntData(a_particle_icomps[a_user_int_attribs[ia]]).data() + old_size;
+            m_pa_user_int_pinned[ia] = a_soa.GetIntData(a_user_int_attribs[ia]).data() + old_size;
         }
         for (std::size_t ia = 0; ia < a_user_real_attribs.size(); ++ia) {
-            m_pa_user_real_pinned[ia] = a_soa.GetRealData(a_particle_comps[a_user_real_attribs[ia]]).data() + old_size;
+            m_pa_user_real_pinned[ia] = a_soa.GetRealData(a_user_real_attribs[ia]).data() + old_size;
         }
 
 #ifdef AMREX_USE_GPU
@@ -308,7 +306,6 @@ struct QEDHelper
 {
     template <typename SoAType>
     QEDHelper (SoAType& a_soa, std::size_t old_size,
-               std::map<std::string,int>& a_particle_comps,
                bool a_has_quantum_sync, bool a_has_breit_wheeler,
                const std::shared_ptr<QuantumSynchrotronEngine>& a_shr_p_qs_engine,
                const std::shared_ptr<BreitWheelerEngine>& a_shr_p_bw_engine)
@@ -317,14 +314,12 @@ struct QEDHelper
         if(has_quantum_sync){
             quantum_sync_get_opt =
                 a_shr_p_qs_engine->build_optical_depth_functor();
-            p_optical_depth_QSR = a_soa.GetRealData(
-                a_particle_comps["opticalDepthQSR"]).data() + old_size;
+            p_optical_depth_QSR = a_soa.GetRealData("opticalDepthQSR").data() + old_size;
         }
         if(has_breit_wheeler){
             breit_wheeler_get_opt =
                 a_shr_p_bw_engine->build_optical_depth_functor();
-            p_optical_depth_BW = a_soa.GetRealData(
-                a_particle_comps["opticalDepthBW"]).data() + old_size;
+            p_optical_depth_BW = a_soa.GetRealData("opticalDepthBW").data() + old_size;
         }
     }
 

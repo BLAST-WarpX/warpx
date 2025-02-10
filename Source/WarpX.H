@@ -212,17 +212,15 @@ public:
      *  (BackwardEuler - 0, Lax-Wendroff - 1)
      */
     static inline auto macroscopic_solver_algo = MacroscopicSolverAlgo::Default;
-    /** Integers that correspond to boundary condition applied to fields at the
-     *  lower domain boundaries
-     *  (0 to 6 correspond to PML, Periodic, PEC, PMC, Damped, Absorbing Silver-Mueller, None)
+    /** Boundary conditions applied to fields at the lower domain boundaries
+     *  (Possible values PML, Periodic, PEC, PMC, Neumann, Damped, Absorbing Silver-Mueller, None)
      */
     static inline amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>
         field_boundary_lo {AMREX_D_DECL(FieldBoundaryType::Default,
                                         FieldBoundaryType::Default,
                                         FieldBoundaryType::Default)};
-    /** Integers that correspond to boundary condition applied to fields at the
-     *  upper domain boundaries
-     *  (0 to 6 correspond to PML, Periodic, PEC, PMC, Damped, Absorbing Silver-Mueller, None)
+    /** Boundary conditions applied to fields at the upper domain boundaries
+     *  (Possible values PML, Periodic, PEC, PMC, Neumann, Damped, Absorbing Silver-Mueller, None)
      */
     static inline amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>
         field_boundary_hi {AMREX_D_DECL(FieldBoundaryType::Default,

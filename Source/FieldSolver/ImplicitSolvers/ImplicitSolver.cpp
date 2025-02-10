@@ -13,15 +13,15 @@ void ImplicitSolver::CreateParticleAttributes () const
     // Add space to save the positions and velocities at the start of the time steps
     for (auto const& pc : m_WarpX->GetPartContainer()) {
 #if (AMREX_SPACEDIM >= 2)
-        pc->NewRealComp("x_n", comm);
+        pc->AddRealComp("x_n", comm);
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-        pc->NewRealComp("y_n", comm);
+        pc->AddRealComp("y_n", comm);
 #endif
-        pc->NewRealComp("z_n", comm);
-        pc->NewRealComp("ux_n", comm);
-        pc->NewRealComp("uy_n", comm);
-        pc->NewRealComp("uz_n", comm);
+        pc->AddRealComp("z_n", comm);
+        pc->AddRealComp("ux_n", comm);
+        pc->AddRealComp("uy_n", comm);
+        pc->AddRealComp("uz_n", comm);
     }
 }
 
@@ -62,13 +62,12 @@ Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const
             lbc[i] = LinOpBCType::Periodic;
         } else if (a_fbc[i] == FieldBoundaryType::PEC) {
             WARPX_ABORT_WITH_MESSAGE("LinOpBCType not set for this FieldBoundaryType");
-        } else if (a_fbc[i] == FieldBoundaryType::PMC) {
-            WARPX_ABORT_WITH_MESSAGE("LinOpBCType not set for this FieldBoundaryType");
         } else if (a_fbc[i] == FieldBoundaryType::Damped) {
             WARPX_ABORT_WITH_MESSAGE("LinOpBCType not set for this FieldBoundaryType");
         } else if (a_fbc[i] == FieldBoundaryType::Absorbing_SilverMueller) {
             WARPX_ABORT_WITH_MESSAGE("LinOpBCType not set for this FieldBoundaryType");
         } else if (a_fbc[i] == FieldBoundaryType::Neumann) {
+            // Also for FieldBoundaryType::PMC
             lbc[i] = LinOpBCType::Neumann;
         } else if (a_fbc[i] == FieldBoundaryType::None) {
             WARPX_ABORT_WITH_MESSAGE("LinOpBCType not set for this FieldBoundaryType");
