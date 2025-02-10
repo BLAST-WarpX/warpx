@@ -1511,7 +1511,7 @@ WarpX::ReadParameters ()
                 );
             }
             // parse number of subintervals from last digit
-            for (char m : JRhom_input.substr(2)) {
+            for (const char m : JRhom_input.substr(2)) {
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                     std::isdigit(m),
                     "psatd.JRhom input string does not include integer 'm'"
@@ -1526,7 +1526,7 @@ WarpX::ReadParameters ()
                 "Vay deposition not implemented with JRhom algorithm");
         }
 
-        if (m_psatd_solution_type != PSATDSolutionType::FirstOrder || m_JRhom == false)
+        if (m_psatd_solution_type != PSATDSolutionType::FirstOrder || !m_JRhom)
         {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 time_dependency_Rho == TimeDependencyRho::Linear,
