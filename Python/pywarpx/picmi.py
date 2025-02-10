@@ -2481,14 +2481,21 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
     scattering_processes: dictionary
         The scattering process to use and any needed information
 
+    product_species: list
+        The species produced by collision processes (currently only ionization
+        products are supported).
+
     ndt: integer, optional
         The collisions will be applied every "ndt" steps. Must be 1 or larger.
     """
 
-    def __init__(self, name, species, scattering_processes, ndt=None, **kw):
+    def __init__(
+        self, name, species, scattering_processes, product_species=None, ndt=None, **kw
+    ):
         self.name = name
         self.species = species
         self.scattering_processes = scattering_processes
+        self.product_species = product_species
         self.ndt = ndt
 
         self.handle_init(kw)
@@ -2497,12 +2504,16 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
         collision = pywarpx.Collisions.newcollision(self.name)
         collision.type = "dsmc"
         collision.species = [species.name for species in self.species]
+        if self.product_species is not None:
+            collision.product_species = [
+                species.name for species in self.product_species
+            ]
         collision.ndt = self.ndt
 
         collision.scattering_processes = self.scattering_processes.keys()
         for process, kw in self.scattering_processes.items():
             for key, val in kw.items():
-                if key == "species":
+                if "species" in key:
                     val = val.name
                 collision.add_new_attr(process + "_" + key, val)
 

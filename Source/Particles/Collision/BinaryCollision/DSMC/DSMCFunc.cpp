@@ -38,21 +38,16 @@ DSMCFunc::DSMCFunc (
         std::string cross_section_file;
         pp_collision_name.query(kw_cross_section.c_str(), cross_section_file);
 
-        // if the scattering process is excitation or ionization get the
-        // energy associated with that process
+        // if the scattering process is excitation, ionization or forward get
+        // the energy associated with that process
+        // (note that this allows forward scattering to be used both with and
+        // without a fixed energy loss)
         amrex::ParticleReal energy = 0._prt;
         if (scattering_process.find("excitation") != std::string::npos ||
-            scattering_process.find("ionization") != std::string::npos) {
+            scattering_process.find("ionization") != std::string::npos ||
+            scattering_process.find("forward") != std::string::npos ) {
             const std::string kw_energy = scattering_process + "_energy";
             utils::parser::getWithParser(
-                pp_collision_name, kw_energy.c_str(), energy);
-        }
-        // if the scattering process is forward scattering get the energy
-        // associated with the process if it is given (this allows forward
-        // scattering to be used both with and without a fixed energy loss)
-        else if (scattering_process.find("forward") != std::string::npos) {
-            const std::string kw_energy = scattering_process + "_energy";
-            utils::parser::queryWithParser(
                 pp_collision_name, kw_energy.c_str(), energy);
         }
 
@@ -61,11 +56,13 @@ DSMCFunc::DSMCFunc (
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::INVALID,
                                         "Cannot add an unknown scattering process type");
 
-        // if the scattering process is ionization get the secondary species
-        // only one ionization process is supported
+        // Only one ionization process is currently supported as part of a given
+        // collision set.
         if (process.type() == ScatteringProcessType::IONIZATION) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!ionization_flag,
-                                             "Background MCC only supports a single ionization process");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !ionization_flag,
+                "DSMC only supports a single ionization process"
+            );
             ionization_flag = true;
 
             // TODO: Add a check that the first species is the electron species

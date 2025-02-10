@@ -13,27 +13,54 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
                                           MultiParticleContainer const * const mypc):
     m_collision_type{BinaryCollisionUtils::get_collision_type(collision_name, mypc)}
 {
-    const amrex::ParmParse pp_collision_name(collision_name);
-
-    // Check if ionization is one of the scattering processes
-    amrex::Vector<std::string> scattering_process_names;
-    pp_collision_name.queryarr("scattering_processes", scattering_process_names);
-    for (const auto& scattering_process : scattering_process_names) {
-        if (scattering_process.find("ionization") != std::string::npos) {
-           m_ionization_flag = true;
-        }
-    }
-
     if (m_collision_type == CollisionType::DSMC)
     {
-        if (m_ionization_flag) {
-            // Product species include the ion
-            // TODO: as an alternative, we could use the runtime attribute `ionization_level` for this species
-            m_num_product_species = 3;
-            m_num_products_host.push_back(2); // electron species:
-            // potentially 2 products per reaction: the scattered incoming electron, and the new electron from ionization
-            m_num_products_host.push_back(1);
-            m_num_products_host.push_back(1); // corresponds to the ionized species
+        const amrex::ParmParse pp_collision_name(collision_name);
+
+        // Check if ionization is one of the scattering processes by querying
+        // for any specified product species (ionization is the only current
+        // DSMC process with products)
+        amrex::Vector<std::string> product_species;
+        pp_collision_name.queryarr("product_species", product_species);
+
+        bool ionization_flag = (product_species.size() > 0);
+
+        // if ionization is one of the processes, check if one of the colliding
+        // species is also used as a product species
+        if (ionization_flag) {
+            // grab the colliding species
+            amrex::Vector<std::string> colliding_species;
+            pp_collision_name.getarr("species", colliding_species);
+            // grab the target species (i.e., the species that looses an
+            // electron during the collision)
+            std::string target_species = "";
+            pp_collision_name.query("ionization_target_species", target_species);
+            // find the index of the non-target species (the one that could
+            // also be used as a product species)
+            int non_target_idx = 0;
+            if (colliding_species[0] == target_species) {
+                non_target_idx = 1;
+            }
+
+            // check if the non-target species is in ``product_species``
+            auto it = std::find(product_species.begin(), product_species.end(), colliding_species[non_target_idx]);
+
+            if (it != product_species.end()) {
+                m_num_product_species = 3;
+                m_num_products_host.push_back(2); // the non-target species
+                m_num_products_host.push_back(1); // the target species
+                m_num_products_host.push_back(1); // corresponds to whichever ionization product species1 is not (ion or electron)
+            } else {
+                m_num_product_species = 4;
+                m_num_products_host.push_back(1); // the non-target species
+                m_num_products_host.push_back(1); // the target species
+                m_num_products_host.push_back(1); // first product species
+                m_num_products_host.push_back(1); // second product species
+            }
+
+            // get the ionization energy
+            pp_collision_name.get("ionization_energy", m_ionization_energy);
+
         } else {
             m_num_product_species = 2;
             m_num_products_host.push_back(1);
