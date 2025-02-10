@@ -14,7 +14,12 @@ Plasma-Based Acceleration
 
 Scientific works in laser-plasma and beam-plasma acceleration.
 
-#. Shrock JE, Rockafellow E, Miao B, Le M, Hollinger RC, Wang S, Gonsalves AJ, Picksley A, Rocca JJ, and Milchberg HM
+#. Ma M, Zeng M, Wang J, Lu G, Yan W, Chen L, and Li D.
+   **Particle-in-cell simulation of laser wakefield accelerators with oblique lasers in quasicylindrical geometry**.
+   Phys. Rev. Accel. Beams **28**, 021301, 2025
+   `DOI:10.1103/PhysRevAccelBeams.28.021301 <https://doi.org/10.1103/PhysRevAccelBeams.28.021301>`__
+
+#. Shrock JE, Rockafellow E, Miao B, Le M, Hollinger RC, Wang S, Gonsalves AJ, Picksley A, Rocca JJ, and Milchberg HM.
    **Guided Mode Evolution and Ionization Injection in Meter-Scale Multi-GeV Laser Wakefield Accelerators**.
    Phys. Rev. Lett. **133**, 045002, 2024
    `DOI:10.1103/PhysRevLett.133.045002 <https://link.aps.org/doi/10.1103/PhysRevLett.133.045002>`__
