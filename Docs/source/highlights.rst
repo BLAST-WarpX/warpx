@@ -154,6 +154,11 @@ High Energy Astrophysical Plasma Physics
 
 Scientific works in astrophysical plasma modeling.
 
+#. Jambunathan R, Jones H, Corrales L, Klion H, Roward ME, Myers A, Zhang W, Vay J-L.
+   **Application of mesh refinement to relativistic magnetic reconnection**.
+   Physics of Plasmas ***32*** 1, 2025
+   `DOI:10.1063/5.0233583 <https://doi.org/10.1063/5.0233583>`__
+
 #. Klion H, Jambunathan R, Rowan ME, Yang E, Willcox D, Vay J-L, Lehe R, Myers A, Huebl A, Zhang W.
    **Particle-in-Cell simulations of relativistic magnetic reconnection with advanced Maxwell solver algorithms**.
    The Astrophysical Journal **952** 8, 2023.
