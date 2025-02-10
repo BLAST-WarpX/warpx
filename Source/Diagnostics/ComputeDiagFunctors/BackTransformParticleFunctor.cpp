@@ -56,8 +56,12 @@ LorentzTransformParticles::LorentzTransformParticles (
     m_uypnew = attribs[PIdx::uy].dataPtr();
     m_uzpnew = attribs[PIdx::uz].dataPtr();
 
+#if (AMREX_SPACEDIM >= 2)
     m_xpold = a_pti.GetAttribs("x_n_btd").dataPtr();
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
     m_ypold = a_pti.GetAttribs("y_n_btd").dataPtr();
+#endif
     m_zpold = a_pti.GetAttribs("z_n_btd").dataPtr();
     m_uxpold = a_pti.GetAttribs("ux_n_btd").dataPtr();
     m_uypold = a_pti.GetAttribs("uy_n_btd").dataPtr();

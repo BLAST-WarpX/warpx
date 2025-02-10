@@ -57,8 +57,12 @@ struct CopyParticleAttribs
         uyp = attribs[PIdx::uy].dataPtr() + a_offset;
         uzp = attribs[PIdx::uz].dataPtr() + a_offset;
 
+#if (AMREX_SPACEDIM >= 2)
         xpold = a_pti.GetAttribs("x_n_btd").dataPtr();
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
         ypold = a_pti.GetAttribs("y_n_btd").dataPtr();
+#endif
         zpold = a_pti.GetAttribs("z_n_btd").dataPtr();
         uxpold = a_pti.GetAttribs("ux_n_btd").dataPtr();
         uypold = a_pti.GetAttribs("uy_n_btd").dataPtr();
@@ -77,8 +81,12 @@ struct CopyParticleAttribs
         AMREX_ASSERT(uyp != nullptr);
         AMREX_ASSERT(uzp != nullptr);
 
+#if (AMREX_SPACEDIM >= 2)
         AMREX_ASSERT(xpold != nullptr);
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
         AMREX_ASSERT(ypold != nullptr);
+#endif
         AMREX_ASSERT(zpold != nullptr);
 
         AMREX_ASSERT(uxpold != nullptr);
@@ -88,8 +96,12 @@ struct CopyParticleAttribs
         amrex::ParticleReal x, y, z;
         m_get_position(i, x, y, z);
 
+#if (AMREX_SPACEDIM >= 2)
         xpold[i] = x;
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
         ypold[i] = y;
+#endif
         zpold[i] = z;
 
         uxpold[i] = uxp[i];

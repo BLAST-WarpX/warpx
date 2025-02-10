@@ -133,8 +133,12 @@ struct LorentzTransformParticles
         const amrex::Real weight_new = (m_t_lab - t_old_p)
                                      / (t_new_p - t_old_p);
         // weighted sum of old and new values
+#if (AMREX_SPACEDIM >= 2)
         const amrex::ParticleReal xp = m_xpold[i_src] * weight_old + xpnew * weight_new;
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
         const amrex::ParticleReal yp = m_ypold[i_src] * weight_old + ypnew * weight_new;
+#endif
         const amrex::ParticleReal zp = z_old_p * weight_old + z_new_p * weight_new;
         const amrex::ParticleReal uxp = m_uxpold[i_src] * weight_old
                                       + m_uxpnew[i_src] * weight_new;
@@ -153,12 +157,8 @@ struct LorentzTransformParticles
 #elif defined (WARPX_DIM_XZ)
         dst.m_rdata[PIdx::x][i_dst] = xp;
         dst.m_rdata[PIdx::z][i_dst] = zp;
-        amrex::ignore_unused(yp);
 #elif defined (WARPX_DIM_1D_Z)
         dst.m_rdata[PIdx::z][i_dst] = zp;
-        amrex::ignore_unused(xp, yp);
-#else
-        amrex::ignore_unused(xp, yp, zp);
 #endif
         dst.m_rdata[PIdx::w][i_dst] = m_wpnew[i_src];
         dst.m_rdata[PIdx::ux][i_dst] = uxp;

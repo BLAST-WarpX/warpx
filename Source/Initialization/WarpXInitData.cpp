@@ -541,8 +541,8 @@ WarpX::InitData ()
         ComputeDt();
         WarpX::PrintDtDxDyDz();
         InitFromScratch();
-        InitRuntimeComps();
         InitDiagnostics();
+        InitRuntimeComps();
     }
     else
     {
