@@ -372,13 +372,13 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
         real_names.push_back("theta");
 #endif
 
-        // get the names of the real comps
-
-        //   note: skips the mandatory AMREX_SPACEDIM positions for pure SoA
+        // get the names of the extra real comps
         real_names.resize(tmp.NumRealComps() - AMREX_SPACEDIM);
-        auto runtime_rnames = tmp.getParticleRuntimeComps();
-        for (auto const& x : runtime_rnames) {
-            real_names[x.second + PIdx::nattribs - AMREX_SPACEDIM] = x.first;
+
+        // note, skip the required compnent names here
+        auto rnames = tmp.GetRealSoANames();
+        for (std::size_t index = PIdx::nattribs; index < rnames.size(); ++index) {
+            real_names[index - AMREX_SPACEDIM] = rnames[index];
         }
 
         // plot any "extra" fields by default
@@ -390,8 +390,10 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
 
         // and the names
         int_names.resize(tmp.NumIntComps());
-        auto runtime_inames = tmp.getParticleRuntimeiComps();
-        for (auto const& x : runtime_inames) { int_names[x.second+0] = x.first; }
+        auto inames = tmp.GetIntSoANames();
+        for (std::size_t index = 0; index < inames.size(); ++index) {
+            int_names[index] = inames[index];
+        }
 
         // plot by default
         int_flags.resize(tmp.NumIntComps(), 1);

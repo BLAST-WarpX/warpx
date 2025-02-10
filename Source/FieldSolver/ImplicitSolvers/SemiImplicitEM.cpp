@@ -5,6 +5,7 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "SemiImplicitEM.H"
+#include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "WarpX.H"
 
 using warpx::fields::FieldType;
@@ -83,6 +84,7 @@ void SemiImplicitEM::OneStep ( amrex::Real  start_time,
 
     // Update WarpX owned Efield_fp to t_{n+1/2}
     m_WarpX->SetElectricFieldAndApplyBCs( m_E, half_time );
+    m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
     // Advance particles from time n+1/2 to time n+1
     m_WarpX->FinishImplicitParticleUpdate();

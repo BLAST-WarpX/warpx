@@ -48,7 +48,7 @@ WarpX::ComputeDt ()
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_const_dt.has_value(), "warpx.const_dt must be specified with the hybrid-PIC solver.");
     } else if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            m_const_dt.has_value() || dt_update_interval.isActivated(),
+            m_const_dt.has_value() || m_dt_update_interval.isActivated(),
             "warpx.const_dt must be specified with the electrostatic solver, or warpx.dt_update_interval must be > 0."
         );
     }

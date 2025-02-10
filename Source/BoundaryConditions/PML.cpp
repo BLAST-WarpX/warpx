@@ -11,6 +11,9 @@
 #include "BoundaryConditions/PML.H"
 #include "BoundaryConditions/PMLComponent.H"
 #include "Fields.H"
+#ifdef AMREX_USE_EB
+#   include "EmbeddedBoundary/EmbeddedBoundary.H"
+#endif
 #ifdef WARPX_USE_FFT
 #   include "FieldSolver/SpectralSolver/SpectralFieldData.H"
 #endif
@@ -506,7 +509,7 @@ SigmaBox::ComputePMLFactorsE (const Real* a_dx, Real dt)
 }
 
 MultiSigmaBox::MultiSigmaBox (const BoxArray& ba, const DistributionMapping& dm,
-                              const BoxArray& grid_ba, const Real* dx,
+                              const BoxArray* grid_ba, const Real* dx,
                               const IntVect& ncell, const IntVect& delta,
                               const amrex::Box& regular_domain, const amrex::Real v_sigma_sb)
     : FabArray<SigmaBox>(ba,dm,1,0,MFInfo(),
@@ -738,8 +741,8 @@ PML::PML (const int lev, const BoxArray& grid_ba,
             auto const eb_fact = fieldEBFactory();
 
             ablastr::fields::VectorField t_pml_edge_lengths = warpx.m_fields.get_alldirs(FieldType::pml_edge_lengths, lev);
-            WarpX::ComputeEdgeLengths(t_pml_edge_lengths, eb_fact);
-            WarpX::ScaleEdges(t_pml_edge_lengths, WarpX::CellSize(lev));
+            warpx::embedded_boundary::ComputeEdgeLengths(t_pml_edge_lengths, eb_fact);
+            warpx::embedded_boundary::ScaleEdges(t_pml_edge_lengths, WarpX::CellSize(lev));
 
         }
     }
@@ -764,7 +767,7 @@ PML::PML (const int lev, const BoxArray& grid_ba,
 
     Box single_domain_box = is_single_box_domain ? domain0 : Box();
     // Empty box (i.e., Box()) means it's not a single box domain.
-    sigba_fp = std::make_unique<MultiSigmaBox>(ba, dm, grid_ba_reduced, geom->CellSize(),
+    sigba_fp = std::make_unique<MultiSigmaBox>(ba, dm, &grid_ba_reduced, geom->CellSize(),
                                                IntVect(ncell), IntVect(delta), single_domain_box, v_sigma_sb);
 
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
@@ -879,7 +882,7 @@ PML::PML (const int lev, const BoxArray& grid_ba,
         warpx.m_fields.alloc_init(FieldType::pml_j_cp, Direction{2}, lev, cba_jz, cdm, 1, ngb, 0.0_rt, false, false);
 
         single_domain_box = is_single_box_domain ? cdomain : Box();
-        sigba_cp = std::make_unique<MultiSigmaBox>(cba, cdm, grid_cba_reduced, cgeom->CellSize(),
+        sigba_cp = std::make_unique<MultiSigmaBox>(cba, cdm, &grid_cba_reduced, cgeom->CellSize(),
                                                    cncells, cdelta, single_domain_box, v_sigma_sb);
 
         if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
@@ -1298,16 +1301,16 @@ PML::PushPSATD (ablastr::fields::MultiFabRegister& fields, const int lev)
 {
     ablastr::fields::VectorField pml_E_fp = fields.get_alldirs(FieldType::pml_E_fp, lev);
     ablastr::fields::VectorField pml_B_fp = fields.get_alldirs(FieldType::pml_B_fp, lev);
-    ablastr::fields::ScalarField pml_F_fp = fields.get(FieldType::pml_F_fp, lev);
-    ablastr::fields::ScalarField pml_G_fp = fields.get(FieldType::pml_G_fp, lev);
+    ablastr::fields::ScalarField pml_F_fp = (fields.has(FieldType::pml_F_fp, lev)) ? fields.get(FieldType::pml_F_fp, lev) : nullptr;
+    ablastr::fields::ScalarField pml_G_fp = (fields.has(FieldType::pml_G_fp, lev)) ? fields.get(FieldType::pml_G_fp, lev) : nullptr;
 
     // Update the fields on the fine and coarse patch
     PushPMLPSATDSinglePatch(lev, *spectral_solver_fp, pml_E_fp, pml_B_fp, pml_F_fp, pml_G_fp, m_fill_guards_fields);
     if (spectral_solver_cp) {
         ablastr::fields::VectorField pml_E_cp = fields.get_alldirs(FieldType::pml_E_cp, lev);
         ablastr::fields::VectorField pml_B_cp = fields.get_alldirs(FieldType::pml_B_cp, lev);
-        ablastr::fields::ScalarField pml_F_cp = fields.get(FieldType::pml_F_cp, lev);
-        ablastr::fields::ScalarField pml_G_cp = fields.get(FieldType::pml_G_cp, lev);
+        ablastr::fields::ScalarField pml_F_cp = (fields.has(FieldType::pml_F_cp, lev)) ? fields.get(FieldType::pml_F_cp, lev) : nullptr;
+        ablastr::fields::ScalarField pml_G_cp = (fields.has(FieldType::pml_G_cp, lev)) ? fields.get(FieldType::pml_G_cp, lev) : nullptr;
         PushPMLPSATDSinglePatch(lev, *spectral_solver_cp, pml_E_cp, pml_B_cp, pml_F_cp, pml_G_cp, m_fill_guards_fields);
     }
 }
