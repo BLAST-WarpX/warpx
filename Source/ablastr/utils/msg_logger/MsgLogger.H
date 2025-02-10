@@ -280,9 +280,9 @@ namespace ablastr::utils::msg_logger
 
 #endif
 
-        const int m_rank       /*! MPI rank of the current process*/;
-        const int m_num_procs  /*! Number of MPI ranks*/;
-        const int m_io_rank    /*! Rank of the I/O process*/;
+        int m_rank       /*! MPI rank of the current process*/;
+        int m_num_procs  /*! Number of MPI ranks*/;
+        int m_io_rank    /*! Rank of the I/O process*/;
 
         std::map<Msg, std::int64_t> m_messages /*! This stores a map to associate warning messages with the corresponding counters*/;
     };

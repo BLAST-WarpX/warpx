@@ -88,7 +88,7 @@ function(find_picsar)
         #message(STATUS "PICSAR: Using version '${PICSAR_VERSION}'")
     else()
         # not supported by PICSAR (yet)
-        #find_package(PICSAR 24.09 CONFIG REQUIRED QED)
+        #find_package(PICSAR 25.01 CONFIG REQUIRED QED)
         #message(STATUS "PICSAR: Found version '${PICSAR_VERSION}'")
         message(FATAL_ERROR "PICSAR: Cannot be used as externally installed "
             "library yet. "
@@ -109,7 +109,7 @@ if(WarpX_QED)
     set(WarpX_picsar_repo "https://github.com/ECP-WarpX/picsar.git"
         CACHE STRING
         "Repository URI to pull and build PICSAR from if(WarpX_picsar_internal)")
-    set(WarpX_picsar_branch "24.09"
+    set(WarpX_picsar_branch "25.01"
         CACHE STRING
         "Repository branch for WarpX_picsar_repo if(WarpX_picsar_internal)")
 

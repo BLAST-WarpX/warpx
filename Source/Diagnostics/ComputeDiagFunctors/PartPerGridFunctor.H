@@ -30,7 +30,7 @@ public:
      */
     void operator()(amrex::MultiFab& mf_dst, int dcomp, int /*i_buffer=0*/) const override;
 private:
-    int const m_lev; /**< level on which mf_src is defined */
+    int m_lev; /**< level on which mf_src is defined */
 };
 
 #endif // WARPX_PARTPERGRIDFUNCTOR_H_

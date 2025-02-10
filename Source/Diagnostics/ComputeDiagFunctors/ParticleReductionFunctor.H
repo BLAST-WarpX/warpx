@@ -43,10 +43,10 @@ public:
      */
     void operator()(amrex::MultiFab& mf_dst, int dcomp, int /*i_buffer=0*/) const override;
 private:
-    int const m_lev; /**< level on which mf_src is defined */
-    int const m_ispec; /**< index of species to average over */
-    bool const m_do_average; /**< Whether to calculate the average of the data */
-    bool const m_do_filter; /**< whether to apply #m_filter_fn */
+    int m_lev; /**< level on which mf_src is defined */
+    int m_ispec; /**< index of species to average over */
+    bool m_do_average; /**< Whether to calculate the average of the data */
+    bool m_do_filter; /**< whether to apply #m_filter_fn */
     /** Parser function to be averaged by the functor. Arguments: x, y, z, ux, uy, uz */
     std::unique_ptr<amrex::Parser> m_map_fn_parser;
     /** Parser function to filter particles before pass to map. Arguments: x, y, z, ux, uy, uz */

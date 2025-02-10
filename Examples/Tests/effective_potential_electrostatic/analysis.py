@@ -66,7 +66,7 @@ for ii, it in enumerate(ts.iterations):
     )
 
     plt.plot(r_grid, n_e_analytic, "k--", alpha=0.6)
-    plt.plot(r_grid, n_e, label=f"t = {ts.t[ii]*1e6:.2f} $\mu$s")
+    plt.plot(r_grid, n_e, label=f"t = {ts.t[ii] * 1e6:.2f} $\mu$s")
 
 print("RMS error (%) in density: ", rms_errors)
 assert np.all(rms_errors < 0.05)

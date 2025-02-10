@@ -193,6 +193,25 @@ public:
                 auto& uy2 = soa_products_data[1].m_rdata[PIdx::uy][product2_index];
                 auto& uz2 = soa_products_data[1].m_rdata[PIdx::uz][product2_index];
 
+#if (defined WARPX_DIM_RZ)
+                /* In RZ geometry, macroparticles can collide with other macroparticles
+                * in the same *cylindrical* cell. For this reason, collisions between macroparticles
+                * are actually not local in space. In this case, the underlying assumption is that
+                * particles within the same cylindrical cell represent a cylindrically-symmetry
+                * momentum distribution function. Therefore, here, we temporarily rotate the
+                * momentum of one of the macroparticles in agreement with this cylindrical symmetry.
+                * (This is technically only valid if we use only the m=0 azimuthal mode in the simulation;
+                * there is a corresponding assert statement at initialization.)
+                */
+                amrex::ParticleReal const theta = (
+                    soa_products_data[1].m_rdata[PIdx::theta][product2_index]
+                    - soa_products_data[0].m_rdata[PIdx::theta][product1_index]
+                );
+                amrex::ParticleReal const ux1buf = ux1;
+                ux1 = ux1buf*std::cos(theta) - uy1*std::sin(theta);
+                uy1 = ux1buf*std::sin(theta) + uy1*std::cos(theta);
+#endif
+
                 // for simplicity (for now) we assume non-relativistic particles
                 // and simply calculate the center-of-momentum velocity from the
                 // rest masses
@@ -261,6 +280,8 @@ public:
                     auto& e_uy1 = soa_products_data[0].m_rdata[PIdx::uy][product1_index+1];
                     auto& e_uz1 = soa_products_data[0].m_rdata[PIdx::uz][product1_index+1];
                     ParticleUtils::RandomizeVelocity(e_ux1, e_uy1, e_uz1, up, engine);
+                } else if (mask[i] == int(ScatteringProcessType::FORWARD)) {
+                    amrex::Abort("Forward scattering with DSMC not implemented yet.");
                 }
                 else {
                     amrex::Abort("Unknown scattering process.");
@@ -272,6 +293,13 @@ public:
                 ux2 += uCOM_x;
                 uy2 += uCOM_y;
                 uz2 += uCOM_z;
+
+#if (defined WARPX_DIM_RZ)
+                /* Undo the earlier velocity rotation. */
+                amrex::ParticleReal const ux1buf_new = ux1;
+                ux1 = ux1buf_new*std::cos(-theta) - uy1*std::sin(-theta);
+                uy1 = ux1buf_new*std::sin(-theta) + uy1*std::cos(-theta);
+#endif
             }
         });
 
@@ -283,7 +311,7 @@ public:
             ParticleCreation::DefaultInitializeRuntimeAttributes(*tile_products[i],
                                        0, 0,
                                        pc_products[i]->getUserRealAttribs(), pc_products[i]->getUserIntAttribs(),
-                                       pc_products[i]->getParticleComps(), pc_products[i]->getParticleiComps(),
+                                       pc_products[i]->GetRealSoANames(), pc_products[i]->GetIntSoANames(),
                                        pc_products[i]->getUserRealAttribParser(),
                                        pc_products[i]->getUserIntAttribParser(),
 #ifdef WARPX_QED

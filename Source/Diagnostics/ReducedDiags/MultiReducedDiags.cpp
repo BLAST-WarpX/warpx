@@ -13,6 +13,7 @@
 #include "FieldEnergy.H"
 #include "FieldMaximum.H"
 #include "FieldMomentum.H"
+#include "FieldPoyntingFlux.H"
 #include "FieldProbe.H"
 #include "FieldReduction.H"
 #include "LoadBalanceCosts.H"
@@ -66,6 +67,7 @@ MultiReducedDiags::MultiReducedDiags ()
             {"FieldEnergy",           [](CS s){return std::make_unique<FieldEnergy>(s);}},
             {"FieldMaximum",          [](CS s){return std::make_unique<FieldMaximum>(s);}},
             {"FieldMomentum",         [](CS s){return std::make_unique<FieldMomentum>(s);}},
+            {"FieldPoyntingFlux",     [](CS s){return std::make_unique<FieldPoyntingFlux>(s);}},
             {"FieldProbe",            [](CS s){return std::make_unique<FieldProbe>(s);}},
             {"FieldReduction",        [](CS s){return std::make_unique<FieldReduction>(s);}},
             {"LoadBalanceCosts",      [](CS s){return std::make_unique<LoadBalanceCosts>(s);}},
@@ -124,6 +126,20 @@ void MultiReducedDiags::ComputeDiags (int step)
 }
 // end void MultiReducedDiags::ComputeDiags
 
+// call functions to compute diags at the mid step time level
+void MultiReducedDiags::ComputeDiagsMidStep (int step)
+{
+    WARPX_PROFILE("MultiReducedDiags::ComputeDiagsMidStep()");
+
+    // loop over all reduced diags
+    for (int i_rd = 0; i_rd < static_cast<int>(m_rd_names.size()); ++i_rd)
+    {
+        m_multi_rd[i_rd] -> ComputeDiagsMidStep(step);
+    }
+    // end loop over all reduced diags
+}
+// end void MultiReducedDiags::ComputeDiagsMidStep
+
 // function to write data
 void MultiReducedDiags::WriteToFile (int step)
 {
@@ -142,3 +158,26 @@ void MultiReducedDiags::WriteToFile (int step)
     // end loop over all reduced diags
 }
 // end void MultiReducedDiags::WriteToFile
+
+void MultiReducedDiags::WriteCheckpointData (std::string const & dir)
+{
+    // Only the I/O rank does
+    if ( !ParallelDescriptor::IOProcessor() ) { return; }
+
+    // loop over all reduced diags
+    for (int i_rd = 0; i_rd < static_cast<int>(m_rd_names.size()); ++i_rd)
+    {
+        m_multi_rd[i_rd]->WriteCheckpointData(dir);
+    }
+    // end loop over all reduced diags
+}
+
+void MultiReducedDiags::ReadCheckpointData (std::string const & dir)
+{
+    // loop over all reduced diags
+    for (int i_rd = 0; i_rd < static_cast<int>(m_rd_names.size()); ++i_rd)
+    {
+        m_multi_rd[i_rd]->ReadCheckpointData(dir);
+    }
+    // end loop over all reduced diags
+}
