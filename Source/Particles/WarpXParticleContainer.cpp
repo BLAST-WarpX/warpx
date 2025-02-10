@@ -480,8 +480,8 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
     const amrex::XDim3 xyzmax = WarpX::UpperCorner(tilebox, depos_lev, 0.5_rt*dt);
     amrex::Box const& domain_box = warpx.Geom(0).Domain();
 
-    auto & field_boundary_lo = warpx.GetFieldBoundaryLo();
-    auto & field_boundary_hi = warpx.GetFieldBoundaryHi();
+    auto const & field_boundary_lo = warpx.GetFieldBoundaryLo();
+    auto const & field_boundary_hi = warpx.GetFieldBoundaryHi();
 
     amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> is_absorbing;
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
