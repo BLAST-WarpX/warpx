@@ -189,17 +189,70 @@ namespace ParticleUtils {
                           && (xlo[2] <= point.z) && (point.z <= xhi[2]));
     }
 
-    /* \brief Crops the position at the specified boundary if check is true
-     * \param[in] x The particle position
+    /* \brief Crops the position at the specified boundary if check is true, 1D version
+     * \param[in] x0 The initial particle position
+     * \param[in/out] x1 The final particle position, with the returned value being cropped
      * \param[in] xmin The lower boundary of the domain
      * \param[in] xmax The upper boundary of the domain
      * \param[in] check Whether to crop at each of the boundaries
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
-    amrex::Real crop_at_boundary(amrex::Real x, amrex::Real xmin, amrex::Real xmax, amrex::GpuArray<bool,2> const& check) {
-        if (check[0] && x < xmin) { return xmin; }
-        if (check[1] && x > xmax) { return xmax; }
-        return x;
+    void crop_at_boundary(amrex::Real & x1,
+                          amrex::Real xmin, amrex::Real xmax, amrex::GpuArray<bool,2> const& check) {
+        if (check[0] && x1 < xmin) {
+            x1 = xmin;
+        }
+        else if (check[1] && x1 > xmax) {
+            x1 = xmax;
+        }
+    }
+
+    /* \brief Crops the position at the specified boundary if check is true, 2D version
+     * \param[in] x0, z0 The initial particle position
+     * \param[in/out] x1, z1 The final particle position, with the returned value being cropped
+     * \param[in] xmin The lower boundary of the domain
+     * \param[in] xmax The upper boundary of the domain
+     * \param[in] check Whether to crop at each of the boundaries
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    void crop_at_boundary(amrex::Real x0, amrex::Real z0,
+                          amrex::Real & x1, amrex::Real & z1,
+                          amrex::Real xmin, amrex::Real xmax, amrex::GpuArray<bool,2> const& check) {
+        if (check[0] && x1 < xmin) {
+            amrex::Real const fx = (x0 - xmin)/(x0 - x1);
+            x1 = xmin;
+            z1 = z0 + fx*(z1 - z0);
+        }
+        else if (check[1] && x1 > xmax) {
+            amrex::Real const fx = (xmax - x0)/(x1 - x0);
+            x1 = xmax;
+            z1 = z0 + fx*(z1 - z0);
+        }
+    }
+
+    /* \brief Crops the position at the specified boundary if check is true, 3D version
+     * \param[in] x0, y0, z0 The initial particle position
+     * \param[in/out] x1, y1, z1 The final particle position, with the returned value being cropped
+     * \param[in] xmin The lower boundary of the domain
+     * \param[in] xmax The upper boundary of the domain
+     * \param[in] check Whether to crop at each of the boundaries
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    void crop_at_boundary(amrex::Real x0, amrex::Real y0, amrex::Real z0,
+                          amrex::Real & x1, amrex::Real & y1, amrex::Real & z1,
+                          amrex::Real xmin, amrex::Real xmax, amrex::GpuArray<bool,2> const& check) {
+        if (check[0] && x1 < xmin) {
+            amrex::Real const fx = (x0 - xmin)/(x0 - x1);
+            x1 = xmin;
+            y1 = y0 + fx*(y1 - y0);
+            z1 = z0 + fx*(z1 - z0);
+        }
+        else if (check[1] && x1 > xmax) {
+            amrex::Real const fx = (xmax - x0)/(x1 - x0);
+            x1 = xmax;
+            y1 = y0 + fx*(y1 - y0);
+            z1 = z0 + fx*(z1 - z0);
+        }
     }
 
 }
