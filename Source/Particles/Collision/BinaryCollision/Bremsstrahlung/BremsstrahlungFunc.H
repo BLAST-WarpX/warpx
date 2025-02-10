@@ -189,8 +189,7 @@ public:
         AMREX_GPU_HOST_DEVICE AMREX_INLINE
         amrex::ParticleReal
         CalculateCrossSection (amrex::ParticleReal KErel_eV,
-                               amrex::ParticleReal n1,
-                               amrex::ParticleReal m1,
+                               amrex::ParticleReal wpe,
                                int & index,
                                int & i0_cut,
                                amrex::ParticleReal & koT1_cut, amrex::ParticleReal & kdsigdk_cut,
@@ -198,7 +197,6 @@ public:
         {
             using namespace amrex::literals;
 
-            amrex::ParticleReal const wpe = PhysConst::q_e*std::sqrt(n1/(m1*PhysConst::ep0));
             amrex::ParticleReal const KEcut_eV = PhysConst::hbar*wpe/PhysConst::q_e;
 
             if (KErel_eV < KEcut_eV) {
@@ -361,10 +359,12 @@ public:
             amrex::ParticleReal const gamma1_rel = std::sqrt(1.0_prt + u1sq_rel/c2);
             amrex::ParticleReal const KE_eV = m1*u1sq_rel/(1.0_prt + gamma1_rel)/PhysConst::q_e;
 
+            amrex::ParticleReal const wpe = PhysConst::q_e*std::sqrt(n1/(m1*PhysConst::ep0));
+
             int i0_cut, index;
             amrex::ParticleReal koT1_cut, kdsigdk_cut;
             amrex::ParticleReal w0;
-            amrex::ParticleReal const sigma_total = CalculateCrossSection(KE_eV, n1, m1,
+            amrex::ParticleReal const sigma_total = CalculateCrossSection(KE_eV, wpe,
                                                                           index, i0_cut, koT1_cut, kdsigdk_cut, w0);
 
             if (sigma_total == 0._prt) { return; }
