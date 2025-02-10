@@ -32,9 +32,9 @@ public:
     /** Copy operator for ParticleBoundaryBuffer */
     ParticleBoundaryBuffer& operator= ( const ParticleBoundaryBuffer & ) = delete;
 
-    /** Move constructor for NamedComponentParticleContainer */
+    /** Move constructor for ParticleBoundaryBuffer */
     ParticleBoundaryBuffer ( ParticleBoundaryBuffer && ) = default;
-    /** Move operator for NamedComponentParticleContainer */
+    /** Move operator for ParticleBoundaryBuffer */
     ParticleBoundaryBuffer& operator= ( ParticleBoundaryBuffer && ) = default;
 
     int numSpecies() const { return static_cast<int>(getSpeciesNames().size()); }
