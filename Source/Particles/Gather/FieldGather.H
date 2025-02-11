@@ -1185,10 +1185,10 @@ void doGatherPicnicShapeN (
     }
     const Complex xy_mid0 = Complex{costheta_mid, sintheta_mid};
 
-    amrex::Real xp_n_c = rp_old;
+    amrex::Real const xp_n_c = rp_old;
     amrex::Real xp_np1_c = rp_new;
 #elif defined(WARPX_DIM_XZ)
-    amrex::Real xp_n_c = xp_n;
+    amrex::Real const xp_n_c = xp_n;
     amrex::Real xp_np1_c = xp_np1;
 #endif
 

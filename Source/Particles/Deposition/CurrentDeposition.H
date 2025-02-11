@@ -1653,11 +1653,11 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             }
             const Complex xy_mid0 = Complex{costheta_mid, sintheta_mid};
 
-            amrex::Real xp_n_c = rp_old;
+            amrex::Real const xp_n_c = rp_old;
             amrex::Real xp_np1_c = rp_new;
             amrex::Real const vy = (-uxp_nph[ip]*sintheta_mid + uyp_nph[ip]*costheta_mid)*gaminv;
 #elif defined(WARPX_DIM_XZ)
-            amrex::Real xp_n_c = xp_n[ip];
+            amrex::Real const xp_n_c = xp_n[ip];
             amrex::Real xp_np1_c = xp_np1;
             amrex::Real const vy = uyp_nph[ip]*gaminv;
 #endif
