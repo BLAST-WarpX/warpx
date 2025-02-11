@@ -487,10 +487,10 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
         is_absorbing[idim][0] = (tilebox.smallEnd(idim) <= domain_box.smallEnd(idim) &&
                                  (field_boundary_lo[idim] == FieldBoundaryType::PEC
-                               || field_boundary_lo[idim] == FieldBoundaryType::PMC));
+                               || field_boundary_lo[idim] == FieldBoundaryType::PECInsulator));
         is_absorbing[idim][1] = (tilebox.bigEnd(idim) >= domain_box.bigEnd(idim) &&
                                  (field_boundary_hi[idim] == FieldBoundaryType::PEC
-                               || field_boundary_hi[idim] == FieldBoundaryType::PMC));
+                               || field_boundary_hi[idim] == FieldBoundaryType::PECInsulator));
     }
 
     if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov ||

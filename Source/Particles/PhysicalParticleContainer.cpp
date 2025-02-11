@@ -2843,10 +2843,10 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
         is_absorbing[idim][0] = (box.smallEnd(idim) <= domain_box.smallEnd(idim) &&
                                  (field_boundary_lo[idim] == FieldBoundaryType::PEC
-                               || field_boundary_lo[idim] == FieldBoundaryType::PMC));
+                               || field_boundary_lo[idim] == FieldBoundaryType::PECInsulator));
         is_absorbing[idim][1] = (box.bigEnd(idim) >= domain_box.bigEnd(idim) &&
                                  (field_boundary_hi[idim] == FieldBoundaryType::PEC
-                               || field_boundary_hi[idim] == FieldBoundaryType::PMC));
+                               || field_boundary_hi[idim] == FieldBoundaryType::PECInsulator));
     }
 
     const Dim3 lo = lbound(box);
