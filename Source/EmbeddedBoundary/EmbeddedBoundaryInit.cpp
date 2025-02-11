@@ -352,9 +352,11 @@ web::MarkExtensionCells (
 #ifdef WARPX_DIM_RZ
     amrex::ignore_unused(cell_size, flag_info_face, flag_ext_face, b_field,
         face_areas, edge_lengths, area_mod);
-    return;
+
 #elif !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ)
+
     WARPX_ABORT_WITH_MESSAGE("MarkExtensionCells only implemented in 2D and 3D");
+
 #else
 
     for (int idim = 0; idim < 3; ++idim) {
