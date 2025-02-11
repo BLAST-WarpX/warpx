@@ -1677,12 +1677,12 @@ void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiF
                     auto const jz_interp = ablastr::coarsen::sample::Interp(Jz, Jz_stag, nodal, coarsen, i, j, k, 0);
 
                     // calculate J^2 on nodal grid (since Te is nodal)
-                    amrex::Real jtot_val = std::sqrt(jx_interp*jx_interp + jy_interp*jy_interp + jz_interp*jz_interp);
+                    amrex::Real jtot_val = 0_rt;
+                    jtot_val = std::sqrt(jx_interp*jx_interp + jy_interp*jy_interp + jz_interp*jz_interp);
 
                     // calculate eta*J^2
                     // what if eta does not depend on j, and rho and only on Te ?
-                    // UPDATE eta to take Te as argument
-                    amrex::Real eta_J2 = eta(rho_val, jtot_val)*jtot_val*jtot_val;
+                    amrex::Real eta_J2 = eta(rho_val, jtot_val, Te_val)*jtot_val*jtot_val;
 
                     // Te already is in Joules so no need to divide eta_J2 by kb
                     Te(i, j, k) = Te_val + dt*eta_J2/(3/2*ne_val);

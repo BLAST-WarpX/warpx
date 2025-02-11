@@ -357,6 +357,7 @@ void FiniteDifferenceSolver::HybridPICSolveE (
     ablastr::fields::VectorField const& Bfield,
     amrex::MultiFab const& rhofield,
     amrex::MultiFab const& Pefield,
+    amrex::MultiFab const& Tefield,
     ablastr::fields::VectorField const& edge_lengths,
     int lev, HybridPICModel const* hybrid_model,
     const bool solve_for_Faraday)
@@ -374,7 +375,7 @@ void FiniteDifferenceSolver::HybridPICSolveE (
 #else
 
         HybridPICSolveECartesian <CartesianYeeAlgorithm> (
-            Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
+            Efield, Jfield, Jifield, Bfield, rhofield, Pefield, Tefield,
             edge_lengths, lev, hybrid_model, solve_for_Faraday
         );
 
@@ -705,6 +706,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     ablastr::fields::VectorField const& Bfield,
     amrex::MultiFab const& rhofield,
     amrex::MultiFab const& Pefield,
+    amrex::MultiFab const& Tefield,
     ablastr::fields::VectorField const& edge_lengths,
     int lev, HybridPICModel const* hybrid_model,
     const bool solve_for_Faraday )
@@ -719,6 +721,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const auto eta_h = hybrid_model->m_eta_h;
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
     const auto resistivity_has_J_dependence = hybrid_model->m_resistivity_has_J_dependence;
+    const auto resistivity_has_Te_dependence = hybrid_model->m_resistivity_has_Te_dependence;
 
     const bool include_hyper_resistivity_term = (eta_h > 0.) && solve_for_Faraday;
 
@@ -841,6 +844,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Array4<Real const> const& enE = enE_nodal_mf.const_array(mfi);
         Array4<Real const> const& rho = rhofield.const_array(mfi);
         Array4<Real const> const& Pe = Pefield.array(mfi);
+        Array4<Real const> const& Te = Tefield.array(mfi);
 
         amrex::Array4<amrex::Real> lx, ly, lz;
         if (EB::enabled()) {
@@ -872,6 +876,12 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // Interpolate to get the appropriate charge density in space
                 Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, k, 0);
 
+                // Interpolate Te to get the appropiate 
+                Real Te_val = 0_rt;
+                if(resistivity_has_Te_dependence) {
+                    Te_val = Interp(Te, nodal, Ex_stag, coarsen, i, j, k, 0);
+                }
+
                 // Interpolate current to appropriate staggering to match E field
                 Real jtot_val = 0._rt;
                 if (solve_for_Faraday && resistivity_has_J_dependence) {
@@ -895,7 +905,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ex(i, j, k) = (enE_x - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) { Ex(i, j, k) += eta(rho_val, jtot_val) * Jx(i, j, k); }
+                if (solve_for_Faraday) { Ex(i, j, k) += eta(rho_val, jtot_val, Te_val) * Jx(i, j, k); }
 
                 if (include_hyper_resistivity_term) {
                     auto nabla2Jx = T_Algo::Dxx(Jx, coefs_x, n_coefs_x, i, j, k);
@@ -915,6 +925,12 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 #endif
                 // Interpolate to get the appropriate charge density in space
                 Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, k, 0);
+
+                // Interpolate Te to get the appropiate 
+                Real Te_val = 0_rt;
+                if(resistivity_has_Te_dependence) {
+                    Te_val = Interp(Te, nodal, Ey_stag, coarsen, i, j, k, 0);
+                }
 
                 // Interpolate current to appropriate staggering to match E field
                 Real jtot_val = 0._rt;
@@ -939,7 +955,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ey(i, j, k) = (enE_y - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) { Ey(i, j, k) += eta(rho_val, jtot_val) * Jy(i, j, k); }
+                if (solve_for_Faraday) { Ey(i, j, k) += eta(rho_val, jtot_val, Te_val) * Jy(i, j, k); }
 
                 if (include_hyper_resistivity_term) {
                     auto nabla2Jy = T_Algo::Dyy(Jy, coefs_y, n_coefs_y, i, j, k);
@@ -955,6 +971,12 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 #endif
                 // Interpolate to get the appropriate charge density in space
                 Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
+
+                // Interpolate Te to get the appropiate 
+                Real Te_val = 0_rt;
+                if(resistivity_has_Te_dependence) {
+                    Te_val = Interp(Te, nodal, Ez_stag, coarsen, i, j, k, 0);
+                }
 
                 // Interpolate current to appropriate staggering to match E field
                 Real jtot_val = 0._rt;
@@ -979,7 +1001,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ez(i, j, k) = (enE_z - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) { Ez(i, j, k) += eta(rho_val, jtot_val) * Jz(i, j, k); }
+                if (solve_for_Faraday) { Ez(i, j, k) += eta(rho_val, jtot_val, Te_val) * Jz(i, j, k); }
 
                 if (include_hyper_resistivity_term) {
                     auto nabla2Jz = T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, k);

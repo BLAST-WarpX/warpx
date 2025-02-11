@@ -167,8 +167,9 @@ public:
     /** Plasma resistivity */
     std::string m_eta_expression = "0.0";
     std::unique_ptr<amrex::Parser> m_resistivity_parser;
-    amrex::ParserExecutor<2> m_eta;
+    amrex::ParserExecutor<3> m_eta;
     bool m_resistivity_has_J_dependence = false;
+    bool m_resistivity_has_Te_dependence = false;
 
     /** Plasma hyper-resisitivity */
     amrex::Real m_eta_h = 0.0;

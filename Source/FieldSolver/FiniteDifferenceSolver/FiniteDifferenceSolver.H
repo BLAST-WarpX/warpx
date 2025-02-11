@@ -157,6 +157,7 @@ class FiniteDifferenceSolver
                                ablastr::fields::VectorField const& Bfield,
                                amrex::MultiFab const& rhofield,
                                amrex::MultiFab const& Pefield,
+                               amrex::MultiFab const& Tefield,
                                ablastr::fields::VectorField const& edge_lengths,
                                int lev, HybridPICModel const* hybrid_model,
                                bool solve_for_Faraday );
@@ -346,6 +347,7 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField const& Bfield,
             amrex::MultiFab const& rhofield,
             amrex::MultiFab const& Pefield,
+            amrex::MultiFab const& Tefield,
             ablastr::fields::VectorField const& edge_lengths,
             int lev, HybridPICModel const* hybrid_model,
             bool solve_for_Faraday );

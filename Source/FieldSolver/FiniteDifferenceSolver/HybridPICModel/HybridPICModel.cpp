@@ -42,7 +42,7 @@ void HybridPICModel::ReadParameters ()
         Abort("hybrid_pic_model.n0_ref should be specified if hybrid_pic_model.gamma != 1");
     }
 
-    pp_hybrid.query("plasma_resistivity(rho,J)", m_eta_expression);
+    pp_hybrid.query("plasma_resistivity(rho,J,Te)", m_eta_expression);
     utils::parser::queryWithParser(pp_hybrid, "n_floor", m_n_floor);
 
     utils::parser::queryWithParser(pp_hybrid, "plasma_hyper_resistivity", m_eta_h);
@@ -132,10 +132,11 @@ void HybridPICModel::AllocateLevelMFs (ablastr::fields::MultiFabRegister & field
 void HybridPICModel::InitData ()
 {
     m_resistivity_parser = std::make_unique<amrex::Parser>(
-        utils::parser::makeParser(m_eta_expression, {"rho","J"}));
-    m_eta = m_resistivity_parser->compile<2>();
+        utils::parser::makeParser(m_eta_expression, {"rho","J","Te"}));
+    m_eta = m_resistivity_parser->compile<3>();
     const std::set<std::string> resistivity_symbols = m_resistivity_parser->symbols();
     m_resistivity_has_J_dependence += resistivity_symbols.count("J");
+    m_resistivity_has_Te_dependence += resistivity_symbols.count("Te");
 
     m_J_external_parser[0] = std::make_unique<amrex::Parser>(
         utils::parser::makeParser(m_Jx_ext_grid_function,{"x","y","z","t"}));
@@ -363,11 +364,12 @@ void HybridPICModel::HybridPICSolveE (
 
     ablastr::fields::VectorField current_fp_plasma = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
     const ablastr::fields::ScalarField electron_pressure_fp = warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
+    const ablastr::fields::ScalarField electron_temperature_fp = warpx.m_fields.get("fluid_temperature_electrons_hybrid", lev);
 
     // Solve E field in regular cells
     warpx.get_pointer_fdtd_solver_fp(lev)->HybridPICSolveE(
         Efield, current_fp_plasma, Jfield, Bfield, rhofield,
-        *electron_pressure_fp, edge_lengths, lev, this, solve_for_Faraday
+        *electron_pressure_fp, *electron_temperature_fp, edge_lengths, lev, this, solve_for_Faraday
     );
     warpx.ApplyEfieldBoundary(lev, patch_type);
 }
