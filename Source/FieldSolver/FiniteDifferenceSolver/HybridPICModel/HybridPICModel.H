@@ -51,7 +51,7 @@ public:
         int lev,
         const amrex::BoxArray& ba,
         const amrex::DistributionMapping& dm,
-        const int ncomps,
+        int ncomps,
         const amrex::IntVect& ngJ,
         const amrex::IntVect& ngRho,
         const amrex::IntVect& ngEB,
@@ -65,7 +65,7 @@ public:
         const amrex::IntVect& Bx_nodal_flag,
         const amrex::IntVect& By_nodal_flag,
         const amrex::IntVect& Bz_nodal_flag
-    );
+    ) const;
 
     void InitData ();
 

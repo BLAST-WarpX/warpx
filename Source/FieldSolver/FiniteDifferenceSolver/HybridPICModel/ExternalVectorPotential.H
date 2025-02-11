@@ -91,8 +91,8 @@ public:
         std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update);
 
     void UpdateHybridExternalFields (
-        const amrex::Real t,
-        const amrex::Real dt
+        amrex::Real t,
+        amrex::Real dt
     );
 };
 

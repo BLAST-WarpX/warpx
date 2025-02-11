@@ -615,7 +615,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 if (update_Er_arr && update_Er_arr(i, j, 0) == 0) { return; }
 
                 // Interpolate to get the appropriate charge density in space
-                Real rho_val = Interp(rho, nodal, Er_stag, coarsen, i, j, 0, 0);
+                const Real rho_val = Interp(rho, nodal, Er_stag, coarsen, i, j, 0, 0);
                 Real rho_val_limited = rho_val;
 
                 // Interpolate current to appropriate staggering to match E field
@@ -676,7 +676,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 }
 
                 // Interpolate to get the appropriate charge density in space
-                Real rho_val = Interp(rho, nodal, Et_stag, coarsen, i, j, 0, 0);
+                const Real rho_val = Interp(rho, nodal, Et_stag, coarsen, i, j, 0, 0);
                 Real rho_val_limited = rho_val;
 
                 // Interpolate current to appropriate staggering to match E field
@@ -726,7 +726,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 if (update_Ez_arr && update_Ez_arr(i, j, 0) == 0) { return; }
 
                 // Interpolate to get the appropriate charge density in space
-                Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, 0, 0);
+                const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, 0, 0);
                 Real rho_val_limited = rho_val;
 
                 // Interpolate current to appropriate staggering to match E field
@@ -994,7 +994,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 if (update_Ex_arr && update_Ex_arr(i, j, k) == 0) { return; }
 
                 // Interpolate to get the appropriate charge density in space
-                Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, k, 0);
+                const Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, k, 0);
                 Real rho_val_limited = rho_val;
 
                 // Interpolate current to appropriate staggering to match E field
@@ -1045,7 +1045,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 if (update_Ey_arr && update_Ey_arr(i, j, k) == 0) { return; }
 
                 // Interpolate to get the appropriate charge density in space
-                Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, k, 0);
+                const Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, k, 0);
                 Real rho_val_limited = rho_val;
 
                 // Interpolate current to appropriate staggering to match E field
@@ -1096,7 +1096,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 if (update_Ez_arr && update_Ez_arr(i, j, k) == 0) { return; }
 
                 // Interpolate to get the appropriate charge density in space
-                Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
+                const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
                 Real rho_val_limited = rho_val;
 
                 // Interpolate current to appropriate staggering to match E field

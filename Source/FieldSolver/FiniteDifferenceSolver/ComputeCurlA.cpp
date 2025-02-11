@@ -22,7 +22,6 @@
 #include <ablastr/coarsen/sample.H>
 
 using namespace amrex;
-using warpx::fields::FieldType;
 
 void FiniteDifferenceSolver::ComputeCurlA (
     ablastr::fields::VectorField& Bfield,

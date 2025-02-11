@@ -83,7 +83,7 @@ void HybridPICModel::AllocateLevelMFs (
     const IntVect& Ez_nodal_flag,
     const IntVect& Bx_nodal_flag,
     const IntVect& By_nodal_flag,
-    const IntVect& Bz_nodal_flag)
+    const IntVect& Bz_nodal_flag) const
 {
     using ablastr::fields::Direction;
 
@@ -610,7 +610,7 @@ WarpX::CalculateExternalCurlA() {
     auto & warpx = WarpX::GetInstance();
 
     // Get reference to External Field Object
-    auto ext_vector = warpx.m_hybrid_pic_model->m_external_vector_potential.get();
+    auto* ext_vector = warpx.m_hybrid_pic_model->m_external_vector_potential.get();
     ext_vector->CalculateExternalCurlA();
 
 }

@@ -43,22 +43,22 @@ ExternalVectorPotential::ReadParameters ()
     m_Ax_ext_grid_function.resize(m_nFields);
     m_Ay_ext_grid_function.resize(m_nFields);
     m_Az_ext_grid_function.resize(m_nFields);
-    for (std::string & field : m_Ax_ext_grid_function) field = "0.0";
-    for (std::string & field : m_Ay_ext_grid_function) field = "0.0";
-    for (std::string & field : m_Az_ext_grid_function) field = "0.0";
+    for (std::string & field : m_Ax_ext_grid_function) { field = "0.0"; }
+    for (std::string & field : m_Ay_ext_grid_function) { field = "0.0"; }
+    for (std::string & field : m_Az_ext_grid_function) { field = "0.0"; }
 
     m_A_external_parser.resize(m_nFields);
     m_A_external.resize(m_nFields);
 
     m_A_ext_time_function.resize(m_nFields);
-    for (std::string & field_time : m_A_ext_time_function) field_time = "1.0";
+    for (std::string & field_time : m_A_ext_time_function) {field_time = "1.0"; }
 
     m_A_external_time_parser.resize(m_nFields);
     m_A_time_scale.resize(m_nFields);
 
     m_read_A_from_file.resize(m_nFields);
     m_external_file_path.resize(m_nFields);
-    for (std::string & file_name : m_external_file_path) file_name = "";
+    for (std::string & file_name : m_external_file_path) { file_name = ""; }
 
     for (int i = 0; i < m_nFields; ++i) {
         bool read_from_file = false;
@@ -97,7 +97,7 @@ ExternalVectorPotential::AllocateLevelMFs (
 {
     using ablastr::fields::Direction;
     for (std::string const & field_name : m_field_names) {
-        std::string Aext_field = field_name + std::string{"_Aext"};
+        const std::string Aext_field = field_name + std::string{"_Aext"};
         fields.alloc_init(Aext_field, Direction{0},
             lev, amrex::convert(ba, Ex_nodal_flag),
             dm, ncomps, ngEB, 0.0_rt);
@@ -108,7 +108,7 @@ ExternalVectorPotential::AllocateLevelMFs (
             lev, amrex::convert(ba, Ez_nodal_flag),
             dm, ncomps, ngEB, 0.0_rt);
 
-        std::string curlAext_field = field_name + std::string{"_curlAext"};
+        const std::string curlAext_field = field_name + std::string{"_curlAext"};
         fields.alloc_init(curlAext_field, Direction{0},
             lev, amrex::convert(ba, Bx_nodal_flag),
             dm, ncomps, ngEB, 0.0_rt);
@@ -298,15 +298,15 @@ ExternalVectorPotential::ZeroFieldinEB (
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
                 // Skip field update in the embedded boundaries
-                if (update_Fx_arr && update_Fx_arr(i, j, k) == 0) Fx(i, j, k) = 0_rt;
+                if (update_Fx_arr && update_Fx_arr(i, j, k) == 0)  { Fx(i, j, k) = 0_rt; }
             },
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                if (update_Fy_arr && update_Fy_arr(i, j, k) == 0) Fy(i, j, k) = 0_rt;
+                if (update_Fy_arr && update_Fy_arr(i, j, k) == 0) { Fy(i, j, k) = 0_rt; }
             },
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                if (update_Fz_arr && update_Fz_arr(i, j, k) == 0) Fz(i, j, k) = 0_rt;
+                if (update_Fz_arr && update_Fz_arr(i, j, k) == 0) { Fz(i, j, k) = 0_rt; }
             }
         );
     }
@@ -333,16 +333,16 @@ ExternalVectorPotential::UpdateHybridExternalFields (const amrex::Real t, const 
     }
 
     for (int i = 0; i < m_nFields; ++i) {
-        std::string const Aext_field = m_field_names[i] + std::string{"_Aext"};
-        std::string const curlAext_field = m_field_names[i] + std::string{"_curlAext"};
+        const std::string Aext_field = m_field_names[i] + std::string{"_Aext"};
+        const std::string curlAext_field = m_field_names[i] + std::string{"_curlAext"};
 
         // Get B-field Scaling Factor
-        amrex::Real scale_factor_B = m_A_time_scale[i](t);
+        const amrex::Real scale_factor_B = m_A_time_scale[i](t);
 
         // Get dA/dt scaling factor based on time centered FD around t
-        amrex::Real sf_l = m_A_time_scale[i](t-0.5_rt*dt);
-        amrex::Real sf_r = m_A_time_scale[i](t+0.5_rt*dt);
-        amrex::Real scale_factor_E = -(sf_r - sf_l)/dt;
+        const amrex::Real sf_l = m_A_time_scale[i](t-0.5_rt*dt);
+        const amrex::Real sf_r = m_A_time_scale[i](t+0.5_rt*dt);
+        const amrex::Real scale_factor_E = -(sf_r - sf_l)/dt;
 
         ablastr::fields::MultiLevelVectorField A_ext =
             warpx.m_fields.get_mr_levels_alldirs(Aext_field, warpx.finestLevel());
