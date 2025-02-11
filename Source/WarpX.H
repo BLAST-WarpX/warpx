@@ -468,9 +468,6 @@ public:
     /** Write a file that record all inputs: inputs file + command line options */
     void WriteUsedInputsFile () const;
 
-    /** Print dt and dx,dy,dz */
-    void PrintDtDxDyDz ();
-
     /**
      * \brief
      * Compute the last time step of the simulation
