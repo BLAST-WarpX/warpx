@@ -81,7 +81,7 @@ public:
         const index_type* AMREX_RESTRICT no_product_p_offsets = no_product_offsets.dataPtr();
         auto const no_product_total = amrex::Scan::PrefixSum<index_type>(n_total_pairs,
             [=] AMREX_GPU_DEVICE (index_type i) -> index_type {
-                return (mask[i] > 0 & mask[i] != int(ScatteringProcessType::IONIZATION)) ? 1 : 0;
+                return ((mask[i] > 0) & (mask[i] != int(ScatteringProcessType::IONIZATION))) ? 1 : 0;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { no_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -113,21 +113,17 @@ public:
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
         );
 
-        amrex::Print() << num_added_vec[0] << "  " << num_added_vec[1] << std::endl;
-
         for (int i = 0; i < m_num_product_species; i++)
         {
             // Add the number of product producing events to the species involved
             // in those processes.
             int num_products = m_num_products_host[i];
-            if (i < 2 & num_products == 1) {
+            if ((i < 2) & (num_products == 1)) {
                 num_products = 0;
             }
             const index_type num_added = with_product_total * num_products;
             num_added_vec[i] += static_cast<int>(num_added);
         }
-
-        amrex::Print() << num_added_vec[0] << "  " << num_added_vec[1] << std::endl;
 
         // resize the particle tiles to accomodate the new particles
         for (int i = 0; i < m_num_product_species; i++)
@@ -214,7 +210,7 @@ public:
         amrex::ParallelForRNG(n_total_pairs,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
         {
-            if (mask[i] > 0 & mask[i] != int(ScatteringProcessType::IONIZATION))
+            if ((mask[i] > 0) & (mask[i] != int(ScatteringProcessType::IONIZATION)))
             {
                 const auto product1_index = products_np_data[0] + no_product_p_offsets[i];
                 // Make a copy of the particle from species 1
@@ -414,9 +410,6 @@ public:
                     // subtract the energy cost for ionization
                     const amrex::ParticleReal E_out = (E_coll - ionization_energy) * PhysConst::q_e;
 
-                    amrex::Print() << " E1, E2, E_coll = " << E1 << "  " << E2 << "  " << E_coll << std::endl;
-                    amrex::Print() << " E_ioniz, E_out = " << ionization_energy << "  " << E_out / PhysConst::q_e << std::endl;
-
                     // Energy division after the ionization event is done as follows:
                     // The ion product energy is obtained from the target energy as
                     //      E2_prime = E2 / E_coll * E_out
@@ -435,7 +428,6 @@ public:
                     // Scale the ion product velocity vector to have the
                     // correct energy
                     const auto scale_factor = std::sqrt(E2_prime / E2);
-                    amrex::Print() << "   " << scale_factor << std::endl;
                     ux_p2 *= scale_factor;
                     uy_p2 *= scale_factor;
                     uz_p2 *= scale_factor;
@@ -444,14 +436,12 @@ public:
                     constexpr auto c2 = PhysConst::c * PhysConst::c;
                     auto mc2 = m_ioniz_product1*c2;
                     amrex::ParticleReal up = static_cast<amrex::ParticleReal>(std::sqrt(E3_prime * (E3_prime + 2.0_prt*mc2) / c2) / m_ioniz_product1);
-                    amrex::Print() << "   new electron " << up << std::endl;
                     ParticleUtils::RandomizeVelocity(ux_p1, uy_p1, uz_p1, up, engine);
 
                     // Isotropically scatter the remaining original particle as well
                     // TODO: Fix this since it doesn't currently conserve momentum
                     mc2 = m1*c2;
                     up = static_cast<amrex::ParticleReal>(std::sqrt(E1_prime * (E1_prime + 2.0_prt*mc2) / c2) / m1);
-                    amrex::Print() << "   old electron " << up << std::endl;
                     ParticleUtils::RandomizeVelocity(ux1, uy1, uz1, up, engine);
                 }
                 else {

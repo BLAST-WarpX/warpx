@@ -86,7 +86,8 @@ collisions.collision_names = coll_elec
 
 coll_elec.ionization_cross_section = ../../../../warpx-data/MCC_cross_sections/Xe/ionization.dat
 coll_elec.ionization_energy = 12.1298431
-coll_elec.ionization_species = ions
+coll_elec.product_species = ions electrons
+coll_elec.ionization_target_species = neutrals
 coll_elec.ndt = 1
 coll_elec.scattering_processes = ionization
 coll_elec.species = electrons neutrals
