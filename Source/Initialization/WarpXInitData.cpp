@@ -567,7 +567,7 @@ WarpX::InitData ()
     else
     {
         InitFromCheckpoint();
-        PrintDtDxDyDz(max_level, geom, dt);
+        ::PrintDtDxDyDz(max_level, geom, dt);
         PostRestart();
         reduced_diags->InitData();
     }
