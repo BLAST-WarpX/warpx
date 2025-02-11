@@ -371,7 +371,7 @@ public:
                 * there is a corresponding assert statement at initialization.)
                 */
                 amrex::ParticleReal const theta = (
-                    soa_products_data[product1_list_index].m_rdata[PIdx::theta][product1_index]
+                    soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::theta][product1_index]
                     - soa_products_data[0].m_rdata[PIdx::theta][species1_index]
                 );
                 amrex::ParticleReal const ux1buf = ux1;
