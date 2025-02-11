@@ -32,12 +32,7 @@ ExternalVectorPotential::ReadParameters ()
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_field_names.empty(),
         "No external field names defined in external_vector_potential.fields");
 
-// #if defined(WARPX_DIM_RZ)
-//     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(false,
-//         "External Time Varying Fields in the Hybrid module is currently not supported. Coming Soon!");
-// #endif
-
-    m_nFields = m_field_names.size();
+    m_nFields = static_cast<int>(m_field_names.size());
 
     // Resize vectors and set defaults
     m_Ax_ext_grid_function.resize(m_nFields);
@@ -147,7 +142,7 @@ ExternalVectorPotential::InitData ()
 
     for (int i = 0; i < m_nFields; ++i) {
 
-        std::string Aext_field = m_field_names[i] + std::string{"_Aext"};
+        const std::string Aext_field = m_field_names[i] + std::string{"_Aext"};
 
         if (m_read_A_from_file[i]) {
             // Read A fields from file
@@ -241,8 +236,8 @@ ExternalVectorPotential::CalculateExternalCurlA (std::string& coil_name)
     auto & warpx = WarpX::GetInstance();
 
     // Compute the curl of at at max and store
-    std::string Aext_field = coil_name + std::string{"_Aext"};
-    std::string curlAext_field = coil_name + std::string{"_curlAext"};
+    const std::string Aext_field = coil_name + std::string{"_Aext"};
+    const std::string curlAext_field = coil_name + std::string{"_curlAext"};
 
     ablastr::fields::MultiLevelVectorField A_ext =
         warpx.m_fields.get_mr_levels_alldirs(Aext_field, warpx.finestLevel());
