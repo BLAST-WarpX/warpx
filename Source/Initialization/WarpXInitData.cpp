@@ -542,7 +542,6 @@ WarpX::InitData ()
         WarpX::PrintDtDxDyDz();
         InitFromScratch();
         InitDiagnostics();
-        InitRuntimeComps();
     }
     else
     {
@@ -703,31 +702,6 @@ WarpX::InitFromScratch ()
 
     InitPML();
 
-}
-
-void WarpX::InitRuntimeComps ()
-{
-    if (mypc->getDoBackTransformedParticles())
-    {
-        // Set comm to false so that the attributes are not communicated
-        // nor written to the checkpoint files
-        int const comm = 0;
-
-        // Add space to save the positions and velocities at the start of the time steps
-        for (auto const& pc : *mypc)
-        {
-#if (AMREX_SPACEDIM >= 2)
-            pc->AddRealComp("x_n_btd", comm);
-#endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-            pc->AddRealComp("y_n_btd", comm);
-#endif
-            pc->AddRealComp("z_n_btd", comm);
-            pc->AddRealComp("ux_n_btd", comm);
-            pc->AddRealComp("uy_n_btd", comm);
-            pc->AddRealComp("uz_n_btd", comm);
-        }
-    }
 }
 
 void

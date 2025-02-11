@@ -433,8 +433,12 @@ public:
      *
      * \param[in] do_back_transformed_particles The parameter to set if back-transformed particles are set to true/false
      */
-    void SetDoBackTransformedParticles(const bool do_back_transformed_particles) {
+    void SetDoBackTransformedParticles (const bool do_back_transformed_particles) {
         m_do_back_transformed_particles = do_back_transformed_particles;
+    }
+
+    bool GetDoBackTransformedParticles () const {
+        return m_do_back_transformed_particles;
     }
 
     //amrex::Real getCharge () {return charge;}
