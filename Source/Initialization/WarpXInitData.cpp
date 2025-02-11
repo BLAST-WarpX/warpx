@@ -288,17 +288,17 @@ WarpX::PrintMainPICparameters ()
     else{
       amrex::Print() << "Operation mode:       | Electromagnetic" << "\n";
     }
-    if (em_solver_medium == MediumForEM::Vacuum ){
+    if (m_em_solver_medium == MediumForEM::Vacuum ){
       amrex::Print() << "                      | - vacuum" << "\n";
     }
-    else if (em_solver_medium == MediumForEM::Macroscopic ){
+    else if (m_em_solver_medium == MediumForEM::Macroscopic ){
       amrex::Print() << "                      | - macroscopic" << "\n";
     }
-    if ( (em_solver_medium == MediumForEM::Macroscopic) &&
+    if ( (m_em_solver_medium == MediumForEM::Macroscopic) &&
        (WarpX::macroscopic_solver_algo == MacroscopicSolverAlgo::LaxWendroff)){
       amrex::Print() << "                      |  - Lax-Wendroff algorithm\n";
     }
-    else if ((em_solver_medium == MediumForEM::Macroscopic) &&
+    else if ((m_em_solver_medium == MediumForEM::Macroscopic) &&
             (WarpX::macroscopic_solver_algo == MacroscopicSolverAlgo::BackwardEuler)){
       amrex::Print() << "                      |  - Backward Euler algorithm\n";
     }
@@ -561,7 +561,7 @@ WarpX::InitData ()
 
     BuildBufferMasks();
 
-    if (WarpX::em_solver_medium == MediumForEM::Macroscopic) {
+    if (m_em_solver_medium == MediumForEM::Macroscopic) {
         const int lev_zero = 0;
         m_macroscopic_properties->InitData(
             Geom(lev_zero),

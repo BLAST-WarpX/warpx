@@ -170,7 +170,9 @@ class ParticleContainerWrapper(object):
         # --- Note that the velocities are handled separately and not included in attr
         # --- (even though they are stored as attributes in the C++)
         for key, vals in kwargs.items():
-            attr[:, self.particle_container.get_comp_index(key) - built_in_attrs] = vals
+            attr[
+                :, self.particle_container.get_real_comp_index(key) - built_in_attrs
+            ] = vals
 
         nattr_int = 0
         attr_int = np.empty([0], dtype=np.int32)
@@ -264,7 +266,7 @@ class ParticleContainerWrapper(object):
         List of arrays
             The requested particle array data
         """
-        comp_idx = self.particle_container.get_comp_index(comp_name)
+        comp_idx = self.particle_container.get_real_comp_index(comp_name)
 
         data_array = []
         for pti in libwarpx.libwarpx_so.WarpXParIter(self.particle_container, level):
@@ -309,7 +311,7 @@ class ParticleContainerWrapper(object):
         List of arrays
             The requested particle array data
         """
-        comp_idx = self.particle_container.get_icomp_index(comp_name)
+        comp_idx = self.particle_container.get_int_comp_index(comp_name)
 
         data_array = []
         for pti in libwarpx.libwarpx_so.WarpXParIter(self.particle_container, level):
@@ -842,16 +844,16 @@ class ParticleBoundaryBufferWrapper(object):
         )
         data_array = []
         # loop over the real attributes
-        if comp_name in part_container.real_comp_names:
-            comp_idx = part_container.real_comp_names[comp_name]
+        if comp_name in part_container.real_soa_names:
+            comp_idx = part_container.get_real_comp_index(comp_name)
             for ii, pti in enumerate(
                 libwarpx.libwarpx_so.BoundaryBufferParIter(part_container, level)
             ):
                 soa = pti.soa()
                 data_array.append(xp.array(soa.get_real_data(comp_idx), copy=False))
         # loop over the integer attributes
-        elif comp_name in part_container.int_comp_names:
-            comp_idx = part_container.int_comp_names[comp_name]
+        elif comp_name in part_container.int_soa_names:
+            comp_idx = part_container.get_int_comp_index(comp_name)
             for ii, pti in enumerate(
                 libwarpx.libwarpx_so.BoundaryBufferParIter(part_container, level)
             ):

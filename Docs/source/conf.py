@@ -56,7 +56,12 @@ extensions = [
     "sphinx_design",
     "breathe",
     "sphinxcontrib.bibtex",
+    "sphinxcontrib.googleanalytics",
 ]
+
+# Google Analytics
+googleanalytics_id = "G-QZGY5060MZ"
+googleanalytics_enabled = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]

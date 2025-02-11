@@ -121,12 +121,22 @@ The particle velocity in the COM frame is then isotropically scattered using the
 Back scattering
 ^^^^^^^^^^^^^^^
 
-The process is the same as for elastic scattering above expect the scattering angle is fixed at :math:`\pi`, meaning the particle velocity in the COM frame is updated to :math:`-\vec{u}_c`.
+The process is the same as for elastic scattering above except the scattering angle is fixed at :math:`\pi`, meaning the particle velocity in the COM frame is updated to :math:`-\vec{u}_c`.
 
 Excitation
 ^^^^^^^^^^
 
 The process is also the same as for elastic scattering except the excitation energy cost is subtracted from the particle energy. This is done by reducing the velocity before a scattering angle is chosen.
+
+Forward scattering
+^^^^^^^^^^^^^^^^^^
+
+This process operates in two ways:
+
+1. If an excitation energy cost is provided, the energy cost is subtracted from the particle energy and no scattering is performed.
+2. If an excitation energy cost is not provided, the particle is not scattered and the velocity is unchanged (corresponding to a scattering angle of :math:`0` in the elastic scattering process above).
+
+See :cite:t:`b-Janssen2016` for a recommended use of this process.
 
 Benchmarks
 ----------
