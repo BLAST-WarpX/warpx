@@ -45,6 +45,7 @@ namespace warpx::fields
         vector_potential_fp_nodal,
         vector_potential_grad_buf_e_stag,
         vector_potential_grad_buf_b_stag,
+        hybrid_electron_temperature_fp, /**< Used with Ohm's law solver. Stores the electron temperature */
         hybrid_electron_pressure_fp, /**< Used with Ohm's law solver. Stores the electron pressure */
         hybrid_rho_fp_temp,          /**< Used with Ohm's law solver. Stores the time interpolated/extrapolated charge density */
         hybrid_current_fp_temp,      /**< Used with Ohm's law solver. Stores the time interpolated/extrapolated current density */

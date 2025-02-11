@@ -80,24 +80,12 @@ void WarpX::HybridPICEvolveFields ()
     // 0'th index of `rho_fp`, J_i^{n-1/2} in `current_fp_temp` and J_i^{n+1/2}
     // in `current_fp`.
 
-    // Calculate Ke using rho^{n+1} in rho_fp  
-    //if(m_hybrid_pic_model->m_solve_electron_energy_equation)
-    //{
-        // copy rho_fp_temp to hybrid_electron_fl->name_mf_N
-    //    m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->setVal(0);
-    //    MultiFab::Copy( *m_fields.get(hybrid_electron_fl->name_mf_N, finest_level),
-    //                    *m_fields.get(FieldType::rho_fp, finest_level),
-    //                   0, 0, 1, m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->nGrowVect());
-        // Calculate Ke
-    //    hybrid_electron_fl->HybridInitializeKe(m_fields, m_hybrid_pic_model->m_gamma, m_hybrid_pic_model->m_n_floor, finest_level);
-    //}
-
     const amrex::Real cur_step = getistep(finest_level);
     const amrex::Real Te0 = m_hybrid_pic_model->m_elec_temp;
     const amrex::Real rho0_ref = m_hybrid_pic_model->m_n0_ref*PhysConst::q_e;
     const amrex::Real gamma_val = m_hybrid_pic_model->m_gamma;
 
-
+    // Initialize electron temperature multifab if qdsmc solver is used
     if(cur_step==1 && m_hybrid_pic_model->m_solve_electron_energy_equation){
 
 #ifdef AMREX_USE_OMP
@@ -116,13 +104,8 @@ void WarpX::HybridPICEvolveFields ()
                 }
             );
         }
-
-    // Fill Boundaries in electron temperature multifab
-    m_fields.get("fluid_temperature_electrons_hybrid",  finest_level)->FillBoundary(Geom(finest_level).periodicity());
-
+        m_fields.get("fluid_temperature_electrons_hybrid",  finest_level)->FillBoundary(Geom(finest_level).periodicity());
     }
-
-
 
     // Calculate Ke using rho^{n} in rho_fp_temp
     if(m_hybrid_pic_model->m_solve_electron_energy_equation)
@@ -184,20 +167,6 @@ void WarpX::HybridPICEvolveFields ()
             0.5_rt, *m_fields.get(FieldType::rho_fp, lev), 0, 0, 1, rho_fp_temp[lev]->nGrowVect()
         );
     }
-
-
-    // Calculate Ke using rho^{n+1/2} in rho_fp_temp
-    //if(m_hybrid_pic_model->m_solve_electron_energy_equation)
-    //{
-        // copy rho_fp_temp to hybrid_electron_fl->name_mf_N
-    //    m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->setVal(0);
-    //    MultiFab::Copy( *m_fields.get(hybrid_electron_fl->name_mf_N, finest_level),
-    //                    *m_fields.get(FieldType::hybrid_rho_fp_temp, finest_level),
-    //                    0, 0, 1, m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->nGrowVect());
-        // Calculate Ke
-    //    hybrid_electron_fl->HybridInitializeKe(m_fields, m_hybrid_pic_model->m_gamma, m_hybrid_pic_model->m_n_floor, finest_level);
-    //}
-
    
     if(m_hybrid_pic_model->m_solve_electron_energy_equation)
     {

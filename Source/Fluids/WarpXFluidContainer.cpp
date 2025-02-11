@@ -1658,7 +1658,6 @@ void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiF
             amrex::Array4<amrex::Real> const& Jy = current_fp_ampere[1]->array(mfi);
             amrex::Array4<amrex::Real> const& Jz = current_fp_ampere[2]->array(mfi);
 
-
             const Box& tilebox  = mfi.tilebox();
             amrex::Box box = amrex::convert( tilebox, ix_type );
             box.grow(m_fields.get(name_mf_K, lev)->nGrowVect());
@@ -1669,7 +1668,7 @@ void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiF
 
                     amrex::Real rho_val = rho(i, j, k);
                     amrex::Real ne_val = rho_val/PhysConst::q_e;
-                    amrex::Real Te_val = Te(i, j, k); // currently in Joules
+                    amrex::Real Te_val = Te(i, j, k)/PhysConst::kb; // convert to K since eta expression should be in SI
 
                     // Interpolate the total plasma current to a nodal grid
                     auto const jx_interp = ablastr::coarsen::sample::Interp(Jx, Jx_stag, nodal, coarsen, i, j, k, 0);
@@ -1681,11 +1680,13 @@ void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiF
                     jtot_val = std::sqrt(jx_interp*jx_interp + jy_interp*jy_interp + jz_interp*jz_interp);
 
                     // calculate eta*J^2
-                    // what if eta does not depend on j, and rho and only on Te ?
+                    // eta expression and units should be in SI
+                    // so all variables here go in SI
                     amrex::Real eta_J2 = eta(rho_val, jtot_val, Te_val)*jtot_val*jtot_val;
 
-                    // Te already is in Joules so no need to divide eta_J2 by kb
-                    Te(i, j, k) = Te_val + dt*eta_J2/(3/2*ne_val);
+                    // Te(i, j, k) and second term already in Joules so no need to divide eta_J2 by kb
+                    // Te_val in K so need to convert to Joules
+                    Te(i, j, k) = PhysConst::kb*Te_val + dt*eta_J2/(3.0/2*ne_val);
                 }
 
             });

@@ -722,6 +722,11 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
     const auto resistivity_has_J_dependence = hybrid_model->m_resistivity_has_J_dependence;
     const auto resistivity_has_Te_dependence = hybrid_model->m_resistivity_has_Te_dependence;
+    const auto solve_electron_energy_equation = hybrid_model->m_solve_electron_energy_equation;
+
+    const auto Te0 = hybrid_model->m_elec_temp;
+    const auto gamma_val = hybrid_model->m_gamma;
+    const auto rho_n0_ref = hybrid_model->m_n0_ref * PhysConst::q_e;
 
     const bool include_hyper_resistivity_term = (eta_h > 0.) && solve_for_Faraday;
 
@@ -876,10 +881,19 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // Interpolate to get the appropriate charge density in space
                 Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, k, 0);
 
-                // Interpolate Te to get the appropiate 
+                // Interpolate Te to get the appropiate temperature in space
+                // Te_val is converted to J since it will only be used to evaluate the resistivity 
+                // which for consistency should only use SI units
                 Real Te_val = 0_rt;
                 if(resistivity_has_Te_dependence) {
-                    Te_val = Interp(Te, nodal, Ex_stag, coarsen, i, j, k, 0);
+                    if(solve_electron_energy_equation){
+                        Te_val = Interp(Te, nodal, Ex_stag, coarsen, i, j, k, 0)/PhysConst::kb;
+                    }
+                    // if the electron energy equation is not solved
+                    // Te is calculated using adiabatic relationship
+                    else{
+                        Te_val = Te0*std::pow(rho_val/rho_n0_ref,gamma_val-1)/PhysConst::kb;
+                    }
                 }
 
                 // Interpolate current to appropriate staggering to match E field
@@ -926,10 +940,19 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // Interpolate to get the appropriate charge density in space
                 Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, k, 0);
 
-                // Interpolate Te to get the appropiate 
+                // Interpolate Te to get the appropiate temperature in space
+                // Te_val is converted to K since it will only be used to evaluate the resistivity 
+                // which for consistency should only use SI units
                 Real Te_val = 0_rt;
                 if(resistivity_has_Te_dependence) {
-                    Te_val = Interp(Te, nodal, Ey_stag, coarsen, i, j, k, 0);
+                    if(solve_electron_energy_equation){
+                        Te_val = Interp(Te, nodal, Ey_stag, coarsen, i, j, k, 0)/PhysConst::kb;
+                    }
+                    // if the electron energy equation is not solved
+                    // Te is calculated using adiabatic relationship
+                    else{
+                        Te_val = Te0*std::pow(rho_val/rho_n0_ref,gamma_val-1)/PhysConst::kb;
+                    }
                 }
 
                 // Interpolate current to appropriate staggering to match E field
@@ -947,7 +970,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // Get the gradient of the electron pressure if the longitudinal part of
                 // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
                 Real grad_Pe = 0._rt;
-                if (!solve_for_Faraday) { grad_Pe = T_Algo::UpwardDy(Pe, coefs_y, n_coefs_y, i, j, k); }
+                if (!solve_for_Faraday) { grad_Pe = T_Algo::UpwardDy(Pe, coefs_y, n_coefs_y, i, j, k);}
 
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_y = Interp(enE, nodal, Ey_stag, coarsen, i, j, k, 1);
@@ -972,10 +995,19 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // Interpolate to get the appropriate charge density in space
                 Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
 
-                // Interpolate Te to get the appropiate 
+                // Interpolate Te to get the appropiate temperature in space
+                // Te_val is converted to K since it will only be used to evaluate the resistivity 
+                // which for consistency should only use SI units
                 Real Te_val = 0_rt;
                 if(resistivity_has_Te_dependence) {
-                    Te_val = Interp(Te, nodal, Ez_stag, coarsen, i, j, k, 0);
+                    if(solve_electron_energy_equation){
+                        Te_val = Interp(Te, nodal, Ez_stag, coarsen, i, j, k, 0)/PhysConst::kb;
+                    }
+                    // if the electron energy equation is not solved
+                    // Te is calculated using adiabatic relationship
+                    else{
+                        Te_val = Te0*std::pow(rho_val/rho_n0_ref,gamma_val-1)/PhysConst::kb;
+                    }
                 }
 
                 // Interpolate current to appropriate staggering to match E field
