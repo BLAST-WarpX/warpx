@@ -185,6 +185,15 @@ namespace
         // TODO: check memory per MPI rank, especially if GPUs are underutilized
         // TODO: CPU tiling hints with OpenMP
     }
+
+    /** Write a file that record all inputs: inputs file + command line options */
+    void WriteUsedInputsFile ()
+    {
+        std::string filename = "warpx_used_inputs";
+        ParmParse pp_warpx("warpx");
+        pp_warpx.queryAdd("used_inputs_file", filename);
+        ablastr::utils::write_used_inputs_file(filename);
+    }
 }
 
 void
@@ -494,16 +503,6 @@ WarpX::PrintMainPICparameters ()
       amrex::Print() << "                      |  - moving_window_v = " << WarpX::moving_window_v << "\n";
       amrex::Print() << "------------------------------------------------------------------------------- \n";
     }
-}
-
-void
-WarpX::WriteUsedInputsFile () const
-{
-    std::string filename = "warpx_used_inputs";
-    ParmParse pp_warpx("warpx");
-    pp_warpx.queryAdd("used_inputs_file", filename);
-
-    ablastr::utils::write_used_inputs_file(filename);
 }
 
 void
