@@ -443,6 +443,15 @@ void ReadBCParams ()
             "PEC boundary not implemented for PSATD, yet!"
         );
 
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            (electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) ||
+            (
+                WarpX::field_boundary_lo[idim] != FieldBoundaryType::PMC &&
+                WarpX::field_boundary_hi[idim] != FieldBoundaryType::PMC
+            ),
+            "PMC boundary not implemented for PSATD, yet!"
+        );
+
         if(WarpX::field_boundary_lo[idim] == FieldBoundaryType::Open &&
            WarpX::field_boundary_hi[idim] == FieldBoundaryType::Open){
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
