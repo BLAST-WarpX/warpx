@@ -1084,13 +1084,7 @@ public:
     void PSATDSubtractCurrentPartialSumsAvg ();
 
 #ifdef WARPX_USE_FFT
-
-#   ifdef WARPX_DIM_RZ
-        SpectralSolverRZ&
-#   else
-        SpectralSolver&
-#   endif
-            get_spectral_solver_fp (int lev) {return *spectral_solver_fp[lev];}
+    auto&  get_spectral_solver_fp (int lev) {return *spectral_solver_fp[lev];}
 #endif
 
     FiniteDifferenceSolver * get_pointer_fdtd_solver_fp (int lev) { return m_fdtd_solver_fp[lev].get(); }
