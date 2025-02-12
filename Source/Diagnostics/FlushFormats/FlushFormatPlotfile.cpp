@@ -374,29 +374,27 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
 
         // get the names of the extra real comps
         real_names.resize(tmp.NumRealComps() - AMREX_SPACEDIM);
+        real_flags = part_diag.m_plot_flags;
+        real_flags.resize(tmp.NumRealComps());
 
-        // note, skip the required compnent names here
+        // note, skip the required component names here
         auto rnames = tmp.GetRealSoANames();
         for (std::size_t index = PIdx::nattribs; index < rnames.size(); ++index) {
             real_names[index - AMREX_SPACEDIM] = rnames[index];
+            real_flags[index - AMREX_SPACEDIM] = pc->h_redistribute_real_comp[index];
         }
-
-        // plot any "extra" fields by default
-        real_flags = part_diag.m_plot_flags;
-        real_flags.resize(tmp.NumRealComps(), 1);
 
         //   note: skip the mandatory AMREX_SPACEDIM positions for pure SoA
         real_flags.erase(real_flags.begin(), real_flags.begin() + AMREX_SPACEDIM);
 
-        // and the names
+        // and the int comps
         int_names.resize(tmp.NumIntComps());
+        int_flags.resize(tmp.NumIntComps());
         auto inames = tmp.GetIntSoANames();
         for (std::size_t index = 0; index < inames.size(); ++index) {
             int_names[index] = inames[index];
+            int_flags[index] = pc->h_redistribute_int_comp[index];
         }
-
-        // plot by default
-        int_flags.resize(tmp.NumIntComps(), 1);
 
         const auto mass = pc->AmIA<PhysicalSpecies::photon>() ? PhysConst::m_e : pc->getMass();
         RandomFilter const random_filter(part_diag.m_do_random_filter,

@@ -624,19 +624,20 @@ for (const auto & particle_diag : particle_diags) {
         real_names[i] = detail::snakeToCamel(rn[i]);
     }
 
-    // plot any "extra" fields by default
     amrex::Vector<int> real_flags = particle_diag.m_plot_flags;
-    real_flags.resize(tmp.NumRealComps(), 1);
+    real_flags.resize(tmp.NumRealComps());
+    for (std::size_t index = PIdx::nattribs; index < real_names.size(); ++index) {
+        real_flags[index] = pc->h_redistribute_real_comp[index];
+    }
 
-    // and the int names
+
+    // and the int components
+    amrex::Vector<int> int_flags(tmp.NumIntComps());
     for (size_t i = 0; i < in.size(); ++i)
     {
         int_names[i] = detail::snakeToCamel(in[i]);
+        int_flags[i] = pc->h_redistribute_int_comp[i];
     }
-
-    // plot by default
-    amrex::Vector<int> int_flags;
-    int_flags.resize(tmp.NumIntComps(), 1);
 
     // real_names contains a list of all real particle attributes.
     // real_flags is 1 or 0, whether quantity is dumped or not.
