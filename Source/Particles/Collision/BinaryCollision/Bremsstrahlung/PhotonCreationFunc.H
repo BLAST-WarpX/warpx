@@ -215,8 +215,11 @@ public:
                 // cc3 = (- 8.0_prt*E*u + 4.0_prt*u*u - 8.0_prt*E*E*u*u + 8.0_prt*E*E*u*g)
                 // c = cc1 + cc2 + cc3
 
+                // Make sure that the root term is always non-negative.
+                amrex::ParticleReal const bac = std::max(b*b - 4.0_prt*a*c, 0._prt);
+
                 // Use the "plus" solution since it keeps the electon motion forward
-                amrex::ParticleReal const u1_rel_after = (-b + std::sqrt(b*b - 4.0_prt*a*c))/(2.0_prt*a)*PhysConst::c;
+                amrex::ParticleReal const u1_rel_after = (-b + std::sqrt(bac))/(2.0_prt*a)*PhysConst::c;
 
                 // The terms inside the sqrt can also be expanded but doesn't seem to improve the round off error
                 // u1_rel_after = (-b + 4.0_prt*std::sqrt(B*B*D*D + 4.0_prt*A*A*B*B - 4.0_prt*B*B*B*B))/(2.0_prt*a)*PhysConst::c
