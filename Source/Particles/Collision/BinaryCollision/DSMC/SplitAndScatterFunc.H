@@ -453,7 +453,7 @@ public:
 
                     const amrex::ParticleReal cos_alpha = (p0*p0 + p1*p1 - p2*p2) / (2.0_prt * p0 * p1);
                     const amrex::ParticleReal sin_alpha = std::sqrt(1.0_prt - cos_alpha*cos_alpha);
-                    const amrex::ParticleReal cos_gamma = (p0*p0 + p2*p2 - p1*p1) / (2.0 * p0 * p2);
+                    const amrex::ParticleReal cos_gamma = (p0*p0 + p2*p2 - p1*p1) / (2.0_prt * p0 * p2);
                     const amrex::ParticleReal sin_gamma = std::sqrt(1.0_prt - cos_gamma*cos_gamma);
 
                     // choose random theta and phi values (orientation of the triangle)
