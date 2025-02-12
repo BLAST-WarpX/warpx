@@ -99,7 +99,7 @@ class PlasmaCylinderCompression(object):
             Ay_data = 0.5 * XM * self.dB
             Az_data = np.zeros_like(RM)
 
-            # Write vector potential to file to exercise field loading via OPenPMD
+            # Write vector potential to file to exercise field loading via OpenPMD
             series = io.Series("Afield.h5", io.Access.create)
 
             it = series.iterations[0]
