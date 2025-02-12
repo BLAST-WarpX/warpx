@@ -17,9 +17,9 @@ my_constants.Lx = 8*sigmax
 my_constants.Ly = 8*sigmay
 my_constants.Lz = 16*sigmaz
 
-my_constants.nx = 8
-my_constants.ny = 8
-my_constants.nz = 8
+my_constants.nx = 32
+my_constants.ny = 32
+my_constants.nz = 32
 
 # TIME
 my_constants.T = 0.5*Lz/clight
@@ -53,6 +53,7 @@ warpx.grid_type = collocated
 algo.particle_shape = 3
 algo.particle_pusher = vay
 warpx.poisson_solver = fft
+particles.do_tiling = 1
 
 #################################
 ########### PARTICLES ###########
@@ -69,12 +70,14 @@ beam.momentum_distribution_type = gaussian
 beam.uz_m = beam_gamma
 beam.uy_m = 0.0
 beam.ux_m = 0.0
-beam.ux_th = 0
-beam.uy_th = 0
+beam.ux_th = 0.01*beam_gamma
+beam.uy_th = 0.02*beam_gamma
 beam.uz_th = 0
-beam.do_not_deposit = 1
 
-my_constants.nmacropart = 11
+beam.do_not_deposit = 1
+beam.do_not_push = 1
+
+my_constants.nmacropart = 15
 
 beam.species_type = electron
 beam.injection_style = gaussian_beam
@@ -107,3 +110,4 @@ diag1.write_species = 1
 diag1.dump_last_timestep = 1
 diag1.species = beam virtual_photons
 diag1.format = openpmd
+diag1.openpmd_backend = h5
