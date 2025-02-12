@@ -66,24 +66,9 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
             m_num_products_host.push_back(1);
             m_num_products_host.push_back(1);
         }
-
-#ifndef AMREX_USE_GPU
-        // On CPU, the device vector can be filled immediately
-        for (int i = 0; i < m_num_product_species; i++) {
-            m_num_products_device.push_back(m_num_products_host[i]);
-        }
-#endif
     }
     else
     {
         WARPX_ABORT_WITH_MESSAGE("Unknown collision type in SplitAndScatterFunc");
     }
-
-#ifdef AMREX_USE_GPU
-     m_num_products_device.resize(m_num_product_species);
-     amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, m_num_products_host.begin(),
-                           m_num_products_host.end(),
-                           m_num_products_device.begin());
-     amrex::Gpu::streamSynchronize();
-#endif
 }

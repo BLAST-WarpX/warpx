@@ -159,8 +159,6 @@ public:
         const index_type* AMREX_RESTRICT products_np_data = products_np.data();
 #endif
 
-        // const int* AMREX_RESTRICT p_num_products_device = m_num_products_device.data();
-
         const int num_product_species = m_num_product_species;
         const auto ionization_energy = m_ionization_energy;
 
@@ -435,12 +433,12 @@ public:
                     const amrex::ParticleReal E2_prime = std::min(E2 / E_coll * E_out, 0.5_prt * E_out);
 
                     // find ellipse semi-major and minor axis
-                    const auto a = 0.5_prt * (E_out - E2_prime);
-                    const auto b = 0.5_prt * std::sqrt(E_out*E_out - 2.0_prt * E_out * E2_prime);
+                    const amrex::ParticleReal a = 0.5_prt * (E_out - E2_prime);
+                    const amrex::ParticleReal b = 0.5_prt * std::sqrt(E_out*E_out - 2.0_prt * E_out * E2_prime);
 
                     // sample random x value and calculate y
-                    const auto x = (2._prt * amrex::Random(engine) - 1.0_prt) * a;
-                    const auto y2 = b*b - b*b/(a*a) * x*x;
+                    const amrex::ParticleReal x = (2._prt * amrex::Random(engine) - 1.0_prt) * a;
+                    const amrex::ParticleReal y2 = b*b - b*b/(a*a) * x*x;
                     const amrex::ParticleReal E0_prime = std::sqrt(y2 + x*x - x*E2_prime + 0.25_prt*E2_prime*E2_prime);
                     const amrex::ParticleReal E1_prime = E_out - E0_prime - E2_prime;
 
@@ -449,9 +447,9 @@ public:
                     // that the net linear momentum in the current frame is 0.
                     // This is achieved by arranging the momentum vectors in
                     // a triangle and finding the required angles between the vectors.
-                    const auto p0 = std::sqrt(2.0_prt * m1 * E0_prime);
-                    const auto p1 = std::sqrt(2.0_prt * m_ioniz_product1 * E1_prime);
-                    const auto p2 = std::sqrt(2.0_prt * m_ioniz_product2 * E2_prime);
+                    const amrex::ParticleReal p0 = std::sqrt(2.0_prt * m1 * E0_prime);
+                    const amrex::ParticleReal p1 = std::sqrt(2.0_prt * m_ioniz_product1 * E1_prime);
+                    const amrex::ParticleReal p2 = std::sqrt(2.0_prt * m_ioniz_product2 * E2_prime);
 
                     const amrex::ParticleReal cos_alpha = (p0*p0 + p1*p1 - p2*p2) / (2.0_prt * p0 * p1);
                     const amrex::ParticleReal sin_alpha = std::sqrt(1.0_prt - cos_alpha*cos_alpha);
@@ -462,10 +460,10 @@ public:
                     const amrex::ParticleReal Theta = amrex::Random(engine) * 2.0_prt * MathConst::pi;
                     const amrex::ParticleReal phi = amrex::Random(engine) * MathConst::pi;
 
-                    const auto cos_theta = std::cos(Theta);
-                    const auto sin_theta = std::sin(Theta);
-                    const auto cos_phi = std::cos(phi);
-                    const auto sin_phi = std::sin(phi);
+                    const amrex::ParticleReal cos_theta = std::cos(Theta);
+                    const amrex::ParticleReal sin_theta = std::sin(Theta);
+                    const amrex::ParticleReal cos_phi = std::cos(phi);
+                    const amrex::ParticleReal sin_phi = std::sin(phi);
 
                     ux1 = p0 / m1 * cos_theta * cos_phi;
                     uy1 = p0 / m1 * cos_theta * sin_phi;
@@ -533,9 +531,7 @@ private:
     // If ionization collisions are included, what is the energy cost
     amrex::ParticleReal m_ionization_energy = 0.0;
     // Vectors of size m_num_product_species storing how many particles of a given species are
-    // produced by a collision event. These vectors are duplicated (one version for host and one
-    // for device) which is necessary with GPUs but redundant on CPU.
-    amrex::Gpu::DeviceVector<int> m_num_products_device;
+    // produced by a collision event.
     amrex::Gpu::HostVector<int> m_num_products_host;
     CollisionType m_collision_type;
 };
