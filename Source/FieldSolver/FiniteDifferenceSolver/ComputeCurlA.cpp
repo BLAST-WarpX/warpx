@@ -19,8 +19,6 @@
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
 
-#include <ablastr/coarsen/sample.H>
-
 using namespace amrex;
 
 void FiniteDifferenceSolver::ComputeCurlA (
