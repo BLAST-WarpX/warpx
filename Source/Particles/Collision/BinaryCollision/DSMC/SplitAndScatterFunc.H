@@ -399,10 +399,10 @@ public:
 
                 if (mask[i] == int(ScatteringProcessType::IONIZATION)) {
                     // calculate kinetic energy of the collision (in eV)
-                    amrex::ParticleReal E1 = (
+                    const amrex::ParticleReal E1 = (
                         0.5_prt * m1 * (ux1*ux1 + uy1*uy1 + uz1*uz1) / PhysConst::q_e
                     );
-                    amrex::ParticleReal E2 = (
+                    const amrex::ParticleReal E2 = (
                         0.5_prt * m2 * (ux_p2*ux_p2 + uy_p2*uy_p2 + uz_p2*uz_p2) / PhysConst::q_e
                     );
                     const amrex::ParticleReal E_coll = E1 + E2;
@@ -453,17 +453,17 @@ public:
                     const auto p1 = std::sqrt(2.0_prt * m_ioniz_product1 * E1_prime);
                     const auto p2 = std::sqrt(2.0_prt * m_ioniz_product2 * E2_prime);
 
-                    const auto cos_alpha = (p0*p0 + p1*p1 - p2*p2) / (2.0_prt * p0 * p1);
-                    const auto sin_alpha = std::sqrt(1.0_prt - cos_alpha*cos_alpha);
-                    const auto cos_gamma = (p0*p0 + p2*p2 - p1*p1) / (2.0 * p0 * p2);
-                    const auto sin_gamma = std::sqrt(1.0_prt - cos_gamma*cos_gamma);
+                    const amrex::ParticleReal cos_alpha = (p0*p0 + p1*p1 - p2*p2) / (2.0_prt * p0 * p1);
+                    const amrex::ParticleReal sin_alpha = std::sqrt(1.0_prt - cos_alpha*cos_alpha);
+                    const amrex::ParticleReal cos_gamma = (p0*p0 + p2*p2 - p1*p1) / (2.0 * p0 * p2);
+                    const amrex::ParticleReal sin_gamma = std::sqrt(1.0_prt - cos_gamma*cos_gamma);
 
                     // choose random theta and phi values (orientation of the triangle)
-                    const auto theta = amrex::Random(engine) * 2.0_prt * MathConst::pi;
-                    const auto phi = amrex::Random(engine) * MathConst::pi;
+                    const amrex::ParticleReal Theta = amrex::Random(engine) * 2.0_prt * MathConst::pi;
+                    const amrex::ParticleReal phi = amrex::Random(engine) * MathConst::pi;
 
-                    const auto cos_theta = std::cos(theta);
-                    const auto sin_theta = std::sin(theta);
+                    const auto cos_theta = std::cos(Theta);
+                    const auto sin_theta = std::sin(Theta);
                     const auto cos_phi = std::cos(phi);
                     const auto sin_phi = std::sin(phi);
 

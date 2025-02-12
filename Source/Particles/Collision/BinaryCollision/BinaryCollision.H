@@ -111,9 +111,9 @@ public:
             // collision set. The reason for this is that during the collision
             // operation, an outgoing particle of the first species type will
             // be created.
-            std::string target_species = "";
+            std::string target_species;
             pp_collision_name.query("ionization_target_species", target_species);
-            if (target_species != "") {
+            if (!target_species.empty()) {
                 if (m_species_names[0] == target_species) {
                     std::swap(m_species_names[0], m_species_names[1]);
                 } else if (m_species_names[1] != target_species) {

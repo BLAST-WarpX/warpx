@@ -23,7 +23,7 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
         amrex::Vector<std::string> product_species;
         pp_collision_name.queryarr("product_species", product_species);
 
-        bool ionization_flag = (product_species.size() > 0);
+        const bool ionization_flag = (!product_species.empty());
 
         // if ionization is one of the processes, check if one of the colliding
         // species is also used as a product species
@@ -33,7 +33,7 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
             pp_collision_name.getarr("species", colliding_species);
             // grab the target species (i.e., the species that looses an
             // electron during the collision)
-            std::string target_species = "";
+            std::string target_species;
             pp_collision_name.query("ionization_target_species", target_species);
             // find the index of the non-target species (the one that could
             // also be used as a product species)
