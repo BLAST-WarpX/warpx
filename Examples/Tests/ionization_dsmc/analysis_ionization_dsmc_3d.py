@@ -109,7 +109,7 @@ def rhs(state, params):
     # $$
     # \frac{\partial n_e}{\partial t} = \dot{n}
     # \frac{\partial n_n}{\partial t} = -\dot{n}
-    # \frac{3}{2}\frac{\partial n_e T_e}{\partial t} = \dot{n} \epsilon_{iz},
+    # \frac{3}{2}\frac{\partial n_e T_e}{\partial t} = -\dot{n} \epsilon_{iz},
     # $$
 
     # where
@@ -132,11 +132,8 @@ def rhs(state, params):
 
     # fill in ionization rate
     f[0] = ndot  # d(ne)/dt
-
-    # at present, the dsmc solver does not deplete electron energy but does deplete neutrals
-    # the opposite is true for the MCC solver
     f[1] = -ndot  # d(nn)/dt
-    f[2] = 0  # d(ne*eps) / dt
+    f[2] = -ndot * iz_energy  # -d(ne*eps) / dt
     return f
 
 
@@ -192,11 +189,11 @@ for i, (title, label, field_warpx, field_theory) in enumerate(
 
     axs[i].legend()
 plt.tight_layout()
-plt.savefig("ionization_dsmc__density_Te.png", dpi=150)
+plt.savefig("ionization_dsmc_density_Te.png", dpi=150)
 
 
 # For now, setting very high tolerances on purpose. This needs to be modified once all features are implemented in the PR.
-tolerances = [1, 1e-6, 1e-2]
+tolerances = [4e-2, 1e-6, 4e-2]
 
 
 def check_tolerance(array, tolerance):

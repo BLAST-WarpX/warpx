@@ -200,10 +200,10 @@ public:
         }
         // Grab the masses of ionization products
         amrex::ParticleReal m_ioniz_product1 = 0;
-        // amrex::ParticleReal m_ioniz_product2 = 0;
+        amrex::ParticleReal m_ioniz_product2 = 0;
         if (num_product_species > 2) {
             m_ioniz_product1 = pc_products[ioniz_product1_list_index]->getMass();
-            // m_ioniz_product2 = pc_products[ioniz_product2_list_index]->getMass();
+            m_ioniz_product2 = pc_products[ioniz_product2_list_index]->getMass();
         }
 
         // First perform all non-product producing collisions
@@ -412,37 +412,72 @@ public:
 
                     // Energy division after the ionization event is done as follows:
                     // The ion product energy is obtained from the target energy as
-                    //      E2_prime = E2 / E_coll * E_out
-                    // The remaining energy for the incoming particle is set to
-                    //      E1_prime = E1 / E_coll * E_out * R
-                    // where R is a random number between 0.5 and 1.
-                    // The energy for the electron product is then obtained as
-                    //      E_new_prime = E_out - E1_prime - E2_prime
+                    //      E2_prime = min(E2 / E_coll * E_out, 0.5 * E_out)
+                    // The energy division for the remaining two particles
+                    // must be done such that velocity vectors exist with net
+                    // zero linear momentum in the current frame. A sufficient
+                    // condition for this is that E1_prime, E2_prime and E3_prime
+                    // are valid edge lengths for a triangle - effectively that
+                    // a ellipse can be drawn from the energy components.
+                    // That ellipse has semi-major and semi-minor axis:
+                    //    a = (E_out - E2_prime) / 2.0
+                    //    b = 0.5 * sqrt(E_out^2 - 2 * E_out * E2_prime)
+                    // The energy components are found by randomly sampling an
+                    // x value between -a and a, and finding the corresponding
+                    // y value that falls on the ellipse: y^2 = b^2 - b^2/a^2 * x^2.
+                    // The secondary electron's energy is then:
+                    //    E0_prime = sqrt(y^2 + (x - E2_prime/2)^2)
+                    // and the final particle's is:
+                    //    E1_prime = E_out - E0_prime - E0_prime
 
-                    // The product ordering ensures that product 1 is the
-                    // electron product.
-                    const amrex::ParticleReal E2_prime = E2 / E_coll * E_out;
-                    const amrex::ParticleReal E1_prime = E1 / E_coll * E_out * 0.5_prt * (amrex::Random(engine) + 1.0_prt);
-                    const amrex::ParticleReal E3_prime = E_out - E1_prime - E2_prime;
+                    // The product ordering ensures that product 2 is the
+                    // ion product.
+                    const amrex::ParticleReal E2_prime = std::min(E2 / E_coll * E_out, 0.5_prt * E_out);
 
-                    // Scale the ion product velocity vector to have the
-                    // correct energy
-                    const auto scale_factor = std::sqrt(E2_prime / E2);
-                    ux_p2 *= scale_factor;
-                    uy_p2 *= scale_factor;
-                    uz_p2 *= scale_factor;
+                    // find ellipse semi-major and minor axis
+                    const auto a = 0.5_prt * (E_out - E2_prime);
+                    const auto b = 0.5_prt * std::sqrt(E_out*E_out - 2.0_prt * E_out * E2_prime);
 
-                    // Isotropically scatter the electron
-                    constexpr auto c2 = PhysConst::c * PhysConst::c;
-                    auto mc2 = m_ioniz_product1*c2;
-                    amrex::ParticleReal up = static_cast<amrex::ParticleReal>(std::sqrt(E3_prime * (E3_prime + 2.0_prt*mc2) / c2) / m_ioniz_product1);
-                    ParticleUtils::RandomizeVelocity(ux_p1, uy_p1, uz_p1, up, engine);
+                    // sample random x value and calculate y
+                    const auto x = (2._prt * amrex::Random(engine) - 1.0_prt) * a;
+                    const auto y2 = b*b - b*b/(a*a) * x*x;
+                    const amrex::ParticleReal E0_prime = std::sqrt(y2 + x*x - x*E2_prime + 0.25_prt*E2_prime*E2_prime);
+                    const amrex::ParticleReal E1_prime = E_out - E0_prime - E2_prime;
 
-                    // Isotropically scatter the remaining original particle as well
-                    // TODO: Fix this since it doesn't currently conserve momentum
-                    mc2 = m1*c2;
-                    up = static_cast<amrex::ParticleReal>(std::sqrt(E1_prime * (E1_prime + 2.0_prt*mc2) / c2) / m1);
-                    ParticleUtils::RandomizeVelocity(ux1, uy1, uz1, up, engine);
+                    // Now that appropriate energies are set for each outgoing species
+                    // the directions for the velocity vectors must be chosen such
+                    // that the net linear momentum in the current frame is 0.
+                    // This is achieved by arranging the momentum vectors in
+                    // a triangle and finding the required angles between the vectors.
+                    const auto p0 = std::sqrt(2.0_prt * m1 * E0_prime);
+                    const auto p1 = std::sqrt(2.0_prt * m_ioniz_product1 * E1_prime);
+                    const auto p2 = std::sqrt(2.0_prt * m_ioniz_product2 * E2_prime);
+
+                    const auto cos_alpha = (p0*p0 + p1*p1 - p2*p2) / (2.0_prt * p0 * p1);
+                    const auto sin_alpha = std::sqrt(1.0_prt - cos_alpha*cos_alpha);
+                    const auto cos_gamma = (p0*p0 + p2*p2 - p1*p1) / (2.0 * p0 * p2);
+                    const auto sin_gamma = std::sqrt(1.0_prt - cos_gamma*cos_gamma);
+
+                    // choose random theta and phi values (orientation of the triangle)
+                    const auto theta = amrex::Random(engine) * 2.0_prt * MathConst::pi;
+                    const auto phi = amrex::Random(engine) * MathConst::pi;
+
+                    const auto cos_theta = std::cos(theta);
+                    const auto sin_theta = std::sin(theta);
+                    const auto cos_phi = std::cos(phi);
+                    const auto sin_phi = std::sin(phi);
+
+                    ux1 = p0 / m1 * cos_theta * cos_phi;
+                    uy1 = p0 / m1 * cos_theta * sin_phi;
+                    uz1 = -p0 / m1 * sin_theta;
+
+                    ux_p1 = p1 / m_ioniz_product1 * (-cos_alpha * cos_theta * cos_phi - sin_alpha * sin_phi);
+                    uy_p1 = p1 / m_ioniz_product1 * (-cos_alpha * cos_theta * sin_phi + sin_alpha * cos_phi);
+                    uz_p1 = p1 / m_ioniz_product1 * (cos_alpha * sin_theta);
+
+                    ux_p2 = p2 / m_ioniz_product2 * (-cos_gamma * cos_theta * cos_phi + sin_gamma * sin_phi);
+                    uy_p2 = p2 / m_ioniz_product2 * (-cos_gamma * cos_theta * sin_phi - sin_gamma * cos_phi);
+                    uz_p2 = p2 / m_ioniz_product2 * (cos_gamma * sin_theta);
                 }
                 else {
                     amrex::Abort("Unknown scattering process.");
