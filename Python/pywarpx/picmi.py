@@ -1854,7 +1854,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Number of substeps to take when updating the B-field.
 
     holmstrom_vacuum_region: bool, default=False
-        Flag to determine handling of vacuum region. Setting to True will solve the simplified Generalized Ohm's Law dropping the Hall and pressure terms.
+        Flag to determine handling of vacuum region. Setting to True will solve the simplified Generalized Ohm's Law dropping the Hall and pressure terms in the vacuum region.
         This flag is useful for suppressing vacuum region fluctuations. A large resistivity value must be used when rho <= rho_floor.
 
     Jx/y/z_external_function: str
