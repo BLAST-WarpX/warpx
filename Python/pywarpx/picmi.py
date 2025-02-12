@@ -1868,8 +1868,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         A_external = {
             '<field_name1>': {
                 'Ax_external_function': <implicit function with (x,y,z) dependence>,
-                'Ax_external_function': <implicit function with (x,y,z) dependence>,
-                'Ax_external_function': <implicit function with (x,y,z) dependence>,
+                'Ay_external_function': <implicit function with (x,y,z) dependence>,
+                'Az_external_function': <implicit function with (x,y,z) dependence>,
                 'A_time_external_function': <implicit function with (t) dependence>
             },
             '<field_name2>: {...}'
