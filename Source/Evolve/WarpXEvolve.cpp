@@ -319,7 +319,7 @@ WarpX::Evolve (int numsteps)
             ExecutePythonCallback("afterEsolve");
         }
 
-        bool do_diagnostic = (multi_diags->DoComputeAndPack(step) || reduced_diags->DoDiags(step));
+        bool const do_diagnostic = (multi_diags->DoComputeAndPack(step) || reduced_diags->DoDiags(step));
         if (synchronize_velocity_for_diagnostics &&
             (do_diagnostic || end_of_step_loop)) {
             // When the diagnostics require synchronization, push p by 0.5*dt to synchronize.
