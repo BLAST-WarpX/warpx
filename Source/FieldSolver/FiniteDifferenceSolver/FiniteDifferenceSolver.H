@@ -277,7 +277,7 @@ class FiniteDifferenceSolver
         void ComputeCurlACylindrical (
             ablastr::fields::VectorField& Bfield,
             ablastr::fields::VectorField const& Afield,
-            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_B,
             int lev
         );
 
