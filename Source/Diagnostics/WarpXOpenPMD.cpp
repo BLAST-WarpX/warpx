@@ -626,7 +626,7 @@ for (const auto & particle_diag : particle_diags) {
 
     amrex::Vector<int> real_flags = particle_diag.m_plot_flags;
     real_flags.resize(tmp.NumRealComps());
-    for (std::size_t index = PIdx::nattribs; index < real_names.size(); ++index) {
+    for (size_t index = PIdx::nattribs; index < rn.size(); ++index) {
         real_flags[index] = pc->h_redistribute_real_comp[index];
     }
 
