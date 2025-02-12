@@ -242,10 +242,12 @@ WarpX::Evolve (int numsteps)
         }
 
         // TODO: move out
+        bool const end_of_step_loop = (step == numsteps_max - 1) || (cur_time + dt[0] >= stop_time - 1.e-3*dt[0]);
         if (evolve_scheme == EvolveScheme::Explicit) {
-            // At the end of last step, push p by 0.5*dt to synchronize
-            if ((cur_time + dt[0] >= stop_time - 1.e-3*dt[0] || step == numsteps_max-1) &&
-                !synchronize_velocity_for_diagnostics) {
+            // At the end of step loop, push p by 0.5*dt to synchronize
+            // This synchronization is not at the correct place since it is done before the window is moved,
+            // before particles are scraped, and before the electrostatic field update
+            if (end_of_step_loop && !synchronize_velocity_for_diagnostics) {
                 Synchronize();
             }
         }
@@ -317,9 +319,9 @@ WarpX::Evolve (int numsteps)
             ExecutePythonCallback("afterEsolve");
         }
 
+        bool do_diagnostic = (multi_diags->DoComputeAndPack(step) || reduced_diags->DoDiags(step));
         if (synchronize_velocity_for_diagnostics &&
-            (multi_diags->DoComputeAndPack(step) || reduced_diags->DoDiags(step) ||
-             (cur_time + dt[0] >= stop_time - 1.e-3*dt[0]) || step == numsteps_max-1)) {
+            (do_diagnostic || end_of_step_loop)) {
             // When the diagnostics require synchronization, push p by 0.5*dt to synchronize.
             // Note that this will be undone at the start of the next step by the half v-push
             // backwards.
@@ -370,8 +372,10 @@ WarpX::Evolve (int numsteps)
     // This if statement is needed for PICMI, which allows the Evolve routine to be
     // called multiple times, otherwise diagnostics will be done at every call,
     // regardless of the diagnostic period parameter provided in the inputs.
-    if (istep[0] == max_step || (stop_time - 1.e-3*dt[0] <= cur_time && cur_time < stop_time + dt[0])
-        || m_exit_loop_due_to_interrupt_signal) {
+    bool const final_time_step = (istep[0] == max_step)
+                                || (cur_time >= stop_time - 1.e-3*dt[0]
+                                 && cur_time < stop_time + dt[0]);
+    if (final_time_step || m_exit_loop_due_to_interrupt_signal) {
         multi_diags->FilterComputePackFlushLastTimestep( istep[0] );
         if (m_exit_loop_due_to_interrupt_signal) { ExecutePythonCallback("onbreaksignal"); }
     }
