@@ -1976,8 +1976,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                 self.Jz_external_function, self.mangle_dict
             ),
         )
-        pywarpx.hybridpicmodel.add_external_fields = self.add_external_fields
-        if self.add_external_fields:
+        if self.A_external is not None:
+                pywarpx.hybridpicmodel.add_external_fields = True
             pywarpx.external_vector_potential.__setattr__(
                 "fields",
                 pywarpx.my_constants.mangle_expression(
