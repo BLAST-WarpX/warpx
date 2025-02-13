@@ -10,6 +10,7 @@ foreach(D IN LISTS WarpX_DIMS)
         FieldEnergy.cpp
         FieldMaximum.cpp
         FieldMomentum.cpp
+        FieldPoyntingFlux.cpp
         FieldProbe.cpp
         FieldProbeParticleContainer.cpp
         FieldReduction.cpp

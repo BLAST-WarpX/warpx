@@ -58,7 +58,7 @@ export CEI_TMP="/tmp/cei"
 CXX=$(which icpc) CC=$(which icc) \
   cmake-easyinstall               \
   --prefix=/usr/local             \
-  git+https://github.com/openPMD/openPMD-api.git@0.15.2 \
+  git+https://github.com/openPMD/openPMD-api.git@0.16.1 \
   -DopenPMD_USE_PYTHON=OFF \
   -DBUILD_TESTING=OFF      \
   -DBUILD_EXAMPLES=OFF     \

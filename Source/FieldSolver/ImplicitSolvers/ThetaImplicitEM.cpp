@@ -6,6 +6,7 @@
  */
 #include "Fields.H"
 #include "ThetaImplicitEM.H"
+#include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "WarpX.H"
 
 using warpx::fields::FieldType;
@@ -109,6 +110,7 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  start_time,
 
     // Update WarpX owned Efield_fp and Bfield_fp to t_{n+theta}
     UpdateWarpXFields( m_E, start_time );
+    m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
     // Advance particles from time n+1/2 to time n+1
     m_WarpX->FinishImplicitParticleUpdate();

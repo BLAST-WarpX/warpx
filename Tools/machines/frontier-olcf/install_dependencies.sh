@@ -87,19 +87,9 @@ python3 -m pip install --upgrade build
 python3 -m pip install --upgrade packaging
 python3 -m pip install --upgrade wheel
 python3 -m pip install --upgrade setuptools
-# cupy and h5py need an older Cython
+# cupy needs an older Cython
 # https://github.com/cupy/cupy/issues/4610
-# https://github.com/h5py/h5py/issues/2268
 python3 -m pip install --upgrade "cython<3.0"
-python3 -m pip install --upgrade numpy
-python3 -m pip install --upgrade pandas
-python3 -m pip install --upgrade scipy
-MPICC="cc -shared" python3 -m pip install --upgrade mpi4py --no-cache-dir --no-build-isolation --no-binary mpi4py
-python3 -m pip install --upgrade openpmd-api
-python3 -m pip install --upgrade matplotlib
-python3 -m pip install --upgrade yt
-# install or update WarpX dependencies such as picmistandard
-python3 -m pip install --upgrade -r $HOME/src/warpx/requirements.txt
 # cupy for ROCm
 #   https://docs.cupy.dev/en/stable/install.html#building-cupy-for-rocm-from-source
 #   https://github.com/cupy/cupy/issues/7830
@@ -108,6 +98,17 @@ CUPY_INSTALL_USE_HIP=1  \
 ROCM_HOME=${ROCM_PATH}  \
 HCC_AMDGPU_TARGET=${AMREX_AMD_ARCH}  \
   python3 -m pip install -v cupy
+python3 -m pip install --upgrade "cython>=3.0"  # for latest mpi4py and everything else
+python3 -m pip install --upgrade numpy
+python3 -m pip install --upgrade h5py
+python3 -m pip install --upgrade pandas
+python3 -m pip install --upgrade scipy
+MPICC="cc -shared" python3 -m pip install --upgrade mpi4py --no-cache-dir --no-build-isolation --no-binary mpi4py
+python3 -m pip install --upgrade openpmd-api
+python3 -m pip install --upgrade matplotlib
+python3 -m pip install --upgrade yt
+# install or update WarpX dependencies such as picmistandard
+python3 -m pip install --upgrade -r $HOME/src/warpx/requirements.txt
 # optional: for optimas (based on libEnsemble & ax->botorch->gpytorch->pytorch)
 #python3 -m pip install --upgrade torch --index-url https://download.pytorch.org/whl/rocm5.4.2
 #python3 -m pip install -r $HOME/src/warpx/Tools/optimas/requirements.txt

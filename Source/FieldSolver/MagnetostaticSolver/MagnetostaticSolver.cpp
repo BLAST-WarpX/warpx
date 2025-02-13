@@ -130,19 +130,18 @@ WarpX::AddMagnetostaticFieldLabFrame()
     // temporary fix!!!
     const amrex::Real absolute_tolerance = 0.0;
     amrex::Real required_precision;
-    if constexpr (std::is_same<Real, float>::value) {
+    if constexpr (std::is_same_v<Real, float>) {
         required_precision = 1e-5;
     }
     else {
         required_precision = 1e-11;
     }
-    const int verbosity = 2;
 
     computeVectorPotential(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::vector_potential_fp_nodal, finest_level),
         required_precision, absolute_tolerance, magnetostatic_solver_max_iters,
-        verbosity
+        magnetostatic_solver_verbosity
     );
 }
 
