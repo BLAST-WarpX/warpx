@@ -855,10 +855,10 @@ MultiParticleContainer::SetDoBackTransformedParticles (const std::string& specie
         if (species_names_list[i] == species_name) {
            found = true;
            auto& pc = allcontainers[i];
-           bool old_do_btd = pc->GetDoBackTransformedParticles();
+           const bool old_do_btd = pc->GetDoBackTransformedParticles();
            pc->SetDoBackTransformedParticles(do_back_transformed_particles);
 
-           if ((old_do_btd == false) && do_back_transformed_particles) {
+           if ((!old_do_btd) && do_back_transformed_particles) {
                // Set comm to false so that the attributes are not communicated
                // nor written to the checkpoint files
                int const comm = 0;
