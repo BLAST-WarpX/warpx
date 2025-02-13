@@ -116,7 +116,7 @@ def select_particles(ids, iteration, *argv):
 
     OUTPUT:
     array with the selected ids
-            
+
     """
     id_it = np.copy(ids[iteration, :])
     selected_ids = np.copy(ids[iteration, :])
