@@ -93,7 +93,7 @@ PYBIND11_MODULE(PYWARPX_MODULE_NAME, m) {
     // TODO broken numpy if not at least v1.15.0: raise warning
     // auto numpy = py::module::import("numpy");
     // auto npversion = numpy.attr("__version__");
-    // std::cout << "numpy version: " << py::str(npversion) << std::endl;
+    // std::cout << "numpy version: " << py::str(npversion) << "\n";
 
     m.def("amrex_init",
         [](const py::list args) {

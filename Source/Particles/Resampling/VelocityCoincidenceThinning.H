@@ -14,6 +14,8 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/ParticleUtils.H"
 
+#include <AMReX_Algorithm.H>
+
 /**
  * \brief This class implements a particle merging scheme wherein particles
  * are clustered in phase space and particles in the same cluster is merged
@@ -67,14 +69,6 @@ public:
     struct HeapSort {
 
         AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-        void swap(int &a, int &b) const
-        {
-            const auto temp = b;
-            b = a;
-            a = temp;
-        }
-
-        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
         void operator() (int index_array[], const int bin_array[], const int start, const int n) const
         {
             // sort index_array into a max heap structure
@@ -84,7 +78,7 @@ public:
                 // move child through heap if it is bigger than its parent
                 while (j > 0 && bin_array[index_array[j+start]] > bin_array[index_array[(j - 1)/2 + start]]) {
                     // swap child and parent until branch is properly ordered
-                    swap(index_array[j+start], index_array[(j - 1)/2 + start]);
+                    amrex::Swap(index_array[j+start], index_array[(j - 1)/2 + start]);
                     j = (j - 1) / 2;
                 }
             }
@@ -92,7 +86,7 @@ public:
             for (int i = n - 1; i > 0; i--)
             {
                 // swap value of first (now the largest value) to the new end point
-                swap(index_array[start], index_array[i+start]);
+                amrex::Swap(index_array[start], index_array[i+start]);
 
                 // remake the max heap
                 int j = 0, index;
@@ -105,7 +99,7 @@ public:
                     }
                     // if parent is smaller than child, swap parent with child having higher value
                     if (index < i && bin_array[index_array[j+start]] < bin_array[index_array[index+start]]) {
-                        swap(index_array[j+start], index_array[index+start]);
+                        amrex::Swap(index_array[j+start], index_array[index+start]);
                     }
                     j = index;
                 }

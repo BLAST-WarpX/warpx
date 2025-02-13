@@ -130,7 +130,7 @@ WarpX::AddMagnetostaticFieldLabFrame()
     // temporary fix!!!
     const amrex::Real absolute_tolerance = 0.0;
     amrex::Real required_precision;
-    if constexpr (std::is_same<Real, float>::value) {
+    if constexpr (std::is_same_v<Real, float>) {
         required_precision = 1e-5;
     }
     else {
