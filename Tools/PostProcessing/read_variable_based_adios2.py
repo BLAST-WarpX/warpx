@@ -105,6 +105,9 @@ def select_particles(ids, iteration, *argv):
     iteration : int
 
     *argv : tuple (numpy array (n_iterations, n_particles) , 2-numbers array-like)
+
+    OUTPUT:
+    array with the selected ids
             
     """
     id_it = np.copy(ids[iteration, :])
