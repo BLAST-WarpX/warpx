@@ -40,8 +40,21 @@ dL_dE_th = (
 
 # Extract the 2D differential luminosity from the file
 series = OpenPMDTimeSeries("./diags/reducedfiles/DifferentialLuminosity2d_beam1_beam2/")
-d2L_dE1_dE2, info = series.get_field("d2L_dE1_dE2", iteration=80)
+d2L_dE1_dE2_sim, info = series.get_field("d2L_dE1_dE2", iteration=80)
 dE1, dE2 = info.dE1, info.dE2
+
+# Compute the analytical 2D differential luminosity for 2 Gaussian beams
+assert info.axes[0] == "E2"
+assert info.axes[1] == "E1"
+E2, E1 = np.meshgrid(info.E2, info.E1, indexing="ij")
+d2L_dE1_dE2_th = (
+    N**2
+    / (2 * (2 * np.pi) ** 2 * sigma_x * sigma_y * sigma_E1 * sigma_E2)
+    * np.exp(
+        -((E1 - E_beam) ** 2) / (2 * sigma_E1**2)
+        - (E2 - E_beam) ** 2 / (2 * sigma_E2**2)
+    )
+)
 
 # Extract test name from path
 test_name = os.path.split(os.getcwd())[1]
@@ -50,13 +63,13 @@ print("test_name", test_name)
 # Pick tolerance
 if "leptons" in test_name:
     tol1 = 0.02
-    tol2 = 0.003
+    tol2 = 0.03
 elif "photons" in test_name:
     # In the photons case, the particles are
     # initialized from a density distribution ;
     # tolerance is larger due to lower particle statistics
-    tol1 = 0.02
-    tol2 = 0.003
+    tol1 = 0.021
+    tol2 = 0.05
 
 # Check that the 1D diagnostic and analytical result match
 error1 = abs(dL_dE_sim - dL_dE_th).max() / abs(dL_dE_th).max()
@@ -64,9 +77,7 @@ print("Relative error: ", error1)
 print("Tolerance: ", tol1)
 
 # Check that the 2D and 1D diagnostics match
-error2 = abs(np.sum(d2L_dE1_dE2) * dE2 * dE1 - np.sum(dL_dE_sim) * dE_bin) / abs(
-    np.sum(dL_dE_sim) * dE_bin
-)
+error2 = abs(d2L_dE1_dE2_sim - d2L_dE1_dE2_th).max() / abs(d2L_dE1_dE2_th).max()
 print("Relative error: ", error2)
 print("Tolerance: ", tol2)
 
