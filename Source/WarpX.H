@@ -1300,26 +1300,6 @@ private:
         return gather_buffer_masks[lev].get();
     }
 
-    /**
-     * \brief Allocates and initializes the stencil coefficients used for the finite-order centering
-     * of fields and currents, and stores them in the given device vectors.
-     *
-     * \param[in,out] device_centering_stencil_coeffs_x device vector where the stencil coefficients along x will be stored
-     * \param[in,out] device_centering_stencil_coeffs_y device vector where the stencil coefficients along y will be stored
-     * \param[in,out] device_centering_stencil_coeffs_z device vector where the stencil coefficients along z will be stored
-     * \param[in] centering_nox order of the finite-order centering along x
-     * \param[in] centering_noy order of the finite-order centering along y
-     * \param[in] centering_noz order of the finite-order centering along z
-     * \param[in] a_grid_type type of grid (collocated or not)
-     */
-    void AllocateCenteringCoefficients (amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_x,
-                                        amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_y,
-                                        amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_z,
-                                        int centering_nox,
-                                        int centering_noy,
-                                        int centering_noz,
-                                        ablastr::utils::enums::GridType a_grid_type);
-
     void AllocLevelMFs (int lev, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm,
                         const amrex::IntVect& ngEB, amrex::IntVect& ngJ,
                         const amrex::IntVect& ngRho, const amrex::IntVect& ngF,
