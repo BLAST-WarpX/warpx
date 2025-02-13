@@ -325,12 +325,12 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
     tmp.AddRealComp("By");
     tmp.AddRealComp("Bz");
 
-    int const Ex_index = tmp.GetRealCompIndex().at("Ex");
-    int const Ey_index = tmp.GetRealCompIndex().at("Ey");
-    int const Ez_index = tmp.GetRealCompIndex().at("Ez");
-    int const Bx_index = tmp.GetRealCompIndex().at("Bx");
-    int const By_index = tmp.GetRealCompIndex().at("By");
-    int const Bz_index = tmp.GetRealCompIndex().at("Bz");
+    int const Ex_index = tmp.GetRealCompIndex("Ex");
+    int const Ey_index = tmp.GetRealCompIndex("Ey");
+    int const Ez_index = tmp.GetRealCompIndex("Ez");
+    int const Bx_index = tmp.GetRealCompIndex("Bx");
+    int const By_index = tmp.GetRealCompIndex("By");
+    int const Bz_index = tmp.GetRealCompIndex("Bz");
 
     auto& warpx = WarpX::GetInstance();
 
