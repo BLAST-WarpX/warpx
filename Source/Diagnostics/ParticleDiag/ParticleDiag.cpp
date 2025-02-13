@@ -36,28 +36,22 @@ ParticleDiag::ParticleDiag (
         std::fill(m_plot_flags.begin(), m_plot_flags.end(), 0);
         bool contains_positions = false;
         if (variables[0] != "none"){
-            std::map<std::string, int> existing_variable_names = pc->getParticleComps();
+            for (auto& var : variables){
 #ifdef WARPX_DIM_RZ
-            // we reconstruct to Cartesian x,y,z for RZ particle output
-            existing_variable_names["y"] = PIdx::theta;
+                // we reconstruct to Cartesian x,y,z for RZ particle output
+                if (var == "y") { var = "theta"; }
 #endif
-            for (const auto& var : variables){
-                // User can request phi and/or EM fields on particles. These are *not* part of the variables that
-                // the particle container carries, and are only added to particles during output.
-                // Therefore, these cases need to be treated specifically.
                 if (var == "phi") {
                     m_plot_phi = true;
                 } else if (var=="EM") {
                     m_plot_EM = true;
                 } else {
-                    const auto search = existing_variable_names.find(var);
-                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                        search != existing_variable_names.end(),
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(pc->HasRealComp(var),
                         "variables argument '" + var
                         +"' is not an existing attribute for this species");
-                    m_plot_flags[existing_variable_names.at(var)] = 1;
+                    m_plot_flags[pc->GetRealCompIndex(var)] = 1;
 
-                    if (var == "x" || var == "y" || var == "z") {
+                    if (var == "x" || var == "y" || var == "z" || var == "theta") {
                         contains_positions = true;
                     }
                 }
@@ -77,7 +71,7 @@ ParticleDiag::ParticleDiag (
     // Always write out theta, whether or not it's requested,
     // to be consistent with always writing out r and z.
     // TODO: openPMD does a reconstruction to Cartesian, so we can now skip force-writing this
-    m_plot_flags[pc->getParticleComps().at("theta")] = 1;
+    m_plot_flags[pc->GetRealCompIndex("theta")] = 1;
 #endif
 
     // build filter functors
