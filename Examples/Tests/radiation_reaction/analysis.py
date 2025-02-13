@@ -41,9 +41,9 @@ inputname = "inputs"
 
 # Physical constants
 c = 299792458.0
-m_e = 9.1093837015e-31
+m_e = 9.1093837139e-31
 q_0 = 1.602176634e-19
-classical_electron_radius = 2.81794e-15
+classical_electron_radius = 2.8179403205e-15
 reference_length = 1.0e-6
 very_small_dot_product = 1.0e-4
 very_small_weight = 1.0e-8

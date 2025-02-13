@@ -28,7 +28,7 @@ namespace ablastr::constant
 
     /** Physical constants
      *
-     * Values are the 2018 CODATA recommended values
+     * Values are the 2022 CODATA recommended values
      * https://physics.nist.gov/cuu/Constants/index.html
      *
      * New additions here should also be considered for addition to

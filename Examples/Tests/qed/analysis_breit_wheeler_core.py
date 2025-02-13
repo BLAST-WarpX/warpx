@@ -43,11 +43,11 @@ import scipy.stats as st
 tol = 1.0e-8
 tol_red = 2.0e-2
 
-# Physical constants (from CODATA 2018, see: https://physics.nist.gov/cuu/Constants/index.html )
-me = 9.1093837015e-31  # electron mass
+# Physical constants (from CODATA 2022, see: https://physics.nist.gov/cuu/Constants/index.html )
+me = 9.1093837139e-31  # electron mass
 c = 299792458  # speed of light
 hbar = 6.62607015e-34 / (2 * np.pi)  # reduced Plank constant
-fine_structure = 7.2973525693e-3  # fine structure constant
+fine_structure = 7.2973525643e-3  # fine structure constant
 qe = 1.602176634e-19  # elementary charge
 E_s = (me**2 * c**3) / (qe * hbar)  # Schwinger E field
 B_s = E_s / c  # Schwinger B field

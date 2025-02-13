@@ -29,7 +29,7 @@ my_constants.Lx = 1.06
 my_constants.Lz = 1.06
 my_constants.x_cent = 0.
 my_constants.z_cent = 0.
-my_constants.mu_0 = 1.25663706212e-06
+my_constants.mu_0 = 1.25663706127e-06
 
 warpx.B_ext_grid_init_style = parse_B_ext_grid_function
 

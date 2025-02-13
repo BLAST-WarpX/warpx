@@ -68,8 +68,8 @@ iy0 = round((0.0 - ymin) / dy)
 iz0 = round((0.0 - zmin) / dz)
 
 # Constants
-eps_0 = 8.8541878128e-12  # Vacuum Permittivity in C/(V*m)
-q_e = -1.60217662e-19  # Electron charge in C
+eps_0 = 8.8541878188e-12  # Vacuum Permittivity in C/(V*m)
+q_e = -1.602176634e-19  # Electron charge in C
 pi = np.pi  # Circular constant of the universe
 r_0 = 0.1  # Initial radius of sphere
 q_tot = -1e-15  # Total charge of sphere in C
