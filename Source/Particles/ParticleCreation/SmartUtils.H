@@ -35,9 +35,9 @@ struct SmartCopyTag
     [[nodiscard]] int size () const noexcept { return static_cast<int>(common_names.size()); }
 };
 
-PolicyVec getPolicies (const NameMap& names) noexcept;
+PolicyVec getPolicies (std::vector<std::string> const & names) noexcept;
 
-SmartCopyTag getSmartCopyTag (const NameMap& src, const NameMap& dst) noexcept;
+SmartCopyTag getSmartCopyTag (std::vector<std::string> const & src, std::vector<std::string> const & dst) noexcept;
 
 /**
  * \brief Sets the ids of newly created particles to the next values.

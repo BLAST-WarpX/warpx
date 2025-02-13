@@ -166,12 +166,6 @@ public:
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag() { return m_eb_update_E; }
     amrex::Vector< std::unique_ptr<amrex::iMultiFab> > const & GetEBReduceParticleShapeFlag() const { return m_eb_reduce_particle_shape; }
 
-    static void shiftMF (amrex::MultiFab& mf, const amrex::Geometry& geom,
-                         int num_shift, int dir, int lev, bool update_cost_flag,
-                         bool safe_guard_cells,
-                         amrex::Real external_field=0.0, bool useparser = false,
-                         amrex::ParserExecutor<3> const& field_parser={});
-
     /**
      * \brief
      * If an authors' string is specified in the inputfile, this method returns that string.
@@ -206,23 +200,19 @@ public:
      *  being used (0 or 1 corresponding to timers or heuristic).
      */
     static inline auto load_balance_costs_update_algo = LoadBalanceCostsUpdateAlgo::Default;
-    //! Integer that corresponds to electromagnetic Maxwell solver (vacuum - 0, macroscopic - 1)
-    static inline auto em_solver_medium = MediumForEM::Default;
     /** Integer that correspond to macroscopic Maxwell solver algorithm
      *  (BackwardEuler - 0, Lax-Wendroff - 1)
      */
     static inline auto macroscopic_solver_algo = MacroscopicSolverAlgo::Default;
-    /** Integers that correspond to boundary condition applied to fields at the
-     *  lower domain boundaries
-     *  (0 to 6 correspond to PML, Periodic, PEC, PMC, Damped, Absorbing Silver-Mueller, None)
+    /** Boundary conditions applied to fields at the lower domain boundaries
+     *  (Possible values PML, Periodic, PEC, PMC, Neumann, Damped, Absorbing Silver-Mueller, None)
      */
     static inline amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>
         field_boundary_lo {AMREX_D_DECL(FieldBoundaryType::Default,
                                         FieldBoundaryType::Default,
                                         FieldBoundaryType::Default)};
-    /** Integers that correspond to boundary condition applied to fields at the
-     *  upper domain boundaries
-     *  (0 to 6 correspond to PML, Periodic, PEC, PMC, Damped, Absorbing Silver-Mueller, None)
+    /** Boundary conditions applied to fields at the upper domain boundaries
+     *  (Possible values PML, Periodic, PEC, PMC, Neumann, Damped, Absorbing Silver-Mueller, None)
      */
     static inline amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>
         field_boundary_hi {AMREX_D_DECL(FieldBoundaryType::Default,
@@ -941,16 +931,6 @@ public:
 
     void ApplyFilterandSumBoundaryRho (int lev, int glev, amrex::MultiFab& rho, int icomp, int ncomp);
 
-    /**
-     * \brief Returns an array of coefficients (Fornberg coefficients), corresponding
-     * to the weight of each point in a finite-difference approximation of a derivative
-     * (up to order \c n_order).
-     *
-     * \param[in] n_order order of the finite-difference approximation
-     * \param[in] a_grid_type type of grid (collocated or not)
-     */
-    static amrex::Vector<amrex::Real> getFornbergStencilCoefficients (int n_order, ablastr::utils::enums::GridType a_grid_type);
-
     // Device vectors of stencil coefficients used for finite-order centering of fields
     amrex::Gpu::DeviceVector<amrex::Real> device_field_centering_stencil_coeffs_x;
     amrex::Gpu::DeviceVector<amrex::Real> device_field_centering_stencil_coeffs_y;
@@ -1382,6 +1362,9 @@ private:
     // Fluid container
     bool do_fluid_species = false;
     std::unique_ptr<MultiFluidContainer> myfl;
+
+    //! Integer that corresponds to electromagnetic Maxwell solver (vacuum - 0, macroscopic - 1)
+    MediumForEM m_em_solver_medium = MediumForEM::Default;
 
     //
     // Fields: First array for level, second for direction

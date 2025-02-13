@@ -8,7 +8,7 @@ from scipy.signal import hilbert
 
 c = 3e8
 lambda_laser = 800e-9
-T_laser = lambda_laser / c  # utile ?
+T_laser = lambda_laser / c
 
 E_max = 3.26e10
 T_peak = 10e-15
@@ -29,41 +29,8 @@ by_t = np.squeeze(by_t)
 bz_t = np.squeeze(bz_t)
 
 n_diags = 401
-"""
-ex_t = np.zeros((n_diags,))
-ey_t = np.zeros((n_diags,))
-ez_t = np.zeros((n_diags,))
-bx_t = np.zeros((n_diags,))
-by_t = np.zeros((n_diags,))
-bz_t = np.zeros((n_diags,))
-
-
-def elec_d(x):
-    return f"/data/particles/electron/{x}/__data__"
- """
-
-# Here we use adios2.Stream instead of openpmd_viewer.OpenPMDTimeSeries
-# This is because the variable based encoding is still experimental
-# and OpenPMDTimeSeries does not support it at the time of writing
-# If there are only a few diagnostics, using file-based encoding will
-# work, but opening/closing files creates A LOT of overhead and
-# with a lot of saved iterations the reading time grows very fast
-#
-# This example should be updated in the future when OpenPMDTimeSeries
-# supports variable-based encoding
-"""
-with Stream("diags/diag1/openpmd.bp", "r") as s:
-    for _ in s.steps():
-        i = s.current_step()
-        ex_t[i] = s.read(elec_d("ex")).item()
-        ey_t[i] = s.read(elec_d("ey")).item()
-        ez_t[i] = s.read(elec_d("ez")).item()
-        bx_t[i] = s.read(elec_d("bx")).item()
-        by_t[i] = s.read(elec_d("by")).item()
-        bz_t[i] = s.read(elec_d("bz")).item() """
 
 DT = 6.324524234e-17  # @ CFL = 0.99
-# on pourrait juste lire l'input file....
 iterations = np.linspace(0, n_diags - 1, n_diags)
 T = (iterations * DT) - DT / 2
 
