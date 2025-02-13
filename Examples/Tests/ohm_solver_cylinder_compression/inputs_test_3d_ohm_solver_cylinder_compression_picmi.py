@@ -39,7 +39,7 @@ class PlasmaCylinderCompression(object):
     # Flux Conserver radius
     R_c = 0.5
 
-    # Plasma Radius (These values match GS solution in gs_psi.csv)
+    # Plasma Radius (These values control the analytical GS solution)
     R_p = 0.25
     delta_p = 0.025
 

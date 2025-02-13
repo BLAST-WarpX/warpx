@@ -52,19 +52,19 @@ namespace warpx::fields
         hybrid_current_fp_external,  /**< Used with Ohm's law solver. Stores external current */
         hybrid_B_fp_external,       /**< Used with Ohm's law solver. Stores external B field */
         hybrid_E_fp_external,       /**< Used with Ohm's law solver. Stores external E field */
-        Efield_cp,  //!< Only used with MR. The field that is updated by the field solver at each timestep, on the coarse patch of each level
-        Bfield_cp,  //!< Only used with MR. The field that is updated by the field solver at each timestep, on the coarse patch of each level
-        current_cp, //!< Only used with MR. The current that is used as a source for the field solver, on the coarse patch of each level
-        rho_cp, //!< Only used with MR. The charge density that is used as a source for the field solver, on the coarse patch of each level
-        F_cp,   //!< Only used with MR. Used for divE cleaning, on the coarse patch of each level
-        G_cp,   //!< Only used with MR. Used for divB cleaning, on the coarse patch of each level
-        Efield_cax, //!< Only used with MR. Particles that are close to the edge of the MR patch (i.e. in the gather buffer) gather from this field
-        Bfield_cax, //!< Only used with MR. Particles that are close to the edge of the MR patch (i.e. in the gather buffer) gather from this field
-        E_external_particle_field, //!< Stores external particle fields provided by the user as  through an openPMD file
-        B_external_particle_field, //!< Stores external particle fields provided by the user as  through an openPMD file
-        distance_to_eb, //!< Only used with embedded boundaries (EB). Stores the distance to the nearest EB
-        edge_lengths,   //!< Only used with the ECT solver. Indicates the length of the cell edge that is covered by the EB, in SI units
-        face_areas,     //!< Only used with the ECT solver. Indicates the area of the cell face that is covered by the EB, in SI units
+        Efield_cp,  /**< Only used with MR. The field that is updated by the field solver at each timestep, on the coarse patch of each level */
+        Bfield_cp,  /**< Only used with MR. The field that is updated by the field solver at each timestep, on the coarse patch of each level */
+        current_cp, /**< Only used with MR. The current that is used as a source for the field solver, on the coarse patch of each level */
+        rho_cp, /**< Only used with MR. The charge density that is used as a source for the field solver, on the coarse patch of each level */
+        F_cp,   /**< Only used with MR. Used for divE cleaning, on the coarse patch of each level */
+        G_cp,   /**< Only used with MR. Used for divB cleaning, on the coarse patch of each level */
+        Efield_cax, /**< Only used with MR. Particles that are close to the edge of the MR patch (i.e. in the gather buffer) gather from this field */
+        Bfield_cax, /**< Only used with MR. Particles that are close to the edge of the MR patch (i.e. in the gather buffer) gather from this field */
+        E_external_particle_field, /**< Stores external particle fields provided by the user as  through an openPMD file */
+        B_external_particle_field, /**< Stores external particle fields provided by the user as  through an openPMD file */
+        distance_to_eb, /**< Only used with embedded boundaries (EB). Stores the distance to the nearest EB */
+        edge_lengths,   /**< Only used with the ECT solver. Indicates the length of the cell edge that is covered by the EB, in SI units */
+        face_areas,     /**< Only used with the ECT solver. Indicates the area of the cell face that is covered by the EB, in SI units */
         area_mod,
         pml_E_fp,
         pml_B_fp,

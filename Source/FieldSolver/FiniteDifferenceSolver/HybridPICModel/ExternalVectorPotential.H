@@ -86,8 +86,10 @@ public:
     void CalculateExternalCurlA (std::string& coil_name);
 
     AMREX_FORCE_INLINE
-    void ZeroFieldinEB (
-        ablastr::fields::VectorField const& Field,
+    void PopulateExternalFieldFromVectorPotential (
+        ablastr::fields::VectorField const& dstField,
+        amrex::Real scale_factor,
+        ablastr::fields::VectorField const& srcField,
         std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update);
 
     void UpdateHybridExternalFields (

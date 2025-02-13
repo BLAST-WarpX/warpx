@@ -595,22 +595,8 @@ void HybridPICModel::FieldPush (
     // Calculate the E-field from Ohm's law
     HybridPICSolveE(Efield, Jfield, Bfield, rhofield, eb_update_E, true);
     warpx.FillBoundaryE(ng, nodal_sync);
-    warpx.ApplyEfieldBoundary(0, PatchType::fine, t_old);
 
     // Push forward the B-field using Faraday's law
     warpx.EvolveB(dt, dt_type, t_old);
     warpx.FillBoundaryB(ng, nodal_sync);
-    warpx.ApplyBfieldBoundary(0, PatchType::fine, dt_type, t_old);
-}
-
-void
-WarpX::CalculateExternalCurlA() {
-    WARPX_PROFILE("WarpX::CalculateExternalCurlA()");
-
-    auto & warpx = WarpX::GetInstance();
-
-    // Get reference to External Field Object
-    auto* ext_vector = warpx.m_hybrid_pic_model->m_external_vector_potential.get();
-    ext_vector->CalculateExternalCurlA();
-
 }
