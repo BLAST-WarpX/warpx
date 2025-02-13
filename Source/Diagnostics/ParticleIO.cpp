@@ -318,19 +318,19 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
         "but this is only available with `diag_type = Full`.");
 
 
-    tmp.NewRealComp("Ex");
-    tmp.NewRealComp("Ey");
-    tmp.NewRealComp("Ez");
-    tmp.NewRealComp("Bx");
-    tmp.NewRealComp("By");
-    tmp.NewRealComp("Bz");
+    tmp.AddRealComp("Ex");
+    tmp.AddRealComp("Ey");
+    tmp.AddRealComp("Ez");
+    tmp.AddRealComp("Bx");
+    tmp.AddRealComp("By");
+    tmp.AddRealComp("Bz");
 
-    int const Ex_index = tmp.getParticleComps().at("Ex");
-    int const Ey_index = tmp.getParticleComps().at("Ey");
-    int const Ez_index = tmp.getParticleComps().at("Ez");
-    int const Bx_index = tmp.getParticleComps().at("Bx");
-    int const By_index = tmp.getParticleComps().at("By");
-    int const Bz_index = tmp.getParticleComps().at("Bz");
+    int const Ex_index = tmp.GetRealCompIndex().at("Ex");
+    int const Ey_index = tmp.GetRealCompIndex().at("Ey");
+    int const Ez_index = tmp.GetRealCompIndex().at("Ez");
+    int const Bx_index = tmp.GetRealCompIndex().at("Bx");
+    int const By_index = tmp.GetRealCompIndex().at("By");
+    int const Bz_index = tmp.GetRealCompIndex().at("Bz");
 
     auto& warpx = WarpX::GetInstance();
 
