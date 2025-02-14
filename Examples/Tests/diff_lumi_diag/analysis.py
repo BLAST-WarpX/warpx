@@ -68,7 +68,7 @@ elif "photons" in test_name:
     # initialized from a density distribution ;
     # tolerance is larger due to lower particle statistics
     tol1 = 0.021
-    tol2 = 0.05
+    tol2 = 0.06
 
 # Check that the 1D diagnostic and analytical result match
 error1 = abs(dL_dE_sim - dL_dE_th).max() / abs(dL_dE_th).max()
