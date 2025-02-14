@@ -34,7 +34,7 @@ dt = 1.0e-6
 uz -= -e / m_e * Ez * dt / 2.0
 
 # Leap frog advance
-for i in range(5):
+for _ in range(5):
     uz += -e / m_e * Ez * dt
     g = np.sqrt((uz / c) ** 2 + 1.0)
     z += (uz / g) * dt
