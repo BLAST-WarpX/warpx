@@ -423,6 +423,142 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
 #endif
 }
 
+
+/**
+ * \brief Field gather for a single particle for a single field
+ *
+ * \tparam depos_order              Particle shape order
+ * \param xp,yp,zp                  Particle position coordinates
+ * \param Fp                        Field on particles.
+ * \param f_arr                     Array4 of the field, either full array or tile.
+ * \param f_type                    IndexType of the field
+ * \param dinv                      3D cell size inverse
+ * \param xyzmin                    The lower bounds of the domain
+ * \param lo                        Index lower bounds of domain.
+ * \param n_rz_azimuthal_modes      Number of azimuthal modes when using RZ geometry
+ */
+template <int depos_order>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void doGatherShapeNSingleField ([[maybe_unused]] const amrex::ParticleReal xp,
+                                [[maybe_unused]] const amrex::ParticleReal yp,
+                                [[maybe_unused]] const amrex::ParticleReal zp,
+                                amrex::ParticleReal& Fp,
+                                amrex::Array4<amrex::Real const> const& f_arr,
+                                const amrex::IndexType f_type,
+                                const amrex::XDim3 & dinv,
+                                const amrex::XDim3 & xyzmin,
+                                const amrex::Dim3& lo,
+                                [[maybe_unused]] const int n_rz_azimuthal_modes)
+{
+    using namespace amrex;
+
+    constexpr int zdir = WARPX_ZINDEX;
+    constexpr int NODE = amrex::IndexType::NODE;
+    constexpr int CELL = amrex::IndexType::CELL;
+
+    // --- Compute shape factors
+    Compute_shape_factor< depos_order > const compute_shape_factor;
+
+#if (AMREX_SPACEDIM >= 2)
+    // x direction
+    // Get particle position
+#ifdef WARPX_DIM_RZ
+    const amrex::Real rp = std::sqrt(xp*xp + yp*yp);
+    const amrex::Real x = (rp - xyzmin.x)*dinv.x;
+#else
+    const amrex::Real x = (xp-xyzmin.x)*dinv.x;
+#endif
+
+    amrex::Real sx_f[depos_order + 1];
+    int j_f = 0;
+    if (f_type[0] == NODE) {
+        j_f= compute_shape_factor(sx_f, x);
+    }
+    if (f_type[0] == CELL) {
+        j_f = compute_shape_factor(sx_f, x - 0.5_rt);
+    }
+#endif
+
+#if defined(WARPX_DIM_3D)
+    // y direction
+    const amrex::Real y = (yp-xyzmin.y)*dinv.y;
+    amrex::Real sy_f[depos_order + 1];
+    int k_f = 0;
+    if (f_type[1] == NODE) {
+        k_f = compute_shape_factor(sy_f, y);
+    }
+    if (f_type[1] == CELL) {
+        k_f = compute_shape_factor(sy_f, y - 0.5_rt);
+    }
+#endif
+
+    // z direction
+    const amrex::Real z = (zp-xyzmin.z)*dinv.z;
+    amrex::Real sz_f[depos_order + 1];
+    int l_f = 0;
+    if (f_type[zdir] == NODE) {
+        l_f = compute_shape_factor(sz_f, z);
+    }
+    if (f_type[zdir] == CELL) {
+        l_f = compute_shape_factor(sz_f, z - 0.5_rt);
+    }
+
+    // Each field is gathered in a separate block of
+    // AMREX_SPACEDIM nested loops because the deposition
+    // order can differ for each component of each field
+    // when galerkin_interpolation is set to 1
+
+#if defined(WARPX_DIM_1D_Z)
+    for (int iz=0; iz<=depos_order; iz++){
+        Fp += sz_f[iz] * f_arr(lo.x+l_f+iz, 0, 0, 0);
+    }
+#elif defined(WARPX_DIM_XZ)
+    for (int iz=0; iz<=depos_order; iz++){
+        for (int ix=0; ix<=depos_order; ix++){
+            Fp += sx_f[ix] * sz_f[iz] * f_arr(lo.x+j_f+ix, lo.y+l_f+iz, 0, 0);
+        }
+    }
+#elif defined(WARPX_DIM_RZ)
+    amrex::ParticleReal Fp_rz = 0.;
+    for (int iz=0; iz<=depos_order; iz++){
+        for (int ix=0; ix<=depos_order; ix++){
+            Fp_rz += sx_f[ix] * sz_f[iz] * f_arr(lo.x+j_f+ix, lo.y+l_f+iz, 0, 0);
+        }
+    }
+    amrex::Real costheta;
+    amrex::Real sintheta;
+    if (rp > 0.) {
+        costheta = xp/rp;
+        sintheta = yp/rp;
+    } else {
+        costheta = 1.;
+        sintheta = 0.;
+    }
+    const Complex xy0 = Complex{costheta, -sintheta};
+    Complex xy = xy0;
+    for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
+        for (int iz=0; iz<=depos_order; iz++){
+            for (int ix=0; ix<=depos_order; ix++){
+                const amrex::Real dF = (+ f_arr(lo.x+j_f+ix, lo.y+l_f+iz, 0, 2*imode-1)*xy.real()
+                                        - f_arr(lo.x+j_f+ix, lo.y+l_f+iz, 0, 2*imode)*xy.imag());
+                Fp_rz += sx_f[ix] * sz_f[iz] * dF;
+            }
+        }
+        xy = xy * xy0;
+    }
+    Fp += Fp_rz;
+#else // defined(WARPX_DIM_3D)
+    for (int iz=0; iz<=depos_order; iz++){
+        for (int iy=0; iy<=depos_order; iy++){
+            for (int ix=0; ix<= depos_order; ix++){
+                Fp += sx_f[ix] * sy_f[iy] * sz_f[iz] * f_arr(lo.x+j_f+ix, lo.y+k_f+iy, lo.z+l_f+iz);
+            }
+        }
+    }
+#endif
+}
+
+
 /**
  * \brief Energy conserving field gather for thread thread_num for the implicit scheme
  *        This uses the same stencil for the gather that is used for Esirkepov current deposition.
@@ -1663,6 +1799,47 @@ void doGatherShapeN (const amrex::ParticleReal xp,
     }
 }
 
+
+/**
+ * \brief Field gather for a single particle
+ *
+ * \param xp,yp,zp                Particle position coordinates
+ * \param Fp                      Field on particles.
+ * \param f_arr                   Array4 of the field, either full array or tile.
+ * \param f_type,by_type,bz_type  IndexType of the magnetic field
+ * \param dinv                    3D cell size inverse
+ * \param xyzmin                  The lower bounds of the domain
+ * \param lo                      Index lower bounds of domain.
+ * \param n_rz_azimuthal_modes    Number of azimuthal modes when using RZ geometry
+ * \param nox                     order of the particle shape function
+ */
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void doGatherShapeNSingleField (const amrex::ParticleReal xp,
+                     const amrex::ParticleReal yp,
+                     const amrex::ParticleReal zp,
+                     amrex::ParticleReal& Fp,
+                     amrex::Array4<amrex::Real const> const& f_arr,
+                     const amrex::IndexType f_type,
+                     const amrex::XDim3 & dinv,
+                     const amrex::XDim3 & xyzmin,
+                     const amrex::Dim3& lo,
+                     const int n_rz_azimuthal_modes,
+                     const int nox )
+{
+    if (nox == 1) {
+        doGatherShapeNSingleField<1>(xp, yp, zp, Fp, f_arr, f_type,
+                            dinv, xyzmin, lo, n_rz_azimuthal_modes);
+    } else if (nox == 2) {
+        doGatherShapeNSingleField<2>(xp, yp, zp, Fp, f_arr, f_type,
+                            dinv, xyzmin, lo, n_rz_azimuthal_modes);
+    } else if (nox == 3) {
+        doGatherShapeNSingleField<3>(xp, yp, zp, Fp, f_arr, f_type,
+                            dinv, xyzmin, lo, n_rz_azimuthal_modes);
+    } else if (nox == 4) {
+        doGatherShapeNSingleField<4>(xp, yp, zp, Fp, f_arr, f_type,
+                            dinv, xyzmin, lo, n_rz_azimuthal_modes);
+    }
+}
 
 /**
  * \brief Field gather for a single particle
