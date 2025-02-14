@@ -1921,11 +1921,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.Jy_external_function = Jy_external_function
         self.Jz_external_function = Jz_external_function
 
-        self.add_external_fields = None
         self.A_external = A_external
-
-        if A_external is not None:
-            self.add_external_fields = True
 
         # Handle keyword arguments used in expressions
         self.user_defined_kw = {}
