@@ -477,7 +477,8 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
     const Dim3 lo = lbound(tilebox);
     // Take into account Galilean shift
     const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, depos_lev, 0.5_rt*dt);
-    const amrex::XDim3 xyzmax = WarpX::UpperCorner(tilebox, depos_lev, 0.5_rt*dt);
+
+    amrex::RealBox const prob_domain = warpx.Geom(0).ProbDomain();
     amrex::Box const& domain_box = warpx.Geom(0).Domain();
 
     auto const & field_boundary_lo = warpx.GetFieldBoundaryLo();
@@ -717,7 +718,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset,
                         uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, xyzmax, is_absorbing, lo, q,
+                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, prob_domain, is_absorbing, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 } else if (WarpX::nox == 2){
                     doVillasenorDepositionShapeNImplicit<2>(
@@ -725,7 +726,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset,
                         uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, xyzmax, is_absorbing, lo, q,
+                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, prob_domain, is_absorbing, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 } else if (WarpX::nox == 3){
                     doVillasenorDepositionShapeNImplicit<3>(
@@ -733,7 +734,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset,
                         uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, xyzmax, is_absorbing, lo, q,
+                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, prob_domain, is_absorbing, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 } else if (WarpX::nox == 4){
                     doVillasenorDepositionShapeNImplicit<4>(
@@ -741,7 +742,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset,
                         uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, xyzmax, is_absorbing, lo, q,
+                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, prob_domain, is_absorbing, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 }
             }

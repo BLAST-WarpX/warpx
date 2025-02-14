@@ -888,7 +888,7 @@ void doGatherPicnicShapeN (
                      [[maybe_unused]] const amrex::IndexType Bz_type,
                      const amrex::XDim3 & dinv,
                      const amrex::XDim3 & xyzmin,
-                     const amrex::XDim3 & xyzmax,
+                     const amrex::RealBox & prob_domain,
                      const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_absorbing,
                      const amrex::Dim3& lo,
                      const int n_rz_azimuthal_modes)
@@ -927,9 +927,9 @@ void doGatherPicnicShapeN (
     amrex::Real xp_np1_c = xp_np1;
     amrex::Real yp_np1_c = yp_np1;
     amrex::Real zp_np1_c = zp_np1;
-    ParticleUtils::crop_at_boundary(xp_n, yp_n, zp_n, xp_np1_c, yp_np1_c, zp_np1_c, xyzmin.x, xyzmax.x, is_absorbing[0]);
-    ParticleUtils::crop_at_boundary(yp_n, zp_n, xp_n, yp_np1_c, zp_np1_c, xp_np1_c, xyzmin.y, xyzmax.y, is_absorbing[1]);
-    ParticleUtils::crop_at_boundary(zp_n, xp_n, yp_n, zp_np1_c, xp_np1_c, yp_np1_c, xyzmin.z, xyzmax.z, is_absorbing[2]);
+    ParticleUtils::crop_at_boundary(xp_n, yp_n, zp_n, xp_np1_c, yp_np1_c, zp_np1_c, prob_domain.lo(0), prob_domain.hi(0), is_absorbing[0]);
+    ParticleUtils::crop_at_boundary(yp_n, zp_n, xp_n, yp_np1_c, zp_np1_c, xp_np1_c, prob_domain.lo(1), prob_domain.hi(1), is_absorbing[1]);
+    ParticleUtils::crop_at_boundary(zp_n, xp_n, yp_n, zp_np1_c, xp_np1_c, yp_np1_c, prob_domain.lo(2), prob_domain.hi(2), is_absorbing[2]);
 
     // Keep these double to avoid bug in single precision
     double const x_new = (xp_np1_c - xyzmin.x)*dinv.x;
@@ -1193,8 +1193,8 @@ void doGatherPicnicShapeN (
 #endif
 
     amrex::Real zp_np1_c = zp_np1;
-    ParticleUtils::crop_at_boundary(xp_n_c, zp_n, xp_np1_c, zp_np1_c, xyzmin.x, xyzmax.x, is_absorbing[0]);
-    ParticleUtils::crop_at_boundary(zp_n, xp_n_c, zp_np1_c, xp_np1_c, xyzmin.z, xyzmax.z, is_absorbing[1]);
+    ParticleUtils::crop_at_boundary(xp_n_c, zp_n, xp_np1_c, zp_np1_c, prob_domain.lo(0), prob_domain.hi(0), is_absorbing[0]);
+    ParticleUtils::crop_at_boundary(zp_n, xp_n_c, zp_np1_c, xp_np1_c, prob_domain.lo(1), prob_domain.hi(1), is_absorbing[1]);
 
     // Keep these double to avoid bug in single precision
     double const x_new = (xp_np1_c - xyzmin.x)*dinv.x;
@@ -1426,7 +1426,7 @@ void doGatherPicnicShapeN (
 #elif defined(WARPX_DIM_1D_Z)
 
     amrex::Real zp_np1_c = zp_np1;
-    ParticleUtils::crop_at_boundary(zp_np1_c, xyzmin.z, xyzmax.z, is_absorbing[0]);
+    ParticleUtils::crop_at_boundary(zp_np1_c, prob_domain.lo(0), prob_domain.hi(0), is_absorbing[0]);
 
     // Keep these double to avoid bug in single precision
     double const z_new = (zp_np1_c - xyzmin.z)*dinv.z;
@@ -1744,7 +1744,7 @@ void doGatherShapeNImplicit (
                      const amrex::IndexType bz_type,
                      const amrex::XDim3 & dinv,
                      const amrex::XDim3 & xyzmin,
-                     const amrex::XDim3 & xyzmax,
+                     const amrex::RealBox & prob_domain,
                      const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_absorbing,
                      const amrex::Dim3& lo,
                      const int n_rz_azimuthal_modes,
@@ -1784,25 +1784,25 @@ void doGatherShapeNImplicit (
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, xyzmax, is_absorbing, lo, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, prob_domain, is_absorbing, lo, n_rz_azimuthal_modes);
         } else if (nox == 2) {
             doGatherPicnicShapeN<2>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, xyzmax, is_absorbing, lo, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, prob_domain, is_absorbing, lo, n_rz_azimuthal_modes);
         } else if (nox == 3) {
             doGatherPicnicShapeN<3>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, xyzmax, is_absorbing, lo, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, prob_domain, is_absorbing, lo, n_rz_azimuthal_modes);
         } else if (nox == 4) {
             doGatherPicnicShapeN<4>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, xyzmax, is_absorbing, lo, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, prob_domain, is_absorbing, lo, n_rz_azimuthal_modes);
         }
     }
     else if (depos_type == CurrentDepositionAlgo::Direct) {

@@ -1353,7 +1353,7 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
                                            const amrex::Real dt,
                                            const amrex::XDim3 & dinv,
                                            const amrex::XDim3 & xyzmin,
-                                           const amrex::XDim3 & xyzmax,
+                                           const amrex::RealBox & prob_domain,
                                            const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_absorbing,
                                            const amrex::Dim3 lo,
                                            const amrex::Real q,
@@ -1421,9 +1421,9 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             amrex::Real xp_np1_c = xp_np1;
             amrex::Real yp_np1_c = yp_np1;
             amrex::Real zp_np1_c = zp_np1;
-            ParticleUtils::crop_at_boundary(xp_n[ip], yp_n[ip], zp_n[ip], xp_np1_c, yp_np1_c, zp_np1_c, xyzmin.x, xyzmax.x, is_absorbing[0]);
-            ParticleUtils::crop_at_boundary(yp_n[ip], zp_n[ip], xp_n[ip], yp_np1_c, zp_np1_c, xp_np1_c, xyzmin.y, xyzmax.y, is_absorbing[1]);
-            ParticleUtils::crop_at_boundary(zp_n[ip], xp_n[ip], yp_n[ip], zp_np1_c, xp_np1_c, yp_np1_c, xyzmin.z, xyzmax.z, is_absorbing[2]);
+            ParticleUtils::crop_at_boundary(xp_n[ip], yp_n[ip], zp_n[ip], xp_np1_c, yp_np1_c, zp_np1_c, prob_domain.lo(0), prob_domain.hi(0), is_absorbing[0]);
+            ParticleUtils::crop_at_boundary(yp_n[ip], zp_n[ip], xp_n[ip], yp_np1_c, zp_np1_c, xp_np1_c, prob_domain.lo(1), prob_domain.hi(1), is_absorbing[1]);
+            ParticleUtils::crop_at_boundary(zp_n[ip], xp_n[ip], yp_n[ip], zp_np1_c, xp_np1_c, yp_np1_c, prob_domain.lo(2), prob_domain.hi(2), is_absorbing[2]);
 
             // Keep these double to avoid bug in single precision
             double const x_new = (xp_np1_c - xyzmin.x)*dinv.x;
@@ -1666,8 +1666,8 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             amrex::Real const vz = (zp_np1   - zp_n[ip])/dt;
 
             amrex::Real zp_np1_c = zp_np1;
-            ParticleUtils::crop_at_boundary(xp_n_c, zp_n[ip], xp_np1_c, zp_np1_c, xyzmin.x, xyzmax.x, is_absorbing[0]);
-            ParticleUtils::crop_at_boundary(zp_n[ip], xp_n_c, zp_np1_c, xp_np1_c, xyzmin.z, xyzmax.z, is_absorbing[1]);
+            ParticleUtils::crop_at_boundary(xp_n_c, zp_n[ip], xp_np1_c, zp_np1_c, prob_domain.lo(0), prob_domain.hi(0), is_absorbing[0]);
+            ParticleUtils::crop_at_boundary(zp_n[ip], xp_n_c, zp_np1_c, xp_np1_c, prob_domain.lo(1), prob_domain.hi(1), is_absorbing[1]);
 
             // Keep these double to avoid bug in single precision
             double const x_new = (xp_np1_c - xyzmin.x)*dinv.x;
@@ -1855,7 +1855,7 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
 #elif defined(WARPX_DIM_1D_Z)
 
             amrex::Real zp_np1_c = zp_np1;
-            ParticleUtils::crop_at_boundary(zp_np1_c, xyzmin.z, xyzmax.z, is_absorbing[0]);
+            ParticleUtils::crop_at_boundary(zp_np1_c, prob_domain.lo(0), prob_domain.hi(0), is_absorbing[0]);
 
             // Keep these double to avoid bug in single precision
             double const z_new = (zp_np1_c - xyzmin.z)*dinv.z;
