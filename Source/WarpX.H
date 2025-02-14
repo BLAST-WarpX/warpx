@@ -770,14 +770,6 @@ public:
     [[nodiscard]] amrex::Real stopTime () const {return stop_time;}
     void updateStopTime (const amrex::Real new_stop_time) {stop_time = new_stop_time;}
 
-    void AverageAndPackFields( amrex::Vector<std::string>& varnames,
-        amrex::Vector<amrex::MultiFab>& mf_avg, amrex::IntVect ngrow) const;
-
-    void prepareFields( int step, amrex::Vector<std::string>& varnames,
-        amrex::Vector<amrex::MultiFab>& mf_avg,
-        amrex::Vector<const amrex::MultiFab*>& output_mf,
-        amrex::Vector<amrex::Geometry>& output_geom ) const;
-
     static std::array<amrex::Real,3> CellSize (int lev);
     static amrex::XDim3 InvCellSize (int lev);
     static amrex::RealBox getRealBox(const amrex::Box& bx, int lev);
