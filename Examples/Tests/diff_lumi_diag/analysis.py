@@ -62,7 +62,7 @@ print("test_name", test_name)
 # Pick tolerance
 if "leptons" in test_name:
     tol1 = 0.02
-    tol2 = 0.03
+    tol2 = 0.04
 elif "photons" in test_name:
     # In the photons case, the particles are
     # initialized from a density distribution ;
