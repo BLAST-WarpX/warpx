@@ -1370,10 +1370,6 @@ void WarpX::CheckKnownIssues()
                 "in a single step, so be careful with your choice of time step.",
                 ablastr::warn_manager::WarnPriority::low);
         }
-
-        const bool external_particle_field_used = (
-            mypc->m_B_ext_particle_s != "none" || mypc->m_E_ext_particle_s != "none"
-        );
     }
 
 #if defined(__CUDACC__) && (__CUDACC_VER_MAJOR__ == 11) && (__CUDACC_VER_MINOR__ == 6)
