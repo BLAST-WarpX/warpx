@@ -415,10 +415,6 @@ namespace
 #endif
                     field(ijk_vec,n) += rscale * psign[idim][iside] * field(iv_mirror,n);
                 }
-                else {
-                    // Note that this includes the cells on the boundary
-                    field(ijk_vec,n) += psign[idim][iside] * field(iv_mirror,n);
-                }
             }
         }
         // 2) The guard cells are updated with the appropriate image
