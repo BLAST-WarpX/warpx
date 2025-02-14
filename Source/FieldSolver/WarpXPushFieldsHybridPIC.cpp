@@ -210,7 +210,6 @@ void WarpX::HybridPICEvolveFields ()
         m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
         m_eb_update_E, false);
     FillBoundaryE(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
-    // ApplyEfieldBoundary(0, PatchType::fine);
 
     // Handle field splitting for Hybrid field push
     if (add_external_fields) {
