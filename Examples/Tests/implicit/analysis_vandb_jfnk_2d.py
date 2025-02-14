@@ -15,7 +15,7 @@ import sys
 import numpy as np
 import yt
 from scipy.constants import e
-from scipy.constants import epsilon_0 epsilon_0_old
+from scipy.constants import epsilon_0 as epsilon_0_old
 
 print(f'epsilon_0_old = {epsilon_0_old}')
 
