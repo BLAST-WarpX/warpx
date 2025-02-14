@@ -1077,52 +1077,40 @@ WarpX::OneStep_sub1 (Real cur_time)
 void
 WarpX::doFieldIonization ()
 {
-    for (int lev = 0; lev <= finest_level; ++lev) {
-        doFieldIonization(lev);
-    }
-}
-
-void
-WarpX::doFieldIonization (int lev)
-{
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    mypc->doFieldIonization(
-        lev,
-        *m_fields.get(FieldType::Efield_aux, Direction{0}, lev),
-        *m_fields.get(FieldType::Efield_aux, Direction{1}, lev),
-        *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
-        *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
-        *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
-        *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
-    );
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        mypc->doFieldIonization(
+            lev,
+            *m_fields.get(FieldType::Efield_aux, Direction{0}, lev),
+            *m_fields.get(FieldType::Efield_aux, Direction{1}, lev),
+            *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
+            *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
+            *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
+            *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
+        );
+    }
 }
 
 #ifdef WARPX_QED
 void
 WarpX::doQEDEvents ()
 {
-    for (int lev = 0; lev <= finest_level; ++lev) {
-        doQEDEvents(lev);
-    }
-}
-
-void
-WarpX::doQEDEvents (int lev)
-{
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    mypc->doQedEvents(
-        lev,
-        *m_fields.get(FieldType::Efield_aux, Direction{0}, lev),
-        *m_fields.get(FieldType::Efield_aux, Direction{1}, lev),
-        *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
-        *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
-        *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
-        *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
-    );
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        mypc->doQedEvents(
+            lev,
+            *m_fields.get(FieldType::Efield_aux, Direction{0}, lev),
+            *m_fields.get(FieldType::Efield_aux, Direction{1}, lev),
+            *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
+            *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
+            *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
+            *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
+        );
+    }
 }
 #endif
 
