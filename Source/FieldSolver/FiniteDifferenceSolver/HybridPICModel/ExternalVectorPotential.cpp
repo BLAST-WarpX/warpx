@@ -218,7 +218,7 @@ ExternalVectorPotential::InitData ()
         m_A_time_scale[i] = m_A_external_time_parser[i]->compile<1>();
 
         const std::set<std::string> A_time_ext_symbols = m_A_external_time_parser[i]->symbols();
-        A_time_dep_count += A_time_ext_symbols.count("t");
+        A_time_dep_count += static_cast<int>(A_time_ext_symbols.count("t"));
     }
 
     if (A_time_dep_count > 0) {
