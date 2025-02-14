@@ -41,7 +41,6 @@ dL_dE_th = (
 # Extract the 2D differential luminosity from the file
 series = OpenPMDTimeSeries("./diags/reducedfiles/DifferentialLuminosity2d_beam1_beam2/")
 d2L_dE1_dE2_sim, info = series.get_field("d2L_dE1_dE2", iteration=80)
-dE1, dE2 = info.dE1, info.dE2
 
 # Compute the analytical 2D differential luminosity for 2 Gaussian beams
 assert info.axes[0] == "E2"
