@@ -166,12 +166,6 @@ public:
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag() { return m_eb_update_E; }
     amrex::Vector< std::unique_ptr<amrex::iMultiFab> > const & GetEBReduceParticleShapeFlag() const { return m_eb_reduce_particle_shape; }
 
-    static void shiftMF (amrex::MultiFab& mf, const amrex::Geometry& geom,
-                         int num_shift, int dir, int lev, bool update_cost_flag,
-                         bool safe_guard_cells,
-                         amrex::Real external_field=0.0, bool useparser = false,
-                         amrex::ParserExecutor<3> const& field_parser={});
-
     /**
      * \brief
      * If an authors' string is specified in the inputfile, this method returns that string.
@@ -206,8 +200,6 @@ public:
      *  being used (0 or 1 corresponding to timers or heuristic).
      */
     static inline auto load_balance_costs_update_algo = LoadBalanceCostsUpdateAlgo::Default;
-    //! Integer that corresponds to electromagnetic Maxwell solver (vacuum - 0, macroscopic - 1)
-    static inline auto em_solver_medium = MediumForEM::Default;
     /** Integer that correspond to macroscopic Maxwell solver algorithm
      *  (BackwardEuler - 0, Lax-Wendroff - 1)
      */
@@ -420,14 +412,7 @@ public:
      * Get pointer to the amrex::MultiFab containing the dotMask for the specified field
      */
     [[nodiscard]] const amrex::iMultiFab*
-    getFieldDotMaskPointer (warpx::fields::FieldType field_type, int lev, int dir) const;
-
-    /**
-     * \brief
-     * Set the dotMask container
-     */
-    void SetDotMask( std::unique_ptr<amrex::iMultiFab>& field_dotMask,
-                     std::string const & field_name, int lev, int dir ) const;
+    getFieldDotMaskPointer (warpx::fields::FieldType field_type, int lev, ablastr::fields::Direction dir) const;
 
     [[nodiscard]] bool DoPML () const {return do_pml;}
     [[nodiscard]] bool DoFluidSpecies () const {return do_fluid_species;}
@@ -939,16 +924,6 @@ public:
 
     void ApplyFilterandSumBoundaryRho (int lev, int glev, amrex::MultiFab& rho, int icomp, int ncomp);
 
-    /**
-     * \brief Returns an array of coefficients (Fornberg coefficients), corresponding
-     * to the weight of each point in a finite-difference approximation of a derivative
-     * (up to order \c n_order).
-     *
-     * \param[in] n_order order of the finite-difference approximation
-     * \param[in] a_grid_type type of grid (collocated or not)
-     */
-    static amrex::Vector<amrex::Real> getFornbergStencilCoefficients (int n_order, ablastr::utils::enums::GridType a_grid_type);
-
     // Device vectors of stencil coefficients used for finite-order centering of fields
     amrex::Gpu::DeviceVector<amrex::Real> device_field_centering_stencil_coeffs_x;
     amrex::Gpu::DeviceVector<amrex::Real> device_field_centering_stencil_coeffs_y;
@@ -976,85 +951,6 @@ public:
 #endif
 
     void InitEB ();
-
-#ifdef AMREX_USE_EB
-
-    /** \brief Set a flag to indicate in which cells a particle should deposit charge/current
-     *  with a reduced, order 1 shape.
-     *
-     * More specifically, the flag is set to 1 if any of the neighboring cells over which the
-     * particle shape might extend are either partially or fully covered by an embedded boundary.
-     * This ensures that a particle in this cell deposits with an order 1 shape, which in turn
-     * makes sure that the particle never deposits any charge in a partially or fully covered cell.
-     *
-     * \param[in] eb_reduce_particle_shape multifab to be filled with 1s and 0s
-     * \param[in] eb_fact EB factory
-     * \param[in] particle_shape_order order of the particle shape function
-     */
-
-
-    void MarkReducedShapeCells (
-        std::unique_ptr<amrex::iMultiFab> & eb_reduce_particle_shape,
-        amrex::EBFArrayBoxFactory const & eb_fact,
-        int particle_shape_order );
-
-    /** \brief Set a flag to indicate on which grid points the field `field`
-     *  should be updated, depending on their position relative to the embedded boundary.
-     *
-     * This function is used by all finite-difference solvers, except the
-     * ECT solver, which instead uses `MarkUpdateECellsECT` and `MarkUpdateBCellsECT`.
-     * It uses a stair-case approximation of the embedded boundary:
-     * If a grid point touches cells that are either partially or fully covered
-     * by the embedded boundary: the corresponding field is not updated.
-     *
-     * More specifically, this function fills the iMultiFabs in `eb_update`
-     * (which have the same indexType as the MultiFabs in `field`) with 1
-     * or 0, depending on whether the grid point should be updated or not.
-     */
-    void MarkUpdateCellsStairCase (
-        std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update,
-        ablastr::fields::VectorField const & field,
-        amrex::EBFArrayBoxFactory const & eb_fact );
-
-    /** \brief Set a flag to indicate on which grid points the E field
-     *  should be updated, depending on their position relative to the embedded boundary.
-     *
-     * This function is used by ECT solver. The E field is not updated if
-     * the edge on which it is defined is fully covered by the embedded boundary.
-     *
-     * More specifically, this function fills the iMultiFabs in `eb_update_E`
-     * (which have the same indexType as the E field) with 1 or 0, depending
-     * on whether the grid point should be updated or not.
-     */
-    void MarkUpdateECellsECT (
-        std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update_E,
-        ablastr::fields::VectorField const& edge_lengths );
-
-    /** \brief Set a flag to indicate on which grid points the B field
-     *  should be updated, depending on their position relative to the embedded boundary.
-     *
-     * This function is used by ECT solver. The B field is not updated if
-     * the face on which it is defined is fully covered by the embedded boundary.
-     *
-     * More specifically, this function fills the iMultiFabs in `eb_update_B`
-     * (which have the same indexType as the B field) with 1 or 0, depending
-     * on whether the grid point should be updated or not.
-     */
-    void MarkUpdateBCellsECT (
-        std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update_B,
-        ablastr::fields::VectorField const& face_areas,
-        ablastr::fields::VectorField const& edge_lengths );
-
-   /**
-    * \brief Initialize information for cell extensions.
-    *        The flags convention for m_flag_info_face is as follows
-    *          - 0 for unstable cells
-    *          - 1 for stable cells which have not been intruded
-    *          - 2 for stable cells which have been intruded
-    *        Here we cannot know if a cell is intruded or not so we initialize all stable cells with 1
-    */
-    void MarkExtensionCells();
-#endif
 
     /**
     * \brief Compute the level set function used for particle-boundary interaction.
@@ -1102,13 +998,7 @@ public:
     void PSATDSubtractCurrentPartialSumsAvg ();
 
 #ifdef WARPX_USE_FFT
-
-#   ifdef WARPX_DIM_RZ
-        SpectralSolverRZ&
-#   else
-        SpectralSolver&
-#   endif
-            get_spectral_solver_fp (int lev) {return *spectral_solver_fp[lev];}
+    auto&  get_spectral_solver_fp (int lev) {return *spectral_solver_fp[lev];}
 #endif
 
     FiniteDifferenceSolver * get_pointer_fdtd_solver_fp (int lev) { return m_fdtd_solver_fp[lev].get(); }
@@ -1380,6 +1270,9 @@ private:
     // Fluid container
     bool do_fluid_species = false;
     std::unique_ptr<MultiFluidContainer> myfl;
+
+    //! Integer that corresponds to electromagnetic Maxwell solver (vacuum - 0, macroscopic - 1)
+    MediumForEM m_em_solver_medium = MediumForEM::Default;
 
     //
     // Fields: First array for level, second for direction

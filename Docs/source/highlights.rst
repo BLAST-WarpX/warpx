@@ -14,7 +14,12 @@ Plasma-Based Acceleration
 
 Scientific works in laser-plasma and beam-plasma acceleration.
 
-#. Shrock JE, Rockafellow E, Miao B, Le M, Hollinger RC, Wang S, Gonsalves AJ, Picksley A, Rocca JJ, and Milchberg HM
+#. Ma M, Zeng M, Wang J, Lu G, Yan W, Chen L, and Li D.
+   **Particle-in-cell simulation of laser wakefield accelerators with oblique lasers in quasicylindrical geometry**.
+   Phys. Rev. Accel. Beams **28**, 021301, 2025
+   `DOI:10.1103/PhysRevAccelBeams.28.021301 <https://doi.org/10.1103/PhysRevAccelBeams.28.021301>`__
+
+#. Shrock JE, Rockafellow E, Miao B, Le M, Hollinger RC, Wang S, Gonsalves AJ, Picksley A, Rocca JJ, and Milchberg HM.
    **Guided Mode Evolution and Ionization Injection in Meter-Scale Multi-GeV Laser Wakefield Accelerators**.
    Phys. Rev. Lett. **133**, 045002, 2024
    `DOI:10.1103/PhysRevLett.133.045002 <https://link.aps.org/doi/10.1103/PhysRevLett.133.045002>`__
@@ -153,6 +158,16 @@ High Energy Astrophysical Plasma Physics
 ****************************************
 
 Scientific works in astrophysical plasma modeling.
+
+#. Jambunathan R, Jones H, Corrales L, Klion H, Roward ME, Myers A, Zhang W, Vay J-L.
+   **Application of mesh refinement to relativistic magnetic reconnection**.
+   Physics of Plasmas ***32*** 1, 2025
+   `DOI:10.1063/5.0233583 <https://doi.org/10.1063/5.0233583>`__
+
+#. Ghosh S, Bhat P.
+   **Magnetic Reconnection: An Alternative Explanation of Radio Emission in Galaxy Clusters**.
+   The Astrophysical Journal Letters **979** 1, 2025.
+   `DOI:10.3847/2041-8213/ad9f2d <https://doi.org/10.3847/2041-8213/ad9f2d>`__
 
 #. Klion H, Jambunathan R, Rowan ME, Yang E, Willcox D, Vay J-L, Lehe R, Myers A, Huebl A, Zhang W.
    **Particle-in-Cell simulations of relativistic magnetic reconnection with advanced Maxwell solver algorithms**.

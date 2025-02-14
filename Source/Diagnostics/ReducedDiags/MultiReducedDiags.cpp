@@ -10,6 +10,7 @@
 #include "ChargeOnEB.H"
 #include "ColliderRelevant.H"
 #include "DifferentialLuminosity.H"
+#include "DifferentialLuminosity2D.H"
 #include "FieldEnergy.H"
 #include "FieldMaximum.H"
 #include "FieldMomentum.H"
@@ -58,6 +59,7 @@ MultiReducedDiags::MultiReducedDiags ()
             {"ChargeOnEB",            [](CS s){return std::make_unique<ChargeOnEB>(s);}},
             {"ColliderRelevant",      [](CS s){return std::make_unique<ColliderRelevant>(s);}},
             {"DifferentialLuminosity",[](CS s){return std::make_unique<DifferentialLuminosity>(s);}},
+            {"DifferentialLuminosity2D",[](CS s){return std::make_unique<DifferentialLuminosity2D>(s);}},
             {"ParticleEnergy",        [](CS s){return std::make_unique<ParticleEnergy>(s);}},
             {"ParticleExtrema",       [](CS s){return std::make_unique<ParticleExtrema>(s);}},
             {"ParticleHistogram",     [](CS s){return std::make_unique<ParticleHistogram>(s);}},

@@ -18,7 +18,7 @@
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "EmbeddedBoundary/Enabled.H"
 #ifdef AMREX_USE_EB
-#   include "EmbeddedBoundary/EmbeddedBoundary.H"
+#   include "EmbeddedBoundary/EmbeddedBoundaryInit.H"
 #endif
 #include "Fields.H"
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver.H"
@@ -288,17 +288,17 @@ WarpX::PrintMainPICparameters ()
     else{
       amrex::Print() << "Operation mode:       | Electromagnetic" << "\n";
     }
-    if (em_solver_medium == MediumForEM::Vacuum ){
+    if (m_em_solver_medium == MediumForEM::Vacuum ){
       amrex::Print() << "                      | - vacuum" << "\n";
     }
-    else if (em_solver_medium == MediumForEM::Macroscopic ){
+    else if (m_em_solver_medium == MediumForEM::Macroscopic ){
       amrex::Print() << "                      | - macroscopic" << "\n";
     }
-    if ( (em_solver_medium == MediumForEM::Macroscopic) &&
+    if ( (m_em_solver_medium == MediumForEM::Macroscopic) &&
        (WarpX::macroscopic_solver_algo == MacroscopicSolverAlgo::LaxWendroff)){
       amrex::Print() << "                      |  - Lax-Wendroff algorithm\n";
     }
-    else if ((em_solver_medium == MediumForEM::Macroscopic) &&
+    else if ((m_em_solver_medium == MediumForEM::Macroscopic) &&
             (WarpX::macroscopic_solver_algo == MacroscopicSolverAlgo::BackwardEuler)){
       amrex::Print() << "                      |  - Backward Euler algorithm\n";
     }
@@ -561,7 +561,7 @@ WarpX::InitData ()
 
     BuildBufferMasks();
 
-    if (WarpX::em_solver_medium == MediumForEM::Macroscopic) {
+    if (m_em_solver_medium == MediumForEM::Macroscopic) {
         const int lev_zero = 0;
         m_macroscopic_properties->InitData(
             Geom(lev_zero),
@@ -1247,22 +1247,27 @@ void WarpX::InitializeEBGridData (int lev)
                 warpx::embedded_boundary::ScaleAreas(face_areas_lev, CellSize(lev));
 
                 // Compute additional quantities required for the ECT solver
-                MarkExtensionCells();
+                const auto& area_mod = m_fields.get_alldirs(FieldType::area_mod, maxLevel());
+                warpx::embedded_boundary::MarkExtensionCells(
+                    CellSize(maxLevel()), m_flag_info_face[maxLevel()], m_flag_ext_face[maxLevel()],
+                    m_fields.get_alldirs(FieldType::Bfield_fp, maxLevel()),
+                    face_areas_lev,
+                    edge_lengths_lev, area_mod);
                 ComputeFaceExtensions();
 
                 // Mark on which grid points E should be updated
-                MarkUpdateECellsECT( m_eb_update_E[lev], edge_lengths_lev );
+                warpx::embedded_boundary::MarkUpdateECellsECT( m_eb_update_E[lev], edge_lengths_lev );
                 // Mark on which grid points B should be updated
-                MarkUpdateBCellsECT( m_eb_update_B[lev], face_areas_lev, edge_lengths_lev);
+                warpx::embedded_boundary::MarkUpdateBCellsECT( m_eb_update_B[lev], face_areas_lev, edge_lengths_lev);
 
             } else {
                 // Mark on which grid points E should be updated (stair-case approximation)
-                MarkUpdateCellsStairCase(
+                warpx::embedded_boundary::MarkUpdateCellsStairCase(
                     m_eb_update_E[lev],
                     m_fields.get_alldirs(FieldType::Efield_fp, lev),
                     eb_fact );
                 // Mark on which grid points B should be updated (stair-case approximation)
-                MarkUpdateCellsStairCase(
+                warpx::embedded_boundary::MarkUpdateCellsStairCase(
                     m_eb_update_B[lev],
                     m_fields.get_alldirs(FieldType::Bfield_fp, lev),
                     eb_fact );
@@ -1271,7 +1276,7 @@ void WarpX::InitializeEBGridData (int lev)
         }
 
         ComputeDistanceToEB();
-        MarkReducedShapeCells( m_eb_reduce_particle_shape[lev], eb_fact, WarpX::nox );
+        warpx::embedded_boundary::MarkReducedShapeCells( m_eb_reduce_particle_shape[lev], eb_fact, nox, Geom(0).periodicity());
 
     }
 #else

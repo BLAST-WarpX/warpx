@@ -104,7 +104,7 @@ void
 ProjectionDivCleaner::ReadParameters ()
 {
     // Initialize tolerance based on field precision
-    if constexpr (std::is_same<Real, float>::value) {
+    if constexpr (std::is_same_v<Real, float>) {
         m_rtol = 5e-5;
         m_atol = 0.0;
     }
@@ -337,7 +337,7 @@ WarpX::ProjectionCleanDivB() {
                 && WarpX::poisson_solver_id == PoissonSolverAlgo::Multigrid)) {
         amrex::Print() << Utils::TextMsg::Info( "Starting Projection B-Field divergence cleaner.");
 
-        if constexpr (!std::is_same<Real, double>::value) {
+        if constexpr (!std::is_same_v<Real, double>) {
             ablastr::warn_manager::WMRecordWarning("Projection Div Cleaner",
                 "WarpX is running with a field precision of SINGLE."
                 "Convergence of projection based div cleaner is not optimal and may fail.",

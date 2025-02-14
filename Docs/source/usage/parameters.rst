@@ -3626,6 +3626,52 @@ This shifts analysis from post-processing to runtime calculation of reduction op
         * ``<reduced_diags_name>.bin_min`` (`float`, in eV)
             The maximum value of :math:`\mathcal{E}^*` for which the differential luminosity is computed.
 
+    * ``DifferentialLuminosity2D``
+        This type computes the two-dimensional differential luminosity between two species, defined as:
+
+        .. math::
+
+            \frac{d^2\mathcal{L}}{dE_1 dE_2}(E_1, E_2, t) = \int_0^t dt'\int d\boldsymbol{x}\, \int d\boldsymbol{p}_1 \int d\boldsymbol{p}_2\;
+             \sqrt{ |\boldsymbol{v}_1 - \boldsymbol{v}_2|^2 - |\boldsymbol{v}_1\times\boldsymbol{v}_2|^2/c^2} \\
+             f_1(\boldsymbol{x}, \boldsymbol{p}_1, t')f_2(\boldsymbol{x}, \boldsymbol{p}_2, t') \delta(E_1 - E_1(\boldsymbol{p}_1)) \delta(E_2 - E_2(\boldsymbol{p}_2))
+
+        where :math:`f_i` is the distribution function of species :math:`i`
+        (normalized such that :math:`\int \int f(\boldsymbol{x} \boldsymbol{p}, t )d\boldsymbol{x} d\boldsymbol{p} = N`
+        is the number of particles in species :math:`i` at time :math:`t`),
+        :math:`\boldsymbol{p}_i` and :math:`E_i (\boldsymbol{p}_i) = \sqrt{m_1^2c^4 + c^2 |\boldsymbol{p}_i|^2}`
+        are, respectively, the momentum and the energy of a particle of the :math:`i`-th species.
+        The 2D differential luminosity is given in units of :math:`\text{m}^{-2}.\text{eV}^{-2}`.
+
+        * ``<reduced_diags_name>.species`` (`list of two strings`)
+            The names of the two species for which the differential luminosity is computed.
+
+        * ``<reduced_diags_name>.bin_number_1`` (`int` > 0)
+            The number of bins in energy :math:`E_1`
+
+        * ``<reduced_diags_name>.bin_max_1`` (`float`, in eV)
+            The minimum value of :math:`E_1` for which the 2D differential luminosity is computed.
+
+        * ``<reduced_diags_name>.bin_min_1`` (`float`, in eV)
+            The maximum value of :math:`E_2` for which the 2D differential luminosity is compute
+
+        * ``<reduced_diags_name>.bin_number_2`` (`int` > 0)
+            The number of bins in energy :math:`E_2`
+
+        * ``<reduced_diags_name>.bin_max_2`` (`float`, in eV)
+            The minimum value of :math:`E_2` for which the 2D differential luminosity is computed.
+
+        * ``<reduced_diags_name>.bin_min_2`` (`float`, in eV)
+            The minimum value of :math:`E_2` for which the 2D differential luminosity is computed.
+
+        * ``<reduced_diags_name>.file_min_digits`` (`int`) optional (default `6`)
+            The minimum number of digits used for the iteration number appended to the diagnostic file names.
+
+        The output is a ``<reduced_diags_name>`` folder containing a set of openPMD files.
+        The values of the diagnostic are stored in a record labeled `d2L_dE1_dE2`.
+        An example input file and a loading python script of
+        using the DifferentialLuminosity2D reduced diagnostics
+        are given in ``Examples/Tests/diff_lumi_diag/``.
+
     * ``Timestep``
         This type outputs the simulation's physical timestep (in seconds) at each mesh refinement level.
 
