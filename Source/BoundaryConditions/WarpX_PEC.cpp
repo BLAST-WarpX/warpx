@@ -398,10 +398,7 @@ namespace
                 amrex::IntVect iv_mirror = ijk_vec;
                 iv_mirror[idim] = mirrorfac[idim][iside] - ijk_vec[idim];
 
-                // Update the cell if the mirror guard cell exists
-                if (ijk_vec == iv_mirror && psign[idim][iside] == -1) {
-                    field(ijk_vec,n) = 0._rt;
-                } else if (fabbox.contains(iv_mirror)) {
+                if (fabbox.contains(iv_mirror)) {
                     // Note that this includes the cells on the boundary for PMC
                     amrex::Real rscale = 1._rt;
 #if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
@@ -417,6 +414,10 @@ namespace
                     }
 #endif
                     field(ijk_vec,n) += rscale * psign[idim][iside] * field(iv_mirror,n);
+                }
+                else {
+                    // Note that this includes the cells on the boundary
+                    field(ijk_vec,n) += psign[idim][iside] * field(iv_mirror,n);
                 }
             }
         }
