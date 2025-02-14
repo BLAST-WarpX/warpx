@@ -694,16 +694,6 @@ public:
     void UpdateAuxilaryDataStagToNodal ();
     void UpdateAuxilaryDataSameType ();
 
-    /**
-     * \brief This function is called if \c warpx.do_current_centering = 1 and
-     * it centers the currents from a nodal grid to a staggered grid (Yee) using
-     * finite-order interpolation based on the Fornberg coefficients.
-     *
-     * \param[in,out] dst destination \c MultiFab where the results of the finite-order centering are stored
-     * \param[in] src source \c MultiFab that contains the values of the nodal current to be centered
-     */
-    void UpdateCurrentNodalToStag (amrex::MultiFab& dst, amrex::MultiFab const& src);
-
     // Fill boundary cells including coarse/fine boundaries
     void FillBoundaryB   (amrex::IntVect ng, std::optional<bool> nodal_sync = std::nullopt);
     void FillBoundaryE   (amrex::IntVect ng, std::optional<bool> nodal_sync = std::nullopt);
