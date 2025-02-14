@@ -17,7 +17,7 @@ import yt
 from scipy.constants import e
 from scipy.constants import epsilon_0 as epsilon_0_old
 
-print(f'epsilon_0_old = {epsilon_0_old}')
+print(f"epsilon_0_old = {epsilon_0_old}")
 
 # Use the same value of epsilon_0 as in Source/ablastr/constant.H
 epsilon_0 = 8.8541878128e-12
