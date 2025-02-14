@@ -12,6 +12,8 @@
 #include "Particles/PinnedMemoryParticleContainer.H"
 #include "Utils/export.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
+
 #include <vector>
 
 
@@ -30,9 +32,9 @@ public:
     /** Copy operator for ParticleBoundaryBuffer */
     ParticleBoundaryBuffer& operator= ( const ParticleBoundaryBuffer & ) = delete;
 
-    /** Move constructor for NamedComponentParticleContainer */
+    /** Move constructor for ParticleBoundaryBuffer */
     ParticleBoundaryBuffer ( ParticleBoundaryBuffer && ) = default;
-    /** Move operator for NamedComponentParticleContainer */
+    /** Move operator for ParticleBoundaryBuffer */
     ParticleBoundaryBuffer& operator= ( ParticleBoundaryBuffer && ) = default;
 
     int numSpecies() const { return static_cast<int>(getSpeciesNames().size()); }
@@ -41,7 +43,7 @@ public:
 
     void gatherParticlesFromDomainBoundaries (MultiParticleContainer& mypc);
     void gatherParticlesFromEmbeddedBoundaries (
-        MultiParticleContainer& mypc, const amrex::Vector<const amrex::MultiFab*>& distance_to_eb
+        MultiParticleContainer& mypc, ablastr::fields::MultiLevelScalarField const& distance_to_eb
     );
 
     void redistribute ();

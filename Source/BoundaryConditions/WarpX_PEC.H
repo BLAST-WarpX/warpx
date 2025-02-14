@@ -31,8 +31,9 @@ namespace PEC {
      */
     void ApplyPECtoEfield (
                         std::array<amrex::MultiFab*, 3> Efield,
-                        const amrex::Vector<FieldBoundaryType>& field_boundary_lo,
-                        const amrex::Vector<FieldBoundaryType>& field_boundary_hi,
+                        const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_lo,
+                        const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_hi,
+                        FieldBoundaryType bc_type,
                         const amrex::IntVect& ng_fieldgather, const amrex::Geometry& geom,
                         int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios,
                         bool split_pml_field = false);
@@ -52,10 +53,12 @@ namespace PEC {
      */
     void ApplyPECtoBfield (
                         std::array<amrex::MultiFab*, 3> Bfield,
-                        const amrex::Vector<FieldBoundaryType>& field_boundary_lo,
-                        const amrex::Vector<FieldBoundaryType>& field_boundary_hi,
+                        const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_lo,
+                        const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_hi,
+                        FieldBoundaryType bc_type,
                         const amrex::IntVect& ng_fieldgather, const amrex::Geometry& geom,
-                        int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios);
+                        int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios,
+                        bool split_pml_field = false);
 
     /**
      * \brief Reflects charge density deposited over the PEC boundary back into
@@ -73,10 +76,10 @@ namespace PEC {
      */
     void ApplyReflectiveBoundarytoRhofield(
                         amrex::MultiFab* rho,
-                        const amrex::Vector<FieldBoundaryType>& field_boundary_lo,
-                        const amrex::Vector<FieldBoundaryType>& field_boundary_hi,
-                        const amrex::Vector<ParticleBoundaryType>& particle_boundary_lo,
-                        const amrex::Vector<ParticleBoundaryType>& particle_boundary_hi,
+                        const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_lo,
+                        const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_hi,
+                        const amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>& particle_boundary_lo,
+                        const amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>& particle_boundary_hi,
                         const amrex::Geometry& geom,
                         int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios);
 
@@ -97,10 +100,10 @@ namespace PEC {
     void ApplyReflectiveBoundarytoJfield(
                         amrex::MultiFab* Jx, amrex::MultiFab* Jy,
                         amrex::MultiFab* Jz,
-                        const amrex::Vector<FieldBoundaryType>& field_boundary_lo,
-                        const amrex::Vector<FieldBoundaryType>& field_boundary_hi,
-                        const amrex::Vector<ParticleBoundaryType>& particle_boundary_lo,
-                        const amrex::Vector<ParticleBoundaryType>& particle_boundary_hi,
+                        const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_lo,
+                        const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_hi,
+                        const amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>& particle_boundary_lo,
+                        const amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>& particle_boundary_hi,
                         const amrex::Geometry& geom,
                         int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios);
 
@@ -117,8 +120,8 @@ namespace PEC {
      */
     void ApplyPECtoElectronPressure (
                                 amrex::MultiFab* Pefield,
-                                const amrex::Vector<FieldBoundaryType>& field_boundary_lo,
-                                const amrex::Vector<FieldBoundaryType>& field_boundary_hi,
+                                const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_lo,
+                                const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_hi,
                                 const amrex::Geometry& geom,
                                 int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios);
 }

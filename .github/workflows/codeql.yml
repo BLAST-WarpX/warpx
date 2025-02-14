@@ -31,6 +31,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        name: Install Python
+        with:
+          python-version: '3.x'
+
       - name: Install Packages (C++)
         if: ${{ matrix.language == 'cpp' }}
         run: |
@@ -38,9 +43,10 @@ jobs:
           sudo apt-get install --yes cmake openmpi-bin libopenmpi-dev libhdf5-openmpi-dev libadios-openmpi-dev ccache
 
           python -m pip install --upgrade pip
+          python -m pip install --upgrade pipx
           python -m pip install --upgrade wheel
           python -m pip install --upgrade cmake
-          export CMAKE="$HOME/.local/bin/cmake" && echo "CMAKE=$CMAKE" >> $GITHUB_ENV
+          python -m pipx install cmake
 
       - name: Set Up Cache
         if: ${{ matrix.language == 'cpp' }}
@@ -54,7 +60,7 @@ jobs:
       - name: Configure (C++)
         if: ${{ matrix.language == 'cpp' }}
         run: |
-          $CMAKE -S . -B build -DWarpX_OPENPMD=ON
+          cmake -S . -B build -DWarpX_OPENPMD=ON
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
@@ -75,7 +81,7 @@ jobs:
           export CCACHE_MAXSIZE=100M
           ccache -z
 
-          $CMAKE --build build -j 4
+          cmake --build build -j 4
 
           ccache -s
           du -hs ~/.cache/ccache
@@ -83,7 +89,7 @@ jobs:
           # Make sure CodeQL has something to do
           touch Source/Utils/WarpXVersion.cpp
           export CCACHE_DISABLE=1
-          $CMAKE --build build -j 4
+          cmake --build build -j 4
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
@@ -110,18 +116,3 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: sarif-results/${{ matrix.language }}.sarif
-
-  save_pr_number:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Save PR number
-        env:
-          PR_NUMBER: ${{ github.event.number }}
-        run: |
-          echo $PR_NUMBER > pr_number.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: pr_number
-          path: pr_number.txt
-          retention-days: 1

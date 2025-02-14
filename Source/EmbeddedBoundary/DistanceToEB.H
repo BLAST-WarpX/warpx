@@ -14,8 +14,6 @@
 #include <AMReX_RealVect.H>
 #include <AMReX_Array.H>
 
-#ifdef AMREX_USE_EB
-
 namespace DistanceToEB
 {
 
@@ -28,7 +26,8 @@ amrex::Real dot_product (const amrex::RealVect& a, const amrex::RealVect& b) noe
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void normalize (amrex::RealVect& a) noexcept
 {
-    amrex::Real inv_norm = 1.0/std::sqrt(dot_product(a,a));
+    using namespace amrex::literals;
+    amrex::Real const inv_norm = 1.0_rt / std::sqrt(dot_product(a, a));
     AMREX_D_DECL(a[0] *= inv_norm,
                  a[1] *= inv_norm,
                  a[2] *= inv_norm);
@@ -46,6 +45,7 @@ amrex::RealVect interp_normal (int i, int j, int k, const amrex::Real W[AMREX_SP
                                amrex::Array4<const amrex::Real> const& phi,
                                amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dxi) noexcept
 {
+    using namespace amrex::literals;
 
 #if (defined WARPX_DIM_3D)
     amrex::RealVect normal{0.0, 0.0, 0.0};
@@ -53,11 +53,11 @@ amrex::RealVect interp_normal (int i, int j, int k, const amrex::Real W[AMREX_SP
         for (int kk = 0; kk < 2; ++kk) {
             for (int jj=0; jj< 2; ++jj) {
                 for (int ii = 0; ii < 2; ++ii) {
-                    int icstart = ic + iic;
-                    amrex::Real sign = (ii%2)*2. - 1.;
-                    int wccomp = static_cast<int>(iic%2);
-                    int w1comp = static_cast<int>(jj%2);
-                    int w2comp = static_cast<int>(kk%2);
+                    int const icstart = ic + iic;
+                    amrex::Real const sign = (ii%2)*2._rt - 1._rt;
+                    int const wccomp = static_cast<int>(iic%2);
+                    int const w1comp = static_cast<int>(jj%2);
+                    int const w2comp = static_cast<int>(kk%2);
                     normal[0] += sign * phi(icstart + ii, j + jj, k + kk) * dxi[0] * Wc[0][wccomp] * W[1][w1comp] * W[2][w2comp];
                 }
             }
@@ -67,11 +67,11 @@ amrex::RealVect interp_normal (int i, int j, int k, const amrex::Real W[AMREX_SP
         for (int kk = 0; kk < 2; ++kk) {
             for (int ii=0; ii< 2; ++ii) {
                 for (int jj = 0; jj < 2; ++jj) {
-                    int jcstart = jc + iic;
-                    amrex::Real sign = (jj%2)*2. - 1.;
-                    int wccomp = static_cast<int>(iic%2);
-                    int w1comp = static_cast<int>(ii%2);
-                    int w2comp = static_cast<int>(kk%2);
+                    int const jcstart = jc + iic;
+                    amrex::Real const sign = (jj%2)*2._rt - 1._rt;
+                    int const wccomp = static_cast<int>(iic%2);
+                    int const w1comp = static_cast<int>(ii%2);
+                    int const w2comp = static_cast<int>(kk%2);
                     normal[1] += sign * phi(i + ii, jcstart + jj, k + kk) * dxi[1] * W[0][w1comp] * Wc[1][wccomp] * W[2][w2comp];
                 }
             }
@@ -81,11 +81,11 @@ amrex::RealVect interp_normal (int i, int j, int k, const amrex::Real W[AMREX_SP
         for (int jj = 0; jj < 2; ++jj) {
             for (int ii=0; ii< 2; ++ii) {
                 for (int kk = 0; kk < 2; ++kk) {
-                    int kcstart = kc + iic;
-                    amrex::Real sign = (kk%2)*2. - 1.;
-                    int wccomp = static_cast<int>(iic%2);
-                    int w1comp = static_cast<int>(ii%2);
-                    int w2comp = static_cast<int>(jj%2);
+                    int const kcstart = kc + iic;
+                    amrex::Real const sign = (kk%2)*2._rt - 1._rt;
+                    int const wccomp = static_cast<int>(iic%2);
+                    int const w1comp = static_cast<int>(ii%2);
+                    int const w2comp = static_cast<int>(jj%2);
                     normal[2] += sign * phi(i + ii, j + jj, kcstart + kk) * dxi[2] * W[0][w1comp] * W[1][w2comp] * Wc[2][wccomp];
                 }
             }
@@ -97,10 +97,10 @@ amrex::RealVect interp_normal (int i, int j, int k, const amrex::Real W[AMREX_SP
     for (int iic = 0; iic < 2; ++iic) {
         for (int jj=0; jj< 2; ++jj) {
             for (int ii = 0; ii < 2; ++ii) {
-                int icstart = ic + iic;
-                amrex::Real sign = (ii%2)*2. - 1.;
-                int wccomp = static_cast<int>(iic%2);
-                int w1comp = static_cast<int>(jj%2);
+                int const icstart = ic + iic;
+                amrex::Real const sign = (ii%2)*2._rt - 1._rt;
+                int const wccomp = static_cast<int>(iic%2);
+                int const w1comp = static_cast<int>(jj%2);
                 normal[0] += sign * phi(icstart + ii, j + jj, k) * dxi[0] * Wc[0][wccomp] * W[1][w1comp];
             }
         }
@@ -108,10 +108,10 @@ amrex::RealVect interp_normal (int i, int j, int k, const amrex::Real W[AMREX_SP
     for (int iic = 0; iic < 2; ++iic) {
         for (int ii=0; ii< 2; ++ii) {
             for (int jj = 0; jj < 2; ++jj) {
-                int jcstart = jc + iic;
-                amrex::Real sign = (jj%2)*2. - 1.;
-                int wccomp = static_cast<int>(iic%2);
-                int w1comp = static_cast<int>(ii%2);
+                int const jcstart = jc + iic;
+                amrex::Real const sign = (jj%2)*2._rt - 1._rt;
+                int const wccomp = static_cast<int>(iic%2);
+                int const w1comp = static_cast<int>(ii%2);
                 normal[1] += sign * phi(i + ii, jcstart + jj, k) * dxi[1] * W[0][w1comp] * Wc[1][wccomp];
             }
         }
@@ -120,13 +120,17 @@ amrex::RealVect interp_normal (int i, int j, int k, const amrex::Real W[AMREX_SP
 
 #else
     amrex::ignore_unused(i, j, k, ic, jc, kc, W, Wc, phi, dxi);
-    amrex::RealVect normal{0.0, 0.0};
-    WARPX_ABORT_WITH_MESSAGE("Error: interp_distance not yet implemented in 1D");
+    amrex::RealVect normal(0.0);
+
+    AMREX_IF_ON_DEVICE((
+        AMREX_DEVICE_ASSERT(0);
+    ))
+    AMREX_IF_ON_HOST((
+        WARPX_ABORT_WITH_MESSAGE("Error: interp_normal not yet implemented in 1D");
+    ))
 
 #endif
     return normal;
 }
 }
-
-#endif // AMREX_USE_EB
 #endif // WARPX_DISTANCETOEB_H_

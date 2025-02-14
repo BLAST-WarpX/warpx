@@ -26,7 +26,7 @@ namespace utils::algorithms
      * @return true if elem is in vect, false otherwise
      */
     template <typename TV, typename TE,
-        class = typename std::enable_if<std::is_convertible<TE,TV>::value>::type>
+        class = typename std::enable_if_t<std::is_convertible_v<TE,TV>>>
     bool is_in(const std::vector<TV>& vect,
                const TE& elem)
     {
@@ -46,7 +46,7 @@ namespace utils::algorithms
      * @return true if any element of elems is in vect, false otherwise
      */
     template <typename TV, typename TE,
-        class = typename std::enable_if<std::is_convertible<TE,TV>::value>::type>
+        class = typename std::enable_if_t<std::is_convertible_v<TE,TV>>>
     bool any_of_is_in(const std::vector<TV>& vect,
                const std::vector<TE>& elems)
     {

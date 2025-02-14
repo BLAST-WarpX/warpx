@@ -85,7 +85,7 @@ ArgParser::ParseArgs (const std::vector<Key>& keys, const int argc, char const* 
 void
 ArgParser::PrintHelp (const vector<ArgParser::Key>& cmd_list)
 {
-    cout << "Command line options: " << endl;
+    cout << "Command line options:\n";
 
     for (const auto& el : cmd_list){
         const auto type = get<1>(el);
@@ -102,7 +102,7 @@ ArgParser::PrintHelp (const vector<ArgParser::Key>& cmd_list)
         cout << get<0>(el)
             << " " << stype
             << " " << get<2>(el)
-            << endl;
+            << "\n";
     }
 
 }

@@ -10,6 +10,7 @@
 
 #include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
+#include "Fields.H"
 #include "Laser/LaserProfiles.H"
 #include "Particles/LaserParticleContainer.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
@@ -181,10 +182,11 @@ LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies,
 
     if (WarpX::gamma_boost > 1.) {
         // Check that the laser direction is equal to the boost direction
-        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(  m_nvec[0]*WarpX::boost_direction[0]
-                                         + m_nvec[1]*WarpX::boost_direction[1]
-                                         + m_nvec[2]*WarpX::boost_direction[2] - 1. < 1.e-12,
-                                           "The Lorentz boost should be in the same direction as the laser propagation");
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            (m_nvec[0]-WarpX::boost_direction[0])*(m_nvec[0]-WarpX::boost_direction[0]) +
+            (m_nvec[1]-WarpX::boost_direction[1])*(m_nvec[1]-WarpX::boost_direction[1]) +
+            (m_nvec[2]-WarpX::boost_direction[2])*(m_nvec[2]-WarpX::boost_direction[2]) < 1.e-12,
+            "The Lorentz boost should be in the same direction as the laser propagation");
         // Get the position of the plane, along the boost direction, in the lab frame
         // and convert the position of the antenna to the boosted frame
         m_Z0_lab = m_nvec[0]*m_position[0] + m_nvec[1]*m_position[1] + m_nvec[2]*m_position[2];
@@ -246,8 +248,10 @@ LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies,
         windir[dir] = 1.0;
 #endif
         AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
-            (m_nvec[0]-windir[0]) + (m_nvec[1]-windir[1]) + (m_nvec[2]-windir[2])
-            < 1.e-12, "do_continous_injection for laser particle only works" +
+            (m_nvec[0]-windir[0])*(m_nvec[0]-windir[0]) +
+            (m_nvec[1]-windir[1])*(m_nvec[1]-windir[1]) +
+            (m_nvec[2]-windir[2])*(m_nvec[2]-windir[2]) < 1.e-12,
+            "do_continous_injection for laser particle only works" +
             " if moving window direction and laser propagation direction are the same");
         if ( WarpX::gamma_boost>1 ){
             AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -410,12 +414,10 @@ LaserParticleContainer::InitData (int lev)
 #if defined(WARPX_DIM_3D)
         return {m_u_X[0]*(pos[0]-m_position[0])+m_u_X[1]*(pos[1]-m_position[1])+m_u_X[2]*(pos[2]-m_position[2]),
                 m_u_Y[0]*(pos[0]-m_position[0])+m_u_Y[1]*(pos[1]-m_position[1])+m_u_Y[2]*(pos[2]-m_position[2])};
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-#   if defined(WARPX_DIM_RZ)
+#elif defined(WARPX_DIM_RZ)
         return {pos[0]-m_position[0], 0.0_rt};
-#   else
+#elif defined(WARPX_DIM_XZ)
         return {m_u_X[0]*(pos[0]-m_position[0])+m_u_X[2]*(pos[2]-m_position[2]), 0.0_rt};
-#   endif
 #else
         return {m_u_X[2]*(pos[2]-m_position[2]), 0.0_rt};
 #endif
@@ -555,16 +557,14 @@ LaserParticleContainer::InitData (int lev)
 }
 
 void
-LaserParticleContainer::Evolve (int lev,
-                                const MultiFab&, const MultiFab&, const MultiFab&,
-                                const MultiFab&, const MultiFab&, const MultiFab&,
-                                MultiFab& jx, MultiFab& jy, MultiFab& jz,
-                                MultiFab* cjx, MultiFab* cjy, MultiFab* cjz,
-                                MultiFab* rho, MultiFab* crho,
-                                const MultiFab*, const MultiFab*, const MultiFab*,
-                                const MultiFab*, const MultiFab*, const MultiFab*,
+LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
+                                int lev,
+                                const std::string& current_fp_string,
                                 Real t, Real dt, DtType /*a_dt_type*/, bool skip_deposition, PushType push_type)
 {
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
     WARPX_PROFILE("LaserParticleContainer::Evolve()");
     WARPX_PROFILE_VAR_NS("LaserParticleContainer::Evolve::ParticlePush", blp_pp);
 
@@ -581,11 +581,12 @@ LaserParticleContainer::Evolve (int lev,
     // Update laser profile
     m_up_laser_profile->update(t_lab);
 
-    BL_ASSERT(OnSameGrids(lev,jx));
+    BL_ASSERT(OnSameGrids(lev, *fields.get(FieldType::current_fp, Direction{0}, lev)));
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
-    const bool has_buffer = cjx;
+    const bool has_rho = fields.has(FieldType::rho_fp, lev);
+    const bool has_buffer = fields.has_vector(FieldType::current_buf, lev);
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -625,11 +626,13 @@ LaserParticleContainer::Evolve (int lev,
                 np_current = 0;
             }
 
-            if (rho && ! skip_deposition && ! do_not_deposit) {
+            if (has_rho && ! skip_deposition && ! do_not_deposit) {
                 int* AMREX_RESTRICT ion_lev = nullptr;
+                amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
                 DepositCharge(pti, wp, ion_lev, rho, 0, 0,
                               np_current, thread_num, lev, lev);
                 if (has_buffer) {
+                    amrex::MultiFab* crho = fields.get(FieldType::rho_buf, lev);
                     DepositCharge(pti, wp, ion_lev, crho, 0, np_current,
                                   np-np_current, thread_num, lev, lev-1);
                 }
@@ -657,6 +660,7 @@ LaserParticleContainer::Evolve (int lev,
             WARPX_PROFILE_VAR_STOP(blp_pp);
 
             // Current Deposition
+            using ablastr::fields::Direction;
             if (!skip_deposition)
             {
                 // Deposit at t_{n+1/2}
@@ -664,13 +668,19 @@ LaserParticleContainer::Evolve (int lev,
 
                 int* ion_lev = nullptr;
                 // Deposit inside domains
-                DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, &jx, &jy, &jz,
+                amrex::MultiFab * jx = fields.get(current_fp_string, Direction{0}, lev);
+                amrex::MultiFab * jy = fields.get(current_fp_string, Direction{1}, lev);
+                amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
+                DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
                                0, np_current, thread_num,
                                lev, lev, dt, relative_time, push_type);
 
                 if (has_buffer)
                 {
                     // Deposit in buffers
+                    amrex::MultiFab * cjx = fields.get(FieldType::current_buf, Direction{0}, lev);
+                    amrex::MultiFab * cjy = fields.get(FieldType::current_buf, Direction{1}, lev);
+                    amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
                     DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, cjx, cjy, cjz,
                                    np_current, np-np_current, thread_num,
                                    lev, lev-1, dt, relative_time, push_type);
@@ -678,11 +688,13 @@ LaserParticleContainer::Evolve (int lev,
             }
 
 
-            if (rho && ! skip_deposition && ! do_not_deposit) {
+            if (has_rho && ! skip_deposition && ! do_not_deposit) {
                 int* AMREX_RESTRICT ion_lev = nullptr;
+                amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
                 DepositCharge(pti, wp, ion_lev, rho, 1, 0,
                               np_current, thread_num, lev, lev);
                 if (has_buffer) {
+                    amrex::MultiFab* crho = fields.get(FieldType::rho_buf, lev);
                     DepositCharge(pti, wp, ion_lev, crho, 1, np_current,
                                   np-np_current, thread_num, lev, lev-1);
                 }
@@ -731,13 +743,12 @@ LaserParticleContainer::ComputeSpacing (int lev, Real& Sx, Real& Sy) const
     Sy = std::min(std::min(dx[0]/(std::abs(m_u_Y[0])+eps),
                            dx[1]/(std::abs(m_u_Y[1])+eps)),
                            dx[2]/(std::abs(m_u_Y[2])+eps));
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-#   if defined(WARPX_DIM_RZ)
+#elif defined(WARPX_DIM_RZ)
     Sx = dx[0];
-#   else
+    Sy = 1.0;
+#elif defined(WARPX_DIM_XZ)
     Sx = std::min(dx[0]/(std::abs(m_u_X[0])+eps),
                   dx[2]/(std::abs(m_u_X[2])+eps));
-#   endif
     Sy = 1.0;
 #else
     Sx = 1.0;
@@ -747,7 +758,7 @@ LaserParticleContainer::ComputeSpacing (int lev, Real& Sx, Real& Sy) const
 }
 
 void
-LaserParticleContainer::ComputeWeightMobility (Real Sx, Real Sy)
+LaserParticleContainer::ComputeWeightMobility ([[maybe_unused]] Real Sx, [[maybe_unused]] Real Sy)
 {
     // The mobility is the constant of proportionality between the field to
     // be emitted, and the corresponding velocity that the particles need to have.
@@ -757,14 +768,7 @@ LaserParticleContainer::ComputeWeightMobility (Real Sx, Real Sy)
     m_mobility = eps/m_e_max;
     m_weight = PhysConst::ep0 / m_mobility;
     // Multiply by particle spacing
-#if defined(WARPX_DIM_3D)
-    m_weight *= Sx * Sy;
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-    m_weight *= Sx;
-    amrex::ignore_unused(Sy);
-#else
-    amrex::ignore_unused(Sx,Sy);
-#endif
+    m_weight *= AMREX_D_TERM(1._rt, * Sx, * Sy);
     // When running in the boosted-frame, the input parameters (and in particular
     // the amplitude of the field) are given in the lab-frame.
     // Therefore, the mobility needs to be modified by a factor WarpX::gamma_boost.
@@ -869,18 +873,18 @@ LaserParticleContainer::update_laser_particle (WarpXParIter& pti,
 #if (AMREX_SPACEDIM >= 2)
     ParticleReal* x_n = nullptr;
     if (push_type == PushType::Implicit) {
-        x_n = pti.GetAttribs(particle_comps["x_n"]).dataPtr();
+        x_n = pti.GetAttribs("x_n").dataPtr();
     }
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
     ParticleReal* y_n = nullptr;
     if (push_type == PushType::Implicit) {
-        y_n = pti.GetAttribs(particle_comps["y_n"]).dataPtr();
+        y_n = pti.GetAttribs("y_n").dataPtr();
     }
 #endif
     ParticleReal* z_n = nullptr;
     if (push_type == PushType::Implicit) {
-        z_n = pti.GetAttribs(particle_comps["z_n"]).dataPtr();
+        z_n = pti.GetAttribs("z_n").dataPtr();
     }
 
     // Copy member variables to tmp copies for GPU runs.
@@ -913,11 +917,13 @@ LaserParticleContainer::update_laser_particle (WarpXParIter& pti,
             puyp[i] = gamma * vy;
             puzp[i] = gamma * vz;
 
-            // Push the the particle positions
+            // Push the particle positions
 
             // When using the implicit solver, this function is called multiple times per timestep
             // (within the linear and nonlinear solver). Thus, the position of the particles needs to be reset
-            // to the initial position (at the beginning of the timestep), before updating the particle position
+            // to the initial position (at the beginning of the timestep), before updating the particle position.
+            // Also, the current deposition schemes expect the particle positions to be time centered
+            // (cur_time + 0.5*dt) for PushType::Implicit.
 
             ParticleReal x=0., y=0., z=0.;
             if (push_type == PushType::Explicit) {
@@ -926,20 +932,26 @@ LaserParticleContainer::update_laser_particle (WarpXParIter& pti,
 
 #if !defined(WARPX_DIM_1D_Z)
             if (push_type == PushType::Implicit) {
-                x = x_n[i];
+                x = x_n[i] + vx * dt*0.5_prt;
             }
-            x += vx * dt;
+            else {
+                x += vx * dt;
+            }
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
             if (push_type == PushType::Implicit) {
-                y = y_n[i];
+                y = y_n[i] + vy * dt*0.5_prt;
             }
-            y += vy * dt;
+            else {
+                y += vy * dt;
+            }
 #endif
             if (push_type == PushType::Implicit) {
-                z = z_n[i];
+                z = z_n[i] + vz * dt*0.5_prt;
             }
-            z += vz * dt;
+            else {
+                z += vz * dt;
+            }
 
             SetPosition(i, x, y, z);
         }

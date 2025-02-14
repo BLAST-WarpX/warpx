@@ -6,7 +6,11 @@
 
 name: 📜 Source
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-source
@@ -25,12 +29,8 @@ jobs:
       run: .github/workflows/source/hasTabs
     - name: End-of-Line whitespaces
       run: .github/workflows/source/hasEOLwhiteSpace
-    - name: Proper file names in Examples
-      run: .github/workflows/source/wrongFileNameInExamples
-    - name: Examples are tested
-      run: .github/workflows/source/inputsNotTested
-    - name: Check that the test matrix for CI includes all tests
-      run: .github/workflows/source/test_ci_matrix.sh
+    - name: Check test input files
+      run: .github/workflows/source/check_inputs.py
     - name: Doxygen
       run: |
         sudo apt-get install -y --no-install-recommends doxygen

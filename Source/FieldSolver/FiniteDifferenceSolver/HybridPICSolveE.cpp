@@ -9,6 +9,7 @@
 
 #include "FiniteDifferenceSolver.H"
 
+#include "EmbeddedBoundary/Enabled.H"
 #ifdef WARPX_DIM_RZ
 #   include "FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
 #else
@@ -23,9 +24,9 @@
 using namespace amrex;
 
 void FiniteDifferenceSolver::CalculateCurrentAmpere (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3>& Jfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3> const& Bfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
+    ablastr::fields::VectorField & Jfield,
+    ablastr::fields::VectorField const& Bfield,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     int lev )
 {
     // Select algorithm (The choice of algorithm is a runtime option,
@@ -33,12 +34,12 @@ void FiniteDifferenceSolver::CalculateCurrentAmpere (
     if (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC) {
 #ifdef WARPX_DIM_RZ
         CalculateCurrentAmpereCylindrical <CylindricalYeeAlgorithm> (
-            Jfield, Bfield, edge_lengths, lev
+            Jfield, Bfield, eb_update_E, lev
         );
 
 #else
         CalculateCurrentAmpereCartesian <CartesianYeeAlgorithm> (
-            Jfield, Bfield, edge_lengths, lev
+            Jfield, Bfield, eb_update_E, lev
         );
 
 #endif
@@ -58,18 +59,14 @@ void FiniteDifferenceSolver::CalculateCurrentAmpere (
 #ifdef WARPX_DIM_RZ
 template<typename T_Algo>
 void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Jfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
+    ablastr::fields::VectorField& Jfield,
+    ablastr::fields::VectorField const& Bfield,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     int lev
 )
 {
     // for the profiler
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
-#ifndef AMREX_USE_EB
-    amrex::ignore_unused(edge_lengths);
-#endif
 
     // reset Jfield
     Jfield[0]->setVal(0);
@@ -95,11 +92,17 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
         Array4<Real> const& Bt = Bfield[1]->array(mfi);
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
 
-#ifdef AMREX_USE_EB
-        amrex::Array4<amrex::Real> const& lr = edge_lengths[0]->array(mfi);
-        amrex::Array4<amrex::Real> const& lt = edge_lengths[1]->array(mfi);
-        amrex::Array4<amrex::Real> const& lz = edge_lengths[2]->array(mfi);
-#endif
+        // Extract structures indicating where the fields
+        // should be updated, given the position of the embedded boundaries.
+        // The plasma current is stored at the same locations as the E-field,
+        // therefore the `eb_update_E` multifab also appropriately specifies
+        // where the plasma current should be calculated.
+        amrex::Array4<int> update_Jr_arr, update_Jt_arr, update_Jz_arr;
+        if (EB::enabled()) {
+            update_Jr_arr = eb_update_E[0]->array(mfi);
+            update_Jt_arr = eb_update_E[1]->array(mfi);
+            update_Jz_arr = eb_update_E[2]->array(mfi);
+        }
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
@@ -125,10 +128,10 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
 
             // Jr calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-#ifdef AMREX_USE_EB
-                // Skip if this cell is fully covered by embedded boundaries
-                if (lr(i, j, 0) <= 0) return;
-#endif
+
+                // Skip field update in the embedded boundaries
+                if (update_Jr_arr && update_Jr_arr(i, j, 0) == 0) { return; }
+
                 // Mode m=0
                 Jr(i, j, 0, 0) = one_over_mu0 * (
                     - T_Algo::DownwardDz(Bt, coefs_z, n_coefs_z, i, j, 0, 0)
@@ -151,11 +154,10 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
 
             // Jt calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-#ifdef AMREX_USE_EB
-                // In RZ Jt is associated with a mesh node, so we need to check if the mesh node is covered
-                amrex::ignore_unused(lt);
-                if (lr(i, j, 0)<=0 || lr(i-1, j, 0)<=0 || lz(i, j-1, 0)<=0 || lz(i, j, 0)<=0) return;
-#endif
+
+                // Skip field update in the embedded boundaries
+                if (update_Jt_arr && update_Jt_arr(i, j, 0) == 0) { return; }
+
                 // r on a nodal point (Jt is nodal in r)
                 Real const r = rmin + i*dr;
                 // Off-axis, regular curl
@@ -199,10 +201,10 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
 
             // Jz calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-#ifdef AMREX_USE_EB
-                // Skip if this cell is fully covered by embedded boundaries
-                if (lz(i, j, 0) <= 0) return;
-#endif
+
+                // Skip field update in the embedded boundaries
+                if (update_Jz_arr && update_Jz_arr(i, j, 0) == 0) { return; }
+
                 // r on a nodal point (Jz is nodal in r)
                 Real const r = rmin + i*dr;
                 // Off-axis, regular curl
@@ -249,18 +251,14 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Jfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
+    ablastr::fields::VectorField& Jfield,
+    ablastr::fields::VectorField const& Bfield,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     int lev
 )
 {
     // for the profiler
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
-#ifndef AMREX_USE_EB
-    amrex::ignore_unused(edge_lengths);
-#endif
 
     // reset Jfield
     Jfield[0]->setVal(0);
@@ -272,25 +270,30 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
     for ( MFIter mfi(*Jfield[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
+        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers) {
             amrex::Gpu::synchronize();
         }
         auto wt = static_cast<amrex::Real>(amrex::second());
 
         // Extract field data for this grid/tile
-        Array4<Real> const& Jx = Jfield[0]->array(mfi);
-        Array4<Real> const& Jy = Jfield[1]->array(mfi);
-        Array4<Real> const& Jz = Jfield[2]->array(mfi);
-        Array4<Real const> const& Bx = Bfield[0]->const_array(mfi);
-        Array4<Real const> const& By = Bfield[1]->const_array(mfi);
-        Array4<Real const> const& Bz = Bfield[2]->const_array(mfi);
+        Array4<Real> const &Jx = Jfield[0]->array(mfi);
+        Array4<Real> const &Jy = Jfield[1]->array(mfi);
+        Array4<Real> const &Jz = Jfield[2]->array(mfi);
+        Array4<Real const> const &Bx = Bfield[0]->const_array(mfi);
+        Array4<Real const> const &By = Bfield[1]->const_array(mfi);
+        Array4<Real const> const &Bz = Bfield[2]->const_array(mfi);
 
-#ifdef AMREX_USE_EB
-        amrex::Array4<amrex::Real> const& lx = edge_lengths[0]->array(mfi);
-        amrex::Array4<amrex::Real> const& ly = edge_lengths[1]->array(mfi);
-        amrex::Array4<amrex::Real> const& lz = edge_lengths[2]->array(mfi);
-#endif
+        // Extract structures indicating where the fields
+        // should be updated, given the position of the embedded boundaries.
+        // The plasma current is stored at the same locations as the E-field,
+        // therefore the `eb_update_E` multifab also appropriately specifies
+        // where the plasma current should be calculated.
+        amrex::Array4<int> update_Jx_arr, update_Jy_arr, update_Jz_arr;
+        if (EB::enabled()) {
+            update_Jx_arr = eb_update_E[0]->array(mfi);
+            update_Jy_arr = eb_update_E[1]->array(mfi);
+            update_Jz_arr = eb_update_E[2]->array(mfi);
+        }
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
@@ -313,10 +316,10 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
 
             // Jx calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-#ifdef AMREX_USE_EB
-                // Skip if this cell is fully covered by embedded boundaries
-                if (lx(i, j, k) <= 0) return;
-#endif
+
+                // Skip field update in the embedded boundaries
+                if (update_Jx_arr && update_Jx_arr(i, j, k) == 0) { return; }
+
                 Jx(i, j, k) = one_over_mu0 * (
                     - T_Algo::DownwardDz(By, coefs_z, n_coefs_z, i, j, k)
                     + T_Algo::DownwardDy(Bz, coefs_y, n_coefs_y, i, j, k)
@@ -325,16 +328,10 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
 
             // Jy calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-#ifdef AMREX_USE_EB
-                // Skip if this cell is fully covered by embedded boundaries
-#ifdef WARPX_DIM_3D
-                if (ly(i,j,k) <= 0) return;
-#elif defined(WARPX_DIM_XZ)
-                // In XZ Jy is associated with a mesh node, so we need to check if the mesh node is covered
-                amrex::ignore_unused(ly);
-                if (lx(i, j, k)<=0 || lx(i-1, j, k)<=0 || lz(i, j-1, k)<=0 || lz(i, j, k)<=0) return;
-#endif
-#endif
+
+                // Skip field update in the embedded boundaries
+                if (update_Jy_arr && update_Jy_arr(i, j, k) == 0) { return; }
+
                 Jy(i, j, k) = one_over_mu0 * (
                     - T_Algo::DownwardDx(Bz, coefs_x, n_coefs_x, i, j, k)
                     + T_Algo::DownwardDz(Bx, coefs_z, n_coefs_z, i, j, k)
@@ -343,10 +340,10 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
 
             // Jz calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-#ifdef AMREX_USE_EB
-                // Skip if this cell is fully covered by embedded boundaries
-                if (lz(i,j,k) <= 0) return;
-#endif
+
+                // Skip field update in the embedded boundaries
+                if (update_Jz_arr && update_Jz_arr(i, j, k) == 0) { return; }
+
                 Jz(i, j, k) = one_over_mu0 * (
                     - T_Algo::DownwardDy(Bx, coefs_y, n_coefs_y, i, j, k)
                     + T_Algo::DownwardDx(By, coefs_x, n_coefs_x, i, j, k)
@@ -366,16 +363,15 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
 
 
 void FiniteDifferenceSolver::HybridPICSolveE (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Efield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Jfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jifield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jextfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
-    std::unique_ptr<amrex::MultiFab> const& rhofield,
-    std::unique_ptr<amrex::MultiFab> const& Pefield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
+    ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField& Jfield,
+    ablastr::fields::VectorField const& Jifield,
+    ablastr::fields::VectorField const& Bfield,
+    amrex::MultiFab const& rhofield,
+    amrex::MultiFab const& Pefield,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     int lev, HybridPICModel const* hybrid_model,
-    const bool include_resistivity_term)
+    const bool solve_for_Faraday)
 {
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
@@ -383,15 +379,15 @@ void FiniteDifferenceSolver::HybridPICSolveE (
 #ifdef WARPX_DIM_RZ
 
         HybridPICSolveECylindrical <CylindricalYeeAlgorithm> (
-            Efield, Jfield, Jifield, Jextfield, Bfield, rhofield, Pefield,
-            edge_lengths, lev, hybrid_model, include_resistivity_term
+            Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
+            eb_update_E, lev, hybrid_model, solve_for_Faraday
         );
 
 #else
 
         HybridPICSolveECartesian <CartesianYeeAlgorithm> (
-            Efield, Jfield, Jifield, Jextfield, Bfield, rhofield, Pefield,
-            edge_lengths, lev, hybrid_model, include_resistivity_term
+            Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
+            eb_update_E, lev, hybrid_model, solve_for_Faraday
         );
 
 #endif
@@ -404,21 +400,16 @@ void FiniteDifferenceSolver::HybridPICSolveE (
 #ifdef WARPX_DIM_RZ
 template<typename T_Algo>
 void FiniteDifferenceSolver::HybridPICSolveECylindrical (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Efield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jifield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jextfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
-    std::unique_ptr<amrex::MultiFab> const& rhofield,
-    std::unique_ptr<amrex::MultiFab> const& Pefield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
+    ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField const& Jfield,
+    ablastr::fields::VectorField const& Jifield,
+    ablastr::fields::VectorField const& Bfield,
+    amrex::MultiFab const& rhofield,
+    amrex::MultiFab const& Pefield,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     int lev, HybridPICModel const* hybrid_model,
-    const bool include_resistivity_term )
+    const bool solve_for_Faraday )
 {
-#ifndef AMREX_USE_EB
-    amrex::ignore_unused(edge_lengths);
-#endif
-
     // Both steps below do not currently support m > 0 and should be
     // modified if such support wants to be added
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -436,7 +427,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
     const auto resistivity_has_J_dependence = hybrid_model->m_resistivity_has_J_dependence;
 
-    const bool include_hyper_resistivity_term = (eta_h > 0.0) && include_resistivity_term;
+    const bool include_hyper_resistivity_term = (eta_h > 0.0) && solve_for_Faraday;
 
     // Index type required for interpolating fields from their respective
     // staggering to the Ex, Ey, Ez locations
@@ -468,8 +459,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     // Also note that enE_nodal_mf does not need to have any guard cells since
     // these values will be interpolated to the Yee mesh which is contained
     // by the nodal mesh.
-    auto const& ba = convert(rhofield->boxArray(), IntVect::TheNodeVector());
-    MultiFab enE_nodal_mf(ba, rhofield->DistributionMap(), 3, IntVect::TheZeroVector());
+    auto const& ba = convert(rhofield.boxArray(), IntVect::TheNodeVector());
+    MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
 
     // Loop through the grids, and over the tiles within each grid for the
     // initial, nodal calculation of E
@@ -490,9 +481,6 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real const> const& Jir = Jifield[0]->const_array(mfi);
         Array4<Real const> const& Jit = Jifield[1]->const_array(mfi);
         Array4<Real const> const& Jiz = Jifield[2]->const_array(mfi);
-        Array4<Real const> const& Jextr = Jextfield[0]->const_array(mfi);
-        Array4<Real const> const& Jextt = Jextfield[1]->const_array(mfi);
-        Array4<Real const> const& Jextz = Jextfield[2]->const_array(mfi);
         Array4<Real const> const& Br = Bfield[0]->const_array(mfi);
         Array4<Real const> const& Bt = Bfield[1]->const_array(mfi);
         Array4<Real const> const& Bz = Bfield[2]->const_array(mfi);
@@ -517,16 +505,16 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
             // calculate enE = (J - Ji) x B
             enE_nodal(i, j, 0, 0) = (
-                (jt_interp - jit_interp - Jextt(i, j, 0)) * Bz_interp
-                - (jz_interp - jiz_interp - Jextz(i, j, 0)) * Bt_interp
+                (jt_interp - jit_interp) * Bz_interp
+                - (jz_interp - jiz_interp) * Bt_interp
             );
             enE_nodal(i, j, 0, 1) = (
-                (jz_interp - jiz_interp - Jextz(i, j, 0)) * Br_interp
-                - (jr_interp - jir_interp - Jextr(i, j, 0)) * Bz_interp
+                (jz_interp - jiz_interp) * Br_interp
+                - (jr_interp - jir_interp) * Bz_interp
             );
             enE_nodal(i, j, 0, 2) = (
-                (jr_interp - jir_interp - Jextr(i, j, 0)) * Bt_interp
-                - (jt_interp - jit_interp - Jextt(i, j, 0)) * Br_interp
+                (jr_interp - jir_interp) * Bt_interp
+                - (jt_interp - jit_interp) * Br_interp
             );
         });
 
@@ -558,14 +546,17 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real const> const& Jt = Jfield[1]->const_array(mfi);
         Array4<Real const> const& Jz = Jfield[2]->const_array(mfi);
         Array4<Real const> const& enE = enE_nodal_mf.const_array(mfi);
-        Array4<Real const> const& rho = rhofield->const_array(mfi);
-        Array4<Real> const& Pe = Pefield->array(mfi);
+        Array4<Real const> const& rho = rhofield.const_array(mfi);
+        Array4<Real const> const& Pe = Pefield.const_array(mfi);
 
-#ifdef AMREX_USE_EB
-        amrex::Array4<amrex::Real> const& lr = edge_lengths[0]->array(mfi);
-        amrex::Array4<amrex::Real> const& lt = edge_lengths[1]->array(mfi);
-        amrex::Array4<amrex::Real> const& lz = edge_lengths[2]->array(mfi);
-#endif
+        // Extract structures indicating where the fields
+        // should be updated, given the position of the embedded boundaries
+        amrex::Array4<int> update_Er_arr, update_Et_arr, update_Ez_arr;
+        if (EB::enabled()) {
+            update_Er_arr = eb_update_E[0]->array(mfi);
+            update_Et_arr = eb_update_E[1]->array(mfi);
+            update_Ez_arr = eb_update_E[2]->array(mfi);
+        }
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
@@ -586,16 +577,16 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
             // Er calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-#ifdef AMREX_USE_EB
-                // Skip if this cell is fully covered by embedded boundaries
-                if (lr(i, j, 0) <= 0) return;
-#endif
+
+                // Skip field update in the embedded boundaries
+                if (update_Er_arr && update_Er_arr(i, j, 0) == 0) { return; }
+
                 // Interpolate to get the appropriate charge density in space
                 Real rho_val = Interp(rho, nodal, Er_stag, coarsen, i, j, 0, 0);
 
                 // Interpolate current to appropriate staggering to match E field
                 Real jtot_val = 0._rt;
-                if (include_resistivity_term && resistivity_has_J_dependence) {
+                if (solve_for_Faraday && resistivity_has_J_dependence) {
                     const Real jr_val = Interp(Jr, Jr_stag, Er_stag, coarsen, i, j, 0, 0);
                     const Real jt_val = Interp(Jt, Jt_stag, Er_stag, coarsen, i, j, 0, 0);
                     const Real jz_val = Interp(Jz, Jz_stag, Er_stag, coarsen, i, j, 0, 0);
@@ -605,8 +596,10 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 // safety condition since we divide by rho_val later
                 if (rho_val < rho_floor) { rho_val = rho_floor; }
 
-                // Get the gradient of the electron pressure
-                auto grad_Pe = T_Algo::UpwardDr(Pe, coefs_r, n_coefs_r, i, j, 0, 0);
+                // Get the gradient of the electron pressure if the longitudinal part of
+                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
+                Real grad_Pe = 0._rt;
+                if (!solve_for_Faraday) { grad_Pe = T_Algo::UpwardDr(Pe, coefs_r, n_coefs_r, i, j, 0, 0); }
 
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_r = Interp(enE, nodal, Er_stag, coarsen, i, j, 0, 0);
@@ -614,24 +607,24 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 Er(i, j, 0) = (enE_r - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) { Er(i, j, 0) += eta(rho_val, jtot_val) * Jr(i, j, 0); }
+                if (solve_for_Faraday) { Er(i, j, 0) += eta(rho_val, jtot_val) * Jr(i, j, 0); }
 
                 if (include_hyper_resistivity_term) {
                     // r on cell-centered point (Jr is cell-centered in r)
-                    Real const r = rmin + (i + 0.5_rt)*dr;
-
-                    auto nabla2Jr = T_Algo::Dr_rDr_over_r(Jr, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
+                    const Real r = rmin + (i + 0.5_rt)*dr;
+                    const Real jr_val = Interp(Jr, Jr_stag, Er_stag, coarsen, i, j, 0, 0);
+                    auto nabla2Jr = T_Algo::Dr_rDr_over_r(Jr, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
+                        + T_Algo::Dzz(Jr, coefs_z, n_coefs_z, i, j, 0, 0) - jr_val/(r*r);
                     Er(i, j, 0) -= eta_h * nabla2Jr;
                 }
             },
 
             // Et calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-#ifdef AMREX_USE_EB
-                // In RZ Et is associated with a mesh node, so we need to check if the mesh node is covered
-                amrex::ignore_unused(lt);
-                if (lr(i, j, 0)<=0 || lr(i-1, j, 0)<=0 || lz(i, j-1, 0)<=0 || lz(i, j, 0)<=0) return;
-#endif
+
+                // Skip field update in the embedded boundaries
+                if (update_Et_arr && update_Et_arr(i, j, 0) == 0) { return; }
+
                 // r on a nodal grid (Et is nodal in r)
                 Real const r = rmin + i*dr;
                 // Mode m=0: // Ensure that Et remains 0 on axis
@@ -641,11 +634,11 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 }
 
                 // Interpolate to get the appropriate charge density in space
-                Real rho_val = Interp(rho, nodal, Er_stag, coarsen, i, j, 0, 0);
+                Real rho_val = Interp(rho, nodal, Et_stag, coarsen, i, j, 0, 0);
 
                 // Interpolate current to appropriate staggering to match E field
                 Real jtot_val = 0._rt;
-                if (include_resistivity_term && resistivity_has_J_dependence) {
+                if (solve_for_Faraday && resistivity_has_J_dependence) {
                     const Real jr_val = Interp(Jr, Jr_stag, Et_stag, coarsen, i, j, 0, 0);
                     const Real jt_val = Interp(Jt, Jt_stag, Et_stag, coarsen, i, j, 0, 0);
                     const Real jz_val = Interp(Jz, Jz_stag, Et_stag, coarsen, i, j, 0, 0);
@@ -665,23 +658,29 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 Et(i, j, 0) = (enE_t - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) { Et(i, j, 0) += eta(rho_val, jtot_val) * Jt(i, j, 0); }
+                if (solve_for_Faraday) { Et(i, j, 0) += eta(rho_val, jtot_val) * Jt(i, j, 0); }
 
-                // Note: Hyper-resisitivity should be revisited here when modal decomposition is implemented
+                if (include_hyper_resistivity_term) {
+                    const Real jt_val = Interp(Jt, Jt_stag, Et_stag, coarsen, i, j, 0, 0);
+                    auto nabla2Jt = T_Algo::Dr_rDr_over_r(Jt, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
+                        + T_Algo::Dzz(Jt, coefs_z, n_coefs_z, i, j, 0, 0) - jt_val/(r*r);
+
+                    Et(i, j, 0) -= eta_h * nabla2Jt;
+                }
             },
 
             // Ez calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-#ifdef AMREX_USE_EB
-                // Skip field solve if this cell is fully covered by embedded boundaries
-                if (lz(i,j,0) <= 0) { return; }
-#endif
+
+                // Skip field update in the embedded boundaries
+                if (update_Ez_arr && update_Ez_arr(i, j, 0) == 0) { return; }
+
                 // Interpolate to get the appropriate charge density in space
                 Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, 0, 0);
 
                 // Interpolate current to appropriate staggering to match E field
                 Real jtot_val = 0._rt;
-                if (include_resistivity_term && resistivity_has_J_dependence) {
+                if (solve_for_Faraday && resistivity_has_J_dependence) {
                     const Real jr_val = Interp(Jr, Jr_stag, Ez_stag, coarsen, i, j, 0, 0);
                     const Real jt_val = Interp(Jt, Jt_stag, Ez_stag, coarsen, i, j, 0, 0);
                     const Real jz_val = Interp(Jz, Jz_stag, Ez_stag, coarsen, i, j, 0, 0);
@@ -691,8 +690,10 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 // safety condition since we divide by rho_val later
                 if (rho_val < rho_floor) { rho_val = rho_floor; }
 
-                // Get the gradient of the electron pressure
-                auto grad_Pe = T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, 0, 0);
+                // Get the gradient of the electron pressure if the longitudinal part of
+                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
+                Real grad_Pe = 0._rt;
+                if (!solve_for_Faraday) { grad_Pe = T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, 0, 0); }
 
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, 0, 2);
@@ -700,10 +701,17 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 Ez(i, j, 0) = (enE_z - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) { Ez(i, j, 0) += eta(rho_val, jtot_val) * Jz(i, j, 0); }
+                if (solve_for_Faraday) { Ez(i, j, 0) += eta(rho_val, jtot_val) * Jz(i, j, 0); }
 
                 if (include_hyper_resistivity_term) {
+                    // r on nodal point (Jz is nodal in r)
+                    Real const r = rmin + i*dr;
+
                     auto nabla2Jz = T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, 0, 0);
+                    if (r > 0.5_rt*dr) {
+                        nabla2Jz += T_Algo::Dr_rDr_over_r(Jz, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
+                    }
+
                     Ez(i, j, 0) -= eta_h * nabla2Jz;
                 }
             }
@@ -722,21 +730,16 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::HybridPICSolveECartesian (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Efield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jifield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jextfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
-    std::unique_ptr<amrex::MultiFab> const& rhofield,
-    std::unique_ptr<amrex::MultiFab> const& Pefield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
+    ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField const& Jfield,
+    ablastr::fields::VectorField const& Jifield,
+    ablastr::fields::VectorField const& Bfield,
+    amrex::MultiFab const& rhofield,
+    amrex::MultiFab const& Pefield,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     int lev, HybridPICModel const* hybrid_model,
-    const bool include_resistivity_term )
+    const bool solve_for_Faraday )
 {
-#ifndef AMREX_USE_EB
-    amrex::ignore_unused(edge_lengths);
-#endif
-
     // for the profiler
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
@@ -748,7 +751,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
     const auto resistivity_has_J_dependence = hybrid_model->m_resistivity_has_J_dependence;
 
-    const bool include_hyper_resistivity_term = (eta_h > 0.) && include_resistivity_term;
+    const bool include_hyper_resistivity_term = (eta_h > 0.) && solve_for_Faraday;
 
     // Index type required for interpolating fields from their respective
     // staggering to the Ex, Ey, Ez locations
@@ -780,8 +783,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     // Also note that enE_nodal_mf does not need to have any guard cells since
     // these values will be interpolated to the Yee mesh which is contained
     // by the nodal mesh.
-    auto const& ba = convert(rhofield->boxArray(), IntVect::TheNodeVector());
-    MultiFab enE_nodal_mf(ba, rhofield->DistributionMap(), 3, IntVect::TheZeroVector());
+    auto const& ba = convert(rhofield.boxArray(), IntVect::TheNodeVector());
+    MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
 
     // Loop through the grids, and over the tiles within each grid for the
     // initial, nodal calculation of E
@@ -802,9 +805,6 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Array4<Real const> const& Jix = Jifield[0]->const_array(mfi);
         Array4<Real const> const& Jiy = Jifield[1]->const_array(mfi);
         Array4<Real const> const& Jiz = Jifield[2]->const_array(mfi);
-        Array4<Real const> const& Jextx = Jextfield[0]->const_array(mfi);
-        Array4<Real const> const& Jexty = Jextfield[1]->const_array(mfi);
-        Array4<Real const> const& Jextz = Jextfield[2]->const_array(mfi);
         Array4<Real const> const& Bx = Bfield[0]->const_array(mfi);
         Array4<Real const> const& By = Bfield[1]->const_array(mfi);
         Array4<Real const> const& Bz = Bfield[2]->const_array(mfi);
@@ -812,7 +812,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         // Loop over the cells and update the nodal E field
         amrex::ParallelFor(mfi.tilebox(), [=] AMREX_GPU_DEVICE (int i, int j, int k){
 
-            // interpolate the total current to a nodal grid
+            // interpolate the total plasma current to a nodal grid
             auto const jx_interp = Interp(Jx, Jx_stag, nodal, coarsen, i, j, k, 0);
             auto const jy_interp = Interp(Jy, Jy_stag, nodal, coarsen, i, j, k, 0);
             auto const jz_interp = Interp(Jz, Jz_stag, nodal, coarsen, i, j, k, 0);
@@ -829,16 +829,16 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
             // calculate enE = (J - Ji) x B
             enE_nodal(i, j, k, 0) = (
-                (jy_interp - jiy_interp - Jexty(i, j, k)) * Bz_interp
-                - (jz_interp - jiz_interp - Jextz(i, j, k)) * By_interp
+                (jy_interp - jiy_interp) * Bz_interp
+                - (jz_interp - jiz_interp) * By_interp
             );
             enE_nodal(i, j, k, 1) = (
-                (jz_interp - jiz_interp - Jextz(i, j, k)) * Bx_interp
-                - (jx_interp - jix_interp - Jextx(i, j, k)) * Bz_interp
+                (jz_interp - jiz_interp) * Bx_interp
+                - (jx_interp - jix_interp) * Bz_interp
             );
             enE_nodal(i, j, k, 2) = (
-                (jx_interp - jix_interp - Jextx(i, j, k)) * By_interp
-                - (jy_interp - jiy_interp - Jexty(i, j, k)) * Bx_interp
+                (jx_interp - jix_interp) * By_interp
+                - (jy_interp - jiy_interp) * Bx_interp
             );
         });
 
@@ -870,14 +870,17 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Array4<Real const> const& Jy = Jfield[1]->const_array(mfi);
         Array4<Real const> const& Jz = Jfield[2]->const_array(mfi);
         Array4<Real const> const& enE = enE_nodal_mf.const_array(mfi);
-        Array4<Real const> const& rho = rhofield->const_array(mfi);
-        Array4<Real> const& Pe = Pefield->array(mfi);
+        Array4<Real const> const& rho = rhofield.const_array(mfi);
+        Array4<Real const> const& Pe = Pefield.array(mfi);
 
-#ifdef AMREX_USE_EB
-        amrex::Array4<amrex::Real> const& lx = edge_lengths[0]->array(mfi);
-        amrex::Array4<amrex::Real> const& ly = edge_lengths[1]->array(mfi);
-        amrex::Array4<amrex::Real> const& lz = edge_lengths[2]->array(mfi);
-#endif
+        // Extract structures indicating where the fields
+        // should be updated, given the position of the embedded boundaries
+        amrex::Array4<int> update_Ex_arr, update_Ey_arr, update_Ez_arr;
+        if (EB::enabled()) {
+            update_Ex_arr = eb_update_E[0]->array(mfi);
+            update_Ey_arr = eb_update_E[1]->array(mfi);
+            update_Ez_arr = eb_update_E[2]->array(mfi);
+        }
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
@@ -896,16 +899,16 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
             // Ex calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-#ifdef AMREX_USE_EB
-                // Skip if this cell is fully covered by embedded boundaries
-                if (lx(i, j, k) <= 0) return;
-#endif
+
+                // Skip field update in the embedded boundaries
+                if (update_Ex_arr && update_Ex_arr(i, j, k) == 0) { return; }
+
                 // Interpolate to get the appropriate charge density in space
                 Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, k, 0);
 
                 // Interpolate current to appropriate staggering to match E field
                 Real jtot_val = 0._rt;
-                if (include_resistivity_term && resistivity_has_J_dependence) {
+                if (solve_for_Faraday && resistivity_has_J_dependence) {
                     const Real jx_val = Interp(Jx, Jx_stag, Ex_stag, coarsen, i, j, k, 0);
                     const Real jy_val = Interp(Jy, Jy_stag, Ex_stag, coarsen, i, j, k, 0);
                     const Real jz_val = Interp(Jz, Jz_stag, Ex_stag, coarsen, i, j, k, 0);
@@ -915,8 +918,10 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // safety condition since we divide by rho_val later
                 if (rho_val < rho_floor) { rho_val = rho_floor; }
 
-                // Get the gradient of the electron pressure
-                auto grad_Pe = T_Algo::UpwardDx(Pe, coefs_x, n_coefs_x, i, j, k);
+                // Get the gradient of the electron pressure if the longitudinal part of
+                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
+                Real grad_Pe = 0._rt;
+                if (!solve_for_Faraday) { grad_Pe = T_Algo::UpwardDx(Pe, coefs_x, n_coefs_x, i, j, k); }
 
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_x = Interp(enE, nodal, Ex_stag, coarsen, i, j, k, 0);
@@ -924,32 +929,28 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ex(i, j, k) = (enE_x - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) { Ex(i, j, k) += eta(rho_val, jtot_val) * Jx(i, j, k); }
+                if (solve_for_Faraday) { Ex(i, j, k) += eta(rho_val, jtot_val) * Jx(i, j, k); }
 
                 if (include_hyper_resistivity_term) {
-                    auto nabla2Jx = T_Algo::Dxx(Jx, coefs_x, n_coefs_x, i, j, k);
+                    auto nabla2Jx = T_Algo::Dxx(Jx, coefs_x, n_coefs_x, i, j, k)
+                        + T_Algo::Dyy(Jx, coefs_y, n_coefs_y, i, j, k)
+                        + T_Algo::Dzz(Jx, coefs_z, n_coefs_z, i, j, k);
                     Ex(i, j, k) -= eta_h * nabla2Jx;
                 }
             },
 
             // Ey calculation
-            [=] AMREX_GPU_DEVICE (int i, int j, int k){
-#ifdef AMREX_USE_EB
-                // Skip field solve if this cell is fully covered by embedded boundaries
-#ifdef WARPX_DIM_3D
-                if (ly(i,j,k) <= 0) { return; }
-#elif defined(WARPX_DIM_XZ)
-                //In XZ Ey is associated with a mesh node, so we need to check if the mesh node is covered
-                amrex::ignore_unused(ly);
-                if (lx(i, j, k)<=0 || lx(i-1, j, k)<=0 || lz(i, j-1, k)<=0 || lz(i, j, k)<=0) { return; }
-#endif
-#endif
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+
+                // Skip field update in the embedded boundaries
+                if (update_Ey_arr && update_Ey_arr(i, j, k) == 0) { return; }
+
                 // Interpolate to get the appropriate charge density in space
                 Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, k, 0);
 
                 // Interpolate current to appropriate staggering to match E field
                 Real jtot_val = 0._rt;
-                if (include_resistivity_term && resistivity_has_J_dependence) {
+                if (solve_for_Faraday && resistivity_has_J_dependence) {
                     const Real jx_val = Interp(Jx, Jx_stag, Ey_stag, coarsen, i, j, k, 0);
                     const Real jy_val = Interp(Jy, Jy_stag, Ey_stag, coarsen, i, j, k, 0);
                     const Real jz_val = Interp(Jz, Jz_stag, Ey_stag, coarsen, i, j, k, 0);
@@ -959,8 +960,10 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // safety condition since we divide by rho_val later
                 if (rho_val < rho_floor) { rho_val = rho_floor; }
 
-                // Get the gradient of the electron pressure
-                auto grad_Pe = T_Algo::UpwardDy(Pe, coefs_y, n_coefs_y, i, j, k);
+                // Get the gradient of the electron pressure if the longitudinal part of
+                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
+                Real grad_Pe = 0._rt;
+                if (!solve_for_Faraday) { grad_Pe = T_Algo::UpwardDy(Pe, coefs_y, n_coefs_y, i, j, k); }
 
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_y = Interp(enE, nodal, Ey_stag, coarsen, i, j, k, 1);
@@ -968,26 +971,28 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ey(i, j, k) = (enE_y - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) { Ey(i, j, k) += eta(rho_val, jtot_val) * Jy(i, j, k); }
+                if (solve_for_Faraday) { Ey(i, j, k) += eta(rho_val, jtot_val) * Jy(i, j, k); }
 
                 if (include_hyper_resistivity_term) {
-                    auto nabla2Jy = T_Algo::Dyy(Jy, coefs_y, n_coefs_y, i, j, k);
+                    auto nabla2Jy = T_Algo::Dxx(Jy, coefs_x, n_coefs_x, i, j, k)
+                        + T_Algo::Dyy(Jy, coefs_y, n_coefs_y, i, j, k)
+                        + T_Algo::Dzz(Jy, coefs_z, n_coefs_z, i, j, k);
                     Ey(i, j, k) -= eta_h * nabla2Jy;
                 }
             },
 
             // Ez calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-#ifdef AMREX_USE_EB
-                // Skip field solve if this cell is fully covered by embedded boundaries
-                if (lz(i,j,k) <= 0) { return; }
-#endif
+
+                // Skip field update in the embedded boundaries
+                if (update_Ez_arr && update_Ez_arr(i, j, k) == 0) { return; }
+
                 // Interpolate to get the appropriate charge density in space
                 Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
 
                 // Interpolate current to appropriate staggering to match E field
                 Real jtot_val = 0._rt;
-                if (include_resistivity_term && resistivity_has_J_dependence) {
+                if (solve_for_Faraday && resistivity_has_J_dependence) {
                     const Real jx_val = Interp(Jx, Jx_stag, Ez_stag, coarsen, i, j, k, 0);
                     const Real jy_val = Interp(Jy, Jy_stag, Ez_stag, coarsen, i, j, k, 0);
                     const Real jz_val = Interp(Jz, Jz_stag, Ez_stag, coarsen, i, j, k, 0);
@@ -997,8 +1002,10 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // safety condition since we divide by rho_val later
                 if (rho_val < rho_floor) { rho_val = rho_floor; }
 
-                // Get the gradient of the electron pressure
-                auto grad_Pe = T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, k);
+                // Get the gradient of the electron pressure if the longitudinal part of
+                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
+                Real grad_Pe = 0._rt;
+                if (!solve_for_Faraday) { grad_Pe = T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, k); }
 
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, k, 2);
@@ -1006,10 +1013,12 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ez(i, j, k) = (enE_z - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) { Ez(i, j, k) += eta(rho_val, jtot_val) * Jz(i, j, k); }
+                if (solve_for_Faraday) { Ez(i, j, k) += eta(rho_val, jtot_val) * Jz(i, j, k); }
 
                 if (include_hyper_resistivity_term) {
-                    auto nabla2Jz = T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, k);
+                    auto nabla2Jz = T_Algo::Dxx(Jz, coefs_x, n_coefs_x, i, j, k)
+                        + T_Algo::Dyy(Jz, coefs_y, n_coefs_y, i, j, k)
+                        + T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, k);
                     Ez(i, j, k) -= eta_h * nabla2Jz;
                 }
             }

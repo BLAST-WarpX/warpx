@@ -2,7 +2,7 @@
 #export proj="<yourProjectNameHere>"  # edit this and comment in
 
 # required dependencies
-module load cmake/3.23.1
+module load cmake/3.29.2
 module load gcc/11.2.1
 module load cuda/12.0.0
 

@@ -13,6 +13,7 @@ foreach(D IN LISTS WarpX_DIMS)
         target_sources(pyWarpX_${SD}
           PRIVATE
             # pybind11
+            MultiFabRegister.cpp
             WarpX.cpp
         )
     endif()

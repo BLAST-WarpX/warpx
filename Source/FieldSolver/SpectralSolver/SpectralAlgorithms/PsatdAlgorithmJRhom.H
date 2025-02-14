@@ -11,6 +11,8 @@
 #include "FieldSolver/SpectralSolver/SpectralKSpace.H"
 #include "SpectralBaseAlgorithm.H"
 
+#include <ablastr/utils/Enums.H>
+
 #include <AMReX_Array.H>
 #include <AMReX_Config.H>
 #include <AMReX_REAL.H>
@@ -46,6 +48,8 @@ class PsatdAlgorithmJRhom : public SpectralBaseAlgorithm
          * \param[in] time_averaging whether to use time averaging for large time steps
          * \param[in] dive_cleaning Update F as part of the field update, so that errors in divE=rho propagate away at the speed of light
          * \param[in] divb_cleaning Update G as part of the field update, so that errors in divB=0 propagate away at the speed of light
+         * \param[in] J_in_time time dependency of J within one time step
+         * \param[in] rho_in_time time dependency of rho within one time step
          */
         PsatdAlgorithmJRhom (
             const SpectralKSpace& spectral_kspace,
@@ -54,14 +58,15 @@ class PsatdAlgorithmJRhom : public SpectralBaseAlgorithm
             int norder_x,
             int norder_y,
             int norder_z,
-            short grid_type,
+            ablastr::utils::enums::GridType grid_type,
             amrex::Real dt,
             bool update_with_rho,
             bool time_averaging,
             bool dive_cleaning,
             bool divb_cleaning,
             int J_in_time,
-            int rho_in_time);
+            int rho_in_time
+        );
 
         /**
          * \brief Updates the E and B fields in spectral space, according to the PSATD-JRhom equations

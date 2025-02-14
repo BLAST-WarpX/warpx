@@ -36,13 +36,13 @@ guardCellManager::Init (
     const amrex::Real *dx,
     const bool do_subcycling,
     const bool do_fdtd_nci_corr,
-    const short grid_type,
+    ablastr::utils::enums::GridType grid_type,
     const bool do_moving_window,
     const int moving_window_dir,
     const int nox,
     const int nox_fft, const int noy_fft, const int noz_fft,
     const int nci_corr_stencil,
-    const int electromagnetic_solver_id,
+    const ElectromagneticSolverAlgo electromagnetic_solver_id,
     const int max_level,
     const amrex::Vector<amrex::Real>& v_galilean,
     const amrex::Vector<amrex::Real>& v_comoving,
@@ -101,9 +101,9 @@ guardCellManager::Init (
     // the fine grid by a number of cells equal to the ref_ratio in the moving
     // window direction.
     if (do_moving_window) {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(ref_ratios.size() <= 1,
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_level <= 1,
             "The number of grow cells for the moving window currently assumes 2 levels max.");
-        const auto nlevs = static_cast<int>(ref_ratios.size()+1);
+        const auto nlevs = static_cast<int>(max_level+1);
         const int max_r = (nlevs > 1) ? ref_ratios[0][moving_window_dir] : 2;
 
         ngx = std::max(ngx,max_r);
@@ -200,6 +200,7 @@ guardCellManager::Init (
         // currents in the latter case). This does not seem to be necessary in x and y,
         // where it still seems fine to set half the number of guard cells of the nodal case.
 
+        using namespace ablastr::utils::enums;
         int ngFFt_x = (grid_type == GridType::Collocated) ? nox_fft : nox_fft / 2;
         int ngFFt_y = (grid_type == GridType::Collocated) ? noy_fft : noy_fft / 2;
         int ngFFt_z = (grid_type == GridType::Collocated || galilean) ? noz_fft : noz_fft / 2;

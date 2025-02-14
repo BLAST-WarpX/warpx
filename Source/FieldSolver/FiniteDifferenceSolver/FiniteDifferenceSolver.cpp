@@ -28,9 +28,9 @@
 
 /* This function initializes the stencil coefficients for the chosen finite-difference algorithm */
 FiniteDifferenceSolver::FiniteDifferenceSolver (
-    int const fdtd_algo,
+    ElectromagneticSolverAlgo const fdtd_algo,
     std::array<amrex::Real,3> cell_size,
-    short grid_type):
+    ablastr::utils::enums::GridType grid_type):
     // Register the type of finite-difference algorithm
     m_fdtd_algo{fdtd_algo},
     m_grid_type{grid_type}
@@ -63,7 +63,7 @@ FiniteDifferenceSolver::FiniteDifferenceSolver (
             "FiniteDifferenceSolver: Unknown algorithm");
     }
 #else
-    if (grid_type == GridType::Collocated) {
+    if (grid_type == ablastr::utils::enums::GridType::Collocated) {
 
         CartesianNodalAlgorithm::InitializeStencilCoefficients( cell_size,
             m_h_stencil_coefs_x, m_h_stencil_coefs_y, m_h_stencil_coefs_z );

@@ -17,6 +17,8 @@
 #   include "FieldSolver/SpectralSolver/SpectralSolver.H"
 #endif
 
+#include <ablastr/fields/MultiFabRegister.H>
+
 #include <AMReX_MultiFab.H>
 #include <AMReX_BoxArray.H>
 #include <AMReX_Config.H>
@@ -79,10 +81,10 @@ class SigmaBoxFactory
     : public amrex::FabFactory<SigmaBox>
 {
 public:
-    SigmaBoxFactory (const amrex::BoxArray& grid_ba, const amrex::Real* dx,
+    SigmaBoxFactory (const amrex::BoxArray* grid_ba, const amrex::Real* dx,
                      const amrex::IntVect& ncell, const amrex::IntVect& delta,
                      const amrex::Box& regular_domain, const amrex::Real v_sigma_sb)
-        : m_grids(grid_ba), m_dx(dx), m_ncell(ncell), m_delta(delta), m_regdomain(regular_domain), m_v_sigma_sb(v_sigma_sb) {}
+        : m_grids{grid_ba}, m_dx(dx), m_ncell(ncell), m_delta(delta), m_regdomain(regular_domain), m_v_sigma_sb(v_sigma_sb) {}
     ~SigmaBoxFactory () override = default;
 
     SigmaBoxFactory (const SigmaBoxFactory&) = default;
@@ -95,7 +97,7 @@ public:
     [[nodiscard]] SigmaBox* create (const amrex::Box& box, int /*ncomps*/,
         const amrex::FabInfo& /*info*/, int /*box_index*/) const final
     {
-        return new SigmaBox(box, m_grids, m_dx, m_ncell, m_delta, m_regdomain, m_v_sigma_sb);
+        return new SigmaBox(box, *m_grids, m_dx, m_ncell, m_delta, m_regdomain, m_v_sigma_sb);
     }
 
     void destroy (SigmaBox* fab) const final
@@ -110,7 +112,7 @@ public:
     }
 
 private:
-    const amrex::BoxArray& m_grids;
+    const amrex::BoxArray* m_grids;
     const amrex::Real* m_dx;
     amrex::IntVect m_ncell;
     amrex::IntVect m_delta;
@@ -123,7 +125,7 @@ class MultiSigmaBox
 {
 public:
     MultiSigmaBox(const amrex::BoxArray& ba, const amrex::DistributionMapping& dm,
-                  const amrex::BoxArray& grid_ba, const amrex::Real* dx,
+                  const amrex::BoxArray* grid_ba, const amrex::Real* dx,
                   const amrex::IntVect& ncell, const amrex::IntVect& delta,
                   const amrex::Box& regular_domain, amrex::Real v_sigma_sb);
     void ComputePMLFactorsB (const amrex::Real* dx, amrex::Real dt);
@@ -140,34 +142,20 @@ public:
          const amrex::DistributionMapping& dm, bool do_similar_dm_pml,
          const amrex::Geometry* geom, const amrex::Geometry* cgeom,
          int ncell, int delta, amrex::IntVect ref_ratio,
-         amrex::Real dt, int nox_fft, int noy_fft, int noz_fft, short grid_type,
+         amrex::Real dt, int nox_fft, int noy_fft, int noz_fft,
+         ablastr::utils::enums::GridType grid_type,
          int do_moving_window, int pml_has_particles, int do_pml_in_domain,
-         int psatd_solution_type, int J_in_time, int rho_in_time,
+         PSATDSolutionType psatd_solution_type,
+         JInTime J_in_time, RhoInTime rho_in_time,
          bool do_pml_dive_cleaning, bool do_pml_divb_cleaning,
          const amrex::IntVect& fill_guards_fields,
          const amrex::IntVect& fill_guards_current,
+         bool eb_enabled,
          int max_guard_EB, amrex::Real v_sigma_sb,
          amrex::IntVect do_pml_Lo = amrex::IntVect::TheUnitVector(),
          amrex::IntVect do_pml_Hi = amrex::IntVect::TheUnitVector());
 
     void ComputePMLFactors (amrex::Real dt);
-
-    std::array<amrex::MultiFab*,3> GetE_fp ();
-    std::array<amrex::MultiFab*,3> GetB_fp ();
-    std::array<amrex::MultiFab*,3> Getj_fp ();
-    std::array<amrex::MultiFab*,3> GetE_cp ();
-    std::array<amrex::MultiFab*,3> GetB_cp ();
-    std::array<amrex::MultiFab*,3> Getj_cp ();
-    std::array<amrex::MultiFab*,3> Get_edge_lengths ();
-    std::array<amrex::MultiFab*,3> Get_face_areas ();
-
-    // Used when WarpX::do_pml_dive_cleaning = true
-    amrex::MultiFab* GetF_fp ();
-    amrex::MultiFab* GetF_cp ();
-
-    // Used when WarpX::do_pml_divb_cleaning = true
-    amrex::MultiFab* GetG_fp ();
-    amrex::MultiFab* GetG_cp ();
 
     [[nodiscard]] const MultiSigmaBox& GetMultiSigmaBox_fp () const
     {
@@ -180,35 +168,33 @@ public:
     }
 
 #ifdef WARPX_USE_FFT
-    void PushPSATD (int lev);
+    void PushPSATD (ablastr::fields::MultiFabRegister& fields, int lev);
 #endif
 
-    void CopyJtoPMLs (const std::array<amrex::MultiFab*,3>& j_fp,
-                    const std::array<amrex::MultiFab*,3>& j_cp);
+    void CopyJtoPMLs (ablastr::fields::MultiFabRegister& fields, int lev);
 
-    void Exchange (const std::array<amrex::MultiFab*,3>& mf_pml,
-                   const std::array<amrex::MultiFab*,3>& mf,
+    void Exchange (ablastr::fields::VectorField mf_pml,
+                   ablastr::fields::VectorField mf,
+                   const PatchType& patch_type,
+                   int do_pml_in_domain);
+    void Exchange (amrex::MultiFab* mf_pml,
+                   amrex::MultiFab* mf,
                    const PatchType& patch_type,
                    int do_pml_in_domain);
 
-    void CopyJtoPMLs (PatchType patch_type,
-                    const std::array<amrex::MultiFab*,3>& jp);
+    void CopyJtoPMLs (
+        ablastr::fields::MultiFabRegister& fields,
+        PatchType patch_type,
+        int lev
+    );
 
-    void ExchangeF (amrex::MultiFab* F_fp, amrex::MultiFab* F_cp, int do_pml_in_domain);
-    void ExchangeF (PatchType patch_type, amrex::MultiFab* Fp, int do_pml_in_domain);
-
-    void ExchangeG (amrex::MultiFab* G_fp, amrex::MultiFab* G_cp, int do_pml_in_domain);
-    void ExchangeG (PatchType patch_type, amrex::MultiFab* Gp, int do_pml_in_domain);
-
-    void FillBoundaryE (PatchType patch_type, std::optional<bool> nodal_sync=std::nullopt);
-    void FillBoundaryB (PatchType patch_type, std::optional<bool> nodal_sync=std::nullopt);
-    void FillBoundaryF (PatchType patch_type, std::optional<bool> nodal_sync=std::nullopt);
-    void FillBoundaryG (PatchType patch_type, std::optional<bool> nodal_sync=std::nullopt);
+    void FillBoundary (ablastr::fields::VectorField mf_pml, PatchType patch_type, std::optional<bool> nodal_sync=std::nullopt);
+    void FillBoundary (amrex::MultiFab & mf_pml, PatchType patch_type, std::optional<bool> nodal_sync=std::nullopt);
 
     [[nodiscard]] bool ok () const { return m_ok; }
 
-    void CheckPoint (const std::string& dir) const;
-    void Restart (const std::string& dir);
+    void CheckPoint (ablastr::fields::MultiFabRegister& fields, const std::string& dir) const;
+    void Restart (ablastr::fields::MultiFabRegister& fields, const std::string& dir);
 
     static void Exchange (amrex::MultiFab& pml, amrex::MultiFab& reg, const amrex::Geometry& geom, int do_pml_in_domain);
 
@@ -218,29 +204,11 @@ private:
     bool m_dive_cleaning;
     bool m_divb_cleaning;
 
-    const amrex::IntVect m_fill_guards_fields;
-    const amrex::IntVect m_fill_guards_current;
+    amrex::IntVect m_fill_guards_fields;
+    amrex::IntVect m_fill_guards_current;
 
     const amrex::Geometry* m_geom;
     const amrex::Geometry* m_cgeom;
-
-    std::array<std::unique_ptr<amrex::MultiFab>,3> pml_E_fp;
-    std::array<std::unique_ptr<amrex::MultiFab>,3> pml_B_fp;
-    std::array<std::unique_ptr<amrex::MultiFab>,3> pml_j_fp;
-
-    std::array<std::unique_ptr<amrex::MultiFab>,3> pml_edge_lengths;
-
-    std::array<std::unique_ptr<amrex::MultiFab>,3> pml_E_cp;
-    std::array<std::unique_ptr<amrex::MultiFab>,3> pml_B_cp;
-    std::array<std::unique_ptr<amrex::MultiFab>,3> pml_j_cp;
-
-    // Used when WarpX::do_pml_dive_cleaning = true
-    std::unique_ptr<amrex::MultiFab> pml_F_fp;
-    std::unique_ptr<amrex::MultiFab> pml_F_cp;
-
-    // Used when WarpX::do_pml_divb_cleaning = true
-    std::unique_ptr<amrex::MultiFab> pml_G_fp;
-    std::unique_ptr<amrex::MultiFab> pml_G_cp;
 
     std::unique_ptr<MultiSigmaBox> sigba_fp;
     std::unique_ptr<MultiSigmaBox> sigba_cp;
@@ -259,7 +227,7 @@ private:
     }
 
 #ifdef AMREX_USE_EB
-    amrex::EBFArrayBoxFactory const& fieldEBFactory () const noexcept {
+    [[nodiscard]] amrex::EBFArrayBoxFactory const& fieldEBFactory () const noexcept {
         return static_cast<amrex::EBFArrayBoxFactory const&>(*pml_field_factory);
     }
 #endif
@@ -290,13 +258,15 @@ private:
 };
 
 #ifdef WARPX_USE_FFT
-void PushPMLPSATDSinglePatch( int lev,
+void PushPMLPSATDSinglePatch (
+    int lev,
     SpectralSolver& solver,
-    std::array<std::unique_ptr<amrex::MultiFab>,3>& pml_E,
-    std::array<std::unique_ptr<amrex::MultiFab>,3>& pml_B,
-    std::unique_ptr<amrex::MultiFab>& pml_F,
-    std::unique_ptr<amrex::MultiFab>& pml_G,
-    const amrex::IntVect& fill_guards);
+    ablastr::fields::VectorField& pml_E,
+    ablastr::fields::VectorField& pml_B,
+    ablastr::fields::ScalarField pml_F,
+    ablastr::fields::ScalarField pml_G,
+    const amrex::IntVect& fill_guards
+);
 #endif
 
 #endif

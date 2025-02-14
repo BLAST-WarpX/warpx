@@ -6,4 +6,4 @@
 
 from .Bucket import Bucket
 
-eb2 = Bucket('eb2')
+eb2 = Bucket("eb2")

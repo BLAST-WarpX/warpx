@@ -64,16 +64,11 @@ public:
 
     void WriteHeader (std::ostream& os) const final;
 
-    void Evolve (int lev,
-                         const amrex::MultiFab&, const amrex::MultiFab&, const amrex::MultiFab&,
-                         const amrex::MultiFab&, const amrex::MultiFab&, const amrex::MultiFab&,
-                         amrex::MultiFab& jx, amrex::MultiFab& jy, amrex::MultiFab& jz,
-                         amrex::MultiFab*, amrex::MultiFab*, amrex::MultiFab*,
-                         amrex::MultiFab* rho, amrex::MultiFab* crho,
-                         const amrex::MultiFab*, const amrex::MultiFab*, const amrex::MultiFab*,
-                         const amrex::MultiFab*, const amrex::MultiFab*, const amrex::MultiFab*,
-                         amrex::Real t, amrex::Real dt, DtType a_dt_type=DtType::Full,
-                         bool skip_deposition=false, PushType push_type=PushType::Explicit) final;
+    void Evolve (ablastr::fields::MultiFabRegister& fields,
+                 int lev,
+                 const std::string& current_fp_string,
+                 amrex::Real t, amrex::Real dt, DtType a_dt_type=DtType::Full,
+                 bool skip_deposition=false, PushType push_type=PushType::Explicit) final;
 
     void PushP (int lev, amrex::Real dt,
                         const amrex::MultiFab& ,

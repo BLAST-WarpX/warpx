@@ -188,10 +188,10 @@ SpectralKSpace::getSpectralShiftFactor( const DistributionMapping& dm,
  * \param grid_type type of grid (collocated or not)
  */
 KVectorComponent
-SpectralKSpace::getModifiedKComponent( const DistributionMapping& dm,
+SpectralKSpace::getModifiedKComponent (const DistributionMapping& dm,
                                        const int i_dim,
                                        const int n_order,
-                                       const short grid_type ) const
+                                       ablastr::utils::enums::GridType grid_type) const
 {
     // Initialize an empty DeviceVector in each box
     KVectorComponent modified_k_comp(spectralspace_ba, dm);

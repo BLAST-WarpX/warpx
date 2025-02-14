@@ -49,7 +49,7 @@ void doParticleMomentumPush(amrex::ParticleReal& ux,
                             const int ion_lev,
                             const amrex::ParticleReal m,
                             const amrex::ParticleReal a_q,
-                            const int pusher_algo,
+                            const ParticlePusherAlgo pusher_algo,
                             const int do_crr,
 #ifdef WARPX_QED
                             const amrex::Real t_chi_max,

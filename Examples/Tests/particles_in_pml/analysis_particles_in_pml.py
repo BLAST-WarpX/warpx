@@ -17,21 +17,19 @@ is close to 0 once the particles have left. With regular
 PML, this test fails, since the particles leave a spurious
 charge, with associated fields, behind them.
 """
-import os
+
 import sys
 
 import yt
 
 yt.funcs.mylog.setLevel(0)
-sys.path.insert(1, '../../../../warpx/Regression/Checksum/')
-import checksumAPI
 
 # Open plotfile specified in command line
 filename = sys.argv[1]
-ds = yt.load( filename )
+ds = yt.load(filename)
 
 # When extracting the fields, choose the right dimensions
-dimensions = [ n_pts for n_pts in ds.domain_dimensions ]
+dimensions = [n_pts for n_pts in ds.domain_dimensions]
 if ds.max_level == 1:
     dimensions[0] *= 2
     dimensions[1] *= 2
@@ -39,12 +37,14 @@ if ds.max_level == 1:
         dimensions[2] *= 2
 
 # Check that the field is low enough
-ad0 = ds.covering_grid(level=ds.max_level, left_edge=ds.domain_left_edge, dims=dimensions)
-Ex_array = ad0[('mesh','Ex')].to_ndarray()
-Ey_array = ad0[('mesh','Ey')].to_ndarray()
-Ez_array = ad0[('mesh','Ez')].to_ndarray()
+ad0 = ds.covering_grid(
+    level=ds.max_level, left_edge=ds.domain_left_edge, dims=dimensions
+)
+Ex_array = ad0[("mesh", "Ex")].to_ndarray()
+Ey_array = ad0[("mesh", "Ey")].to_ndarray()
+Ez_array = ad0[("mesh", "Ez")].to_ndarray()
 max_Efield = max(Ex_array.max(), Ey_array.max(), Ez_array.max())
-print( "max_Efield = %s" %max_Efield )
+print("max_Efield = %s" % max_Efield)
 
 # The field associated with the particle does not have
 # the same amplitude in 2d and 3d
@@ -63,6 +63,3 @@ else:
 
 print("tolerance_abs: " + str(tolerance_abs))
 assert max_Efield < tolerance_abs
-
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename)

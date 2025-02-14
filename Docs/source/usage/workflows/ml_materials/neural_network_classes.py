@@ -16,10 +16,12 @@ class ActivationType(Enum):
     """
     Activation class provides an enumeration type for the supported activation layers
     """
+
     ReLU = 1
     Tanh = 2
     PReLU = 3
     Sigmoid = 4
+
 
 def get_enum_type(type_to_test, EnumClass):
     """
@@ -42,28 +44,25 @@ def get_enum_type(type_to_test, EnumClass):
         raise Exception("unsupported type entered")
 
 
-
 class ConnectedNN(nn.Module):
     """
     ConnectedNN is a class of fully connected neural networks
     """
+
     def __init__(self, layers):
         super().__init__()
         self.stack = nn.Sequential(*layers)
+
     def forward(self, x):
         return self.stack(x)
+
 
 class OneActNN(ConnectedNN):
     """
     OneActNN is class of fully connected neural networks admitting only one activation function
     """
-    def __init__(self,
-                 n_in,
-                 n_out,
-                 n_hidden_nodes,
-                 n_hidden_layers,
-                 act):
 
+    def __init__(self, n_in, n_out, n_hidden_nodes, n_hidden_layers, act):
         self.n_in = n_in
         self.n_out = n_out
         self.n_hidden_layers = n_hidden_layers
@@ -84,7 +83,7 @@ class OneActNN(ConnectedNN):
                 layers += [nn.Sigmoid()]
 
             if ii < self.n_hidden_layers - 1:
-                layers += [nn.Linear(self.n_hidden_nodes,self.n_hidden_nodes)]
+                layers += [nn.Linear(self.n_hidden_nodes, self.n_hidden_nodes)]
 
         layers += [nn.Linear(self.n_hidden_nodes, self.n_out)]
 

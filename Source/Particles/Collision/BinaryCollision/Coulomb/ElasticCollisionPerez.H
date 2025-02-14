@@ -25,7 +25,6 @@
  * @param[in] I1,I2 the index arrays. They determine all elements that will be used.
  * @param[in,out] soa_1,soa_2 the struct of array for species 1/2
  * @param[in] n1,n2 density of species 1/2
- * @param[in] n12 density parameter for s12
  * @param[in] T1,T2 temperature [Joules] of species 1/2
  *            only used if L <= 0
  * @param[in] q1,q2 charge of species 1/2
@@ -33,7 +32,9 @@
  * @param[in] dt is the time step length between two collision calls.
  * @param[in] L is the Coulomb log and will be used if greater than zero,
  *            otherwise will be computed.
+ * @param[in] dV is the volume of the corresponding cell.
  * @param[in] engine the random number generator state & factory
+ * @param[in] isSameSpecies whether this is an intra-species collision process
  * @param[in] coll_idx is the collision index offset.
 */
 
@@ -46,13 +47,12 @@ void ElasticCollisionPerez (
     T_index const* AMREX_RESTRICT I2,
     SoaData_type soa_1, SoaData_type soa_2,
     T_PR const  n1, T_PR const  n2,
-    T_PR const  n12,
     T_PR const  T1, T_PR const  T2,
     T_PR const  q1, T_PR const  q2,
     T_PR const  m1, T_PR const  m2,
-    T_R const  dt, T_PR const  L,
+    T_R const  dt, T_PR const  L, T_R const  dV,
     amrex::RandomEngine const& engine,
-    T_index coll_idx)
+    bool const isSameSpecies, T_index coll_idx)
 {
     const T_index NI1 = I1e - I1s;
     const T_index NI2 = I2e - I2s;
@@ -69,15 +69,22 @@ void ElasticCollisionPerez (
     T_PR * const AMREX_RESTRICT u2y = soa_2.m_rdata[PIdx::uy];
     T_PR * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];
 
-    // compute Debye length lmdD
+    // compute Debye length lmdD (if not using a fixed L = Coulomb log)
     T_PR lmdD = T_PR(-1.0);
     if ( L <= T_PR(0.0) ) {
         lmdD = T_PR(1.0)/std::sqrt( n1*q1*q1/(T1*PhysConst::ep0) +
                                     n2*q2*q2/(T2*PhysConst::ep0) );
     }
-    T_PR rmin = std::pow( T_PR(4.0) * MathConst::pi / T_PR(3.0) *
-               amrex::max(n1,n2), T_PR(-1.0/3.0) );
-    lmdD = amrex::max(lmdD, rmin);
+
+    // compute atomic spacing
+    const T_PR maxn = amrex::max(n1,n2);
+    const auto rmin = static_cast<T_PR>( 1.0/std::cbrt(4.0*MathConst::pi/3.0*maxn) );
+
+    // bmax (screening length) cannot be smaller than atomic spacing
+    const T_PR bmax = amrex::max(lmdD, rmin);
+
+    // set max cross section based on mfp = atomic spacing
+    const T_PR sigma_max = T_PR(1.0) / (maxn * rmin);
 
 #if (defined WARPX_DIM_RZ)
     T_PR * const AMREX_RESTRICT theta1 = soa_1.m_rdata[PIdx::theta];
@@ -108,13 +115,22 @@ void ElasticCollisionPerez (
           u1y[I1[i1]] = u1xbuf*std::sin(theta) + u1y[I1[i1]]*std::cos(theta);
 #endif
 
+          // Compute the effective density n12 used to compute the normalized
+          // scattering path s12 in UpdateMomentumPerezElastic().
+          // s12 is defined such that the expected value of the change in particle
+          // velocity is equal to that from the full NxN pairing method, as described
+          // here https://arxiv.org/abs/2407.19151. This method is a direct extension
+          // of the original method by Takizuka and Abe JCP 25 (1977) to weighted particles.
+          T_PR n12;
+          const T_PR wpmax = amrex::max(w1[ I1[i1] ],w2[ I2[i2] ]);
+          if (isSameSpecies) { n12 = wpmax*static_cast<T_PR>(min_N+max_N-1)/dV; }
+          else { n12 = wpmax*static_cast<T_PR>(min_N)/dV; }
+
           UpdateMomentumPerezElastic(
               u1x[ I1[i1] ], u1y[ I1[i1] ], u1z[ I1[i1] ],
               u2x[ I2[i2] ], u2y[ I2[i2] ], u2z[ I2[i2] ],
-              n1, n2, n12,
               q1, m1, w1[ I1[i1] ], q2, m2, w2[ I2[i2] ],
-              dt, L, lmdD,
-              engine);
+              n12, sigma_max, L, bmax, dt, engine );
 
 #if (defined WARPX_DIM_RZ)
           T_PR const u1xbuf_new = u1x[I1[i1]];

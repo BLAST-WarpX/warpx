@@ -94,11 +94,6 @@ public:
         const auto soa_1 = ptile1.getParticleTileData();
         const auto soa_2 = ptile2.getParticleTileData();
 
-        amrex::ParticleReal* AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
-        amrex::ParticleReal* AMREX_RESTRICT w2 = soa_2.m_rdata[PIdx::w];
-        uint64_t* AMREX_RESTRICT idcpu1 = soa_1.m_idcpu;
-        uint64_t* AMREX_RESTRICT idcpu2 = soa_2.m_idcpu;
-
         // Create necessary GPU vectors, that will be used in the kernel below
         amrex::Vector<SoaData_type> soa_products;
         for (int i = 0; i < m_num_product_species; i++)
@@ -151,12 +146,6 @@ public:
                 // Set the weight of the new particles to p_pair_reaction_weight[i]
                 soa_products_data[1].m_rdata[PIdx::w][product2_index] = p_pair_reaction_weight[i];
 
-                // Remove p_pair_reaction_weight[i] from the colliding particles' weights
-                BinaryCollisionUtils::remove_weight_from_colliding_particle(
-                    w1[p_pair_indices_1[i]], idcpu1[p_pair_indices_1[i]], p_pair_reaction_weight[i]);
-                BinaryCollisionUtils::remove_weight_from_colliding_particle(
-                    w2[p_pair_indices_2[i]], idcpu2[p_pair_indices_2[i]], p_pair_reaction_weight[i]);
-
                 // Set the child particle properties appropriately
                 auto& ux1 = soa_products_data[0].m_rdata[PIdx::ux][product1_index];
                 auto& uy1 = soa_products_data[0].m_rdata[PIdx::uy][product1_index];
@@ -164,6 +153,25 @@ public:
                 auto& ux2 = soa_products_data[1].m_rdata[PIdx::ux][product2_index];
                 auto& uy2 = soa_products_data[1].m_rdata[PIdx::uy][product2_index];
                 auto& uz2 = soa_products_data[1].m_rdata[PIdx::uz][product2_index];
+
+#if (defined WARPX_DIM_RZ)
+                /* In RZ geometry, macroparticles can collide with other macroparticles
+                * in the same *cylindrical* cell. For this reason, collisions between macroparticles
+                * are actually not local in space. In this case, the underlying assumption is that
+                * particles within the same cylindrical cell represent a cylindrically-symmetry
+                * momentum distribution function. Therefore, here, we temporarily rotate the
+                * momentum of one of the macroparticles in agreement with this cylindrical symmetry.
+                * (This is technically only valid if we use only the m=0 azimuthal mode in the simulation;
+                * there is a corresponding assert statement at initialization.)
+                */
+                amrex::ParticleReal const theta = (
+                    soa_products_data[1].m_rdata[PIdx::theta][product2_index]
+                    - soa_products_data[0].m_rdata[PIdx::theta][product1_index]
+                );
+                amrex::ParticleReal const ux1buf = ux1;
+                ux1 = ux1buf*std::cos(theta) - uy1*std::sin(theta);
+                uy1 = ux1buf*std::sin(theta) + uy1*std::cos(theta);
+#endif
 
                 // for simplicity (for now) we assume non-relativistic particles
                 // and simply calculate the center-of-momentum velocity from the
@@ -213,6 +221,8 @@ public:
                     else {
                         amrex::Abort("Uneven mass charge-exchange not implemented yet.");
                     }
+                } else if (mask[i] == int(ScatteringProcessType::FORWARD)) {
+                    amrex::Abort("Forward scattering with DSMC not implemented yet.");
                 }
                 else {
                     amrex::Abort("Unknown scattering process.");
@@ -224,6 +234,13 @@ public:
                 ux2 += uCOM_x;
                 uy2 += uCOM_y;
                 uz2 += uCOM_z;
+
+#if (defined WARPX_DIM_RZ)
+                /* Undo the earlier velocity rotation. */
+                amrex::ParticleReal const ux1buf_new = ux1;
+                ux1 = ux1buf_new*std::cos(-theta) - uy1*std::sin(-theta);
+                uy1 = ux1buf_new*std::sin(-theta) + uy1*std::cos(-theta);
+#endif
             }
         });
 
@@ -235,7 +252,7 @@ public:
             ParticleCreation::DefaultInitializeRuntimeAttributes(*tile_products[i],
                                        0, 0,
                                        pc_products[i]->getUserRealAttribs(), pc_products[i]->getUserIntAttribs(),
-                                       pc_products[i]->getParticleComps(), pc_products[i]->getParticleiComps(),
+                                       pc_products[i]->GetRealSoANames(), pc_products[i]->GetIntSoANames(),
                                        pc_products[i]->getUserRealAttribParser(),
                                        pc_products[i]->getUserIntAttribParser(),
 #ifdef WARPX_QED

@@ -91,11 +91,10 @@ public:
             const SoaData_type& soa_1, const SoaData_type& soa_2,
             GetParticlePosition<PIdx> /*get_position_1*/, GetParticlePosition<PIdx> /*get_position_2*/,
             amrex::ParticleReal const  n1, amrex::ParticleReal const  n2,
-            amrex::ParticleReal const  n12,
             amrex::ParticleReal const  T1, amrex::ParticleReal const  T2,
             amrex::ParticleReal const  q1, amrex::ParticleReal const  q2,
             amrex::ParticleReal const  m1, amrex::ParticleReal const  m2,
-            amrex::Real const  dt, amrex::Real const /*dV*/, index_type coll_idx,
+            amrex::Real const  dt, amrex::Real const dV, index_type coll_idx,
             index_type const /*cell_start_pair*/, index_type* /*p_mask*/,
             index_type* /*p_pair_indices_1*/, index_type* /*p_pair_indices_2*/,
             amrex::ParticleReal* /*p_pair_reaction_weight*/,
@@ -105,9 +104,9 @@ public:
 
             ElasticCollisionPerez(
                     I1s, I1e, I2s, I2e, I1, I2,
-                    soa_1, soa_2, n1, n2, n12, T1, T2,
+                    soa_1, soa_2, n1, n2, T1, T2,
                     q1, q2, m1, m2,
-                    dt, m_CoulombLog, engine, coll_idx);
+                    dt, m_CoulombLog, dV, engine, m_isSameSpecies, coll_idx);
         }
 
         amrex::ParticleReal m_CoulombLog;

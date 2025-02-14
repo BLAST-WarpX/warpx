@@ -12,6 +12,8 @@
 
 #include "Utils/WarpX_Complex.H"
 
+#include <ablastr/utils/Enums.H>
+
 #include <AMReX_Array.H>
 #include <AMReX_BoxArray.H>
 #include <AMReX_Config.H>
@@ -59,9 +61,11 @@ class SpectralKSpace
             const amrex::BoxArray& realspace_ba,
             int i_dim, bool only_positive_k ) const;
 
-        KVectorComponent getModifiedKComponent(
-            const amrex::DistributionMapping& dm, int i_dim,
-            int n_order, short grid_type ) const;
+        KVectorComponent getModifiedKComponent (
+            const amrex::DistributionMapping& dm,
+            int i_dim,
+            int n_order,
+            ablastr::utils::enums::GridType grid_type) const;
 
         SpectralShiftFactor getSpectralShiftFactor(
             const amrex::DistributionMapping& dm, int i_dim,
