@@ -629,9 +629,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     // interpolate the nodal neE values to the Yee grid
                     auto enE_r = Interp(enE, nodal, Er_stag, coarsen, i, j, 0, 0);
 
-                    // safety condition since we divide by rho_val later
-                    auto rho_val_limited = (rho_val_limited < rho_floor) ?
-                        rho_floor : rho_val;
+                    // safety condition since we divide by rho
+                    auto rho_val_limited = std::max(rho_val, rho_floor);
 
                     Er(i, j, 0) = (enE_r - grad_Pe) / rho_val_limited;
                 }
@@ -690,9 +689,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     // interpolate the nodal neE values to the Yee grid
                     auto enE_t = Interp(enE, nodal, Et_stag, coarsen, i, j, 0, 1);
 
-                    // safety condition since we divide by rho_val later
-                    auto rho_val_limited = (rho_val_limited < rho_floor) ?
-                        rho_floor : rho_val;
+                    // safety condition since we divide by rho
+                    auto rho_val_limited = std::max(rho_val, rho_floor);
 
                     Et(i, j, 0) = (enE_t - grad_Pe) / rho_val_limited;
                 }
@@ -743,9 +741,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     // interpolate the nodal neE values to the Yee grid
                     auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, 0, 2);
 
-                    // safety condition since we divide by rho_val later
-                    auto rho_val_limited = (rho_val_limited < rho_floor) ?
-                        rho_floor : rho_val;
+                    // safety condition since we divide by rho
+                    auto rho_val_limited = std::max(rho_val, rho_floor);
 
                     Ez(i, j, 0) = (enE_z - grad_Pe) / rho_val_limited;
                 }
@@ -1013,9 +1010,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     // interpolate the nodal neE values to the Yee grid
                     auto enE_x = Interp(enE, nodal, Ex_stag, coarsen, i, j, k, 0);
 
-                    // safety condition since we divide by rho_val later
-                    auto rho_val_limited = (rho_val_limited < rho_floor) ?
-                        rho_floor : rho_val;
+                    // safety condition since we divide by rho
+                    auto rho_val_limited = std::max(rho_val, rho_floor);
 
                     Ex(i, j, k) = (enE_x - grad_Pe) / rho_val_limited;
                 }
@@ -1067,9 +1063,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     // interpolate the nodal neE values to the Yee grid
                     auto enE_y = Interp(enE, nodal, Ey_stag, coarsen, i, j, k, 1);
 
-                    // safety condition since we divide by rho_val later
-                    auto rho_val_limited = (rho_val_limited < rho_floor) ?
-                        rho_floor : rho_val;
+                    // safety condition since we divide by rho
+                    auto rho_val_limited = std::max(rho_val, rho_floor);
 
                     Ey(i, j, k) = (enE_y - grad_Pe) / rho_val_limited;
                 }
@@ -1121,9 +1116,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     // interpolate the nodal neE values to the Yee grid
                     auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, k, 2);
 
-                    // safety condition since we divide by rho_val later
-                    auto rho_val_limited = (rho_val_limited < rho_floor) ?
-                        rho_floor : rho_val;
+                    // safety condition since we divide by rho
+                    auto rho_val_limited = std::max(rho_val, rho_floor);
 
                     Ez(i, j, k) = (enE_z - grad_Pe) / rho_val_limited;
                 }
