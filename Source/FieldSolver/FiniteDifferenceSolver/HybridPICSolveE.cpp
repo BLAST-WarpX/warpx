@@ -622,15 +622,15 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 } else {
                     // Get the gradient of the electron pressure if the longitudinal part of
                     // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                    Real grad_Pe = (!solve_for_Faraday) ?
+                    const Real grad_Pe = (!solve_for_Faraday) ?
                         T_Algo::UpwardDr(Pe, coefs_r, n_coefs_r, i, j, 0, 0)
                         : 0._rt;
 
                     // interpolate the nodal neE values to the Yee grid
-                    auto enE_r = Interp(enE, nodal, Er_stag, coarsen, i, j, 0, 0);
+                    const auto enE_r = Interp(enE, nodal, Er_stag, coarsen, i, j, 0, 0);
 
                     // safety condition since we divide by rho
-                    auto rho_val_limited = std::max(rho_val, rho_floor);
+                    const auto rho_val_limited = std::max(rho_val, rho_floor);
 
                     Er(i, j, 0) = (enE_r - grad_Pe) / rho_val_limited;
                 }
@@ -684,13 +684,13 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 } else {
                     // Get the gradient of the electron pressure
                     // -> d/dt = 0 for m = 0
-                    auto grad_Pe = 0.0_rt;
+                    const auto grad_Pe = 0.0_rt;
 
                     // interpolate the nodal neE values to the Yee grid
-                    auto enE_t = Interp(enE, nodal, Et_stag, coarsen, i, j, 0, 1);
+                    const auto enE_t = Interp(enE, nodal, Et_stag, coarsen, i, j, 0, 1);
 
                     // safety condition since we divide by rho
-                    auto rho_val_limited = std::max(rho_val, rho_floor);
+                    const auto rho_val_limited = std::max(rho_val, rho_floor);
 
                     Et(i, j, 0) = (enE_t - grad_Pe) / rho_val_limited;
                 }
@@ -734,15 +734,15 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 } else {
                     // Get the gradient of the electron pressure if the longitudinal part of
                     // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                    Real grad_Pe = (!solve_for_Faraday) ?
+                    const Real grad_Pe = (!solve_for_Faraday) ?
                         T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, 0, 0)
                         : 0._rt;
 
                     // interpolate the nodal neE values to the Yee grid
-                    auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, 0, 2);
+                    const auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, 0, 2);
 
                     // safety condition since we divide by rho
-                    auto rho_val_limited = std::max(rho_val, rho_floor);
+                    const auto rho_val_limited = std::max(rho_val, rho_floor);
 
                     Ez(i, j, 0) = (enE_z - grad_Pe) / rho_val_limited;
                 }
@@ -762,7 +762,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
                     if (include_hyper_resistivity_term) {
                         // r on nodal point (Jz is nodal in r)
-                        Real const r = rmin + i*dr;
+                        const Real r = rmin + i*dr;
 
                         auto nabla2Jz = T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, 0, 0);
                         if (r > 0.5_rt*dr) {
@@ -1003,15 +1003,15 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 } else {
                     // Get the gradient of the electron pressure if the longitudinal part of
                     // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                    Real grad_Pe = (!solve_for_Faraday) ?
+                    const Real grad_Pe = (!solve_for_Faraday) ?
                         T_Algo::UpwardDx(Pe, coefs_x, n_coefs_x, i, j, k)
                         : 0._rt;
 
                     // interpolate the nodal neE values to the Yee grid
-                    auto enE_x = Interp(enE, nodal, Ex_stag, coarsen, i, j, k, 0);
+                    const auto enE_x = Interp(enE, nodal, Ex_stag, coarsen, i, j, k, 0);
 
                     // safety condition since we divide by rho
-                    auto rho_val_limited = std::max(rho_val, rho_floor);
+                    const auto rho_val_limited = std::max(rho_val, rho_floor);
 
                     Ex(i, j, k) = (enE_x - grad_Pe) / rho_val_limited;
                 }
@@ -1056,15 +1056,15 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 } else {
                     // Get the gradient of the electron pressure if the longitudinal part of
                     // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                    Real grad_Pe = (!solve_for_Faraday) ?
+                    const Real grad_Pe = (!solve_for_Faraday) ?
                         T_Algo::UpwardDy(Pe, coefs_y, n_coefs_y, i, j, k)
                         : 0._rt;
 
                     // interpolate the nodal neE values to the Yee grid
-                    auto enE_y = Interp(enE, nodal, Ey_stag, coarsen, i, j, k, 1);
+                    const auto enE_y = Interp(enE, nodal, Ey_stag, coarsen, i, j, k, 1);
 
                     // safety condition since we divide by rho
-                    auto rho_val_limited = std::max(rho_val, rho_floor);
+                    const auto rho_val_limited = std::max(rho_val, rho_floor);
 
                     Ey(i, j, k) = (enE_y - grad_Pe) / rho_val_limited;
                 }
@@ -1109,15 +1109,15 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 } else {
                     // Get the gradient of the electron pressure if the longitudinal part of
                     // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                    Real grad_Pe = (!solve_for_Faraday) ?
+                    const Real grad_Pe = (!solve_for_Faraday) ?
                         T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, k)
                         : 0._rt;
 
                     // interpolate the nodal neE values to the Yee grid
-                    auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, k, 2);
+                    const auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, k, 2);
 
                     // safety condition since we divide by rho
-                    auto rho_val_limited = std::max(rho_val, rho_floor);
+                    const auto rho_val_limited = std::max(rho_val, rho_floor);
 
                     Ez(i, j, k) = (enE_z - grad_Pe) / rho_val_limited;
                 }
