@@ -1608,7 +1608,6 @@ void WarpXFluidContainer::HybridQDSMCUpdateTe (ablastr::fields::MultiFabRegister
 // To Do:
 // pass Te and rho multifabs as arguments too !
 // check: no need to fill Boundary? Hybrid_Electron_Joule_Heating should be called after filling boundary of rho and Te 
-// UPDATE eta to take Te as argument !
 void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiFabRegister& m_fields, 
                                         HybridPICModel const* hybrid_model, 
                                         amrex::Real dt, int lev)
