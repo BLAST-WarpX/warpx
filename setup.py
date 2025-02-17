@@ -107,7 +107,6 @@ class CMakeBuild(build_ext):
             "-DWarpX_FFT:BOOL=" + WARPX_FFT,
             "-DWarpX_PYTHON:BOOL=ON",
             "-DWarpX_PYTHON_IPO:BOOL=" + WARPX_PYTHON_IPO,
-            "-DWarpX_QED:BOOL=" + WARPX_QED,
             "-DWarpX_QED_TABLE_GEN:BOOL=" + WARPX_QED_TABLE_GEN,
             ## dependency control (developers & package managers)
             "-DWarpX_amrex_internal=" + WARPX_AMREX_INTERNAL,
@@ -124,8 +123,6 @@ class CMakeBuild(build_ext):
             # Windows: has no RPath concept, all `.dll`s must be in %PATH%
             #          or same dir as calling executable
         ]
-        if WARPX_QED.upper() in ["1", "ON", "TRUE", "YES"]:
-            cmake_args.append("-DWarpX_picsar_internal=" + WARPX_PICSAR_INTERNAL)
         if WARPX_OPENPMD.upper() in ["1", "ON", "TRUE", "YES"]:
             cmake_args += [
                 "-DHDF5_USE_STATIC_LIBRARIES:BOOL=" + HDF5_USE_STATIC_LIBRARIES,
@@ -207,7 +204,6 @@ WARPX_OPENPMD = env.pop("WARPX_OPENPMD", "ON")
 WARPX_PRECISION = env.pop("WARPX_PRECISION", "DOUBLE")
 WARPX_PARTICLE_PRECISION = env.pop("WARPX_PARTICLE_PRECISION", WARPX_PRECISION)
 WARPX_FFT = env.pop("WARPX_FFT", "OFF")
-WARPX_QED = env.pop("WARPX_QED", "ON")
 WARPX_QED_TABLE_GEN = env.pop("WARPX_QED_TABLE_GEN", "OFF")
 WARPX_DIMS = env.pop("WARPX_DIMS", "1;2;RZ;3")
 BUILD_PARALLEL = env.pop("BUILD_PARALLEL", "2")

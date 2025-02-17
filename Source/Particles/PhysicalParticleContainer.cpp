@@ -17,10 +17,8 @@
 #include "Initialization/InjectorPosition.H"
 #include "MultiParticleContainer.H"
 #include "Particles/AddPlasmaUtilities.H"
-#ifdef WARPX_QED
-#   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
-#   include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper.H"
-#endif
+#include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
+#include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper.H"
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/Gather/GetExternalFields.H"
 #include "Particles/ParticleCreation/DefaultInitialization.H"
@@ -195,20 +193,15 @@ namespace
         uint64_t * AMREX_RESTRICT idcpu,
         const GpuArray<ParticleReal*,PIdx::nattribs>& pa, long& ip,
         const bool& do_field_ionization, int* pi
-#ifdef WARPX_QED
         ,const QEDHelper& qed_helper
-#endif
         ) noexcept
     {
         for (int idx=0 ; idx < PIdx::nattribs ; idx++) {
             pa[idx][ip] = 0._rt;
         }
         if (do_field_ionization) {pi[ip] = 0;}
-#ifdef WARPX_QED
         if (qed_helper.has_quantum_sync) {qed_helper.p_optical_depth_QSR[ip] = 0._rt;}
         if (qed_helper.has_breit_wheeler) {qed_helper.p_optical_depth_BW[ip] = 0._rt;}
-#endif
-
         idcpu[ip] = amrex::ParticleIdCpus::Invalid;
     }
 }
@@ -339,7 +332,6 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
         "Radiation reaction can be enabled only if Boris pusher is used");
     //_____________________________
 
-#ifdef WARPX_QED
     pp_species_name.query("do_qed_quantum_sync", m_do_qed_quantum_sync);
     if (m_do_qed_quantum_sync) {
         AddRealComp("opticalDepthQSR");
@@ -354,7 +346,6 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
         pp_species_name.get("qed_quantum_sync_phot_product_species",
             m_qed_quantum_sync_phot_product_name);
     }
-#endif
 
     // User-defined integer attributes
     pp_species_name.queryarr("addIntegerAttributes", m_user_int_attribs);
@@ -816,11 +807,9 @@ PhysicalParticleContainer::DefaultInitializeRuntimeAttributes (
                                        GetRealSoANames(), GetIntSoANames(),
                                        amrex::GetVecOfPtrs(m_user_real_attrib_parser),
                                        amrex::GetVecOfPtrs(m_user_int_attrib_parser),
-#ifdef WARPX_QED
                                        true,
                                        m_shr_p_bw_engine.get(),
                                        m_shr_p_qs_engine.get(),
-#endif
                                        ionization_initial_level,
                                        0,pinned_tile.numParticles());
 }
@@ -1097,11 +1086,9 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
             pi = soa.GetIntData("ionizationLevel").data() + old_size;
         }
 
-#ifdef WARPX_QED
         const QEDHelper qed_helper(soa, old_size,
                                    has_quantum_sync(), has_breit_wheeler(),
                                    m_shr_p_qs_engine, m_shr_p_bw_engine);
-#endif
 
         const bool loc_do_field_ionization = do_field_ionization;
         const int loc_ionization_initial_level = ionization_initial_level;
@@ -1148,9 +1135,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
 #endif
                 if (!box_contains) {
                     ZeroInitializeAndSetNegativeID(pa_idcpu, pa, ip, loc_do_field_ionization, pi
-#ifdef WARPX_QED
                                                    ,qed_helper
-#endif
                                                    );
                     continue;
                 }
@@ -1185,9 +1170,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
                                                              beta_boost, t);
                     if (!inj_pos->insideBounds(xb, yb, z0)) {
                         ZeroInitializeAndSetNegativeID(pa_idcpu, pa, ip, loc_do_field_ionization, pi
-#ifdef WARPX_QED
                                                    ,qed_helper
-#endif
                                                    );
                         continue;
                     }
@@ -1198,9 +1181,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
                     // Remove particle if density below threshold
                     if ( dens < density_min ){
                         ZeroInitializeAndSetNegativeID(pa_idcpu, pa, ip, loc_do_field_ionization, pi
-#ifdef WARPX_QED
                                                    ,qed_helper
-#endif
                                                    );
                         continue;
                     }
@@ -1215,9 +1196,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
                     // go to the next generated particle.
                     if (!inj_pos->insideBounds(xb, yb, z0_lab)) {
                         ZeroInitializeAndSetNegativeID(pa_idcpu, pa, ip, loc_do_field_ionization, pi
-#ifdef WARPX_QED
                                                    ,qed_helper
-#endif
                                                    );
                         continue;
                     }
@@ -1226,9 +1205,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
                     // Remove particle if density below threshold
                     if ( dens < density_min ){
                         ZeroInitializeAndSetNegativeID(pa_idcpu, pa, ip, loc_do_field_ionization, pi
-#ifdef WARPX_QED
                                                    ,qed_helper
-#endif
                                                    );
                         continue;
                     }
@@ -1250,7 +1227,6 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
                     pi[ip] = loc_ionization_initial_level;
                 }
 
-#ifdef WARPX_QED
                 if(qed_helper.has_quantum_sync){
                     qed_helper.p_optical_depth_QSR[ip] = qed_helper.quantum_sync_get_opt(engine);
                 }
@@ -1258,7 +1234,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
                 if(qed_helper.has_breit_wheeler){
                     qed_helper.p_optical_depth_BW[ip] = qed_helper.breit_wheeler_get_opt(engine);
                 }
-#endif
+
                 // Initialize user-defined integers with user-defined parser
                 for (int ia = 0; ia < n_user_int_attribs; ++ia) {
                     pa_user_int_data[ia][ip] = static_cast<int>(user_int_parserexec_data[ia](pos.x, pos.y, pos.z, u.x, u.y, u.z, t));
@@ -1533,11 +1509,9 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
             p_ion_level = soa.GetIntData("ionizationLevel").data() + old_size;
         }
 
-#ifdef WARPX_QED
         const QEDHelper qed_helper(soa, old_size,
                                    has_quantum_sync(), has_breit_wheeler(),
                                    m_shr_p_qs_engine, m_shr_p_bw_engine);
-#endif
 
         const bool loc_do_field_ionization = do_field_ionization;
         const int loc_ionization_initial_level = ionization_initial_level;
@@ -1699,7 +1673,6 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                     p_ion_level[ip] = loc_ionization_initial_level;
                 }
 
-#ifdef WARPX_QED
                 if(qed_helper.has_quantum_sync){
                     qed_helper.p_optical_depth_QSR[ip] = qed_helper.quantum_sync_get_opt(engine);
                 }
@@ -1707,7 +1680,6 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 if(qed_helper.has_breit_wheeler){
                     qed_helper.p_optical_depth_BW[ip] = qed_helper.breit_wheeler_get_opt(engine);
                 }
-#endif
 
                 // Initialize user-defined integers with user-defined parser
                 for (int ia = 0; ia < n_user_int_attribs; ++ia) {
@@ -2644,7 +2616,6 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 
     const auto pusher_algo = WarpX::particle_pusher_algo;
     const auto do_crr = do_classical_radiation_reaction;
-#ifdef WARPX_QED
     const auto do_sync = m_do_qed_quantum_sync;
     amrex::Real t_chi_max = 0.0;
     if (do_sync) { t_chi_max = m_shr_p_qs_engine->get_minimum_chi_part(); }
@@ -2656,7 +2627,6 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
         evolve_opt = m_shr_p_qs_engine->build_evolve_functor();
         p_optical_depth_QSR = pti.GetAttribs("opticalDepthQSR").dataPtr()  + offset;
     }
-#endif
 
     const auto t_do_not_gather = do_not_gather;
 
@@ -2664,11 +2634,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     enum qed_flags : int { no_qed, has_qed };
 
     const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
-#ifdef WARPX_QED
     const int qed_runtime_flag = (local_has_quantum_sync || do_sync) ? has_qed : no_qed;
-#else
-    int qed_runtime_flag = no_qed;
-#endif
 
     // Using this version of ParallelFor with compile time options
     // improves performance when qed or external EB are not used by reducing
@@ -2715,9 +2681,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 
         scaleFields(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
 
-#ifdef WARPX_QED
         if (!do_sync)
-#endif
         {
             if (do_copy) {
                 //  Copy the old x and u for the BTD
@@ -2728,15 +2692,12 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                       ion_lev ? ion_lev[ip] : 1,
                                       m, q, pusher_algo, do_crr,
-#ifdef WARPX_QED
                                       t_chi_max,
-#endif
                                       dt);
 
             UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], dt);
             setPosition(ip, xp, yp, zp);
         }
-#ifdef WARPX_QED
         else {
             if constexpr (qed_control == has_qed) {
                 if (do_copy) {
@@ -2755,9 +2716,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                 setPosition(ip, xp, yp, zp);
             }
         }
-#endif
 
-#ifdef WARPX_QED
         [[maybe_unused]] auto foo_local_has_quantum_sync = local_has_quantum_sync;
         [[maybe_unused]] auto *foo_podq = p_optical_depth_QSR;
         [[maybe_unused]] const auto& foo_evolve_opt = evolve_opt; // have to do all these for nvcc
@@ -2768,9 +2727,6 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                            dt, p_optical_depth_QSR[ip]);
             }
         }
-#else
-            amrex::ignore_unused(qed_control);
-#endif
     });
 }
 
@@ -2886,7 +2842,6 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
 
     const auto pusher_algo = WarpX::particle_pusher_algo;
     const auto do_crr = do_classical_radiation_reaction;
-#ifdef WARPX_QED
     const auto do_sync = m_do_qed_quantum_sync;
     amrex::Real t_chi_max = 0.0;
     if (do_sync) { t_chi_max = m_shr_p_qs_engine->get_minimum_chi_part(); }
@@ -2898,7 +2853,6 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
         evolve_opt = m_shr_p_qs_engine->build_evolve_functor();
         p_optical_depth_QSR = pti.GetAttribs("opticalDepthQSR").dataPtr()  + offset;
     }
-#endif
 
     const auto t_do_not_gather = do_not_gather;
 
@@ -2906,11 +2860,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
     enum qed_flags : int { no_qed, has_qed };
 
     const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
-#ifdef WARPX_QED
     const int qed_runtime_flag = (local_has_quantum_sync || do_sync) ? has_qed : no_qed;
-#else
-    const int qed_runtime_flag = no_qed;
-#endif
 
     const int max_iterations = WarpX::max_particle_its_in_implicit_scheme;
     const amrex::ParticleReal particle_tolerance = WarpX::particle_tol_in_implicit_scheme;
@@ -3008,20 +2958,15 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
             uy[ip] = uy_n[ip];
             uz[ip] = uz_n[ip];
 
-#ifdef WARPX_QED
             if (!do_sync)
-#endif
             {
                 doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
                                           Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                           ion_lev ? ion_lev[ip] : 1,
                                           m, q, pusher_algo, do_crr,
-#ifdef WARPX_QED
                                           t_chi_max,
-#endif
                                           dt);
             }
-#ifdef WARPX_QED
             else {
                 if constexpr (qed_control == has_qed) {
                     doParticleMomentumPush<1>(ux[ip], uy[ip], uz[ip],
@@ -3032,9 +2977,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
                                               dt);
                 }
             }
-#endif
 
-#ifdef WARPX_QED
             [[maybe_unused]] auto foo_local_has_quantum_sync = local_has_quantum_sync;
             [[maybe_unused]] auto *foo_podq = p_optical_depth_QSR;
             [[maybe_unused]] const auto& foo_evolve_opt = evolve_opt; // have to do all these for nvcc
@@ -3045,9 +2988,6 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
                                dt, p_optical_depth_QSR[ip]);
                 }
             }
-#else
-            amrex::ignore_unused(qed_control);
-#endif
 
             // Take average to get the time centered value
             ux[ip] = 0.5_rt*(ux[ip] + ux_n[ip]);
@@ -3268,8 +3208,6 @@ PhysicalParticleContainer::findRefinedInjectionBox (amrex::Box& a_fine_injection
     return refine_injection;
 }
 
-#ifdef WARPX_QED
-
 
 bool PhysicalParticleContainer::has_quantum_sync () const
 {
@@ -3308,5 +3246,3 @@ PhysicalParticleContainer::getPairGenerationFilterFunc ()
     WARPX_PROFILE("PhysicalParticleContainer::getPairGenerationFunc()");
     return PairGenerationFilterFunc{GetRealCompIndex("opticalDepthBW") - NArrayReal};
 }
-
-#endif

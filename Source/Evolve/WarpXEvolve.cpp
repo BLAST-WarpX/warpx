@@ -177,10 +177,8 @@ WarpX::Evolve (int numsteps)
         mypc->doCollisions( cur_time, dt[0] );
         ExecutePythonCallback("aftercollisions");
 
-#ifdef WARPX_QED
         doQEDEvents();
         mypc->doQEDSchwinger();
-#endif
 
         // Main PIC operation:
         // gather fields, push particles, deposit sources, update fields
@@ -1099,7 +1097,6 @@ WarpX::doFieldIonization (int lev)
     );
 }
 
-#ifdef WARPX_QED
 void
 WarpX::doQEDEvents ()
 {
@@ -1124,7 +1121,6 @@ WarpX::doQEDEvents (int lev)
         *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
     );
 }
-#endif
 
 void
 WarpX::PushParticlesandDeposit (amrex::Real cur_time, bool skip_current, PushType push_type)

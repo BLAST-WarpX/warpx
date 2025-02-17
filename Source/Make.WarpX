@@ -106,10 +106,6 @@ endif
 
 ifeq ($(QED),TRUE)
   INCLUDE_LOCATIONS += $(PICSAR_HOME)/multi_physics/QED/include
-  CXXFLAGS += -DWARPX_QED
-  CFLAGS   += -DWARPX_QED
-  FFLAGS   += -DWARPX_QED
-  F90FLAGS += -DWARPX_QED
   USERSuffix := $(USERSuffix).QED
 
   ifeq ($(QED_TABLE_GEN),TRUE)

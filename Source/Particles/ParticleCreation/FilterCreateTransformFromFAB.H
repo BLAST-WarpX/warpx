@@ -139,12 +139,10 @@ Index filterCreateTransformFromFAB (DstPC& pc1, DstPC& pc2,
                                        pc1.GetRealSoANames(), pc1.GetIntSoANames(),
                                        pc1.getUserRealAttribParser(),
                                        pc1.getUserIntAttribParser(),
-#ifdef WARPX_QED
                                        false, // do not initialize QED quantities, since they were initialized
                                               // when calling the CreateFunc functor
                                        pc1.get_breit_wheeler_engine_ptr(),
                                        pc1.get_quantum_sync_engine_ptr(),
-#endif
                                        pc1.getIonizationInitialLevel(),
                                        old_np1, new_np1);
     ParticleCreation::DefaultInitializeRuntimeAttributes(dst2,
@@ -153,12 +151,10 @@ Index filterCreateTransformFromFAB (DstPC& pc1, DstPC& pc2,
                                        pc2.GetRealSoANames(), pc2.GetIntSoANames(),
                                        pc2.getUserRealAttribParser(),
                                        pc2.getUserIntAttribParser(),
-#ifdef WARPX_QED
                                        false, // do not initialize QED quantities, since they were initialized
                                               // when calling the CreateFunc functor
                                        pc2.get_breit_wheeler_engine_ptr(),
                                        pc2.get_quantum_sync_engine_ptr(),
-#endif
                                        pc2.getIonizationInitialLevel(),
                                        old_np2, new_np2);
 

@@ -2302,7 +2302,6 @@ PREDEFINED             = AMREX_Linux=1 \
                          WARPX_USE_GPU=1 \
                          WARPX_USE_OPENPMD=1 \
                          WARPX_USE_FFT=1 \
-                         WARPX_QED=1 \
                          WARPX_QED_TABLE_GEN=1
 
 PREDEFINED           += "AMREX_ENUM(CLASS,...)=\"enum class CLASS : int { __VA_ARGS__ };\""

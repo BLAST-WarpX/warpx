@@ -13,18 +13,14 @@
 
 #include "Fields.H"
 #include "Particles/ElementaryProcess/Ionization.H"
-#ifdef WARPX_QED
-#   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
-#   include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper.H"
-#   include "Particles/ElementaryProcess/QEDSchwingerProcess.H"
-#   include "Particles/ElementaryProcess/QEDPairGeneration.H"
-#   include "Particles/ElementaryProcess/QEDPhotonEmission.H"
-#endif
+#include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
+#include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper.H"
+#include "Particles/ElementaryProcess/QEDSchwingerProcess.H"
+#include "Particles/ElementaryProcess/QEDPairGeneration.H"
+#include "Particles/ElementaryProcess/QEDPhotonEmission.H"
 #include "Particles/LaserParticleContainer.H"
 #include "Particles/ParticleCreation/FilterCopyTransform.H"
-#ifdef WARPX_QED
-#   include "Particles/ParticleCreation/FilterCreateTransformFromFAB.H"
-#endif
+#include "Particles/ParticleCreation/FilterCreateTransformFromFAB.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/ParticleCreation/SmartCreate.H"
 #include "Particles/ParticleCreation/SmartUtils.H"
@@ -350,8 +346,6 @@ MultiParticleContainer::ReadParameters ()
             m_laser_deposit_on_main_grid[i] = true;
         }
 
-
-#ifdef WARPX_QED
         const ParmParse pp_warpx("warpx");
         pp_warpx.query("do_qed_schwinger", m_do_qed_schwinger);
 
@@ -381,7 +375,6 @@ MultiParticleContainer::ReadParameters ()
             utils::parser::queryWithParser(
                 pp_qed_schwinger, "zmax", m_qed_schwinger_zmax);
         }
-#endif
         initialized = true;
     }
 }
@@ -450,10 +443,8 @@ MultiParticleContainer::InitMultiPhysicsModules ()
     // This is used for ionization and pair creation processes.
     mapSpeciesProduct();
     CheckIonizationProductSpecies();
-#ifdef WARPX_QED
     CheckQEDProductSpecies();
     InitQED();
-#endif
 }
 
 void
@@ -784,7 +775,6 @@ MultiParticleContainer::mapSpeciesProduct ()
             pc->ionization_product = i_product;
         }
 
-#ifdef WARPX_QED
         if (pc->has_breit_wheeler()){
             const int i_product_ele = getSpeciesID(
                 pc->m_qed_breit_wheeler_ele_product_name);
@@ -800,18 +790,15 @@ MultiParticleContainer::mapSpeciesProduct ()
                 pc->m_qed_quantum_sync_phot_product_name);
             pc->m_qed_quantum_sync_phot_product = i_product_phot;
         }
-#endif
 
     }
 
-#ifdef WARPX_QED
     if (m_do_qed_schwinger) {
         m_qed_schwinger_ele_product =
             getSpeciesID(m_qed_schwinger_ele_product_name);
         m_qed_schwinger_pos_product =
             getSpeciesID(m_qed_schwinger_pos_product_name);
     }
-#endif
 }
 
 /* \brief Given a species name, return its ID.
@@ -967,7 +954,6 @@ void MultiParticleContainer::ScrapeParticlesAtEB (
     }
 }
 
-#ifdef WARPX_QED
 void MultiParticleContainer::InitQED ()
 {
     m_shr_p_qs_engine = std::make_shared<QuantumSynchrotronEngine>();
@@ -1700,5 +1686,3 @@ void MultiParticleContainer::CheckQEDProductSpecies()
     }
 
 }
-
-#endif

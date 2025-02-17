@@ -16,10 +16,8 @@
 #include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
 #include "Particles/Collision/CollisionHandler.H"
-#ifdef WARPX_QED
-#   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper_fwd.H"
-#   include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper_fwd.H"
-#endif
+#include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper_fwd.H"
+#include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper_fwd.H"
 #include "PhysicalParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
@@ -186,7 +184,6 @@ public:
     */
     void doResampling (int timestep, bool verbose);
 
-#ifdef WARPX_QED
     /** If Schwinger process is activated, this function is called at every
      * timestep in Evolve and is used to create Schwinger electron-positron pairs.
      * Within this function we loop over all cells to calculate the number of
@@ -201,7 +198,6 @@ public:
      * object (to make the link between Real and int quantities).
      */
     [[nodiscard]] amrex::Box ComputeSchwingerGlobalBox () const;
-#endif
 
     void Restart (const std::string& dir);
 
@@ -323,7 +319,6 @@ public:
     amrex::Gpu::DeviceVector<amrex::ParticleReal> d_repeated_plasma_lens_strengths_E;
     amrex::Gpu::DeviceVector<amrex::ParticleReal> d_repeated_plasma_lens_strengths_B;
 
-#ifdef WARPX_QED
     /**
     * \brief Performs QED events (Breit-Wheeler process and photon emission)
     */
@@ -334,7 +329,6 @@ public:
                       const amrex::MultiFab& Bx,
                       const amrex::MultiFab& By,
                       const amrex::MultiFab& Bz);
-#endif
 
     [[nodiscard]] int getSpeciesID (const std::string& product_str) const;
 
@@ -343,7 +337,6 @@ public:
 
 protected:
 
-#ifdef WARPX_QED
     /**
     * \brief Performs Breit-Wheeler process for the species for which it is enabled
     */
@@ -365,7 +358,6 @@ protected:
                            const amrex::MultiFab& Bx,
                            const amrex::MultiFab& By,
                            const amrex::MultiFab& Bz);
-#endif
 
     // Particle container types
     enum struct PCTypes {Physical, RigidInjected, Photon};
@@ -406,7 +398,6 @@ protected:
     }
 
 
-#ifdef WARPX_QED
     // The QED engines
     std::shared_ptr<BreitWheelerEngine> m_shr_p_bw_engine;
     std::shared_ptr<QuantumSynchrotronEngine> m_shr_p_qs_engine;
@@ -490,8 +481,6 @@ protected:
     amrex::Real m_qed_schwinger_zmin = std::numeric_limits<amrex::Real>::lowest();
     amrex::Real m_qed_schwinger_zmax = std::numeric_limits<amrex::Real>::max();
 
-#endif
-
 private:
 
     // physical particles (+ laser)
@@ -528,14 +517,12 @@ private:
     */
     void CheckIonizationProductSpecies();
 
-#ifdef WARPX_QED
     /**
     * Should be called right after mapSpeciesProduct in InitData.
     * It checks the physical correctness of product particle species
     * selected by the user for QED processes.
     */
     void CheckQEDProductSpecies();
-#endif
 
 
 };

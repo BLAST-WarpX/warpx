@@ -7,9 +7,7 @@
  */
 #include "PhotonParticleContainer.H"
 
-#ifdef WARPX_QED
-#   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
-#endif
+#include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/Gather/GetExternalFields.H"
 #include "Particles/PhysicalParticleContainer.H"
@@ -49,7 +47,6 @@ PhotonParticleContainer::PhotonParticleContainer (AmrCore* amr_core, int ispecie
 {
     const ParmParse pp_species_name(species_name);
 
-#ifdef WARPX_QED
         //Find out if Breit Wheeler process is enabled
         pp_species_name.query("do_qed_breit_wheeler", m_do_qed_breit_wheeler);
 
@@ -67,7 +64,6 @@ PhotonParticleContainer::PhotonParticleContainer (AmrCore* amr_core, int ispecie
         test_quantum_sync == 0,
         "ERROR: do_qed_quantum_sync can be 1 for species NOT listed in particles.photon_species only!");
         //_________________________________________________________
-#endif
 
 }
 
@@ -116,7 +112,6 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
     ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr() + offset;
     ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr() + offset;
 
-#ifdef WARPX_QED
     BreitWheelerEvolveOpticalDepth evolve_opt;
     amrex::ParticleReal* AMREX_RESTRICT p_optical_depth_BW = nullptr;
     const bool local_has_breit_wheeler = has_breit_wheeler();
@@ -124,7 +119,6 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
         evolve_opt = m_shr_p_bw_engine->build_evolve_functor();
         p_optical_depth_BW = pti.GetAttribs("opticalDepthBW").dataPtr() + offset;
     }
-#endif
 
     auto copyAttribs = CopyParticleAttribs(pti, tmp_particle_data, offset);
     const int do_copy = (m_do_back_transformed_particles && (a_dt_type!=DtType::SecondHalf) );
@@ -170,11 +164,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
     enum qed_flags : int { no_qed, has_qed };
 
     const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
-#ifdef WARPX_QED
     const int qed_runtime_flag = (local_has_breit_wheeler) ? has_qed : no_qed;
-#else
-    const int qed_runtime_flag = no_qed;
-#endif
 
     amrex::ParallelFor(TypeList<CompileTimeOptions<no_exteb,has_exteb>,
                                 CompileTimeOptions<no_qed  ,has_qed>>{},
@@ -207,7 +197,6 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
                 getExternalEB(i, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
             }
 
-#ifdef WARPX_QED
             [[maybe_unused]] const auto& evolve_opt_tmp = evolve_opt;
             [[maybe_unused]] auto *p_optical_depth_BW_tmp = p_optical_depth_BW;
             [[maybe_unused]] auto *ux_tmp = ux; // for nvhpc
@@ -218,9 +207,6 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
                 evolve_opt(ux[i], uy[i], uz[i], Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                            dt, p_optical_depth_BW[i]);
             }
-#else
-            amrex::ignore_unused(qed_control);
-#endif
 
             UpdatePositionPhoton( x, y, z, ux[i], uy[i], uz[i], dt );
             SetPosition(i, x, y, z);

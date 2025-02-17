@@ -9,10 +9,8 @@
 #define WARPX_DEFAULTINITIALIZATION_H_
 
 #include <WarpX.H>
-#ifdef WARPX_QED
-#   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
-#   include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper.H"
-#endif
+#include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
+#include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper.H"
 
 #include <AMReX_GpuContainers.H>
 #include <AMReX_REAL.H>
@@ -50,11 +48,8 @@ static std::map<std::string, InitializationPolicy> initialization_policies = {
 #ifdef WARPX_DIM_RZ
     {"theta", InitializationPolicy::Zero},
 #endif
-
-#ifdef WARPX_QED
     {"opticalDepthBW",   InitializationPolicy::RandomExp},
     {"opticalDepthQSR",   InitializationPolicy::RandomExp}
-#endif
 
 };
 
@@ -124,11 +119,9 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                                          const std::vector<std::string>& particle_icomps,
                                          const std::vector<amrex::Parser*>& user_real_attrib_parser,
                                          const std::vector<amrex::Parser*>& user_int_attrib_parser,
-#ifdef WARPX_QED
                                          const bool do_qed_comps,
                                          BreitWheelerEngine* p_bw_engine,
                                          QuantumSynchrotronEngine* p_qs_engine,
-#endif
                                          const int ionization_initial_level,
                                          int start, int stop)
 {
@@ -149,7 +142,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
         for (int j = PIdx::nattribs + n_external_attr_real; j < ptile.NumRealComps() ; ++j)
         {
             auto attr_ptr = ptile.GetStructOfArrays().GetRealData(j).data();
-#ifdef WARPX_QED
+
             // Current runtime comp is quantum synchrotron optical depth
             auto const it_qsr = std::find(particle_comps.begin(), particle_comps.end(), "opticalDepthQSR");
             if (it_qsr != particle_comps.end() &&
@@ -195,7 +188,6 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                     }
                 }
             }
-#endif
 
             for (int ia = 0; ia < n_user_real_attribs; ++ia)
             {

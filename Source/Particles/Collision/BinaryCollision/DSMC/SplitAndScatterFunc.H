@@ -255,12 +255,10 @@ public:
                                        pc_products[i]->GetRealSoANames(), pc_products[i]->GetIntSoANames(),
                                        pc_products[i]->getUserRealAttribParser(),
                                        pc_products[i]->getUserIntAttribParser(),
-#ifdef WARPX_QED
                                        false, // do not initialize QED quantities, since they were initialized
                                               // when calling the SmartCopy functors
                                        pc_products[i]->get_breit_wheeler_engine_ptr(),
                                        pc_products[i]->get_quantum_sync_engine_ptr(),
-#endif
                                        pc_products[i]->getIonizationInitialLevel(),
                                        start_index, stop_index);
         }

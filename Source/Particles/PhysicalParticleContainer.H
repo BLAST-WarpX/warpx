@@ -14,12 +14,10 @@
 #include "Evolve/WarpXPushType.H"
 #include "Initialization/PlasmaInjector.H"
 #include "Particles/ElementaryProcess/Ionization.H"
-#ifdef WARPX_QED
-#    include "Particles/ElementaryProcess/QEDPairGeneration.H"
-#    include "Particles/ElementaryProcess/QEDPhotonEmission.H"
-#    include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper_fwd.H"
-#    include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper_fwd.H"
-#endif
+#include "Particles/ElementaryProcess/QEDPairGeneration.H"
+#include "Particles/ElementaryProcess/QEDPhotonEmission.H"
+#include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper_fwd.H"
+#include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper_fwd.H"
 #include "Particles/Gather/ScaleFields.H"
 #include "Particles/Resampling/Resampling.H"
 #include "WarpXParticleContainer.H"
@@ -292,7 +290,6 @@ public:
     */
     void resample (int timestep, bool verbose=true) final;
 
-#ifdef WARPX_QED
     //Functions decleared in WarpXParticleContainer.H
     //containers for which QED processes could be relevant
     //are expected to override these functions
@@ -337,7 +334,6 @@ public:
     PhotonEmissionFilterFunc getPhotonEmissionFilterFunc ();
 
     PairGenerationFilterFunc getPairGenerationFilterFunc ();
-#endif
 
     std::vector<std::string> getUserIntAttribs () const override {
         return m_user_int_attribs;
@@ -395,7 +391,6 @@ protected:
     // A flag to enable saving of the previous timestep positions
     bool m_save_previous_position = false;
 
-#ifdef WARPX_QED
     // A flag to enable quantum_synchrotron process for leptons
     bool m_do_qed_quantum_sync = false;
 
@@ -407,7 +402,7 @@ protected:
 
     // A smart pointer to an instance of a Breit Wheeler engine [photons only!]
     std::shared_ptr<BreitWheelerEngine> m_shr_p_bw_engine;
-#endif
+
     /* Vector of user-defined integer attributes for species, species_name */
     std::vector<std::string> m_user_int_attribs;
     /* Vector of user-defined real attributes for species, species_name */

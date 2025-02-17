@@ -51,17 +51,13 @@ void doParticleMomentumPush(amrex::ParticleReal& ux,
                             const amrex::ParticleReal a_q,
                             const ParticlePusherAlgo pusher_algo,
                             const int do_crr,
-#ifdef WARPX_QED
-                            const amrex::Real t_chi_max,
-#endif
+                            [[maybe_unused]] const amrex::Real t_chi_max,
                             const amrex::Real dt)
 {
     amrex::ParticleReal qp = a_q;
     qp *= ion_lev;
 
     if (do_crr) {
-#ifdef WARPX_QED
-        amrex::ignore_unused(t_chi_max);
         if constexpr (do_sync) {
             auto chi = QedUtils::chi_ele_pos(m*ux, m*uy, m*uz,
                                             Ex, Ey, Ez,
@@ -76,8 +72,8 @@ void doParticleMomentumPush(amrex::ParticleReal& ux,
                                      Ex, Ey, Ez, Bx,
                                      By, Bz, qp, m, dt);
             }
-        } else
-#endif
+        }
+        else
         {
 
             UpdateMomentumBorisWithRadiationReaction(ux, uy, uz,

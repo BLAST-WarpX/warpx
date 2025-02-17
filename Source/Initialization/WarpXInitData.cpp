@@ -516,9 +516,7 @@ WarpX::InitData ()
 
     ablastr::parallelization::check_mpi_thread_level();
 
-#ifdef WARPX_QED
     Print() << "PICSAR (" << WarpX::PicsarVersion() << ")\n";
-#endif
 
     Print() << "WarpX (" << WarpX::Version() << ")\n";
 

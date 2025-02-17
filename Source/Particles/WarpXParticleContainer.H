@@ -17,11 +17,8 @@
 #include "Initialization/PlasmaInjector.H"
 #include "Particles/ParticleBoundaries.H"
 #include "SpeciesPhysicalProperties.H"
-
-#ifdef WARPX_QED
-#    include "ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper_fwd.H"
-#    include "ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper_fwd.H"
-#endif
+#include "ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper_fwd.H"
+#include "ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper_fwd.H"
 #include "MultiParticleContainer_fwd.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
@@ -444,15 +441,11 @@ public:
 
     int DoFieldIonization() const { return do_field_ionization; }
 
-#ifdef WARPX_QED
     //Species for which QED effects are relevant should override these methods
     virtual bool has_quantum_sync() const {return false;}
     virtual bool has_breit_wheeler() const {return false;}
 
     int DoQED() const { return has_quantum_sync() || has_breit_wheeler(); }
-#else
-    int DoQED() const { return false; }
-#endif
 
     /* \brief This function tests if the current species
     *  is of a given PhysicalSpecies (specified as a template parameter).
@@ -491,10 +484,8 @@ public:
 
     virtual amrex::Vector< amrex::Parser* > getUserRealAttribParser () const { return amrex::Vector<amrex::Parser*>{}; }
 
-#ifdef WARPX_QED
     virtual BreitWheelerEngine* get_breit_wheeler_engine_ptr () const {return nullptr;}
     virtual QuantumSynchrotronEngine* get_quantum_sync_engine_ptr () const {return nullptr;}
-#endif
 
     void setDoNotPush (bool flag) { do_not_push = flag; }
 
@@ -542,7 +533,6 @@ protected:
     /** Whether back-transformed diagnostics is turned on for the corresponding species.*/
     bool m_do_back_transformed_particles = false;
 
-#ifdef WARPX_QED
     //Species can receive a shared pointer to a QED engine (species for
     //which this is relevant should override these functions)
     virtual void
@@ -557,7 +547,6 @@ protected:
     int m_qed_quantum_sync_phot_product;
     std::string m_qed_quantum_sync_phot_product_name;
 
-#endif
     amrex::Vector<amrex::FArrayBox> local_rho;
     amrex::Vector<amrex::FArrayBox> local_jx;
     amrex::Vector<amrex::FArrayBox> local_jy;

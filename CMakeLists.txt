@@ -492,13 +492,12 @@ foreach(D IN LISTS WarpX_DIMS)
         target_link_libraries(ablastr_${SD} PUBLIC openPMD::openPMD)
     endif()
 
-    if(WarpX_QED)
-        target_compile_definitions(ablastr_${SD} PUBLIC WARPX_QED)
-        if(WarpX_QED_TABLE_GEN)
-            target_compile_definitions(ablastr_${SD} PUBLIC WARPX_QED_TABLE_GEN)
-        endif()
-        target_link_libraries(ablastr_${SD} PUBLIC PXRMP_QED::PXRMP_QED)
+
+    if(WarpX_QED_TABLE_GEN)
+        target_compile_definitions(ablastr_${SD} PUBLIC WARPX_QED_TABLE_GEN)
     endif()
+    target_link_libraries(ablastr_${SD} PUBLIC PXRMP_QED::PXRMP_QED)
+
 endforeach()
 
 # C++ properties: at least a C++17 capable compiler is needed

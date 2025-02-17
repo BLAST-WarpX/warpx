@@ -10,10 +10,8 @@
 
 #include "Initialization/PlasmaInjector.H"
 
-#ifdef WARPX_QED
-#   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
-#   include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper.H"
-#endif
+#include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
+#include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper.H"
 
 #include <AMReX_Array.H>
 #include <AMReX_Box.H>
@@ -301,7 +299,6 @@ struct PlasmaParserHelper
     const PlasmaParserWrapper* m_wrapper_ptr;
 };
 
-#ifdef WARPX_QED
 struct QEDHelper
 {
     template <typename SoAType>
@@ -332,6 +329,5 @@ struct QEDHelper
     QuantumSynchrotronGetOpticalDepth quantum_sync_get_opt;
     BreitWheelerGetOpticalDepth breit_wheeler_get_opt;
 };
-#endif
 
 #endif /*WARPX_ADDPLASMAUTILITIES_H_*/

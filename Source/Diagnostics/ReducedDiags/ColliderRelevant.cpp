@@ -9,9 +9,7 @@
 
 #include "Diagnostics/ReducedDiags/ReducedDiags.H"
 #include "Fields.H"
-#if (defined WARPX_QED)
-#   include "Particles/ElementaryProcess/QEDInternals/QedChiFunctions.H"
-#endif
+#include "Particles/ElementaryProcess/QEDInternals/QedChiFunctions.H"
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/Gather/GetExternalFields.H"
 #include "Particles/MultiParticleContainer.H"
@@ -416,7 +414,6 @@ void ColliderRelevant::ComputeDiags (int step)
         m_data[get_idx("thetay_std_"+m_beam_name[i_s])] = thetay_std;
 #endif
 
-#if (defined WARPX_QED)
         // get mass
         amrex::ParticleReal m = myspc.getMass();
         const bool is_photon = myspc.AmIA<PhysicalSpecies::photon>();
@@ -542,7 +539,6 @@ void ColliderRelevant::ComputeDiags (int step)
             m_data[get_idx("chiave_"+m_beam_name[i_s])] = chiave_f/w_tot;
             m_data[get_idx("chimax_"+m_beam_name[i_s])] = chimax_f;
         }
-#endif
     } // end loop over species
 
     // make density MultiFabs from nodal to cell centered

@@ -278,7 +278,6 @@ Environment Variable          Default & Values                             Descr
 ``WARPX_PRECISION``           SINGLE/**DOUBLE**                            Floating point precision (single/double)
 ``WARPX_PARTICLE_PRECISION``  SINGLE/**DOUBLE**                            Particle floating point precision (single/double), defaults to WarpX_PRECISION value if not set
 ``WARPX_FFT``                 ON/**OFF**                                   FFT-based solvers
-``WARPX_QED``                 **ON**/OFF                                   PICSAR QED (requires PICSAR)
 ``WARPX_QED_TABLE_GEN``       ON/**OFF**                                   QED table generation (requires PICSAR and Boost)
 ``BUILD_PARALLEL``            ``2``                                        Number of threads to use for parallel builds
 ``BUILD_SHARED_LIBS``         ON/**OFF**                                   Build shared libraries for dependencies

@@ -8,9 +8,7 @@
 #include "ParticleExtrema.H"
 
 #include "Diagnostics/ReducedDiags/ReducedDiags.H"
-#if (defined WARPX_QED)
-#   include "Particles/ElementaryProcess/QEDInternals/QedChiFunctions.H"
-#endif
+#include "Particles/ElementaryProcess/QEDInternals/QedChiFunctions.H"
 #include "Fields.H"
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/Gather/GetExternalFields.H"
@@ -240,7 +238,6 @@ void ParticleExtrema::ComputeDiags (int step)
         amrex::ParallelDescriptor::ReduceRealMin({xmin,ymin,zmin,uxmin,uymin,uzmin,gmin,wmin});
         amrex::ParallelDescriptor::ReduceRealMax({xmax,ymax,zmax,uxmax,uymax,uzmax,gmax,wmax});
 
-#if (defined WARPX_QED)
         // get number of level (int)
         const auto level_number = WarpX::GetInstance().finestLevel();
 
@@ -363,7 +360,6 @@ void ParticleExtrema::ComputeDiags (int step)
             amrex::ParallelDescriptor::ReduceRealMin(chimin_f, amrex::ParallelDescriptor::IOProcessorNumber());
             amrex::ParallelDescriptor::ReduceRealMax(chimax_f, amrex::ParallelDescriptor::IOProcessorNumber());
         }
-#endif
 
         const auto get_idx = [&](const std::string& name){
             return m_headers_indices.at(name).idx;
@@ -385,13 +381,11 @@ void ParticleExtrema::ComputeDiags (int step)
         m_data[get_idx("gmax")] = gmax;
         m_data[get_idx("wmin")] = wmin;
         m_data[get_idx("wmax")] = wmax;
-#if (defined WARPX_QED)
         if (myspc.DoQED())
         {
             m_data[get_idx("chimin")] = chimin_f;
             m_data[get_idx("chimax")] = chimax_f;
         }
-#endif
     }
     // end loop over species
 }
