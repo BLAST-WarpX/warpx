@@ -18,11 +18,22 @@ namespace ablastr::constant
     {
         using namespace amrex::literals;
 
+        namespace variable_templates
+        {
+            //! ratio of a circle's circumference to its diameter (variable template)
+            template<typename T>
+            constexpr auto pi = static_cast<T>(3.14159265358979323846);
+
+            //! https://tauday.com/tau-manifesto (variable template)
+            template<typename T>
+            constexpr auto tau = static_cast<T>(2.0 * pi<double>);
+        }
+
         //! ratio of a circle's circumference to its diameter
-        static constexpr amrex::Real pi = 3.14159265358979323846_rt;
+        static constexpr auto pi = variable_templates::pi<amrex::Real>;
 
         //! https://tauday.com/tau-manifesto
-        static constexpr amrex::Real tau = 2.0_rt * pi;
+        static constexpr auto tau = variable_templates::tau<amrex::Real>;
     } // namespace math
 
     /** Physical constants
@@ -37,8 +48,6 @@ namespace ablastr::constant
      */
     namespace SI
     {
-        using namespace amrex::literals;
-
         namespace variable_templates
         {
             //! vacuum speed of light [m/s] (variable template)
