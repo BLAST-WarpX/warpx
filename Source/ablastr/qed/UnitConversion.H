@@ -1,13 +1,16 @@
 /* Copyright 2025 Luca Fedeli
  *
  * This file is part of WarpX.
+ * Based on PICSAR QED.
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef ABLASTR_QED_UNITCONVERSION_H_
-#define ABLASTR_QED_UNITCONVERSION_H_
+
+#ifndef ABLASTR_QED_UNIT_CONVERSION_H_
+#define ABLASTR_QED_UNIT_CONVERSION_H_
 
 #include "ablastr/constant.H"
+#include "ablastr/math/Vec3.H"
 
 #include <AMReX_Math.H>
 #include <AMReX_REAL.H>
@@ -148,82 +151,75 @@ namespace ablastr::qed
 
     template
     <
-        quantity Quantity,
         unit_system From,
-        unit_system To,
-        typename RealType = amrex::Real
+        unit_system To
     >
-    AMREX_FORCE_INLINE
-    constexpr RealType
-    convert (RealType value) noexcept ;
-
-
-    template
-    <
-        quantity Quantity,
-        typename RealType = amrex::Real
-    >
-    AMREX_FORCE_INLINE
-    constexpr RealType
-    convert <
-        Quantity,
-        unit_system::SI,
-        unit_system::SI,
-        RealType> (RealType value) noexcept
+    struct from_to
     {
-        return value;
-    }
+        template
+        <
+            quantity Quantity,
+            typename RealType
+        >
+        AMREX_FORCE_INLINE
+        static constexpr RealType
+        convert (RealType value) noexcept
+        {
+            if constexpr (From == unit_system::SI || To == unit_system::heaviside_lorentz)
+            {
+                return value*detail::SI_to_HL_factors::fact<Quantity, RealType>;
+            }
+            else if constexpr (From == unit_system::heaviside_lorentz || To == unit_system::SI)
+            {
+                constexpr auto fact = static_cast<RealType>(
+                    1.0/detail::SI_to_HL_factors::fact<Quantity, double>);
+                return value*fact;
+            }
+            else
+            {
+                return value;
+            }
+        }
 
-    template
-    <
-        quantity Quantity,
-        typename RealType = amrex::Real
-    >
-    AMREX_FORCE_INLINE
-    constexpr RealType
-    convert <
-        Quantity,
-        unit_system::heaviside_lorentz,
-        unit_system::heaviside_lorentz,
-        RealType> (RealType value) noexcept
-    {
-        return value;
-    }
+        template
+        <
+            quantity Quantity,
+            typename RealType
+        >
+        AMREX_FORCE_INLINE
+        static constexpr math::vec3<RealType>
+        convert (const math::vec3<RealType>& vec) noexcept
+        {
+            constexpr auto fact = convert<Quantity>(RealType(1.0));
+            return vec * fact;
+        }
+    };
 
-    template
-    <
-        quantity Quantity,
-        typename RealType = amrex::Real
-    >
-    AMREX_FORCE_INLINE
-    constexpr RealType
-    convert <
-        Quantity,
-        unit_system::SI,
-        unit_system::heaviside_lorentz,
-        RealType> (RealType value) noexcept
-    {
-        return value*
-            detail::SI_to_HL_factors::fact<Quantity, RealType>;
-    }
 
-    template
-    <
-        quantity Quantity,
-        typename RealType = amrex::Real
-    >
-    AMREX_FORCE_INLINE
-    constexpr auto
-    convert <
-        Quantity,
-        unit_system::heaviside_lorentz,
-        unit_system::SI,
-        RealType> (RealType value) noexcept
-    {
-        constexpr auto fact = static_cast<RealType>(
-            1.0/detail::SI_to_HL_factors::fact<Quantity, double>);
-        return value*fact;
-    }
+    /**
+    * Electron rest energy in heaviside_lorentz units
+    */
+    template <typename RealType>
+    constexpr auto heaviside_lorentz_electron_rest_energy = static_cast<RealType>(
+        from_to<unit_system::SI, unit_system::heaviside_lorentz>::convert<quantity::energy>(
+            ablastr::constant::SI::variable_templates::m_e<double>*
+            amrex::Math::powi<2>(ablastr::constant::SI::variable_templates::c<double>)));
+
+    /**
+    * Schwinger field in heaviside_lorentz units
+    */
+    template <typename RealType>
+    constexpr auto heaviside_lorentz_schwinger_field = static_cast<RealType>(
+        from_to<unit_system::SI, unit_system::heaviside_lorentz>::convert<quantity::E>(
+            ablastr::constant::SI::variable_templates::schwinger_field<double>));
+
+    /**
+    * Elementary charge in heaviside_lorentz units
+    */
+    template <typename RealType>
+    constexpr auto heaviside_lorentz_elementary_charge = static_cast<RealType>(
+        from_to<unit_system::SI, unit_system::heaviside_lorentz>::convert<quantity::charge>(
+            ablastr::constant::SI::variable_templates::q_e<double>));
 }
 
-#endif //ABLASTR_QED_UNITCONVERSION_H_
+#endif //ABLASTR_QED_UNIT_CONVERSION_H_

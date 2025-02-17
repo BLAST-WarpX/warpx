@@ -1,6 +1,7 @@
 /* Copyright 2025 Luca Fedeli
  *
  * This file is part of WarpX.
+ * Based on PICSAR QED.
  *
  * License: BSD-3-Clause-LBNL
  */
@@ -11,7 +12,6 @@
 #include <AMReX_Array.H>
 #include <AMReX_Extension.H>
 #include <AMReX_GpuQualifiers.H>
-#include <AMReX_Math.H>
 
 #include <cmath>
 
