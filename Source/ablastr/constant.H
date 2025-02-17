@@ -117,6 +117,10 @@ namespace ablastr::constant
             //! 1 MeV/c^2 in [kg] (variable template)
             template<typename T>
             constexpr auto MeV_invc2 = static_cast<T>(MeV<double> / (c<double> * c<double>));
+
+            //! sqrt(4*pi*alpha) is a constant used for the Heaviside Lorentz unit system (variable template)
+            template<typename T>
+            constexpr auto sqrt_4_pi_fine_structure = static_cast<T>(0.302822120872089);
         }
 
         //! vacuum speed of light [m/s]
@@ -162,6 +166,10 @@ namespace ablastr::constant
         static constexpr auto eV_invc2 = variable_templates::eV_invc2<amrex::Real>;
         //! 1 MeV/c^2 in [kg]
         static constexpr auto MeV_invc2 = variable_templates::MeV_invc2<amrex::Real>;
+
+        //! sqrt(4*pi*alpha) is a constant used for the Heaviside Lorentz unit system (variable template)
+        static constexpr auto sqrt_4_pi_fine_structure = variable_templates::sqrt_4_pi_fine_structure<amrex::Real>;
+
     } // namespace SI
 } // namespace ablastr::constant
 
