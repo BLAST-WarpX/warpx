@@ -100,7 +100,7 @@ def compute_rate_coefficients(temperatures_eV, energy_eV, sigma_m2, num_samples=
 
 
 def rhs(state, params):
-    """ Compute the right-hand side of ODE system that solves the global model described below.
+    """Compute the right-hand side of ODE system that solves the global model described below.
     The global model solves for the evolution of plasma density ($n_e$), neutral density ($n_n),
     and electron temperature ($T_e$) in the presence of ionization.
     The model equations consist of a continuity equation for electrons and neutrals,
