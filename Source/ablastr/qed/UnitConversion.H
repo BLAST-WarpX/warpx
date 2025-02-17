@@ -4,8 +4,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef ABLASTR_QED_UNIT_CONVERSION_H_
-#define ABLASTR_QED_UNIT_CONVERSION_H_
+#ifndef ABLASTR_QED_UNITCONVERSION_H_
+#define ABLASTR_QED_UNITCONVERSION_H_
 
 #include "ablastr/constant.H"
 
@@ -226,4 +226,4 @@ namespace ablastr::qed
     }
 }
 
-#endif //ABLASTR_QED_UNIT_CONVERSION_H_
+#endif //ABLASTR_QED_UNITCONVERSION_H_
