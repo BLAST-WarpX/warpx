@@ -10,7 +10,6 @@
 
 #include <AMReX_REAL.H>
 
-
 /** Numerical compile-time constants */
 namespace ablastr::constant
 {
@@ -65,6 +64,8 @@ namespace ablastr::constant
         static constexpr double xi = 1.3050122447005176e-52;
         //! xi times c2 = xi*c*c. This should be usable for single precision instead of xi; very close to smallest float32 number possible (1.2e-38)
         static constexpr auto xi_c2 = 1.1728865132395492e-35_rt;
+        //! Schwinger field [V/m]
+        static constexpr auto schwinger_field = (m_e*m_e)*(c*c*c)/(hbar*q_e);
 
         //! Boltzmann constant (exact) [J/K]
         static constexpr auto kb = 1.380649e-23_rt;
