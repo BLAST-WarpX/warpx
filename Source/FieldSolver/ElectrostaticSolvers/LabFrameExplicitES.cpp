@@ -31,8 +31,10 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
     using ablastr::fields::MultiLevelVectorField;
     using warpx::fields::FieldType;
 
+    bool const skip_lev0_coarse_patch = true;
+
     const MultiLevelScalarField rho_fp = fields.get_mr_levels(FieldType::rho_fp, max_level);
-    const MultiLevelScalarField rho_cp = fields.get_mr_levels(FieldType::rho_cp, max_level);
+    const MultiLevelScalarField rho_cp = fields.get_mr_levels(FieldType::rho_cp, max_level, skip_lev0_coarse_patch);
     const MultiLevelScalarField phi_fp = fields.get_mr_levels(FieldType::phi_fp, max_level);
     const MultiLevelVectorField Efield_fp = fields.get_mr_levels_alldirs(FieldType::Efield_fp, max_level);
 
@@ -75,7 +77,7 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
         // Use the AMREX MLMG or the FFT (IGF) solver otherwise
         computePhi(rho_fp, phi_fp, beta, self_fields_required_precision,
                    self_fields_absolute_tolerance, self_fields_max_iters,
-                   self_fields_verbosity);
+                   self_fields_verbosity, is_igf_2d_slices);
 #endif
 
     }

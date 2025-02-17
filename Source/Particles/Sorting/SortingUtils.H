@@ -174,9 +174,9 @@ class fillBufferFlagRemainingParticles
         amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> m_inv_cell_size;
         amrex::Box m_domain;
         int* m_inexflag_ptr;
-        WarpXParticleContainer::ParticleTileType::ConstParticleTileDataType const m_ptd;
+        WarpXParticleContainer::ParticleTileType::ConstParticleTileDataType m_ptd;
         amrex::Array4<int const> m_buffer_mask;
-        int const m_start_index;
+        int m_start_index;
         int const* m_indices_ptr;
 };
 

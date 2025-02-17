@@ -153,7 +153,7 @@ BoundaryScrapingDiagnostics::Flush (int i_buffer, bool /* force_flush */)
         warpx.gett_new(0),
         m_output_species.at(i_buffer),
         nlev_output, file_prefix,
-        m_file_min_digits, false, false, use_pinned_pc, isBTD,
+        m_file_min_digits, false, false, m_verbose, use_pinned_pc, isBTD,
         warpx.getistep(0), bufferID, numBTDBuffers, geom,
         isLastBTD);
 

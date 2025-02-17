@@ -24,10 +24,21 @@ class ParticleContainerWrapper(object):
 
     def __init__(self, species_name):
         self.name = species_name
+        self._particle_container = None
 
-        # grab the desired particle container
-        mypc = libwarpx.warpx.multi_particle_container()
-        self.particle_container = mypc.get_particle_container_from_name(self.name)
+    @property
+    def particle_container(self):
+        if self._particle_container is None:
+            try:
+                mypc = libwarpx.warpx.multi_particle_container()
+                self._particle_container = mypc.get_particle_container_from_name(
+                    self.name
+                )
+            except AttributeError as e:
+                msg = "You must initialize WarpX before accessing a ParticleContainerWrapper's particle_container."
+                raise AttributeError(msg) from e
+
+        return self._particle_container
 
     def add_particles(
         self,
@@ -96,31 +107,31 @@ class ParticleContainerWrapper(object):
             maxlen = max(maxlen, lenw)
 
         # --- Make sure that the lengths of the input parameters are consistent
-        assert (
-            x is None or lenx == maxlen or lenx == 1
-        ), "Length of x doesn't match len of others"
-        assert (
-            y is None or leny == maxlen or leny == 1
-        ), "Length of y doesn't match len of others"
-        assert (
-            z is None or lenz == maxlen or lenz == 1
-        ), "Length of z doesn't match len of others"
-        assert (
-            ux is None or lenux == maxlen or lenux == 1
-        ), "Length of ux doesn't match len of others"
-        assert (
-            uy is None or lenuy == maxlen or lenuy == 1
-        ), "Length of uy doesn't match len of others"
-        assert (
-            uz is None or lenuz == maxlen or lenuz == 1
-        ), "Length of uz doesn't match len of others"
-        assert (
-            w is None or lenw == maxlen or lenw == 1
-        ), "Length of w doesn't match len of others"
+        assert x is None or lenx == maxlen or lenx == 1, (
+            "Length of x doesn't match len of others"
+        )
+        assert y is None or leny == maxlen or leny == 1, (
+            "Length of y doesn't match len of others"
+        )
+        assert z is None or lenz == maxlen or lenz == 1, (
+            "Length of z doesn't match len of others"
+        )
+        assert ux is None or lenux == maxlen or lenux == 1, (
+            "Length of ux doesn't match len of others"
+        )
+        assert uy is None or lenuy == maxlen or lenuy == 1, (
+            "Length of uy doesn't match len of others"
+        )
+        assert uz is None or lenuz == maxlen or lenuz == 1, (
+            "Length of uz doesn't match len of others"
+        )
+        assert w is None or lenw == maxlen or lenw == 1, (
+            "Length of w doesn't match len of others"
+        )
         for key, val in kwargs.items():
-            assert (
-                np.size(val) == 1 or len(val) == maxlen
-            ), f"Length of {key} doesn't match len of others"
+            assert np.size(val) == 1 or len(val) == maxlen, (
+                f"Length of {key} doesn't match len of others"
+            )
 
         # --- Broadcast scalars into appropriate length arrays
         # --- If the parameter was not supplied, use the default value
@@ -159,7 +170,9 @@ class ParticleContainerWrapper(object):
         # --- Note that the velocities are handled separately and not included in attr
         # --- (even though they are stored as attributes in the C++)
         for key, vals in kwargs.items():
-            attr[:, self.particle_container.get_comp_index(key) - built_in_attrs] = vals
+            attr[
+                :, self.particle_container.get_real_comp_index(key) - built_in_attrs
+            ] = vals
 
         nattr_int = 0
         attr_int = np.empty([0], dtype=np.int32)
@@ -253,7 +266,7 @@ class ParticleContainerWrapper(object):
         List of arrays
             The requested particle array data
         """
-        comp_idx = self.particle_container.get_comp_index(comp_name)
+        comp_idx = self.particle_container.get_real_comp_index(comp_name)
 
         data_array = []
         for pti in libwarpx.libwarpx_so.WarpXParIter(self.particle_container, level):
@@ -298,7 +311,7 @@ class ParticleContainerWrapper(object):
         List of arrays
             The requested particle array data
         """
-        comp_idx = self.particle_container.get_icomp_index(comp_name)
+        comp_idx = self.particle_container.get_int_comp_index(comp_name)
 
         data_array = []
         for pti in libwarpx.libwarpx_so.WarpXParIter(self.particle_container, level):
@@ -758,7 +771,18 @@ class ParticleBoundaryBufferWrapper(object):
     """
 
     def __init__(self):
-        self.particle_buffer = libwarpx.warpx.get_particle_boundary_buffer()
+        self._particle_buffer = None
+
+    @property
+    def particle_buffer(self):
+        if self._particle_buffer is None:
+            try:
+                self._particle_buffer = libwarpx.warpx.get_particle_boundary_buffer()
+            except AttributeError as e:
+                msg = "You must initialize WarpX before accessing a ParticleBoundaryBufferWrapper's particle_buffer."
+                raise AttributeError(msg) from e
+
+        return self._particle_buffer
 
     def get_particle_boundary_buffer_size(self, species_name, boundary, local=False):
         """
@@ -820,16 +844,16 @@ class ParticleBoundaryBufferWrapper(object):
         )
         data_array = []
         # loop over the real attributes
-        if comp_name in part_container.real_comp_names:
-            comp_idx = part_container.real_comp_names[comp_name]
+        if comp_name in part_container.real_soa_names:
+            comp_idx = part_container.get_real_comp_index(comp_name)
             for ii, pti in enumerate(
                 libwarpx.libwarpx_so.BoundaryBufferParIter(part_container, level)
             ):
                 soa = pti.soa()
                 data_array.append(xp.array(soa.get_real_data(comp_idx), copy=False))
         # loop over the integer attributes
-        elif comp_name in part_container.int_comp_names:
-            comp_idx = part_container.int_comp_names[comp_name]
+        elif comp_name in part_container.int_soa_names:
+            comp_idx = part_container.get_int_comp_index(comp_name)
             for ii, pti in enumerate(
                 libwarpx.libwarpx_so.BoundaryBufferParIter(part_container, level)
             ):

@@ -53,6 +53,7 @@ sudo apt-get install -y --no-install-recommends \
     rocm-dev        \
     rocfft-dev      \
     rocprim-dev     \
+    rocsparse-dev   \
     rocrand-dev     \
     hiprand-dev
 
@@ -79,16 +80,3 @@ sudo curl -L -o /usr/local/bin/cmake-easyinstall https://raw.githubusercontent.c
 sudo chmod a+x /usr/local/bin/cmake-easyinstall
 export CEI_SUDO="sudo"
 export CEI_TMP="/tmp/cei"
-
-# heFFTe
-#
-cmake-easyinstall --prefix=/usr/local                      \
-    git+https://github.com/icl-utk-edu/heffte.git@v2.4.0   \
-    -DCMAKE_CXX_COMPILER_LAUNCHER=$(which ccache)          \
-    -DCMAKE_CXX_STANDARD=17 -DHeffte_ENABLE_DOXYGEN=OFF    \
-    -DHeffte_ENABLE_FFTW=OFF -DHeffte_ENABLE_TESTING=OFF   \
-    -DHeffte_ENABLE_CUDA=OFF -DHeffte_ENABLE_ROCM=ON       \
-    -DHeffte_ENABLE_ONEAPI=OFF -DHeffte_ENABLE_MKL=OFF     \
-    -DHeffte_ENABLE_PYTHON=OFF -DHeffte_ENABLE_FORTRAN=OFF \
-    -DHeffte_ENABLE_MAGMA=OFF                              \
-    -DCMAKE_VERBOSE_MAKEFILE=ON

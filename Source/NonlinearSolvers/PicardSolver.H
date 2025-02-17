@@ -138,6 +138,7 @@ void PicardSolver<Vec,Ops>::Solve ( Vec&         a_U,
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         this->m_is_defined,
         "PicardSolver::Solve() called on undefined object");
+    amrex::ignore_unused(a_dt);
     using namespace amrex::literals;
 
     //
@@ -156,7 +157,7 @@ void PicardSolver<Vec,Ops>::Solve ( Vec&         a_U,
         m_Usave.Copy(a_U);
 
         // Update the solver state (a_U = a_b + m_R)
-        m_ops->ComputeRHS( m_R, a_U, a_time, a_dt, iter, false );
+        m_ops->ComputeRHS( m_R, a_U, a_time, iter, false );
         a_U.Copy(a_b);
         a_U += m_R;
 
@@ -204,7 +205,7 @@ void PicardSolver<Vec,Ops>::Solve ( Vec&         a_U,
                          " and the relative tolerance is " << m_rtol <<
                          ". Absolute norm is " << norm_abs <<
                          " and the absolute tolerance is " << m_atol;
-       if (this->m_verbose) { amrex::Print() << convergenceMsg.str() << std::endl; }
+       if (this->m_verbose) { amrex::Print() << convergenceMsg.str() << "\n"; }
        if (m_require_convergence) {
            WARPX_ABORT_WITH_MESSAGE(convergenceMsg.str());
        } else {

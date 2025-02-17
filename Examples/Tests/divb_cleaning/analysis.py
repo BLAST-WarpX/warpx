@@ -8,15 +8,11 @@
 
 import sys
 
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import os
-
 import numpy as np
 import yt
 
 yt.funcs.mylog.setLevel(50)
 
-from checksumAPI import evaluate_checksum
 from scipy.constants import c
 
 # Name of the last plotfile
@@ -51,9 +47,3 @@ rel_error = np.amax(abs(x - y)) / np.amax(abs(y))
 tolerance = 1e-1
 
 assert rel_error < tolerance
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)
