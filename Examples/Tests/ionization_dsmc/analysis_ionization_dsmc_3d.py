@@ -65,21 +65,21 @@ def get_density(ts):
 
 
 def compute_rate_coefficients(temperatures_eV, energy_eV, sigma_m2, num_samples=1024):
-    # """Integrate cross sections over maxwellian VDF to obtain reaction rate coefficients
-    # Given electron energy in eV (`energy_eV`) and reaction cross sections at those energies (`sigma_m2`),
-    # this function computes the reaction rate coefficient $k(T_e)$ for maxwellian electrons at
-    # a provided list of electron temperatures `temperatures_eV`.
+    """Integrate cross sections over maxwellian VDF to obtain reaction rate coefficients
+    Given electron energy in eV (`energy_eV`) and reaction cross sections at those energies (`sigma_m2`),
+    this function computes the reaction rate coefficient $k(T_e)$ for maxwellian electrons at
+    a provided list of electron temperatures `temperatures_eV`.
 
-    # The rate coefficient is given by
+    The rate coefficient is given by
 
-    # $$
-    # k(T_e) = \int \sigma(E) E dE
-    # $$
+    $$
+    k(T_e) = \int \sigma(E) E dE
+    $$
 
-    # where the energy $E$ is drawn from a maxwellian distribution function with zero speed and temperature $T_e$.
-    # We solve this using a quasi-monte carlo approach, by drawing a large number of low-discrepancy samples from
-    # the appropriate distribution and obtaining the average of $\sigma(E) E$.
-    # """
+    where the energy $E$ is drawn from a maxwellian distribution function with zero speed and temperature $T_e$.
+    We solve this using a quasi-monte carlo approach, by drawing a large number of low-discrepancy samples from
+    the appropriate distribution and obtaining the average of $\sigma(E) E$.
+    """
     thermal_speed_scale = np.sqrt(q_e / m_e)
     k = np.zeros(temperatures_eV.size)
 
@@ -100,26 +100,26 @@ def compute_rate_coefficients(temperatures_eV, energy_eV, sigma_m2, num_samples=
 
 
 def rhs(state, params):
-    # """ Compute the right-hand side of ODE system that solves the global model described below.
-    # The global model solves for the evolution of plasma density ($n_e$), neutral density ($n_n),
-    # and electron temperature ($T_e$) in the presence of ionization.
-    # The model equations consist of a continuity equation for electrons and neutrals,
-    # combined with an energy equation for electrons.
+    """ Compute the right-hand side of ODE system that solves the global model described below.
+    The global model solves for the evolution of plasma density ($n_e$), neutral density ($n_n),
+    and electron temperature ($T_e$) in the presence of ionization.
+    The model equations consist of a continuity equation for electrons and neutrals,
+    combined with an energy equation for electrons.
 
-    # $$
-    # \frac{\partial n_e}{\partial t} = \dot{n}
-    # \frac{\partial n_n}{\partial t} = -\dot{n}
-    # \frac{3}{2}\frac{\partial n_e T_e}{\partial t} = -\dot{n} \epsilon_{iz},
-    # $$
+    $$
+    \frac{\partial n_e}{\partial t} = \dot{n}
+    \frac{\partial n_n}{\partial t} = -\dot{n}
+    \frac{3}{2}\frac{\partial n_e T_e}{\partial t} = -\dot{n} \epsilon_{iz},
+    $$
 
-    # where
+    where
 
-    # $$
-    # \dot{n} = n_n n_e k_{iz}(T_e),
-    # $$
+    $$
+    \dot{n} = n_n n_e k_{iz}(T_e),
+    $$
 
-    # $k_iz$ is the ionization rate coefficient as a function of electron temperature in eV, and $\epsilon_{iz}$ is the ionization energy cost in eV.
-    # """
+    $k_iz$ is the ionization rate coefficient as a function of electron temperature in eV, and $\epsilon_{iz}$ is the ionization energy cost in eV.
+    """
     # unpack parameters
     E_iz, Te_table, kiz_table = params
     ne, nn, energy = state[0], state[1], state[2]
@@ -192,7 +192,6 @@ plt.tight_layout()
 plt.savefig("ionization_dsmc_density_Te.png", dpi=150)
 
 
-# For now, setting very high tolerances on purpose. This needs to be modified once all features are implemented in the PR.
 tolerances = [4e-2, 1e-6, 4e-2]
 
 

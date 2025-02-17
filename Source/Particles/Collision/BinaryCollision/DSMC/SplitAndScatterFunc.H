@@ -116,7 +116,11 @@ public:
         for (int i = 0; i < m_num_product_species; i++)
         {
             // Add the number of product producing events to the species involved
-            // in those processes.
+            // in those processes. For the two colliding particles, if either is set to 
+            // have just 1 copy in the products it indicates that that species is not a
+            // product of the product producing reaction (instead it is just tracked as
+            // an outgoing particle in non-product producing reactions), and therefore 
+            // it does not count in the products. 
             int num_products = m_num_products_host[i];
             if ((i < 2) & (num_products == 1)) {
                 num_products = 0;

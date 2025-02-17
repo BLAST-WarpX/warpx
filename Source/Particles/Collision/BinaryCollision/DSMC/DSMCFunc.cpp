@@ -65,8 +65,6 @@ DSMCFunc::DSMCFunc (
             );
             ionization_flag = true;
 
-            // TODO: Add a check that the first species is the electron species
-            // (This should be done for impact ionization with MCC too)
             // And add a check that the ionization species has the same mass
             // (and a positive charge), compared to the target species
         }
