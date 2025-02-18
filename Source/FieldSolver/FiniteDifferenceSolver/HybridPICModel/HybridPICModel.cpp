@@ -75,6 +75,13 @@ void HybridPICModel::ReadParameters ()
     utils::parser::queryWithParser(pp_hybrid, "include_Joule_heating", m_include_Joule_heating);
 
     // ADD ASSERT in case m_solve_electron_energy_equation is False and m_include_Joule_heating is True
+
+    //bool to indicate if classical Bremsstrahlung loss is included (when m_solve_electron_energy_equation is True)
+    utils::parser::queryWithParser(pp_hybrid, "include_Bremsstrahlung", m_include_Bremsstrahlung);
+
+    // Z effective for Bremsstrahlung power loss.
+    pp_hybrid.query("Zeff", m_Zeff);
+
 }
 
 void HybridPICModel::AllocateLevelMFs (

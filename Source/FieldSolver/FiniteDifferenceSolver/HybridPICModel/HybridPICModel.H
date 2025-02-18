@@ -233,6 +233,12 @@ public:
 
     bool m_include_Joule_heating;
 
+    bool m_include_Bremsstrahlung;
+
+    // Z effective for classical Bremsstrahlung power loss calculation
+    // only if QDSMC solver with Bremsstrahlung flag is used
+    amrex::Real m_Zeff = 1.0;
+
 };
 
 /**

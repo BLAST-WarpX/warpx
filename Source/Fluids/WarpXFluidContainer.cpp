@@ -1684,8 +1684,74 @@ void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiF
                     amrex::Real eta_J2 = eta(rho_val, jtot_val, Te_val)*jtot_val*jtot_val;
 
                     // Te(i, j, k) and second term already in Joules so no need to divide eta_J2 by kb
-                    // Te_val in K so need to convert to Joules
-                    Te(i, j, k) = PhysConst::kb*Te_val + dt*eta_J2/(3.0/2*ne_val);
+                    Te(i, j, k) = Te(i, j, k) + dt*eta_J2/(3.0/2*ne_val);
+                }
+
+            });
+        }
+
+    // Fill Boundary ?
+    m_fields.get(name_mf_T, lev)->FillBoundary(m_fields.get(name_mf_T, lev)->nGrowVect(), period);
+}
+
+
+// To Do:
+// pass Te and rho multifabs as arguments too !
+void WarpXFluidContainer::Hybrid_Electron_Bremsstrahlung (ablastr::fields::MultiFabRegister& m_fields, 
+                                        HybridPICModel const* hybrid_model, 
+                                        amrex::Real dt, int lev)
+{
+    WarpX &warpx = WarpX::GetInstance();
+    const amrex::Geometry &geom = warpx.Geom(lev);
+    const amrex::Periodicity &period = geom.periodicity();
+    const auto dx = geom.CellSizeArray();
+    const auto cell_volume = dx[0]*dx[1]*dx[2];
+
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    // Zeff should be self consistent with simulation but it is 
+    // an input parameter for now.
+    // Once Hybrid PIC is extended to do more than 1 ion species
+    // Zeff should be calculated from rho_total and rho of each species.
+    const auto Zeff = hybrid_model->m_Zeff;
+    amrex::Real constant_val = 5.91361e37;
+
+    // For safety condition (divition by rho)
+    amrex::Real rho_floor = PhysConst::q_e*hybrid_model->m_n_floor;
+    const auto ix_type = m_fields.get(name_mf_NU, Direction{0}, lev)->ixType().toIntVect();
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*m_fields.get(name_mf_N, lev), TilingIfNotGPU()); mfi.isValid(); ++mfi )
+        {
+            // using Te right after Joule heating/qdsmc (operator splitting approach)
+            // this is first order accurate in time
+            amrex::Array4<amrex::Real> const& Te = m_fields.get(name_mf_T, lev)->array(mfi);
+
+            // using rho at n+1
+            amrex::Array4<amrex::Real> const& rho = m_fields.get(FieldType::rho_fp, lev)->array(mfi);
+
+            const Box& tilebox  = mfi.tilebox();
+            amrex::Box box = amrex::convert( tilebox, ix_type );
+            box.grow(m_fields.get(name_mf_K, lev)->nGrowVect());
+
+            ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+
+                if(rho(i, j, k) > rho_floor){
+
+                    amrex::Real rho_val = rho(i, j, k);
+                    amrex::Real ne_val = rho_val/PhysConst::q_e;
+                    amrex::Real Te_val = Te(i, j, k); // in J
+
+                    // calculate power loss per unit volume due to Bremsstrahlung
+                    // Expression gives value in W/m^3
+                    // Te in sqrt() is in eV in this formula
+                    amrex::Real dW_dV = Zeff*Zeff*ne_val*ne_val*std::sqrt(Te_val/PhysConst::q_e)/constant_val;
+
+                    // Te(i, j, k) and second term already in Joules
+                    Te(i, j, k) = Te(i, j, k) - dW_dV*dt*cell_volume;
                 }
 
             });

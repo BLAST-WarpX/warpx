@@ -152,6 +152,13 @@ public:
                                         HybridPICModel const* hybrid_model, 
                                         amrex::Real dt, int lev);
 
+    // Adds Bremsstrahlung loss to electrons
+    // current implementation assumes only 1 ion species
+    // only called if flag is used and compatible with QDSMC solver only
+    void Hybrid_Electron_Bremsstrahlung (ablastr::fields::MultiFabRegister& m_fields, 
+                                        HybridPICModel const* hybrid_model, 
+                                        amrex::Real dt, int lev);
+
     [[nodiscard]] amrex::Real getCharge () const {return charge;}
     [[nodiscard]] amrex::Real getMass () const {return mass;}
 

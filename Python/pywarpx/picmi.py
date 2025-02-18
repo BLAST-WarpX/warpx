@@ -1911,8 +1911,10 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Jy_external_function=None,
         Jz_external_function=None,
         A_external=None,
-        solve_electron_energy_equation=False,
-        include_Joule_heating=False,
+        solve_electron_energy_equation=None,
+        include_Joule_heating=None,
+        include_Bremsstrahlung=None,
+        Zeff = None,
         **kw,
     ):
         self.grid = grid
@@ -1924,6 +1926,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.n_floor = n_floor
         self.plasma_resistivity = plasma_resistivity
         self.plasma_hyper_resistivity = plasma_hyper_resistivity
+        self.Zeff = Zeff
 
         self.substeps = substeps
 
@@ -1938,6 +1941,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.solve_electron_energy_equation = solve_electron_energy_equation
 
         self.include_Joule_heating = include_Joule_heating
+
+        self.include_Bremsstrahlung = include_Bremsstrahlung
 
         # Handle keyword arguments used in expressions
         self.user_defined_kw = {}
@@ -2044,6 +2049,10 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
 
         pywarpx.hybridpicmodel.include_Joule_heating = (
             self.include_Joule_heating
+        )
+
+        pywarpx.hybridpicmodel.include_Bremsstrahlung = (
+            self.include_Bremsstrahlung
         )
 
 
