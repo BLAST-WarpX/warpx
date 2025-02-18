@@ -1436,9 +1436,13 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             amrex::Real const vy = (yp_np1 - yp_n[ip])/dt;
             amrex::Real const vz = (zp_np1 - zp_n[ip])/dt;
 
-            double const dxp = (xp_np1 - xp_n[ip])*dinv.x;
-            double const dyp = (yp_np1 - yp_n[ip])*dinv.y;
-            double const dzp = (zp_np1 - zp_n[ip])*dinv.z;
+            // The step size needs to be for the full step
+            double const x_new_f = (xp_np1 - xyzmin.x)*dinv.x;
+            double const y_new_f = (yp_np1 - xyzmin.y)*dinv.y;
+            double const z_new_f = (zp_np1 - xyzmin.z)*dinv.z;
+            double const dxp = x_new_f - x_old;
+            double const dyp = y_new_f - y_old;
+            double const dzp = z_new_f - z_old;
 
             // Define velocity kernals to deposit
             amrex::Real const wqx = wq*vx*invvol;
@@ -1655,10 +1659,12 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
 
             amrex::Real const xp_n_c = rp_old;
             amrex::Real xp_np1_c = rp_new;
+            amrex::Real const xp_np1_f = rp_new;
             amrex::Real const vy = (-uxp_nph[ip]*sintheta_mid + uyp_nph[ip]*costheta_mid)*gaminv;
 #elif defined(WARPX_DIM_XZ)
             amrex::Real const xp_n_c = xp_n[ip];
             amrex::Real xp_np1_c = xp_np1;
+            amrex::Real const xp_np1_f = xp_np1;
             amrex::Real const vy = uyp_nph[ip]*gaminv;
 #endif
 
@@ -1675,8 +1681,11 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             double const z_new = (zp_np1_c - xyzmin.z)*dinv.z;
             double const z_old = (zp_n[ip] - xyzmin.z)*dinv.z;
 
-            double const dxp = (xp_np1 - xp_n[ip])*dinv.x;
-            double const dzp = (zp_np1 - zp_n[ip])*dinv.z;
+            // The step size needs to be for the full step
+            double const x_new_f = (xp_np1_f - xyzmin.x)*dinv.x;
+            double const z_new_f = (zp_np1 - xyzmin.z)*dinv.z;
+            double const dxp = x_new_f - x_old;
+            double const dzp = z_new_f - z_old;
 
             // Define velocity kernals to deposit
             amrex::Real const wqx = wq*vx*invvol;
@@ -1864,7 +1873,9 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             amrex::Real const vy = uyp_nph[ip]*gaminv;
             amrex::Real const vz = (zp_np1 - zp_n[ip])/dt;
 
-            double const dzp = (zp_np1 - zp_n[ip])*dinv.z;
+            // The step size needs to be for the full step
+            double const z_new_f = (zp_np1 - xyzmin.z)*dinv.z;
+            double const dzp = z_new_f - z_old;
 
             // Define velocity kernals to deposit
             amrex::Real const wqx = wq*vx*invvol;

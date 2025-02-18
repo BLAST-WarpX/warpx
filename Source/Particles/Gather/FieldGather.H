@@ -943,9 +943,13 @@ void doGatherPicnicShapeN (
     double const y_bar = (y_new + y_old)*0.5_rt;
     double const z_bar = (z_new + z_old)*0.5_rt;
 
-    double const dxp = (xp_np1 - xp_n)*dinv.x;
-    double const dyp = (yp_np1 - yp_n)*dinv.y;
-    double const dzp = (zp_np1 - zp_n)*dinv.z;
+    // The step size needs to be for the full step
+    double const x_new_f = (xp_np1 - xyzmin.x)*dinv.x;
+    double const y_new_f = (yp_np1 - xyzmin.y)*dinv.y;
+    double const z_new_f = (zp_np1 - xyzmin.z)*dinv.z;
+    double const dxp = x_new_f - x_old;
+    double const dyp = y_new_f - y_old;
+    double const dzp = z_new_f - z_old;
 
     // compute cell crossings in X-direction
     const auto i_old = static_cast<int>(x_old-shift);
@@ -1187,9 +1191,11 @@ void doGatherPicnicShapeN (
 
     amrex::Real const xp_n_c = rp_old;
     amrex::Real xp_np1_c = rp_new;
+    amrex::Real const xp_np1_f = rp_new;
 #elif defined(WARPX_DIM_XZ)
     amrex::Real const xp_n_c = xp_n;
     amrex::Real xp_np1_c = xp_np1;
+    amrex::Real const xp_np1_f = xp_np1;
 #endif
 
     amrex::Real zp_np1_c = zp_np1;
@@ -1205,8 +1211,11 @@ void doGatherPicnicShapeN (
     double const x_bar = (x_new + x_old)*0.5_rt;
     double const z_bar = (z_new + z_old)*0.5_rt;
 
-    double const dxp = (xp_np1 - xp_n)*dinv.x;
-    double const dzp = (zp_np1 - zp_n)*dinv.z;
+    // The step size needs to be for the full step
+    double const x_new_f = (xp_np1_f - xyzmin.x)*dinv.x;
+    double const z_new_f = (zp_np1 - xyzmin.z)*dinv.z;
+    double const dxp = x_new_f - x_old;
+    double const dzp = z_new_f - z_old;
 
     // compute cell crossings in X-direction
     const auto i_old = static_cast<int>(x_old-shift);
@@ -1434,7 +1443,9 @@ void doGatherPicnicShapeN (
 
     double const z_bar = (z_new + z_old)*0.5_rt;
 
-    double const dzp = (zp_np1 - zp_n)*dinv.z;
+    // The step size needs to be for the full step
+    double const z_new_f = (zp_np1 - xyzmin.z)*dinv.z;
+    double const dzp = z_new_f - z_old;
 
     // compute cell crossings in Z-direction
     const auto k_old = static_cast<int>(z_old-shift);
