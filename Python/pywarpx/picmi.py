@@ -2903,11 +2903,11 @@ class Simulation(picmistandard.PICMI_Simulation):
         Using the Intervals parser syntax, this string defines the timesteps at which particles are sorted. If <=0, do not sort particles.
         It is turned on on GPUs for performance reasons (to improve memory locality).
 
-    warpx_sort_particles_for_deposition: bool, optional (default: true for the CUDA backend, otherwise false)
+    warpx_sort_particles_for_deposition: bool, optional (default: true for the CUDA and HIP backend, otherwise false)
         This option controls the type of sorting used if particle sorting is turned on, i.e. if sort_intervals is not <=0.
         If `true`, particles will be sorted by cell to optimize deposition with many particles per cell, in the order `x` -> `y` -> `z` -> `ppc`.
         If `false`, particles will be sorted by bin, using the sort_bin_size parameter below, in the order `ppc` -> `x` -> `y` -> `z`.
-        `true` is recommended for best performance on NVIDIA GPUs, especially if there are many particles per cell.
+        `true` is recommended for best performance on NVIDIA and AMD GPUs, especially if there are many particles per cell.
 
     warpx_sort_idx_type: list of int, optional (default: 0 0 0)
         This controls the type of grid used to sort the particles when sort_particles_for_deposition is true.

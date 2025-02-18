@@ -164,7 +164,7 @@ bool WarpX::refine_plasma     = false;
 utils::parser::IntervalsParser WarpX::sort_intervals;
 amrex::IntVect WarpX::sort_bin_size(AMREX_D_DECL(1,1,1));
 
-#if defined(AMREX_USE_CUDA)
+#if defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)
 bool WarpX::sort_particles_for_deposition = true;
 #else
 bool WarpX::sort_particles_for_deposition = false;
