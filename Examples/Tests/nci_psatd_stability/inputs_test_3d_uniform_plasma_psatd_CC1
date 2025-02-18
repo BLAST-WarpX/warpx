@@ -1,0 +1,11 @@
+# base input parameters
+FILE = inputs_base_3d
+
+# test input parameters
+diag1.fields_to_plot = Bx By Bz divE Ex Ey Ez F G jx jy jz rho
+psatd.J_in_time = constant
+psatd.rho_in_time = constant
+warpx.abort_on_warning_threshold = medium
+warpx.do_dive_cleaning = 1
+warpx.do_psatd_JRhom = 1
+warpx.do_psatd_JRhom_n_depositions = 1
