@@ -195,13 +195,13 @@ endif()
 
 if(WarpX_FFT)
     add_warpx_test(
-        test_rz_multiJ_psatd  # name
+        test_rz_psatd_LL2  # name
         RZ  # dims
         2  # nprocs
-        inputs_test_rz_multiJ_psatd  # inputs
+        inputs_test_rz_psatd_LL2  # inputs
         OFF  # analysis
         "analysis_default_regression.py --path diags/diag1000025"  # checksum
         OFF  # dependency
     )
-    label_warpx_test(test_rz_multiJ_psatd slow)
+    label_warpx_test(test_test_rz_psatd_LL2 slow)
 endif()
