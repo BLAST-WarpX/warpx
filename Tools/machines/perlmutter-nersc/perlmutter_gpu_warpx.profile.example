@@ -15,7 +15,7 @@ module load cudatoolkit
 module load cmake/3.30.2
 
 # missing modules installed here
-export SW_DIR=${PSCRATCH}/storage/sw/perlmutter/gpu
+export SW_DIR=${PSCRATCH}/storage/sw/warpx/perlmutter/gpu
 
 # optional: for QED support with detailed tables
 export CMAKE_PREFIX_PATH=${SW_DIR}/boost-1.82.0:${CMAKE_PREFIX_PATH}
