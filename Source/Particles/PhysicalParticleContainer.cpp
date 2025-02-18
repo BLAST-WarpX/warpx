@@ -2841,10 +2841,12 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
 
     amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> is_absorbing;
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
-        is_absorbing[idim][0] = (box.smallEnd(idim) <= domain_box.smallEnd(idim) &&
+        is_absorbing[idim][0] = m_crop_on_PEC_boundary &&
+                                (box.smallEnd(idim) <= domain_box.smallEnd(idim) &&
                                  (field_boundary_lo[idim] == FieldBoundaryType::PEC
                                || field_boundary_lo[idim] == FieldBoundaryType::PECInsulator));
-        is_absorbing[idim][1] = (box.bigEnd(idim) >= domain_box.bigEnd(idim) &&
+        is_absorbing[idim][1] = m_crop_on_PEC_boundary &&
+                                (box.bigEnd(idim) >= domain_box.bigEnd(idim) &&
                                  (field_boundary_hi[idim] == FieldBoundaryType::PEC
                                || field_boundary_hi[idim] == FieldBoundaryType::PECInsulator));
     }

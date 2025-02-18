@@ -140,6 +140,8 @@ WarpXParticleContainer::WarpXParticleContainer (AmrCore* amr_core, int ispecies)
     m_boundary_conditions.SetBoundsZ(WarpX::particle_boundary_lo[0], WarpX::particle_boundary_hi[0]);
 #endif
     m_boundary_conditions.BuildReflectionModelParsers();
+
+    pp_particles.query("crop_on_PEC_boundary", m_crop_on_PEC_boundary);
 }
 
 void
@@ -490,10 +492,12 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
 
     amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> is_absorbing;
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
-        is_absorbing[idim][0] = (tilebox.smallEnd(idim) <= domain_box.smallEnd(idim) &&
+        is_absorbing[idim][0] = m_crop_on_PEC_boundary &&
+                                (tilebox.smallEnd(idim) <= domain_box.smallEnd(idim) &&
                                  (field_boundary_lo[idim] == FieldBoundaryType::PEC
                                || field_boundary_lo[idim] == FieldBoundaryType::PECInsulator));
-        is_absorbing[idim][1] = (tilebox.bigEnd(idim) >= domain_box.bigEnd(idim) &&
+        is_absorbing[idim][1] = m_crop_on_PEC_boundary &&
+                                (tilebox.bigEnd(idim) >= domain_box.bigEnd(idim) &&
                                  (field_boundary_hi[idim] == FieldBoundaryType::PEC
                                || field_boundary_hi[idim] == FieldBoundaryType::PECInsulator));
     }

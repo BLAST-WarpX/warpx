@@ -508,6 +508,10 @@ protected:
     // Controls boundaries for particles exiting the domain
     ParticleBoundaries m_boundary_conditions;
 
+    // Controls whether particle trajectoris are cropped when particles
+    // cross a PEC boundary
+    bool m_crop_on_PEC_boundary = false;
+
     //! instead of depositing (current, charge) on the finest patch level, deposit to the coarsest grid
     bool m_deposit_on_main_grid = false;
 

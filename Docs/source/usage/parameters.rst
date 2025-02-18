@@ -532,6 +532,7 @@ Domain Boundary Conditions
     * ``damped``: This is the recommended option in the moving direction when using the spectral solver with moving window (currently only supported along z). This boundary condition applies a damping factor to the electric and magnetic fields in the outer half of the guard cells, using a sine squared profile. As the spectral solver is by nature periodic, the damping prevents fields from wrapping around to the other end of the domain when the periodicity is not desired. This boundary condition is only valid when using the spectral solver.
 
     * ``pec``: This option can be used to set a Perfect Electric Conductor at the simulation boundary. Please see the :ref:`PEC theory section <theory-bc-pec>` for more details. Note that PEC boundary is invalid at `r=0` for the RZ solver. Please use ``none`` option. This boundary condition does not work with the spectral solver.
+      There is the additional input parameter ``particles.crop_on_PEC_boundary`` which sets whethers particle trajectories are cropped when particles cross PEC boundaries, defaulting to false.
 
     * ``pmc``: This option can be used to set a Perfect Magnetic Conductor at the simulation boundary. Please see the :ref:`PEC theory section <theory-bc-pmc>` for more details. This is equivalent to ``Neumann``. This boundary condition does not work with the spectral solver.
 
@@ -541,6 +542,7 @@ Domain Boundary Conditions
       The expressions are given for the low and high boundary on each axis, as listed below. The tangential fields are specified as
       expressions that can depend on the location and time. The tangential fields are in two pairs, the electric fields and the
       magnetic fields. In each pair, if one is specified, the other will be set to zero if not also specified.
+      There is the additional input parameter ``particles.crop_on_PEC_boundary`` which sets whethers particle trajectories are cropped when particles cross pec_insulator boundaries, defaulting to false.
 
       * ``insulator.area_x_lo(y,z)``: For the lower x (or r) boundary, expression specifying the insulator location
 
