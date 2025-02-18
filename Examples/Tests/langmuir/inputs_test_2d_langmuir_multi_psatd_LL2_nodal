@@ -1,14 +1,13 @@
 # base input parameters
-FILE = inputs_base_3d
+FILE = inputs_base_2d
 
 # test input parameters
-algo.current_deposition = direct
 algo.maxwell_solver = psatd
 psatd.J_in_time = linear
 psatd.solution_type = first-order
 psatd.update_with_rho = 1
 warpx.abort_on_warning_threshold = medium
-warpx.cfl = 0.5773502691896258
-warpx.do_multi_J = 1
-warpx.do_multi_J_n_depositions = 2
+warpx.cfl = 0.7071067811865475
+warpx.do_psatd_JRhom = 1
+warpx.do_psatd_JRhom_n_depositions = 2
 warpx.grid_type = collocated
