@@ -1455,7 +1455,7 @@ void WarpXFluidContainer::HybridInitializeUe (
     for ( MFIter mfi(*m_fields.get(name_mf_N, lev), TilingIfNotGPU()); mfi.isValid(); ++mfi )
         {
             //amrex::Array4<amrex::Real> const& rho = m_fields.get(name_mf_N, lev)->array(mfi);
-            
+
             // using rho at n+1/2 in rho_fp_temp
             amrex::Array4<amrex::Real> const& rho = m_fields.get(FieldType::hybrid_rho_fp_temp, lev)->array(mfi);
 
@@ -1607,9 +1607,9 @@ void WarpXFluidContainer::HybridQDSMCUpdateTe (ablastr::fields::MultiFabRegister
 
 // To Do:
 // pass Te and rho multifabs as arguments too !
-// check: no need to fill Boundary? Hybrid_Electron_Joule_Heating should be called after filling boundary of rho and Te 
-void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiFabRegister& m_fields, 
-                                        HybridPICModel const* hybrid_model, 
+// check: no need to fill Boundary? Hybrid_Electron_Joule_Heating should be called after filling boundary of rho and Te
+void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiFabRegister& m_fields,
+                                        HybridPICModel const* hybrid_model,
                                         amrex::Real dt, int lev)
 {
     WarpX &warpx = WarpX::GetInstance();
@@ -1697,8 +1697,8 @@ void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiF
 
 // To Do:
 // pass Te and rho multifabs as arguments too !
-void WarpXFluidContainer::Hybrid_Electron_Bremsstrahlung (ablastr::fields::MultiFabRegister& m_fields, 
-                                        HybridPICModel const* hybrid_model, 
+void WarpXFluidContainer::Hybrid_Electron_Bremsstrahlung (ablastr::fields::MultiFabRegister& m_fields,
+                                        HybridPICModel const* hybrid_model,
                                         amrex::Real dt, int lev)
 {
     WarpX &warpx = WarpX::GetInstance();
@@ -1710,7 +1710,7 @@ void WarpXFluidContainer::Hybrid_Electron_Bremsstrahlung (ablastr::fields::Multi
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    // Zeff should be self consistent with simulation but it is 
+    // Zeff should be self consistent with simulation but it is
     // an input parameter for now.
     // Once Hybrid PIC is extended to do more than 1 ion species
     // Zeff should be calculated from rho_total and rho of each species.

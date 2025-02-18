@@ -628,7 +628,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 Real rho_val_limited = rho_val;
 
                 // Interpolate Te to get the appropiate temperature in space
-                // Te_val is converted to K since it will only be used to evaluate the resistivity 
+                // Te_val is converted to K since it will only be used to evaluate the resistivity
                 // which for consistency should only use SI units
                 Real Te_val = 0_rt;
                 if(resistivity_has_Te_dependence) {
@@ -704,7 +704,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 Real rho_val_limited = rho_val;
 
                 // Interpolate Te to get the appropiate temperature in space
-                // Te_val is converted to K since it will only be used to evaluate the resistivity 
+                // Te_val is converted to K since it will only be used to evaluate the resistivity
                 // which for consistency should only use SI units
                 Real Te_val = 0_rt;
                 if(resistivity_has_Te_dependence) {
@@ -769,7 +769,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 Real rho_val_limited = rho_val;
 
                 // Interpolate Te to get the appropiate temperature in space
-                // Te_val is converted to K since it will only be used to evaluate the resistivity 
+                // Te_val is converted to K since it will only be used to evaluate the resistivity
                 // which for consistency should only use SI units
                 Real Te_val = 0_rt;
                 if(resistivity_has_Te_dependence) {
@@ -1060,7 +1060,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Real rho_val_limited = rho_val;
 
                 // Interpolate Te to get the appropiate temperature in space
-                // Te_val is converted to K since it will only be used to evaluate the resistivity 
+                // Te_val is converted to K since it will only be used to evaluate the resistivity
                 // which for consistency should only use SI units
                 Real Te_val = 0_rt;
                 if(resistivity_has_Te_dependence) {
@@ -1126,7 +1126,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Real rho_val_limited = rho_val;
 
                 // Interpolate Te to get the appropiate temperature in space
-                // Te_val is converted to K since it will only be used to evaluate the resistivity 
+                // Te_val is converted to K since it will only be used to evaluate the resistivity
                 // which for consistency should only use SI units
                 Real Te_val = 0_rt;
                 if(resistivity_has_Te_dependence) {
@@ -1192,7 +1192,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Real rho_val_limited = rho_val;
 
                 // Interpolate Te to get the appropiate temperature in space
-                // Te_val is converted to K since it will only be used to evaluate the resistivity 
+                // Te_val is converted to K since it will only be used to evaluate the resistivity
                 // which for consistency should only use SI units
                 Real Te_val = 0_rt;
                 if(resistivity_has_Te_dependence) {
