@@ -382,7 +382,7 @@ void FiniteDifferenceSolver::HybridPICSolveE (
 #ifdef WARPX_DIM_RZ
 
         HybridPICSolveECylindrical <CylindricalYeeAlgorithm> (
-            Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
+            Efield, Jfield, Jifield, Bfield, rhofield, Pefield, Tefield,
             eb_update_E, lev, hybrid_model, solve_for_Faraday
         );
 
@@ -409,6 +409,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     ablastr::fields::VectorField const& Bfield,
     amrex::MultiFab const& rhofield,
     amrex::MultiFab const& Pefield,
+    amrex::MultiFab const& Tefield,
     std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     int lev, HybridPICModel const* hybrid_model,
     const bool solve_for_Faraday )
@@ -429,6 +430,12 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     const auto eta_h = hybrid_model->m_eta_h;
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
     const auto resistivity_has_J_dependence = hybrid_model->m_resistivity_has_J_dependence;
+    const auto resistivity_has_Te_dependence = hybrid_model->m_resistivity_has_Te_dependence;
+    const auto solve_electron_energy_equation = hybrid_model->m_solve_electron_energy_equation;
+
+    const auto Te0 = hybrid_model->m_elec_temp;
+    const auto gamma_val = hybrid_model->m_gamma;
+    const auto rho_n0_ref = hybrid_model->m_n0_ref * PhysConst::q_e;
 
     const bool include_hyper_resistivity_term = (eta_h > 0.0) && solve_for_Faraday;
 
@@ -575,6 +582,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real const> const& enE = enE_nodal_mf.const_array(mfi);
         Array4<Real const> const& rho = rhofield.const_array(mfi);
         Array4<Real const> const& Pe = Pefield.const_array(mfi);
+        Array4<Real const> const& Te = Tefield.array(mfi);
 
         // Extract structures indicating where the fields
         // should be updated, given the position of the embedded boundaries
@@ -619,6 +627,21 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 const Real rho_val = Interp(rho, nodal, Er_stag, coarsen, i, j, 0, 0);
                 Real rho_val_limited = rho_val;
 
+                // Interpolate Te to get the appropiate temperature in space
+                // Te_val is converted to K since it will only be used to evaluate the resistivity 
+                // which for consistency should only use SI units
+                Real Te_val = 0_rt;
+                if(resistivity_has_Te_dependence) {
+                    if(solve_electron_energy_equation){
+                        Te_val = Interp(Te, nodal, Er_stag, coarsen, i, j, 0, 0)/PhysConst::kb;
+                    }
+                    // if the electron energy equation is not solved
+                    // Te is calculated using adiabatic relationship
+                    else{
+                        Te_val = Te0*std::pow(rho_val_limited/rho_n0_ref,gamma_val-1)/PhysConst::kb;
+                    }
+                }
+
                 // Interpolate current to appropriate staggering to match E field
                 Real jtot_val = 0._rt;
                 if (solve_for_Faraday && resistivity_has_J_dependence) {
@@ -646,7 +669,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 }
 
                 // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) { Er(i, j, 0) += eta(rho_val, jtot_val) * Jr(i, j, 0); }
+                if (solve_for_Faraday) { Er(i, j, 0) += eta(rho_val, jtot_val, Te_val) * Jr(i, j, 0); }
 
                 if (include_hyper_resistivity_term) {
                     // r on cell-centered point (Jr is cell-centered in r)
@@ -680,6 +703,21 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 const Real rho_val = Interp(rho, nodal, Et_stag, coarsen, i, j, 0, 0);
                 Real rho_val_limited = rho_val;
 
+                // Interpolate Te to get the appropiate temperature in space
+                // Te_val is converted to K since it will only be used to evaluate the resistivity 
+                // which for consistency should only use SI units
+                Real Te_val = 0_rt;
+                if(resistivity_has_Te_dependence) {
+                    if(solve_electron_energy_equation){
+                        Te_val = Interp(Te, nodal, Et_stag, coarsen, i, j, 0, 0)/PhysConst::kb;
+                    }
+                    // if the electron energy equation is not solved
+                    // Te is calculated using adiabatic relationship
+                    else{
+                        Te_val = Te0*std::pow(rho_val_limited/rho_n0_ref,gamma_val-1)/PhysConst::kb;
+                    }
+                }
+
                 // Interpolate current to appropriate staggering to match E field
                 Real jtot_val = 0._rt;
                 if (solve_for_Faraday && resistivity_has_J_dependence) {
@@ -706,7 +744,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 }
 
                 // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) { Et(i, j, 0) += eta(rho_val, jtot_val) * Jt(i, j, 0); }
+                if (solve_for_Faraday) { Et(i, j, 0) += eta(rho_val, jtot_val, Te_val) * Jt(i, j, 0); }
 
                 if (include_hyper_resistivity_term) {
                     const Real jt_val = Interp(Jt, Jt_stag, Et_stag, coarsen, i, j, 0, 0);
@@ -729,6 +767,21 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 // Interpolate to get the appropriate charge density in space
                 const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, 0, 0);
                 Real rho_val_limited = rho_val;
+
+                // Interpolate Te to get the appropiate temperature in space
+                // Te_val is converted to K since it will only be used to evaluate the resistivity 
+                // which for consistency should only use SI units
+                Real Te_val = 0_rt;
+                if(resistivity_has_Te_dependence) {
+                    if(solve_electron_energy_equation){
+                        Te_val = Interp(Te, nodal, Ez_stag, coarsen, i, j, 0, 0)/PhysConst::kb;
+                    }
+                    // if the electron energy equation is not solved
+                    // Te is calculated using adiabatic relationship
+                    else{
+                        Te_val = Te0*std::pow(rho_val_limited/rho_n0_ref,gamma_val-1)/PhysConst::kb;
+                    }
+                }
 
                 // Interpolate current to appropriate staggering to match E field
                 Real jtot_val = 0._rt;
@@ -757,7 +810,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 }
 
                 // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) { Ez(i, j, 0) += eta(rho_val, jtot_val) * Jz(i, j, 0); }
+                if (solve_for_Faraday) { Ez(i, j, 0) += eta(rho_val, jtot_val, Te_val) * Jz(i, j, 0); }
 
                 if (include_hyper_resistivity_term) {
                     // r on nodal point (Jz is nodal in r)
@@ -1007,7 +1060,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Real rho_val_limited = rho_val;
 
                 // Interpolate Te to get the appropiate temperature in space
-                // Te_val is converted to J since it will only be used to evaluate the resistivity 
+                // Te_val is converted to K since it will only be used to evaluate the resistivity 
                 // which for consistency should only use SI units
                 Real Te_val = 0_rt;
                 if(resistivity_has_Te_dependence) {

@@ -262,6 +262,7 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField const& Bfield,
             amrex::MultiFab const& rhofield,
             amrex::MultiFab const& Pefield,
+            amrex::MultiFab const& Tefield,
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
             int lev, HybridPICModel const* hybrid_model,
             bool solve_for_Faraday );
