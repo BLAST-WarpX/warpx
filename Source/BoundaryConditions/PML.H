@@ -221,11 +221,6 @@ private:
     // Factory for field data
     std::unique_ptr<amrex::FabFactory<amrex::FArrayBox> > pml_field_factory;
 
-    [[nodiscard]] amrex::FabFactory<amrex::FArrayBox> const& fieldFactory () const noexcept
-    {
-        return *pml_field_factory;
-    }
-
 #ifdef AMREX_USE_EB
     [[nodiscard]] amrex::EBFArrayBoxFactory const& fieldEBFactory () const noexcept {
         return static_cast<amrex::EBFArrayBoxFactory const&>(*pml_field_factory);

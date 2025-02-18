@@ -1542,12 +1542,6 @@ private:
     // Factory for field data
     amrex::Vector<std::unique_ptr<amrex::FabFactory<amrex::FArrayBox> > > m_field_factory;
 
-    [[nodiscard]]
-    amrex::FabFactory<amrex::FArrayBox> const& fieldFactory (int lev) const noexcept
-    {
-        return *m_field_factory[lev];
-    }
-
     /** Stop the simulation at the end of the current step due to a received Unix signal?
      */
     bool m_exit_loop_due_to_interrupt_signal = false;
