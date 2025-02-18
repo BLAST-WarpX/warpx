@@ -209,27 +209,25 @@ FlushFormatCheckpoint::CheckpointParticles (
             write_real_comps.push_back(1);
         }
 
-        int const compile_time_comps = static_cast<int>(real_names.size());
-
-        // get the names of the real comps
-        //   note: skips the mandatory AMREX_SPACEDIM positions for pure SoA
+        // get the names of the extra real comps
         real_names.resize(pc->NumRealComps() - AMREX_SPACEDIM);
         write_real_comps.resize(pc->NumRealComps() - AMREX_SPACEDIM);
-        auto runtime_rnames = pc->getParticleRuntimeComps();
-        for (auto const& x : runtime_rnames) {
-            int const i = x.second + PIdx::nattribs - AMREX_SPACEDIM;
-            real_names[i] = x.first;
-            write_real_comps[i] = pc->h_redistribute_real_comp[i + compile_time_comps];
+
+        // note, skip the required compnent names here
+        auto rnames = pc->GetRealSoANames();
+        for (std::size_t index = PIdx::nattribs; index < rnames.size(); ++index) {
+            std::size_t const i = index - AMREX_SPACEDIM;
+            real_names[i] = rnames[index];
+            write_real_comps[i] = pc->h_redistribute_real_comp[index];
         }
 
         // and the int comps
         int_names.resize(pc->NumIntComps());
         write_int_comps.resize(pc->NumIntComps());
-        auto runtime_inames = pc->getParticleRuntimeiComps();
-        for (auto const& x : runtime_inames) {
-            int const i = x.second + 0;
-            int_names[i] = x.first;
-            write_int_comps[i] = pc->h_redistribute_int_comp[i+AMREX_SPACEDIM];
+        auto inames = pc->GetIntSoANames();
+        for (std::size_t index = 0; index < inames.size(); ++index) {
+            int_names[index] = inames[index];
+            write_int_comps[index] = pc->h_redistribute_int_comp[index];
         }
 
         pc->Checkpoint(dir, part_diag.getSpeciesName(),

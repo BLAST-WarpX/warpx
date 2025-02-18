@@ -235,7 +235,7 @@ public:
             ParticleCreation::DefaultInitializeRuntimeAttributes(*tile_products[i],
                                        0, 0,
                                        pc_products[i]->getUserRealAttribs(), pc_products[i]->getUserIntAttribs(),
-                                       pc_products[i]->getParticleComps(), pc_products[i]->getParticleiComps(),
+                                       pc_products[i]->GetRealSoANames(), pc_products[i]->GetIntSoANames(),
                                        pc_products[i]->getUserRealAttribParser(),
                                        pc_products[i]->getUserIntAttribParser(),
 #ifdef WARPX_QED

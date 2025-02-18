@@ -50,6 +50,7 @@
 
 #include "FieldSolver/ImplicitSolvers/ImplicitSolverLibrary.H"
 
+#include <ablastr/math/FiniteDifference.H>
 #include <ablastr/utils/SignalHandling.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -201,27 +202,25 @@ namespace
     }
 
     /**
-     * \brief Re-orders the Fornberg coefficients so that they can be used more conveniently for
-     * finite-order centering operations. For example, for finite-order centering of order 6,
-     * the Fornberg coefficients \c (c_0,c_1,c_2) are re-ordered as \c (c_2,c_1,c_0,c_0,c_1,c_2).
-     *
-     * \param[in,out] ordered_coeffs host vector where the re-ordered Fornberg coefficients will be stored
-     * \param[in] unordered_coeffs host vector storing the original sequence of Fornberg coefficients
-     * \param[in] order order of the finite-order centering along a given direction
+     * \brief
+     * Set the dotMask container
      */
-    void ReorderFornbergCoefficients (
-        amrex::Vector<amrex::Real>& ordered_coeffs,
-        const amrex::Vector<amrex::Real>& unordered_coeffs,
-        const int order)
-        {
-            const int n = order / 2;
-            for (int i = 0; i < n; i++) {
-                ordered_coeffs[i] = unordered_coeffs[n-1-i];
-            }
-            for (int i = n; i < order; i++) {
-                ordered_coeffs[i] = unordered_coeffs[i-n];
-            }
-        }
+    void SetDotMask( std::unique_ptr<amrex::iMultiFab>& field_dotMask,
+                     ablastr::fields::ConstScalarField const& field,
+                     amrex::Periodicity const& periodicity)
+
+    {
+        // Define the dot mask for this field_type needed to properly compute dotProduct()
+        // for field values that have shared locations on different MPI ranks
+        if (field_dotMask != nullptr) { return; }
+
+        const auto& this_ba = field->boxArray();
+        const auto tmp = amrex::MultiFab{
+            this_ba, field->DistributionMap(),
+            1, 0, amrex::MFInfo().SetAlloc(false)};
+
+        field_dotMask = tmp.OwnerMask(periodicity);
+    }
 }
 
 void WarpX::MakeWarpX ()
@@ -268,6 +267,8 @@ WarpX::Finalize()
 
 WarpX::WarpX ()
 {
+    warpx::initialization::initialize_warning_manager();
+
     ReadParameters();
 
     BackwardCompatibility();
@@ -374,7 +375,7 @@ WarpX::WarpX ()
 
     m_field_factory.resize(nlevs_max);
 
-    if (em_solver_medium == MediumForEM::Macroscopic) {
+    if (m_em_solver_medium == MediumForEM::Macroscopic) {
         // create object for macroscopic solver
         m_macroscopic_properties = std::make_unique<MacroscopicProperties>();
     }
@@ -518,32 +519,6 @@ WarpX::ReadParameters ()
 
     {
         ParmParse const pp_warpx("warpx");
-
-        //"Synthetic" warning messages may be injected in the Warning Manager via
-        // inputfile for debug&testing purposes.
-        ablastr::warn_manager::GetWMInstance().debug_read_warnings_from_input(pp_warpx);
-
-        // Set the flag to control if WarpX has to emit a warning message as soon as a warning is recorded
-        bool always_warn_immediately = false;
-        pp_warpx.query("always_warn_immediately", always_warn_immediately);
-        ablastr::warn_manager::GetWMInstance().SetAlwaysWarnImmediately(always_warn_immediately);
-
-        // Set the WarnPriority threshold to decide if WarpX has to abort when a warning is recorded
-        if(std::string str_abort_on_warning_threshold;
-            pp_warpx.query("abort_on_warning_threshold", str_abort_on_warning_threshold)){
-            std::optional<ablastr::warn_manager::WarnPriority> abort_on_warning_threshold = std::nullopt;
-            if (str_abort_on_warning_threshold == "high") {
-                abort_on_warning_threshold = ablastr::warn_manager::WarnPriority::high;
-            } else if (str_abort_on_warning_threshold == "medium" ) {
-                abort_on_warning_threshold = ablastr::warn_manager::WarnPriority::medium;
-            } else if (str_abort_on_warning_threshold == "low") {
-                abort_on_warning_threshold = ablastr::warn_manager::WarnPriority::low;
-            } else {
-                WARPX_ABORT_WITH_MESSAGE(str_abort_on_warning_threshold
-                    +"is not a valid option for warpx.abort_on_warning_threshold (use: low, medium or high)");
-            }
-            ablastr::warn_manager::GetWMInstance().SetAbortThreshold(abort_on_warning_threshold);
-        }
 
         std::vector<int> numprocs_in;
         utils::parser::queryArrWithParser(
@@ -768,12 +743,22 @@ WarpX::ReadParameters ()
             use_kspace_filter = use_filter;
             use_filter = false;
         }
-        else // FDTD
+        else
         {
-            // Filter currently not working with FDTD solver in RZ geometry along R
-            // (see https://github.com/ECP-WarpX/WarpX/issues/1943)
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!use_filter || filter_npass_each_dir[0] == 0,
-                "In RZ geometry with FDTD, filtering can only be apply along z. This can be controlled by setting warpx.filter_npass_each_dir");
+            if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::HybridPIC) {
+                // Filter currently not working with FDTD solver in RZ geometry along R
+                // (see https://github.com/ECP-WarpX/WarpX/issues/1943)
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!use_filter || filter_npass_each_dir[0] == 0,
+                    "In RZ geometry with FDTD, filtering can only be applied along z. This can be controlled by setting warpx.filter_npass_each_dir");
+            } else {
+                if (use_filter && filter_npass_each_dir[0] > 0) {
+                    ablastr::warn_manager::WMRecordWarning(
+                        "HybridPIC ElectromagneticSolver",
+                        "Radial Filtering in RZ is not currently using radial geometric weighting to conserve charge. Use at your own risk.",
+                        ablastr::warn_manager::WarnPriority::low
+                    );
+                }
+            }
         }
 #endif
 
@@ -1270,8 +1255,8 @@ WarpX::ReadParameters ()
                 " combined with mesh refinement is currently not implemented");
         }
 
-        pp_algo.query_enum_sloppy("em_solver_medium", em_solver_medium, "-_");
-        if (em_solver_medium == MediumForEM::Macroscopic ) {
+        pp_algo.query_enum_sloppy("em_solver_medium", m_em_solver_medium, "-_");
+        if (m_em_solver_medium == MediumForEM::Macroscopic ) {
             pp_algo.query_enum_sloppy("macroscopic_sigma_method",
                                       macroscopic_solver_algo, "-_");
         }
@@ -2282,8 +2267,9 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
     {
         m_hybrid_pic_model->AllocateLevelMFs(
             m_fields,
-            lev, ba, dm, ncomps, ngJ, ngRho, jx_nodal_flag, jy_nodal_flag,
-            jz_nodal_flag, rho_nodal_flag
+            lev, ba, dm, ncomps, ngJ, ngRho, ngEB, jx_nodal_flag, jy_nodal_flag,
+            jz_nodal_flag, rho_nodal_flag, Ex_nodal_flag, Ey_nodal_flag, Ez_nodal_flag,
+            Bx_nodal_flag, By_nodal_flag, Bz_nodal_flag
         );
     }
 
@@ -2296,7 +2282,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
     }
 
     // Allocate extra multifabs for macroscopic properties of the medium
-    if (em_solver_medium == MediumForEM::Macroscopic) {
+    if (m_em_solver_medium == MediumForEM::Macroscopic) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE( lev==0,
             "Macroscopic properties are not supported with mesh refinement.");
         m_macroscopic_properties->AllocateLevelMFs(ba, dm, ngEB);
@@ -3196,49 +3182,6 @@ WarpX::BuildBufferMasksInBox ( const amrex::Box tbx, amrex::IArrayBox &buffer_ma
     });
 }
 
-amrex::Vector<amrex::Real> WarpX::getFornbergStencilCoefficients (const int n_order, ablastr::utils::enums::GridType a_grid_type)
-{
-    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(n_order % 2 == 0, "n_order must be even");
-
-    const int m = n_order / 2;
-    amrex::Vector<amrex::Real> coeffs;
-    coeffs.resize(m);
-
-    // There are closed-form formula for these coefficients, but they result in
-    // an overflow when evaluated numerically. One way to avoid the overflow is
-    // to calculate the coefficients by recurrence.
-
-    // Coefficients for collocated (nodal) finite-difference approximation
-    if (a_grid_type == GridType::Collocated)
-    {
-        // First coefficient
-        coeffs.at(0) = m * 2._rt / (m+1);
-        // Other coefficients by recurrence
-        for (int n = 1; n < m; n++)
-        {
-            coeffs.at(n) = - (m-n) * 1._rt / (m+n+1) * coeffs.at(n-1);
-        }
-    }
-    // Coefficients for staggered finite-difference approximation
-    else
-    {
-        Real prod = 1.;
-        for (int k = 1; k < m+1; k++)
-        {
-            prod *= (m + k) / (4._rt * k);
-        }
-        // First coefficient
-        coeffs.at(0) = 4_rt * m * prod * prod;
-        // Other coefficients by recurrence
-        for (int n = 1; n < m; n++)
-        {
-            coeffs.at(n) = - ((2_rt*n-1) * (m-n)) * 1._rt / ((2_rt*n+1) * (m+n)) * coeffs.at(n-1);
-        }
-    }
-
-    return coeffs;
-}
-
 void WarpX::AllocateCenteringCoefficients (amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_x,
                                            amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_y,
                                            amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_z,
@@ -3257,9 +3200,9 @@ void WarpX::AllocateCenteringCoefficients (amrex::Gpu::DeviceVector<amrex::Real>
     amrex::Vector<amrex::Real> host_centering_stencil_coeffs_y;
     amrex::Vector<amrex::Real> host_centering_stencil_coeffs_z;
 
-    Fornberg_stencil_coeffs_x = getFornbergStencilCoefficients(centering_nox, a_grid_type);
-    Fornberg_stencil_coeffs_y = getFornbergStencilCoefficients(centering_noy, a_grid_type);
-    Fornberg_stencil_coeffs_z = getFornbergStencilCoefficients(centering_noz, a_grid_type);
+    Fornberg_stencil_coeffs_x = ablastr::math::getFornbergStencilCoefficients(centering_nox, a_grid_type);
+    Fornberg_stencil_coeffs_y = ablastr::math::getFornbergStencilCoefficients(centering_noy, a_grid_type);
+    Fornberg_stencil_coeffs_z = ablastr::math::getFornbergStencilCoefficients(centering_noz, a_grid_type);
 
     host_centering_stencil_coeffs_x.resize(centering_nox);
     host_centering_stencil_coeffs_y.resize(centering_noy);
@@ -3267,17 +3210,17 @@ void WarpX::AllocateCenteringCoefficients (amrex::Gpu::DeviceVector<amrex::Real>
 
     // Re-order Fornberg stencil coefficients:
     // example for order 6: (c_0,c_1,c_2) becomes (c_2,c_1,c_0,c_0,c_1,c_2)
-    ::ReorderFornbergCoefficients(
+    ablastr::math::ReorderFornbergCoefficients(
         host_centering_stencil_coeffs_x,
         Fornberg_stencil_coeffs_x,
         centering_nox
     );
-    ::ReorderFornbergCoefficients(
+    ablastr::math::ReorderFornbergCoefficients(
         host_centering_stencil_coeffs_y,
         Fornberg_stencil_coeffs_y,
         centering_noy
     );
-    ::ReorderFornbergCoefficients(
+    ablastr::math::ReorderFornbergCoefficients(
         host_centering_stencil_coeffs_z,
         Fornberg_stencil_coeffs_z,
         centering_noz
@@ -3405,40 +3348,25 @@ WarpX::MakeDistributionMap (int lev, amrex::BoxArray const& ba)
 }
 
 const amrex::iMultiFab*
-WarpX::getFieldDotMaskPointer ( FieldType field_type, int lev, int dir ) const
+WarpX::getFieldDotMaskPointer ( FieldType field_type, int lev, ablastr::fields::Direction dir ) const
 {
+    const auto periodicity = Geom(lev).periodicity();
     switch(field_type)
     {
         case FieldType::Efield_fp :
-            SetDotMask( Efield_dotMask[lev][dir], "Efield_fp", lev, dir );
+            ::SetDotMask( Efield_dotMask[lev][dir], m_fields.get("Efield_fp", dir, lev), periodicity);
             return Efield_dotMask[lev][dir].get();
         case FieldType::Bfield_fp :
-            SetDotMask( Bfield_dotMask[lev][dir], "Bfield_fp", lev, dir );
+            ::SetDotMask( Bfield_dotMask[lev][dir], m_fields.get("Bfield_fp", dir, lev), periodicity);
             return Bfield_dotMask[lev][dir].get();
         case FieldType::vector_potential_fp :
-            SetDotMask( Afield_dotMask[lev][dir], "vector_potential_fp", lev, dir );
+            ::SetDotMask( Afield_dotMask[lev][dir], m_fields.get("vector_potential_fp", dir, lev), periodicity);
             return Afield_dotMask[lev][dir].get();
         case FieldType::phi_fp :
-            SetDotMask( phi_dotMask[lev], "phi_fp", lev, 0 );
+            ::SetDotMask( phi_dotMask[lev], m_fields.get("phi_fp", dir, lev), periodicity);
             return phi_dotMask[lev].get();
         default:
             WARPX_ABORT_WITH_MESSAGE("Invalid field type for dotMask");
             return Efield_dotMask[lev][dir].get();
     }
-}
-
-void WarpX::SetDotMask( std::unique_ptr<amrex::iMultiFab>& field_dotMask,
-                        std::string const & field_name, int lev, int dir ) const
-{
-    // Define the dot mask for this field_type needed to properly compute dotProduct()
-    // for field values that have shared locations on different MPI ranks
-    if (field_dotMask != nullptr) { return; }
-
-    ablastr::fields::ConstVectorField const& this_field = m_fields.get_alldirs(field_name,lev);
-    const amrex::BoxArray& this_ba = this_field[dir]->boxArray();
-    const amrex::MultiFab tmp( this_ba, this_field[dir]->DistributionMap(),
-                               1, 0, amrex::MFInfo().SetAlloc(false) );
-    const amrex::Periodicity& period = Geom(lev).periodicity();
-    field_dotMask = tmp.OwnerMask(period);
-
 }

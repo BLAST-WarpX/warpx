@@ -438,10 +438,10 @@ WarpX::OneStep_nosub (Real cur_time)
         EvolveB(0.5_rt * dt[0], DtType::FirstHalf, cur_time); // We now have B^{n+1/2}
         FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
-        if (WarpX::em_solver_medium == MediumForEM::Vacuum) {
+        if (m_em_solver_medium == MediumForEM::Vacuum) {
             // vacuum medium
             EvolveE(dt[0], cur_time); // We now have E^{n+1}
-        } else if (WarpX::em_solver_medium == MediumForEM::Macroscopic) {
+        } else if (m_em_solver_medium == MediumForEM::Macroscopic) {
             // macroscopic medium
             MacroscopicEvolveE(dt[0], cur_time); // We now have E^{n+1}
         } else {

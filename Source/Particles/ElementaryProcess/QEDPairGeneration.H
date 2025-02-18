@@ -41,7 +41,7 @@ public:
     /**
     * \brief Constructor of the PairGenerationFilterFunc functor.
     *
-    * @param[in] opt_depth_runtime_comp index of the optical depth component
+    * @param[in] opt_depth_runtime_comp index of the optical depth runtime component
     */
     PairGenerationFilterFunc(int const opt_depth_runtime_comp)
         : m_opt_depth_runtime_comp(opt_depth_runtime_comp)
@@ -67,7 +67,7 @@ public:
     }
 
 private:
-    int m_opt_depth_runtime_comp = 0; /*!< Index of the optical depth component of the species.*/
+    int m_opt_depth_runtime_comp = 0; /*!< Index of the optical depth runtime component of the species. */
 };
 
 /**
