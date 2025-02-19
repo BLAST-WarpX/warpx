@@ -1743,15 +1743,14 @@ void WarpXFluidContainer::Hybrid_Electron_Bremsstrahlung (ablastr::fields::Multi
 
                     amrex::Real rho_val = rho(i, j, k);
                     amrex::Real ne_val = rho_val/PhysConst::q_e;
-                    amrex::Real Te_val = Te(i, j, k); // in J
 
                     // calculate power loss per unit volume due to Bremsstrahlung
                     // Expression gives value in W/m^3
                     // Te in sqrt() is in eV in this formula
-                    amrex::Real dW_dV = Zeff*Zeff*ne_val*ne_val*std::sqrt(Te_val/PhysConst::q_e)/constant_val;
+                    amrex::Real dW_dV = Zeff*Zeff*ne_val*ne_val*std::sqrt(Te(i, j, k)/PhysConst::q_e)/constant_val;
 
                     // Te(i, j, k) and second term already in Joules
-                    Te(i, j, k) = Te(i, j, k) - dW_dV*dt*cell_volume;
+                    Te(i, j, k) = Te(i, j, k) - dW_dV*dt/(1.5*ne_val);
                 }
 
             });
