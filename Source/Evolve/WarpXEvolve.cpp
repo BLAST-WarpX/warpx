@@ -729,7 +729,7 @@ WarpX::OneStep_psatd_JRhom (const amrex::Real cur_time)
     const int n_deposit = WarpX::do_psatd_JRhom_n_depositions;
     // Time sub-step for each multi-J deposition
     const amrex::Real sub_dt = dt[0] / static_cast<amrex::Real>(n_deposit);
-    // Whether to perform multi-J depositions on a time interval that spans
+    // Whether to perform PSATD-JRhom depositions on a time interval that spans
     // one or two full time steps (from n*dt to (n+1)*dt, or from n*dt to (n+2)*dt)
     const int n_loop = (WarpX::fft_do_time_averaging) ? 2*n_deposit : n_deposit;
 
@@ -761,9 +761,9 @@ WarpX::OneStep_psatd_JRhom (const amrex::Real cur_time)
         if (J_in_time == JInTime::Quadratic)
         {
             PSATDMoveJNewToJMid();
-            mypc->DepositCurrent(current, dt[0], t_deposit_current + 0.5_rt*sub_dt);
-            SyncCurrent(current_fp, current_cp, current_buf);
-            PSATDForwardTransformJ(current_fp, current_cp);
+            mypc->DepositCurrent( m_fields.get_mr_levels_alldirs(current_string, finest_level),  dt[0], t_deposit_current + 0.5_rt*sub_dt);
+            SyncCurrent("current_fp");
+            PSATDForwardTransformJ("current_fp", "current_cp");
         }
 
         // Deposit new rho

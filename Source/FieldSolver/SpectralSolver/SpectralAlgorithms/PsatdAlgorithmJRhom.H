@@ -64,8 +64,8 @@ class PsatdAlgorithmJRhom : public SpectralBaseAlgorithm
             bool time_averaging,
             bool dive_cleaning,
             bool divb_cleaning,
-            int J_in_time,
-            int rho_in_time
+            JInTime J_in_time,
+            RhoInTime rho_in_time
         );
 
         /**
@@ -134,8 +134,8 @@ class PsatdAlgorithmJRhom : public SpectralBaseAlgorithm
         bool m_time_averaging;
         bool m_dive_cleaning;
         bool m_divb_cleaning;
-        int m_J_in_time;
-        int m_rho_in_time;
+        JInTime m_J_in_time;
+        RhoInTime m_rho_in_time;
 };
 #endif // WARPX_USE_FFT
 #endif // WARPX_PSATD_ALGORITHM_JRHOM_H_
