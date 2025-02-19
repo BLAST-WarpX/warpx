@@ -258,6 +258,8 @@ namespace
         copy_to_device(host_centering_stencil_coeffs_z, device_centering_stencil_coeffs_z);
 
         amrex::Gpu::synchronize();
+    }
+
     /**
      * \brief
      * Set the dotMask container
