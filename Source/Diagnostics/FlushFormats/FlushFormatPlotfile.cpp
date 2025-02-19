@@ -362,7 +362,13 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
         Vector<int> int_flags;
         Vector<int> real_flags;
 
-        // note: positions skipped here, since we reconstruct a plotfile SoA from them
+#if !defined (WARPX_DIM_1D_Z)
+        real_names.push_back("position_x");
+#endif
+#if defined (WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+        real_names.push_back("position_y");
+#endif
+        real_names.push_back("position_z");
         real_names.push_back("weight");
         real_names.push_back("momentum_x");
         real_names.push_back("momentum_y");
@@ -373,18 +379,19 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
 #endif
 
         // get the names of the extra real comps
-        real_names.resize(tmp.NumRealComps() - AMREX_SPACEDIM);
+        real_names.resize(tmp.NumRealComps());
         real_flags = part_diag.m_plot_flags;
         real_flags.resize(tmp.NumRealComps());
 
         // note, skip the required component names here
         auto rnames = tmp.GetRealSoANames();
         for (std::size_t index = PIdx::nattribs; index < rnames.size(); ++index) {
-            real_names[index - AMREX_SPACEDIM] = rnames[index];
-            real_flags[index - AMREX_SPACEDIM] = pc->h_redistribute_real_comp[index];
+            real_names[index] = rnames[index];
+            real_flags[index] = pc->h_redistribute_real_comp[index];
         }
 
         //   note: skip the mandatory AMREX_SPACEDIM positions for pure SoA
+        real_names.erase(real_names.begin(), real_names.begin() + AMREX_SPACEDIM);
         real_flags.erase(real_flags.begin(), real_flags.begin() + AMREX_SPACEDIM);
 
         // and the int comps
@@ -426,6 +433,7 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
             tmp.copyParticles(*pinned_pc, true);
             particlesConvertUnits(ConvertDirection::WarpX_to_SI, &tmp, mass);
         }
+
         // real_names contains a list of all particle attributes.
         // real_flags & int_flags are 1 or 0, whether quantity is dumped or not.
         tmp.WritePlotFile(
