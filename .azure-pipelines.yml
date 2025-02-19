@@ -166,3 +166,9 @@ jobs:
         -exec cat {} \;
     displayName: 'Logs'
     condition: always()
+
+  - bash: |
+      # clean out so the Post-job Cache "tar" command has more disk space available
+      rm -rf build
+    displayName: 'Clean Build Directory'
+    condition: always()
