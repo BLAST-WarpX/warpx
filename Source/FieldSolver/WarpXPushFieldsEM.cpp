@@ -101,6 +101,8 @@ namespace {
 #endif
     }
 
+
+#   ifndef WARPX_DIM_RZ
     /**
      * \brief Correct current in Fourier space so that the continuity equation is satisfied
      */
@@ -136,6 +138,7 @@ namespace {
             }
         }
     }
+#   endif
 
 }
 
