@@ -202,7 +202,7 @@ PenaltyReturnTypeOnItsOwnLine: 60
 PointerAlignment: Right
 PPIndentWidth:   -1
 QualifierAlignment: Leave
-ReferenceAlignment: Pointer
+ReferenceAlignment: Middle
 ReflowComments:  true
 RemoveBracesLLVM: false
 RemoveParentheses: Leave
