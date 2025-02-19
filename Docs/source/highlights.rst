@@ -159,6 +159,11 @@ High Energy Astrophysical Plasma Physics
 
 Scientific works in astrophysical plasma modeling.
 
+#. Sam A, Kumar P, Fletcher AC, Crabtree C, Lee N, Elschot S.
+   **Nonlinear evolution, propagation, electron-trapping, and damping effects of ion-acoustic solitons using fully kinetic PIC simulations**.
+   Phys. Plasmas **32** 022103, 2025
+   `DOI:10.1063/5.0249525 <https://doi.org/10.1063/5.0249525>`__
+
 #. Jambunathan R, Jones H, Corrales L, Klion H, Roward ME, Myers A, Zhang W, Vay J-L.
    **Application of mesh refinement to relativistic magnetic reconnection**.
    Physics of Plasmas ***32*** 1, 2025
