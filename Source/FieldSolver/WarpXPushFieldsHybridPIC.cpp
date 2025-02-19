@@ -197,7 +197,7 @@ void WarpX::HybridPICEvolveFields ()
             gett_old(0) + 0.5_rt*dt[0],
             0.5_rt*dt[0]);
     }
-   
+
     if(m_hybrid_pic_model->m_solve_electron_energy_equation)
     {
         // Calculate plasma current at n+1/2 using Ampere's law
@@ -308,7 +308,7 @@ void WarpX::HybridPICEvolveFields ()
         // This term should also apply MCC to ions particle container
         // Implement for 1 ion species and then extend to multiple species using mypc
         // COMPLETE ...
-        
+
     }
 
     // Calculate the electron pressure at t=n+1
