@@ -1658,7 +1658,7 @@ WarpX::ReadParameters ()
             );
         }
 
-        if (!(J_in_time == JInTime::Constant && rho_in_time == RhoInTime::Linear))
+        if (J_in_time != JInTime::Constant || rho_in_time != RhoInTime::Linear)
         {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 update_with_rho,
