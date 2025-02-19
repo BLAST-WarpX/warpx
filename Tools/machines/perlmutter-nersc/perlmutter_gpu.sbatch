@@ -17,7 +17,7 @@
 # A100 80GB (256 nodes)
 #S BATCH -C gpu&hbm80g
 #SBATCH --exclusive
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=32
 # ideally single:1, but NERSC cgroups issue
 #SBATCH --gpu-bind=none
 #SBATCH --ntasks-per-node=4
