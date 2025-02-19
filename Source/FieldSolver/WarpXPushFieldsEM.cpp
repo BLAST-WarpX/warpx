@@ -101,15 +101,14 @@ namespace {
 #endif
     }
 
-
-#   ifndef WARPX_DIM_RZ
     /**
      * \brief Correct current in Fourier space so that the continuity equation is satisfied
      */
+    template <typename SpectralSolverType>
     void PSATDCurrentCorrection (
         const int finest_level,
-        amrex::Vector<std::unique_ptr<SpectralSolver>>& spectral_solver_fp,
-        amrex::Vector<std::unique_ptr<SpectralSolver>>& spectral_solver_cp)
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_fp,
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_cp)
     {
         for (int lev = 0; lev <= finest_level; ++lev)
         {
@@ -124,10 +123,11 @@ namespace {
     /**
      * \brief Vay deposition in Fourier space (https://doi.org/10.1016/j.jcp.2013.03.010)
      */
+    template <typename SpectralSolverType>
     void PSATDVayDeposition (
         const int finest_level,
-        amrex::Vector<std::unique_ptr<SpectralSolver>>& spectral_solver_fp,
-        amrex::Vector<std::unique_ptr<SpectralSolver>>& spectral_solver_cp)
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_fp,
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_cp)
     {
         for (int lev = 0; lev <= finest_level; ++lev)
         {
@@ -138,8 +138,6 @@ namespace {
             }
         }
     }
-#   endif
-
 }
 
 void WarpX::PSATDForwardTransformEB ()
