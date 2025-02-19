@@ -134,22 +134,3 @@ WarpX::UpdateDtFromParticleSpeeds ()
         dt[lev] = dt[lev+1] * refRatio(lev)[0];
     }
 }
-
-void
-WarpX::PrintDtDxDyDz ()
-{
-    for (int lev=0; lev <= max_level; lev++) {
-        const amrex::Real* dx_lev = geom[lev].CellSize();
-        amrex::Print() << "Level " << lev << ": dt = " << dt[lev]
-#if defined(WARPX_DIM_1D_Z)
-                       << " ; dz = " << dx_lev[0] << '\n';
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                       << " ; dx = " << dx_lev[0]
-                       << " ; dz = " << dx_lev[1] << '\n';
-#elif defined(WARPX_DIM_3D)
-                       << " ; dx = " << dx_lev[0]
-                       << " ; dy = " << dx_lev[1]
-                       << " ; dz = " << dx_lev[2] << '\n';
-#endif
-    }
-}

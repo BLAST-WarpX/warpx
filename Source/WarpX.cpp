@@ -743,12 +743,22 @@ WarpX::ReadParameters ()
             use_kspace_filter = use_filter;
             use_filter = false;
         }
-        else // FDTD
+        else
         {
-            // Filter currently not working with FDTD solver in RZ geometry along R
-            // (see https://github.com/ECP-WarpX/WarpX/issues/1943)
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!use_filter || filter_npass_each_dir[0] == 0,
-                "In RZ geometry with FDTD, filtering can only be apply along z. This can be controlled by setting warpx.filter_npass_each_dir");
+            if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::HybridPIC) {
+                // Filter currently not working with FDTD solver in RZ geometry along R
+                // (see https://github.com/ECP-WarpX/WarpX/issues/1943)
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!use_filter || filter_npass_each_dir[0] == 0,
+                    "In RZ geometry with FDTD, filtering can only be applied along z. This can be controlled by setting warpx.filter_npass_each_dir");
+            } else {
+                if (use_filter && filter_npass_each_dir[0] > 0) {
+                    ablastr::warn_manager::WMRecordWarning(
+                        "HybridPIC ElectromagneticSolver",
+                        "Radial Filtering in RZ is not currently using radial geometric weighting to conserve charge. Use at your own risk.",
+                        ablastr::warn_manager::WarnPriority::low
+                    );
+                }
+            }
         }
 #endif
 
@@ -2257,8 +2267,9 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
     {
         m_hybrid_pic_model->AllocateLevelMFs(
             m_fields,
-            lev, ba, dm, ncomps, ngJ, ngRho, jx_nodal_flag, jy_nodal_flag,
-            jz_nodal_flag, rho_nodal_flag
+            lev, ba, dm, ncomps, ngJ, ngRho, ngEB, jx_nodal_flag, jy_nodal_flag,
+            jz_nodal_flag, rho_nodal_flag, Ex_nodal_flag, Ey_nodal_flag, Ez_nodal_flag,
+            Bx_nodal_flag, By_nodal_flag, Bz_nodal_flag
         );
     }
 

@@ -112,9 +112,9 @@ struct GetExternalEBField
                 lab_time = m_gamma_boost*m_time + m_uz_boost*z*inv_c2;
                 z = m_gamma_boost*z + m_uz_boost*m_time;
             }
-            Bx = m_Bxfield_partparser(x, y, z, lab_time);
-            By = m_Byfield_partparser(x, y, z, lab_time);
-            Bz = m_Bzfield_partparser(x, y, z, lab_time);
+            Bx = m_Bxfield_partparser((amrex::ParticleReal) x, (amrex::ParticleReal) y, (amrex::ParticleReal) z, lab_time);
+            By = m_Byfield_partparser((amrex::ParticleReal) x, (amrex::ParticleReal) y, (amrex::ParticleReal) z, lab_time);
+            Bz = m_Bzfield_partparser((amrex::ParticleReal) x, (amrex::ParticleReal) y, (amrex::ParticleReal) z, lab_time);
         }
 
         if (m_Etype == RepeatedPlasmaLens ||

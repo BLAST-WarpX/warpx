@@ -93,6 +93,27 @@ using namespace amrex;
 
 namespace
 {
+
+    /** Print dt and dx,dy,dz */
+    void PrintDtDxDyDz (
+        int max_level, const amrex::Vector<Geometry>& geom, const amrex::Vector<amrex::Real>& dt)
+    {
+        for (int lev=0; lev <= max_level; lev++) {
+            const amrex::Real* dx_lev = geom[lev].CellSize();
+            amrex::Print() << "Level " << lev << ": dt = " << dt[lev]
+    #if defined(WARPX_DIM_1D_Z)
+                           << " ; dz = " << dx_lev[0] << '\n';
+    #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                           << " ; dx = " << dx_lev[0]
+                           << " ; dz = " << dx_lev[1] << '\n';
+    #elif defined(WARPX_DIM_3D)
+                           << " ; dx = " << dx_lev[0]
+                           << " ; dy = " << dx_lev[1]
+                           << " ; dz = " << dx_lev[2] << '\n';
+    #endif
+        }
+    }
+
     /**
      * \brief Check that the number of guard cells is smaller than the number of valid cells,
      * for a given MultiFab, and abort otherwise.
@@ -539,14 +560,14 @@ WarpX::InitData ()
     if (restart_chkfile.empty())
     {
         ComputeDt();
-        WarpX::PrintDtDxDyDz();
+        ::PrintDtDxDyDz(max_level, geom, dt);
         InitFromScratch();
         InitDiagnostics();
     }
     else
     {
         InitFromCheckpoint();
-        WarpX::PrintDtDxDyDz();
+        ::PrintDtDxDyDz(max_level, geom, dt);
         PostRestart();
         reduced_diags->InitData();
     }
@@ -1048,20 +1069,25 @@ WarpX::InitLevelData (int lev, Real /*time*/)
     }
 }
 
-void WarpX::ComputeExternalFieldOnGridUsingParser (
-    warpx::fields::FieldType field,
+template<typename T>
+void ComputeExternalFieldOnGridUsingParser_template (
+    T field,
     amrex::ParserExecutor<4> const& fx_parser,
     amrex::ParserExecutor<4> const& fy_parser,
     amrex::ParserExecutor<4> const& fz_parser,
     int lev, PatchType patch_type,
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field)
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field,
+    bool use_eb_flags)
 {
-    auto t = gett_new(lev);
+    auto &warpx = WarpX::GetInstance();
+    auto const &geom = warpx.Geom(lev);
 
-    auto dx_lev = geom[lev].CellSizeArray();
-    const RealBox& real_box = geom[lev].ProbDomain();
+    auto t = warpx.gett_new(lev);
 
-    amrex::IntVect refratio = (lev > 0 ) ? RefRatio(lev-1) : amrex::IntVect(1);
+    auto dx_lev = geom.CellSizeArray();
+    const RealBox& real_box = geom.ProbDomain();
+
+    amrex::IntVect refratio = (lev > 0 ) ? WarpX::RefRatio(lev-1) : amrex::IntVect(1);
     if (patch_type == PatchType::coarse) {
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             dx_lev[idim] = dx_lev[idim] * refratio[idim];
@@ -1069,9 +1095,9 @@ void WarpX::ComputeExternalFieldOnGridUsingParser (
     }
 
     using ablastr::fields::Direction;
-    amrex::MultiFab* mfx = m_fields.get(field, Direction{0}, lev);
-    amrex::MultiFab* mfy = m_fields.get(field, Direction{1}, lev);
-    amrex::MultiFab* mfz = m_fields.get(field, Direction{2}, lev);
+    amrex::MultiFab* mfx = warpx.m_fields.get(field, Direction{0}, lev);
+    amrex::MultiFab* mfy = warpx.m_fields.get(field, Direction{1}, lev);
+    amrex::MultiFab* mfz = warpx.m_fields.get(field, Direction{2}, lev);
 
     const amrex::IntVect x_nodal_flag = mfx->ixType().toIntVect();
     const amrex::IntVect y_nodal_flag = mfy->ixType().toIntVect();
@@ -1087,7 +1113,7 @@ void WarpX::ComputeExternalFieldOnGridUsingParser (
         auto const& mfzfab = mfz->array(mfi);
 
         amrex::Array4<int> update_fx_arr, update_fy_arr, update_fz_arr;
-        if (EB::enabled()) {
+        if (use_eb_flags && EB::enabled()) {
             update_fx_arr = eb_update_field[lev][0]->array(mfi);
             update_fy_arr = eb_update_field[lev][1]->array(mfi);
             update_fz_arr = eb_update_field[lev][2]->array(mfi);
@@ -1179,6 +1205,68 @@ void WarpX::ComputeExternalFieldOnGridUsingParser (
             }
         );
     }
+}
+
+void WarpX::ComputeExternalFieldOnGridUsingParser (
+    warpx::fields::FieldType field,
+    amrex::ParserExecutor<4> const& fx_parser,
+    amrex::ParserExecutor<4> const& fy_parser,
+    amrex::ParserExecutor<4> const& fz_parser,
+    int lev, PatchType patch_type,
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field,
+    bool use_eb_flags)
+{
+    ComputeExternalFieldOnGridUsingParser_template<warpx::fields::FieldType> (
+        field,
+        fx_parser, fy_parser, fz_parser,
+        lev, patch_type, eb_update_field,
+        use_eb_flags);
+}
+
+void WarpX::ComputeExternalFieldOnGridUsingParser (
+    std::string const& field,
+    amrex::ParserExecutor<4> const& fx_parser,
+    amrex::ParserExecutor<4> const& fy_parser,
+    amrex::ParserExecutor<4> const& fz_parser,
+    int lev, PatchType patch_type,
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field,
+    bool use_eb_flags)
+{
+    ComputeExternalFieldOnGridUsingParser_template<std::string const&> (
+        field,
+        fx_parser, fy_parser, fz_parser,
+        lev, patch_type, eb_update_field,
+        use_eb_flags);
+}
+
+void WarpX::ComputeExternalFieldOnGridUsingParser (
+    warpx::fields::FieldType field,
+    amrex::ParserExecutor<4> const& fx_parser,
+    amrex::ParserExecutor<4> const& fy_parser,
+    amrex::ParserExecutor<4> const& fz_parser,
+    int lev, PatchType patch_type,
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field)
+{
+    ComputeExternalFieldOnGridUsingParser_template<warpx::fields::FieldType> (
+        field,
+        fx_parser, fy_parser, fz_parser,
+        lev, patch_type, eb_update_field,
+        true);
+}
+
+void WarpX::ComputeExternalFieldOnGridUsingParser (
+    std::string const& field,
+    amrex::ParserExecutor<4> const& fx_parser,
+    amrex::ParserExecutor<4> const& fy_parser,
+    amrex::ParserExecutor<4> const& fz_parser,
+    int lev, PatchType patch_type,
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field)
+{
+    ComputeExternalFieldOnGridUsingParser_template<std::string const&> (
+        field,
+        fx_parser, fy_parser, fz_parser,
+        lev, patch_type, eb_update_field,
+        true);
 }
 
 void WarpX::CheckGuardCells()

@@ -33,7 +33,7 @@ from .Constants import my_constants  # noqa
 from .Diagnostics import diagnostics, reduced_diagnostics  # noqa
 from .EB2 import eb2  # noqa
 from .Geometry import geometry  # noqa
-from .HybridPICModel import hybridpicmodel  # noqa
+from .HybridPICModel import hybridpicmodel, external_vector_potential  # noqa
 from .Interpolation import interpolation  # noqa
 from .Lasers import lasers  # noqa
 from .LoadThirdParty import load_cupy  # noqa

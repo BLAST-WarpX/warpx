@@ -2537,6 +2537,27 @@ Maxwell solver: kinetic-fluid hybrid
 * ``hybrid_pic_model.substeps`` (`int`) optional (default ``10``)
     If ``algo.maxwell_solver`` is set to ``hybrid``, this sets the number of sub-steps to take during the B-field update.
 
+* ``hybrid_pic_model.holmstrom_vacuum_region`` (`bool`) optional (default ``false``)
+    If ``algo.maxwell_solver`` is set to ``hybrid``, this sets the vacuum region handling of the generalized Ohm's Law to suppress vacuum fluctuations. :cite:t:`param-holmstrom2013handlingvacuumregionshybrid`.
+
+* ``hybid_pic_model.add_external_fields`` (`bool`) optional (default ``false``)
+    If ``algo.maxwell_solver`` is set to ``hybrid``, this sets the hybrid solver to use split external fields defined in external_vector_potential inputs.
+
+* ``external_vector_potential.fields`` (list of `str`) optional (default ``empty``)
+    If ``hybid_pic_model.add_external_fields`` is set to ``true``, this adds a list names for external time varying vector potentials to be added to hybrid solver.
+
+* ``external_vector_potential.<field name>.read_from_file`` (`bool`) optional (default ``false``)
+    If ``hybid_pic_model.add_external_fields`` is set to ``true``, this flag determines whether to load an external field or use an implcit function to evaluate the time varying field.
+
+* ``external_vector_potential.<field name>.path`` (`str`) optional (default ``""``)
+    If ``external_vector_potential.<field name>.read_from_file`` is set to ``true``, sets the path to an OpenPMD file that can be loaded externally in :math:`weber/m`.
+
+* ``external_vector_potential.<field name>.A[x,y,z]_external_grid_function(x,y,z)`` (`str`) optional (default ``"0"``)
+    If ``external_vector_potential.<field name>.read_from_file`` is set to ``false``, Sets the external vector potential to be populated by an implicit function (on the grid) in :math:`weber/m`.
+
+* ``external_vector_potential.<field name>.A_time_external_grid_function(t)`` (`str`) optional (default ``"1"``)
+    This sets the relative strength of the external vector potential by a dimensionless implicit time function, which can compute the external B fields and E fields based on the value and first time derivative of the function.
+
 .. note::
 
     Based on results from :cite:t:`param-Stanier2020` it is recommended to use
