@@ -344,7 +344,7 @@ ExternalVectorPotential::UpdateHybridExternalFields (const amrex::Real t, const 
     ablastr::fields::MultiLevelVectorField E_ext =
         warpx.m_fields.get_mr_levels_alldirs(FieldType::hybrid_E_fp_external, warpx.finestLevel());
 
-    // Zero E and B external fields    prior to accumulating external fields
+    // Zero E and B external fields prior to accumulating external fields
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
         for (int idir = 0; idir < 3; ++idir) {
             B_ext[lev][Direction{idir}]->setVal(0.0_rt);
