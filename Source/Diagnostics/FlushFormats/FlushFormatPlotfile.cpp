@@ -387,7 +387,7 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
         auto rnames = tmp.GetRealSoANames();
         for (std::size_t index = PIdx::nattribs; index < rnames.size(); ++index) {
             real_names[index] = rnames[index];
-            real_flags[index] = pc->h_redistribute_real_comp[index];
+            real_flags[index] = tmp.h_redistribute_real_comp[index];
         }
 
         //   note: skip the mandatory AMREX_SPACEDIM positions for pure SoA
@@ -400,7 +400,7 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
         auto inames = tmp.GetIntSoANames();
         for (std::size_t index = 0; index < inames.size(); ++index) {
             int_names[index] = inames[index];
-            int_flags[index] = pc->h_redistribute_int_comp[index];
+            int_flags[index] = tmp.h_redistribute_int_comp[index];
         }
 
         const auto mass = pc->AmIA<PhysicalSpecies::photon>() ? PhysConst::m_e : pc->getMass();

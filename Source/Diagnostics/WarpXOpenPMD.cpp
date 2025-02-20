@@ -627,7 +627,7 @@ for (const auto & particle_diag : particle_diags) {
     amrex::Vector<int> real_flags = particle_diag.m_plot_flags;
     real_flags.resize(tmp.NumRealComps());
     for (size_t index = PIdx::nattribs; index < rn.size(); ++index) {
-        real_flags[index] = pc->h_redistribute_real_comp[index];
+        real_flags[index] = tmp.h_redistribute_real_comp[index];
     }
 
 
@@ -636,7 +636,7 @@ for (const auto & particle_diag : particle_diags) {
     for (size_t i = 0; i < in.size(); ++i)
     {
         int_names[i] = detail::snakeToCamel(in[i]);
-        int_flags[i] = pc->h_redistribute_int_comp[i];
+        int_flags[i] = tmp.h_redistribute_int_comp[i];
     }
 
     // real_names contains a list of all real particle attributes.
