@@ -1,10 +1,3 @@
-/* Copyright 2020 Remi Lehe
- *
- * This file is part of WarpX.
- *
- * License: BSD-3-Clause-LBNL
- */
-
 #ifndef WARPX_FINITE_DIFFERENCE_ALGORITHM_CARTESIAN_CUSTOM_COEF_H_
 #define WARPX_FINITE_DIFFERENCE_ALGORITHM_CARTESIAN_CUSTOM_COEF_H_
 
@@ -16,7 +9,7 @@
 #include <AMReX_Array4.H>
 #include <AMReX_Gpu.H>
 #include <AMReX_REAL.H>
-#include <AMReX_ParmParse.H>
+#include <AMReX_ParmParse.H> // Added this include
 #include <AMReX_Parser.H>
 
 #include <algorithm>
@@ -47,7 +40,7 @@ struct CartesianCustomCoefAlgorithm {
         stencil_coefs_z.resize(1);
         stencil_coefs_z[0] = 1._rt * inv_dz;
 
-        amrex::ParmParse pp_algo("algo");
+        amrex::ParmParse pp_algo("algo"); // Moved ParmParse here
         Vector<Real> upward_coefs_x, downward_coefs_x;
         Vector<Real> upward_coefs_y, downward_coefs_y;
         Vector<Real> upward_coefs_z, downward_coefs_z;
@@ -109,25 +102,128 @@ struct CartesianCustomCoefAlgorithm {
             }
         }
 
-        // Print coefficients for debugging
-        amrex::Print() << "X stencil coefficients: ";
-        for (auto coef : stencil_coefs_x) amrex::Print() << coef << " ";
+        // --- ADDED PRINT STATEMENTS HERE ---
+        amrex::Print() << "Custom Stencil Coefficients (x, upward):\n";
+        for (int i = 0; i < stencil_coefs_x.size() / 2; ++i) {
+            amrex::Print() << stencil_coefs_x[i] << " ";
+        }
         amrex::Print() << "\n";
+
+        amrex::Print() << "Custom Stencil Coefficients (x, downward):\n";
+        for (int i = stencil_coefs_x.size() / 2; i < stencil_coefs_x.size(); ++i) {
+            amrex::Print() << stencil_coefs_x[i] << " ";
+        }
+        amrex::Print() << "\n";
+
+        amrex::Print() << "Custom Stencil Coefficients (y, upward):\n";
+        for (int i = 0; i < stencil_coefs_y.size() / 2; ++i) {
+             amrex::Print() << stencil_coefs_y[i] << " ";
+        }
+        amrex::Print() << "\n";
+
+        amrex::Print() << "Custom Stencil Coefficients (y, downward):\n";
+        for (int i = stencil_coefs_y.size() / 2; i < stencil_coefs_y.size(); ++i) {
+            amrex::Print() << stencil_coefs_y[i] << " ";
+        }
+        amrex::Print() << "\n";
+
+        amrex::Print() << "Custom Stencil Coefficients (z, upward):\n";
+        for (int i = 0; i < stencil_coefs_z.size() / 2; ++i) {
+            amrex::Print() << stencil_coefs_z[i] << " ";
+        }
+        amrex::Print() << "\n";
+
+        amrex::Print() << "Custom Stencil Coefficients (z, downward):\n";
+        for (int i = stencil_coefs_z.size() / 2; i < stencil_coefs_z.size(); ++i) {
+            amrex::Print() << stencil_coefs_z[i] << " ";
+        }
+        amrex::Print() << "\n";
+        // --- END OF ADDED PRINT STATEMENTS ---
+
     }
 
     static amrex::Real ComputeMaxDt(amrex::Real const * const dx) {
         using namespace amrex::literals;
-        amrex::Real const delta_t = 1._rt / (std::sqrt(AMREX_D_TERM(
-            1._rt / (dx[0]*dx[0]),
-            + 1._rt / (dx[1]*dx[1]),
-            + 1._rt / (dx[2]*dx[2])
-        )) * PhysConst::c);
+        
+        // Get the stencil coefficients
+        amrex::ParmParse pp_algo("algo");
+        amrex::Vector<amrex::Real> upward_coefs_x, downward_coefs_x;
+        amrex::Vector<amrex::Real> upward_coefs_y, downward_coefs_y;
+        amrex::Vector<amrex::Real> upward_coefs_z, downward_coefs_z;
+        
+        // Sum of absolute coefficients for each direction
+        amrex::Real sum_abs_coefs_x = 1.0_rt;
+        amrex::Real sum_abs_coefs_y = 1.0_rt;
+        amrex::Real sum_abs_coefs_z = 1.0_rt;
+        
+        // If custom coefficients exist, calculate their absolute value sums
+        if (pp_algo.queryarr("custom_coef_upward_stencil_x", upward_coefs_x) &&
+            pp_algo.queryarr("custom_coef_downward_stencil_x", downward_coefs_x)) {
+            sum_abs_coefs_x = 0.0_rt;
+            for (auto const& coef : upward_coefs_x) sum_abs_coefs_x += std::abs(coef);
+            for (auto const& coef : downward_coefs_x) sum_abs_coefs_x += std::abs(coef);
+        }
+        
+        if (pp_algo.queryarr("custom_coef_upward_stencil_y", upward_coefs_y) &&
+            pp_algo.queryarr("custom_coef_downward_stencil_y", downward_coefs_y)) {
+            sum_abs_coefs_y = 0.0_rt;
+            for (auto const& coef : upward_coefs_y) sum_abs_coefs_y += std::abs(coef);
+            for (auto const& coef : downward_coefs_y) sum_abs_coefs_y += std::abs(coef);
+        }
+        
+        if (pp_algo.queryarr("custom_coef_upward_stencil_z", upward_coefs_z) &&
+            pp_algo.queryarr("custom_coef_downward_stencil_z", downward_coefs_z)) {
+            sum_abs_coefs_z = 0.0_rt;
+            for (auto const& coef : upward_coefs_z) sum_abs_coefs_z += std::abs(coef);
+            for (auto const& coef : downward_coefs_z) sum_abs_coefs_z += std::abs(coef);
+        }
+        
+        // Implementing equation (22) from the paper
+        amrex::Real const delta_t = 1._rt / (PhysConst::c * std::sqrt(
+            AMREX_D_TERM(
+                (sum_abs_coefs_x * sum_abs_coefs_x) / (dx[0] * dx[0]),
+                + (sum_abs_coefs_y * sum_abs_coefs_y) / (dx[1] * dx[1]),
+                + (sum_abs_coefs_z * sum_abs_coefs_z) / (dx[2] * dx[2])
+            )));
+        
+        // Print CFL number (dt*c/dx for the smallest dx)
+        amrex::Real min_dx = std::min({dx[0], dx[1], dx[2]});
+        amrex::Print() << "Computed CFL number: " << delta_t * PhysConst::c / min_dx << "\n";
+        
         return delta_t;
     }
 
-    static amrex::IntVect GetMaxGuardCell() {
-        return amrex::IntVect{AMREX_D_DECL(1,1,1)};
-    }
+
+
+
+    static amrex::IntVect GetMaxGuardCell()
+    {
+        amrex::ParmParse pp_algo("algo");
+        amrex::Vector<amrex::Real> upward_coefs_x, downward_coefs_x;
+        amrex::Vector<amrex::Real> upward_coefs_y, downward_coefs_y;
+        amrex::Vector<amrex::Real> upward_coefs_z, downward_coefs_z;
+
+        // We only care about whether the arrays exist, and their sizes.  The
+        // actual values don't matter for GetMaxGuardCell. We use dummy values
+        // if they aren't in the input file
+        int stencil_size_x = 1;
+        if (pp_algo.queryarr("custom_coef_upward_stencil_x", upward_coefs_x) &&
+            pp_algo.queryarr("custom_coef_downward_stencil_x", downward_coefs_x)) {
+            stencil_size_x = std::max(upward_coefs_x.size(), downward_coefs_x.size());  //could be different
+        }
+        int stencil_size_y = 1;
+        if (pp_algo.queryarr("custom_coef_upward_stencil_y", upward_coefs_y) &&
+             pp_algo.queryarr("custom_coef_downward_stencil_y", downward_coefs_y)) {
+            stencil_size_y = std::max(upward_coefs_y.size(), downward_coefs_y.size());
+        }
+        int stencil_size_z = 1;
+         if (pp_algo.queryarr("custom_coef_upward_stencil_z", upward_coefs_z) &&
+             pp_algo.queryarr("custom_coef_downward_stencil_z", downward_coefs_z)) {
+            stencil_size_z = std::max(upward_coefs_z.size(), downward_coefs_z.size());
+        }
+
+        return amrex::IntVect{AMREX_D_DECL(stencil_size_x, stencil_size_y, stencil_size_z)};
+    }    
 
     /**
      * Perform derivative along x on a cell-centered grid, from a nodal field `F` */
@@ -139,14 +235,13 @@ struct CartesianCustomCoefAlgorithm {
 
         using namespace amrex;
 #if defined WARPX_DIM_3D
-        if (n_coefs_x == 1) {
-            return coefs_x[0] * (F(i+1,j,k,ncomp) - F(i,j,k,ncomp));
-        }
 
         amrex::Real derivative = 0;
         int stencil_size = n_coefs_x / 2;
         for (int l = 0; l < stencil_size; l++) {
-            derivative += coefs_x[l] * (F(i+1,j,k,ncomp) - F(i,j,k,ncomp));
+            // --- (Commented Out) Debugging Print Statement ---
+            //amrex::Print() << "UpwardDx: i=" << i << " j=" << j << " k=" << k << " l=" << l << " coef=" << coefs_x[l] << " F(i+1+l)=" << F(i+1+l,j,k,ncomp) << " F(i-l)=" << F(i-l,j,k,ncomp) << "\n";
+            derivative += coefs_x[l] * (F(i+1+l,j,k,ncomp) - F(i-l,j,k,ncomp));
         }
         return derivative;
 #elif (defined WARPX_DIM_1D_Z)
@@ -166,14 +261,13 @@ struct CartesianCustomCoefAlgorithm {
 
         using namespace amrex;
 #if defined WARPX_DIM_3D
-        if (n_coefs_x == 1) {
-            return coefs_x[0] * (F(i,j,k,ncomp) - F(i-1,j,k,ncomp));
-        }
 
         amrex::Real derivative = 0;
         int stencil_size = n_coefs_x / 2;
         for (int l = 0; l < stencil_size; l++) {
-            derivative += coefs_x[l + stencil_size] * (F(i,j,k,ncomp) - F(i-1,j,k,ncomp));
+            // --- (Commented Out) Debugging Print Statement ---
+            //amrex::Print() << "DownwardDx: i=" << i << " j=" << j << " k=" << k << " l=" << l << " coef=" << coefs_x[l + stencil_size] << " F(i+l)=" << F(i+l,j,k,ncomp) << " F(i-l-1)=" << F(i-l-1,j,k,ncomp) << "\n";
+            derivative += coefs_x[l + stencil_size] * (F(i+l,j,k,ncomp) - F(i-l-1,j,k,ncomp));
         }
         return derivative;
 #elif (defined WARPX_DIM_1D_Z)
@@ -192,14 +286,13 @@ struct CartesianCustomCoefAlgorithm {
 
         using namespace amrex;
 #if defined WARPX_DIM_3D
-        if (n_coefs_y == 1) {
-            return coefs_y[0] * (F(i,j+1,k,ncomp) - F(i,j,k,ncomp));
-        }
 
         amrex::Real derivative = 0;
         int stencil_size = n_coefs_y / 2;
         for (int l = 0; l < stencil_size; l++) {
-            derivative += coefs_y[l] * (F(i,j+1,k,ncomp) - F(i,j,k,ncomp));
+            // --- (Commented Out) Debugging Print Statement ---
+            //amrex::Print() << "UpwardDy: i=" << i << " j=" << j << " k=" << k << " l=" << l << " coef=" << coefs_y[l] << " F(i,j+1+l)=" << F(i,j+1+l,k,ncomp) << " F(i,j-l)=" << F(i,j-l,k,ncomp) << "\n";
+            derivative += coefs_y[l] * (F(i,j+1+l,k,ncomp) - F(i,j-l,k,ncomp));
         }
         return derivative;
 #elif (defined WARPX_DIM_XZ || WARPX_DIM_1D_Z)
@@ -219,14 +312,13 @@ struct CartesianCustomCoefAlgorithm {
 
         using namespace amrex;
 #if defined WARPX_DIM_3D
-        if (n_coefs_y == 1) {
-            return coefs_y[0] * (F(i,j,k,ncomp) - F(i,j-1,k,ncomp));
-        }
-
-        amrex::Real derivative = 0;
+        
         int stencil_size = n_coefs_y / 2;
+        amrex::Real derivative = 0;
         for (int l = 0; l < stencil_size; l++) {
-            derivative += coefs_y[l + stencil_size] * (F(i,j,k,ncomp) - F(i,j-1,k,ncomp));
+            // --- (Commented Out) Debugging Print Statement ---
+            //amrex::Print() << "DownwardDy: i=" << i << " j=" << j << " k=" << k << " l=" << l << " coef=" << coefs_y[l + stencil_size] << " F(i,j+l)=" << F(i,j+l,k,ncomp) << " F(i,j-1-l)=" << F(i,j-1-l,k,ncomp) << "\n";
+            derivative += coefs_y[l + stencil_size] * (F(i,j+l,k,ncomp) - F(i,j-1-l,k,ncomp));
         }
         return derivative;
 #elif (defined WARPX_DIM_XZ || WARPX_DIM_1D_Z)
@@ -245,37 +337,18 @@ struct CartesianCustomCoefAlgorithm {
 
         using namespace amrex;
 #if defined WARPX_DIM_3D
-        if (n_coefs_z == 1) {
-            return coefs_z[0] * (F(i,j,k+1,ncomp) - F(i,j,k,ncomp));
-        }
-
-        amrex::Real derivative = 0;
         int stencil_size = n_coefs_z / 2;
-        for (int l = 0; l < stencil_size; l++) {
-            derivative += coefs_z[l] * (F(i,j,k+1,ncomp) - F(i,j,k,ncomp));
-        }
-        return derivative;
-#elif (defined WARPX_DIM_XZ)
-        if (n_coefs_z == 1) {
-            return coefs_z[0] * (F(i,j+1,k,ncomp) - F(i,j,k,ncomp));
-        }
         amrex::Real derivative = 0;
-        int stencil_size = n_coefs_z / 2;
         for (int l = 0; l < stencil_size; l++) {
-            derivative += coefs_z[l] * (F(i,j+1,k,ncomp) - F(i,j,k,ncomp));
+            // --- (Commented Out) Debugging Print Statement ---
+            //amrex::Print() << "UpwardDz: i=" << i << " j=" << j << " k=" << k << " l=" << l << " coef=" << coefs_z[l] << " F(i,j,k+1+l)=" << F(i,j,k+1+l,ncomp) << " F(i,j,k-l)=" << F(i,j,k-l,ncomp) << "\n";
+            derivative += coefs_z[l] * (F(i,j,k+1+l,ncomp) - F(i,j,k-l,ncomp));
         }
         return derivative;
 #elif (defined WARPX_DIM_1D_Z)
-        if (n_coefs_z == 1) {
-            return coefs_z[0] * (F(i+1,j,k,ncomp) - F(i,j,k,ncomp));
-        }
-        amrex::Real derivative = 0;
-        int stencil_size = n_coefs_z / 2;
-        for (int l = 0; l < stencil_size; l++) {
-            derivative += coefs_z[l] * (F(i+1,k,j,ncomp) - F(i,j,k,ncomp));
-        }
-        return derivative;
-#endif
+        amrex::ignore_unused(F, i, j, k, ncomp);
+        return 0._rt;
+#endif    
     }
 
     /**
@@ -289,36 +362,18 @@ struct CartesianCustomCoefAlgorithm {
 
         using namespace amrex;
 #if defined WARPX_DIM_3D
-        if (n_coefs_z == 1) {
-            return coefs_z[0] * (F(i,j,k,ncomp) - F(i,j,k-1,ncomp));
-        }
 
         amrex::Real derivative = 0;
         int stencil_size = n_coefs_z / 2;
         for (int l = 0; l < stencil_size; l++) {
-            derivative += coefs_z[l + stencil_size] * (F(i,j,k,ncomp) - F(i,j,k-1,ncomp));
-        }
-        return derivative;
-#elif (defined WARPX_DIM_XZ)
-        if (n_coefs_z == 1) {
-            return coefs_z[0] * (F(i,j,k,ncomp) - F(i,j-1,k,ncomp));
-        }
-        amrex::Real derivative = 0;
-        int stencil_size = n_coefs_z / 2;
-        for (int l = 0; l < stencil_size; l++) {
-            derivative += coefs_z[l + stencil_size] * (F(i,j,k,ncomp) - F(i,j-1,k,ncomp));
+            // --- (Commented Out) Debugging Print Statement ---
+            //amrex::Print() << "DownwardDz: i=" << i << " j=" << j << " k=" << k << " l=" << l << " coef=" << coefs_z[l + stencil_size] << " F(i,j,k+l)=" << F(i,j,k+l,ncomp) << " F(i,j,k-1-l)=" << F(i,j,k-1-l,ncomp) << "\n";
+            derivative += coefs_z[l + stencil_size] * (F(i,j,k+l,ncomp) - F(i,j,k-1-l,ncomp));
         }
         return derivative;
 #elif (defined WARPX_DIM_1D_Z)
-        if (n_coefs_z == 1) {
-            return coefs_z[0] * (F(i,j,k,ncomp) - F(i-1,j,k,ncomp));
-        }
-        amrex::Real derivative = 0;
-        int stencil_size = n_coefs_z / 2;
-        for (int l = 0; l < stencil_size; l++) {
-            derivative += coefs_z[l + stencil_size] * (F(i,j,k,ncomp) - F(i-1,j,k,ncomp));
-        }
-        return derivative;
+        amrex::ignore_unused(F, coefs_z, n_coefs_z, i, j, k, ncomp);
+        return 0._rt;
 #endif
     }
 };
