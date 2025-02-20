@@ -4282,7 +4282,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
                 ]
                 if expr is not None
             ):
-                self.user_defined_kw[k] = kwargs.pop(k)
+                self.user_defined_kw[k] = kw.pop(k)
 
         return kw
 
