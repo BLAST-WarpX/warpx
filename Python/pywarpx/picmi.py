@@ -4121,7 +4121,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
     target_up_x, target_up_y, target_up_z: floats
         For diagnostic type 'FieldProbe', the vector specifying up in the 'Plane'
     """
-   
+
     def __init__(
         self,
         diag_type,
@@ -4261,11 +4261,17 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
         self.bin_max_ord = kw.pop("bin_max_ord")
         histogram_function_abs = kw.pop("histogram_function_abs")
         histogram_function_ord = kw.pop("histogram_function_ord")
-        self.__setattr__("histogram_function_abs(t,x,y,z,ux,uy,uz,w)", histogram_function_abs)
-        self.__setattr__("histogram_function_ord(t,x,y,z,ux,uy,uz,w)", histogram_function_ord)
+        self.__setattr__(
+            "histogram_function_abs(t,x,y,z,ux,uy,uz,w)", histogram_function_abs
+        )
+        self.__setattr__(
+            "histogram_function_ord(t,x,y,z,ux,uy,uz,w)", histogram_function_ord
+        )
 
         filter_function = kw.pop("filter_function", None)
-        value_function = kw.pop("filter_function", "1.") # set the weight to be 1 by default, i.e., count the number of particles 
+        value_function = kw.pop(
+            "filter_function", "1."
+        )  # set the weight to be 1 by default, i.e., count the number of particles
 
         self.__setattr__("filter_function(t,x,y,z,ux,uy,uz,w)", filter_function)
         self.__setattr__("value_function(t,x,y,z,ux,uy,uz,w)", value_function)
@@ -4273,12 +4279,12 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
         # Check the function expressions for constants
         for k in list(kw.keys()):
             if any(
-                re.search(r'\b%s\b'%k, expr)
+                re.search(r"\b%s\b" % k, expr)
                 for expr in [
                     histogram_function_abs,
                     histogram_function_ord,
                     filter_function,
-                    value_function
+                    value_function,
                 ]
                 if expr is not None
             ):
