@@ -1,12 +1,12 @@
 {
   "lev=0": {},
   "electron": {
-    "particle_momentum_x": 3.3665608248716305e-19,
-    "particle_momentum_y": 3.392690322852239e-19,
-    "particle_momentum_z": 5.254577143779578e-19,
-    "particle_position_x": 26933.772112044953,
-    "particle_position_y": 26926.994273876346,
-    "particle_theta": 29492.77423173835,
-    "particle_weight": 2.4953304765944705e-07
+    "particle_momentum_x": 1.3547613622259754e-18,
+    "particle_momentum_y": 1.3539614160696825e-18,
+    "particle_momentum_z": 2.102305484242805e-18,
+    "particle_position_x": 108281.74349700565,
+    "particle_position_y": 108222.91506078152,
+    "particle_theta": 118597.06004310239,
+    "particle_weight": 2.5087578786544294e-07
   }
 }

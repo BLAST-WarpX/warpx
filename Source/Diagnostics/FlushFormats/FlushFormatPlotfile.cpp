@@ -66,6 +66,7 @@ FlushFormatPlotfile::WriteToFile (
     const amrex::Vector<ParticleDiag>& particle_diags, int nlev,
     const std::string prefix, int file_min_digits, bool plot_raw_fields,
     bool plot_raw_fields_guards,
+    int verbose,
     const bool /*use_pinned_pc*/,
     bool isBTD, int snapshotID,  int bufferID, int numBuffers,
     const amrex::Geometry& /*full_BTD_snapshot*/,
@@ -74,17 +75,19 @@ FlushFormatPlotfile::WriteToFile (
     WARPX_PROFILE("FlushFormatPlotfile::WriteToFile()");
     auto & warpx = WarpX::GetInstance();
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
-    if (!isBTD)
-    {
-      amrex::Print() << Utils::TextMsg::Info("Writing plotfile " + filename);
-    } else
-    {
-      amrex::Print() << Utils::TextMsg::Info("Writing buffer " + std::to_string(bufferID+1) + " of " + std::to_string(numBuffers)
-                        + " to snapshot " + std::to_string(snapshotID) +  " in plotfile BTD " + prefix );
-      if (isLastBTDFlush)
-      {
-        amrex::Print() << Utils::TextMsg::Info("Finished writing snapshot " + std::to_string(snapshotID) + " in plotfile BTD " + filename);
-      }
+    if (verbose > 0) {
+        if (!isBTD)
+        {
+            amrex::Print() << Utils::TextMsg::Info("Writing plotfile " + filename);
+        } else
+        {
+            amrex::Print() << Utils::TextMsg::Info("Writing buffer " + std::to_string(bufferID+1) + " of " + std::to_string(numBuffers)
+                                + " to snapshot " + std::to_string(snapshotID) +  " in plotfile BTD " + prefix );
+            if (isLastBTDFlush)
+            {
+                amrex::Print() << Utils::TextMsg::Info("Finished writing snapshot " + std::to_string(snapshotID) + " in plotfile BTD " + filename);
+            }
+        }
     }
 
     Vector<std::string> rfs;
@@ -372,13 +375,13 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
         real_names.push_back("phi");
 #endif
 
-        // get the names of the real comps
-
-        //   note: skips the mandatory AMREX_SPACEDIM positions for pure SoA
+        // get the names of the extra real comps
         real_names.resize(tmp.NumRealComps() - AMREX_SPACEDIM);
-        auto runtime_rnames = tmp.getParticleRuntimeComps();
-        for (auto const& x : runtime_rnames) {
-            real_names[x.second + PIdx::nattribs - AMREX_SPACEDIM] = x.first;
+
+        // note, skip the required compnent names here
+        auto rnames = tmp.GetRealSoANames();
+        for (std::size_t index = PIdx::nattribs; index < rnames.size(); ++index) {
+            real_names[index - AMREX_SPACEDIM] = rnames[index];
         }
 
         // plot any "extra" fields by default
@@ -390,8 +393,10 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
 
         // and the names
         int_names.resize(tmp.NumIntComps());
-        auto runtime_inames = tmp.getParticleRuntimeiComps();
-        for (auto const& x : runtime_inames) { int_names[x.second+0] = x.first; }
+        auto inames = tmp.GetIntSoANames();
+        for (std::size_t index = 0; index < inames.size(); ++index) {
+            int_names[index] = inames[index];
+        }
 
         // plot by default
         int_flags.resize(tmp.NumIntComps(), 1);

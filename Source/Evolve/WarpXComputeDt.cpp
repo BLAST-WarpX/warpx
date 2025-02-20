@@ -50,7 +50,7 @@ WarpX::ComputeDt ()
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_const_dt.has_value(), "warpx.const_dt must be specified with the hybrid-PIC solver.");
     } else if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            m_const_dt.has_value() || dt_update_interval.isActivated(),
+            m_const_dt.has_value() || m_dt_update_interval.isActivated(),
             "warpx.const_dt must be specified with the electrostatic solver, or warpx.dt_update_interval must be > 0."
         );
     }
@@ -100,7 +100,7 @@ WarpX::ComputeDt ()
     dt.resize(0);
     dt.resize(max_level+1,deltat);
 
-    if (do_subcycling) {
+    if (m_do_subcycling) {
         for (int lev = max_level-1; lev >= 0; --lev) {
             dt[lev] = dt[lev+1] * refRatio(lev)[0];
         }
@@ -138,26 +138,5 @@ WarpX::UpdateDtFromParticleSpeeds ()
 
     for (int lev = max_level-1; lev >= 0; --lev) {
         dt[lev] = dt[lev+1] * refRatio(lev)[0];
-    }
-}
-
-void
-WarpX::PrintDtDxDyDz ()
-{
-    for (int lev=0; lev <= max_level; lev++) {
-        const amrex::Real* dx_lev = geom[lev].CellSize();
-        amrex::Print() << "Level " << lev << ": dt = " << dt[lev]
-#if defined(WARPX_DIM_1D_Z)
-                       << " ; dz = " << dx_lev[0] << '\n';
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                       << " ; dx = " << dx_lev[0] << '\n';
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                       << " ; dx = " << dx_lev[0]
-                       << " ; dz = " << dx_lev[1] << '\n';
-#elif defined(WARPX_DIM_3D)
-                       << " ; dx = " << dx_lev[0]
-                       << " ; dy = " << dx_lev[1]
-                       << " ; dz = " << dx_lev[2] << '\n';
-#endif
     }
 }

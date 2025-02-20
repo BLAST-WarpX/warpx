@@ -38,20 +38,12 @@ If want to use WarpX on a specific high-performance computing (HPC) systems, jum
 
    .. image:: conda.svg
 
-Using the Conda Package
------------------------
+Using the Conda-Forge Package
+-----------------------------
 
-A package for WarpX is available via the `Conda <https://conda.io>`_ package manager.
+A package for WarpX is available via `Conda-Forge <https://conda-forge.org/download/>`__.
 
 .. tip::
-
-   We recommend to configure your conda to use the faster ``libmamba`` `dependency solver <https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community>`__.
-
-   .. code-block:: bash
-
-      conda update -y -n base conda
-      conda install -y -n base conda-libmamba-solver
-      conda config --set solver libmamba
 
    We recommend to deactivate that conda self-activates its ``base`` environment.
    This `avoids interference with the system and other package managers <https://collegeville.github.io/CW20/WorkshopResources/WhitePapers/huebl-working-with-multiple-pkg-mgrs.pdf>`__.
@@ -60,14 +52,21 @@ A package for WarpX is available via the `Conda <https://conda.io>`_ package man
 
       conda config --set auto_activate_base false
 
+   In order to make sure that the conda configuration uses ``conda-forge`` as the only channel, which will help avoid issues with blocked ``defaults`` or ``anaconda`` repositories, please set the following configurations:
+
+   .. code-block:: bash
+
+      conda config --add channels conda-forge
+      conda config --set channel_priority strict
+
 .. code-block:: bash
 
-   conda create -n warpx -c conda-forge warpx
-   conda activate warpx
+   mamba create -n warpx -c conda-forge warpx
+   mamba activate warpx
 
 .. note::
 
-   The ``warpx`` `conda package <https://anaconda.org/conda-forge/warpx>`__ does not yet provide GPU support.
+   The ``warpx`` package on conda-forge does not yet provide `GPU support <https://github.com/conda-forge/warpx-feedstock/issues/89>`__.
 
 
 .. _install-spack:
@@ -80,7 +79,7 @@ Using the Spack Package
 -----------------------
 
 Packages for WarpX are available via the `Spack <https://spack.readthedocs.io>`__ package manager.
-The package ``warpx`` installs executables and the package ``py-warpx`` includes Python bindings, i.e. `PICMI <https://github.com/picmi-standard/picmi>`_.
+The package ``warpx`` installs executables and the variant ``warpx +python`` also includes Python bindings, i.e. `PICMI <https://github.com/picmi-standard/picmi>`__.
 
 .. code-block:: bash
 
@@ -89,11 +88,11 @@ The package ``warpx`` installs executables and the package ``py-warpx`` includes
    spack buildcache keys --install --trust
 
    # see `spack info py-warpx` for build options.
-   # optional arguments:  -mpi ^warpx dims=2 compute=cuda
-   spack install py-warpx
-   spack load py-warpx
+   # optional arguments:       -mpi compute=cuda
+   spack install warpx +python
+   spack load warpx +python
 
-See ``spack info warpx`` or ``spack info py-warpx`` and `the official Spack tutorial <https://spack-tutorial.readthedocs.io>`__ for more information.
+See ``spack info warpx`` and `the official Spack tutorial <https://spack-tutorial.readthedocs.io>`__ for more information.
 
 
 .. _install-pypi:

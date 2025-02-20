@@ -10,18 +10,11 @@
 # This is a script that analyses the simulation results from the script `inputs_vandb_2d`.
 # This simulates a 2D periodic plasma using the implicit solver
 # with the Villasenor deposition using shape factor 2.
-import os
 import sys
 
 import numpy as np
 import yt
 from scipy.constants import e, epsilon_0
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
-
-# this will be the name of the plot file
-fn = sys.argv[1]
 
 field_energy = np.loadtxt("diags/reducedfiles/field_energy.txt", skiprows=1)
 particle_energy = np.loadtxt("diags/reducedfiles/particle_energy.txt", skiprows=1)
@@ -65,9 +58,3 @@ print(f"rms error in charge conservation: {drho_rms}")
 print(f"tolerance: {tolerance_rel_charge}")
 
 assert drho_rms < tolerance_rel_charge
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

@@ -230,16 +230,3 @@ if sim.test:
     assert np.isclose(m4_rms_error, 1.515, atol=0.01)
     assert np.isclose(m5_rms_error, 0.718, atol=0.01)
     assert np.isclose(m6_rms_error, 0.357, atol=0.01)
-
-    # checksum check
-    import os
-    import sys
-
-    sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-    from checksumAPI import evaluate_checksum
-
-    # compare checksums
-    evaluate_checksum(
-        test_name=os.path.split(os.getcwd())[1],
-        output_file=sys.argv[1],
-    )

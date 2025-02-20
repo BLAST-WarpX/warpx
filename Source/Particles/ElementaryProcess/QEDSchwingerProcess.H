@@ -17,9 +17,9 @@
  */
 struct SchwingerFilterFunc
 {
-    const int m_threshold_poisson_gaussian;
-    const amrex::Real m_dV;
-    const amrex::Real m_dt;
+    int m_threshold_poisson_gaussian;
+    amrex::Real m_dV;
+    amrex::Real m_dt;
 
     /** Get the number of created pairs in a given cell at a given timestep.
      *
@@ -59,8 +59,8 @@ struct SchwingerFilterFunc
  */
 struct SchwingerTransformFunc
 {
-    const amrex::Real m_y_size;
-    const int m_weight_index;
+    amrex::Real m_y_size;
+    int m_weight_index;
 
     /** Assign a weight to particles created via the Schwinger process.
      *

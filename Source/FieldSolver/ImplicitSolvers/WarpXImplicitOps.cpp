@@ -70,7 +70,7 @@ WarpX::ImplicitPreRHSOp ( amrex::Real  a_cur_time,
 }
 
 void
-WarpX::SetElectricFieldAndApplyBCs ( const WarpXSolverVec&  a_E )
+WarpX::SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time )
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         a_E.getArrayVecType()==warpx::fields::FieldType::Efield_fp,
@@ -84,12 +84,12 @@ WarpX::SetElectricFieldAndApplyBCs ( const WarpXSolverVec&  a_E )
     amrex::MultiFab::Copy(*Efield_fp[0][1], *Evec[0][1], 0, 0, ncomps, Evec[0][1]->nGrowVect());
     amrex::MultiFab::Copy(*Efield_fp[0][2], *Evec[0][2], 0, 0, ncomps, Evec[0][2]->nGrowVect());
     FillBoundaryE(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
-    ApplyEfieldBoundary(0, PatchType::fine);
+    ApplyEfieldBoundary(0, PatchType::fine, a_time);
 }
 
 void
-WarpX::UpdateMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField const&  a_Bn,
-                                       amrex::Real                                    a_thetadt )
+WarpX::UpdateMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField const& a_Bn,
+                                       amrex::Real a_thetadt, amrex::Real start_time )
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -100,29 +100,23 @@ WarpX::UpdateMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField co
         amrex::MultiFab::Copy(*Bfp[1], *a_Bn[lev][1], 0, 0, ncomps, a_Bn[lev][1]->nGrowVect());
         amrex::MultiFab::Copy(*Bfp[2], *a_Bn[lev][2], 0, 0, ncomps, a_Bn[lev][2]->nGrowVect());
     }
-    EvolveB(a_thetadt, DtType::Full);
-    ApplyMagneticFieldBCs();
+    EvolveB(a_thetadt, DtType::Full, start_time);
+    FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
 }
 
 void
-WarpX::FinishMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField const&  a_Bn,
-                                       amrex::Real                                    a_theta )
+WarpX::FinishMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField const& a_Bn,
+                                       amrex::Real a_theta, amrex::Real a_time )
 {
     using warpx::fields::FieldType;
 
     FinishImplicitField(m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, 0), a_Bn, a_theta);
-    ApplyMagneticFieldBCs();
-}
-
-void
-WarpX::ApplyMagneticFieldBCs()
-{
+    ApplyBfieldBoundary(0, PatchType::fine, DtType::Full, a_time);
     FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
-    ApplyBfieldBoundary(0, PatchType::fine, DtType::Full);
 }
 
 void
-WarpX::SpectralSourceFreeFieldAdvance ()
+WarpX::SpectralSourceFreeFieldAdvance (amrex::Real start_time)
 {
     using namespace amrex::literals;
     using warpx::fields::FieldType;
@@ -148,7 +142,7 @@ WarpX::SpectralSourceFreeFieldAdvance ()
     current_fp[1]->setVal(0._rt);
     current_fp[2]->setVal(0._rt);
     if (rho_fp) { rho_fp->setVal(0._rt); }
-    PushPSATD(); // Note that this does dt/2
+    PushPSATD(start_time); // Note that this does dt/2
     FillBoundaryE(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
     FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
 
@@ -175,7 +169,7 @@ WarpX::SaveParticlesAtImplicitStepStart ( )
 #endif
             {
 
-            auto particle_comps = pc->getParticleComps();
+            auto particle_comps = pc->GetRealSoANames();
 
             for (WarpXParIter pti(*pc, lev); pti.isValid(); ++pti) {
 
@@ -187,17 +181,17 @@ WarpX::SaveParticlesAtImplicitStepStart ( )
                 amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
 #if !defined(WARPX_DIM_1D_Z)
-                amrex::ParticleReal* x_n = pti.GetAttribs(particle_comps["x_n"]).dataPtr();
+                amrex::ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr();
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                amrex::ParticleReal* y_n = pti.GetAttribs(particle_comps["y_n"]).dataPtr();
+                amrex::ParticleReal* y_n = pti.GetAttribs("y_n").dataPtr();
 #endif
 #if !defined(WARPX_DIM_RCYLINDER)
-                amrex::ParticleReal* z_n = pti.GetAttribs(particle_comps["z_n"]).dataPtr();
+                amrex::ParticleReal* z_n = pti.GetAttribs("z_n").dataPtr();
 #endif
-                amrex::ParticleReal* ux_n = pti.GetAttribs(particle_comps["ux_n"]).dataPtr();
-                amrex::ParticleReal* uy_n = pti.GetAttribs(particle_comps["uy_n"]).dataPtr();
-                amrex::ParticleReal* uz_n = pti.GetAttribs(particle_comps["uz_n"]).dataPtr();
+                amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
+                amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
+                amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
 
                 const long np = pti.numParticles();
 
@@ -249,7 +243,7 @@ WarpX::FinishImplicitParticleUpdate ()
 #endif
             {
 
-            auto particle_comps = pc->getParticleComps();
+            auto particle_comps = pc->GetRealSoANames();
 
             for (WarpXParIter pti(*pc, lev); pti.isValid(); ++pti) {
 
@@ -262,17 +256,17 @@ WarpX::FinishImplicitParticleUpdate ()
                 amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
 #if !defined(WARPX_DIM_1D_Z)
-                amrex::ParticleReal* x_n = pti.GetAttribs(particle_comps["x_n"]).dataPtr();
+                amrex::ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr();
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                amrex::ParticleReal* y_n = pti.GetAttribs(particle_comps["y_n"]).dataPtr();
+                amrex::ParticleReal* y_n = pti.GetAttribs("y_n").dataPtr();
 #endif
 #if !defined(WARPX_DIM_RCYLINDER)
-                amrex::ParticleReal* z_n = pti.GetAttribs(particle_comps["z_n"]).dataPtr();
+                amrex::ParticleReal* z_n = pti.GetAttribs("z_n").dataPtr();
 #endif
-                amrex::ParticleReal* ux_n = pti.GetAttribs(particle_comps["ux_n"]).dataPtr();
-                amrex::ParticleReal* uy_n = pti.GetAttribs(particle_comps["uy_n"]).dataPtr();
-                amrex::ParticleReal* uz_n = pti.GetAttribs(particle_comps["uz_n"]).dataPtr();
+                amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
+                amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
+                amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
 
                 const long np = pti.numParticles();
 
@@ -308,8 +302,8 @@ WarpX::FinishImplicitParticleUpdate ()
 }
 
 void
-WarpX::FinishImplicitField( ablastr::fields::MultiLevelVectorField const&  Field_fp,
-                            ablastr::fields::MultiLevelVectorField const&  Field_n,
+WarpX::FinishImplicitField( ablastr::fields::MultiLevelVectorField const& Field_fp,
+                            ablastr::fields::MultiLevelVectorField const& Field_n,
                             amrex::Real  theta )
 {
     using namespace amrex::literals;
@@ -359,7 +353,7 @@ WarpX::FinishImplicitField( ablastr::fields::MultiLevelVectorField const&  Field
 }
 
 void
-WarpX::ImplicitComputeRHSE (amrex::Real a_dt, WarpXSolverVec&  a_Erhs_vec)
+WarpX::ImplicitComputeRHSE (amrex::Real a_dt, WarpXSolverVec& a_Erhs_vec)
 {
     for (int lev = 0; lev <= finest_level; ++lev)
     {
@@ -368,7 +362,7 @@ WarpX::ImplicitComputeRHSE (amrex::Real a_dt, WarpXSolverVec&  a_Erhs_vec)
 }
 
 void
-WarpX::ImplicitComputeRHSE (int lev, amrex::Real a_dt, WarpXSolverVec&  a_Erhs_vec)
+WarpX::ImplicitComputeRHSE (int lev, amrex::Real a_dt, WarpXSolverVec& a_Erhs_vec)
 {
     WARPX_PROFILE("WarpX::ImplicitComputeRHSE()");
     ImplicitComputeRHSE(lev, PatchType::fine, a_dt, a_Erhs_vec);
@@ -379,7 +373,7 @@ WarpX::ImplicitComputeRHSE (int lev, amrex::Real a_dt, WarpXSolverVec&  a_Erhs_v
 }
 
 void
-WarpX::ImplicitComputeRHSE (int lev, PatchType patch_type, amrex::Real a_dt, WarpXSolverVec&  a_Erhs_vec)
+WarpX::ImplicitComputeRHSE (int lev, PatchType patch_type, amrex::Real a_dt, WarpXSolverVec& a_Erhs_vec)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         a_Erhs_vec.getArrayVecType()==warpx::fields::FieldType::Efield_fp,
@@ -399,12 +393,14 @@ WarpX::ImplicitComputeRHSE (int lev, PatchType patch_type, amrex::Real a_dt, War
                                         lev,
                                         patch_type,
                                         a_Erhs_vec.getArrayVec()[lev],
+                                        m_eb_update_E[lev],
                                         a_dt );
     } else {
         m_fdtd_solver_cp[lev]->EvolveE( m_fields,
                                         lev,
                                         patch_type,
                                         a_Erhs_vec.getArrayVec()[lev],
+                                        m_eb_update_E[lev],
                                         a_dt );
     }
 

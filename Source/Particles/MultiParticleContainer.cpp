@@ -21,7 +21,6 @@
 #   include "Particles/ElementaryProcess/QEDPhotonEmission.H"
 #endif
 #include "Particles/LaserParticleContainer.H"
-#include "Particles/NamedComponentParticleContainer.H"
 #include "Particles/ParticleCreation/FilterCopyTransform.H"
 #ifdef WARPX_QED
 #   include "Particles/ParticleCreation/FilterCreateTransformFromFAB.H"
@@ -88,7 +87,7 @@ namespace
     /** A little collection to transport six Array4 that point to the EM fields */
     struct MyFieldList
     {
-        Array4< amrex::Real const > const Ex, Ey, Ez, Bx, By, Bz;
+        Array4< amrex::Real const > Ex, Ey, Ez, Bx, By, Bz;
     };
 }
 
@@ -223,7 +222,7 @@ MultiParticleContainer::ReadParameters ()
                 pp_particles, "repeated_plasma_lens_lengths",
                 h_repeated_plasma_lens_lengths);
 
-            const int n_lenses = static_cast<int>(h_repeated_plasma_lens_starts.size());
+            const auto n_lenses = static_cast<int>(h_repeated_plasma_lens_starts.size());
             d_repeated_plasma_lens_starts.resize(n_lenses);
             d_repeated_plasma_lens_lengths.resize(n_lenses);
             amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
@@ -1622,7 +1621,7 @@ void MultiParticleContainer::doQedQuantumSync (int lev,
 
             auto Transform = PhotonEmissionTransformFunc(
                   m_shr_p_qs_engine->build_optical_depth_functor(),
-                  pc_source->particle_runtime_comps["opticalDepthQSR"],
+                  pc_source->GetRealCompIndex("opticalDepthQSR") - pc_source->NArrayReal,
                   m_shr_p_qs_engine->build_phot_em_functor(),
                   pti, lev, Ex.nGrowVect(),
                   Ex[pti], Ey[pti], Ez[pti],

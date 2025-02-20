@@ -1,5 +1,5 @@
 # Maximum number of time steps
-max_step = 10
+max_step = 20
 
 # The lo and hi ends of grids are multipliers of blocking factor
 amr.blocking_factor = 8
@@ -13,7 +13,7 @@ amr.max_level = 0
 
 # Deactivate Maxwell solver
 algo.maxwell_solver = none
-warpx.const_dt = 1e-9
+warpx.const_dt = 0.5e-9
 
 # Embedded boundary
 warpx.eb_implicit_function = "-(x**2+y**2+z**2-2**2)"

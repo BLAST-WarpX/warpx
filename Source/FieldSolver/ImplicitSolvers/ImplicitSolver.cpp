@@ -1,7 +1,31 @@
 #include "ImplicitSolver.H"
 #include "WarpX.H"
+#include "Particles/MultiParticleContainer.H"
 
 using namespace amrex;
+
+void ImplicitSolver::CreateParticleAttributes () const
+{
+    // Set comm to false to that the attributes are not communicated
+    // nor written to the checkpoint files
+    int const comm = 0;
+
+    // Add space to save the positions and velocities at the start of the time steps
+    for (auto const& pc : m_WarpX->GetPartContainer()) {
+#if !defined(WARPX_DIM_1D_Z)
+        pc->AddRealComp("x_n", comm);
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        pc->AddRealComp("y_n", comm);
+#endif
+#if !defined(WARPX_DIM_RCYLINDER)
+        pc->AddRealComp("z_n", comm);
+#endif
+        pc->AddRealComp("ux_n", comm);
+        pc->AddRealComp("uy_n", comm);
+        pc->AddRealComp("uz_n", comm);
+    }
+}
 
 const Geometry& ImplicitSolver::GetGeometry (const int a_lvl) const
 {
@@ -40,14 +64,18 @@ Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const
             lbc[i] = LinOpBCType::Periodic;
         } else if (a_fbc[i] == FieldBoundaryType::PEC) {
             WARPX_ABORT_WITH_MESSAGE("LinOpBCType not set for this FieldBoundaryType");
-        } else if (a_fbc[i] == FieldBoundaryType::PMC) {
-            WARPX_ABORT_WITH_MESSAGE("LinOpBCType not set for this FieldBoundaryType");
         } else if (a_fbc[i] == FieldBoundaryType::Damped) {
             WARPX_ABORT_WITH_MESSAGE("LinOpBCType not set for this FieldBoundaryType");
         } else if (a_fbc[i] == FieldBoundaryType::Absorbing_SilverMueller) {
             WARPX_ABORT_WITH_MESSAGE("LinOpBCType not set for this FieldBoundaryType");
         } else if (a_fbc[i] == FieldBoundaryType::Neumann) {
-            lbc[i] = LinOpBCType::Neumann;
+            // Also for FieldBoundaryType::PMC
+            lbc[i] = LinOpBCType::symmetry;
+        } else if (a_fbc[i] == FieldBoundaryType::PECInsulator) {
+            ablastr::warn_manager::WMRecordWarning("Implicit solver",
+                "With PECInsulator, in the Curl-Curl preconditioner Neumann boundary will be used since the full boundary is not yet implemented.",
+                ablastr::warn_manager::WarnPriority::medium);
+            lbc[i] = LinOpBCType::symmetry;
         } else if (a_fbc[i] == FieldBoundaryType::None) {
             WARPX_ABORT_WITH_MESSAGE("LinOpBCType not set for this FieldBoundaryType");
         } else if (a_fbc[i] == FieldBoundaryType::Open) {

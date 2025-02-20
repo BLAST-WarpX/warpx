@@ -31,7 +31,7 @@ fi
 
 # Remove old dependencies #####################################################
 #
-SW_DIR="${CFS}/${proj}/${USER}/sw/perlmutter/cpu"
+SW_DIR="${PSCRATCH}/storage/sw/warpx/perlmutter/cpu"
 rm -rf ${SW_DIR}
 mkdir -p ${SW_DIR}
 
@@ -44,8 +44,28 @@ python3 -m pip uninstall -qqq -y mpi4py 2>/dev/null || true
 # General extra dependencies ##################################################
 #
 
+# build parallelism
+PARALLEL=16
+
 # tmpfs build directory: avoids issues often seen with $HOME and is faster
 build_dir=$(mktemp -d)
+
+# CCache
+curl -Lo ccache.tar.xz https://github.com/ccache/ccache/releases/download/v4.10.2/ccache-4.10.2-linux-x86_64.tar.xz
+tar -xf ccache.tar.xz
+mv ccache-4.10.2-linux-x86_64 ${SW_DIR}/ccache-4.10.2
+rm -rf ccache.tar.xz
+
+# Boost (QED tables)
+rm -rf $HOME/src/boost-temp
+mkdir -p $HOME/src/boost-temp
+curl -Lo $HOME/src/boost-temp/boost.tar.gz https://archives.boost.io/release/1.82.0/source/boost_1_82_0.tar.gz
+tar -xzf $HOME/src/boost-temp/boost.tar.gz -C $HOME/src/boost-temp
+cd $HOME/src/boost-temp/boost_1_82_0
+./bootstrap.sh --with-libraries=math --prefix=${SW_DIR}/boost-1.82.0
+./b2 cxxflags="-std=c++17" install -j ${PARALLEL}
+cd -
+rm -rf $HOME/src/boost-temp
 
 # c-blosc (I/O compression)
 if [ -d $HOME/src/c-blosc ]
@@ -59,7 +79,7 @@ else
 fi
 rm -rf $HOME/src/c-blosc-pm-cpu-build
 cmake -S $HOME/src/c-blosc -B ${build_dir}/c-blosc-pm-cpu-build -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/c-blosc-1.21.1
-cmake --build ${build_dir}/c-blosc-pm-cpu-build --target install --parallel 16
+cmake --build ${build_dir}/c-blosc-pm-cpu-build --target install --parallel ${PARALLEL}
 rm -rf ${build_dir}/c-blosc-pm-cpu-build
 
 # ADIOS2
@@ -74,7 +94,7 @@ else
 fi
 rm -rf $HOME/src/adios2-pm-cpu-build
 cmake -S $HOME/src/adios2 -B ${build_dir}/adios2-pm-cpu-build -DADIOS2_USE_Blosc=ON -DADIOS2_USE_CUDA=OFF -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.8.3
-cmake --build ${build_dir}/adios2-pm-cpu-build --target install -j 16
+cmake --build ${build_dir}/adios2-pm-cpu-build --target install -j ${PARALLEL}
 rm -rf ${build_dir}/adios2-pm-cpu-build
 
 # BLAS++ (for PSATD+RZ)
@@ -89,7 +109,7 @@ else
 fi
 rm -rf $HOME/src/blaspp-pm-cpu-build
 CXX=$(which CC) cmake -S $HOME/src/blaspp -B ${build_dir}/blaspp-pm-cpu-build -Duse_openmp=ON -Dgpu_backend=OFF -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
-cmake --build ${build_dir}/blaspp-pm-cpu-build --target install --parallel 16
+cmake --build ${build_dir}/blaspp-pm-cpu-build --target install --parallel ${PARALLEL}
 rm -rf ${build_dir}/blaspp-pm-cpu-build
 
 # LAPACK++ (for PSATD+RZ)
@@ -104,47 +124,8 @@ else
 fi
 rm -rf $HOME/src/lapackpp-pm-cpu-build
 CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $HOME/src/lapackpp -B ${build_dir}/lapackpp-pm-cpu-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
-cmake --build ${build_dir}/lapackpp-pm-cpu-build --target install --parallel 16
+cmake --build ${build_dir}/lapackpp-pm-cpu-build --target install --parallel ${PARALLEL}
 rm -rf ${build_dir}/lapackpp-pm-cpu-build
-
-# heFFTe
-if [ -d $HOME/src/heffte ]
-then
-  cd $HOME/src/heffte
-  git fetch --prune
-  git checkout v2.4.0
-  cd -
-else
-  git clone -b v2.4.0 https://github.com/icl-utk-edu/heffte.git ${HOME}/src/heffte
-fi
-rm -rf ${HOME}/src/heffte-pm-cpu-build
-cmake \
-    -S ${HOME}/src/heffte               \
-    -B ${build_dir}/heffte-pm-cpu-build \
-    -DBUILD_SHARED_LIBS=ON              \
-    -DCMAKE_BUILD_TYPE=Release          \
-    -DCMAKE_CXX_STANDARD=17             \
-    -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON  \
-    -DCMAKE_INSTALL_PREFIX=${SW_DIR}/heffte-2.4.0  \
-    -DHeffte_DISABLE_GPU_AWARE_MPI=ON   \
-    -DHeffte_ENABLE_AVX=ON              \
-    -DHeffte_ENABLE_AVX512=OFF          \
-    -DHeffte_ENABLE_FFTW=ON             \
-    -DHeffte_ENABLE_CUDA=OFF            \
-    -DHeffte_ENABLE_ROCM=OFF            \
-    -DHeffte_ENABLE_ONEAPI=OFF          \
-    -DHeffte_ENABLE_MKL=OFF             \
-    -DHeffte_ENABLE_DOXYGEN=OFF         \
-    -DHeffte_SEQUENTIAL_TESTING=OFF     \
-    -DHeffte_ENABLE_TESTING=OFF         \
-    -DHeffte_ENABLE_TRACING=OFF         \
-    -DHeffte_ENABLE_PYTHON=OFF          \
-    -DHeffte_ENABLE_FORTRAN=OFF         \
-    -DHeffte_ENABLE_SWIG=OFF            \
-    -DHeffte_ENABLE_MAGMA=OFF
-cmake --build ${build_dir}/heffte-pm-cpu-build --target install --parallel 16
-rm -rf ${build_dir}/heffte-pm-cpu-build
-
 
 # Python ######################################################################
 #

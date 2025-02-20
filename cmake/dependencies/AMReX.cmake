@@ -51,6 +51,12 @@ macro(find_amrex)
             set(AMReX_OMP          OFF    CACHE INTERNAL "")
         endif()
 
+        if(WarpX_FFT OR ABLASTR_FFT)
+            set(AMReX_FFT ON CACHE INTERNAL "")
+        else()
+            set(AMReX_FFT OFF CACHE INTERNAL "")
+        endif()
+
         if(WarpX_EB)
             set(AMReX_EB ON CACHE INTERNAL "")
         else()
@@ -93,7 +99,7 @@ macro(find_amrex)
         set(AMReX_PROBINIT OFF CACHE INTERNAL "")
         set(AMReX_TINY_PROFILE ON CACHE BOOL "")
         set(AMReX_LINEAR_SOLVERS_EM ON CACHE INTERNAL "")
-        set(AMReX_LINEAR_SOLVERS_INCFLO OFF CACHE INTERNAL "")
+        set(AMReX_LINEAR_SOLVERS_INCFLO ON CACHE INTERNAL "")
 
         if(WarpX_ASCENT OR WarpX_SENSEI)
             set(AMReX_GPU_RDC ON CACHE BOOL "")
@@ -245,6 +251,11 @@ macro(find_amrex)
         foreach(D IN LISTS WarpX_amrex_dim)
             set(COMPONENT_DIMS ${COMPONENT_DIMS} ${D}D)
         endforeach()
+        if(WarpX_FFT)
+            set(COMPONENT_FFT FFT)
+        else()
+            set(COMPONENT_FFT)
+        endif()
         if(WarpX_EB)
             set(COMPONENT_EB EB)
         else()
@@ -262,7 +273,7 @@ macro(find_amrex)
         endif()
         set(COMPONENT_PRECISION ${WarpX_PRECISION} P${WarpX_PARTICLE_PRECISION})
 
-        find_package(AMReX 24.11 CONFIG REQUIRED COMPONENTS ${COMPONENT_ASCENT} ${COMPONENT_CATALYST} ${COMPONENT_DIMS} ${COMPONENT_EB} PARTICLES ${COMPONENT_PIC} ${COMPONENT_PRECISION} ${COMPONENT_SENSEI} LSOLVERS)
+        find_package(AMReX 25.02 CONFIG REQUIRED COMPONENTS ${COMPONENT_ASCENT} ${COMPONENT_CATALYST} ${COMPONENT_DIMS} ${COMPONENT_EB} ${COMPONENT_FFT} PARTICLES ${COMPONENT_PIC} ${COMPONENT_PRECISION} ${COMPONENT_SENSEI} LSOLVERS)
         # note: TINYP skipped because user-configured and optional
 
         # AMReX CMake helper scripts
@@ -285,7 +296,7 @@ set(WarpX_amrex_src ""
 set(WarpX_amrex_repo "https://github.com/AMReX-Codes/amrex.git"
     CACHE STRING
     "Repository URI to pull and build AMReX from if(WarpX_amrex_internal)")
-set(WarpX_amrex_branch "4b703fec6c2ff983e465c8cef0cc4947231edb07"
+set(WarpX_amrex_branch "b364becad939a490bca4e7f8b23f7392c558a311"
     CACHE STRING
     "Repository branch for WarpX_amrex_repo if(WarpX_amrex_internal)")
 

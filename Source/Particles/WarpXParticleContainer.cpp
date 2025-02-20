@@ -89,10 +89,14 @@ WarpXParIter::WarpXParIter (ContainerType& pc, int level, MFItInfo& info)
 }
 
 WarpXParticleContainer::WarpXParticleContainer (AmrCore* amr_core, int ispecies)
-    : NamedComponentParticleContainer<DefaultAllocator>(amr_core->GetParGDB())
+    : amrex::ParticleContainerPureSoA<PIdx::nattribs, 0>(amr_core->GetParGDB())
     , species_id(ispecies)
 {
     SetParticleSize();
+    SetSoACompileTimeNames(
+                           {PIdx::names.begin(), PIdx::names.end()},
+                           {IntIdx::names.begin(), IntIdx::names.end()}
+                           );
     ReadParameters();
 
     // Reading the external fields needs to be here since ReadParameters
@@ -604,49 +608,64 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
     else {
         if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov) {
             if (push_type == PushType::Explicit) {
-                if        (WarpX::nox == 1){
+
+                amrex::Array4<const int> eb_reduce_particle_shape;
+                if (EB::enabled()) {
+                    eb_reduce_particle_shape = (*warpx.GetEBReduceParticleShapeFlag()[lev])[pti].array();
+                }
+
+                if      (WarpX::nox == 1){
                     doEsirkepovDepositionShapeN<1>(
-                        GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
-                        uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
-                        WarpX::n_rz_azimuthal_modes);
+                    GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
+                    uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
+                    jx_arr, jy_arr, jz_arr,
+                    np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
+                    WarpX::n_rz_azimuthal_modes,
+                    eb_reduce_particle_shape, EB::enabled() );
                 } else if (WarpX::nox == 2){
                     doEsirkepovDepositionShapeN<2>(
                         GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
                         uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
-                        WarpX::n_rz_azimuthal_modes);
+                        jx_arr, jy_arr, jz_arr,
+                        np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
+                        WarpX::n_rz_azimuthal_modes,
+                        eb_reduce_particle_shape, EB::enabled() );
                 } else if (WarpX::nox == 3){
                     doEsirkepovDepositionShapeN<3>(
                         GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
                         uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
-                        WarpX::n_rz_azimuthal_modes);
+                        jx_arr, jy_arr, jz_arr,
+                        np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
+                        WarpX::n_rz_azimuthal_modes,
+                        eb_reduce_particle_shape, EB::enabled() );
                 } else if (WarpX::nox == 4){
                     doEsirkepovDepositionShapeN<4>(
                         GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
                         uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
-                        WarpX::n_rz_azimuthal_modes);
+                        jx_arr, jy_arr, jz_arr,
+                        np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
+                        WarpX::n_rz_azimuthal_modes,
+                        eb_reduce_particle_shape, EB::enabled() );
                 }
+
             } else if (push_type == PushType::Implicit) {
 #if (AMREX_SPACEDIM >= 2)
-                auto& xp_n = pti.GetAttribs(particle_comps["x_n"]);
+                auto& xp_n = pti.GetAttribs("x_n");
                 const ParticleReal* xp_n_data = xp_n.dataPtr() + offset;
 #else
                 const ParticleReal* xp_n_data = nullptr;
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-                auto& yp_n = pti.GetAttribs(particle_comps["y_n"]);
+                auto& yp_n = pti.GetAttribs("y_n");
                 const ParticleReal* yp_n_data = yp_n.dataPtr() + offset;
 #else
                 const ParticleReal* yp_n_data = nullptr;
 #endif
-                auto& zp_n = pti.GetAttribs(particle_comps["z_n"]);
+                auto& zp_n = pti.GetAttribs("z_n");
                 const ParticleReal* zp_n_data = zp_n.dataPtr() + offset;
-                auto& uxp_n = pti.GetAttribs(particle_comps["ux_n"]);
-                auto& uyp_n = pti.GetAttribs(particle_comps["uy_n"]);
-                auto& uzp_n = pti.GetAttribs(particle_comps["uz_n"]);
+                auto& uxp_n = pti.GetAttribs("ux_n");
+                auto& uyp_n = pti.GetAttribs("uy_n");
+                auto& uzp_n = pti.GetAttribs("uz_n");
                 if        (WarpX::nox == 1){
                     doChargeConservingDepositionShapeNImplicit<1>(
                         xp_n_data, yp_n_data, zp_n_data,
@@ -684,22 +703,22 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
         } else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
             if (push_type == PushType::Implicit) {
 #if (AMREX_SPACEDIM >= 2)
-                auto& xp_n = pti.GetAttribs(particle_comps["x_n"]);
+                auto& xp_n = pti.GetAttribs("x_n");
                 const ParticleReal* xp_n_data = xp_n.dataPtr() + offset;
 #else
                 const ParticleReal* xp_n_data = nullptr;
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-                auto& yp_n = pti.GetAttribs(particle_comps["y_n"]);
+                auto& yp_n = pti.GetAttribs("y_n");
                 const ParticleReal* yp_n_data = yp_n.dataPtr() + offset;
 #else
                 const ParticleReal* yp_n_data = nullptr;
 #endif
-                auto& zp_n = pti.GetAttribs(particle_comps["z_n"]);
+                auto& zp_n = pti.GetAttribs("z_n");
                 const ParticleReal* zp_n_data = zp_n.dataPtr() + offset;
-                auto& uxp_n = pti.GetAttribs(particle_comps["ux_n"]);
-                auto& uyp_n = pti.GetAttribs(particle_comps["uy_n"]);
-                auto& uzp_n = pti.GetAttribs(particle_comps["uz_n"]);
+                auto& uxp_n = pti.GetAttribs("ux_n");
+                auto& uyp_n = pti.GetAttribs("uy_n");
+                auto& uzp_n = pti.GetAttribs("uz_n");
                 if (WarpX::nox == 1){
                     doVillasenorDepositionShapeNImplicit<1>(
                         xp_n_data, yp_n_data, zp_n_data,
@@ -794,9 +813,9 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
                 }
             } else if (push_type == PushType::Implicit) {
-                auto& uxp_n = pti.GetAttribs(particle_comps["ux_n"]);
-                auto& uyp_n = pti.GetAttribs(particle_comps["uy_n"]);
-                auto& uzp_n = pti.GetAttribs(particle_comps["uz_n"]);
+                auto& uxp_n = pti.GetAttribs("ux_n");
+                auto& uyp_n = pti.GetAttribs("uy_n");
+                auto& uzp_n = pti.GetAttribs("uz_n");
                 if        (WarpX::nox == 1){
                     doDepositionShapeNImplicit<1>(
                         GetPosition, wp.dataPtr() + offset,
@@ -873,7 +892,7 @@ WarpXParticleContainer::DepositCurrent (
             int* AMREX_RESTRICT ion_lev = nullptr;
             if (do_field_ionization)
             {
-                ion_lev = pti.GetiAttribs(particle_icomps["ionizationLevel"]).dataPtr();
+                ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
             }
 
             DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev,
@@ -1268,7 +1287,7 @@ WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
         int* AMREX_RESTRICT ion_lev = nullptr;
         if (do_field_ionization)
         {
-            ion_lev = pti.GetiAttribs(particle_icomps["ionizationLevel"]).dataPtr();
+            ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
         }
 
         DepositCharge(pti, wp, ion_lev, rho, icomp, 0, np, thread_num, lev, lev);
@@ -1552,8 +1571,16 @@ WarpXParticleContainer::PushX (int lev, amrex::Real dt)
 // without runtime component).
 void WarpXParticleContainer::defineAllParticleTiles () noexcept
 {
-    // Call the parent class's method
-    NamedComponentParticleContainer<amrex::DefaultAllocator>::defineAllParticleTiles();
+        for (int lev = 0; lev <= finestLevel(); ++lev)
+        {
+            for (auto mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
+            {
+                const int grid_id = mfi.index();
+                const int tile_id = mfi.LocalTileIndex();
+                DefineAndReturnParticleTile(lev, grid_id, tile_id);
+            }
+        }
+
 
     // Resize the tmp_particle_data (no present in parent class)
     tmp_particle_data.resize(finestLevel()+1);
@@ -1576,7 +1603,7 @@ WarpXParticleContainer::particlePostLocate(ParticleType& p,
 {
     if (not do_splitting) { return; }
 
-    // Tag particle if goes to higher level.
+    // Tag particle if it goes to a higher level.
     // It will be split later in the loop
     if (pld.m_lev == lev+1
         and p.id() != amrex::LongParticleIds::NoSplitParticleID

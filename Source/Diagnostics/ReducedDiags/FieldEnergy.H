@@ -39,16 +39,15 @@ public:
      */
     void ComputeDiags(int step) final;
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     /**
-     * \brief Calculate the integral of the field squared in radial coordinates
+     * \brief Calculate the integral of the field squared, taking into
+     *        account the fraction of the cell volume within the domain.
      *
      * \param field The MultiFab to be integrated
      * \param lev The refinement level
      * \return The integral
      */
-    amrex::Real ComputeNorm2Radial(const amrex::MultiFab& field, int lev);
-#endif
+    amrex::Real ComputeNorm2(const amrex::MultiFab& field, int lev);
 
 };
 

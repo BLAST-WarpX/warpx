@@ -196,7 +196,6 @@ particle_bw_diag = picmi.ParticleDiagnostic(
 histuH_rdiag = picmi.ReducedDiagnostic(
     diag_type="ParticleHistogram",
     name="histuH",
-    period=100,
     species=hydrogen,
     bin_number=1000,
     bin_min=0.0,
@@ -208,7 +207,6 @@ histuH_rdiag = picmi.ReducedDiagnostic(
 histue_rdiag = picmi.ReducedDiagnostic(
     diag_type="ParticleHistogram",
     name="histue",
-    period=100,
     species=electrons,
     bin_number=1000,
     bin_min=0.0,
@@ -222,7 +220,6 @@ histue_rdiag = picmi.ReducedDiagnostic(
 histuzAll_rdiag = picmi.ReducedDiagnostic(
     diag_type="ParticleHistogram",
     name="histuzAll",
-    period=100,
     species=hydrogen,
     bin_number=1000,
     bin_min=-0.474,
@@ -233,7 +230,6 @@ histuzAll_rdiag = picmi.ReducedDiagnostic(
 field_probe_z_rdiag = picmi.ReducedDiagnostic(
     diag_type="FieldProbe",
     name="FieldProbe_Z",
-    period=100,
     integrate=0,
     probe_geometry="Line",
     x_probe=0.0,
@@ -246,7 +242,6 @@ field_probe_z_rdiag = picmi.ReducedDiagnostic(
 field_probe_scat_point_rdiag = picmi.ReducedDiagnostic(
     diag_type="FieldProbe",
     name="FieldProbe_ScatPoint",
-    period=1,
     integrate=0,
     probe_geometry="Point",
     x_probe=0.0,
@@ -256,7 +251,6 @@ field_probe_scat_point_rdiag = picmi.ReducedDiagnostic(
 field_probe_scat_line_rdiag = picmi.ReducedDiagnostic(
     diag_type="FieldProbe",
     name="FieldProbe_ScatLine",
-    period=100,
     integrate=1,
     probe_geometry="Line",
     x_probe=-2.5e-6,
@@ -267,7 +261,8 @@ field_probe_scat_line_rdiag = picmi.ReducedDiagnostic(
 )
 
 load_balance_costs_rdiag = picmi.ReducedDiagnostic(
-    diag_type="LoadBalanceCosts", name="LBC", period=100
+    diag_type="LoadBalanceCosts",
+    name="LBC",
 )
 
 # Set up simulation
@@ -278,6 +273,7 @@ sim = picmi.Simulation(
     particle_shape="cubic",
     warpx_numprocs=[1, 2],  # deactivate `numprocs` for dynamic load balancing
     warpx_use_filter=1,
+    warpx_reduced_diags_intervals=100,
     warpx_load_balance_intervals=100,
     warpx_load_balance_costs_update="heuristic",
 )

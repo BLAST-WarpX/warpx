@@ -62,13 +62,14 @@ namespace
                                   amrex::GpuArray<FieldBoundaryType, 3> const fbndry_hi)
     {
         using namespace amrex::literals;
+        amrex::IntVect ijk_next = ijk_vec;
+        amrex::IntVect ijk_nextp1 = ijk_vec;
         amrex::IntVect ijk_mirror = ijk_vec;
-        amrex::IntVect ijk_mirrorp1 = ijk_vec;
         bool OnBoundary = false;
         bool GuardCell = false;
         bool isInsulatorBoundary = false;
         amrex::Real sign = +1._rt;
-        bool is_normal_to_boundary;
+        bool is_normal_to_boundary = false;
         amrex::Real field_value = 0._rt;
         bool set_field = false;
         // Loop over all dimensions
@@ -114,12 +115,14 @@ namespace
                     } else if (ig > 0) {
                         GuardCell = true;
 
+                        // Location of the next cells inward
+                        ijk_next[idim] = ijk_vec[idim] - ig*iside;
+                        ijk_nextp1[idim] = ijk_next[idim] - ig*iside;
+
                         // Mirror location inside the domain by "ig" number of cells
                         ijk_mirror[idim] = ( (iside == -1)
                                         ? (dom_lo[idim] + ig - (1 - is_nodal[idim]))
-                                        : (dom_hi[idim] + 1 - ig));
-                        // Location twice as far in, for extrapolation
-                        ijk_mirrorp1[idim] = 2*ijk_mirror[idim] - ijk_vec[idim];
+                                        : (dom_hi[idim] - ig + 1));
 
                         // Check for components with even symmetry.
                         // True for E_like and tangential, and B_like and normal
@@ -162,12 +165,12 @@ namespace
                 // The value on the boundary is left unmodified
                 // The values in the guard cells are extrapolated
                 if (GuardCell) {
-                    field(ijk_vec, n) = 2._rt*field(ijk_mirror, n) - field(ijk_mirrorp1, n);
+                    field(ijk_vec, n) = 2._rt*field(ijk_next, n) - field(ijk_nextp1, n);
                 }
             } else if ((OnBoundary || GuardCell) && set_field) {
                 field(ijk_vec, n) = field_value;
             } else if (GuardCell) {
-                field(ijk_vec, n) = 2._rt*field(ijk_mirror, n) - field(ijk_mirrorp1, n);
+                field(ijk_vec, n) = 2._rt*field(ijk_next, n) - field(ijk_nextp1, n);
             }
         } else {
             if (OnBoundary && (E_like ^ is_normal_to_boundary)) {
@@ -446,12 +449,15 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
 
                 amrex::IntVect const iv(AMREX_D_DECL(i, j, k));
 #if defined(WARPX_DIM_3D) || defined(WARPX_ZINDEX)
-                amrex::Real const x = (AMREX_SPACEDIM > 1 ? xyzmin_x.x + (iv[0] - lo_x[0])*dx[0] : 0._rt);
+                amrex::Real const shiftx = (Fx_nodal[0] ? 0._rt : 0.5_rt);
+                amrex::Real const x = (AMREX_SPACEDIM > 1 ? xyzmin_x.x + (iv[0] - lo_x[0] + shiftx)*dx[0] : 0._rt);
 #endif
-                amrex::Real const y = (AMREX_SPACEDIM == 3 ? xyzmin_x.y + (iv[1] - lo_x[1])*dx[1] : 0._rt);
+                amrex::Real const shifty = (AMREX_SPACEDIM == 3 ? (Fx_nodal[1] ? 0._rt : 0.5_rt) : 0._rt);
+                amrex::Real const y = (AMREX_SPACEDIM == 3 ? xyzmin_x.y + (iv[1] - lo_x[1] + shifty)*dx[1] : 0._rt);
 #ifndef WARPX_DIM_1D_Z
 #if defined(WARPX_ZINDEX)
-                amrex::Real const z = xyzmin_x.z + (iv[WARPX_ZINDEX] - lo_x[WARPX_ZINDEX])*dx[2];
+                amrex::Real const shiftz = (Fx_nodal[WARPX_ZINDEX] ? 0._rt : 0.5_rt);
+                amrex::Real const z = xyzmin_x.z + (iv[WARPX_ZINDEX] - lo_x[WARPX_ZINDEX] + shiftz)*dx[2];
 #else
                 amrex::Real const z = 0._rt;
 #endif
@@ -499,12 +505,15 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
 
                 amrex::IntVect const iv(AMREX_D_DECL(i, j, k));
 #if defined(WARPX_DIM_3D) || defined(WARPX_ZINDEX)
-                amrex::Real const x = (AMREX_SPACEDIM > 1 ? xyzmin_y.x + (iv[0] - lo_y[0])*dx[0] : 0._rt);
+                amrex::Real const shiftx = (Fy_nodal[0] ? 0._rt : 0.5_rt);
+                amrex::Real const x = (AMREX_SPACEDIM > 1 ? xyzmin_y.x + (iv[0] - lo_y[0] + shiftx)*dx[0] : 0._rt);
 #endif
-                amrex::Real const y = (AMREX_SPACEDIM == 3 ? xyzmin_y.y + (iv[1] - lo_y[1])*dx[1] : 0._rt);
+                amrex::Real const shifty = (AMREX_SPACEDIM == 3 ? (Fy_nodal[1] ? 0._rt : 0.5_rt) : 0._rt);
+                amrex::Real const y = (AMREX_SPACEDIM == 3 ? xyzmin_y.y + (iv[1] - lo_y[1] + shifty)*dx[1] : 0._rt);
 #ifndef WARPX_DIM_1D_Z
 #if defined(WARPX_ZINDEX)
-                amrex::Real const z = xyzmin_y.z + (iv[WARPX_ZINDEX] - lo_y[WARPX_ZINDEX])*dx[2];
+                amrex::Real const shiftz = (Fy_nodal[WARPX_ZINDEX] ? 0._rt : 0.5_rt);
+                amrex::Real const z = xyzmin_y.z + (iv[WARPX_ZINDEX] - lo_y[WARPX_ZINDEX] + shiftz)*dx[2];
 #else
                 amrex::Real const z = 0._rt;
 #endif
@@ -552,12 +561,15 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
 
                 amrex::IntVect const iv(AMREX_D_DECL(i, j, k));
 #if defined(WARPX_DIM_3D) || defined(WARPX_ZINDEX)
-                amrex::Real const x = (AMREX_SPACEDIM > 1 ? xyzmin_z.x + (iv[0] - lo_z[0])*dx[0] : 0._rt);
+                amrex::Real const shiftx = (Fz_nodal[0] ? 0._rt : 0.5_rt);
+                amrex::Real const x = (AMREX_SPACEDIM > 1 ? xyzmin_z.x + (iv[0] - lo_z[0] + shiftx)*dx[0] : 0._rt);
 #endif
-                amrex::Real const y = (AMREX_SPACEDIM == 3 ? xyzmin_z.y + (iv[1] - lo_z[1])*dx[1] : 0._rt);
+                amrex::Real const shifty = (AMREX_SPACEDIM == 3 ? (Fz_nodal[1] ? 0._rt : 0.5_rt) : 0._rt);
+                amrex::Real const y = (AMREX_SPACEDIM == 3 ? xyzmin_z.y + (iv[1] - lo_z[1] + shifty)*dx[1] : 0._rt);
 #ifndef WARPX_DIM_1D_Z
 #if defined(WARPX_ZINDEX)
-                amrex::Real const z = xyzmin_z.z + (iv[WARPX_ZINDEX] - lo_z[WARPX_ZINDEX])*dx[2];
+                amrex::Real const shiftz = (Fz_nodal[WARPX_ZINDEX] ? 0._rt : 0.5_rt);
+                amrex::Real const z = xyzmin_z.z + (iv[WARPX_ZINDEX] - lo_z[WARPX_ZINDEX] + shiftz)*dx[2];
 #else
                 amrex::Real const z = 0._rt;
 #endif
