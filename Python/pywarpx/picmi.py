@@ -4121,7 +4121,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
     target_up_x, target_up_y, target_up_z: floats
         For diagnostic type 'FieldProbe', the vector specifying up in the 'Plane'
     """
-
+   
     def __init__(
         self,
         diag_type,
@@ -4162,6 +4162,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
         self._species_reduced_diagnostics = [
             "BeamRelevant",
             "ParticleHistogram",
+            "ParticleHistogram2D",
             "ParticleExtrema",
         ]
 
@@ -4172,6 +4173,8 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
             self.species = species.name
             if self.type == "ParticleHistogram":
                 kw = self._handle_particle_histogram(**kw)
+            elif self.type == "ParticleHistogram2D":
+                kw = self._handle_particle_histogram2d(**kw)
         elif self.type == "FieldProbe":
             kw = self._handle_field_probe(**kw)
         elif self.type == "FieldReduction":
@@ -4246,6 +4249,40 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
             ):
                 self.user_defined_kw[k] = kw[k]
                 del kw[k]
+
+        return kw
+
+    def _handle_particle_histogram2d(self, **kw):
+        self.bin_number_abs = kw.pop("bin_number_abs")
+        self.bin_number_ord = kw.pop("bin_number_ord")
+        self.bin_min_abs = kw.pop("bin_min_abs")
+        self.bin_max_abs = kw.pop("bin_max_abs")
+        self.bin_min_ord = kw.pop("bin_min_ord")
+        self.bin_max_ord = kw.pop("bin_max_ord")
+        histogram_function_abs = kw.pop("histogram_function_abs")
+        histogram_function_ord = kw.pop("histogram_function_ord")
+        self.__setattr__("histogram_function_abs(t,x,y,z,ux,uy,uz,w)", histogram_function_abs)
+        self.__setattr__("histogram_function_ord(t,x,y,z,ux,uy,uz,w)", histogram_function_ord)
+
+        filter_function = kw.pop("filter_function", None)
+        value_function = kw.pop("filter_function", "1.") # set the weight to be 1 by default, i.e., count the number of particles 
+
+        self.__setattr__("filter_function(t,x,y,z,ux,uy,uz,w)", filter_function)
+        self.__setattr__("value_function(t,x,y,z,ux,uy,uz,w)", value_function)
+
+        # Check the function expressions for constants
+        for k in list(kw.keys()):
+            if any(
+                re.search(r'\b%s\b'%k, expr)
+                for expr in [
+                    histogram_function_abs,
+                    histogram_function_ord,
+                    filter_function,
+                    value_function
+                ]
+                if expr is not None
+            ):
+                self.user_defined_kw[k] = kwargs.pop(k)
 
         return kw
 
