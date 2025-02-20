@@ -24,10 +24,10 @@
 using namespace amrex;
 
 void FiniteDifferenceSolver::ComputeCurlA (
-    [[maybe_unused]]ablastr::fields::VectorField& Bfield,
-    [[maybe_unused]]ablastr::fields::VectorField const& Afield,
-    [[maybe_unused]]std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_B,
-    [[maybe_unused]]int lev )
+    ablastr::fields::VectorField& Bfield,
+    ablastr::fields::VectorField const& Afield,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_B,
+    int lev )
 {
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
@@ -38,9 +38,9 @@ void FiniteDifferenceSolver::ComputeCurlA (
         );
 
 #elif defined(WARPX_DIM_RSPHERE)
-        /* ComputeCurlASpherical <SphericalYeeAlgorithm> ( */
-            /* Bfield, Afield, eb_update_B, lev */
-        /* ); */
+        ComputeCurlASpherical <SphericalYeeAlgorithm> (
+            Bfield, Afield, eb_update_B, lev
+        );
 
 #else
         ComputeCurlACartesian <CartesianYeeAlgorithm> (
@@ -206,6 +206,100 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
 }
 
 #elif defined(WARPX_DIM_RSPHERE)
+template<typename T_Algo>
+void FiniteDifferenceSolver::ComputeCurlASpherical (
+    ablastr::fields::VectorField& Bfield,
+    ablastr::fields::VectorField const& Afield,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_B,
+    int lev
+)
+{
+    // for the profiler
+    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+
+    // reset Bfield
+    Bfield[0]->setVal(0);
+    Bfield[1]->setVal(0);
+    Bfield[2]->setVal(0);
+
+    // Loop through the grids, and over the tiles within each grid
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*Afield[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
+        {
+            amrex::Gpu::synchronize();
+        }
+        Real wt = static_cast<Real>(amrex::second());
+
+        // Extract field data for this grid/tile
+        Array4<const Real> const& At = Afield[1]->const_array(mfi);
+        Array4<const Real> const& Ap = Afield[2]->const_array(mfi);
+        Array4<Real> const& Br = Bfield[0]->array(mfi);
+        Array4<Real> const& Bt = Bfield[1]->array(mfi);
+        Array4<Real> const& Bp = Bfield[2]->array(mfi);
+
+        // Extract structures indicating where the fields
+        // should be updated, given the position of the embedded boundaries.
+        amrex::Array4<int> update_Br_arr, update_Bt_arr, update_Bp_arr;
+        if (EB::enabled()) {
+            update_Br_arr = eb_update_B[0]->array(mfi);
+            update_Bt_arr = eb_update_B[1]->array(mfi);
+            update_Bp_arr = eb_update_B[2]->array(mfi);
+        }
+
+        // Extract stencil coefficients
+        Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
+        int const n_coefs_r = static_cast<int>(m_stencil_coefs_r.size());
+
+        // Extract spherical specific parameters
+        Real const dr = m_dr;
+        Real const rmin = m_rmin;
+
+        // Extract tileboxes for which to loop over
+        Box const& tbr = mfi.tilebox(Bfield[0]->ixType().toIntVect());
+        Box const& tbt = mfi.tilebox(Bfield[1]->ixType().toIntVect());
+        Box const& tbp = mfi.tilebox(Bfield[2]->ixType().toIntVect());
+
+        // Calculate the B-field from the A-field
+        amrex::ParallelFor(tbr, tbt, tbp,
+
+            // Br calculation
+            [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
+                // Skip field update in the embedded boundaries
+                if (update_Br_arr && update_Br_arr(i, j, 0) == 0) { return; }
+                Br(i, j, 0, 0) = 0._rt;
+            },
+
+            // Bt calculation
+            [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
+                // Skip field update in the embedded boundaries
+                if (update_Bt_arr && update_Bt_arr(i, j, 0) == 0) { return; }
+
+                Bt(i, j, 0, 0) = - (
+                    T_Algo::UpwardDr(Ap, coefs_r, n_coefs_r, i, j, 0, 0));
+            },
+
+            // Bp calculation
+            [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
+                // Skip field update in the embedded boundaries
+                if (update_Bp_arr && update_Bp_arr(i, j, 0) == 0) { return; }
+
+                Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bp is cell-centered in r)
+                Bp(i, j, 0, 0) =  T_Algo::UpwardDrr_over_r(At, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
+            }
+        );
+
+        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
+        {
+            amrex::Gpu::synchronize();
+            wt = static_cast<Real>(amrex::second()) - wt;
+            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
+        }
+    }
+}
+
 #else
 
 template<typename T_Algo>
