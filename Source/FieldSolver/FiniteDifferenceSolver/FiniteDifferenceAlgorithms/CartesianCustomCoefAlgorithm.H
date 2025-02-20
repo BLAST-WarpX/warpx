@@ -144,18 +144,18 @@ struct CartesianCustomCoefAlgorithm {
 
     static amrex::Real ComputeMaxDt(amrex::Real const * const dx) {
         using namespace amrex::literals;
-        
+
         // Get the stencil coefficients
         amrex::ParmParse pp_algo("algo");
         amrex::Vector<amrex::Real> upward_coefs_x, downward_coefs_x;
         amrex::Vector<amrex::Real> upward_coefs_y, downward_coefs_y;
         amrex::Vector<amrex::Real> upward_coefs_z, downward_coefs_z;
-        
+
         // Sum of absolute coefficients for each direction
         amrex::Real sum_abs_coefs_x = 1.0_rt;
         amrex::Real sum_abs_coefs_y = 1.0_rt;
         amrex::Real sum_abs_coefs_z = 1.0_rt;
-        
+
         // If custom coefficients exist, calculate their absolute value sums
         if (pp_algo.queryarr("custom_coef_upward_stencil_x", upward_coefs_x) &&
             pp_algo.queryarr("custom_coef_downward_stencil_x", downward_coefs_x)) {
@@ -163,21 +163,21 @@ struct CartesianCustomCoefAlgorithm {
             for (auto const& coef : upward_coefs_x) sum_abs_coefs_x += std::abs(coef);
             for (auto const& coef : downward_coefs_x) sum_abs_coefs_x += std::abs(coef);
         }
-        
+
         if (pp_algo.queryarr("custom_coef_upward_stencil_y", upward_coefs_y) &&
             pp_algo.queryarr("custom_coef_downward_stencil_y", downward_coefs_y)) {
             sum_abs_coefs_y = 0.0_rt;
             for (auto const& coef : upward_coefs_y) sum_abs_coefs_y += std::abs(coef);
             for (auto const& coef : downward_coefs_y) sum_abs_coefs_y += std::abs(coef);
         }
-        
+
         if (pp_algo.queryarr("custom_coef_upward_stencil_z", upward_coefs_z) &&
             pp_algo.queryarr("custom_coef_downward_stencil_z", downward_coefs_z)) {
             sum_abs_coefs_z = 0.0_rt;
             for (auto const& coef : upward_coefs_z) sum_abs_coefs_z += std::abs(coef);
             for (auto const& coef : downward_coefs_z) sum_abs_coefs_z += std::abs(coef);
         }
-        
+
         // Implementing equation (22) from the paper
         amrex::Real const delta_t = 1._rt / (PhysConst::c * std::sqrt(
             AMREX_D_TERM(
@@ -185,11 +185,11 @@ struct CartesianCustomCoefAlgorithm {
                 + (sum_abs_coefs_y * sum_abs_coefs_y) / (dx[1] * dx[1]),
                 + (sum_abs_coefs_z * sum_abs_coefs_z) / (dx[2] * dx[2])
             )));
-        
+
         // Print CFL number (dt*c/dx for the smallest dx)
         amrex::Real min_dx = std::min({dx[0], dx[1], dx[2]});
         amrex::Print() << "Computed CFL number: " << delta_t * PhysConst::c / min_dx << "\n";
-        
+
         return delta_t;
     }
 
@@ -223,7 +223,7 @@ struct CartesianCustomCoefAlgorithm {
         }
 
         return amrex::IntVect{AMREX_D_DECL(stencil_size_x, stencil_size_y, stencil_size_z)};
-    }    
+    }
 
     /**
      * Perform derivative along x on a cell-centered grid, from a nodal field `F` */
@@ -312,7 +312,7 @@ struct CartesianCustomCoefAlgorithm {
 
         using namespace amrex;
 #if defined WARPX_DIM_3D
-        
+
         int stencil_size = n_coefs_y / 2;
         amrex::Real derivative = 0;
         for (int l = 0; l < stencil_size; l++) {
@@ -348,7 +348,7 @@ struct CartesianCustomCoefAlgorithm {
 #elif (defined WARPX_DIM_1D_Z)
         amrex::ignore_unused(F, i, j, k, ncomp);
         return 0._rt;
-#endif    
+#endif
     }
 
     /**
