@@ -33,6 +33,7 @@
 #include <AMReX_Tuple.H>
 
 #include <memory>
+#include <numeric>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -225,15 +226,10 @@ public:
         if (std::is_same_v<ReduceOp, amrex::ReduceOpSum>)
         {
             amrex::ParallelDescriptor::ReduceRealSum(reduce_value);
-        // If reduction operation is a sum, multiply the value by the cell volume so that the
-        // result is the integral of the function over the simulation domain.
-#if defined(WARPX_DIM_1D_Z)
-            reduce_value *= dx[0];
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-            reduce_value *= dx[0]*dx[1];
-#else
-            reduce_value *= dx[0]*dx[1]*dx[2];
-#endif
+            // If reduction operation is a sum, multiply the value by the cell volume so that the
+            // result is the integral of the function over the simulation domain.
+            const auto cell_volume = std::reduce(std::begin(dx), std::end(dx), 1.0_rt, std::multiplies<>());
+            reduce_value *= cell_volume;
         }
 
         // Fill output array
