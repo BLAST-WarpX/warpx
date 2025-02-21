@@ -50,7 +50,9 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("plasma_resistivity(rho,J)", m_eta_expression);
     utils::parser::queryWithParser(pp_hybrid, "n_floor", m_n_floor);
 
-    utils::parser::queryWithParser(pp_hybrid, "plasma_hyper_resistivity", m_eta_h);
+    // Trying to add hyper-resistivity expression -  mtobin 20240217
+    // utils::parser::queryWithParser(pp_hybrid, "plasma_hyper_resistivity", m_eta_h);
+    pp_hybrid.query("plasma_hyper_resistivity(rho,B)", m_eta_h_expression);
 
     // convert electron temperature from eV to J
     m_elec_temp *= PhysConst::q_e;
@@ -159,6 +161,13 @@ void HybridPICModel::InitData ()
     m_eta = m_resistivity_parser->compile<2>();
     const std::set<std::string> resistivity_symbols = m_resistivity_parser->symbols();
     m_resistivity_has_J_dependence += resistivity_symbols.count("J");
+
+    // Adding hyper-resistivity expression - mtobin 20240217
+    m_hyper_resistivity_parser = std::make_unique<amrex::Parser>(
+        utils::parser::makeParser(m_eta_h_expression, {"rho","B"}));
+    m_eta_h = m_hyper_resistivity_parser->compile<2>();
+    const std::set<std::string> hyper_resistivity_symbols = m_hyper_resistivity_parser->symbols();
+    m_hyper_resistivity_has_B_dependence += hyper_resistivity_symbols.count("B");
 
     m_J_external_parser[0] = std::make_unique<amrex::Parser>(
         utils::parser::makeParser(m_Jx_ext_grid_function,{"x","y","z","t"}));

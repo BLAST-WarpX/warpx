@@ -428,8 +428,11 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     const auto eta_h = hybrid_model->m_eta_h;
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
     const auto resistivity_has_J_dependence = hybrid_model->m_resistivity_has_J_dependence;
+    // Adding hyper-resistivity expression - mtobin 20240217
+    const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
 
-    const bool include_hyper_resistivity_term = (eta_h > 0.0) && solve_for_Faraday;
+    // const bool include_hyper_resistivity_term = (eta_h > 0.0) && solve_for_Faraday;
+    const bool include_hyper_resistivity_term = solve_for_Faraday;
 
     const bool include_external_fields = hybrid_model->m_add_external_fields;
 
@@ -574,6 +577,10 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real const> const& enE = enE_nodal_mf.const_array(mfi);
         Array4<Real const> const& rho = rhofield.const_array(mfi);
         Array4<Real const> const& Pe = Pefield.const_array(mfi);
+        // Extract B field for hyper-resistivity - mtobin 20240217
+        Array4<Real> const& Br = Bfield[0]->array(mfi);
+        Array4<Real> const& Bt = Bfield[1]->array(mfi);
+        Array4<Real> const& Bz = Bfield[2]->array(mfi);
 
         // Extract structures indicating where the fields
         // should be updated, given the position of the embedded boundaries
@@ -627,6 +634,15 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     jtot_val = std::sqrt(jr_val*jr_val + jt_val*jt_val + jz_val*jz_val);
                 }
 
+                // Interpolate B field to appropriate staggering to match E field - mtobin 20240217
+                Real btot_val = 0._rt;
+                if (solve_for_Faraday && hyper_resistivity_has_B_dependence) {
+                    const Real br_val = Interp(Br, Br_stag, Er_stag, coarsen, i, j, 0, 0);
+                    const Real bt_val = Interp(Bt, Bt_stag, Er_stag, coarsen, i, j, 0, 0);
+                    const Real bz_val = Interp(Bz, Bz_stag, Er_stag, coarsen, i, j, 0, 0);
+                    btot_val = std::sqrt(br_val*br_val + bt_val*bt_val + bz_val*bz_val);
+                }
+
                 // safety condition since we divide by rho_val later
                 if (rho_val_limited < rho_floor) { rho_val_limited = rho_floor; }
 
@@ -653,7 +669,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     const Real jr_val = Interp(Jr, Jr_stag, Er_stag, coarsen, i, j, 0, 0);
                     auto nabla2Jr = T_Algo::Dr_rDr_over_r(Jr, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
                         + T_Algo::Dzz(Jr, coefs_z, n_coefs_z, i, j, 0, 0) - jr_val/(r*r);
-                    Er(i, j, 0) -= eta_h * nabla2Jr;
+                    // Adding hyper-resistivity expression - mtobin 20240217
+                    // Er(i, j, 0) -= eta_h * nabla2Jr;
+                    Er(i, j, 0) -= eta_h(rho_val, btot_val) * nabla2Jr;
                 }
 
                 if (include_external_fields && (rho_val >= rho_floor)) {
@@ -688,6 +706,15 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     jtot_val = std::sqrt(jr_val*jr_val + jt_val*jt_val + jz_val*jz_val);
                 }
 
+                // Interpolate B field to appropriate staggering to match E field - mtobin 20240217
+                Real btot_val = 0._rt;
+                if (solve_for_Faraday && hyper_resistivity_has_B_dependence) {
+                    const Real br_val = Interp(Br, Br_stag, Et_stag, coarsen, i, j, 0, 0);
+                    const Real bt_val = Interp(Bt, Bt_stag, Et_stag, coarsen, i, j, 0, 0);
+                    const Real bz_val = Interp(Bz, Bz_stag, Et_stag, coarsen, i, j, 0, 0);
+                    btot_val = std::sqrt(br_val*br_val + bt_val*bt_val + bz_val*bz_val);
+                }
+
                 // safety condition since we divide by rho_val later
                 if (rho_val_limited < rho_floor) { rho_val_limited = rho_floor; }
 
@@ -711,7 +738,10 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     const Real jt_val = Interp(Jt, Jt_stag, Et_stag, coarsen, i, j, 0, 0);
                     auto nabla2Jt = T_Algo::Dr_rDr_over_r(Jt, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
                         + T_Algo::Dzz(Jt, coefs_z, n_coefs_z, i, j, 0, 0) - jt_val/(r*r);
-                    Et(i, j, 0) -= eta_h * nabla2Jt;
+
+                    // Adding hyper-resistivity expression - mtobin 20240217
+                    // Et(i, j, 0) -= eta_h * nabla2Jt;
+                    Et(i, j, 0) -= eta_h(rho_val, btot_val) * nabla2Jt;
                 }
 
                 if (include_external_fields && (rho_val >= rho_floor)) {
@@ -736,6 +766,16 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     const Real jt_val = Interp(Jt, Jt_stag, Ez_stag, coarsen, i, j, 0, 0);
                     const Real jz_val = Interp(Jz, Jz_stag, Ez_stag, coarsen, i, j, 0, 0);
                     jtot_val = std::sqrt(jr_val*jr_val + jt_val*jt_val + jz_val*jz_val);
+                }
+
+
+                // Interpolate B field to appropriate staggering to match E field - mtobin 20240217
+                Real btot_val = 0._rt;
+                if (solve_for_Faraday && hyper_resistivity_has_B_dependence) {
+                    const Real br_val = Interp(Br, Br_stag, Ez_stag, coarsen, i, j, 0, 0);
+                    const Real bt_val = Interp(Bt, Bt_stag, Ez_stag, coarsen, i, j, 0, 0);
+                    const Real bz_val = Interp(Bz, Bz_stag, Ez_stag, coarsen, i, j, 0, 0);
+                    btot_val = std::sqrt(br_val*br_val + bt_val*bt_val + bz_val*bz_val);
                 }
 
                 // safety condition since we divide by rho_val later
@@ -767,7 +807,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         nabla2Jz += T_Algo::Dr_rDr_over_r(Jz, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
                     }
 
-                    Ez(i, j, 0) -= eta_h * nabla2Jz;
+                    // Adding hyper-resistivity expression - mtobin 20240217
+                    // Ez(i, j, 0) -= eta_h * nabla2Jz;
+                    Ez(i, j, 0) -= eta_h(rho_val, btot_val) * nabla2Jz;
                 }
 
                 if (include_external_fields && (rho_val >= rho_floor)) {
@@ -809,8 +851,11 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const auto eta_h = hybrid_model->m_eta_h;
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
     const auto resistivity_has_J_dependence = hybrid_model->m_resistivity_has_J_dependence;
+    // For hyper-resistivity expression - mtobin 20240217
+    const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
 
-    const bool include_hyper_resistivity_term = (eta_h > 0.) && solve_for_Faraday;
+    // const bool include_hyper_resistivity_term = (eta_h > 0.) && solve_for_Faraday;
+    const bool include_hyper_resistivity_term = solve_for_Faraday;
 
     const bool include_external_fields = hybrid_model->m_add_external_fields;
 
@@ -955,6 +1000,10 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Array4<Real const> const& enE = enE_nodal_mf.const_array(mfi);
         Array4<Real const> const& rho = rhofield.const_array(mfi);
         Array4<Real const> const& Pe = Pefield.array(mfi);
+        // For hyper-resistivity dependent on B - mtobin 20240217
+        Array4<Real> const& Bx = Bfield[0]->array(mfi);
+        Array4<Real> const& By = Bfield[1]->array(mfi);
+        Array4<Real> const& Bz = Bfield[2]->array(mfi);
 
         // Extract structures indicating where the fields
         // should be updated, given the position of the embedded boundaries
@@ -1006,6 +1055,15 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
+                // Interpolate B field to appropriate staggering to match E field - mtobin 20240217
+                Real btot_val = 0._rt;
+                if (solve_for_Faraday && hyper_resistivity_has_B_dependence) {
+                    const Real bx_val = Interp(Bx, Bx_stag, Ex_stag, coarsen, i, j, k, 0);
+                    const Real by_val = Interp(By, By_stag, Ex_stag, coarsen, i, j, k, 0);
+                    const Real bz_val = Interp(Bz, Bz_stag, Ex_stag, coarsen, i, j, k, 0);
+                    btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
+                }
+
                 // safety condition since we divide by rho_val later
                 if (rho_val_limited < rho_floor) { rho_val_limited = rho_floor; }
 
@@ -1030,7 +1088,10 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     auto nabla2Jx = T_Algo::Dxx(Jx, coefs_x, n_coefs_x, i, j, k)
                         + T_Algo::Dyy(Jx, coefs_y, n_coefs_y, i, j, k)
                         + T_Algo::Dzz(Jx, coefs_z, n_coefs_z, i, j, k);
-                    Ex(i, j, k) -= eta_h * nabla2Jx;
+                    
+                    // Modified for hyper-resistivity expression - mtobin 20240217
+                    // Ex(i, j, k) -= eta_h * nabla2Jx;
+                    Ex(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jx;
                 }
 
                 if (include_external_fields && (rho_val >= rho_floor)) {
@@ -1057,6 +1118,15 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
+                // Interpolate B field to appropriate staggering to match E field - mtobin 20240217
+                Real btot_val = 0._rt;
+                if (solve_for_Faraday && hyper_resistivity_has_B_dependence) {
+                    const Real bx_val = Interp(Bx, Bx_stag, Ey_stag, coarsen, i, j, k, 0);
+                    const Real by_val = Interp(By, By_stag, Ey_stag, coarsen, i, j, k, 0);
+                    const Real bz_val = Interp(Bz, Bz_stag, Ey_stag, coarsen, i, j, k, 0);
+                    btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
+                }
+
                 // safety condition since we divide by rho_val later
                 if (rho_val_limited < rho_floor) { rho_val_limited = rho_floor; }
 
@@ -1081,7 +1151,10 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     auto nabla2Jy = T_Algo::Dxx(Jy, coefs_x, n_coefs_x, i, j, k)
                         + T_Algo::Dyy(Jy, coefs_y, n_coefs_y, i, j, k)
                         + T_Algo::Dzz(Jy, coefs_z, n_coefs_z, i, j, k);
-                    Ey(i, j, k) -= eta_h * nabla2Jy;
+
+                    // For hyper-resistivity dependence on B - mtobin 20240217
+                    // Ey(i, j, k) -= eta_h * nabla2Jy;
+                    Ey(i, j, k) -= eta_h(rho_val, jtot_val) * nabla2Jy;
                 }
 
                 if (include_external_fields && (rho_val >= rho_floor)) {
@@ -1108,6 +1181,15 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
+                // Interpolate B field to appropriate staggering to match E field - mtobin 20240217
+                Real btot_val = 0._rt;
+                if (solve_for_Faraday && hyper_resistivity_has_B_dependence) {
+                    const Real bx_val = Interp(Bx, Bx_stag, Ez_stag, coarsen, i, j, k, 0);
+                    const Real by_val = Interp(By, By_stag, Ez_stag, coarsen, i, j, k, 0);
+                    const Real bz_val = Interp(Bz, Bz_stag, Ez_stag, coarsen, i, j, k, 0);
+                    btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
+                }
+
                 // safety condition since we divide by rho_val later
                 if (rho_val_limited < rho_floor) { rho_val_limited = rho_floor; }
 
@@ -1132,7 +1214,10 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     auto nabla2Jz = T_Algo::Dxx(Jz, coefs_x, n_coefs_x, i, j, k)
                         + T_Algo::Dyy(Jz, coefs_y, n_coefs_y, i, j, k)
                         + T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, k);
-                    Ez(i, j, k) -= eta_h * nabla2Jz;
+
+                    // For hyper-resistivity dependence on B - mtobin 20240217
+                    // Ez(i, j, k) -= eta_h * nabla2Jz;
+                    Ez(i, j, k) -= eta_h(rho_val, jtot_val) * nabla2Jz;
                 }
 
                 if (include_external_fields && (rho_val >= rho_floor)) {

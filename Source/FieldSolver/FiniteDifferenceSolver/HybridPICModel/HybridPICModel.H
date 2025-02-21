@@ -194,7 +194,12 @@ public:
     bool m_resistivity_has_J_dependence = false;
 
     /** Plasma hyper-resisitivity */
-    amrex::Real m_eta_h = 0.0;
+    /** Expanded mtobin 20240218 */
+    // amrex::Real m_eta_h = 0.0;
+    std::string m_eta_h_expression = "0.0";
+    std::unique_ptr<amrex::Parser> m_hyper_resistivity_parser;
+    amrex::ParserExecutor<2> m_eta_h;
+    bool m_hyper_resistivity_has_B_dependence = false;
 
     /** External current */
     std::string m_Jx_ext_grid_function = "0.0";
