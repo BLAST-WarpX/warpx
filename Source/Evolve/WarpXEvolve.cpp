@@ -438,10 +438,10 @@ WarpX::OneStep_nosub (Real cur_time)
         EvolveB(0.5_rt * dt[0], DtType::FirstHalf, cur_time); // We now have B^{n+1/2}
         FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
-        if (WarpX::em_solver_medium == MediumForEM::Vacuum) {
+        if (m_em_solver_medium == MediumForEM::Vacuum) {
             // vacuum medium
             EvolveE(dt[0], cur_time); // We now have E^{n+1}
-        } else if (WarpX::em_solver_medium == MediumForEM::Macroscopic) {
+        } else if (m_em_solver_medium == MediumForEM::Macroscopic) {
             // macroscopic medium
             MacroscopicEvolveE(dt[0], cur_time); // We now have E^{n+1}
         } else {
@@ -671,6 +671,8 @@ WarpX::OneStep_multiJ (const amrex::Real cur_time)
 
     using warpx::fields::FieldType;
 
+    bool const skip_lev0_coarse_patch = true;
+
     const int rho_mid = spectral_solver_fp[0]->m_spectral_index.rho_mid;
     const int rho_new = spectral_solver_fp[0]->m_spectral_index.rho_new;
 
@@ -804,8 +806,8 @@ WarpX::OneStep_multiJ (const amrex::Real cur_time)
         PSATDBackwardTransformEBavg(
             m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_fp, finest_level),
             m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_fp, finest_level),
-            m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_cp, finest_level),
-            m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_cp, finest_level)
+            m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_cp, finest_level, skip_lev0_coarse_patch),
+            m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_cp, finest_level, skip_lev0_coarse_patch)
         );
     }
 
@@ -876,11 +878,13 @@ WarpX::OneStep_sub1 (Real cur_time)
 
     using warpx::fields::FieldType;
 
+    bool const skip_lev0_coarse_patch = true;
+
     // i) Push particles and fields on the fine patch (first fine step)
     PushParticlesandDeposit(fine_lev, cur_time, DtType::FirstHalf);
     RestrictCurrentFromFineToCoarsePatch(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
-        m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level), fine_lev);
+        m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch), fine_lev);
     RestrictRhoFromFineToCoarsePatch(fine_lev);
     if (use_filter) {
         ApplyFilterMF( m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), fine_lev);
@@ -889,10 +893,13 @@ WarpX::OneStep_sub1 (Real cur_time)
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         fine_lev, Geom(fine_lev).periodicity());
 
-    ApplyFilterandSumBoundaryRho(
-        m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
-        m_fields.get_mr_levels(FieldType::rho_cp, finest_level),
-        fine_lev, PatchType::fine, 0, 2*ncomps);
+    if (m_fields.has(FieldType::rho_fp, finest_level) &&
+        m_fields.has(FieldType::rho_cp, finest_level)) {
+        ApplyFilterandSumBoundaryRho(
+            m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
+            m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_lev0_coarse_patch),
+            fine_lev, PatchType::fine, 0, 2*ncomps);
+    }
 
     EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::FirstHalf, cur_time);
     EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::FirstHalf);
@@ -922,13 +929,18 @@ WarpX::OneStep_sub1 (Real cur_time)
     StoreCurrent(coarse_lev);
     AddCurrentFromFineLevelandSumBoundary(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
-        m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level),
-        m_fields.get_mr_levels_alldirs(FieldType::current_buf, finest_level), coarse_lev);
-    AddRhoFromFineLevelandSumBoundary(
-        m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
-        m_fields.get_mr_levels(FieldType::rho_cp, finest_level),
-        m_fields.get_mr_levels(FieldType::rho_buf, finest_level),
-        coarse_lev, 0, ncomps);
+        m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch),
+        m_fields.get_mr_levels_alldirs(FieldType::current_buf, finest_level, skip_lev0_coarse_patch), coarse_lev);
+
+    if (m_fields.has(FieldType::rho_fp, finest_level) &&
+        m_fields.has(FieldType::rho_cp, finest_level) &&
+        m_fields.has(FieldType::rho_buf, finest_level)) {
+        AddRhoFromFineLevelandSumBoundary(
+            m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
+            m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_lev0_coarse_patch),
+            m_fields.get_mr_levels(FieldType::rho_buf, finest_level, skip_lev0_coarse_patch),
+            coarse_lev, 0, ncomps);
+    }
 
     EvolveB(fine_lev, PatchType::coarse, dt[fine_lev], DtType::FirstHalf, cur_time);
     EvolveF(fine_lev, PatchType::coarse, dt[fine_lev], DtType::FirstHalf);
@@ -958,16 +970,20 @@ WarpX::OneStep_sub1 (Real cur_time)
     PushParticlesandDeposit(fine_lev, cur_time + dt[fine_lev], DtType::SecondHalf);
     RestrictCurrentFromFineToCoarsePatch(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
-        m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level), fine_lev);
+        m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch), fine_lev);
     RestrictRhoFromFineToCoarsePatch(fine_lev);
     if (use_filter) {
         ApplyFilterMF( m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), fine_lev);
     }
     SumBoundaryJ( m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), fine_lev, Geom(fine_lev).periodicity());
-    ApplyFilterandSumBoundaryRho(
-        m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
-        m_fields.get_mr_levels(FieldType::rho_cp, finest_level),
-        fine_lev, PatchType::fine, 0, ncomps);
+
+    if (m_fields.has(FieldType::rho_fp, finest_level) &&
+        m_fields.has(FieldType::rho_cp, finest_level)) {
+        ApplyFilterandSumBoundaryRho(
+            m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
+            m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_lev0_coarse_patch),
+            fine_lev, PatchType::fine, 0, ncomps);
+    }
 
     EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::FirstHalf, cur_time + dt[fine_lev]);
     EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], DtType::FirstHalf);
@@ -996,14 +1012,19 @@ WarpX::OneStep_sub1 (Real cur_time)
     RestoreCurrent(coarse_lev);
     AddCurrentFromFineLevelandSumBoundary(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
-        m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level),
-        m_fields.get_mr_levels_alldirs(FieldType::current_buf, finest_level),
+        m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch),
+        m_fields.get_mr_levels_alldirs(FieldType::current_buf, finest_level, skip_lev0_coarse_patch),
         coarse_lev);
-    AddRhoFromFineLevelandSumBoundary(
-        m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
-        m_fields.get_mr_levels(FieldType::rho_cp, finest_level),
-        m_fields.get_mr_levels(FieldType::rho_buf, finest_level),
-        coarse_lev, ncomps, ncomps);
+
+    if (m_fields.has(FieldType::rho_fp, finest_level) &&
+        m_fields.has(FieldType::rho_cp, finest_level) &&
+        m_fields.has(FieldType::rho_buf, finest_level)) {
+        AddRhoFromFineLevelandSumBoundary(
+            m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
+            m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_lev0_coarse_patch),
+            m_fields.get_mr_levels(FieldType::rho_buf, finest_level, skip_lev0_coarse_patch),
+            coarse_lev, ncomps, ncomps);
+    }
 
     EvolveE(fine_lev, PatchType::coarse, dt[fine_lev], cur_time + 0.5_rt * dt[fine_lev]);
     FillBoundaryE(fine_lev, PatchType::coarse, guard_cells.ng_FieldSolver,
@@ -1056,52 +1077,40 @@ WarpX::OneStep_sub1 (Real cur_time)
 void
 WarpX::doFieldIonization ()
 {
-    for (int lev = 0; lev <= finest_level; ++lev) {
-        doFieldIonization(lev);
-    }
-}
-
-void
-WarpX::doFieldIonization (int lev)
-{
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    mypc->doFieldIonization(
-        lev,
-        *m_fields.get(FieldType::Efield_aux, Direction{0}, lev),
-        *m_fields.get(FieldType::Efield_aux, Direction{1}, lev),
-        *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
-        *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
-        *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
-        *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
-    );
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        mypc->doFieldIonization(
+            lev,
+            *m_fields.get(FieldType::Efield_aux, Direction{0}, lev),
+            *m_fields.get(FieldType::Efield_aux, Direction{1}, lev),
+            *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
+            *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
+            *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
+            *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
+        );
+    }
 }
 
 #ifdef WARPX_QED
 void
 WarpX::doQEDEvents ()
 {
-    for (int lev = 0; lev <= finest_level; ++lev) {
-        doQEDEvents(lev);
-    }
-}
-
-void
-WarpX::doQEDEvents (int lev)
-{
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    mypc->doQedEvents(
-        lev,
-        *m_fields.get(FieldType::Efield_aux, Direction{0}, lev),
-        *m_fields.get(FieldType::Efield_aux, Direction{1}, lev),
-        *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
-        *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
-        *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
-        *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
-    );
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        mypc->doQedEvents(
+            lev,
+            *m_fields.get(FieldType::Efield_aux, Direction{0}, lev),
+            *m_fields.get(FieldType::Efield_aux, Direction{1}, lev),
+            *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
+            *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
+            *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
+            *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
+        );
+    }
 }
 #endif
 

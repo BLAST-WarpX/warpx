@@ -143,6 +143,10 @@ CMake Option                  Default & Values                               Des
 ``WarpX_pybind11_repo``       ``https://github.com/pybind/pybind11.git``     Repository URI to pull and build pybind11 from
 ``WarpX_pybind11_branch``     *we set and maintain a compatible commit*      Repository branch for ``WarpX_pybind11_repo``
 ``WarpX_pybind11_internal``   **ON**/OFF                                     Needs a pre-installed pybind11 library if set to ``OFF``
+``WarpX_TEST_CLEANUP``        ON/**OFF**                                     Clean up automated test directories
+``WarpX_TEST_DEBUGGER``       ON/**OFF**                                     Run automated tests without AMReX signal handling (to attach debuggers)
+``WarpX_TEST_FPETRAP``        ON/**OFF**                                     Run automated tests with FPE-trapping runtime parameters
+``WarpX_BACKTRACE_INFO``      ON/**OFF**                                     Compile with -g1 for minimal debug symbols (currently used in CI tests)
 ============================= ============================================== ===========================================================
 
 For example, one can also build against a local AMReX copy.

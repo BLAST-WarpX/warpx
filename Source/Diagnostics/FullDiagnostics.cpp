@@ -565,12 +565,10 @@ FullDiagnostics::AddRZModesToDiags (int lev)
 
     // Check if divE is requested
     // If so, all components will be written out
-    bool divE_requested = false;
-    for (int comp = 0; comp < m_varnames.size(); comp++) {
-        if ( m_varnames[comp] == "divE" ) {
-            divE_requested = true;
-        }
-    }
+    const bool divE_requested = std::any_of(
+        std::begin(m_varnames),
+        std::end(m_varnames),
+        [](const auto& varname) { return varname == "divE"; });
 
     // If rho is requested, all components will be written out
     const bool rho_requested = utils::algorithms::is_in( m_varnames, "rho" );
@@ -875,7 +873,7 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
         } else if ( m_varnames[comp] == "divE" ){
             m_all_field_functors[lev][comp] = std::make_unique<DivEFunctor>(warpx.m_fields.get_alldirs(FieldType::Efield_aux, lev), lev, m_crse_ratio);
         } else {
-            std::cout << "Error on component " << m_varnames[comp] << std::endl;
+            std::cout << "Error on component " << m_varnames[comp] << "\n";
             WARPX_ABORT_WITH_MESSAGE(m_varnames[comp] + " is not a known field output type for this geometry");
         }
     }

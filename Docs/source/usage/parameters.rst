@@ -533,6 +533,8 @@ Domain Boundary Conditions
 
     * ``pec``: This option can be used to set a Perfect Electric Conductor at the simulation boundary. Please see the :ref:`PEC theory section <theory-bc-pec>` for more details. Note that PEC boundary is invalid at `r=0` for the RZ solver. Please use ``none`` option. This boundary condition does not work with the spectral solver.
 
+    * ``pmc``: This option can be used to set a Perfect Magnetic Conductor at the simulation boundary. Please see the :ref:`PEC theory section <theory-bc-pmc>` for more details. This is equivalent to ``Neumann``. This boundary condition does not work with the spectral solver.
+
     * ``pec_insulator``: This option specifies a mixed perfect electric conductor and insulator boundary, where some part of the
       boundary is PEC and some is insulator. In the insulator portion, the normal fields are extrapolated and the tangential fields
       are either set to the specified value or extrapolated. The region that is insulator is specified using a spatially dependent expression with the insulator being in the area where the value of the expression is greater than zero.
@@ -2167,8 +2169,8 @@ Details about the collision models can be found in the :ref:`theory section <mul
 
 * ``<collision_name>.scattering_processes`` (`strings` separated by spaces)
     Only for ``dsmc`` and ``background_mcc``. The scattering processes that should be
-    included. Available options are ``elastic``, ``back`` & ``charge_exchange``
-    for ions and ``elastic``, ``excitationX`` & ``ionization`` for electrons.
+    included. Available options are ``elastic``, ``excitationX``, ``forward``, ``back``, and ``charge_exchange``
+    for ions and ``elastic``, ``excitationX``, ``ionization`` & ``forward`` for electrons.
     Multiple excitation events can be included for electrons corresponding to
     excitation to different levels, the ``X`` above can be changed to a unique
     identifier for each excitation process. For each scattering process specified
@@ -2534,6 +2536,27 @@ Maxwell solver: kinetic-fluid hybrid
 
 * ``hybrid_pic_model.substeps`` (`int`) optional (default ``10``)
     If ``algo.maxwell_solver`` is set to ``hybrid``, this sets the number of sub-steps to take during the B-field update.
+
+* ``hybrid_pic_model.holmstrom_vacuum_region`` (`bool`) optional (default ``false``)
+    If ``algo.maxwell_solver`` is set to ``hybrid``, this sets the vacuum region handling of the generalized Ohm's Law to suppress vacuum fluctuations. :cite:t:`param-holmstrom2013handlingvacuumregionshybrid`.
+
+* ``hybid_pic_model.add_external_fields`` (`bool`) optional (default ``false``)
+    If ``algo.maxwell_solver`` is set to ``hybrid``, this sets the hybrid solver to use split external fields defined in external_vector_potential inputs.
+
+* ``external_vector_potential.fields`` (list of `str`) optional (default ``empty``)
+    If ``hybid_pic_model.add_external_fields`` is set to ``true``, this adds a list names for external time varying vector potentials to be added to hybrid solver.
+
+* ``external_vector_potential.<field name>.read_from_file`` (`bool`) optional (default ``false``)
+    If ``hybid_pic_model.add_external_fields`` is set to ``true``, this flag determines whether to load an external field or use an implcit function to evaluate the time varying field.
+
+* ``external_vector_potential.<field name>.path`` (`str`) optional (default ``""``)
+    If ``external_vector_potential.<field name>.read_from_file`` is set to ``true``, sets the path to an OpenPMD file that can be loaded externally in :math:`weber/m`.
+
+* ``external_vector_potential.<field name>.A[x,y,z]_external_grid_function(x,y,z)`` (`str`) optional (default ``"0"``)
+    If ``external_vector_potential.<field name>.read_from_file`` is set to ``false``, Sets the external vector potential to be populated by an implicit function (on the grid) in :math:`weber/m`.
+
+* ``external_vector_potential.<field name>.A_time_external_grid_function(t)`` (`str`) optional (default ``"1"``)
+    This sets the relative strength of the external vector potential by a dimensionless implicit time function, which can compute the external B fields and E fields based on the value and first time derivative of the function.
 
 .. note::
 
@@ -3182,6 +3205,12 @@ This shifts analysis from post-processing to runtime calculation of reduction op
         Note that the fields are averaged on the cell centers before their maximum values are
         computed.
 
+    * ``FieldPoyntingFlux``
+        Integrates the normal Poynting flux over each domain boundary surface and also integrates the flux over time.
+        This provides the power and total energy loss into or out of the simulation domain.
+        The output columns are the flux for each dimension on the lower boundaries, then the higher boundaries,
+        then the integrated energy loss for each dimension on the the lower and higher boundaries.
+
     * ``FieldProbe``
         This type computes the value of each component of the electric and magnetic fields
         and of the Poynting vector (a measure of electromagnetic flux) at points in the domain.
@@ -3617,6 +3646,52 @@ This shifts analysis from post-processing to runtime calculation of reduction op
 
         * ``<reduced_diags_name>.bin_min`` (`float`, in eV)
             The maximum value of :math:`\mathcal{E}^*` for which the differential luminosity is computed.
+
+    * ``DifferentialLuminosity2D``
+        This type computes the two-dimensional differential luminosity between two species, defined as:
+
+        .. math::
+
+            \frac{d^2\mathcal{L}}{dE_1 dE_2}(E_1, E_2, t) = \int_0^t dt'\int d\boldsymbol{x}\, \int d\boldsymbol{p}_1 \int d\boldsymbol{p}_2\;
+             \sqrt{ |\boldsymbol{v}_1 - \boldsymbol{v}_2|^2 - |\boldsymbol{v}_1\times\boldsymbol{v}_2|^2/c^2} \\
+             f_1(\boldsymbol{x}, \boldsymbol{p}_1, t')f_2(\boldsymbol{x}, \boldsymbol{p}_2, t') \delta(E_1 - E_1(\boldsymbol{p}_1)) \delta(E_2 - E_2(\boldsymbol{p}_2))
+
+        where :math:`f_i` is the distribution function of species :math:`i`
+        (normalized such that :math:`\int \int f(\boldsymbol{x} \boldsymbol{p}, t )d\boldsymbol{x} d\boldsymbol{p} = N`
+        is the number of particles in species :math:`i` at time :math:`t`),
+        :math:`\boldsymbol{p}_i` and :math:`E_i (\boldsymbol{p}_i) = \sqrt{m_1^2c^4 + c^2 |\boldsymbol{p}_i|^2}`
+        are, respectively, the momentum and the energy of a particle of the :math:`i`-th species.
+        The 2D differential luminosity is given in units of :math:`\text{m}^{-2}.\text{eV}^{-2}`.
+
+        * ``<reduced_diags_name>.species`` (`list of two strings`)
+            The names of the two species for which the differential luminosity is computed.
+
+        * ``<reduced_diags_name>.bin_number_1`` (`int` > 0)
+            The number of bins in energy :math:`E_1`
+
+        * ``<reduced_diags_name>.bin_max_1`` (`float`, in eV)
+            The minimum value of :math:`E_1` for which the 2D differential luminosity is computed.
+
+        * ``<reduced_diags_name>.bin_min_1`` (`float`, in eV)
+            The maximum value of :math:`E_2` for which the 2D differential luminosity is compute
+
+        * ``<reduced_diags_name>.bin_number_2`` (`int` > 0)
+            The number of bins in energy :math:`E_2`
+
+        * ``<reduced_diags_name>.bin_max_2`` (`float`, in eV)
+            The minimum value of :math:`E_2` for which the 2D differential luminosity is computed.
+
+        * ``<reduced_diags_name>.bin_min_2`` (`float`, in eV)
+            The minimum value of :math:`E_2` for which the 2D differential luminosity is computed.
+
+        * ``<reduced_diags_name>.file_min_digits`` (`int`) optional (default `6`)
+            The minimum number of digits used for the iteration number appended to the diagnostic file names.
+
+        The output is a ``<reduced_diags_name>`` folder containing a set of openPMD files.
+        The values of the diagnostic are stored in a record labeled `d2L_dE1_dE2`.
+        An example input file and a loading python script of
+        using the DifferentialLuminosity2D reduced diagnostics
+        are given in ``Examples/Tests/diff_lumi_diag/``.
 
     * ``Timestep``
         This type outputs the simulation's physical timestep (in seconds) at each mesh refinement level.
