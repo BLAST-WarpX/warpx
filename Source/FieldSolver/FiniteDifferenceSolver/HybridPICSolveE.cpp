@@ -794,7 +794,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     Ez(i, j, 0) += eta(rho_val, jtot_val) * Jz(i, j, 0);
 
                     if (include_hyper_resistivity_term) {
-                        
+
                         // Interpolate B field to appropriate staggering to match E field - mtobin 20240217
                         Real btot_val = 0._rt;
                         if (hyper_resistivity_has_B_dependence) {
@@ -803,7 +803,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                             const Real bz_val = Interp(Bz, Bz_stag, Ez_stag, coarsen, i, j, 0, 0);
                             btot_val = std::sqrt(br_val*br_val + bt_val*bt_val + bz_val*bz_val);
                         }
-                        
+
                         // r on nodal point (Jz is nodal in r)
                         const Real r = rmin + i*dr;
 
@@ -1094,7 +1094,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                         auto nabla2Jx = T_Algo::Dxx(Jx, coefs_x, n_coefs_x, i, j, k)
                             + T_Algo::Dyy(Jx, coefs_y, n_coefs_y, i, j, k)
                             + T_Algo::Dzz(Jx, coefs_z, n_coefs_z, i, j, k);
-                    
+
                         // Modified for hyper-resistivity expression - mtobin 20240217
                         // Ex(i, j, k) -= eta_h * nabla2Jx;
                         Ex(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jx;
@@ -1221,7 +1221,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                             const Real bz_val = Interp(Bz, Bz_stag, Ez_stag, coarsen, i, j, k, 0);
                             btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
                         }
-                        
+
                         auto nabla2Jz = T_Algo::Dxx(Jz, coefs_x, n_coefs_x, i, j, k)
                             + T_Algo::Dyy(Jz, coefs_y, n_coefs_y, i, j, k)
                             + T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, k);
