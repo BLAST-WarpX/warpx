@@ -1853,8 +1853,37 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
     substeps: int, default=100
         Number of substeps to take when updating the B-field.
 
+    holmstrom_vacuum_region: bool, default=False
+        Flag to determine handling of vacuum region. Setting to True will solve the simplified Generalized Ohm's Law dropping the Hall and pressure terms in the vacuum region.
+        This flag is useful for suppressing vacuum region fluctuations. A large resistivity value must be used when rho <= rho_floor.
+
     Jx/y/z_external_function: str
         Function of space and time specifying external (non-plasma) currents.
+
+    A_external: dict
+        Function of space and time specifying external (non-plasma) vector potential fields.
+        It is expected that a nested dicitonary will be passed
+        into picmi for each field that has different timings
+        e.g.
+        A_external = {
+            '<field_name1>': {
+                'Ax_external_function': <implicit function with (x,y,z) dependence>,
+                'Ay_external_function': <implicit function with (x,y,z) dependence>,
+                'Az_external_function': <implicit function with (x,y,z) dependence>,
+                'A_time_external_function': <implicit function with (t) dependence>
+            },
+            '<field_name2>: {...}'
+        }
+
+        or if fields are to be loaded from an OpenPMD file
+        A_external = {
+            '<field_name1>': {
+                'load_from_file': True,
+                'path': <path to OpenPMD file>,
+                'A_time_external_function': <implicit function with (t) dependence>
+            },
+            '<field_name2>: {...}'
+        }
     """
 
     def __init__(
@@ -1867,9 +1896,11 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         plasma_resistivity=None,
         plasma_hyper_resistivity=None,
         substeps=None,
+        holmstrom_vacuum_region=None,
         Jx_external_function=None,
         Jy_external_function=None,
         Jz_external_function=None,
+        A_external=None,
         **kw,
     ):
         self.grid = grid
@@ -1884,9 +1915,13 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
 
         self.substeps = substeps
 
+        self.holmstrom_vacuum_region = holmstrom_vacuum_region
+
         self.Jx_external_function = Jx_external_function
         self.Jy_external_function = Jy_external_function
         self.Jz_external_function = Jz_external_function
+
+        self.A_external = A_external
 
         # Handle keyword arguments used in expressions
         self.user_defined_kw = {}
@@ -1918,6 +1953,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         )
         pywarpx.hybridpicmodel.plasma_hyper_resistivity = self.plasma_hyper_resistivity
         pywarpx.hybridpicmodel.substeps = self.substeps
+        pywarpx.hybridpicmodel.holmstrom_vacuum_region = self.holmstrom_vacuum_region
         pywarpx.hybridpicmodel.__setattr__(
             "Jx_external_grid_function(x,y,z,t)",
             pywarpx.my_constants.mangle_expression(
@@ -1936,6 +1972,47 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                 self.Jz_external_function, self.mangle_dict
             ),
         )
+        if self.A_external is not None:
+            pywarpx.hybridpicmodel.add_external_fields = True
+            pywarpx.external_vector_potential.__setattr__(
+                "fields",
+                pywarpx.my_constants.mangle_expression(
+                    list(self.A_external.keys()), self.mangle_dict
+                ),
+            )
+            for field_name, field_dict in self.A_external.items():
+                if field_dict.get("read_from_file", False):
+                    pywarpx.external_vector_potential.__setattr__(
+                        f"{field_name}.read_from_file", field_dict["read_from_file"]
+                    )
+                    pywarpx.external_vector_potential.__setattr__(
+                        f"{field_name}.path", field_dict["path"]
+                    )
+                else:
+                    pywarpx.external_vector_potential.__setattr__(
+                        f"{field_name}.Ax_external_grid_function(x,y,z)",
+                        pywarpx.my_constants.mangle_expression(
+                            field_dict["Ax_external_function"], self.mangle_dict
+                        ),
+                    )
+                    pywarpx.external_vector_potential.__setattr__(
+                        f"{field_name}.Ay_external_grid_function(x,y,z)",
+                        pywarpx.my_constants.mangle_expression(
+                            field_dict["Ay_external_function"], self.mangle_dict
+                        ),
+                    )
+                    pywarpx.external_vector_potential.__setattr__(
+                        f"{field_name}.Az_external_grid_function(x,y,z)",
+                        pywarpx.my_constants.mangle_expression(
+                            field_dict["Az_external_function"], self.mangle_dict
+                        ),
+                    )
+                pywarpx.external_vector_potential.__setattr__(
+                    f"{field_name}.A_time_external_function(t)",
+                    pywarpx.my_constants.mangle_expression(
+                        field_dict["A_time_external_function"], self.mangle_dict
+                    ),
+                )
 
 
 class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
