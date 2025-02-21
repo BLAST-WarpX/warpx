@@ -16,7 +16,7 @@
 #include <AMReX_Print.H>
 
 int
-main (int argc, char *argv[]) {
+main (int argc, char* argv[]) {
     warpx::initialization::initialize_external_libraries(argc, argv);
     {
         WARPX_PROFILE_VAR("main()", pmain);
@@ -24,7 +24,7 @@ main (int argc, char *argv[]) {
         auto timer = ablastr::utils::timer::Timer{};
         timer.record_start_time();
 
-        auto & warpx = WarpX::GetInstance();
+        auto& warpx = WarpX::GetInstance();
         warpx.InitData();
         warpx.Evolve();
         const auto is_warpx_verbose = warpx.Verbose();
