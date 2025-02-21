@@ -227,6 +227,8 @@ QdsmcParticleContainer::InitParticles (int lev)
         }
     }
     AddNParticles(0, n_to_add, xpos, ypos, zpos);
+
+    amrex::Gpu::synchronize();
 }
 
 
@@ -277,6 +279,7 @@ QdsmcParticleContainer::SetV (int lev,
             part_vz[ip] = vzp;
         });
     }
+    // add synchronize here?
 }
 
 
@@ -326,6 +329,7 @@ QdsmcParticleContainer::SetK (int lev,
             part_entropy[ip] = kn_p;
         });
     }
+    // add synchronize here?
 }
 
 
@@ -378,9 +382,12 @@ QdsmcParticleContainer::PushX (int lev, amrex::Real dt)
     //WARPX_ALWAYS_ASSERT_WITH_MESSAGE(part_dx_max >= dx[0], "QdsmcParticleContainer::PushX: qdsmc_part_dx >= dx");
     //WARPX_ALWAYS_ASSERT_WITH_MESSAGE(part_dy_max >= dx[1], "QdsmcParticleContainer::PushX: qdsmc_part_dy >= dy");
     //WARPX_ALWAYS_ASSERT_WITH_MESSAGE(part_dz_max >= dx[2], "QdsmcParticleContainer::PushX: qdsmc_part_dz >= dz");
+    amrex::Gpu::synchronize();
 }
 
 
+// Do I really need to call this function?
+// Test without it, since r0 does not change and r is updated every time qdsmc is called.
 void
 QdsmcParticleContainer::ResetParticles(int lev)
 {
@@ -471,10 +478,11 @@ QdsmcParticleContainer::DepositK(int lev, amrex::MultiFab &Kfield)
         });
     }
 
+    amrex::Gpu::synchronize();
+
     ablastr::utils::communication::SumBoundary(
             Kfield, 0, Kfield.nComp(), Kfield.nGrowVect(), Kfield.nGrowVect(),
             WarpX::do_single_precision_comms, period);
-
 }
 
 
@@ -529,6 +537,8 @@ QdsmcParticleContainer::DepositField(int lev, amrex::MultiFab &Field)
             }
         });
     }
+
+    amrex::Gpu::synchronize();
 
     ablastr::utils::communication::SumBoundary(
             Field, 0, Field.nComp(), Field.nGrowVect(), Field.nGrowVect(),

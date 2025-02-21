@@ -304,8 +304,13 @@ void WarpX::HybridPICEvolveFields ()
             hybrid_electron_fl->Hybrid_Electron_Bremsstrahlung(m_fields, m_hybrid_pic_model.get(), dt[0], finest_level);
         }
 
-        // add source/sink term due to collisions with ions (Qei-Qie)
-        // This term should also apply MCC to ions particle container
+        // add conductivity term here. 
+        // Write functions in FluidContainer, use multigrid solver from amrex
+        // look at example from amrex guided tutorials (MLMG) linear operator classes
+        
+
+        // add source/sink term due to collisions with ions (Qei)
+        // This term should also apply MCC to ions particle container (Qie)
         // Implement for 1 ion species and then extend to multiple species using mypc
         // COMPLETE ...
 

@@ -1911,9 +1911,9 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Jy_external_function=None,
         Jz_external_function=None,
         A_external=None,
-        solve_electron_energy_equation=None,
-        include_Joule_heating=None,
-        include_Bremsstrahlung=None,
+        solve_electron_energy_equation=False,
+        include_Joule_heating=False,
+        include_Bremsstrahlung=False,
         Zeff=None,
         **kw,
     ):
@@ -1966,6 +1966,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.n0_ref = self.n0
         pywarpx.hybridpicmodel.gamma = self.gamma
         pywarpx.hybridpicmodel.n_floor = self.n_floor
+        pywarpx.hybridpicmodel.Zeff = self.Zeff
+        
         pywarpx.hybridpicmodel.__setattr__(
             "plasma_resistivity(rho,J,Te)",
             pywarpx.my_constants.mangle_expression(
@@ -2039,15 +2041,13 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
             self.solve_electron_energy_equation
         )
 
-        pywarpx.hybridpicmodel.include_Joule_heating = self.include_Joule_heating
-
-        pywarpx.hybridpicmodel.solve_electron_energy_equation = (
-            self.solve_electron_energy_equation
+        pywarpx.hybridpicmodel.include_Joule_heating = (
+            self.include_Joule_heating
         )
 
-        pywarpx.hybridpicmodel.include_Joule_heating = self.include_Joule_heating
-
-        pywarpx.hybridpicmodel.include_Bremsstrahlung = self.include_Bremsstrahlung
+        pywarpx.hybridpicmodel.include_Bremsstrahlung = (
+            self.include_Bremsstrahlung
+        )
 
 
 class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):

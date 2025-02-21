@@ -1684,13 +1684,10 @@ void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiF
                     amrex::Real eta_J2 = eta(rho_val, jtot_val, Te_val)*jtot_val*jtot_val;
 
                     // Te(i, j, k) and second term already in Joules so no need to divide eta_J2 by kb
-                    Te(i, j, k) = Te(i, j, k) + dt*eta_J2/(3.0/2*ne_val);
+                    Te(i, j, k) = Te(i, j, k) + dt*eta_J2/(1.5*ne_val);
                 }
-
             });
         }
-
-    // Fill Boundary ?
     m_fields.get(name_mf_T, lev)->FillBoundary(m_fields.get(name_mf_T, lev)->nGrowVect(), period);
 }
 
@@ -1752,10 +1749,7 @@ void WarpXFluidContainer::Hybrid_Electron_Bremsstrahlung (ablastr::fields::Multi
                     // Te(i, j, k) and second term already in Joules
                     Te(i, j, k) = Te(i, j, k) - dW_dV*dt/(1.5*ne_val);
                 }
-
             });
         }
-
-    // Fill Boundary ?
     m_fields.get(name_mf_T, lev)->FillBoundary(m_fields.get(name_mf_T, lev)->nGrowVect(), period);
 }
