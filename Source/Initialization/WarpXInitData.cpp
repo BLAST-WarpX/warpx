@@ -93,6 +93,27 @@ using namespace amrex;
 
 namespace
 {
+
+    /** Print dt and dx,dy,dz */
+    void PrintDtDxDyDz (
+        int max_level, const amrex::Vector<Geometry>& geom, const amrex::Vector<amrex::Real>& dt)
+    {
+        for (int lev=0; lev <= max_level; lev++) {
+            const amrex::Real* dx_lev = geom[lev].CellSize();
+            amrex::Print() << "Level " << lev << ": dt = " << dt[lev]
+    #if defined(WARPX_DIM_1D_Z)
+                           << " ; dz = " << dx_lev[0] << '\n';
+    #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                           << " ; dx = " << dx_lev[0]
+                           << " ; dz = " << dx_lev[1] << '\n';
+    #elif defined(WARPX_DIM_3D)
+                           << " ; dx = " << dx_lev[0]
+                           << " ; dy = " << dx_lev[1]
+                           << " ; dz = " << dx_lev[2] << '\n';
+    #endif
+        }
+    }
+
     /**
      * \brief Check that the number of guard cells is smaller than the number of valid cells,
      * for a given MultiFab, and abort otherwise.
@@ -539,14 +560,14 @@ WarpX::InitData ()
     if (restart_chkfile.empty())
     {
         ComputeDt();
-        WarpX::PrintDtDxDyDz();
+        ::PrintDtDxDyDz(max_level, geom, dt);
         InitFromScratch();
         InitDiagnostics();
     }
     else
     {
         InitFromCheckpoint();
-        WarpX::PrintDtDxDyDz();
+        ::PrintDtDxDyDz(max_level, geom, dt);
         PostRestart();
         reduced_diags->InitData();
     }
