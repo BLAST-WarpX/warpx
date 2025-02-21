@@ -1107,7 +1107,7 @@ WarpX::ReadParameters ()
             "algo.maxwell_solver = psatd is not supported because WarpX was built without spectral solvers");
 #endif
 
-#if (defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)) && defined(WARPX_USE_FFT)
+#if (defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)) && defined(WARPX_USE_FFT)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE( electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD,
             "algo.maxwell_solver = psatd is not available for 1D geometry");
 #endif
