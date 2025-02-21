@@ -4083,7 +4083,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
 
     bin_max_abs: float
         For diagnostic type 'ParticleHistogram2D', the maximum value of the bins for the abscissa axis.
-    
+
     bin_max_ord: float
         For diagnostic type 'ParticleHistogram2D', the maximum value of the bins for the ordinate axis.
 
@@ -4092,7 +4092,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
 
     bin_min_ord: float
         For diagnostic type 'ParticleHistogram2D', the minimum value of the bins for the ordinate axis.
-    
+
     bin_number_abs: integer
         For diagnostic type 'ParticleHistogram2D', the number of bins used for the histogram for the abscissa axis.
 
