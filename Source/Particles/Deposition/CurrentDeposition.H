@@ -1455,7 +1455,6 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             double z_new = (zp_np1 - xyzmin.z)*dinv.z;
             double const z_old = (zp_n[ip] - xyzmin.z)*dinv.z;
             amrex::Real const vz = (zp_np1 - zp_n[ip])/dt;
-            amrex::Print() << std::setprecision(18) << "ZZ " << zp_np1 << "\n";
 
             // compute total change in particle position and the initial cell
             // locations in each direction used to find the position at cell crossings.
