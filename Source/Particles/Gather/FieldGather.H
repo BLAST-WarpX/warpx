@@ -888,7 +888,7 @@ void doGatherPicnicShapeN (
                      [[maybe_unused]] const amrex::IndexType Bz_type,
                      const amrex::XDim3 & dinv,
                      const amrex::XDim3 & xyzmin,
-                     const amrex::RealBox & prob_domain,
+                     const amrex::Box & domain,
                      const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_absorbing,
                      const amrex::Dim3& lo,
                      const int n_rz_azimuthal_modes)
@@ -911,6 +911,75 @@ void doGatherPicnicShapeN (
     Real constexpr one_sixth = 1.0_rt / 6.0_rt;
 #endif
 
+    // computes current and old position in grid units
+#if defined(WARPX_DIM_RZ)
+    amrex::Real const xp_new = xp_np1;
+    amrex::Real const yp_new = yp_np1;
+    amrex::Real const xp_mid = xp_nph;
+    amrex::Real const yp_mid = yp_nph;
+    amrex::Real const xp_old = xp_n;
+    amrex::Real const yp_old = yp_n;
+    amrex::Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new);
+    amrex::Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old);
+    amrex::Real const rp_mid = (rp_new + rp_old)/2._rt;
+    amrex::Real costheta_mid, sintheta_mid;
+    if (rp_mid > 0._rt) {
+        costheta_mid = xp_mid/rp_mid;
+        sintheta_mid = yp_mid/rp_mid;
+    } else {
+        costheta_mid = 1._rt;
+        sintheta_mid = 0._rt;
+    }
+    const Complex xy_mid0 = Complex{costheta_mid, sintheta_mid};
+    // Keep these double to avoid bug in single precision
+    double x_new = (rp_new - xyzmin.x)*dinv.x;
+    double const x_old = (rp_old - xyzmin.x)*dinv.x;
+#elif !defined(WARPX_DIM_1D_Z)
+    // Keep these double to avoid bug in single precision
+    double x_new = (xp_np1 - xyzmin.x)*dinv.x;
+    double const x_old = (xp_n - xyzmin.x)*dinv.x;
+#endif
+#if defined(WARPX_DIM_3D)
+    // Keep these double to avoid bug in single precision
+    double y_new = (yp_np1 - xyzmin.y)*dinv.y;
+    double const y_old = (yp_n   - xyzmin.y)*dinv.y;
+#endif
+    // Keep these double to avoid bug in single precision
+    double z_new = (zp_np1 - xyzmin.z)*dinv.z;
+    double const z_old = (zp_n   - xyzmin.z)*dinv.z;
+
+    // compute total change in particle position and the initial cell
+    // locations in each direction used to find the position at cell crossings.
+#if !defined(WARPX_DIM_1D_Z)
+    const double dxp = x_new - x_old;
+#endif
+#if defined(WARPX_DIM_3D)
+    const double dyp = y_new - y_old;
+#endif
+    const double dzp = z_new - z_old;
+
+#if defined(WARPX_DIM_3D)
+    ParticleUtils::crop_at_boundary(x_old, y_old, z_old, x_new, y_new, z_new,
+                                    domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
+    ParticleUtils::crop_at_boundary(y_old, z_old, x_old, y_new, z_new, x_new,
+                                    domain.smallEnd(1) - lo.x, domain.bigEnd(1) - lo.y, is_absorbing[1]);
+    ParticleUtils::crop_at_boundary(z_old, x_old, y_old, z_new, x_new, y_new,
+                                    domain.smallEnd(2) - lo.x, domain.bigEnd(2) - lo.z, is_absorbing[2]);
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+    ParticleUtils::crop_at_boundary(x_old, z_old, x_new, z_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
+    ParticleUtils::crop_at_boundary(z_old, x_old, z_new, x_new, domain.smallEnd(1) - lo.y, domain.bigEnd(1) - lo.y, is_absorbing[1]);
+#elif defined(WARPX_DIM_1D_Z)
+    ParticleUtils::crop_at_boundary(z_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
+#endif
+
+#if !defined(WARPX_DIM_1D_Z)
+    double const x_bar = 0.5*(x_old + x_new);
+#endif
+#if defined(WARPX_DIM_3D)
+    double const y_bar = 0.5*(y_old + y_new);
+#endif
+    double const z_bar = 0.5*(z_old + z_new);
+
     // 1) Determine the number of segments.
     // 2) Loop over segments and gather electric field.
     // 3) Gather magnetic field.
@@ -923,33 +992,6 @@ void doGatherPicnicShapeN (
     if ( (depos_order % 2) == 0 ) { shift = 0.5; }
 
 #if defined(WARPX_DIM_3D)
-
-    amrex::Real xp_np1_c = xp_np1;
-    amrex::Real yp_np1_c = yp_np1;
-    amrex::Real zp_np1_c = zp_np1;
-    ParticleUtils::crop_at_boundary(xp_n, yp_n, zp_n, xp_np1_c, yp_np1_c, zp_np1_c, prob_domain.lo(0), prob_domain.hi(0), is_absorbing[0]);
-    ParticleUtils::crop_at_boundary(yp_n, zp_n, xp_n, yp_np1_c, zp_np1_c, xp_np1_c, prob_domain.lo(1), prob_domain.hi(1), is_absorbing[1]);
-    ParticleUtils::crop_at_boundary(zp_n, xp_n, yp_n, zp_np1_c, xp_np1_c, yp_np1_c, prob_domain.lo(2), prob_domain.hi(2), is_absorbing[2]);
-
-    // Keep these double to avoid bug in single precision
-    double const x_new = (xp_np1_c - xyzmin.x)*dinv.x;
-    double const x_old = (xp_n     - xyzmin.x)*dinv.x;
-    double const y_new = (yp_np1_c - xyzmin.y)*dinv.y;
-    double const y_old = (yp_n     - xyzmin.y)*dinv.y;
-    double const z_new = (zp_np1_c - xyzmin.z)*dinv.z;
-    double const z_old = (zp_n     - xyzmin.z)*dinv.z;
-
-    double const x_bar = (x_new + x_old)*0.5_rt;
-    double const y_bar = (y_new + y_old)*0.5_rt;
-    double const z_bar = (z_new + z_old)*0.5_rt;
-
-    // The step size needs to be for the full step
-    double const x_new_f = (xp_np1 - xyzmin.x)*dinv.x;
-    double const y_new_f = (yp_np1 - xyzmin.y)*dinv.y;
-    double const z_new_f = (zp_np1 - xyzmin.z)*dinv.z;
-    double const dxp = x_new_f - x_old;
-    double const dyp = y_new_f - y_old;
-    double const dzp = z_new_f - z_old;
 
     // compute cell crossings in X-direction
     const auto i_old = static_cast<int>(x_old-shift);
@@ -1169,54 +1211,6 @@ void doGatherPicnicShapeN (
 
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
 
-#if defined(WARPX_DIM_RZ)
-    amrex::Real const xp_new = xp_np1;
-    amrex::Real const yp_new = yp_np1;
-    amrex::Real const xp_mid = xp_nph;
-    amrex::Real const yp_mid = yp_nph;
-    amrex::Real const xp_old = xp_n;
-    amrex::Real const yp_old = yp_n;
-    amrex::Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new);
-    amrex::Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old);
-    amrex::Real const rp_mid = (rp_new + rp_old)/2._rt;
-    amrex::Real costheta_mid, sintheta_mid;
-    if (rp_mid > 0._rt) {
-        costheta_mid = xp_mid/rp_mid;
-        sintheta_mid = yp_mid/rp_mid;
-    } else {
-        costheta_mid = 1._rt;
-        sintheta_mid = 0._rt;
-    }
-    const Complex xy_mid0 = Complex{costheta_mid, sintheta_mid};
-
-    amrex::Real const xp_n_c = rp_old;
-    amrex::Real xp_np1_c = rp_new;
-    amrex::Real const xp_np1_f = rp_new;
-#elif defined(WARPX_DIM_XZ)
-    amrex::Real const xp_n_c = xp_n;
-    amrex::Real xp_np1_c = xp_np1;
-    amrex::Real const xp_np1_f = xp_np1;
-#endif
-
-    amrex::Real zp_np1_c = zp_np1;
-    ParticleUtils::crop_at_boundary(xp_n_c, zp_n, xp_np1_c, zp_np1_c, prob_domain.lo(0), prob_domain.hi(0), is_absorbing[0]);
-    ParticleUtils::crop_at_boundary(zp_n, xp_n_c, zp_np1_c, xp_np1_c, prob_domain.lo(1), prob_domain.hi(1), is_absorbing[1]);
-
-    // Keep these double to avoid bug in single precision
-    double const x_new = (xp_np1_c - xyzmin.x)*dinv.x;
-    double const x_old = (xp_n_c   - xyzmin.x)*dinv.x;
-    double const z_new = (zp_np1_c - xyzmin.z)*dinv.z;
-    double const z_old = (zp_n     - xyzmin.z)*dinv.z;
-
-    double const x_bar = (x_new + x_old)*0.5_rt;
-    double const z_bar = (z_new + z_old)*0.5_rt;
-
-    // The step size needs to be for the full step
-    double const x_new_f = (xp_np1_f - xyzmin.x)*dinv.x;
-    double const z_new_f = (zp_np1 - xyzmin.z)*dinv.z;
-    double const dxp = x_new_f - x_old;
-    double const dzp = z_new_f - z_old;
-
     // compute cell crossings in X-direction
     const auto i_old = static_cast<int>(x_old-shift);
     const auto i_new = static_cast<int>(x_new-shift);
@@ -1433,19 +1427,6 @@ void doGatherPicnicShapeN (
 #endif
 
 #elif defined(WARPX_DIM_1D_Z)
-
-    amrex::Real zp_np1_c = zp_np1;
-    ParticleUtils::crop_at_boundary(zp_np1_c, prob_domain.lo(0), prob_domain.hi(0), is_absorbing[0]);
-
-    // Keep these double to avoid bug in single precision
-    double const z_new = (zp_np1_c - xyzmin.z)*dinv.z;
-    double const z_old = (zp_n     - xyzmin.z)*dinv.z;
-
-    double const z_bar = (z_new + z_old)*0.5_rt;
-
-    // The step size needs to be for the full step
-    double const z_new_f = (zp_np1 - xyzmin.z)*dinv.z;
-    double const dzp = z_new_f - z_old;
 
     // compute cell crossings in Z-direction
     const auto k_old = static_cast<int>(z_old-shift);
@@ -1755,7 +1736,7 @@ void doGatherShapeNImplicit (
                      const amrex::IndexType bz_type,
                      const amrex::XDim3 & dinv,
                      const amrex::XDim3 & xyzmin,
-                     const amrex::RealBox & prob_domain,
+                     const amrex::Box & domain,
                      const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_absorbing,
                      const amrex::Dim3& lo,
                      const int n_rz_azimuthal_modes,
@@ -1795,25 +1776,25 @@ void doGatherShapeNImplicit (
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, prob_domain, is_absorbing, lo, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, domain, is_absorbing, lo, n_rz_azimuthal_modes);
         } else if (nox == 2) {
             doGatherPicnicShapeN<2>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, prob_domain, is_absorbing, lo, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, domain, is_absorbing, lo, n_rz_azimuthal_modes);
         } else if (nox == 3) {
             doGatherPicnicShapeN<3>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, prob_domain, is_absorbing, lo, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, domain, is_absorbing, lo, n_rz_azimuthal_modes);
         } else if (nox == 4) {
             doGatherPicnicShapeN<4>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, prob_domain, is_absorbing, lo, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, domain, is_absorbing, lo, n_rz_azimuthal_modes);
         }
     }
     else if (depos_type == CurrentDepositionAlgo::Direct) {
