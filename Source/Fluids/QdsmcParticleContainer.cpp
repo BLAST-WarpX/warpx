@@ -280,6 +280,8 @@ QdsmcParticleContainer::SetV (int lev,
         });
     }
     // add synchronize here?
+
+    amrex::Gpu::synchronize();
 }
 
 
@@ -330,6 +332,8 @@ QdsmcParticleContainer::SetK (int lev,
         });
     }
     // add synchronize here?
+
+    amrex::Gpu::synchronize();
 }
 
 
