@@ -279,7 +279,6 @@ QdsmcParticleContainer::SetV (int lev,
             part_vz[ip] = vzp;
         });
     }
-    // add synchronize here?
 
     amrex::Gpu::synchronize();
 }
@@ -331,7 +330,6 @@ QdsmcParticleContainer::SetK (int lev,
             part_entropy[ip] = kn_p;
         });
     }
-    // add synchronize here?
 
     amrex::Gpu::synchronize();
 }
