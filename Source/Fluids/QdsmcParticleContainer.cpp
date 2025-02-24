@@ -309,7 +309,7 @@ void QdsmcParticleContainer::InitParticles(int lev)
     }
     amrex::Gpu::synchronize();
     Redistribute();
-    
+
 }
 
 
