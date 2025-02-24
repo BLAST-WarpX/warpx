@@ -1095,7 +1095,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                         Te_val = Te0/PhysConst::kb;
                     }
                 }
-                
+
 
 
                 // Add resistivity only if E field value is used to update B
