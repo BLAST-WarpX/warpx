@@ -1581,7 +1581,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 
                 // Determine the position of the particle within the cell
                 XDim3 pos;
-                XDim3 r;
+                XDim3 r = {0._rt, 0._rt, 0._rt};
 #ifdef AMREX_USE_EB
                 if (inject_from_eb) {
                     auto const& pt = eb_data.randomPointOnEB(i,j,k,engine);
