@@ -206,8 +206,8 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
     // Create diagnostic file and write header
     if (!this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor()) {
 
-        std::filesystem::path diagnostic_path(this->m_diagnostic_file);
-        std::filesystem::path diagnostic_dir = diagnostic_path.parent_path();
+        std::filesystem::path const diagnostic_path(this->m_diagnostic_file);
+        std::filesystem::path const diagnostic_dir = diagnostic_path.parent_path();
         if (!diagnostic_dir.empty()) {
             std::filesystem::create_directories(diagnostic_dir);
         }
