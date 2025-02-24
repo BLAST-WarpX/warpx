@@ -199,6 +199,7 @@ public:
     std::string m_eta_h_expression = "0.0";
     std::unique_ptr<amrex::Parser> m_hyper_resistivity_parser;
     amrex::ParserExecutor<2> m_eta_h;
+    bool m_include_hyper_resistivity_term = false;
     bool m_hyper_resistivity_has_B_dependence = false;
 
     /** External current */

@@ -432,7 +432,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
 
     // const bool include_hyper_resistivity_term = (eta_h > 0.0) && solve_for_Faraday;
-    const bool include_hyper_resistivity_term = solve_for_Faraday;
+    const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity_term;
 
     const bool include_external_fields = hybrid_model->m_add_external_fields;
 
@@ -860,7 +860,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
 
     // const bool include_hyper_resistivity_term = (eta_h > 0.) && solve_for_Faraday;
-    const bool include_hyper_resistivity_term = solve_for_Faraday;
+    const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity_term;
 
     const bool include_external_fields = hybrid_model->m_add_external_fields;
 
@@ -1085,12 +1085,13 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
                         // Interpolate B field to appropriate staggering to match E field - mtobin 20240217
                         Real btot_val = 0._rt;
-                        if (solve_for_Faraday && hyper_resistivity_has_B_dependence) {
+                        if (hyper_resistivity_has_B_dependence) {
                             const Real bx_val = Interp(Bx, Bx_stag, Ex_stag, coarsen, i, j, k, 0);
                             const Real by_val = Interp(By, By_stag, Ex_stag, coarsen, i, j, k, 0);
                             const Real bz_val = Interp(Bz, Bz_stag, Ex_stag, coarsen, i, j, k, 0);
                             btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
                         }
+
                         auto nabla2Jx = T_Algo::Dxx(Jx, coefs_x, n_coefs_x, i, j, k)
                             + T_Algo::Dyy(Jx, coefs_y, n_coefs_y, i, j, k)
                             + T_Algo::Dzz(Jx, coefs_z, n_coefs_z, i, j, k);
@@ -1150,12 +1151,13 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
                         // Interpolate B field to appropriate staggering to match E field - mtobin 20240217
                         Real btot_val = 0._rt;
-                        if (solve_for_Faraday && hyper_resistivity_has_B_dependence) {
+                        if (hyper_resistivity_has_B_dependence) {
                             const Real bx_val = Interp(Bx, Bx_stag, Ey_stag, coarsen, i, j, k, 0);
                             const Real by_val = Interp(By, By_stag, Ey_stag, coarsen, i, j, k, 0);
                             const Real bz_val = Interp(Bz, Bz_stag, Ey_stag, coarsen, i, j, k, 0);
                             btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
                         }
+
                         auto nabla2Jy = T_Algo::Dxx(Jy, coefs_x, n_coefs_x, i, j, k)
                             + T_Algo::Dyy(Jy, coefs_y, n_coefs_y, i, j, k)
                             + T_Algo::Dzz(Jy, coefs_z, n_coefs_z, i, j, k);
@@ -1215,7 +1217,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
                         // Interpolate B field to appropriate staggering to match E field - mtobin 20240217
                         Real btot_val = 0._rt;
-                        if (solve_for_Faraday && hyper_resistivity_has_B_dependence) {
+                        if (hyper_resistivity_has_B_dependence) {
                             const Real bx_val = Interp(Bx, Bx_stag, Ez_stag, coarsen, i, j, k, 0);
                             const Real by_val = Interp(By, By_stag, Ez_stag, coarsen, i, j, k, 0);
                             const Real bz_val = Interp(Bz, Bz_stag, Ez_stag, coarsen, i, j, k, 0);

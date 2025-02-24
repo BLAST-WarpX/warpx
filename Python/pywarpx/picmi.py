@@ -1954,9 +1954,9 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         # Enabling hyperresistivity expression - mtobin 20240218
         # pywarpx.hybridpicmodel.plasma_hyper_resistivity = self.plasma_hyper_resistivity
         pywarpx.hybridpicmodel.__setattr__(
-            "plasma_hyperresistivity(rho,B)",
+            "plasma_hyper_resistivity(rho,B)",
             pywarpx.my_constants.mangle_expression(
-                self.plasma_hyperresistivity, self.mangle_dict
+                self.plasma_hyper_resistivity, self.mangle_dict
             ),
         )
         pywarpx.hybridpicmodel.substeps = self.substeps
