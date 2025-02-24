@@ -346,11 +346,8 @@ namespace
      * \brief Sets the rho or J field value near PEC and PMC boundaries by appropriately
      *        folding in the rho or J deposited into the ghost cells.
      *        Note that energy conservation demands that the boundary conditions for J be
-     *        consistent with those for E used to push the particles. If E_i is odd, then
-     *        J_i deposited to ghost cells should be subtracted from its mirror location
-     *        inside the domain. If E_i is even, then J_i deposited to the ghost cells should
-     *        be added to its mirror location inside the domain. If this is not done,
-     *        then artificial heating can occur at the boundaries.
+     *        consistent with those for E used to push the particles.
+     *        If this is not done, then artificial heating can occur at the boundaries.
      *        PEC: The charge and current density parallel to the boundary deposited to the
      *             guard cells is subtracted from its mirror location inside the domain.
      *             The current density normal to the boundary deposited to the guard cells is
@@ -370,7 +367,7 @@ namespace
      * \param[in out] field          field data to be updated
      * \param[in] mirrorfac          mirror cell is given by mirrorfac - ijk_vec
      * \param[in] psign              Whether the field value should be flipped across the boundary
-     * \param[in] is_pec_pmc_bndy    Whether the field boundary is pec or pmc
+     * \param[in] is_pec_pmc_bndy    True if the field boundary is either pec or pmc
      * \param[in] tangent_to_bndy    Whether a given direction is perpendicular to the boundary
      * \param[in] fabbox             multifab box including ghost cells
      */
