@@ -260,7 +260,7 @@ diag_field_list = ["B", "E", "J", "rho"]
 diag_particle_list = ["weighting", "position", "momentum"]
 coarse_btd_end = int((L_plasma_bulk + 0.001 + stage_spacing * (N_stage - 1)) * 100000)
 stage_end_snapshots = [
-    f"{int((L_plasma_bulk+stage_spacing*ii)*100000)}:{int((L_plasma_bulk+stage_spacing*ii)*100000+50)}:5"
+    f"{int((L_plasma_bulk + stage_spacing * ii) * 100000)}:{int((L_plasma_bulk + stage_spacing * ii) * 100000 + 50)}:5"
     for ii in range(1)
 ]
 btd_particle_diag = picmi.LabFrameParticleDiagnostic(

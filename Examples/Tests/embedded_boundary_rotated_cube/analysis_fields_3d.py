@@ -7,15 +7,11 @@
 # License: BSD-3-Clause-LBNL
 
 
-import os
 import sys
 
 import numpy as np
 import yt
 from scipy.constants import c, mu_0, pi
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 # This is a script that analyses the simulation results from
 # the script `inputs_3d`. This simulates a TMmnp mode in a PEC cubic resonator rotated by pi/8.
@@ -143,9 +139,3 @@ rel_err_z = np.sqrt(
     np.sum(np.square(Bz_sim[:, :, :, 0] - Bz_th)) / np.sum(np.square(Bz_th))
 )
 assert rel_err_z < rel_tol_err
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

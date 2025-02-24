@@ -350,9 +350,7 @@ namespace ablastr::fields
     )
     {
         if (m_mf_register.count(internal_name) == 0) {
-            // FIXME: temporary, throw a std::runtime_error
-            // throw std::runtime_error("MultiFabRegister::get name does not exist in register: " + key);
-            return nullptr;
+            throw std::runtime_error("MultiFabRegister::get name does not exist in register: " + internal_name);
         }
         amrex::MultiFab & mf = m_mf_register.at(internal_name).m_mf;
 
@@ -365,9 +363,7 @@ namespace ablastr::fields
     ) const
     {
         if (m_mf_register.count(internal_name) == 0) {
-            // FIXME: temporary, throw a std::runtime_error
-            // throw std::runtime_error("MultiFabRegister::get name does not exist in register: " + internal_name);
-            return nullptr;
+            throw std::runtime_error("MultiFabRegister::get name does not exist in register: " + internal_name);
         }
         amrex::MultiFab const & mf = m_mf_register.at(internal_name).m_mf;
 
@@ -419,14 +415,22 @@ namespace ablastr::fields
     MultiLevelScalarField
     MultiFabRegister::internal_get_mr_levels (
         std::string const & name,
-        int finest_level
+        int finest_level,
+        bool skip_level_0
     )
     {
         MultiLevelScalarField field_on_level;
         field_on_level.reserve(finest_level+1);
         for (int lvl = 0; lvl <= finest_level; lvl++)
         {
-            field_on_level.push_back(internal_get(name, lvl));
+            if (lvl == 0 && skip_level_0)
+            {
+                field_on_level.push_back(nullptr);
+            }
+            else
+            {
+                field_on_level.push_back(internal_get(name, lvl));
+            }
         }
         return field_on_level;
     }
@@ -434,14 +438,22 @@ namespace ablastr::fields
     ConstMultiLevelScalarField
     MultiFabRegister::internal_get_mr_levels (
         std::string const & name,
-        int finest_level
+        int finest_level,
+        bool skip_level_0
     ) const
     {
         ConstMultiLevelScalarField field_on_level;
         field_on_level.reserve(finest_level+1);
         for (int lvl = 0; lvl <= finest_level; lvl++)
         {
-            field_on_level.push_back(internal_get(name, lvl));
+            if (lvl == 0 && skip_level_0)
+            {
+                field_on_level.push_back(nullptr);
+            }
+            else
+            {
+                field_on_level.push_back(internal_get(name, lvl));
+            }
         }
         return field_on_level;
     }
@@ -483,7 +495,8 @@ namespace ablastr::fields
     MultiLevelVectorField
     MultiFabRegister::internal_get_mr_levels_alldirs (
         std::string const & name,
-        int finest_level
+        int finest_level,
+        bool skip_level_0
     )
     {
         MultiLevelVectorField field_on_level;
@@ -497,7 +510,14 @@ namespace ablastr::fields
             // insert components
             for (Direction const & dir : m_all_dirs)
             {
-                field_on_level[lvl][dir] = internal_get(name, dir, lvl);
+                if (lvl == 0 && skip_level_0)
+                {
+                    field_on_level[lvl][dir] = nullptr;
+                }
+                else
+                {
+                    field_on_level[lvl][dir] = internal_get(name, dir, lvl);
+                }
             }
         }
         return field_on_level;
@@ -506,7 +526,8 @@ namespace ablastr::fields
     ConstMultiLevelVectorField
     MultiFabRegister::internal_get_mr_levels_alldirs (
         std::string const & name,
-        int finest_level
+        int finest_level,
+        bool skip_level_0
     ) const
     {
         ConstMultiLevelVectorField field_on_level;
@@ -520,7 +541,14 @@ namespace ablastr::fields
             // insert components
             for (Direction const & dir : m_all_dirs)
             {
-                field_on_level[lvl][dir] = internal_get(name, dir, lvl);
+                if (lvl == 0 && skip_level_0)
+                {
+                    field_on_level[lvl][dir] = nullptr;
+                }
+                else
+                {
+                    field_on_level[lvl][dir] = internal_get(name, dir, lvl);
+                }
             }
         }
         return field_on_level;

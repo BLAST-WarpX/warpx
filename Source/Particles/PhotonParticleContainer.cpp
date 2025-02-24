@@ -122,7 +122,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
     const bool local_has_breit_wheeler = has_breit_wheeler();
     if (local_has_breit_wheeler) {
         evolve_opt = m_shr_p_bw_engine->build_evolve_functor();
-        p_optical_depth_BW = pti.GetAttribs(particle_comps["opticalDepthBW"]).dataPtr() + offset;
+        p_optical_depth_BW = pti.GetAttribs("opticalDepthBW").dataPtr() + offset;
     }
 #endif
 

@@ -6,7 +6,7 @@ add_warpx_test(
     3  # dims
     1  # nprocs
     inputs_test_3d_thomson_parabola_spectrometer  # inputs
-    analysis_default_openpmd_regression.py  # analysis
-    diags/diag1  # output
+    "analysis.py"  # analysis
+    "analysis_default_regression.py --path diags/diag1"  # checksum
     OFF  # dependency
 )

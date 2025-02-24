@@ -11,16 +11,12 @@
 # Various particle and field quantities are written to file using the reduced diagnostics
 # and compared with the corresponding quantities computed from the data in the plotfiles.
 
-import os
 import sys
 
 import numpy as np
 import openpmd_api as io
 import yt
 from scipy.constants import c, e, m_e, m_p
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 
 def do_analysis(single_precision=False):
@@ -228,8 +224,6 @@ def do_analysis(single_precision=False):
     error_plt = dict()
     error_opmd = dict()
     tolerance = 5e-3 if single_precision else 1e-12
-    # if single precision, increase tolerance from default value
-    check_tolerance = 5e-3 if single_precision else 1e-9
 
     for k in values_yt.keys():
         # check that the zeros line up, since we'll be ignoring them in the error calculation
@@ -247,10 +241,3 @@ def do_analysis(single_precision=False):
         )
         assert error_opmd[k] < tolerance
         print(k, "relative error openPMD = ", error_opmd[k])
-
-    # compare checksums
-    evaluate_checksum(
-        test_name=os.path.split(os.getcwd())[1],
-        output_file=sys.argv[1],
-        rtol=check_tolerance,
-    )

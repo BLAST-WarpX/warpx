@@ -10,7 +10,6 @@
 #include "Diagnostics/ParticleDiag/ParticleDiag.H"
 #include "FieldIO.H"
 #include "Particles/Filter/FilterFunctors.H"
-#include "Particles/NamedComponentParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/RelativeCellPosition.H"
@@ -531,10 +530,10 @@ WarpXOpenPMDPlot::WriteOpenPMDParticles (const amrex::Vector<ParticleDiag>& part
 {
 WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDParticles()");
 
-for (unsigned i = 0, n = particle_diags.size(); i < n; ++i) {
+for (const auto & particle_diag : particle_diags) {
 
-    WarpXParticleContainer* pc = particle_diags[i].getParticleContainer();
-    PinnedMemoryParticleContainer* pinned_pc = particle_diags[i].getPinnedParticleContainer();
+    WarpXParticleContainer* pc = particle_diag.getParticleContainer();
+    PinnedMemoryParticleContainer* pinned_pc = particle_diag.getPinnedParticleContainer();
     if (isBTD || use_pinned_pc) {
         if (!pinned_pc->isDefined()) {
             continue;  // Skip to the next particle container
@@ -546,17 +545,17 @@ for (unsigned i = 0, n = particle_diags.size(); i < n; ++i) {
         pc->make_alike<amrex::PinnedArenaAllocator>();
 
     const auto mass = pc->AmIA<PhysicalSpecies::photon>() ? PhysConst::m_e : pc->getMass();
-    RandomFilter const random_filter(particle_diags[i].m_do_random_filter,
-                                     particle_diags[i].m_random_fraction);
-    UniformFilter const uniform_filter(particle_diags[i].m_do_uniform_filter,
-                                       particle_diags[i].m_uniform_stride);
-    ParserFilter parser_filter(particle_diags[i].m_do_parser_filter,
+    RandomFilter const random_filter(particle_diag.m_do_random_filter,
+                                     particle_diag.m_random_fraction);
+    UniformFilter const uniform_filter(particle_diag.m_do_uniform_filter,
+                                       particle_diag.m_uniform_stride);
+    ParserFilter parser_filter(particle_diag.m_do_parser_filter,
                                utils::parser::compileParser<ParticleDiag::m_nvars>
-                                     (particle_diags[i].m_particle_filter_parser.get()),
+                                     (particle_diag.m_particle_filter_parser.get()),
                                  pc->getMass(), time);
     parser_filter.m_units = InputUnits::SI;
-    GeometryFilter const geometry_filter(particle_diags[i].m_do_geom_filter,
-                                           particle_diags[i].m_diag_domain);
+    GeometryFilter const geometry_filter(particle_diag.m_do_geom_filter,
+                                           particle_diag.m_diag_domain);
 
     if (isBTD || use_pinned_pc) {
         particlesConvertUnits(ConvertDirection::WarpX_to_SI, pinned_pc, mass);
@@ -587,54 +586,62 @@ for (unsigned i = 0, n = particle_diags.size(); i < n; ++i) {
     }
 
     // Gather the electrostatic potential (phi) on the macroparticles
-    if ( particle_diags[i].m_plot_phi ) {
+    if ( particle_diag.m_plot_phi ) {
         storePhiOnParticles( tmp, WarpX::electrostatic_solver_id, !use_pinned_pc );
     }
 
-    // names of amrex::Real and int particle attributes in SoA data
+    // names of amrex::ParticleReal and int particle attributes in SoA data
+    auto const rn = tmp.GetRealSoANames();
+    auto const in = tmp.GetIntSoANames();
     amrex::Vector<std::string> real_names;
-    amrex::Vector<std::string> int_names;
-    amrex::Vector<int> int_flags;
-    amrex::Vector<int> real_flags;
-    // see openPMD ED-PIC extension for namings
-    // note: an underscore separates the record name from its component
-    //       for non-scalar records
-    // note: in RZ, we reconstruct x,y,z positions from r,z,theta in WarpX
+    amrex::Vector<std::string> int_names(in.begin(), in.end());
+
+    // transform names to openPMD, separated by underscores
+    {
+        // see openPMD ED-PIC extension for namings
+        // note: an underscore separates the record name from its component
+        //       for non-scalar records
+        // note: in RZ, we reconstruct x,y,z positions from r,z,theta in WarpX
 #if !defined (WARPX_DIM_1D_Z)
-    real_names.push_back("position_x");
+        real_names.push_back("position_x");
 #endif
 #if defined (WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-    real_names.push_back("position_y");
+        real_names.push_back("position_y");
 #endif
-    real_names.push_back("position_z");
-    real_names.push_back("weighting");
-    real_names.push_back("momentum_x");
-    real_names.push_back("momentum_y");
-    real_names.push_back("momentum_z");
-    // get the names of the real comps
-    real_names.resize(tmp.NumRealComps());
-    auto runtime_rnames = tmp.getParticleRuntimeComps();
-    for (auto const& x : runtime_rnames)
-    {
-        real_names[x.second+PIdx::nattribs] = detail::snakeToCamel(x.first);
+        real_names.push_back("position_z");
+        real_names.push_back("weighting");
+        real_names.push_back("momentum_x");
+        real_names.push_back("momentum_y");
+        real_names.push_back("momentum_z");
     }
+    for (size_t i = real_names.size(); i < rn.size(); ++i)
+    {
+        real_names.push_back(rn[i]);
+    }
+
+    for (size_t i = PIdx::nattribs; i < rn.size(); ++i)
+    {
+        real_names[i] = detail::snakeToCamel(rn[i]);
+    }
+
     // plot any "extra" fields by default
-    real_flags = particle_diags[i].m_plot_flags;
+    amrex::Vector<int> real_flags = particle_diag.m_plot_flags;
     real_flags.resize(tmp.NumRealComps(), 1);
-    // and the names
-    int_names.resize(tmp.NumIntComps());
-    auto runtime_inames = tmp.getParticleRuntimeiComps();
-    for (auto const& x : runtime_inames)
+
+    // and the int names
+    for (size_t i = 0; i < in.size(); ++i)
     {
-        int_names[x.second+0] = detail::snakeToCamel(x.first);
+        int_names[i] = detail::snakeToCamel(in[i]);
     }
+
     // plot by default
+    amrex::Vector<int> int_flags;
     int_flags.resize(tmp.NumIntComps(), 1);
 
     // real_names contains a list of all real particle attributes.
     // real_flags is 1 or 0, whether quantity is dumped or not.
     DumpToFile(&tmp,
-        particle_diags.at(i).getSpeciesName(),
+        particle_diag.getSpeciesName(),
         m_CurrentStep,
         real_flags,
         int_flags,
