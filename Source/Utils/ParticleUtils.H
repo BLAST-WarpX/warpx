@@ -219,12 +219,12 @@ namespace ParticleUtils {
                           double & x1, double & z1,
                           int xmin, int xmax, amrex::GpuArray<bool,2> const& check) {
         if (check[0] && x1 < xmin) {
-            amrex::Real const fx = (x0 - xmin)/(x0 - x1);
+            double const fx = ((x0 - x1) != 0. ? (x0 - xmin)/(x0 - x1) : 0.);
             x1 = xmin;
             z1 = z0 + fx*(z1 - z0);
         }
         else if (check[1] && x1 > xmax) {
-            amrex::Real const fx = (xmax - x0)/(x1 - x0);
+            double const fx = ((x0 - x1) != 0. ? (xmax - x0)/(x1 - x0) : 0.);
             x1 = xmax;
             z1 = z0 + fx*(z1 - z0);
         }
@@ -242,13 +242,13 @@ namespace ParticleUtils {
                           double & x1, double & y1, double & z1,
                           int xmin, int xmax, amrex::GpuArray<bool,2> const& check) {
         if (check[0] && x1 < xmin) {
-            amrex::Real const fx = (x0 - xmin)/(x0 - x1);
+            double const fx = ((x0 - x1) != 0. ? (x0 - xmin)/(x0 - x1) : 0.);
             x1 = xmin;
             y1 = y0 + fx*(y1 - y0);
             z1 = z0 + fx*(z1 - z0);
         }
         else if (check[1] && x1 > xmax) {
-            amrex::Real const fx = (xmax - x0)/(x1 - x0);
+            double const fx = ((x0 - x1) != 0. ? (xmax - x0)/(x1 - x0) : 0.);
             x1 = xmax;
             y1 = y0 + fx*(y1 - y0);
             z1 = z0 + fx*(z1 - z0);
