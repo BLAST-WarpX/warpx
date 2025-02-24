@@ -287,6 +287,7 @@ foreach(D IN LISTS WarpX_DIMS)
             set_target_properties(lib_${SD} PROPERTIES
                 UNITY_BUILD ON
                 UNITY_BUILD_MODE BATCH
+                UNITY_BUILD_UNIQUE_ID "WARPX_UNITY_ID"
                 # Number must be more than the number of .cpp files in WarpX
                 UNITY_BUILD_BATCH_SIZE 10000
             )
