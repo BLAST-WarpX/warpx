@@ -8,9 +8,9 @@ if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in yo
 # required dependencies
 module load cmake/3.27.9
 module load craype-accel-amd-gfx90a
-module load rocm/5.7.1
-module load cray-mpich/8.1.28
-module load cce/17.0.0  # must be loaded after rocm
+module load rocm/6.2.4
+module load cray-mpich/8.1.31
+module load cce/18.0.1  # must be loaded after rocm
 # https://docs.olcf.ornl.gov/systems/frontier_user_guide.html#compatible-compiler-rocm-toolchain-versions
 
 # Fix for OpenMP Runtime (OLCFHELP-21543)
