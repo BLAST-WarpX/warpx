@@ -380,7 +380,7 @@ namespace
                                 amrex::Array4<amrex::Real> const& field,
                                 amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> const& mirrorfac,
                                 amrex::GpuArray<GpuArray<amrex::Real, 2>, AMREX_SPACEDIM> const& psign,
-                                amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> const& is_pec_pmc_bndy,
+                                amrex::GpuArray<GpuArray<bool, 2>, AMREX_SPACEDIM> const& is_pec_pmc_bndy,
                                 amrex::GpuArray<bool, AMREX_SPACEDIM> const& tangent_to_bndy,
                                 [[maybe_unused]]int const is_nodal_r,
                                 amrex::Box const& fabbox)
@@ -699,7 +699,7 @@ PEC::ApplyBoundarytoRhofield (
     // cells for boundaries that are NOT PEC
     amrex::Box grown_domain_box = domain_box;
 
-    amrex::GpuArray<GpuArray<int,2>, AMREX_SPACEDIM> is_pec_pmc_bndy;
+    amrex::GpuArray<GpuArray<bool,2>, AMREX_SPACEDIM> is_pec_pmc_bndy;
     amrex::GpuArray<bool, AMREX_SPACEDIM> is_tangent_to_bndy;
     amrex::GpuArray<GpuArray<amrex::Real,2>, AMREX_SPACEDIM> psign;
     amrex::GpuArray<GpuArray<int,2>, AMREX_SPACEDIM> mirrorfac;
@@ -805,7 +805,7 @@ PEC::ApplyBoundarytoJfield(
     // directions of the current density multifab
     const amrex::IntVect ng_fieldgather = Jx->nGrowVect();
 
-    amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> is_pec_pmc_bndy;
+    amrex::GpuArray<GpuArray<bool, 2>, AMREX_SPACEDIM> is_pec_pmc_bndy;
     amrex::GpuArray<GpuArray<bool, AMREX_SPACEDIM>, 3> is_tangent_to_bndy;
     amrex::GpuArray<GpuArray<GpuArray<amrex::Real, 2>, AMREX_SPACEDIM>, 3> psign;
     amrex::GpuArray<GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM>, 3> mirrorfac;
