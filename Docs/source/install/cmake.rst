@@ -121,6 +121,7 @@ CMake Option                  Default & Values                               Des
 ============================= ============================================== ===========================================================
 ``BUILD_SHARED_LIBS``         ON/**OFF**                                     `Build shared libraries for dependencies <https://cmake.org/cmake/help/latest/variable/BUILD_SHARED_LIBS.html>`__
 ``WarpX_CCACHE``              **ON**/OFF                                     Search and use CCache to speed up rebuilds.
+``WarpX_UNITY_BUILD``         ON/**OFF**                                     WarpX library as unity build (single TU)
 ``AMReX_CUDA_PTX_VERBOSE``    ON/**OFF**                                     Print CUDA code generation statistics from ``ptxas``.
 ``WarpX_amrex_src``           *None*                                         Path to AMReX source directory (preferred if set)
 ``WarpX_amrex_repo``          ``https://github.com/AMReX-Codes/amrex.git``   Repository URI to pull and build AMReX from
