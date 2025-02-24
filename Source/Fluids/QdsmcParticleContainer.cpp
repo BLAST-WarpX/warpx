@@ -293,21 +293,23 @@ void QdsmcParticleContainer::InitParticles(int lev)
         const amrex::Box& box = mfi.validbox(); // Owned cells
         amrex::Vector<amrex::ParticleReal> xpos, ypos, zpos;
         int n_to_add_local = 0;
-        for (int i = box.smallEnd(0); i <= box.bigEnd(0); ++i)
-            for (int j = box.smallEnd(1); j <= box.bigEnd(1); ++j)
-                for (int k = box.smallEnd(2); k <= box.bigEnd(2); ++k)
-                {
+        for (int i = box.smallEnd(0); i <= box.bigEnd(0); ++i){
+            for (int j = box.smallEnd(1); j <= box.bigEnd(1); ++j){
+                for (int k = box.smallEnd(2); k <= box.bigEnd(2); ++k){
+
                     amrex::ParticleReal x = problo[0] + (i+0.5)*dx[0];
                     amrex::ParticleReal y = problo[1] + (j+0.5)*dx[1];
                     amrex::ParticleReal z = problo[2] + (k+0.5)*dx[2];
                     xpos.push_back(x); ypos.push_back(y); zpos.push_back(z);
                     n_to_add_local++;
                 }
+            }
+        }
         AddNParticles(0, n_to_add_local, xpos, ypos, zpos);
     }
-    // Optional: Redistribute() if particles might move later, but not needed here
-    Redistribute();
     amrex::Gpu::synchronize();
+    Redistribute();
+    
 }
 
 
