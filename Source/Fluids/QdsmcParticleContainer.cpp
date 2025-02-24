@@ -24,6 +24,7 @@
 #include <ablastr/utils/Communication.H>
 
 #include <AMReX.H>
+#include <AMReX_BLProfiler.H>
 #include <AMReX_AmrCore.H>
 #include <AMReX_AmrParGDB.H>
 #include <AMReX_BLassert.H>
@@ -76,11 +77,14 @@ QdsmcParticleContainer::QdsmcParticleContainer (AmrCore* amr_core)
 }
 
 
+
 void
 QdsmcParticleContainer::AddNParticles (int lev, amrex::Long n,
                         amrex::Vector<amrex::ParticleReal> const & x,
                         amrex::Vector<amrex::ParticleReal> const & y,
-                        amrex::Vector<amrex::ParticleReal> const & z)
+                        amrex::Vector<amrex::ParticleReal> const & z,
+                        const int grid_id,
+                        const int tile_id)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(lev == 0, "QdsmcParticleContainer::AddNParticles: only lev=0 is supported yet.");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(x.size() == n,"x.size() != # of qdsmc particles to add");
@@ -112,9 +116,7 @@ QdsmcParticleContainer::AddNParticles (int lev, amrex::Long n,
         return;
     }
 
-    //  Add to grid 0 and tile 0
-    // Redistribute() will move them to proper places.
-    auto& particle_tile = DefineAndReturnParticleTile(0, 0, 0);
+    auto& particle_tile = DefineAndReturnParticleTile(0, grid_id, tile_id);
 
     // Creates a temporary tile to obtain data from simulation. This data
     // is then coppied to the permament tile which is stored on the particle
@@ -149,7 +151,7 @@ QdsmcParticleContainer::AddNParticles (int lev, amrex::Long n,
     pinned_tile.push_back_real(QdsmcPIdx::np_real, np, 0.0_prt);
 
     if ( (NumRuntimeRealComps()>0) || (NumRuntimeIntComps()>0) ){
-            DefineAndReturnParticleTile(0, 0, 0);
+            DefineAndReturnParticleTile(0, grid_id, tile_id);
         }
 
     pinned_tile.resize(np);
@@ -177,6 +179,7 @@ QdsmcParticleContainer::AddNParticles (int lev, amrex::Long n,
 //    }
 //#endif
 }
+
 
 /*
 void
@@ -288,11 +291,16 @@ void QdsmcParticleContainer::InitParticles(int lev)
     const amrex::Real* dx = geom.CellSize();
     const auto& ba = warpx.boxArray(lev); // Grid boxes
     const auto& dm = warpx.DistributionMap(lev); // Rank ownership
+
     for (amrex::MFIter mfi(ba, dm); mfi.isValid(); ++mfi)
     {
         const amrex::Box& box = mfi.validbox(); // Owned cells
+        const int grid_id = mfi.index();
+        const int tile_id = mfi.LocalTileIndex();
+
         amrex::Vector<amrex::ParticleReal> xpos, ypos, zpos;
         int n_to_add_local = 0;
+
         for (int i = box.smallEnd(0); i <= box.bigEnd(0); ++i){
             for (int j = box.smallEnd(1); j <= box.bigEnd(1); ++j){
                 for (int k = box.smallEnd(2); k <= box.bigEnd(2); ++k){
@@ -305,12 +313,93 @@ void QdsmcParticleContainer::InitParticles(int lev)
                 }
             }
         }
-        AddNParticles(0, n_to_add_local, xpos, ypos, zpos);
+
+        AddNParticles(0, n_to_add_local, xpos, ypos, zpos, grid_id, tile_id);
     }
     amrex::Gpu::synchronize();
     Redistribute();
-
 }
+
+
+/*
+void QdsmcParticleContainer::InitParticles(int lev)
+{
+    // complete using example from EMParticleContainer:
+    BL_PROFILE("QDSMCParticleContainer::InitParticles");
+
+    auto& warpx = WarpX::GetInstance();
+    const auto& geom = warpx.Geom(lev);
+    const auto plo = geom.ProbLoArray();
+    const auto phi = geom.ProbHiArray();
+    const amrex::Real* dx = geom.CellSize();
+    const auto& ba = warpx.boxArray(lev); // Grid boxes
+    const auto& dm = warpx.DistributionMap(lev); // Rank ownership
+    const auto periodic = warpx.Geom(lev).isPeriodic();
+
+    for(MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
+    {
+        const Box& tile_box  = mfi.tilebox();
+
+        const auto lo = amrex::lbound(tile_box);
+        const auto hi = amrex::ubound(tile_box);
+
+        Gpu::ManagedVector<unsigned int> counts(tile_box.numPts(), 0);
+        unsigned int* pcount = counts.dataPtr();
+
+        Gpu::ManagedVector<unsigned int> offsets(tile_box.numPts());
+        unsigned int* poffset = offsets.dataPtr();
+
+        amrex::ParallelFor(tile_box,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+            // fix in case is periodic in a specific direction
+            // is this adding more particles than needed?
+
+            amrex::Real x = plo[0] + (i + 0.5)*dx[0];
+            amrex::Real y = plo[1] + (j + 0.5)*dx[1];
+            amrex::Real z = plo[2] + (k + 0.5)*dx[2];
+
+            int ix = i - lo.x;
+                int iy = j - lo.y;
+                int iz = k - lo.z;
+                int nx = hi.x-lo.x+1;
+                int ny = hi.y-lo.y+1;
+                int nz = hi.z-lo.z+1;
+                unsigned int uix = amrex::min(nx-1,amrex::max(0,ix));
+                unsigned int uiy = amrex::min(ny-1,amrex::max(0,iy));
+                unsigned int uiz = amrex::min(nz-1,amrex::max(0,iz));
+                unsigned int cellid = (uix * ny + uiy) * nz + uiz;
+                pcount[cellid] += 1;
+        });
+
+        Gpu::exclusive_scan(counts.begin(), counts.end(), offsets.begin());
+
+        int num_to_add = offsets[tile_box.numPts()-1] + counts[tile_box.numPts()-1];
+
+        auto& particles = GetParticles(lev);
+        auto& particle_tile = particles[std::make_pair(mfi.index(), mfi.LocalTileIndex())];
+
+        auto old_size = particle_tile.numParticles();
+        auto new_size = old_size + num_to_add;
+        particle_tile.resize(new_size);
+
+        if (num_to_add == 0) continue;
+
+        ParticleType* pstruct = particle_tile.GetArrayOfStructs();
+
+        auto arrdata = particle_tile.GetStructOfArrays().realarray();
+
+        int procID = ParallelDescriptor::MyProc();
+
+
+
+
+    }
+
+    amrex::Gpu::synchronize();
+    Redistribute();
+}
+*/
 
 
 void
