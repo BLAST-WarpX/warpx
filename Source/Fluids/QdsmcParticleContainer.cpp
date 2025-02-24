@@ -178,7 +178,7 @@ QdsmcParticleContainer::AddNParticles (int lev, amrex::Long n,
 //#endif
 }
 
-
+/*
 void
 QdsmcParticleContainer::InitParticles (int lev)
 {
@@ -230,6 +230,54 @@ QdsmcParticleContainer::InitParticles (int lev)
 
     amrex::Gpu::synchronize();
 }
+*/
+
+///* new version, divide initialization in z pos using different ranks, then Redistribute
+void QdsmcParticleContainer::InitParticles(int lev)
+{
+    auto& warpx = WarpX::GetInstance();
+
+    const auto problo = warpx.Geom(lev).ProbLoArray();
+    const auto probhi = warpx.Geom(lev).ProbHiArray();
+    const amrex::Real* dx = warpx.Geom(lev).CellSize();
+    const auto periodic = warpx.Geom(lev).isPeriodic();
+
+    int nx = (probhi[0] - problo[0])/dx[0] - periodic[0];
+    int ny = (probhi[1] - problo[1])/dx[1] - periodic[1];
+    int nz = (probhi[2] - problo[2])/dx[2] - periodic[2];
+
+    int n_to_add_local = 0;
+
+    amrex::Vector<amrex::ParticleReal> xpos;
+    amrex::Vector<amrex::ParticleReal> ypos;
+    amrex::Vector<amrex::ParticleReal> zpos;
+
+    const int myproc = ParallelDescriptor::MyProc();
+    const int nprocs = ParallelDescriptor::NProcs();
+
+    int nz_per_proc = (nz + 1) / nprocs;
+    int z_start = myproc * nz_per_proc;
+    int z_end = (myproc == nprocs - 1) ? (nz + 1) : z_start + nz_per_proc;
+
+    for (int i = 0; i <= nx; i++){
+        for (int j = 0; j <= ny; j++){
+            for (int k = z_start; k < z_end; k++){
+                amrex::ParticleReal x = problo[0] + (i+0.5)*dx[0];
+                amrex::ParticleReal y = problo[1] + (j+0.5)*dx[1];
+                amrex::ParticleReal z = problo[2] + (k+0.5)*dx[2];
+
+                xpos.push_back(x);
+                ypos.push_back(y);
+                zpos.push_back(z);
+
+                n_to_add_local++;
+            }
+        }
+    }
+    AddNParticles(0, n_to_add_local, xpos, ypos, zpos);
+    amrex::Gpu::synchronize();
+}
+//*/
 
 
 void
@@ -429,6 +477,7 @@ QdsmcParticleContainer::ResetParticles(int lev)
     }
 
     Redistribute();
+    amrex::Gpu::synchronize();
 }
 
 

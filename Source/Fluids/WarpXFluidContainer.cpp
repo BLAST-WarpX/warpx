@@ -1625,6 +1625,9 @@ void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiF
     // For safety condition (divition by rho)
     amrex::Real rho_floor = PhysConst::q_e*hybrid_model->m_n_floor;
 
+    // Te0 to treat it as floor value. This is a quick fix for Spitzer type resistivity.
+    const auto Te0_K = hybrid_model->m_elec_temp / PhysConst::kb;
+
     const auto ix_type = m_fields.get(name_mf_NU, Direction{0}, lev)->ixType().toIntVect();
 
     ablastr::fields::VectorField current_fp_ampere = m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
@@ -1667,7 +1670,11 @@ void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiF
 
                     amrex::Real rho_val = rho(i, j, k);
                     amrex::Real ne_val = rho_val/PhysConst::q_e;
+
                     amrex::Real Te_val = Te(i, j, k)/PhysConst::kb; // convert to K since eta expression should be in SI
+                    if(Te_val<Te0_K){
+                        Te_val = Te0_K;
+                    }
 
                     // Interpolate the total plasma current to a nodal grid
                     auto const jx_interp = ablastr::coarsen::sample::Interp(Jx, Jx_stag, nodal, coarsen, i, j, k, 0);

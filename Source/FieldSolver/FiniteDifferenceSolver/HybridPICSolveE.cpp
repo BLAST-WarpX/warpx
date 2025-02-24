@@ -1091,7 +1091,12 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     else{
                         Te_val = Te0*std::pow(rho_val/rho_n0_ref,gamma_val-1)/PhysConst::kb;
                     }
+                    if(Te_val<Te0/PhysConst::kb){
+                        Te_val = Te0/PhysConst::kb;
+                    }
                 }
+                
+
 
                 // Add resistivity only if E field value is used to update B
                 if (solve_for_Faraday) {
@@ -1158,6 +1163,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     // Te is calculated using adiabatic relationship
                     else{
                         Te_val = Te0*std::pow(rho_val/rho_n0_ref,gamma_val-1)/PhysConst::kb;
+                    }
+                    if(Te_val<Te0/PhysConst::kb){
+                        Te_val = Te0/PhysConst::kb;
                     }
                 }
 
@@ -1226,6 +1234,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     // Te is calculated using adiabatic relationship
                     else{
                         Te_val = Te0*std::pow(rho_val/rho_n0_ref,gamma_val-1)/PhysConst::kb;
+                    }
+                    if(Te_val<Te0/PhysConst::kb){
+                        Te_val = Te0/PhysConst::kb;
                     }
                 }
 
