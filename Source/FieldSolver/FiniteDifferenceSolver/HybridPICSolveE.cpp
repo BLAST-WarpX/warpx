@@ -429,8 +429,6 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
     const auto resistivity_has_J_dependence = hybrid_model->m_resistivity_has_J_dependence;
     const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
-
-    // const bool include_hyper_resistivity_term = (eta_h > 0.0) && solve_for_Faraday;
     const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity_term;
 
     const bool include_external_fields = hybrid_model->m_add_external_fields;
@@ -850,8 +848,6 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
     const auto resistivity_has_J_dependence = hybrid_model->m_resistivity_has_J_dependence;
     const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
-
-    // const bool include_hyper_resistivity_term = (eta_h > 0.) && solve_for_Faraday;
     const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity_term;
 
     const bool include_external_fields = hybrid_model->m_add_external_fields;
