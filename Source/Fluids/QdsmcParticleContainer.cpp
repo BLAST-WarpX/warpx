@@ -221,8 +221,9 @@ QdsmcParticleContainer::InitParticles (int lev)
 }
 */
 
+
 // new version, divide initialization in z pos using different ranks, then Redistribute
-/*
+// this one seemed to work better
 void QdsmcParticleContainer::InitParticles(int lev)
 {
     auto& warpx = WarpX::GetInstance();
@@ -252,6 +253,7 @@ void QdsmcParticleContainer::InitParticles(int lev)
     for (int i = 0; i <= nx; i++){
         for (int j = 0; j <= ny; j++){
             for (int k = z_start; k < z_end; k++){
+
                 amrex::ParticleReal x = problo[0] + (i+0.5)*dx[0];
                 amrex::ParticleReal y = problo[1] + (j+0.5)*dx[1];
                 amrex::ParticleReal z = problo[2] + (k+0.5)*dx[2];
@@ -265,12 +267,13 @@ void QdsmcParticleContainer::InitParticles(int lev)
         }
     }
 
-    AddNParticles(0, n_to_add_local, xpos, ypos, zpos);
+    AddNParticles(0, n_to_add_local, xpos, ypos, zpos, 0, 0);
+    Redistribute();
     amrex::Gpu::synchronize();
 }
-*/
 
 
+/*
 void QdsmcParticleContainer::InitParticles(int lev)
 {
     auto& warpx = WarpX::GetInstance();
@@ -305,75 +308,6 @@ void QdsmcParticleContainer::InitParticles(int lev)
         AddNParticles(0, n_to_add_local, xpos, ypos, zpos, grid_id, tile_id);
         //amrex::Gpu::synchronize();
     }
-}
-
-
-/*
-void QdsmcParticleContainer::InitParticles(int lev)
-{
-    auto& warpx = WarpX::GetInstance();
-    const auto& geom = warpx.Geom(lev);
-    const auto problo = geom.ProbLoArray();
-    const amrex::Real* dx = geom.CellSize();
-    const auto& ba = warpx.boxArray(lev);       // Grid boxes
-    const auto& dm = warpx.DistributionMap(lev); // Rank ownership
-
-    // Pre-allocate particle memory
-    reserveData();
-    resizeData();
-
-    // Iterate over tiles owned by this rank
-    for(MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
-    {
-        const amrex::Box& box = mfi.validbox(); // Cells this rank owns
-        auto& particle_tile = DefineAndReturnParticleTile(lev, mfi); // Direct to tile
-
-        int np_old = particle_tile.numParticles();
-        int np_add = box.numPts(); // One particle per cell
-        int np_new = np_old + np_add;
-
-        particle_tile.resize(np_new);
-        auto& soa = particle_tile.GetStructOfArrays();
-
-        amrex::ParticleReal* x_data = soa.GetRealData(QdsmcPIdx::x).data();
-        amrex::ParticleReal* y_data = soa.GetRealData(QdsmcPIdx::y).data();
-        amrex::ParticleReal* z_data = soa.GetRealData(QdsmcPIdx::z).data();
-        amrex::ParticleReal* x_node_data = soa.GetRealData(QdsmcPIdx::x_node).data();
-        amrex::ParticleReal* y_node_data = soa.GetRealData(QdsmcPIdx::y_node).data();
-        amrex::ParticleReal* z_node_data = soa.GetRealData(QdsmcPIdx::z_node).data();
-        amrex::ParticleReal* vx_data = soa.GetRealData(QdsmcPIdx::vx).data();
-        amrex::ParticleReal* vy_data = soa.GetRealData(QdsmcPIdx::vy).data();
-        amrex::ParticleReal* vz_data = soa.GetRealData(QdsmcPIdx::vz).data();
-        amrex::ParticleReal* entropy_data = soa.GetRealData(QdsmcPIdx::entropy).data();
-        amrex::ParticleReal* np_real_data = soa.GetRealData(QdsmcPIdx::np_real).data();
-
-        int idx = np_old;
-
-        for (int i = box.smallEnd(0); i <= box.bigEnd(0); ++i){
-            for (int j = box.smallEnd(1); j <= box.bigEnd(1); ++j){
-                for (int k = box.smallEnd(2); k <= box.bigEnd(2); ++k){
-                    x_data[idx] = problo[0] + (i+0.5)*dx[0];
-                    y_data[idx] = problo[1] + (j+0.5)*dx[1];
-                    z_data[idx] = problo[2] + (k+0.5)*dx[2];
-
-                    x_node_data[idx] = x_data[idx];
-                    y_node_data[idx] = y_data[idx];
-                    z_node_data[idx] = z_data[idx];
-
-                    vx_data[idx] = 0.0;
-                    vy_data[idx] = 0.0;
-                    vz_data[idx] = 0.0;
-
-                    entropy_data[idx] = 0.0;
-                    np_real_data[idx] = 0.0;
-
-                    idx++;
-                }
-            }
-        }
-    }
-    amrex::Gpu::synchronize();
-    Redistribute(); // this call might not be necessary
 }
 */
 
@@ -520,6 +454,81 @@ void QdsmcParticleContainer::InitParticles(int lev)
     Redistribute();
 }
 */
+
+
+/*
+void QdsmcParticleContainer::InitParticles(int lev)
+{
+    auto& warpx = WarpX::GetInstance();
+    const auto& geom = warpx.Geom(lev);
+    const auto problo = geom.ProbLoArray();
+    const amrex::Real* dx = geom.CellSize();
+    const auto& ba = warpx.boxArray(lev);
+    const auto& dm = warpx.DistributionMap(lev);
+
+    reserveData();
+    resizeData();
+
+    for (amrex::MFIter mfi(ba, dm); mfi.isValid(); ++mfi)
+    {
+        const amrex::Box& box = mfi.validbox();
+
+        auto& particles = GetParticles(lev);
+        auto& particle_tile = particles[std::make_pair(mfi.index(), mfi.LocalTileIndex())];
+
+        int np_old = particle_tile.numParticles();
+        int np_add = box.numPts();
+        int np_new = np_old + np_add;
+
+        particle_tile.resize(np_new);
+        auto& soa = particle_tile.GetStructOfArrays();
+
+        amrex::ParticleReal* x_data = soa.GetRealData(QdsmcPIdx::x).data();
+        amrex::ParticleReal* y_data = soa.GetRealData(QdsmcPIdx::y).data();
+        amrex::ParticleReal* z_data = soa.GetRealData(QdsmcPIdx::z).data();
+        amrex::ParticleReal* x_node_data = soa.GetRealData(QdsmcPIdx::x_node).data();
+        amrex::ParticleReal* y_node_data = soa.GetRealData(QdsmcPIdx::y_node).data();
+        amrex::ParticleReal* z_node_data = soa.GetRealData(QdsmcPIdx::z_node).data();
+        amrex::ParticleReal* vx_data = soa.GetRealData(QdsmcPIdx::vx).data();
+        amrex::ParticleReal* vy_data = soa.GetRealData(QdsmcPIdx::vy).data();
+        amrex::ParticleReal* vz_data = soa.GetRealData(QdsmcPIdx::vz).data();
+        amrex::ParticleReal* entropy_data = soa.GetRealData(QdsmcPIdx::entropy).data();
+        amrex::ParticleReal* np_real_data = soa.GetRealData(QdsmcPIdx::np_real).data();
+
+        int idx = np_old;
+        for (int i = box.smallEnd(0); i <= box.bigEnd(0); ++i){
+            for (int j = box.smallEnd(1); j <= box.bigEnd(1); ++j){
+                for (int k = box.smallEnd(2); k <= box.bigEnd(2); ++k)
+                {
+                    // Cell-centered placement
+                    x_data[idx] = problo[0] + (i+0.5)*dx[0];
+                    y_data[idx] = problo[1] + (j+0.5)*dx[1];
+                    z_data[idx] = problo[2] + (k+0.5)*dx[2];
+
+                    x_node_data[idx] = x_data[idx];
+                    y_node_data[idx] = y_data[idx];
+                    z_node_data[idx] = z_data[idx];
+
+                    vx_data[idx] = 0.0;
+                    vy_data[idx] = 0.0;
+                    vz_data[idx] = 0.0;
+
+                    entropy_data[idx] = 0.0;
+                    np_real_data[idx] = 0.0;
+
+                    idx++;
+                }
+            }
+        }
+
+        auto& idcpu_data = soa.GetIdCPUData();
+        for (int i = np_old; i < np_new; ++i) {
+            idcpu_data[i] = amrex::SetParticleIDandCPU(ParticleType::NextID(), ParallelDescriptor::MyProc());
+        }
+
+    }
+    //amrex::Gpu::synchronize();
+}*/
 
 
 void
