@@ -119,9 +119,9 @@ class SimData:
             kcoords = k.astype(int) // k_blocking_factor
 
             # Fill in cost array
-            shape = (kmax + 1, jmax + 1, imax + 1)[: 2 + self.is_3D]
+            shape = (kmax + 1, jmax + 1, imax + 1)[1 - self.is_3D :]
             coords = [
-                coord[: 2 + self.is_3D] for coord in zip(kcoords, jcoords, icoords)
+                coord[1 - self.is_3D :] for coord in zip(kcoords, jcoords, icoords)
             ]
 
             cost_arr = np.full(shape, 0.0)

@@ -66,16 +66,6 @@ jobs:
       cacheHitVar: CCACHE_CACHE_RESTORED
     displayName: Cache Ccache Objects
 
-  - task: Cache@2
-    continueOnError: true
-    inputs:
-      key: 'Python3 | "$(System.JobName)" | .azure-pipelines.yml'
-      restoreKeys: |
-         Python3 | "$(System.JobName)" | .azure-pipelines.yml
-      path: /home/vsts/.local/lib/python3.8
-      cacheHitVar: PYTHON38_CACHE_RESTORED
-    displayName: Cache Python Libraries
-
   - bash: |
       set -o nounset errexit pipefail
       cat /proc/cpuinfo | grep "model name" | sort -u
@@ -175,4 +165,10 @@ jobs:
         -exec echo -e "\nBacktrace\n---------\n{}\n---------" \; \
         -exec cat {} \;
     displayName: 'Logs'
+    condition: always()
+
+  - bash: |
+      # clean out so the Post-job Cache "tar" command has more disk space available
+      rm -rf build
+    displayName: 'Clean Build Directory'
     condition: always()

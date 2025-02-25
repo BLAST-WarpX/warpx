@@ -1853,8 +1853,37 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
     substeps: int, default=100
         Number of substeps to take when updating the B-field.
 
+    holmstrom_vacuum_region: bool, default=False
+        Flag to determine handling of vacuum region. Setting to True will solve the simplified Generalized Ohm's Law dropping the Hall and pressure terms in the vacuum region.
+        This flag is useful for suppressing vacuum region fluctuations. A large resistivity value must be used when rho <= rho_floor.
+
     Jx/y/z_external_function: str
         Function of space and time specifying external (non-plasma) currents.
+
+    A_external: dict
+        Function of space and time specifying external (non-plasma) vector potential fields.
+        It is expected that a nested dicitonary will be passed
+        into picmi for each field that has different timings
+        e.g.
+        A_external = {
+            '<field_name1>': {
+                'Ax_external_function': <implicit function with (x,y,z) dependence>,
+                'Ay_external_function': <implicit function with (x,y,z) dependence>,
+                'Az_external_function': <implicit function with (x,y,z) dependence>,
+                'A_time_external_function': <implicit function with (t) dependence>
+            },
+            '<field_name2>: {...}'
+        }
+
+        or if fields are to be loaded from an OpenPMD file
+        A_external = {
+            '<field_name1>': {
+                'load_from_file': True,
+                'path': <path to OpenPMD file>,
+                'A_time_external_function': <implicit function with (t) dependence>
+            },
+            '<field_name2>: {...}'
+        }
     """
 
     def __init__(
@@ -1867,9 +1896,11 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         plasma_resistivity=None,
         plasma_hyper_resistivity=None,
         substeps=None,
+        holmstrom_vacuum_region=None,
         Jx_external_function=None,
         Jy_external_function=None,
         Jz_external_function=None,
+        A_external=None,
         **kw,
     ):
         self.grid = grid
@@ -1884,9 +1915,13 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
 
         self.substeps = substeps
 
+        self.holmstrom_vacuum_region = holmstrom_vacuum_region
+
         self.Jx_external_function = Jx_external_function
         self.Jy_external_function = Jy_external_function
         self.Jz_external_function = Jz_external_function
+
+        self.A_external = A_external
 
         # Handle keyword arguments used in expressions
         self.user_defined_kw = {}
@@ -1916,8 +1951,14 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                 self.plasma_resistivity, self.mangle_dict
             ),
         )
-        pywarpx.hybridpicmodel.plasma_hyper_resistivity = self.plasma_hyper_resistivity
+        pywarpx.hybridpicmodel.__setattr__(
+            "plasma_hyper_resistivity(rho,B)",
+            pywarpx.my_constants.mangle_expression(
+                self.plasma_hyper_resistivity, self.mangle_dict
+            ),
+        )
         pywarpx.hybridpicmodel.substeps = self.substeps
+        pywarpx.hybridpicmodel.holmstrom_vacuum_region = self.holmstrom_vacuum_region
         pywarpx.hybridpicmodel.__setattr__(
             "Jx_external_grid_function(x,y,z,t)",
             pywarpx.my_constants.mangle_expression(
@@ -1936,6 +1977,47 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                 self.Jz_external_function, self.mangle_dict
             ),
         )
+        if self.A_external is not None:
+            pywarpx.hybridpicmodel.add_external_fields = True
+            pywarpx.external_vector_potential.__setattr__(
+                "fields",
+                pywarpx.my_constants.mangle_expression(
+                    list(self.A_external.keys()), self.mangle_dict
+                ),
+            )
+            for field_name, field_dict in self.A_external.items():
+                if field_dict.get("read_from_file", False):
+                    pywarpx.external_vector_potential.__setattr__(
+                        f"{field_name}.read_from_file", field_dict["read_from_file"]
+                    )
+                    pywarpx.external_vector_potential.__setattr__(
+                        f"{field_name}.path", field_dict["path"]
+                    )
+                else:
+                    pywarpx.external_vector_potential.__setattr__(
+                        f"{field_name}.Ax_external_grid_function(x,y,z)",
+                        pywarpx.my_constants.mangle_expression(
+                            field_dict["Ax_external_function"], self.mangle_dict
+                        ),
+                    )
+                    pywarpx.external_vector_potential.__setattr__(
+                        f"{field_name}.Ay_external_grid_function(x,y,z)",
+                        pywarpx.my_constants.mangle_expression(
+                            field_dict["Ay_external_function"], self.mangle_dict
+                        ),
+                    )
+                    pywarpx.external_vector_potential.__setattr__(
+                        f"{field_name}.Az_external_grid_function(x,y,z)",
+                        pywarpx.my_constants.mangle_expression(
+                            field_dict["Az_external_function"], self.mangle_dict
+                        ),
+                    )
+                pywarpx.external_vector_potential.__setattr__(
+                    f"{field_name}.A_time_external_function(t)",
+                    pywarpx.my_constants.mangle_expression(
+                        field_dict["A_time_external_function"], self.mangle_dict
+                    ),
+                )
 
 
 class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
@@ -3984,7 +4066,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
 
     species: species instance
         The name of the species for which to calculate the diagnostic, required for
-        diagnostic types 'BeamRelevant', 'ParticleHistogram', and 'ParticleExtrema'
+        diagnostic types 'BeamRelevant', 'ParticleHistogram', 'ParticleHistogram2D', and 'ParticleExtrema'
 
     bin_number: integer
         For diagnostic type 'ParticleHistogram', the number of bins used for the histogram
@@ -4002,7 +4084,34 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
         For diagnostic type 'ParticleHistogram', the function evaluated to produce the histogram data
 
     filter_function: string, optional
-        For diagnostic type 'ParticleHistogram', the function to filter whether particles are included in the histogram
+        For diagnostic types 'ParticleHistogram' and 'ParticleHistogram2D', the function to filter whether particles are included in the histogram
+
+    bin_max_abs: float
+        For diagnostic type 'ParticleHistogram2D', the maximum value of the bins for the abscissa axis.
+
+    bin_max_ord: float
+        For diagnostic type 'ParticleHistogram2D', the maximum value of the bins for the ordinate axis.
+
+    bin_min_abs: float
+        For diagnostic type 'ParticleHistogram2D', the minimum value of the bins for the abscissa axis.
+
+    bin_min_ord: float
+        For diagnostic type 'ParticleHistogram2D', the minimum value of the bins for the ordinate axis.
+
+    bin_number_abs: integer
+        For diagnostic type 'ParticleHistogram2D', the number of bins used for the histogram for the abscissa axis.
+
+    bin_number_ord: integer
+        For diagnostic type 'ParticleHistogram2D', the number of bins used for the histogram for the ordinate axis.
+
+    histogram_function_abs: string
+        For diagnostic type 'ParticleHistogram2D', the histogram function for the abscissa axis.
+
+    histogram_function_ord: string
+        For diagnostic type 'ParticleHistogram2D', the histogram function for the ordinate axis.
+
+    value_function: string, optional
+        For diagnostic type 'ParticleHistogram2D', the expression for the weight used to calculate the histogram.
 
     reduced_function: string
         For diagnostic type 'FieldReduction', the function of the fields to evaluate
@@ -4085,6 +4194,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
         self._species_reduced_diagnostics = [
             "BeamRelevant",
             "ParticleHistogram",
+            "ParticleHistogram2D",
             "ParticleExtrema",
         ]
 
@@ -4095,6 +4205,8 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
             self.species = species.name
             if self.type == "ParticleHistogram":
                 kw = self._handle_particle_histogram(**kw)
+            elif self.type == "ParticleHistogram2D":
+                kw = self._handle_particle_histogram2d(**kw)
         elif self.type == "FieldProbe":
             kw = self._handle_field_probe(**kw)
         elif self.type == "FieldReduction":
@@ -4169,6 +4281,44 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
             ):
                 self.user_defined_kw[k] = kw[k]
                 del kw[k]
+
+        return kw
+
+    def _handle_particle_histogram2d(self, **kw):
+        self.bin_number_abs = kw.pop("bin_number_abs")
+        self.bin_number_ord = kw.pop("bin_number_ord")
+        self.bin_min_abs = kw.pop("bin_min_abs")
+        self.bin_max_abs = kw.pop("bin_max_abs")
+        self.bin_min_ord = kw.pop("bin_min_ord")
+        self.bin_max_ord = kw.pop("bin_max_ord")
+        histogram_function_abs = kw.pop("histogram_function_abs")
+        histogram_function_ord = kw.pop("histogram_function_ord")
+        self.__setattr__(
+            "histogram_function_abs(t,x,y,z,ux,uy,uz,w)", histogram_function_abs
+        )
+        self.__setattr__(
+            "histogram_function_ord(t,x,y,z,ux,uy,uz,w)", histogram_function_ord
+        )
+
+        filter_function = kw.pop("filter_function", None)
+        value_function = kw.pop("value_function", None)
+
+        self.__setattr__("filter_function(t,x,y,z,ux,uy,uz,w)", filter_function)
+        self.__setattr__("value_function(t,x,y,z,ux,uy,uz,w)", value_function)
+
+        # Check the function expressions for constants
+        for k in list(kw.keys()):
+            if any(
+                re.search(r"\b%s\b" % k, expr)
+                for expr in [
+                    histogram_function_abs,
+                    histogram_function_ord,
+                    filter_function,
+                    value_function,
+                ]
+                if expr is not None
+            ):
+                self.user_defined_kw[k] = kw.pop(k)
 
         return kw
 
