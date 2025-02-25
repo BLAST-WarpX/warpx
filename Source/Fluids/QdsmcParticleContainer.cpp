@@ -512,7 +512,7 @@ void QdsmcParticleContainer::InitParticles(int lev)
     for(MFIter mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
     {
         auto& particles = GetParticles(lev)[std::make_pair(mfi.index(),mfi.LocalTileIndex())];
-      
+
         //std::array<amrex::Real, NReal> real_attribs;
 
 
