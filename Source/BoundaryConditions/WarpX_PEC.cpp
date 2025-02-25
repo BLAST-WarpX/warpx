@@ -704,7 +704,7 @@ PEC::ApplyBoundarytoRhofield (
         is_pec_pmc_bndy[idim][0] = ( field_boundary_lo[idim] == FieldBoundaryType::PEC
                                   || field_boundary_lo[idim] == FieldBoundaryType::PMC );
         is_pec_pmc_bndy[idim][1] = ( field_boundary_hi[idim] == FieldBoundaryType::PEC
-                                  || field_boundary_lo[idim] == FieldBoundaryType::PMC );
+                                  || field_boundary_hi[idim] == FieldBoundaryType::PMC );
         if (!is_pec_pmc_bndy[idim][0]) { grown_domain_box.growLo(idim, ng_fieldgather[idim]); }
         if (!is_pec_pmc_bndy[idim][1]) { grown_domain_box.growHi(idim, ng_fieldgather[idim]); }
 
