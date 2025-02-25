@@ -34,19 +34,6 @@ namespace
         return std::any_of(field_boundary_lo.begin(), field_boundary_lo.end(), isFT) ||
                std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(), isFT);
     }
-
-    /** Returns true if any particle boundary is set to ParticleBoundaryType PT, else returns false.*/
-    template <ParticleBoundaryType PT>
-    [[nodiscard]]
-    bool isAnyBoundary (const amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>& particle_boundary_lo,
-        const amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>& particle_boundary_hi)
-    {
-        const auto isPT = [](const auto& b){
-            return b == PT;};
-        return std::any_of(particle_boundary_lo.begin(), particle_boundary_lo.end(), isPT) ||
-               std::any_of(particle_boundary_hi.begin(), particle_boundary_hi.end(), isPT);
-    }
-
 }
 
 void WarpX::ApplyEfieldBoundary(const int lev, PatchType patch_type, amrex::Real time)
