@@ -4,6 +4,7 @@
  *
  * License: BSD-3-Clause-LBNL
  */
+#include "Fields.H"
 #include "SemiImplicitEM.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "WarpX.H"
