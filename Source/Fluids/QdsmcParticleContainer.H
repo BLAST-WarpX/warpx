@@ -74,9 +74,7 @@ public:
     void AddNParticles (int lev, amrex::Long np,
                         amrex::Vector<amrex::ParticleReal> const & x,
                         amrex::Vector<amrex::ParticleReal> const & y,
-                        amrex::Vector<amrex::ParticleReal> const & z,
-                        const int grid_id,
-                        const int tile_id);
+                        amrex::Vector<amrex::ParticleReal> const & z);
     /*
     * Function that initializes the particles (only positions)
     * current version only adds one particle per cell (qdsmc for electron energy equation)
