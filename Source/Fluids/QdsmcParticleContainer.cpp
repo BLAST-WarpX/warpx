@@ -349,7 +349,7 @@ void QdsmcParticleContainer::InitParticles(int lev)
         amrex::ParticleReal* vz_data = soa.GetRealData(QdsmcPIdx::vz).data();
         amrex::ParticleReal* entropy_data = soa.GetRealData(QdsmcPIdx::entropy).data();
         amrex::ParticleReal* np_real_data = soa.GetRealData(QdsmcPIdx::np_real).data();
-        
+
         int idx = np_old;
 
         for (int i = box.smallEnd(0); i <= box.bigEnd(0); ++i){
@@ -414,7 +414,7 @@ void QdsmcParticleContainer::InitParticles(int lev)
         {
             // fix in case is periodic in a specific direction
             // is this adding more particles than needed?
-            
+
             int ix = i - lo.x;
             int iy = j - lo.y;
             int iz = k - lo.z;
@@ -440,7 +440,7 @@ void QdsmcParticleContainer::InitParticles(int lev)
         auto new_size = old_size + num_to_add;
         particle_tile.resize(new_size);
 
-        
+
         if (num_to_add == 0) continue;
 
         auto arrdata = particle_tile.GetStructOfArrays().GetRealData();
@@ -468,7 +468,7 @@ void QdsmcParticleContainer::InitParticles(int lev)
             amrex::Real y = plo[1] + (j + 0.5)*dx[1];
             amrex::Real z = plo[2] + (k + 0.5)*dx[2];
 
-            
+
             arrdata[QdsmcPIdx::x][pidx] = x;
             arrdata[QdsmcPIdx::y][pidx] = y;
             arrdata[QdsmcPIdx::z][pidx] = z;
@@ -483,10 +483,10 @@ void QdsmcParticleContainer::InitParticles(int lev)
 
             arrdata[QdsmcPIdx::entropy][pidx] = 0;
             arrdata[QdsmcPIdx::np_real][pidx] = 0;
-            
+
 
         });
-        
+
     }
 
     amrex::Gpu::synchronize();
@@ -514,8 +514,8 @@ void QdsmcParticleContainer::InitParticles(int lev)
         auto& particles = GetParticles(lev)[std::make_pair(mfi.index(),mfi.LocalTileIndex())];
       
         //std::array<amrex::Real, NReal> real_attribs;
-        
-  
+
+
     }
 
 
