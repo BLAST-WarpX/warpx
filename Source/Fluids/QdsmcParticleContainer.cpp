@@ -77,7 +77,8 @@ QdsmcParticleContainer::QdsmcParticleContainer (AmrCore* amr_core)
 }
 
 
-
+/*
+// Original
 void
 QdsmcParticleContainer::AddNParticles (int lev, amrex::Long n,
                         amrex::Vector<amrex::ParticleReal> const & x,
@@ -163,8 +164,130 @@ QdsmcParticleContainer::AddNParticles (int lev, amrex::Long n,
     amrex::copyParticles(
             particle_tile, pinned_tile, 0, old_np, pinned_tile.numParticles()
         );
+}*/
+
+
+// each MPI rank simply uses all the particles provided to it.
+void QdsmcParticleContainer::AddNParticles (int lev, amrex::Long n,
+                        amrex::Vector<amrex::ParticleReal> const & x,
+                        amrex::Vector<amrex::ParticleReal> const & y,
+                        amrex::Vector<amrex::ParticleReal> const & z,
+                        const int grid_id,
+                        const int tile_id)
+{
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(lev == 0,
+        "QdsmcParticleContainer::AddNParticles: only lev=0 is supported yet.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(x.size() == n,
+        "x.size() != # of qdsmc particles to add");
+
+    // In the original version the I/O processor would partition the global array
+    // among all MPI ranks. In the multi-GPU, tiled version each MPI rank already has
+    // only its own local particles, so we set:
+    long ibegin = 0;
+    long iend = n;
+
+    // Ensure that the particle container is ready for new data.
+    reserveData();
+    resizeData();
+
+    // Get the local particle tile. (Here we assume one tile per MPI rank for simplicity.)
+    auto& particle_tile = DefineAndReturnParticleTile(0, 0, 0);
+
+    // Create a temporary pinned tile to hold the new particle data.
+    using PinnedTile = typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType;
+    PinnedTile pinned_tile;
+    pinned_tile.define(NumRuntimeRealComps(), NumRuntimeIntComps());
+
+    const std::size_t np = iend - ibegin;
+
+    // Set the IDs and CPU info for the new particles.
+    for (auto i = ibegin; i < iend; ++i)
+    {
+        auto & idcpu_data = pinned_tile.GetStructOfArrays().GetIdCPUData();
+        amrex::Long current_id = ParticleType::NextID();
+        idcpu_data.push_back(amrex::SetParticleIDandCPU(current_id, ParallelDescriptor::MyProc()));
+    }
+
+#if !defined (WARPX_DIM_1D_Z)
+    pinned_tile.push_back_real(QdsmcPIdx::x, x.data() + ibegin, x.data() + iend);
+    pinned_tile.push_back_real(QdsmcPIdx::x_node, x.data() + ibegin, x.data() + iend);
+#endif
+#if defined (WARPX_DIM_3D)
+    pinned_tile.push_back_real(QdsmcPIdx::y, y.data() + ibegin, y.data() + iend);
+    pinned_tile.push_back_real(QdsmcPIdx::y_node, y.data() + ibegin, y.data() + iend);
+#endif
+    pinned_tile.push_back_real(QdsmcPIdx::z, z.data() + ibegin, z.data() + iend);
+    pinned_tile.push_back_real(QdsmcPIdx::z_node, z.data() + ibegin, z.data() + iend);
+
+    // Initialize velocity and other attributes to zero.
+    pinned_tile.push_back_real(QdsmcPIdx::vx, np, 0.0_prt);
+    pinned_tile.push_back_real(QdsmcPIdx::vy, np, 0.0_prt);
+    pinned_tile.push_back_real(QdsmcPIdx::vz, np, 0.0_prt);
+    pinned_tile.push_back_real(QdsmcPIdx::entropy, np, 0.0_prt);
+    pinned_tile.push_back_real(QdsmcPIdx::np_real, np, 0.0_prt);
+
+    if ((NumRuntimeRealComps() > 0) || (NumRuntimeIntComps() > 0)) {
+        DefineAndReturnParticleTile(0, 0, 0);
+    }
+
+    pinned_tile.resize(np);
+
+    // Append the new particles to the permanent tile.
+    auto old_np = particle_tile.numParticles();
+    auto new_np = old_np + pinned_tile.numParticles();
+    particle_tile.resize(new_np);
+    amrex::copyParticles(
+        particle_tile, pinned_tile, 0, old_np, pinned_tile.numParticles()
+    );
+
+    // Redistribute particles if needed
+    Redistribute();
 }
 
+void QdsmcParticleContainer::InitParticles (int lev)
+{
+    auto& warpx = WarpX::GetInstance();
+    const auto problo = warpx.Geom(lev).ProbLoArray();
+    const amrex::Real* dx = warpx.Geom(lev).CellSize();
+    // Get the BoxArray and DistributionMapping for the level.
+    const amrex::BoxArray& ba = warpx.boxArray(lev);
+    const amrex::DistributionMapping& dm = warpx.DistributionMap(lev);
+
+    // Local vectors to hold the fictitious particle coordinates
+    amrex::Vector<amrex::ParticleReal> xpos;
+    amrex::Vector<amrex::ParticleReal> ypos;
+    amrex::Vector<amrex::ParticleReal> zpos;
+    int n_to_add = 0;
+
+    // Loop over all boxes (tiles) that belong to this MPI rank.
+    for (amrex::MFIter mfi(ba, dm); mfi.isValid(); ++mfi)
+    {
+        // The valid box for this MPI rank/tile.
+        const amrex::Box& bx = mfi.validbox();
+
+        for (int i = bx.smallEnd(0); i <= bx.bigEnd(0); ++i) {
+            for (int j = bx.smallEnd(1); j <= bx.bigEnd(1); ++j) {
+                for (int k = bx.smallEnd(2); k <= bx.bigEnd(2); ++k) {
+                    amrex::IntVect iv{i, j, k};
+
+                    amrex::ParticleReal x = problo[0] + (iv[0] + 0.5) * dx[0];
+                    amrex::ParticleReal y = problo[1] + (iv[1] + 0.5) * dx[1];
+                    amrex::ParticleReal z = problo[2] + (iv[2] + 0.5) * dx[2];
+
+                    xpos.push_back(x);
+                    ypos.push_back(y);
+                    zpos.push_back(z);
+                    ++n_to_add;
+                }
+            }
+        }
+    }
+
+    // Now add the local particles.
+    AddNParticles(0, n_to_add, xpos, ypos, zpos, 0, 0);
+
+    amrex::Gpu::synchronize();
+}
 
 /*
 // first implementation, works well on 1 gpu
@@ -224,6 +347,7 @@ QdsmcParticleContainer::InitParticles (int lev)
 
 // new version, divide initialization in z pos using different ranks, then Redistribute
 // this one seemed to work better
+/*
 void QdsmcParticleContainer::InitParticles(int lev)
 {
     auto& warpx = WarpX::GetInstance();
@@ -270,7 +394,7 @@ void QdsmcParticleContainer::InitParticles(int lev)
     AddNParticles(0, n_to_add_local, xpos, ypos, zpos, 0, 0);
     Redistribute();
     amrex::Gpu::synchronize();
-}
+}*/
 
 
 /*
