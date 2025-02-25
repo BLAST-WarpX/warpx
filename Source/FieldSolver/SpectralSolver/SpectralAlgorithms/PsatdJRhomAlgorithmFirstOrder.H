@@ -26,12 +26,12 @@
 /*
  * \brief Class that updates the fields in spectral space according to the first-order PSATD equations.
  */
-class PsatdAlgorithmFirstOrder : public SpectralBaseAlgorithm
+class PsatdJRhomAlgorithmFirstOrder : public SpectralBaseAlgorithm
 {
     public:
 
         /**
-         * \brief Constructor of the class PsatdAlgorithmFirstOrder
+         * \brief Constructor of the class PsatdJRhomAlgorithmFirstOrder
          *
          * \param[in] spectral_kspace spectral space
          * \param[in] dm distribution mapping
@@ -45,7 +45,7 @@ class PsatdAlgorithmFirstOrder : public SpectralBaseAlgorithm
          * \param[in] J_in_time time dependency of J (currently supported: constant, linear)
          * \param[in] rho_in_time time dependency of rho (currently supported: constant, linear)
          */
-        PsatdAlgorithmFirstOrder (
+        PsatdJRhomAlgorithmFirstOrder (
             const SpectralKSpace& spectral_kspace,
             const amrex::DistributionMapping& dm,
             const SpectralFieldIndex& spectral_index,

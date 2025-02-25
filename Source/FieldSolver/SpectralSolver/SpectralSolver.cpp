@@ -8,9 +8,9 @@
 #include "FieldSolver/SpectralSolver/SpectralFieldData.H"
 #include "SpectralAlgorithms/PsatdAlgorithmComoving.H"
 #include "SpectralAlgorithms/PsatdAlgorithmPml.H"
-#include "SpectralAlgorithms/PsatdAlgorithmFirstOrder.H"
+#include "SpectralAlgorithms/PsatdJRhomAlgorithmFirstOrder.H"
 #include "SpectralAlgorithms/PsatdAlgorithmGalilean.H"
-#include "SpectralAlgorithms/PsatdAlgorithmJRhom.H"
+#include "SpectralAlgorithms/PsatdJRhomAlgorithmSecondOrder.H"
 #include "SpectralKSpace.H"
 #include "SpectralSolver.H"
 #include "Utils/TextMsg.H"
@@ -93,13 +93,13 @@ SpectralSolver::SpectralSolver (
 
             const bool div_cleaning = (dive_cleaning && divb_cleaning);
 
-            algorithm = std::make_unique<PsatdAlgorithmFirstOrder>(
+            algorithm = std::make_unique<PsatdJRhomAlgorithmFirstOrder>(
                 k_space, dm, m_spectral_index, norder_x, norder_y, norder_z, grid_type,
                 dt, div_cleaning, J_in_time, rho_in_time);
         }
         else if (psatd_solution_type == PSATDSolutionType::SecondOrder)
         {
-            algorithm = std::make_unique<PsatdAlgorithmJRhom>(
+            algorithm = std::make_unique<PsatdJRhomAlgorithmSecondOrder>(
               k_space, dm, m_spectral_index, norder_x, norder_y, norder_z, grid_type,
               dt, update_with_rho, fft_do_time_averaging, dive_cleaning, divb_cleaning, J_in_time, rho_in_time);
         }

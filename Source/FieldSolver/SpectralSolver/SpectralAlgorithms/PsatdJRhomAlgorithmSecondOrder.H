@@ -29,12 +29,12 @@
  *        linear in time and two currents, deposited at the beginning and the end of the time step,
  *        are used for the PSATD update equations, instead of only one current deposited at half time.
  */
-class PsatdAlgorithmJRhom : public SpectralBaseAlgorithm
+class PsatdJRhomAlgorithmSecondOrder : public SpectralBaseAlgorithm
 {
     public:
 
         /**
-         * \brief Constructor of the class PsatdAlgorithmJRhom
+         * \brief Constructor of the class PsatdJRhomAlgorithmSecondOrder
          *
          * \param[in] spectral_kspace spectral space
          * \param[in] dm distribution mapping
@@ -51,7 +51,7 @@ class PsatdAlgorithmJRhom : public SpectralBaseAlgorithm
          * \param[in] J_in_time time dependency of J within one time step
          * \param[in] rho_in_time time dependency of rho within one time step
          */
-        PsatdAlgorithmJRhom (
+        PsatdJRhomAlgorithmSecondOrder (
             const SpectralKSpace& spectral_kspace,
             const amrex::DistributionMapping& dm,
             const SpectralFieldIndex& spectral_index,
