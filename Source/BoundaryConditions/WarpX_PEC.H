@@ -67,8 +67,6 @@ namespace PEC {
      * \param[in,out] rho                    Multifab containing the charge density
      * \param[in]     field_boundary_lo      Boundary types of the "low" field boundaries
      * \param[in]     field_boundary_hi      Boundary types of the "high" field boundaries
-     * \param[in]     particle_boundary_lo   Boundary types of the "low" particle boundaries
-     * \param[in]     particle_boundary_hi   Boundary types of the "high" particle boundaries
      * \param[in]     geom                   geometry object of level "lev"
      * \param[in]     lev                    level of the Multifab
      * \param[in]     patch_type             coarse or fine
@@ -88,8 +86,6 @@ namespace PEC {
      * \param[in,out] Jx, Jy, Jz             Multifabs containing the current density
      * \param[in]     field_boundary_lo      Boundary types of the "low" field boundaries
      * \param[in]     field_boundary_hi      Boundary types of the "high" field boundaries
-     * \param[in]     particle_boundary_lo   Boundary types of the "low" particle boundaries
-     * \param[in]     particle_boundary_hi   Boundary types of the "high" particle boundaries
      * \param[in]     geom                   geometry object of level "lev"
      * \param[in]     lev                    level of the Multifab
      * \param[in]     patch_type             coarse or fine
