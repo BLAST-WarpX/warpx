@@ -45,6 +45,25 @@ cmake -S $HOME/src/c-blosc -B $HOME/src/c-blosc-pm-gpu-build -DBUILD_TESTS=OFF -
 cmake --build $HOME/src/c-blosc-pm-gpu-build --target install --parallel 16
 rm -rf $HOME/src/c-blosc-pm-gpu-build
 
+# HDF5 (for openPMD)
+if [ -d $HOME/src/hdf5 ]
+then
+  cd $HOME/src/hdf5
+  git fetch --prune
+  git checkout hdf5-1_14_1-2
+  cd -
+else
+  git clone -b hdf5-1_14_1-2 https://github.com/HDFGroup/hdf5.git $HOME/src/hdf5
+fi
+rm -rf $HOME/src/hdf5-build
+cmake -S $HOME/src/hdf5          \
+      -B $HOME/src/hdf5-build    \
+      -DBUILD_TESTING=OFF        \
+      -DHDF5_ENABLE_PARALLEL=ON  \
+      -DCMAKE_INSTALL_PREFIX=${SW_DIR}/hdf5-1.14.1.2
+cmake --build $HOME/src/hdf5-build --target install --parallel 10
+rm -rf $HOME/src/hdf5-build
+
 # ADIOS2
 if [ -d $HOME/src/adios2 ]
 then
