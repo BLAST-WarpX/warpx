@@ -33,3 +33,4 @@ jobs:
       run: |
         cd Tools/Algorithms
         jupyter nbconvert --to notebook --execute psatd.ipynb
+        jupyter nbconvert --to notebook --execute psatd_pml.ipynb
