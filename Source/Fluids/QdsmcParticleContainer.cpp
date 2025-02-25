@@ -116,7 +116,7 @@ QdsmcParticleContainer::AddNParticles (int lev, amrex::Long n,
         return;
     }
 
-    auto& particle_tile = DefineAndReturnParticleTile(0, 0, 0);
+    auto& particle_tile = DefineAndReturnParticleTile(0, grid_id, tile_id);
 
     // Creates a temporary tile to obtain data from simulation. This data
     // is then coppied to the permament tile which is stored on the particle
@@ -151,7 +151,7 @@ QdsmcParticleContainer::AddNParticles (int lev, amrex::Long n,
     pinned_tile.push_back_real(QdsmcPIdx::np_real, np, 0.0_prt);
 
     if ( (NumRuntimeRealComps()>0) || (NumRuntimeIntComps()>0) ){
-            DefineAndReturnParticleTile(0, 0, 0);
+            DefineAndReturnParticleTile(0, grid_id, tile_id);
         }
 
     pinned_tile.resize(np);
@@ -163,8 +163,6 @@ QdsmcParticleContainer::AddNParticles (int lev, amrex::Long n,
     amrex::copyParticles(
             particle_tile, pinned_tile, 0, old_np, pinned_tile.numParticles()
         );
-
-    Redistribute();
 }
 
 
@@ -305,9 +303,8 @@ void QdsmcParticleContainer::InitParticles(int lev)
         }
 
         AddNParticles(0, n_to_add_local, xpos, ypos, zpos, grid_id, tile_id);
+        //amrex::Gpu::synchronize();
     }
-    amrex::Gpu::synchronize();
-    Redistribute();
 }
 
 
