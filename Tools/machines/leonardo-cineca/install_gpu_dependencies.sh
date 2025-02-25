@@ -30,15 +30,14 @@ mkdir -p ${SW_DIR}
 if [ -d $HOME/src/adios2 ]
 then
   cd $HOME/src/adios2
-  git fetch
-  git checkout master
-  git pull
+  git fetch --prune
+  git checkout v2.10.2
   cd -
 else
-  git clone https://github.com/ornladios/ADIOS2.git $HOME/src/adios2
+  git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git $HOME/src/adios2
 fi
 rm -rf $HOME/src/adios2-gpu-build
-cmake -S $HOME/src/adios2 -B $HOME/src/adios2-gpu-build -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-master
+cmake -S $HOME/src/adios2 -B $HOME/src/adios2-gpu-build -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.2
 cmake --build $HOME/src/adios2-gpu-build --target install -j 16
 rm -rf $HOME/src/adios2-gpu-build
 
