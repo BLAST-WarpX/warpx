@@ -903,10 +903,10 @@ class ParticleBoundaryBufferWrapper(object):
         )
 
         # Select on the particles from the previous step
-        data_array_over_previous_step = []
+        data_array_this_step = []
         for data, step in zip(data_array, step_scraped_array):
-            data_array_over_previous_step.append(data[step == current_step])
-        return data_array_over_previous_step
+            data_array_this_step.append(data[step == current_step])
+        return data_array_this_step
 
     def clear_buffer(self):
         """
