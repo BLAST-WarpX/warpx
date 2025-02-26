@@ -863,9 +863,7 @@ class ParticleBoundaryBufferWrapper(object):
             raise RuntimeError("Name %s not found" % comp_name)
         return data_array
 
-    def get_particle_scraped_over_previous_timestep(
-        self, species_name, boundary, comp_name, level
-    ):
+    def get_particle_scraped_this_step(self, species_name, boundary, comp_name, level):
         """
         This returns a list of numpy or cupy arrays containing the particle array data
         for a species that has been scraped by a specific simulation boundary.

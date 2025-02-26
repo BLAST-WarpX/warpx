@@ -188,51 +188,23 @@ def secondary_emission():
     elect_pc = particle_containers.ParticleContainerWrapper("electrons")
 
     if n != 0:
-        r = concat(
-            buffer.get_particle_scraped_over_previous_timestep("ions", "eb", "x", lev)
-        )
+        r = concat(buffer.get_particle_scraped_this_step("ions", "eb", "x", lev))
         theta = concat(
-            buffer.get_particle_scraped_over_previous_timestep(
-                "ions", "eb", "theta", lev
-            )
+            buffer.get_particle_scraped_this_step("ions", "eb", "theta", lev)
         )
-        z = concat(
-            buffer.get_particle_scraped_over_previous_timestep("ions", "eb", "z", lev)
-        )
+        z = concat(buffer.get_particle_scraped_this_step("ions", "eb", "z", lev))
         x = r * np.cos(theta)  # from RZ coordinates to 3D coordinates
         y = r * np.sin(theta)
-        ux = concat(
-            buffer.get_particle_scraped_over_previous_timestep("ions", "eb", "ux", lev)
-        )
-        uy = concat(
-            buffer.get_particle_scraped_over_previous_timestep("ions", "eb", "uy", lev)
-        )
-        uz = concat(
-            buffer.get_particle_scraped_over_previous_timestep("ions", "eb", "uz", lev)
-        )
-        w = concat(
-            buffer.get_particle_scraped_over_previous_timestep("ions", "eb", "w", lev)
-        )
-        nx = concat(
-            buffer.get_particle_scraped_over_previous_timestep("ions", "eb", "nx", lev)
-        )
-        ny = concat(
-            buffer.get_particle_scraped_over_previous_timestep("ions", "eb", "ny", lev)
-        )
-        nz = concat(
-            buffer.get_particle_scraped_over_previous_timestep("ions", "eb", "nz", lev)
-        )
+        ux = concat(buffer.get_particle_scraped_this_step("ions", "eb", "ux", lev))
+        uy = concat(buffer.get_particle_scraped_this_step("ions", "eb", "uy", lev))
+        uz = concat(buffer.get_particle_scraped_this_step("ions", "eb", "uz", lev))
+        w = concat(buffer.get_particle_scraped_this_step("ions", "eb", "w", lev))
+        nx = concat(buffer.get_particle_scraped_this_step("ions", "eb", "nx", lev))
+        ny = concat(buffer.get_particle_scraped_this_step("ions", "eb", "ny", lev))
+        nz = concat(buffer.get_particle_scraped_this_step("ions", "eb", "nz", lev))
         delta_t = concat(
-            buffer.get_particle_scraped_over_previous_timestep(
-                "ions", "eb", "deltaTimeScraped", lev
-            )
+            buffer.get_particle_scraped_this_step("ions", "eb", "deltaTimeScraped", lev)
         )
-        print(
-            buffer.get_particle_scraped_over_previous_timestep(
-                "ions", "eb", "stepScraped", lev
-            )
-        )
-        print(sim.extension.warpx.getistep(lev))
 
         energy_ions = 0.5 * proton_mass * w * (ux**2 + uy**2 + uz**2)
         energy_ions_in_kEv = energy_ions / (e * 1000)
