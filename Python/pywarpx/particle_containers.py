@@ -863,6 +863,55 @@ class ParticleBoundaryBufferWrapper(object):
             raise RuntimeError("Name %s not found" % comp_name)
         return data_array
 
+    def get_particle_scraped_over_previous_timestep(
+        self, species_name, boundary, comp_name, level
+    ):
+        """
+        This returns a list of numpy or cupy arrays containing the particle array data
+        for a species that has been scraped by a specific simulation boundary.
+
+        The data for the arrays is a copy of the underlying memory buffer in WarpX ;
+        writing to these arrays will not affect the simulation.
+        # TODO: not sure about this
+
+        Parameters
+        ----------
+
+            species_name   : str
+                The species name that the data will be returned for.
+
+            boundary       : str
+                The boundary from which to get the scraped particle data in the
+                form x/y/z_hi/lo or eb.
+
+            comp_name      : str
+                The component of the array data that will be returned.
+                "x", "y", "z", "ux", "uy", "uz", "w"
+                "stepScraped","deltaTimeScraped",
+                if boundary='eb': "nx", "ny", "nz"
+
+            level          : int
+                Which AMR level to retrieve scraped particle data from.
+        """
+        # Extract the integer number of the current timestep
+        current_step = libwarpx.libwarpx_so.get_instance().getistep(level)
+
+        # Extract the data requested by the user
+        data_array = self.get_particle_boundary_buffer(
+            species_name, boundary, comp_name, level
+        )
+        step_scraped_array = self.get_particle_boundary_buffer(
+            species_name, boundary, "stepScraped", level
+        )
+
+        # Select on the particles from the previous step
+        data_array_over_previous_step = []
+        for data, step in zip(data_array, step_scraped_array):
+            data_array_over_previous_step.append(
+                data[step == current_step]  # TODO: is this a copy or a view?
+            )
+        return data_array_over_previous_step
+
     def clear_buffer(self):
         """
 
