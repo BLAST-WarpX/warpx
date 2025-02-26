@@ -10,6 +10,7 @@
 #include "Particles/ParticleIO.H"
 
 #include "Fields.H"
+#include "Particles/Gather/GetExternalFields.H"
 #include "Particles/LaserParticleContainer.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/PhysicalParticleContainer.H"
