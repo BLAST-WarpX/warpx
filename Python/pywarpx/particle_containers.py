@@ -868,9 +868,8 @@ class ParticleBoundaryBufferWrapper(object):
         This returns a list of numpy or cupy arrays containing the particle array data
         for a species that has been scraped by a specific simulation boundary.
 
-        The data for the arrays is a copy of the underlying memory buffer in WarpX ;
-        writing to these arrays will not affect the simulation.
-        # TODO: not sure about this
+        The data for the arrays is a view of the underlying boundary buffer in WarpX ;
+        writing to these arrays will therefore also modify the underlying boundary buffer.
 
         Parameters
         ----------
@@ -905,9 +904,7 @@ class ParticleBoundaryBufferWrapper(object):
         # Select on the particles from the previous step
         data_array_over_previous_step = []
         for data, step in zip(data_array, step_scraped_array):
-            data_array_over_previous_step.append(
-                data[step == current_step]  # TODO: is this a copy or a view?
-            )
+            data_array_over_previous_step.append(data[step == current_step])
         return data_array_over_previous_step
 
     def clear_buffer(self):
