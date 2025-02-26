@@ -398,15 +398,8 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                 By_particle_arr[ip] = 0._rt;
                 Bz_particle_arr[ip] = 0._rt;
 
-                amrex::ParticleReal Ex_external, Ey_external, Ez_external;
-                amrex::ParticleReal Bx_external, By_external, Bz_external;
-                getExternalEB(ip, Ex_external, Ey_external, Ez_external, Bx_external, By_external, Bz_external);
-                Ex_particle_arr[ip] += Ex_external;
-                Ey_particle_arr[ip] += Ey_external;
-                Ez_particle_arr[ip] += Ez_external;
-                Bx_particle_arr[ip] += Bx_external;
-                By_particle_arr[ip] += By_external;
-                Bz_particle_arr[ip] += Bz_external;
+                getExternalEB(ip, Ex_particle_arr[ip], Ey_particle_arr[ip], Ez_particle_arr[ip], 
+                    Bx_particle_arr[ip], By_particle_arr[ip], Bz_particle_arr[ip]);
 
                doGatherShapeN(
                     xp, yp, zp,
