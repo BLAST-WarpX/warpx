@@ -866,7 +866,8 @@ class ParticleBoundaryBufferWrapper(object):
     def get_particle_scraped_this_step(self, species_name, boundary, comp_name, level):
         """
         This returns a list of numpy or cupy arrays containing the particle array data
-        for a species that has been scraped by a specific simulation boundary.
+        for particles that have been scraped at the current timestep, 
+        for a specific species and simulation boundary.
 
         The data for the arrays is a view of the underlying boundary buffer in WarpX ;
         writing to these arrays will therefore also modify the underlying boundary buffer.
