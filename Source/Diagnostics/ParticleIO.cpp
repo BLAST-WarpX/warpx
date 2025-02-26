@@ -341,12 +341,12 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
     constexpr auto lev0=0;
 
-    amrex::MultiFab const& Ex = *warpx.m_fields.get(FieldType::Efield_fp, Dir{0}, lev0);
-    amrex::MultiFab const& Ey = *warpx.m_fields.get(FieldType::Efield_fp, Dir{1}, lev0);
-    amrex::MultiFab const& Ez = *warpx.m_fields.get(FieldType::Efield_fp, Dir{2}, lev0);
-    amrex::MultiFab const& Bx = *warpx.m_fields.get(FieldType::Bfield_fp, Dir{0}, lev0);
-    amrex::MultiFab const& By = *warpx.m_fields.get(FieldType::Bfield_fp, Dir{1}, lev0);
-    amrex::MultiFab const& Bz = *warpx.m_fields.get(FieldType::Bfield_fp, Dir{2}, lev0);
+    amrex::MultiFab const& Ex = *warpx.m_fields.get(FieldType::Efield_aux, Dir{0}, lev0);
+    amrex::MultiFab const& Ey = *warpx.m_fields.get(FieldType::Efield_aux, Dir{1}, lev0);
+    amrex::MultiFab const& Ez = *warpx.m_fields.get(FieldType::Efield_aux, Dir{2}, lev0);
+    amrex::MultiFab const& Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Dir{0}, lev0);
+    amrex::MultiFab const& By = *warpx.m_fields.get(FieldType::Bfield_aux, Dir{1}, lev0);
+    amrex::MultiFab const& Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Dir{2}, lev0);
 
     const amrex::XDim3 dinv = WarpX::InvCellSize(lev0);
     const bool galerkin_interpolation = WarpX::galerkin_interpolation;
