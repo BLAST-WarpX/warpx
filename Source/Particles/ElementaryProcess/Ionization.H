@@ -113,7 +113,7 @@ struct IonizationFilterFunc
             amrex::ParticleReal by = m_By_external_particle;
             amrex::ParticleReal bz = m_Bz_external_particle;
 
-             m_get_externalEB(i, ex, ey, ez, bx, by, bz);
+            m_get_externalEB(i, ex, ey, ez, bx, by, bz);
 
             doGatherShapeN(xp, yp, zp, ex, ey, ez, bx, by, bz,
                            m_ex_arr, m_ey_arr, m_ez_arr, m_bx_arr, m_by_arr, m_bz_arr,
