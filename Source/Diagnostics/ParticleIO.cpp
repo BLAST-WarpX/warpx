@@ -398,7 +398,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                 By_particle_arr[ip] = 0._rt;
                 Bz_particle_arr[ip] = 0._rt;
 
-                getExternalEB(ip, Ex_particle_arr[ip], Ey_particle_arr[ip], Ez_particle_arr[ip], 
+                getExternalEB(ip, Ex_particle_arr[ip], Ey_particle_arr[ip], Ez_particle_arr[ip],
                     Bx_particle_arr[ip], By_particle_arr[ip], Bz_particle_arr[ip]);
 
                doGatherShapeN(
