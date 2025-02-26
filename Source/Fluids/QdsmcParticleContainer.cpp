@@ -76,7 +76,7 @@ QdsmcParticleContainer::QdsmcParticleContainer (AmrCore* amr_core)
     SetParticleSize();
 }
 
-
+/*
 void QdsmcParticleContainer::AddNParticles (int lev, amrex::Long n,
                         amrex::Vector<amrex::ParticleReal> const & x,
                         amrex::Vector<amrex::ParticleReal> const & y,
@@ -193,7 +193,7 @@ void QdsmcParticleContainer::InitParticles_old (int lev)
     AddNParticles(0, n_to_add, xpos, ypos, zpos);
     amrex::Gpu::synchronize();
 }
-
+*/
 
 void QdsmcParticleContainer::InitParticles(int lev){
 
@@ -323,8 +323,6 @@ void QdsmcParticleContainer::InitParticles(int lev){
             wt = static_cast<amrex::Real>(amrex::second()) - wt;
             amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
         }
-        
-
     }    
 
     //Redistribute is not needed anymore?
