@@ -397,7 +397,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                 Bx_particle_arr[ip] = 0._rt;
                 By_particle_arr[ip] = 0._rt;
                 Bz_particle_arr[ip] = 0._rt;
-                
+
                 amrex::ParticleReal Ex_external, Ey_external, Ez_external;
                 amrex::ParticleReal Bx_external, By_external, Bz_external;
                 getExternalEB(ip, Ex_external, Ey_external, Ez_external, Bx_external, By_external, Bz_external);
