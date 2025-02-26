@@ -373,6 +373,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
         const auto bz_type = Bz.ixType();
 
         const auto getPosition = GetParticlePosition<PIdx>(pti);
+        const auto getExternalEB = GetExternalEBField(pti);
         amrex::ParticleReal* Ex_particle_arr = pti.GetStructOfArrays().GetRealData(Ex_index).dataPtr();
         amrex::ParticleReal* Ey_particle_arr = pti.GetStructOfArrays().GetRealData(Ey_index).dataPtr();
         amrex::ParticleReal* Ez_particle_arr = pti.GetStructOfArrays().GetRealData(Ez_index).dataPtr();
@@ -396,6 +397,16 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                 Bx_particle_arr[ip] = 0._rt;
                 By_particle_arr[ip] = 0._rt;
                 Bz_particle_arr[ip] = 0._rt;
+                
+                amrex::ParticleReal Ex_external, Ey_external, Ez_external;
+                amrex::ParticleReal Bx_external, By_external, Bz_external;
+                getExternalEB(ip, Ex_external, Ey_external, Ez_external, Bx_external, By_external, Bz_external);
+                Ex_particle_arr[ip] += Ex_external;
+                Ey_particle_arr[ip] += Ey_external;
+                Ez_particle_arr[ip] += Ez_external;
+                Bx_particle_arr[ip] += Bx_external;
+                By_particle_arr[ip] += By_external;
+                Bz_particle_arr[ip] += Bz_external;
 
                doGatherShapeN(
                     xp, yp, zp,
