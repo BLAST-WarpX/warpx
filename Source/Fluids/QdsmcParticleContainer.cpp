@@ -325,8 +325,9 @@ void QdsmcParticleContainer::InitParticles(int lev){
         }
     }    
 
+    amrex::Gpu::synchronize();
     //Redistribute is not needed anymore?
-    Redistribute();
+    //Redistribute();
 }
 
 
