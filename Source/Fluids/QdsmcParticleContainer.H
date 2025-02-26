@@ -83,7 +83,9 @@ public:
     * (nppc = order^dim), or nppc = 1 for electron energy equation used in HybridSolver
     * calls AddNParticles
     */
-    void InitParticles (int lev);
+    void InitParticles_old (int lev);
+
+    void InitParticles(int lev);
 
     // Function that set the fictitious particles velocities (only drift for now)
     // check if U or NU is going to be used, current version written for U

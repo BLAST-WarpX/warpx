@@ -151,7 +151,7 @@ void QdsmcParticleContainer::AddNParticles (int lev, amrex::Long n,
 }
 
 
-void QdsmcParticleContainer::InitParticles (int lev)
+void QdsmcParticleContainer::InitParticles_old (int lev)
 {
     auto& warpx = WarpX::GetInstance();
     const auto problo = warpx.Geom(lev).ProbLoArray();
@@ -192,6 +192,152 @@ void QdsmcParticleContainer::InitParticles (int lev)
 
     AddNParticles(0, n_to_add, xpos, ypos, zpos);
     amrex::Gpu::synchronize();
+}
+
+
+void QdsmcParticleContainer::InitParticles(int lev){
+
+    WARPX_PROFILE("QdsmcParticleContainer::InitParticles()");
+
+    reserveData();
+    resizeData();
+
+    auto& warpx = WarpX::GetInstance();
+    const auto problo = warpx.Geom(lev).ProbLoArray();
+    const amrex::Real* dx = warpx.Geom(lev).CellSize();
+
+    for (int lev = 0; lev <= finestLevel(); ++lev)
+    {
+        for (auto mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
+        {
+            const int grid_id = mfi.index();
+            const int tile_id = mfi.LocalTileIndex();
+            DefineAndReturnParticleTile(lev, grid_id, tile_id);
+        }
+    }
+
+    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+
+    MFItInfo info;
+    if (do_tiling && Gpu::notInLaunchRegion()) {
+        info.EnableTiling(tile_size);
+    }
+#ifdef AMREX_USE_OMP
+    info.SetDynamic(true);
+#pragma omp parallel if (not WarpX::serialize_initial_conditions)
+#endif
+    for (MFIter mfi = MakeMFIter(lev, info); mfi.isValid(); ++mfi)
+    {
+        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
+        {
+            amrex::Gpu::synchronize();
+        }
+        auto wt = static_cast<amrex::Real>(amrex::second());
+
+        const Box& tile_box = mfi.tilebox();
+        //const RealBox tile_realbox = WarpX::getRealBox(tile_box, lev);
+
+        const int grid_id = mfi.index();
+        const int tile_id = mfi.LocalTileIndex();
+
+        Gpu::DeviceVector<amrex::Long> counts(tile_box.numPts(), 0);
+        Gpu::DeviceVector<amrex::Long> offset(tile_box.numPts());
+        auto *pcounts = counts.data();
+
+        amrex::ParallelFor(tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+            const IntVect iv(AMREX_D_DECL(i, j, k));
+            auto index = tile_box.index(iv);
+            pcounts[index] = 1;
+        });
+
+        const amrex::Long max_new_particles = Scan::ExclusiveSum(counts.size(), counts.data(), offset.data());
+
+        // Update NextID to include particles created in this function
+        amrex::Long pid;
+        pid = ParticleType::NextID();
+        ParticleType::NextID(pid+max_new_particles);
+
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(pid + max_new_particles < LongParticleIds::LastParticleID,"ERROR: overflow on particle id numbers");
+
+        const int cpuid = ParallelDescriptor::MyProc();
+
+        auto& particle_tile = GetParticles(lev)[std::make_pair(grid_id,tile_id)];
+
+        if ( (NumRuntimeRealComps()>0) || (NumRuntimeIntComps()>0) ) {
+            DefineAndReturnParticleTile(lev, grid_id, tile_id);
+        }
+
+        auto const old_size = static_cast<amrex::Long>(particle_tile.size());
+        auto const new_size = old_size + max_new_particles;
+        particle_tile.resize(new_size);
+
+        auto& soa = particle_tile.GetStructOfArrays();
+
+        GpuArray<ParticleReal*,QdsmcPIdx::nattribs> pa;
+        for (int ia = 0; ia < QdsmcPIdx::nattribs; ++ia) {
+            pa[ia] = soa.GetRealData(ia).data() + old_size;
+        }
+        uint64_t * AMREX_RESTRICT pa_idcpu = soa.GetIdCPUData().data() + old_size;
+
+        auto *const poffset = offset.data();
+
+        amrex::ParallelFor(tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+            const IntVect iv = IntVect(AMREX_D_DECL(i, j, k));
+            const auto index = tile_box.index(iv);
+
+            long ip = poffset[index];
+            pa_idcpu[ip] = amrex::SetParticleIDandCPU(pid+ip, cpuid);
+
+            amrex::Real x = problo[0] + (iv[0] + 0.5) * dx[0];
+            amrex::Real y = problo[1] + (iv[1] + 0.5) * dx[1];
+            amrex::Real z = problo[2] + (iv[2] + 0.5) * dx[2];
+
+            pa[QdsmcPIdx::x][ip] = x;
+            pa[QdsmcPIdx::y][ip] = y;
+            pa[QdsmcPIdx::z][ip] = z;
+
+            pa[QdsmcPIdx::x_node][ip] = x;
+            pa[QdsmcPIdx::y_node][ip] = y;
+            pa[QdsmcPIdx::z_node][ip] = z;
+
+            pa[QdsmcPIdx::vx][ip] = 0.0;
+            pa[QdsmcPIdx::vy][ip] = 0.0;
+            pa[QdsmcPIdx::vz][ip] = 0.0;
+
+            pa[QdsmcPIdx::entropy][ip] = 0.0;
+            pa[QdsmcPIdx::np_real][ip] = 0.0;
+
+        });
+
+        amrex::Gpu::synchronize();
+        
+        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
+        {
+            wt = static_cast<amrex::Real>(amrex::second()) - wt;
+            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
+        }
+        
+
+    }    
+
+/*
+    // Remove particles that are inside the embedded boundaries
+#ifdef AMREX_USE_EB
+    if (EB::enabled())
+    {
+        using warpx::fields::FieldType;
+        auto & warpx = WarpX::GetInstance();
+        scrapeParticlesAtEB(
+            *this,
+            warpx.m_fields.get_mr_levels(FieldType::distance_to_eb, warpx.finestLevel()),
+            ParticleBoundaryProcess::Absorb());
+    }
+#endif
+*/
+    //Redistribute is not needed anymore?
+    //Redistribute();
 }
 
 
