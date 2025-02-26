@@ -586,11 +586,14 @@ for (const auto & particle_diag : particle_diags) {
     }
 
     // Gather the electrostatic potential (phi) on the macroparticles
+    // Detect whether this is a FullDiagnostic (use_pinned_pc = 0) or
+    // a BoundaryScrapingDiagnostic/BackTransformedDiagnostic (use_pinned_pc=1)
+    bool const is_full_diagnostic = !use_pinned_pc;
     if ( particle_diag.m_plot_phi ) {
-        storePhiOnParticles( tmp, WarpX::electrostatic_solver_id, !use_pinned_pc );
+        storePhiOnParticles( tmp, WarpX::electrostatic_solver_id, is_full_diagnostic);
     }
     if ( particle_diag.m_plot_EM ) {
-        storeEMFieldsOnParticles( tmp, WarpX::electromagnetic_solver_id, !use_pinned_pc );
+        storeEMFieldsOnParticles( tmp, WarpX::electromagnetic_solver_id, is_full_diagnostic);
     }
 
     // names of amrex::ParticleReal and int particle attributes in SoA data
