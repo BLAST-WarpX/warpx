@@ -206,6 +206,7 @@ void QdsmcParticleContainer::InitParticles(int lev){
     const auto problo = warpx.Geom(lev).ProbLoArray();
     const amrex::Real* dx = warpx.Geom(lev).CellSize();
 
+    // Define all particles tiles
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
         for (auto mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
@@ -255,9 +256,13 @@ void QdsmcParticleContainer::InitParticles(int lev){
 
         // Update NextID to include particles created in this function
         amrex::Long pid;
-        pid = ParticleType::NextID();
-        ParticleType::NextID(pid+max_new_particles);
-
+#ifdef AMREX_USE_OMP
+#pragma omp critical (add_plasma_nextid)
+#endif
+        {
+            pid = ParticleType::NextID();
+            ParticleType::NextID(pid+max_new_particles);
+        }
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(pid + max_new_particles < LongParticleIds::LastParticleID,"ERROR: overflow on particle id numbers");
 
         const int cpuid = ParallelDescriptor::MyProc();
@@ -322,22 +327,8 @@ void QdsmcParticleContainer::InitParticles(int lev){
 
     }    
 
-/*
-    // Remove particles that are inside the embedded boundaries
-#ifdef AMREX_USE_EB
-    if (EB::enabled())
-    {
-        using warpx::fields::FieldType;
-        auto & warpx = WarpX::GetInstance();
-        scrapeParticlesAtEB(
-            *this,
-            warpx.m_fields.get_mr_levels(FieldType::distance_to_eb, warpx.finestLevel()),
-            ParticleBoundaryProcess::Absorb());
-    }
-#endif
-*/
     //Redistribute is not needed anymore?
-    //Redistribute();
+    Redistribute();
 }
 
 
