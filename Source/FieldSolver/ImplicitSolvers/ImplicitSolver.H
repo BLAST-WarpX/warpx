@@ -181,6 +181,11 @@ protected:
     }
 
     /**
+     * \brief Initialize the Mass Matrices used for plasma response in nonlinear Newton solver
+     */
+    void InitializeMassMatrices ();
+
+    /**
      * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType
      */
     [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> convertFieldBCToLinOpBC ( const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& ) const;

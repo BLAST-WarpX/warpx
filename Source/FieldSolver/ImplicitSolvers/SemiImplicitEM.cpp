@@ -31,18 +31,8 @@ void SemiImplicitEM::Define ( WarpX*  a_WarpX )
     const amrex::ParmParse pp("implicit_evolve");
     parseNonlinearSolverParams( pp );
 
-    // Define sigma_PC if using PC for plasma response
-    using ablastr::fields::Direction;
-    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        const auto& ba_Ex = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->boxArray();
-        const auto& ba_Ey = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{1}, lev)->boxArray();
-        const auto& ba_Ez = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{2}, lev)->boxArray();
-        const auto& dm = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->DistributionMap();
-        const amrex::IntVect ngb = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->nGrowVect();
-        m_WarpX->m_fields.alloc_init(FieldType::sigma_PC, Direction{0}, lev, ba_Ex, dm, 1, ngb, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::sigma_PC, Direction{1}, lev, ba_Ey, dm, 1, ngb, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::sigma_PC, Direction{2}, lev, ba_Ez, dm, 1, ngb, 0.0_rt);
-    }
+    // Initialize the mass matrices for plasma response
+    if (m_use_mass_matrices) { InitializeMassMatrices(); }
 
     // Define the nonlinear solver
     m_nlsolver->Define(m_E, this);
