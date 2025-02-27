@@ -495,22 +495,22 @@ void doJandSigmaDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPos
             GetPosition(ip, xp_nph, yp_nph, zp_nph);
 
             // Compute magnetic field on particle
-            amrex::ParticleReal Bxp;
-            amrex::ParticleReal Byp;
-            amrex::ParticleReal Bzp;
+            amrex::ParticleReal Bpx;
+            amrex::ParticleReal Bpy;
+            amrex::ParticleReal Bpz;
             doGatherBShapeN<1>( xp_nph, yp_nph, zp_nph,
-                                Bxp, Byp, Bzp,
+                                Bpx, Bpy, Bpz,
                                 Bx_arr, By_arr, Bz_arr,
                                 dinv, xyzmin, lo );
 
             constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
 
-            // convert B on particle to normalized cyclotron units with dt/2.0
+            // Convert B on particle to normalized cyclotron units with dt/2.0
             const amrex::ParticleReal gamma_bar = std::sqrt(1._prt + (uxp[ip]*uxp[ip] + uyp[ip]*uyp[ip] + uzp[ip]*uzp[ip])*inv_c2);
-            const amrex::Real alpha = qs/ms*0.5*dt/gamma_bar;
-            Bxp *= alpha;
-            Byp *= alpha;
-            Bzp *= alpha;
+            const amrex::Real alpha = qs/ms*0.5_rt*dt/gamma_bar;
+            Bpx *= alpha;
+            Bpy *= alpha;
+            Bpz *= alpha;
 
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
             // The uxp,uyp,uzp are the velocities at time level n+1/2
@@ -527,11 +527,29 @@ void doJandSigmaDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPos
 
             amrex::Real wq  = qs*wp[ip];
 
+            // Perform direct current deposition for J
             const amrex::Real relative_time = 0._rt;
             doDepositionShapeNKernel<depos_order>(xp_nph, yp_nph, zp_nph, wq, vx, vy, vz, jx_arr, jy_arr, jz_arr,
                                                   jx_type, jy_type, jz_type,
                                                   relative_time, dinv, xyzmin,
                                                   invvol, lo, n_rz_azimuthal_modes);
+
+            // Compute Mass Matrix kernals (non-relativistic for now)
+            amrex::Real rhop = wq*gaminv;
+            amrex::Real Bpsq = Bpx*Bpx + Bpy*Bpy + Bpz*Bpz;
+            amrex::Real arogp = alpha*rhop/(1.0_rt + Bpsq);
+
+            amrex::Real fpxx = arogp*(Bpx*Bpx + 1.0_rt);
+            amrex::Real fpxy = arogp*(Bpx*Bpy + Bpz);
+            amrex::Real fpxz = arogp*(Bpx*Bpz - Bpy);
+
+            amrex::Real fpyx = arogp*(Bpy*Bpx - Bpz);
+            amrex::Real fpyy = arogp*(Bpy*Bpy + 1.0_rt);
+            amrex::Real fpyz = arogp*(Bpy*Bpz + Bpx);
+
+            amrex::Real fpzx = arogp*(Bpz*Bpx + Bpy);
+            amrex::Real fpzy = arogp*(Bpz*Bpy - Bpx);
+            amrex::Real fpzz = arogp*(Bpz*Bpz + 1.0_rt);
 
         }
     );
