@@ -73,6 +73,9 @@ struct ParticleBoundaries
         amrex::Real SEE_probability_yhi = 0.0_rt;
         amrex::Real SEE_probability_zlo = 0.0_rt;
         amrex::Real SEE_probability_zhi = 0.0_rt;
+
+        amrex::Real max_SEE_probability = 0.0_rt;
+        amrex::Real v_SEE = 0.0_rt;
     };
     ParticleBoundariesData data;
 

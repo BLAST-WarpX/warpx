@@ -417,6 +417,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     pp_species_name.queryWithParser("SEE_probability_yhi", m_boundary_conditions.data.SEE_probability_yhi);
     pp_species_name.queryWithParser("SEE_probability_zlo", m_boundary_conditions.data.SEE_probability_zlo);
     pp_species_name.queryWithParser("SEE_probability_zhi", m_boundary_conditions.data.SEE_probability_zhi);
+    m_boundary_conditions.SaveMaxSEEProbability();
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         (m_boundary_conditions.data.SEE_probability_xlo >= 0.) ||
@@ -426,6 +427,14 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
         (m_boundary_conditions.data.SEE_probability_zlo >= 0.) ||
         (m_boundary_conditions.data.SEE_probability_zhi >= 0.),
         "Secondary electron emission probability must be >= 0.");
+
+    // Read emission energy for SEE
+    amrex::Real SEE_emission_energy = 1.0;
+    pp_species_name.query("SEE_emission_energy", SEE_emission_energy);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        SEE_emission_energy > 0.,
+        "Secondary electron emission energy must be > 0.");
+    m_boundary_conditions.SetSEEvMag(SEE_emission_energy, mass);
 
     const ParmParse pp_boundary("boundary");
     bool flag = false;
