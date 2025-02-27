@@ -38,9 +38,9 @@ namespace ablastr::qed
         const math::vec3<RealType>& t_em_e,
         const math::vec3<RealType>& t_em_b) noexcept
     {
-        const auto p    = from_to<UnitSystem, unit_system::heaviside_lorentz>::convert<quantity::momentum>(t_p);
-        const auto em_e = from_to<UnitSystem, unit_system::heaviside_lorentz>::convert<quantity::E>(t_em_e);
-        const auto em_b = from_to<UnitSystem, unit_system::heaviside_lorentz>::convert<quantity::B>(t_em_b);
+        const auto p    = convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::momentum>(t_p);
+        const auto em_e = convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::E>       (t_em_e);
+        const auto em_b = convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::B>       (t_em_b);
 
         const auto norm_p = math::norm(p);
 
@@ -109,9 +109,9 @@ namespace ablastr::qed
         const math::vec3<RealType>& t_em_b,
         const RealType reference_quantity = math::one<RealType>) noexcept
     {
-        const auto p    = from_to<UnitSystem, unit_system::heaviside_lorentz>::convert<quantity::momentum>(t_p);
-        const auto em_e = from_to<UnitSystem, unit_system::heaviside_lorentz>::convert<quantity::E>(t_em_e);
-        const auto em_b = from_to<UnitSystem, unit_system::heaviside_lorentz>::convert<quantity::B>(t_em_b);
+        const auto p    = convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::momentum>(t_p);
+        const auto em_e = convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::E>       (t_em_e);
+        const auto em_b = convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::B>       (t_em_b);
 
         const auto norm_p = norm(p);
 

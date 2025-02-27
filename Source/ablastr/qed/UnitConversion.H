@@ -152,48 +152,47 @@ namespace ablastr::qed
     template
     <
         unit_system From,
-        unit_system To
+        unit_system To,
+        quantity Quantity,
+        typename RealType
     >
-    struct from_to
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    constexpr RealType
+    convert_from_to (RealType value) noexcept
     {
-        template
-        <
-            quantity Quantity,
-            typename RealType
-        >
-        AMREX_FORCE_INLINE
-        static constexpr RealType
-        convert (RealType value) noexcept
+        if constexpr (From == unit_system::SI || To == unit_system::heaviside_lorentz)
         {
-            if constexpr (From == unit_system::SI || To == unit_system::heaviside_lorentz)
-            {
-                return value*detail::SI_to_HL_factors::fact<Quantity, RealType>;
-            }
-            else if constexpr (From == unit_system::heaviside_lorentz || To == unit_system::SI)
-            {
-                constexpr auto fact = static_cast<RealType>(
-                    1.0/detail::SI_to_HL_factors::fact<Quantity, double>);
-                return value*fact;
-            }
-            else
-            {
-                return value;
-            }
+            return value*detail::SI_to_HL_factors::fact<Quantity, RealType>;
         }
+        else if constexpr (From == unit_system::heaviside_lorentz || To == unit_system::SI)
+        {
+            constexpr auto fact = static_cast<RealType>(
+                1.0/detail::SI_to_HL_factors::fact<Quantity, double>);
+            return value*fact;
+        }
+        else
+        {
+            return value;
+        }
+    }
 
-        template
-        <
-            quantity Quantity,
-            typename RealType
-        >
-        AMREX_FORCE_INLINE
-        static constexpr math::vec3<RealType>
-        convert (const math::vec3<RealType>& vec) noexcept
-        {
-            constexpr auto fact = convert<Quantity>(RealType(1.0));
-            return vec * fact;
-        }
-    };
+    template
+    <
+        unit_system From,
+        unit_system To,
+        quantity Quantity,
+        typename RealType
+    >
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    constexpr math::vec3<RealType>
+    convert_from_to (const math::vec3<RealType>& vec) noexcept
+    {
+        using namespace math;
+
+        constexpr auto fact =
+            convert_from_to<From, To, Quantity, RealType> (RealType(1.0));
+        return vec*fact;
+    }
 
 
     /**
@@ -201,7 +200,7 @@ namespace ablastr::qed
     */
     template <typename RealType>
     constexpr auto heaviside_lorentz_electron_rest_energy = static_cast<RealType>(
-        from_to<unit_system::SI, unit_system::heaviside_lorentz>::convert<quantity::energy>(
+        convert_from_to<unit_system::SI, unit_system::heaviside_lorentz,quantity::energy>(
             ablastr::constant::SI::variable_templates::m_e<double>*
             amrex::Math::powi<2>(ablastr::constant::SI::variable_templates::c<double>)));
 
@@ -210,7 +209,7 @@ namespace ablastr::qed
     */
     template <typename RealType>
     constexpr auto heaviside_lorentz_schwinger_field = static_cast<RealType>(
-        from_to<unit_system::SI, unit_system::heaviside_lorentz>::convert<quantity::E>(
+        convert_from_to<unit_system::SI, unit_system::heaviside_lorentz,quantity::E>(
             ablastr::constant::SI::variable_templates::schwinger_field<double>));
 
     /**
@@ -218,7 +217,7 @@ namespace ablastr::qed
     */
     template <typename RealType>
     constexpr auto heaviside_lorentz_elementary_charge = static_cast<RealType>(
-        from_to<unit_system::SI, unit_system::heaviside_lorentz>::convert<quantity::charge>(
+        convert_from_to<unit_system::SI, unit_system::heaviside_lorentz,quantity::charge>(
             ablastr::constant::SI::variable_templates::q_e<double>));
 }
 

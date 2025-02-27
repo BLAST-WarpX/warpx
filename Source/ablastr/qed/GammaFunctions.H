@@ -32,7 +32,7 @@ namespace ablastr::qed
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     RealType compute_gamma_photon (const math::vec3<RealType>& t_p) noexcept
     {
-        const auto p = from_to<UnitSystem, unit_system::heaviside_lorentz>::convert<quantity::momentum>(t_p);
+        const auto p = convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::momentum>(t_p);
         return math::norm(p)/heaviside_lorentz_electron_rest_energy<RealType>;
     }
 

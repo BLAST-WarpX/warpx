@@ -51,8 +51,8 @@ namespace ablastr::qed::schwinger
         const math::vec3<RealType>& t_em_e,
         const math::vec3<RealType>& t_em_b) noexcept
     {
-        const auto em_e = from_to<UnitSystem, unit_system::heaviside_lorentz>::convert<quantity::E>(t_em_e);
-        const auto em_b = from_to<UnitSystem, unit_system::heaviside_lorentz>::convert<quantity::B>(t_em_b);
+        const auto em_e = convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::E>(t_em_e);
+        const auto em_b = convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::B>(t_em_b);
 
         constexpr auto one_over_schwinger = static_cast<RealType>(
             1.0/heaviside_lorentz_schwinger_field<double>);
@@ -72,7 +72,7 @@ namespace ablastr::qed::schwinger
                 2.0*ablastr::constant::math::variable_templates::pi<double>));
 
         constexpr auto rate_conv =
-            from_to<unit_system::heaviside_lorentz, UnitSystem>::convert<quantity::rate>(RealType(1.0));
+            convert_from_to<unit_system::heaviside_lorentz, UnitSystem, quantity::rate>(RealType(1.0));
 
         constexpr auto zero = RealType(0.0);
         constexpr auto rtp  = ablastr::constant::math::variable_templates::pi<RealType>;
@@ -138,14 +138,14 @@ namespace ablastr::qed::schwinger
     {
         using namespace picsar::multi_physics::math;
 
-        const auto em_e = from_to<UnitSystem, unit_system::heaviside_lorentz>::convert<quantity::E>(t_em_e);
-        const auto em_b = from_to<UnitSystem, unit_system::heaviside_lorentz>::convert<quantity::B>(t_em_b);
+        const auto em_e = convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::E>(t_em_e);
+        const auto em_b = convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::B>(t_em_b);
 
         const auto schwinger_pair_production_rate = pair_production_rate<
             RealType, unit_system::heaviside_lorentz>(em_e, em_b);
 
-        const auto dt = from_to<UnitSystem, unit_system::heaviside_lorentz>::convert<quantity::time>(t_dt);
-        const auto volume = from_to<UnitSystem, unit_system::heaviside_lorentz>::convert<quantity::volume>(t_volume);
+        const auto dt     = convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::time>  (t_dt);
+        const auto volume = convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::volume>(t_volume);
 
         return schwinger_pair_production_rate*dt*volume;
     }
