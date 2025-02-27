@@ -337,4 +337,3 @@ namespace ablastr::qed
 
 
 #endif //ABLASTR_QED_LOOKUP_TABLES_
-
