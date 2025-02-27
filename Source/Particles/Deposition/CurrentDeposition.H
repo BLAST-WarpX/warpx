@@ -495,11 +495,11 @@ void doJandSigmaDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPos
             GetPosition(ip, xp_nph, yp_nph, zp_nph);
 
             // Compute magnetic field on particle
-            amrex::ParticleReal Bpx;
-            amrex::ParticleReal Bpy;
-            amrex::ParticleReal Bpz;
+            amrex::ParticleReal Bxp = 0.0;
+            amrex::ParticleReal Byp = 0.0;
+            amrex::ParticleReal Bzp = 0.0;
             doGatherBShapeN<1>( xp_nph, yp_nph, zp_nph,
-                                Bpx, Bpy, Bpz,
+                                Bxp, Byp, Bzp,
                                 Bx_arr, By_arr, Bz_arr,
                                 dinv, xyzmin, lo );
 
@@ -508,9 +508,9 @@ void doJandSigmaDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPos
             // Convert B on particle to normalized cyclotron units with dt/2.0
             const amrex::ParticleReal gamma_bar = std::sqrt(1._prt + (uxp[ip]*uxp[ip] + uyp[ip]*uyp[ip] + uzp[ip]*uzp[ip])*inv_c2);
             const amrex::Real alpha = qs/ms*0.5_rt*dt/gamma_bar;
-            Bpx *= alpha;
-            Bpy *= alpha;
-            Bpz *= alpha;
+            Bxp *= alpha;
+            Byp *= alpha;
+            Bzp *= alpha;
 
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
             // The uxp,uyp,uzp are the velocities at time level n+1/2
@@ -535,21 +535,21 @@ void doJandSigmaDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPos
                                                   invvol, lo, n_rz_azimuthal_modes);
 
             // Compute Mass Matrix kernals (non-relativistic for now)
-            amrex::Real rhop = wq*gaminv;
-            amrex::Real Bpsq = Bpx*Bpx + Bpy*Bpy + Bpz*Bpz;
+            amrex::Real rhop = wq*gaminv*invvol;
+            amrex::Real Bpsq = Bxp*Bxp + Byp*Byp + Bzp*Bzp;
             amrex::Real arogp = alpha*rhop/(1.0_rt + Bpsq);
 
-            amrex::Real fpxx = arogp*(Bpx*Bpx + 1.0_rt);
-            amrex::Real fpxy = arogp*(Bpx*Bpy + Bpz);
-            amrex::Real fpxz = arogp*(Bpx*Bpz - Bpy);
+            amrex::Real fpxx = arogp*(Bxp*Bxp + 1.0_rt);
+            amrex::Real fpxy = arogp*(Bxp*Byp + Bzp);
+            amrex::Real fpxz = arogp*(Bxp*Bzp - Byp);
 
-            amrex::Real fpyx = arogp*(Bpy*Bpx - Bpz);
-            amrex::Real fpyy = arogp*(Bpy*Bpy + 1.0_rt);
-            amrex::Real fpyz = arogp*(Bpy*Bpz + Bpx);
+            amrex::Real fpyx = arogp*(Byp*Bxp - Bzp);
+            amrex::Real fpyy = arogp*(Byp*Byp + 1.0_rt);
+            amrex::Real fpyz = arogp*(Byp*Bzp + Bxp);
 
-            amrex::Real fpzx = arogp*(Bpz*Bpx + Bpy);
-            amrex::Real fpzy = arogp*(Bpz*Bpy - Bpx);
-            amrex::Real fpzz = arogp*(Bpz*Bpz + 1.0_rt);
+            amrex::Real fpzx = arogp*(Bzp*Bxp + Byp);
+            amrex::Real fpzy = arogp*(Bzp*Byp - Bxp);
+            amrex::Real fpzz = arogp*(Bzp*Bzp + 1.0_rt);
 
         }
     );
