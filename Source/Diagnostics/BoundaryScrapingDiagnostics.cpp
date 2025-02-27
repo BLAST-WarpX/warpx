@@ -84,10 +84,9 @@ BoundaryScrapingDiagnostics::InitializeBufferData (int /*i_buffer*/, int /*lev*/
 }
 
 void
-BoundaryScrapingDiagnostics::InitializeParticleBuffer ()
+BoundaryScrapingDiagnostics::InitializeParticleBuffer (const MultiParticleContainer& mpc)
 {
     auto & warpx = WarpX::GetInstance();
-    const MultiParticleContainer& mpc = warpx.GetPartContainer();
 
     // If the user does not specify any species, dump all species
     if (m_output_species_names.empty()) {
