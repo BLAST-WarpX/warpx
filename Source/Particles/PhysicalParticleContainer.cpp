@@ -410,6 +410,23 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     pp_species_name.query("reflection_model_zhi(E)", m_boundary_conditions.reflection_model_zhi_str);
     m_boundary_conditions.BuildReflectionModelParsers();
 
+    // Read SEE parameters for absorbing boundaries; SEE probability defaults to zero
+    pp_species_name.queryWithParser("SEE_probability_xlo", m_boundary_conditions.data.SEE_probability_xlo);
+    pp_species_name.queryWithParser("SEE_probability_xhi", m_boundary_conditions.data.SEE_probability_xhi);
+    pp_species_name.queryWithParser("SEE_probability_ylo", m_boundary_conditions.data.SEE_probability_ylo);
+    pp_species_name.queryWithParser("SEE_probability_yhi", m_boundary_conditions.data.SEE_probability_yhi);
+    pp_species_name.queryWithParser("SEE_probability_zlo", m_boundary_conditions.data.SEE_probability_zlo);
+    pp_species_name.queryWithParser("SEE_probability_zhi", m_boundary_conditions.data.SEE_probability_zhi);
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        (m_boundary_conditions.data.SEE_probability_xlo >= 0.) ||
+        (m_boundary_conditions.data.SEE_probability_xhi >= 0.) ||
+        (m_boundary_conditions.data.SEE_probability_ylo >= 0.) ||
+        (m_boundary_conditions.data.SEE_probability_yhi >= 0.) ||
+        (m_boundary_conditions.data.SEE_probability_zlo >= 0.) ||
+        (m_boundary_conditions.data.SEE_probability_zhi >= 0.),
+        "Secondary electron emission probability must be >= 0.");
+
     const ParmParse pp_boundary("boundary");
     bool flag = false;
     pp_boundary.query("reflect_all_velocities", flag);
