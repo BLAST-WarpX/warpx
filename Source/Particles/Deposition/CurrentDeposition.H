@@ -272,9 +272,15 @@ AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void doMassMatrixDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
                                         [[maybe_unused]] const amrex::ParticleReal yp,
                                         [[maybe_unused]] const amrex::ParticleReal zp,
+                                        const amrex::ParticleReal wqx,
+                                        const amrex::ParticleReal wqy,
+                                        const amrex::ParticleReal wqz,
                                         const amrex::ParticleReal fpxx,
                                         const amrex::ParticleReal fpyy,
                                         const amrex::ParticleReal fpzz,
+                                        amrex::Array4<amrex::Real> const& jx_arr,
+                                        amrex::Array4<amrex::Real> const& jy_arr,
+                                        amrex::Array4<amrex::Real> const& jz_arr,
                                         amrex::Array4<amrex::Real> const& Sx_arr,
                                         amrex::Array4<amrex::Real> const& Sy_arr,
                                         amrex::Array4<amrex::Real> const& Sz_arr,
@@ -388,6 +394,16 @@ void doMassMatrixDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleRe
 #if defined(WARPX_DIM_1D_Z)
     for (int iz=0; iz<=depos_order; iz++){
         amrex::Gpu::Atomic::AddNoRet(
+            &jx_arr(lo.x+l_jx+iz, 0, 0, 0),
+            sz_jx[iz]*wqx);
+        amrex::Gpu::Atomic::AddNoRet(
+            &jy_arr(lo.x+l_jy+iz, 0, 0, 0),
+            sz_jy[iz]*wqy);
+        amrex::Gpu::Atomic::AddNoRet(
+            &jz_arr(lo.x+l_jz+iz, 0, 0, 0),
+            sz_jz[iz]*wqz);
+        //
+        amrex::Gpu::Atomic::AddNoRet(
             &Sx_arr(lo.x+l_jx+iz, 0, 0, 0),
             sz_jx[iz]*sz_jx[iz]*fpxx);
         amrex::Gpu::Atomic::AddNoRet(
@@ -401,6 +417,16 @@ void doMassMatrixDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleRe
 #if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     for (int iz=0; iz<=depos_order; iz++){
         for (int ix=0; ix<=depos_order; ix++){
+            amrex::Gpu::Atomic::AddNoRet(
+                &jx_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, 0),
+                sx_jx[ix]*sz_jx[iz]*wqx);
+            amrex::Gpu::Atomic::AddNoRet(
+                &jy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 0),
+                sx_jy[ix]*sz_jy[iz]*wqy);
+            amrex::Gpu::Atomic::AddNoRet(
+                &jz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, 0),
+                sx_jz[ix]*sz_jz[iz]*wqz);
+            //
             amrex::Gpu::Atomic::AddNoRet(
                 &Sx_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, 0),
                 sx_jx[ix]*sx_jx[ix]*sz_jx[iz]*sz_jx[iz]*fpxx);
@@ -416,6 +442,16 @@ void doMassMatrixDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleRe
     for (int iz=0; iz<=depos_order; iz++){
         for (int iy=0; iy<=depos_order; iy++){
             for (int ix=0; ix<=depos_order; ix++){
+                amrex::Gpu::Atomic::AddNoRet(
+                    &jx_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz),
+                    sx_jx[ix]*sy_jx[iy]*sz_jx[iz]*wqx);
+                amrex::Gpu::Atomic::AddNoRet(
+                    &jy_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz),
+                    sx_jy[ix]*sy_jy[iy]*sz_jy[iz]*wqy);
+                amrex::Gpu::Atomic::AddNoRet(
+                    &jz_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz),
+                    sx_jz[ix]*sy_jz[iy]*sz_jz[iz]*wqz);
+                //
                 amrex::Gpu::Atomic::AddNoRet(
                     &Sx_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz),
                     sx_jx[ix]*sx_jx[ix]*sy_jx[iy]*sy_jx[iy]*sz_jx[iz]*sz_jx[iz]*fpxx);
@@ -703,21 +739,20 @@ void doJandSigmaDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPos
             const amrex::ParticleReal gamma_np1 = std::sqrt(1._prt + (uxp_np1*uxp_np1 + uyp_np1*uyp_np1 + uzp_np1*uzp_np1)*inv_c2);
             const amrex::ParticleReal gaminv = 2.0_prt/(gamma_n + gamma_np1);
 
-            const amrex::Real vx  = uxp[ip]*gaminv;
-            const amrex::Real vy  = uyp[ip]*gaminv;
-            const amrex::Real vz  = uzp[ip]*gaminv;
-
-            amrex::Real wq  = qs*wp[ip];
+            // Compute current density kernals to deposit
+            const amrex::Real rhop = qs*wp[ip]*invvol*gaminv;
+            amrex::Real wqx  = rhop*uxp[ip];
+            amrex::Real wqy  = rhop*uyp[ip];
+            amrex::Real wqz  = rhop*uzp[ip];
 
             // Perform direct current deposition for J
-            const amrex::Real relative_time = 0._rt;
-            doDepositionShapeNKernel<depos_order>(xp_nph, yp_nph, zp_nph, wq, vx, vy, vz, jx_arr, jy_arr, jz_arr,
-                                                  jx_type, jy_type, jz_type,
-                                                  relative_time, dinv, xyzmin,
-                                                  invvol, lo, n_rz_azimuthal_modes);
+            //const amrex::Real relative_time = 0._rt;
+            //doDepositionShapeNKernel<depos_order>(xp_nph, yp_nph, zp_nph, wq, vx, vy, vz, jx_arr, jy_arr, jz_arr,
+            //                                      jx_type, jy_type, jz_type,
+            //                                      relative_time, dinv, xyzmin,
+            //                                      invvol, lo, n_rz_azimuthal_modes);
 
             // Compute Mass Matrix kernals (non-relativistic for now)
-            amrex::Real rhop = wq*gaminv*invvol;
             amrex::Real Bpsq = Bxp*Bxp + Byp*Byp + Bzp*Bzp;
             amrex::Real arogp = alpha*rhop/(1.0_rt + Bpsq);
 
@@ -733,8 +768,11 @@ void doJandSigmaDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPos
             //amrex::Real fpzy = arogp*(Bzp*Byp - Bxp);
             amrex::Real fpzz = arogp*(Bzp*Bzp + 1.0_rt);
 
+
             doMassMatrixDepositionShapeNKernel<depos_order>( xp_nph, yp_nph, zp_nph,
+                                                             wqx, wqy, wqz,
                                                              fpxx, fpyy, fpzz,
+                                                             jx_arr, jy_arr, jz_arr,
                                                              Sx_arr, Sy_arr, Sz_arr,
                                                              jx_type, jy_type, jz_type,
                                                              dinv, xyzmin, lo );
