@@ -1951,7 +1951,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                 self.plasma_resistivity, self.mangle_dict
             ),
         )
-        pywarpx.hybridpicmodel.plasma_hyper_resistivity = self.plasma_hyper_resistivity
+        pywarpx.hybridpicmodel.__setattr__(
+            "plasma_hyper_resistivity(rho,B)",
+            pywarpx.my_constants.mangle_expression(
+                self.plasma_hyper_resistivity, self.mangle_dict
+            ),
+        )
         pywarpx.hybridpicmodel.substeps = self.substeps
         pywarpx.hybridpicmodel.holmstrom_vacuum_region = self.holmstrom_vacuum_region
         pywarpx.hybridpicmodel.__setattr__(
@@ -4061,7 +4066,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
 
     species: species instance
         The name of the species for which to calculate the diagnostic, required for
-        diagnostic types 'BeamRelevant', 'ParticleHistogram', and 'ParticleExtrema'
+        diagnostic types 'BeamRelevant', 'ParticleHistogram', 'ParticleHistogram2D', and 'ParticleExtrema'
 
     bin_number: integer
         For diagnostic type 'ParticleHistogram', the number of bins used for the histogram
@@ -4079,7 +4084,34 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
         For diagnostic type 'ParticleHistogram', the function evaluated to produce the histogram data
 
     filter_function: string, optional
-        For diagnostic type 'ParticleHistogram', the function to filter whether particles are included in the histogram
+        For diagnostic types 'ParticleHistogram' and 'ParticleHistogram2D', the function to filter whether particles are included in the histogram
+
+    bin_max_abs: float
+        For diagnostic type 'ParticleHistogram2D', the maximum value of the bins for the abscissa axis.
+
+    bin_max_ord: float
+        For diagnostic type 'ParticleHistogram2D', the maximum value of the bins for the ordinate axis.
+
+    bin_min_abs: float
+        For diagnostic type 'ParticleHistogram2D', the minimum value of the bins for the abscissa axis.
+
+    bin_min_ord: float
+        For diagnostic type 'ParticleHistogram2D', the minimum value of the bins for the ordinate axis.
+
+    bin_number_abs: integer
+        For diagnostic type 'ParticleHistogram2D', the number of bins used for the histogram for the abscissa axis.
+
+    bin_number_ord: integer
+        For diagnostic type 'ParticleHistogram2D', the number of bins used for the histogram for the ordinate axis.
+
+    histogram_function_abs: string
+        For diagnostic type 'ParticleHistogram2D', the histogram function for the abscissa axis.
+
+    histogram_function_ord: string
+        For diagnostic type 'ParticleHistogram2D', the histogram function for the ordinate axis.
+
+    value_function: string, optional
+        For diagnostic type 'ParticleHistogram2D', the expression for the weight used to calculate the histogram.
 
     reduced_function: string
         For diagnostic type 'FieldReduction', the function of the fields to evaluate
@@ -4162,6 +4194,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
         self._species_reduced_diagnostics = [
             "BeamRelevant",
             "ParticleHistogram",
+            "ParticleHistogram2D",
             "ParticleExtrema",
         ]
 
@@ -4172,6 +4205,8 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
             self.species = species.name
             if self.type == "ParticleHistogram":
                 kw = self._handle_particle_histogram(**kw)
+            elif self.type == "ParticleHistogram2D":
+                kw = self._handle_particle_histogram2d(**kw)
         elif self.type == "FieldProbe":
             kw = self._handle_field_probe(**kw)
         elif self.type == "FieldReduction":
@@ -4246,6 +4281,44 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
             ):
                 self.user_defined_kw[k] = kw[k]
                 del kw[k]
+
+        return kw
+
+    def _handle_particle_histogram2d(self, **kw):
+        self.bin_number_abs = kw.pop("bin_number_abs")
+        self.bin_number_ord = kw.pop("bin_number_ord")
+        self.bin_min_abs = kw.pop("bin_min_abs")
+        self.bin_max_abs = kw.pop("bin_max_abs")
+        self.bin_min_ord = kw.pop("bin_min_ord")
+        self.bin_max_ord = kw.pop("bin_max_ord")
+        histogram_function_abs = kw.pop("histogram_function_abs")
+        histogram_function_ord = kw.pop("histogram_function_ord")
+        self.__setattr__(
+            "histogram_function_abs(t,x,y,z,ux,uy,uz,w)", histogram_function_abs
+        )
+        self.__setattr__(
+            "histogram_function_ord(t,x,y,z,ux,uy,uz,w)", histogram_function_ord
+        )
+
+        filter_function = kw.pop("filter_function", None)
+        value_function = kw.pop("value_function", None)
+
+        self.__setattr__("filter_function(t,x,y,z,ux,uy,uz,w)", filter_function)
+        self.__setattr__("value_function(t,x,y,z,ux,uy,uz,w)", value_function)
+
+        # Check the function expressions for constants
+        for k in list(kw.keys()):
+            if any(
+                re.search(r"\b%s\b" % k, expr)
+                for expr in [
+                    histogram_function_abs,
+                    histogram_function_ord,
+                    filter_function,
+                    value_function,
+                ]
+                if expr is not None
+            ):
+                self.user_defined_kw[k] = kw.pop(k)
 
         return kw
 

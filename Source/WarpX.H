@@ -157,9 +157,7 @@ public:
 
     MultiParticleContainer& GetPartContainer () { return *mypc; }
     MultiFluidContainer& GetFluidContainer () { return *myfl; }
-    MacroscopicProperties& GetMacroscopicProperties () { return *m_macroscopic_properties; }
     ElectrostaticSolver& GetElectrostaticSolver () {return *m_electrostatic_solver;}
-    HybridPICModel& GetHybridPICModel () { return *m_hybrid_pic_model; }
     [[nodiscard]] HybridPICModel * get_pointer_HybridPICModel () const { return m_hybrid_pic_model.get(); }
     MultiDiagnostics& GetMultiDiags () {return *multi_diags;}
     ParticleBoundaryBuffer& GetParticleBoundaryBuffer () { return *m_particle_boundary_buffer; }
@@ -462,9 +460,6 @@ public:
     /** Write a file that record all inputs: inputs file + command line options */
     void WriteUsedInputsFile () const;
 
-    /** Print dt and dx,dy,dz */
-    void PrintDtDxDyDz ();
-
     /**
      * \brief
      * Compute the last time step of the simulation
@@ -663,17 +658,9 @@ public:
 
     /** Run the ionization module on all species */
     void doFieldIonization ();
-    /** Run the ionization module on all species at level lev
-     * \param lev level
-     */
-    void doFieldIonization (int lev);
 
     /** Run the QED module on all species */
     void doQEDEvents ();
-    /** Run the QED module on all species at level lev
-     * \param lev level
-     */
-    void doQEDEvents (int lev);
 
     void PushParticlesandDeposit (int lev, amrex::Real cur_time, DtType a_dt_type=DtType::Full, bool skip_current=false,
                                  PushType push_type=PushType::Explicit);
@@ -761,14 +748,6 @@ public:
     void updateMaxStep (const int new_max_step) {max_step = new_max_step;}
     [[nodiscard]] amrex::Real stopTime () const {return stop_time;}
     void updateStopTime (const amrex::Real new_stop_time) {stop_time = new_stop_time;}
-
-    void AverageAndPackFields( amrex::Vector<std::string>& varnames,
-        amrex::Vector<amrex::MultiFab>& mf_avg, amrex::IntVect ngrow) const;
-
-    void prepareFields( int step, amrex::Vector<std::string>& varnames,
-        amrex::Vector<amrex::MultiFab>& mf_avg,
-        amrex::Vector<const amrex::MultiFab*>& output_mf,
-        amrex::Vector<amrex::Geometry>& output_geom ) const;
 
     static std::array<amrex::Real,3> CellSize (int lev);
     static amrex::XDim3 InvCellSize (int lev);
@@ -1179,11 +1158,6 @@ private:
         const ablastr::fields::MultiLevelVectorField& current,
         int lev,
         const amrex::Periodicity& period);
-    void NodalSyncJ (
-        const ablastr::fields::MultiLevelVectorField& J_fp,
-        const ablastr::fields::MultiLevelVectorField& J_cp,
-        int lev,
-        PatchType patch_type);
 
     void RestrictRhoFromFineToCoarsePatch (int lev );
     void ApplyFilterandSumBoundaryRho (
@@ -1198,13 +1172,6 @@ private:
         const ablastr::fields::MultiLevelScalarField& charge_cp,
         ablastr::fields::MultiLevelScalarField const & charge_buffer,
         int lev,
-        int icomp,
-        int ncomp);
-    void NodalSyncRho (
-        const amrex::Vector<std::unique_ptr<amrex::MultiFab>>& charge_fp,
-        const amrex::Vector<std::unique_ptr<amrex::MultiFab>>& charge_cp,
-        int lev,
-        PatchType patch_type,
         int icomp,
         int ncomp);
 
