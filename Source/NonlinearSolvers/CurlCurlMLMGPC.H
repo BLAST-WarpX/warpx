@@ -77,17 +77,12 @@ class CurlCurlMLMGPC : public Preconditioner<T,Ops>
         /**
          * \brief Define the preconditioner
          */
-        void Define (const T&, Ops*) override;
+        void Define (const T& a_U, Ops* const a_ops, const T* const a_beta = nullptr) override;
 
         /**
          * \brief Update the preconditioner
          */
         void Update (const T& a_U) override;
-
-        /**
-         * \brief Update the preconditioner
-         */
-        void Update (const T& a_U, const T& a_beta) override;
 
         /**
          * \brief Apply (solve) the preconditioner given a RHS
@@ -125,6 +120,8 @@ class CurlCurlMLMGPC : public Preconditioner<T,Ops>
         int m_max_iter = 10;
         int m_max_coarsening_level = 30;
 
+        bool m_beta_scalar = true;
+
         RT m_atol = 1.0e-16;
         RT m_rtol = 1.0e-4;
 
@@ -138,8 +135,6 @@ class CurlCurlMLMGPC : public Preconditioner<T,Ops>
 
 // currently not implemented in 1D
 #ifndef WARPX_DIM_1D_Z
-        amrex::Array<amrex::MultiFab,3> m_bcoef;
-
         amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> m_bc_lo;
         amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> m_bc_hi;
 
@@ -165,6 +160,7 @@ void CurlCurlMLMGPC<T,Ops>::printParameters() const
     auto pc_name = getEnumNameString(PreconditionerType::pc_curl_curl_mlmg);
     Print() << pc_name << " verbose:              " << (m_verbose?"true":"false") << "\n";
     Print() << pc_name << " bottom verbose:       " << (m_bottom_verbose?"true":"false") << "\n";
+    Print() << pc_name << " beta coeff:           " << (m_beta_scalar?"scalar (1.0)":"MultiFab") << "\n";
     Print() << pc_name << " max iter:             " << m_max_iter << "\n";
     Print() << pc_name << " agglomeration:        " << m_agglomeration << "\n";
     Print() << pc_name << " consolidation:        " << m_consolidation << "\n";
@@ -197,7 +193,8 @@ void CurlCurlMLMGPC<T,Ops>::readParameters()
 
 template <class T, class Ops>
 void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
-                                     Ops* const a_ops )
+                                     Ops* const a_ops,
+                                     const T* const a_beta )
 {
     using namespace amrex;
 
@@ -218,41 +215,10 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
     // Get data vectors from a_U
     auto& u_mfarrvec = a_U.getArrayVec();
 
-#if defined(WARPX_DIM_1D_Z)
-    amrex::ignore_unused(u_mfarrvec);
-    WARPX_ABORT_WITH_MESSAGE("CurlCurlMLMGPC not yet implemented for 1D");
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-    // In WarpX, missing dimension is y
-    // In AMReX, missing dimension is z
-    {
-        m_bcoef[0].define( u_mfarrvec[0][0]->boxArray(),
-                           u_mfarrvec[0][0]->DistributionMap(),
-                           u_mfarrvec[0][0]->nComp(),
-                           IntVect::TheZeroVector() );
-    }
-    {
-        m_bcoef[1].define( u_mfarrvec[0][2]->boxArray(),
-                           u_mfarrvec[0][2]->DistributionMap(),
-                           u_mfarrvec[0][2]->nComp(),
-                           IntVect::TheZeroVector() );
-    }
-    {
-        m_bcoef[2].define( u_mfarrvec[0][1]->boxArray(),
-                           u_mfarrvec[0][1]->DistributionMap(),
-                           u_mfarrvec[0][1]->nComp(),
-                           IntVect::TheZeroVector() );
-    }
-#elif defined(WARPX_DIM_3D)
-    for (int d = 0; d < 3; d++) {
-        m_bcoef[d].define( u_mfarrvec[0][d]->boxArray(),
-                           u_mfarrvec[0][d]->DistributionMap(),
-                           u_mfarrvec[0][d]->nComp(),
-                           IntVect::TheZeroVector() );
-    }
-#endif
-
 // currently not implemented in 1D
 #ifdef WARPX_DIM_1D_Z
+    amrex::ignore_unused(u_mfarrvec);
+    amrex::ignore_unused(a_beta);
     WARPX_ABORT_WITH_MESSAGE("CurlCurlMLMGPC not yet implemented for 1D");
 #else
     // create info object for curl-curl op
@@ -264,6 +230,9 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
     // Set number of AMR levels and create geometry, grids, and
     // distribution mapping vectors.
     m_num_amr_levels = m_ops->numAMRLevels();
+    if (m_num_amr_levels > 1) {
+        WARPX_ABORT_WITH_MESSAGE("CurlCurlMLMGPC::Define(): m_num_amr_levels > 1");
+    }
     m_geom.resize(m_num_amr_levels);
     m_grids.resize(m_num_amr_levels);
     m_dmap.resize(m_num_amr_levels);
@@ -296,45 +265,32 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
         m_gmres_solver->setPrecondNumIters(m_max_iter);
         m_gmres_solver->setVerbose(static_cast<int>(m_verbose));
     }
+
+    if (a_beta != nullptr) {
+        m_beta_scalar = false;
+        auto& b_mfarrvec = a_beta->getArrayVec()[0];
+#if defined(WARPX_DIM_1D_Z)
+        // Missing dimensions is x,y in WarpX and y,z in AMReX
+        WARPX_ABORT_WITH_MESSAGE("CurlCurlMLMGPC not yet implemented for 1D");
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        // Missing dimension is y in WarpX and z in AMReX
+        m_curl_curl->setBeta({Array<MultiFab const*,3>{b_mfarrvec[0],
+                                                       b_mfarrvec[2],
+                                                       b_mfarrvec[1]}});
+#elif defined(WARPX_DIM_3D)
+        m_curl_curl->setBeta({Array<MultiFab const*,3>{b_mfarrvec[0],
+                                                       b_mfarrvec[1],
+                                                       b_mfarrvec[2]}});
+#endif
+    }
 #endif
 
     m_is_defined = true;
 }
 
-//template <class T, class Ops>
-//void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
-//{
-//    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-//        IsDefined(),
-//        "CurlCurlMLMGPC::Update() called on undefined object" );
-//
-//    // a_U is not needed for a linear operator
-//    amrex::ignore_unused(a_U);
-//
-//    // set the coefficients alpha and beta for curl-curl op
-//    // (m_dt here is actually theta<=0.5 times simulation dt)
-//    const RT alpha = (this->m_dt*PhysConst::c) * (this->m_dt*PhysConst::c);
-//    const RT beta = RT(1.0);
-//
-//// currently not implemented in 1D
-//#ifndef WARPX_DIM_1D_Z
-//    m_curl_curl->setScalars(alpha, beta);
-//#endif
-//
-//    if (m_verbose) {
-//        amrex::Print() << "Updating " << amrex::getEnumNameString(PreconditionerType::pc_curl_curl_mlmg)
-//                       << ": theta*dt = " << this->m_dt << ", "
-//                       << " coefficients: "
-//                       << "alpha = " << alpha << ", "
-//                       << "beta = " << beta << "\n";
-//    }
-//}
-
 template <class T, class Ops>
 void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
 {
-    using namespace amrex;
-
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         IsDefined(),
         "CurlCurlMLMGPC::Update() called on undefined object" );
@@ -342,83 +298,20 @@ void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
     // a_U is not needed for a linear operator
     amrex::ignore_unused(a_U);
 
-    // set the coefficients alpha for curl-curl op
-    // (m_dt here is actually theta<=0.5 times simulation dt)
-    const RT alpha = (this->m_dt*PhysConst::c) * (this->m_dt*PhysConst::c);
-    // Set beta as 1.0
-    const RT beta = RT(1.0);
-
-#if defined(WARPX_DIM_1D_Z)
-    WARPX_ABORT_WITH_MESSAGE("CurlCurlMLMGPC not yet implemented for 1D");
-#else
-    m_curl_curl->setScalars(alpha, beta);
-    for (int d = 0; d < 3; d++) {
-        m_bcoef[d].setVal(beta);
-    }
-    m_curl_curl->setBeta({Array<MultiFab const*,3>{m_bcoef.data(),
-                                                   m_bcoef.data()+1,
-                                                   m_bcoef.data()+2}});
-#endif
-
-    if (m_verbose) {
-        amrex::Print() << "Updating " << amrex::getEnumNameString(PreconditionerType::pc_curl_curl_mlmg)
-                       << ": theta*dt = " << this->m_dt << ", "
-                       << " coefficients: "
-                       << "alpha = " << alpha << ", "
-                       << "beta = " << beta << "\n";
-    }
-}
-
-template <class T, class Ops>
-void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U, const T& a_beta)
-{
-    using namespace amrex;
-
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        IsDefined(),
-        "CurlCurlMLMGPC::Update() called on undefined object" );
-
-    // a_U is not needed for a linear operator
-    amrex::ignore_unused(a_U);
-
-    // set the coefficient alpha for curl-curl op
-    // (m_dt here is actually theta<=0.5 times simulation dt)
+    // set the alpha for curl-curl op
+    // (m_dt is simulation dt times time integration coeff)
     const RT alpha = (this->m_dt*PhysConst::c) * (this->m_dt*PhysConst::c);
 
-    // copy beta from input argument to local array (using deep-copy since
-    // the input argument may not be persistent from where this function and
-    // then apply function is called)
-
-    // Get data vectors from a_U
-    auto& b_mfarrvec = a_beta.getArrayVec()[0];
-#if defined(WARPX_DIM_1D_Z)
-    amrex::ignore_unused(b_mfarrvec);
-    WARPX_ABORT_WITH_MESSAGE("CurlCurlMLMGPC not yet implemented for 1D");
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-    // In WarpX, missing dimension is y
-    // In AMReX, missing dimension is z
-    amrex::MultiFab::Copy( m_bcoef[0], *(b_mfarrvec[0]), 0, 0, m_bcoef[0].nComp(), IntVect::TheZeroVector());
-    amrex::MultiFab::Copy( m_bcoef[1], *(b_mfarrvec[2]), 0, 0, m_bcoef[1].nComp(), IntVect::TheZeroVector());
-    amrex::MultiFab::Copy( m_bcoef[2], *(b_mfarrvec[1]), 0, 0, m_bcoef[2].nComp(), IntVect::TheZeroVector());
-#elif defined(WARPX_DIM_3D)
-    for (int d = 0; d < 3; d++) {
-        amrex::MultiFab::Copy( m_bcoef[d], *(b_mfarrvec[d]), 0, 0, m_bcoef[d].nComp(), IntVect::TheZeroVector());
-    }
-#endif
-
+// currently not implemented in 1D
 #ifndef WARPX_DIM_1D_Z
-    m_curl_curl->setScalars(alpha, 1.0);
-    m_curl_curl->setBeta({Array<MultiFab const*,3>{m_bcoef.data(),
-                                                   m_bcoef.data()+1,
-                                                   m_bcoef.data()+2}});
+    m_curl_curl->setScalars(alpha, RT(1.0));
 #endif
 
     if (m_verbose) {
         amrex::Print() << "Updating " << amrex::getEnumNameString(PreconditionerType::pc_curl_curl_mlmg)
                        << ": theta*dt = " << this->m_dt << ", "
                        << " coefficients: "
-                       << "alpha = " << alpha << ", "
-                       << "beta = (MultiFab)" << "\n";
+                       << "alpha = " << alpha << "\n";
     }
 }
 
