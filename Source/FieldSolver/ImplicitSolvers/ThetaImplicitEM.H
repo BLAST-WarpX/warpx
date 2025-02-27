@@ -87,9 +87,9 @@ public:
     /**
      * \brief Return pointer to MultiFab array for mass matrix
      */
-    [[nodiscard]] const amrex::Array<amrex::MultiFab*,3>* GetSigmaCoeff() const override
+    [[nodiscard]] const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetSigmaCoeff() const override
     {
-        return &m_sigma_mfarr;
+        return &m_sigma_mfarrvec;
     }
 
 private:
@@ -102,7 +102,7 @@ private:
     /**
      * \brief Array of multifab pointers to mass matrix
      */
-    amrex::Array<amrex::MultiFab*,3> m_sigma_mfarr = {nullptr, nullptr, nullptr};
+    amrex::Vector<amrex::Array<amrex::MultiFab*,3>> m_sigma_mfarrvec;
 
     /**
      * \brief Solver vectors to be used in the nonlinear solver to solve for the

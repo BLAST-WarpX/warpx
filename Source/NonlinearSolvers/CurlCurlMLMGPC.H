@@ -133,6 +133,8 @@ class CurlCurlMLMGPC : public Preconditioner<T,Ops>
         amrex::Vector<amrex::DistributionMapping> m_dmap;
         amrex::IntVect m_gv;
 
+        const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* m_bcoefs = nullptr;
+
 // currently not implemented in 1D
 #ifndef WARPX_DIM_1D_Z
         amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> m_bc_lo;
@@ -264,24 +266,8 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
         m_gmres_solver->setVerbose(static_cast<int>(m_verbose));
     }
 
-    auto b_mfarrvec = m_ops->GetSigmaCoeff();
-
-    if (b_mfarrvec != nullptr) {
-        m_beta_scalar = false;
-#if defined(WARPX_DIM_1D_Z)
-        // Missing dimensions is x,y in WarpX and y,z in AMReX
-        WARPX_ABORT_WITH_MESSAGE("CurlCurlMLMGPC not yet implemented for 1D");
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-        // Missing dimension is y in WarpX and z in AMReX
-        m_curl_curl->setBeta({Array<MultiFab const*,3>{(*b_mfarrvec)[0],
-                                                       (*b_mfarrvec)[2],
-                                                       (*b_mfarrvec)[1]}});
-#elif defined(WARPX_DIM_3D)
-        m_curl_curl->setBeta({Array<MultiFab const*,3>{(*b_mfarrvec)[0],
-                                                       (*b_mfarrvec)[1],
-                                                       (*b_mfarrvec)[2]}});
-#endif
-    }
+    m_bcoefs = m_ops->GetSigmaCoeff();
+    if (m_bcoefs != nullptr) { m_beta_scalar = false; }
 #endif
 
     m_is_defined = true;
@@ -290,6 +276,8 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
 template <class T, class Ops>
 void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
 {
+    using namespace amrex;
+
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         IsDefined(),
         "CurlCurlMLMGPC::Update() called on undefined object" );
@@ -304,6 +292,24 @@ void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
 // currently not implemented in 1D
 #ifndef WARPX_DIM_1D_Z
     m_curl_curl->setScalars(alpha, RT(1.0));
+
+    if (!m_beta_scalar) {
+        for (int n = 0; n < m_num_amr_levels; n++) {
+#if defined(WARPX_DIM_1D_Z)
+            // Missing dimensions is x,y in WarpX and y,z in AMReX
+            WARPX_ABORT_WITH_MESSAGE("CurlCurlMLMGPC not yet implemented for 1D");
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+            // Missing dimension is y in WarpX and z in AMReX
+            m_curl_curl->setBeta({Array<MultiFab const*,3>{ (*m_bcoefs)[n][0],
+                                                            (*m_bcoefs)[n][2],
+                                                            (*m_bcoefs)[n][1]}});
+#elif defined(WARPX_DIM_3D)
+            m_curl_curl->setBeta({Array<MultiFab const*,3>{ (*m_bcoefs)[n][0],
+                                                            (*m_bcoefs)[n][1],
+                                                            (*m_bcoefs)[n][2]}});
+#endif
+        }
+    }
 #endif
 
     if (m_verbose) {

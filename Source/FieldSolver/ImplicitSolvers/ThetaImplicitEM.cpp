@@ -63,9 +63,11 @@ void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
     }
 
     // Set the pointer to mass matrix MultiFab
-    m_sigma_mfarr = m_WarpX->m_fields.get_alldirs(FieldType::sigmaPC, 0);
-    // setting m_sigma to 1.0 right now for testing
-    for (int dim = 0; dim < 3; dim++) { m_sigma_mfarr[dim]->setVal(1.0); }
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        m_sigma_mfarrvec.push_back(m_WarpX->m_fields.get_alldirs(FieldType::sigmaPC, 0));
+        // setting m_sigma to 1.0 right now for testing
+        for (int dim = 0; dim < 3; dim++) { m_sigma_mfarrvec[lev][dim]->setVal(1.0); }
+    }
 
     // Define the nonlinear solver
     m_nlsolver->Define(m_E, this);
