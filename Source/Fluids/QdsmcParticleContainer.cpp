@@ -204,6 +204,7 @@ void QdsmcParticleContainer::InitParticles(int lev){
 
     auto& warpx = WarpX::GetInstance();
     const auto problo = warpx.Geom(lev).ProbLoArray();
+    const auto probhi = warpx.Geom(lev).ProbHiArray();
     const amrex::Real* dx = warpx.Geom(lev).CellSize();
 
     // Define all particles tiles
@@ -234,7 +235,7 @@ void QdsmcParticleContainer::InitParticles(int lev){
         auto wt = static_cast<amrex::Real>(amrex::second());
 
         const Box& tile_box = mfi.tilebox();
-        //const RealBox tile_realbox = WarpX::getRealBox(tile_box, lev);
+        const RealBox tile_realbox = WarpX::getRealBox(tile_box, lev);
 
         const int grid_id = mfi.index();
         const int tile_id = mfi.LocalTileIndex();
@@ -247,7 +248,17 @@ void QdsmcParticleContainer::InitParticles(int lev){
         {
             const IntVect iv(AMREX_D_DECL(i, j, k));
             auto index = tile_box.index(iv);
-            pcounts[index] = 1;
+
+            // Compute the physical coordinates (cell center) for this index.
+            amrex::Real x = problo[0] + (iv[0] + 0.5) * dx[0];
+            amrex::Real y = problo[1] + (iv[1] + 0.5) * dx[1];
+            amrex::Real z = problo[2] + (iv[2] + 0.5) * dx[2];
+
+            // Only create a particle if the computed center is within the domain.
+            // (Assuming the physical domain is [problo, probhi).)
+            if ( x < tile_realbox.hi(0) && y < tile_realbox.hi(1) && z < tile_realbox.hi(2) ) { pcounts[index] = 1; }
+            else { pcounts[index] = 0; }
+
         });
 
         amrex::Gpu::synchronize();
@@ -257,7 +268,7 @@ void QdsmcParticleContainer::InitParticles(int lev){
         // Update NextID to include particles created in this function
         amrex::Long pid;
 #ifdef AMREX_USE_OMP
-#pragma omp critical (add_plasma_nextid)
+#pragma omp critical (qdsmc_nextid)
 #endif
         {
             pid = ParticleType::NextID();
@@ -291,9 +302,19 @@ void QdsmcParticleContainer::InitParticles(int lev){
         {
             const IntVect iv = IntVect(AMREX_D_DECL(i, j, k));
             const auto index = tile_box.index(iv);
-
+            
+            // Skip if this cell did not count as a valid cell.
+            if ( pcounts[index] == 0 ) {
+                return;
+            }
+            
             long ip = poffset[index];
-            pa_idcpu[ip] = amrex::SetParticleIDandCPU(pid+ip, cpuid);
+            // check that ip is in [0, max_new_particles)
+            if (ip < 0 || ip >= max_new_particles) {
+                return;
+            }
+
+            pa_idcpu[ip] = amrex::SetParticleIDandCPU(pid + ip, cpuid);
 
             amrex::Real x = problo[0] + (iv[0] + 0.5) * dx[0];
             amrex::Real y = problo[1] + (iv[1] + 0.5) * dx[1];
@@ -326,8 +347,9 @@ void QdsmcParticleContainer::InitParticles(int lev){
     }    
 
     amrex::Gpu::synchronize();
+    
     //Redistribute is not needed anymore?
-    //Redistribute();
+    Redistribute();
 }
 
 
