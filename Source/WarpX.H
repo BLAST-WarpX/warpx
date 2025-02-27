@@ -139,7 +139,8 @@ public:
     void ImplicitPreRHSOp ( amrex::Real cur_time,
                             amrex::Real a_full_dt,
                             int         a_nl_iter,
-                            bool        a_from_jacobian );
+                            bool        a_from_jacobian,
+                            bool        a_use_mass_matrices );
     void SaveParticlesAtImplicitStepStart ();
     void FinishImplicitParticleUpdate ();
     void SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time );

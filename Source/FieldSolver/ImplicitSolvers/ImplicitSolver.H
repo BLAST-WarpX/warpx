@@ -147,6 +147,11 @@ protected:
     int m_max_particle_iterations = 21;
 
     /**
+     * \brief Whether to use mass matrices for the implicit solver
+     */
+    bool m_use_mass_matrices = false;
+
+    /**
      * \brief parse nonlinear solver parameters (if one is used)
      */
     void parseNonlinearSolverParams( const amrex::ParmParse&  pp )
@@ -166,6 +171,7 @@ protected:
             m_nlsolver = std::make_unique<NewtonSolver<WarpXSolverVec,ImplicitSolver>>();
             pp.query("max_particle_iterations", m_max_particle_iterations);
             pp.query("particle_tolerance", m_particle_tolerance);
+            pp.query("use_mass_matrices", m_use_mass_matrices);
         }
         else {
             WARPX_ABORT_WITH_MESSAGE(
