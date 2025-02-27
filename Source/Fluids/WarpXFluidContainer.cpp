@@ -1419,6 +1419,8 @@ void WarpXFluidContainer::HybridInitializeUe (
         HybridPICModel const* hybrid_model,
         int lev)
 {
+    WARPX_PROFILE("WarpXFluidContainer::HybridInitializeUe");
+
     WarpX &warpx = WarpX::GetInstance();
     const amrex::Geometry &geom = warpx.Geom(lev);
     const amrex::Periodicity &period = geom.periodicity();
@@ -1511,6 +1513,8 @@ void WarpXFluidContainer::HybridInitializeUe (
 
 void WarpXFluidContainer::HybridInitializeKe (ablastr::fields::MultiFabRegister& m_fields, amrex::Real gamma, amrex::Real n_floor, int lev)
 {
+    WARPX_PROFILE("WarpXFluidContainer::HybridInitializeKe");
+
     using warpx::fields::FieldType;
 
     WarpX &warpx = WarpX::GetInstance();
@@ -1558,6 +1562,8 @@ void WarpXFluidContainer::HybridInitializeKe (ablastr::fields::MultiFabRegister&
 
 void WarpXFluidContainer::HybridQDSMCUpdateTe (ablastr::fields::MultiFabRegister& m_fields, amrex::Real gamma, amrex::Real n_floor, int lev)
 {
+    WARPX_PROFILE("WarpXFluidContainer::HybridQDSMCUpdateTe");
+
     using warpx::fields::FieldType;
 
     WarpX &warpx = WarpX::GetInstance();
@@ -1612,6 +1618,8 @@ void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiF
                                         HybridPICModel const* hybrid_model,
                                         amrex::Real dt, int lev)
 {
+    WARPX_PROFILE("WarpXFluidContainer::Hybrid_Electron_Joule_Heating");
+
     WarpX &warpx = WarpX::GetInstance();
     const amrex::Geometry &geom = warpx.Geom(lev);
     const amrex::Periodicity &period = geom.periodicity();
@@ -1705,6 +1713,8 @@ void WarpXFluidContainer::Hybrid_Electron_Bremsstrahlung (ablastr::fields::Multi
                                         HybridPICModel const* hybrid_model,
                                         amrex::Real dt, int lev)
 {
+    WARPX_PROFILE("WarpXFluidContainer::Hybrid_Electron_Bremsstrahlung");
+
     WarpX &warpx = WarpX::GetInstance();
     const amrex::Geometry &geom = warpx.Geom(lev);
     const amrex::Periodicity &period = geom.periodicity();

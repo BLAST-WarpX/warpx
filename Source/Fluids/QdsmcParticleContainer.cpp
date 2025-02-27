@@ -207,15 +207,13 @@ void QdsmcParticleContainer::InitParticles(int lev){
     const amrex::Real* dx = warpx.Geom(lev).CellSize();
 
     // Define all particles tiles
-    for (int lev = 0; lev <= finestLevel(); ++lev)
+    for (auto mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
     {
-        for (auto mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
-        {
-            const int grid_id = mfi.index();
-            const int tile_id = mfi.LocalTileIndex();
-            DefineAndReturnParticleTile(lev, grid_id, tile_id);
-        }
+        const int grid_id = mfi.index();
+        const int tile_id = mfi.LocalTileIndex();
+        DefineAndReturnParticleTile(lev, grid_id, tile_id);
     }
+
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
@@ -251,6 +249,8 @@ void QdsmcParticleContainer::InitParticles(int lev){
             auto index = tile_box.index(iv);
             pcounts[index] = 1;
         });
+
+        amrex::Gpu::synchronize();
 
         const amrex::Long max_new_particles = Scan::ExclusiveSum(counts.size(), counts.data(), offset.data());
 
@@ -337,6 +337,8 @@ QdsmcParticleContainer::SetV (int lev,
                     const amrex::MultiFab &Uy,
                     const amrex::MultiFab &Uz)
 {
+    WARPX_PROFILE("QdsmcParticleContainer::SetV()");
+
     const amrex::XDim3 dinv = WarpX::InvCellSize(lev);
 
     auto& warpx = WarpX::GetInstance();
@@ -388,6 +390,8 @@ QdsmcParticleContainer::SetK (int lev,
                 const amrex::MultiFab &Kfield,
                 const amrex::MultiFab &rhofield)
 {
+    WARPX_PROFILE("QdsmcParticleContainer::SetK()");
+
     // get a reference to WarpX instance
     auto & warpx = WarpX::GetInstance();
 
@@ -437,6 +441,8 @@ QdsmcParticleContainer::SetK (int lev,
 void
 QdsmcParticleContainer::PushX (int lev, amrex::Real dt)
 {
+    WARPX_PROFILE("QdsmcParticleContainer::PushX()");
+
     for (iterator pti(*this, lev); pti.isValid(); ++pti)
     {
         auto const np = pti.numParticles();
@@ -492,6 +498,8 @@ QdsmcParticleContainer::PushX (int lev, amrex::Real dt)
 void
 QdsmcParticleContainer::ResetParticles(int lev)
 {
+    WARPX_PROFILE("QdsmcParticleContainer::ResetParticles()");
+
     for (iterator pti(*this, lev); pti.isValid(); ++pti)
     {
         auto const np = pti.numParticles();
@@ -536,6 +544,8 @@ QdsmcParticleContainer::ResetParticles(int lev)
 void
 QdsmcParticleContainer::DepositK(int lev, amrex::MultiFab &Kfield)
 {
+    WARPX_PROFILE("QdsmcParticleContainer::DepositK()");
+
     const amrex::XDim3 dinv = WarpX::InvCellSize(lev);
 
     WarpX &warpx = WarpX::GetInstance();
@@ -594,6 +604,8 @@ QdsmcParticleContainer::DepositK(int lev, amrex::MultiFab &Kfield)
 void
 QdsmcParticleContainer::DepositField(int lev, amrex::MultiFab &Field)
 {
+     WARPX_PROFILE("QdsmcParticleContainer::DepositField()");
+
     const amrex::XDim3 dinv = WarpX::InvCellSize(lev);
 
     WarpX &warpx = WarpX::GetInstance();
