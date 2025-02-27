@@ -1648,10 +1648,25 @@ WarpXParticleContainer::ApplyBoundaryConditions (){
                     GetPosition.AsStored(i, x, y, z);
                     // Note that for RZ, (x, y, z) is actually (r, theta, z).
 
+                    // Save the particle position before applying the boundary conditions
+                    ParticleReal xpos = x;
+                    ParticleReal ypos = y;
+                    ParticleReal zpos = z;
+
                     bool particle_lost = false;
+                    bool SEE_particle_added = false;
+                    int SEE_num_particles_added = 0;
                     ApplyParticleBoundaries::apply_boundaries(x, y, z, gridmin, gridmax,
                                                               ux[i], uy[i], uz[i], particle_lost,
+                                                              SEE_particle_added, SEE_num_particles_added,
                                                               boundary_conditions, engine);
+
+                    if (SEE_particle_added) {
+                        ApplyParticleBoundaries::do_SEE(xpos, ypos, zpos, gridmin, gridmax,
+                                                        boundary_conditions.max_SEE_probability,
+                                                        boundary_conditions.v_SEE,
+                                                        SEE_num_particles_added, engine);
+                    }
 
                     if (particle_lost) {
                         pidw.make_invalid();
