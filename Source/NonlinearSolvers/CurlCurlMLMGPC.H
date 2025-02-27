@@ -77,7 +77,7 @@ class CurlCurlMLMGPC : public Preconditioner<T,Ops>
         /**
          * \brief Define the preconditioner
          */
-        void Define (const T& a_U, Ops* const a_ops, const T* const a_beta = nullptr) override;
+        void Define (const T&, Ops* const) override;
 
         /**
          * \brief Update the preconditioner
@@ -193,8 +193,7 @@ void CurlCurlMLMGPC<T,Ops>::readParameters()
 
 template <class T, class Ops>
 void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
-                                     Ops* const a_ops,
-                                     const T* const a_beta )
+                                     Ops* const a_ops )
 {
     using namespace amrex;
 
@@ -218,7 +217,6 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
 // currently not implemented in 1D
 #ifdef WARPX_DIM_1D_Z
     amrex::ignore_unused(u_mfarrvec);
-    amrex::ignore_unused(a_beta);
     WARPX_ABORT_WITH_MESSAGE("CurlCurlMLMGPC not yet implemented for 1D");
 #else
     // create info object for curl-curl op
@@ -266,21 +264,22 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
         m_gmres_solver->setVerbose(static_cast<int>(m_verbose));
     }
 
-    if (a_beta != nullptr) {
+    auto b_mfarrvec = m_ops->GetSigmaCoeff();
+
+    if (b_mfarrvec != nullptr) {
         m_beta_scalar = false;
-        auto& b_mfarrvec = a_beta->getArrayVec()[0];
 #if defined(WARPX_DIM_1D_Z)
         // Missing dimensions is x,y in WarpX and y,z in AMReX
         WARPX_ABORT_WITH_MESSAGE("CurlCurlMLMGPC not yet implemented for 1D");
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         // Missing dimension is y in WarpX and z in AMReX
-        m_curl_curl->setBeta({Array<MultiFab const*,3>{b_mfarrvec[0],
-                                                       b_mfarrvec[2],
-                                                       b_mfarrvec[1]}});
+        m_curl_curl->setBeta({Array<MultiFab const*,3>{(*b_mfarrvec)[0],
+                                                       (*b_mfarrvec)[2],
+                                                       (*b_mfarrvec)[1]}});
 #elif defined(WARPX_DIM_3D)
-        m_curl_curl->setBeta({Array<MultiFab const*,3>{b_mfarrvec[0],
-                                                       b_mfarrvec[1],
-                                                       b_mfarrvec[2]}});
+        m_curl_curl->setBeta({Array<MultiFab const*,3>{(*b_mfarrvec)[0],
+                                                       (*b_mfarrvec)[1],
+                                                       (*b_mfarrvec)[2]}});
 #endif
     }
 #endif
