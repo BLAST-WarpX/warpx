@@ -89,10 +89,12 @@ struct SchwingerTransformFunc
      */
     template <typename DstTile>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    void operator() (DstTile& dst1, DstTile& dst2, const int i_dst1,
-                       const int i_dst2, const int N,
-                        const amrex::Real total_weight) const noexcept
+    void operator() (
+        DstTile& dst1, DstTile& dst2, const int i_dst1,
+        const int i_dst2, const int N,
+        const amrex::Real total_weight) const noexcept
     {
+        using namespace amrex;
 
 #if defined(WARPX_DIM_1D_Z)
         const auto w = 0.0_rt;
