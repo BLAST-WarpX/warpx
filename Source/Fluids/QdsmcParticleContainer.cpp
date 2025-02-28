@@ -263,7 +263,6 @@ void QdsmcParticleContainer::InitParticles (int lev)
         Gpu::DeviceVector<amrex::Long> counts(tile_box.numPts(), 0);
         Gpu::DeviceVector<amrex::Long> offset(tile_box.numPts());
         auto *pcounts = counts.data();
-
         
         amrex::ParallelFor(tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
@@ -288,8 +287,10 @@ void QdsmcParticleContainer::InitParticles (int lev)
 
         });
         
-
         amrex::Gpu::synchronize();
+
+        amrex::AllPrint() << "Rank " << ParallelDescriptor::MyProc()
+            << "After first ParallelFor" << "\n";  
 
         const amrex::Long max_new_particles = Scan::ExclusiveSum(counts.size(), counts.data(), offset.data());
 
@@ -366,15 +367,22 @@ void QdsmcParticleContainer::InitParticles (int lev)
         });
 
         amrex::Gpu::synchronize();
+
+        amrex::AllPrint() << "Rank " << ParallelDescriptor::MyProc()
+            << "After second ParallelFor" << "\n";  
         
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
         {
             wt = static_cast<amrex::Real>(amrex::second()) - wt;
             amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
         }
-    }    
+    }  
 
     amrex::Gpu::synchronize();
+
+    amrex::AllPrint() << "Rank " << ParallelDescriptor::MyProc()
+            << "post_MFIter" << "\n";  
+
     Redistribute();
 }
 
