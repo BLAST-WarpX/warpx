@@ -15,8 +15,6 @@
 #include <AMReX_Parser.H>
 #include <AMReX_REAL.H>
 
-#include <optional>
-
 
 /** \brief Functor class that assigns external
  *         field values (E and B) to particles.
