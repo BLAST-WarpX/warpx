@@ -24,12 +24,13 @@ nx, nz = 256, 128
 xmin, zmin = -100e-6, 0.0
 xmax, zmax = 100e-6, 100e-6
 
+# Instead of 'pml', we use 'open' (an absorbing condition) because PICMI does not accept "pml"
 grid = picmi.Cartesian2DGrid(
     number_of_cells=[nx, nz],
     lower_bound=[xmin, zmin],
     upper_bound=[xmax, zmax],
-    lower_boundary_conditions=['pml', 'pml'],
-    upper_boundary_conditions=['pml', 'pml'],
+    lower_boundary_conditions=['open', 'open'],
+    upper_boundary_conditions=['open', 'open'],
     warpx_max_grid_size=128,
     warpx_blocking_factor=32,
 )
@@ -44,12 +45,12 @@ solver = picmi.ElectromagneticSolver(
 # -----------------------------
 # Plasma Species Initialization
 # -----------------------------
-# Electrons: zmin = zc - lgrad*log(400), zmax = 25.47931e-6
+# For electrons: zmin = zc - lgrad*log(400), zmax = 25.47931e-6
 zmin_e = zc - lgrad * math.log(400)
 zmax_e = 25.47931e-6
 
 electrons_distribution = picmi.UniformDistribution(
-    density=nc,  # using nc as constant density placeholder
+    density=nc,  # using nc as a constant density placeholder
     lower_bound=[xmin, zmin_e],
     upper_bound=[xmax, zmax_e],
     fill_in=True,
@@ -62,12 +63,12 @@ electrons = picmi.Species(
     initial_distribution=electrons_distribution,
 )
 
-# Ions: zmin = 19.520e-6, zmax = 25.47931e-6
+# For ions: zmin = 19.520e-6, zmax = 25.47931e-6
 zmin_i = 19.520e-6
 zmax_i = 25.47931e-6
 
 ions_distribution = picmi.UniformDistribution(
-    density=nc,  # using nc as constant density placeholder
+    density=nc,  # using nc as a constant density placeholder
     lower_bound=[xmin, zmin_i],
     upper_bound=[xmax, zmax_i],
     fill_in=True,
@@ -120,7 +121,7 @@ sim = picmi.Simulation(
     warpx_serialize_initial_conditions=1,
 )
 
-# Add species with corrected keyword: n_macroparticle_per_cell
+# Use the correct keyword "n_macroparticle_per_cell"
 sim.add_species(
     electrons,
     layout=picmi.GriddedLayout(grid=grid, n_macroparticle_per_cell=[2, 2])
@@ -130,10 +131,7 @@ sim.add_species(
     layout=picmi.GriddedLayout(grid=grid, n_macroparticle_per_cell=[2, 2])
 )
 
-# Add the laser using its antenna injection method
 sim.add_laser(laser1, injection_method=laser_antenna)
-
-# Add diagnostic
 sim.add_diagnostic(field_diag)
 
 sim.write_input_file(file_name="inputs_2d_picmi.txt")
