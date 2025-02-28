@@ -20,13 +20,11 @@ zc2   = 24.05545177444479562e-6
 # -----------------------------
 # Simulation Domain Setup
 # -----------------------------
-# geometry.prob_lo = -100.e-6   0.
-# geometry.prob_hi =  100.e-6   100.e-6
 nx, nz = 256, 128
 xmin, zmin = -100e-6, 0.0
 xmax, zmax = 100e-6, 100e-6
 
-# Use 'open' instead of 'pml' as PICMI does not support 'pml'
+# Use 'open' as the absorbing boundary (since "pml" is not supported by PICMI)
 grid = picmi.Cartesian2DGrid(
     number_of_cells=[nx, nz],
     lower_bound=[xmin, zmin],
@@ -48,12 +46,10 @@ solver = picmi.ElectromagneticSolver(
 # Plasma Species Initialization
 # -----------------------------
 # For electrons:
-# electrons.zmin = zc - lgrad*log(400), zmax = 25.47931e-6
 zmin_e = zc - lgrad * math.log(400)
 zmax_e = 25.47931e-6
-# For 2D PICMI, supply 3-component bounds even if the grid is 2D.
 electrons_distribution = picmi.UniformDistribution(
-    density=nc,  # using nc as the constant density placeholder
+    density=nc,  # constant density placeholder
     lower_bound=[xmin, 0.0, zmin_e],
     upper_bound=[xmax, 0.0, zmax_e],
     fill_in=True,
@@ -67,11 +63,10 @@ electrons = picmi.Species(
 )
 
 # For ions:
-# ions.zmin = 19.520e-6, zmax = 25.47931e-6
 zmin_i = 19.520e-6
 zmax_i = 25.47931e-6
 ions_distribution = picmi.UniformDistribution(
-    density=nc,  # using nc as the constant density placeholder
+    density=nc,  # constant density placeholder
     lower_bound=[xmin, 0.0, zmin_i],
     upper_bound=[xmax, 0.0, zmax_i],
     fill_in=True,
@@ -87,20 +82,31 @@ ions = picmi.Species(
 # -----------------------------
 # Laser Initialization
 # -----------------------------
-# Laser parameters directly translated from the input file.
+# Use 3-element vectors for laser parameters.
+# Original input:
+#   position     = 0. 0. 5.e-6
+#   direction    = 0. 0. 1.
+#   polarization = 1. 0. 0.
+#   e_max        = 4.e12, wavelength = 0.8e-6,
+#   profile      = Gaussian, profile_waist = 5.e-6,
+#   profile_duration = 15.e-15, profile_t_peak = 25.e-15,
+#   profile_focal_distance = 15.e-6
 laser1 = picmi.GaussianLaser(
     wavelength=0.8e-6,
     waist=5e-6,
     duration=15e-15,
-    focal_position=[0.0, 15e-6 + 5e-6],  # [x, z] in 2D
-    centroid_position=[0.0, 5e-6 - picmi.constants.c * 25e-15],
-    propagation_direction=[0, 1],
-    polarization_direction=[1, 0],
+    # Provide a 3-element focal_position: [x, y, z]
+    focal_position=[0.0, 0.0, 15e-6 + 5e-6],
+    # Provide a 3-element centroid_position: [x, y, z]
+    centroid_position=[0.0, 0.0, 5e-6 - picmi.constants.c * 25e-15],
+    propagation_direction=[0, 0, 1],
+    polarization_direction=[1, 0, 0],
     E0=4.e12,
 )
+# Similarly, provide 3-element vectors for the laser antenna.
 laser_antenna = picmi.LaserAntenna(
-    position=[0.0, 5e-6],
-    normal_vector=[0, 1],
+    position=[0.0, 0.0, 5e-6],
+    normal_vector=[0, 0, 1],
 )
 
 # -----------------------------
@@ -125,7 +131,7 @@ sim = picmi.Simulation(
     warpx_serialize_initial_conditions=1,
 )
 
-# For the GriddedLayout in 2D, n_macroparticle_per_cell remains a 2-element list.
+# Use GriddedLayout with 2 macroparticles per cell (2D)
 sim.add_species(
     electrons,
     layout=picmi.GriddedLayout(grid=grid, n_macroparticle_per_cell=[2, 2])
