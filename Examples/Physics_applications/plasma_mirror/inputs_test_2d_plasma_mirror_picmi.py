@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import math
+
 from pywarpx import picmi
 
 # -----------------------------
@@ -10,12 +11,12 @@ max_steps = 20
 # -----------------------------
 # User-defined Constants (from your inputs file)
 # -----------------------------
-zc    = 20.e-6
-zp    = 20.05545177444479562e-6
+zc = 20.0e-6
+zp = 20.05545177444479562e-6
 lgrad = 0.08e-6
-nc    = 1.74e27
-zp2   = 24.e-6
-zc2   = 24.05545177444479562e-6
+nc = 1.74e27
+zp2 = 24.0e-6
+zc2 = 24.05545177444479562e-6
 
 # -----------------------------
 # Simulation Domain Setup (2D: x and z)
@@ -29,8 +30,8 @@ grid = picmi.Cartesian2DGrid(
     number_of_cells=[nx, nz],
     lower_bound=[xmin, zmin],
     upper_bound=[xmax, zmax],
-    lower_boundary_conditions=['open', 'open'],
-    upper_boundary_conditions=['open', 'open'],
+    lower_boundary_conditions=["open", "open"],
+    upper_boundary_conditions=["open", "open"],
     warpx_max_grid_size=128,
     warpx_blocking_factor=32,
     # No moving window is specified
@@ -39,9 +40,7 @@ grid = picmi.Cartesian2DGrid(
 # -----------------------------
 # Numerical Solver Setup
 # -----------------------------
-solver = picmi.ElectromagneticSolver(
-    grid=grid, method="Yee", cfl=1.0
-)
+solver = picmi.ElectromagneticSolver(grid=grid, method="Yee", cfl=1.0)
 
 # -----------------------------
 # Plasma Species Initialization
@@ -95,7 +94,7 @@ laser1 = picmi.GaussianLaser(
     centroid_position=[0.0, 0.0, 5e-6 - picmi.constants.c * 25e-15],
     propagation_direction=[0, 0, 1],
     polarization_direction=[1, 0, 0],
-    E0=4.e12,
+    E0=4.0e12,
     fill_in=False,  # Disable continuous injection
 )
 laser_antenna = picmi.LaserAntenna(
@@ -128,12 +127,10 @@ sim = picmi.Simulation(
 
 # Use GriddedLayout with 2 macroparticles per cell (2D layout)
 sim.add_species(
-    electrons,
-    layout=picmi.GriddedLayout(grid=grid, n_macroparticle_per_cell=[2, 2])
+    electrons, layout=picmi.GriddedLayout(grid=grid, n_macroparticle_per_cell=[2, 2])
 )
 sim.add_species(
-    ions,
-    layout=picmi.GriddedLayout(grid=grid, n_macroparticle_per_cell=[2, 2])
+    ions, layout=picmi.GriddedLayout(grid=grid, n_macroparticle_per_cell=[2, 2])
 )
 
 sim.add_laser(laser1, injection_method=laser_antenna)
@@ -143,4 +140,3 @@ sim.write_input_file(file_name="inputs_2d_picmi.txt")
 sim.initialize_inputs()
 sim.initialize_warpx()
 sim.step(max_steps)
-
