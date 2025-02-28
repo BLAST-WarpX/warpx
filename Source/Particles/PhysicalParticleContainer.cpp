@@ -412,21 +412,10 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
 
     if (WarpX::isAnyParticleBoundaryAbsorbing()) {
         // Read SEE parameters for absorbing boundaries; SEE probability defaults to zero
-        pp_species_name.queryWithParser("SEE_probability_xlo", m_boundary_conditions.data.SEE_probability_xlo);
-        pp_species_name.queryWithParser("SEE_probability_xhi", m_boundary_conditions.data.SEE_probability_xhi);
-        pp_species_name.queryWithParser("SEE_probability_ylo", m_boundary_conditions.data.SEE_probability_ylo);
-        pp_species_name.queryWithParser("SEE_probability_yhi", m_boundary_conditions.data.SEE_probability_yhi);
-        pp_species_name.queryWithParser("SEE_probability_zlo", m_boundary_conditions.data.SEE_probability_zlo);
-        pp_species_name.queryWithParser("SEE_probability_zhi", m_boundary_conditions.data.SEE_probability_zhi);
-        m_boundary_conditions.SaveMaxSEEProbability();
+        pp_species_name.queryWithParser("SEE_probability", m_boundary_conditions.data.SEE_probability);
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            (m_boundary_conditions.data.SEE_probability_xlo >= 0.) ||
-            (m_boundary_conditions.data.SEE_probability_xhi >= 0.) ||
-            (m_boundary_conditions.data.SEE_probability_ylo >= 0.) ||
-            (m_boundary_conditions.data.SEE_probability_yhi >= 0.) ||
-            (m_boundary_conditions.data.SEE_probability_zlo >= 0.) ||
-            (m_boundary_conditions.data.SEE_probability_zhi >= 0.),
+            (m_boundary_conditions.data.SEE_probability >= 0.),
             "Secondary electron emission probability must be >= 0.");
 
         if (m_boundary_conditions.data.max_SEE_probability > 0.0) {

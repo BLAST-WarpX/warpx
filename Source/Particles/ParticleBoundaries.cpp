@@ -96,14 +96,6 @@ ParticleBoundaries::BuildReflectionModelParsers ()
 }
 
 void
-ParticleBoundaries::SaveMaxSEEProbability ()
-{
-    data.max_SEE_probability = std::max({data.SEE_probability_xlo, data.SEE_probability_xhi,
-                                         data.SEE_probability_ylo, data.SEE_probability_yhi,
-                                         data.SEE_probability_zlo, data.SEE_probability_zhi});
-}
-
-void
 ParticleBoundaries::SetSEEvMag (amrex::Real E)
 {
     data.vSEE = std::sqrt(2.0 * E * PhysConst::q_e / PhysConst::m_e);

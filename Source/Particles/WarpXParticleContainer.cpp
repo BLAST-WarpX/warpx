@@ -1654,18 +1654,17 @@ WarpXParticleContainer::ApplyBoundaryConditions (){
                     ParticleReal zpos = z;
 
                     bool particle_lost = false;
-                    bool SEE_particle_added = false;
-                    int SEE_num_particles_added = 0;
+                    bool do_SEE_flag = false;
                     ApplyParticleBoundaries::apply_boundaries(x, y, z, gridmin, gridmax,
                                                               ux[i], uy[i], uz[i], particle_lost,
-                                                              SEE_particle_added, SEE_num_particles_added,
+                                                              do_SEE_flag,
                                                               boundary_conditions, engine);
 
-                    if (SEE_particle_added) {
+                    if (do_SEE_flag) {
                         ApplyParticleBoundaries::do_SEE(xpos, ypos, zpos, gridmin, gridmax,
-                                                        boundary_conditions.max_SEE_probability,
+                                                        boundary_conditions.SEE_probability,
                                                         boundary_conditions.v_SEE,
-                                                        SEE_num_particles_added, engine);
+                                                        engine);
                     }
 
                     if (particle_lost) {
