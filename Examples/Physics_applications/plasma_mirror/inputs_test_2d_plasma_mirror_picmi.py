@@ -18,13 +18,13 @@ zp2   = 24.e-6
 zc2   = 24.05545177444479562e-6
 
 # -----------------------------
-# Simulation Domain Setup
+# Simulation Domain Setup (2D: x and z)
 # -----------------------------
 nx, nz = 256, 128
 xmin, zmin = -100e-6, 0.0
 xmax, zmax = 100e-6, 100e-6
 
-# Use 'open' for boundary conditions since PICMI does not accept 'pml'
+# Set moving_window_velocity so that the window moves along z
 grid = picmi.Cartesian2DGrid(
     number_of_cells=[nx, nz],
     lower_bound=[xmin, zmin],
@@ -33,6 +33,7 @@ grid = picmi.Cartesian2DGrid(
     upper_boundary_conditions=['open', 'open'],
     warpx_max_grid_size=128,
     warpx_blocking_factor=32,
+    moving_window_velocity=[0.0, picmi.constants.c]  # window moving along z
 )
 
 # -----------------------------
@@ -45,11 +46,13 @@ solver = picmi.ElectromagneticSolver(
 # -----------------------------
 # Plasma Species Initialization
 # -----------------------------
-# For electrons: zmin = zc - lgrad*log(400), zmax = 25.47931e-6
+# For electrons:
+# electrons.zmin = zc - lgrad*log(400), zmax = 25.47931e-6
 zmin_e = zc - lgrad * math.log(400)
 zmax_e = 25.47931e-6
+# For species initialization, supply 3-element bounds (x, dummy y, z)
 electrons_distribution = picmi.UniformDistribution(
-    density=nc,  # constant density placeholder
+    density=nc,  
     lower_bound=[xmin, 0.0, zmin_e],
     upper_bound=[xmax, 0.0, zmax_e],
     fill_in=True,
@@ -62,11 +65,12 @@ electrons = picmi.Species(
     initial_distribution=electrons_distribution,
 )
 
-# For ions: zmin = 19.520e-6, zmax = 25.47931e-6
+# For ions:
+# ions.zmin = 19.520e-6, zmax = 25.47931e-6
 zmin_i = 19.520e-6
 zmax_i = 25.47931e-6
 ions_distribution = picmi.UniformDistribution(
-    density=nc,  # constant density placeholder
+    density=nc,
     lower_bound=[xmin, 0.0, zmin_i],
     upper_bound=[xmax, 0.0, zmax_i],
     fill_in=True,
@@ -80,24 +84,22 @@ ions = picmi.Species(
 )
 
 # -----------------------------
-# Laser Initialization
+# Laser Initialization (2D version)
 # -----------------------------
-# All laser-related vectors are provided as 3-element lists.
+# For a 2D simulation, define laser parameters with 2-element vectors (x,z)
 laser1 = picmi.GaussianLaser(
     wavelength=0.8e-6,
     waist=5e-6,
     duration=15e-15,
-    focal_position=[0.0, 0.0, 15e-6 + 5e-6],
-    centroid_position=[0.0, 0.0, 5e-6 - picmi.constants.c * 25e-15],
-    propagation_direction=[0, 0, 1],
-    polarization_direction=[1, 0, 0],
+    focal_position=[0.0, 15e-6 + 5e-6],  # (x, z)
+    centroid_position=[0.0, 5e-6 - picmi.constants.c * 25e-15],
+    propagation_direction=[0, 1],         # along z
+    polarization_direction=[1, 0],          # along x
     E0=4.e12,
 )
-# Disable continuous injection by setting do_continuous_injection to 0.
 laser_antenna = picmi.LaserAntenna(
-    position=[0.0, 0.0, 5e-6],
-    normal_vector=[0, 0, 1],
-    do_continuous_injection=0,
+    position=[0.0, 5e-6],
+    normal_vector=[0, 1],
 )
 
 # -----------------------------
@@ -122,7 +124,7 @@ sim = picmi.Simulation(
     warpx_serialize_initial_conditions=1,
 )
 
-# Use GriddedLayout with 2 macroparticles per cell (2D)
+# For species, use GriddedLayout with 2 macroparticles per cell (2D)
 sim.add_species(
     electrons,
     layout=picmi.GriddedLayout(grid=grid, n_macroparticle_per_cell=[2, 2])
