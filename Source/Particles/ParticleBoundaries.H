@@ -67,7 +67,7 @@ struct ParticleBoundaries
 
         bool reflect_all_velocities;
 
-        amrex::Real SEE_probability = 0.0_rt;
+        amrex::Real SEE_probability = 0.;
         amrex::Real v_SEE = 0.;
     };
     ParticleBoundariesData data;

@@ -1660,7 +1660,7 @@ WarpXParticleContainer::ApplyBoundaryConditions (){
                                                               do_SEE_flag,
                                                               boundary_conditions, engine);
 
-                    if (do_SEE_flag) {
+                    if (boundary_conditions.SEE_probability > 0. && do_SEE_flag) {
                         ApplyParticleBoundaries::do_SEE(xpos, ypos, zpos, gridmin, gridmax,
                                                         boundary_conditions.SEE_probability,
                                                         boundary_conditions.v_SEE,
