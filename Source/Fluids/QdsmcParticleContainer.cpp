@@ -194,20 +194,27 @@ void QdsmcParticleContainer::InitParticles_old (int lev)
     amrex::Gpu::synchronize();
 }
 */
-
-void QdsmcParticleContainer::InitParticles(int lev){
-
-    WARPX_PROFILE("QdsmcParticleContainer::InitParticles()");
-
+void QdsmcParticleContainer::AllocData()
+{
     reserveData();
     resizeData();
+}
+
+void QdsmcParticleContainer::InitParticles (int lev)
+{
+    WARPX_PROFILE("QdsmcParticleContainer::InitParticles()");
 
     auto& warpx = WarpX::GetInstance();
     const auto problo = warpx.Geom(lev).ProbLoArray();
     const auto probhi = warpx.Geom(lev).ProbHiArray();
-    const amrex::Real* dx = warpx.Geom(lev).CellSize();
+    const auto dx     = warpx.Geom(lev).CellSize();
 
-    // Define all particles tiles
+    // Pointer to tile-based cost data (for load balancing)
+    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+
+    // ---------------------------------------------------------------------
+    // 1) Define Particle Tiles for all grids at this level
+    // ---------------------------------------------------------------------
     for (auto mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
     {
         const int grid_id = mfi.index();
@@ -215,16 +222,16 @@ void QdsmcParticleContainer::InitParticles(int lev){
         DefineAndReturnParticleTile(lev, grid_id, tile_id);
     }
 
-
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
+    // ---------------------------------------------------------------------
+    // 2) Loop over all tiles again to create new particles
+    // ---------------------------------------------------------------------
     MFItInfo info;
-    if (do_tiling && Gpu::notInLaunchRegion()) {
+    if (do_tiling && amrex::Gpu::notInLaunchRegion()) {
         info.EnableTiling(tile_size);
     }
 #ifdef AMREX_USE_OMP
     info.SetDynamic(true);
-#pragma omp parallel if (not WarpX::serialize_initial_conditions)
+#pragma omp parallel if (!WarpX::serialize_initial_conditions)
 #endif
     for (MFIter mfi = MakeMFIter(lev, info); mfi.isValid(); ++mfi)
     {
@@ -244,6 +251,7 @@ void QdsmcParticleContainer::InitParticles(int lev){
         Gpu::DeviceVector<amrex::Long> offset(tile_box.numPts());
         auto *pcounts = counts.data();
 
+        
         amrex::ParallelFor(tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
             const IntVect iv(AMREX_D_DECL(i, j, k));
@@ -266,6 +274,7 @@ void QdsmcParticleContainer::InitParticles(int lev){
             }
 
         });
+        
 
         amrex::Gpu::synchronize();
 
@@ -300,7 +309,7 @@ void QdsmcParticleContainer::InitParticles(int lev){
         for (int ia = 0; ia < QdsmcPIdx::nattribs; ++ia) {
             pa[ia] = soa.GetRealData(ia).data() + old_size;
         }
-        uint64_t * AMREX_RESTRICT pa_idcpu = soa.GetIdCPUData().data() + old_size;
+        uint64_t* AMREX_RESTRICT pa_idcpu = soa.GetIdCPUData().data() + old_size;
 
         auto *const poffset = offset.data();
 
@@ -314,15 +323,16 @@ void QdsmcParticleContainer::InitParticles(int lev){
                 // Skip if this cell did not count as a valid cell.
                 if ( pcounts[index] == 0 ) { return; }
                 
-                long ip = poffset[index];
+                const amrex::Long ip = poffset[index];
                 // check that ip is in [0, max_new_particles)
                 if (ip < 0 || ip >= max_new_particles) { return; }
+                
+                const amrex::Real x = problo[0] + (iv[0] + 0.5_rt) * dx[0];
+                const amrex::Real y = problo[1] + (iv[1] + 0.5_rt) * dx[1];
+                const amrex::Real z = problo[2] + (iv[2] + 0.5_rt) * dx[2];
 
+                
                 pa_idcpu[ip] = amrex::SetParticleIDandCPU(pid + ip, cpuid);
-
-                amrex::Real x = problo[0] + (iv[0] + 0.5) * dx[0];
-                amrex::Real y = problo[1] + (iv[1] + 0.5) * dx[1];
-                amrex::Real z = problo[2] + (iv[2] + 0.5) * dx[2];
 
                 pa[QdsmcPIdx::x][ip] = x;
                 pa[QdsmcPIdx::y][ip] = y;
@@ -332,13 +342,13 @@ void QdsmcParticleContainer::InitParticles(int lev){
                 pa[QdsmcPIdx::y_node][ip] = y;
                 pa[QdsmcPIdx::z_node][ip] = z;
 
-                pa[QdsmcPIdx::vx][ip] = 0.0;
-                pa[QdsmcPIdx::vy][ip] = 0.0;
-                pa[QdsmcPIdx::vz][ip] = 0.0;
+                pa[QdsmcPIdx::vx][ip] = 0._rt;
+                pa[QdsmcPIdx::vy][ip] = 0._rt;
+                pa[QdsmcPIdx::vz][ip] = 0._rt;
 
-                pa[QdsmcPIdx::entropy][ip] = 0.0;
-                pa[QdsmcPIdx::np_real][ip] = 0.0;
-
+                pa[QdsmcPIdx::entropy][ip] = 0._rt;
+                pa[QdsmcPIdx::np_real][ip] = 0._rt;
+                
             }
         });
 
@@ -352,8 +362,6 @@ void QdsmcParticleContainer::InitParticles(int lev){
     }    
 
     amrex::Gpu::synchronize();
-    
-    //Redistribute is not needed anymore?
     Redistribute();
 }
 

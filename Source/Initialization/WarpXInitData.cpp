@@ -723,6 +723,7 @@ WarpX::InitFromScratch ()
     mypc->InitData();
 
     if(m_hybrid_pic_model->m_solve_electron_energy_equation){
+        qdsmc_hybrid_electron_pc->AllocData();
         qdsmc_hybrid_electron_pc->InitParticles(0);
     }
 
