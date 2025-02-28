@@ -260,15 +260,17 @@ void QdsmcParticleContainer::InitParticles (int lev)
         const int grid_id = mfi.index();
         const int tile_id = mfi.LocalTileIndex();
 
-        Gpu::DeviceVector<amrex::Long> counts(tile_box.numPts(), 0);
+        //Gpu::DeviceVector<amrex::Long> counts(tile_box.numPts(), 0); // original
+        Gpu::DeviceVector<amrex::Long> counts(tile_box.numPts(), 1); // for debugging
         Gpu::DeviceVector<amrex::Long> offset(tile_box.numPts());
         auto *pcounts = counts.data();
 
         amrex::Gpu::synchronize(); // added for debugging
 
         amrex::AllPrint() << "Rank " << ParallelDescriptor::MyProc()
-            << "Before first ParallelFor (but with extra synchronize)" << "\n"; 
+            << "Before first ParallelFor(commented now) (but with extra synchronize)" << "\n"; 
         
+        /*
         amrex::ParallelFor(tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
             const IntVect iv(AMREX_D_DECL(i, j, k));
@@ -291,13 +293,19 @@ void QdsmcParticleContainer::InitParticles (int lev)
             }
 
         });
+        */
         
         amrex::Gpu::synchronize();
 
         amrex::AllPrint() << "Rank " << ParallelDescriptor::MyProc()
-            << "After first ParallelFor" << "\n";  
+            << "After first ParallelFor(commented now)" << "\n";  
 
         const amrex::Long max_new_particles = Scan::ExclusiveSum(counts.size(), counts.data(), offset.data());
+
+        amrex::Gpu::synchronize(); // Added for debugging
+
+        amrex::AllPrint() << "Rank " << ParallelDescriptor::MyProc()
+            << "After Scan::ExclusiveSum" << "\n";  
 
         // Update NextID to include particles created in this function
         amrex::Long pid;
