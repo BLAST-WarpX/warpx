@@ -3300,6 +3300,16 @@ WarpX::isAnyParticleBoundaryThermal ()
     return false;
 }
 
+bool
+WarpX::isAnyParticleBoundaryAbsorbing ()
+{
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        if (WarpX::particle_boundary_lo[idim] == ParticleBoundaryType::Absorbing) {return true;}
+        if (WarpX::particle_boundary_hi[idim] == ParticleBoundaryType::Absorbing) {return true;}
+    }
+    return false;
+}
+
 void
 WarpX::AllocInitMultiFab (
     std::unique_ptr<amrex::iMultiFab>& mf,

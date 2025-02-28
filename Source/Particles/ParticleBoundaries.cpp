@@ -104,7 +104,7 @@ ParticleBoundaries::SaveMaxSEEProbability ()
 }
 
 void
-ParticleBoundaries::SetSEEvMag (amrex::Real E, amrex::ParticleReal& mass)
+ParticleBoundaries::SetSEEvMag (amrex::Real E)
 {
-    data.vSEE = std::sqrt(2.0 * E / PhysConst::q_e / mass);
+    data.vSEE = std::sqrt(2.0 * E * PhysConst::q_e / PhysConst::m_e);
 }
