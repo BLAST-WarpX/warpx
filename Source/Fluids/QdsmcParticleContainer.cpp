@@ -245,6 +245,18 @@ void QdsmcParticleContainer::InitParticles (int lev)
         Box tile_box   = mfi.validbox() & domain_box; // intersection
         const RealBox tile_realbox = WarpX::getRealBox(tile_box, lev);
 
+        amrex::AllPrint() << "Rank " << ParallelDescriptor::MyProc()
+            << " tile_box: " << tile_box
+            << " numPts=" << tile_box.numPts() << std::endl;
+
+        amrex::AllPrint() << "Rank " << ParallelDescriptor::MyProc()
+            << " tile_realbox: lo=" << tile_realbox.lo(0) << "," << tile_realbox.lo(1) << "," << tile_realbox.lo(2)
+            << " hi=" << tile_realbox.hi(0) << "," << tile_realbox.hi(1) << "," << tile_realbox.hi(2) << std::endl;
+
+        if (tile_box.numPts()==0) {
+            continue; // Go to the next tile
+        }
+
         const int grid_id = mfi.index();
         const int tile_id = mfi.LocalTileIndex();
 
