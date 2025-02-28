@@ -12,7 +12,11 @@
 /**
  * \brief Types for preconditioners for field solvers
  */
-AMREX_ENUM(PreconditionerType, pc_curl_curl_mlmg, none);
+AMREX_ENUM(PreconditionerType,
+    pc_curl_curl_mlmg,
+    pc_jacobi,
+    none
+);
 
 /**
  * \brief Base class for preconditioners
