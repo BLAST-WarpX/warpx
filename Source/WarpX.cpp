@@ -164,14 +164,6 @@ bool WarpX::refine_plasma     = false;
 utils::parser::IntervalsParser WarpX::sort_intervals;
 amrex::IntVect WarpX::sort_bin_size(AMREX_D_DECL(1,1,1));
 
-#if defined(AMREX_USE_CUDA)
-bool WarpX::sort_particles_for_deposition = true;
-#else
-bool WarpX::sort_particles_for_deposition = false;
-#endif
-
-amrex::IntVect WarpX::sort_idx_type(AMREX_D_DECL(0,0,0));
-
 bool WarpX::do_dynamic_scheduling = true;
 
 bool WarpX::do_multi_J = false;

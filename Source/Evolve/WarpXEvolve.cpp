@@ -584,7 +584,8 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         if (verbose) {
             amrex::Print() << Utils::TextMsg::Info("re-sorting particles");
         }
-        mypc->SortParticlesByBin(sort_bin_size);
+        mypc->SortParticlesByBin(
+            sort_bin_size, sort_particles_for_deposition, sort_idx_type);
     }
 }
 
