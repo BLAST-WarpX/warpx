@@ -241,7 +241,8 @@ void QdsmcParticleContainer::InitParticles (int lev)
         }
         auto wt = static_cast<amrex::Real>(amrex::second());
 
-        const Box& tile_box = mfi.validbox(); 
+        Box domain_box = warpx.Geom(lev).Domain();
+        Box tile_box   = mfi.validbox() & domain_box; // intersection
         const RealBox tile_realbox = WarpX::getRealBox(tile_box, lev);
 
         const int grid_id = mfi.index();
