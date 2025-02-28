@@ -8,7 +8,7 @@ from pywarpx import picmi
 max_steps = 20
 
 # -----------------------------
-# User-defined Constants (from my_constants)
+# User-defined Constants (from your inputs file)
 # -----------------------------
 zc    = 20.e-6
 zp    = 20.05545177444479562e-6
@@ -24,7 +24,7 @@ nx, nz = 256, 128
 xmin, zmin = -100e-6, 0.0
 xmax, zmax = 100e-6, 100e-6
 
-# Set moving_window_velocity so that the window moves along z
+# Use 'open' as boundary conditions since PICMI does not support 'pml'
 grid = picmi.Cartesian2DGrid(
     number_of_cells=[nx, nz],
     lower_bound=[xmin, zmin],
@@ -33,7 +33,7 @@ grid = picmi.Cartesian2DGrid(
     upper_boundary_conditions=['open', 'open'],
     warpx_max_grid_size=128,
     warpx_blocking_factor=32,
-    moving_window_velocity=[0.0, picmi.constants.c]  # window moving along z
+    # No moving window is specified
 )
 
 # -----------------------------
@@ -50,9 +50,9 @@ solver = picmi.ElectromagneticSolver(
 # electrons.zmin = zc - lgrad*log(400), zmax = 25.47931e-6
 zmin_e = zc - lgrad * math.log(400)
 zmax_e = 25.47931e-6
-# For species initialization, supply 3-element bounds (x, dummy y, z)
+# PICMI requires 3-element bounds for species even in 2D (dummy y coordinate = 0)
 electrons_distribution = picmi.UniformDistribution(
-    density=nc,  
+    density=nc,
     lower_bound=[xmin, 0.0, zmin_e],
     upper_bound=[xmax, 0.0, zmax_e],
     fill_in=True,
@@ -84,22 +84,23 @@ ions = picmi.Species(
 )
 
 # -----------------------------
-# Laser Initialization (2D version)
+# Laser Initialization
 # -----------------------------
-# For a 2D simulation, define laser parameters with 2-element vectors (x,z)
+# Supply full 3-element vectors for laser parameters.
 laser1 = picmi.GaussianLaser(
     wavelength=0.8e-6,
     waist=5e-6,
     duration=15e-15,
-    focal_position=[0.0, 15e-6 + 5e-6],  # (x, z)
-    centroid_position=[0.0, 5e-6 - picmi.constants.c * 25e-15],
-    propagation_direction=[0, 1],         # along z
-    polarization_direction=[1, 0],          # along x
+    focal_position=[0.0, 0.0, 15e-6 + 5e-6],  # [x, y, z]
+    centroid_position=[0.0, 0.0, 5e-6 - picmi.constants.c * 25e-15],
+    propagation_direction=[0, 0, 1],
+    polarization_direction=[1, 0, 0],
     E0=4.e12,
+    fill_in=False,  # Disable continuous injection
 )
 laser_antenna = picmi.LaserAntenna(
-    position=[0.0, 5e-6],
-    normal_vector=[0, 1],
+    position=[0.0, 0.0, 5e-6],
+    normal_vector=[0, 0, 1],
 )
 
 # -----------------------------
@@ -119,12 +120,12 @@ sim = picmi.Simulation(
     solver=solver,
     max_steps=max_steps,
     verbose=1,
-    particle_shape="cubic",
+    particle_shape="cubic",  # corresponds to order 3 particle shape
     warpx_use_filter=1,
     warpx_serialize_initial_conditions=1,
 )
 
-# For species, use GriddedLayout with 2 macroparticles per cell (2D)
+# Use GriddedLayout with 2 macroparticles per cell (2D layout)
 sim.add_species(
     electrons,
     layout=picmi.GriddedLayout(grid=grid, n_macroparticle_per_cell=[2, 2])
