@@ -22,9 +22,9 @@ module load Boost/1.82.0-cpeCray-23.09
 # optional: for openPMD support
 export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-1.21.1:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=${SW_DIR}/hdf5-1.14.1.2:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.8.3:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.10.2:$CMAKE_PREFIX_PATH
 export PATH=${SW_DIR}/hdf5-1.14.1.2/bin:${PATH}
-export PATH=${SW_DIR}/adios2-2.8.3/bin:${PATH}
+export PATH=${SW_DIR}/adios2-2.10.2/bin:${PATH}
 
 # optional: for Python bindings or libEnsemble
 module load cray-python/3.11.7
