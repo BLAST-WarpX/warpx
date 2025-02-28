@@ -73,7 +73,6 @@ struct GetExternalEBField
         using namespace amrex::literals;
 
         if (d_lattice_element_finder.m_initialized) {
-            // Note that the "*" is needed since d_lattice_element_finder is optional
             d_lattice_element_finder(i, field_Ex, field_Ey, field_Ez,
                                         field_Bx, field_By, field_Bz);
         }
