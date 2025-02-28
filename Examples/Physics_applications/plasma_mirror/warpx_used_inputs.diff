@@ -1,0 +1,105 @@
+2c2
+< algo.load_balance_intervals = 66
+---
+> algo.maxwell_solver = Yee
+48a49,50
+> boundary.particle_hi = open open
+> boundary.particle_lo = open open
+49a52
+> diag1.fields_to_plot = Bx By Bz Ex Ey Ez jx jy jz rho
+52a56
+> diag1.write_species = 0
+57,61c61,67
+< electrons.charge = -q_e
+< electrons.density_function(x,y,z) = if(z<zp, nc*exp((z-zc)/lgrad), if(z<=zp2, 2.*nc, nc*exp(-(z-zc2)/lgrad)))
+< electrons.injection_style = NUniformPerCell
+< electrons.mass = m_e
+< electrons.momentum_distribution_type = gaussian
+---
+> electrons.charge = -1.602176634e-19
+> electrons.density = 1.74e+27
+> electrons.do_continuous_injection = 1
+> electrons.initialize_self_fields = 0
+> electrons.injection_style = nuniformpercell
+> electrons.mass = 9.1093837015e-31
+> electrons.momentum_distribution_type = constant
+63,67c69,78
+< electrons.profile = parse_density_function
+< electrons.ux_th = .01
+< electrons.uz_th = .01
+< electrons.zmax = 25.47931e-6
+< electrons.zmin = zc-lgrad*log(400)
+---
+> electrons.profile = constant
+> electrons.ux = 0.0
+> electrons.uy = 0.0
+> electrons.uz = 0.0
+> electrons.xmax = 0.0001
+> electrons.xmin = -0.0001
+> electrons.ymax = 0.0
+> electrons.ymin = 0.0
+> electrons.zmax = 2.547931e-05
+> electrons.zmin = 1.9520682836231365e-05
+73d83
+< geometry.prob_hi = 100.e-6 100.e-6
+75c85
+< geometry.prob_lo = -100.e-6 0.
+---
+> geometry.prob_lo = -0.0001 0.0
+77,81c87,93
+< ions.charge = q_e
+< ions.density_function(x,y,z) = if(z<zp, nc*exp((z-zc)/lgrad), if(z<=zp2, 2.*nc, nc*exp(-(z-zc2)/lgrad)))
+< ions.injection_style = NUniformPerCell
+< ions.mass = m_p
+< ions.momentum_distribution_type = at_rest
+---
+> ions.charge = 1.602176634e-19
+> ions.density = 1.74e+27
+> ions.do_continuous_injection = 1
+> ions.initialize_self_fields = 0
+> ions.injection_style = nuniformpercell
+> ions.mass = 1.67262192369e-27
+> ions.momentum_distribution_type = constant
+83,89c95,109
+< ions.profile = parse_density_function
+< ions.zmax = 25.47931e-6
+< ions.zmin = 19.520e-6
+< laser1.direction = 0. 0. 1.
+< laser1.e_max = 4.e12
+< laser1.polarization = 1. 0. 0.
+< laser1.position = 0. 0. 5.e-6
+---
+> ions.profile = constant
+> ions.ux = 0.0
+> ions.uy = 0.0
+> ions.uz = 0.0
+> ions.xmax = 0.0001
+> ions.xmin = -0.0001
+> ions.ymax = 0.0
+> ions.ymin = 0.0
+> ions.zmax = 2.547931e-05
+> ions.zmin = 1.952e-05
+> laser1.direction = 0 0 1
+> laser1.do_continuous_injection = 0
+> laser1.e_max = 4000000000000.0
+> laser1.polarization = 1 0 0
+> laser1.position = 0.0 0.0 5e-06
+91,95c111,115
+< laser1.profile_duration = 15.e-15
+< laser1.profile_focal_distance = 15.e-6
+< laser1.profile_t_peak = 25.e-15
+< laser1.profile_waist = 5.e-6
+< laser1.wavelength = 0.8e-6
+---
+> laser1.profile_duration = 1.5e-14
+> laser1.profile_focal_distance = 1.5000000000000002e-05
+> laser1.profile_t_peak = 2.5e-14
+> laser1.profile_waist = 5e-06
+> laser1.wavelength = 8e-07
+99,104d118
+< my_constants.lgrad = .08e-6
+< my_constants.nc = 1.74e27
+< my_constants.zc = 20.e-6
+< my_constants.zc2 = 24.05545177444479562e-6
+< my_constants.zp = 20.05545177444479562e-6
+< my_constants.zp2 = 24.e-6

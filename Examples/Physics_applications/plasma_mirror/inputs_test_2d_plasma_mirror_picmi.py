@@ -108,6 +108,7 @@ laser_antenna = picmi.LaserAntenna(
 # -----------------------------
 field_diag = picmi.FieldDiagnostic(
     name="diag1",
+    warpx_format="openpmd",
     grid=grid,
     period=10,
     data_list=["E", "B", "J", "rho"],

@@ -78,7 +78,5 @@ laser1.profile_focal_distance = 15.e-6  # Focal distance from the antenna (in me
 
 # Diagnostics
 diagnostics.diags_names = diag1
-diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho rho_electrons rho_ions
 diag1.intervals = 10
 diag1.diag_type = Full
-diag1.format = openpmd
