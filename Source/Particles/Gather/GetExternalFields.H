@@ -56,10 +56,10 @@ struct GetExternalEBField
     const amrex::ParticleReal* AMREX_RESTRICT m_uy = nullptr;
     const amrex::ParticleReal* AMREX_RESTRICT m_uz = nullptr;
 
-    LatticeElementFinderDevice* d_lattice_element_finder = nullptr;
+    LatticeElementFinderDevice d_lattice_element_finder;
 
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    bool isNoOp () const { return (m_Etype == None && m_Btype == None && !d_lattice_element_finder); }
+    bool isNoOp () const { return (m_Etype == None && m_Btype == None && !d_lattice_element_finder.m_initialized); }
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void operator () (long i,
@@ -72,10 +72,10 @@ struct GetExternalEBField
     {
         using namespace amrex::literals;
 
-        if (d_lattice_element_finder) {
+        if (d_lattice_element_finder.m_initialized) {
             // Note that the "*" is needed since d_lattice_element_finder is optional
-            (*d_lattice_element_finder)(i, field_Ex, field_Ey, field_Ez,
-                                           field_Bx, field_By, field_Bz);
+            d_lattice_element_finder(i, field_Ex, field_Ey, field_Ez,
+                                        field_Bx, field_By, field_Bz);
         }
 
         if (m_Etype == None && m_Btype == None) { return; }
