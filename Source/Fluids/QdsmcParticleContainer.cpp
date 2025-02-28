@@ -263,6 +263,11 @@ void QdsmcParticleContainer::InitParticles (int lev)
         Gpu::DeviceVector<amrex::Long> counts(tile_box.numPts(), 0);
         Gpu::DeviceVector<amrex::Long> offset(tile_box.numPts());
         auto *pcounts = counts.data();
+
+        amrex::Gpu::synchronize(); // added for debugging
+
+        amrex::AllPrint() << "Rank " << ParallelDescriptor::MyProc()
+            << "Before first ParallelFor (but with extra synchronize)" << "\n"; 
         
         amrex::ParallelFor(tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
