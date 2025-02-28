@@ -241,7 +241,7 @@ void QdsmcParticleContainer::InitParticles (int lev)
         }
         auto wt = static_cast<amrex::Real>(amrex::second());
 
-        const Box& tile_box = mfi.tilebox();
+        const Box& tile_box = mfi.validbox(); 
         const RealBox tile_realbox = WarpX::getRealBox(tile_box, lev);
 
         const int grid_id = mfi.index();
