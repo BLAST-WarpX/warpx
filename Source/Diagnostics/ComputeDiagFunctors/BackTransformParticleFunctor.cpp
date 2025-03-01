@@ -45,9 +45,6 @@ LorentzTransformParticles::LorentzTransformParticles (
 {
     using namespace amrex::literals;
 
-    // FIXME
-    //if (tmp_particle_data.empty()) { return; }
-
     m_get_position = GetParticlePosition<PIdx>(a_pti, a_offset);
 
     const auto& attribs = a_pti.GetAttribs();

@@ -48,9 +48,6 @@ struct CopyParticleAttribs
         WarpXParIter& a_pti,
         long a_offset = 0) noexcept
     {
-        // FIXME
-        //if (tmp_particle_data.empty()) { return; }
-
         const auto& attribs = a_pti.GetAttribs();
 
         uxp = attribs[PIdx::ux].dataPtr() + a_offset;
