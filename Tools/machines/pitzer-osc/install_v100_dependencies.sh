@@ -107,10 +107,10 @@ rm -rf ${build_dir}/c-blosc-pitzer-build
 if [ -d ${SRC_DIR}/adios2 ]; then
   cd ${SRC_DIR}/adios2
   git fetch --prune
-  git checkout v2.10.1
+  git checkout v2.10.2
   cd -
 else
-  git clone -b v2.10.1 https://github.com/ornladios/ADIOS2.git ${SRC_DIR}/adios2
+  git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git ${SRC_DIR}/adios2
 fi
 rm -rf ${build_dir}/adios2-pitzer-build
 cmake -S ${SRC_DIR}/adios2 \
@@ -122,7 +122,7 @@ cmake -S ${SRC_DIR}/adios2 \
   -DADIOS2_USE_Python=OFF \
   -DADIOS2_USE_SST=OFF \
   -DADIOS2_USE_ZeroMQ=OFF \
-  -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.1
+  -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.2
 cmake --build ${build_dir}/adios2-pitzer-build --target install -j 16
 rm -rf ${build_dir}/adios2-pitzer-build
 

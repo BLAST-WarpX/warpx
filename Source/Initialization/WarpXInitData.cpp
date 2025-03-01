@@ -29,7 +29,6 @@
 #include "Initialization/ExternalField.H"
 #include "Initialization/DivCleaner/ProjectionDivCleaner.H"
 #include "Particles/MultiParticleContainer.H"
-#include "Utils/Algorithms/LinearInterpolation.H"
 #include "Utils/Logo/GetLogo.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
@@ -40,6 +39,7 @@
 #include "Python/callbacks.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/math/LinearInterpolation.H>
 #include <ablastr/parallelization/MPIInitHelpers.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/utils/UsedInputsFile.H>
@@ -1698,7 +1698,7 @@ WarpX::ReadExternalFieldFromFile (
                     f01 = fc_array(0, iz  , ir+1),
                     f10 = fc_array(0, iz+1, ir  ),
                     f11 = fc_array(0, iz+1, ir+1);
-                mffab(i,j,k) = static_cast<amrex::Real>(utils::algorithms::bilinear_interp<double>
+                mffab(i,j,k) = static_cast<amrex::Real>(ablastr::math::bilinear_interp<double>
                     (xx0, xx0+file_dr, xx1, xx1+file_dz,
                      f00, f01, f10, f11,
                      x0, x1));
@@ -1713,7 +1713,7 @@ WarpX::ReadExternalFieldFromFile (
                     f101 = fc_array(iz+1, iy  , ix+1),
                     f110 = fc_array(iz  , iy+1, ix+1),
                     f111 = fc_array(iz+1, iy+1, ix+1);
-                mffab(i,j,k) = static_cast<amrex::Real>(utils::algorithms::trilinear_interp<double>
+                mffab(i,j,k) = static_cast<amrex::Real>(ablastr::math::trilinear_interp<double>
                     (xx0, xx0+file_dx, xx1, xx1+file_dy, xx2, xx2+file_dz,
                      f000, f001, f010, f011, f100, f101, f110, f111,
                      x0, x1, x2));

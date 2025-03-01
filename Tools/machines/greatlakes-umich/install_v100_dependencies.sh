@@ -57,10 +57,10 @@ if [ -d $HOME/src/adios2 ]
 then
   cd $HOME/src/adios2
   git fetch --prune
-  git checkout v2.10.0
+  git checkout v2.10.2
   cd -
 else
-  git clone -b v2.10.0 https://github.com/ornladios/ADIOS2.git $HOME/src/adios2
+  git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git $HOME/src/adios2
 fi
 rm -rf $HOME/src/adios2-v100-build
 cmake                                \
@@ -71,7 +71,7 @@ cmake                                \
   -DADIOS2_USE_Fortran=OFF           \
   -DADIOS2_USE_Python=OFF            \
   -DADIOS2_USE_ZeroMQ=OFF            \
-  -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.0
+  -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.2
 cmake --build ${build_dir}/adios2-v100-build --target install -j 8
 rm -rf ${build_dir}/adios2-v100-build
 

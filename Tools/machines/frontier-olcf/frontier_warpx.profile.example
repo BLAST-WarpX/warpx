@@ -33,7 +33,7 @@ export LD_LIBRARY_PATH=${HOME}/sw/frontier/gpu/lapackpp-2024.05.31/lib64:$LD_LIB
 module load boost/1.85.0
 
 # optional: for openPMD support
-module load adios2/2.10.0-mpi
+module load adios2/2.10.2-mpi
 module load hdf5/1.14.3-mpi
 
 # optional: for Python bindings or libEnsemble
