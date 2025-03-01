@@ -597,6 +597,12 @@ WarpX::InitData ()
 
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
         m_hybrid_pic_model->InitData();
+        
+        if(m_hybrid_pic_model->m_solve_electron_energy_equation){
+            qdsmc_hybrid_electron_pc->AllocData();
+            qdsmc_hybrid_electron_pc->InitParticles(0); //only level 0 for now
+        }
+        
     }
 
     if (ParallelDescriptor::IOProcessor()) {
@@ -722,10 +728,12 @@ WarpX::InitFromScratch ()
     mypc->AllocData();
     mypc->InitData();
 
+    /*
     if(m_hybrid_pic_model->m_solve_electron_energy_equation){
         qdsmc_hybrid_electron_pc->AllocData();
         qdsmc_hybrid_electron_pc->InitParticles(0);
     }
+    */
 
     InitPML();
 

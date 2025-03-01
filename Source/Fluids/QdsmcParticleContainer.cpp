@@ -200,6 +200,7 @@ void QdsmcParticleContainer::AllocData()
     resizeData();
 }
 
+/*
 void QdsmcParticleContainer::InitParticles_2 (int lev)
 {
     //WARPX_PROFILE("QdsmcParticleContainer::InitParticles()");
@@ -270,30 +271,30 @@ void QdsmcParticleContainer::InitParticles_2 (int lev)
         amrex::AllPrint() << "Rank " << ParallelDescriptor::MyProc()
             << "Before first ParallelFor(commented now) (but with extra synchronize)" << "\n"; 
         
-        /*
-        amrex::ParallelFor(tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            const IntVect iv(AMREX_D_DECL(i, j, k));
-            auto index = tile_box.index(iv);
+        //
+        //amrex::ParallelFor(tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        //{
+        //    const IntVect iv(AMREX_D_DECL(i, j, k));
+        //    auto index = tile_box.index(iv);
 
             // Compute the physical coordinates (cell center) for this index.
-            amrex::Real x = problo[0] + (iv[0] + 0.5) * dx[0];
-            amrex::Real y = problo[1] + (iv[1] + 0.5) * dx[1];
-            amrex::Real z = problo[2] + (iv[2] + 0.5) * dx[2];
+        //    amrex::Real x = problo[0] + (iv[0] + 0.5) * dx[0];
+        //    amrex::Real y = problo[1] + (iv[1] + 0.5) * dx[1];
+        //    amrex::Real z = problo[2] + (iv[2] + 0.5) * dx[2];
 
             // Only create a particle if the computed center is within the domain.
             // (Assuming the physical domain is [problo, probhi).)
-            if ( x >= tile_realbox.lo(0) && x < tile_realbox.hi(0) &&
-                 y >= tile_realbox.lo(1) && y < tile_realbox.hi(1) &&
-                 z >= tile_realbox.lo(2) && z < tile_realbox.hi(2) )
-            {
-                    pcounts[index] = 1;
-            } else {
-                    pcounts[index] = 0;
-            }
+        //    if ( x >= tile_realbox.lo(0) && x < tile_realbox.hi(0) &&
+        //         y >= tile_realbox.lo(1) && y < tile_realbox.hi(1) &&
+        //         z >= tile_realbox.lo(2) && z < tile_realbox.hi(2) )
+        //    {
+        //            pcounts[index] = 1;
+        //    } else {
+        //            pcounts[index] = 0;
+        //    }
 
         });
-        */
+        //
         
         amrex::Gpu::synchronize();
 
@@ -398,7 +399,7 @@ void QdsmcParticleContainer::InitParticles_2 (int lev)
 
     Redistribute();
 }
-
+*/
 
 
 void QdsmcParticleContainer::InitParticles(int lev){
@@ -529,8 +530,7 @@ void QdsmcParticleContainer::InitParticles(int lev){
     }    
 
     amrex::Gpu::synchronize();
-    //Redistribute is not needed anymore?
-    //Redistribute();
+    
 }
 
 

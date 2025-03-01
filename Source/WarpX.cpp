@@ -2282,6 +2282,12 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         // allocate multifabs for electron fluid container used in hibryd-PIC model
         // multifabs in fluid container are created as nodal (ba is converted to nodal in each alloc_init call)
         hybrid_electron_fl->AllocateLevelMFs(m_fields, ba, dm, lev);
+        /*
+        if(m_hybrid_pic_model->m_solve_electron_energy_equation){
+            qdsmc_hybrid_electron_pc->AllocData();
+            qdsmc_hybrid_electron_pc->InitParticles(0); //only level 0 for now
+        }
+        */
     }
 
     // Allocate extra multifabs needed for fluids

@@ -292,6 +292,7 @@ void HybridPICModel::InitData ()
         // Fill Boundaries in electron temperature multifab
         warpx.m_fields.get("fluid_temperature_electrons_hybrid",  warpx.finestLevel())->FillBoundary(warpx.Geom(warpx.finestLevel()).periodicity());
     }
+
 }
 
 void HybridPICModel::GetCurrentExternal ()
