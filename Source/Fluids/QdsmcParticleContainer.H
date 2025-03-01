@@ -87,6 +87,8 @@ public:
 
     void AllocData();
 
+    void InitParticles_2(int lev);
+
     void InitParticles(int lev);
 
     // Function that set the fictitious particles velocities (only drift for now)
