@@ -13,6 +13,8 @@
 #include "Utils/TextMsg.H"
 
 #include <vector>
+#include <istream>
+#include <filesystem>
 
 /**
  * \brief Picard fixed-point iteration method to solve nonlinear
@@ -42,7 +44,8 @@ public:
     void Solve ( Vec&   a_U,
            const Vec&   a_b,
            amrex::Real  a_time,
-           amrex::Real  a_dt ) const override;
+           amrex::Real  a_dt,
+           int          a_step) const override;
 
     void GetSolverParams ( amrex::Real&  a_rtol,
                            amrex::Real&  a_atol,
@@ -114,6 +117,31 @@ void PicardSolver<Vec,Ops>::Define ( const Vec&  a_U,
 
     this->m_is_defined = true;
 
+    // Create diagnostic file and write header
+    if (!this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor()) {
+
+        std::filesystem::path const diagnostic_path(this->m_diagnostic_file);
+        std::filesystem::path const diagnostic_dir = diagnostic_path.parent_path();
+        if (!diagnostic_dir.empty()) {
+            std::filesystem::create_directories(diagnostic_dir);
+        }
+
+        std::ofstream diagnostic_file{this->m_diagnostic_file, std::ofstream::out | std::ofstream::trunc};
+        int c = 0;
+        diagnostic_file << "#";
+        diagnostic_file << "[" << c++ << "]step()";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]time(s)";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]iters";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]norm_abs";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]norm_rel";
+        diagnostic_file << "\n";
+        diagnostic_file.close();
+    }
+
 }
 
 template <class Vec, class Ops>
@@ -125,14 +153,15 @@ void PicardSolver<Vec,Ops>::ParseParameters ()
     pp_picard.query("relative_tolerance",  m_rtol);
     pp_picard.query("max_iterations",      m_maxits);
     pp_picard.query("require_convergence", m_require_convergence);
-
+    pp_picard.query("diagnostic_file",     this->m_diagnostic_file);
 }
 
 template <class Vec, class Ops>
 void PicardSolver<Vec,Ops>::Solve ( Vec&         a_U,
                               const Vec&         a_b,
                                     amrex::Real  a_time,
-                                    amrex::Real  a_dt ) const
+                                    amrex::Real  a_dt,
+                                    int          a_step) const
 {
     BL_PROFILE("PicardSolver::Solve()");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -211,6 +240,22 @@ void PicardSolver<Vec,Ops>::Solve ( Vec&         a_U,
        } else {
            ablastr::warn_manager::WMRecordWarning("PicardSolver", convergenceMsg.str());
        }
+    }
+
+    if (!this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor()) {
+        std::ofstream diagnostic_file{this->m_diagnostic_file, std::ofstream::out | std::ofstream::app};
+        diagnostic_file << std::setprecision(14);
+        diagnostic_file << a_step;
+        diagnostic_file << " ";
+        diagnostic_file << a_time;
+        diagnostic_file << " ";
+        diagnostic_file << iter;
+        diagnostic_file << " ";
+        diagnostic_file << norm_abs;
+        diagnostic_file << " ";
+        diagnostic_file << norm_rel;
+        diagnostic_file << "\n";
+        diagnostic_file.close();
     }
 
 }

@@ -76,16 +76,18 @@ cmake -S $SHAREDHOMEDIR/src/c-blosc -B $SHAREDHOMEDIR/src/c-blosc-ad-build -DBUI
 cmake --build $SHAREDHOMEDIR/src/c-blosc-ad-build --target install --parallel 16
 rm -rf $SHAREDHOMEDIR/src/c-blosc-ad-build
 
-# ADIOS2 v. 2.8.3 (for OpenPMD)
+# ADIOS2 v. 2.10.2 (for OpenPMD)
 if [ -d $SHAREDHOMEDIR/src/adios2 ]
 then
-  # git repository is already there
-  :
+  cd $SHAREDHOMEDIR/src/adios2
+  git fetch --prune
+  git checkout v2.10.2
+  cd -
 else
-  git clone -b v2.8.3 https://github.com/ornladios/ADIOS2.git $SHAREDHOMEDIR/src/adios2
+  git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git $SHAREDHOMEDIR/src/adios2
 fi
 rm -rf $SHAREDHOMEDIR/src/adios2-ad-build
-cmake -S $SHAREDHOMEDIR/src/adios2 -B $SHAREDHOMEDIR/src/adios2-ad-build -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.8.3
+cmake -S $SHAREDHOMEDIR/src/adios2 -B $SHAREDHOMEDIR/src/adios2-ad-build -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.2
 cmake --build $SHAREDHOMEDIR/src/adios2-ad-build --target install -j 16
 rm -rf $SHAREDHOMEDIR/src/adios2-ad-build
 

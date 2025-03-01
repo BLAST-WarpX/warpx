@@ -59,7 +59,8 @@ public:
     virtual void Solve ( Vec&,
                    const Vec&,
                          amrex::Real,
-                         amrex::Real ) const = 0;
+                         amrex::Real,
+                         int) const = 0;
 
     /**
      * \brief Print parameters used by the nonlinear solver.
@@ -81,6 +82,7 @@ protected:
 
     bool m_is_defined = false;
     mutable bool m_verbose = true;
+    std::string m_diagnostic_file;
 
 };
 
