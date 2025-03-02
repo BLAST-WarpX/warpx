@@ -175,6 +175,7 @@ void HybridPICModel::InitQdsmcParticleContainer() {
     qdsmc_hybrid_electron_pc = std::make_unique<QdsmcParticleContainer>(&warpx);
 
     qdsmc_hybrid_electron_pc->AllocData(); // Allocate memory (reserveData() and resizeData())
+    amrex::Gpu::synchronize();
     // only level 0 for now
     qdsmc_hybrid_electron_pc->InitParticles(0);
     // Otherwise, loop over levels if AMR is used:
