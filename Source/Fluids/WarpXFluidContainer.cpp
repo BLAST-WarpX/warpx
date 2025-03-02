@@ -1474,10 +1474,10 @@ void WarpXFluidContainer::HybridInitializeUe (
             amrex::Array4<amrex::Real> const& Uez = m_fields.get(name_mf_NU, Direction{2}, lev)->array(mfi);
 
             const Box& tilebox  = mfi.tilebox();
-            amrex::Box box = amrex::convert( tilebox, ix_type );
-            box.grow(m_fields.get(name_mf_K, lev)->nGrowVect());
+            //amrex::Box box = amrex::convert( tilebox, ix_type );
+            //box.grow(m_fields.get(name_mf_K, lev)->nGrowVect());
 
-            ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+            ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                 if( rho(i, j, k) > 0.0_rt ){
 
                     // safety condition since we divide by rho_val later
