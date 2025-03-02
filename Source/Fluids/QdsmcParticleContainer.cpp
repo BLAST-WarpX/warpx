@@ -808,7 +808,7 @@ QdsmcParticleContainer::DepositK(int lev, amrex::MultiFab &Kfield)
 void
 QdsmcParticleContainer::DepositField(int lev, amrex::MultiFab &Field)
 {
-     WARPX_PROFILE("QdsmcParticleContainer::DepositField()");
+    WARPX_PROFILE("QdsmcParticleContainer::DepositField()");
 
     const amrex::XDim3 dinv = WarpX::InvCellSize(lev);
 

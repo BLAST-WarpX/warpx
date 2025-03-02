@@ -48,7 +48,7 @@ struct QdsmcPIdx
  * which is branched from the amrex::ParticleContainer.
  */
 class QdsmcParticleContainer
-    : public amrex::ParticleContainerPureSoA<QdsmcPIdx::nattribs, 0>
+    : public amrex::ParticleContainerPureSoA<QdsmcPIdx::nattribs, 0, amrex::DefaultAllocator>
 {
 public:
     static constexpr int NStructReal = 0;
