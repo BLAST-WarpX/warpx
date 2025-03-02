@@ -10,6 +10,7 @@
 
 #include "HybridPICModel.H"
 #include "Fluids/WarpXFluidContainer.H"
+#include "Fluids/QdsmcParticleContainer.H"
 
 #include "EmbeddedBoundary/Enabled.H"
 #include "Python/callbacks.H"
@@ -166,6 +167,20 @@ void HybridPICModel::AllocateLevelMFs (
         (ncomps == 1),
         "Ohm's law solver only support m = 0 azimuthal mode at present.");
 #endif
+}
+
+void HybridPICModel::InitQdsmcParticleContainer() {
+
+    auto& warpx = WarpX::GetInstance();
+    qdsmc_hybrid_electron_pc = std::make_unique<QdsmcParticleContainer>(&warpx);
+
+    qdsmc_hybrid_electron_pc->AllocData(); // Allocate memory (reserveData() and resizeData())
+    // only level 0 for now
+    qdsmc_hybrid_electron_pc->InitParticles(0);
+    // Otherwise, loop over levels if AMR is used:
+    // for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+    //     m_qdsmc_pc->InitParticles(lev);
+    // }
 }
 
 void HybridPICModel::InitData ()

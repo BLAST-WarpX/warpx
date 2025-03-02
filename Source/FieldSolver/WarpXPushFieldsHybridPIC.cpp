@@ -267,28 +267,28 @@ void WarpX::HybridPICEvolveFields ()
 
         
         // Reset qdsmc particles positions to x0,y0,z0 and rest of attributes to 0 and redistribute
-        qdsmc_hybrid_electron_pc->ResetParticles(finest_level);
+        m_hybrid_pic_model->qdsmc_hybrid_electron_pc->ResetParticles(finest_level);
 
         // Set fictitious electron particles velocities
-        qdsmc_hybrid_electron_pc->SetV(finest_level,
+        m_hybrid_pic_model->qdsmc_hybrid_electron_pc->SetV(finest_level,
             *m_fields.get(hybrid_electron_fl->name_mf_NU, Direction{0}, finest_level),
             *m_fields.get(hybrid_electron_fl->name_mf_NU, Direction{1}, finest_level),
             *m_fields.get(hybrid_electron_fl->name_mf_NU, Direction{2}, finest_level));
 
         // Set fictitious electron particles entropy
-        qdsmc_hybrid_electron_pc->SetK(finest_level,
+        m_hybrid_pic_model->qdsmc_hybrid_electron_pc->SetK(finest_level,
             *m_fields.get(hybrid_electron_fl->name_mf_K, finest_level),
             *m_fields.get(hybrid_electron_fl->name_mf_N, finest_level));
 
         // Push fictitious electron particles
-        qdsmc_hybrid_electron_pc->PushX(finest_level, dt[0]);
+        m_hybrid_pic_model->qdsmc_hybrid_electron_pc->PushX(finest_level, dt[0]);
 
         /// Needed to update Te later on (weights from qdsmc particles)
         m_fields.get(hybrid_electron_fl->name_mf_weights, finest_level)->setVal(0);
-        qdsmc_hybrid_electron_pc->DepositField(finest_level, *m_fields.get(hybrid_electron_fl->name_mf_weights, finest_level));
+        m_hybrid_pic_model->qdsmc_hybrid_electron_pc->DepositField(finest_level, *m_fields.get(hybrid_electron_fl->name_mf_weights, finest_level));
 
         // Deposit entropy from qdsmc
-        qdsmc_hybrid_electron_pc->DepositK(finest_level, *m_fields.get(hybrid_electron_fl->name_mf_K, finest_level));
+        m_hybrid_pic_model->qdsmc_hybrid_electron_pc->DepositK(finest_level, *m_fields.get(hybrid_electron_fl->name_mf_K, finest_level));
 
         // Update ne to n+1 before updating Te so the calculation is consistent
         m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->setVal(0);

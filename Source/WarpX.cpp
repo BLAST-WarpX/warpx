@@ -40,7 +40,7 @@
 #include "Particles/MultiParticleContainer.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
-#include "Fluids/QdsmcParticleContainer.H"
+//#include "Fluids/QdsmcParticleContainer.H"
 #include "Particles/ParticleBoundaryBuffer.H"
 #include "AcceleratorLattice/AcceleratorLattice.H"
 #include "Utils/TextMsg.H"
@@ -363,7 +363,7 @@ WarpX::WarpX ()
         hybrid_electron_fl = std::make_unique<WarpXFluidContainer>(0, "electrons_hybrid", true);
 
         // Create electron qdsmc particle container for hybrid-PIC model electron energy equation solver
-        qdsmc_hybrid_electron_pc = std::make_unique<QdsmcParticleContainer>(this);
+        //qdsmc_hybrid_electron_pc = std::make_unique<QdsmcParticleContainer>(this);
     }
 
     current_buffer_masks.resize(nlevs_max);
@@ -2282,12 +2282,6 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         // allocate multifabs for electron fluid container used in hibryd-PIC model
         // multifabs in fluid container are created as nodal (ba is converted to nodal in each alloc_init call)
         hybrid_electron_fl->AllocateLevelMFs(m_fields, ba, dm, lev);
-        /*
-        if(m_hybrid_pic_model->m_solve_electron_energy_equation){
-            qdsmc_hybrid_electron_pc->AllocData();
-            qdsmc_hybrid_electron_pc->InitParticles(0); //only level 0 for now
-        }
-        */
     }
 
     // Allocate extra multifabs needed for fluids

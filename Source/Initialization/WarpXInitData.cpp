@@ -29,7 +29,7 @@
 #include "Initialization/ExternalField.H"
 #include "Initialization/DivCleaner/ProjectionDivCleaner.H"
 #include "Particles/MultiParticleContainer.H"
-#include "Fluids/QdsmcParticleContainer.H"
+//#include "Fluids/QdsmcParticleContainer.H"
 #include "Utils/Algorithms/LinearInterpolation.H"
 #include "Utils/Logo/GetLogo.H"
 #include "Utils/Parser/ParserUtils.H"
@@ -598,9 +598,14 @@ WarpX::InitData ()
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
         m_hybrid_pic_model->InitData();
         
-        if(m_hybrid_pic_model->m_solve_electron_energy_equation){
-            qdsmc_hybrid_electron_pc->AllocData();
-            qdsmc_hybrid_electron_pc->InitParticles(0); //only level 0 for now
+        // old version
+        //if(m_hybrid_pic_model->m_solve_electron_energy_equation){
+        //    qdsmc_hybrid_electron_pc->AllocData();
+        //    qdsmc_hybrid_electron_pc->InitParticles(0); //only level 0 for now
+        //}
+
+        if (m_hybrid_pic_model->m_solve_electron_energy_equation) {
+            m_hybrid_pic_model->InitQdsmcParticleContainer();
         }
         
     }
@@ -727,13 +732,6 @@ WarpX::InitFromScratch ()
 
     mypc->AllocData();
     mypc->InitData();
-
-    /*
-    if(m_hybrid_pic_model->m_solve_electron_energy_equation){
-        qdsmc_hybrid_electron_pc->AllocData();
-        qdsmc_hybrid_electron_pc->InitParticles(0);
-    }
-    */
 
     InitPML();
 

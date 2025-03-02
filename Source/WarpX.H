@@ -28,7 +28,7 @@
 #include "Particles/WarpXParticleContainer_fwd.H"
 #include "Fluids/MultiFluidContainer_fwd.H"
 #include "Fluids/WarpXFluidContainer_fwd.H"
-#include "Fluids/QdsmcParticleContainer_fwd.H"
+//#include "Fluids/QdsmcParticleContainer_fwd.H"
 
 #ifdef WARPX_USE_FFT
 #   ifdef WARPX_DIM_RZ
@@ -1287,7 +1287,7 @@ private:
     std::unique_ptr<MultiDiagnostics> multi_diags;
 
     // Qdsmc particle container for electron (fluid) used in the electron energy equation solver in the hybrid pic model
-    std::unique_ptr<QdsmcParticleContainer> qdsmc_hybrid_electron_pc;
+    //std::unique_ptr<QdsmcParticleContainer> qdsmc_hybrid_electron_pc;
 
     // Fluid container
     bool do_fluid_species = false;

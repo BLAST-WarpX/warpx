@@ -17,6 +17,7 @@
 
 #include "ExternalVectorPotential.H"
 #include "Utils/WarpXAlgorithmSelection.H"
+#include "Fluids/QdsmcParticleContainer.H"
 
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "Utils/Parser/ParserUtils.H"
@@ -172,6 +173,9 @@ public:
         amrex::MultiFab& Pe_field,
         amrex::MultiFab const& rho_field ) const;
 
+
+    void InitQdsmcParticleContainer();
+
     // Declare variables to hold hybrid-PIC model parameters
     /** Number of substeps to take when evolving B */
     int m_substeps = 10;
@@ -238,6 +242,8 @@ public:
     // Z effective for classical Bremsstrahlung power loss calculation
     // only if QDSMC solver with Bremsstrahlung flag is used
     amrex::Real m_Zeff = 1.0;
+
+    std::unique_ptr<QdsmcParticleContainer> qdsmc_hybrid_electron_pc;
 
 };
 
