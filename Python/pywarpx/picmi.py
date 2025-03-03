@@ -3043,7 +3043,7 @@ class Simulation(picmistandard.PICMI_Simulation):
             pywarpx.warpx.field_centering_noz = self.field_centering_order[-1]
         # warpx.current_centering_no<x,y,z>
         if self.current_centering_order is not None:
-            pywarpx.warpx.m_current_centering_nox = self.current_centering_order[0]
+            pywarpx.warpx.current_centering_nox = self.current_centering_order[0]
             if self.solver.grid.number_of_dimensions == 3:
                 pywarpx.warpx.current_centering_noy = self.current_centering_order[1]
             pywarpx.warpx.current_centering_noz = self.current_centering_order[-1]
