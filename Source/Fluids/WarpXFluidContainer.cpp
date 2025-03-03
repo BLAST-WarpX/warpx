@@ -1669,10 +1669,10 @@ void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiF
             amrex::Array4<amrex::Real> const& Jz = current_fp_ampere[2]->array(mfi);
 
             const Box& tilebox  = mfi.tilebox();
-            amrex::Box box = amrex::convert( tilebox, ix_type );
-            box.grow(m_fields.get(name_mf_K, lev)->nGrowVect());
+            //amrex::Box box = amrex::convert( tilebox, ix_type );
+            //box.grow(m_fields.get(name_mf_K, lev)->nGrowVect());
 
-            ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+            ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
 
                 if(rho(i, j, k) > rho_floor){
 
