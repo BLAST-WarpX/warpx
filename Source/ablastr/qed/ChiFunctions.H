@@ -166,7 +166,7 @@ namespace ablastr::qed
         const RealType ex, const RealType ey, const RealType ez,
         const RealType bx, const RealType by, const RealType bz) noexcept
     {
-        const auto p = math::vec3<RealType>{px, py, pz};
+        const auto p    = math::vec3<RealType>{px, py, pz};
         const auto em_e = math::vec3<RealType>{ex, ey, ez};
         const auto em_b = math::vec3<RealType>{bx, by, bz};
         return chi_ele_pos<RealType, UnitSystem>(p, em_e, em_b);
