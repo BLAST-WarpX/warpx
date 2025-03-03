@@ -3033,7 +3033,7 @@ class Simulation(picmistandard.PICMI_Simulation):
 
         self.solver.solver_initialize_inputs()
 
-        # Initialize warpx.field_centering_no<x,y,z> and warpx.m_current_centering_no<x,y,z>
+        # Initialize warpx.field_centering_no<x,y,z> and warpx.current_centering_no<x,y,z>
         # if set by the user in the input (need to access grid info from solver attribute)
         # warpx.field_centering_no<x,y,z>
         if self.field_centering_order is not None:
