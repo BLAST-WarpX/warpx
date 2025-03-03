@@ -265,7 +265,7 @@ void WarpX::HybridPICEvolveFields ()
     // all the qdsmc solver functions should be in a ElectronEnergyEquationSolver class as well as other solvers like Layer method
     if(m_hybrid_pic_model->m_solve_electron_energy_equation){
 
-        /*
+        
         // Reset qdsmc particles positions to x0,y0,z0 and rest of attributes to 0 and redistribute
         m_hybrid_pic_model->qdsmc_hybrid_electron_pc->ResetParticles(finest_level);
 
@@ -318,7 +318,7 @@ void WarpX::HybridPICEvolveFields ()
         // This term should also apply MCC to ions particle container (Qie)
         // Implement for 1 ion species and then extend to multiple species using mypc
         // COMPLETE ...
-        */
+        
         
 
     }

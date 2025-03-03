@@ -542,9 +542,9 @@ void QdsmcParticleContainer::InitParticles(int lev){
     reserveData();
     resizeData();
 
-    auto& warpx = WarpX::GetInstance();
-    const auto problo = warpx.Geom(lev).ProbLoArray();
-    const amrex::Real* dx = warpx.Geom(lev).CellSize();
+    const Geometry& geom = Geom(lev);
+    const auto dx = geom.CellSizeArray();
+    const auto problo = geom.ProbLoArray();
 
     // Define all particles tiles
     for (int lev = 0; lev <= finestLevel(); ++lev)
@@ -596,6 +596,7 @@ void QdsmcParticleContainer::InitParticles(int lev){
 
 
         // Function for debug printing
+        /*
         amrex::Print() << "counts.size() = " << counts.size() << ", max_new_particles = " << max_new_particles << "\n";
         std::vector<amrex::Long> h_counts(counts.size());
         std::vector<amrex::Long> h_offset(counts.size());
@@ -604,6 +605,7 @@ void QdsmcParticleContainer::InitParticles(int lev){
         for (int i = 0; i < counts.size(); ++i) {
             amrex::Print() << "counts[" << i << "] = " << h_counts[i] << ", offset[" << i << "] = " << h_offset[i] << "\n";
         }
+        */
         // remove up to here
 
         // Update NextID to include particles created in this function
@@ -640,26 +642,28 @@ void QdsmcParticleContainer::InitParticles(int lev){
         auto *const poffset = offset.data();
 
         // for debug printing
-        amrex::Print() << "Rank " << amrex::ParallelDescriptor::MyProc() << ": tile_box = " << tile_box
-               << ", numPts = " << tile_box.numPts() << "\n";
+        //amrex::Print() << "Rank " << amrex::ParallelDescriptor::MyProc() << ": tile_box = " << tile_box
+        //       << ", numPts = " << tile_box.numPts() << "\n";
         // remove up to here
 
         amrex::ParallelFor(tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
-            const IntVect iv = IntVect(AMREX_D_DECL(i, j, k));
+            const IntVect iv(AMREX_D_DECL(i, j, k));
 
+            /*
             if (i < tile_box.smallEnd(0) || i > tile_box.bigEnd(0) ||
                 j < tile_box.smallEnd(1) || j > tile_box.bigEnd(1) ||
                 k < tile_box.smallEnd(2) || k > tile_box.bigEnd(2)) {
             return;  // Skip this thread if outside bounds
             }
+            */
             const auto index = tile_box.index(iv);
 
-            if (index >= 0 && index < tile_box.numPts()) {
+            //if (index >= 0 && index < tile_box.numPts()) {
                 
                 long ip = poffset[index];
 
-                if (ip >= 0 && ip < max_new_particles) {
+                //if (ip >= 0 && ip < max_new_particles) {
                     pa_idcpu[ip] = amrex::SetParticleIDandCPU(pid+ip, cpuid);
 
                     amrex::Real x = problo[0] + (iv[0] + 0.5) * dx[0];
@@ -680,8 +684,8 @@ void QdsmcParticleContainer::InitParticles(int lev){
 
                     pa[QdsmcPIdx::entropy][ip] = 0.0;
                     pa[QdsmcPIdx::np_real][ip] = 0.0;
-                }
-            }
+                //}
+            //}
 
         });
 
@@ -695,8 +699,6 @@ void QdsmcParticleContainer::InitParticles(int lev){
     }    
 
     amrex::Gpu::synchronize();
-    //Redistribute is not needed anymore?
-    //Redistribute();
 }
 
 
