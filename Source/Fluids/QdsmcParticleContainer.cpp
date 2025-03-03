@@ -601,7 +601,7 @@ void QdsmcParticleContainer::InitParticles(int lev){
         std::vector<amrex::Long> h_offset(counts.size());
         Gpu::copy(Gpu::deviceToHost, counts.begin(), counts.end(), h_counts.begin());
         Gpu::copy(Gpu::deviceToHost, offset.begin(), offset.end(), h_offset.begin());
-        for (int i = 0; i < std::min(10, (int)counts.size()); ++i) {
+        for (int i = 0; i < counts.size(); ++i) {
             amrex::Print() << "counts[" << i << "] = " << h_counts[i] << ", offset[" << i << "] = " << h_offset[i] << "\n";
         }
         // remove up to here
@@ -647,6 +647,12 @@ void QdsmcParticleContainer::InitParticles(int lev){
         amrex::ParallelFor(tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
             const IntVect iv = IntVect(AMREX_D_DECL(i, j, k));
+
+            if (i < tile_box.smallEnd(0) || i > tile_box.bigEnd(0) ||
+                j < tile_box.smallEnd(1) || j > tile_box.bigEnd(1) ||
+                k < tile_box.smallEnd(2) || k > tile_box.bigEnd(2)) {
+            return;  // Skip this thread if outside bounds
+            }
             const auto index = tile_box.index(iv);
 
             if (index >= 0 && index < tile_box.numPts()) {
