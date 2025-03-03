@@ -979,12 +979,12 @@ QdsmcParticleContainer::DepositField(int lev, amrex::MultiFab &Field)
 
     const amrex::XDim3 dinv = WarpX::InvCellSize(lev);
 
-    WarpX &warpx = WarpX::GetInstance();
-    const amrex::Geometry &geom = warpx.Geom(lev);
+    const Geometry& geom = Geom(lev);
     const amrex::Periodicity &period = geom.periodicity();
-    auto plo = geom.ProbLoArray();
 
-    const amrex::Real* dx = warpx.Geom(lev).CellSize();
+    const auto plo = geom.ProbLoArray();
+    const auto dx = geom.CellSizeArray();
+    const auto cell_volume = dx[0]*dx[1]*dx[2];
 
     Field.setVal(0);
 
@@ -1017,7 +1017,7 @@ QdsmcParticleContainer::DepositField(int lev, amrex::MultiFab &Field)
             // avoid launching kernel for "empty" particles
             if(part_np_real[ip]>0)
             {
-                amrex::Real val = part_np_real[ip]/(dx[0]*dx[1]*dx[2]);
+                amrex::Real val = part_np_real[ip]/cell_volume;
                 do_deposit_scalar(arrField, part_x[ip], part_y[ip], part_z[ip], plo, dinv, val, box);
             }
         });
