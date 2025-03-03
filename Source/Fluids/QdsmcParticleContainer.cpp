@@ -594,6 +594,18 @@ void QdsmcParticleContainer::InitParticles(int lev){
 
         const amrex::Long max_new_particles = Scan::ExclusiveSum(counts.size(), counts.data(), offset.data());
 
+
+        // Function for debug printing
+        amrex::Print() << "counts.size() = " << counts.size() << ", max_new_particles = " << max_new_particles << "\n";
+        std::vector<amrex::Long> h_counts(counts.size());
+        std::vector<amrex::Long> h_offset(counts.size());
+        Gpu::copy(Gpu::deviceToHost, counts.begin(), counts.end(), h_counts.begin());
+        Gpu::copy(Gpu::deviceToHost, offset.begin(), offset.end(), h_offset.begin());
+        for (int i = 0; i < std::min(10, (int)counts.size()); ++i) {
+            amrex::Print() << "counts[" << i << "] = " << h_counts[i] << ", offset[" << i << "] = " << h_offset[i] << "\n";
+        }
+        // remove up to here
+
         // Update NextID to include particles created in this function
         amrex::Long pid;
 #ifdef AMREX_USE_OMP
@@ -627,32 +639,43 @@ void QdsmcParticleContainer::InitParticles(int lev){
 
         auto *const poffset = offset.data();
 
+        // for debug printing
+        amrex::Print() << "Rank " << amrex::ParallelDescriptor::MyProc() << ": tile_box = " << tile_box
+               << ", numPts = " << tile_box.numPts() << "\n";
+        // remove up to here
+
         amrex::ParallelFor(tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
             const IntVect iv = IntVect(AMREX_D_DECL(i, j, k));
             const auto index = tile_box.index(iv);
 
-            long ip = poffset[index];
-            pa_idcpu[ip] = amrex::SetParticleIDandCPU(pid+ip, cpuid);
+            if (index >= 0 && index < tile_box.numPts()) {
+                
+                long ip = poffset[index];
 
-            amrex::Real x = problo[0] + (iv[0] + 0.5) * dx[0];
-            amrex::Real y = problo[1] + (iv[1] + 0.5) * dx[1];
-            amrex::Real z = problo[2] + (iv[2] + 0.5) * dx[2];
+                if (ip >= 0 && ip < max_new_particles) {
+                    pa_idcpu[ip] = amrex::SetParticleIDandCPU(pid+ip, cpuid);
 
-            pa[QdsmcPIdx::x][ip] = x;
-            pa[QdsmcPIdx::y][ip] = y;
-            pa[QdsmcPIdx::z][ip] = z;
+                    amrex::Real x = problo[0] + (iv[0] + 0.5) * dx[0];
+                    amrex::Real y = problo[1] + (iv[1] + 0.5) * dx[1];
+                    amrex::Real z = problo[2] + (iv[2] + 0.5) * dx[2];
 
-            pa[QdsmcPIdx::x_node][ip] = x;
-            pa[QdsmcPIdx::y_node][ip] = y;
-            pa[QdsmcPIdx::z_node][ip] = z;
+                    pa[QdsmcPIdx::x][ip] = x;
+                    pa[QdsmcPIdx::y][ip] = y;
+                    pa[QdsmcPIdx::z][ip] = z;
 
-            pa[QdsmcPIdx::vx][ip] = 0.0;
-            pa[QdsmcPIdx::vy][ip] = 0.0;
-            pa[QdsmcPIdx::vz][ip] = 0.0;
+                    pa[QdsmcPIdx::x_node][ip] = x;
+                    pa[QdsmcPIdx::y_node][ip] = y;
+                    pa[QdsmcPIdx::z_node][ip] = z;
 
-            pa[QdsmcPIdx::entropy][ip] = 0.0;
-            pa[QdsmcPIdx::np_real][ip] = 0.0;
+                    pa[QdsmcPIdx::vx][ip] = 0.0;
+                    pa[QdsmcPIdx::vy][ip] = 0.0;
+                    pa[QdsmcPIdx::vz][ip] = 0.0;
+
+                    pa[QdsmcPIdx::entropy][ip] = 0.0;
+                    pa[QdsmcPIdx::np_real][ip] = 0.0;
+                }
+            }
 
         });
 
