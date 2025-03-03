@@ -19,6 +19,7 @@
 #include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 #include "Diagnostics/MultiDiagnostics.H"
+#include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 
 #include <ablastr/utils/Communication.H>
 #include <ablastr/utils/text/StreamUtils.H>
@@ -400,8 +401,18 @@ WarpX::InitFromCheckpoint ()
 
     if (EB::enabled()) { InitializeEBGridData(maxLevel()); }
 
+    reduced_diags->ReadCheckpointData(restart_chkfile);
+
     // Initialize particles
     mypc->AllocData();
     mypc->Restart(restart_chkfile);
+
+    if (m_implicit_solver) {
+
+        m_implicit_solver->Define(this);
+        m_implicit_solver->GetParticleSolverParams( max_particle_its_in_implicit_scheme,
+                                                    particle_tol_in_implicit_scheme );
+        m_implicit_solver->CreateParticleAttributes();
+    }
 
 }

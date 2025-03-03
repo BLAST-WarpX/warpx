@@ -16,7 +16,7 @@
  *    This class is templated on a vector class Vec, and an operator class Ops.
  *
  *    The Ops class must have the following function:
- *    ComputeRHS( R_vec, U_vec, time, dt, nl_iter, from_jacobian ),
+ *    ComputeRHS( R_vec, U_vec, time, nl_iter, from_jacobian ),
  *    where U_vec and R_vec are of type Vec.
  *
  *    The Vec class must have basic math operators, such as Copy, +=, -=,
@@ -59,7 +59,8 @@ public:
     virtual void Solve ( Vec&,
                    const Vec&,
                          amrex::Real,
-                         amrex::Real ) const = 0;
+                         amrex::Real,
+                         int) const = 0;
 
     /**
      * \brief Print parameters used by the nonlinear solver.
@@ -81,6 +82,7 @@ protected:
 
     bool m_is_defined = false;
     mutable bool m_verbose = true;
+    std::string m_diagnostic_file;
 
 };
 

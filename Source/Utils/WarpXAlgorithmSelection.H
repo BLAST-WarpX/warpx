@@ -33,6 +33,7 @@ AMREX_ENUM(EvolveScheme,
            Explicit,
            ThetaImplicitEM,
            SemiImplicitEM,
+           StrangImplicitSpectralEM,
            Default = Explicit);
 
 /**
@@ -62,6 +63,7 @@ AMREX_ENUM(ElectrostaticSolverAlgo,
            Relativistic,
            LabFrameElectroMagnetostatic,
            LabFrame,
+           LabFrameEffectivePotential,
            Default = None);
 
 AMREX_ENUM(PoissonSolverAlgo,
@@ -123,16 +125,17 @@ AMREX_ENUM(FieldBoundaryType,
            Periodic,
            PEC,      //!< perfect electric conductor (PEC) with E_tangential=0
            PMC,      //!< perfect magnetic conductor (PMC) with B_tangential=0
+           Neumann = PMC, // For electrostatic, the normal E is set to zero
            Damped,   // Fields in the guard cells are damped for PSATD
                      //in the moving window direction
            Absorbing_SilverMueller, // Silver-Mueller boundary condition
            absorbingsilvermueller = Absorbing_SilverMueller,
-           Neumann, // For electrostatic, the normal E is set to zero
            None,    // The fields values at the boundary are not updated. This is
                     // useful for RZ simulations, at r=0.
            Open,    // Used in the Integrated Green Function Poisson solver
                     // Note that the solver implicitely assumes open BCs:
                     // no need to enforce them separately
+           PECInsulator, // Mixed boundary with PEC and insulator
            Default = PML);
 
 /** Particle boundary conditions at the domain boundary

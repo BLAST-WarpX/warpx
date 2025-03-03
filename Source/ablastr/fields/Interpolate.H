@@ -11,11 +11,8 @@
 #include <AMReX_IntVect.H>
 #include <AMReX_MFInterp_C.H>
 
-#include <ablastr/fields/Interpolate.H>
-
 #include <array>
 #include <optional>
-
 
 namespace ablastr::fields::details {
 
@@ -46,9 +43,9 @@ namespace ablastr::fields::details {
                                        0, m_refratio);
         }
 
-        amrex::Array4<amrex::Real> const m_phi_fp_arr;
-        amrex::Array4<amrex::Real const> const m_phi_cp_arr;
-        amrex::IntVect const m_refratio;
+        amrex::Array4<amrex::Real> m_phi_fp_arr;
+        amrex::Array4<amrex::Real const> m_phi_cp_arr;
+        amrex::IntVect m_refratio;
     };
 } // namespace ablastr::fields::details
 

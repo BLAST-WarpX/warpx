@@ -301,3 +301,23 @@ the right boundary is reflecting.
 
 .. bibliography::
    :keyprefix: bc-
+
+.. _theory-bc-pmc:
+
+Perfect Magnetic Conductor
+----------------------------
+
+This boundary can be used to model a symmetric surface, where charges and current are
+symmetric across the boundary.
+This is equivalent to the Neumann (zero-derivative) boundary condition.
+For the electromagnetic solve, at PMC, the tangential magnetic field and the normal electric
+field are odd across the boundary and set to 0 on the boundary.
+In the guard-cell region, those fields are set equal and
+opposite to the respective field component in the mirror location across the PMC boundary.
+The other components, the normal magnetic field and tangential electric field, are even
+and set equal to the field component in the mirror location in the domain across the PMC boundary.
+
+The PMC boundary condition also impacts the deposition of charge and current density.
+The charge and current densities deposited into the guard cells are reflected back into
+the domain, adding them to the mirror cells in the domain.
+This represents the charge and current from the virtual symmetric particles in the guard cells.

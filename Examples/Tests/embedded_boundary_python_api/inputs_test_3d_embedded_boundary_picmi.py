@@ -43,7 +43,7 @@ grid = picmi.Cartesian3DGrid(
 
 flag_correct_div = False
 
-solver = picmi.ElectromagneticSolver(grid=grid, method="Yee", cfl=1.0)
+solver = picmi.ElectromagneticSolver(grid=grid, method="ECT", cfl=1.0)
 
 n_cavity = 30
 L_cavity = n_cavity * unit

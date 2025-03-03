@@ -69,12 +69,12 @@ if [ -d ${SRC_DIR}/adios2 ]
 then
   cd ${SRC_DIR}/adios2
   git fetch --prune
-  git checkout v2.8.3
+  git checkout v2.10.2
   cd -
 else
-  git clone -b v2.8.3 https://github.com/ornladios/ADIOS2.git ${SRC_DIR}/adios2
+  git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git ${SRC_DIR}/adios2
 fi
-cmake -S ${SRC_DIR}/adios2 -B ${build_dir}/adios2-lassen-build -DBUILD_TESTING=OFF -DADIOS2_BUILD_EXAMPLES=OFF -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_SST=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.8.3
+cmake -S ${SRC_DIR}/adios2 -B ${build_dir}/adios2-lassen-build -DBUILD_TESTING=OFF -DADIOS2_BUILD_EXAMPLES=OFF -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_SST=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.2
 cmake --build ${build_dir}/adios2-lassen-build --target install -j 10
 
 # BLAS++ (for PSATD+RZ)
@@ -114,7 +114,7 @@ rm -rf ${SW_DIR}/venvs/warpx-lassen-toss3
 python3 -m venv ${SW_DIR}/venvs/warpx-lassen-toss3
 source ${SW_DIR}/venvs/warpx-lassen-toss3/bin/activate
 python3 -m pip install --upgrade pip
-python3 -m pip cache purge
+# python3 -m pip cache purge  # error: pip cache commands can not function since cache is disabled
 python3 -m pip install --upgrade build
 python3 -m pip install --upgrade packaging
 python3 -m pip install --upgrade wheel

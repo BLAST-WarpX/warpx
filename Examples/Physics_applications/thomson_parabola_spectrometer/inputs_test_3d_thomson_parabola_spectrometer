@@ -1,0 +1,192 @@
+##############
+#### CONSTANTS
+##############
+my_constants.MeV = 1e6*q_e
+
+# distance between pinhole and electric field
+my_constants.d1 = 0.1 # m
+# length of the electric field region
+my_constants.d2 = 0.19 # m
+# length of the magnetic field region
+my_constants.d3 = 0.12 # m
+# distance between the magnetic field and the screen
+my_constants.d4 = 0.2 # m
+
+# constant fields in the TPS
+my_constants.E0 = 1e5 # V/m
+my_constants.B0 = 0.872 # T
+
+# transverse domain
+my_constants.xmin = -0.4 # m
+my_constants.xmax =  0.4 # m
+my_constants.ymin = -0.4 # m
+my_constants.ymax =  0.4 # m
+
+# longitudinal domain
+my_constants.zmin= -1e-3 # m
+my_constants.zmax = d1+d2+d3+d4
+
+# each macroparticle corresponds to 1 real particle
+my_constants.N_real_particles = 1e3
+my_constants.N_macro_particles = 1e3
+
+# maximum energy of the different species
+# we assume that all the species have a
+# uniform energy distribution in [0.5*Emax,Emax]
+my_constants.Emax_hydrogen1_1 = 40*MeV
+my_constants.Emax_carbon12_6 = 20*MeV
+my_constants.Emax_carbon12_4 = 20*MeV
+
+# velocity of a very slow particle
+# used to estimate the simulation time
+my_constants.vz = sqrt(2*1*MeV/(12*m_p))
+my_constants.max_steps = 400
+my_constants.max_time = (-zmin+d1+d2+d3+d4) / vz
+my_constants.dt = max_time / max_steps
+
+#############
+#### NUMERICS
+#############
+algo.particle_shape = 1
+algo.maxwell_solver = none
+algo.particle_pusher = boris
+amr.max_level = 0
+warpx.verbose = 1
+
+########
+#### BOX
+########
+amr.n_cell = 8 8 8
+geometry.dims = 3
+geometry.prob_hi = xmax ymax zmax
+geometry.prob_lo = xmin ymin zmin
+
+#########
+#### TIME
+#########
+stop_time = max_time
+warpx.const_dt = dt
+
+#############
+#### BOUNDARY
+#############
+boundary.particle_hi = absorbing absorbing absorbing
+boundary.particle_lo = absorbing absorbing absorbing
+
+##############
+#### PARTICLES
+##############
+particles.species_names = hydrogen1_1 carbon12_6 carbon12_4
+
+hydrogen1_1.charge = q_e
+hydrogen1_1.initialize_self_fields = 0
+hydrogen1_1.injection_style = gaussian_beam
+hydrogen1_1.mass = m_p
+hydrogen1_1.momentum_distribution_type = uniform
+hydrogen1_1.npart = N_macro_particles
+hydrogen1_1.q_tot = N_real_particles*q_e
+hydrogen1_1.ux_min = 0
+hydrogen1_1.uy_min = 0
+hydrogen1_1.uz_min = sqrt(Emax_hydrogen1_1/m_p)/clight
+hydrogen1_1.ux_max = 0
+hydrogen1_1.uy_max = 0
+hydrogen1_1.uz_max = sqrt(2*Emax_hydrogen1_1/m_p)/clight
+hydrogen1_1.x_m = 0
+hydrogen1_1.x_rms = 0
+hydrogen1_1.y_m = 0
+hydrogen1_1.y_rms = 0
+hydrogen1_1.z_m = 0
+hydrogen1_1.z_rms = 0
+hydrogen1_1.do_not_gather = 1
+hydrogen1_1.do_not_deposit = 1
+
+# carbon12_6 means carbon ions with 12 nucleons, of which 6 protons
+carbon12_6.charge = 6*q_e
+carbon12_6.initialize_self_fields = 0
+carbon12_6.injection_style = gaussian_beam
+carbon12_6.mass = 12*m_p
+carbon12_6.momentum_distribution_type = uniform
+carbon12_6.npart = N_macro_particles
+carbon12_6.q_tot = N_real_particles*6*q_e
+carbon12_6.ux_min = 0
+carbon12_6.uy_min = 0
+carbon12_6.uz_min = sqrt(Emax_carbon12_6/(12*m_p))/clight
+carbon12_6.ux_max = 0
+carbon12_6.uy_max = 0
+carbon12_6.uz_max = sqrt(2*Emax_carbon12_6/(12*m_p))/clight
+carbon12_6.x_m = 0
+carbon12_6.x_rms = 0
+carbon12_6.y_m = 0
+carbon12_6.y_rms = 0
+carbon12_6.z_m = 0
+carbon12_6.z_rms = 0
+carbon12_6.do_not_gather = 1
+carbon12_6.do_not_deposit = 1
+
+carbon12_4.charge = 4*q_e
+carbon12_4.initialize_self_fields = 0
+carbon12_4.injection_style = gaussian_beam
+carbon12_4.mass = 12*m_p
+carbon12_4.momentum_distribution_type = uniform
+carbon12_4.npart = N_macro_particles
+carbon12_4.q_tot = N_real_particles*4*q_e
+carbon12_4.ux_min = 0
+carbon12_4.uy_min = 0
+carbon12_4.uz_min = sqrt(Emax_carbon12_4/(12*m_p))/clight
+carbon12_4.ux_max = 0
+carbon12_4.uy_max = 0
+carbon12_4.uz_max = sqrt(2*Emax_carbon12_4/(12*m_p))/clight
+carbon12_4.x_m = 0
+carbon12_4.x_rms = 0
+carbon12_4.y_m = 0
+carbon12_4.y_rms = 0
+carbon12_4.z_m = 0
+carbon12_4.z_rms = 0
+carbon12_4.do_not_gather = 1
+carbon12_4.do_not_deposit = 1
+
+###########
+#### FIELDS
+###########
+particles.E_ext_particle_init_style = parse_E_ext_particle_function
+particles.Ex_external_particle_function(x,y,z,t) = "E0*(z>d1)*(z<(d1+d2))"
+particles.Ey_external_particle_function(x,y,z,t) = 0
+particles.Ez_external_particle_function(x,y,z,t) = 0
+
+particles.B_ext_particle_init_style = parse_B_ext_particle_function
+particles.Bx_external_particle_function(x,y,z,t) = "B0*(z>d1+d2)*(z<(d1+d2+d3))"
+particles.By_external_particle_function(x,y,z,t) = 0
+particles.Bz_external_particle_function(x,y,z,t) = 0
+
+################
+#### DIAGNOSTICS
+################
+diagnostics.diags_names = diag0 screen diag1
+
+diag0.diag_type = Full
+diag0.fields_to_plot = none
+diag0.format = openpmd
+diag0.intervals = 0:0
+diag0.write_species = 1
+diag0.species = hydrogen1_1 carbon12_6 carbon12_4
+diag0.dump_last_timestep = 0
+
+# diagnostic that collects the particles at the detector's position,
+# i.e. when a particle exits the domain from z_max = zhi
+# we store it in the screen diagnostic
+# we are assuming that most particles will exit the domain at z_max
+# which requires a large enough transverse box
+screen.diag_type = BoundaryScraping
+screen.format = openpmd
+screen.intervals = 1
+hydrogen1_1.save_particles_at_zhi = 1
+carbon12_6.save_particles_at_zhi = 1
+carbon12_4.save_particles_at_zhi = 1
+
+diag1.diag_type = Full
+diag1.fields_to_plot = rho_hydrogen1_1 rho_carbon12_6 rho_carbon12_4
+diag1.format = openpmd
+diag1.intervals = 50:50
+diag1.write_species = 1
+diag1.species = hydrogen1_1 carbon12_6 carbon12_4
+diag1.dump_last_timestep = 0
