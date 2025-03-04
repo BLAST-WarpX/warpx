@@ -1,0 +1,36 @@
+max_step = 8
+amr.n_cell = 8
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 8
+geometry.dims = 1
+geometry.prob_lo = 0
+geometry.prob_hi = 3
+
+# Boundary condition
+boundary.field_lo = pec
+boundary.field_hi = pec
+
+algo.maxwell_solver = none
+
+warpx.const_dt = 1.e-6
+warpx.synchronize_velocity_for_diagnostics = 1
+
+# Order of particle shape factors
+algo.particle_shape = 1
+
+particles.species_names = electron
+electron.species_type = electron
+electron.injection_style = "SingleParticle"
+electron.single_particle_pos = 0.0 0.0 0.1
+electron.single_particle_u = 0.0 0.0 0.0
+electron.single_particle_weight = 1.0
+
+# Apply a uniform Ez
+particles.E_ext_particle_init_style = constant
+particles.E_external_particle = 0.0 0.0 -1.0
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 5
+diag1.diag_type = Full

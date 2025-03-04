@@ -17,14 +17,19 @@ namespace warpx::initialization
      * @param[in] argc number of arguments from main()
      * @param[in] argv argument strings from main()
      */
-    void initialize_external_libraries(int argc, char* argv[]);
+    void initialize_external_libraries (int argc, char* argv[]);
 
     /** Initializes, in the following order:
      * - the FFT library through the anyfft::cleanup() function in ablastr
      * - the AMReX library
      * - the MPI library through the mpi_finalize helper function in ablastr
      */
-    void finalize_external_libraries();
+    void finalize_external_libraries ();
+
+    /**
+     * Initializes the Warning manager in ablastr
+     */
+    void initialize_warning_manager ();
 
     /** Check that warpx.dims matches the binary name
     */

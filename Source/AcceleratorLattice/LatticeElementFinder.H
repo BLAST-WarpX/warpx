@@ -114,6 +114,9 @@ struct LatticeElementFinderDevice
                                     AcceleratorLattice const& accelerator_lattice,
                                     LatticeElementFinder const & h_finder);
 
+    /* Whether the class has been initialized */
+    bool m_initialized = false;
+
     /* Size and location of the index lookup table */
     amrex::Real m_zmin;
     amrex::Real m_dz;

@@ -1,3 +1,5 @@
-include $(WARPX_HOME)/Source/ablastr/math/fft/Make.package
+CEXE_sources += FiniteDifference.cpp
 
-VPATH_LOCATIONS   += $(WARPX_HOME)/Source/ablastr
+VPATH_LOCATIONS   += $(WARPX_HOME)/Source/ablastr/math
+
+include $(WARPX_HOME)/Source/ablastr/math/fft/Make.package
