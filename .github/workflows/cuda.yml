@@ -14,12 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-# Ref.:
-#   https://gitlab.com/nvidia/container-images/cuda/-/blob/master/dist/ubuntu18.04/10.1/base/Dockerfile
-#   https://github.com/ComputationalRadiationPhysics/picongpu/blob/0.5.0/share/picongpu/dockerfiles/ubuntu-1604/Dockerfile
-#   https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/
   build_nvcc:
-    name: NVCC 11.3 SP
+    name: NVCC 12.6 SP
     runs-on: ubuntu-24.04
     if: github.event.pull_request.draft == false
     env:
@@ -33,7 +29,7 @@ jobs:
         python-version: '3.x'
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/nvcc11-3.sh
+        .github/workflows/dependencies/nvcc.sh 12.6
     - name: CCache Cache
       uses: actions/cache@v4
       with:
@@ -100,14 +96,14 @@ jobs:
   # make sure legacy build system continues to build, i.e., that we don't forget
   # to add new .cpp files
   build_nvcc_gnumake:
-    name: NVCC 11.8.0 GNUmake
+    name: NVCC 12.6 GNU Make
     runs-on: ubuntu-24.04
     if: github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/nvcc11-8.sh
+        .github/workflows/dependencies/nvcc.sh 12.6
     - name: CCache Cache
       uses: actions/cache@v4
       with:
