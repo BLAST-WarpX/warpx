@@ -30,7 +30,8 @@ sudo apt-get install -y \
 $(dirname "$0")/ccache.sh
 
 # parse version number from command line argument
-VERSION_DOTTED=${1-12.6} && VERSION_DASHED=$(sed 's/\./-/' <<< ${VERSION_DOTTED})
+VERSION_DOTTED=${1:-12.6}
+VERSION_DASHED=${VERSION_DOTTED/./-}  # replace first occurence of "." with "-"
 
 wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
 sudo dpkg -i cuda-keyring_1.1-1_all.deb
