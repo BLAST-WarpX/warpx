@@ -20,7 +20,7 @@ jobs:
 #   https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/
   build_nvcc:
     name: NVCC 11.3 SP
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     if: github.event.pull_request.draft == false
     env:
       CXXFLAGS: "-Werror"
@@ -101,7 +101,7 @@ jobs:
   # to add new .cpp files
   build_nvcc_gnumake:
     name: NVCC 11.8.0 GNUmake
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     if: github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
@@ -135,7 +135,7 @@ jobs:
 
   build_nvhpc24-1-nvcc:
     name: NVHPC@24.1 NVCC/NVC++ Release [tests]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     if: github.event.pull_request.draft == false
     #env:
     #  # For NVHPC, Ninja is slower than the default:

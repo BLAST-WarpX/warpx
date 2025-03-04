@@ -18,7 +18,7 @@ jobs:
 # intel-basekit intel-hpckit are too large in size
   build_icc:
     name: oneAPI ICC SP&DP
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     if: github.event.pull_request.draft == false
     # For oneAPI, Ninja is slower than the default:
     #env:
@@ -79,7 +79,7 @@ jobs:
 
   build_icpx:
     name: oneAPI ICX SP
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     # Since 2021.4.0, AMReX_GpuUtility.H: error: comparison with NaN always evaluates to false in fast floating point modes
     # oneAPI 2022.2.0 hangs for -O2 and higher:
     #   https://github.com/ECP-WarpX/WarpX/issues/3442
@@ -144,7 +144,7 @@ jobs:
 
   build_dpcc:
     name: oneAPI DPC++ SP
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     # Since 2021.4.0, AMReX_GpuUtility.H: error: comparison with NaN always evaluates to false in fast floating point modes
     # oneAPI 2022.2.0 hangs for -O2 and higher:
     #   https://github.com/ECP-WarpX/WarpX/issues/3442
