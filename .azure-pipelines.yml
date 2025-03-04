@@ -1,7 +1,7 @@
 # -*- mode: yaml -*-
 
 pool:
-  vmImage: 'ubuntu-20.04'
+  vmImage: 'ubuntu-24.04'
 
 trigger:
   branches:
