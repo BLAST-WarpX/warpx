@@ -149,7 +149,7 @@ void ParticleHistogram2D::ComputeDiags (int step)
     }
 
     d_data_2D.copy(m_h_data_2D);
-    Gpu::streamSynchronize();
+    // Gpu::streamSynchronize() is not needed, because there is a sync in WarpXParIter constructor later
 
     auto d_table = d_data_2D.table();
 
