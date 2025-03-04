@@ -28,16 +28,16 @@ module load ninja/1.10.2
 SW_DIR="/p/lustre1/${USER}/tioga/warpx/mi300a"
 module load cray-hdf5-parallel/1.12.2.11
 export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-2.15.1:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.10.1:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.10.2:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=${SW_DIR}/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=${SW_DIR}/lapackpp-2024.05.31:$CMAKE_PREFIX_PATH
 
 export LD_LIBRARY_PATH=${SW_DIR}/c-blosc-2.15.1/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=${SW_DIR}/adios2-2.10.1/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/adios2-2.10.2/lib64:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=${SW_DIR}/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=${SW_DIR}/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
 
-export PATH=${SW_DIR}/adios2-2.10.1/bin:${PATH}
+export PATH=${SW_DIR}/adios2-2.10.2/bin:${PATH}
 
 # python
 module load cray-python/3.11.7

@@ -87,9 +87,7 @@ python3 -m pip install --upgrade build
 python3 -m pip install --upgrade packaging
 python3 -m pip install --upgrade wheel
 python3 -m pip install --upgrade setuptools
-# cupy needs an older Cython
-# https://github.com/cupy/cupy/issues/4610
-python3 -m pip install --upgrade "cython<3.0"
+python3 -m pip install --upgrade "cython>=3.0"
 # cupy for ROCm
 #   https://docs.cupy.dev/en/stable/install.html#building-cupy-for-rocm-from-source
 #   https://github.com/cupy/cupy/issues/7830
@@ -97,8 +95,7 @@ CC=cc CXX=CC \
 CUPY_INSTALL_USE_HIP=1  \
 ROCM_HOME=${ROCM_PATH}  \
 HCC_AMDGPU_TARGET=${AMREX_AMD_ARCH}  \
-  python3 -m pip install -v cupy
-python3 -m pip install --upgrade "cython>=3.0"  # for latest mpi4py and everything else
+  python3 -m pip install -v git+https://github.com/cupy/cupy.git@e669b994f976565bf2da4b1f82de51e10b58fbe1
 python3 -m pip install --upgrade numpy
 python3 -m pip install --upgrade h5py
 python3 -m pip install --upgrade pandas
