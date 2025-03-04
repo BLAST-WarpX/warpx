@@ -130,7 +130,7 @@ jobs:
         du -hs ~/.cache/ccache
 
   build_nvhpc:
-    name: NVIDIA HPC SDK
+    name: NVHPC
     runs-on: ubuntu-24.04
     if: github.event.pull_request.draft == false
     #env:
