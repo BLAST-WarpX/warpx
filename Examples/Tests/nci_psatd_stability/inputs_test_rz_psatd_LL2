@@ -36,14 +36,12 @@ warpx.cfl = 1.
 
 warpx.do_dive_cleaning = 1
 warpx.do_divb_cleaning = 1
-warpx.do_psatd_JRhom = 1
-warpx.do_psatd_JRhom_n_depositions = 2
 psatd.do_time_averaging = 1
 
 # PSATD
 psatd.update_with_rho = 1
 #psatd.v_galilean = 0. 0. -0.9373391857121336
-psatd.J_in_time = linear
+psatd.JRhom = "LL2"
 
 # Particles
 

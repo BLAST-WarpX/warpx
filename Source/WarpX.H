@@ -366,9 +366,6 @@ public:
     //! Specifies the type of grid used for the above sorting, i.e. cell-centered, nodal, or mixed
     static amrex::IntVect sort_idx_type;
 
-    static bool do_psatd_JRhom;
-    static int do_psatd_JRhom_n_depositions;
-
     //! With mesh refinement, particles located inside a refinement patch, but within
     //! #n_field_gather_buffer cells of the edge of the patch, will gather the fields
     //! from the lower refinement level instead of the refinement patch itself
@@ -1795,6 +1792,10 @@ private:
 
     // implicit solver object
     std::unique_ptr<ImplicitSolver> m_implicit_solver;
+
+    //! PSATD JRhom algorithm
+    bool m_JRhom = false;
+    int m_JRhom_subintervals;
 
 };
 

@@ -199,7 +199,7 @@ WarpX::Evolve (int numsteps)
             PushParticlesandDeposit(cur_time, skip_deposition);
         }
         // Electromagnetic case: PSATD-JRhom algorithm
-        else if (do_psatd_JRhom)
+        else if (m_JRhom)
         {
             OneStep_psatd_JRhom(cur_time);
         }
@@ -726,7 +726,7 @@ WarpX::OneStep_psatd_JRhom (const amrex::Real cur_time)
     }
 
     // Number of depositions for multi-J scheme
-    const int n_deposit = WarpX::do_psatd_JRhom_n_depositions;
+    const int n_deposit = WarpX::m_JRhom_subintervals;
     // Time sub-step for each multi-J deposition
     const amrex::Real sub_dt = dt[0] / static_cast<amrex::Real>(n_deposit);
     // Whether to perform PSATD-JRhom depositions on a time interval that spans

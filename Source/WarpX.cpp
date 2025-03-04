@@ -173,9 +173,6 @@ amrex::IntVect WarpX::sort_idx_type(AMREX_D_DECL(0,0,0));
 
 bool WarpX::do_dynamic_scheduling = true;
 
-bool WarpX::do_psatd_JRhom = false;
-int WarpX::do_psatd_JRhom_n_depositions;
-
 IntVect WarpX::filter_npass_each_dir(1);
 
 int WarpX::n_field_gather_buffer = -1;
@@ -642,12 +639,6 @@ WarpX::ReadParameters ()
         pp_warpx.query("verbose", verbose);
         utils::parser::queryWithParser(pp_warpx, "regrid_int", regrid_int);
         pp_warpx.query("do_subcycling", m_do_subcycling);
-        pp_warpx.query("do_psatd_JRhom", do_psatd_JRhom);
-        if (do_psatd_JRhom)
-        {
-            utils::parser::getWithParser(
-                pp_warpx, "do_psatd_JRhom_n_depositions", do_psatd_JRhom_n_depositions);
-        }
         pp_warpx.query("use_hybrid_QED", use_hybrid_QED);
         pp_warpx.query("safe_guard_cells", m_safe_guard_cells);
         std::vector<std::string> override_sync_intervals_string_vec = {"1"};
@@ -1196,12 +1187,6 @@ WarpX::ReadParameters ()
                 "Vay deposition is implemented only for PSATD");
         }
 
-        if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Vay) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                do_psatd_JRhom == false,
-                "Vay deposition not implemented with PSATD-JRhom algorithm");
-        }
-
         if (current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 evolve_scheme == EvolveScheme::SemiImplicitEM ||
@@ -1493,10 +1478,59 @@ WarpX::ReadParameters ()
         // second-order solution)
         pp_psatd.query_enum_sloppy("solution_type", m_psatd_solution_type, "-_");
 
-        // Integers that correspond to the time dependency of J (constant, linear)
-        // and rho (linear, quadratic) for the PSATD algorithm
-        pp_psatd.query_enum_sloppy("J_in_time", J_in_time, "-_");
-        pp_psatd.query_enum_sloppy("rho_in_time", rho_in_time, "-_");
+        std::string JRhom_input;
+        pp_psatd.query("JRhom", JRhom_input);
+        if (!JRhom_input.empty()) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                JRhom_input.length() >= 3,
+                "psatd.JRhom input string is too short to parse"
+            );
+            m_JRhom = true;
+            // parse time dependency of J from first character
+            if (JRhom_input[0] == 'C') {
+                J_in_time = JInTime::Constant;
+            }
+            else if (JRhom_input[0] == 'L') {
+                J_in_time = JInTime::Linear;
+            }
+            else if (JRhom_input[0] == 'Q') {
+                J_in_time = JInTime::Quadratic;
+            }
+            else {
+                WARPX_ABORT_WITH_MESSAGE(
+                    "Time dependency of J set by psatd.JRhom not implemented"
+                );
+            }
+            // parse time dependency of rho from second character
+            if (JRhom_input[1] == 'C') {
+                rho_in_time = RhoInTime::Constant;
+            }
+            else if (JRhom_input[1] == 'L') {
+                rho_in_time = RhoInTime::Linear;
+            }
+            else if (JRhom_input[1] == 'Q') {
+                rho_in_time = RhoInTime::Quadratic;
+            }
+            else {
+                WARPX_ABORT_WITH_MESSAGE(
+                    "Time dependency of rho set by psatd.JRhom not implemented"
+                );
+            }
+            // parse number of subintervals from last digit
+            for (const char m : JRhom_input.substr(2)) {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    std::isdigit(m),
+                    "psatd.JRhom input string does not include integer 'm'"
+                );
+            }
+            m_JRhom_subintervals = std::stoi(JRhom_input.substr(2));
+        }
+
+        if (current_deposition_algo == CurrentDepositionAlgo::Vay) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                m_JRhom == false,
+                "Vay deposition not implemented with JRhom algorithm");
+        }
 
         // Current correction activated by default, unless a charge-conserving
         // current deposition (Esirkepov, Vay) or the div(E) cleaning scheme
@@ -1510,8 +1544,8 @@ WarpX::ReadParameters ()
         }
 
         // TODO Remove this default when current correction will
-        // be implemented for the PSATD-JRhom algorithm as well.
-        if (do_psatd_JRhom) { current_correction = false; }
+        // be implemented for the PSATD-JRhom algorithm as well
+        if (m_JRhom) { current_correction = false; }
 
         pp_psatd.query("current_correction", current_correction);
 
@@ -1650,7 +1684,7 @@ WarpX::ReadParameters ()
             "psatd.update_with_rho must be equal to 1 for comoving PSATD"
         );
 
-        if (do_psatd_JRhom)
+        if (m_JRhom)
         {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 v_galilean_is_zero,
@@ -1658,27 +1692,28 @@ WarpX::ReadParameters ()
             );
         }
 
-        if (J_in_time != JInTime::Constant || rho_in_time != RhoInTime::Linear)
+        //if (J_in_time != JInTime::Constant || rho_in_time != RhoInTime::Linear)
+        if (!(J_in_time == JInTime::Constant && rho_in_time == RhoInTime::Linear))
         {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 update_with_rho,
-                "psatd.update_with_rho must be set to 1 when !(J_in_time == JInTime::Constant && rho_in_time == RhoInTime::Linear)");
+                "psatd.update_with_rho must be set to 1 unless J is constant in time and Rho is linear in time");
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 v_galilean_is_zero,
-                "!(J_in_time == JInTime::Constant && rho_in_time == RhoInTime::Linear) not implemented with Galilean PSATD");
+                "Time dependencies other than J constant and Rho linear not implemented with Galilean PSATD");
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 v_comoving_is_zero,
-                "!(J_in_time == JInTime::Constant && rho_in_time == RhoInTime::Linear) not implemented with comoving PSATD");
+                "Time dependencies other than J constant and Rho linear not implemented with comoving PSATD");
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 !current_correction,
-                "psatd.current_correction=1 not implemented with !(J_in_time == JInTime::Constant && rho_in_time == RhoInTime::Linear)");
+                "psatd.current_correction=1 not implemented unless J is constant in time and Rho is linear in time");
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 current_deposition_algo != CurrentDepositionAlgo::Vay,
-                "algo.current_deposition=vay not implemented with !(J_in_time == JInTime::Constant && rho_in_time == RhoInTime::Linear)");
+                "algo.current_deposition=vay not implemented unless J is constant in time and Rho is linear in time");
         }
 
         for (int dir = 0; dir < AMREX_SPACEDIM; dir++)
@@ -2070,7 +2105,7 @@ WarpX::AllocLevelData (int lev, const BoxArray& ba, const DistributionMapping& d
         WarpX::m_v_galilean,
         WarpX::m_v_comoving,
         m_safe_guard_cells,
-        WarpX::do_psatd_JRhom,
+        WarpX::m_JRhom,
         WarpX::fft_do_time_averaging,
         ::isAnyBoundaryPML(field_boundary_lo, field_boundary_hi),
         WarpX::do_pml_in_domain,
@@ -2421,7 +2456,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
         if (do_dive_cleaning || update_with_rho || current_correction) {
             // For the PSATD-JRhom algorithm we can allocate only one rho component (no distinction between old and new)
-            rho_ncomps = (WarpX::do_psatd_JRhom) ? ncomps : 2*ncomps;
+            rho_ncomps = (WarpX::m_JRhom) ? ncomps : 2*ncomps;
         }
     }
     if (rho_ncomps > 0)
@@ -2811,7 +2846,7 @@ void WarpX::AllocLevelSpectralSolverRZ (amrex::Vector<std::unique_ptr<SpectralSo
     const RealVect dx_vect(dx[0], dx[2]);
 
     amrex::Real solver_dt = dt[lev];
-    if (WarpX::do_psatd_JRhom) { solver_dt /= static_cast<amrex::Real>(WarpX::do_psatd_JRhom_n_depositions); }
+    if (WarpX::m_JRhom) { solver_dt /= static_cast<amrex::Real>(WarpX::m_JRhom_subintervals); }
     if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
         // The step is Strang split into two half steps
         solver_dt /= 2.;
@@ -2868,7 +2903,7 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
 #endif
 
     amrex::Real solver_dt = dt[lev];
-    if (WarpX::do_psatd_JRhom) { solver_dt /= static_cast<amrex::Real>(WarpX::do_psatd_JRhom_n_depositions); }
+    if (WarpX::m_JRhom) { solver_dt /= static_cast<amrex::Real>(WarpX::m_JRhom_subintervals); }
     if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
         // The step is Strang split into two half steps
         solver_dt /= 2.;
