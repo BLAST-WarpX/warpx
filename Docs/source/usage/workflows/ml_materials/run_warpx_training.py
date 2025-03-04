@@ -107,7 +107,6 @@ def get_species_of_accelerator_stage(
         density_expression=f"n0*(1.+4.*(x**2+y**2)/(kp**2*Rc**4))*(0.5*(1.-cos(pi*(z-{stage_zmin})/Lplus)))*((z-{stage_zmin})<Lplus)"
         + f"+n0*(1.+4.*(x**2+y**2)/(kp**2*Rc**4))*((z-{stage_zmin})>=Lplus)*((z-{stage_zmin})<(Lplus+Lp))"
         + f"+n0*(1.+4.*(x**2+y**2)/(kp**2*Rc**4))*(0.5*(1.+cos(pi*((z-{stage_zmin})-Lplus-Lp)/Lminus)))*((z-{stage_zmin})>=(Lplus+Lp))*((z-{stage_zmin})<(Lplus+Lp+Lminus))",
-        pi=3.141592653589793,
         n0=n0,
         kp=q_e / c * math.sqrt(n0 / (m_e * ep0)),
         Rc=Rc,
