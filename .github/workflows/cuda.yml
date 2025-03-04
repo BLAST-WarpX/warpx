@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   build_nvcc:
-    name: NVCC 12.6 SP
+    name: NVCC SP
     runs-on: ubuntu-24.04
     if: github.event.pull_request.draft == false
     env:
@@ -96,7 +96,7 @@ jobs:
   # make sure legacy build system continues to build, i.e., that we don't forget
   # to add new .cpp files
   build_nvcc_gnumake:
-    name: NVCC 12.6 GNU Make
+    name: NVCC GNU Make
     runs-on: ubuntu-24.04
     if: github.event.pull_request.draft == false
     steps:
@@ -130,7 +130,7 @@ jobs:
         du -hs ~/.cache/ccache
 
   build_nvhpc:
-    name: NVHPC 25.1 NVCC/NVC++ Release [tests]
+    name: NVIDIA HPC SDK
     runs-on: ubuntu-24.04
     if: github.event.pull_request.draft == false
     #env:
