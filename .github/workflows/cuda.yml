@@ -129,8 +129,8 @@ jobs:
         ccache -s
         du -hs ~/.cache/ccache
 
-  build_nvhpc24-1-nvcc:
-    name: NVHPC@24.1 NVCC/NVC++ Release [tests]
+  build_nvhpc:
+    name: NVHPC 25.1 NVCC/NVC++ Release [tests]
     runs-on: ubuntu-24.04
     if: github.event.pull_request.draft == false
     #env:
@@ -139,7 +139,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Dependencies
-      run: .github/workflows/dependencies/nvhpc.sh
+      run: .github/workflows/dependencies/nvhpc.sh 25.1
     - name: CCache Cache
       uses: actions/cache@v4
       with:
@@ -155,7 +155,7 @@ jobs:
         ccache -z
 
         source /etc/profile.d/modules.sh
-        module load /opt/nvidia/hpc_sdk/modulefiles/nvhpc/24.1
+        module load /opt/nvidia/hpc_sdk/modulefiles/nvhpc/25.1
         which nvcc || echo "nvcc not in PATH!"
         which nvc++ || echo "nvc++ not in PATH!"
         which nvc || echo "nvc not in PATH!"
