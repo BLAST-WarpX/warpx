@@ -181,6 +181,7 @@ web::MarkUpdateCellsStairCase (
                     // these are the neighboring cells for the nodal gripoint at index i.
                     // If `eb_update_arr` is cell-centerd in a given direction, we only need to check
                     // the cell at the same position (e.g., in the first dimension: the cell at index i).
+/*
                     int const i_start = ( index_type.nodeCentered(0) )? i-1 : i;
 #if AMREX_SPACEDIM > 1
                     int const j_start = ( index_type.nodeCentered(1) )? j-1 : j;
@@ -192,6 +193,12 @@ web::MarkUpdateCellsStairCase (
 #else
                     int const k_start = k;
 #endif
+*/
+                    // quick fix for Hybrid solver with EB
+                    int const i_start = i;
+                    int const j_start = j;
+                    int const k_start = k;
+
                     // Loop over neighboring cells
                     int eb_update_flag = 1;
                     for (int i_cell = i_start; i_cell <= i; ++i_cell) {

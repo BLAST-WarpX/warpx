@@ -1599,8 +1599,8 @@ void WarpXFluidContainer::HybridQDSMCUpdateTe (ablastr::fields::MultiFabRegister
                     //    ne = n_floor;
                     //}
                     amrex::Real weight = weights(i,j,k);
-                    // if(weight>0){
-                    if(weight>0 && ne>n_floor){ // maybe only do this if ne is larger than n_floor ?
+
+                    if(weight>0 && ne>n_floor){
                         weight = weight*cell_volume;
                         Te(i, j, k) = (Ke(i, j, k)*PhysConst::q_e/std::pow(ne, 1-gamma))/weight; // Te in Joules
                     }
