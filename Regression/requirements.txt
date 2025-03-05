@@ -1,7 +1,7 @@
 -r ../requirements.txt
 dill
 lasy>=0.5.0
-matplotlib
+matplotlib>=3.10.0
 mpi4py
 numpy
 openpmd-api

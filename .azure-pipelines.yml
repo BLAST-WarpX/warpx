@@ -112,6 +112,10 @@ jobs:
           -Duse_cmake_find_lapack=ON -Dbuild_tests=OFF -DCMAKE_VERBOSE_MAKEFILE=ON
       fi
       # Python modules required for test analysis
+      # (remove system copy of Matplotlib to avoid conflict
+      # with version set in the requirements file - see, e.g.,
+      # https://github.com/matplotlib/matplotlib/issues/28768)
+      sudo apt remove python3-matplotlib
       python3 -m pip install --upgrade -r Regression/requirements.txt
       python3 -m pip cache purge
       # external repositories required for test analysis

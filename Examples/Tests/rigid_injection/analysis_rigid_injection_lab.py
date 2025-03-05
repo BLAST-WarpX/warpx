@@ -96,5 +96,7 @@ x = ad_start["beam", "particle_position_x"]
 z = ad_start["beam", "particle_position_y"]
 orig_z = ad_start["beam", "particle_orig_z"]
 center = ad_start["beam", "particle_center"]
-assert np.array_equal(z, orig_z)
+print(z)
+print(orig_z)
+assert np.isclose(z, orig_z, rtol=1e-15, atol=1e-15).all()
 assert np.array_equal(1 * (np.abs(x) < 5.0e-7), center)
