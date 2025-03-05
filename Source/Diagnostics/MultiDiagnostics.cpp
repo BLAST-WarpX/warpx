@@ -77,6 +77,16 @@ MultiDiagnostics::ReadParameters ()
     }
 }
 
+bool
+MultiDiagnostics::DoComputeAndPack (int step, bool force_flush)
+{
+    bool result = false;
+    for( auto& diag : alldiags ){
+        result = result || diag->DoComputeAndPack(step, force_flush);
+    }
+    return result;
+}
+
 void
 MultiDiagnostics::FilterComputePackFlush (int step, bool force_flush, bool BackTransform)
 {
