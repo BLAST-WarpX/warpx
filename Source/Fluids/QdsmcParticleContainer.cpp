@@ -270,8 +270,8 @@ void QdsmcParticleContainer::InitParticles (int lev)
         amrex::Gpu::synchronize(); // added for debugging
 
         amrex::AllPrint() << "Rank " << ParallelDescriptor::MyProc()
-            << "Before first ParallelFor(commented now) (but with extra synchronize)" << "\n"; 
-        
+            << "Before first ParallelFor(commented now) (but with extra synchronize)" << "\n";
+
         //
         //amrex::ParallelFor(tile_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         //{
@@ -296,18 +296,18 @@ void QdsmcParticleContainer::InitParticles (int lev)
 
         });
         //
-        
+
         amrex::Gpu::synchronize();
 
         amrex::AllPrint() << "Rank " << ParallelDescriptor::MyProc()
-            << "After first ParallelFor(commented now)" << "\n";  
+            << "After first ParallelFor(commented now)" << "\n";
 
         const amrex::Long max_new_particles = Scan::ExclusiveSum(counts.size(), counts.data(), offset.data());
 
         amrex::Gpu::synchronize(); // Added for debugging
 
         amrex::AllPrint() << "Rank " << ParallelDescriptor::MyProc()
-            << "After Scan::ExclusiveSum" << "\n";  
+            << "After Scan::ExclusiveSum" << "\n";
 
         // Update NextID to include particles created in this function
         amrex::Long pid;
@@ -348,19 +348,19 @@ void QdsmcParticleContainer::InitParticles (int lev)
             if(tile_box.contains(iv))
             {
                 const auto index = tile_box.index(iv);
-            
+
                 // Skip if this cell did not count as a valid cell.
                 if ( pcounts[index] == 0 ) { return; }
-                
+
                 const amrex::Long ip = poffset[index];
                 // check that ip is in [0, max_new_particles)
                 if (ip < 0 || ip >= max_new_particles) { return; }
-                
+
                 const amrex::Real x = problo[0] + (iv[0] + 0.5_rt) * dx[0];
                 const amrex::Real y = problo[1] + (iv[1] + 0.5_rt) * dx[1];
                 const amrex::Real z = problo[2] + (iv[2] + 0.5_rt) * dx[2];
 
-                
+
                 pa_idcpu[ip] = amrex::SetParticleIDandCPU(pid + ip, cpuid);
 
                 pa[QdsmcPIdx::x][ip] = x;
@@ -377,26 +377,26 @@ void QdsmcParticleContainer::InitParticles (int lev)
 
                 pa[QdsmcPIdx::entropy][ip] = 0._rt;
                 pa[QdsmcPIdx::np_real][ip] = 0._rt;
-                
+
             }
         });
 
         amrex::Gpu::synchronize();
 
         amrex::AllPrint() << "Rank " << ParallelDescriptor::MyProc()
-            << "After second ParallelFor" << "\n";  
-        
+            << "After second ParallelFor" << "\n";
+
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
         {
             wt = static_cast<amrex::Real>(amrex::second()) - wt;
             amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
         }
-    }  
+    }
 
     amrex::Gpu::synchronize();
 
     amrex::AllPrint() << "Rank " << ParallelDescriptor::MyProc()
-            << "post_MFIter" << "\n";  
+            << "post_MFIter" << "\n";
 
     Redistribute();
 }
@@ -522,13 +522,13 @@ void QdsmcParticleContainer::InitParticles_2(int lev){
         });
 
         amrex::Gpu::synchronize();
-        
+
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
         {
             wt = static_cast<amrex::Real>(amrex::second()) - wt;
             amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
         }
-    }    
+    }
 
     amrex::Gpu::synchronize();
     Redistribute();
@@ -660,7 +660,7 @@ void QdsmcParticleContainer::InitParticles(int lev){
             const auto index = tile_box.index(iv);
 
             //if (index >= 0 && index < tile_box.numPts()) {
-                
+
                 long ip = poffset[index];
 
                 //if (ip >= 0 && ip < max_new_particles) {
@@ -690,13 +690,13 @@ void QdsmcParticleContainer::InitParticles(int lev){
         });
 
         amrex::Gpu::synchronize();
-        
+
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
         {
             wt = static_cast<amrex::Real>(amrex::second()) - wt;
             amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
         }
-    }    
+    }
 
     amrex::Gpu::synchronize();
 }
