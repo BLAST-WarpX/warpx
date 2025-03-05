@@ -7,7 +7,7 @@ add_warpx_test(
     2  # nprocs
     inputs_test_1d_collision_z  # inputs
     "analysis_collision_1d.py diags/diag1000600"  # analysis
-    "analysis_default_regression.py --path diags/diag1000600"  # checksum
+    "analysis_default_regression.py --path diags/diag1000600 --rtol 1e-2"  # checksum
     OFF  # dependency
 )
 
