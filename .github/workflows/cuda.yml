@@ -88,7 +88,7 @@ jobs:
         cmake --build build_sp -j 4
 
         python3 -m pip install --upgrade pip
-        python3 -m pip install --upgrade build packaging setuptools wheel
+        python3 -m pip install --upgrade build packaging setuptools[core] wheel
         export WARPX_MPI=ON
         export PYWARPX_LIB_DIR=$PWD/build_sp/lib/site-packages/pywarpx/
         python3 -m pip wheel .
@@ -191,7 +191,7 @@ jobs:
         #export CFLAGS="-noswitcherror"
 
         #python3 -m pip install --upgrade pip
-        #python3 -m pip install --upgrade build packaging setuptools wheel
+        #python3 -m pip install --upgrade build packaging setuptools[core] wheel
         #export WARPX_MPI=ON
         #export PYWARPX_LIB_DIR=$PWD/build/lib/site-packages/pywarpx/
         #python3 -m pip wheel .

@@ -50,7 +50,7 @@ jobs:
         export CC=$(which icc)
 
         python3 -m pip install --upgrade pip
-        python3 -m pip install --upgrade build packaging setuptools wheel
+        python3 -m pip install --upgrade build packaging setuptools[core] wheel
 
         cmake -S . -B build_dp \
           -DCMAKE_VERBOSE_MAKEFILE=ON \
@@ -118,7 +118,7 @@ jobs:
         export CC=$(which icx)
 
         python3 -m pip install --upgrade pip
-        python3 -m pip install --upgrade build packaging setuptools wheel
+        python3 -m pip install --upgrade build packaging setuptools[core] wheel
 
         cmake -S . -B build_sp         \
           -DCMAKE_CXX_FLAGS_RELEASE="-O1 -DNDEBUG" \
@@ -201,6 +201,6 @@ jobs:
 
      # Skip this as it will copy the binary artifacts and we are tight on disk space
      #   python3 -m pip install --upgrade pip
-     #   python3 -m pip install --upgrade build packaging setuptools wheel
+     #   python3 -m pip install --upgrade build packaging setuptools[core] wheel
      #   PYWARPX_LIB_DIR=$PWD/build_sp/lib/site-packages/pywarpx/ python3 -m pip wheel .
      #   python3 -m pip install *.whl
