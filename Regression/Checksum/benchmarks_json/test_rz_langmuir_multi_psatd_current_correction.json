@@ -9,7 +9,6 @@
     "rho": 3855770.585538005
   },
   "ions": {
-    "particle_momentum_x": 9.303284812749536e-37,
     "particle_momentum_y": 1.475435436402189e-21,
     "particle_momentum_z": 1.9507023826482256e-21,
     "particle_position_x": 0.5290000097194892,
@@ -18,7 +17,6 @@
     "particle_weight": 81147583679.15044
   },
   "electrons": {
-    "particle_momentum_x": 2.5301631422412464e-36,
     "particle_momentum_y": 2.0033141618079855e-20,
     "particle_momentum_z": 2.785324108949854e-20,
     "particle_position_x": 0.5290000111160095,

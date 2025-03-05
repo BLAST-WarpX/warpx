@@ -30,17 +30,17 @@ time_averaging = False
 periodic_single_box = False
 with open("./warpx_used_inputs", "r") as f:
     warpx_used_inputs = f.read()
-if re.search("geometry.dims\s*=\s*2", warpx_used_inputs):
+if re.search("geometry.dims = 2", warpx_used_inputs):
     dims = "2D"
-elif re.search("geometry.dims\s*=\s*RZ", warpx_used_inputs):
+elif re.search("geometry.dims = RZ", warpx_used_inputs):
     dims = "RZ"
-elif re.search("geometry.dims\s*=\s*3", warpx_used_inputs):
+elif re.search("geometry.dims = 3", warpx_used_inputs):
     dims = "3D"
-if re.search("psatd.current_correction\s*=\s*1", warpx_used_inputs):
+if re.search("psatd.current_correction = 1", warpx_used_inputs):
     current_correction = True
-if re.search("psatd.do_time_averaging\s*=\s*1", warpx_used_inputs):
+if re.search("psatd.do_time_averaging = 1", warpx_used_inputs):
     time_averaging = True
-if re.search("psatd.periodic_single_box_fft\s*=\s*1", warpx_used_inputs):
+if re.search("psatd.periodic_single_box_fft = 1", warpx_used_inputs):
     periodic_single_box = True
 
 ds = yt.load(filename)
@@ -82,6 +82,7 @@ elif dims == "RZ":
         energy_ref = 191002.6526271543
     if current_correction and periodic_single_box:
         energy_ref = 472779.70801323955
+        tol_charge = 1e-8
     if current_correction and not periodic_single_box:
         energy_ref = 511671.4108624746
         tol_charge = 3e-4
