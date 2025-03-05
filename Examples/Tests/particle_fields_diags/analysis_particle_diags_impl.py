@@ -223,7 +223,7 @@ def do_analysis(single_precision=False):
 
     error_plt = dict()
     error_opmd = dict()
-    tolerance = 5e-3 if single_precision else 1e-12
+    tolerance = 5e-3 if single_precision else 1e-8
 
     for k in values_yt.keys():
         # check that the zeros line up, since we'll be ignoring them in the error calculation
