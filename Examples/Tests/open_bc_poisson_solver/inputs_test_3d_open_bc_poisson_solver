@@ -36,7 +36,7 @@ diagnostics.diags_names = diag1 diag2
 
 diag1.intervals = 1
 diag1.diag_type = Full
-diag1.fields_to_plot = Ex Ey Ez Bx By rho
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz rho
 diag1.format = plotfile
 
 diag2.intervals = 1

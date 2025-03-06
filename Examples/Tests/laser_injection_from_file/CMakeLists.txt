@@ -117,7 +117,7 @@ add_warpx_test(
     1  # nprocs
     inputs_test_rz_laser_injection_from_lasy_file  # inputs
     "analysis_rz.py diags/diag1000252"  # analysis
-    "analysis_default_regression.py --path diags/diag1000252 --rtol 1e-1"  # checksum
+    "analysis_default_regression.py --path diags/diag1000252"  # checksum
     test_rz_laser_injection_from_lasy_file_prepare  # dependency
 )
 
@@ -137,6 +137,6 @@ add_warpx_test(
     1  # nprocs
     inputs_test_rz_laser_injection_from_RZ_lasy_file  # inputs
     "analysis_from_RZ_file.py diags/diag1000612"  # analysis
-    "analysis_default_regression.py --path diags/diag1000612 --rtol 1e-2"  # checksum
+    "analysis_default_regression.py --path diags/diag1000612"  # checksum
     test_rz_laser_injection_from_RZ_lasy_file_prepare  # dependency
 )

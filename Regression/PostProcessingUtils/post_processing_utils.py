@@ -21,24 +21,9 @@ def check_particle_filter(fn, filtered_fn, filter_expression, dim, species_name)
     ## Load arrays from the unfiltered diagnostic
     ids = ad[species_name, "particle_id"].to_ndarray()
     cpus = ad[species_name, "particle_cpu"].to_ndarray()
-    skip_px = False
-    skip_py = False
-    skip_pz = False
-    try:
-        px = ad[species_name, "particle_momentum_x"].to_ndarray()
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        skip_px = True
-    try:
-        pz = ad[species_name, "particle_momentum_z"].to_ndarray()
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        skip_pz = True
-    try:
-        py = ad[species_name, "particle_momentum_y"].to_ndarray()
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        skip_py = True
+    px = ad[species_name, "particle_momentum_x"].to_ndarray()
+    pz = ad[species_name, "particle_momentum_z"].to_ndarray()
+    py = ad[species_name, "particle_momentum_y"].to_ndarray()
     w = ad[species_name, "particle_weight"].to_ndarray()
     if dim == "2d":
         x = ad[species_name, "particle_position_x"].to_ndarray()
@@ -55,18 +40,9 @@ def check_particle_filter(fn, filtered_fn, filter_expression, dim, species_name)
     ## Load arrays from the filtered diagnostic
     ids_filtered_warpx = ad_filtered[species_name, "particle_id"].to_ndarray()
     cpus_filtered_warpx = ad_filtered[species_name, "particle_cpu"].to_ndarray()
-    if not skip_px:
-        px_filtered_warpx = ad_filtered[
-            species_name, "particle_momentum_x"
-        ].to_ndarray()
-    if not skip_pz:
-        pz_filtered_warpx = ad_filtered[
-            species_name, "particle_momentum_z"
-        ].to_ndarray()
-    if not skip_py:
-        py_filtered_warpx = ad_filtered[
-            species_name, "particle_momentum_y"
-        ].to_ndarray()
+    px_filtered_warpx = ad_filtered[species_name, "particle_momentum_x"].to_ndarray()
+    pz_filtered_warpx = ad_filtered[species_name, "particle_momentum_z"].to_ndarray()
+    py_filtered_warpx = ad_filtered[species_name, "particle_momentum_y"].to_ndarray()
     w_filtered_warpx = ad_filtered[species_name, "particle_weight"].to_ndarray()
     if dim == "2d":
         x_filtered_warpx = ad_filtered[species_name, "particle_position_x"].to_ndarray()
@@ -101,24 +77,21 @@ def check_particle_filter(fn, filtered_fn, filter_expression, dim, species_name)
 
     ## Finally, we check that the sum of the particles quantities are the same to machine precision
     tolerance_checksum = 1.0e-12
-    if not skip_px:
-        check_array_sum(
-            px[sorted_ind_filtered_python],
-            px_filtered_warpx[sorted_ind_filtered_warpx],
-            tolerance_checksum,
-        )
-    if not skip_pz:
-        check_array_sum(
-            pz[sorted_ind_filtered_python],
-            pz_filtered_warpx[sorted_ind_filtered_warpx],
-            tolerance_checksum,
-        )
-    if not skip_py:
-        check_array_sum(
-            py[sorted_ind_filtered_python],
-            py_filtered_warpx[sorted_ind_filtered_warpx],
-            tolerance_checksum,
-        )
+    check_array_sum(
+        px[sorted_ind_filtered_python],
+        px_filtered_warpx[sorted_ind_filtered_warpx],
+        tolerance_checksum,
+    )
+    check_array_sum(
+        pz[sorted_ind_filtered_python],
+        pz_filtered_warpx[sorted_ind_filtered_warpx],
+        tolerance_checksum,
+    )
+    check_array_sum(
+        py[sorted_ind_filtered_python],
+        py_filtered_warpx[sorted_ind_filtered_warpx],
+        tolerance_checksum,
+    )
     check_array_sum(
         w[sorted_ind_filtered_python],
         w_filtered_warpx[sorted_ind_filtered_warpx],

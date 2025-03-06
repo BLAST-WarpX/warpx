@@ -80,7 +80,7 @@ E_fusion_total = E_fusion + E_decay  # Energy released during p + B -> 3*alpha
 
 ## Checks whether this is the 2D or the 3D test
 with open("./warpx_used_inputs") as warpx_used_inputs:
-    is_2D = re.search("geometry.dims = 2", warpx_used_inputs.read())
+    is_2D = re.search("geometry.dims\s*=\s*2", warpx_used_inputs.read())
 warpx_used_inputs.close()
 
 ## Some numerical parameters for this test
@@ -698,7 +698,7 @@ def check_initial_energy2(data):
         ## statistics and an event like alpha1 emitted exactly in direction of proton & alpha2
         ## emitted exactly in direction opposite to Beryllium is somewhat rare.
         assert is_close(
-            np.amax(energy_alpha2_simulation), max_energy_alpha23, rtol=1e-1
+            np.amax(energy_alpha2_simulation), max_energy_alpha23, rtol=5e-2
         )
         assert is_close(
             np.amin(energy_alpha2_simulation), min_energy_alpha23, atol=3.218e-14

@@ -7,7 +7,7 @@ add_warpx_test(
     2  # nprocs
     inputs_test_1d_collision_z  # inputs
     "analysis_collision_1d.py diags/diag1000600"  # analysis
-    "analysis_default_regression.py --path diags/diag1000600 --rtol 1e-2"  # checksum
+    "analysis_default_regression.py --path diags/diag1000600"  # checksum
     OFF  # dependency
 )
 
@@ -17,7 +17,7 @@ add_warpx_test(
     1  # nprocs
     inputs_test_2d_collision_xz  # inputs
     "analysis_collision_2d.py diags/diag1000150"  # analysis
-    "analysis_default_regression.py --path diags/diag1000150 --rtol 1e-1"  # checksum
+    "analysis_default_regression.py --path diags/diag1000150"  # checksum
     OFF  # dependency
 )
 
@@ -27,7 +27,7 @@ add_warpx_test(
     1  # nprocs
     inputs_test_2d_collision_xz_picmi.py  # inputs
     "analysis_collision_2d.py diags/diag1000150"  # analysis
-    "analysis_default_regression.py --path diags/diag1000150 --rtol 1e-1"  # checksum
+    "analysis_default_regression.py --path diags/diag1000150"  # checksum
     OFF  # dependency
 )
 
@@ -37,7 +37,7 @@ add_warpx_test(
     1  # nprocs
     inputs_test_3d_collision_iso  # inputs
     "analysis_collision_3d_isotropization.py diags/diag1000100"  # analysis
-    "analysis_default_regression.py --path diags/diag1000100 --rtol 1e-2"  # checksum
+    "analysis_default_regression.py --path diags/diag1000100"  # checksum
     OFF  # dependency
 )
 
@@ -47,7 +47,7 @@ add_warpx_test(
     1  # nprocs
     inputs_test_3d_collision_xyz  # inputs
     "analysis_collision_3d.py diags/diag1000150"  # analysis
-    "analysis_default_regression.py --path diags/diag1000150 --rtol 1e-2"  # checksum
+    "analysis_default_regression.py --path diags/diag1000150"  # checksum
     OFF  # dependency
 )
 
