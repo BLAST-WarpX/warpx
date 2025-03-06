@@ -148,7 +148,7 @@ Now, ensure Python tooling is up-to-date:
 .. code-block:: bash
 
    python3 -m pip install -U pip
-   python3 -m pip install -U build packaging setuptools wheel
+   python3 -m pip install -U build packaging setuptools[core] wheel
    python3 -m pip install -U cmake
 
 Then we compile WarpX as in the previous section (with or without CUDA) adding ``-DWarpX_PYTHON=ON`` and then we install it into our Python:

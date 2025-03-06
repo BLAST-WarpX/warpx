@@ -109,7 +109,7 @@ Given that you have the :ref:`WarpX dependencies <install-dependencies>` install
 .. code-block:: bash
 
    python3 -m pip install -U pip
-   python3 -m pip install -U build packaging setuptools wheel
+   python3 -m pip install -U build packaging setuptools[core] wheel
    python3 -m pip install -U cmake
 
    python3 -m pip wheel -v git+https://github.com/ECP-WarpX/WarpX.git

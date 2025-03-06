@@ -926,6 +926,8 @@ WarpX::ReadParameters ()
             "J-damping can only be done when PML are inside simulation domain (do_pml_in_domain=1)"
         );
 
+        pp_warpx.query("synchronize_velocity_for_diagnostics", synchronize_velocity_for_diagnostics);
+
         {
             // Parameters below control all plotfile diagnostics
             bool plotfile_min_max = true;
@@ -1185,15 +1187,6 @@ WarpX::ReadParameters ()
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 do_multi_J == false,
                 "Vay deposition not implemented with multi-J algorithm");
-        }
-
-        if (current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                evolve_scheme == EvolveScheme::SemiImplicitEM ||
-                evolve_scheme == EvolveScheme::ThetaImplicitEM ||
-                evolve_scheme == EvolveScheme::StrangImplicitSpectralEM,
-                "Villasenor current deposition can only"
-                "be used with Implicit evolve schemes.");
         }
 
         // Query algo.field_gathering from input, set field_gathering_algo to
