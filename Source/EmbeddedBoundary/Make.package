@@ -1,11 +1,11 @@
-CEXE_headers += EmbeddedBoundary.H
+CEXE_headers += EmbeddedBoundaryInit.H
 CEXE_headers += Enabled.H
 CEXE_headers += ParticleScraper.H
 CEXE_headers += ParticleBoundaryProcess.H
 CEXE_headers += DistanceToEB.H
 CEXE_headers += WarpXFaceInfoBox.H
 
-CEXE_sources += EmbeddedBoundary.cpp
+CEXE_sources += EmbeddedBoundaryInit.cpp
 CEXE_sources += Enabled.cpp
 CEXE_sources += WarpXInitEB.cpp
 CEXE_sources += WarpXFaceExtensions.cpp

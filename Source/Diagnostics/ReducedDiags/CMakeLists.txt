@@ -6,6 +6,7 @@ foreach(D IN LISTS WarpX_DIMS)
         ChargeOnEB.cpp
         ColliderRelevant.cpp
         DifferentialLuminosity.cpp
+        DifferentialLuminosity2D.cpp
         FieldEnergy.cpp
         FieldMaximum.cpp
         FieldMomentum.cpp

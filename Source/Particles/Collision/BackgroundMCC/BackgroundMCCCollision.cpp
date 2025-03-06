@@ -276,7 +276,7 @@ BackgroundMCCCollision::doCollisions (amrex::Real cur_time, amrex::Real dt, Mult
         }
 
         amrex::Print() << Utils::TextMsg::Info(
-            "Setting up collisions for " + m_species_names[0] + " with:\n"
+            "Setting up Monte-Carlo collisions for " + m_species_names[0] + " with:\n"
             + "     total non-ionization collision probability: "
             + std::to_string(m_total_collision_prob)
             + "\n     total ionization collision probability: "

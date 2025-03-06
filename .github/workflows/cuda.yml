@@ -88,7 +88,7 @@ jobs:
         cmake --build build_sp -j 4
 
         python3 -m pip install --upgrade pip
-        python3 -m pip install --upgrade build packaging setuptools wheel
+        python3 -m pip install --upgrade build packaging setuptools[core] wheel
         export WARPX_MPI=ON
         export PYWARPX_LIB_DIR=$PWD/build_sp/lib/site-packages/pywarpx/
         python3 -m pip wheel .
@@ -127,7 +127,7 @@ jobs:
         which nvcc || echo "nvcc not in PATH!"
 
         git clone https://github.com/AMReX-Codes/amrex.git ../amrex
-        cd ../amrex && git checkout --detach 198da4879a63f1bc8c4e8d674bf9185525318f61 && cd -
+        cd ../amrex && git checkout --detach 044d52f7d309e340939d7cae449fd83209da317f && cd -
         make COMP=gcc QED=FALSE USE_MPI=TRUE USE_GPU=TRUE USE_OMP=FALSE USE_FFT=TRUE USE_CCACHE=TRUE -j 4
 
         ccache -s
@@ -191,7 +191,7 @@ jobs:
         #export CFLAGS="-noswitcherror"
 
         #python3 -m pip install --upgrade pip
-        #python3 -m pip install --upgrade build packaging setuptools wheel
+        #python3 -m pip install --upgrade build packaging setuptools[core] wheel
         #export WARPX_MPI=ON
         #export PYWARPX_LIB_DIR=$PWD/build/lib/site-packages/pywarpx/
         #python3 -m pip wheel .

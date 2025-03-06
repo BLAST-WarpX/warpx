@@ -200,6 +200,27 @@ namespace
             std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(), is_pml);
         return is_any_pml;
     }
+
+    /**
+     * \brief
+     * Set the dotMask container
+     */
+    void SetDotMask( std::unique_ptr<amrex::iMultiFab>& field_dotMask,
+                     ablastr::fields::ConstScalarField const& field,
+                     amrex::Periodicity const& periodicity)
+
+    {
+        // Define the dot mask for this field_type needed to properly compute dotProduct()
+        // for field values that have shared locations on different MPI ranks
+        if (field_dotMask != nullptr) { return; }
+
+        const auto& this_ba = field->boxArray();
+        const auto tmp = amrex::MultiFab{
+            this_ba, field->DistributionMap(),
+            1, 0, amrex::MFInfo().SetAlloc(false)};
+
+        field_dotMask = tmp.OwnerMask(periodicity);
+    }
 }
 
 void WarpX::MakeWarpX ()
@@ -722,12 +743,22 @@ WarpX::ReadParameters ()
             use_kspace_filter = use_filter;
             use_filter = false;
         }
-        else // FDTD
+        else
         {
-            // Filter currently not working with FDTD solver in RZ geometry along R
-            // (see https://github.com/ECP-WarpX/WarpX/issues/1943)
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!use_filter || filter_npass_each_dir[0] == 0,
-                "In RZ geometry with FDTD, filtering can only be apply along z. This can be controlled by setting warpx.filter_npass_each_dir");
+            if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::HybridPIC) {
+                // Filter currently not working with FDTD solver in RZ geometry along R
+                // (see https://github.com/ECP-WarpX/WarpX/issues/1943)
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!use_filter || filter_npass_each_dir[0] == 0,
+                    "In RZ geometry with FDTD, filtering can only be applied along z. This can be controlled by setting warpx.filter_npass_each_dir");
+            } else {
+                if (use_filter && filter_npass_each_dir[0] > 0) {
+                    ablastr::warn_manager::WMRecordWarning(
+                        "HybridPIC ElectromagneticSolver",
+                        "Radial Filtering in RZ is not currently using radial geometric weighting to conserve charge. Use at your own risk.",
+                        ablastr::warn_manager::WarnPriority::low
+                    );
+                }
+            }
         }
 #endif
 
@@ -894,6 +925,8 @@ WarpX::ReadParameters ()
             (do_pml_j_damping==0)||(do_pml_in_domain==1),
             "J-damping can only be done when PML are inside simulation domain (do_pml_in_domain=1)"
         );
+
+        pp_warpx.query("synchronize_velocity_for_diagnostics", synchronize_velocity_for_diagnostics);
 
         {
             // Parameters below control all plotfile diagnostics
@@ -1154,15 +1187,6 @@ WarpX::ReadParameters ()
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 do_multi_J == false,
                 "Vay deposition not implemented with multi-J algorithm");
-        }
-
-        if (current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                evolve_scheme == EvolveScheme::SemiImplicitEM ||
-                evolve_scheme == EvolveScheme::ThetaImplicitEM ||
-                evolve_scheme == EvolveScheme::StrangImplicitSpectralEM,
-                "Villasenor current deposition can only"
-                "be used with Implicit evolve schemes.");
         }
 
         // Query algo.field_gathering from input, set field_gathering_algo to
@@ -2236,8 +2260,9 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
     {
         m_hybrid_pic_model->AllocateLevelMFs(
             m_fields,
-            lev, ba, dm, ncomps, ngJ, ngRho, jx_nodal_flag, jy_nodal_flag,
-            jz_nodal_flag, rho_nodal_flag
+            lev, ba, dm, ncomps, ngJ, ngRho, ngEB, jx_nodal_flag, jy_nodal_flag,
+            jz_nodal_flag, rho_nodal_flag, Ex_nodal_flag, Ey_nodal_flag, Ez_nodal_flag,
+            Bx_nodal_flag, By_nodal_flag, Bz_nodal_flag
         );
     }
 
@@ -3316,40 +3341,25 @@ WarpX::MakeDistributionMap (int lev, amrex::BoxArray const& ba)
 }
 
 const amrex::iMultiFab*
-WarpX::getFieldDotMaskPointer ( FieldType field_type, int lev, int dir ) const
+WarpX::getFieldDotMaskPointer ( FieldType field_type, int lev, ablastr::fields::Direction dir ) const
 {
+    const auto periodicity = Geom(lev).periodicity();
     switch(field_type)
     {
         case FieldType::Efield_fp :
-            SetDotMask( Efield_dotMask[lev][dir], "Efield_fp", lev, dir );
+            ::SetDotMask( Efield_dotMask[lev][dir], m_fields.get("Efield_fp", dir, lev), periodicity);
             return Efield_dotMask[lev][dir].get();
         case FieldType::Bfield_fp :
-            SetDotMask( Bfield_dotMask[lev][dir], "Bfield_fp", lev, dir );
+            ::SetDotMask( Bfield_dotMask[lev][dir], m_fields.get("Bfield_fp", dir, lev), periodicity);
             return Bfield_dotMask[lev][dir].get();
         case FieldType::vector_potential_fp :
-            SetDotMask( Afield_dotMask[lev][dir], "vector_potential_fp", lev, dir );
+            ::SetDotMask( Afield_dotMask[lev][dir], m_fields.get("vector_potential_fp", dir, lev), periodicity);
             return Afield_dotMask[lev][dir].get();
         case FieldType::phi_fp :
-            SetDotMask( phi_dotMask[lev], "phi_fp", lev, 0 );
+            ::SetDotMask( phi_dotMask[lev], m_fields.get("phi_fp", dir, lev), periodicity);
             return phi_dotMask[lev].get();
         default:
             WARPX_ABORT_WITH_MESSAGE("Invalid field type for dotMask");
             return Efield_dotMask[lev][dir].get();
     }
-}
-
-void WarpX::SetDotMask( std::unique_ptr<amrex::iMultiFab>& field_dotMask,
-                        std::string const & field_name, int lev, int dir ) const
-{
-    // Define the dot mask for this field_type needed to properly compute dotProduct()
-    // for field values that have shared locations on different MPI ranks
-    if (field_dotMask != nullptr) { return; }
-
-    ablastr::fields::ConstVectorField const& this_field = m_fields.get_alldirs(field_name,lev);
-    const amrex::BoxArray& this_ba = this_field[dir]->boxArray();
-    const amrex::MultiFab tmp( this_ba, this_field[dir]->DistributionMap(),
-                               1, 0, amrex::MFInfo().SetAlloc(false) );
-    const amrex::Periodicity& period = Geom(lev).periodicity();
-    field_dotMask = tmp.OwnerMask(period);
-
 }

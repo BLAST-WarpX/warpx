@@ -10,6 +10,7 @@
 #include "ChargeOnEB.H"
 #include "ColliderRelevant.H"
 #include "DifferentialLuminosity.H"
+#include "DifferentialLuminosity2D.H"
 #include "FieldEnergy.H"
 #include "FieldMaximum.H"
 #include "FieldMomentum.H"
@@ -58,6 +59,7 @@ MultiReducedDiags::MultiReducedDiags ()
             {"ChargeOnEB",            [](CS s){return std::make_unique<ChargeOnEB>(s);}},
             {"ColliderRelevant",      [](CS s){return std::make_unique<ColliderRelevant>(s);}},
             {"DifferentialLuminosity",[](CS s){return std::make_unique<DifferentialLuminosity>(s);}},
+            {"DifferentialLuminosity2D",[](CS s){return std::make_unique<DifferentialLuminosity2D>(s);}},
             {"ParticleEnergy",        [](CS s){return std::make_unique<ParticleEnergy>(s);}},
             {"ParticleExtrema",       [](CS s){return std::make_unique<ParticleExtrema>(s);}},
             {"ParticleHistogram",     [](CS s){return std::make_unique<ParticleHistogram>(s);}},
@@ -158,6 +160,18 @@ void MultiReducedDiags::WriteToFile (int step)
     // end loop over all reduced diags
 }
 // end void MultiReducedDiags::WriteToFile
+
+// Check if any diagnostics will be done
+bool MultiReducedDiags::DoDiags(int step)
+{
+    bool result = false;
+    for (int i_rd = 0; i_rd < static_cast<int>(m_rd_names.size()); ++i_rd)
+    {
+        result = result || m_multi_rd[i_rd] -> DoDiags(step);
+    }
+    return result;
+}
+// end bool MultiReducedDiags::DoDiags
 
 void MultiReducedDiags::WriteCheckpointData (std::string const & dir)
 {

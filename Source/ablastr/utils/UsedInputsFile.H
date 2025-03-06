@@ -19,9 +19,10 @@ namespace ablastr::utils
      * Only the AMReX IOProcessor writes.
      *
      * @param filename the name of the text file to write
+     * @param verbose print information about the file location to stdout
      */
     void
-    write_used_inputs_file (std::string const & filename);
+    write_used_inputs_file (std::string const & filename, bool verbose=true);
 }
 
 #endif // ABLASTR_USED_INPUTS_FILE_H

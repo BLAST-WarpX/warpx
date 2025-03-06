@@ -92,6 +92,8 @@ LatticeElementFinderDevice::InitLatticeElementFinderDevice (WarpXParIter const& 
                                                             LatticeElementFinder const & h_finder)
 {
 
+    m_initialized = true;
+
     auto& warpx = WarpX::GetInstance();
 
     int const lev = a_pti.GetLevel();
