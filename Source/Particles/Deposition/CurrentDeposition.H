@@ -765,7 +765,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             double const lensq_after  = (x_new - x_old)*(x_new - x_old)
                                       + (y_new - y_old)*(y_new - y_old)
                                       + (z_new - z_old)*(z_new - z_old);
-            double const len_ratio = (lensq_after > 0. ? std::sqrt(lensq_before/lensq_after) : 0.);
+            double const len_ratio = (lensq_after > 0. ? std::sqrt(lensq_before/lensq_after) : 1.);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             double const lensq_before = (x_new - x_old)*(x_new - x_old)
                                       + (z_new - z_old)*(z_new - z_old);
@@ -775,12 +775,12 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                             domain.smallEnd(1) - lo.y, domain.bigEnd(1) - lo.y, is_absorbing[1]);
             double const lensq_after  = (x_new - x_old)*(x_new - x_old)
                                       + (z_new - z_old)*(z_new - z_old);
-            double const len_ratio = (lensq_after > 0. ? std::sqrt(lensq_before/lensq_after) : 0.);
+            double const len_ratio = (lensq_after > 0. ? std::sqrt(lensq_before/lensq_after) : 1.);
 #elif defined(WARPX_DIM_1D_Z)
             double const len_before = (z_new - z_old);
             ParticleUtils::crop_at_boundary(z_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
             double const len_after  = (z_new - z_old);
-            double const len_ratio = (len_after > 0. ? len_before/len_after : 0.);
+            double const len_ratio = (len_after > 0. ? len_before/len_after : 1.);
 #endif
 
             // Check whether the particle is close to the EB at the old and new position
