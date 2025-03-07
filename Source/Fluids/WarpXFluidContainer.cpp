@@ -1595,9 +1595,6 @@ void WarpXFluidContainer::HybridQDSMCUpdateTe (ablastr::fields::MultiFabRegister
                 if( rho(i, j, k) > 0 ){
 
                     amrex::Real ne = rho(i, j, k)/PhysConst::q_e;
-                    //if(ne<n_floor){
-                    //    ne = n_floor;
-                    //}
                     amrex::Real weight = weights(i,j,k);
 
                     if(weight>0 && ne>n_floor){
