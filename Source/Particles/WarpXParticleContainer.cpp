@@ -1352,6 +1352,129 @@ WarpXParticleContainer::GetChargeDensity (int lev, bool local)
     return rho;
 }
 
+/* \brief Calculate Temperature from the particles
+ * \param temperature Full array of temperature
+ * \param lev         Level of box that contains particles
+ */
+void
+WarpXParticleContainer::DepositTemperature (amrex::MultiFab* temperature, const int lev)
+{
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(mass > 0.,
+        "The temperature can not be calculated for a massless species.");
+
+    // Temporary cell-centered, multi-component MultiFab for storing particles sums
+    int const sum_comps = 4;
+    amrex::MultiFab sum_mf(temperature->boxArray(), temperature->DistributionMap(), sum_comps, temperature->nGrowVect());
+    sum_mf.setVal(0., 0, sum_comps, sum_mf.nGrowVect());
+
+    // Calculate the averages in two steps, first the average velocity <u>, then the
+    // average velocity squared <u - <u>>**2. This method is more robust than the
+    // single step using <u**2> - <u>**2 when <u> >> u_rms.
+    ParticleToMesh(*this, sum_mf, lev,
+            [=] AMREX_GPU_DEVICE (const WarpXParticleContainer::SuperParticleType& p,
+                amrex::Array4<amrex::Real> const& sum_array,
+                amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& plo,
+                amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dxi)
+            {
+                // Get position in AMReX convention to calculate corresponding index.
+                const auto [ii, jj, kk] = amrex::getParticleCell(p, plo, dxi).dim3();
+
+                const amrex::ParticleReal w  = p.rdata(PIdx::w);
+                const amrex::ParticleReal ux = p.rdata(PIdx::ux);
+                const amrex::ParticleReal uy = p.rdata(PIdx::uy);
+                const amrex::ParticleReal uz = p.rdata(PIdx::uz);
+                amrex::Gpu::Atomic::AddNoRet(&sum_array(ii, jj, kk, 0), (amrex::Real)(w));
+                amrex::Gpu::Atomic::AddNoRet(&sum_array(ii, jj, kk, 1), (amrex::Real)(w*ux));
+                amrex::Gpu::Atomic::AddNoRet(&sum_array(ii, jj, kk, 2), (amrex::Real)(w*uy));
+                amrex::Gpu::Atomic::AddNoRet(&sum_array(ii, jj, kk, 3), (amrex::Real)(w*uz));
+            });
+
+    // Divide value by number of particles for average
+    for (amrex::MFIter mfi(sum_mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        const amrex::Box& box = mfi.tilebox();
+        amrex::Array4<amrex::Real> const& sum_array = sum_mf.array(mfi);
+        amrex::ParallelFor(box,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    if (sum_array(i,j,k,0) > 0) {
+                        const amrex::Real invsum = 1._rt/sum_array(i,j,k,0);
+                        sum_array(i,j,k,1) *= invsum;
+                        sum_array(i,j,k,2) *= invsum;
+                        sum_array(i,j,k,3) *= invsum;
+                    }
+                });
+    }
+
+    // Calculate the sum of the squares, subtracting the averages
+    // These loops must be written out since ParticleToMesh always zeros out the mf.
+    const auto plo = Geom(lev).ProbLoArray();
+    const auto dxi = Geom(lev).InvCellSizeArray();
+    for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
+    {
+        const long np = pti.numParticles();
+        auto& tile = pti.GetParticleTile();
+        auto ptd = tile.getParticleTileData();
+        amrex::ParticleReal* wp = pti.GetAttribs(PIdx::w).dataPtr();
+        amrex::ParticleReal* uxp = pti.GetAttribs(PIdx::ux).dataPtr();
+        amrex::ParticleReal* uyp = pti.GetAttribs(PIdx::uy).dataPtr();
+        amrex::ParticleReal* uzp = pti.GetAttribs(PIdx::uz).dataPtr();
+
+        amrex::Array4<amrex::Real> const& sum_array = sum_mf.array(pti);
+        amrex::Array4<amrex::Real> const& temp_array = temperature->array(pti);
+
+        amrex::ParallelFor(np,
+            [=] AMREX_GPU_DEVICE (long ip) {
+                // Get position in AMReX convention to calculate corresponding index.
+                const auto p = WarpXParticleContainer::ParticleType(ptd, ip);
+                const auto [ii, jj, kk] = getParticleCell(p, plo, dxi).dim3();
+
+                const amrex::ParticleReal w  = wp[ip];
+                const amrex::ParticleReal ux = uxp[ip] - sum_array(ii, jj, kk, 1);
+                const amrex::ParticleReal uy = uyp[ip] - sum_array(ii, jj, kk, 2);
+                const amrex::ParticleReal uz = uzp[ip] - sum_array(ii, jj, kk, 3);
+                const amrex::Real usq = (amrex::Real)(w*(ux*ux + uy*uy + uz*uz));
+                amrex::Gpu::Atomic::AddNoRet(&temp_array(ii, jj, kk), usq);
+            });
+    }
+
+    // Divide the squares by number of particles for average and calculate the temperature
+    for (amrex::MFIter mfi(sum_mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        const amrex::Box& box = mfi.tilebox();
+        amrex::Array4<amrex::Real> const& sum_array = sum_mf.array(mfi);
+        amrex::Array4<amrex::Real> const& temp_array = temperature->array(mfi);
+        amrex::ParallelFor(box,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                if (sum_array(i,j,k,0) > 0) {
+                    const amrex::Real invsum = 1._rt/sum_array(i,j,k,0);
+                    temp_array(i,j,k) *= mass*invsum/(3._rt*PhysConst::q_e);
+                }
+            });
+    }
+
+}
+
+std::unique_ptr<amrex::MultiFab>
+WarpXParticleContainer::GetTemperature (int lev)
+{
+    auto const& ba = m_gdb->ParticleBoxArray(lev);
+    auto const& dm = m_gdb->DistributionMap(lev);
+
+    // Create cell centered MultiFab with no guard cells
+    int const ncomps = 1;
+    int const ng_temperature = 0;
+    auto temperature = std::make_unique<MultiFab>(ba, dm, ncomps, ng_temperature);
+    temperature->setVal(0., 0, ncomps, temperature->nGrowVect());
+
+    // Thermodynamic temperature is not defined for massless particles
+    if (mass > 0.) {
+        DepositTemperature(temperature.get(), lev);
+    }
+
+    return temperature;
+}
+
 amrex::ParticleReal WarpXParticleContainer::sumParticleWeight(bool local) {
 
     amrex::ParticleReal total_weight = 0.0;
