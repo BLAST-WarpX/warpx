@@ -101,7 +101,7 @@ jobs:
 
   build_3D_sp:
     name: GCC 3D & RZ w/ MPI, single precision
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     if: github.event.pull_request.draft == false
     env:
       CXX: "g++-12"
