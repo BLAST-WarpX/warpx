@@ -16,7 +16,7 @@ concurrency:
 jobs:
   build_nvcc:
     name: NVCC SP
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     if: github.event.pull_request.draft == false
     env:
       CXXFLAGS: "-Werror"
@@ -29,7 +29,7 @@ jobs:
         python-version: '3.x'
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/nvcc.sh 12.6
+        .github/workflows/dependencies/nvcc.sh 11.7
     - name: CCache Cache
       uses: actions/cache@v4
       with:
@@ -97,13 +97,13 @@ jobs:
   # to add new .cpp files
   build_nvcc_gnumake:
     name: NVCC GNU Make
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     if: github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/nvcc.sh 12.6
+        .github/workflows/dependencies/nvcc.sh 11.7
     - name: CCache Cache
       uses: actions/cache@v4
       with:
