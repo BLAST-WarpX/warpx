@@ -14,69 +14,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-# Ref.: https://github.com/rscohn2/oneapi-ci
-# intel-basekit intel-hpckit are too large in size
-  build_icc:
-    name: oneAPI ICC SP&DP
-    runs-on: ubuntu-24.04
-    if: github.event.pull_request.draft == false
-    # For oneAPI, Ninja is slower than the default:
-    #env:
-    #  CMAKE_GENERATOR: Ninja
-    steps:
-    - uses: actions/checkout@v4
-    - name: install dependencies
-      run: |
-        .github/workflows/dependencies/icc.sh
-    - name: CCache Cache
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/ccache
-        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
-        restore-keys: |
-             ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: build WarpX
-      run: |
-        export CCACHE_COMPRESS=1
-        export CCACHE_COMPRESSLEVEL=10
-        export CCACHE_MAXSIZE=200M
-        export CCACHE_DEPEND=1
-        ccache -z
-
-        set +eu
-        source /opt/intel/oneapi/setvars.sh
-        set -eu
-        export CXX=$(which icpc)
-        export CC=$(which icc)
-
-        python3 -m pip install --upgrade pip
-        python3 -m pip install --upgrade build packaging setuptools wheel
-
-        cmake -S . -B build_dp \
-          -DCMAKE_VERBOSE_MAKEFILE=ON \
-          -DpyAMReX_IPO=OFF           \
-          -DWarpX_PYTHON=ON           \
-          -DWarpX_PYTHON_IPO=OFF      \
-          -DWarpX_MPI=OFF             \
-          -DWarpX_OPENPMD=ON          \
-          -DWarpX_openpmd_internal=OFF
-        cmake --build build_dp -j 4
-
-        cmake -S . -B build_sp \
-          -DCMAKE_VERBOSE_MAKEFILE=ON  \
-          -DpyAMReX_IPO=OFF            \
-          -DWarpX_PYTHON=ON            \
-          -DWarpX_PYTHON_IPO=OFF       \
-          -DWarpX_MPI=OFF              \
-          -DWarpX_OPENPMD=ON           \
-          -DWarpX_openpmd_internal=OFF \
-          -DWarpX_PRECISION=SINGLE
-        cmake --build build_sp -j 4
-        cmake --build build_sp --target pip_install
-
-        ccache -s
-        du -hs ~/.cache/ccache
-
   build_icpx:
     name: oneAPI ICX SP
     runs-on: ubuntu-24.04
