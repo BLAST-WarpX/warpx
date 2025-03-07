@@ -88,13 +88,13 @@ if sim.resonant:
 
     t_grid = np.arange(num_steps) * dt * sim.w_ci
     plt.plot(
-        t_grid, np.abs(field_kt[:, 4] / sim.B0), "r", label=fr"m = 4, $kl_i={k[4]:.2f}$"
+        t_grid, np.abs(field_kt[:, 4] / sim.B0), "r", label=rf"m = 4, $kl_i={k[4]:.2f}$"
     )
     plt.plot(
-        t_grid, np.abs(field_kt[:, 5] / sim.B0), "b", label=fr"m = 5, $kl_i={k[5]:.2f}$"
+        t_grid, np.abs(field_kt[:, 5] / sim.B0), "b", label=rf"m = 5, $kl_i={k[5]:.2f}$"
     )
     plt.plot(
-        t_grid, np.abs(field_kt[:, 6] / sim.B0), "k", label=fr"m = 6, $kl_i={k[6]:.2f}$"
+        t_grid, np.abs(field_kt[:, 6] / sim.B0), "k", label=rf"m = 6, $kl_i={k[6]:.2f}$"
     )
 
     # The theoretical growth rates for the 4th, 5th and 6th Fourier modes of
