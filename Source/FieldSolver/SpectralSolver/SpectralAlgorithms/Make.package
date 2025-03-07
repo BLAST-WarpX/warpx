@@ -1,9 +1,9 @@
 CEXE_sources += SpectralBaseAlgorithm.cpp
 CEXE_sources += PsatdJRhomAlgorithmFirstOrder.cpp
-CEXE_sources += PsatdAlgorithmGalilean.cpp
 CEXE_sources += PsatdJRhomAlgorithmSecondOrder.cpp
-CEXE_sources += PsatdAlgorithmPml.cpp
+CEXE_sources += PsatdAlgorithmGalilean.cpp
 CEXE_sources += PsatdAlgorithmComoving.cpp
+CEXE_sources += PsatdAlgorithmPml.cpp
 
 ifeq ($(USE_RZ),TRUE)
   CEXE_sources += SpectralBaseAlgorithmRZ.cpp

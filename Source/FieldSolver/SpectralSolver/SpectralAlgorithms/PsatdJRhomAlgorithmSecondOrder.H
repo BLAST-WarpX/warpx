@@ -4,8 +4,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef WARPX_PSATD_ALGORITHM_JRHOM_H_
-#define WARPX_PSATD_ALGORITHM_JRHOM_H_
+#ifndef WARPX_PSATD_JRHOM_ALGORITHM_SECOND_ORDER_H_
+#define WARPX_PSATD_JRHOM_ALGORITHM_SECOND_ORDER_H_
 
 #include "FieldSolver/SpectralSolver/SpectralFieldData.H"
 #include "FieldSolver/SpectralSolver/SpectralKSpace.H"
@@ -138,4 +138,4 @@ class PsatdJRhomAlgorithmSecondOrder : public SpectralBaseAlgorithm
         RhoInTime m_rho_in_time;
 };
 #endif // WARPX_USE_FFT
-#endif // WARPX_PSATD_ALGORITHM_JRHOM_H_
+#endif // WARPX_PSATD_JRHOM_ALGORITHM_SECOND_ORDER_H_
