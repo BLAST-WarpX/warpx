@@ -1475,6 +1475,78 @@ WarpXParticleContainer::GetTemperature (int lev)
     return temperature;
 }
 
+/* \brief Calculate number density from the particles
+ * \param number_density Full array of number density
+ * \param lev         Level of box that contains particles
+ */
+void
+WarpXParticleContainer::DepositNumberDensity (amrex::MultiFab* number_density, const int lev)
+{
+
+    // Calculate the number density
+    ParticleToMesh(*this, *number_density, lev,
+            [=] AMREX_GPU_DEVICE (const WarpXParticleContainer::SuperParticleType& p,
+                amrex::Array4<amrex::Real> const& num_array,
+                amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& plo,
+                amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dxi)
+            {
+                // Get position in AMReX convention to calculate corresponding index.
+                const auto [ii, jj, kk] = amrex::getParticleCell(p, plo, dxi).dim3();
+                const amrex::ParticleReal w = p.rdata(PIdx::w);
+                amrex::Gpu::Atomic::AddNoRet(&num_array(ii, jj, kk), (amrex::Real)(w));
+            });
+
+    auto const dV = AMREX_D_TERM(Geom(lev).CellSize(0), *Geom(lev).CellSize(1), *Geom(lev).CellSize(2));
+
+    // Divide value by the volume to get the density
+    for (amrex::MFIter mfi(*number_density, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        const amrex::Box& box = mfi.tilebox();
+
+#if defined WARPX_DIM_RZ
+        int const box_lo_r = box.smallEnd(0);
+        amrex::XDim3 const xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+        amrex::Real const rmin = xyzmin.x;
+#endif
+
+        auto volume_factor = [=] AMREX_GPU_DEVICE(int i) noexcept {
+#if defined WARPX_DIM_RZ
+            // Return the radial factor for the volume element, dV
+            amrex::Real const r = rmin + (i - box_lo_r)*dr;
+            // This is (pi*(r+dr)**2 - pi*r**2)/dr
+            return MathConst::pi*(2.0_rt*r + dr);
+#else
+            // No factor is needed for Cartesian
+            amrex::ignore_unused(i);
+            return 1._prt;
+#endif
+            };
+
+        amrex::Array4<amrex::Real> const& num_array = number_density->array(mfi);
+        amrex::ParallelFor(box,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                num_array(i,j,k) /= dV*volume_factor(i);
+            });
+    }
+
+}
+
+std::unique_ptr<amrex::MultiFab>
+WarpXParticleContainer::GetNumberDensity (int lev)
+{
+    auto const& ba = m_gdb->ParticleBoxArray(lev);
+    auto const& dm = m_gdb->DistributionMap(lev);
+
+    // Create cell centered MultiFab with no guard cells
+    int const ncomps = 1;
+    int const ng = 0;
+    auto number_density = std::make_unique<MultiFab>(ba, dm, ncomps, ng);
+    number_density->setVal(0., 0, ncomps, number_density->nGrowVect());
+    DepositTemperature(number_density.get(), lev);
+
+    return number_density;
+}
+
 amrex::ParticleReal WarpXParticleContainer::sumParticleWeight(bool local) {
 
     amrex::ParticleReal total_weight = 0.0;

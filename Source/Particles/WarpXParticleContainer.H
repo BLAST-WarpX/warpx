@@ -326,6 +326,9 @@ public:
     void DepositTemperature (amrex::MultiFab* temperature, const int lev);
     std::unique_ptr<amrex::MultiFab> GetTemperature (int lev);
 
+    void DepositNumberDensity (amrex::MultiFab* number_density, const int lev);
+    std::unique_ptr<amrex::MultiFab> GetNumberDensity (int lev);
+
     // If particles start outside of the domain, ContinuousInjection
     // makes sure that they are initialized when they enter the domain, and
     // NOT before. Virtual function, overriden by derived classes.
