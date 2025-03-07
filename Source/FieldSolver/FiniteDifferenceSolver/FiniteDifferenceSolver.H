@@ -336,6 +336,14 @@ class FiniteDifferenceSolver
             int lev
         );
 
+        template<typename T_Algo>
+        void ComputeCurlASpherical (
+            ablastr::fields::VectorField& Bfield,
+            ablastr::fields::VectorField const& Afield,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_B,
+            int lev
+        );
+
 #else
         template< typename T_Algo >
         void EvolveBCartesian (
