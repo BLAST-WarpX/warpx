@@ -1680,7 +1680,7 @@ void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiF
 
                     // remove this. Control on Te is set in eta() expression defined by the user.
                     // unless this is necessary to avoid Te blowing up or m=4 amplification
-                    if(Te_val<Te0_K){ 
+                    if(Te_val<Te0_K){
                         Te_val = Te0_K;
                     }
 
