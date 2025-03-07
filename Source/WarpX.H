@@ -1656,16 +1656,6 @@ private:
     void PSATDBackwardTransformG ();
 
     /**
-     * \brief Correct current in Fourier space so that the continuity equation is satisfied
-     */
-    void PSATDCurrentCorrection ();
-
-    /**
-     * \brief Vay deposition in Fourier space (https://doi.org/10.1016/j.jcp.2013.03.010)
-     */
-    void PSATDVayDeposition ();
-
-    /**
      * \brief Update all necessary fields in spectral space
      */
     void PSATDPushSpectralFields ();
