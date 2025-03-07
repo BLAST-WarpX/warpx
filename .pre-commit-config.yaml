@@ -68,7 +68,7 @@ repos:
   rev: v19.1.7
   hooks:
   - id: clang-format
-    files: '^Source/main.cpp'
+    files: '(Source/main.cpp|Source/WarpX.H|Source/WarpX.cpp)'
 
 # Python: Ruff linter & formatter
 #   https://docs.astral.sh/ruff/
