@@ -675,16 +675,6 @@ public:
     void UpdateAuxilaryDataStagToNodal ();
     void UpdateAuxilaryDataSameType ();
 
-    /**
-     * \brief This function is called if \c warpx.do_current_centering = 1 and
-     * it centers the currents from a nodal grid to a staggered grid (Yee) using
-     * finite-order interpolation based on the Fornberg coefficients.
-     *
-     * \param[in,out] dst destination \c MultiFab where the results of the finite-order centering are stored
-     * \param[in] src source \c MultiFab that contains the values of the nodal current to be centered
-     */
-    void UpdateCurrentNodalToStag (amrex::MultiFab& dst, amrex::MultiFab const& src);
-
     // Fill boundary cells including coarse/fine boundaries
     void FillBoundaryB   (amrex::IntVect ng, std::optional<bool> nodal_sync = std::nullopt);
     void FillBoundaryE   (amrex::IntVect ng, std::optional<bool> nodal_sync = std::nullopt);
@@ -1225,26 +1215,6 @@ private:
         return gather_buffer_masks[lev].get();
     }
 
-    /**
-     * \brief Allocates and initializes the stencil coefficients used for the finite-order centering
-     * of fields and currents, and stores them in the given device vectors.
-     *
-     * \param[in,out] device_centering_stencil_coeffs_x device vector where the stencil coefficients along x will be stored
-     * \param[in,out] device_centering_stencil_coeffs_y device vector where the stencil coefficients along y will be stored
-     * \param[in,out] device_centering_stencil_coeffs_z device vector where the stencil coefficients along z will be stored
-     * \param[in] centering_nox order of the finite-order centering along x
-     * \param[in] centering_noy order of the finite-order centering along y
-     * \param[in] centering_noz order of the finite-order centering along z
-     * \param[in] a_grid_type type of grid (collocated or not)
-     */
-    void AllocateCenteringCoefficients (amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_x,
-                                        amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_y,
-                                        amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_z,
-                                        int centering_nox,
-                                        int centering_noy,
-                                        int centering_noz,
-                                        ablastr::utils::enums::GridType a_grid_type);
-
     void AllocLevelMFs (int lev, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm,
                         const amrex::IntVect& ngEB, amrex::IntVect& ngJ,
                         const amrex::IntVect& ngRho, const amrex::IntVect& ngF,
@@ -1460,6 +1430,8 @@ private:
     amrex::VisMF::Header::Version plotfile_headerversion  = amrex::VisMF::Header::Version_v1;
     amrex::VisMF::Header::Version slice_plotfile_headerversion  = amrex::VisMF::Header::Version_v1;
 
+    bool synchronize_velocity_for_diagnostics = false;
+
     bool use_single_read = true;
     bool use_single_write = true;
     int mffile_nstreams = 4;
@@ -1652,16 +1624,6 @@ private:
      * \brief Backward FFT of G on all mesh refinement levels
      */
     void PSATDBackwardTransformG ();
-
-    /**
-     * \brief Correct current in Fourier space so that the continuity equation is satisfied
-     */
-    void PSATDCurrentCorrection ();
-
-    /**
-     * \brief Vay deposition in Fourier space (https://doi.org/10.1016/j.jcp.2013.03.010)
-     */
-    void PSATDVayDeposition ();
 
     /**
      * \brief Update all necessary fields in spectral space

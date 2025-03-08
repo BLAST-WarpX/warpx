@@ -53,6 +53,69 @@
 using namespace amrex;
 using warpx::fields::FieldType;
 
+namespace
+{
+    /**
+     * \brief This function is called if \c warpx.do_current_centering = 1 and
+     * it centers the currents from a nodal grid to a staggered grid (Yee) using
+     * finite-order interpolation based on the Fornberg coefficients.
+     *
+     * \param[in,out] dst destination \c MultiFab where the results of the finite-order centering are stored
+     * \param[in] src source \c MultiFab that contains the values of the nodal current to be centered
+     * \param[in] cc_nox order of finite-order centering of currents, along x
+     * \param[in] cc_noy order of finite-order centering of currents, along y
+     * \param[in] cc_noz order of finite-order centering of currents, along z
+     * \param[in] device_current_centering_stencil_coeffs_x stencil coefficients for finite-order centering of currents, along x
+     * \param[in] device_current_centering_stencil_coeffs_y stencil coefficients for finite-order centering of currents, along y
+     * \param[in] device_current_centering_stencil_coeffs_z stencil coefficients for finite-order centering of currents, along z
+     */
+    void UpdateCurrentNodalToStag (
+        amrex::MultiFab& dst, const amrex::MultiFab& src,
+        const int cc_nox, const int cc_noy, const int cc_noz,
+        const amrex::Gpu::DeviceVector<amrex::Real>& device_current_centering_stencil_coeffs_x,
+        const amrex::Gpu::DeviceVector<amrex::Real>& device_current_centering_stencil_coeffs_y,
+        const amrex::Gpu::DeviceVector<amrex::Real>& device_current_centering_stencil_coeffs_z)
+    {
+        // If source and destination MultiFabs have the same index type, a simple copy is enough
+        // (for example, this happens with the current along y in 2D, which is always fully nodal)
+        if (dst.ixType() == src.ixType())
+        {
+            amrex::MultiFab::Copy(dst, src, 0, 0, dst.nComp(), dst.nGrowVect());
+            return;
+        }
+
+        amrex::IntVect const& dst_stag = dst.ixType().toIntVect();
+
+        // Source MultiFab always has nodal index type when this function is called
+        amrex::IntVect const& src_stag = amrex::IntVect::TheNodeVector();
+
+#ifdef AMREX_USE_OMP
+    #pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi(dst, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            // Loop over full box including ghost cells
+            // (input arrays will be padded with zeros beyond ghost cells
+            // for out-of-bound accesses due to large-stencil operations)
+            const Box bx = mfi.growntilebox();
+
+            amrex::Array4<amrex::Real const> const& src_arr = src.const_array(mfi);
+            amrex::Array4<amrex::Real>       const& dst_arr = dst.array(mfi);
+
+            // Device vectors of stencil coefficients used for finite-order centering of currents
+            amrex::Real const * stencil_coeffs_x = device_current_centering_stencil_coeffs_x.data();
+            amrex::Real const * stencil_coeffs_y = device_current_centering_stencil_coeffs_y.data();
+            amrex::Real const * stencil_coeffs_z = device_current_centering_stencil_coeffs_z.data();
+
+            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int j, int k, int l) noexcept
+            {
+                warpx_interp(j, k, l, dst_arr, src_arr, dst_stag, src_stag, cc_nox, cc_noy, cc_noz,
+                             stencil_coeffs_x, stencil_coeffs_y, stencil_coeffs_z);
+            });
+        }
+    }
+}
+
 void
 WarpX::UpdateAuxilaryData ()
 {
@@ -594,53 +657,6 @@ WarpX::UpdateAuxilaryDataSameType ()
     }
 }
 
-void WarpX::UpdateCurrentNodalToStag (amrex::MultiFab& dst, amrex::MultiFab const& src)
-{
-    // If source and destination MultiFabs have the same index type, a simple copy is enough
-    // (for example, this happens with the current along y in 2D, which is always fully nodal)
-    if (dst.ixType() == src.ixType())
-    {
-        amrex::MultiFab::Copy(dst, src, 0, 0, dst.nComp(), dst.nGrowVect());
-        return;
-    }
-
-    amrex::IntVect const& dst_stag = dst.ixType().toIntVect();
-
-    // Source MultiFab always has nodal index type when this function is called
-    amrex::IntVect const& src_stag = amrex::IntVect::TheNodeVector();
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (Gpu::notInLaunchRegion())
-#endif
-
-    for (MFIter mfi(dst, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-    {
-        // Loop over full box including ghost cells
-        // (input arrays will be padded with zeros beyond ghost cells
-        // for out-of-bound accesses due to large-stencil operations)
-        const Box bx = mfi.growntilebox();
-
-        amrex::Array4<amrex::Real const> const& src_arr = src.const_array(mfi);
-        amrex::Array4<amrex::Real>       const& dst_arr = dst.array(mfi);
-
-        // Order of finite-order centering of currents
-        const int cc_nox = WarpX::current_centering_nox;
-        const int cc_noy = WarpX::current_centering_noy;
-        const int cc_noz = WarpX::current_centering_noz;
-
-        // Device vectors of stencil coefficients used for finite-order centering of currents
-        amrex::Real const * stencil_coeffs_x = WarpX::device_current_centering_stencil_coeffs_x.data();
-        amrex::Real const * stencil_coeffs_y = WarpX::device_current_centering_stencil_coeffs_y.data();
-        amrex::Real const * stencil_coeffs_z = WarpX::device_current_centering_stencil_coeffs_z.data();
-
-        amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int j, int k, int l) noexcept
-        {
-            warpx_interp(j, k, l, dst_arr, src_arr, dst_stag, src_stag, cc_nox, cc_noy, cc_noz,
-                         stencil_coeffs_x, stencil_coeffs_y, stencil_coeffs_z);
-        });
-    }
-}
-
 void
 WarpX::FillBoundaryB (IntVect ng, std::optional<bool> nodal_sync)
 {
@@ -1094,9 +1110,15 @@ WarpX::SyncCurrent (const std::string& current_fp_string)
                                          "warpx.do_current_centering=1 not supported with more than one fine levels");
         for (int lev = 0; lev <= finest_level; lev++)
         {
-            WarpX::UpdateCurrentNodalToStag(*J_fp[lev][Direction{0}], *J_fp_nodal[lev][Direction{0}]);
-            WarpX::UpdateCurrentNodalToStag(*J_fp[lev][Direction{1}], *J_fp_nodal[lev][Direction{1}]);
-            WarpX::UpdateCurrentNodalToStag(*J_fp[lev][Direction{2}], *J_fp_nodal[lev][Direction{2}]);
+            constexpr auto all_dirs = std::array{Direction{0}, Direction{1}, Direction{2}};
+            for (const auto& dir : all_dirs){
+                ::UpdateCurrentNodalToStag(
+                    *J_fp[lev][dir], *J_fp_nodal[lev][dir],
+                    current_centering_nox, current_centering_noy, current_centering_noz,
+                    device_current_centering_stencil_coeffs_x,
+                    device_current_centering_stencil_coeffs_y,
+                    device_current_centering_stencil_coeffs_z);
+            }
         }
     }
 
