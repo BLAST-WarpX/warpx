@@ -48,8 +48,8 @@ class PsatdJRhomAlgorithmSecondOrder : public SpectralBaseAlgorithm
          * \param[in] time_averaging whether to use time averaging for large time steps
          * \param[in] dive_cleaning Update F as part of the field update, so that errors in divE=rho propagate away at the speed of light
          * \param[in] divb_cleaning Update G as part of the field update, so that errors in divB=0 propagate away at the speed of light
-         * \param[in] J_in_time time dependency of J within one time step
-         * \param[in] rho_in_time time dependency of rho within one time step
+         * \param[in] time_dependency_J time dependency of J within one time step
+         * \param[in] time_dependency_rho time dependency of rho within one time step
          */
         PsatdJRhomAlgorithmSecondOrder (
             const SpectralKSpace& spectral_kspace,
@@ -64,8 +64,8 @@ class PsatdJRhomAlgorithmSecondOrder : public SpectralBaseAlgorithm
             bool time_averaging,
             bool dive_cleaning,
             bool divb_cleaning,
-            JInTime J_in_time,
-            RhoInTime rho_in_time
+            TimeDependencyJ time_dependency_J,
+            TimeDependencyRho time_dependency_rho
         );
 
         /**
@@ -134,8 +134,8 @@ class PsatdJRhomAlgorithmSecondOrder : public SpectralBaseAlgorithm
         bool m_time_averaging;
         bool m_dive_cleaning;
         bool m_divb_cleaning;
-        JInTime m_J_in_time;
-        RhoInTime m_rho_in_time;
+        TimeDependencyJ m_time_dependency_J;
+        TimeDependencyRho m_time_dependency_rho;
 };
 #endif // WARPX_USE_FFT
 #endif // WARPX_PSATD_JRHOM_ALGORITHM_SECOND_ORDER_H_

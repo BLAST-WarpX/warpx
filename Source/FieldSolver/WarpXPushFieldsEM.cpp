@@ -325,9 +325,9 @@ void WarpX::PSATDForwardTransformJ (
     {
         Idx = spectral_solver_fp[lev]->m_spectral_index;
 
-        idx_jx = (J_in_time != JInTime::Constant) ? static_cast<int>(Idx.Jx_new) : static_cast<int>(Idx.Jx_mid);
-        idx_jy = (J_in_time != JInTime::Constant) ? static_cast<int>(Idx.Jy_new) : static_cast<int>(Idx.Jy_mid);
-        idx_jz = (J_in_time != JInTime::Constant) ? static_cast<int>(Idx.Jz_new) : static_cast<int>(Idx.Jz_mid);
+        idx_jx = (time_dependency_J != TimeDependencyJ::Constant) ? static_cast<int>(Idx.Jx_new) : static_cast<int>(Idx.Jx_mid);
+        idx_jy = (time_dependency_J != TimeDependencyJ::Constant) ? static_cast<int>(Idx.Jy_new) : static_cast<int>(Idx.Jy_mid);
+        idx_jz = (time_dependency_J != TimeDependencyJ::Constant) ? static_cast<int>(Idx.Jz_new) : static_cast<int>(Idx.Jz_mid);
 
         if (m_fields.has_vector(J_fp_string, lev)) {
             ablastr::fields::VectorField const J_fp = m_fields.get_alldirs(J_fp_string, lev);
@@ -338,9 +338,9 @@ void WarpX::PSATDForwardTransformJ (
         {
             Idx = spectral_solver_cp[lev]->m_spectral_index;
 
-            idx_jx = (J_in_time != JInTime::Constant) ? static_cast<int>(Idx.Jx_new) : static_cast<int>(Idx.Jx_mid);
-            idx_jy = (J_in_time != JInTime::Constant) ? static_cast<int>(Idx.Jy_new) : static_cast<int>(Idx.Jy_mid);
-            idx_jz = (J_in_time != JInTime::Constant) ? static_cast<int>(Idx.Jz_new) : static_cast<int>(Idx.Jz_mid);
+            idx_jx = (time_dependency_J != TimeDependencyJ::Constant) ? static_cast<int>(Idx.Jx_new) : static_cast<int>(Idx.Jx_mid);
+            idx_jy = (time_dependency_J != TimeDependencyJ::Constant) ? static_cast<int>(Idx.Jy_new) : static_cast<int>(Idx.Jy_mid);
+            idx_jz = (time_dependency_J != TimeDependencyJ::Constant) ? static_cast<int>(Idx.Jz_new) : static_cast<int>(Idx.Jz_mid);
 
             if (m_fields.has_vector(J_cp_string, lev)) {
                 ablastr::fields::VectorField const J_cp =  m_fields.get_alldirs(J_cp_string, lev);
@@ -357,9 +357,9 @@ void WarpX::PSATDForwardTransformJ (
         {
             Idx = spectral_solver_fp[lev]->m_spectral_index;
 
-            idx_jx = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jx_new) : static_cast<int>(Idx.Jx_mid);
-            idx_jy = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jy_new) : static_cast<int>(Idx.Jy_mid);
-            idx_jz = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jz_new) : static_cast<int>(Idx.Jz_mid);
+            idx_jx = (time_dependency_J == TimeDependencyJ::Linear) ? static_cast<int>(Idx.Jx_new) : static_cast<int>(Idx.Jx_mid);
+            idx_jy = (time_dependency_J == TimeDependencyJ::Linear) ? static_cast<int>(Idx.Jy_new) : static_cast<int>(Idx.Jy_mid);
+            idx_jz = (time_dependency_J == TimeDependencyJ::Linear) ? static_cast<int>(Idx.Jz_new) : static_cast<int>(Idx.Jz_mid);
 
             spectral_solver_fp[lev]->ApplyFilter(lev, idx_jx, idx_jy, idx_jz);
 
@@ -367,9 +367,9 @@ void WarpX::PSATDForwardTransformJ (
             {
                 Idx = spectral_solver_cp[lev]->m_spectral_index;
 
-                idx_jx = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jx_new) : static_cast<int>(Idx.Jx_mid);
-                idx_jy = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jy_new) : static_cast<int>(Idx.Jy_mid);
-                idx_jz = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jz_new) : static_cast<int>(Idx.Jz_mid);
+                idx_jx = (time_dependency_J == TimeDependencyJ::Linear) ? static_cast<int>(Idx.Jx_new) : static_cast<int>(Idx.Jx_mid);
+                idx_jy = (time_dependency_J == TimeDependencyJ::Linear) ? static_cast<int>(Idx.Jy_new) : static_cast<int>(Idx.Jy_mid);
+                idx_jz = (time_dependency_J == TimeDependencyJ::Linear) ? static_cast<int>(Idx.Jz_new) : static_cast<int>(Idx.Jz_mid);
 
                 spectral_solver_cp[lev]->ApplyFilter(lev, idx_jx, idx_jy, idx_jz);
             }

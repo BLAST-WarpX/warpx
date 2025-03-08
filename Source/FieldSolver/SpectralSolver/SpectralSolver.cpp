@@ -38,8 +38,8 @@ SpectralSolver::SpectralSolver (
                 const bool update_with_rho,
                 const bool fft_do_time_averaging,
                 const PSATDSolutionType psatd_solution_type,
-                const JInTime J_in_time,
-                const RhoInTime rho_in_time,
+                const TimeDependencyJ time_dependency_J,
+                const TimeDependencyRho time_dependency_rho,
                 const bool dive_cleaning,
                 const bool divb_cleaning)
     : m_dt(dt)
@@ -52,7 +52,7 @@ SpectralSolver::SpectralSolver (
     const SpectralKSpace k_space= SpectralKSpace(realspace_ba, dm, dx);
 
     m_spectral_index = SpectralFieldIndex(
-        update_with_rho, fft_do_time_averaging, J_in_time, rho_in_time,
+        update_with_rho, fft_do_time_averaging, time_dependency_J, time_dependency_rho,
         dive_cleaning, divb_cleaning, pml);
 
     // - Select the algorithm depending on the input parameters
@@ -95,13 +95,13 @@ SpectralSolver::SpectralSolver (
 
             algorithm = std::make_unique<PsatdJRhomAlgorithmFirstOrder>(
                 k_space, dm, m_spectral_index, norder_x, norder_y, norder_z, grid_type,
-                dt, div_cleaning, J_in_time, rho_in_time);
+                dt, div_cleaning, time_dependency_J, time_dependency_rho);
         }
         else if (psatd_solution_type == PSATDSolutionType::SecondOrder)
         {
             algorithm = std::make_unique<PsatdJRhomAlgorithmSecondOrder>(
               k_space, dm, m_spectral_index, norder_x, norder_y, norder_z, grid_type,
-              dt, update_with_rho, fft_do_time_averaging, dive_cleaning, divb_cleaning, J_in_time, rho_in_time);
+              dt, update_with_rho, fft_do_time_averaging, dive_cleaning, divb_cleaning, time_dependency_J, time_dependency_rho);
         }
     }
 

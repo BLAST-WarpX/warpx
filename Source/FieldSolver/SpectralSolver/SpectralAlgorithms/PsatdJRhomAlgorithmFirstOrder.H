@@ -42,8 +42,8 @@ class PsatdJRhomAlgorithmFirstOrder : public SpectralBaseAlgorithm
          * \param[in] grid_type type of grid (collocated or not)
          * \param[in] dt time step of the simulation
          * \param[in] div_cleaning whether to use divergence correction for both E and B (thus, F and G)
-         * \param[in] J_in_time time dependency of J (currently supported: constant, linear)
-         * \param[in] rho_in_time time dependency of rho (currently supported: constant, linear)
+         * \param[in] time_dependency_J time dependency of J (currently supported: constant, linear)
+         * \param[in] time_dependency_rho time dependency of rho (currently supported: constant, linear)
          */
         PsatdJRhomAlgorithmFirstOrder (
             const SpectralKSpace& spectral_kspace,
@@ -55,8 +55,8 @@ class PsatdJRhomAlgorithmFirstOrder : public SpectralBaseAlgorithm
             ablastr::utils::enums::GridType grid_type,
             amrex::Real dt,
             bool div_cleaning,
-            JInTime J_in_time,
-            RhoInTime rho_in_time);
+            TimeDependencyJ time_dependency_J,
+            TimeDependencyRho time_dependency_rho);
 
         /**
          * \brief Updates E, B, F, and G fields in spectral space,
@@ -93,8 +93,8 @@ class PsatdJRhomAlgorithmFirstOrder : public SpectralBaseAlgorithm
         // Other member variables
         amrex::Real m_dt;
         bool m_div_cleaning;
-        JInTime m_J_in_time;
-        RhoInTime m_rho_in_time;
+        TimeDependencyJ m_time_dependency_J;
+        TimeDependencyRho m_time_dependency_rho;
 };
 #endif // WARPX_USE_FFT
 #endif // WARPX_PSATD_JRHOM_ALGORITHM_FIRST_ORDER_H_
