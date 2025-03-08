@@ -94,7 +94,7 @@ void FiniteDifferenceSolver::EvolveE (
 
     } else if (m_fdtd_algo == ElectromagneticSolverAlgo::CustomCoef) {
 
-        EvolveECartesian <CartesianCustomCoefAlgorithm> ( Efield, Bfield, Jfield, edge_lengths, Ffield, lev, dt );
+        EvolveECartesian <CartesianCustomCoefAlgorithm> ( Efield, Bfield, Jfield, eb_update_E, Ffield, lev, dt );
 
 #endif
     } else {
