@@ -1547,6 +1547,61 @@ WarpXParticleContainer::GetNumberDensity (int lev)
     return number_density;
 }
 
+std::unique_ptr<amrex::MultiFab>
+WarpXParticleContainer::GetDebyeLength (int lev)
+{
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(mass*charge != 0.,
+        "The Debye length can not be calculated for a massless or neutral species.");
+
+    std::unique_ptr<amrex::MultiFab> temperature = GetTemperature(lev);
+    std::unique_ptr<amrex::MultiFab> number_density = GetNumberDensity(lev);
+
+    amrex::BoxArray const & ba = temperature->boxArray();
+    amrex::DistributionMapping const & dm = temperature->DistributionMap();
+    int const ncomps = 1;
+    int const ng = 0;
+    auto debye_length = std::make_unique<amrex::MultiFab>(ba, dm, ncomps, ng);
+
+    amrex::Real const rmass = (amrex::Real)(mass);
+    amrex::Real const rcharge = (amrex::Real)(charge);
+    amrex::Real const Aconst = PhysConst::ep0/(rcharge*rcharge);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(*debye_length, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        const amrex::Box& box = mfi.tilebox();
+
+        amrex::Array4<amrex::Real> const& num_array = number_density->array(mfi);
+        amrex::Array4<amrex::Real> const& temp_array = temperature->array(mfi);
+        amrex::Array4<amrex::Real> const& debye_array = debye_length->array(mfi);
+
+        amrex::ParallelFor(box,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+
+                amrex::Real const N = num_array(i,j,k);
+                amrex::Real const T = temp_array(i,j,k);
+                amrex::Real const R = 1.0_rt/std::cbrt(4.0_rt/3.0_rt*MathConst::pi*N); // atomic spacing [m]
+
+                // compute the fermi energy. Should only be used for fermions such as
+                // electrons and ions with an odd number of nucleons, but its easiest just
+                // to include it for all charged species and it is insignificant for ions.
+                // EF_Joules = hbar^2/(2*mass)*(3*pi^2*n)^(2/3)
+                amrex::Real const EF = PhysConst::hbar*PhysConst::hbar/(2.0_rt*rmass)*std::pow(3.0_rt*MathConst::pi*MathConst::pi*N, 2.0_rt/3.0_rt);
+
+                // Debye length squared
+                amrex::Real const LDe_sq = std::max(Aconst*(T + 2.0_rt/3.0_rt*EF)/N, R*R); // [m^2]
+
+                debye_array(i,j,k) = std::sqrt(LDe_sq);
+
+            });
+    }
+
+    return debye_length;
+}
+
 amrex::ParticleReal WarpXParticleContainer::sumParticleWeight(bool local) {
 
     amrex::ParticleReal total_weight = 0.0;

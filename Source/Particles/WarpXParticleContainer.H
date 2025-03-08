@@ -329,6 +329,8 @@ public:
     void DepositNumberDensity (amrex::MultiFab* number_density, const int lev);
     std::unique_ptr<amrex::MultiFab> GetNumberDensity (int lev);
 
+    std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);
+
     // If particles start outside of the domain, ContinuousInjection
     // makes sure that they are initialized when they enter the domain, and
     // NOT before. Virtual function, overriden by derived classes.
