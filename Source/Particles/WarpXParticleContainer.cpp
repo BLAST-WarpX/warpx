@@ -1371,6 +1371,9 @@ WarpXParticleContainer::DepositTemperature (amrex::MultiFab* temperature, const 
     // Calculate the averages in two steps, first the average velocity <u>, then the
     // average velocity squared <u - <u>>**2. This method is more robust than the
     // single step using <u**2> - <u>**2 when <u> >> u_rms.
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
     ParticleToMesh(*this, sum_mf, lev,
             [=] AMREX_GPU_DEVICE (const WarpXParticleContainer::SuperParticleType& p,
                 amrex::Array4<amrex::Real> const& sum_array,
@@ -1391,6 +1394,9 @@ WarpXParticleContainer::DepositTemperature (amrex::MultiFab* temperature, const 
             });
 
     // Divide value by number of particles for average
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
     for (amrex::MFIter mfi(sum_mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
         const amrex::Box& box = mfi.tilebox();
@@ -1410,6 +1416,9 @@ WarpXParticleContainer::DepositTemperature (amrex::MultiFab* temperature, const 
     // These loops must be written out since ParticleToMesh always zeros out the mf.
     const auto plo = Geom(lev).ProbLoArray();
     const auto dxi = Geom(lev).InvCellSizeArray();
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
     for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
     {
         const long np = pti.numParticles();
@@ -1439,6 +1448,9 @@ WarpXParticleContainer::DepositTemperature (amrex::MultiFab* temperature, const 
     }
 
     // Divide the squares by number of particles for average and calculate the temperature
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
     for (amrex::MFIter mfi(sum_mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
         const amrex::Box& box = mfi.tilebox();
@@ -1463,8 +1475,8 @@ WarpXParticleContainer::GetTemperature (int lev)
 
     // Create cell centered MultiFab with no guard cells
     int const ncomps = 1;
-    int const ng_temperature = 0;
-    auto temperature = std::make_unique<MultiFab>(ba, dm, ncomps, ng_temperature);
+    int const ng = 0;
+    auto temperature = std::make_unique<amrex::MultiFab>(ba, dm, ncomps, ng);
     temperature->setVal(0., 0, ncomps, temperature->nGrowVect());
 
     // Thermodynamic temperature is not defined for massless particles
@@ -1484,6 +1496,9 @@ WarpXParticleContainer::DepositNumberDensity (amrex::MultiFab* number_density, c
 {
 
     // Calculate the number density
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
     ParticleToMesh(*this, *number_density, lev,
             [=] AMREX_GPU_DEVICE (const WarpXParticleContainer::SuperParticleType& p,
                 amrex::Array4<amrex::Real> const& num_array,
@@ -1499,6 +1514,9 @@ WarpXParticleContainer::DepositNumberDensity (amrex::MultiFab* number_density, c
     auto const dV = AMREX_D_TERM(Geom(lev).CellSize(0), *Geom(lev).CellSize(1), *Geom(lev).CellSize(2));
 
     // Divide value by the volume to get the density
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
     for (amrex::MFIter mfi(*number_density, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
         const amrex::Box& box = mfi.tilebox();
@@ -1540,7 +1558,7 @@ WarpXParticleContainer::GetNumberDensity (int lev)
     // Create cell centered MultiFab with no guard cells
     int const ncomps = 1;
     int const ng = 0;
-    auto number_density = std::make_unique<MultiFab>(ba, dm, ncomps, ng);
+    auto number_density = std::make_unique<amrex::MultiFab>(ba, dm, ncomps, ng);
     number_density->setVal(0., 0, ncomps, number_density->nGrowVect());
     DepositTemperature(number_density.get(), lev);
 
