@@ -322,6 +322,7 @@ class PlasmaCylinderCompression(object):
                 n0_p=self.n0,
                 B0=self.B0,
                 T_i=self.T_i,
+                do_temperature_deposition=True,
             ),
         )
         simulation.add_species(

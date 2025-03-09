@@ -1,0 +1,483 @@
+/* Copyright 2025 The WarpX Community
+ *
+ * This file is part of WarpX.
+ *
+ * Authors: S. Eric Clark (Helion Energy)
+ *
+ * License: BSD-3-Clause-LBNL
+ */
+
+#ifndef WARPX_TEMPERATUREDEPOSITION_H_
+#define WARPX_TEMPERATUREDEPOSITION_H_
+
+#include "Particles/Deposition/VarianceAccumulationBuffer.H"
+#include "Particles/Deposition/SharedDepositionUtils.H"
+#include "ablastr/parallelization/KernelTimer.H"
+#include "Particles/Pusher/GetAndSetPosition.H"
+#include "Particles/ShapeFactors.H"
+#include "Utils/TextMsg.H"
+#include "Utils/WarpXAlgorithmSelection.H"
+#include "Utils/WarpXConst.H"
+#ifdef WARPX_DIM_RZ
+#   include "Utils/WarpX_Complex.H"
+#endif
+
+#include "WarpX.H" // todo: remove include and pass globals as args
+
+#include <AMReX.H>
+#include <AMReX_Arena.H>
+#include <AMReX_Array4.H>
+#include <AMReX_Dim3.H>
+#include <AMReX_REAL.H>
+
+namespace warpx::particles::deposition {
+
+/**
+ * \brief Kernel for the direct current deposition for thread thread_num
+ * \tparam depos_order deposition order
+ * \param xp, yp, zp    The particle positions.
+ * \param wq            The charge of the macroparticle
+ * \param vx,vy,vz      The particle velocities
+ * \param varx_arr,vary_arr,varz_arr Array4 of velocity variance, either full array or tile.
+ * \param wx_arr,wy_arr,wz_arr Array4 of weight sums, either full array or tile.
+ * \param w2x_arr,w2y_arr,w2z_arr Array4 of weight**2 sums, either full array or tile.
+ * \param varx_type,vary_type,varz_type The grid types along each direction, either NODE or CELL
+ * \param relative_time Time at which to deposit J, relative to the time of the
+ *                      current positions of the particles. When different than 0,
+ *                      the particle position will be temporarily modified to match
+ *                      the time of the deposition.
+ * \param dinv          3D cell size inverse
+ * \param xyzmin        The lower bounds of the domain
+ * \param lo            Index lower bounds of domain.
+ * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
+ */
+template <int depos_order>
+AMREX_GPU_HOST_DEVICE AMREX_INLINE
+void doVarianceDepositionShapeNKernel(
+    [[maybe_unused]] const amrex::ParticleReal xp,
+    [[maybe_unused]] const amrex::ParticleReal yp,
+    [[maybe_unused]] const amrex::ParticleReal zp,
+    const amrex::ParticleReal wq,
+    const amrex::ParticleReal vx,
+    const amrex::ParticleReal vy,
+    const amrex::ParticleReal vz,
+    const amrex::Array4<amrex::Real> & varx_arr,
+    const amrex::Array4<amrex::Real> & vary_arr,
+    const amrex::Array4<amrex::Real> & varz_arr,
+    const amrex::Array4<amrex::Real> & wx_arr,
+    const amrex::Array4<amrex::Real> & wy_arr,
+    const amrex::Array4<amrex::Real> & wz_arr,
+    const amrex::Array4<amrex::Real> & w2x_arr,
+    const amrex::Array4<amrex::Real> & w2y_arr,
+    const amrex::Array4<amrex::Real> & w2z_arr,
+    const amrex::Array4<amrex::Real> & vxbar_arr,
+    const amrex::Array4<amrex::Real> & vybar_arr,
+    const amrex::Array4<amrex::Real> & vzbar_arr,
+    const amrex::IntVect & varx_type,
+    const amrex::IntVect & vary_type,
+    const amrex::IntVect & varz_type,
+    const amrex::Real relative_time,
+    const amrex::XDim3 & dinv,
+    const amrex::XDim3 & xyzmin,
+    const amrex::Dim3 lo,
+    [[maybe_unused]] const int n_rz_azimuthal_modes)
+{
+    using namespace amrex::literals;
+
+    constexpr int NODE = amrex::IndexType::NODE;
+    constexpr int CELL = amrex::IndexType::CELL;
+
+    // wqx, wqy wqz are particle current in each direction
+#if defined(WARPX_DIM_RZ)
+    // In RZ, wqx is actually wqr, and wqy is wqtheta
+    // Convert to cylindrical at the mid point
+    const amrex::Real xpmid = xp + relative_time*vx;
+    const amrex::Real ypmid = yp + relative_time*vy;
+    const amrex::Real rpmid = std::sqrt(xpmid*xpmid + ypmid*ypmid);
+    const amrex::Real costheta = (rpmid > 0._rt ? xpmid/rpmid : 1._rt);
+    const amrex::Real sintheta = (rpmid > 0._rt ? ypmid/rpmid : 0._rt);
+    const Complex xy0 = Complex{costheta, sintheta};
+    const amrex::Real wqx = wq*(+vx*costheta + vy*sintheta);
+    const amrex::Real wqy = wq*(-vx*sintheta + vy*costheta);
+#else
+    const amrex::Real wqx = wq*vx;
+    const amrex::Real wqy = wq*vy;
+#endif
+    const amrex::Real wqz = wq*vz;
+
+    // --- Compute shape factors
+    Compute_shape_factor< depos_order > const compute_shape_factor;
+#if (AMREX_SPACEDIM >= 2)
+    // x direction
+    // Get particle position after 1/2 push back in position
+    // Keep these double to avoid bug in single precision
+#if defined(WARPX_DIM_RZ)
+    const double xmid = (rpmid - xyzmin.x)*dinv.x;
+#else
+    const double xmid = ((xp - xyzmin.x) + relative_time*vx)*dinv.x;
+#endif
+
+    // j_j[xyz] leftmost grid point in x that the particle touches for the centering of each current
+    // sx_j[xyz] shape factor along x for the centering of each current
+    // There are only two possible centerings, node or cell centered, so at most only two shape factor
+    // arrays will be needed.
+    // Keep these double to avoid bug in single precision
+    double sx_node[depos_order + 1] = {0.};
+    double sx_cell[depos_order + 1] = {0.};
+    int j_node = 0;
+    int j_cell = 0;
+    if (varx_type[0] == NODE || vary_type[0] == NODE || varz_type[0] == NODE) {
+        j_node = compute_shape_factor(sx_node, xmid);
+    }
+    if (varx_type[0] == CELL || vary_type[0] == CELL || varz_type[0] == CELL) {
+        j_cell = compute_shape_factor(sx_cell, xmid - 0.5);
+    }
+
+    amrex::Real sx_jx[depos_order + 1] = {0._rt};
+    amrex::Real sx_jy[depos_order + 1] = {0._rt};
+    amrex::Real sx_jz[depos_order + 1] = {0._rt};
+    for (int ix=0; ix<=depos_order; ix++)
+    {
+        sx_jx[ix] = ((varx_type[0] == NODE) ? amrex::Real(sx_node[ix]) : amrex::Real(sx_cell[ix]));
+        sx_jy[ix] = ((vary_type[0] == NODE) ? amrex::Real(sx_node[ix]) : amrex::Real(sx_cell[ix]));
+        sx_jz[ix] = ((varz_type[0] == NODE) ? amrex::Real(sx_node[ix]) : amrex::Real(sx_cell[ix]));
+    }
+
+    int const j_jx = ((varx_type[0] == NODE) ? j_node : j_cell);
+    int const j_jy = ((vary_type[0] == NODE) ? j_node : j_cell);
+    int const j_jz = ((varz_type[0] == NODE) ? j_node : j_cell);
+#endif //AMREX_SPACEDIM >= 2
+
+#if defined(WARPX_DIM_3D)
+    // y direction
+    // Keep these double to avoid bug in single precision
+    const double ymid = ((yp - xyzmin.y) + relative_time*vy)*dinv.y;
+    double sy_node[depos_order + 1] = {0.};
+    double sy_cell[depos_order + 1] = {0.};
+    int k_node = 0;
+    int k_cell = 0;
+    if (varx_type[1] == NODE || vary_type[1] == NODE || varz_type[1] == NODE) {
+        k_node = compute_shape_factor(sy_node, ymid);
+    }
+    if (varx_type[1] == CELL || vary_type[1] == CELL || varz_type[1] == CELL) {
+        k_cell = compute_shape_factor(sy_cell, ymid - 0.5);
+    }
+    amrex::Real sy_jx[depos_order + 1] = {0._rt};
+    amrex::Real sy_jy[depos_order + 1] = {0._rt};
+    amrex::Real sy_jz[depos_order + 1] = {0._rt};
+    for (int iy=0; iy<=depos_order; iy++)
+    {
+        sy_jx[iy] = ((varx_type[1] == NODE) ? amrex::Real(sy_node[iy]) : amrex::Real(sy_cell[iy]));
+        sy_jy[iy] = ((vary_type[1] == NODE) ? amrex::Real(sy_node[iy]) : amrex::Real(sy_cell[iy]));
+        sy_jz[iy] = ((varz_type[1] == NODE) ? amrex::Real(sy_node[iy]) : amrex::Real(sy_cell[iy]));
+    }
+    int const k_jx = ((varx_type[1] == NODE) ? k_node : k_cell);
+    int const k_jy = ((vary_type[1] == NODE) ? k_node : k_cell);
+    int const k_jz = ((varz_type[1] == NODE) ? k_node : k_cell);
+#endif
+
+    // z direction
+    // Keep these double to avoid bug in single precision
+    constexpr int zdir = WARPX_ZINDEX;
+    const double zmid = ((zp - xyzmin.z) + relative_time*vz)*dinv.z;
+    double sz_node[depos_order + 1] = {0.};
+    double sz_cell[depos_order + 1] = {0.};
+    int l_node = 0;
+    int l_cell = 0;
+    if (varx_type[zdir] == NODE || vary_type[zdir] == NODE || varz_type[zdir] == NODE) {
+        l_node = compute_shape_factor(sz_node, zmid);
+    }
+    if (varx_type[zdir] == CELL || vary_type[zdir] == CELL || varz_type[zdir] == CELL) {
+        l_cell = compute_shape_factor(sz_cell, zmid - 0.5);
+    }
+    amrex::Real sz_jx[depos_order + 1] = {0._rt};
+    amrex::Real sz_jy[depos_order + 1] = {0._rt};
+    amrex::Real sz_jz[depos_order + 1] = {0._rt};
+    for (int iz=0; iz<=depos_order; iz++)
+    {
+        sz_jx[iz] = ((varx_type[zdir] == NODE) ? amrex::Real(sz_node[iz]) : amrex::Real(sz_cell[iz]));
+        sz_jy[iz] = ((vary_type[zdir] == NODE) ? amrex::Real(sz_node[iz]) : amrex::Real(sz_cell[iz]));
+        sz_jz[iz] = ((varz_type[zdir] == NODE) ? amrex::Real(sz_node[iz]) : amrex::Real(sz_cell[iz]));
+    }
+    int const l_jx = ((varx_type[zdir] == NODE) ? l_node : l_cell);
+    int const l_jy = ((vary_type[zdir] == NODE) ? l_node : l_cell);
+    int const l_jz = ((varz_type[zdir] == NODE) ? l_node : l_cell);
+
+#if defined(WARPX_DIM_1D_Z)
+    for (int iz=0; iz<=depos_order; iz++){
+        const amrex::Real wqx_var = wq*sz_jx[iz];
+        const amrex::Real wqy_var = wq*sz_jy[iz];
+        const amrex::Real wqz_var = wq*sz_jz[iz];
+
+        // Update w_sum
+        const amrex::Real wxsum = amrex::Gpu::Atomic::Add(
+            &wx_arr(lo.x+l_jx+iz, 0, 0, 0), wqx_var);
+        const amrex::Real wysum = amrex::Gpu::Atomic::Add(
+            &wy_arr(lo.x+l_jy+iz, 0, 0, 0), wqy_var);
+        const amrex::Real wzsum = amrex::Gpu::Atomic::Add(
+            &wz_arr(lo.x+l_jz+iz, 0, 0, 0), wqz_var);
+
+        // Update w2_sum
+        const amrex::Real w2xsum = amrex::Gpu::Atomic::Add(
+            &w2x_arr(lo.x+l_jx+iz, 0, 0, 0), wqx_var*wqx_var);
+        const amrex::Real w2ysum = amrex::Gpu::Atomic::Add(
+            &w2y_arr(lo.x+l_jy+iz, 0, 0, 0), wqy_var*wqy_var);
+        const amrex::Real w2zsum = amrex::Gpu::Atomic::Add(
+            &w2z_arr(lo.x+l_jz+iz, 0, 0, 0), wqz_var*wqz_var);
+
+        // Update mean
+        const amrex::Real vxbar_old = vxbar_arr(lo.x+l_jx+iz, 0, 0);
+        const amrex::Real vxbar = amrex::Gpu::Atomic::Add(
+            &vxbar_arr(lo.x+l_jx+iz, 0, 0, 0),
+            (wqx_var/wxsum)*(vx - vxbar_old));
+
+        const amrex::Real vybar_old = vybar_arr(lo.x+l_jy+iz, 0, 0);
+        const amrex::Real vybar = amrex::Gpu::Atomic::Add(
+            &vybar_arr(lo.x+l_jy+iz, 0, 0, 0),
+            (wqy_var/wysum)*(vy - vybar_old));
+
+        const amrex::Real vzbar_old = vzbar_arr(lo.x+l_jz+iz, 0, 0);
+        const amrex::Real vzbar = amrex::Gpu::Atomic::Add(
+            &vzbar_arr(lo.x+l_jz+iz, 0, 0, 0),
+            (wqz_var/wzsum)*(vz - vzbar_old));
+
+        // Online Variance Update
+        amrex::Gpu::Atomic::AddNoRet(
+            &varx_arr(lo.x+l_jx+iz, 0, 0, 0),
+            wqx_var*(vx - vxbar_old)*(vx - vxbar));
+        amrex::Gpu::Atomic::AddNoRet(
+            &vary_arr(lo.x+l_jy+iz, 0, 0, 0),
+            wqy_var*(vy - vybar_old)*(vy - vybar));
+        amrex::Gpu::Atomic::AddNoRet(
+            &varz_arr(lo.x+l_jz+iz, 0, 0, 0),
+            wqz_var*(vz - vzbar_old)*(vz - vzbar));
+    }
+#endif
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+    for (int iz=0; iz<=depos_order; iz++){
+        for (int ix=0; ix<=depos_order; ix++){
+            const amrex::Real wqx_var = wq*sx_jx[ix]*sz_jx[iz];
+            const amrex::Real wqy_var = wq*sx_jy[ix]*sz_jy[iz];
+            const amrex::Real wqz_var = wq*sx_jz[ix]*sz_jz[iz];
+
+            // Update w_sum
+            const amrex::Real wxsum = amrex::Gpu::Atomic::Add(
+                &wx_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, 0), wqx_var);
+            const amrex::Real wysum = amrex::Gpu::Atomic::Add(
+                &wy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 0), wqy_var);
+            const amrex::Real wzsum = amrex::Gpu::Atomic::Add(
+                &wz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, 0), wqz_var);
+
+            // Update w2_sum
+            const amrex::Real w2xsum = amrex::Gpu::Atomic::Add(
+                &w2x_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, 0), wqx_var*wqx_var);
+            const amrex::Real w2ysum = amrex::Gpu::Atomic::Add(
+                &w2y_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 0), wqy_var*wqy_var);
+            const amrex::Real w2zsum = amrex::Gpu::Atomic::Add(
+                &w2z_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, 0), wqz_var*wqz_var);
+
+            // Update mean
+            const amrex::Real vxbar_old = vxbar_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0);
+            const amrex::Real vxbar = amrex::Gpu::Atomic::Add(
+                &vxbar_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, 0),
+                (wqx_var/wxsum)*(vx - vxbar_old));
+
+            const amrex::Real vybar_old = vybar_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0);
+            const amrex::Real vybar = amrex::Gpu::Atomic::Add(
+                &vybar_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 0),
+                (wqy_var/wysum)*(vy - vybar_old));
+
+            const amrex::Real vzbar_old = vzbar_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0);
+            const amrex::Real vzbar = amrex::Gpu::Atomic::Add(
+                &vzbar_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, 0),
+                (wqz_var/wzsum)*(vz - vzbar_old));
+
+            // Online Variance Update
+            amrex::Gpu::Atomic::AddNoRet(
+                &varx_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, 0),
+                wqx_var*(vx - vxbar_old)*(vx - vxbar));
+            amrex::Gpu::Atomic::AddNoRet(
+                &vary_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 0),
+                wqy_var*(vy - vybar_old)*(vy - vybar));
+            amrex::Gpu::Atomic::AddNoRet(
+                &varz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, 0),
+                wqz_var*(vz - vzbar_old)*(vz - vzbar));
+        }
+    }
+#elif defined(WARPX_DIM_3D)
+    for (int iz=0; iz<=depos_order; iz++){
+        for (int iy=0; iy<=depos_order; iy++){
+            for (int ix=0; ix<=depos_order; ix++){
+                const amrex::Real wqx_var = wq*sx_jx[ix]*sy_jx[ix]*sz_jx[iz];
+                const amrex::Real wqy_var = wq*sx_jy[ix]*sy_jy[ix]*sz_jy[iz];
+                const amrex::Real wqz_var = wq*sx_jz[ix]*sy_jz[ix]*sz_jz[iz];
+
+                // Update w_sum
+                const amrex::Real wxsum = amrex::Gpu::Atomic::Add(
+                    &wx_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz, 0), wqx_var);
+                const amrex::Real wysum = amrex::Gpu::Atomic::Add(
+                    &wy_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz, 0), wqy_var);
+                const amrex::Real wzsum = amrex::Gpu::Atomic::Add(
+                    &wz_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz, 0), wqz_var);
+
+                // Update w2_sum
+                const amrex::Real w2xsum = amrex::Gpu::Atomic::Add(
+                    &w2x_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz, 0), wqx_var*wqx_var);
+                const amrex::Real w2ysum = amrex::Gpu::Atomic::Add(
+                    &w2y_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz, 0), wqy_var*wqy_var);
+                const amrex::Real w2zsum = amrex::Gpu::Atomic::Add(
+                    &w2z_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz, 0), wqz_var*wqz_var);
+
+                // Update mean
+                const amrex::Real vxbar_old = vxbar_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz);
+                const amrex::Real vxbar = amrex::Gpu::Atomic::Add(
+                    &vxbar_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz, 0),
+                    (wqx_var/wxsum)*(vx - vxbar_old));
+
+                const amrex::Real vybar_old = vybar_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz);
+                const amrex::Real vybar = amrex::Gpu::Atomic::Add(
+                    &vybar_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz, 0),
+                    (wqy_var/wysum)*(vy - vybar_old));
+
+                const amrex::Real vzbar_old = vzbar_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz);
+                const amrex::Real vzbar = amrex::Gpu::Atomic::Add(
+                    &vzbar_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz, 0),
+                    (wqz_var/wzsum)*(vz - vzbar_old));
+
+                // Online Variance Update
+                amrex::Gpu::Atomic::AddNoRet(
+                    &varx_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz, 0),
+                    wqx_var*(vx - vxbar_old)*(vx - vxbar));
+                amrex::Gpu::Atomic::AddNoRet(
+                    &vary_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz, 0),
+                    wqy_var*(vy - vybar_old)*(vy - vybar));
+                amrex::Gpu::Atomic::AddNoRet(
+                    &varz_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz, 0),
+                    wqz_var*(vz - vzbar_old)*(vz - vzbar));
+            }
+        }
+    }
+#endif
+}
+
+/**
+ * \brief Temperature Deposition for thread thread_num
+ * \tparam depos_order deposition order
+ * \param GetPosition  A functor for returning the particle position.
+ * \param wp           Pointer to array of particle weights.
+ * \param uxp,uyp,uzp  Pointer to arrays of particle momentum.
+ * \param ion_lev      Pointer to array of particle ionization level. This is
+                         required to have the charge of each macroparticle
+                         since q is a scalar. For non-ionizable species,
+                         ion_lev is a null pointer.
+ * \param varx_fab,vary_fab,varz_fab FArrayBox of variance, either full array or tile.
+ * \param wx_fab,wy_fab,wz_fab FArrayBox for running weights buffer, either full array or tile.
+ * \param w2x_fab,w2y_fab,w2z_fab FArrayBox for weights^2 buffer, either full array or tile.
+ * \param vxbar_fab,vybar_fab,vzbar_fab FArrayBox of current density, either full array or tile.
+ * \param np_to_deposit Number of particles for which current is deposited.
+ * \param relative_time Time at which to deposit J, relative to the time of the
+ *                      current positions of the particles. When different than 0,
+ *                      the particle position will be temporarily modified to match
+ *                      the time of the deposition.
+ * \param dinv         3D cell size inverse
+ * \param xyzmin       Physical lower bounds of domain.
+ * \param lo           Index lower bounds of domain.
+ * \param q            species charge.
+ * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
+ */
+template <int depos_order>
+void doVarianceDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
+                         const amrex::ParticleReal * wp,
+                         const amrex::ParticleReal * uxp,
+                         const amrex::ParticleReal * uyp,
+                         const amrex::ParticleReal * uzp,
+                         const int* ion_lev,
+                         amrex::FArrayBox& varx_fab,
+                         amrex::FArrayBox& vary_fab,
+                         amrex::FArrayBox& varz_fab,
+                         amrex::FArrayBox& wx_fab,
+                         amrex::FArrayBox& wy_fab,
+                         amrex::FArrayBox& wz_fab,
+                         amrex::FArrayBox& w2x_fab,
+                         amrex::FArrayBox& w2y_fab,
+                         amrex::FArrayBox& w2z_fab,
+                         amrex::FArrayBox& vxbar_fab,
+                         amrex::FArrayBox& vybar_fab,
+                         amrex::FArrayBox& vzbar_fab,
+                         const long np_to_deposit,
+                         const amrex::Real relative_time,
+                         const amrex::XDim3 & dinv,
+                         const amrex::XDim3 & xyzmin,
+                         const amrex::Dim3 lo,
+                         const amrex::Real q,
+                         [[maybe_unused]]const int n_rz_azimuthal_modes)
+{
+    using namespace amrex::literals;
+
+#if defined(WARPX_DIM_RZ)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        n_rz_azimuthal_modes == 1,
+        "Azimuthal Fourier decomposition for temperature deposition is not implemented."
+        " Only mode=0 supported in RZ."
+    );
+#endif
+
+    // Whether ion_lev is a null pointer (do_ionization=0) or a real pointer
+    // (do_ionization=1)
+    const bool do_ionization = ion_lev;
+
+    const amrex::Real clightsq = 1.0_rt/PhysConst::c/PhysConst::c;
+
+    const amrex::Array4<amrex::Real> & varx_arr = varx_fab.array();
+    const amrex::Array4<amrex::Real> & vary_arr = vary_fab.array();
+    const amrex::Array4<amrex::Real> & varz_arr = varz_fab.array();
+    const amrex::Array4<amrex::Real> & wx_arr = wx_fab.array();
+    const amrex::Array4<amrex::Real> & wy_arr = wy_fab.array();
+    const amrex::Array4<amrex::Real> & wz_arr = wz_fab.array();
+    const amrex::Array4<amrex::Real> & w2x_arr = w2x_fab.array();
+    const amrex::Array4<amrex::Real> & w2y_arr = w2y_fab.array();
+    const amrex::Array4<amrex::Real> & w2z_arr = w2z_fab.array();
+    const amrex::Array4<amrex::Real> & vxbar_arr = vxbar_fab.array();
+    const amrex::Array4<amrex::Real> & vybar_arr = vybar_fab.array();
+    const amrex::Array4<amrex::Real> & vzbar_arr = vzbar_fab.array();
+    const amrex::IntVect & varx_type = varx_fab.box().type();
+    const amrex::IntVect & vary_type = vary_fab.box().type();
+    const amrex::IntVect & varz_type = varz_fab.box().type();
+
+    // Loop over particles and deposit into jx_fab, jy_fab and jz_fab
+    amrex::ParallelFor(
+        np_to_deposit,
+        [=] AMREX_GPU_DEVICE (long ip) {
+            amrex::ParticleReal xp, yp, zp;
+            GetPosition(ip, xp, yp, zp);
+
+            // --- Get particle quantities
+            const amrex::ParticleReal gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*clightsq
+                                                        + uyp[ip]*uyp[ip]*clightsq
+                                                        + uzp[ip]*uzp[ip]*clightsq);
+            const amrex::ParticleReal vx  = uxp[ip]*gaminv;
+            const amrex::ParticleReal vy  = uyp[ip]*gaminv;
+            const amrex::ParticleReal vz  = uzp[ip]*gaminv;
+
+            amrex::ParticleReal wq  = q*wp[ip];
+            if (do_ionization){
+                wq *= ion_lev[ip];
+            }
+
+            doVarianceDepositionShapeNKernel<depos_order>(
+                xp, yp, zp, wq, vx, vy, vz,
+                varx_arr, vary_arr, varz_arr,
+                wx_arr, wy_arr, wz_arr,
+                w2x_arr, w2y_arr, w2z_arr,
+                vxbar_arr, vybar_arr, vzbar_arr,
+                varx_type, vary_type, varz_type,
+                relative_time, dinv, xyzmin,
+                lo, n_rz_azimuthal_modes);
+        }
+    );
+
+    amrex::Gpu::streamSynchronize();
+}
+
+} // namespace warpx::particles::deposition
+#endif // WARPX_TEMPERATUREDEPOSITION_H_
