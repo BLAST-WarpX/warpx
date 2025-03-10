@@ -9,7 +9,7 @@
 
 #include "Particles/Deposition/VarianceAccumulationBuffer.H"
 #include "Particles/Deposition/TemperatureDeposition.H"
-
+#include "Parallelization/WarpXSumGuardCells.H"
 #include "Fields.H"
 
 #include <ablastr/utils/Communication.H>
@@ -40,17 +40,17 @@ VarianceAccumulationBuffer::VarianceAccumulationBuffer (ablastr::fields::MultiLe
         amrex::IntVect const& ngy = T_vf[lev][Direction{1}]->nGrowVect();
         amrex::IntVect const& ngz = T_vf[lev][Direction{2}]->nGrowVect();
 
-        warpx.m_fields.alloc_init("w_" + species_name, lev, bax, dmx, ncomps, ngx, 0.0_rt);
-        warpx.m_fields.alloc_init("w_" + species_name, lev, bay, dmy, ncomps, ngy, 0.0_rt);
-        warpx.m_fields.alloc_init("w_" + species_name, lev, baz, dmz, ncomps, ngz, 0.0_rt);
+        warpx.m_fields.alloc_init("w_" + species_name, Direction{0}, lev, bax, dmx, ncomps, ngx, 0.0_rt);
+        warpx.m_fields.alloc_init("w_" + species_name, Direction{1}, lev, bay, dmy, ncomps, ngy, 0.0_rt);
+        warpx.m_fields.alloc_init("w_" + species_name, Direction{2}, lev, baz, dmz, ncomps, ngz, 0.0_rt);
 
-        warpx.m_fields.alloc_init("w2_" + species_name, lev, bax, dmx, ncomps, ngx, 0.0_rt);
-        warpx.m_fields.alloc_init("w2_" + species_name, lev, bay, dmy, ncomps, ngy, 0.0_rt);
-        warpx.m_fields.alloc_init("w2_" + species_name, lev, baz, dmz, ncomps, ngz, 0.0_rt);
+        warpx.m_fields.alloc_init("w2_" + species_name, Direction{0}, lev, bax, dmx, ncomps, ngx, 0.0_rt);
+        warpx.m_fields.alloc_init("w2_" + species_name, Direction{1}, lev, bay, dmy, ncomps, ngy, 0.0_rt);
+        warpx.m_fields.alloc_init("w2_" + species_name, Direction{2}, lev, baz, dmz, ncomps, ngz, 0.0_rt);
 
-        warpx.m_fields.alloc_init("vbar_" + species_name, lev, bax, dmx, ncomps, ngx, 0.0_rt);
-        warpx.m_fields.alloc_init("vbar_" + species_name, lev, bay, dmy, ncomps, ngy, 0.0_rt);
-        warpx.m_fields.alloc_init("vbar_" + species_name, lev, baz, dmz, ncomps, ngz, 0.0_rt);
+        warpx.m_fields.alloc_init("vbar_" + species_name, Direction{0}, lev, bax, dmx, ncomps, ngx, 0.0_rt);
+        warpx.m_fields.alloc_init("vbar_" + species_name, Direction{1}, lev, bay, dmy, ncomps, ngy, 0.0_rt);
+        warpx.m_fields.alloc_init("vbar_" + species_name, Direction{2}, lev, baz, dmz, ncomps, ngz, 0.0_rt);
     }
 
     // Grab references to these arrays to store in this data structure
@@ -123,22 +123,22 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
             };
             variancemf_old.setVal(0.0_rt);
 
-            // Copy existing ghost cells into buffer
-            wmf_old.ParallelCopyToGhost(wmf, 0, 0, 1,
-                wmf.nGrowVect(), wmf.nGrowVect(),
-                warpx.Geom(lev).periodicity());
+            // Sum guard cells into buffer
+            WarpXSumGuardCells(wmf_old, wmf,
+                warpx.Geom(lev).periodicity(),
+                wmf.nGrowVect(), 0, 1);
 
-            w2mf_old.ParallelCopyToGhost(w2mf, 0, 0, 1,
-                w2mf.nGrowVect(), w2mf.nGrowVect(),
-                warpx.Geom(lev).periodicity());
+            WarpXSumGuardCells(w2mf_old, w2mf,
+                warpx.Geom(lev).periodicity(),
+                w2mf.nGrowVect(), 0, 1);
 
-            vbarmf_old.ParallelCopyToGhost(vbarmf, 0, 0, 1,
-                vbarmf.nGrowVect(), vbarmf.nGrowVect(),
-                warpx.Geom(lev).periodicity());
+            WarpXSumGuardCells(vbarmf_old, vbarmf,
+                warpx.Geom(lev).periodicity(),
+                vbarmf.nGrowVect(), 0, 1);
 
-            variancemf_old.ParallelCopyToGhost(variancemf, 0, 0, 1,
-                variancemf.nGrowVect(), variancemf.nGrowVect(),
-                warpx.Geom(lev).periodicity());
+            WarpXSumGuardCells(variancemf_old, variancemf,
+                warpx.Geom(lev).periodicity(),
+                variancemf.nGrowVect(), 0, 1);
 
             // Fill Boundaries of the weights array via comms to get new values
             // in ghost cells
@@ -151,14 +151,15 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
             ablastr::utils::communication::FillBoundary(
                 variancemf, WarpX::do_single_precision_comms, periodicity);
 
+            amrex::Gpu::streamSynchronize();
+
             // Kernel that updates remainder of ghost values after communicating weight sums
-            #ifdef AMREX_USE_OMP
-            #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-            #endif
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
             for ( amrex::MFIter mfi(variancemf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
                 // Extract Tileboxes for wmf and bbf
-                auto const& tb = mfi.tilebox();
-                auto const& tbgrown = mfi.growntilebox();
+                auto const& tbgrown = mfi.growntilebox(variancemf.nGrowVect());
 
                 const auto& w_old_arr = wmf_old.const_array(mfi);
                 const auto& w2_old_arr = w2mf_old.const_array(mfi);
@@ -172,8 +173,8 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
 
                 amrex::ParallelFor(tbgrown,
                     [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                        // Check if we are in a ghost cell
-                        if (!tb.contains(i, j, k)) {
+                        // Check if we are in a cell that requires combining variances
+                        if (w_old_arr(i,j,k) > 0.0_rt) {
                             // Update weights and un-normalized variance
                             amrex::Real w_a = w_old_arr(i,j,k);
                             amrex::Real w_b = w_arr(i,j,k);
@@ -186,15 +187,19 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
                             w2_arr(i,j,k) += w2_old_arr(i,j,k);
 
                             // Update Mean and Variance
-                            vbar_arr(i,j,k) = (w_a*v_a + w_b*v_b)/w_arr(i,j,k);
-                            variance_arr(i,j,k) +=  variance_old_arr(i,j,k) + delta*delta*w_a*w_b/w_arr(i,j,k);
+                            if (w_arr(i,j,k) > 0.0_rt) {
+                                vbar_arr(i,j,k) = (w_a*v_a + w_b*v_b)/w_arr(i,j,k);
+                                variance_arr(i,j,k) +=  variance_old_arr(i,j,k) + delta*delta*w_a*w_b/w_arr(i,j,k);
+                            }
                         }
 
                         // Apply Sample Reliability Normalization in any cell or after combining ghost cells
-                        variance_arr(i,j,k) /= (1 - w2_arr(i,j,k)/(w_arr(i,j,k)*w_arr(i,j,k)));
+                        if (w_arr(i,j,k) > 0.0_rt) {
+                            variance_arr(i,j,k) /= (w_arr(i,j,k) - w2_arr(i,j,k)/w_arr(i,j,k));
+                        }
                 });
             }
+            amrex::Gpu::streamSynchronize();
         }
     }
-    amrex::Gpu::streamSynchronize();
 }

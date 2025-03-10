@@ -312,6 +312,7 @@ class PlasmaCylinderCompression(object):
             name="ions",
             charge="q_e",
             mass=self.M,
+            warpx_do_temperature_deposition=True,
             initial_distribution=picmi.AnalyticDistribution(
                 density_expression="n0_p/(1+exp((sqrt(x*x+y*y)-R_p)/delta_p))",
                 momentum_expressions=momentum_expr,
@@ -322,7 +323,6 @@ class PlasmaCylinderCompression(object):
                 n0_p=self.n0,
                 B0=self.B0,
                 T_i=self.T_i,
-                do_temperature_deposition=True,
             ),
         )
         simulation.add_species(
@@ -392,3 +392,23 @@ sys.argv = sys.argv[:1] + left
 
 run = PlasmaCylinderCompression(test=args.test, verbose=args.verbose)
 simulation.step()
+
+# import matplotlib.pyplot as plt
+
+# plt.ion()
+
+# wx = fields.CustomNamedxWrapper("w_ions")
+# wy = fields.CustomNamedyWrapper("w_ions")
+# wz = fields.CustomNamedzWrapper("w_ions")
+
+# w2x = fields.CustomNamedxWrapper("w2_ions")
+# w2y = fields.CustomNamedyWrapper("w2_ions")
+# w2z = fields.CustomNamedzWrapper("w2_ions")
+
+# vbarx = fields.CustomNamedxWrapper("vbar_ions")
+# vbary = fields.CustomNamedyWrapper("vbar_ions")
+# vbarz = fields.CustomNamedzWrapper("vbar_ions")
+
+# Tx = fields.CustomNamedxWrapper("T_ions")
+# Ty = fields.CustomNamedyWrapper("T_ions")
+# Tz = fields.CustomNamedzWrapper("T_ions")

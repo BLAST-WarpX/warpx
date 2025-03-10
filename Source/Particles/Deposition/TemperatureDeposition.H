@@ -87,24 +87,6 @@ void doVarianceDepositionShapeNKernel(
     constexpr int NODE = amrex::IndexType::NODE;
     constexpr int CELL = amrex::IndexType::CELL;
 
-    // wqx, wqy wqz are particle current in each direction
-#if defined(WARPX_DIM_RZ)
-    // In RZ, wqx is actually wqr, and wqy is wqtheta
-    // Convert to cylindrical at the mid point
-    const amrex::Real xpmid = xp + relative_time*vx;
-    const amrex::Real ypmid = yp + relative_time*vy;
-    const amrex::Real rpmid = std::sqrt(xpmid*xpmid + ypmid*ypmid);
-    const amrex::Real costheta = (rpmid > 0._rt ? xpmid/rpmid : 1._rt);
-    const amrex::Real sintheta = (rpmid > 0._rt ? ypmid/rpmid : 0._rt);
-    const Complex xy0 = Complex{costheta, sintheta};
-    const amrex::Real wqx = wq*(+vx*costheta + vy*sintheta);
-    const amrex::Real wqy = wq*(-vx*sintheta + vy*costheta);
-#else
-    const amrex::Real wqx = wq*vx;
-    const amrex::Real wqy = wq*vy;
-#endif
-    const amrex::Real wqz = wq*vz;
-
     // --- Compute shape factors
     Compute_shape_factor< depos_order > const compute_shape_factor;
 #if (AMREX_SPACEDIM >= 2)
@@ -205,41 +187,45 @@ void doVarianceDepositionShapeNKernel(
 
 #if defined(WARPX_DIM_1D_Z)
     for (int iz=0; iz<=depos_order; iz++){
-        const amrex::Real wqx_var = wq*sz_jx[iz];
-        const amrex::Real wqy_var = wq*sz_jy[iz];
-        const amrex::Real wqz_var = wq*sz_jz[iz];
+        const amrex::Real wqx_var = static_cast<amrex::Real>(wq)*sz_jx[iz];
+        const amrex::Real wqy_var = static_cast<amrex::Real>(wq)*sz_jy[iz];
+        const amrex::Real wqz_var = static_cast<amrex::Real>(wq)*sz_jz[iz];
 
         // Update w_sum
-        const amrex::Real wxsum = amrex::Gpu::Atomic::Add(
+        amrex::Gpu::Atomic::AddNoRet(
             &wx_arr(lo.x+l_jx+iz, 0, 0, 0), wqx_var);
-        const amrex::Real wysum = amrex::Gpu::Atomic::Add(
+        amrex::Gpu::Atomic::AddNoRet(
             &wy_arr(lo.x+l_jy+iz, 0, 0, 0), wqy_var);
-        const amrex::Real wzsum = amrex::Gpu::Atomic::Add(
+        amrex::Gpu::Atomic::AddNoRet(
             &wz_arr(lo.x+l_jz+iz, 0, 0, 0), wqz_var);
 
         // Update w2_sum
-        const amrex::Real w2xsum = amrex::Gpu::Atomic::Add(
+        amrex::Gpu::Atomic::AddNoRet(
             &w2x_arr(lo.x+l_jx+iz, 0, 0, 0), wqx_var*wqx_var);
-        const amrex::Real w2ysum = amrex::Gpu::Atomic::Add(
+        amrex::Gpu::Atomic::AddNoRet(
             &w2y_arr(lo.x+l_jy+iz, 0, 0, 0), wqy_var*wqy_var);
-        const amrex::Real w2zsum = amrex::Gpu::Atomic::Add(
+        amrex::Gpu::Atomic::AddNoRet(
             &w2z_arr(lo.x+l_jz+iz, 0, 0, 0), wqz_var*wqz_var);
+
+        const amrex::Real wxsum = wx_arr(lo.x+l_jx+iz, 0, 0, 0);
+        const amrex::Real wysum = wy_arr(lo.x+l_jx+iz, 0, 0, 0);
+        const amrex::Real wzsum = wz_arr(lo.x+l_jx+iz, 0, 0, 0);
 
         // Update mean
         const amrex::Real vxbar_old = vxbar_arr(lo.x+l_jx+iz, 0, 0);
-        const amrex::Real vxbar = amrex::Gpu::Atomic::Add(
+        amrex::Gpu::Atomic::AddNoRet(
             &vxbar_arr(lo.x+l_jx+iz, 0, 0, 0),
-            (wqx_var/wxsum)*(vx - vxbar_old));
+            (wqx_var/wxsum)*(static_cast<amrex::Real>(vx) - vxbar_old));
 
         const amrex::Real vybar_old = vybar_arr(lo.x+l_jy+iz, 0, 0);
-        const amrex::Real vybar = amrex::Gpu::Atomic::Add(
+        amrex::Gpu::Atomic::AddNoRet(
             &vybar_arr(lo.x+l_jy+iz, 0, 0, 0),
-            (wqy_var/wysum)*(vy - vybar_old));
+            (wqy_var/wysum)*(static_cast<amrex::Real>(vy) - vybar_old));
 
         const amrex::Real vzbar_old = vzbar_arr(lo.x+l_jz+iz, 0, 0);
-        const amrex::Real vzbar = amrex::Gpu::Atomic::Add(
+        amrex::Gpu::Atomic::AddNoRet(
             &vzbar_arr(lo.x+l_jz+iz, 0, 0, 0),
-            (wqz_var/wzsum)*(vz - vzbar_old));
+            (wqz_var/wzsum)*(static_cast<amrex::Real>(vz) - vzbar_old));
 
         // Online Variance Update
         amrex::Gpu::Atomic::AddNoRet(
@@ -308,52 +294,62 @@ void doVarianceDepositionShapeNKernel(
     for (int iz=0; iz<=depos_order; iz++){
         for (int iy=0; iy<=depos_order; iy++){
             for (int ix=0; ix<=depos_order; ix++){
-                const amrex::Real wqx_var = wq*sx_jx[ix]*sy_jx[ix]*sz_jx[iz];
-                const amrex::Real wqy_var = wq*sx_jy[ix]*sy_jy[ix]*sz_jy[iz];
-                const amrex::Real wqz_var = wq*sx_jz[ix]*sy_jz[ix]*sz_jz[iz];
+                const amrex::Real wqx_var = wq*sx_jx[ix]*sy_jx[iy]*sz_jx[iz];
+                const amrex::Real wqy_var = wq*sx_jy[ix]*sy_jy[iy]*sz_jy[iz];
+                const amrex::Real wqz_var = wq*sx_jz[ix]*sy_jz[iy]*sz_jz[iz];
+
+                const amrex::Real wx_old = wx_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz, 0);
+                const amrex::Real wy_old = wy_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz, 0);
+                const amrex::Real wz_old = wz_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz, 0);
 
                 // Update w_sum
-                const amrex::Real wxsum = amrex::Gpu::Atomic::Add(
+                amrex::Gpu::Atomic::AddNoRet(
                     &wx_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz, 0), wqx_var);
-                const amrex::Real wysum = amrex::Gpu::Atomic::Add(
+                amrex::Gpu::Atomic::AddNoRet(
                     &wy_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz, 0), wqy_var);
-                const amrex::Real wzsum = amrex::Gpu::Atomic::Add(
+                amrex::Gpu::Atomic::AddNoRet(
                     &wz_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz, 0), wqz_var);
 
+                const amrex::Real wxsum = wx_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz, 0);
+                const amrex::Real wysum = wy_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz, 0);
+                const amrex::Real wzsum = wz_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz, 0);
+
                 // Update w2_sum
-                const amrex::Real w2xsum = amrex::Gpu::Atomic::Add(
+                amrex::Gpu::Atomic::AddNoRet(
                     &w2x_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz, 0), wqx_var*wqx_var);
-                const amrex::Real w2ysum = amrex::Gpu::Atomic::Add(
+                amrex::Gpu::Atomic::AddNoRet(
                     &w2y_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz, 0), wqy_var*wqy_var);
-                const amrex::Real w2zsum = amrex::Gpu::Atomic::Add(
+                amrex::Gpu::Atomic::AddNoRet(
                     &w2z_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz, 0), wqz_var*wqz_var);
 
                 // Update mean
-                const amrex::Real vxbar_old = vxbar_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz);
-                const amrex::Real vxbar = amrex::Gpu::Atomic::Add(
+                const amrex::Real vxbar_diff = static_cast<amrex::Real>(vx)
+                    - vxbar_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz);
+                const amrex::Real vybar_diff = static_cast<amrex::Real>(vy)
+                    - vybar_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz);
+                const amrex::Real vzbar_diff = static_cast<amrex::Real>(vz)
+                    - vzbar_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz);
+
+                amrex::Gpu::Atomic::AddNoRet(
                     &vxbar_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz, 0),
-                    (wqx_var/wxsum)*(vx - vxbar_old));
-
-                const amrex::Real vybar_old = vybar_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz);
-                const amrex::Real vybar = amrex::Gpu::Atomic::Add(
+                    vxbar_diff*(wqx_var/wxsum));
+                amrex::Gpu::Atomic::AddNoRet(
                     &vybar_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz, 0),
-                    (wqy_var/wysum)*(vy - vybar_old));
-
-                const amrex::Real vzbar_old = vzbar_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz);
-                const amrex::Real vzbar = amrex::Gpu::Atomic::Add(
+                    vybar_diff*(wqy_var/wysum));
+                amrex::Gpu::Atomic::AddNoRet(
                     &vzbar_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz, 0),
-                    (wqz_var/wzsum)*(vz - vzbar_old));
+                    vzbar_diff*(wqz_var/wzsum));
 
                 // Online Variance Update
                 amrex::Gpu::Atomic::AddNoRet(
                     &varx_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz, 0),
-                    wqx_var*(vx - vxbar_old)*(vx - vxbar));
+                    wqx_var*wx_old*vxbar_diff*vxbar_diff/wxsum);
                 amrex::Gpu::Atomic::AddNoRet(
                     &vary_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz, 0),
-                    wqy_var*(vy - vybar_old)*(vy - vybar));
+                    wqy_var*wy_old*vybar_diff*vybar_diff/wysum);
                 amrex::Gpu::Atomic::AddNoRet(
                     &varz_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz, 0),
-                    wqz_var*(vz - vzbar_old)*(vz - vzbar));
+                    wqz_var*wz_old*vzbar_diff*vzbar_diff/wzsum);
             }
         }
     }

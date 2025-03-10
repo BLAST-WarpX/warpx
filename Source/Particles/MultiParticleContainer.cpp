@@ -602,7 +602,7 @@ MultiParticleContainer::DepositTemperatures (
         if (!pc->getTemperatureDepositionFlag()) { continue; }
 
         // Generate Name to look up temperature MF in the register
-        const std::string temperature_vf_str = "T_" + pc->getSpeciesTypeName();
+        const std::string temperature_vf_str = "T_" + species_names[pc->getSpeciesId()];
         ablastr::fields::MultiLevelVectorField T_vf =
             fields.get_mr_levels_alldirs(temperature_vf_str, WarpX::GetInstance().finestLevel());
 
