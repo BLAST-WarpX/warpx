@@ -1555,8 +1555,7 @@ WarpX::ReadExternalFieldFromFile (
        const std::string& F_name, const std::string& F_component)
 {
     // Get WarpX domain info
-    auto& warpx = WarpX::GetInstance();
-    amrex::Geometry const& geom0 = warpx.Geom(0);
+    amrex::Geometry const& geom0 = Geom(0);
     const amrex::RealBox& real_box = geom0.ProbDomain();
     const auto dx = geom0.CellSizeArray();
     const amrex::IntVect nodal_flag = mf->ixType().toIntVect();
