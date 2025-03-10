@@ -1776,7 +1776,7 @@ void WarpXFluidContainer::Hybrid_Electron_Bremsstrahlung (ablastr::fields::Multi
 
 /*
     Function for electron-ion temperature relaxation as part of the electron energy equation used in the Hybrid PIC model.
-    When used, MCC module should be called in WarpXPushFieldsHybridPIC.cpp for ions so energy is conserved. 
+    When used, MCC module should be called in WarpXPushFieldsHybridPIC.cpp for ions so energy is conserved.
     Collision frequencies should be used consistently.
 */
 void WarpXFluidContainer::Hybrid_Electron_Qei (ablastr::fields::MultiFabRegister& m_fields,
