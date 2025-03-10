@@ -360,12 +360,12 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
     }
 
     if (!this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor() &&
-        a_step%this->m_diagnostic_interval==0) {
+        ((a_step+1)%this->m_diagnostic_interval==0 || a_step==0)) {
         std::ofstream diagnostic_file{this->m_diagnostic_file, std::ofstream::out | std::ofstream::app};
         diagnostic_file << std::setprecision(14);
-        diagnostic_file << a_step;
+        diagnostic_file << a_step+1;
         diagnostic_file << " ";;
-        diagnostic_file << a_time;
+        diagnostic_file << a_time + a_dt;
         diagnostic_file << " ";;
         diagnostic_file << iter;
         diagnostic_file << " ";;
