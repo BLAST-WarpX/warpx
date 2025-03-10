@@ -152,6 +152,7 @@ public:
          const amrex::IntVect& fill_guards_current,
          bool eb_enabled,
          int max_guard_EB, amrex::Real v_sigma_sb,
+         ablastr::fields::MultiFabRegister& fields,
          amrex::IntVect do_pml_Lo = amrex::IntVect::TheUnitVector(),
          amrex::IntVect do_pml_Hi = amrex::IntVect::TheUnitVector());
 
