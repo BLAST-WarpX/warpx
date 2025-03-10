@@ -13,8 +13,11 @@
 #include <utility>
 #include <vector>
 
-PolicyVec getPolicies (const NameMap& names) noexcept
+PolicyVec getPolicies (std::vector<std::string> const & names_vec) noexcept
 {
+    NameMap names;
+    for (auto i = 0u; i < names_vec.size(); ++i) { names.emplace(names_vec[i], i); }
+
     std::vector<InitializationPolicy> h_policies;
     h_policies.resize(names.size());
     for (const auto& kv : names)
@@ -31,9 +34,15 @@ PolicyVec getPolicies (const NameMap& names) noexcept
     return policies;
 }
 
-SmartCopyTag getSmartCopyTag (const NameMap& src, const NameMap& dst) noexcept
+SmartCopyTag getSmartCopyTag (std::vector<std::string> const & src_names, std::vector<std::string> const & dst_names) noexcept
 {
     SmartCopyTag tag;
+
+    // We want to avoid running an NxM algorithm to find pairs, so sort the components first.
+    NameMap src;
+    NameMap dst;
+    for (auto i = 0u; i < src_names.size(); ++i) { src.emplace(src_names[i], i); }
+    for (auto i = 0u; i < dst_names.size(); ++i) { dst.emplace(dst_names[i], i); }
 
     std::vector<int> h_src_comps;
     std::vector<int> h_dst_comps;

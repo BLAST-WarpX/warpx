@@ -23,7 +23,7 @@ Please add the following sentence to your publications, it helps contributors ke
 
 **Plain text:**
 
-  This research used the open-source particle-in-cell code WarpX https://github.com/ECP-WarpX/WarpX. Primary WarpX contributors are with LBNL, LLNL, CEA-LIDYL, SLAC, DESY, CERN, and TAE Technologies. We acknowledge all WarpX contributors.
+  This research used the open-source particle-in-cell code WarpX https://github.com/ECP-WarpX/WarpX. Primary WarpX contributors are with LBNL, LLNL, CEA-LIDYL, SLAC, DESY, CERN, Helion Energy, and TAE Technologies. We acknowledge all WarpX contributors.
 
 **LaTeX:**
 
@@ -31,7 +31,7 @@ Please add the following sentence to your publications, it helps contributors ke
 
   \usepackage{hyperref}
   This research used the open-source particle-in-cell code WarpX \url{https://github.com/ECP-WarpX/WarpX}.
-  Primary WarpX contributors are with LBNL, LLNL, CEA-LIDYL, SLAC, DESY, CERN, and TAE Technologies.
+  Primary WarpX contributors are with LBNL, LLNL, CEA-LIDYL, SLAC, DESY, CERN, Helion Energy, and TAE Technologies.
   We acknowledge all WarpX contributors.
 
 .. _acknowledge_warpx_ref:

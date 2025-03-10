@@ -106,6 +106,14 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
             utils::parser::getWithParser(
                 pp_collision_name, kw_energy.c_str(), energy);
         }
+        // if the scattering process is forward scattering get the energy
+        // associated with the process if it is given (this allows forward
+        // scattering to be used both with and without a fixed energy loss)
+        else if (scattering_process.find("forward") != std::string::npos) {
+            const std::string kw_energy = scattering_process + "_energy";
+            utils::parser::queryWithParser(
+                pp_collision_name, kw_energy.c_str(), energy);
+        }
 
         ScatteringProcess process(scattering_process, cross_section_file, energy);
 
@@ -268,7 +276,7 @@ BackgroundMCCCollision::doCollisions (amrex::Real cur_time, amrex::Real dt, Mult
         }
 
         amrex::Print() << Utils::TextMsg::Info(
-            "Setting up collisions for " + m_species_names[0] + " with:\n"
+            "Setting up Monte-Carlo collisions for " + m_species_names[0] + " with:\n"
             + "     total non-ionization collision probability: "
             + std::to_string(m_total_collision_prob)
             + "\n     total ionization collision probability: "

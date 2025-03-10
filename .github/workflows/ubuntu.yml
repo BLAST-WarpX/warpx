@@ -211,7 +211,7 @@ jobs:
         ccache -z
 
         python3 -m pip install --upgrade pip
-        python3 -m pip install --upgrade build packaging setuptools wheel
+        python3 -m pip install --upgrade build packaging setuptools[core] wheel
 
         export CXXFLAGS="-Werror -Wno-error=pass-failed"
 

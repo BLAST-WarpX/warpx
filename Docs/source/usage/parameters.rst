@@ -533,6 +533,8 @@ Domain Boundary Conditions
 
     * ``pec``: This option can be used to set a Perfect Electric Conductor at the simulation boundary. Please see the :ref:`PEC theory section <theory-bc-pec>` for more details. Note that PEC boundary is invalid at `r=0` for the RZ solver. Please use ``none`` option. This boundary condition does not work with the spectral solver.
 
+    * ``pmc``: This option can be used to set a Perfect Magnetic Conductor at the simulation boundary. Please see the :ref:`PEC theory section <theory-bc-pmc>` for more details. This is equivalent to ``Neumann``. This boundary condition does not work with the spectral solver.
+
     * ``pec_insulator``: This option specifies a mixed perfect electric conductor and insulator boundary, where some part of the
       boundary is PEC and some is insulator. In the insulator portion, the normal fields are extrapolated and the tangential fields
       are either set to the specified value or extrapolated. The region that is insulator is specified using a spatially dependent expression with the insulator being in the area where the value of the expression is greater than zero.
@@ -2068,7 +2070,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     In this case, only one species name should be given.
 
 * ``<collision_name>.product_species`` (`strings`)
-    Only for ``nuclearfusion``. The name(s) of the species in which to add
+    Only for ``dsmc`` and ``nuclearfusion``. The name(s) of the species in which to add
     the new macroparticles created by the reaction.
 
 * ``<collision_name>.ndt`` (`int`) optional
@@ -2167,8 +2169,8 @@ Details about the collision models can be found in the :ref:`theory section <mul
 
 * ``<collision_name>.scattering_processes`` (`strings` separated by spaces)
     Only for ``dsmc`` and ``background_mcc``. The scattering processes that should be
-    included. Available options are ``elastic``, ``back`` & ``charge_exchange``
-    for ions and ``elastic``, ``excitationX`` & ``ionization`` for electrons.
+    included. Available options are ``elastic``, ``excitationX``, ``forward``, ``back``, and ``charge_exchange``
+    for ions and ``elastic``, ``excitationX``, ``ionization`` & ``forward`` for electrons.
     Multiple excitation events can be included for electrons corresponding to
     excitation to different levels, the ``X`` above can be changed to a unique
     identifier for each excitation process. For each scattering process specified
@@ -2183,13 +2185,17 @@ Details about the collision models can be found in the :ref:`theory section <mul
     represent the kinetic energy of the colliding particles in the center-of-mass frame.
 
 * ``<collision_name>.<scattering_process>_energy`` (`float`)
-    Only for ``background_mcc``. If the scattering process is either
+    Only for ``dsmc`` and ``background_mcc``. If the scattering process is either
     ``excitationX`` or ``ionization`` the energy cost of that process must be given in eV.
 
 * ``<collision_name>.ionization_species`` (`float`)
     Only for ``background_mcc``. If the scattering process is ``ionization`` the
     produced species must also be given. For example if argon properties is used
     for the background gas, a species of argon ions should be specified here.
+
+* ``<collision_name>.ionization_target_species`` (`string`)
+    Only for ``dsmc`` with impact ionization. This specifies which one of the
+    colliding particles is ionized.
 
 .. _running-cpp-parameters-numerics:
 
@@ -2252,7 +2258,7 @@ Particle push, charge and current deposition, field gathering
 
 * ``algo.current_deposition`` (`string`, optional)
     This parameter selects the algorithm for the deposition of the current density.
-    Available options are: ``direct``, ``esirkepov``, and ``vay``. The default choice
+    Available options are: ``direct``, ``esirkepov``, ``villasenor``, and ``vay``. The default choice
     is ``esirkepov`` for FDTD maxwell solvers but ``direct`` for standard or
     Galilean PSATD solver (i.e. with ``algo.maxwell_solver = psatd``) and
     for the hybrid-PIC solver (i.e. with ``algo.maxwell_solver = hybrid``) and for
@@ -2271,7 +2277,12 @@ Particle push, charge and current deposition, field gathering
        :cite:t:`param-Esirkepovcpc01`.
        This deposition scheme guarantees charge conservation for shape factors of arbitrary order.
 
-    3. ``vay``
+    3. ``villasenor``
+
+       This uses the Villasenor-Buneman algorithm which guarantees charge conservation.
+       The algorithm is described in :cite:t:`pt-Villasenorcpc92`.
+
+    4. ``vay``
 
        The current density is deposited as described in :cite:t:`param-VayJCP2013` (see section :ref:`current_deposition` for more details).
        This option guarantees charge conservation only when used in combination
@@ -2535,6 +2546,27 @@ Maxwell solver: kinetic-fluid hybrid
 * ``hybrid_pic_model.substeps`` (`int`) optional (default ``10``)
     If ``algo.maxwell_solver`` is set to ``hybrid``, this sets the number of sub-steps to take during the B-field update.
 
+* ``hybrid_pic_model.holmstrom_vacuum_region`` (`bool`) optional (default ``false``)
+    If ``algo.maxwell_solver`` is set to ``hybrid``, this sets the vacuum region handling of the generalized Ohm's Law to suppress vacuum fluctuations. :cite:t:`param-holmstrom2013handlingvacuumregionshybrid`.
+
+* ``hybid_pic_model.add_external_fields`` (`bool`) optional (default ``false``)
+    If ``algo.maxwell_solver`` is set to ``hybrid``, this sets the hybrid solver to use split external fields defined in external_vector_potential inputs.
+
+* ``external_vector_potential.fields`` (list of `str`) optional (default ``empty``)
+    If ``hybid_pic_model.add_external_fields`` is set to ``true``, this adds a list names for external time varying vector potentials to be added to hybrid solver.
+
+* ``external_vector_potential.<field name>.read_from_file`` (`bool`) optional (default ``false``)
+    If ``hybid_pic_model.add_external_fields`` is set to ``true``, this flag determines whether to load an external field or use an implcit function to evaluate the time varying field.
+
+* ``external_vector_potential.<field name>.path`` (`str`) optional (default ``""``)
+    If ``external_vector_potential.<field name>.read_from_file`` is set to ``true``, sets the path to an OpenPMD file that can be loaded externally in :math:`weber/m`.
+
+* ``external_vector_potential.<field name>.A[x,y,z]_external_grid_function(x,y,z)`` (`str`) optional (default ``"0"``)
+    If ``external_vector_potential.<field name>.read_from_file`` is set to ``false``, Sets the external vector potential to be populated by an implicit function (on the grid) in :math:`weber/m`.
+
+* ``external_vector_potential.<field name>.A_time_external_grid_function(t)`` (`str`) optional (default ``"1"``)
+    This sets the relative strength of the external vector potential by a dimensionless implicit time function, which can compute the external B fields and E fields based on the value and first time derivative of the function.
+
 .. note::
 
     Based on results from :cite:t:`param-Stanier2020` it is recommended to use
@@ -2716,6 +2748,12 @@ WarpX has five types of diagnostics:
 Similar to what is done for physical species, WarpX has a class Diagnostics that allows users to initialize different diagnostics, each of them with different fields, resolution and period.
 This currently applies to standard diagnostics, but should be extended to back-transformed diagnostics and reduced diagnostics (and others) in a near future.
 
+* ``warpx.synchronize_velocity_for_diagnostics`` (``0`` or ``1``, optional, default ``0``)
+    Whether to synchronize the particle velocities with the particle positions in the diagnostics.
+    In its normal operation, WarpX is using the leap frog algorithm to advance the particles, and leaves the positions and velocities of the particles unsynchronized at the end of each time step, with the velocities lagging behind a half step.
+    When this option is turned on, whenever any diagnostics will be calculated, the velocities will be advanced a half step to
+    synchronize with the position before the diagnostics are generated.
+
 .. _running-cpp-parameters-diagnostics-full:
 
 Full Diagnostics
@@ -2773,16 +2811,16 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     Only read if ``<diag_name>.format = sensei``.
     When 1 lower left corner of the mesh is pinned to 0.,0.,0.
 
-* ``<diag_name>.openpmd_backend`` (``bp``, ``h5`` or ``json``) optional, only used if ``<diag_name>.format = openpmd``
+* ``<diag_name>.openpmd_backend`` (``bp5``, ``bp4``, ``h5`` or ``json``) optional, only used if ``<diag_name>.format = openpmd``
     `I/O backend <https://openpmd-api.readthedocs.io/en/latest/backends/overview.html>`_ for `openPMD <https://www.openPMD.org>`_ data dumps.
-    ``bp`` is the `ADIOS I/O library <https://csmd.ornl.gov/adios>`_, ``h5`` is the `HDF5 format <https://www.hdfgroup.org/solutions/hdf5/>`_, and ``json`` is a `simple text format <https://en.wikipedia.org/wiki/JSON>`_.
-    ``json`` only works with serial/single-rank jobs.
+    ``bp5``/``bp4`` is the `ADIOS I/O library <https://csmd.ornl.gov/adios>`_, ``h5`` is the `HDF5 format <https://www.hdfgroup.org/solutions/hdf5/>`_, and ``json`` is a `simple text format <https://en.wikipedia.org/wiki/JSON>`_.
+    ``json`` is for debugging and only works with serial/single-rank jobs.
     When WarpX is compiled with openPMD support, the first available backend in the order given above is taken.
 
 * ``<diag_name>.openpmd_encoding`` (optional, ``v`` (variable based), ``f`` (file based) or ``g`` (group based) ) only read if ``<diag_name>.format = openpmd``.
      openPMD `file output encoding <https://openpmd-api.readthedocs.io/en/0.16.1/usage/concepts.html#iteration-and-series>`__.
      File based: one file per timestep (slower), group/variable based: one file for all steps (faster)).
-     ``variable based`` is an `experimental feature with ADIOS2 <https://openpmd-api.readthedocs.io/en/0.16.1/backends/adios2.html#experimental-new-adios2-schema>`__ and not supported for back-transformed diagnostics.
+     ``variable based`` is an `experimental feature with ADIOS2 BP5 <https://openpmd-api.readthedocs.io/en/0.16.1/backends/adios2.html#experimental-new-adios2-schema>`__ that will replace ``g``.
      Default: ``f`` (full diagnostics)
 
 * ``<diag_name>.adios2_operator.type`` (``zfp``, ``blosc``) optional,
@@ -2795,21 +2833,28 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
 
     .. code-block:: text
 
-        <diag_name>.adios2_operator.type = blosc
-        <diag_name>.adios2_operator.parameters.compressor = zstd
-        <diag_name>.adios2_operator.parameters.clevel = 1
-        <diag_name>.adios2_operator.parameters.doshuffle = BLOSC_BITSHUFFLE
-        <diag_name>.adios2_operator.parameters.threshold = 2048
-        <diag_name>.adios2_operator.parameters.nthreads = 6  # per MPI rank (and thus per GPU)
+       <diag_name>.adios2_operator.type = blosc
+       <diag_name>.adios2_operator.parameters.compressor = zstd
+       <diag_name>.adios2_operator.parameters.clevel = 1
+       <diag_name>.adios2_operator.parameters.doshuffle = BLOSC_BITSHUFFLE
+       <diag_name>.adios2_operator.parameters.threshold = 2048
+       <diag_name>.adios2_operator.parameters.nthreads = 6  # per MPI rank (and thus per GPU)
 
     or for the lossy ZFP compressor using very strong compression per scalar:
 
     .. code-block:: text
 
-        <diag_name>.adios2_operator.type = zfp
-        <diag_name>.adios2_operator.parameters.precision = 3
+       <diag_name>.adios2_operator.type = zfp
+       <diag_name>.adios2_operator.parameters.precision = 3
 
-* ``<diag_name>.adios2_engine.type`` (``bp4``, ``sst``, ``ssc``, ``dataman``) optional,
+    For back-transformed diagnostics with ADIOS BP5, we are experimenting with a new option for variable-based encoding that "flattens" the output steps, aiming to increase write and read performance:
+
+    .. code-block:: text
+
+       <diag_name>.openpmd_backend = bp5
+       <diag_name>.adios2_engine.parameters.FlattenSteps = on
+
+* ``<diag_name>.adios2_engine.type`` (``bp5``, ``bp4``, ``sst``, ``ssc``, ``dataman``) optional,
     `ADIOS2 Engine type <https://openpmd-api.readthedocs.io/en/0.16.1/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.
     See full list of engines at `ADIOS2 readthedocs <https://adios2.readthedocs.io/en/latest/engines/engines.html>`__
 
@@ -3623,6 +3668,52 @@ This shifts analysis from post-processing to runtime calculation of reduction op
 
         * ``<reduced_diags_name>.bin_min`` (`float`, in eV)
             The maximum value of :math:`\mathcal{E}^*` for which the differential luminosity is computed.
+
+    * ``DifferentialLuminosity2D``
+        This type computes the two-dimensional differential luminosity between two species, defined as:
+
+        .. math::
+
+            \frac{d^2\mathcal{L}}{dE_1 dE_2}(E_1, E_2, t) = \int_0^t dt'\int d\boldsymbol{x}\, \int d\boldsymbol{p}_1 \int d\boldsymbol{p}_2\;
+             \sqrt{ |\boldsymbol{v}_1 - \boldsymbol{v}_2|^2 - |\boldsymbol{v}_1\times\boldsymbol{v}_2|^2/c^2} \\
+             f_1(\boldsymbol{x}, \boldsymbol{p}_1, t')f_2(\boldsymbol{x}, \boldsymbol{p}_2, t') \delta(E_1 - E_1(\boldsymbol{p}_1)) \delta(E_2 - E_2(\boldsymbol{p}_2))
+
+        where :math:`f_i` is the distribution function of species :math:`i`
+        (normalized such that :math:`\int \int f(\boldsymbol{x} \boldsymbol{p}, t )d\boldsymbol{x} d\boldsymbol{p} = N`
+        is the number of particles in species :math:`i` at time :math:`t`),
+        :math:`\boldsymbol{p}_i` and :math:`E_i (\boldsymbol{p}_i) = \sqrt{m_1^2c^4 + c^2 |\boldsymbol{p}_i|^2}`
+        are, respectively, the momentum and the energy of a particle of the :math:`i`-th species.
+        The 2D differential luminosity is given in units of :math:`\text{m}^{-2}.\text{eV}^{-2}`.
+
+        * ``<reduced_diags_name>.species`` (`list of two strings`)
+            The names of the two species for which the differential luminosity is computed.
+
+        * ``<reduced_diags_name>.bin_number_1`` (`int` > 0)
+            The number of bins in energy :math:`E_1`
+
+        * ``<reduced_diags_name>.bin_max_1`` (`float`, in eV)
+            The minimum value of :math:`E_1` for which the 2D differential luminosity is computed.
+
+        * ``<reduced_diags_name>.bin_min_1`` (`float`, in eV)
+            The maximum value of :math:`E_2` for which the 2D differential luminosity is compute
+
+        * ``<reduced_diags_name>.bin_number_2`` (`int` > 0)
+            The number of bins in energy :math:`E_2`
+
+        * ``<reduced_diags_name>.bin_max_2`` (`float`, in eV)
+            The minimum value of :math:`E_2` for which the 2D differential luminosity is computed.
+
+        * ``<reduced_diags_name>.bin_min_2`` (`float`, in eV)
+            The minimum value of :math:`E_2` for which the 2D differential luminosity is computed.
+
+        * ``<reduced_diags_name>.file_min_digits`` (`int`) optional (default `6`)
+            The minimum number of digits used for the iteration number appended to the diagnostic file names.
+
+        The output is a ``<reduced_diags_name>`` folder containing a set of openPMD files.
+        The values of the diagnostic are stored in a record labeled `d2L_dE1_dE2`.
+        An example input file and a loading python script of
+        using the DifferentialLuminosity2D reduced diagnostics
+        are given in ``Examples/Tests/diff_lumi_diag/``.
 
     * ``Timestep``
         This type outputs the simulation's physical timestep (in seconds) at each mesh refinement level.

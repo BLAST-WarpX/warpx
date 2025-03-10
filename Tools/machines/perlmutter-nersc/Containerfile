@@ -155,7 +155,7 @@ RUN python3 -m venv /opt/venv && \
     cython \
     packaging \
     build \
-    setuptools
+    setuptools[core]
 
 # Set up the environment for the virtual environment
 ENV PATH="/opt/venv/bin:${PATH}"
