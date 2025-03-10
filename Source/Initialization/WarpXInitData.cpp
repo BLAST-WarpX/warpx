@@ -595,7 +595,7 @@ WarpX::InitData ()
     m_electrostatic_solver->InitData();
 
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
-        m_hybrid_pic_model->InitData();
+        m_hybrid_pic_model->InitData(m_fields);
     }
 
     if (ParallelDescriptor::IOProcessor()) {

@@ -67,7 +67,7 @@ public:
         const amrex::IntVect& Bz_nodal_flag
     ) const;
 
-    void InitData ();
+    void InitData (const ablastr::fields::MultiFabRegister& fields);
 
     /**
      * \brief
