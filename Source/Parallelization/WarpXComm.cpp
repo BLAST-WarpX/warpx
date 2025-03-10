@@ -1115,9 +1115,9 @@ WarpX::SyncCurrent (const std::string& current_fp_string)
                 ::UpdateCurrentNodalToStag(
                     *J_fp[lev][dir], *J_fp_nodal[lev][dir],
                     current_centering_nox, current_centering_noy, current_centering_noz,
-                    m_device_current_centering_stencil_coeffs_x,
-                    m_device_current_centering_stencil_coeffs_y,
-                    m_device_current_centering_stencil_coeffs_z);
+                    device_current_centering_stencil_coeffs_x,
+                    device_current_centering_stencil_coeffs_y,
+                    device_current_centering_stencil_coeffs_z);
             }
         }
     }
