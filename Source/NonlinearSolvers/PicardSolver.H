@@ -118,7 +118,9 @@ void PicardSolver<Vec,Ops>::Define ( const Vec&  a_U,
     this->m_is_defined = true;
 
     // Create diagnostic file and write header
-    if (!this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor()) {
+    if (amrex::ParallelDescriptor::IOProcessor()
+        && !this->m_diagnostic_file.empty()
+        && !amrex::FileExists(this->m_diagnostic_file)) {
 
         std::filesystem::path const diagnostic_path(this->m_diagnostic_file);
         std::filesystem::path const diagnostic_dir = diagnostic_path.parent_path();
