@@ -157,6 +157,7 @@ public:
 
     MultiParticleContainer& GetPartContainer () { return *mypc; }
     MultiFluidContainer& GetFluidContainer () { return *myfl; }
+    WarpXFluidContainer& GetElectronFluidContainer () { return *hybrid_electron_fl; }
     ElectrostaticSolver& GetElectrostaticSolver () {return *m_electrostatic_solver;}
     [[nodiscard]] HybridPICModel * get_pointer_HybridPICModel () const { return m_hybrid_pic_model.get(); }
     MultiDiagnostics& GetMultiDiags () {return *multi_diags;}
@@ -1261,6 +1262,8 @@ private:
     //! Integer that corresponds to electromagnetic Maxwell solver (vacuum - 0, macroscopic - 1)
     MediumForEM m_em_solver_medium = MediumForEM::Default;
 
+    // Fluid container used in hybrid solver for electron energy equation
+    std::unique_ptr<WarpXFluidContainer> hybrid_electron_fl;
     //
     // Fields: First array for level, second for direction
     //

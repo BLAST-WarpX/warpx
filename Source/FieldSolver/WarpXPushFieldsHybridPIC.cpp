@@ -14,6 +14,7 @@
 #include "Utils/TextMsg.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
+#include "Fluids/QdsmcParticleContainer.H"
 #include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
@@ -102,6 +103,48 @@ void WarpX::HybridPICEvolveFields ()
     // 0'th index of `rho_fp`, J_i^{n-1/2} in `current_fp_temp` and J_i^{n+1/2}
     // in `current_fp`.
 
+    const amrex::Real cur_step = getistep(finest_level);
+    const amrex::Real Te0 = m_hybrid_pic_model->m_elec_temp;
+    const amrex::Real rho0_ref = m_hybrid_pic_model->m_n0_ref*PhysConst::q_e;
+    const amrex::Real gamma_val = m_hybrid_pic_model->m_gamma;
+
+    // Initialize electron temperature multifab if qdsmc solver is used
+    if(cur_step==1 && m_hybrid_pic_model->m_solve_electron_energy_equation){
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi(*m_fields.get("fluid_temperature_electrons_hybrid", finest_level), TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            amrex::Box const &tile_box = mfi.tilebox(m_fields.get("fluid_temperature_electrons_hybrid",  finest_level)->ixType().toIntVect());
+            amrex::Array4<Real> const &Te_arr = m_fields.get("fluid_temperature_electrons_hybrid",  finest_level)->array(mfi);
+            const amrex::Array4<amrex::Real> rho_arr = m_fields.get(FieldType::rho_fp,  finest_level)->array(mfi);
+
+            amrex::ParallelFor(tile_box,
+                [=] AMREX_GPU_DEVICE(int i, int j, int k)
+                {
+                    Te_arr(i, j, k) = Te0*std::pow(rho_arr(i, j, k)/rho0_ref,gamma_val-1);
+                }
+            );
+        }
+        m_fields.get("fluid_temperature_electrons_hybrid",  finest_level)->FillBoundary(Geom(finest_level).periodicity());
+    }
+
+    // Calculate Ke using rho^{n} in rho_fp_temp
+    if(m_hybrid_pic_model->m_solve_electron_energy_equation)
+    {
+
+        // copy rho_fp_temp to hybrid_electron_fl->name_mf_N
+        m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->setVal(0);
+        MultiFab::Copy( *m_fields.get(hybrid_electron_fl->name_mf_N, finest_level),
+                        *m_fields.get(FieldType::hybrid_rho_fp_temp, finest_level),
+                       0, 0, 1, m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->nGrowVect());
+        // Calculate Ke
+        hybrid_electron_fl->HybridInitializeKe(m_fields, m_hybrid_pic_model->m_gamma, m_hybrid_pic_model->m_n_floor, finest_level);
+
+    }
+
+
     // Note: E^{n} is recalculated with the accurate J_i^{n} since at the end
     // of the last step we had to "guess" it. It also needs to be
     // recalculated to include the resistivity before evolving B.
@@ -157,6 +200,24 @@ void WarpX::HybridPICEvolveFields ()
             0.5_rt*dt[0]);
     }
 
+    if(m_hybrid_pic_model->m_solve_electron_energy_equation)
+    {
+
+        // Calculate plasma current at n+1/2 using Ampere's law
+        // using B field at t=n+1/2
+        m_hybrid_pic_model->CalculatePlasmaCurrent(
+            m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
+            m_eb_update_E);
+
+        // Calculates Ue using Jtot at n+1/2 and Ji at n+1/2
+        hybrid_electron_fl->HybridInitializeUe(m_fields, // pass also rho as argument
+                m_fields.get_alldirs(FieldType::current_fp, finest_level),
+                m_hybrid_pic_model.get(),
+                finest_level);
+
+    }
+
+
     // Now push the B field from t=n+1/2 to t=n+1 using the n+1/2 quantities
     for (int sub_step = 0; sub_step < sub_steps; sub_step++)
     {
@@ -196,13 +257,76 @@ void WarpX::HybridPICEvolveFields ()
             0.5_rt*dt[0]);
     }
 
+    // calculate plasma current at n+1
+    m_hybrid_pic_model->CalculatePlasmaCurrent(
+        m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
+        m_eb_update_E);
+
+    // all the qdsmc solver functions should be in a ElectronEnergyEquationSolver class as well as other solvers like Layer method
+    if(m_hybrid_pic_model->m_solve_electron_energy_equation){
+
+
+        // Reset qdsmc particles positions to x0,y0,z0 and rest of attributes to 0 and redistribute
+        m_hybrid_pic_model->qdsmc_hybrid_electron_pc->ResetParticles(finest_level);
+
+        // Set fictitious electron particles velocities
+        m_hybrid_pic_model->qdsmc_hybrid_electron_pc->SetV(finest_level,
+            *m_fields.get(hybrid_electron_fl->name_mf_NU, Direction{0}, finest_level),
+            *m_fields.get(hybrid_electron_fl->name_mf_NU, Direction{1}, finest_level),
+            *m_fields.get(hybrid_electron_fl->name_mf_NU, Direction{2}, finest_level));
+
+        // Set fictitious electron particles entropy
+        m_hybrid_pic_model->qdsmc_hybrid_electron_pc->SetK(finest_level,
+            *m_fields.get(hybrid_electron_fl->name_mf_K, finest_level),
+            *m_fields.get(hybrid_electron_fl->name_mf_N, finest_level));
+
+        // Push fictitious electron particles
+        m_hybrid_pic_model->qdsmc_hybrid_electron_pc->PushX(finest_level, dt[0]);
+
+        /// Needed to update Te later on (weights from qdsmc particles)
+        m_fields.get(hybrid_electron_fl->name_mf_weights, finest_level)->setVal(0);
+        m_hybrid_pic_model->qdsmc_hybrid_electron_pc->DepositField(finest_level, *m_fields.get(hybrid_electron_fl->name_mf_weights, finest_level));
+
+        // Deposit entropy from qdsmc
+        m_hybrid_pic_model->qdsmc_hybrid_electron_pc->DepositK(finest_level, *m_fields.get(hybrid_electron_fl->name_mf_K, finest_level));
+
+        // Update ne to n+1 before updating Te so the calculation is consistent
+        m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->setVal(0);
+        MultiFab::Copy( *m_fields.get(hybrid_electron_fl->name_mf_N, finest_level),
+                        *m_fields.get(FieldType::rho_fp, finest_level),
+                        0, 0, 1, m_fields.get(hybrid_electron_fl->name_mf_N, finest_level)->nGrowVect());
+
+        // Update Te after QDSMC solver:
+        hybrid_electron_fl->HybridQDSMCUpdateTe(m_fields, m_hybrid_pic_model->m_gamma, m_hybrid_pic_model->m_n_floor, finest_level);
+
+        // adds Joule heating using operator splitting approach
+        if(m_hybrid_pic_model->m_include_Joule_heating){
+            hybrid_electron_fl->Hybrid_Electron_Joule_Heating(m_fields, m_hybrid_pic_model.get(), dt[0], finest_level);
+        }
+
+        // adds Bremsstrahlung loss using operator splitting approach
+        if(m_hybrid_pic_model->m_include_Bremsstrahlung){
+            hybrid_electron_fl->Hybrid_Electron_Bremsstrahlung(m_fields, m_hybrid_pic_model.get(), dt[0], finest_level);
+        }
+
+        // add conductivity term here.
+        // Write functions in FluidContainer, use multigrid solver from amrex
+        // look at example from amrex guided tutorials (MLMG) linear operator classes
+
+
+        // add source/sink term due to collisions with ions (Qei)
+        // This term should also apply MCC to ions particle container (Qie)
+        // Implement for 1 ion species and then extend to multiple species using mypc
+        // COMPLETE ...
+
+
+
+    }
+
     // Calculate the electron pressure at t=n+1
     m_hybrid_pic_model->CalculateElectronPressure();
 
     // Update the E field to t=n+1 using the extrapolated J_i^n+1 value
-    m_hybrid_pic_model->CalculatePlasmaCurrent(
-        m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
-        m_eb_update_E);
     m_hybrid_pic_model->HybridPICSolveE(
         m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
         current_fp_temp,

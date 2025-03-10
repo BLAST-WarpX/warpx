@@ -18,41 +18,44 @@
 #include <ablastr/coarsen/sample.H>
 #include <ablastr/utils/Communication.H>
 
+#include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
+
 using namespace ablastr::utils::communication;
 using namespace amrex;
 
 
-WarpXFluidContainer::WarpXFluidContainer(int ispecies, const std::string &name):
+WarpXFluidContainer::WarpXFluidContainer(int ispecies, const std::string &name, bool electron_hybrid):
     species_id{ispecies},
     species_name{name}
 {
-    ReadParameters();
+    if(!electron_hybrid){
+        ReadParameters();
 
-    // Initialize injection objects
-    const ParmParse pp_species_name(species_name);
-    SpeciesUtils::parseDensity(species_name, "", h_inj_rho, density_parser);
-    SpeciesUtils::parseMomentum(species_name, "", "none", h_inj_mom,
-        ux_parser, uy_parser, uz_parser, ux_th_parser, uy_th_parser, uz_th_parser, h_mom_temp, h_mom_vel);
-    if (h_inj_rho) {
-#ifdef AMREX_USE_GPU
-        d_inj_rho = static_cast<InjectorDensity*>
-            (amrex::The_Arena()->alloc(sizeof(InjectorDensity)));
-        amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
-#else
-        d_inj_rho = h_inj_rho.get();
-#endif
-    }
-    if (h_inj_mom) {
-#ifdef AMREX_USE_GPU
-        d_inj_mom = static_cast<InjectorMomentum*>
-            (amrex::The_Arena()->alloc(sizeof(InjectorMomentum)));
-        amrex::Gpu::htod_memcpy_async(d_inj_mom, h_inj_mom.get(), sizeof(InjectorMomentum));
-#else
-        d_inj_mom = h_inj_mom.get();
-#endif
-    }
+        // Initialize injection objects
+        const ParmParse pp_species_name(species_name);
+        SpeciesUtils::parseDensity(species_name, "", h_inj_rho, density_parser);
+        SpeciesUtils::parseMomentum(species_name, "", "none", h_inj_mom,
+            ux_parser, uy_parser, uz_parser, ux_th_parser, uy_th_parser, uz_th_parser, h_mom_temp, h_mom_vel);
+        if (h_inj_rho) {
+    #ifdef AMREX_USE_GPU
+            d_inj_rho = static_cast<InjectorDensity*>
+                (amrex::The_Arena()->alloc(sizeof(InjectorDensity)));
+            amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
+    #else
+            d_inj_rho = h_inj_rho.get();
+    #endif
+        }
+        if (h_inj_mom) {
+    #ifdef AMREX_USE_GPU
+            d_inj_mom = static_cast<InjectorMomentum*>
+                (amrex::The_Arena()->alloc(sizeof(InjectorMomentum)));
+            amrex::Gpu::htod_memcpy_async(d_inj_mom, h_inj_mom.get(), sizeof(InjectorMomentum));
+    #else
+            d_inj_mom = h_inj_mom.get();
+    #endif
+        }
     amrex::Gpu::synchronize();
-
+    }
 }
 
 void WarpXFluidContainer::ReadParameters()
@@ -159,6 +162,18 @@ void WarpXFluidContainer::AllocateLevelMFs(ablastr::fields::MultiFabRegister& fi
 
     fields.alloc_init(
             name_mf_NU, Direction{2}, lev, amrex::convert(ba, amrex::IntVect::TheNodeVector()), dm,
+            ncomps, nguards, 0.0_rt);
+
+    fields.alloc_init(
+            name_mf_T, lev, amrex::convert(ba, amrex::IntVect::TheNodeVector()), dm,
+            ncomps, nguards, 0.0_rt);
+
+    fields.alloc_init(
+            name_mf_K, lev, amrex::convert(ba, amrex::IntVect::TheNodeVector()), dm,
+            ncomps, nguards, 0.0_rt);
+
+    fields.alloc_init(
+            name_mf_weights, lev, amrex::convert(ba, amrex::IntVect::TheNodeVector()), dm,
             ncomps, nguards, 0.0_rt);
 
 }
@@ -1395,4 +1410,436 @@ void WarpXFluidContainer::DepositCurrent(
             }
         );
     }
+}
+
+
+void WarpXFluidContainer::HybridInitializeUe (
+        ablastr::fields::MultiFabRegister& m_fields,
+        ablastr::fields::VectorField const& Ji,
+        HybridPICModel const* hybrid_model,
+        int lev)
+{
+    WARPX_PROFILE("WarpXFluidContainer::HybridInitializeUe");
+
+    WarpX &warpx = WarpX::GetInstance();
+    const amrex::Geometry &geom = warpx.Geom(lev);
+    const amrex::Periodicity &period = geom.periodicity();
+
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    // For safety condition (divition by rho)
+    amrex::Real rho_floor = PhysConst::q_e*hybrid_model->m_n_floor;
+
+    // Set Ue to 0
+    m_fields.get(name_mf_NU, Direction{0}, lev)->setVal(0.0_rt);
+    m_fields.get(name_mf_NU, Direction{1}, lev)->setVal(0.0_rt);
+    m_fields.get(name_mf_NU, Direction{2}, lev)->setVal(0.0_rt);
+
+    const auto ix_type = m_fields.get(name_mf_NU, Direction{0}, lev)->ixType().toIntVect();
+
+    ablastr::fields::VectorField current_fp_ampere = m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
+
+    // Index type required for interpolating fields from their respective
+    // staggering to nodal grid
+    amrex::GpuArray<int, 3> const& Jx_stag = hybrid_model->Jx_IndexType;
+    amrex::GpuArray<int, 3> const& Jy_stag = hybrid_model->Jy_IndexType;
+    amrex::GpuArray<int, 3> const& Jz_stag = hybrid_model->Jz_IndexType;
+
+    // Parameters for 'interp' that maps from Yee to nodal mesh
+    amrex::GpuArray<int, 3> const& nodal = {1, 1, 1};
+    // The coarsingng is just 1 so no coarsening is done
+    amrex::GpuArray<int, 3> const& coarsen = {1, 1, 1};
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*m_fields.get(name_mf_N, lev), TilingIfNotGPU()); mfi.isValid(); ++mfi )
+        {
+            // using rho at n+1/2 in rho_fp_temp
+            amrex::Array4<amrex::Real> const& rho = m_fields.get(FieldType::hybrid_rho_fp_temp, lev)->array(mfi);
+
+            amrex::Array4<amrex::Real> const& Jx = current_fp_ampere[0]->array(mfi);
+            amrex::Array4<amrex::Real> const& Jy = current_fp_ampere[1]->array(mfi);
+            amrex::Array4<amrex::Real> const& Jz = current_fp_ampere[2]->array(mfi);
+
+            amrex::Array4<amrex::Real> const& Jix = Ji[0]->array(mfi);
+            amrex::Array4<amrex::Real> const& Jiy = Ji[1]->array(mfi);
+            amrex::Array4<amrex::Real> const& Jiz = Ji[2]->array(mfi);
+
+            amrex::Array4<amrex::Real> const& Uex = m_fields.get(name_mf_NU, Direction{0}, lev)->array(mfi);
+            amrex::Array4<amrex::Real> const& Uey = m_fields.get(name_mf_NU, Direction{1}, lev)->array(mfi);
+            amrex::Array4<amrex::Real> const& Uez = m_fields.get(name_mf_NU, Direction{2}, lev)->array(mfi);
+
+            const Box& tilebox  = mfi.tilebox();
+            //amrex::Box box = amrex::convert( tilebox, ix_type );
+            //box.grow(m_fields.get(name_mf_K, lev)->nGrowVect());
+
+            ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                // to test, Ue is calculated only when rho > rho_floor
+                if( rho(i, j, k) > rho_floor ){
+
+                    // safety condition since we divide by rho_val later
+                    //amrex::Real rho_val = rho_floor;
+                    //if(rho(i, j, k) > rho_floor){
+                    //    rho_val = rho(i, j, k);
+                    //}
+                    amrex::Real rho_val = rho(i, j, k); // to test
+
+                    // Interpolate the total plasma current to a nodal grid
+                    auto const jx_interp = ablastr::coarsen::sample::Interp(Jx, Jx_stag, nodal, coarsen, i, j, k, 0);
+                    auto const jy_interp = ablastr::coarsen::sample::Interp(Jy, Jy_stag, nodal, coarsen, i, j, k, 0);
+                    auto const jz_interp = ablastr::coarsen::sample::Interp(Jz, Jz_stag, nodal, coarsen, i, j, k, 0);
+
+                    // Interpolate the ion current to a nodal grid
+                    auto const jix_interp = ablastr::coarsen::sample::Interp(Jix, Jx_stag, nodal, coarsen, i, j, k, 0);
+                    auto const jiy_interp = ablastr::coarsen::sample::Interp(Jiy, Jy_stag, nodal, coarsen, i, j, k, 0);
+                    auto const jiz_interp = ablastr::coarsen::sample::Interp(Jiz, Jz_stag, nodal, coarsen, i, j, k, 0);
+
+                    // this needs to be rewritten for multiple ion species when implemented :
+                    Uex(i, j, k) = -(jx_interp - jix_interp)/rho_val;
+                    Uey(i, j, k) = -(jy_interp - jiy_interp)/rho_val;
+                    Uez(i, j, k) = -(jz_interp - jiz_interp)/rho_val;
+                }
+
+            });
+        }
+
+    m_fields.get(name_mf_NU, Direction{0}, lev)->FillBoundary(m_fields.get(name_mf_NU, Direction{0}, lev)->nGrowVect(), period);
+    m_fields.get(name_mf_NU, Direction{1}, lev)->FillBoundary(m_fields.get(name_mf_NU, Direction{1}, lev)->nGrowVect(), period);
+    m_fields.get(name_mf_NU, Direction{2}, lev)->FillBoundary(m_fields.get(name_mf_NU, Direction{2}, lev)->nGrowVect(), period);
+}
+
+
+void WarpXFluidContainer::HybridInitializeKe (ablastr::fields::MultiFabRegister& m_fields, amrex::Real gamma, amrex::Real n_floor, int lev)
+{
+    WARPX_PROFILE("WarpXFluidContainer::HybridInitializeKe");
+
+    using warpx::fields::FieldType;
+
+    WarpX &warpx = WarpX::GetInstance();
+    const amrex::Geometry &geom = warpx.Geom(lev);
+    const amrex::Periodicity &period = geom.periodicity();
+
+    // Set Ke to 0
+    m_fields.get(name_mf_K, lev)->setVal(0);
+
+    const auto ix_type = m_fields.get(name_mf_K, lev)->ixType().toIntVect();
+
+    // For safety condition (divition by rho)
+    amrex::Real rho_floor = PhysConst::q_e*n_floor;
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*m_fields.get(name_mf_N, lev), TilingIfNotGPU()); mfi.isValid(); ++mfi )
+        {
+            amrex::Array4<amrex::Real> const& rho = m_fields.get(name_mf_N, lev)->array(mfi);
+            amrex::Array4<amrex::Real> const& Te = m_fields.get(name_mf_T, lev)->array(mfi);
+            amrex::Array4<amrex::Real> const& Ke = m_fields.get(name_mf_K, lev)->array(mfi);
+
+            const Box& tilebox  = mfi.tilebox();
+            amrex::Box box = amrex::convert( tilebox, ix_type );
+            box.grow(m_fields.get(name_mf_K, lev)->nGrowVect());
+
+            ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                // to test, only calculated when rho > rho_floor
+                if( rho(i, j, k) > rho_floor ){
+
+                    // safety condition since we divide by rho_val later
+                    //amrex::Real rho_val = rho_floor;
+                    //if(rho(i, j, k) > rho_floor){
+                    //    rho_val = rho(i, j, k);
+                    //}
+
+                    amrex::Real rho_val = rho(i, j, k);
+
+                    amrex::Real ne = rho_val/PhysConst::q_e;
+                    Ke(i, j, k) = Te(i, j, k)*std::pow(ne, 1-gamma)/PhysConst::q_e; // Ke with Te in eV to avoid small numbers
+                }
+            });
+        }
+    m_fields.get(name_mf_K, lev)->FillBoundary(m_fields.get(name_mf_K, lev)->nGrowVect(), period);
+}
+
+
+void WarpXFluidContainer::HybridQDSMCUpdateTe (ablastr::fields::MultiFabRegister& m_fields, amrex::Real gamma, amrex::Real n_floor, int lev)
+{
+    WARPX_PROFILE("WarpXFluidContainer::HybridQDSMCUpdateTe");
+
+    using warpx::fields::FieldType;
+
+    WarpX &warpx = WarpX::GetInstance();
+    const amrex::Geometry &geom = warpx.Geom(lev);
+    const amrex::Periodicity &period = geom.periodicity();
+    const auto dx = geom.CellSizeArray();
+    const auto cell_volume = dx[0]*dx[1]*dx[2];
+
+    // Set Te to 0
+    m_fields.get(name_mf_T, lev)->setVal(0);
+
+    const auto ix_type = m_fields.get(name_mf_T, lev)->ixType().toIntVect();
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*m_fields.get(name_mf_N, lev), TilingIfNotGPU()); mfi.isValid(); ++mfi )
+        {
+            amrex::Array4<amrex::Real> const& rho = m_fields.get(name_mf_N, lev)->array(mfi);
+            amrex::Array4<amrex::Real> const& Ke = m_fields.get(name_mf_K, lev)->array(mfi);
+            amrex::Array4<amrex::Real> const& Te = m_fields.get(name_mf_T, lev)->array(mfi);
+            amrex::Array4<amrex::Real> const& weights = m_fields.get(name_mf_weights, lev)->array(mfi);
+
+            const Box& tilebox  = mfi.tilebox();
+            amrex::Box box = amrex::convert( tilebox, ix_type );
+            box.grow(m_fields.get(name_mf_K, lev)->nGrowVect());
+
+            ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                if( rho(i, j, k) > 0 ){
+
+                    amrex::Real ne = rho(i, j, k)/PhysConst::q_e;
+                    amrex::Real weight = weights(i,j,k);
+
+                    if(weight>0 && ne>n_floor){
+                        weight = weight*cell_volume;
+                        Te(i, j, k) = (Ke(i, j, k)*PhysConst::q_e/std::pow(ne, 1-gamma))/weight; // Te in Joules
+                    }
+                }
+            });
+        }
+    m_fields.get(name_mf_T, lev)->FillBoundary(m_fields.get(name_mf_T, lev)->nGrowVect(), period);
+}
+
+
+// To Do:
+// pass Te and rho multifabs as arguments too !
+void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiFabRegister& m_fields,
+                                        HybridPICModel const* hybrid_model,
+                                        amrex::Real dt, int lev)
+{
+    WARPX_PROFILE("WarpXFluidContainer::Hybrid_Electron_Joule_Heating");
+
+    WarpX &warpx = WarpX::GetInstance();
+    const amrex::Geometry &geom = warpx.Geom(lev);
+    const amrex::Periodicity &period = geom.periodicity();
+
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    // get hybrid model parameters
+    const auto eta = hybrid_model->m_eta;
+
+    // For safety condition (divition by rho)
+    amrex::Real rho_floor = PhysConst::q_e*hybrid_model->m_n_floor;
+
+    // Te0 to treat it as floor value. This is a quick fix for Spitzer type resistivity.
+    const auto Te0_K = hybrid_model->m_elec_temp / PhysConst::kb;
+
+    const auto ix_type = m_fields.get(name_mf_NU, Direction{0}, lev)->ixType().toIntVect();
+
+    ablastr::fields::VectorField current_fp_ampere = m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
+
+    // Index type required for interpolating fields from their respective
+    // staggering to nodal grid
+    amrex::GpuArray<int, 3> const& Jx_stag = hybrid_model->Jx_IndexType;
+    amrex::GpuArray<int, 3> const& Jy_stag = hybrid_model->Jy_IndexType;
+    amrex::GpuArray<int, 3> const& Jz_stag = hybrid_model->Jz_IndexType;
+
+    // Parameters for 'interp' that maps from Yee to nodal mesh
+    amrex::GpuArray<int, 3> const& nodal = {1, 1, 1};
+    // The coarsingng is just 1 so no coarsening is done
+    amrex::GpuArray<int, 3> const& coarsen = {1, 1, 1};
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*m_fields.get(name_mf_N, lev), TilingIfNotGPU()); mfi.isValid(); ++mfi )
+        {
+
+            // using Te right after qdsmc update
+            amrex::Array4<amrex::Real> const& Te = m_fields.get(name_mf_T, lev)->array(mfi);
+
+            // using rho at n+1
+            amrex::Array4<amrex::Real> const& rho = m_fields.get(FieldType::rho_fp, lev)->array(mfi);
+
+            // using total plasma current at n+1
+            amrex::Array4<amrex::Real> const& Jx = current_fp_ampere[0]->array(mfi);
+            amrex::Array4<amrex::Real> const& Jy = current_fp_ampere[1]->array(mfi);
+            amrex::Array4<amrex::Real> const& Jz = current_fp_ampere[2]->array(mfi);
+
+            const Box& tilebox  = mfi.tilebox();
+            //amrex::Box box = amrex::convert( tilebox, ix_type );
+            //box.grow(m_fields.get(name_mf_K, lev)->nGrowVect());
+
+            ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+
+                if(rho(i, j, k) > rho_floor){
+
+                    amrex::Real rho_val = rho(i, j, k);
+                    amrex::Real ne_val = rho_val/PhysConst::q_e;
+
+                    amrex::Real Te_val = Te(i, j, k)/PhysConst::kb; // convert to K since eta expression should be in SI
+
+                    // remove this. Control on Te is set in eta() expression defined by the user.
+                    // unless this is necessary to avoid Te blowing up or m=4 amplification
+                    //if(Te_val<Te0_K){
+                    //    Te_val = Te0_K;
+                    //}
+
+                    // Interpolate the total plasma current to a nodal grid
+                    auto const jx_interp = ablastr::coarsen::sample::Interp(Jx, Jx_stag, nodal, coarsen, i, j, k, 0);
+                    auto const jy_interp = ablastr::coarsen::sample::Interp(Jy, Jy_stag, nodal, coarsen, i, j, k, 0);
+                    auto const jz_interp = ablastr::coarsen::sample::Interp(Jz, Jz_stag, nodal, coarsen, i, j, k, 0);
+
+                    // calculate J^2 on nodal grid (since Te is nodal)
+                    amrex::Real jtot_val = 0_rt;
+                    jtot_val = std::sqrt(jx_interp*jx_interp + jy_interp*jy_interp + jz_interp*jz_interp);
+
+                    // calculate eta*J^2
+                    // eta expression and units should be in SI
+                    // so all variables here go in SI
+                    amrex::Real eta_J2 = eta(rho_val, jtot_val, Te_val)*jtot_val*jtot_val;
+
+                    // Te(i, j, k) and second term already in Joules so no need to divide eta_J2 by kb
+                    Te(i, j, k) = Te(i, j, k) + dt*eta_J2/(1.5*ne_val);
+                }
+            });
+        }
+    m_fields.get(name_mf_T, lev)->FillBoundary(m_fields.get(name_mf_T, lev)->nGrowVect(), period);
+}
+
+
+// To Do:
+// pass Te and rho multifabs as arguments too !
+void WarpXFluidContainer::Hybrid_Electron_Bremsstrahlung (ablastr::fields::MultiFabRegister& m_fields,
+                                        HybridPICModel const* hybrid_model,
+                                        amrex::Real dt, int lev)
+{
+    WARPX_PROFILE("WarpXFluidContainer::Hybrid_Electron_Bremsstrahlung");
+
+    WarpX &warpx = WarpX::GetInstance();
+    const amrex::Geometry &geom = warpx.Geom(lev);
+    const amrex::Periodicity &period = geom.periodicity();
+
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    // Zeff should be self consistent with simulation but it is
+    // an input parameter for now.
+    // Once Hybrid PIC is extended to do more than 1 ion species
+    // Zeff should be calculated from rho_total and rho of each species.
+    const auto Zeff = hybrid_model->m_Zeff;
+    amrex::Real Zeff3 = Zeff*Zeff*Zeff;
+    amrex::Real constant_val = 5.91361e37;
+
+    // For safety condition (divition by rho)
+    amrex::Real rho_floor = PhysConst::q_e*hybrid_model->m_n_floor;
+    const auto ix_type = m_fields.get(name_mf_NU, Direction{0}, lev)->ixType().toIntVect();
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*m_fields.get(name_mf_N, lev), TilingIfNotGPU()); mfi.isValid(); ++mfi )
+        {
+            // using Te right after Joule heating/qdsmc (operator splitting approach)
+            // this is first order accurate in time
+            amrex::Array4<amrex::Real> const& Te = m_fields.get(name_mf_T, lev)->array(mfi);
+
+            // using rho at n+1
+            amrex::Array4<amrex::Real> const& rho = m_fields.get(FieldType::rho_fp, lev)->array(mfi);
+
+            const Box& tilebox  = mfi.tilebox();
+            amrex::Box box = amrex::convert( tilebox, ix_type );
+            box.grow(m_fields.get(name_mf_K, lev)->nGrowVect());
+
+            ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+
+                if(rho(i, j, k) > rho_floor){
+
+                    amrex::Real rho_val = rho(i, j, k);
+                    amrex::Real ne_val = rho_val/PhysConst::q_e;
+
+                    // calculate power loss per unit volume due to Bremsstrahlung
+                    // Expression gives value in W/m^3
+                    // Te in sqrt() is in eV in this formula
+                    // update once multi ion species is included (one of these ne_val should be ni_val)
+                    amrex::Real dW_dV = Zeff3*ne_val*ne_val*std::sqrt(Te(i, j, k)/PhysConst::q_e)/constant_val;
+
+                    // Te(i, j, k) and second term already in Joules
+                    Te(i, j, k) = Te(i, j, k) - dW_dV*dt/(1.5*ne_val);
+                }
+            });
+        }
+    m_fields.get(name_mf_T, lev)->FillBoundary(m_fields.get(name_mf_T, lev)->nGrowVect(), period);
+}
+
+
+/*
+    Function for electron-ion temperature relaxation as part of the electron energy equation used in the Hybrid PIC model.
+    When used, MCC module should be called in WarpXPushFieldsHybridPIC.cpp for ions so energy is conserved.
+    Collision frequencies should be used consistently.
+    Check that if Ti is vector field, then average over degrees of freedom to get Ti
+*/
+void WarpXFluidContainer::Hybrid_Electron_Qei (ablastr::fields::MultiFabRegister& m_fields,
+                                        HybridPICModel const* hybrid_model,
+                                        ablastr::fields::ScalarField const& Ti_field,
+                                        amrex::Real m_ion, amrex::Real dt, int lev)
+{
+    WARPX_PROFILE("WarpXFluidContainer::Hybrid_Electron_Qei");
+
+    WarpX &warpx = WarpX::GetInstance();
+    const amrex::Geometry &geom = warpx.Geom(lev);
+    const amrex::Periodicity &period = geom.periodicity();
+
+    using warpx::fields::FieldType;
+
+    const auto nu_ei = hybrid_model->m_nu_ei;
+
+    // For safety condition (divition by rho)
+    amrex::Real rho_floor = PhysConst::q_e*hybrid_model->m_n_floor;
+    const auto ix_type = m_fields.get(name_mf_N, lev)->ixType().toIntVect();
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*m_fields.get(name_mf_N, lev), TilingIfNotGPU()); mfi.isValid(); ++mfi )
+        {
+            // This assumes operator splitting approach
+            // use temperatures at n+1
+            amrex::Array4<amrex::Real> const& Te = m_fields.get(name_mf_T, lev)->array(mfi);
+            amrex::Array4<amrex::Real> const& Ti = Ti_field->array(mfi);
+
+            // using rho at n+1
+            amrex::Array4<amrex::Real> const& rho = m_fields.get(FieldType::rho_fp, lev)->array(mfi);
+
+            const Box& tilebox  = mfi.tilebox();
+            amrex::Box box = amrex::convert( tilebox, ix_type );
+            box.grow(m_fields.get(name_mf_N, lev)->nGrowVect());
+
+            ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+
+                // careful here, once multi ion species feature is included
+                // use rho_val control since it will be needed in the formula below (ne won't be equal to ni).
+                if(rho(i, j, k) > 0.0_rt){
+
+                    amrex::Real rho_val = rho(i, j, k);
+                    amrex::Real ne_val = rho_val/PhysConst::q_e;
+                    amrex::Real Te_val_K = Te(i, j, k) / PhysConst::kb; // convert Te from J to K for nu_ei evaluation
+
+                    // nu_ei expression defined by user using parser
+                    amrex::Real nu_ei_val = nu_ei(Te_val_K, ne_val);
+
+                    // CHECK Ti UNITS !!!!
+                    // If Ti is in K, then convert to Joules below !
+                    // refactor hybrid code so Te is in K instead of J.
+
+                    // -3*me/mi*nu_ei*ni*kb*(Te-Ti), then divide by 3/2*kb*ne
+                    // since only one ion species for now, ni_val=ne_val -> -2*me/mi*nu_ei*kb*(Te-Ti)
+                    // Te(i, j, k) and second term already in Joules so no need to divide by kb
+                    Te(i, j, k) = Te(i, j, k) - dt*2*PhysConst::m_e/m_ion*nu_ei_val*(Te(i, j, k) - PhysConst::kb*Ti(i, j, k));
+                }
+            });
+        }
+
+    m_fields.get(name_mf_T, lev)->FillBoundary(m_fields.get(name_mf_T, lev)->nGrowVect(), period);
 }

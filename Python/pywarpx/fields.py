@@ -1129,3 +1129,71 @@ def GCPPMLWrapper(level=0, include_ghosts=False):
     return _MultiFABWrapper(
         mf_name="pml_G_cp", level=level, include_ghosts=include_ghosts
     )
+
+
+# remove
+def Ne_HybridWrapper(level=0, include_ghosts=False):
+    return _MultiFABWrapper(
+        mf_name="fluid_density_electrons_hybrid",
+        level=level,
+        include_ghosts=include_ghosts,
+    )
+
+
+def NUex_HybridWrapper(level=0, include_ghosts=False):
+    return _MultiFABWrapper(
+        mf_name="fluid_momentum_density_electrons_hybrid",
+        idir=0,
+        level=level,
+        include_ghosts=include_ghosts,
+    )
+
+
+def NUey_HybridWrapper(level=0, include_ghosts=False):
+    return _MultiFABWrapper(
+        mf_name="fluid_momentum_density_electrons_hybrid",
+        idir=1,
+        level=level,
+        include_ghosts=include_ghosts,
+    )
+
+
+def NUez_HybridWrapper(level=0, include_ghosts=False):
+    return _MultiFABWrapper(
+        mf_name="fluid_momentum_density_electrons_hybrid",
+        idir=2,
+        level=level,
+        include_ghosts=include_ghosts,
+    )
+
+
+def Te_HybridWrapper(level=0, include_ghosts=False):
+    return _MultiFABWrapper(
+        mf_name="fluid_temperature_electrons_hybrid",
+        level=level,
+        include_ghosts=include_ghosts,
+    )
+
+
+def Ke_HybridWrapper(level=0, include_ghosts=False):
+    return _MultiFABWrapper(
+        mf_name="fluid_entropy_electrons_hybrid",
+        level=level,
+        include_ghosts=include_ghosts,
+    )
+
+
+def fluid_weights_HybridWrapper(level=0, include_ghosts=False):
+    return _MultiFABWrapper(
+        mf_name="fluid_qdsmc_weights_electrons_hybrid",
+        level=level,
+        include_ghosts=include_ghosts,
+    )
+
+
+def Hybrid_Pe_Wrapper(level=0, include_ghosts=False):
+    return _MultiFABWrapper(
+        mf_name="hybrid_electron_pressure_fp",
+        level=level,
+        include_ghosts=include_ghosts,
+    )

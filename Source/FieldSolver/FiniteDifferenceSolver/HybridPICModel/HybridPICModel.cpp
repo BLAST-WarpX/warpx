@@ -9,6 +9,8 @@
  */
 
 #include "HybridPICModel.H"
+#include "Fluids/WarpXFluidContainer.H"
+#include "Fluids/QdsmcParticleContainer.H"
 
 #include "EmbeddedBoundary/Enabled.H"
 #include "Python/callbacks.H"
@@ -47,8 +49,10 @@ void HybridPICModel::ReadParameters ()
         Abort("hybrid_pic_model.n0_ref should be specified if hybrid_pic_model.gamma != 1");
     }
 
-    pp_hybrid.query("plasma_resistivity(rho,J)", m_eta_expression);
+    pp_hybrid.query("plasma_resistivity(rho,J,Te)", m_eta_expression);
     pp_hybrid.query("plasma_hyper_resistivity(rho,B)", m_eta_h_expression);
+
+    pp_hybrid.query("nu_ei_function(ne,Te)", m_nu_ei_expression);
 
     utils::parser::queryWithParser(pp_hybrid, "n_floor", m_n_floor);
 
@@ -66,6 +70,21 @@ void HybridPICModel::ReadParameters ()
     if (m_add_external_fields) {
         m_external_vector_potential = std::make_unique<ExternalVectorPotential>();
     }
+
+    //bool to indicate if electron fluid equation will be solved or not
+    utils::parser::queryWithParser(pp_hybrid, "solve_electron_energy_equation", m_solve_electron_energy_equation);
+
+    //bool to indicate if Joule heating is included (when m_solve_electron_energy_equation is True)
+    utils::parser::queryWithParser(pp_hybrid, "include_Joule_heating", m_include_Joule_heating);
+
+    // ADD ASSERT in case m_solve_electron_energy_equation is False and m_include_Joule_heating is True
+
+    //bool to indicate if classical Bremsstrahlung loss is included (when m_solve_electron_energy_equation is True)
+    utils::parser::queryWithParser(pp_hybrid, "include_Bremsstrahlung", m_include_Bremsstrahlung);
+
+    // Z effective for Bremsstrahlung power loss.
+    pp_hybrid.query("Zeff", m_Zeff);
+
 }
 
 void HybridPICModel::AllocateLevelMFs (
@@ -152,13 +171,21 @@ void HybridPICModel::AllocateLevelMFs (
 #endif
 }
 
+void HybridPICModel::InitQdsmcParticleContainer()
+{
+    auto& warpx = WarpX::GetInstance();
+    qdsmc_hybrid_electron_pc = std::make_unique<QdsmcParticleContainer>(&warpx);
+    qdsmc_hybrid_electron_pc->InitParticles(0);
+}
+
 void HybridPICModel::InitData ()
 {
     m_resistivity_parser = std::make_unique<amrex::Parser>(
-        utils::parser::makeParser(m_eta_expression, {"rho","J"}));
-    m_eta = m_resistivity_parser->compile<2>();
+        utils::parser::makeParser(m_eta_expression, {"rho","J","Te"}));
+    m_eta = m_resistivity_parser->compile<3>();
     const std::set<std::string> resistivity_symbols = m_resistivity_parser->symbols();
     m_resistivity_has_J_dependence += resistivity_symbols.count("J");
+    m_resistivity_has_Te_dependence += resistivity_symbols.count("Te");
 
     m_include_hyper_resistivity_term = (m_eta_h_expression != "0.0");
     m_hyper_resistivity_parser = std::make_unique<amrex::Parser>(
@@ -166,6 +193,10 @@ void HybridPICModel::InitData ()
     m_eta_h = m_hyper_resistivity_parser->compile<2>();
     const std::set<std::string> hyper_resistivity_symbols = m_hyper_resistivity_parser->symbols();
     m_hyper_resistivity_has_B_dependence += hyper_resistivity_symbols.count("B");
+
+    m_nu_ei_parser = std::make_unique<amrex::Parser>(
+        utils::parser::makeParser(m_nu_ei_expression, {"ne","Te"}));
+    m_nu_ei = m_nu_ei_parser->compile<2>();
 
     m_J_external_parser[0] = std::make_unique<amrex::Parser>(
         utils::parser::makeParser(m_Jx_ext_grid_function,{"x","y","z","t"}));
@@ -272,6 +303,17 @@ void HybridPICModel::InitData ()
     if (m_add_external_fields) {
         m_external_vector_potential->InitData();
     }
+
+    const auto elec_temp = m_elec_temp;
+
+    // Initialize electron temperature multifab (just Te, might not need to do this at all, remove!)
+    if(!m_solve_electron_energy_equation)
+    {
+        warpx.m_fields.get("fluid_temperature_electrons_hybrid",  warpx.finestLevel())->setVal(elec_temp);
+        // Fill Boundaries in electron temperature multifab
+        warpx.m_fields.get("fluid_temperature_electrons_hybrid",  warpx.finestLevel())->FillBoundary(warpx.Geom(warpx.finestLevel()).periodicity());
+    }
+
 }
 
 void HybridPICModel::GetCurrentExternal ()
@@ -385,11 +427,12 @@ void HybridPICModel::HybridPICSolveE (
 
     ablastr::fields::VectorField current_fp_plasma = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
     auto* const electron_pressure_fp = warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
+    auto* const electron_temperature_fp = warpx.m_fields.get("fluid_temperature_electrons_hybrid", lev);
 
     // Solve E field in regular cells
     warpx.get_pointer_fdtd_solver_fp(lev)->HybridPICSolveE(
         Efield, current_fp_plasma, Jfield, Bfield, rhofield,
-        *electron_pressure_fp, eb_update_E, lev, this, solve_for_Faraday
+        *electron_pressure_fp, *electron_temperature_fp, eb_update_E, lev, this, solve_for_Faraday
     );
     amrex::Real const time = warpx.gett_old(0) + warpx.getdt(0);
     warpx.ApplyEfieldBoundary(lev, patch_type, time);
@@ -409,11 +452,13 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
     WARPX_PROFILE("WarpX::CalculateElectronPressure()");
 
     auto& warpx = WarpX::GetInstance();
+    ablastr::fields::ScalarField electron_temperature_fp = warpx.m_fields.get("fluid_temperature_electrons_hybrid", lev);
     ablastr::fields::ScalarField electron_pressure_fp = warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
     ablastr::fields::ScalarField rho_fp = warpx.m_fields.get(FieldType::rho_fp, lev);
 
     // Calculate the electron pressure using rho^{n+1}.
     FillElectronPressureMF(
+        *electron_temperature_fp,
         *electron_pressure_fp,
         *rho_fp
     );
@@ -422,15 +467,17 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
 }
 
 void HybridPICModel::FillElectronPressureMF (
+    amrex::MultiFab& Te_field,
     amrex::MultiFab& Pe_field,
     amrex::MultiFab const& rho_field
 ) const
 {
     const auto n0_ref = m_n0_ref;
-    const auto elec_temp = m_elec_temp;
     const auto gamma = m_gamma;
+    const auto Te_0 = m_elec_temp;
 
-    // Loop through the grids, and over the tiles within each grid
+    if(!m_solve_electron_energy_equation){
+// Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -443,12 +490,37 @@ void HybridPICModel::FillElectronPressureMF (
         // Extract tileboxes for which to loop
         const Box& tilebox  = mfi.tilebox();
 
-        ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-            Pe(i, j, k) = ElectronPressure::get_pressure(
-                n0_ref, elec_temp, gamma, rho(i, j, k)
-            );
-        });
+            ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                Pe(i, j, k) = ElectronPressure::get_pressure(
+                    n0_ref, Te_0, gamma, rho(i, j, k)
+                );
+            });
+        }
     }
+    else{
+// Loop through the grids, and over the tiles within each grid
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for ( MFIter mfi(Pe_field, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+        {
+            // Extract field data for this grid/tile
+            Array4<Real const> const& rho = rho_field.const_array(mfi);
+            Array4<Real> const& Pe = Pe_field.array(mfi);
+            Array4<Real> const& Te = Te_field.array(mfi);
+
+            // Extract tileboxes for which to loop
+            const Box& tilebox  = mfi.tilebox();
+
+            ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                Pe(i, j, k) = ElectronPressure::get_pressure_ideal_gas(
+                     Te(i, j, k), rho(i, j, k)
+                );
+            });
+        }
+
+    }
+
 }
 
 void HybridPICModel::BfieldEvolveRK (

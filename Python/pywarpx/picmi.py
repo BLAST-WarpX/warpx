@@ -1884,6 +1884,16 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
             },
             '<field_name2>: {...}'
         }
+
+    solve_electron_energy_equation, default=False
+        If true, it uses the qdscm algorithm to advect Ke and update the electron temperature
+        In absence of sources and sinks, it should reproduce adiabatic relationship for Pe
+
+    include_Joule_heating, default=False
+        Requires solve_electron_energy_equation to be True (qdsmc algorithm)
+        If true, term eta*J^2 is added after the the advection part of the electron energy equation,
+        where eta is the plasma_resistivity expression used as input.
+        Valid for 1 ion species in current implementation.
     """
 
     def __init__(
@@ -1901,6 +1911,11 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Jy_external_function=None,
         Jz_external_function=None,
         A_external=None,
+        solve_electron_energy_equation=False,
+        include_Joule_heating=False,
+        include_Bremsstrahlung=False,
+        Zeff=None,
+        nu_ei_function=None,
         **kw,
     ):
         self.grid = grid
@@ -1912,6 +1927,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.n_floor = n_floor
         self.plasma_resistivity = plasma_resistivity
         self.plasma_hyper_resistivity = plasma_hyper_resistivity
+        self.Zeff = Zeff
 
         self.substeps = substeps
 
@@ -1922,6 +1938,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.Jz_external_function = Jz_external_function
 
         self.A_external = A_external
+
+        self.solve_electron_energy_equation = solve_electron_energy_equation
+        self.include_Joule_heating = include_Joule_heating
+        self.include_Bremsstrahlung = include_Bremsstrahlung
+
+        self.nu_ei_function = nu_ei_function
 
         # Handle keyword arguments used in expressions
         self.user_defined_kw = {}
@@ -1945,8 +1967,10 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.n0_ref = self.n0
         pywarpx.hybridpicmodel.gamma = self.gamma
         pywarpx.hybridpicmodel.n_floor = self.n_floor
+        pywarpx.hybridpicmodel.Zeff = self.Zeff
+
         pywarpx.hybridpicmodel.__setattr__(
-            "plasma_resistivity(rho,J)",
+            "plasma_resistivity(rho,J,Te)",
             pywarpx.my_constants.mangle_expression(
                 self.plasma_resistivity, self.mangle_dict
             ),
@@ -2018,6 +2042,19 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                         field_dict["A_time_external_function"], self.mangle_dict
                     ),
                 )
+
+        pywarpx.hybridpicmodel.solve_electron_energy_equation = (
+            self.solve_electron_energy_equation
+        )
+        pywarpx.hybridpicmodel.include_Joule_heating = self.include_Joule_heating
+        pywarpx.hybridpicmodel.include_Bremsstrahlung = self.include_Bremsstrahlung
+
+        pywarpx.hybridpicmodel.__setattr__(
+            "nu_ei_function(ne,Te)",
+            pywarpx.my_constants.mangle_expression(
+                self.nu_ei_function, self.mangle_dict
+            ),
+        )
 
 
 class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):

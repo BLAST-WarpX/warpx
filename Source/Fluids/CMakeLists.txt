@@ -4,5 +4,6 @@ foreach(D IN LISTS WarpX_DIMS)
       PRIVATE
         MultiFluidContainer.cpp
         WarpXFluidContainer.cpp
+        QdsmcParticleContainer.cpp
     )
 endforeach()

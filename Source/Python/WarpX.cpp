@@ -30,6 +30,7 @@
 #include <Particles/MultiParticleContainer.H>
 #include <Fluids/MultiFluidContainer.H>
 #include <Fluids/WarpXFluidContainer.H>
+#include <Fluids/QdsmcParticleContainer.H>
 #include <Particles/ParticleBoundaryBuffer.H>
 #include <AcceleratorLattice/AcceleratorLattice.H>
 #include <Utils/TextMsg.H>

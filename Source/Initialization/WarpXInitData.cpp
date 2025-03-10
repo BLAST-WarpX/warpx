@@ -596,6 +596,11 @@ WarpX::InitData ()
 
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
         m_hybrid_pic_model->InitData();
+
+        if (m_hybrid_pic_model->m_solve_electron_energy_equation) {
+            m_hybrid_pic_model->InitQdsmcParticleContainer();
+        }
+
     }
 
     if (ParallelDescriptor::IOProcessor()) {
