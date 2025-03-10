@@ -1818,7 +1818,8 @@ void WarpXFluidContainer::Hybrid_Electron_Qei (ablastr::fields::MultiFabRegister
 
             ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
 
-                // only do if rho
+                // careful here, once multi ion species feature is included
+                // use rho_val control since it will be needed in the formula below (ne won't be equal to ni).
                 if(rho(i, j, k) > 0.0_rt){
 
                     amrex::Real rho_val = rho(i, j, k);
