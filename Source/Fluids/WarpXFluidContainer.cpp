@@ -1683,7 +1683,7 @@ void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiF
 
                     // remove this. Control on Te is set in eta() expression defined by the user.
                     // unless this is necessary to avoid Te blowing up or m=4 amplification
-                    //if(Te_val<Te0_K){ 
+                    //if(Te_val<Te0_K){
                     //    Te_val = Te0_K;
                     //}
 
@@ -1777,7 +1777,7 @@ void WarpXFluidContainer::Hybrid_Electron_Bremsstrahlung (ablastr::fields::Multi
 
 /*
     Function for electron-ion temperature relaxation as part of the electron energy equation used in the Hybrid PIC model.
-    When used, MCC module should be called internally for ions so energy is conserved. 
+    When used, MCC module should be called internally for ions so energy is conserved.
     Collision frequencies should be choosen consistently.
 */
 void WarpXFluidContainer::Hybrid_Electron_Qei (ablastr::fields::MultiFabRegister& m_fields,
@@ -1823,7 +1823,7 @@ void WarpXFluidContainer::Hybrid_Electron_Qei (ablastr::fields::MultiFabRegister
                     amrex::Real ne_val = rho_val/PhysConst::q_e;
 
                     // use expression for ei collision frequency here
-                    // user defined with parser? 
+                    // user defined with parser?
                     amrex::Real nu_ei_val = 0.0_rt;
 
                     // CHECK Ti UNITS !!!! formula below assumes Ti is in J (since Te multifab is in J)
