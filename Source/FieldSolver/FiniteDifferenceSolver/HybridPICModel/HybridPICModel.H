@@ -206,6 +206,11 @@ public:
     bool m_include_hyper_resistivity_term = false;
     bool m_hyper_resistivity_has_B_dependence = false;
 
+    /** Electron ion collision frequency expression */
+    std::string m_nu_ei_expression = "0.0";
+    std::unique_ptr<amrex::Parser> m_nu_ei_parser;
+    amrex::ParserExecutor<2> m_nu_ei;
+
     /** External current */
     std::string m_Jx_ext_grid_function = "0.0";
     std::string m_Jy_ext_grid_function = "0.0";

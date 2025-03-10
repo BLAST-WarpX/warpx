@@ -1613,7 +1613,6 @@ void WarpXFluidContainer::HybridQDSMCUpdateTe (ablastr::fields::MultiFabRegister
 
 // To Do:
 // pass Te and rho multifabs as arguments too !
-// check: no need to fill Boundary? Hybrid_Electron_Joule_Heating should be called after filling boundary of rho and Te
 void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiFabRegister& m_fields,
                                         HybridPICModel const* hybrid_model,
                                         amrex::Real dt, int lev)
@@ -1777,8 +1776,8 @@ void WarpXFluidContainer::Hybrid_Electron_Bremsstrahlung (ablastr::fields::Multi
 
 /*
     Function for electron-ion temperature relaxation as part of the electron energy equation used in the Hybrid PIC model.
-    When used, MCC module should be called internally for ions so energy is conserved. 
-    Collision frequencies should be choosen consistently.
+    When used, MCC module should be called in WarpXPushFieldsHybridPIC.cpp for ions so energy is conserved. 
+    Collision frequencies should be used consistently.
 */
 void WarpXFluidContainer::Hybrid_Electron_Qei (ablastr::fields::MultiFabRegister& m_fields,
                                         HybridPICModel const* hybrid_model,
@@ -1792,6 +1791,8 @@ void WarpXFluidContainer::Hybrid_Electron_Qei (ablastr::fields::MultiFabRegister
     const amrex::Periodicity &period = geom.periodicity();
 
     using warpx::fields::FieldType;
+
+    const auto nu_ei = hybrid_model->m_nu_ei;
 
     // For safety condition (divition by rho)
     amrex::Real rho_floor = PhysConst::q_e*hybrid_model->m_n_floor;
@@ -1817,23 +1818,26 @@ void WarpXFluidContainer::Hybrid_Electron_Qei (ablastr::fields::MultiFabRegister
             ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
 
                 // only do if rho
-                if(rho(i, j, k) > rho_floor){
+                if(rho(i, j, k) > 0.0_rt){
 
                     amrex::Real rho_val = rho(i, j, k);
                     amrex::Real ne_val = rho_val/PhysConst::q_e;
+                    amrex::Real Te_val_K = Te(i, j, k) / PhysConst::kb; // convert Te from J to K for nu_ei evaluation
 
-                    // use expression for ei collision frequency here
-                    // user defined with parser? 
-                    amrex::Real nu_ei_val = 0.0_rt;
+                    // nu_ei expression defined by user using parser
+                    amrex::Real nu_ei_val = nu_ei(Te_val_K, ne_val);
 
-                    // CHECK Ti UNITS !!!! formula below assumes Ti is in J (since Te multifab is in J)
+                    // CHECK Ti UNITS !!!!
+                    // If Ti is in K, then convert to Joules below !
+                    // refactor hybrid code so Te is in K instead of J.
 
                     // -3*me/mi*nu_ei*ni*kb*(Te-Ti), then divide by 3/2*kb*ne
                     // since only one ion species for now, ni_val=ne_val -> -2*me/mi*nu_ei*kb*(Te-Ti)
                     // Te(i, j, k) and second term already in Joules so no need to divide by kb
-                    Te(i, j, k) = Te(i, j, k) - 2*PhysConst::m_e/m_ion*nu_ei_val*(Te(i, j, k) - Ti(i, j, k));
+                    Te(i, j, k) = Te(i, j, k) - dt*2*PhysConst::m_e/m_ion*nu_ei_val*(Te(i, j, k) - PhysConst::kb*Ti(i, j, k));
                 }
             });
         }
+
     m_fields.get(name_mf_T, lev)->FillBoundary(m_fields.get(name_mf_T, lev)->nGrowVect(), period);
 }
