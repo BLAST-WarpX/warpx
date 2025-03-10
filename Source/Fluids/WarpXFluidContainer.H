@@ -135,8 +135,8 @@ public:
 
     // HybridUpdateUe calculates Ue from Je = J_ampere - Ji and saves in NU for hybrid solver
     void HybridInitializeUe (ablastr::fields::MultiFabRegister& m_fields,
-        ablastr::fields::VectorField const& Ji,
-        HybridPICModel const* hybrid_model, int lev);
+                    ablastr::fields::VectorField const& Ji,
+                    HybridPICModel const* hybrid_model, int lev);
 
     // Sets Ke in fluid container MF to be used by qdsmc particles
     void HybridInitializeKe (ablastr::fields::MultiFabRegister& m_fields, amrex::Real gamma, amrex::Real n_floor, int lev);
@@ -158,6 +158,16 @@ public:
     void Hybrid_Electron_Bremsstrahlung (ablastr::fields::MultiFabRegister& m_fields,
                                         HybridPICModel const* hybrid_model,
                                         amrex::Real dt, int lev);
+
+    // Adds electron - ion temperature relaxation due to collisions term
+    // this is used exclusively in the electron energy equation part of the Hybrid PIC model.
+    // This function should be called once per ion species
+    // add particle container
+    void Hybrid_Electron_Qei (ablastr::fields::MultiFabRegister& m_fields,
+                                        HybridPICModel const* hybrid_model,
+                                        ablastr::fields::ScalarField const& Ti,
+                                        amrex::Real m_ion, amrex::Real dt, int lev);
+
 
     [[nodiscard]] amrex::Real getCharge () const {return charge;}
     [[nodiscard]] amrex::Real getMass () const {return mass;}

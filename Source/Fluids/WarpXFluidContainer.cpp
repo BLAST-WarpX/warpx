@@ -1456,8 +1456,6 @@ void WarpXFluidContainer::HybridInitializeUe (
 #endif
     for ( MFIter mfi(*m_fields.get(name_mf_N, lev), TilingIfNotGPU()); mfi.isValid(); ++mfi )
         {
-            //amrex::Array4<amrex::Real> const& rho = m_fields.get(name_mf_N, lev)->array(mfi);
-
             // using rho at n+1/2 in rho_fp_temp
             amrex::Array4<amrex::Real> const& rho = m_fields.get(FieldType::hybrid_rho_fp_temp, lev)->array(mfi);
 
@@ -1478,13 +1476,15 @@ void WarpXFluidContainer::HybridInitializeUe (
             //box.grow(m_fields.get(name_mf_K, lev)->nGrowVect());
 
             ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                if( rho(i, j, k) > 0.0_rt ){
+                // to test, Ue is calculated only when rho > rho_floor
+                if( rho(i, j, k) > rho_floor ){
 
                     // safety condition since we divide by rho_val later
-                    amrex::Real rho_val = rho_floor;
-                    if(rho(i, j, k) > rho_floor){
-                        rho_val = rho(i, j, k);
-                    }
+                    //amrex::Real rho_val = rho_floor;
+                    //if(rho(i, j, k) > rho_floor){
+                    //    rho_val = rho(i, j, k);
+                    //}
+                    amrex::Real rho_val = rho(i, j, k); // to test
 
                     // Interpolate the total plasma current to a nodal grid
                     auto const jx_interp = ablastr::coarsen::sample::Interp(Jx, Jx_stag, nodal, coarsen, i, j, k, 0);
@@ -1543,13 +1543,16 @@ void WarpXFluidContainer::HybridInitializeKe (ablastr::fields::MultiFabRegister&
             box.grow(m_fields.get(name_mf_K, lev)->nGrowVect());
 
             ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                if( rho(i, j, k) > 0.0_rt ){
+                // to test, only calculated when rho > rho_floor
+                if( rho(i, j, k) > rho_floor ){
 
                     // safety condition since we divide by rho_val later
-                    amrex::Real rho_val = rho_floor;
-                    if(rho(i, j, k) > rho_floor){
-                        rho_val = rho(i, j, k);
-                    }
+                    //amrex::Real rho_val = rho_floor;
+                    //if(rho(i, j, k) > rho_floor){
+                    //    rho_val = rho(i, j, k);
+                    //}
+
+                    amrex::Real rho_val = rho(i, j, k);
 
                     amrex::Real ne = rho_val/PhysConst::q_e;
                     Ke(i, j, k) = Te(i, j, k)*std::pow(ne, 1-gamma)/PhysConst::q_e; // Ke with Te in eV to avoid small numbers
@@ -1680,9 +1683,9 @@ void WarpXFluidContainer::Hybrid_Electron_Joule_Heating (ablastr::fields::MultiF
 
                     // remove this. Control on Te is set in eta() expression defined by the user.
                     // unless this is necessary to avoid Te blowing up or m=4 amplification
-                    if(Te_val<Te0_K){ 
-                        Te_val = Te0_K;
-                    }
+                    //if(Te_val<Te0_K){ 
+                    //    Te_val = Te0_K;
+                    //}
 
                     // Interpolate the total plasma current to a nodal grid
                     auto const jx_interp = ablastr::coarsen::sample::Interp(Jx, Jx_stag, nodal, coarsen, i, j, k, 0);
@@ -1718,8 +1721,6 @@ void WarpXFluidContainer::Hybrid_Electron_Bremsstrahlung (ablastr::fields::Multi
     WarpX &warpx = WarpX::GetInstance();
     const amrex::Geometry &geom = warpx.Geom(lev);
     const amrex::Periodicity &period = geom.periodicity();
-    const auto dx = geom.CellSizeArray();
-    const auto cell_volume = dx[0]*dx[1]*dx[2];
 
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -1767,6 +1768,70 @@ void WarpXFluidContainer::Hybrid_Electron_Bremsstrahlung (ablastr::fields::Multi
 
                     // Te(i, j, k) and second term already in Joules
                     Te(i, j, k) = Te(i, j, k) - dW_dV*dt/(1.5*ne_val);
+                }
+            });
+        }
+    m_fields.get(name_mf_T, lev)->FillBoundary(m_fields.get(name_mf_T, lev)->nGrowVect(), period);
+}
+
+
+/*
+    Function for electron-ion temperature relaxation as part of the electron energy equation used in the Hybrid PIC model.
+    When used, MCC module should be called internally for ions so energy is conserved. 
+    Collision frequencies should be choosen consistently.
+*/
+void WarpXFluidContainer::Hybrid_Electron_Qei (ablastr::fields::MultiFabRegister& m_fields,
+                                        HybridPICModel const* hybrid_model,
+                                        ablastr::fields::ScalarField const& Ti_field,
+                                        amrex::Real m_ion, amrex::Real dt, int lev)
+{
+    WARPX_PROFILE("WarpXFluidContainer::Hybrid_Electron_Qei");
+
+    WarpX &warpx = WarpX::GetInstance();
+    const amrex::Geometry &geom = warpx.Geom(lev);
+    const amrex::Periodicity &period = geom.periodicity();
+
+    using warpx::fields::FieldType;
+
+    // For safety condition (divition by rho)
+    amrex::Real rho_floor = PhysConst::q_e*hybrid_model->m_n_floor;
+    const auto ix_type = m_fields.get(name_mf_N, lev)->ixType().toIntVect();
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*m_fields.get(name_mf_N, lev), TilingIfNotGPU()); mfi.isValid(); ++mfi )
+        {
+            // This assumes operator splitting approach
+            // use temperatures at n+1
+            amrex::Array4<amrex::Real> const& Te = m_fields.get(name_mf_T, lev)->array(mfi);
+            amrex::Array4<amrex::Real> const& Ti = Ti_field->array(mfi);
+
+            // using rho at n+1
+            amrex::Array4<amrex::Real> const& rho = m_fields.get(FieldType::rho_fp, lev)->array(mfi);
+
+            const Box& tilebox  = mfi.tilebox();
+            amrex::Box box = amrex::convert( tilebox, ix_type );
+            box.grow(m_fields.get(name_mf_N, lev)->nGrowVect());
+
+            ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+
+                // only do if rho
+                if(rho(i, j, k) > rho_floor){
+
+                    amrex::Real rho_val = rho(i, j, k);
+                    amrex::Real ne_val = rho_val/PhysConst::q_e;
+
+                    // use expression for ei collision frequency here
+                    // user defined with parser? 
+                    amrex::Real nu_ei_val = 0.0_rt;
+
+                    // CHECK Ti UNITS !!!! formula below assumes Ti is in J (since Te multifab is in J)
+
+                    // -3*me/mi*nu_ei*ni*kb*(Te-Ti), then divide by 3/2*kb*ne
+                    // since only one ion species for now, ni_val=ne_val -> -2*me/mi*nu_ei*kb*(Te-Ti)
+                    // Te(i, j, k) and second term already in Joules so no need to divide by kb
+                    Te(i, j, k) = Te(i, j, k) - 2*PhysConst::m_e/m_ion*nu_ei_val*(Te(i, j, k) - Ti(i, j, k));
                 }
             });
         }

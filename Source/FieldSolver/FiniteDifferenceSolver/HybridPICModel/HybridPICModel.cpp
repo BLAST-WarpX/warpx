@@ -300,7 +300,7 @@ void HybridPICModel::InitData ()
 
     const auto elec_temp = m_elec_temp;
 
-    // Initialize electron temperature multifab (isothermal)
+    // Initialize electron temperature multifab (just Te, might not need to do this at all, remove!)
     if(!m_solve_electron_energy_equation)
     {
         warpx.m_fields.get("fluid_temperature_electrons_hybrid",  warpx.finestLevel())->setVal(elec_temp);

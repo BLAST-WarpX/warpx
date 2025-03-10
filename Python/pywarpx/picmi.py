@@ -1915,6 +1915,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         include_Joule_heating=False,
         include_Bremsstrahlung=False,
         Zeff=None,
+        nu_ei_function=None,
         **kw,
     ):
         self.grid = grid
@@ -1939,10 +1940,10 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.A_external = A_external
 
         self.solve_electron_energy_equation = solve_electron_energy_equation
-
         self.include_Joule_heating = include_Joule_heating
-
         self.include_Bremsstrahlung = include_Bremsstrahlung
+
+        self.nu_ei_function = nu_ei_function
 
         # Handle keyword arguments used in expressions
         self.user_defined_kw = {}
@@ -2045,10 +2046,15 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.solve_electron_energy_equation = (
             self.solve_electron_energy_equation
         )
-
         pywarpx.hybridpicmodel.include_Joule_heating = self.include_Joule_heating
-
         pywarpx.hybridpicmodel.include_Bremsstrahlung = self.include_Bremsstrahlung
+
+        pywarpx.hybridpicmodel.__setattr__(
+            "nu_ei_function(ne,Te)",
+            pywarpx.my_constants.mangle_expression(
+                self.nu_ei_function, self.mangle_dict
+            ),
+        )
 
 
 class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
