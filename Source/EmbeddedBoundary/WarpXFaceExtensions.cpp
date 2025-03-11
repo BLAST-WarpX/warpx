@@ -48,7 +48,7 @@ namespace
 
         if constexpr (dim == 0) {
             return 0.5_rt * std::max({ly(i, j, k) * dz, ly(i, j, k + 1) * dz,
-                                  lz(i, j, k) * dy, lz(i, j + 1, k) * dy});
+                                      lz(i, j, k) * dy, lz(i, j + 1, k) * dy});
         }
         else if constexpr (dim == 1)
         {
