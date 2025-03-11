@@ -1377,7 +1377,7 @@ WarpX::ReadParameters ()
             }
         }
 
-        pp_warpx.query("sort_particles_for_deposition",sort_particles_for_deposition);
+        pp_warpx.query("sort_particles_for_deposition",m_sort_particles_for_deposition);
         Vector<int> vect_sort_idx_type(AMREX_SPACEDIM,0);
         const bool sort_idx_type_is_specified =
             utils::parser::queryArrWithParser(
@@ -1385,7 +1385,7 @@ WarpX::ReadParameters ()
                 vect_sort_idx_type, 0, AMREX_SPACEDIM);
         if (sort_idx_type_is_specified){
             for (int i=0; i<AMREX_SPACEDIM; i++) {
-                sort_idx_type[i] = vect_sort_idx_type[i];
+                m_sort_idx_type[i] = vect_sort_idx_type[i];
             }
         }
 

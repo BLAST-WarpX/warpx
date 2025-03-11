@@ -1488,13 +1488,13 @@ private:
 
     //! If true, particles will be sorted in the order x -> y -> z -> ppc for faster deposition
 #if defined(AMREX_USE_CUDA)
-    bool sort_particles_for_deposition = true;
+    bool m_sort_particles_for_deposition = true;
 #else
-    bool sort_particles_for_deposition = false;
+    bool m_sort_particles_for_deposition = false;
 #endif
 
     //! Specifies the type of grid used for the above sorting, i.e. cell-centered, nodal, or mixed
-    amrex::IntVect sort_idx_type = amrex::IntVect(AMREX_D_DECL(0,0,0));
+    amrex::IntVect m_sort_idx_type = amrex::IntVect(AMREX_D_DECL(0,0,0));
 
     //! Solve Poisson equation when loading an external magnetic field to clean divergence
     //! This is useful to remove errors that could lead to non-zero B field divergence
