@@ -86,7 +86,7 @@ python3 -m pip install --upgrade pip
 python3 -m pip install --upgrade build
 python3 -m pip install --upgrade packaging
 python3 -m pip install --upgrade wheel
-python3 -m pip install --upgrade setuptools
+python3 -m pip install --upgrade setuptools[core]
 python3 -m pip install --upgrade "cython>=3.0"
 # cupy for ROCm
 #   https://docs.cupy.dev/en/stable/install.html#building-cupy-for-rocm-from-source

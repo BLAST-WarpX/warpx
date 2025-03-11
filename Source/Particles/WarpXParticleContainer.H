@@ -433,8 +433,12 @@ public:
      *
      * \param[in] do_back_transformed_particles The parameter to set if back-transformed particles are set to true/false
      */
-    void SetDoBackTransformedParticles(const bool do_back_transformed_particles) {
+    void SetDoBackTransformedParticles (const bool do_back_transformed_particles) {
         m_do_back_transformed_particles = do_back_transformed_particles;
+    }
+
+    bool GetDoBackTransformedParticles () const {
+        return m_do_back_transformed_particles;
     }
 
     //amrex::Real getCharge () {return charge;}
@@ -569,12 +573,7 @@ public:
                                        TmpIdx::nattribs>;
     using TmpParticles = amrex::Vector<std::map<PairIndex, TmpParticleTile> >;
 
-    TmpParticles getTmpParticleData () const noexcept {return tmp_particle_data;}
-
     int getIonizationInitialLevel () const noexcept {return ionization_initial_level;}
-
-protected:
-    TmpParticles tmp_particle_data;
 
 private:
     void particlePostLocate(ParticleType& p, const amrex::ParticleLocData& pld, int lev) override;

@@ -146,11 +146,6 @@ int WarpX::field_centering_nox = 2;
 int WarpX::field_centering_noy = 2;
 int WarpX::field_centering_noz = 2;
 
-// Order of finite-order centering of currents (nodal to staggered)
-int WarpX::current_centering_nox = 2;
-int WarpX::current_centering_noy = 2;
-int WarpX::current_centering_noz = 2;
-
 bool WarpX::use_fdtd_nci_corr = false;
 bool WarpX::galerkin_interpolation = true;
 
@@ -188,7 +183,6 @@ WarpX* WarpX::m_instance = nullptr;
 
 namespace
 {
-
     [[nodiscard]] bool
     isAnyBoundaryPML(
         const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_lo,
@@ -199,6 +193,66 @@ namespace
             std::any_of(field_boundary_lo.begin(), field_boundary_lo.end(), is_pml) ||
             std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(), is_pml);
         return is_any_pml;
+    }
+
+    /**
+     * \brief Allocates and initializes the stencil coefficients used for the finite-order centering
+     * of fields and currents, and stores them in the given device vectors.
+     *
+     * \param[in,out] device_centering_stencil_coeffs_x device vector where the stencil coefficients along x will be stored
+     * \param[in,out] device_centering_stencil_coeffs_y device vector where the stencil coefficients along y will be stored
+     * \param[in,out] device_centering_stencil_coeffs_z device vector where the stencil coefficients along z will be stored
+     * \param[in] centering_nox order of the finite-order centering along x
+     * \param[in] centering_noy order of the finite-order centering along y
+     * \param[in] centering_noz order of the finite-order centering along z
+     * \param[in] a_grid_type type of grid (collocated or not)
+     */
+    void AllocateCenteringCoefficients (amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_x,
+        amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_y,
+        amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_z,
+        int centering_nox,
+        int centering_noy,
+        int centering_noz,
+        ablastr::utils::enums::GridType a_grid_type)
+    {
+        // Vectors of Fornberg stencil coefficients
+        const auto Fornberg_stencil_coeffs_x = ablastr::math::getFornbergStencilCoefficients(centering_nox, a_grid_type);
+        const auto Fornberg_stencil_coeffs_y = ablastr::math::getFornbergStencilCoefficients(centering_noy, a_grid_type);
+        const auto Fornberg_stencil_coeffs_z = ablastr::math::getFornbergStencilCoefficients(centering_noz, a_grid_type);
+
+        // Host vectors of stencil coefficients used for finite-order centering
+        auto host_centering_stencil_coeffs_x = amrex::Vector<amrex::Real>(centering_nox);
+        auto host_centering_stencil_coeffs_y = amrex::Vector<amrex::Real>(centering_noy);
+        auto host_centering_stencil_coeffs_z = amrex::Vector<amrex::Real>(centering_noz);
+
+        // Re-order Fornberg stencil coefficients:
+        // example for order 6: (c_0,c_1,c_2) becomes (c_2,c_1,c_0,c_0,c_1,c_2)
+        ablastr::math::ReorderFornbergCoefficients(
+            host_centering_stencil_coeffs_x,
+            Fornberg_stencil_coeffs_x,
+            centering_nox);
+
+        ablastr::math::ReorderFornbergCoefficients(
+            host_centering_stencil_coeffs_y,
+            Fornberg_stencil_coeffs_y,
+            centering_noy);
+
+        ablastr::math::ReorderFornbergCoefficients(
+            host_centering_stencil_coeffs_z,
+            Fornberg_stencil_coeffs_z,
+            centering_noz);
+
+        // Device vectors of stencil coefficients used for finite-order centering
+        const auto copy_to_device = [](const auto& src, auto& dst){
+            dst.resize(src.size());
+            amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, src.begin(), src.end(), dst.begin());
+        };
+
+        copy_to_device(host_centering_stencil_coeffs_x, device_centering_stencil_coeffs_x);
+        copy_to_device(host_centering_stencil_coeffs_y, device_centering_stencil_coeffs_y);
+        copy_to_device(host_centering_stencil_coeffs_z, device_centering_stencil_coeffs_z);
+
+        amrex::Gpu::synchronize();
     }
 
     /**
@@ -926,6 +980,8 @@ WarpX::ReadParameters ()
             "J-damping can only be done when PML are inside simulation domain (do_pml_in_domain=1)"
         );
 
+        pp_warpx.query("synchronize_velocity_for_diagnostics", synchronize_velocity_for_diagnostics);
+
         {
             // Parameters below control all plotfile diagnostics
             bool plotfile_min_max = true;
@@ -1021,9 +1077,9 @@ WarpX::ReadParameters ()
             field_centering_noz = 8;
             // Finite-order centering of currents (nodal to staggered)
             do_current_centering = true;
-            current_centering_nox = 8;
-            current_centering_noy = 8;
-            current_centering_noz = 8;
+            m_current_centering_nox = 8;
+            m_current_centering_noy = 8;
+            m_current_centering_noz = 8;
         }
 
 #ifdef WARPX_DIM_RZ
@@ -1061,18 +1117,18 @@ WarpX::ReadParameters ()
                 "warpx.do_current_centering=1 can be used only with warpx.grid_type=hybrid");
 
             utils::parser::queryWithParser(
-                pp_warpx, "current_centering_nox", current_centering_nox);
+                pp_warpx, "current_centering_nox", m_current_centering_nox);
             utils::parser::queryWithParser(
-                pp_warpx, "current_centering_noy", current_centering_noy);
+                pp_warpx, "current_centering_noy", m_current_centering_noy);
             utils::parser::queryWithParser(
-                pp_warpx, "current_centering_noz", current_centering_noz);
+                pp_warpx, "current_centering_noz", m_current_centering_noz);
 
-            AllocateCenteringCoefficients(device_current_centering_stencil_coeffs_x,
+            ::AllocateCenteringCoefficients(device_current_centering_stencil_coeffs_x,
                                           device_current_centering_stencil_coeffs_y,
                                           device_current_centering_stencil_coeffs_z,
-                                          current_centering_nox,
-                                          current_centering_noy,
-                                          current_centering_noz,
+                                          m_current_centering_nox,
+                                          m_current_centering_noy,
+                                          m_current_centering_noz,
                                           grid_type);
         }
 
@@ -1185,15 +1241,6 @@ WarpX::ReadParameters ()
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 do_multi_J == false,
                 "Vay deposition not implemented with multi-J algorithm");
-        }
-
-        if (current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                evolve_scheme == EvolveScheme::SemiImplicitEM ||
-                evolve_scheme == EvolveScheme::ThetaImplicitEM ||
-                evolve_scheme == EvolveScheme::StrangImplicitSpectralEM,
-                "Villasenor current deposition can only"
-                "be used with Implicit evolve schemes.");
         }
 
         // Query algo.field_gathering from input, set field_gathering_algo to
@@ -1419,7 +1466,7 @@ WarpX::ReadParameters ()
             utils::parser::queryWithParser(
                 pp_warpx, "field_centering_noz", field_centering_noz);
 
-            AllocateCenteringCoefficients(device_field_centering_stencil_coeffs_x,
+            ::AllocateCenteringCoefficients(device_field_centering_stencil_coeffs_x,
                                           device_field_centering_stencil_coeffs_y,
                                           device_field_centering_stencil_coeffs_z,
                                           field_centering_nox,
@@ -2106,7 +2153,7 @@ WarpX::AllocLevelData (int lev, const BoxArray& ba, const DistributionMapping& d
                   guard_cells.ng_alloc_Rho, guard_cells.ng_alloc_F, guard_cells.ng_alloc_G, aux_is_nodal);
 
     m_accelerator_lattice[lev] = std::make_unique<AcceleratorLattice>();
-    m_accelerator_lattice[lev]->InitElementFinder(lev, gamma_boost, ba, dm);
+    m_accelerator_lattice[lev]->InitElementFinder(lev, gamma_boost, gett_new(), ba, dm);
 
 }
 
@@ -3180,73 +3227,6 @@ WarpX::BuildBufferMasksInBox ( const amrex::Box tbx, amrex::IArrayBox &buffer_ma
         }
         msk(i,j,k) = 1;
     });
-}
-
-void WarpX::AllocateCenteringCoefficients (amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_x,
-                                           amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_y,
-                                           amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_z,
-                                           const int centering_nox,
-                                           const int centering_noy,
-                                           const int centering_noz,
-                                           ablastr::utils::enums::GridType a_grid_type)
-{
-    // Vectors of Fornberg stencil coefficients
-    amrex::Vector<amrex::Real> Fornberg_stencil_coeffs_x;
-    amrex::Vector<amrex::Real> Fornberg_stencil_coeffs_y;
-    amrex::Vector<amrex::Real> Fornberg_stencil_coeffs_z;
-
-    // Host vectors of stencil coefficients used for finite-order centering
-    amrex::Vector<amrex::Real> host_centering_stencil_coeffs_x;
-    amrex::Vector<amrex::Real> host_centering_stencil_coeffs_y;
-    amrex::Vector<amrex::Real> host_centering_stencil_coeffs_z;
-
-    Fornberg_stencil_coeffs_x = ablastr::math::getFornbergStencilCoefficients(centering_nox, a_grid_type);
-    Fornberg_stencil_coeffs_y = ablastr::math::getFornbergStencilCoefficients(centering_noy, a_grid_type);
-    Fornberg_stencil_coeffs_z = ablastr::math::getFornbergStencilCoefficients(centering_noz, a_grid_type);
-
-    host_centering_stencil_coeffs_x.resize(centering_nox);
-    host_centering_stencil_coeffs_y.resize(centering_noy);
-    host_centering_stencil_coeffs_z.resize(centering_noz);
-
-    // Re-order Fornberg stencil coefficients:
-    // example for order 6: (c_0,c_1,c_2) becomes (c_2,c_1,c_0,c_0,c_1,c_2)
-    ablastr::math::ReorderFornbergCoefficients(
-        host_centering_stencil_coeffs_x,
-        Fornberg_stencil_coeffs_x,
-        centering_nox
-    );
-    ablastr::math::ReorderFornbergCoefficients(
-        host_centering_stencil_coeffs_y,
-        Fornberg_stencil_coeffs_y,
-        centering_noy
-    );
-    ablastr::math::ReorderFornbergCoefficients(
-        host_centering_stencil_coeffs_z,
-        Fornberg_stencil_coeffs_z,
-        centering_noz
-    );
-
-    // Device vectors of stencil coefficients used for finite-order centering
-
-    device_centering_stencil_coeffs_x.resize(host_centering_stencil_coeffs_x.size());
-    amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
-                          host_centering_stencil_coeffs_x.begin(),
-                          host_centering_stencil_coeffs_x.end(),
-                          device_centering_stencil_coeffs_x.begin());
-
-    device_centering_stencil_coeffs_y.resize(host_centering_stencil_coeffs_y.size());
-    amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
-                          host_centering_stencil_coeffs_y.begin(),
-                          host_centering_stencil_coeffs_y.end(),
-                          device_centering_stencil_coeffs_y.begin());
-
-    device_centering_stencil_coeffs_z.resize(host_centering_stencil_coeffs_z.size());
-    amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
-                          host_centering_stencil_coeffs_z.begin(),
-                          host_centering_stencil_coeffs_z.end(),
-                          device_centering_stencil_coeffs_z.begin());
-
-    amrex::Gpu::synchronize();
 }
 
 const iMultiFab*

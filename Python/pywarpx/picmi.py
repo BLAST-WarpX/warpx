@@ -2563,14 +2563,21 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
     scattering_processes: dictionary
         The scattering process to use and any needed information
 
+    product_species: list
+        The species produced by collision processes (currently only ionization
+        products are supported).
+
     ndt: integer, optional
         The collisions will be applied every "ndt" steps. Must be 1 or larger.
     """
 
-    def __init__(self, name, species, scattering_processes, ndt=None, **kw):
+    def __init__(
+        self, name, species, scattering_processes, product_species=None, ndt=None, **kw
+    ):
         self.name = name
         self.species = species
         self.scattering_processes = scattering_processes
+        self.product_species = product_species
         self.ndt = ndt
 
         self.handle_init(kw)
@@ -2579,12 +2586,16 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
         collision = pywarpx.Collisions.newcollision(self.name)
         collision.type = "dsmc"
         collision.species = [species.name for species in self.species]
+        if self.product_species is not None:
+            collision.product_species = [
+                species.name for species in self.product_species
+            ]
         collision.ndt = self.ndt
 
         collision.scattering_processes = self.scattering_processes.keys()
         for process, kw in self.scattering_processes.items():
             for key, val in kw.items():
-                if key == "species":
+                if "species" in key:
                     val = val.name
                 collision.add_new_attr(process + "_" + key, val)
 
@@ -2898,6 +2909,11 @@ class Simulation(picmistandard.PICMI_Simulation):
     warpx_checkpoint_signals: list of strings
         Signals on which to write out a checkpoint
 
+    warpx_synchronize_velocity: bool, default=False
+        Flags whether the particle velocities are synchronized in time with
+        the positions in the diagnostics. When False, the particles are
+        one half step behind the positions (except for the final diagnostic).
+
     warpx_numprocs: list of ints (1 in 1D, 2 in 2D, 3 in 3D)
         Domain decomposition on the coarsest level.
         The domain will be chopped into the exact number of pieces in each dimension as specified by this parameter.
@@ -3017,6 +3033,8 @@ class Simulation(picmistandard.PICMI_Simulation):
         self.reduced_diags_separator = kw.pop("warpx_reduced_diags_separator", None)
         self.reduced_diags_precision = kw.pop("warpx_reduced_diags_precision", None)
 
+        self.synchronize_velocity = kw.pop("warpx_synchronize_velocity", None)
+
         self.inputs_initialized = False
         self.warpx_initialized = False
 
@@ -3080,6 +3098,8 @@ class Simulation(picmistandard.PICMI_Simulation):
 
         pywarpx.warpx.break_signals = self.break_signals
         pywarpx.warpx.checkpoint_signals = self.checkpoint_signals
+
+        pywarpx.warpx.synchronize_velocity_for_diagnostics = self.synchronize_velocity
 
         pywarpx.warpx.numprocs = self.numprocs
 

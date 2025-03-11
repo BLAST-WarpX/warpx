@@ -15,8 +15,6 @@
 #include <AMReX_Parser.H>
 #include <AMReX_REAL.H>
 
-#include <optional>
-
 
 /** \brief Functor class that assigns external
  *         field values (E and B) to particles.
@@ -56,10 +54,10 @@ struct GetExternalEBField
     const amrex::ParticleReal* AMREX_RESTRICT m_uy = nullptr;
     const amrex::ParticleReal* AMREX_RESTRICT m_uz = nullptr;
 
-    std::optional<LatticeElementFinderDevice> d_lattice_element_finder;
+    LatticeElementFinderDevice d_lattice_element_finder;
 
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    bool isNoOp () const { return (m_Etype == None && m_Btype == None && !d_lattice_element_finder.has_value()); }
+    bool isNoOp () const { return (m_Etype == None && m_Btype == None && !d_lattice_element_finder.m_initialized); }
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void operator () (long i,
@@ -72,10 +70,9 @@ struct GetExternalEBField
     {
         using namespace amrex::literals;
 
-        if (d_lattice_element_finder) {
-            // Note that the "*" is needed since d_lattice_element_finder is optional
-            (*d_lattice_element_finder)(i, field_Ex, field_Ey, field_Ez,
-                                           field_Bx, field_By, field_Bz);
+        if (d_lattice_element_finder.m_initialized) {
+            d_lattice_element_finder(i, field_Ex, field_Ey, field_Ez,
+                                        field_Bx, field_By, field_Bz);
         }
 
         if (m_Etype == None && m_Btype == None) { return; }

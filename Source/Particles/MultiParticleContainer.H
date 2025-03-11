@@ -257,6 +257,13 @@ public:
      */
     void SetDoBackTransformedParticles (const std::string& species_name, bool do_back_transformed_particles);
 
+    /** Get value of private member m_do_back_transformed_particles
+     */
+    [[nodiscard]] bool getDoBackTransformedParticles () const
+    {
+        return m_do_back_transformed_particles;
+    }
+
     [[nodiscard]] int nSpeciesDepositOnMainGrid () const
     {
         bool const onMainGrid = true;
