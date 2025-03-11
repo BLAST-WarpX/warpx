@@ -57,7 +57,7 @@ namespace
                                       lz(i, j, k) * dx, lz(i + 1, j, k) * dx});
 #elif defined(WARPX_DIM_3D)
             return 0.5_rt * std::max({lx(i, j, k) * dz, lx(i, j, k + 1) * dz,
-                                  lz(i, j, k) * dx, lz(i + 1, j, k) * dx});
+                                      lz(i, j, k) * dx, lz(i + 1, j, k) * dx});
 #else
             amrex::Abort("ComputeSStab: Only implemented in 2D3V and 3D3V");
 #endif
