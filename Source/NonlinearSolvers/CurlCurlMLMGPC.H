@@ -309,7 +309,7 @@ void CurlCurlMLMGPC<T,Ops>::Apply (T& a_x, const T& a_b)
 
         // Copy initial guess to local object
 #if defined(WARPX_DIM_1D_Z)
-        // Missing dimensions is x,y in WarpX and y,z in AMReX
+        // Missing dimensions are x,y in WarpX and y,z in AMReX
         Array<MultiFab,3> solution { MultiFab(*x_mfarrvec[n][2], make_alias, 0, 1),
                                      MultiFab(*x_mfarrvec[n][1], make_alias, 0, 1),
                                      MultiFab(*x_mfarrvec[n][0], make_alias, 0, 1) };
