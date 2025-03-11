@@ -1,13 +1,13 @@
 # WarpX
 
-[![Code Status development](https://dev.azure.com/ECP-WarpX/WarpX/_apis/build/status/ECP-WarpX.WarpX?branchName=development)](https://dev.azure.com/ECP-WarpX/WarpX/_build/latest?definitionId=1&branchName=development)
-[![Nightly Installation Tests](https://dev.azure.com/ECP-WarpX/WarpX/_apis/build/status/ECP-WarpX.Nightly?branchName=nightly&label=nightly%20packages)](https://dev.azure.com/ECP-WarpX/WarpX/_build?definitionId=2)
+[![Code Status development](https://dev.azure.com/BLAST-WarpX/warpx/_apis/build/status/ECP-WarpX.WarpX?branchName=development)](https://dev.azure.com/BLAST-WarpX/warpx/_build/latest?definitionId=1&branchName=development)
+[![Nightly Installation Tests](https://dev.azure.com/BLAST-WarpX/warpx/_apis/build/status/ECP-WarpX.Nightly?branchName=nightly&label=nightly%20packages)](https://dev.azure.com/BLAST-WarpX/warpx/_build?definitionId=2)
 [![Documentation Status](https://readthedocs.org/projects/warpx/badge/?version=latest)](https://warpx.readthedocs.io)
 [![Spack Version](https://img.shields.io/spack/v/warpx)](https://spack.readthedocs.io/en/latest/package_list.html#warpx)
 [![Conda Version](https://img.shields.io/conda/vn/conda-forge/warpx)](https://anaconda.org/conda-forge/warpx)
-[![Discussions](https://img.shields.io/badge/chat-discussions-turquoise.svg)](https://github.com/ECP-WarpX/WarpX/discussions)  
+[![Discussions](https://img.shields.io/badge/chat-discussions-turquoise.svg)](https://github.com/BLAST-WarpX/warpx/discussions)  
 [![Supported Platforms](https://img.shields.io/badge/platforms-linux%20|%20osx%20|%20win-blue)](https://warpx.readthedocs.io/en/latest/install/users.html)
-[![GitHub commits since last release](https://img.shields.io/github/commits-since/ECP-WarpX/WarpX/latest/development.svg)](https://github.com/ECP-WarpX/WarpX/compare/development)
+[![GitHub commits since last release](https://img.shields.io/github/commits-since/BLAST-WarpX/warpx/latest/development.svg)](https://github.com/BLAST-WarpX/warpx/compare/development)
 [![HPSF](https://img.shields.io/badge/hosted%20by-HPSF-orange)](https://hpsf.io)
 [![Language: C++17](https://img.shields.io/badge/language-C%2B%2B17-orange.svg)](https://isocpp.org/)
 [![Language: Python](https://img.shields.io/badge/language-Python-orange.svg)](https://python.org/)  
@@ -32,7 +32,7 @@ WarpX scales to the world's largest supercomputers and was awarded the [2022 ACM
 In order to learn how to install and run the code, please see the online documentation:
 https://warpx.readthedocs.io
 
-To contact the developers, feel free to open an issue on this repo, or visit our discussions page at https://github.com/ECP-WarpX/WarpX/discussions
+To contact the developers, feel free to open an issue on this repo, or visit our discussions page at https://github.com/BLAST-WarpX/warpx/discussions
 
 ## Contributing
 
@@ -45,7 +45,7 @@ To contact the developers, feel free to open an issue on this repo, or visit our
 [![SENSEI](https://img.shields.io/static/v1?label="runs%20on"&message="SENSEI"&color="blueviolet")](https://sensei-insitu.org)
 
 Our workflow is described in [CONTRIBUTING.rst](CONTRIBUTING.rst).
-We invite you to contribute to WarpX in any form following our [Code of Conduct](https://warpx.readthedocs.io/en/latest/coc.html), e.g., contribute to [discussions](https://github.com/ECP-WarpX/WarpX/discussions), help each other in [issues](https://github.com/ECP-WarpX/WarpX/issues), fix bugs, or add [documentation](https://warpx.readthedocs.io/en/latest/developers/documentation.html) and new functionality!
+We invite you to contribute to WarpX in any form following our [Code of Conduct](https://warpx.readthedocs.io/en/latest/coc.html), e.g., contribute to [discussions](https://github.com/BLAST-WarpX/warpx/discussions), help each other in [issues](https://github.com/BLAST-WarpX/warpx/issues), fix bugs, or add [documentation](https://warpx.readthedocs.io/en/latest/developers/documentation.html) and new functionality!
 
 ## Governance
 

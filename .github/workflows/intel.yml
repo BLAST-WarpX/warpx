@@ -82,7 +82,7 @@ jobs:
     runs-on: ubuntu-20.04
     # Since 2021.4.0, AMReX_GpuUtility.H: error: comparison with NaN always evaluates to false in fast floating point modes
     # oneAPI 2022.2.0 hangs for -O2 and higher:
-    #   https://github.com/ECP-WarpX/WarpX/issues/3442
+    #   https://github.com/BLAST-WarpX/warpx/issues/3442
     env:
       CXXFLAGS: "-Werror -Wno-error=pass-failed -Wno-tautological-constant-compare"
     # For oneAPI, Ninja is slower than the default:
@@ -147,7 +147,7 @@ jobs:
     runs-on: ubuntu-20.04
     # Since 2021.4.0, AMReX_GpuUtility.H: error: comparison with NaN always evaluates to false in fast floating point modes
     # oneAPI 2022.2.0 hangs for -O2 and higher:
-    #   https://github.com/ECP-WarpX/WarpX/issues/3442
+    #   https://github.com/BLAST-WarpX/warpx/issues/3442
     env:
       CXXFLAGS: "-Werror -Wno-tautological-constant-compare"
     # For oneAPI, Ninja is slower than the default:
