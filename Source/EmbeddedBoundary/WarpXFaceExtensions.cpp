@@ -64,7 +64,7 @@ namespace
         }
         else if constexpr(dim == 2){
             return 0.5_rt * std::max({lx(i, j, k) * dy, lx(i, j + 1, k) * dy,
-                                  ly(i, j, k) * dx, ly(i + 1, j, k) * dx});
+                                      ly(i, j, k) * dx, ly(i + 1, j, k) * dx});
         }
 
         amrex::Abort("ComputeSStab: dim must be 0, 1 or 2");
