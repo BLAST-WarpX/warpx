@@ -699,7 +699,14 @@ WarpX::AddExternalFields (int const lev)
 
 void
 WarpX::InitDiagnostics () {
-    multi_diags->InitData();
+
+    // Parameters used to initialize diagnostics
+    const auto init_diag_params = InitDiagnosticsParameters {
+        finestLevel(), maxLevel(),
+        do_moving_window, moving_window_dir,
+        moving_window_x, Geom(0).CellSize(moving_window_dir)};
+
+    multi_diags->InitData(init_diag_params);
     reduced_diags->InitData();
 }
 

@@ -22,7 +22,26 @@
 #include <vector>
 
 /** All types of diagnostics. */
-enum struct DiagTypes {Full, BackTransformed, BoundaryScraping, TimeAveraged};
+enum struct DiagTypes
+{
+    Full,
+    BackTransformed,
+    BoundaryScraping,
+    TimeAveraged
+};
+
+/** A struct containing the parameters required to initialize a diagnostics */
+struct InitDiagnosticsParameters
+{
+    int finest_level;
+    int max_level;
+
+    int do_moving_window;
+    int moving_window_dir;
+    amrex::Real moving_window_x;
+    amrex::Real cell_size_lev0_mwdir;
+};
+
 /**
  * \brief base class for diagnostics.
  * Contains main routines to filter, compute and flush diagnostics.
@@ -71,9 +90,10 @@ public:
      * (including metadata listing the total number of particles) even if the snapshot is incomplete
      */
     virtual void Flush (int i_buffer, bool force_flush) = 0;
+
     /** Initialize pointers to main fields and allocate output multifab m_mf_output. */
-    void InitData ();
-    void InitDataBeforeRestart ();
+    void InitData (const InitDiagnosticsParameters& params);
+    void InitDataBeforeRestart (const InitDiagnosticsParameters& params);
     void InitDataAfterRestart ();
     /** Initialize functors that store pointers to the fields requested by the user.
      *
@@ -193,7 +213,7 @@ protected:
     /** Whether to output a message when diagnostics are output */
     int m_verbose = 2;
     /** Initialize member variables of the base Diagnostics class. */
-    void InitBaseData ();
+    void InitBaseData (const InitDiagnosticsParameters& params);
     /** Initialize m_mf_output vectors and data required to construct the buffers
      * \param[in] i_buffer index of buffer for which the output MultiFab is defined.
      * \param[in] lev level on which the output MultiFab is defined
