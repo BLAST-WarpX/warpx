@@ -16,6 +16,7 @@
 #include "FlushFormats/FlushFormat.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/Algorithms/IsIn.H"
+#include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "WarpX.H"
@@ -155,9 +156,8 @@ FullDiagnostics::ReadParameters ()
         const bool averaging_period_steps_specified = pp_diag_name.query(
                 "average_period_steps", m_average_period_steps
         );
-        const bool averaging_period_time_specified = pp_diag_name.queryWithParser(
-                "average_period_time", m_average_period_time
-        );
+        const bool averaging_period_time_specified = utils::parser::queryWithParser
+            (pp_diag_name, "average_period_time", m_average_period_time);
 
         if (m_time_average_mode == TimeAverageType::Static) {
             // This fails if users do not specify a start.
