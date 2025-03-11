@@ -133,7 +133,6 @@ FullDiagnostics::ReadParameters ()
         const amrex::ParmParse pp_warpx("warpx");
         std::vector<std::string> dt_interval_vec = {"-1"};
         const bool timestep_may_vary = pp_warpx.queryarr("dt_update_interval", dt_interval_vec);
-        amrex::Print() << Utils::TextMsg::Warn("Time step varies?" + std::to_string(timestep_may_vary));
         if (timestep_may_vary) {
             WARPX_ABORT_WITH_MESSAGE(
                     "Time-averaged diagnostics (encountered in: "
