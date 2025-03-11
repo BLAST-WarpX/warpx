@@ -569,9 +569,6 @@ protected:
 
 public:
     using PairIndex = std::pair<int, int>;
-    using TmpParticleTile = std::array<amrex::Gpu::DeviceVector<amrex::ParticleReal>,
-                                       TmpIdx::nattribs>;
-    using TmpParticles = amrex::Vector<std::map<PairIndex, TmpParticleTile> >;
 
     int getIonizationInitialLevel () const noexcept {return ionization_initial_level;}
 

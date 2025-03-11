@@ -21,8 +21,6 @@
  */
 struct SelectParticles
 {
-    using TmpParticles = WarpXParticleContainer::TmpParticles;
-
     /**
      * \brief Constructor of SelectParticles functor.
      *
@@ -76,8 +74,6 @@ struct SelectParticles
  */
 struct LorentzTransformParticles
 {
-
-    using TmpParticles = WarpXParticleContainer::TmpParticles;
 
     /**
      * \brief Constructor of the LorentzTransformParticles functor.
