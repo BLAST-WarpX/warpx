@@ -34,10 +34,10 @@ MultiDiagnostics::MultiDiagnostics ()
 }
 
 void
-MultiDiagnostics::InitData ()
+MultiDiagnostics::InitData (const InitDiagnosticsParameters& params)
 {
     for( auto& diag : alldiags ){
-        diag->InitData();
+        diag->InitData(params);
     }
 }
 

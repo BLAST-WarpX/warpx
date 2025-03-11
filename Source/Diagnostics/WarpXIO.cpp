@@ -18,6 +18,7 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
+#include "Diagnostics.H"
 #include "Diagnostics/MultiDiagnostics.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 
@@ -229,13 +230,19 @@ WarpX::InitFromCheckpoint ()
         is >> time_of_last_gal_shift;
         ablastr::utils::text::goto_next_line(is);
 
+        // Parameters used to initialize diagnostics
+        const auto init_diag_params = InitDiagnosticsParameters {
+            finestLevel(), maxLevel(),
+            do_moving_window, moving_window_dir,
+            moving_window_x, Geom(0).CellSize(moving_window_dir)};
+
         for (int idiag = 0; idiag < multi_diags->GetTotalDiags(); ++idiag)
         {
             if( multi_diags->diagstypes(idiag) == DiagTypes::BackTransformed )
             {
                 auto& diag = multi_diags->GetDiag(idiag);
                 if (diag.getnumbuffers() > 0) {
-                    diag.InitDataBeforeRestart();
+                    diag.InitDataBeforeRestart(init_diag_params);
                     for (int i_buffer=0; i_buffer<diag.getnumbuffers(); ++i_buffer){
                         amrex::Real tlab;
                         is >> tlab;
@@ -270,10 +277,10 @@ WarpX::InitFromCheckpoint ()
                     }
                     diag.InitDataAfterRestart();
                 } else {
-                    diag.InitData();
+                    diag.InitData(init_diag_params);
                 }
             } else {
-                multi_diags->GetDiag(idiag).InitData();
+                multi_diags->GetDiag(idiag).InitData(init_diag_params);
             }
         }
     }
