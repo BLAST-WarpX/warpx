@@ -13,6 +13,7 @@ geometry.coord_sys = 0
 ############ CONSTANTS #############
 #################################
 my_constants.Te = 10
+my_constants.ion_mass = 2.196035502270312e-25
 warpx.const_dt = 1e-09
 
 #################################
@@ -61,17 +62,17 @@ ions.momentum_distribution_type = gaussian
 ions.num_particles_per_cell_each_dim = 4 4 4
 ions.profile = constant
 ions.ux_m = 0.0
-ions.ux_th = 4.5810168302300867e-07
+ions.ux_th = sqrt(q_e * Te / m_p) / clight
 ions.uy_m = 0.0
-ions.uy_th = 4.5810168302300867e-07
+ions.uy_th = sqrt(q_e * Te / m_p) / clight
 ions.uz_m = 0.0
-ions.uz_th = 4.5810168302300867e-07
+ions.uz_th = sqrt(q_e * Te / m_p) / clight
 
 neutrals.charge = 0
 neutrals.density = 1e+20
 neutrals.initialize_self_fields = 0
 neutrals.injection_style = nuniformpercell
-neutrals.mass = 2.196035502270312e-25
+neutrals.mass = ion_mass
 neutrals.momentum_distribution_type = gaussian
 neutrals.num_particles_per_cell_each_dim = 4 4 4
 neutrals.profile = constant
@@ -82,16 +83,15 @@ neutrals.uy_th = 4.5810168302300867e-07
 neutrals.uz_m = 0.0
 neutrals.uz_th = 4.5810168302300867e-07
 
-collisions.collision_names = coll_elec
+collisions.collision_names = ioniz
 
-coll_elec.ionization_cross_section = ../../../../warpx-data/MCC_cross_sections/Xe/ionization.dat
-coll_elec.ionization_energy = 12.1298431
-coll_elec.product_species = ions electrons
-coll_elec.ionization_target_species = neutrals
-coll_elec.ndt = 1
-coll_elec.scattering_processes = ionization
-coll_elec.species = electrons neutrals
-coll_elec.type = dsmc
+ioniz.ionization_cross_section = ../../../../warpx-data/MCC_cross_sections/Xe/ionization.dat
+ioniz.ionization_energy = 12.1298431
+ioniz.product_species = ions electrons
+ioniz.ionization_target_species = neutrals
+ioniz.ndt = 1
+ioniz.scattering_processes = ionization
+ioniz.type = dsmc
 
 #################################
 ############ DIAGNOSTICS #############

@@ -1,0 +1,4 @@
+# base input parameters
+FILE = inputs_base_3d
+
+ioniz.species = electrons neutrals
