@@ -1371,9 +1371,6 @@ WarpXParticleContainer::DepositTemperature (amrex::MultiFab* temperature, const 
     // Calculate the averages in two steps, first the average velocity <u>, then the
     // average velocity squared <u - <u>>**2. This method is more robust than the
     // single step using <u**2> - <u>**2 when <u> >> u_rms.
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
     ParticleToMesh(*this, sum_mf, lev,
             [=] AMREX_GPU_DEVICE (const WarpXParticleContainer::SuperParticleType& p,
                 amrex::Array4<amrex::Real> const& sum_array,
@@ -1383,10 +1380,10 @@ WarpXParticleContainer::DepositTemperature (amrex::MultiFab* temperature, const 
                 // Get position in AMReX convention to calculate corresponding index.
                 const auto [ii, jj, kk] = amrex::getParticleCell(p, plo, dxi).dim3();
 
-                const amrex::ParticleReal w  = p.rdata(PIdx::w);
-                const amrex::ParticleReal ux = p.rdata(PIdx::ux);
-                const amrex::ParticleReal uy = p.rdata(PIdx::uy);
-                const amrex::ParticleReal uz = p.rdata(PIdx::uz);
+                amrex::ParticleReal const w  = p.rdata(PIdx::w);
+                amrex::ParticleReal const ux = p.rdata(PIdx::ux);
+                amrex::ParticleReal const uy = p.rdata(PIdx::uy);
+                amrex::ParticleReal const uz = p.rdata(PIdx::uz);
                 amrex::Gpu::Atomic::AddNoRet(&sum_array(ii, jj, kk, 0), (amrex::Real)(w));
                 amrex::Gpu::Atomic::AddNoRet(&sum_array(ii, jj, kk, 1), (amrex::Real)(w*ux));
                 amrex::Gpu::Atomic::AddNoRet(&sum_array(ii, jj, kk, 2), (amrex::Real)(w*uy));
@@ -1496,9 +1493,6 @@ WarpXParticleContainer::DepositNumberDensity (amrex::MultiFab* number_density, c
 {
 
     // Calculate the number density
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
     ParticleToMesh(*this, *number_density, lev,
             [=] AMREX_GPU_DEVICE (const WarpXParticleContainer::SuperParticleType& p,
                 amrex::Array4<amrex::Real> const& num_array,
@@ -1560,7 +1554,7 @@ WarpXParticleContainer::GetNumberDensity (int lev)
     int const ng = 0;
     auto number_density = std::make_unique<amrex::MultiFab>(ba, dm, ncomps, ng);
     number_density->setVal(0., 0, ncomps, number_density->nGrowVect());
-    DepositTemperature(number_density.get(), lev);
+    DepositNumberDensity(number_density.get(), lev);
 
     return number_density;
 }
@@ -1600,14 +1594,15 @@ WarpXParticleContainer::GetDebyeLength (int lev)
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
 
                 amrex::Real const N = num_array(i,j,k);
-                amrex::Real const T = temp_array(i,j,k);
+                amrex::Real const T = temp_array(i,j,k)*PhysConst::q_e;  // temp_array is in eV
                 amrex::Real const R = 1.0_rt/std::cbrt(4.0_rt/3.0_rt*MathConst::pi*N); // atomic spacing [m]
 
                 // compute the fermi energy. Should only be used for fermions such as
                 // electrons and ions with an odd number of nucleons, but its easiest just
                 // to include it for all charged species and it is insignificant for ions.
-                // EF_Joules = hbar^2/(2*mass)*(3*pi^2*n)^(2/3)
-                amrex::Real const EF = PhysConst::hbar*PhysConst::hbar/(2.0_rt*rmass)*std::pow(3.0_rt*MathConst::pi*MathConst::pi*N, 2.0_rt/3.0_rt);
+                // EF_Joules = hbar^2/(2*mass)*(3*pi^2*N)^(2/3)
+                amrex::Real const EF = PhysConst::hbar*PhysConst::hbar/(2.0_rt*rmass)*
+                                       std::pow(3.0_rt*MathConst::pi*MathConst::pi*N, 2.0_rt/3.0_rt);
 
                 // Debye length squared
                 amrex::Real const LDe_sq = std::max(Aconst*(T + 2.0_rt/3.0_rt*EF)/N, R*R); // [m^2]

@@ -83,7 +83,8 @@ namespace warpx::fields
         Bfield_avg_cp,
         B_old, /**< Stores the value of B at the beginning of the timestep, for the implicit solver */
         ECTRhofield,
-        Venl
+        Venl,
+        global_debye_length
     );
 
     /** these are vector fields */
