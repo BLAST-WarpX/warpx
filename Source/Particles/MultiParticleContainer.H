@@ -173,7 +173,7 @@ public:
 
     std::unique_ptr<amrex::MultiFab> GetChargeDensity(int lev, bool local = false);
 
-    std::unique_ptr<amrex::MultiFab> GlobalDebyeLength (int lev);
+    void GenerateGlobalDebyeLength ();
 
     void doFieldIonization (int lev,
                             const amrex::MultiFab& Ex, const amrex::MultiFab& Ey, const amrex::MultiFab& Ez,
