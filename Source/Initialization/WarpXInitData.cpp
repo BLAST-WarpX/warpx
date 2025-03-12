@@ -706,7 +706,9 @@ WarpX::InitDiagnostics () {
         do_moving_window, moving_window_dir,
         moving_window_x, Geom(0).CellSize(moving_window_dir)};
 
-    multi_diags->InitData(init_diag_params);
+    auto* p_warpx_mesh = dynamic_cast<amrex::AmrMesh*>(this);
+
+    multi_diags->InitData(init_diag_params, p_warpx_mesh);
     reduced_diags->InitData();
 }
 

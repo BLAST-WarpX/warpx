@@ -34,10 +34,10 @@ MultiDiagnostics::MultiDiagnostics ()
 }
 
 void
-MultiDiagnostics::InitData (const InitDiagnosticsParameters& params)
+MultiDiagnostics::InitData (const InitDiagnosticsParameters& params, amrex::AmrMesh* p_warpx_mesh)
 {
     for( auto& diag : alldiags ){
-        diag->InitData(params);
+        diag->InitData(params, p_warpx_mesh);
     }
 }
 

@@ -236,13 +236,15 @@ WarpX::InitFromCheckpoint ()
             do_moving_window, moving_window_dir,
             moving_window_x, Geom(0).CellSize(moving_window_dir)};
 
+        auto* p_warpx_mesh = dynamic_cast<amrex::AmrMesh*>(this);
+
         for (int idiag = 0; idiag < multi_diags->GetTotalDiags(); ++idiag)
         {
             if( multi_diags->diagstypes(idiag) == DiagTypes::BackTransformed )
             {
                 auto& diag = multi_diags->GetDiag(idiag);
                 if (diag.getnumbuffers() > 0) {
-                    diag.InitDataBeforeRestart(init_diag_params);
+                    diag.InitDataBeforeRestart(init_diag_params, p_warpx_mesh);
                     for (int i_buffer=0; i_buffer<diag.getnumbuffers(); ++i_buffer){
                         amrex::Real tlab;
                         is >> tlab;
@@ -277,10 +279,10 @@ WarpX::InitFromCheckpoint ()
                     }
                     diag.InitDataAfterRestart();
                 } else {
-                    diag.InitData(init_diag_params);
+                    diag.InitData(init_diag_params, p_warpx_mesh);
                 }
             } else {
-                multi_diags->GetDiag(idiag).InitData(init_diag_params);
+                multi_diags->GetDiag(idiag).InitData(init_diag_params, p_warpx_mesh);
             }
         }
     }

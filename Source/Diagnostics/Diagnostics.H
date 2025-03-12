@@ -92,8 +92,8 @@ public:
     virtual void Flush (int i_buffer, bool force_flush) = 0;
 
     /** Initialize pointers to main fields and allocate output multifab m_mf_output. */
-    void InitData (const InitDiagnosticsParameters& params);
-    void InitDataBeforeRestart (const InitDiagnosticsParameters& params);
+    void InitData (const InitDiagnosticsParameters& params, amrex::AmrMesh* p_warpx_mesh);
+    void InitDataBeforeRestart (const InitDiagnosticsParameters& params, amrex::AmrMesh* p_warpx_mesh);
     void InitDataAfterRestart ();
     /** Initialize functors that store pointers to the fields requested by the user.
      *
@@ -213,7 +213,7 @@ protected:
     /** Whether to output a message when diagnostics are output */
     int m_verbose = 2;
     /** Initialize member variables of the base Diagnostics class. */
-    void InitBaseData (const InitDiagnosticsParameters& params);
+    void InitBaseData (const InitDiagnosticsParameters& params, [[maybe_unused]] amrex::AmrMesh* p_warpx_mesh);
     /** Initialize m_mf_output vectors and data required to construct the buffers
      * \param[in] i_buffer index of buffer for which the output MultiFab is defined.
      * \param[in] lev level on which the output MultiFab is defined
