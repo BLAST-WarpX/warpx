@@ -53,18 +53,22 @@ public:
     {
         using namespace amrex::literals;
         const amrex::ParmParse pp_collision_name(collision_name);
+
+        utils::parser::queryWithParser(
+            pp_collision_name, "use_global_debye_length", m_use_global_debye_length);
+
         // default Coulomb log, if < 0, will be computed automatically
         amrex::ParticleReal CoulombLog = -1.0_prt;
         utils::parser::queryWithParser(
             pp_collision_name, "CoulombLog", CoulombLog);
         m_CoulombLog = CoulombLog;
-
         m_exe.m_CoulombLog = m_CoulombLog;
-        if (m_CoulombLog<0.0) { m_exe.m_computeSpeciesTemperatures = true; }
-        m_exe.m_isSameSpecies = m_isSameSpecies;
 
-        utils::parser::queryWithParser(
-            pp_collision_name, "use_global_debye_length", m_use_global_debye_length);
+        if (m_CoulombLog<0.0 && !m_use_global_debye_length) {
+            m_exe.m_computeSpeciesTemperatures = true;
+        }
+
+        m_exe.m_isSameSpecies = m_isSameSpecies;
 
     }
 
