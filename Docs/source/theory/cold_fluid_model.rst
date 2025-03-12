@@ -44,7 +44,7 @@ Implementation details
 
 .. _fig_fluid_loop:
 
-.. figure:: https://github.com/ECP-WarpX/WarpX/assets/69021085/dcbcc0e4-7899-43e4-b580-f57eb359b457
+.. figure:: https://github.com/BLAST-WarpX/warpx/assets/69021085/dcbcc0e4-7899-43e4-b580-f57eb359b457
    :alt: Figure showing fluid Loop embedded within the overall PIC loop.
 
    Fluid Loop embedded within the overall PIC loop.
@@ -102,7 +102,7 @@ Step 5: **Current and Charge Deposition**
    The implemented MUSCL scheme has a simplified slope averaging, see the extended writeup for details.
 
    More details on the precise implementation are available here, `WarpX_Cold_Rel_Fluids.pdf`_.
-.. _WarpX_Cold_Rel_Fluids.pdf: https://github.com/ECP-WarpX/WarpX/files/12886437/WarpX_Cold_Rel_Fluids.pdf
+.. _WarpX_Cold_Rel_Fluids.pdf: https://github.com/BLAST-WarpX/warpx/files/12886437/WarpX_Cold_Rel_Fluids.pdf
 
 .. warning::
       If using the fluid model with the Kinetic-Fluid Hybrid model or the electrostatic solver, there is a known

@@ -26,9 +26,9 @@ single directory (e.g. ``warpx_directory``):
 
     mkdir warpx_directory
     cd warpx_directory
-    git clone https://github.com/ECP-WarpX/WarpX.git
+    git clone https://github.com/BLAST-WarpX/warpx.git
     git clone https://github.com/ECP-WarpX/picsar.git
-    git clone https://github.com/ECP-WarpX/warpx-data.git
+    git clone https://github.com/BLAST-WarpX/warpx-data.git
     git clone https://github.com/AMReX-Codes/amrex.git
 
 .. note::

@@ -116,7 +116,7 @@ jobs:
       python3 -m pip cache purge
       # external repositories required for test analysis
       cd ..
-      git clone --depth 1 https://github.com/ECP-WarpX/warpx-data.git
+      git clone --depth 1 https://github.com/BLAST-WarpX/warpx-data.git
       # TODO select only specific datasets?
       git clone --depth 1 https://github.com/openPMD/openPMD-example-datasets.git
       cd -

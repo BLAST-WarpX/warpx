@@ -769,7 +769,7 @@ WarpX::ReadParameters ()
         }
 
         // Filter currently not working with FDTD solver in RZ geometry: turn OFF by default
-        // (see https://github.com/ECP-WarpX/WarpX/issues/1943)
+        // (see https://github.com/BLAST-WarpX/warpx/issues/1943)
 #ifdef WARPX_DIM_RZ
         if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) { WarpX::use_filter = false; }
 #endif
@@ -801,7 +801,7 @@ WarpX::ReadParameters ()
         {
             if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::HybridPIC) {
                 // Filter currently not working with FDTD solver in RZ geometry along R
-                // (see https://github.com/ECP-WarpX/WarpX/issues/1943)
+                // (see https://github.com/BLAST-WarpX/warpx/issues/1943)
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!use_filter || filter_npass_each_dir[0] == 0,
                     "In RZ geometry with FDTD, filtering can only be applied along z. This can be controlled by setting warpx.filter_npass_each_dir");
             } else {

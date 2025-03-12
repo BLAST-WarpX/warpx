@@ -38,7 +38,7 @@ Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git /usr/workspace/${USER}/lassen/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git /usr/workspace/${USER}/lassen/src/warpx
 
 We use system software modules, add environment hints and further dependencies via the file ``$HOME/lassen_v100_warpx_toss3.profile``.
 Create it now:
@@ -199,7 +199,7 @@ Known System Issues
    Feb 17th, 2022 (INC0278922):
    The implementation of ``AllGatherv`` in IBM's MPI optimization library "libcollectives" is broken and leads to HDF5 crashes for multi-node runs.
 
-   Our batch script templates above `apply this work-around <https://github.com/ECP-WarpX/WarpX/pull/2874>`__ *before* the call to ``jsrun``, which avoids the broken routines from IBM and trades them for an OpenMPI implementation of collectives:
+   Our batch script templates above `apply this work-around <https://github.com/BLAST-WarpX/warpx/pull/2874>`__ *before* the call to ``jsrun``, which avoids the broken routines from IBM and trades them for an OpenMPI implementation of collectives:
 
    .. code-block:: bash
 
