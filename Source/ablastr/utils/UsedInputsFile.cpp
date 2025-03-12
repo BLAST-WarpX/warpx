@@ -11,14 +11,20 @@
 #include <AMReX_ParmParse.H>
 #include <AMReX_Print.H>
 
-#include <ios>
+#include <ostream>
 #include <string>
 
 
 void
-ablastr::utils::write_used_inputs_file (std::string const & filename)
+ablastr::utils::write_used_inputs_file (std::string const & filename, bool verbose)
 {
-    amrex::Print() << "For full input parameters, see the file: " << filename << "\n\n";
+    if (filename.empty() || filename == "/dev/null") {
+        return;
+    }
+
+    if (verbose) {
+        amrex::Print() << "For full input parameters, see the file: " << filename << "\n\n";
+    }
 
     if (amrex::ParallelDescriptor::IOProcessor()) {
         std::ofstream jobInfoFile;

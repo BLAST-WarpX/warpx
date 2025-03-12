@@ -50,7 +50,7 @@ jobs:
         export CC=$(which icc)
 
         python3 -m pip install --upgrade pip
-        python3 -m pip install --upgrade build packaging setuptools wheel
+        python3 -m pip install --upgrade build packaging setuptools[core] wheel
 
         cmake -S . -B build_dp \
           -DCMAKE_VERBOSE_MAKEFILE=ON \
@@ -82,7 +82,7 @@ jobs:
     runs-on: ubuntu-20.04
     # Since 2021.4.0, AMReX_GpuUtility.H: error: comparison with NaN always evaluates to false in fast floating point modes
     # oneAPI 2022.2.0 hangs for -O2 and higher:
-    #   https://github.com/ECP-WarpX/WarpX/issues/3442
+    #   https://github.com/BLAST-WarpX/warpx/issues/3442
     env:
       CXXFLAGS: "-Werror -Wno-error=pass-failed -Wno-tautological-constant-compare"
     # For oneAPI, Ninja is slower than the default:
@@ -118,7 +118,7 @@ jobs:
         export CC=$(which icx)
 
         python3 -m pip install --upgrade pip
-        python3 -m pip install --upgrade build packaging setuptools wheel
+        python3 -m pip install --upgrade build packaging setuptools[core] wheel
 
         cmake -S . -B build_sp         \
           -DCMAKE_CXX_FLAGS_RELEASE="-O1 -DNDEBUG" \
@@ -147,7 +147,7 @@ jobs:
     runs-on: ubuntu-20.04
     # Since 2021.4.0, AMReX_GpuUtility.H: error: comparison with NaN always evaluates to false in fast floating point modes
     # oneAPI 2022.2.0 hangs for -O2 and higher:
-    #   https://github.com/ECP-WarpX/WarpX/issues/3442
+    #   https://github.com/BLAST-WarpX/warpx/issues/3442
     env:
       CXXFLAGS: "-Werror -Wno-tautological-constant-compare"
     # For oneAPI, Ninja is slower than the default:
@@ -201,6 +201,6 @@ jobs:
 
      # Skip this as it will copy the binary artifacts and we are tight on disk space
      #   python3 -m pip install --upgrade pip
-     #   python3 -m pip install --upgrade build packaging setuptools wheel
+     #   python3 -m pip install --upgrade build packaging setuptools[core] wheel
      #   PYWARPX_LIB_DIR=$PWD/build_sp/lib/site-packages/pywarpx/ python3 -m pip wheel .
      #   python3 -m pip install *.whl

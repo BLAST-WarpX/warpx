@@ -16,6 +16,8 @@
 #include <AMReX_ParmParse.H>
 
 #include <vector>
+#include <istream>
+#include <filesystem>
 
 /**
  * \brief Newton method to solve nonlinear equation of form:
@@ -45,7 +47,8 @@ public:
     void Solve ( Vec&   a_U,
            const Vec&   a_b,
            amrex::Real  a_time,
-           amrex::Real  a_dt ) const override;
+           amrex::Real  a_dt,
+           int          a_step) const override;
 
     void GetSolverParams ( amrex::Real&  a_rtol,
                            amrex::Real&  a_atol,
@@ -200,6 +203,36 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
 
     this->m_is_defined = true;
 
+    // Create diagnostic file and write header
+    if (amrex::ParallelDescriptor::IOProcessor()
+        && !this->m_diagnostic_file.empty()
+        && !amrex::FileExists(this->m_diagnostic_file)) {
+
+        std::filesystem::path const diagnostic_path(this->m_diagnostic_file);
+        std::filesystem::path const diagnostic_dir = diagnostic_path.parent_path();
+        if (!diagnostic_dir.empty()) {
+            std::filesystem::create_directories(diagnostic_dir);
+        }
+
+        std::ofstream diagnostic_file{this->m_diagnostic_file, std::ofstream::out | std::ofstream::trunc};
+        int c = 0;
+        diagnostic_file << "#";
+        diagnostic_file << "[" << c++ << "]step()";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]time(s)";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]iters";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]norm_abs";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]norm_rel";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]gmres_iters";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]gmres_last_res";
+        diagnostic_file << "\n";
+        diagnostic_file.close();
+    }
 }
 
 template <class Vec, class Ops>
@@ -211,6 +244,7 @@ void NewtonSolver<Vec,Ops>::ParseParameters ()
     pp_newton.query("relative_tolerance",  m_rtol);
     pp_newton.query("max_iterations",      m_maxits);
     pp_newton.query("require_convergence", m_require_convergence);
+    pp_newton.query("diagnostic_file",     this->m_diagnostic_file);
 
     const amrex::ParmParse pp_gmres("gmres");
     pp_gmres.query("verbose_int",         m_gmres_verbose_int);
@@ -227,7 +261,8 @@ template <class Vec, class Ops>
 void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
                               const Vec&         a_b,
                                     amrex::Real  a_time,
-                                    amrex::Real  a_dt ) const
+                                    amrex::Real  a_dt,
+                                    int          a_step) const
 {
     BL_PROFILE("NewtonSolver::Solve()");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -248,6 +283,7 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
     amrex::Real norm_rel = 0.;
 
     int iter;
+    int linear_solver_iters = 0;
     for (iter = 0; iter < m_maxits;) {
 
         // Compute residual: F(U) = U - b - R(U)
@@ -293,6 +329,7 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
         // Solve linear system for Newton step [Jac]*dU = F
         m_dU.zero();
         m_linear_solver->solve( m_dU, m_F, m_gmres_rtol, m_gmres_atol );
+        linear_solver_iters += m_linear_solver->getNumIters();
 
         // Update solution
         a_U -= m_dU;
@@ -313,12 +350,32 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
                          " and the relative tolerance is " << m_rtol <<
                          ". Absolute norm is " << norm_abs <<
                          " and the absolute tolerance is " << m_atol;
-       if (this->m_verbose) { amrex::Print() << convergenceMsg.str() << std::endl; }
+       if (this->m_verbose) { amrex::Print() << convergenceMsg.str() << "\n"; }
        if (m_require_convergence) {
            WARPX_ABORT_WITH_MESSAGE(convergenceMsg.str());
        } else {
            ablastr::warn_manager::WMRecordWarning("NewtonSolver", convergenceMsg.str());
        }
+    }
+
+    if (!this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor()) {
+        std::ofstream diagnostic_file{this->m_diagnostic_file, std::ofstream::out | std::ofstream::app};
+        diagnostic_file << std::setprecision(14);
+        diagnostic_file << a_step;
+        diagnostic_file << " ";;
+        diagnostic_file << a_time;
+        diagnostic_file << " ";;
+        diagnostic_file << iter;
+        diagnostic_file << " ";;
+        diagnostic_file << norm_abs;
+        diagnostic_file << " ";;
+        diagnostic_file << norm_rel;
+        diagnostic_file << " ";;
+        diagnostic_file << linear_solver_iters;
+        diagnostic_file << " ";;
+        diagnostic_file << m_linear_solver->getResidualNorm();
+        diagnostic_file << "\n";
+        diagnostic_file.close();
     }
 
 }

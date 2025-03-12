@@ -100,6 +100,44 @@ namespace {
         solver.BackwardTransform(lev, *vector_field[2], compz, fill_guards);
 #endif
     }
+
+    /**
+     * \brief Correct current in Fourier space so that the continuity equation is satisfied
+     */
+    template <typename SpectralSolverType>
+    void PSATDCurrentCorrection (
+        const int finest_level,
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_fp,
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_cp)
+    {
+        for (int lev = 0; lev <= finest_level; ++lev)
+        {
+            spectral_solver_fp[lev]->CurrentCorrection();
+            if (spectral_solver_cp[lev])
+            {
+                spectral_solver_cp[lev]->CurrentCorrection();
+            }
+        }
+    }
+
+    /**
+     * \brief Vay deposition in Fourier space (https://doi.org/10.1016/j.jcp.2013.03.010)
+     */
+    template <typename SpectralSolverType>
+    void PSATDVayDeposition (
+        const int finest_level,
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_fp,
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_cp)
+    {
+        for (int lev = 0; lev <= finest_level; ++lev)
+        {
+            spectral_solver_fp[lev]->VayDeposition();
+            if (spectral_solver_cp[lev])
+            {
+                spectral_solver_cp[lev]->VayDeposition();
+            }
+        }
+    }
 }
 
 void WarpX::PSATDForwardTransformEB ()
@@ -466,32 +504,6 @@ void WarpX::PSATDForwardTransformRho (
 #endif
 }
 
-void WarpX::PSATDCurrentCorrection ()
-{
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        spectral_solver_fp[lev]->CurrentCorrection();
-
-        if (spectral_solver_cp[lev])
-        {
-            spectral_solver_cp[lev]->CurrentCorrection();
-        }
-    }
-}
-
-void WarpX::PSATDVayDeposition ()
-{
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        spectral_solver_fp[lev]->VayDeposition();
-
-        if (spectral_solver_cp[lev])
-        {
-            spectral_solver_cp[lev]->VayDeposition();
-        }
-    }
-}
-
 void WarpX::PSATDSubtractCurrentPartialSumsAvg ()
 {
     using ablastr::fields::Direction;
@@ -722,6 +734,8 @@ WarpX::PushPSATD (amrex::Real start_time)
         "PushFieldsEM: PSATD solver selected but not built");
 #else
 
+    bool const skip_lev0_coarse_patch = true;
+
     const int rho_old = spectral_solver_fp[0]->m_spectral_index.rho_old;
     const int rho_new = spectral_solver_fp[0]->m_spectral_index.rho_new;
 
@@ -742,7 +756,7 @@ WarpX::PushPSATD (amrex::Real start_time)
             PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 1, rho_new);
 
             // Correct J in k-space
-            PSATDCurrentCorrection();
+            ::PSATDCurrentCorrection(finest_level, spectral_solver_fp, spectral_solver_cp);
 
             // Inverse FFT of J
             PSATDBackwardTransformJ(current_fp_string, current_cp_string);
@@ -757,7 +771,7 @@ WarpX::PushPSATD (amrex::Real start_time)
             PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 1, rho_new);
 
             // Compute J from D in k-space
-            PSATDVayDeposition();
+            ::PSATDVayDeposition(finest_level, spectral_solver_fp, spectral_solver_cp);
 
             // Inverse FFT of J, subtract cumulative sums of D
             current_fp_string = "current_fp";
@@ -795,7 +809,7 @@ WarpX::PushPSATD (amrex::Real start_time)
 #endif
 
             // Correct J in k-space
-            PSATDCurrentCorrection();
+            ::PSATDCurrentCorrection(finest_level, spectral_solver_fp, spectral_solver_cp);
 
             // Inverse FFT of J
             PSATDBackwardTransformJ(current_fp_string, current_cp_string);
@@ -811,7 +825,7 @@ WarpX::PushPSATD (amrex::Real start_time)
             PSATDForwardTransformJ(current_fp_string, current_cp_string);
 
             // Compute J from D in k-space
-            PSATDVayDeposition();
+            ::PSATDVayDeposition(finest_level, spectral_solver_fp, spectral_solver_cp);
 
             // Inverse FFT of J, subtract cumulative sums of D
             current_fp_string = "current_fp";
@@ -853,8 +867,8 @@ WarpX::PushPSATD (amrex::Real start_time)
     if (WarpX::fft_do_time_averaging) {
         auto Efield_avg_fp = m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_fp, finest_level);
         auto Bfield_avg_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_fp, finest_level);
-        auto Efield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_cp, finest_level);
-        auto Bfield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_cp, finest_level);
+        auto Efield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_cp, finest_level, skip_lev0_coarse_patch);
+        auto Bfield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_cp, finest_level, skip_lev0_coarse_patch);
         PSATDBackwardTransformEBavg(Efield_avg_fp, Bfield_avg_fp, Efield_avg_cp, Bfield_avg_cp);
     }
     if (WarpX::do_dive_cleaning) { PSATDBackwardTransformF(); }
@@ -1105,6 +1119,8 @@ WarpX::EvolveG (int lev, PatchType patch_type, amrex::Real a_dt, DtType /*a_dt_t
 
     WARPX_PROFILE("WarpX::EvolveG()");
 
+    bool const skip_lev0_coarse_patch = true;
+
     // Evolve G field in regular cells
     if (patch_type == PatchType::fine)
     {
@@ -1115,7 +1131,7 @@ WarpX::EvolveG (int lev, PatchType patch_type, amrex::Real a_dt, DtType /*a_dt_t
     }
     else // coarse patch
     {
-        ablastr::fields::MultiLevelVectorField const& Bfield_cp_new = m_fields.get_mr_levels_alldirs(FieldType::Bfield_cp, finest_level);
+        ablastr::fields::MultiLevelVectorField const& Bfield_cp_new = m_fields.get_mr_levels_alldirs(FieldType::Bfield_cp, finest_level, skip_lev0_coarse_patch);
         m_fdtd_solver_cp[lev]->EvolveG(
             m_fields.get(FieldType::G_cp, lev),
             Bfield_cp_new[lev], a_dt);
@@ -1331,7 +1347,7 @@ void WarpX::DampFieldsInGuards(const int lev, amrex::MultiFab* mf)
 // It is faster to apply this on the grid than to do it particle by particle.
 // It is put here since there isn't another nice place for it.
 void
-WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, MultiFab* Jz, int lev)
+WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, MultiFab* Jz, int lev) const
 {
     const amrex::IntVect ngJ = Jx->nGrowVect();
     const std::array<Real,3>& dx = WarpX::CellSize(lev);
@@ -1340,7 +1356,7 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
     constexpr int NODE = amrex::IndexType::NODE;
 
     // See Verboncoeur JCP 174, 421-427 (2001) for the modified volume factor
-    const amrex::Real axis_volume_factor = (verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
+    const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
 
     for ( MFIter mfi(*Jx, TilingIfNotGPU()); mfi.isValid(); ++mfi )
     {
@@ -1504,7 +1520,7 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
 }
 
 void
-WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev)
+WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev) const
 {
     const amrex::IntVect ngRho = Rho->nGrowVect();
     const std::array<Real,3>& dx = WarpX::CellSize(lev);
@@ -1513,7 +1529,7 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev)
     constexpr int NODE = amrex::IndexType::NODE;
 
     // See Verboncoeur JCP 174, 421-427 (2001) for the modified volume factor
-    const amrex::Real axis_volume_factor = (verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
+    const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
 
     Box tilebox;
 

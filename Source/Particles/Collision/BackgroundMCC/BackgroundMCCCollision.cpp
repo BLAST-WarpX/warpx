@@ -40,7 +40,7 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
     }
     else {
         std::string background_density_str;
-        pp_collision_name.get("background_density(x,y,z,t)", background_density_str);
+        utils::parser::Store_parserString(pp_collision_name, "background_density(x,y,z,t)", background_density_str);
         m_background_density_parser =
             utils::parser::makeParser(background_density_str, {"x", "y", "z", "t"});
     }
@@ -55,7 +55,7 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
     }
     else {
         std::string background_temperature_str;
-        pp_collision_name.get("background_temperature(x,y,z,t)", background_temperature_str);
+        utils::parser::Store_parserString(pp_collision_name, "background_temperature(x,y,z,t)", background_temperature_str);
         m_background_temperature_parser =
             utils::parser::makeParser(background_temperature_str, {"x", "y", "z", "t"});
     }
@@ -104,6 +104,14 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
             scattering_process.find("ionization") != std::string::npos) {
             const std::string kw_energy = scattering_process + "_energy";
             utils::parser::getWithParser(
+                pp_collision_name, kw_energy.c_str(), energy);
+        }
+        // if the scattering process is forward scattering get the energy
+        // associated with the process if it is given (this allows forward
+        // scattering to be used both with and without a fixed energy loss)
+        else if (scattering_process.find("forward") != std::string::npos) {
+            const std::string kw_energy = scattering_process + "_energy";
+            utils::parser::queryWithParser(
                 pp_collision_name, kw_energy.c_str(), energy);
         }
 
@@ -268,7 +276,7 @@ BackgroundMCCCollision::doCollisions (amrex::Real cur_time, amrex::Real dt, Mult
         }
 
         amrex::Print() << Utils::TextMsg::Info(
-            "Setting up collisions for " + m_species_names[0] + " with:\n"
+            "Setting up Monte-Carlo collisions for " + m_species_names[0] + " with:\n"
             + "     total non-ionization collision probability: "
             + std::to_string(m_total_collision_prob)
             + "\n     total ionization collision probability: "

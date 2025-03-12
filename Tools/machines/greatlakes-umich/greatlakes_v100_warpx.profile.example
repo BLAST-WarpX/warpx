@@ -21,16 +21,16 @@ module load phdf5/1.12.1
 
 SW_DIR="${HOME}/sw/greatlakes/v100"
 export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc2-2.14.4:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.10.0:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.10.2:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=${SW_DIR}/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=${SW_DIR}/lapackpp-2024.05.31:$CMAKE_PREFIX_PATH
 
 export LD_LIBRARY_PATH=${SW_DIR}/c-blosc2-2.14.4/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=${SW_DIR}/adios2-2.10.0/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/adios2-2.10.2/lib64:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=${SW_DIR}/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=${SW_DIR}/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
 
-export PATH=${SW_DIR}/adios2-2.10.0/bin:${PATH}
+export PATH=${SW_DIR}/adios2-2.10.2/bin:${PATH}
 
 # optional: for Python bindings or libEnsemble
 module load python/3.12.1

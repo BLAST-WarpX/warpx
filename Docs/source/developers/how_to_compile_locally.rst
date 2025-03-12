@@ -1,7 +1,7 @@
 .. _developers-local-compile:
 
-Fast, Local Compilation
-=======================
+How to compile locally and fast
+===============================
 
 For simplicity, WarpX :ref:`compilation with CMake <building-cmake>` by default downloads, configures and compiles compatible versions of :ref:`central dependencies <install-dependencies>` such as:
 
@@ -32,7 +32,7 @@ For instance, clone these dependencies to ``$HOME/src``:
 
    cd $HOME/src
 
-   git clone https://github.com/ECP-WarpX/WarpX.git warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git warpx
    git clone https://github.com/AMReX-Codes/amrex.git
    git clone https://github.com/openPMD/openPMD-api.git
    git clone https://github.com/ECP-WarpX/picsar.git

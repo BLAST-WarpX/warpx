@@ -274,7 +274,7 @@ btd_particle_diag = picmi.LabFrameParticleDiagnostic(
     data_list=diag_particle_list,
     write_dir="lab_particle_diags",
     warpx_format="openpmd",
-    warpx_openpmd_backend="bp",
+    warpx_openpmd_backend="bp5",
 )
 
 btd_field_diag = picmi.LabFrameFieldDiagnostic(
@@ -287,7 +287,7 @@ btd_field_diag = picmi.LabFrameFieldDiagnostic(
     warpx_upper_bound=[128.0e-6, 0.0e-6, 0.0],
     write_dir="lab_field_diags",
     warpx_format="openpmd",
-    warpx_openpmd_backend="bp",
+    warpx_openpmd_backend="bp5",
 )
 
 field_diag = picmi.FieldDiagnostic(
