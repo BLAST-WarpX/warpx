@@ -350,10 +350,10 @@ Diagnostics::BaseReadParameters ()
 
 
 void
-Diagnostics::InitDataBeforeRestart (const InitDiagnosticsParameters& params)
+Diagnostics::InitDataBeforeRestart (const InitDiagnosticsParameters& params, amrex::AmrMesh* p_warpx_mesh)
 {
     // initialize member variables and arrays in base class::Diagnostics
-    InitBaseData(params);
+    InitBaseData(params, p_warpx_mesh);
     // initialize member variables and arrays specific to each derived class
     // (FullDiagnostics, BTDiagnostics, etc.)
     DerivedInitData();
@@ -429,10 +429,10 @@ Diagnostics::InitDataAfterRestart ()
 
 
 void
-Diagnostics::InitData (const InitDiagnosticsParameters& params)
+Diagnostics::InitData (const InitDiagnosticsParameters& params, amrex::AmrMesh* p_warpx_mesh)
 {
     // initialize member variables and arrays in base class::Diagnostics
-    InitBaseData(params);
+    InitBaseData(params, p_warpx_mesh);
     // initialize member variables and arrays specific to each derived class
     // (FullDiagnostics, BTDiagnostics, etc.)
     DerivedInitData();
@@ -504,7 +504,7 @@ Diagnostics::InitData (const InitDiagnosticsParameters& params)
 
 
 void
-Diagnostics::InitBaseData (const InitDiagnosticsParameters& params)
+Diagnostics::InitBaseData (const InitDiagnosticsParameters& params, [[maybe_unused]] amrex::AmrMesh* p_warpx_mesh)
 {
     // Number of levels in the simulation at the current timestep
     nlev = params.finest_level + 1;
@@ -519,11 +519,11 @@ Diagnostics::InitBaseData (const InitDiagnosticsParameters& params)
     if (params.do_moving_window) {
         const int moving_dir = params.moving_window_dir;
         const amrex::Real displacement =
-            warpx.getmoving_window_x() - warpx.Geom(0).ProbLo(moving_dir);
+            params.moving_window_x - warpx.Geom(0).ProbLo(moving_dir);
         const int shift_num_base = static_cast<int>
             (displacement / warpx.Geom(0).CellSize(moving_dir));
-        m_lo[moving_dir] += shift_num_base * warpx.Geom(0).CellSize(moving_dir);
-        m_hi[moving_dir] += shift_num_base * warpx.Geom(0).CellSize(moving_dir);
+        m_lo[moving_dir] += shift_num_base * cell_size_lev0_mwdir;
+        m_hi[moving_dir] += shift_num_base * cell_size_lev0_mwdir;
     }
     // Construct Flush class.
     if        (m_format == "plotfile"){
@@ -537,9 +537,7 @@ Diagnostics::InitBaseData (const InitDiagnosticsParameters& params)
         m_flush_format = std::make_unique<FlushFormatCatalyst>();
     } else if (m_format == "sensei") {
 #ifdef AMREX_USE_SENSEI_INSITU
-        m_flush_format = std::make_unique<FlushFormatSensei>(
-            dynamic_cast<amrex::AmrMesh*>(const_cast<WarpX*>(&warpx)),
-            m_diag_name);
+        m_flush_format = std::make_unique<FlushFormatSensei>(p_warpx_mesh, m_diag_name);
 #else
         WARPX_ABORT_WITH_MESSAGE(
             "To use SENSEI in situ, compile with USE_SENSEI=TRUE");
