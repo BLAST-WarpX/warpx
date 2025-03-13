@@ -241,6 +241,8 @@ public:
         using namespace ParticleUtils;
         using namespace amrex::literals;
 
+        WARPX_PROFILE("BinaryCollision::doCollisionsWithinTile");
+
         const auto& binary_collision_functor = m_binary_collision_functor.executor();
         const bool have_product_species = m_have_product_species;
 
@@ -268,7 +270,9 @@ public:
             ParticleTileType& ptile_1 = species_1.ParticlesAt(lev, mfi);
 
             // Find the particles that are in each cell of this tile
+            WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findParticlesInEachCell", prof_findParticlesInEachCell);
             ParticleBins bins_1 = findParticlesInEachCell( lev, mfi, ptile_1 );
+            WARPX_PROFILE_VAR_STOP(prof_findParticlesInEachCell);
 
             // Loop over cells, and collide the particles in each cell
 
@@ -308,6 +312,7 @@ public:
             // Compute how many pairs in each cell and store in n_pairs_in_each_cell array
             // For a single species, the number of pair in a cell is half the number of particles
             // in that cell, rounded up to the next higher integer.
+            WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::computeNumberOfPairs", prof_computeNumberOfPairs);
             amrex::ParallelFor( n_cells_products,
                 [=] AMREX_GPU_DEVICE (int i_cell) noexcept
                 {
@@ -342,6 +347,7 @@ public:
             const auto n_independent_pairs =  (int) amrex::Scan::ExclusiveSum(n_cells+1,
                                                     p_n_ind_pairs_in_each_cell, coll_offsets.data(), amrex::Scan::RetSum{true});
             index_type* AMREX_RESTRICT p_coll_offsets = coll_offsets.dataPtr();
+            WARPX_PROFILE_VAR_STOP(prof_computeNumberOfPairs);
 
             // mask: equal to 1 if particle creation occurs for a given pair, 0 otherwise
             amrex::Gpu::DeviceVector<index_type> mask(n_total_pairs);
@@ -377,6 +383,7 @@ public:
             amrex::ParticleReal* AMREX_RESTRICT T1_in_each_cell = T1_vec.dataPtr();
 
             // Loop over cells
+            WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::computeDensityTemperatures", prof_computeDensityTemperatures);
             amrex::ParallelForRNG( n_cells,
                 [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
                 {
@@ -440,6 +447,7 @@ public:
 
                 }
             );
+            WARPX_PROFILE_VAR_STOP(prof_computeDensityTemperatures);
 
             // Loop over independent particle pairs
             // To speed up binary collisions on GPU, we try to expose as much parallelism
@@ -448,6 +456,7 @@ public:
             // that do not touch the same macroparticles, so that there is no race condition),
             // where the number of independent pairs is determined by the lower number of
             // macroparticles of either species, within each cell.
+            WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::LoopOverCollisions", prof_loopOverCollisions);
             amrex::ParallelForRNG( n_independent_pairs,
                 [=] AMREX_GPU_DEVICE (int i_coll, amrex::RandomEngine const& engine) noexcept
                 {
@@ -501,7 +510,7 @@ public:
                         p_pair_reaction_weight, engine);
                 }
             );
-
+            WARPX_PROFILE_VAR_STOP(prof_loopOverCollisions);
             // Create the new product particles and define their initial values
             // num_added: how many particles of each product species have been created
             const amrex::Vector<int> num_added = m_copy_transform_functor(n_total_pairs,
@@ -526,8 +535,10 @@ public:
             ParticleTileType& ptile_2 = species_2.ParticlesAt(lev, mfi);
 
             // Find the particles that are in each cell of this tile
+            WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findParticlesInEachCell", prof_findParticlesInEachCell);
             ParticleBins bins_1 = findParticlesInEachCell( lev, mfi, ptile_1 );
             ParticleBins bins_2 = findParticlesInEachCell( lev, mfi, ptile_2 );
+            WARPX_PROFILE_VAR_STOP(prof_findParticlesInEachCell);
 
             // Loop over cells, and collide the particles in each cell
 
@@ -574,6 +585,7 @@ public:
             // Compute how many pairs in each cell and store in n_pairs_in_each_cell array
             // For different species, the number of pairs in a cell is the number of particles of
             // the species that has the most particles in that cell
+            WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::computeNumberOfPairs", prof_computeNumberOfPairs);
             amrex::ParallelFor( n_cells_products,
                 [=] AMREX_GPU_DEVICE (int i_cell) noexcept
                 {
@@ -621,6 +633,7 @@ public:
             const auto n_independent_pairs = (int) amrex::Scan::ExclusiveSum(n_cells+1,
                                                     p_n_ind_pairs_in_each_cell, coll_offsets.data(), amrex::Scan::RetSum{true});
             index_type* AMREX_RESTRICT p_coll_offsets = coll_offsets.dataPtr();
+            WARPX_PROFILE_VAR_STOP(prof_computeNumberOfPairs);
 
             // mask: equal to 1 if particle creation occurs for a given pair, 0 otherwise
             amrex::Gpu::DeviceVector<index_type> mask(n_total_pairs);
@@ -660,6 +673,7 @@ public:
             amrex::ParticleReal* AMREX_RESTRICT T2_in_each_cell = T2_vec.dataPtr();
 
             // Loop over cells
+            WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures", prof_findDensityTemperatures);
             amrex::ParallelForRNG( n_cells,
                 [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
                 {
@@ -744,7 +758,7 @@ public:
                     }
                 }
             );
-
+            WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures);
             // Loop over independent particle pairs
             // To speed up binary collisions on GPU, we try to expose as much parallelism
             // as possible (while avoiding race conditions): Instead of looping with one GPU
@@ -752,6 +766,7 @@ public:
             // that do not touch the same macroparticles, so that there is no race condition),
             // where the number of independent pairs is determined by the lower number of
             // macroparticles of either species, within each cell.
+            WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::LoopOverCollisions", prof_loopOverCollisions);
             amrex::ParallelForRNG( n_independent_pairs,
                 [=] AMREX_GPU_DEVICE (int i_coll, amrex::RandomEngine const& engine) noexcept
                 {
@@ -812,6 +827,7 @@ public:
                         p_pair_reaction_weight, engine);
                 }
             );
+            WARPX_PROFILE_VAR_STOP(prof_loopOverCollisions);
 
             // Create the new product particles and define their initial values
             // num_added: how many particles of each product species have been created
