@@ -201,8 +201,6 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
 
     using namespace amrex;
 
-    if (m_bcoefs == nullptr) { return; }
-
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         IsDefined(),
         "JacobiPC::Apply() called on undefined object" );
@@ -213,36 +211,44 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
         a_b.getArrayVecType()==warpx::fields::FieldType::Efield_fp,
         "JacobiPC::Apply() - a_b must be Efield_fp type");
 
-    // Get the data vectors
-    auto& b_mfarrvec = a_b.getArrayVec();
-    auto& x_mfarrvec = a_x.getArrayVec();
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        ((b_mfarrvec.size() == m_num_amr_levels) && (x_mfarrvec.size() == m_num_amr_levels)),
-        "Error in JacobiPC::Apply() - mismatch in number of levels." );
+    if (m_bcoefs == nullptr) {
 
-    // setting initial guess x = b/diag(A)
-    for (int n = 0; n < m_num_amr_levels; n++) {
-        for (int dim = 0; dim < 3; dim++) {
-            const auto& b_mf = *(b_mfarrvec[n][dim]);
-            const auto& a_mf = *((*m_bcoefs)[n][dim]);
-            auto& x_mf = *(x_mfarrvec[n][dim]);
+        a_x.Copy(a_b);
 
-            for (MFIter mfi(x_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-                Box bx = mfi.tilebox();
-                auto x_arr = x_mf.array(mfi);
-                auto b_arr = b_mf.const_array(mfi);
-                auto a_arr = a_mf.const_array(mfi);
+    } else {
 
-                ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
-                {
-                    x_arr(i,j,k) = b_arr(i,j,k) / a_arr(i,j,k);
-                });
+        // Get the data vectors
+        auto& b_mfarrvec = a_b.getArrayVec();
+        auto& x_mfarrvec = a_x.getArrayVec();
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            ((b_mfarrvec.size() == m_num_amr_levels) && (x_mfarrvec.size() == m_num_amr_levels)),
+            "Error in JacobiPC::Apply() - mismatch in number of levels." );
+
+        // setting initial guess x = b/diag(A)
+        for (int n = 0; n < m_num_amr_levels; n++) {
+            for (int dim = 0; dim < 3; dim++) {
+                const auto& b_mf = *(b_mfarrvec[n][dim]);
+                const auto& a_mf = *((*m_bcoefs)[n][dim]);
+                auto& x_mf = *(x_mfarrvec[n][dim]);
+
+                for (MFIter mfi(x_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                    Box bx = mfi.tilebox();
+                    auto x_arr = x_mf.array(mfi);
+                    auto b_arr = b_mf.const_array(mfi);
+                    auto a_arr = a_mf.const_array(mfi);
+
+                    ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
+                    {
+                        x_arr(i,j,k) = b_arr(i,j,k) / a_arr(i,j,k);
+                    });
+                }
             }
         }
-    }
 
-    // Jacobi iterations
-    // not yet implemented; will do after mass matrix has nondiagonal elements
+        // Jacobi iterations
+        // not yet implemented; will do after mass matrix has nondiagonal elements
+
+    }
 }
 
 #endif
