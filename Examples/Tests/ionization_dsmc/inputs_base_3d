@@ -22,7 +22,7 @@ warpx.const_dt = 1e-09
 geometry.dims = 3
 geometry.prob_hi = 0.1 0.1 0.1
 geometry.prob_lo = 0 0 0
-amr.max_grid_size = 8
+amr.max_grid_size = 4
 
 #################################
 ###### BOUNDARY CONDITIONS ######
