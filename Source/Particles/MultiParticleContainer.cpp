@@ -680,7 +680,6 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
                     amrex::Real const invLDe_sq = global_debye_array(i,j,k);
                     if (invLDe_sq > 0.) {
                         global_debye_array(i,j,k) = std::sqrt(1.0_rt/invLDe_sq);
-                        /* amrex::Print() << "global_debye_array " << global_debye_array(i,j,k) << "\n"; */
                     }
                 });
         }
