@@ -422,7 +422,7 @@ public:
                     // Product 2 is definitely an ion, so we first choose its
                     // proportion to be n_2 = min(E2 / E_coll, 0.5 * R), where
                     // R is a random number between 0 and 1.
-                    // The second and third numbers (n_0 & n_1) are then found
+                    // The other two numbers (n_0 & n_1) are then found
                     // by choosing a random point on the ellipse characterized
                     // by the semi-major and semi-minor axes
                     //    a = (1 - n_0) / 2.0
