@@ -1445,6 +1445,7 @@ WarpXParticleContainer::DepositTemperature (amrex::MultiFab* temperature, const 
     }
 
     // Divide the squares by number of particles for average and calculate the temperature
+    amrex::ParticleReal mass_local = mass;
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -1457,7 +1458,7 @@ WarpXParticleContainer::DepositTemperature (amrex::MultiFab* temperature, const 
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                 if (sum_array(i,j,k,0) > 0) {
                     const amrex::Real invsum = 1._rt/sum_array(i,j,k,0);
-                    temp_array(i,j,k) *= mass*invsum/(3._rt*PhysConst::q_e);
+                    temp_array(i,j,k) *= mass_local*invsum/(3._rt*PhysConst::q_e);
                 }
             });
     }
