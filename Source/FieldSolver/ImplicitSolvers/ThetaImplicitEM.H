@@ -87,11 +87,6 @@ public:
 private:
 
     /**
-     * \brief Time-biasing parameter for fields used on RHS to advance system
-     */
-    amrex::Real m_theta = 0.5;
-
-    /**
      * \brief Solver vectors to be used in the nonlinear solver to solve for the
      * electric field E. The main logic for determining which variables should be
      * WarpXSolverVec type is that it must have the same size and have the same

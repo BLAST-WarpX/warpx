@@ -345,11 +345,6 @@ public:
     static utils::parser::IntervalsParser sort_intervals;
     static amrex::IntVect sort_bin_size;
 
-    //! If true, particles will be sorted in the order x -> y -> z -> ppc for faster deposition
-    static bool sort_particles_for_deposition;
-    //! Specifies the type of grid used for the above sorting, i.e. cell-centered, nodal, or mixed
-    static amrex::IntVect sort_idx_type;
-
     static bool do_multi_J;
     static int do_multi_J_n_depositions;
 
@@ -1460,6 +1455,18 @@ private:
     int nox_fft = 16;
     int noy_fft = 16;
     int noz_fft = 16;
+
+
+
+    //! If true, particles will be sorted in the order x -> y -> z -> ppc for faster deposition
+#if defined(AMREX_USE_CUDA)
+    bool m_sort_particles_for_deposition = true;
+#else
+    bool m_sort_particles_for_deposition = false;
+#endif
+
+    //! Specifies the type of grid used for the above sorting, i.e. cell-centered, nodal, or mixed
+    amrex::IntVect m_sort_idx_type = amrex::IntVect(AMREX_D_DECL(0,0,0));
 
     //! Solve Poisson equation when loading an external magnetic field to clean divergence
     //! This is useful to remove errors that could lead to non-zero B field divergence

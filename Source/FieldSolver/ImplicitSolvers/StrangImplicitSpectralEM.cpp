@@ -81,7 +81,7 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real start_time,
 
     // Solve nonlinear system for E at t_{n+1/2}
     // Particles will be advanced to t_{n+1/2}
-    m_nlsolver->Solve( m_E, m_Eold, half_time, 0.5_rt*m_dt, a_step );
+    m_nlsolver->Solve( m_E, m_Eold, start_time, m_dt, a_step );
 
     // Update WarpX owned Efield_fp and Bfield_fp to t_{n+1/2}
     UpdateWarpXFields( m_E, half_time );
@@ -101,12 +101,13 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real start_time,
 
 void StrangImplicitSpectralEM::ComputeRHS ( WarpXSolverVec& a_RHS,
                                             WarpXSolverVec const & a_E,
-                                            amrex::Real half_time,
+                                            amrex::Real start_time,
                                             int a_nl_iter,
                                             bool a_from_jacobian )
 {
     // Update WarpX-owned Efield_fp and Bfield_fp using current state of
     // E from the nonlinear solver at time n+1/2
+    const amrex::Real half_time = start_time + 0.5_rt*m_dt;
     UpdateWarpXFields( a_E, half_time );
 
     // Self consistently update particle positions and velocities using the

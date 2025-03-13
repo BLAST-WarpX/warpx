@@ -767,7 +767,7 @@ WarpXOpenPMDPlot::DumpToFile (ParticleContainer* pc,
 
             // Do not call storeChunk() with zero-sized particle tiles:
             //   https://github.com/openPMD/openPMD-api/issues/1147
-            //   https://github.com/ECP-WarpX/WarpX/pull/1898#discussion_r745008290
+            //   https://github.com/BLAST-WarpX/warpx/pull/1898#discussion_r745008290
             if (numParticleOnTile == 0) { continue; }
 
             contributed_particles = true;
@@ -789,7 +789,7 @@ WarpXOpenPMDPlot::DumpToFile (ParticleContainer* pc,
     // meta-data is committed for each variable.
     //
     // Refs.:
-    //   https://github.com/ECP-WarpX/WarpX/issues/3389
+    //   https://github.com/BLAST-WarpX/warpx/issues/3389
     //   https://github.com/ornladios/ADIOS2/issues/3455
     //   BP4 (ADIOS 2.8): last MPI rank's `Put` meta-data wins
     //   BP5 (ADIOS 2.8): everyone has to write an empty block

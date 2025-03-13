@@ -17,7 +17,7 @@ Users
    </style>
 
 Our community is here to help.
-Please `report installation problems <https://github.com/ECP-WarpX/WarpX/issues/new>`_ in case you should get stuck.
+Please `report installation problems <https://github.com/BLAST-WarpX/warpx/issues/new>`_ in case you should get stuck.
 
 Choose **one** of the installation methods below to get started:
 
@@ -112,7 +112,7 @@ Given that you have the :ref:`WarpX dependencies <install-dependencies>` install
    python3 -m pip install -U build packaging setuptools[core] wheel
    python3 -m pip install -U cmake
 
-   python3 -m pip wheel -v git+https://github.com/ECP-WarpX/WarpX.git
+   python3 -m pip wheel -v git+https://github.com/BLAST-WarpX/warpx.git
    python3 -m pip install *whl
 
 In the future, will publish pre-compiled binary packages on `PyPI <https://pypi.org/>`__ for faster installs.
@@ -147,7 +147,7 @@ After installing the :ref:`WarpX dependencies <install-dependencies>`, you can a
 .. code-block:: bash
 
    # get the source code
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
    cd $HOME/src/warpx
 
    # configure

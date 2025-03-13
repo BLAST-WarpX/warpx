@@ -159,14 +159,6 @@ bool WarpX::refine_plasma     = false;
 utils::parser::IntervalsParser WarpX::sort_intervals;
 amrex::IntVect WarpX::sort_bin_size(AMREX_D_DECL(1,1,1));
 
-#if defined(AMREX_USE_CUDA)
-bool WarpX::sort_particles_for_deposition = true;
-#else
-bool WarpX::sort_particles_for_deposition = false;
-#endif
-
-amrex::IntVect WarpX::sort_idx_type(AMREX_D_DECL(0,0,0));
-
 bool WarpX::do_dynamic_scheduling = true;
 
 bool WarpX::do_multi_J = false;
@@ -769,7 +761,7 @@ WarpX::ReadParameters ()
         }
 
         // Filter currently not working with FDTD solver in RZ geometry: turn OFF by default
-        // (see https://github.com/ECP-WarpX/WarpX/issues/1943)
+        // (see https://github.com/BLAST-WarpX/warpx/issues/1943)
 #ifdef WARPX_DIM_RZ
         if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) { WarpX::use_filter = false; }
 #endif
@@ -801,7 +793,7 @@ WarpX::ReadParameters ()
         {
             if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::HybridPIC) {
                 // Filter currently not working with FDTD solver in RZ geometry along R
-                // (see https://github.com/ECP-WarpX/WarpX/issues/1943)
+                // (see https://github.com/BLAST-WarpX/warpx/issues/1943)
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!use_filter || filter_npass_each_dir[0] == 0,
                     "In RZ geometry with FDTD, filtering can only be applied along z. This can be controlled by setting warpx.filter_npass_each_dir");
             } else {
@@ -1432,7 +1424,7 @@ WarpX::ReadParameters ()
             }
         }
 
-        pp_warpx.query("sort_particles_for_deposition",sort_particles_for_deposition);
+        pp_warpx.query("sort_particles_for_deposition",m_sort_particles_for_deposition);
         Vector<int> vect_sort_idx_type(AMREX_SPACEDIM,0);
         const bool sort_idx_type_is_specified =
             utils::parser::queryArrWithParser(
@@ -1440,7 +1432,7 @@ WarpX::ReadParameters ()
                 vect_sort_idx_type, 0, AMREX_SPACEDIM);
         if (sort_idx_type_is_specified){
             for (int i=0; i<AMREX_SPACEDIM; i++) {
-                sort_idx_type[i] = vect_sort_idx_type[i];
+                m_sort_idx_type[i] = vect_sort_idx_type[i];
             }
         }
 

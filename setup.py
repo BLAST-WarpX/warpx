@@ -299,8 +299,8 @@ setup(
         "Documentation": "https://warpx.readthedocs.io",
         "Doxygen": "https://warpx.readthedocs.io/en/latest/_static/doxyhtml/index.html",
         #'Reference': 'https://doi.org/...', (Paper and/or Zenodo)
-        "Source": "https://github.com/ECP-WarpX/WarpX",
-        "Tracker": "https://github.com/ECP-WarpX/WarpX/issues",
+        "Source": "https://github.com/BLAST-WarpX/warpx",
+        "Tracker": "https://github.com/BLAST-WarpX/warpx/issues",
     },
     # CMake: self-built as extension module
     ext_modules=cxx_modules,
