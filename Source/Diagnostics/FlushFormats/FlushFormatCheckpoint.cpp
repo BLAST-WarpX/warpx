@@ -213,7 +213,7 @@ FlushFormatCheckpoint::CheckpointParticles (
         real_names.resize(pc->NumRealComps() - AMREX_SPACEDIM);
         write_real_comps.resize(pc->NumRealComps() - AMREX_SPACEDIM);
 
-        // note, skip the required compnent names here
+        // note, skip the required component names here
         auto rnames = pc->GetRealSoANames();
         for (std::size_t index = PIdx::nattribs; index < rnames.size(); ++index) {
             std::size_t const i = index - AMREX_SPACEDIM;

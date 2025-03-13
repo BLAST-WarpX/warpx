@@ -80,7 +80,7 @@ void SemiImplicitEM::OneStep ( amrex::Real  start_time,
     // Solve nonlinear system for Eg at t_{n+1/2}
     // Particles will be advanced to t_{n+1/2}
     m_E.Copy(m_Eold); // initial guess for Eg^{n+1/2}
-    m_nlsolver->Solve( m_E, m_Eold, half_time, 0.5_rt*m_dt, a_step );
+    m_nlsolver->Solve( m_E, m_Eold, start_time, m_dt, a_step );
 
     // Update WarpX owned Efield_fp to t_{n+1/2}
     m_WarpX->SetElectricFieldAndApplyBCs( m_E, half_time );
@@ -103,12 +103,13 @@ void SemiImplicitEM::OneStep ( amrex::Real  start_time,
 
 void SemiImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
                             const WarpXSolverVec&  a_E,
-                                  amrex::Real      half_time,
+                                  amrex::Real      start_time,
                                   int              a_nl_iter,
                                   bool             a_from_jacobian )
 {
     // Update WarpX-owned Efield_fp using current state of Eg from
     // the nonlinear solver at time n+theta
+    const amrex::Real half_time = start_time + 0.5_rt*m_dt;
     m_WarpX->SetElectricFieldAndApplyBCs( a_E, half_time );
 
     // Update particle positions and velocities using the current state

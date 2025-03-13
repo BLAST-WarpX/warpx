@@ -1834,26 +1834,13 @@ WarpXParticleContainer::PushX (int lev, amrex::Real dt)
 // without runtime component).
 void WarpXParticleContainer::defineAllParticleTiles () noexcept
 {
-        for (int lev = 0; lev <= finestLevel(); ++lev)
-        {
-            for (auto mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
-            {
-                const int grid_id = mfi.index();
-                const int tile_id = mfi.LocalTileIndex();
-                DefineAndReturnParticleTile(lev, grid_id, tile_id);
-            }
-        }
-
-
-    // Resize the tmp_particle_data (no present in parent class)
-    tmp_particle_data.resize(finestLevel()+1);
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
         for (auto mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
         {
             const int grid_id = mfi.index();
             const int tile_id = mfi.LocalTileIndex();
-            tmp_particle_data[lev][std::make_pair(grid_id,tile_id)];
+            DefineAndReturnParticleTile(lev, grid_id, tile_id);
         }
     }
 }

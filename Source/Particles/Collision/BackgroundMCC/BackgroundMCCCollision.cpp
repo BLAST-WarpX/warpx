@@ -40,7 +40,7 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
     }
     else {
         std::string background_density_str;
-        pp_collision_name.get("background_density(x,y,z,t)", background_density_str);
+        utils::parser::Store_parserString(pp_collision_name, "background_density(x,y,z,t)", background_density_str);
         m_background_density_parser =
             utils::parser::makeParser(background_density_str, {"x", "y", "z", "t"});
     }
@@ -55,7 +55,7 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
     }
     else {
         std::string background_temperature_str;
-        pp_collision_name.get("background_temperature(x,y,z,t)", background_temperature_str);
+        utils::parser::Store_parserString(pp_collision_name, "background_temperature(x,y,z,t)", background_temperature_str);
         m_background_temperature_parser =
             utils::parser::makeParser(background_temperature_str, {"x", "y", "z", "t"});
     }

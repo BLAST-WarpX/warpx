@@ -23,7 +23,7 @@
 export OMPI_MCA_io=ompio
 
 # Work-around for broken IBM "libcollectives" MPI_Allgatherv
-#   https://github.com/ECP-WarpX/WarpX/pull/2874
+#   https://github.com/BLAST-WarpX/warpx/pull/2874
 export OMPI_MCA_coll_ibm_skip_allgatherv=true
 
 # ROMIO has a hint for GPFS named IBM_largeblock_io which optimizes I/O with operations on large blocks
