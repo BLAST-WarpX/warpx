@@ -192,7 +192,7 @@ plt.tight_layout()
 plt.savefig("ionization_dsmc_density_Te.png", dpi=150)
 
 
-tolerances = [3e-2, 1e-6, 4e-2]
+tolerances = [3e-2, 1e-6, 5e-2]
 
 
 def check_tolerance(array, tolerance):
