@@ -295,8 +295,8 @@ public:
         auto *tile_products_data = tile_products.data();
 
         bool const use_global_debye_length = m_use_global_debye_length;
-        amrex::Real * global_debye_length_data;
-        if (m_use_global_debye_length) {
+        amrex::Real * global_debye_length_data = nullptr;
+        if (use_global_debye_length) {
             WarpX & warpx = WarpX::GetInstance();
             amrex::MultiFab & global_debye_length = *warpx.m_fields.get(warpx::fields::FieldType::global_debye_length, lev);
             amrex::FArrayBox & global_debye_length_fab = global_debye_length[mfi];

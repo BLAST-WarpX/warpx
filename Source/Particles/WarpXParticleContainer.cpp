@@ -1519,25 +1519,22 @@ WarpXParticleContainer::DepositNumberDensity (amrex::MultiFab* number_density, c
         int const box_lo_r = box.smallEnd(0);
         amrex::XDim3 const xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
         amrex::Real const rmin = xyzmin.x;
+        amrex::Real const dr = Geom(lev).CellSize(0);
 #endif
-
-        auto volume_factor = [=] AMREX_GPU_DEVICE(int i) noexcept {
-#if defined WARPX_DIM_RZ
-            // Return the radial factor for the volume element, dV
-            amrex::Real const r = rmin + (i - box_lo_r)*dr;
-            // This is (pi*(r+dr)**2 - pi*r**2)/dr
-            return MathConst::pi*(2.0_rt*r + dr);
-#else
-            // No factor is needed for Cartesian
-            amrex::ignore_unused(i);
-            return 1._prt;
-#endif
-            };
 
         amrex::Array4<amrex::Real> const& num_array = number_density->array(mfi);
         amrex::ParallelFor(box,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                num_array(i,j,k) /= dV*volume_factor(i);
+#if defined WARPX_DIM_RZ
+                // Return the radial factor for the volume element, dV
+                amrex::Real const r = rmin + (i - box_lo_r)*dr;
+                // This is (pi*(r+dr)**2 - pi*r**2)/dr
+                amrex::Real const volume_factor = MathConst::pi*(2.0_rt*r + dr);
+#else
+                // No factor is needed for Cartesian
+                amrex::Real constexpr volume_factor = 1._rt;
+#endif
+                num_array(i,j,k) /= dV*volume_factor;
             });
     }
 
