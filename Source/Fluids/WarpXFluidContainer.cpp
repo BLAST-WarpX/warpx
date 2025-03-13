@@ -1782,7 +1782,7 @@ void WarpXFluidContainer::Hybrid_Electron_Bremsstrahlung (ablastr::fields::Multi
 */
 void WarpXFluidContainer::Hybrid_Electron_Qei (ablastr::fields::MultiFabRegister& m_fields,
                                         HybridPICModel const* hybrid_model,
-                                        ablastr::fields::ScalarField const& Ti_field,
+                                        ablastr::fields::VectorField const& Ti_field,
                                         amrex::Real m_ion, amrex::Real dt, int lev)
 {
     WARPX_PROFILE("WarpXFluidContainer::Hybrid_Electron_Qei");
@@ -1807,7 +1807,9 @@ void WarpXFluidContainer::Hybrid_Electron_Qei (ablastr::fields::MultiFabRegister
             // This assumes operator splitting approach
             // use temperatures at n+1
             amrex::Array4<amrex::Real> const& Te = m_fields.get(name_mf_T, lev)->array(mfi);
-            amrex::Array4<amrex::Real> const& Ti = Ti_field->array(mfi);
+            amrex::Array4<amrex::Real> const& Ti_x = Ti_field[0]->array(mfi);
+            amrex::Array4<amrex::Real> const& Ti_y = Ti_field[1]->array(mfi);
+            amrex::Array4<amrex::Real> const& Ti_z = Ti_field[2]->array(mfi);
 
             // using rho at n+1
             amrex::Array4<amrex::Real> const& rho = m_fields.get(FieldType::rho_fp, lev)->array(mfi);
@@ -1829,6 +1831,9 @@ void WarpXFluidContainer::Hybrid_Electron_Qei (ablastr::fields::MultiFabRegister
                     // nu_ei expression defined by user using parser
                     amrex::Real nu_ei_val = nu_ei(Te_val_K, ne_val);
 
+                    // avg Ti over degrees of freedom
+                    amrex::Real Ti_avg = (Ti_x(i, j, k) + Ti_y(i, j, k) + Ti_z(i, j, k))/3.0;
+
                     // CHECK Ti UNITS !!!!
                     // If Ti is in K, then convert to Joules below !
                     // refactor hybrid code so Te is in K instead of J.
@@ -1836,7 +1841,7 @@ void WarpXFluidContainer::Hybrid_Electron_Qei (ablastr::fields::MultiFabRegister
                     // -3*me/mi*nu_ei*ni*kb*(Te-Ti), then divide by 3/2*kb*ne
                     // since only one ion species for now, ni_val=ne_val -> -2*me/mi*nu_ei*kb*(Te-Ti)
                     // Te(i, j, k) and second term already in Joules so no need to divide by kb
-                    Te(i, j, k) = Te(i, j, k) - dt*2*PhysConst::m_e/m_ion*nu_ei_val*(Te(i, j, k) - PhysConst::kb*Ti(i, j, k));
+                    Te(i, j, k) = Te(i, j, k) - dt*2*PhysConst::m_e/m_ion*nu_ei_val*(Te(i, j, k) - PhysConst::kb*Ti_avg);
                 }
             });
         }

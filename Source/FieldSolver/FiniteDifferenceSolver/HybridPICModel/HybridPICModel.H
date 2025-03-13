@@ -248,6 +248,8 @@ public:
 
     bool m_include_Bremsstrahlung;
 
+    bool m_include_Qei;
+
     // Z effective for classical Bremsstrahlung power loss calculation
     // only if QDSMC solver with Bremsstrahlung flag is used
     amrex::Real m_Zeff = 1.0;
