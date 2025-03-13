@@ -201,6 +201,8 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
 
     using namespace amrex;
 
+    if (m_bcoefs == nullptr) { return; }
+
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         IsDefined(),
         "JacobiPC::Apply() called on undefined object" );
