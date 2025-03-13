@@ -735,7 +735,31 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                 }
             }
             else {
-                WARPX_ABORT_WITH_MESSAGE("The Villasenor algorithm can only be used with implicit algorithm.");
+                if (WarpX::nox == 1){
+                    doVillasenorDepositionShapeNExplicit<1>(
+                        GetPosition, wp.dataPtr() + offset,
+                        uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
+                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
+                        WarpX::n_rz_azimuthal_modes);
+                } else if (WarpX::nox == 2){
+                    doVillasenorDepositionShapeNExplicit<2>(
+                        GetPosition, wp.dataPtr() + offset,
+                        uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
+                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
+                        WarpX::n_rz_azimuthal_modes);
+                } else if (WarpX::nox == 3){
+                    doVillasenorDepositionShapeNExplicit<3>(
+                        GetPosition, wp.dataPtr() + offset,
+                        uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
+                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
+                        WarpX::n_rz_azimuthal_modes);
+                } else if (WarpX::nox == 4){
+                    doVillasenorDepositionShapeNExplicit<4>(
+                        GetPosition, wp.dataPtr() + offset,
+                        uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
+                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
+                        WarpX::n_rz_azimuthal_modes);
+                }
             }
         } else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Vay) {
             if (push_type == PushType::Implicit) {
@@ -1550,26 +1574,13 @@ WarpXParticleContainer::PushX (int lev, amrex::Real dt)
 // without runtime component).
 void WarpXParticleContainer::defineAllParticleTiles () noexcept
 {
-        for (int lev = 0; lev <= finestLevel(); ++lev)
-        {
-            for (auto mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
-            {
-                const int grid_id = mfi.index();
-                const int tile_id = mfi.LocalTileIndex();
-                DefineAndReturnParticleTile(lev, grid_id, tile_id);
-            }
-        }
-
-
-    // Resize the tmp_particle_data (no present in parent class)
-    tmp_particle_data.resize(finestLevel()+1);
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
         for (auto mfi = MakeMFIter(lev); mfi.isValid(); ++mfi)
         {
             const int grid_id = mfi.index();
             const int tile_id = mfi.LocalTileIndex();
-            tmp_particle_data[lev][std::make_pair(grid_id,tile_id)];
+            DefineAndReturnParticleTile(lev, grid_id, tile_id);
         }
     }
 }

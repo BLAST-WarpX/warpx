@@ -82,7 +82,7 @@ public:
   /** Initialize openPMD I/O routines
    *
    * @param ie  iteration encoding from openPMD: "group, file, variable"
-   * @param filetype file backend, e.g. "bp" or "h5"
+   * @param filetype file backend, e.g. "bp5", "bp4", or "h5"
    * @param operator_type openPMD-api backend operator (compressor) for ADIOS2
    * @param operator_parameters openPMD-api backend operator parameters for ADIOS2
    * @param engine_type ADIOS engine for output
@@ -149,7 +149,7 @@ public:
               bool isBTD = false,
               const amrex::Geometry& full_BTD_snapshot=amrex::Geometry() ) const;
 
-  /** Return OpenPMD File type ("bp" or "h5" or "json")*/
+  /** Return OpenPMD File type ("bp5", "bp4", "h5" or "json")*/
   std::string OpenPMDFileType () { return m_OpenPMDFileType; }
 
 private:
@@ -176,6 +176,19 @@ private:
     }
   }
 
+  /** Flushing out data of the current openPMD iteration
+   *
+   * @param[in] isBTD if the current diagnostic is BTD
+   *
+   * if isBTD=false, apply the default flush behaviour
+   * if isBTD=true,  advice to use ADIOS Put() instead of PDW for better performance.
+   *
+   * iteration.seriesFlush() is used instead of series.flush()
+   *  because the latter flushes only if data is dirty
+   *  this causes trouble when the underlying writing function is collective (like PDW)
+   *
+   */
+  void flushCurrent (bool isBTD) const;
 
   /** This function does initial setup for the fields when interation is newly created
    *  @param[in] meshes   The meshes in a series
@@ -337,7 +350,7 @@ private:
   int m_MPISize = 1;
 
   openPMD::IterationEncoding m_Encoding = openPMD::IterationEncoding::fileBased;
-  std::string m_OpenPMDFileType = "bp"; //! MPI-parallel openPMD backend: bp or h5
+  std::string m_OpenPMDFileType = "bp5"; //! MPI-parallel openPMD backend: bp5, bp4 or h5
   std::string m_OpenPMDoptions = "{}"; //! JSON option string for openPMD::Series constructor
   int m_CurrentStep  = -1;
 

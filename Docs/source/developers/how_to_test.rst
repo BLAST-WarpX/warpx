@@ -34,7 +34,7 @@ If you install ``pre-commit`` locally, the style and correctness checks will run
 If you do not install ``pre-commit`` locally, these checks will run automatically as part of our CI workflows and a commit containing style and correctness changes might be added automatically to your branch after you have pushed your own commit.
 In that case, you will need to pull that automated commit before pushing further commits.
 
-The configuration options for ``pre-commit`` are set in the `pre-commit-config.yaml <https://github.com/ECP-WarpX/WarpX/blob/development/.pre-commit-config.yaml>`__ file.
+The configuration options for ``pre-commit`` are set in the `pre-commit-config.yaml <https://github.com/BLAST-WarpX/warpx/blob/development/.pre-commit-config.yaml>`__ file.
 
 How to configure the automated tests
 ------------------------------------
@@ -50,7 +50,7 @@ How to run automated tests locally
 
 Once your code changes are ready, there are ways to check that they do not break the rest of the code.
 WarpX has automated tests running every time a commit is pushed to an open pull request.
-The input files and scripts used by the automated tests can be found in the `Examples <https://github.com/ECP-WarpX/WarpX/tree/development/Examples>`__ directory, either under `Physics_applications <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Physics_applications>`__ or `Tests <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests>`__.
+The input files and scripts used by the automated tests can be found in the `Examples <https://github.com/BLAST-WarpX/warpx/tree/development/Examples>`__ directory, either under `Physics_applications <https://github.com/BLAST-WarpX/warpx/tree/development/Examples/Physics_applications>`__ or `Tests <https://github.com/BLAST-WarpX/warpx/tree/development/Examples/Tests>`__.
 
 For easier debugging, it can be convenient to run the tests on your local computer by executing CTest as illustrated in the examples below (where we assume that WarpX was configured and built in the directory ``build``):
 
@@ -130,7 +130,7 @@ An automated test typically consists of the following components:
 
 * checksum file.
 
-As mentioned above, the input files and scripts used by the automated tests can be found in the `Examples <https://github.com/ECP-WarpX/WarpX/tree/development/Examples>`__ directory, under either `Physics_applications <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Physics_applications>`__ or `Tests <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests>`__.
+As mentioned above, the input files and scripts used by the automated tests can be found in the `Examples <https://github.com/BLAST-WarpX/warpx/tree/development/Examples>`__ directory, under either `Physics_applications <https://github.com/BLAST-WarpX/warpx/tree/development/Examples/Physics_applications>`__ or `Tests <https://github.com/BLAST-WarpX/warpx/tree/development/Examples/Tests>`__.
 
 Each test directory must contain a file named ``CMakeLists.txt`` where all tests associated with the input files and scripts in that directory must be listed.
 
@@ -168,9 +168,9 @@ Here's how to add an automated test:
 
 #. Add the test to the ``CMakeLists.txt`` file (add such file if you are adding the test in a new test directory) using the function ``add_warpx_test`` mentioned above.
 
-#. If the test directory is new, add the directory with the command ``add_subdirectory`` in `Physics_applications/CMakeLists.txt <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Physics_applications/CMakeLists.txt>`__ or `Tests/CMakeLists.txt <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests/CMakeLists.txt>`__, depending on where the test directory is located.
+#. If the test directory is new, add the directory with the command ``add_subdirectory`` in `Physics_applications/CMakeLists.txt <https://github.com/BLAST-WarpX/warpx/tree/development/Examples/Physics_applications/CMakeLists.txt>`__ or `Tests/CMakeLists.txt <https://github.com/BLAST-WarpX/warpx/tree/development/Examples/Tests/CMakeLists.txt>`__, depending on where the test directory is located.
 
-#. If the test directory is new, make a symbolic link to the default regression analysis script ``analysis_default_regression.py`` from `Examples/analysis_default_regression.py <https://github.com/ECP-WarpX/WarpX/blob/development/Examples/analysis_default_regression.py>`__, by running ``ln -s ../../analysis_default_regression.py analysis_default_regression.py`` from the test directory.
+#. If the test directory is new, make a symbolic link to the default regression analysis script ``analysis_default_regression.py`` from `Examples/analysis_default_regression.py <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/analysis_default_regression.py>`__, by running ``ln -s ../../analysis_default_regression.py analysis_default_regression.py`` from the test directory.
 
 #. Run the test locally with ``ctest``, after setting the environment variable ``CHECKSUM_RESET=ON``, in order to generate automatically the checksum file.
 
@@ -178,7 +178,7 @@ Once you have added the test, run the test locally again, after resetting ``CHEC
 
 The ``analysis`` and ``checksum`` commands passed as arguments to ``add_warpx_test`` can be set to ``OFF`` if the intention is to skip the respective analysis for a given test.
 
-If you need a new Python package dependency for testing, please add it in `Regression/requirements.txt <https://github.com/ECP-WarpX/WarpX/blob/development/Regression/requirements.txt>`__.
+If you need a new Python package dependency for testing, please add it in `Regression/requirements.txt <https://github.com/BLAST-WarpX/warpx/blob/development/Regression/requirements.txt>`__.
 
 Sometimes two or more tests share a large number of input parameters.
 The shared input parameters can be collected in a "base" input file that can be passed as a runtime parameter in the actual test input files through the parameter ``FILE``.
@@ -221,7 +221,7 @@ Here's how to do so:
 
 #. Save the raw log as a text file on your computer.
 
-#. Go to the directory `Tools/DevUtils <https://github.com/ECP-WarpX/WarpX/tree/development/Tools/DevUtils>`__ and run the Python script `update_benchmarks_from_azure_output.py <https://github.com/ECP-WarpX/WarpX/blob/development/Tools/DevUtils/update_benchmarks_from_azure_output.py>`__ passing the path of the raw log text file as a command line argument:
+#. Go to the directory `Tools/DevUtils <https://github.com/BLAST-WarpX/warpx/tree/development/Tools/DevUtils>`__ and run the Python script `update_benchmarks_from_azure_output.py <https://github.com/BLAST-WarpX/warpx/blob/development/Tools/DevUtils/update_benchmarks_from_azure_output.py>`__ passing the path of the raw log text file as a command line argument:
 
    .. code:: bash
 

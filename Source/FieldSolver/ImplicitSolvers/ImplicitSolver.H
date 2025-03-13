@@ -102,6 +102,8 @@ public:
     [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> GetLinOpBCLo () const;
     [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> GetLinOpBCHi () const;
 
+    [[nodiscard]] amrex::Real  GetTheta () const { return m_theta; }
+
 protected:
 
     /**
@@ -120,6 +122,11 @@ protected:
      * \brief Time step
      */
     mutable amrex::Real m_dt = 0.0;
+
+    /**
+     * \brief Time-biasing parameter for fields used on RHS to advance system.
+     */
+    amrex::Real m_theta = 0.5;
 
     /**
      * \brief Nonlinear solver type and object

@@ -293,13 +293,6 @@ public:
     //! Order of finite centering of fields (from staggered grid to nodal grid), along z
     static int field_centering_noz;
 
-    //! Order of finite centering of currents (from nodal grid to staggered grid), along x
-    static int current_centering_nox;
-    //! Order of finite centering of currents (from nodal grid to staggered grid), along y
-    static int current_centering_noy;
-    //! Order of finite centering of currents (from nodal grid to staggered grid), along z
-    static int current_centering_noz;
-
     //! Number of modes for the RZ multi-mode version
     static int n_rz_azimuthal_modes;
     //! Number of MultiFab components
@@ -351,11 +344,6 @@ public:
 
     static utils::parser::IntervalsParser sort_intervals;
     static amrex::IntVect sort_bin_size;
-
-    //! If true, particles will be sorted in the order x -> y -> z -> ppc for faster deposition
-    static bool sort_particles_for_deposition;
-    //! Specifies the type of grid used for the above sorting, i.e. cell-centered, nodal, or mixed
-    static amrex::IntVect sort_idx_type;
 
     static bool do_multi_J;
     static int do_multi_J_n_depositions;
@@ -674,16 +662,6 @@ public:
     void UpdateAuxilaryData ();
     void UpdateAuxilaryDataStagToNodal ();
     void UpdateAuxilaryDataSameType ();
-
-    /**
-     * \brief This function is called if \c warpx.do_current_centering = 1 and
-     * it centers the currents from a nodal grid to a staggered grid (Yee) using
-     * finite-order interpolation based on the Fornberg coefficients.
-     *
-     * \param[in,out] dst destination \c MultiFab where the results of the finite-order centering are stored
-     * \param[in] src source \c MultiFab that contains the values of the nodal current to be centered
-     */
-    void UpdateCurrentNodalToStag (amrex::MultiFab& dst, amrex::MultiFab const& src);
 
     // Fill boundary cells including coarse/fine boundaries
     void FillBoundaryB   (amrex::IntVect ng, std::optional<bool> nodal_sync = std::nullopt);
@@ -1225,26 +1203,6 @@ private:
         return gather_buffer_masks[lev].get();
     }
 
-    /**
-     * \brief Allocates and initializes the stencil coefficients used for the finite-order centering
-     * of fields and currents, and stores them in the given device vectors.
-     *
-     * \param[in,out] device_centering_stencil_coeffs_x device vector where the stencil coefficients along x will be stored
-     * \param[in,out] device_centering_stencil_coeffs_y device vector where the stencil coefficients along y will be stored
-     * \param[in,out] device_centering_stencil_coeffs_z device vector where the stencil coefficients along z will be stored
-     * \param[in] centering_nox order of the finite-order centering along x
-     * \param[in] centering_noy order of the finite-order centering along y
-     * \param[in] centering_noz order of the finite-order centering along z
-     * \param[in] a_grid_type type of grid (collocated or not)
-     */
-    void AllocateCenteringCoefficients (amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_x,
-                                        amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_y,
-                                        amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_z,
-                                        int centering_nox,
-                                        int centering_noy,
-                                        int centering_noz,
-                                        ablastr::utils::enums::GridType a_grid_type);
-
     void AllocLevelMFs (int lev, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm,
                         const amrex::IntVect& ngEB, amrex::IntVect& ngJ,
                         const amrex::IntVect& ngRho, const amrex::IntVect& ngF,
@@ -1283,6 +1241,13 @@ private:
     // Particle container
     std::unique_ptr<MultiParticleContainer> mypc;
     std::unique_ptr<MultiDiagnostics> multi_diags;
+
+    //! Order of finite centering of currents (from nodal grid to staggered grid), along x
+    int m_current_centering_nox  = 2;
+    //! Order of finite centering of currents (from nodal grid to staggered grid), along y
+    int m_current_centering_noy = 2;
+    //! Order of finite centering of currents (from nodal grid to staggered grid), along z
+    int m_current_centering_noz = 2;
 
     // Fluid container
     bool do_fluid_species = false;
@@ -1460,6 +1425,8 @@ private:
     amrex::VisMF::Header::Version plotfile_headerversion  = amrex::VisMF::Header::Version_v1;
     amrex::VisMF::Header::Version slice_plotfile_headerversion  = amrex::VisMF::Header::Version_v1;
 
+    bool synchronize_velocity_for_diagnostics = false;
+
     bool use_single_read = true;
     bool use_single_write = true;
     int mffile_nstreams = 4;
@@ -1489,6 +1456,18 @@ private:
     int noy_fft = 16;
     int noz_fft = 16;
 
+
+
+    //! If true, particles will be sorted in the order x -> y -> z -> ppc for faster deposition
+#if defined(AMREX_USE_CUDA)
+    bool m_sort_particles_for_deposition = true;
+#else
+    bool m_sort_particles_for_deposition = false;
+#endif
+
+    //! Specifies the type of grid used for the above sorting, i.e. cell-centered, nodal, or mixed
+    amrex::IntVect m_sort_idx_type = amrex::IntVect(AMREX_D_DECL(0,0,0));
+
     //! Solve Poisson equation when loading an external magnetic field to clean divergence
     //! This is useful to remove errors that could lead to non-zero B field divergence
     bool m_do_divb_cleaning_external = false;
@@ -1508,12 +1487,6 @@ private:
 
     // Factory for field data
     amrex::Vector<std::unique_ptr<amrex::FabFactory<amrex::FArrayBox> > > m_field_factory;
-
-    [[nodiscard]]
-    amrex::FabFactory<amrex::FArrayBox> const& fieldFactory (int lev) const noexcept
-    {
-        return *m_field_factory[lev];
-    }
 
     /** Stop the simulation at the end of the current step due to a received Unix signal?
      */
@@ -1652,16 +1625,6 @@ private:
      * \brief Backward FFT of G on all mesh refinement levels
      */
     void PSATDBackwardTransformG ();
-
-    /**
-     * \brief Correct current in Fourier space so that the continuity equation is satisfied
-     */
-    void PSATDCurrentCorrection ();
-
-    /**
-     * \brief Vay deposition in Fourier space (https://doi.org/10.1016/j.jcp.2013.03.010)
-     */
-    void PSATDVayDeposition ();
 
     /**
      * \brief Update all necessary fields in spectral space

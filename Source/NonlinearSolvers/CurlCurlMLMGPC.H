@@ -18,12 +18,10 @@
 #include <AMReX_Array.H>
 #include <AMReX_Vector.H>
 #include <AMReX_MultiFab.H>
-#ifndef WARPX_DIM_1D_Z // currently not implemented in 1D
 #include <AMReX_MLLinOp.H>
 #include <AMReX_MLCurlCurl.H>
 #include <AMReX_MLMG.H>
 #include <AMReX_GMRES_MLMG.H>
-#endif
 
 /**
  * \brief Curl-curl Preconditioner
@@ -135,8 +133,6 @@ class CurlCurlMLMGPC : public Preconditioner<T,Ops>
 
         const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* m_bcoefs = nullptr;
 
-// currently not implemented in 1D
-#ifndef WARPX_DIM_1D_Z
         amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> m_bc_lo;
         amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> m_bc_hi;
 
@@ -144,7 +140,6 @@ class CurlCurlMLMGPC : public Preconditioner<T,Ops>
         std::unique_ptr<amrex::MLCurlCurl> m_curl_curl;
         std::unique_ptr<amrex::MLMGT<MFArr>> m_solver;
         std::unique_ptr<amrex::GMRESMLMGT<MFArr>> m_gmres_solver;
-#endif
 
         /**
          * \brief Read parameters
@@ -216,11 +211,6 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
     // Get data vectors from a_U
     auto& u_mfarrvec = a_U.getArrayVec();
 
-// currently not implemented in 1D
-#ifdef WARPX_DIM_1D_Z
-    amrex::ignore_unused(u_mfarrvec);
-    WARPX_ABORT_WITH_MESSAGE("CurlCurlMLMGPC not yet implemented for 1D");
-#else
     // create info object for curl-curl op
     m_info = std::make_unique<LPInfo>();
     m_info->setAgglomeration(m_agglomeration);
@@ -268,7 +258,6 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
 
     m_bcoefs = m_ops->GetSigmaCoeff();
     if (m_bcoefs != nullptr) { m_beta_scalar = false; }
-#endif
 
     m_is_defined = true;
 }
@@ -286,18 +275,17 @@ void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
     amrex::ignore_unused(a_U);
 
     // set the alpha for curl-curl op
-    // (m_dt is simulation dt times time integration coeff)
-    const RT alpha = (this->m_dt*PhysConst::c) * (this->m_dt*PhysConst::c);
-
-// currently not implemented in 1D
-#ifndef WARPX_DIM_1D_Z
+    const RT thetaDt = m_ops->GetTheta()*this->m_dt;
+    const RT alpha = (thetaDt*PhysConst::c) * (thetaDt*PhysConst::c);
     m_curl_curl->setScalars(alpha, RT(1.0));
 
     if (!m_beta_scalar) {
         for (int n = 0; n < m_num_amr_levels; n++) {
 #if defined(WARPX_DIM_1D_Z)
             // Missing dimensions is x,y in WarpX and y,z in AMReX
-            WARPX_ABORT_WITH_MESSAGE("CurlCurlMLMGPC not yet implemented for 1D");
+            m_curl_curl->setBeta({Array<MultiFab const*,3>{ (*m_bcoefs)[n][2],
+                                                            (*m_bcoefs)[n][1],
+                                                            (*m_bcoefs)[n][0]}});
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             // Missing dimension is y in WarpX and z in AMReX
             m_curl_curl->setBeta({Array<MultiFab const*,3>{ (*m_bcoefs)[n][0],
@@ -310,11 +298,10 @@ void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
 #endif
         }
     }
-#endif
 
     if (m_verbose) {
         amrex::Print() << "Updating " << amrex::getEnumNameString(PreconditionerType::pc_curl_curl_mlmg)
-                       << ": theta*dt = " << this->m_dt << ", "
+                       << ": theta*dt = " << thetaDt << ", "
                        << " coefficients: "
                        << "alpha = " << alpha << "\n";
     }
@@ -352,8 +339,13 @@ void CurlCurlMLMGPC<T,Ops>::Apply (T& a_x, const T& a_b)
 
         // Copy initial guess to local object
 #if defined(WARPX_DIM_1D_Z)
-        // Missing dimensions is x,y in WarpX and y,z in AMReX
-        WARPX_ABORT_WITH_MESSAGE("CurlCurlMLMGPC not yet implemented for 1D");
+        // Missing dimensions are x,y in WarpX and y,z in AMReX
+        Array<MultiFab,3> solution { MultiFab(*x_mfarrvec[n][2], make_alias, 0, 1),
+                                     MultiFab(*x_mfarrvec[n][1], make_alias, 0, 1),
+                                     MultiFab(*x_mfarrvec[n][0], make_alias, 0, 1) };
+        Array<MultiFab,3> rhs      { MultiFab(*b_mfarrvec[n][2], make_alias, 0, 1),
+                                     MultiFab(*b_mfarrvec[n][1], make_alias, 0, 1),
+                                     MultiFab(*b_mfarrvec[n][0], make_alias, 0, 1) };
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         // Missing dimension is y in WarpX and z in AMReX
         Array<MultiFab,3> solution { MultiFab(*x_mfarrvec[n][0], make_alias, 0, 1),
@@ -371,15 +363,12 @@ void CurlCurlMLMGPC<T,Ops>::Apply (T& a_x, const T& a_b)
                                      MultiFab(*b_mfarrvec[n][2], make_alias, 0, 1) };
 #endif
 
-// currently not implemented in 1D
-#ifndef WARPX_DIM_1D_Z
         m_curl_curl->prepareRHS({&rhs});
         if (m_use_gmres) {
             m_gmres_solver->solve(solution, rhs, m_rtol, m_atol);
         } else {
             m_solver->solve({&solution}, {&rhs}, m_rtol, m_atol);
         }
-#endif
     }
 }
 

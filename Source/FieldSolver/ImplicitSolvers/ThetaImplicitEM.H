@@ -95,11 +95,6 @@ public:
 private:
 
     /**
-     * \brief Time-biasing parameter for fields used on RHS to advance system
-     */
-    amrex::Real m_theta = 0.5;
-
-    /**
      * \brief Array of multifab pointers to mass matrix
      */
     amrex::Vector<amrex::Array<amrex::MultiFab*,3>> m_sigma_mfarrvec;
