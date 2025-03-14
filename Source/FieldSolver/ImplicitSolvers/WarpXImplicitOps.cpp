@@ -47,12 +47,12 @@
 
 void
 WarpX::ImplicitPreRHSOp ( amrex::Real  a_cur_time,
+                          amrex::Real  a_theta,
                           amrex::Real  a_full_dt,
                           int          a_nl_iter,
                           bool         a_from_jacobian,
                           bool         a_use_mass_matrices )
 {
-    using namespace amrex::literals;
     using warpx::fields::FieldType;
     amrex::ignore_unused( a_full_dt, a_nl_iter, a_from_jacobian );
 
@@ -71,7 +71,8 @@ WarpX::ImplicitPreRHSOp ( amrex::Real  a_cur_time,
     SyncCurrentAndRho();
     if (deposit_mass_matrices) {
         SyncMassMatricesAndApplyBCs();
-        AddDiagonalToMassMatrices();
+        const amrex::Real theta_dt = a_theta*a_full_dt;
+        SetMassMatricesForPC( theta_dt );
     }
 
 }
@@ -84,7 +85,6 @@ WarpX::SyncMassMatricesAndApplyBCs ()
 
     SyncMassMatrices();
 
-    // Reflect charge and current density over PEC boundaries, if needed.
     for (int lev = 0; lev <= finest_level; ++lev) {
         ApplyJfieldBoundary(lev,
             m_fields.get(FieldType::sigma_PC, Direction{0}, lev),
@@ -95,16 +95,36 @@ WarpX::SyncMassMatricesAndApplyBCs ()
 }
 
 void
-WarpX::AddDiagonalToMassMatrices ()
+WarpX::SetMassMatricesForPC ( amrex::Real a_theta_dt )
 {
+
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
+    // Compute the identity plus mass matrix term for the preconditioner
+    // I + c^2*mu0*theta*dt*MassMatrix
+
+    // This factor is needed for being direclty used in PC
+    const amrex::Real pc_factor = PhysConst::c * PhysConst::c * PhysConst::mu0 * a_theta_dt;
+
+    const int diag_comp = 0;
     for (int lev = 0; lev <= finest_level; ++lev) {
-        m_fields.get(FieldType::sigma_PC, Direction{0}, lev)->plus(1.0,0,1,0);
-        m_fields.get(FieldType::sigma_PC, Direction{1}, lev)->plus(1.0,0,1,0);
-        m_fields.get(FieldType::sigma_PC, Direction{2}, lev)->plus(1.0,0,1,0);
+
+        // scale all components by pc_factor
+        const int ncomp0 = m_fields.get(FieldType::sigma_PC, Direction{0}, lev)->nComp();
+        const int ncomp1 = m_fields.get(FieldType::sigma_PC, Direction{1}, lev)->nComp();
+        const int ncomp2 = m_fields.get(FieldType::sigma_PC, Direction{2}, lev)->nComp();
+        m_fields.get(FieldType::sigma_PC, Direction{0}, lev)->mult(pc_factor,0,ncomp0);
+        m_fields.get(FieldType::sigma_PC, Direction{1}, lev)->mult(pc_factor,0,ncomp1);
+        m_fields.get(FieldType::sigma_PC, Direction{2}, lev)->mult(pc_factor,0,ncomp2);
+
+        // add one to diagonal terms
+        m_fields.get(FieldType::sigma_PC, Direction{0}, lev)->plus(1.0,diag_comp,1,0);
+        m_fields.get(FieldType::sigma_PC, Direction{1}, lev)->plus(1.0,diag_comp,1,0);
+        m_fields.get(FieldType::sigma_PC, Direction{2}, lev)->plus(1.0,diag_comp,1,0);
+
     }
+
 }
 
 void

@@ -116,7 +116,7 @@ void StrangImplicitSpectralEM::ComputeRHS ( WarpXSolverVec& a_RHS,
 
     // Self consistently update particle positions and velocities using the
     // current state of the fields E and B. Deposit current density at time n+1/2.
-    m_WarpX->ImplicitPreRHSOp( half_time, m_dt, a_nl_iter, a_from_jacobian, m_use_mass_matrices );
+    m_WarpX->ImplicitPreRHSOp( half_time, m_theta, m_dt, a_nl_iter, a_from_jacobian, m_use_mass_matrices );
 
     // For Strang split implicit PSATD, the RHS = -dt*mu*c**2*J
     bool const allow_type_mismatch = true;

@@ -137,13 +137,14 @@ public:
     // Functions used by implicit solvers
     //
     void ImplicitPreRHSOp ( amrex::Real cur_time,
+                            amrex::Real a_theta,
                             amrex::Real a_full_dt,
                             int         a_nl_iter,
                             bool        a_from_jacobian,
                             bool        a_use_mass_matrices );
     void SyncMassMatricesAndApplyBCs ();
     void SyncMassMatrices ();
-    void AddDiagonalToMassMatrices ();
+    void SetMassMatricesForPC ( amrex::Real a_theta_dt );
     void SaveParticlesAtImplicitStepStart ();
     void FinishImplicitParticleUpdate ();
     void SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time );
