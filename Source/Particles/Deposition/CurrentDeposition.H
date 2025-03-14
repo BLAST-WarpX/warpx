@@ -745,29 +745,24 @@ void doJandSigmaDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPos
             amrex::Real wqy  = rhop*uyp[ip];
             amrex::Real wqz  = rhop*uzp[ip];
 
-            // Perform direct current deposition for J
-            //const amrex::Real relative_time = 0._rt;
-            //doDepositionShapeNKernel<depos_order>(xp_nph, yp_nph, zp_nph, wq, vx, vy, vz, jx_arr, jy_arr, jz_arr,
-            //                                      jx_type, jy_type, jz_type,
-            //                                      relative_time, dinv, xyzmin,
-            //                                      invvol, lo, n_rz_azimuthal_modes);
-
             // Compute Mass Matrix kernals (non-relativistic for now)
             amrex::Real Bpsq = Bxp*Bxp + Byp*Byp + Bzp*Bzp;
             amrex::Real arogp = alpha*rhop/(1.0_rt + Bpsq);
 
             amrex::Real fpxx = arogp*(Bxp*Bxp + 1.0_rt);
-            //amrex::Real fpxy = arogp*(Bxp*Byp + Bzp);
-            //amrex::Real fpxz = arogp*(Bxp*Bzp - Byp);
+            amrex::Real fpxy = arogp*(Bxp*Byp + Bzp);
+            amrex::Real fpxz = arogp*(Bxp*Bzp - Byp);
+            amrex::ignore_unused(fpxy,fpxz);
 
-            //amrex::Real fpyx = arogp*(Byp*Bxp - Bzp);
+            amrex::Real fpyx = arogp*(Byp*Bxp - Bzp);
             amrex::Real fpyy = arogp*(Byp*Byp + 1.0_rt);
-            //amrex::Real fpyz = arogp*(Byp*Bzp + Bxp);
+            amrex::Real fpyz = arogp*(Byp*Bzp + Bxp);
+            amrex::ignore_unused(fpyx,fpyz);
 
-            //amrex::Real fpzx = arogp*(Bzp*Bxp + Byp);
-            //amrex::Real fpzy = arogp*(Bzp*Byp - Bxp);
+            amrex::Real fpzx = arogp*(Bzp*Bxp + Byp);
+            amrex::Real fpzy = arogp*(Bzp*Byp - Bxp);
             amrex::Real fpzz = arogp*(Bzp*Bzp + 1.0_rt);
-
+            amrex::ignore_unused(fpzx,fpzy);
 
             doMassMatrixDepositionShapeNKernel<depos_order>( xp_nph, yp_nph, zp_nph,
                                                              wqx, wqy, wqz,
