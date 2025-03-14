@@ -2015,7 +2015,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * Sx = fields.get(FieldType::MassMatrices, Direction{0}, lev);
                         amrex::MultiFab * Sy = fields.get(FieldType::MassMatrices, Direction{1}, lev);
                         amrex::MultiFab * Sz = fields.get(FieldType::MassMatrices, Direction{2}, lev);
-                        DepositCurrentAndMassMatrices(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
+                        DepositCurrentAndMassMatrices(pti, wp, uxp, uyp, uzp, jx, jy, jz,
                                        Sx, Sy, Sz, bxfab, byfab, bzfab, 0, np_current, thread_num,
                                        lev, lev, dt);
                     }

@@ -877,10 +877,6 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
  * \param pti         Particle iterator
  * \param wp          Array of particle weights
  * \param uxp uyp uzp Array of particle momenta
- * \param ion_lev     Pointer to array of particle ionization level. This is
-                      required to have the charge of each macroparticle
-                      since q is a scalar. For non-ionizable species,
-                      ion_lev is a null pointer.
  * \param jx jy jz    Full array of current density
  * \param Sx Sy Sz    Full array of mass matrices
  * \param Bx By Bz    Full array of magnetic field
@@ -900,7 +896,6 @@ void
 WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
                                         RealVector const & wp, RealVector const & uxp,
                                         RealVector const & uyp, RealVector const & uzp,
-                                        int const * const ion_lev,
                                         amrex::MultiFab * const jx, amrex::MultiFab * const jy, amrex::MultiFab * const jz,
                                         amrex::MultiFab * const Sx, amrex::MultiFab * const Sy, amrex::MultiFab * const Sz,
                                         const amrex::FArrayBox * Bx, const amrex::FArrayBox * By, const amrex::FArrayBox * Bz,
