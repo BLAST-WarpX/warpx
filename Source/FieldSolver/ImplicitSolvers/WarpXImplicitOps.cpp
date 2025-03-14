@@ -86,26 +86,26 @@ WarpX::SyncMassMatricesAndApplyBCs ()
     // Copy mass matrices elements used for the preconditioner
     for (int lev = 0; lev <= finest_level; ++lev) {
 
-        const int ncomp0 = m_fields.get(FieldType::sigma_PC, Direction{0}, lev)->nComp();
-        const int ncomp1 = m_fields.get(FieldType::sigma_PC, Direction{1}, lev)->nComp();
-        const int ncomp2 = m_fields.get(FieldType::sigma_PC, Direction{2}, lev)->nComp();
+        const int ncomp0 = m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev)->nComp();
+        const int ncomp1 = m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev)->nComp();
+        const int ncomp2 = m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev)->nComp();
 
         ablastr::fields::VectorField MM = m_fields.get_alldirs(FieldType::MassMatrices, lev);
-        ablastr::fields::VectorField sigma_PC = m_fields.get_alldirs(FieldType::sigma_PC, lev);
-        amrex::MultiFab::Copy(*sigma_PC[0], *MM[0], 0, 0, ncomp0, MM[0]->nGrowVect());
-        amrex::MultiFab::Copy(*sigma_PC[1], *MM[1], 0, 0, ncomp1, MM[1]->nGrowVect());
-        amrex::MultiFab::Copy(*sigma_PC[2], *MM[2], 0, 0, ncomp2, MM[2]->nGrowVect());
+        ablastr::fields::VectorField MM_PC = m_fields.get_alldirs(FieldType::MassMatrices_PC, lev);
+        amrex::MultiFab::Copy(*MM_PC[0], *MM[0], 0, 0, ncomp0, MM[0]->nGrowVect());
+        amrex::MultiFab::Copy(*MM_PC[1], *MM[1], 0, 0, ncomp1, MM[1]->nGrowVect());
+        amrex::MultiFab::Copy(*MM_PC[2], *MM[2], 0, 0, ncomp2, MM[2]->nGrowVect());
     }
 
-    // Do addOp Exchange on sigma_PC
+    // Do addOp Exchange on MassMatrices_PC
     SyncMassMatrices();
 
-    // Apply BCs to sigma_PC
+    // Apply BCs to MassMatrices_PC
     for (int lev = 0; lev <= finest_level; ++lev) {
         ApplyJfieldBoundary(lev,
-            m_fields.get(FieldType::sigma_PC, Direction{0}, lev),
-            m_fields.get(FieldType::sigma_PC, Direction{1}, lev),
-            m_fields.get(FieldType::sigma_PC, Direction{2}, lev),
+            m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev),
+            m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev),
+            m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev),
             PatchType::fine);
     }
 }
@@ -124,22 +124,22 @@ WarpX::SetMassMatricesForPC ( amrex::Real a_theta_dt )
 
     for (int lev = 0; lev <= finest_level; ++lev) {
 
-        const int ncomp0 = m_fields.get(FieldType::sigma_PC, Direction{0}, lev)->nComp();
-        const int ncomp1 = m_fields.get(FieldType::sigma_PC, Direction{1}, lev)->nComp();
-        const int ncomp2 = m_fields.get(FieldType::sigma_PC, Direction{2}, lev)->nComp();
+        const int ncomp0 = m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev)->nComp();
+        const int ncomp1 = m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev)->nComp();
+        const int ncomp2 = m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev)->nComp();
 
-        m_fields.get(FieldType::sigma_PC, Direction{0}, lev)->mult(pc_factor,0,ncomp0);
-        m_fields.get(FieldType::sigma_PC, Direction{1}, lev)->mult(pc_factor,0,ncomp1);
-        m_fields.get(FieldType::sigma_PC, Direction{2}, lev)->mult(pc_factor,0,ncomp2);
+        m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev)->mult(pc_factor,0,ncomp0);
+        m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev)->mult(pc_factor,0,ncomp1);
+        m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev)->mult(pc_factor,0,ncomp2);
 
     }
 
     // Add one to diagonal terms
     const int diag_comp = 0;
     for (int lev = 0; lev <= finest_level; ++lev) {
-        m_fields.get(FieldType::sigma_PC, Direction{0}, lev)->plus(1.0,diag_comp,1,0);
-        m_fields.get(FieldType::sigma_PC, Direction{1}, lev)->plus(1.0,diag_comp,1,0);
-        m_fields.get(FieldType::sigma_PC, Direction{2}, lev)->plus(1.0,diag_comp,1,0);
+        m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev)->plus(1.0,diag_comp,1,0);
+        m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev)->plus(1.0,diag_comp,1,0);
+        m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev)->plus(1.0,diag_comp,1,0);
     }
 
 }

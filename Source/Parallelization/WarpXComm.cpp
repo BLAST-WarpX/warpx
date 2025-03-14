@@ -1272,7 +1272,7 @@ WarpX::SyncMassMatrices ()
 {
     WARPX_PROFILE("WarpX::SyncMassMatrices()");
 
-    ablastr::fields::MultiLevelVectorField const& Sigma_fp = m_fields.get_mr_levels_alldirs("sigma_PC", finest_level);
+    ablastr::fields::MultiLevelVectorField const& Sigma_fp = m_fields.get_mr_levels_alldirs("MassMatrices_PC", finest_level);
 
     for (int idim = 0; idim < 3; ++idim)
     {

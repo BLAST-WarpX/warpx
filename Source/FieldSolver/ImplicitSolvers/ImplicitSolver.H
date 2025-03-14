@@ -99,8 +99,8 @@ public:
     /**
      * \brief Return pointer to MultiFab array for mass matrix
      */
-    [[nodiscard]] const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetSigmaCoeff() const {
-        if (m_use_mass_matrices) { return &m_sigma_mfarrvec; }
+    [[nodiscard]] const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetMassMatricesCoeff() const {
+        if (m_use_mass_matrices) { return &m_mmpc_mfarrvec; }
         else { return nullptr; }
     }
 
@@ -154,9 +154,9 @@ protected:
     bool m_use_mass_matrices = false;
 
     /**
-     * \brief Array of multifab pointers to mass matrix
+     * \brief Array of multifab pointers to mass matrix preconditioner
      */
-    amrex::Vector<amrex::Array<amrex::MultiFab*,3>> m_sigma_mfarrvec;
+    amrex::Vector<amrex::Array<amrex::MultiFab*,3>> m_mmpc_mfarrvec;
 
     /**
      * \brief parse nonlinear solver parameters (if one is used)
