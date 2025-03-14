@@ -69,7 +69,42 @@ WarpX::ImplicitPreRHSOp ( amrex::Real  a_cur_time,
     PushParticlesandDeposit(a_cur_time, skip_current, deposit_mass_matrices, push_type);
 
     SyncCurrentAndRho();
+    if (deposit_mass_matrices) {
+        SyncMassMatricesAndApplyBCs();
+        AddDiagonalToMassMatrices();
+    }
 
+}
+
+void
+WarpX::SyncMassMatricesAndApplyBCs ()
+{
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    SyncMassMatrices();
+
+    // Reflect charge and current density over PEC boundaries, if needed.
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        ApplyJfieldBoundary(lev,
+            m_fields.get(FieldType::sigma_PC, Direction{0}, lev),
+            m_fields.get(FieldType::sigma_PC, Direction{1}, lev),
+            m_fields.get(FieldType::sigma_PC, Direction{2}, lev),
+            PatchType::fine);
+    }
+}
+
+void
+WarpX::AddDiagonalToMassMatrices ()
+{
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        m_fields.get(FieldType::sigma_PC, Direction{0}, lev)->plus(1.0,0,1,0);
+        m_fields.get(FieldType::sigma_PC, Direction{1}, lev)->plus(1.0,0,1,0);
+        m_fields.get(FieldType::sigma_PC, Direction{2}, lev)->plus(1.0,0,1,0);
+    }
 }
 
 void
