@@ -276,7 +276,7 @@ void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
     // a_U is not needed for a linear operator
     amrex::ignore_unused(a_U);
 
-    // set the alpha for curl-curl op
+    // set the alpha coefficient for the curl-curl op
     const RT thetaDt = m_ops->GetTheta()*this->m_dt;
     const RT alpha = (thetaDt*PhysConst::c) * (thetaDt*PhysConst::c);
     m_curl_curl->setScalars(alpha, RT(1.0));

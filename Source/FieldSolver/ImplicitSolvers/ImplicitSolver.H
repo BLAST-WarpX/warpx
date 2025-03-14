@@ -66,12 +66,6 @@ public:
                            amrex::Real  a_dt,
                            int          a_step ) = 0;
 
-
-    /**
-     * \brief Return pointer to MultiFab array for mass matrix
-     */
-    [[nodiscard]] virtual const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetSigmaCoeff() const { return nullptr; }
-
     //
     // the following routines are called by the linear and nonlinear solvers
     //
@@ -101,6 +95,14 @@ public:
     [[nodiscard]] const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& GetFieldBoundaryHi () const;
     [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> GetLinOpBCLo () const;
     [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> GetLinOpBCHi () const;
+
+    /**
+     * \brief Return pointer to MultiFab array for mass matrix
+     */
+    [[nodiscard]] const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetSigmaCoeff() const {
+        if (m_use_mass_matrices) { return &m_sigma_mfarrvec; }
+        else { return nullptr; }
+    }
 
     [[nodiscard]] amrex::Real  GetTheta () const { return m_theta; }
 
@@ -150,6 +152,11 @@ protected:
      * \brief Whether to use mass matrices for the implicit solver
      */
     bool m_use_mass_matrices = false;
+
+    /**
+     * \brief Array of multifab pointers to mass matrix
+     */
+    amrex::Vector<amrex::Array<amrex::MultiFab*,3>> m_sigma_mfarrvec;
 
     /**
      * \brief parse nonlinear solver parameters (if one is used)

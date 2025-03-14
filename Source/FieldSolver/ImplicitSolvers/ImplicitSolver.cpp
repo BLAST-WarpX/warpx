@@ -89,6 +89,7 @@ Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const
 
 void ImplicitSolver::InitializeMassMatrices ()
 {
+
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
@@ -101,4 +102,10 @@ void ImplicitSolver::InitializeMassMatrices ()
         m_WarpX->m_fields.alloc_init(FieldType::sigma_PC, Direction{1}, lev, ba_Ey, dm, 1, ngb, 0.0_rt);
         m_WarpX->m_fields.alloc_init(FieldType::sigma_PC, Direction{2}, lev, ba_Ez, dm, 1, ngb, 0.0_rt);
     }
+
+    // Set the pointer to mass matrix MultiFab
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        m_sigma_mfarrvec.push_back(m_WarpX->m_fields.get_alldirs(FieldType::sigma_PC, 0));
+    }
+
 }
