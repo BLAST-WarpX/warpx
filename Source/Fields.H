@@ -85,8 +85,7 @@ namespace warpx::fields
         sigma_PC, // Stores mass matrix elements for the implicit solver preconditioner (PC)
         ECTRhofield,
         Venl,
-        global_debye_length,
-        sigmaPC
+        global_debye_length
     );
 
     /** these are vector fields */
@@ -129,8 +128,7 @@ namespace warpx::fields
         FieldType::B_old,
         FieldType::sigma_PC,
         FieldType::ECTRhofield,
-        FieldType::Venl,
-        FieldType::sigmaPC
+        FieldType::Venl
     };
 
     /** Returns true if a FieldType represents a vector field */
