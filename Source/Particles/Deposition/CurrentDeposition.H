@@ -665,7 +665,6 @@ void doDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPosition,
  * \param lo            Index lower bounds of domain.
  * \param qs            Species charge.
  * \param ms            Species mass.
- * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
  */
 template <int depos_order>
 void doJandSigmaDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPosition,
@@ -691,8 +690,7 @@ void doJandSigmaDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPos
                                 const amrex::XDim3 & xyzmin,
                                 const amrex::Dim3 lo,
                                 const amrex::Real qs,
-                                const amrex::Real ms,
-                                [[maybe_unused]]const int n_rz_azimuthal_modes)
+                                const amrex::Real ms)
 {
     using namespace amrex::literals;
 
@@ -2403,6 +2401,138 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
                                                           uxp_nph[ip], uyp_nph[ip], uzp_nph[ip], gaminv,
                                                           Jx_arr, Jy_arr, Jz_arr,
                                                           dt, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
+
+    });
+}
+
+/**
+ * \brief Current density and mass matricies deposition using the Villasenor and Buneman deposition
+ *        for thread thread_num for implicit scheme.
+ *
+ * \param depos_order  deposition order
+ * \param xp_n,yp_n,zp_n  Pointer to arrays of particle position at time level n.
+ * \param GetPosition  A functor for returning the particle position.
+ * \param wp           Pointer to array of particle weights.
+ * \param uxp_n,uyp_n,uzp_n  Pointer to arrays of particle momentum at time level n.
+ * \param uxp_nph,uyp_nph,uzp_nph  Pointer to arrays of particle momentum at time level n + 1/2.
+ * \param Jx_arr,Jy_arr,Jz_arr  Array4 of current density, either full array or tile.
+ * \param np_to_deposit         Number of particles for which current is deposited.
+ * \param dt                    Time step for particle level
+ * \param dinv                  3D cell size inverse
+ * \param xyzmin                Physical lower bounds of domain.
+ * \param lo                    Index lower bounds of domain.
+ * \param q                     species charge.
+ */
+template <int depos_order>
+void doJandSigmaVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::ParticleReal * const xp_n,
+                                           [[maybe_unused]]const amrex::ParticleReal * const yp_n,
+                                           [[maybe_unused]]const amrex::ParticleReal * const zp_n,
+                                           const GetParticlePosition<PIdx>& GetPosition,
+                                           const amrex::ParticleReal * const wp,
+                                           [[maybe_unused]]const amrex::ParticleReal * const uxp_n,
+                                           [[maybe_unused]]const amrex::ParticleReal * const uyp_n,
+                                           [[maybe_unused]]const amrex::ParticleReal * const uzp_n,
+                                           [[maybe_unused]]const amrex::ParticleReal * const uxp,
+                                           [[maybe_unused]]const amrex::ParticleReal * const uyp,
+                                           [[maybe_unused]]const amrex::ParticleReal * const uzp,
+                                           const amrex::Array4<amrex::Real>& Jx_arr,
+                                           const amrex::Array4<amrex::Real>& Jy_arr,
+                                           const amrex::Array4<amrex::Real>& Jz_arr,
+                                           const amrex::Array4<amrex::Real>& Sx_arr,
+                                           const amrex::Array4<amrex::Real>& Sy_arr,
+                                           const amrex::Array4<amrex::Real>& Sz_arr,
+                                           const amrex::Array4<amrex::Real const>& Bx_arr,
+                                           const amrex::Array4<amrex::Real const>& By_arr,
+                                           const amrex::Array4<amrex::Real const>& Bz_arr,
+                                           const long np_to_deposit,
+                                           const amrex::Real dt,
+                                           const amrex::XDim3 & dinv,
+                                           const amrex::XDim3 & xyzmin,
+                                           const amrex::Dim3 lo,
+                                           const amrex::Real qs,
+                                           const amrex::Real ms)
+{
+    using namespace amrex::literals;
+
+    const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
+
+    // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
+    amrex::ParallelFor(
+        np_to_deposit,
+        [=] AMREX_GPU_DEVICE (long const ip) {
+            amrex::ParticleReal xp_nph, yp_nph, zp_nph;
+            GetPosition(ip, xp_nph, yp_nph, zp_nph);
+
+            // Compute magnetic field on particle
+            amrex::ParticleReal Bxp = 0.0;
+            amrex::ParticleReal Byp = 0.0;
+            amrex::ParticleReal Bzp = 0.0;
+            doGatherBShapeN<1>( xp_nph, yp_nph, zp_nph,
+                                Bxp, Byp, Bzp,
+                                Bx_arr, By_arr, Bz_arr,
+                                dinv, xyzmin, lo );
+
+            constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
+
+            // Convert B on particle to normalized cyclotron units with dt/2.0
+            const amrex::ParticleReal gamma_bar = std::sqrt(1._prt + (uxp[ip]*uxp[ip] + uyp[ip]*uyp[ip] + uzp[ip]*uzp[ip])*inv_c2);
+            const amrex::Real alpha = qs/ms*0.5_rt*dt/gamma_bar;
+            Bxp *= alpha;
+            Byp *= alpha;
+            Bzp *= alpha;
+
+            // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
+            // The uxp,uyp,uzp are the velocities at time level n+1/2
+            const amrex::ParticleReal uxp_np1 = 2._prt*uxp[ip] - uxp_n[ip];
+            const amrex::ParticleReal uyp_np1 = 2._prt*uyp[ip] - uyp_n[ip];
+            const amrex::ParticleReal uzp_np1 = 2._prt*uzp[ip] - uzp_n[ip];
+            const amrex::ParticleReal gamma_n = std::sqrt(1._prt + (uxp_n[ip]*uxp_n[ip] + uyp_n[ip]*uyp_n[ip] + uzp_n[ip]*uzp_n[ip])*inv_c2);
+            const amrex::ParticleReal gamma_np1 = std::sqrt(1._prt + (uxp_np1*uxp_np1 + uyp_np1*uyp_np1 + uzp_np1*uzp_np1)*inv_c2);
+            const amrex::ParticleReal gaminv = 2.0_prt/(gamma_n + gamma_np1);
+
+            // Compute current density kernals to deposit
+            const amrex::Real rhop = qs*wp[ip]*invvol*gaminv;
+            amrex::Real wqx  = rhop*uxp[ip];
+            amrex::Real wqy  = rhop*uyp[ip];
+            amrex::Real wqz  = rhop*uzp[ip];
+
+            // Compute Mass Matrix kernals (non-relativistic for now)
+            amrex::Real Bpsq = Bxp*Bxp + Byp*Byp + Bzp*Bzp;
+            amrex::Real arogp = alpha*rhop/(1.0_rt + Bpsq);
+
+            amrex::Real fpxx = arogp*(Bxp*Bxp + 1.0_rt);
+            amrex::Real fpxy = arogp*(Bxp*Byp + Bzp);
+            amrex::Real fpxz = arogp*(Bxp*Bzp - Byp);
+            amrex::ignore_unused(fpxy,fpxz);
+
+            amrex::Real fpyx = arogp*(Byp*Bxp - Bzp);
+            amrex::Real fpyy = arogp*(Byp*Byp + 1.0_rt);
+            amrex::Real fpyz = arogp*(Byp*Bzp + Bxp);
+            amrex::ignore_unused(fpyx,fpyz);
+
+            amrex::Real fpzx = arogp*(Bzp*Bxp + Byp);
+            amrex::Real fpzy = arogp*(Bzp*Byp - Bxp);
+            amrex::Real fpzz = arogp*(Bzp*Bzp + 1.0_rt);
+            amrex::ignore_unused(fpzx,fpzy);
+
+            // Compute position at time n + 1
+            amrex::ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n[ip];
+            amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n[ip];
+            amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n[ip];
+
+            //doMassMatrixVillasenorDepositionShapeNKernel<depos_order>(
+            //                                                 xp_n[ip], yp_n[ip], zp_n[ip],
+            //                                                 xp_np1, yp_np1, zp_np1,
+            //                                                 wqx, wqy, wqz,
+            //                                                 fpxx, fpyy, fpzz,
+            //                                                 Jx_arr, Jy_arr, Jz_arr,
+            //                                                 Sx_arr, Sy_arr, Sz_arr,
+            //                                                 dinv, xyzmin, lo );
+
+            //VillasenorDepositionShapeNKernel<depos_order>(xp_n[ip], yp_n[ip], zp_n[ip], xp_np1, yp_np1, zp_np1, wq,
+            //                                              uxp[ip], uyp[ip], uzp[ip], gaminv,
+            //                                              Jx_arr, Jy_arr, Jz_arr,
+            //                                              dt, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
 
     });
 }

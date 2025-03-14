@@ -1086,21 +1086,23 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
         auto& zp_n = pti.GetAttribs("z_n");
         const ParticleReal* zp_n_data = zp_n.dataPtr() + offset;
         if (WarpX::nox == 1){
-            doVillasenorDepositionShapeNImplicit<1>(
+            doJandSigmaVillasenorDepositionShapeNImplicit<1>(
                 xp_n_data, yp_n_data, zp_n_data,
                 GetPosition, wp.dataPtr() + offset,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
-                uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, lo, qs,
-                WarpX::n_rz_azimuthal_modes);
+                uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
+                jx_arr, jy_arr, jz_arr, Sx_arr, Sy_arr, Sz_arr,
+                Bx_arr, By_arr, Bz_arr, np_to_deposit, dt, dinv,
+                xyzmin, lo, qs, ms);
         } else if (WarpX::nox == 2){
-            doVillasenorDepositionShapeNImplicit<2>(
+            doJandSigmaVillasenorDepositionShapeNImplicit<2>(
                 xp_n_data, yp_n_data, zp_n_data,
                 GetPosition, wp.dataPtr() + offset,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
-                uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, lo, qs,
-                WarpX::n_rz_azimuthal_modes);
+                uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
+                jx_arr, jy_arr, jz_arr, Sx_arr, Sy_arr, Sz_arr,
+                Bx_arr, By_arr, Bz_arr, np_to_deposit, dt, dinv,
+                xyzmin, lo, qs, ms);
         } else {
             WARPX_ABORT_WITH_MESSAGE("mass matrices only used for shape = 1 and 2.");
         }
@@ -1112,7 +1114,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                 jx_fab, jy_fab, jz_fab, Sx_arr, Sy_arr, Sz_arr,
                 Bx_arr, By_arr, Bz_arr, np_to_deposit, dt, dinv,
-                xyzmin, lo, qs, ms, WarpX::n_rz_azimuthal_modes);
+                xyzmin, lo, qs, ms);
         } else if (WarpX::nox == 2){
             doJandSigmaDepositionShapeNImplicit<2>(
                 GetPosition, wp.dataPtr() + offset,
@@ -1120,7 +1122,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                 jx_fab, jy_fab, jz_fab, Sx_arr, Sy_arr, Sz_arr,
                 Bx_arr, By_arr, Bz_arr, np_to_deposit, dt, dinv,
-                xyzmin, lo, qs, ms, WarpX::n_rz_azimuthal_modes);
+                xyzmin, lo, qs, ms);
         } else {
             WARPX_ABORT_WITH_MESSAGE("mass matrices only used for shape = 1 and 2.");
         }
