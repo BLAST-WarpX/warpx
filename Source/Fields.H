@@ -84,7 +84,8 @@ namespace warpx::fields
         B_old, /**< Stores the value of B at the beginning of the timestep, for the implicit solver */
         ECTRhofield,
         Venl,
-        global_debye_length
+        global_debye_length,
+        sigmaPC
     );
 
     /** these are vector fields */
@@ -126,7 +127,8 @@ namespace warpx::fields
         FieldType::Bfield_avg_cp,
         FieldType::B_old,
         FieldType::ECTRhofield,
-        FieldType::Venl
+        FieldType::Venl,
+        FieldType::sigmaPC
     };
 
     /** Returns true if a FieldType represents a vector field */

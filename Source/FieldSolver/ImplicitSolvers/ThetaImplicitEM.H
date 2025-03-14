@@ -84,7 +84,20 @@ public:
                       int              a_nl_iter,
                       bool             a_from_jacobian ) override;
 
+    /**
+     * \brief Return pointer to MultiFab array for mass matrix
+     */
+    [[nodiscard]] const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetSigmaCoeff() const override
+    {
+        return &m_sigma_mfarrvec;
+    }
+
 private:
+
+    /**
+     * \brief Array of multifab pointers to mass matrix
+     */
+    amrex::Vector<amrex::Array<amrex::MultiFab*,3>> m_sigma_mfarrvec;
 
     /**
      * \brief Solver vectors to be used in the nonlinear solver to solve for the

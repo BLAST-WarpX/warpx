@@ -66,6 +66,12 @@ public:
                            amrex::Real  a_dt,
                            int          a_step ) = 0;
 
+
+    /**
+     * \brief Return pointer to MultiFab array for mass matrix
+     */
+    [[nodiscard]] virtual const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetSigmaCoeff() const { return nullptr; }
+
     //
     // the following routines are called by the linear and nonlinear solvers
     //
