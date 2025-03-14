@@ -90,6 +90,15 @@ Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const
 void ImplicitSolver::InitializeMassMatrices ()
 {
 
+    // Initializes the MassMatrices and MassMatrices_PC containers
+    // The latter has a reduced number of elements that is used for the preconditioner.
+    // They are the same for now as we only include the diagonal elements of the diagonal matrices.
+    // Off-diagonal matrices (e.g. MassMatrices_xy) are not yet included.
+    //
+    // dJ_x = MassMatrices_xx*dEx + MassMatrices_xy*dEy + MassMatrices_xz*dEz
+    // dJ_y = MassMatrices_yx*dEx + MassMatrices_yy*dEy + MassMatrices_yz*dEz
+    // dJ_z = MassMatrices_zx*dEx + MassMatrices_zy*dEy + MassMatrices_zz*dEz
+
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
@@ -98,6 +107,9 @@ void ImplicitSolver::InitializeMassMatrices ()
         const auto& ba_Ez = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{2}, lev)->boxArray();
         const auto& dm = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->DistributionMap();
         const amrex::IntVect ngb = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->nGrowVect();
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices, Direction{0}, lev, ba_Ex, dm, 1, ngb, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices, Direction{1}, lev, ba_Ey, dm, 1, ngb, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices, Direction{2}, lev, ba_Ez, dm, 1, ngb, 0.0_rt);
         m_WarpX->m_fields.alloc_init(FieldType::sigma_PC, Direction{0}, lev, ba_Ex, dm, 1, ngb, 0.0_rt);
         m_WarpX->m_fields.alloc_init(FieldType::sigma_PC, Direction{1}, lev, ba_Ey, dm, 1, ngb, 0.0_rt);
         m_WarpX->m_fields.alloc_init(FieldType::sigma_PC, Direction{2}, lev, ba_Ez, dm, 1, ngb, 0.0_rt);
