@@ -7,8 +7,13 @@
 
 #include "Initialization/WarpXAMReXInit.H"
 
+#include "BoundaryConditions/FieldBoundaries.H"
+#include "Particles/ParticleBoundaries.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
+#include "Utils/WarpXAlgorithmSelection.H"
+
+#include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX.H>
 #include <AMReX_BLProfiler.H>
@@ -95,6 +100,41 @@ namespace {
         pp_particles.queryAdd("do_tiling", do_tiling);
     }
 
+    void set_periodicity_according_to_boundary_types ()
+    {
+        auto pp_geometry = amrex::ParmParse{"geometry"};
+        if (pp_geometry.contains("is_periodic")){
+            std::string const warnMsg =
+                "geometry.is_periodic is only used internally. Please use `boundary.field_lo`,"
+                " `boundary.field_hi` to specifiy field boundary conditions and"
+                " 'boundary.particle_lo', 'boundary.particle_hi'  to specify particle"
+                " boundary conditions.";
+            ablastr::warn_manager::WMRecordWarning("Input", warnMsg);
+        }
+
+        const auto [field_boundary_lo, field_boundary_hi] =
+            warpx::boundary_conditions::parse_field_boundaries();
+        const auto [particle_boundary_lo, particle_boundary_hi] =
+            warpx::particles::parse_particle_boundaries(field_boundary_lo, field_boundary_hi);
+
+        amrex::Vector<int> geom_periodicity(AMREX_SPACEDIM,0);
+
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            if (field_boundary_lo[idim] == FieldBoundaryType::Periodic ||
+                field_boundary_hi[idim] == FieldBoundaryType::Periodic ||
+                particle_boundary_lo[idim] == ParticleBoundaryType::Periodic ||
+                particle_boundary_hi[idim] == ParticleBoundaryType::Periodic ) {
+                    geom_periodicity[idim] = 1;
+            }
+        }
+
+        // Appending periodicity information to input so that it can be used by amrex
+        // to set parameters necessary to define geometry and perform communication
+        // such as FillBoundary. The periodicity is 1 if user-define boundary condition is
+        // periodic else it is set to 0.
+        pp_geometry.addarr("is_periodic", geom_periodicity);
+    }
+
     /** Overwrite defaults in AMReX Inputs
      *
      * This overwrites defaults in amrex::ParmParse for inputs.
@@ -108,6 +148,7 @@ namespace {
         apply_workaround_for_warpx_numprocs();
         set_device_synchronization();
         override_default_tiling_option_for_particles();
+        set_periodicity_according_to_boundary_types();
     }
 
     /** Parse prob_lo and hi

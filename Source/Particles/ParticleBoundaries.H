@@ -10,7 +10,22 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 
 #include <AMReX_AmrCore.H>
+#include <AMReX_Array.H>
+#include <AMReX_Config.H>
 #include <AMReX_Parser.H>
+
+#include <utility>
+
+namespace warpx::particles
+{
+    std::pair<
+        amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM>,
+        amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM>
+    >
+    parse_particle_boundaries (
+        const amrex::Array<FieldBoundaryType, AMREX_SPACEDIM>& field_boundary_lo,
+        const amrex::Array<FieldBoundaryType, AMREX_SPACEDIM>& field_boundary_hi);
+}
 
 /**
  *  This allows a different boundary condition on each edge of the grid.

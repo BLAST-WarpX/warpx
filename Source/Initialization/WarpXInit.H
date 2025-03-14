@@ -7,6 +7,10 @@
 #ifndef WARPX_INIT_H_
 #define WARPX_INIT_H_
 
+#include "Utils/WarpXAlgorithmSelection.H"
+
+#include <AMReX_Array.H>
+
 namespace warpx::initialization
 {
     /** Initializes, in the following order:
