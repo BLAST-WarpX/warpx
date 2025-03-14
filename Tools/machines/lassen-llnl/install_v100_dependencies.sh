@@ -15,13 +15,13 @@ set -eu -o pipefail
 # Check: ######################################################################
 #
 #   Was lassen_v100_warpx.profile sourced and configured correctly?
-if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your lassen_v100_warpx_toss3.profile file! Please edit its line 2 to continue!"; exit 1; fi
+if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your lassen_v100_warpx.profile file! Please edit its line 2 to continue!"; exit 1; fi
 
 
 # Remove old dependencies #####################################################
 #
-SRC_DIR="/usr/workspace/${USER}/lassen-toss3/src"
-SW_DIR="/usr/workspace/${USER}/lassen-toss3/gpu"
+SRC_DIR="/usr/workspace/${USER}/lassen/src"
+SW_DIR="/usr/workspace/${USER}/lassen/gpu"
 rm -rf ${SW_DIR}
 mkdir -p ${SW_DIR}
 mkdir -p ${SRC_DIR}
@@ -110,9 +110,9 @@ cmake --build ${build_dir}/lapackpp-lassen-build --target install --parallel 10
 export PIP_EXTRA_INDEX_URL="https://pypi.org/simple"
 
 python3 -m pip install --upgrade --user virtualenv
-rm -rf ${SW_DIR}/venvs/warpx-lassen-toss3
-python3 -m venv ${SW_DIR}/venvs/warpx-lassen-toss3
-source ${SW_DIR}/venvs/warpx-lassen-toss3/bin/activate
+rm -rf ${SW_DIR}/venvs/warpx-lassen
+python3 -m venv ${SW_DIR}/venvs/warpx-lassen
+source ${SW_DIR}/venvs/warpx-lassen/bin/activate
 python3 -m pip install --upgrade pip
 # python3 -m pip cache purge  # error: pip cache commands can not function since cache is disabled
 python3 -m pip install --upgrade build
