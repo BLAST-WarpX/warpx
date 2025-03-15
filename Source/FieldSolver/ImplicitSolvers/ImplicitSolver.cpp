@@ -95,9 +95,9 @@ void ImplicitSolver::InitializeMassMatrices ()
     // They are the same for now as we only include the diagonal elements of the diagonal matrices.
     // Off-diagonal matrices (e.g. MassMatrices_xy) are not yet included.
     //
-    // dJ_x = MassMatrices_xx*dEx + MassMatrices_xy*dEy + MassMatrices_xz*dEz
-    // dJ_y = MassMatrices_yx*dEx + MassMatrices_yy*dEy + MassMatrices_yz*dEz
-    // dJ_z = MassMatrices_zx*dEx + MassMatrices_zy*dEy + MassMatrices_zz*dEz
+    // dJx = MassMatrices_xx*dEx + MassMatrices_xy*dEy + MassMatrices_xz*dEz
+    // dJy = MassMatrices_yx*dEx + MassMatrices_yy*dEy + MassMatrices_yz*dEz
+    // dJz = MassMatrices_zx*dEx + MassMatrices_zy*dEy + MassMatrices_zz*dEz
 
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
