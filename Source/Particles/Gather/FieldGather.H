@@ -1694,13 +1694,11 @@ void doGatherBShapeN (
 
     // computes current and old position in grid units
 #if defined(WARPX_DIM_RZ)
-    amrex::Real const xp_mid = xp_nph;
-    amrex::Real const yp_mid = yp_nph;
-    amrex::Real const rp_mid = (rp_new + rp_old)/2._rt;
+    amrex::Real const rp_mid = std::sqrt(xp_nph*xp_nph + yp_nph*yp_nph);
     amrex::Real costheta_mid, sintheta_mid;
     if (rp_mid > 0._rt) {
-        costheta_mid = xp_mid/rp_mid;
-        sintheta_mid = yp_mid/rp_mid;
+        costheta_mid = xp_nph/rp_mid;
+        sintheta_mid = yp_nph/rp_mid;
     } else {
         costheta_mid = 1._rt;
         sintheta_mid = 0._rt;
@@ -1779,7 +1777,7 @@ void doGatherBShapeN (
 
 #ifdef WARPX_DIM_RZ
 
-    // Convert Exp and Eyp (which are actually Er and Etheta) to Ex and Ey
+    // Convert Bxp and Byp (which are actually Br and Bth) to Bx and By
     const amrex::Real Bxp_save = Bxp;
     Bxp = costheta_mid*Bxp - sintheta_mid*Byp;
     Byp = costheta_mid*Byp + sintheta_mid*Bxp_save;
