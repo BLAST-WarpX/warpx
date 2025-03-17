@@ -840,6 +840,148 @@ void doGatherShapeNEsirkepovStencilImplicit (
 }
 
 /**
+ * \brief Magnetic field gather for a single particle
+ *
+ * \param xp,yp,zp                Particle position coordinates
+ * \param Bxp,Byp,Bzp             Magnetic field on particles.
+ * \param bx_arr,by_arr,bz_arr    Array4 of the magnetic field, either full array or tile.
+ * \param dinv                    3D cell size inverse
+ * \param xyzmin                  The lower bounds of the domain
+ * \param lo                      Index lower bounds of domain.
+ */
+template <int depos_order>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void doGatherBShapeN (
+                     [[maybe_unused]] const amrex::ParticleReal xp,
+                     [[maybe_unused]] const amrex::ParticleReal yp,
+                     const amrex::ParticleReal zp,
+                     amrex::ParticleReal& Bxp,
+                     amrex::ParticleReal& Byp,
+                     amrex::ParticleReal& Bzp,
+                     amrex::Array4<amrex::Real const> const& Bx_arr,
+                     amrex::Array4<amrex::Real const> const& By_arr,
+                     amrex::Array4<amrex::Real const> const& Bz_arr,
+                     const amrex::XDim3 & dinv,
+                     const amrex::XDim3 & xyzmin,
+                     const amrex::Dim3& lo )
+{
+    using namespace amrex;
+
+    // computes current and old position in grid units
+#if defined(WARPX_DIM_RZ)
+    amrex::Real const rp = std::sqrt(xp*xp + yp*yp);
+    amrex::Real costheta, sintheta;
+    if (rp > 0._rt) {
+        costheta = xp/rp;
+        sintheta = yp/rp;
+    } else {
+        costheta = 1._rt;
+        sintheta = 0._rt;
+    }
+    // Keep these double to avoid bug in single precision
+    double const x_bar = (rp - xyzmin.x)*dinv.x;
+#elif !defined(WARPX_DIM_1D_Z)
+    // Keep these double to avoid bug in single precision
+    double const x_bar = (xp - xyzmin.x)*dinv.x;
+#endif
+#if defined(WARPX_DIM_3D)
+    // Keep these double to avoid bug in single precision
+    double const y_bar = (yp - xyzmin.y)*dinv.y;
+#endif
+    // Keep these double to avoid bug in single precision
+    double const z_bar = (zp - xyzmin.z)*dinv.z;
+
+#if defined(WARPX_DIM_3D)
+
+    // gather magnetic field
+    const Compute_shape_factor< depos_order > compute_shape_factor_B;
+    double sz_bar_node[depos_order+1] = {0.};
+    double sz_bar_cell[depos_order+1] = {0.};
+    const int k_bar_node = compute_shape_factor_B(sz_bar_node, z_bar);
+    const int k_bar_cell = compute_shape_factor_B(sz_bar_cell, z_bar-0.5);
+    double sy_bar_node[depos_order+1] = {0.};
+    double sy_bar_cell[depos_order+1] = {0.};
+    const int j_bar_node = compute_shape_factor_B(sy_bar_node, y_bar);
+    const int j_bar_cell = compute_shape_factor_B(sy_bar_cell, y_bar-0.5);
+    double sx_bar_node[depos_order+1] = {0.};
+    double sx_bar_cell[depos_order+1] = {0.};
+    const int i_bar_node = compute_shape_factor_B(sx_bar_node, x_bar);
+    const int i_bar_cell = compute_shape_factor_B(sx_bar_cell, x_bar-0.5);
+
+    amrex::Real weight;
+    for (int i=0; i<=depos_order; i++) {
+        for (int j=0; j<=depos_order; j++) {
+            for (int k=0; k<=depos_order; k++) {
+                weight = static_cast<amrex::Real>(sx_bar_node[i]*sy_bar_cell[j]*sz_bar_cell[k]);
+                Bxp += Bx_arr(lo.x+i_bar_node+i, lo.y+j_bar_cell+j, lo.z+k_bar_cell+k)*weight;
+                //
+                weight = static_cast<amrex::Real>(sx_bar_cell[i]*sy_bar_node[j]*sz_bar_cell[k]);
+                Byp += By_arr(lo.x+i_bar_cell+i, lo.y+j_bar_node+j, lo.z+k_bar_cell+k)*weight;
+                //
+                weight = static_cast<amrex::Real>(sx_bar_cell[i]*sy_bar_cell[j]*sz_bar_node[k]);
+                Bzp += Bz_arr(lo.x+i_bar_cell+i, lo.y+j_bar_cell+j, lo.z+k_bar_node+k)*weight;
+            }
+        }
+    }
+
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+
+    // gather magnetic field and out-of-plane electric field
+    const Compute_shape_factor< depos_order > compute_shape_factor_B;
+    double sz_bar_node[depos_order+1] = {0.};
+    double sz_bar_cell[depos_order+1] = {0.};
+    const int k_bar_node = compute_shape_factor_B(sz_bar_node, z_bar);
+    const int k_bar_cell = compute_shape_factor_B(sz_bar_cell, z_bar-0.5);
+    double sx_bar_node[depos_order+1] = {0.};
+    double sx_bar_cell[depos_order+1] = {0.};
+    const int i_bar_node = compute_shape_factor_B(sx_bar_node, x_bar);
+    const int i_bar_cell = compute_shape_factor_B(sx_bar_cell, x_bar-0.5);
+
+    for (int i=0; i<=depos_order; i++) {
+        for (int k=0; k<=depos_order; k++) {
+            const auto weight_Bz = static_cast<amrex::Real>(sx_bar_cell[i]*sz_bar_node[k]);
+            Bzp += Bz_arr(lo.x+i_bar_cell+i, lo.y+k_bar_node+k, 0, 0)*weight_Bz;
+            //
+            const auto weight_Bx = static_cast<amrex::Real>(sx_bar_node[i]*sz_bar_cell[k]);
+            Bxp += Bx_arr(lo.x+i_bar_node+i, lo.y+k_bar_cell+k, 0, 0)*weight_Bx;
+            //
+            const auto weight_By = static_cast<amrex::Real>(sx_bar_cell[i]*sz_bar_cell[k]);
+            Byp += By_arr(lo.x+i_bar_cell+i, lo.y+k_bar_cell+k, 0, 0)*weight_By;
+        }
+    }
+
+#ifdef WARPX_DIM_RZ
+
+    // Convert Bxp and Byp (which are actually Br and Bth) to Bx and By
+    const amrex::Real Bxp_save = Bxp;
+    Bxp = costheta*Bxp - sintheta*Byp;
+    Byp = costheta*Byp + sintheta*Bxp_save;
+
+#endif
+
+#elif defined(WARPX_DIM_1D_Z)
+
+    // gather magnetic field
+    const Compute_shape_factor< depos_order > compute_shape_factor_B;
+    double sz_bar_node[depos_order+1] = {0.};
+    double sz_bar_cell[depos_order+1] = {0.};
+    const int k_bar_node = compute_shape_factor_B(sz_bar_node, z_bar);
+    const int k_bar_cell = compute_shape_factor_B(sz_bar_cell, z_bar-0.5_rt);
+
+    amrex::Real weight;
+    for (int k=0; k<=depos_order; k++) {
+        weight = static_cast<amrex::Real>(sz_bar_node[k]);
+        Bzp += Bz_arr(lo.x+k_bar_node+k, 0, 0)*weight;
+        //
+        weight = static_cast<amrex::Real>(sz_bar_cell[k]);
+        Bxp += Bx_arr(lo.x+k_bar_cell+k, 0, 0)*weight;
+        Byp += By_arr(lo.x+k_bar_cell+k, 0, 0)*weight;
+    }
+
+#endif
+}
+
+/**
  * \brief Energy conserving field gather for thread thread_num for the implicit scheme
  *        This uses the same stencil for the gather that is used for Villasenor current deposition.
  *        The magnetic field is deposited using direct deposition.
@@ -931,23 +1073,19 @@ void doGatherPicnicShapeN (
     // Keep these double to avoid bug in single precision
     double const x_new = (rp_new - xyzmin.x)*dinv.x;
     double const x_old = (rp_old - xyzmin.x)*dinv.x;
-    double const x_bar = (rp_mid - xyzmin.x)*dinv.x;
 #elif !defined(WARPX_DIM_1D_Z)
     // Keep these double to avoid bug in single precision
     double const x_new = (xp_np1 - xyzmin.x)*dinv.x;
     double const x_old = (xp_n - xyzmin.x)*dinv.x;
-    double const x_bar = (xp_nph - xyzmin.x)*dinv.x;
 #endif
 #if defined(WARPX_DIM_3D)
     // Keep these double to avoid bug in single precision
     double const y_new = (yp_np1 - xyzmin.y)*dinv.y;
     double const y_old = (yp_n   - xyzmin.y)*dinv.y;
-    double const y_bar = (yp_nph - xyzmin.y)*dinv.y;
 #endif
     // Keep these double to avoid bug in single precision
     double const z_new = (zp_np1 - xyzmin.z)*dinv.z;
     double const z_old = (zp_n   - xyzmin.z)*dinv.z;
-    double const z_bar = (zp_nph - xyzmin.z)*dinv.z;
 
     // 1) Determine the number of segments.
     // 2) Loop over segments and gather electric field.
@@ -1149,38 +1287,6 @@ void doGatherPicnicShapeN (
 
     } // end loop over segments
 
-    // gather magnetic field
-    const int depos_order_B = 1; // second template parameter?
-    const Compute_shape_factor< depos_order_B > compute_shape_factor_B;
-    double sz_bar_node[depos_order_B+1] = {0.};
-    double sz_bar_cell[depos_order_B+1] = {0.};
-    const int k_bar_node = compute_shape_factor_B(sz_bar_node, z_bar);
-    const int k_bar_cell = compute_shape_factor_B(sz_bar_cell, z_bar-0.5);
-    double sy_bar_node[depos_order_B+1] = {0.};
-    double sy_bar_cell[depos_order_B+1] = {0.};
-    const int j_bar_node = compute_shape_factor_B(sy_bar_node, y_bar);
-    const int j_bar_cell = compute_shape_factor_B(sy_bar_cell, y_bar-0.5);
-    double sx_bar_node[depos_order_B+1] = {0.};
-    double sx_bar_cell[depos_order_B+1] = {0.};
-    const int i_bar_node = compute_shape_factor_B(sx_bar_node, x_bar);
-    const int i_bar_cell = compute_shape_factor_B(sx_bar_cell, x_bar-0.5);
-
-    amrex::Real weight;
-    for (int i=0; i<=depos_order_B; i++) {
-        for (int j=0; j<=depos_order_B; j++) {
-            for (int k=0; k<=depos_order_B; k++) {
-                weight = static_cast<amrex::Real>(sx_bar_node[i]*sy_bar_cell[j]*sz_bar_cell[k]);
-                Bxp += Bx_arr(lo.x+i_bar_node+i, lo.y+j_bar_cell+j, lo.z+k_bar_cell+k)*weight;
-                //
-                weight = static_cast<amrex::Real>(sx_bar_cell[i]*sy_bar_node[j]*sz_bar_cell[k]);
-                Byp += By_arr(lo.x+i_bar_cell+i, lo.y+j_bar_node+j, lo.z+k_bar_cell+k)*weight;
-                //
-                weight = static_cast<amrex::Real>(sx_bar_cell[i]*sy_bar_cell[j]*sz_bar_node[k]);
-                Bzp += Bz_arr(lo.x+i_bar_cell+i, lo.y+j_bar_cell+j, lo.z+k_bar_node+k)*weight;
-            }
-        }
-    }
-
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
 
     // compute cell crossings in X-direction
@@ -1348,55 +1454,12 @@ void doGatherPicnicShapeN (
 
     }
 
-    // gather magnetic field and out-of-plane electric field
-    const int depos_order_B = 1; // second template parameter?
-    const Compute_shape_factor< depos_order_B > compute_shape_factor_B;
-    double sz_bar_node[depos_order_B+1] = {0.};
-    double sz_bar_cell[depos_order_B+1] = {0.};
-    const int k_bar_node = compute_shape_factor_B(sz_bar_node, z_bar);
-    const int k_bar_cell = compute_shape_factor_B(sz_bar_cell, z_bar-0.5);
-    double sx_bar_node[depos_order_B+1] = {0.};
-    double sx_bar_cell[depos_order_B+1] = {0.};
-    const int i_bar_node = compute_shape_factor_B(sx_bar_node, x_bar);
-    const int i_bar_cell = compute_shape_factor_B(sx_bar_cell, x_bar-0.5);
-
-    for (int i=0; i<=depos_order_B; i++) {
-        for (int k=0; k<=depos_order_B; k++) {
-            const auto weight_Bz = static_cast<amrex::Real>(sx_bar_cell[i]*sz_bar_node[k]);
-            Bzp += Bz_arr(lo.x+i_bar_cell+i, lo.y+k_bar_node+k, 0, 0)*weight_Bz;
-            //
-            const auto weight_Bx = static_cast<amrex::Real>(sx_bar_node[i]*sz_bar_cell[k]);
-            Bxp += Bx_arr(lo.x+i_bar_node+i, lo.y+k_bar_cell+k, 0, 0)*weight_Bx;
-            //
-            const auto weight_By = static_cast<amrex::Real>(sx_bar_cell[i]*sz_bar_cell[k]);
-            Byp += By_arr(lo.x+i_bar_cell+i, lo.y+k_bar_cell+k, 0, 0)*weight_By;
-#if defined(WARPX_DIM_RZ)
-            Complex xy_mid = xy_mid0; // Throughout the following loop, xy_mid takes the value e^{i m theta}
-            for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
-                const auto dBx = (+ Bx_arr(lo.x+i_bar_node+i, lo.y+k_bar_cell+k, 0, 2*imode-1)*xy_mid.real()
-                                  - Bx_arr(lo.x+i_bar_node+i, lo.y+k_bar_cell+k, 0, 2*imode)*xy_mid.imag());
-                const auto dBy = (+ By_arr(lo.x+i_bar_cell+i, lo.y+k_bar_cell+k, 0, 2*imode-1)*xy_mid.real()
-                                  - By_arr(lo.x+i_bar_cell+i, lo.y+k_bar_cell+k, 0, 2*imode)*xy_mid.imag());
-                const auto dBz = (+ Bz_arr(lo.x+i_bar_cell+i, lo.y+k_bar_node+k, 0, 2*imode-1)*xy_mid.real()
-                                  - Bz_arr(lo.x+i_bar_cell+i, lo.y+k_bar_node+k, 0, 2*imode)*xy_mid.imag());
-                Bxp += weight_Bx*dBx;
-                Byp += weight_By*dBy;
-                Bzp += weight_Bz*dBz;
-                xy_mid = xy_mid*xy_mid0;
-            }
-#endif
-        }
-    }
-
 #ifdef WARPX_DIM_RZ
 
     // Convert Exp and Eyp (which are actually Er and Etheta) to Ex and Ey
     const amrex::Real Exp_save = Exp;
     Exp = costheta_mid*Exp - sintheta_mid*Eyp;
     Eyp = costheta_mid*Eyp + sintheta_mid*Exp_save;
-    const amrex::Real Bxp_save = Bxp;
-    Bxp = costheta_mid*Bxp - sintheta_mid*Byp;
-    Byp = costheta_mid*Byp + sintheta_mid*Bxp_save;
 
 #endif
 
@@ -1480,25 +1543,15 @@ void doGatherPicnicShapeN (
 
     }
 
+#endif
+
     // gather magnetic field
     const int depos_order_B = 1; // second template parameter?
-    const Compute_shape_factor< depos_order_B > compute_shape_factor_B;
-    double sz_bar_node[depos_order_B+1] = {0.};
-    double sz_bar_cell[depos_order_B+1] = {0.};
-    const int k_bar_node = compute_shape_factor_B(sz_bar_node, z_bar);
-    const int k_bar_cell = compute_shape_factor_B(sz_bar_cell, z_bar-0.5_rt);
+    doGatherBShapeN<depos_order_B>( xp_nph, yp_nph, zp_nph,
+                                    Bxp, Byp, Bzp,
+                                    Bx_arr, By_arr, Bz_arr,
+                                    dinv, xyzmin, lo );
 
-    amrex::Real weight;
-    for (int k=0; k<=depos_order_B; k++) {
-        weight = static_cast<amrex::Real>(sz_bar_node[k]);
-        Bzp += Bz_arr(lo.x+k_bar_node+k, 0, 0)*weight;
-        //
-        weight = static_cast<amrex::Real>(sz_bar_cell[k]);
-        Bxp += Bx_arr(lo.x+k_bar_cell+k, 0, 0)*weight;
-        Byp += By_arr(lo.x+k_bar_cell+k, 0, 0)*weight;
-    }
-
-#endif
 }
 
 /**
