@@ -384,10 +384,11 @@ WarpX::Evolve (int numsteps)
         ablastr::warn_manager::GetWMInstance().PrintGlobalWarnings("THE END");
 }
 
-/* /brief Perform one PIC iteration, without subcycling
-*  i.e. all levels/patches use the same timestep (that of the finest level)
-*  for the field advance and particle pusher.
-*/
+/**
+ * \brief Perform one PIC iteration, without subcycling
+ * i.e. all levels/patches use the same timestep (that of the finest level)
+ * for the field advance and particle pusher.
+ */
 void
 WarpX::OneStep_nosub (Real cur_time)
 {
@@ -869,21 +870,22 @@ WarpX::OneStep_multiJ (const amrex::Real cur_time)
 #endif // WARPX_USE_FFT
 }
 
-/* /brief Perform one PIC iteration, with subcycling
-*  i.e. The fine patch uses a smaller timestep (and steps more often)
-*  than the coarse patch, for the field advance and particle pusher.
-*
-* This version of subcycling only works for 2 levels and with a refinement
-* ratio of 2.
-* The particles and fields of the fine patch are pushed twice
-* (with dt[coarse]/2) in this routine.
-* The particles of the coarse patch and mother grid are pushed only once
-* (with dt[coarse]). The fields on the coarse patch and mother grid
-* are pushed in a way which is equivalent to pushing once only, with
-* a current which is the average of the coarse + fine current at the 2
-* steps of the fine grid.
-*
-*/
+/**
+ *  \brief Perform one PIC iteration, with subcycling
+ *  i.e. The fine patch uses a smaller timestep (and steps more often)
+ *  than the coarse patch, for the field advance and particle pusher.
+ *
+ * This version of subcycling only works for 2 levels and with a refinement
+ * ratio of 2.
+ * The particles and fields of the fine patch are pushed twice
+ * (with dt[coarse]/2) in this routine.
+ * The particles of the coarse patch and mother grid are pushed only once
+ * (with dt[coarse]). The fields on the coarse patch and mother grid
+ * are pushed in a way which is equivalent to pushing once only, with
+ * a current which is the average of the coarse + fine current at the 2
+ * steps of the fine grid.
+ *
+ */
 void
 WarpX::OneStep_sub1 (Real cur_time)
 {
