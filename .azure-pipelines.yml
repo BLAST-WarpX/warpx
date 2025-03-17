@@ -66,16 +66,6 @@ jobs:
       cacheHitVar: CCACHE_CACHE_RESTORED
     displayName: Cache Ccache Objects
 
-  - task: Cache@2
-    continueOnError: true
-    inputs:
-      key: 'Python3 | "$(System.JobName)" | .azure-pipelines.yml'
-      restoreKeys: |
-         Python3 | "$(System.JobName)" | .azure-pipelines.yml
-      path: /home/vsts/.local/lib/python3.8
-      cacheHitVar: PYTHON38_CACHE_RESTORED
-    displayName: Cache Python Libraries
-
   - bash: |
       set -o nounset errexit pipefail
       cat /proc/cpuinfo | grep "model name" | sort -u
@@ -90,7 +80,7 @@ jobs:
       python3 -m pip install --upgrade pip
       python3 -m pip install --upgrade build
       python3 -m pip install --upgrade packaging
-      python3 -m pip install --upgrade setuptools
+      python3 -m pip install --upgrade setuptools[core]
       python3 -m pip install --upgrade wheel
       python3 -m pip install --upgrade virtualenv
       python3 -m pip install --upgrade pipx
@@ -126,7 +116,7 @@ jobs:
       python3 -m pip cache purge
       # external repositories required for test analysis
       cd ..
-      git clone --depth 1 https://github.com/ECP-WarpX/warpx-data.git
+      git clone --depth 1 https://github.com/BLAST-WarpX/warpx-data.git
       # TODO select only specific datasets?
       git clone --depth 1 https://github.com/openPMD/openPMD-example-datasets.git
       cd -
@@ -175,4 +165,10 @@ jobs:
         -exec echo -e "\nBacktrace\n---------\n{}\n---------" \; \
         -exec cat {} \;
     displayName: 'Logs'
+    condition: always()
+
+  - bash: |
+      # clean out so the Post-job Cache "tar" command has more disk space available
+      rm -rf build
+    displayName: 'Clean Build Directory'
     condition: always()

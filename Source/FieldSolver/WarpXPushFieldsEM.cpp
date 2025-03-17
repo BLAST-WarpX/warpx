@@ -100,6 +100,44 @@ namespace {
         solver.BackwardTransform(lev, *vector_field[2], compz, fill_guards);
 #endif
     }
+
+    /**
+     * \brief Correct current in Fourier space so that the continuity equation is satisfied
+     */
+    template <typename SpectralSolverType>
+    void PSATDCurrentCorrection (
+        const int finest_level,
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_fp,
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_cp)
+    {
+        for (int lev = 0; lev <= finest_level; ++lev)
+        {
+            spectral_solver_fp[lev]->CurrentCorrection();
+            if (spectral_solver_cp[lev])
+            {
+                spectral_solver_cp[lev]->CurrentCorrection();
+            }
+        }
+    }
+
+    /**
+     * \brief Vay deposition in Fourier space (https://doi.org/10.1016/j.jcp.2013.03.010)
+     */
+    template <typename SpectralSolverType>
+    void PSATDVayDeposition (
+        const int finest_level,
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_fp,
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_cp)
+    {
+        for (int lev = 0; lev <= finest_level; ++lev)
+        {
+            spectral_solver_fp[lev]->VayDeposition();
+            if (spectral_solver_cp[lev])
+            {
+                spectral_solver_cp[lev]->VayDeposition();
+            }
+        }
+    }
 }
 
 void WarpX::PSATDForwardTransformEB ()
@@ -466,32 +504,6 @@ void WarpX::PSATDForwardTransformRho (
 #endif
 }
 
-void WarpX::PSATDCurrentCorrection ()
-{
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        spectral_solver_fp[lev]->CurrentCorrection();
-
-        if (spectral_solver_cp[lev])
-        {
-            spectral_solver_cp[lev]->CurrentCorrection();
-        }
-    }
-}
-
-void WarpX::PSATDVayDeposition ()
-{
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        spectral_solver_fp[lev]->VayDeposition();
-
-        if (spectral_solver_cp[lev])
-        {
-            spectral_solver_cp[lev]->VayDeposition();
-        }
-    }
-}
-
 void WarpX::PSATDSubtractCurrentPartialSumsAvg ()
 {
     using ablastr::fields::Direction;
@@ -744,7 +756,7 @@ WarpX::PushPSATD (amrex::Real start_time)
             PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 1, rho_new);
 
             // Correct J in k-space
-            PSATDCurrentCorrection();
+            ::PSATDCurrentCorrection(finest_level, spectral_solver_fp, spectral_solver_cp);
 
             // Inverse FFT of J
             PSATDBackwardTransformJ(current_fp_string, current_cp_string);
@@ -759,7 +771,7 @@ WarpX::PushPSATD (amrex::Real start_time)
             PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 1, rho_new);
 
             // Compute J from D in k-space
-            PSATDVayDeposition();
+            ::PSATDVayDeposition(finest_level, spectral_solver_fp, spectral_solver_cp);
 
             // Inverse FFT of J, subtract cumulative sums of D
             current_fp_string = "current_fp";
@@ -797,7 +809,7 @@ WarpX::PushPSATD (amrex::Real start_time)
 #endif
 
             // Correct J in k-space
-            PSATDCurrentCorrection();
+            ::PSATDCurrentCorrection(finest_level, spectral_solver_fp, spectral_solver_cp);
 
             // Inverse FFT of J
             PSATDBackwardTransformJ(current_fp_string, current_cp_string);
@@ -813,7 +825,7 @@ WarpX::PushPSATD (amrex::Real start_time)
             PSATDForwardTransformJ(current_fp_string, current_cp_string);
 
             // Compute J from D in k-space
-            PSATDVayDeposition();
+            ::PSATDVayDeposition(finest_level, spectral_solver_fp, spectral_solver_cp);
 
             // Inverse FFT of J, subtract cumulative sums of D
             current_fp_string = "current_fp";

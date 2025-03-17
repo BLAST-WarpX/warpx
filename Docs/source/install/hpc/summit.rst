@@ -37,7 +37,7 @@ Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
 We use system software modules, add environment hints and further dependencies via the file ``$HOME/summit_warpx.profile``.
 Create it now:
@@ -331,7 +331,7 @@ Known System Issues
    The implementation of barriers in IBM's MPI fork is broken and leads to crashes at scale.
    This is seen with runs using 200 nodes and above.
 
-   Our batch script templates above `apply this work-around <https://github.com/ECP-WarpX/WarpX/pull/2283>`__ *before* the call to ``jsrun``, which avoids the broken routines from IBM and trades them for an OpenMPI implementation of collectives:
+   Our batch script templates above `apply this work-around <https://github.com/BLAST-WarpX/warpx/pull/2283>`__ *before* the call to ``jsrun``, which avoids the broken routines from IBM and trades them for an OpenMPI implementation of collectives:
 
    .. code-block:: bash
 
