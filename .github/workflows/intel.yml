@@ -125,6 +125,7 @@ jobs:
           -DBUILD_SHARED_LIBS=ON       \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_COMPUTE=SYCL         \
+          -DWarpX_DIMS="RZ;3"          \
           -DWarpX_EB=ON                \
           -DWarpX_FFT=ON               \
           -DWarpX_PYTHON=ON            \
