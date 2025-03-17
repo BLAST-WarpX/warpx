@@ -848,6 +848,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
  * \param dinv                    3D cell size inverse
  * \param xyzmin                  The lower bounds of the domain
  * \param lo                      Index lower bounds of domain.
+ * \param n_rz_azimuthal_modes    Number of azimuthal modes when using RZ geometry
  */
 template <int depos_order>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -863,9 +864,13 @@ void doGatherBShapeN (
                      amrex::Array4<amrex::Real const> const& Bz_arr,
                      const amrex::XDim3 & dinv,
                      const amrex::XDim3 & xyzmin,
-                     const amrex::Dim3& lo )
+                     const amrex::Dim3& lo,
+                     const int n_rz_azimuthal_modes)
 {
     using namespace amrex;
+#if !defined(WARPX_DIM_RZ)
+    ignore_unused(n_rz_azimuthal_modes);
+#endif
 
     // computes current and old position in grid units
 #if defined(WARPX_DIM_RZ)
@@ -878,6 +883,7 @@ void doGatherBShapeN (
         costheta = 1._rt;
         sintheta = 0._rt;
     }
+    const Complex xy_mid0 = Complex{costheta, sintheta};
     // Keep these double to avoid bug in single precision
     double const x_bar = (rp - xyzmin.x)*dinv.x;
 #elif !defined(WARPX_DIM_1D_Z)
@@ -947,6 +953,21 @@ void doGatherBShapeN (
             //
             const auto weight_By = static_cast<amrex::Real>(sx_bar_cell[i]*sz_bar_cell[k]);
             Byp += By_arr(lo.x+i_bar_cell+i, lo.y+k_bar_cell+k, 0, 0)*weight_By;
+#if defined(WARPX_DIM_RZ)
+            Complex xy_mid = xy_mid0; // Throughout the following loop, xy_mid takes the value e^{i m theta}
+            for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
+                const auto dBx = (+ Bx_arr(lo.x+i_bar_node+i, lo.y+k_bar_cell+k, 0, 2*imode-1)*xy_mid.real()
+                                  - Bx_arr(lo.x+i_bar_node+i, lo.y+k_bar_cell+k, 0, 2*imode)*xy_mid.imag());
+                const auto dBy = (+ By_arr(lo.x+i_bar_cell+i, lo.y+k_bar_cell+k, 0, 2*imode-1)*xy_mid.real()
+                                  - By_arr(lo.x+i_bar_cell+i, lo.y+k_bar_cell+k, 0, 2*imode)*xy_mid.imag());
+                const auto dBz = (+ Bz_arr(lo.x+i_bar_cell+i, lo.y+k_bar_node+k, 0, 2*imode-1)*xy_mid.real()
+                                  - Bz_arr(lo.x+i_bar_cell+i, lo.y+k_bar_node+k, 0, 2*imode)*xy_mid.imag());
+                Bxp += weight_Bx*dBx;
+                Byp += weight_By*dBy;
+                Bzp += weight_Bz*dBz;
+                xy_mid = xy_mid*xy_mid0;
+            }
+#endif
         }
     }
 
@@ -1550,7 +1571,7 @@ void doGatherPicnicShapeN (
     doGatherBShapeN<depos_order_B>( xp_nph, yp_nph, zp_nph,
                                     Bxp, Byp, Bzp,
                                     Bx_arr, By_arr, Bz_arr,
-                                    dinv, xyzmin, lo );
+                                    dinv, xyzmin, lo, n_rz_azimuthal_modes );
 
 }
 
