@@ -1170,6 +1170,7 @@ WarpX::MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amre
     );
 
     m_fdtd_solver_fp[lev]->MacroscopicEvolveE(
+        macroscopic_solver_algo,
         m_fields.get_alldirs(FieldType::Efield_fp, lev),
         m_fields.get_alldirs(FieldType::Bfield_fp, lev),
         m_fields.get_alldirs(FieldType::current_fp, lev),

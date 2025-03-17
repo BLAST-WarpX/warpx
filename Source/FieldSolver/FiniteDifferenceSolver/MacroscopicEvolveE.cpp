@@ -11,7 +11,6 @@
 #include "MacroscopicProperties/MacroscopicProperties.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include "WarpX.H"
 
 #include <ablastr/coarsen/sample.H>
 
@@ -24,6 +23,7 @@
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_IndexType.H>
+#include <AMReX_iMultiFab.H>
 #include <AMReX_MFIter.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
@@ -37,6 +37,7 @@ using namespace amrex;
 using namespace ablastr::fields;
 
 void FiniteDifferenceSolver::MacroscopicEvolveE (
+    const MacroscopicSolverAlgo macroscopic_solver_algo,
     ablastr::fields::VectorField const& Efield,
     ablastr::fields::VectorField const& Bfield,
     ablastr::fields::VectorField const& Jfield,
@@ -58,13 +59,13 @@ void FiniteDifferenceSolver::MacroscopicEvolveE (
 
     if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee) {
 
-        if (WarpX::macroscopic_solver_algo == MacroscopicSolverAlgo::LaxWendroff) {
+        if (macroscopic_solver_algo == MacroscopicSolverAlgo::LaxWendroff) {
 
             MacroscopicEvolveECartesian <CartesianYeeAlgorithm, LaxWendroffAlgo>
                        ( Efield, Bfield, Jfield, eb_update_E, dt, macroscopic_properties);
 
         }
-        if (WarpX::macroscopic_solver_algo == MacroscopicSolverAlgo::BackwardEuler) {
+        if (macroscopic_solver_algo == MacroscopicSolverAlgo::BackwardEuler) {
 
             MacroscopicEvolveECartesian <CartesianYeeAlgorithm, BackwardEulerAlgo>
                        ( Efield, Bfield, Jfield, eb_update_E, dt, macroscopic_properties);
@@ -75,12 +76,12 @@ void FiniteDifferenceSolver::MacroscopicEvolveE (
 
         // Note : EvolveE is the same for CKC and Yee.
         // In the templated Yee and CKC calls, the core operations for EvolveE is the same.
-        if (WarpX::macroscopic_solver_algo == MacroscopicSolverAlgo::LaxWendroff) {
+        if (macroscopic_solver_algo == MacroscopicSolverAlgo::LaxWendroff) {
 
             MacroscopicEvolveECartesian <CartesianCKCAlgorithm, LaxWendroffAlgo>
                        ( Efield, Bfield, Jfield, eb_update_E, dt, macroscopic_properties);
 
-        } else if (WarpX::macroscopic_solver_algo == MacroscopicSolverAlgo::BackwardEuler) {
+        } else if (macroscopic_solver_algo == MacroscopicSolverAlgo::BackwardEuler) {
 
             MacroscopicEvolveECartesian <CartesianCKCAlgorithm, BackwardEulerAlgo>
                        ( Efield, Bfield, Jfield, eb_update_E, dt, macroscopic_properties);
