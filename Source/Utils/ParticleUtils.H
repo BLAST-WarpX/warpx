@@ -11,6 +11,7 @@
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_DenseBins.H>
+#include <AMReX_Geometry.H>
 #include <AMReX_Particles.H>
 
 #include <AMReX_BaseFwd.H>
@@ -24,12 +25,12 @@ namespace ParticleUtils {
      * particles of a given species present in each cell.
      * Note that this does *not* rearrange particle arrays.
      *
-     * @param[in] lev the index of the refinement level.
+     * @param[in] geom_lev the geometry of the current refinement level.
      * @param[in] mfi the MultiFAB iterator.
      * @param[in] ptile the particle tile.
      */
     amrex::DenseBins<typename WarpXParticleContainer::ParticleTileType::ParticleTileDataType>
-    findParticlesInEachCell (int lev,
+    findParticlesInEachCell (amrex::Geometry const& geom_lev,
                              amrex::MFIter const & mfi,
                              WarpXParticleContainer::ParticleTileType & ptile);
 

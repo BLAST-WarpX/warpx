@@ -288,9 +288,12 @@ public:
     * \brief This function determines if resampling should be done for the current species, and
     * if so, performs the resampling.
     *
+    * @param[in] geom the geometry of all refinement levels
     * @param[in] timestep the current timestep.
+    * @param[in] verbose flag to control if information on the resampling process is printed out.
     */
-    void resample (int timestep, bool verbose=true) final;
+    void resample (
+        const amrex::Vector<amrex::Geometry>& geom, int timestep, bool verbose=true) final;
 
 #ifdef WARPX_QED
     //Functions decleared in WarpXParticleContainer.H

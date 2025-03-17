@@ -292,14 +292,14 @@ public:
         }
         auto *tile_products_data = tile_products.data();
 
-        amrex::Geometry const& geom = WarpX::GetInstance().Geom(lev);
-        auto const dV = AMREX_D_TERM(geom.CellSize(0), *geom.CellSize(1), *geom.CellSize(2));
+        amrex::Geometry const& geom_lev = WarpX::GetInstance().Geom(lev);
+        auto const dV = AMREX_D_TERM(geom_lev.CellSize(0), *geom_lev.CellSize(1), *geom_lev.CellSize(2));
 #if defined WARPX_DIM_RZ
         amrex::Box const& cbx = mfi.tilebox(amrex::IntVect::TheZeroVector()); //Cell-centered box
         auto const lo = lbound(cbx);
         auto const hi = ubound(cbx);
         int const nz = hi.y - lo.y + 1;
-        auto const dr = geom.CellSize(0);
+        auto const dr = geom_lev.CellSize(0);
 #endif
 
         auto volume_factor = [=] AMREX_GPU_DEVICE(int i_cell) noexcept {
@@ -320,7 +320,7 @@ public:
             ParticleTileType& ptile_1 = species_1.ParticlesAt(lev, mfi);
 
             // Find the particles that are in each cell of this tile
-            ParticleBins bins_1 = findParticlesInEachCell( lev, mfi, ptile_1 );
+            ParticleBins bins_1 = findParticlesInEachCell( geom_lev, mfi, ptile_1 );
 
             // Loop over cells, and collide the particles in each cell
 
@@ -525,8 +525,8 @@ public:
             ParticleTileType& ptile_2 = species_2.ParticlesAt(lev, mfi);
 
             // Find the particles that are in each cell of this tile
-            ParticleBins bins_1 = findParticlesInEachCell( lev, mfi, ptile_1 );
-            ParticleBins bins_2 = findParticlesInEachCell( lev, mfi, ptile_2 );
+            ParticleBins bins_1 = findParticlesInEachCell( geom_lev, mfi, ptile_1 );
+            ParticleBins bins_2 = findParticlesInEachCell( geom_lev, mfi, ptile_2 );
 
             // Loop over cells, and collide the particles in each cell
 

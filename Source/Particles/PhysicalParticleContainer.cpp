@@ -3193,7 +3193,7 @@ PlasmaInjector* PhysicalParticleContainer::GetPlasmaInjector (int i)
     }
 }
 
-void PhysicalParticleContainer::resample (const int timestep, const bool verbose)
+void PhysicalParticleContainer::resample (const amrex::Vector<amrex::Geometry>& geom, const int timestep, const bool verbose)
 {
     // In heavily load imbalanced simulations, MPI processes with few particles will spend most of
     // the time at the MPI synchronization in TotalNumberOfParticles(). Having two profiler entries
@@ -3216,7 +3216,7 @@ void PhysicalParticleContainer::resample (const int timestep, const bool verbose
         {
             for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
             {
-                m_resampler(pti, lev, this);
+                m_resampler(geom[lev], pti, lev, this);
             }
         }
         deleteInvalidParticles();
