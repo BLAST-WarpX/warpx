@@ -49,7 +49,7 @@ void FiniteDifferenceSolver::MacroscopicEvolveE (
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
 #ifdef WARPX_DIM_RZ
-    amrex::ignore_unused(Efield, Bfield, Jfield, eb_update_E, dt, macroscopic_properties);
+    amrex::ignore_unused(macroscopic_solver_algo, Efield, Bfield, Jfield, eb_update_E, dt, macroscopic_properties);
 
     WARPX_ABORT_WITH_MESSAGE("currently macro E-push does not work for RZ");
 #else
