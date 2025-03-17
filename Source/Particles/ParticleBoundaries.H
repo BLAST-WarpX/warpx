@@ -18,6 +18,17 @@
 
 namespace warpx::particles
 {
+    /**
+     * \brief Reads the particle boundary conditions from
+     * the inputfile
+     *
+     * \param[in] field_boundary_lo the field boundary condition for the lower boundary
+     * \param[in] field_boundary_hi the field boundary condition for the upper boundary
+     *
+     * \returns a pair of amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM>
+     *          containing the boundary conditions for the lower and the
+     *          upper boundary.
+     */
     std::pair<
         amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM>,
         amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM>
