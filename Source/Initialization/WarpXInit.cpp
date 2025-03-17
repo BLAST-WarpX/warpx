@@ -12,7 +12,6 @@
 
 #include <AMReX.H>
 #include <AMReX_ParmParse.H>
-#include <AMReX_Vector.H>
 
 #include <ablastr/math/fft/AnyFFT.H>
 #include <ablastr/parallelization/MPIInitHelpers.H>
