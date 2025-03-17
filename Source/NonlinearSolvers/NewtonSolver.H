@@ -245,6 +245,7 @@ void NewtonSolver<Vec,Ops>::ParseParameters ()
     pp_newton.query("max_iterations",      m_maxits);
     pp_newton.query("require_convergence", m_require_convergence);
     pp_newton.query("diagnostic_file",     this->m_diagnostic_file);
+    pp_newton.query("diagnostic_interval", this->m_diagnostic_interval);
 
     const amrex::ParmParse pp_gmres("gmres");
     pp_gmres.query("verbose_int",         m_gmres_verbose_int);
@@ -358,12 +359,13 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
        }
     }
 
-    if (!this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor()) {
+    if (!this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor() &&
+        ((a_step+1)%this->m_diagnostic_interval==0 || a_step==0)) {
         std::ofstream diagnostic_file{this->m_diagnostic_file, std::ofstream::out | std::ofstream::app};
         diagnostic_file << std::setprecision(14);
-        diagnostic_file << a_step;
+        diagnostic_file << a_step+1;
         diagnostic_file << " ";;
-        diagnostic_file << a_time;
+        diagnostic_file << a_time + a_dt;
         diagnostic_file << " ";;
         diagnostic_file << iter;
         diagnostic_file << " ";;

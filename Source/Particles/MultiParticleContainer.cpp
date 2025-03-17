@@ -611,11 +611,14 @@ MultiParticleContainer::GetChargeDensity (int lev, bool local)
 }
 
 void
-MultiParticleContainer::SortParticlesByBin (amrex::IntVect bin_size)
+MultiParticleContainer::SortParticlesByBin (
+    const amrex::IntVect& bin_size,
+    const bool sort_particles_for_deposition,
+    const amrex::IntVect& sort_idx_type)
 {
     for (auto& pc : allcontainers) {
-        if (WarpX::sort_particles_for_deposition) {
-            pc->SortParticlesForDeposition(WarpX::sort_idx_type);
+        if (sort_particles_for_deposition) {
+            pc->SortParticlesForDeposition(sort_idx_type);
         } else {
             pc->SortParticlesByBin(bin_size);
         }

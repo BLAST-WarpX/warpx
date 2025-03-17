@@ -161,14 +161,6 @@ bool WarpX::refine_plasma     = false;
 utils::parser::IntervalsParser WarpX::sort_intervals;
 amrex::IntVect WarpX::sort_bin_size(AMREX_D_DECL(1,1,1));
 
-#if defined(AMREX_USE_CUDA)
-bool WarpX::sort_particles_for_deposition = true;
-#else
-bool WarpX::sort_particles_for_deposition = false;
-#endif
-
-amrex::IntVect WarpX::sort_idx_type(AMREX_D_DECL(0,0,0));
-
 bool WarpX::do_dynamic_scheduling = true;
 
 bool WarpX::do_multi_J = false;
@@ -1467,7 +1459,7 @@ WarpX::ReadParameters ()
             }
         }
 
-        pp_warpx.query("sort_particles_for_deposition",sort_particles_for_deposition);
+        pp_warpx.query("sort_particles_for_deposition",m_sort_particles_for_deposition);
         Vector<int> vect_sort_idx_type(AMREX_SPACEDIM,0);
         const bool sort_idx_type_is_specified =
             utils::parser::queryArrWithParser(
@@ -1475,7 +1467,7 @@ WarpX::ReadParameters ()
                 vect_sort_idx_type, 0, AMREX_SPACEDIM);
         if (sort_idx_type_is_specified){
             for (int i=0; i<AMREX_SPACEDIM; i++) {
-                sort_idx_type[i] = vect_sort_idx_type[i];
+                m_sort_idx_type[i] = vect_sort_idx_type[i];
             }
         }
 

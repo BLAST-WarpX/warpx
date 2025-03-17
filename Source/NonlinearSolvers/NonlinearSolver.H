@@ -83,6 +83,7 @@ protected:
     bool m_is_defined = false;
     mutable bool m_verbose = true;
     std::string m_diagnostic_file;
+    int m_diagnostic_interval = 1;
 
 };
 
