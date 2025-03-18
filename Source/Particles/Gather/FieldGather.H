@@ -865,14 +865,11 @@ void doGatherBShapeN (
                      const amrex::XDim3 & dinv,
                      const amrex::XDim3 & xyzmin,
                      const amrex::Dim3& lo,
-                     const int n_rz_azimuthal_modes)
+                     [[maybe_unused]] const int n_rz_azimuthal_modes)
 {
     using namespace amrex;
-#if !defined(WARPX_DIM_RZ)
-    ignore_unused(n_rz_azimuthal_modes);
-#endif
 
-    // computes current and old position in grid units
+    // Compute particle position in grid units
 #if defined(WARPX_DIM_RZ)
     amrex::Real const rp = std::sqrt(xp*xp + yp*yp);
     amrex::Real costheta, sintheta;
@@ -884,17 +881,13 @@ void doGatherBShapeN (
         sintheta = 0._rt;
     }
     const Complex xy0 = Complex{costheta, sintheta};
-    // Keep these double to avoid bug in single precision
     double const x_bar = (rp - xyzmin.x)*dinv.x;
 #elif !defined(WARPX_DIM_1D_Z)
-    // Keep these double to avoid bug in single precision
     double const x_bar = (xp - xyzmin.x)*dinv.x;
 #endif
 #if defined(WARPX_DIM_3D)
-    // Keep these double to avoid bug in single precision
     double const y_bar = (yp - xyzmin.y)*dinv.y;
 #endif
-    // Keep these double to avoid bug in single precision
     double const z_bar = (zp - xyzmin.z)*dinv.z;
 
 #if defined(WARPX_DIM_3D)
