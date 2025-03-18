@@ -906,7 +906,7 @@ void doGatherBShapeN (
     if (Bx_type[zdir] == NODE || By_type[zdir] == NODE || Bz_type[zdir] == NODE) {
         kp_node = shape_factor_B(sz_node, z_bar);
     }
-    else if (Bx_type[zdir] == CELL || By_type[zdir] == CELL || Bz_type[zdir] == CELL) {
+    if (Bx_type[zdir] == CELL || By_type[zdir] == CELL || Bz_type[zdir] == CELL) {
         kp_cell = shape_factor_B(sz_cell, z_bar - 0.5_rt);
     }
 
@@ -928,7 +928,7 @@ void doGatherBShapeN (
     if (Bx_type[0] == NODE || By_type[0] == NODE || Bz_type[0] == NODE) {
         ip_node = shape_factor_B(sx_node, x_bar);
     }
-    else if (Bx_type[0] == CELL || By_type[0] == CELL || Bz_type[0] == CELL) {
+    if (Bx_type[0] == CELL || By_type[0] == CELL || Bz_type[0] == CELL) {
         ip_cell = shape_factor_B(sx_cell, x_bar - 0.5_rt);
     }
 
@@ -951,7 +951,7 @@ void doGatherBShapeN (
     if (Bx_type[1] == NODE || By_type[1] == NODE || Bz_type[1] == NODE) {
         jp_node = shape_factor_B(sy_node, y_bar);
     }
-    else if (Bx_type[1] == CELL || By_type[1] == CELL || Bz_type[1] == CELL) {
+    if (Bx_type[1] == CELL || By_type[1] == CELL || Bz_type[1] == CELL) {
         jp_cell = shape_factor_B(sy_cell, y_bar - 0.5_rt);
     }
 
