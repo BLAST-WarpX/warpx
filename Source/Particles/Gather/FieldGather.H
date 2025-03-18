@@ -871,6 +871,9 @@ void doGatherBShapeN (
                      [[maybe_unused]] const int n_rz_azimuthal_modes)
 {
     using namespace amrex;
+    constexpr int zdir = WARPX_ZINDEX;
+    constexpr int NODE = amrex::IndexType::NODE;
+    constexpr int CELL = amrex::IndexType::CELL;
 
     // Compute particle position in grid units
 #if defined(WARPX_DIM_RZ)
@@ -893,71 +896,114 @@ void doGatherBShapeN (
 #endif
     double const z_bar = (zp - xyzmin.z)*dinv.z;
 
-#if defined(WARPX_DIM_3D)
+    // Compute shape factors for z-direction
+    const Compute_shape_factor< depos_order > shape_factor_B;
 
-    // gather magnetic field
-    const Compute_shape_factor< depos_order > compute_shape_factor_B;
+    int kp_node = 0;
+    int kp_cell = 0;
     double sz_node[depos_order+1] = {0.};
     double sz_cell[depos_order+1] = {0.};
-    const int k_node = compute_shape_factor_B(sz_node, z_bar);
-    const int k_cell = compute_shape_factor_B(sz_cell, z_bar-0.5);
-    double sy_node[depos_order+1] = {0.};
-    double sy_cell[depos_order+1] = {0.};
-    const int j_node = compute_shape_factor_B(sy_node, y_bar);
-    const int j_cell = compute_shape_factor_B(sy_cell, y_bar-0.5);
+    if (Bx_type[zdir] == NODE || By_type[zdir] == NODE || Bz_type[zdir] == NODE) {
+        kp_node = shape_factor_B(sz_node, z_bar);
+    }
+    else if (Bx_type[zdir] == CELL || By_type[zdir] == CELL || Bz_type[zdir] == CELL) {
+        kp_cell = shape_factor_B(sz_cell, z_bar - 0.5_rt);
+    }
+
+    const int kp_Bx = ((Bx_type[zdir] == NODE) ? kp_node : kp_cell);
+    const double (&sz_Bx)[depos_order+1] = ((Bx_type[zdir] == NODE) ? sz_node : sz_cell);
+
+    const int kp_By = ((By_type[zdir] == NODE) ? kp_node : kp_cell);
+    const double (&sz_By)[depos_order+1] = ((By_type[zdir] == NODE) ? sz_node : sz_cell);
+
+    const int kp_Bz = ((Bz_type[zdir] == NODE) ? kp_node : kp_cell);
+    const double (&sz_Bz)[depos_order+1] = ((Bz_type[zdir] == NODE) ? sz_node : sz_cell);
+
+#if !defined(WARPX_DIM_1D_Z)
+    // Compute shape factors for x-direction
+    int ip_node = 0;
+    int ip_cell = 0;
     double sx_node[depos_order+1] = {0.};
     double sx_cell[depos_order+1] = {0.};
-    const int i_node = compute_shape_factor_B(sx_node, x_bar);
-    const int i_cell = compute_shape_factor_B(sx_cell, x_bar-0.5);
+    if (Bx_type[0] == NODE || By_type[0] == NODE || Bz_type[0] == NODE) {
+        ip_node = shape_factor_B(sx_node, x_bar);
+    }
+    else if (Bx_type[0] == CELL || By_type[0] == CELL || Bz_type[0] == CELL) {
+        ip_cell = shape_factor_B(sx_cell, x_bar - 0.5_rt);
+    }
 
+    const int ip_Bx = ((Bx_type[0] == NODE) ? ip_node : ip_cell);
+    const double (&sx_Bx)[depos_order+1] = ((Bx_type[0] == NODE) ? sx_node : sx_cell);
+
+    const int ip_By = ((By_type[0] == NODE) ? ip_node : ip_cell);
+    const double (&sx_By)[depos_order+1] = ((By_type[0] == NODE) ? sx_node : sx_cell);
+
+    const int ip_Bz = ((Bz_type[0] == NODE) ? ip_node : ip_cell);
+    const double (&sx_Bz)[depos_order+1] = ((Bz_type[0] == NODE) ? sx_node : sx_cell);
+#endif
+
+#if defined(WARPX_DIM_3D)
+    // Compute shape factors for y-direction
+    int jp_node = 0;
+    int jp_cell = 0;
+    double sy_node[depos_order+1] = {0.};
+    double sy_cell[depos_order+1] = {0.};
+    if (Bx_type[1] == NODE || By_type[1] == NODE || Bz_type[1] == NODE) {
+        jp_node = shape_factor_B(sy_node, y_bar);
+    }
+    else if (Bx_type[1] == CELL || By_type[1] == CELL || Bz_type[1] == CELL) {
+        jp_cell = shape_factor_B(sy_cell, y_bar - 0.5_rt);
+    }
+
+    const int jp_Bx = ((Bx_type[1] == NODE) ? jp_node : jp_cell);
+    const double (&sy_Bx)[depos_order+1] = ((Bx_type[1] == NODE) ? sy_node : sy_cell);
+
+    const int jp_By = ((By_type[1] == NODE) ? jp_node : jp_cell);
+    const double (&sy_By)[depos_order+1] = ((By_type[1] == NODE) ? sy_node : sy_cell);
+
+    const int jp_Bz = ((Bz_type[1] == NODE) ? jp_node : jp_cell);
+    const double (&sy_Bz)[depos_order+1] = ((Bz_type[1] == NODE) ? sy_node : sy_cell);
+
+    // Gather magnetic field
     amrex::Real weight;
     for (int i=0; i<=depos_order; i++) {
         for (int j=0; j<=depos_order; j++) {
             for (int k=0; k<=depos_order; k++) {
-                weight = static_cast<amrex::Real>(sx_node[i]*sy_cell[j]*sz_cell[k]);
-                Bxp += Bx_arr(lo.x+i_node+i, lo.y+j_cell+j, lo.z+k_cell+k)*weight;
+                weight = static_cast<amrex::Real>(sx_Bx[i]*sy_Bx[j]*sz_Bx[k]);
+                Bxp += Bx_arr(lo.x+ip_Bx+i, lo.y+jp_Bx+j, lo.z+kp_Bx+k)*weight;
                 //
-                weight = static_cast<amrex::Real>(sx_cell[i]*sy_node[j]*sz_cell[k]);
-                Byp += By_arr(lo.x+i_cell+i, lo.y+j_node+j, lo.z+k_cell+k)*weight;
+                weight = static_cast<amrex::Real>(sx_By[i]*sy_By[j]*sz_By[k]);
+                Byp += By_arr(lo.x+ip_By+i, lo.y+jp_By+j, lo.z+kp_By+k)*weight;
                 //
-                weight = static_cast<amrex::Real>(sx_cell[i]*sy_cell[j]*sz_node[k]);
-                Bzp += Bz_arr(lo.x+i_cell+i, lo.y+j_cell+j, lo.z+k_node+k)*weight;
+                weight = static_cast<amrex::Real>(sx_Bz[i]*sy_Bz[j]*sz_Bz[k]);
+                Bzp += Bz_arr(lo.x+ip_Bz+i, lo.y+jp_Bz+j, lo.z+kp_Bz+k)*weight;
             }
         }
     }
 
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
 
-    // gather magnetic field and out-of-plane electric field
-    const Compute_shape_factor< depos_order > compute_shape_factor_B;
-    double sz_node[depos_order+1] = {0.};
-    double sz_cell[depos_order+1] = {0.};
-    const int k_node = compute_shape_factor_B(sz_node, z_bar);
-    const int k_cell = compute_shape_factor_B(sz_cell, z_bar-0.5);
-    double sx_node[depos_order+1] = {0.};
-    double sx_cell[depos_order+1] = {0.};
-    const int i_node = compute_shape_factor_B(sx_node, x_bar);
-    const int i_cell = compute_shape_factor_B(sx_cell, x_bar-0.5);
-
+    // Gather magnetic field
     for (int i=0; i<=depos_order; i++) {
         for (int k=0; k<=depos_order; k++) {
-            const auto weight_Bz = static_cast<amrex::Real>(sx_cell[i]*sz_node[k]);
-            Bzp += Bz_arr(lo.x+i_cell+i, lo.y+k_node+k, 0, 0)*weight_Bz;
+            const auto weight_Bx = static_cast<amrex::Real>(sx_Bx[i]*sz_Bx[k]);
+            Bxp += Bx_arr(lo.x+ip_Bx+i, lo.y+kp_Bx+k, 0, 0)*weight_Bx;
             //
-            const auto weight_Bx = static_cast<amrex::Real>(sx_node[i]*sz_cell[k]);
-            Bxp += Bx_arr(lo.x+i_node+i, lo.y+k_cell+k, 0, 0)*weight_Bx;
+            const auto weight_By = static_cast<amrex::Real>(sx_By[i]*sz_By[k]);
+            Byp += By_arr(lo.x+ip_By+i, lo.y+kp_By+k, 0, 0)*weight_By;
             //
-            const auto weight_By = static_cast<amrex::Real>(sx_cell[i]*sz_cell[k]);
-            Byp += By_arr(lo.x+i_cell+i, lo.y+k_cell+k, 0, 0)*weight_By;
+            const auto weight_Bz = static_cast<amrex::Real>(sx_Bz[i]*sz_Bz[k]);
+            Bzp += Bz_arr(lo.x+ip_Bz+i, lo.y+kp_Bz+k, 0, 0)*weight_Bz;
+            //
 #if defined(WARPX_DIM_RZ)
             Complex xy = xy0; // Throughout the following loop, xy takes the value e^{i m theta}
             for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
-                const auto dBx = (+ Bx_arr(lo.x+i_node+i, lo.y+k_cell+k, 0, 2*imode-1)*xy.real()
-                                  - Bx_arr(lo.x+i_node+i, lo.y+k_cell+k, 0, 2*imode)*xy.imag());
-                const auto dBy = (+ By_arr(lo.x+i_cell+i, lo.y+k_cell+k, 0, 2*imode-1)*xy.real()
-                                  - By_arr(lo.x+i_cell+i, lo.y+k_cell+k, 0, 2*imode)*xy.imag());
-                const auto dBz = (+ Bz_arr(lo.x+i_cell+i, lo.y+k_node+k, 0, 2*imode-1)*xy.real()
-                                  - Bz_arr(lo.x+i_cell+i, lo.y+k_node+k, 0, 2*imode)*xy.imag());
+                const auto dBx = (+ Bx_arr(lo.x+ip_Bx+i, lo.y+kp_Bx+k, 0, 2*imode-1)*xy.real()
+                                  - Bx_arr(lo.x+ip_Bx+i, lo.y+kp_Bx+k, 0, 2*imode)*xy.imag());
+                const auto dBy = (+ By_arr(lo.x+ip_By+i, lo.y+kp_By+k, 0, 2*imode-1)*xy.real()
+                                  - By_arr(lo.x+ip_By+i, lo.y+kp_By+k, 0, 2*imode)*xy.imag());
+                const auto dBz = (+ Bz_arr(lo.x+ip_Bz+i, lo.y+kp_Bz+k, 0, 2*imode-1)*xy.real()
+                                  - Bz_arr(lo.x+ip_Bz+i, lo.y+kp_Bz+k, 0, 2*imode)*xy.imag());
                 Bxp += weight_Bx*dBx;
                 Byp += weight_By*dBy;
                 Bzp += weight_Bz*dBz;
@@ -978,21 +1024,17 @@ void doGatherBShapeN (
 
 #elif defined(WARPX_DIM_1D_Z)
 
-    // gather magnetic field
-    const Compute_shape_factor< depos_order > compute_shape_factor_B;
-    double sz_node[depos_order+1] = {0.};
-    double sz_cell[depos_order+1] = {0.};
-    const int k_node = compute_shape_factor_B(sz_node, z_bar);
-    const int k_cell = compute_shape_factor_B(sz_cell, z_bar-0.5_rt);
-
+    // Gather magnetic field
     amrex::Real weight;
     for (int k=0; k<=depos_order; k++) {
-        weight = static_cast<amrex::Real>(sz_node[k]);
-        Bzp += Bz_arr(lo.x+k_node+k, 0, 0)*weight;
+        weight = static_cast<amrex::Real>(sz_Bx[k]);
+        Bxp += Bx_arr(lo.x+kp_Bx+k, 0, 0)*weight;
         //
-        weight = static_cast<amrex::Real>(sz_cell[k]);
-        Bxp += Bx_arr(lo.x+k_cell+k, 0, 0)*weight;
-        Byp += By_arr(lo.x+k_cell+k, 0, 0)*weight;
+        weight = static_cast<amrex::Real>(sz_By[k]);
+        Byp += By_arr(lo.x+kp_By+k, 0, 0)*weight;
+        //
+        weight = static_cast<amrex::Real>(sz_Bz[k]);
+        Bzp += Bz_arr(lo.x+kp_Bz+k, 0, 0)*weight;
     }
 
 #endif
