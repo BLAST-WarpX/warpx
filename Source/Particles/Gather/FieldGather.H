@@ -862,6 +862,9 @@ void doGatherBShapeN (
                      amrex::Array4<amrex::Real const> const& Bx_arr,
                      amrex::Array4<amrex::Real const> const& By_arr,
                      amrex::Array4<amrex::Real const> const& Bz_arr,
+                     [[maybe_unused]] const amrex::IndexType Bx_type,
+                     [[maybe_unused]] const amrex::IndexType By_type,
+                     [[maybe_unused]] const amrex::IndexType Bz_type,
                      const amrex::XDim3 & dinv,
                      const amrex::XDim3 & xyzmin,
                      const amrex::Dim3& lo,
@@ -1038,9 +1041,9 @@ void doGatherPicnicShapeN (
                      [[maybe_unused]] const amrex::IndexType Ex_type,
                      [[maybe_unused]] const amrex::IndexType Ey_type,
                      [[maybe_unused]] const amrex::IndexType Ez_type,
-                     [[maybe_unused]] const amrex::IndexType Bx_type,
-                     [[maybe_unused]] const amrex::IndexType By_type,
-                     [[maybe_unused]] const amrex::IndexType Bz_type,
+                     const amrex::IndexType Bx_type,
+                     const amrex::IndexType By_type,
+                     const amrex::IndexType Bz_type,
                      const amrex::XDim3 & dinv,
                      const amrex::XDim3 & xyzmin,
                      const amrex::Dim3& lo,
@@ -1564,6 +1567,7 @@ void doGatherPicnicShapeN (
     doGatherBShapeN<depos_order_B>( xp_nph, yp_nph, zp_nph,
                                     Bxp, Byp, Bzp,
                                     Bx_arr, By_arr, Bz_arr,
+                                    Bx_type, By_type, Bz_type,
                                     dinv, xyzmin, lo, n_rz_azimuthal_modes );
 
 }
