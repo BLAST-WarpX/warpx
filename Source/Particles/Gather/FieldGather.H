@@ -272,9 +272,9 @@ void doGatherVectorFieldShapeN (
 
 template <int depos_order, int galerkin_interpolation>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
-                     [[maybe_unused]] const amrex::ParticleReal yp,
-                     [[maybe_unused]] const amrex::ParticleReal zp,
+void doGatherShapeN (const amrex::ParticleReal xp,
+                     const amrex::ParticleReal yp,
+                     const amrex::ParticleReal zp,
                      amrex::ParticleReal& Exp,
                      amrex::ParticleReal& Eyp,
                      amrex::ParticleReal& Ezp,
@@ -296,7 +296,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
                      const amrex::XDim3 & dinv,
                      const amrex::XDim3 & xyzmin,
                      const amrex::Dim3& lo,
-                     [[maybe_unused]] const int n_rz_azimuthal_modes)
+                     const int n_rz_azimuthal_modes)
 {
     // Gather electric field
     const int depos_order_Eperp = depos_order;
