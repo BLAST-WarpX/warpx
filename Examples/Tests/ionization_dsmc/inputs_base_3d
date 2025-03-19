@@ -5,15 +5,18 @@ max_step = 250
 amr.n_cell = 8 8 8
 amr.max_level = 0
 
-warpx.do_electrostatic = labframe
+algo.maxwell_solver = none
+algo.current_deposition = direct
 algo.particle_shape = 1
 amrex.verbose = 1
 geometry.coord_sys = 0
+
 #################################
 ############ CONSTANTS #############
 #################################
 my_constants.Te = 10
-my_constants.ion_mass = 2.196035502270312e-25
+my_constants.Ti = 2000
+my_constants.Tn = 0.01
 warpx.const_dt = 1e-09
 
 #################################
@@ -44,7 +47,7 @@ electrons.initialize_self_fields = 0
 electrons.injection_style = nuniformpercell
 electrons.mass = m_e
 electrons.momentum_distribution_type = gaussian
-electrons.num_particles_per_cell_each_dim = 4 4 4
+electrons.num_particles_per_cell_each_dim = 5 5 5
 electrons.profile = constant
 electrons.ux_m = 0.0
 electrons.ux_th =  sqrt(q_e * Te / m_e) / clight
@@ -57,36 +60,35 @@ ions.charge = q_e
 ions.density = 1e+14
 ions.initialize_self_fields = 0
 ions.injection_style = nuniformpercell
-ions.mass = 2.196035502270312e-25
+ions.mass = m_p
 ions.momentum_distribution_type = gaussian
 ions.num_particles_per_cell_each_dim = 4 4 4
 ions.profile = constant
 ions.ux_m = 0.0
-ions.ux_th = sqrt(q_e * Te / m_p) / clight
+ions.ux_th = sqrt(q_e * Ti / m_p) / clight
 ions.uy_m = 0.0
-ions.uy_th = sqrt(q_e * Te / m_p) / clight
+ions.uy_th = sqrt(q_e * Ti / m_p) / clight
 ions.uz_m = 0.0
-ions.uz_th = sqrt(q_e * Te / m_p) / clight
+ions.uz_th = sqrt(q_e * Ti / m_p) / clight
 
 neutrals.charge = 0
 neutrals.density = 1e+20
 neutrals.initialize_self_fields = 0
 neutrals.injection_style = nuniformpercell
-neutrals.mass = ion_mass
+neutrals.mass = m_p
 neutrals.momentum_distribution_type = gaussian
-neutrals.num_particles_per_cell_each_dim = 4 4 4
+neutrals.num_particles_per_cell_each_dim = 2 2 2
 neutrals.profile = constant
 neutrals.ux_m = 0.0
-neutrals.ux_th = 4.5810168302300867e-07
+neutrals.ux_th = sqrt(q_e * Tn / m_p) / clight
 neutrals.uy_m = 0.0
-neutrals.uy_th = 4.5810168302300867e-07
+neutrals.uy_th = sqrt(q_e * Tn / m_p) / clight
 neutrals.uz_m = 0.0
-neutrals.uz_th = 4.5810168302300867e-07
+neutrals.uz_th = sqrt(q_e * Tn / m_p) / clight
 
 collisions.collision_names = ioniz
 
-ioniz.ionization_cross_section = ../../../../warpx-data/MCC_cross_sections/Xe/ionization.dat
-ioniz.ionization_energy = 12.1298431
+ioniz.ionization_energy = 13.59844
 ioniz.product_species = ions electrons
 ioniz.ionization_target_species = neutrals
 ioniz.ndt = 1
