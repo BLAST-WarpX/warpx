@@ -840,31 +840,34 @@ void doGatherShapeNEsirkepovStencilImplicit (
 }
 
 /**
- * \brief Magnetic field gather for a single particle
+ * \brief Gather vector field F for a single particle
+ *
+ * \tparam depos_order_perp       Particle shape order in parallel direction
+ * \tparam depos_order_para       Particle shape order in perpendicular direction
  *
  * \param xp,yp,zp                Particle position coordinates
- * \param Bxp,Byp,Bzp             Magnetic field on particles.
- * \param bx_arr,by_arr,bz_arr    Array4 of the magnetic field, either full array or tile.
+ * \param Fxp,Fyp,Fzp             Vector field on particle
+ * \param Fx_arr,Fy_arr,Fz_arr    Array4 of the vector field, either full array or tile
  * \param dinv                    3D cell size inverse
  * \param xyzmin                  The lower bounds of the domain
- * \param lo                      Index lower bounds of domain.
+ * \param lo                      Index lower bounds of domain
  * \param n_rz_azimuthal_modes    Number of azimuthal modes when using RZ geometry
  */
-template <int depos_order>
+template <int depos_order_perp, int depos_order_para>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void doGatherBShapeN (
+void doGatherVectorFieldShapeN (
                      [[maybe_unused]] const amrex::ParticleReal xp,
                      [[maybe_unused]] const amrex::ParticleReal yp,
                      const amrex::ParticleReal zp,
-                     amrex::ParticleReal& Bxp,
-                     amrex::ParticleReal& Byp,
-                     amrex::ParticleReal& Bzp,
-                     amrex::Array4<amrex::Real const> const& Bx_arr,
-                     amrex::Array4<amrex::Real const> const& By_arr,
-                     amrex::Array4<amrex::Real const> const& Bz_arr,
-                     const amrex::IndexType Bx_type,
-                     const amrex::IndexType By_type,
-                     const amrex::IndexType Bz_type,
+                     amrex::ParticleReal& Fxp,
+                     amrex::ParticleReal& Fyp,
+                     amrex::ParticleReal& Fzp,
+                     amrex::Array4<amrex::Real const> const& Fx_arr,
+                     amrex::Array4<amrex::Real const> const& Fy_arr,
+                     amrex::Array4<amrex::Real const> const& Fz_arr,
+                     const amrex::IndexType Fx_type,
+                     const amrex::IndexType Fy_type,
+                     const amrex::IndexType Fz_type,
                      const amrex::XDim3 & dinv,
                      const amrex::XDim3 & xyzmin,
                      const amrex::Dim3& lo,
@@ -896,145 +899,177 @@ void doGatherBShapeN (
 #endif
     double const z_bar = (zp - xyzmin.z)*dinv.z;
 
-    // Compute shape factors for z-direction
-    const Compute_shape_factor< depos_order > shape_factor_B;
+    const Compute_shape_factor< depos_order_perp > shape_factor_perp;
+    const Compute_shape_factor< depos_order_para > shape_factor_para;
 
+    // Compute shape factors for z-direction
     int kp_node = 0;
     int kp_cell = 0;
-    double sz_node[depos_order+1] = {0.};
-    double sz_cell[depos_order+1] = {0.};
-    if (Bx_type[zdir] == NODE || By_type[zdir] == NODE || Bz_type[zdir] == NODE) {
-        kp_node = shape_factor_B(sz_node, z_bar);
+    double sz_node[depos_order_perp+1] = {0.};
+    double sz_cell[depos_order_perp+1] = {0.};
+    if (Fx_type[zdir] == NODE || Fy_type[zdir] == NODE) {
+        kp_node = shape_factor_perp(sz_node, z_bar);
     }
-    if (Bx_type[zdir] == CELL || By_type[zdir] == CELL || Bz_type[zdir] == CELL) {
-        kp_cell = shape_factor_B(sz_cell, z_bar - 0.5_rt);
+    if (Fx_type[zdir] == CELL || Fy_type[zdir] == CELL) {
+        kp_cell = shape_factor_perp(sz_cell, z_bar - 0.5_rt);
     }
 
-    const int kp_Bx = ((Bx_type[zdir] == NODE) ? kp_node : kp_cell);
-    const double (&sz_Bx)[depos_order+1] = ((Bx_type[zdir] == NODE) ? sz_node : sz_cell);
+    const int kp_Fx = ((Fx_type[zdir] == NODE) ? kp_node : kp_cell);
+    const double (&sz_Fx)[depos_order_perp+1] = ((Fx_type[zdir] == NODE) ? sz_node : sz_cell);
 
-    const int kp_By = ((By_type[zdir] == NODE) ? kp_node : kp_cell);
-    const double (&sz_By)[depos_order+1] = ((By_type[zdir] == NODE) ? sz_node : sz_cell);
+    const int kp_Fy = ((Fy_type[zdir] == NODE) ? kp_node : kp_cell);
+    const double (&sz_Fy)[depos_order_perp+1] = ((Fy_type[zdir] == NODE) ? sz_node : sz_cell);
 
-    const int kp_Bz = ((Bz_type[zdir] == NODE) ? kp_node : kp_cell);
-    const double (&sz_Bz)[depos_order+1] = ((Bz_type[zdir] == NODE) ? sz_node : sz_cell);
+    int kp_Fz = 0;
+    double sz_Fz[depos_order_para+1] = {0.};
+    if (Fz_type[zdir] == NODE) { kp_Fz = shape_factor_para(sz_Fz, z_bar); }
+    else  { kp_Fz = shape_factor_para(sz_Fz, z_bar - 0.5_rt); }
 
 #if !defined(WARPX_DIM_1D_Z)
     // Compute shape factors for x-direction
     int ip_node = 0;
     int ip_cell = 0;
-    double sx_node[depos_order+1] = {0.};
-    double sx_cell[depos_order+1] = {0.};
-    if (Bx_type[0] == NODE || By_type[0] == NODE || Bz_type[0] == NODE) {
-        ip_node = shape_factor_B(sx_node, x_bar);
+    double sx_node[depos_order_perp+1] = {0.};
+    double sx_cell[depos_order_perp+1] = {0.};
+    if (Fy_type[0] == NODE || Fz_type[0] == NODE) {
+        ip_node = shape_factor_perp(sx_node, x_bar);
     }
-    if (Bx_type[0] == CELL || By_type[0] == CELL || Bz_type[0] == CELL) {
-        ip_cell = shape_factor_B(sx_cell, x_bar - 0.5_rt);
+    if (Fy_type[0] == CELL || Fz_type[0] == CELL) {
+        ip_cell = shape_factor_perp(sx_cell, x_bar - 0.5_rt);
     }
 
-    const int ip_Bx = ((Bx_type[0] == NODE) ? ip_node : ip_cell);
-    const double (&sx_Bx)[depos_order+1] = ((Bx_type[0] == NODE) ? sx_node : sx_cell);
+    const int ip_Fy = ((Fy_type[0] == NODE) ? ip_node : ip_cell);
+    const double (&sx_Fy)[depos_order_perp+1] = ((Fy_type[0] == NODE) ? sx_node : sx_cell);
 
-    const int ip_By = ((By_type[0] == NODE) ? ip_node : ip_cell);
-    const double (&sx_By)[depos_order+1] = ((By_type[0] == NODE) ? sx_node : sx_cell);
+    const int ip_Fz = ((Fz_type[0] == NODE) ? ip_node : ip_cell);
+    const double (&sx_Fz)[depos_order_perp+1] = ((Fz_type[0] == NODE) ? sx_node : sx_cell);
 
-    const int ip_Bz = ((Bz_type[0] == NODE) ? ip_node : ip_cell);
-    const double (&sx_Bz)[depos_order+1] = ((Bz_type[0] == NODE) ? sx_node : sx_cell);
+    int ip_Fx = 0;
+    double sx_Fx[depos_order_para + 1] = {0.};
+    if (Fx_type[0] == NODE) { ip_Fx = shape_factor_para(sx_Fx, x_bar); }
+    else  { ip_Fx = shape_factor_para(sx_Fx, x_bar - 0.5_rt); }
 #endif
 
 #if defined(WARPX_DIM_3D)
     // Compute shape factors for y-direction
     int jp_node = 0;
     int jp_cell = 0;
-    double sy_node[depos_order+1] = {0.};
-    double sy_cell[depos_order+1] = {0.};
-    if (Bx_type[1] == NODE || By_type[1] == NODE || Bz_type[1] == NODE) {
-        jp_node = shape_factor_B(sy_node, y_bar);
+    double sy_node[depos_order_perp+1] = {0.};
+    double sy_cell[depos_order_perp+1] = {0.};
+    if (Fx_type[1] == NODE || Fz_type[1] == NODE) {
+        jp_node = shape_factor_perp(sy_node, y_bar);
     }
-    if (Bx_type[1] == CELL || By_type[1] == CELL || Bz_type[1] == CELL) {
-        jp_cell = shape_factor_B(sy_cell, y_bar - 0.5_rt);
+    if (Fx_type[1] == CELL || Fz_type[1] == CELL) {
+        jp_cell = shape_factor_perp(sy_cell, y_bar - 0.5_rt);
     }
 
-    const int jp_Bx = ((Bx_type[1] == NODE) ? jp_node : jp_cell);
-    const double (&sy_Bx)[depos_order+1] = ((Bx_type[1] == NODE) ? sy_node : sy_cell);
+    const int jp_Fx = ((Fx_type[1] == NODE) ? jp_node : jp_cell);
+    const double (&sy_Fx)[depos_order_perp+1] = ((Fx_type[1] == NODE) ? sy_node : sy_cell);
 
-    const int jp_By = ((By_type[1] == NODE) ? jp_node : jp_cell);
-    const double (&sy_By)[depos_order+1] = ((By_type[1] == NODE) ? sy_node : sy_cell);
+    const int jp_Fz = ((Fz_type[1] == NODE) ? jp_node : jp_cell);
+    const double (&sy_Fz)[depos_order_perp+1] = ((Fz_type[1] == NODE) ? sy_node : sy_cell);
 
-    const int jp_Bz = ((Bz_type[1] == NODE) ? jp_node : jp_cell);
-    const double (&sy_Bz)[depos_order+1] = ((Bz_type[1] == NODE) ? sy_node : sy_cell);
+    int jp_Fy = 0;
+    double sy_Fy[depos_order_para + 1] = {0.};
+    if (Fy_type[1] == NODE) { jp_Fy = shape_factor_para(sy_Fy, y_bar); }
+    else  { jp_Fy = shape_factor_para(sy_Fy, y_bar - 0.5_rt); }
 
-    // Gather magnetic field
+    // Gather vector field F
     amrex::Real weight;
-    for (int i=0; i<=depos_order; i++) {
-        for (int j=0; j<=depos_order; j++) {
-            for (int k=0; k<=depos_order; k++) {
-                weight = static_cast<amrex::Real>(sx_Bx[i]*sy_Bx[j]*sz_Bx[k]);
-                Bxp += Bx_arr(lo.x+ip_Bx+i, lo.y+jp_Bx+j, lo.z+kp_Bx+k)*weight;
-                //
-                weight = static_cast<amrex::Real>(sx_By[i]*sy_By[j]*sz_By[k]);
-                Byp += By_arr(lo.x+ip_By+i, lo.y+jp_By+j, lo.z+kp_By+k)*weight;
-                //
-                weight = static_cast<amrex::Real>(sx_Bz[i]*sy_Bz[j]*sz_Bz[k]);
-                Bzp += Bz_arr(lo.x+ip_Bz+i, lo.y+jp_Bz+j, lo.z+kp_Bz+k)*weight;
+    for (int i=0; i<=depos_order_para; i++) {
+        for (int j=0; j<=depos_order_perp; j++) {
+            for (int k=0; k<=depos_order_perp; k++) {
+                weight = static_cast<amrex::Real>(sx_Fx[i]*sy_Fx[j]*sz_Fx[k]);
+                Fxp += Fx_arr(lo.x+ip_Fx+i, lo.y+jp_Fx+j, lo.z+kp_Fx+k)*weight;
+            }
+        }
+    }
+    for (int i=0; i<=depos_order_perp; i++) {
+        for (int j=0; j<=depos_order_para; j++) {
+            for (int k=0; k<=depos_order_perp; k++) {
+                weight = static_cast<amrex::Real>(sx_Fy[i]*sy_Fy[j]*sz_Fy[k]);
+                Fyp += Fy_arr(lo.x+ip_Fy+i, lo.y+jp_Fy+j, lo.z+kp_Fy+k)*weight;
+            }
+        }
+    }
+    for (int i=0; i<=depos_order_perp; i++) {
+        for (int j=0; j<=depos_order_perp; j++) {
+            for (int k=0; k<=depos_order_para; k++) {
+                weight = static_cast<amrex::Real>(sx_Fz[i]*sy_Fz[j]*sz_Fz[k]);
+                Fzp += Fz_arr(lo.x+ip_Fz+i, lo.y+jp_Fz+j, lo.z+kp_Fz+k)*weight;
             }
         }
     }
 
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
 
-    // Gather magnetic field
-    for (int i=0; i<=depos_order; i++) {
-        for (int k=0; k<=depos_order; k++) {
-            const auto weight_Bx = static_cast<amrex::Real>(sx_Bx[i]*sz_Bx[k]);
-            Bxp += Bx_arr(lo.x+ip_Bx+i, lo.y+kp_Bx+k, 0, 0)*weight_Bx;
-            //
-            const auto weight_By = static_cast<amrex::Real>(sx_By[i]*sz_By[k]);
-            Byp += By_arr(lo.x+ip_By+i, lo.y+kp_By+k, 0, 0)*weight_By;
-            //
-            const auto weight_Bz = static_cast<amrex::Real>(sx_Bz[i]*sz_Bz[k]);
-            Bzp += Bz_arr(lo.x+ip_Bz+i, lo.y+kp_Bz+k, 0, 0)*weight_Bz;
-            //
+    // Gather vector field F
+    for (int i=0; i<=depos_order_para; i++) {
+        for (int k=0; k<=depos_order_perp; k++) {
+            const auto weight_Fx = static_cast<amrex::Real>(sx_Fx[i]*sz_Fx[k]);
+            Fxp += Fx_arr(lo.x+ip_Fx+i, lo.y+kp_Fx+k, 0, 0)*weight_Fx;
 #if defined(WARPX_DIM_RZ)
             Complex xy = xy0; // Throughout the following loop, xy takes the value e^{i m theta}
             for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
-                const auto dBx = (+ Bx_arr(lo.x+ip_Bx+i, lo.y+kp_Bx+k, 0, 2*imode-1)*xy.real()
-                                  - Bx_arr(lo.x+ip_Bx+i, lo.y+kp_Bx+k, 0, 2*imode)*xy.imag());
-                const auto dBy = (+ By_arr(lo.x+ip_By+i, lo.y+kp_By+k, 0, 2*imode-1)*xy.real()
-                                  - By_arr(lo.x+ip_By+i, lo.y+kp_By+k, 0, 2*imode)*xy.imag());
-                const auto dBz = (+ Bz_arr(lo.x+ip_Bz+i, lo.y+kp_Bz+k, 0, 2*imode-1)*xy.real()
-                                  - Bz_arr(lo.x+ip_Bz+i, lo.y+kp_Bz+k, 0, 2*imode)*xy.imag());
-                Bxp += weight_Bx*dBx;
-                Byp += weight_By*dBy;
-                Bzp += weight_Bz*dBz;
+                const auto dFx = (+ Fx_arr(lo.x+ip_Fx+i, lo.y+kp_Fx+k, 0, 2*imode-1)*xy.real()
+                                  - Fx_arr(lo.x+ip_Fx+i, lo.y+kp_Fx+k, 0, 2*imode)*xy.imag());
+                Fxp += weight_Fx*dFx;
+                xy = xy*xy0;
+            }
+#endif
+        }
+    }
+    for (int i=0; i<=depos_order_perp; i++) {
+        for (int k=0; k<=depos_order_perp; k++) {
+            const auto weight_Fy = static_cast<amrex::Real>(sx_Fy[i]*sz_Fy[k]);
+            Fyp += Fy_arr(lo.x+ip_Fy+i, lo.y+kp_Fy+k, 0, 0)*weight_Fy;
+#if defined(WARPX_DIM_RZ)
+            Complex xy = xy0; // Throughout the following loop, xy takes the value e^{i m theta}
+            for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
+                const auto dFy = (+ Fy_arr(lo.x+ip_Fy+i, lo.y+kp_Fy+k, 0, 2*imode-1)*xy.real()
+                                  - Fy_arr(lo.x+ip_Fy+i, lo.y+kp_Fy+k, 0, 2*imode)*xy.imag());
+                Fyp += weight_Fy*dFy;
+                xy = xy*xy0;
+            }
+#endif
+        }
+    }
+    for (int i=0; i<=depos_order_perp; i++) {
+        for (int k=0; k<=depos_order_para; k++) {
+            const auto weight_Fz = static_cast<amrex::Real>(sx_Fz[i]*sz_Fz[k]);
+            Fzp += Fz_arr(lo.x+ip_Fz+i, lo.y+kp_Fz+k, 0, 0)*weight_Fz;
+#if defined(WARPX_DIM_RZ)
+            Complex xy = xy0; // Throughout the following loop, xy takes the value e^{i m theta}
+            for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
+                const auto dFz = (+ Fz_arr(lo.x+ip_Fz+i, lo.y+kp_Fz+k, 0, 2*imode-1)*xy.real()
+                                  - Fz_arr(lo.x+ip_Fz+i, lo.y+kp_Fz+k, 0, 2*imode)*xy.imag());
+                Fzp += weight_Fz*dFz;
                 xy = xy*xy0;
             }
 #endif
         }
     }
 
-#ifdef WARPX_DIM_RZ
-
-    // Convert Bxp and Byp (which are actually Br and Bth) to Bx and By
-    const amrex::Real Bxp_save = Bxp;
-    Bxp = costheta*Bxp - sintheta*Byp;
-    Byp = costheta*Byp + sintheta*Bxp_save;
-
+#if defined(WARPX_DIM_RZ)
+    // Convert Fxp and Fyp (which are actually Fr and Fth) to Fx and Fy
+    const amrex::Real Fxp_save = Fxp;
+    Fxp = costheta*Fxp - sintheta*Fyp;
+    Fyp = costheta*Fyp + sintheta*Fxp_save;
 #endif
 
 #elif defined(WARPX_DIM_1D_Z)
 
-    // Gather magnetic field
-    amrex::Real weight;
-    for (int k=0; k<=depos_order; k++) {
-        weight = static_cast<amrex::Real>(sz_Bx[k]);
-        Bxp += Bx_arr(lo.x+kp_Bx+k, 0, 0)*weight;
+    // Gather vector field F
+    for (int k=0; k<=depos_order_perp; k++) {
+        const auto weight_Fx = static_cast<amrex::Real>(sz_Fx[k]);
+        Fxp += Fx_arr(lo.x+kp_Fx+k, 0, 0)*weight_Fx;
         //
-        weight = static_cast<amrex::Real>(sz_By[k]);
-        Byp += By_arr(lo.x+kp_By+k, 0, 0)*weight;
-        //
-        weight = static_cast<amrex::Real>(sz_Bz[k]);
-        Bzp += Bz_arr(lo.x+kp_Bz+k, 0, 0)*weight;
+        const auto weight_Fy = static_cast<amrex::Real>(sz_Fy[k]);
+        Fyp += Fy_arr(lo.x+kp_Fy+k, 0, 0)*weight_Fy;
+    }
+    for (int k=0; k<=depos_order_para; k++) {
+        const auto weight_Fz = static_cast<amrex::Real>(sz_Fz[k]);
+        Fzp += Fz_arr(lo.x+kp_Fz+k, 0, 0)*weight_Fz;
     }
 
 #endif
@@ -1604,9 +1639,11 @@ void doGatherPicnicShapeN (
 
 #endif
 
-    // gather magnetic field
-    const int depos_order_B = 1; // second template parameter?
-    doGatherBShapeN<depos_order_B>( xp_nph, yp_nph, zp_nph,
+    // Gather magnetic field
+    const int depos_order_perp = 1;
+    const int depos_order_para = 1;
+    doGatherVectorFieldShapeN<depos_order_perp,depos_order_para>(
+                                    xp_nph, yp_nph, zp_nph,
                                     Bxp, Byp, Bzp,
                                     Bx_arr, By_arr, Bz_arr,
                                     Bx_type, By_type, Bz_type,
