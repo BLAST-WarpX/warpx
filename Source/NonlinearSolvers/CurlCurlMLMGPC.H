@@ -153,6 +153,7 @@ class CurlCurlMLMGPC : public Preconditioner<T,Ops>
 template <class T, class Ops>
 void CurlCurlMLMGPC<T,Ops>::printParameters() const
 {
+    BL_PROFILE("CurlCurlMLMGPC::printParameters()");
     using namespace amrex;
     auto pc_name = getEnumNameString(PreconditionerType::pc_curl_curl_mlmg);
     Print() << pc_name << " verbose:              " << (m_verbose?"true":"false") << "\n";
@@ -175,6 +176,7 @@ void CurlCurlMLMGPC<T,Ops>::printParameters() const
 template <class T, class Ops>
 void CurlCurlMLMGPC<T,Ops>::readParameters()
 {
+    BL_PROFILE("CurlCurlMLMGPC::readParameters()");
     const amrex::ParmParse pp(amrex::getEnumNameString(PreconditionerType::pc_curl_curl_mlmg));
     pp.query("verbose", m_verbose);
     pp.query("bottom_verbose", m_bottom_verbose);
@@ -192,6 +194,7 @@ template <class T, class Ops>
 void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
                                      Ops* const a_ops )
 {
+    BL_PROFILE("CurlCurlMLMGPC::Define()");
     using namespace amrex;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -265,6 +268,7 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
 template <class T, class Ops>
 void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
 {
+    BL_PROFILE("CurlCurlMLMGPC::Update()");
     using namespace amrex;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -316,6 +320,7 @@ void CurlCurlMLMGPC<T,Ops>::Apply (T& a_x, const T& a_b)
     //  operator:
     //      A x = curl (alpha * curl (x) ) + beta * x
 
+    BL_PROFILE("CurlCurlMLMGPC::Apply()");
     using namespace amrex;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(

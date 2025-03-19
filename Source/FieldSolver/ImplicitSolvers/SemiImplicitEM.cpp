@@ -13,6 +13,8 @@ using namespace amrex::literals;
 
 void SemiImplicitEM::Define ( WarpX*  a_WarpX )
 {
+    BL_PROFILE("SemiImplicitEM::Define()");
+
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !m_is_defined,
         "SemiImplicitEM object is already defined!");
@@ -36,6 +38,8 @@ void SemiImplicitEM::Define ( WarpX*  a_WarpX )
 
 void SemiImplicitEM::PrintParameters () const
 {
+    BL_PROFILE("SemiImplicitEM::PrintParameters()");
+
     if (!m_WarpX->Verbose()) { return; }
     amrex::Print() << "\n";
     amrex::Print() << "-----------------------------------------------------------\n";
@@ -57,6 +61,8 @@ void SemiImplicitEM::OneStep ( amrex::Real  start_time,
                                amrex::Real  a_dt,
                                int          a_step )
 {
+    BL_PROFILE("SemiImplicitEM::OneStep()");
+
     amrex::ignore_unused(a_step);
 
     // Set the member time step
@@ -107,6 +113,8 @@ void SemiImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
                                   int              a_nl_iter,
                                   bool             a_from_jacobian )
 {
+    BL_PROFILE("SemiImplicitEM::ComputeRHS()");
+
     // Update WarpX-owned Efield_fp using current state of Eg from
     // the nonlinear solver at time n+theta
     const amrex::Real half_time = start_time + 0.5_rt*m_dt;

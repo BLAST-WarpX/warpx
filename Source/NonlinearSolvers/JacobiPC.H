@@ -129,6 +129,7 @@ class JacobiPC : public Preconditioner<T,Ops>
 template <class T, class Ops>
 void JacobiPC<T,Ops>::printParameters() const
 {
+    BL_PROFILE("JacobiPC::printParameters()");
     using namespace amrex;
     auto pc_name = getEnumNameString(PreconditionerType::pc_jacobi);
     Print() << pc_name << " verbose:              " << (m_verbose?"true":"false") << "\n";
@@ -140,6 +141,7 @@ void JacobiPC<T,Ops>::printParameters() const
 template <class T, class Ops>
 void JacobiPC<T,Ops>::readParameters()
 {
+    BL_PROFILE("JacobiPC::readParameters()");
     const amrex::ParmParse pp(amrex::getEnumNameString(PreconditionerType::pc_jacobi));
     pp.query("verbose", m_verbose);
     pp.query("max_iter", m_max_iter);
@@ -151,6 +153,7 @@ template <class T, class Ops>
 void JacobiPC<T,Ops>::Define ( const T& a_U,
                                Ops* const a_ops )
 {
+    BL_PROFILE("JacobiPC::Define()");
     using namespace amrex;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -177,6 +180,7 @@ void JacobiPC<T,Ops>::Define ( const T& a_U,
 template <class T, class Ops>
 void JacobiPC<T,Ops>::Update (const T& a_U)
 {
+    BL_PROFILE("JacobiPC::Update()");
     using namespace amrex;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -199,6 +203,7 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
     //      A x = b
     //  where A is the linear operator.
 
+    BL_PROFILE("JacobiPC::Apply()");
     using namespace amrex;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(

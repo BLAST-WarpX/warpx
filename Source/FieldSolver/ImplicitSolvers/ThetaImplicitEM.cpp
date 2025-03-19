@@ -14,6 +14,8 @@ using namespace amrex::literals;
 
 void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
 {
+    BL_PROFILE("ThetaImplicitEM::Define()");
+
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !m_is_defined,
         "ThetaImplicitEM object is already defined!");
@@ -77,6 +79,8 @@ void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
 
 void ThetaImplicitEM::PrintParameters () const
 {
+    BL_PROFILE("ThetaImplicitEM::PrintParameters()");
+
     if (!m_WarpX->Verbose()) { return; }
     amrex::Print() << "\n";
     amrex::Print() << "-----------------------------------------------------------\n";
@@ -99,6 +103,8 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  start_time,
                                 const amrex::Real  a_dt,
                                 const int          a_step )
 {
+    BL_PROFILE("ThetaImplicitEM::OneStep()");
+
     amrex::ignore_unused(a_step);
 
     // Fields have Eg^{n} and Bg^{n}
@@ -147,6 +153,8 @@ void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
                                    int              a_nl_iter,
                                    bool             a_from_jacobian )
 {
+    BL_PROFILE("ThetaImplicitEM::ComputeRHS()");
+
     // Update WarpX-owned Efield_fp and Bfield_fp using current state of
     // Eg from the nonlinear solver at time n+theta
     UpdateWarpXFields( a_E, start_time );
@@ -163,6 +171,7 @@ void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
 void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
                                           amrex::Real start_time )
 {
+    BL_PROFILE("ThetaImplicitEM::UpdateWarpXFields()");
 
     // Update Efield_fp owned by WarpX
     const amrex::Real theta_time = start_time + m_theta*m_dt;
@@ -176,6 +185,7 @@ void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
 
 void ThetaImplicitEM::FinishFieldUpdate ( amrex::Real end_time )
 {
+    BL_PROFILE("ThetaImplicitEM::FinishFieldUpdate()");
 
     // Eg^{n+1} = (1/theta)*Eg^{n+theta} + (1-1/theta)*Eg^n
     // Bg^{n+1} = (1/theta)*Bg^{n+theta} + (1-1/theta)*Bg^n
