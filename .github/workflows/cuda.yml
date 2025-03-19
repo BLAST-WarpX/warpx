@@ -14,13 +14,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-# Ref.:
-#   https://gitlab.com/nvidia/container-images/cuda/-/blob/master/dist/ubuntu18.04/10.1/base/Dockerfile
-#   https://github.com/ComputationalRadiationPhysics/picongpu/blob/0.5.0/share/picongpu/dockerfiles/ubuntu-1604/Dockerfile
-#   https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/
   build_nvcc:
-    name: NVCC 11.3 SP
-    runs-on: ubuntu-20.04
+    name: NVCC SP
+    runs-on: ubuntu-22.04
     if: github.event.pull_request.draft == false
     env:
       CXXFLAGS: "-Werror"
@@ -33,7 +29,7 @@ jobs:
         python-version: '3.x'
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/nvcc11-3.sh
+        .github/workflows/dependencies/nvcc.sh 11.7
     - name: CCache Cache
       uses: actions/cache@v4
       with:
@@ -100,14 +96,14 @@ jobs:
   # make sure legacy build system continues to build, i.e., that we don't forget
   # to add new .cpp files
   build_nvcc_gnumake:
-    name: NVCC 11.8.0 GNUmake
-    runs-on: ubuntu-20.04
+    name: NVCC GNU Make
+    runs-on: ubuntu-22.04
     if: github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/nvcc11-8.sh
+        .github/workflows/dependencies/nvcc.sh 11.7
     - name: CCache Cache
       uses: actions/cache@v4
       with:
@@ -133,9 +129,9 @@ jobs:
         ccache -s
         du -hs ~/.cache/ccache
 
-  build_nvhpc24-1-nvcc:
-    name: NVHPC@24.1 NVCC/NVC++ Release [tests]
-    runs-on: ubuntu-20.04
+  build_nvhpc:
+    name: NVHPC
+    runs-on: ubuntu-24.04
     if: github.event.pull_request.draft == false
     #env:
     #  # For NVHPC, Ninja is slower than the default:
@@ -143,7 +139,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Dependencies
-      run: .github/workflows/dependencies/nvhpc.sh
+      run: .github/workflows/dependencies/nvhpc.sh 25.1
     - name: CCache Cache
       uses: actions/cache@v4
       with:
@@ -159,7 +155,7 @@ jobs:
         ccache -z
 
         source /etc/profile.d/modules.sh
-        module load /opt/nvidia/hpc_sdk/modulefiles/nvhpc/24.1
+        module load /opt/nvidia/hpc_sdk/modulefiles/nvhpc/25.1
         which nvcc || echo "nvcc not in PATH!"
         which nvc++ || echo "nvc++ not in PATH!"
         which nvc || echo "nvc not in PATH!"
