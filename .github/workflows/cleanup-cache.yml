@@ -9,7 +9,7 @@ on:
 jobs:
   CleanUpCcacheCache:
     name: Clean Up Ccache Cache for ${{ github.event.workflow_run.name }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: write
       contents: read

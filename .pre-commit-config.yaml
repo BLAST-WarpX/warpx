@@ -65,7 +65,7 @@ repos:
 
 # C++ formatting
 - repo: https://github.com/pre-commit/mirrors-clang-format
-  rev: v19.1.7
+  rev: v20.1.0
   hooks:
   - id: clang-format
     files: '^Source/main.cpp'
@@ -73,7 +73,7 @@ repos:
 # Python: Ruff linter & formatter
 #   https://docs.astral.sh/ruff/
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.9.10
+  rev: v0.11.0
   hooks:
     # Run the linter
     - id: ruff

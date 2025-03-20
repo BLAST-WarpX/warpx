@@ -254,31 +254,34 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
             };
 
             // Compute E x B
-            reduce_ops.eval(box, reduce_data,
-                [=] AMREX_GPU_DEVICE (int i, int j, int k) -> amrex::GpuTuple<amrex::Real>
-                {
-                    amrex::Real Ex_cc = 0._rt, Ey_cc = 0._rt, Ez_cc = 0._rt;
-                    amrex::Real Bx_cc = 0._rt, By_cc = 0._rt, Bz_cc = 0._rt;
+            // On GPU, reduce_ops doesn't work with empty boxes.
+            if (box.ok()) {
+                reduce_ops.eval(box, reduce_data,
+                    [=] AMREX_GPU_DEVICE (int i, int j, int k) -> amrex::GpuTuple<amrex::Real>
+                    {
+                        amrex::Real Ex_cc = 0._rt, Ey_cc = 0._rt, Ez_cc = 0._rt;
+                        amrex::Real Bx_cc = 0._rt, By_cc = 0._rt, Bz_cc = 0._rt;
 
-                    if (normal_dir == 1 || normal_dir == 2) {
-                        Ex_cc = ablastr::coarsen::sample::Interp(Ex_arr, Ex_stag, cc, cr, i, j, k, comp);
-                        Bx_cc = ablastr::coarsen::sample::Interp(Bx_arr, Bx_stag, cc, cr, i, j, k, comp);
-                    }
+                        if (normal_dir == 1 || normal_dir == 2) {
+                            Ex_cc = ablastr::coarsen::sample::Interp(Ex_arr, Ex_stag, cc, cr, i, j, k, comp);
+                            Bx_cc = ablastr::coarsen::sample::Interp(Bx_arr, Bx_stag, cc, cr, i, j, k, comp);
+                        }
 
-                    if (normal_dir == 0 || normal_dir == 2) {
-                        Ey_cc = ablastr::coarsen::sample::Interp(Ey_arr, Ey_stag, cc, cr, i, j, k, comp);
-                        By_cc = ablastr::coarsen::sample::Interp(By_arr, By_stag, cc, cr, i, j, k, comp);
-                    }
-                    if (normal_dir == 0 || normal_dir == 1) {
-                        Ez_cc = ablastr::coarsen::sample::Interp(Ez_arr, Ez_stag, cc, cr, i, j, k, comp);
-                        Bz_cc = ablastr::coarsen::sample::Interp(Bz_arr, Bz_stag, cc, cr, i, j, k, comp);
-                    }
+                        if (normal_dir == 0 || normal_dir == 2) {
+                            Ey_cc = ablastr::coarsen::sample::Interp(Ey_arr, Ey_stag, cc, cr, i, j, k, comp);
+                            By_cc = ablastr::coarsen::sample::Interp(By_arr, By_stag, cc, cr, i, j, k, comp);
+                        }
+                        if (normal_dir == 0 || normal_dir == 1) {
+                            Ez_cc = ablastr::coarsen::sample::Interp(Ez_arr, Ez_stag, cc, cr, i, j, k, comp);
+                            Bz_cc = ablastr::coarsen::sample::Interp(Bz_arr, Bz_stag, cc, cr, i, j, k, comp);
+                        }
 
-                    amrex::Real const af = area_factor(i,j,k);
-                    if      (normal_dir == 0) { return af*(Ey_cc * Bz_cc - Ez_cc * By_cc); }
-                    else if (normal_dir == 1) { return af*(Ez_cc * Bx_cc - Ex_cc * Bz_cc); }
-                    else                      { return af*(Ex_cc * By_cc - Ey_cc * Bx_cc); }
-                });
+                        amrex::Real const af = area_factor(i,j,k);
+                        if      (normal_dir == 0) { return af*(Ey_cc * Bz_cc - Ez_cc * By_cc); }
+                        else if (normal_dir == 1) { return af*(Ez_cc * Bx_cc - Ex_cc * Bz_cc); }
+                        else                      { return af*(Ex_cc * By_cc - Ey_cc * Bx_cc); }
+                    });
+            }
         }
 
         int const sign = (face().isLow() ? -1 : 1);
