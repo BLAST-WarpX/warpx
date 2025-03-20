@@ -56,24 +56,18 @@ void doGatherVectorFieldShapeN (
 
     // Compute particle position in grid units
 #if defined(WARPX_DIM_RZ)
-    amrex::Real const rp = std::sqrt(xp*xp + yp*yp);
-    amrex::Real costheta, sintheta;
-    if (rp > 0._rt) {
-        costheta = xp/rp;
-        sintheta = yp/rp;
-    } else {
-        costheta = 1._rt;
-        sintheta = 0._rt;
-    }
+    const amrex::Real rp = std::sqrt(xp*xp + yp*yp);
+    const amrex::Real costheta = (rp > 0. ? xp/rp: 1._rt);
+    const amrex::Real sintheta = (rp > 0. ? yp/rp: 0.);
     const Complex xy0 = Complex{costheta, sintheta};
-    double const x_bar = (rp - xyzmin.x)*dinv.x;
+    const double x_bar = (rp - xyzmin.x)*dinv.x;
 #elif !defined(WARPX_DIM_1D_Z)
-    double const x_bar = (xp - xyzmin.x)*dinv.x;
+    const double x_bar = (xp - xyzmin.x)*dinv.x;
 #endif
 #if defined(WARPX_DIM_3D)
-    double const y_bar = (yp - xyzmin.y)*dinv.y;
+    const double y_bar = (yp - xyzmin.y)*dinv.y;
 #endif
-    double const z_bar = (zp - xyzmin.z)*dinv.z;
+    const double z_bar = (zp - xyzmin.z)*dinv.z;
 
     const Compute_shape_factor< depos_order_perp > shape_factor_perp;
     const Compute_shape_factor< depos_order_para > shape_factor_para;
