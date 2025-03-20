@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef SMART_CREATE_H_
-#define SMART_CREATE_H_
+#ifndef WARPX_SMART_CREATE_H_
+#define WARPX_SMART_CREATE_H_
 
 #include "DefaultInitialization.H"
 
@@ -14,6 +14,8 @@
 #include <AMReX_AmrCore.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_ParallelDescriptor.H>
+#include <AMReX_Particle.H>
+#include <AMReX_ParticleTile.H>
 
 /**
  * \brief This is a functor for performing a "smart create" that works
@@ -33,7 +35,7 @@ struct SmartCreate
 {
     const InitializationPolicy* m_policy_real;
     const InitializationPolicy* m_policy_int;
-    const int m_weight_index = 0;
+    int m_weight_index = 0;
 
     template <typename PartData>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -47,23 +49,22 @@ struct SmartCreate
         const int id = 0) const noexcept
     {
 #if defined(WARPX_DIM_3D)
-        prt.m_aos[i_prt].pos(0) = x;
-        prt.m_aos[i_prt].pos(1) = y;
-        prt.m_aos[i_prt].pos(2) = z;
+        prt.m_rdata[PIdx::x][i_prt] = x;
+        prt.m_rdata[PIdx::y][i_prt] = y;
+        prt.m_rdata[PIdx::z][i_prt] = z;
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-        prt.m_aos[i_prt].pos(0) = x;
-        prt.m_aos[i_prt].pos(1) = z;
+        prt.m_rdata[PIdx::x][i_prt] = x;
+        prt.m_rdata[PIdx::z][i_prt] = z;
         amrex::ignore_unused(y);
 #else
-        prt.m_aos[i_prt].pos(0) = z;
+        prt.m_rdata[PIdx::z][i_prt] = z;
         amrex::ignore_unused(x,y);
 #endif
 
-        prt.m_aos[i_prt].cpu() = cpu;
-        prt.m_aos[i_prt].id() = id;
+        prt.m_idcpu[i_prt] = amrex::SetParticleIDandCPU(id, cpu);
 
-        // initialize the real components
-        for (int j = 0; j < PartData::NAR; ++j) {
+        // initialize the real components after position
+        for (int j = AMREX_SPACEDIM; j < PartData::NAR; ++j) {
             prt.m_rdata[j][i_prt] = initializeRealValue(m_policy_real[j], engine);
         }
         for (int j = 0; j < prt.m_num_runtime_real; ++j) {
@@ -96,8 +97,8 @@ class SmartCreateFactory
 public:
     template <class PartTileData>
     SmartCreateFactory (const PartTileData& part) noexcept:
-        m_policy_real{getPolicies(part.getParticleComps())},
-        m_policy_int{getPolicies(part.getParticleiComps())},
+        m_policy_real{getPolicies(part.GetRealSoANames())},
+        m_policy_int{getPolicies(part.GetIntSoANames())},
         m_defined{true}
     {}
 
@@ -111,4 +112,4 @@ public:
     [[nodiscard]] bool isDefined () const noexcept { return m_defined; }
 };
 
-#endif //SMART_CREATE_H_
+#endif //WARPX_SMART_CREATE_H_

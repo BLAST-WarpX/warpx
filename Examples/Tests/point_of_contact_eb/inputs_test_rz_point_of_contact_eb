@@ -1,0 +1,42 @@
+amr.max_level = 0
+
+max_step = 3
+
+amr.n_cell = 64 64
+amr.blocking_factor = 8
+amr.max_grid_size = 128
+
+geometry.dims = RZ
+geometry.prob_lo     = 0.0 -0.26
+geometry.prob_hi     = 0.26  0.26
+
+boundary.field_lo = none periodic
+boundary.field_hi = pec periodic
+
+warpx.const_dt = 1e-10
+warpx.eb_implicit_function = "-(x**2 -0.2**2)"
+
+# Do not evolve the E and B fields
+algo.maxwell_solver = none
+algo.field_gathering = momentum-conserving
+algo.particle_shape = 1
+
+particles.species_names = electron
+electron.charge = -q_e
+electron.mass = m_e
+electron.injection_style = "SingleParticle"
+electron.single_particle_pos = -0.25 0 0
+electron.single_particle_u = 1 0.5 0.0
+electron.single_particle_weight = 1
+
+electron.save_particles_at_eb = 1
+
+diagnostics.diags_names = diag1 diag2
+
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.fields_to_plot = Er
+diag1.format = openpmd
+
+diag2.diag_type = BoundaryScraping
+diag2.format = openpmd

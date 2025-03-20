@@ -12,7 +12,7 @@
 /* \brief Shuffle array according to Fisher-Yates algorithm.
  *        Only shuffle the part between is <= i < ie, n = ie-is.
  *        T_index shall be
- *        amrex::DenseBins<WarpXParticleContainer::ParticleType>::index_type
+ *        amrex::DenseBins<WarpXParticleContainer::ParticleTileType::ParticleTileDataType>::index_type
 */
 
 template <typename T_index>

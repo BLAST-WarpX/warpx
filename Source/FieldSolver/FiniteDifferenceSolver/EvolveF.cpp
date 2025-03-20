@@ -44,9 +44,9 @@ using namespace amrex;
  * \brief Update the F field, over one timestep
  */
 void FiniteDifferenceSolver::EvolveF (
-    std::unique_ptr<amrex::MultiFab>& Ffield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Efield,
-    std::unique_ptr<amrex::MultiFab> const& rhofield,
+    amrex::MultiFab* Ffield,
+    ablastr::fields::VectorField const& Efield,
+    amrex::MultiFab* const rhofield,
     int const rhocomp,
     amrex::Real const dt ) {
 
@@ -82,9 +82,9 @@ void FiniteDifferenceSolver::EvolveF (
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::EvolveFCartesian (
-    std::unique_ptr<amrex::MultiFab>& Ffield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Efield,
-    std::unique_ptr<amrex::MultiFab> const& rhofield,
+    amrex::MultiFab* Ffield,
+    ablastr::fields::VectorField const Efield,
+    amrex::MultiFab* const rhofield,
     int const rhocomp,
     amrex::Real const dt ) {
 
@@ -135,9 +135,9 @@ void FiniteDifferenceSolver::EvolveFCartesian (
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::EvolveFCylindrical (
-    std::unique_ptr<amrex::MultiFab>& Ffield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Efield,
-    std::unique_ptr<amrex::MultiFab> const& rhofield,
+    amrex::MultiFab* Ffield,
+    ablastr::fields::VectorField const & Efield,
+    amrex::MultiFab* const rhofield,
     int const rhocomp,
     amrex::Real const dt ) {
 
@@ -148,7 +148,7 @@ void FiniteDifferenceSolver::EvolveFCylindrical (
     for ( MFIter mfi(*Ffield, TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
 
         // Extract field data for this grid/tile
-        Array4<Real> F = Ffield->array(mfi);
+        const Array4<Real> F = Ffield->array(mfi);
         Array4<Real> const& Er = Efield[0]->array(mfi);
         Array4<Real> const& Et = Efield[1]->array(mfi);
         Array4<Real> const& Ez = Efield[2]->array(mfi);

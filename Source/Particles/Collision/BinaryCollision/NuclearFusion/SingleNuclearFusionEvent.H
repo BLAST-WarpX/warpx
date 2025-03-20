@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef SINGLE_NUCLEAR_FUSION_EVENT_H_
-#define SINGLE_NUCLEAR_FUSION_EVENT_H_
+#ifndef WARPX_SINGLE_NUCLEAR_FUSION_EVENT_H_
+#define WARPX_SINGLE_NUCLEAR_FUSION_EVENT_H_
 
 #include "BoschHaleFusionCrossSection.H"
 #include "ProtonBoronFusionCrossSection.H"
@@ -131,4 +131,4 @@ void SingleNuclearFusionEvent (const amrex::ParticleReal& u1x, const amrex::Part
     }
 
 }
-#endif // SINGLE_NUCLEAR_FUSION_EVENT_H_
+#endif // WARPX_SINGLE_NUCLEAR_FUSION_EVENT_H_

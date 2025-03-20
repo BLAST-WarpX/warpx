@@ -12,11 +12,11 @@ Run
 
 The following **Python** script configures and launches the simulation.
 
-.. dropdown:: Script ``PICMI_inputs.py``
+.. dropdown:: Script ``inputs_test_2d_ohm_solver_magnetic_reconnection_picmi.py``
 
-   .. literalinclude:: PICMI_inputs.py
+   .. literalinclude:: inputs_test_2d_ohm_solver_magnetic_reconnection_picmi.py
       :language: python3
-      :caption: You can copy this file from ``Examples/Tests/ohm_solver_magnetic_reconnection/PICMI_inputs.py``.
+      :caption: You can copy this file from ``Examples/Tests/ohm_solver_magnetic_reconnection/inputs_test_2d_ohm_solver_magnetic_reconnection_picmi.py``.
 
 Running the full simulation should take about 4 hours if executed on 1 V100 GPU.
 For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with
@@ -24,7 +24,7 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with
 
    .. code-block:: bash
 
-      python3 PICMI_inputs.py
+      python3 inputs_test_2d_ohm_solver_magnetic_reconnection_picmi.py
 
 Analyze
 -------

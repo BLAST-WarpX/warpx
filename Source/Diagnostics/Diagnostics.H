@@ -21,6 +21,8 @@
 #include <string>
 #include <vector>
 
+/** All types of diagnostics. */
+enum struct DiagTypes {Full, BackTransformed, BoundaryScraping, TimeAveraged};
 /**
  * \brief base class for diagnostics.
  * Contains main routines to filter, compute and flush diagnostics.
@@ -35,7 +37,7 @@ public:
      * @param i index of diagnostics in MultiDiagnostics::alldiags
      * @param name diagnostics name in the inputs file
      */
-    Diagnostics (int i, std::string name);
+    Diagnostics (int i, std::string name, DiagTypes diag_type);
 
     /** Virtual Destructor to handle clean destruction of derived classes */
     virtual ~Diagnostics ();
@@ -45,6 +47,8 @@ public:
     Diagnostics(Diagnostics&& )                    = default;
     Diagnostics& operator=(Diagnostics&& )         = default;
 
+    /** Stores the diag type */
+    DiagTypes m_diag_type;
     /** Pack (stack) all fields in the cell-centered output MultiFab m_mf_output.
      *
      * Fields are computed (e.g., cell-centered or back-transformed)
@@ -186,6 +190,8 @@ public:
 protected:
     /** Read Parameters of the base Diagnostics class */
     bool BaseReadParameters ();
+    /** Whether to output a message when diagnostics are output */
+    int m_verbose = 2;
     /** Initialize member variables of the base Diagnostics class. */
     void InitBaseData ();
     /** Initialize m_mf_output vectors and data required to construct the buffers
@@ -266,6 +272,12 @@ protected:
      *  The second vector is loops over the total number of levels.
      */
     amrex::Vector< amrex::Vector< amrex::MultiFab > >  m_mf_output;
+    /** summation multifab, where all fields (computed, cell-centered, and stacked)
+     *  are summed for every step in a time averaging period.
+     *  The first vector is for total number of snapshots. (=1 for FullDiagnostics)
+     *  The second vector is loops over the total number of levels.
+     */
+    amrex::Vector< amrex::Vector <amrex::MultiFab > > m_sum_mf_output;
 
     /** Geometry that defines the domain attributes corresponding to output multifab.
      *  Specifically, the user-defined physical co-ordinates for the diagnostics
@@ -304,16 +316,13 @@ protected:
     int m_num_buffers;
     /** Array of species indices that dump rho per species */
     amrex::Vector<int> m_rho_per_species_index;
+    /** Array of species indices that dump temperature per species */
+    amrex::Vector<int> m_T_per_species_index;
     /** Vector of particle buffer vectors for each snapshot */
     amrex::Vector< amrex::Vector<std::unique_ptr<PinnedMemoryParticleContainer> > > m_particles_buffer;
     /** Vector of pointers to functors to compute particle output per species*/
     amrex::Vector< std::unique_ptr<ComputeParticleDiagFunctor> > m_all_particle_functors;
 
-    /** Vector of total number of particles previously flushed, per species, per snapshot.
-     *  The first vector is for total number of snapshots and second vector loops
-     *  over the total number of species selected for diagnostics.
-     */
-    amrex::Vector< amrex::Vector <int> > m_totalParticles_flushed_already;
     /** Vector of total number of particles in the buffer, per species, per snapshot.
      *  The first vector is for total number of snapshots and second vector loops
      *  over the total number of species selected for diagnostics.

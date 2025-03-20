@@ -6,9 +6,10 @@
 
 from .Bucket import Bucket
 
-particles = Bucket('particles', species_names=[], rigid_injected_species=[])
+particles = Bucket("particles", species_names=[], rigid_injected_species=[])
 particles_list = []
 particle_dict = {}
+
 
 def newspecies(name):
     result = Bucket(name)

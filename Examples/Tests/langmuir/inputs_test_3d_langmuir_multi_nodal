@@ -1,0 +1,6 @@
+# base input parameters
+FILE = inputs_base_3d
+
+# test input parameters
+algo.current_deposition = direct
+warpx.grid_type = collocated

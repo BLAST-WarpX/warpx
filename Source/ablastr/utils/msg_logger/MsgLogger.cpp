@@ -147,9 +147,10 @@ Msg Msg::deserialize (std::vector<char>::const_iterator& it)
     return msg;
 }
 
-Msg Msg::deserialize (std::vector<char>::const_iterator&& it)
+Msg Msg::deserialize (std::vector<char>::const_iterator&& rit)
 {
-    return Msg::deserialize(it);
+    auto lit = std::vector<char>::const_iterator{std::move(rit)};
+    return Msg::deserialize(lit);
 }
 
 std::vector<char> MsgWithCounter::serialize() const
@@ -174,9 +175,10 @@ MsgWithCounter MsgWithCounter::deserialize (std::vector<char>::const_iterator& i
     return msg_with_counter;
 }
 
-MsgWithCounter MsgWithCounter::deserialize (std::vector<char>::const_iterator&& it)
+MsgWithCounter MsgWithCounter::deserialize (std::vector<char>::const_iterator&& rit)
 {
-    return MsgWithCounter::deserialize(it);
+    auto lit = std::vector<char>::const_iterator{std::move(rit)};
+    return MsgWithCounter::deserialize(lit);
 }
 
 std::vector<char> MsgWithCounterAndRanks::serialize() const
@@ -205,9 +207,10 @@ MsgWithCounterAndRanks::deserialize (std::vector<char>::const_iterator& it)
 }
 
 MsgWithCounterAndRanks
-MsgWithCounterAndRanks::deserialize (std::vector<char>::const_iterator&& it)
+MsgWithCounterAndRanks::deserialize (std::vector<char>::const_iterator&& rit)
 {
-    return MsgWithCounterAndRanks::deserialize(it);
+    auto lit = std::vector<char>::const_iterator{std::move(rit)};
+    return MsgWithCounterAndRanks::deserialize(lit);
 }
 
 Logger::Logger() :
@@ -216,7 +219,7 @@ Logger::Logger() :
     m_io_rank{amrex::ParallelDescriptor::IOProcessorNumber()}
 {}
 
-void Logger::record_msg(Msg msg)
+void Logger::record_msg(const Msg& msg)
 {
     m_messages[msg]++;
 }
@@ -225,6 +228,7 @@ std::vector<Msg> Logger::get_msgs() const
 {
     auto res = std::vector<Msg>{};
 
+    res.reserve(m_messages.size());
     for (const auto& msg_w_counter : m_messages) {
         res.emplace_back(msg_w_counter.first);
     }
@@ -236,6 +240,7 @@ std::vector<MsgWithCounter> Logger::get_msgs_with_counter() const
 {
     auto res = std::vector<MsgWithCounter>{};
 
+    res.reserve(m_messages.size());
     for (const auto& msg : m_messages) {
         res.emplace_back(MsgWithCounter{msg.first, msg.second});
     }
@@ -309,6 +314,7 @@ std::vector<MsgWithCounterAndRanks>
 Logger::one_rank_gather_msgs_with_counter_and_ranks() const
 {
     std::vector<MsgWithCounterAndRanks> res;
+    res.reserve(m_messages.size());
     for (const auto& el : m_messages)
     {
         res.emplace_back(

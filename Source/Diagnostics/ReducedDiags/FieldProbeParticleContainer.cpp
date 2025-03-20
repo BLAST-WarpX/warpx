@@ -59,7 +59,7 @@
 using namespace amrex;
 
 FieldProbeParticleContainer::FieldProbeParticleContainer (AmrCore* amr_core)
-    : ParticleContainer<0, 0, FieldProbePIdx::nattribs>(amr_core->GetParGDB())
+    : ParticleContainerPureSoA<FieldProbePIdx::nattribs, 0>(amr_core->GetParGDB())
 {
     SetParticleSize();
 }
@@ -76,6 +76,10 @@ FieldProbeParticleContainer::AddNParticles (int lev,
 
     // number of particles to add
     auto const np = static_cast<int>(x.size());
+    if (np <= 0){
+        Redistribute();
+        return;
+    }
 
     // have to resize here, not in the constructor because grids have not
     // been built when constructor was called.
@@ -89,33 +93,15 @@ FieldProbeParticleContainer::AddNParticles (int lev,
      * is then coppied to the permament tile which is stored on the particle
      * (particle_tile).
      */
+    using PinnedTile = typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType;
 
-    using PinnedTile = ParticleTile<amrex::Particle<NStructReal, NStructInt>,
-                                    NArrayReal, NArrayInt,
-                                    amrex::PinnedArenaAllocator>;
     PinnedTile pinned_tile;
     pinned_tile.define(NumRuntimeRealComps(), NumRuntimeIntComps());
 
     for (int i = 0; i < np; i++)
     {
-        ParticleType p;
-        p.id() = ParticleType::NextID();
-        p.cpu() = ParallelDescriptor::MyProc();
-#if defined(WARPX_DIM_3D)
-        p.pos(0) = x[i];
-        p.pos(1) = y[i];
-        p.pos(2) = z[i];
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-        amrex::ignore_unused(y);
-        p.pos(0) = x[i];
-        p.pos(1) = z[i];
-#elif defined(WARPX_DIM_1D_Z)
-        amrex::ignore_unused(x, y);
-        p.pos(0) = z[i];
-#endif
-
-        // write position, cpu id, and particle id to particle
-        pinned_tile.push_back(p);
+        auto & idcpu_data = pinned_tile.GetStructOfArrays().GetIdCPUData();
+        idcpu_data.push_back(amrex::SetParticleIDandCPU(ParticleType::NextID(), ParallelDescriptor::MyProc()));
     }
 
     // write Real attributes (SoA) to particle initialized zero
@@ -125,7 +111,13 @@ FieldProbeParticleContainer::AddNParticles (int lev,
 #ifdef WARPX_DIM_RZ
     pinned_tile.push_back_real(FieldProbePIdx::theta, np, 0.0);
 #endif
-
+#if !defined (WARPX_DIM_1D_Z)
+    pinned_tile.push_back_real(FieldProbePIdx::x, x);
+#endif
+#if defined (WARPX_DIM_3D)
+    pinned_tile.push_back_real(FieldProbePIdx::y, y);
+#endif
+    pinned_tile.push_back_real(FieldProbePIdx::z, z);
     pinned_tile.push_back_real(FieldProbePIdx::Ex, np, 0.0);
     pinned_tile.push_back_real(FieldProbePIdx::Ey, np, 0.0);
     pinned_tile.push_back_real(FieldProbePIdx::Ez, np, 0.0);
@@ -134,8 +126,8 @@ FieldProbeParticleContainer::AddNParticles (int lev,
     pinned_tile.push_back_real(FieldProbePIdx::Bz, np, 0.0);
     pinned_tile.push_back_real(FieldProbePIdx::S, np, 0.0);
 
-    auto old_np = particle_tile.numParticles();
-    auto new_np = old_np + pinned_tile.numParticles();
+    const auto old_np = particle_tile.numParticles();
+    const auto new_np = old_np + pinned_tile.numParticles();
     particle_tile.resize(new_np);
     amrex::copyParticles(
         particle_tile, pinned_tile, 0, old_np, pinned_tile.numParticles());

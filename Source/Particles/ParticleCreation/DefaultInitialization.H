@@ -5,8 +5,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef DEFAULTINITIALIZATION_H_
-#define DEFAULTINITIALIZATION_H_
+#ifndef WARPX_DEFAULTINITIALIZATION_H_
+#define WARPX_DEFAULTINITIALIZATION_H_
 
 #include <WarpX.H>
 #ifdef WARPX_QED
@@ -102,8 +102,8 @@ namespace ParticleCreation {
      * These are NOT initialized by this function.
      * @param[in] user_real_attribs The names of the real components for this particle tile
      * @param[in] user_int_attribs The names of the int components for this particle tile
-     * @param[in] particle_comps map between particle component index and component name for real comps
-     * @param[in] particle_icomps map between particle component index and component name for int comps
+     * @param[in] particle_comps particle component names for real comps
+     * @param[in] particle_icomps particle component names for int comps
      * @param[in] user_real_attrib_parser the parser functions used to initialize the user real components
      * @param[in] user_int_attrib_parser the parser functions used to initialize the user int components
      * @param[in] do_qed_comps whether to initialize the qed components (these are usually handled by
@@ -120,8 +120,8 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                                          const int n_external_attr_int,
                                          const std::vector<std::string>& user_real_attribs,
                                          const std::vector<std::string>& user_int_attribs,
-                                         const std::map<std::string, int>& particle_comps,
-                                         const std::map<std::string, int>& particle_icomps,
+                                         const std::vector<std::string>& particle_comps,
+                                         const std::vector<std::string>& particle_icomps,
                                          const std::vector<amrex::Parser*>& user_real_attrib_parser,
                                          const std::vector<amrex::Parser*>& user_int_attrib_parser,
 #ifdef WARPX_QED
@@ -151,8 +151,9 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
             auto attr_ptr = ptile.GetStructOfArrays().GetRealData(j).data();
 #ifdef WARPX_QED
             // Current runtime comp is quantum synchrotron optical depth
-            if (particle_comps.find("opticalDepthQSR") != particle_comps.end() &&
-                particle_comps.at("opticalDepthQSR") == j)
+            auto const it_qsr = std::find(particle_comps.begin(), particle_comps.end(), "opticalDepthQSR");
+            if (it_qsr != particle_comps.end() &&
+                std::distance(particle_comps.begin(), it_qsr) == j)
             {
                 if (!do_qed_comps) { continue; }
                 const QuantumSynchrotronGetOpticalDepth quantum_sync_get_opt =
@@ -161,7 +162,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                 if constexpr (amrex::RunOnGpu<typename PTile::template AllocatorType<amrex::Real>>::value) {
                         amrex::ParallelForRNG(stop - start,
                                               [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept {
-                                                  int ip = i + start;
+                                                  const int ip = i + start;
                                                   attr_ptr[ip] = quantum_sync_get_opt(engine);
                                               });
                 // Otherwise (e.g. particle tile allocated in pinned memory), run on CPU
@@ -172,9 +173,10 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                 }
             }
 
-             // Current runtime comp is Breit-Wheeler optical depth
-            if (particle_comps.find("opticalDepthBW") != particle_comps.end() &&
-                particle_comps.at("opticalDepthBW") == j)
+            // Current runtime comp is Breit-Wheeler optical depth
+            auto const it_bw = std::find(particle_comps.begin(), particle_comps.end(), "opticalDepthBW");
+            if (it_bw != particle_comps.end() &&
+                std::distance(particle_comps.begin(), it_bw) == j)
             {
                 if (!do_qed_comps) { continue; }
                 const BreitWheelerGetOpticalDepth breit_wheeler_get_opt =
@@ -183,7 +185,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                 if constexpr (amrex::RunOnGpu<typename PTile::template AllocatorType<amrex::Real>>::value) {
                         amrex::ParallelForRNG(stop - start,
                                               [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept {
-                                                  int ip = i + start;
+                                                  const int ip = i + start;
                                                   attr_ptr[ip] = breit_wheeler_get_opt(engine);
                                               });
                 // Otherwise (e.g. particle tile allocated in pinned memory), run on CPU
@@ -198,8 +200,9 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
             for (int ia = 0; ia < n_user_real_attribs; ++ia)
             {
                 // Current runtime comp is ia-th user defined attribute
-                if (particle_comps.find(user_real_attribs[ia]) != particle_comps.end() &&
-                    particle_comps.at(user_real_attribs[ia]) == j)
+                auto const it_ura = std::find(particle_comps.begin(), particle_comps.end(), user_real_attribs[ia]);
+                if (it_ura != particle_comps.end() &&
+                    std::distance(particle_comps.begin(), it_ura) == j)
                 {
                     const amrex::ParserExecutor<7> user_real_attrib_parserexec =
                                              user_real_attrib_parser[ia]->compile<7>();
@@ -207,7 +210,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                     if constexpr (amrex::RunOnGpu<typename PTile::template AllocatorType<amrex::Real>>::value) {
                         amrex::ParallelFor(stop - start,
                                            [=] AMREX_GPU_DEVICE (int i) noexcept {
-                                               int ip = i + start;
+                                               const int ip = i + start;
                                                amrex::ParticleReal xp, yp, zp;
                                                get_position(ip, xp, yp, zp);
                                                attr_ptr[ip] = user_real_attrib_parserexec(xp, yp, zp,
@@ -232,13 +235,14 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
             auto attr_ptr = ptile.GetStructOfArrays().GetIntData(j).data();
 
             // Current runtime comp is ionization level
-            if (particle_icomps.find("ionizationLevel") != particle_icomps.end() &&
-                particle_icomps.at("ionizationLevel") == j)
+            auto const it_ioniz = std::find(particle_icomps.begin(), particle_icomps.end(), "ionizationLevel");
+            if (it_ioniz != particle_icomps.end() &&
+                std::distance(particle_icomps.begin(), it_ioniz) == j)
             {
                 if constexpr (amrex::RunOnGpu<typename PTile::template AllocatorType<int>>::value) {
                         amrex::ParallelFor(stop - start,
                                            [=] AMREX_GPU_DEVICE (int i) noexcept {
-                                               int ip = i + start;
+                                               const int ip = i + start;
                                                attr_ptr[ip] = ionization_initial_level;
                                            });
                 } else {
@@ -251,15 +255,16 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
             for (int ia = 0; ia < n_user_int_attribs; ++ia)
             {
                 // Current runtime comp is ia-th user defined attribute
-                if (particle_icomps.find(user_int_attribs[ia]) != particle_icomps.end() &&
-                    particle_icomps.at(user_int_attribs[ia]) == j)
+                auto const it_uia = std::find(particle_icomps.begin(), particle_icomps.end(), user_int_attribs[ia]);
+                if (it_uia != particle_icomps.end() &&
+                    std::distance(particle_icomps.begin(), it_uia) == j)
                 {
                      const amrex::ParserExecutor<7> user_int_attrib_parserexec =
                                              user_int_attrib_parser[ia]->compile<7>();
                 if constexpr (amrex::RunOnGpu<typename PTile::template AllocatorType<int>>::value) {
                         amrex::ParallelFor(stop - start,
                                            [=] AMREX_GPU_DEVICE (int i) noexcept {
-                                               int ip = i + start;
+                                               const int ip = i + start;
                                                amrex::ParticleReal xp, yp, zp;
                                                get_position(ip, xp, yp, zp);
                                                attr_ptr[ip] = static_cast<int>(
@@ -280,4 +285,4 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
 
 }
 
-#endif
+#endif //WARPX_DEFAULTINITIALIZATION_H_

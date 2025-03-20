@@ -9,6 +9,7 @@
  */
 #include "PlasmaInjector.H"
 
+#include "EmbeddedBoundary/Enabled.H"
 #include "Initialization/GetTemperature.H"
 #include "Initialization/GetVelocity.H"
 #include "Initialization/InjectorDensity.H"
@@ -51,11 +52,11 @@ PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
 {
 
 #ifdef AMREX_USE_GPU
-    static_assert(std::is_trivially_copyable<InjectorPosition>::value,
+    static_assert(std::is_trivially_copyable_v<InjectorPosition>,
                   "InjectorPosition must be trivially copyable");
-    static_assert(std::is_trivially_copyable<InjectorDensity>::value,
+    static_assert(std::is_trivially_copyable_v<InjectorDensity>,
                   "InjectorDensity must be trivially copyable");
-    static_assert(std::is_trivially_copyable<InjectorMomentum>::value,
+    static_assert(std::is_trivially_copyable_v<InjectorMomentum>,
                   "InjectorMomentum must be trivially copyable");
 #endif
 
@@ -232,6 +233,11 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
     utils::parser::getWithParser(pp_species, source_name, "npart", npart);
     utils::parser::queryWithParser(pp_species, source_name, "do_symmetrize", do_symmetrize);
     utils::parser::queryWithParser(pp_species, source_name, "symmetrization_order", symmetrization_order);
+    const bool focusing_is_specified = pp_species.contains("focal_distance");
+    if(focusing_is_specified){
+        do_focusing = true;
+        utils::parser::queryWithParser(pp_species, source_name, "focal_distance", focal_distance);
+    }
     const std::set<int> valid_symmetries = {4,8};
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( valid_symmetries.count(symmetrization_order),
         "Error: Symmetrization only supported to orders 4 or 8 ");
@@ -240,6 +246,7 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
                                 ux_parser, uy_parser, uz_parser,
                                 ux_th_parser, uy_th_parser, uz_th_parser,
                                 h_mom_temp, h_mom_vel);
+
 #if defined(WARPX_DIM_XZ)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( y_rms > 0._rt,
         "Error: Gaussian beam y_rms must be strictly greater than 0 in 2D "
@@ -297,50 +304,66 @@ void PlasmaInjector::setupNFluxPerCell (amrex::ParmParse const& pp_species)
         "(Please visit PR#765 for more information.)");
     }
 #endif
-    utils::parser::getWithParser(pp_species, source_name, "surface_flux_pos", surface_flux_pos);
+
     utils::parser::queryWithParser(pp_species, source_name, "flux_tmin", flux_tmin);
     utils::parser::queryWithParser(pp_species, source_name, "flux_tmax", flux_tmax);
-    std::string flux_normal_axis_string;
-    utils::parser::get(pp_species, source_name, "flux_normal_axis", flux_normal_axis_string);
-    flux_normal_axis = -1;
+
+    // Check whether injection from the embedded boundary is requested
+    utils::parser::queryWithParser(pp_species, source_name, "inject_from_embedded_boundary", m_inject_from_eb);
+    if (m_inject_from_eb) {
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE( EB::enabled(),
+            "Error: Embedded boundary injection is only available when "
+            "embedded boundaries are enabled.");
+        flux_normal_axis = 2; // Interpret z as the normal direction to the EB
+        flux_direction = 1;
+    } else {
+        // Injection is through a plane in this case.
+        // Parse the parameters of the plane (position, normal direction, etc.)
+
+        utils::parser::getWithParser(pp_species, source_name, "surface_flux_pos", surface_flux_pos);
+        std::string flux_normal_axis_string;
+        utils::parser::get(pp_species, source_name, "flux_normal_axis", flux_normal_axis_string);
+        flux_normal_axis = -1;
 #ifdef WARPX_DIM_RZ
-    if      (flux_normal_axis_string == "r" || flux_normal_axis_string == "R") {
-        flux_normal_axis = 0;
-    }
-    if      (flux_normal_axis_string == "t" || flux_normal_axis_string == "T") {
-        flux_normal_axis = 1;
-    }
+        if      (flux_normal_axis_string == "r" || flux_normal_axis_string == "R") {
+            flux_normal_axis = 0;
+        }
+        if      (flux_normal_axis_string == "t" || flux_normal_axis_string == "T") {
+            flux_normal_axis = 1;
+        }
 #else
 #    ifndef WARPX_DIM_1D_Z
-    if      (flux_normal_axis_string == "x" || flux_normal_axis_string == "X") {
-        flux_normal_axis = 0;
-    }
+        if      (flux_normal_axis_string == "x" || flux_normal_axis_string == "X") {
+            flux_normal_axis = 0;
+        }
 #    endif
 #endif
 #ifdef WARPX_DIM_3D
-    if (flux_normal_axis_string == "y" || flux_normal_axis_string == "Y") {
-        flux_normal_axis = 1;
-    }
+        if (flux_normal_axis_string == "y" || flux_normal_axis_string == "Y") {
+            flux_normal_axis = 1;
+        }
 #endif
-    if (flux_normal_axis_string == "z" || flux_normal_axis_string == "Z") {
-        flux_normal_axis = 2;
-    }
+        if (flux_normal_axis_string == "z" || flux_normal_axis_string == "Z") {
+            flux_normal_axis = 2;
+        }
 #ifdef WARPX_DIM_3D
-    const std::string flux_normal_axis_help = "'x', 'y', or 'z'.";
+        const std::string flux_normal_axis_help = "'x', 'y', or 'z'.";
 #else
 #    ifdef WARPX_DIM_RZ
-    const std::string flux_normal_axis_help = "'r' or 'z'.";
+        const std::string flux_normal_axis_help = "'r' or 'z'.";
 #    elif WARPX_DIM_XZ
-    const std::string flux_normal_axis_help = "'x' or 'z'.";
+        const std::string flux_normal_axis_help = "'x' or 'z'.";
 #    else
-    const std::string flux_normal_axis_help = "'z'.";
+        const std::string flux_normal_axis_help = "'z'.";
 #    endif
-#endif
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(flux_normal_axis >= 0,
-        "Error: Invalid value for flux_normal_axis. It must be " + flux_normal_axis_help);
-    utils::parser::getWithParser(pp_species, source_name, "flux_direction", flux_direction);
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(flux_direction == +1 || flux_direction == -1,
-        "Error: flux_direction must be -1 or +1.");
+    #endif
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(flux_normal_axis >= 0,
+            "Error: Invalid value for flux_normal_axis. It must be " + flux_normal_axis_help);
+        utils::parser::getWithParser(pp_species, source_name, "flux_direction", flux_direction);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(flux_direction == +1 || flux_direction == -1,
+            "Error: flux_direction must be -1 or +1.");
+    }
+
     // Construct InjectorPosition with InjectorPositionRandom.
     h_flux_pos = std::make_unique<InjectorPosition>(
         (InjectorPositionRandomPlane*)nullptr,
@@ -501,18 +524,15 @@ void PlasmaInjector::setupExternalFile (amrex::ParmParse const& pp_species)
     } // IOProcessor
 
     // Broadcast charge and mass to non-IO processors if read in from the file
-    if (!charge_is_specified && !species_is_specified) {
-        // Use ReduceBoolOr since Bcast(bool) doesn't compile
-        amrex::ParallelDescriptor::ReduceBoolOr(charge_from_source, amrex::ParallelDescriptor::IOProcessorNumber());
-        if (charge_from_source) {
-            amrex::ParallelDescriptor::Bcast(&charge, 1, amrex::ParallelDescriptor::IOProcessorNumber());
-        }
+    std::array<int,2> flags{charge_from_source, mass_from_source};
+    amrex::ParallelDescriptor::Bcast(flags.data(), flags.size(), amrex::ParallelDescriptor::IOProcessorNumber());
+    charge_from_source = flags[0];
+    mass_from_source   = flags[1];
+    if (charge_from_source) {
+        amrex::ParallelDescriptor::Bcast(&charge, 1, amrex::ParallelDescriptor::IOProcessorNumber());
     }
-    if (!mass_is_specified && !species_is_specified) {
-        amrex::ParallelDescriptor::ReduceBoolOr(mass_from_source, amrex::ParallelDescriptor::IOProcessorNumber());
-        if (mass_from_source) {
-            amrex::ParallelDescriptor::Bcast(&mass, 1, amrex::ParallelDescriptor::IOProcessorNumber());
-        }
+    if (mass_from_source) {
+        amrex::ParallelDescriptor::Bcast(&mass, 1, amrex::ParallelDescriptor::IOProcessorNumber());
     }
 #else
     WARPX_ABORT_WITH_MESSAGE(
@@ -574,9 +594,9 @@ bool PlasmaInjector::insideBounds (amrex::Real x, amrex::Real y, amrex::Real z) 
 bool PlasmaInjector::overlapsWith (const amrex::XDim3& lo,
                                    const amrex::XDim3& hi) const noexcept
 {
-    return ! (   (xmin > hi.x) || (xmax < lo.x)
-              || (ymin > hi.y) || (ymax < lo.y)
-              || (zmin > hi.z) || (zmax < lo.z) );
+    return  (    (xmin <= hi.x) && (xmax >= lo.x)
+              && (ymin <= hi.y) && (ymax >= lo.y)
+              && (zmin <= hi.z) && (zmax >= lo.z) );
 }
 
 bool

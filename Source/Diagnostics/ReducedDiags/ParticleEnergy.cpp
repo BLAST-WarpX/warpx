@@ -34,7 +34,7 @@
 using namespace amrex;
 
 // constructor
-ParticleEnergy::ParticleEnergy (std::string rd_name)
+ParticleEnergy::ParticleEnergy (const std::string& rd_name)
 : ReducedDiags{rd_name}
 {
     // get a reference to WarpX instance
@@ -78,7 +78,7 @@ ParticleEnergy::ParticleEnergy (std::string rd_name)
                 ofs << m_sep;
                 ofs << "[" << c++ << "]" << species_names[i] + "_mean(J)";
             }
-            ofs << std::endl;
+            ofs << "\n";
             // close file
             ofs.close();
         }

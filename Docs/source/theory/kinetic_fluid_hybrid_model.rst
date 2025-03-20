@@ -46,7 +46,7 @@ integrating over velocity), also called the generalized Ohm's law, is given by:
 
     .. math::
 
-        en_e\vec{E} = \frac{m}{e}\frac{\partial \vec{J}_e}{\partial t} + \frac{m}{e^2}\left( \vec{U}_e\cdot\nabla \right) \vec{J}_e - \nabla\cdot {\overleftrightarrow P}_e - \vec{J}_e\times\vec{B}+\vec{R}_e
+        en_e\vec{E} = \frac{m}{e}\frac{\partial \vec{J}_e}{\partial t} + \frac{m}{e}\left( \vec{U}_e\cdot\nabla \right) \vec{J}_e - \nabla\cdot {\overleftrightarrow P}_e - \vec{J}_e\times\vec{B}+\vec{R}_e
 
 where :math:`\vec{U}_e = \vec{J}_e/(en_e)` is the electron fluid velocity,
 :math:`{\overleftrightarrow P}_e` is the electron pressure tensor and
@@ -64,7 +64,7 @@ Plugging this back into the generalized Ohm' law gives:
 
         \left(en_e +\frac{m}{e\mu_0}\nabla\times\nabla\times\right)\vec{E} =&
         - \frac{m}{e}\left( \frac{\partial\vec{J}_{ext}}{\partial t} + \sum_{s\neq e}\frac{\partial\vec{J}_s}{\partial t} \right) \\
-        &+ \frac{m}{e^2}\left( \vec{U}_e\cdot\nabla \right) \vec{J}_e - \nabla\cdot {\overleftrightarrow P}_e - \vec{J}_e\times\vec{B}+\vec{R}_e.
+        &+ \frac{m}{e}\left( \vec{U}_e\cdot\nabla \right) \vec{J}_e - \nabla\cdot {\overleftrightarrow P}_e - \vec{J}_e\times\vec{B}+\vec{R}_e.
 
 If we now further assume electrons are inertialess (i.e. :math:`m=0`), the above equation simplifies to,
 
@@ -73,13 +73,13 @@ If we now further assume electrons are inertialess (i.e. :math:`m=0`), the above
         en_e\vec{E} = -\vec{J}_e\times\vec{B}-\nabla\cdot{\overleftrightarrow P}_e+\vec{R}_e.
 
 Making the further simplifying assumptions that the electron pressure is isotropic and that
-the electron drag term can be written as a simple resistance
-i.e. :math:`\vec{R}_e = en_e\vec{\eta}\cdot\vec{J}`, brings us to the implemented form of
+the electron drag term can be written using a simple resistivity (:math:`\eta`) and hyper-resistivity (:math:`\eta_h`)
+i.e. :math:`\vec{R}_e = en_e(\eta-\eta_h \nabla^2)\vec{J}`, brings us to the implemented form of
 Ohm's law:
 
     .. math::
 
-        \vec{E} = -\frac{1}{en_e}\left( \vec{J}_e\times\vec{B} + \nabla P_e \right)+\vec{\eta}\cdot\vec{J}.
+        \vec{E} = -\frac{1}{en_e}\left( \vec{J}_e\times\vec{B} + \nabla P_e \right)+\eta\vec{J}-\eta_h \nabla^2\vec{J}.
 
 Lastly, if an electron temperature is given from which the electron pressure can
 be calculated, the model is fully constrained and can be evolved given initial
@@ -116,8 +116,7 @@ be interpolated to the correct time, using :math:`\vec{J}_i^n = 1/2(\vec{J}_i^{n
 The electron pressure is simply calculated using :math:`\rho^n` and the B-field is also already
 known at the correct time since it was calculated for :math:`t=t_n` at the end of the last step.
 Once :math:`\vec{E}^n` is calculated, it is used to push :math:`\vec{B}^n` forward in time
-(using the Maxwell-Faraday equation, i.e. the same as in the regular PIC routine with ``WarpX::EvolveB()``)
-to :math:`\vec{B}^{n+1/2}`.
+(using the Maxwell-Faraday equation) to :math:`\vec{B}^{n+1/2}`.
 
 Second half step
 """"""""""""""""
@@ -147,10 +146,11 @@ Sub-stepping
 ^^^^^^^^^^^^
 
 It is also well known that hybrid PIC routines require the B-field to be
-updated with a smaller timestep than needed for the particles. The update steps
-as outlined above are therefore wrapped in loops that enable the B-field to be
-sub-stepped. The exact number of sub-steps used can be specified by the user
-through a runtime simulation parameter (see :ref:`input parameters section <running-cpp-parameters-hybrid-model>`).
+updated with a smaller timestep than needed for the particles. A 4th order
+Runge-Kutta scheme is used to update the B-field. The RK scheme is repeated a
+number of times during each half-step outlined above. The number of sub-steps
+used can be specified by the user through a runtime simulation parameter
+(see :ref:`input parameters section <running-cpp-parameters-hybrid-model>`).
 
 .. _theory-hybrid-model-elec-temp:
 
@@ -166,6 +166,14 @@ input parameters, :math:`T_{e0}`, :math:`n_0` and :math:`\gamma` using
 
 The isothermal limit is given by :math:`\gamma = 1` while :math:`\gamma = 5/3`
 (default) produces the adiabatic limit.
+
+Electron current
+^^^^^^^^^^^^^^^^
+
+WarpX's displacement current diagnostic can be used to output the electron current in
+the kinetic-fluid hybrid model since in the absence of kinetic electrons, and under
+the assumption of zero displacement current, that diagnostic simply calculates the
+hybrid model's electron current.
 
 .. bibliography::
     :keyprefix: kfhm-

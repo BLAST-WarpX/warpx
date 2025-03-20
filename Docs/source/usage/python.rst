@@ -35,7 +35,7 @@ Simulation and Grid Setup
 -------------------------
 
 .. autoclass:: pywarpx.picmi.Simulation
-    :members: step, add_species, add_laser, write_input_file
+    :members: step, add_species, add_laser, add_applied_field, write_input_file
 
 .. autoclass:: pywarpx.picmi.Cartesian3DGrid
 
@@ -53,6 +53,30 @@ Field solvers define the updates of electric and magnetic fields.
 
 .. autoclass:: pywarpx.picmi.ElectrostaticSolver
 
+Object that allows smoothing of fields.
+
+.. autoclass:: pywarpx.picmi.BinomialSmoother
+
+Evolve Schemes
+--------------
+
+These define the scheme use to evolve the fields and particles.
+An instance of one of these would be passed as the `evolve_scheme` into the `Simulation`.
+
+.. autoclass:: pywarpx.picmi.ExplicitEvolveScheme
+
+.. autoclass:: pywarpx.picmi.ThetaImplicitEMEvolveScheme
+
+.. autoclass:: pywarpx.picmi.SemiImplicitEMEvolveScheme
+
+There are several support classes use to specify components of the evolve schemes
+
+.. autoclass:: pywarpx.picmi.PicardNonlinearSolver
+
+.. autoclass:: pywarpx.picmi.NewtonNonlinearSolver
+
+.. autoclass:: pywarpx.picmi.GMRESLinearSolver
+
 Constants
 ---------
 
@@ -69,11 +93,15 @@ which can be used directly inside any PICMI script. The values are in SI units.
 Applied fields
 --------------
 
+Instances of the classes below need to be passed to the method `add_applied_field` of the `Simulation` class.
+
 .. autoclass:: pywarpx.picmi.AnalyticInitialField
 
 .. autoclass:: pywarpx.picmi.ConstantAppliedField
 
 .. autoclass:: pywarpx.picmi.AnalyticAppliedField
+
+.. autoclass:: pywarpx.picmi.LoadInitialField
 
 .. autoclass:: pywarpx.picmi.PlasmaLens
 
@@ -86,11 +114,17 @@ Diagnostics
 
 .. autoclass:: pywarpx.picmi.FieldDiagnostic
 
+.. autoclass:: pywarpx.picmi.TimeAveragedFieldDiagnostic
+
 .. autoclass:: pywarpx.picmi.ElectrostaticFieldDiagnostic
 
 .. autoclass:: pywarpx.picmi.Checkpoint
 
+.. autoclass:: pywarpx.picmi.ReducedDiagnostic
+
 Lab-frame diagnostics diagnostics are used when running boosted-frame simulations.
+
+.. autoclass:: pywarpx.picmi.LabFrameParticleDiagnostic
 
 .. autoclass:: pywarpx.picmi.LabFrameFieldDiagnostic
 
@@ -111,6 +145,10 @@ Particle distributions can be used for to initialize particles in a particle spe
 .. autoclass:: pywarpx.picmi.UniformDistribution
 
 .. autoclass:: pywarpx.picmi.AnalyticDistribution
+
+.. autoclass:: pywarpx.picmi.UniformFluxDistribution
+
+.. autoclass:: pywarpx.picmi.AnalyticFluxDistribution
 
 .. autoclass:: pywarpx.picmi.ParticleListDistribution
 

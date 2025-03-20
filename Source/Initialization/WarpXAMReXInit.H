@@ -33,4 +33,4 @@ namespace warpx::initialization
     );
 
 }
-#endif
+#endif //WARPX_AMREX_INIT_H_

@@ -1,0 +1,121 @@
+# Iterations
+max_step = 25
+
+# Domain
+amr.n_cell = 32 64
+amr.max_level = 0
+warpx.numprocs = 1 2
+
+# Geometry
+geometry.dims = RZ
+geometry.prob_lo =   0    -220e-6
+geometry.prob_hi = 200e-6   10e-6
+boundary.field_lo = none damped
+boundary.field_hi = none damped
+
+# Algorithms
+algo.current_deposition = direct
+algo.charge_deposition = standard
+algo.field_gathering = energy-conserving
+algo.maxwell_solver = psatd
+algo.particle_pusher = vay
+algo.particle_shape = 3
+
+# Numerics
+warpx.do_moving_window = 1
+warpx.moving_window_dir = z
+warpx.moving_window_v = 1.
+warpx.n_rz_azimuthal_modes = 1
+warpx.use_filter = 1
+warpx.verbose = 1
+warpx.abort_on_warning_threshold = medium
+
+warpx.cfl = 1.
+#warpx.gamma_boost = 1.
+#warpx.boost_direction = z
+
+warpx.do_dive_cleaning = 1
+warpx.do_divb_cleaning = 1
+warpx.do_multi_J = 1
+warpx.do_multi_J_n_depositions = 2
+psatd.do_time_averaging = 1
+
+# PSATD
+psatd.update_with_rho = 1
+#psatd.v_galilean = 0. 0. -0.9373391857121336
+psatd.J_in_time = linear
+
+# Particles
+
+particles.species_names = driver driver_back plasma_e plasma_p
+particles.use_fdtd_nci_corr = 0
+particles.rigid_injected_species = driver
+
+driver.species_type = electron
+driver.injection_style = "gaussian_beam"
+driver.x_rms = 5e-6
+driver.y_rms = 5e-6
+driver.z_rms = 20.1e-6
+driver.x_m = 0.
+driver.y_m = 0.
+driver.z_m = -80e-6
+driver.npart = 1000000
+driver.q_tot = -1e-9
+driver.momentum_distribution_type = "gaussian"
+driver.ux_m = 0.
+driver.uy_m = 0.
+driver.uz_m = 2000.
+driver.ux_th = 4.
+driver.uy_th = 4.
+driver.uz_th = 20.
+driver.zinject_plane = 2e-3
+driver.rigid_advance = true
+driver.initialize_self_fields = 0
+driver.do_symmetrize = 1
+driver.symmetrization_order = 4
+
+driver_back.species_type = positron
+driver_back.injection_style = "gaussian_beam"
+driver_back.x_rms = 5e-6
+driver_back.y_rms = 5e-6
+driver_back.z_rms = 20.1e-6
+driver_back.x_m = 0.
+driver_back.y_m = 0.
+driver_back.z_m = -80e-6
+driver_back.npart = 1000000
+driver_back.q_tot = 1e-9
+driver_back.momentum_distribution_type = "at_rest"
+driver_back.initialize_self_fields = 0
+driver_back.do_symmetrize = 1
+driver_back.symmetrization_order = 4
+
+plasma_e.species_type = electron
+plasma_e.injection_style = "NUniformPerCell"
+plasma_e.zmin = 0.
+plasma_e.zmax = 0.5
+plasma_e.xmin = -180e-6
+plasma_e.xmax =  180e-6
+plasma_e.profile = constant
+plasma_e.density = 1e23
+plasma_e.num_particles_per_cell_each_dim = 2 2 1
+plasma_e.momentum_distribution_type = "at_rest"
+plasma_e.do_continuous_injection = 1
+
+plasma_p.species_type = hydrogen
+plasma_p.injection_style = "NUniformPerCell"
+plasma_p.zmin = 0.
+plasma_p.zmax = 0.5
+plasma_p.xmin = -180e-6
+plasma_p.xmax =  180e-6
+plasma_p.profile = constant
+plasma_p.density = 1e23
+plasma_p.num_particles_per_cell_each_dim = 2 2 1
+plasma_p.momentum_distribution_type = "at_rest"
+plasma_p.do_continuous_injection = 1
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 25
+diag1.diag_type = Full
+diag1.fields_to_plot = Er Ez Bt jr jz rho rho_driver rho_plasma_e rho_plasma_p
+diag1.species = driver plasma_e plasma_p

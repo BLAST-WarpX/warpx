@@ -29,7 +29,7 @@
 using namespace amrex::literals;
 
 // constructor
-RhoMaximum::RhoMaximum (std::string rd_name)
+RhoMaximum::RhoMaximum (const std::string& rd_name)
 : ReducedDiags{rd_name}
 {
     // RZ coordinate is not working
@@ -76,7 +76,7 @@ RhoMaximum::RhoMaximum (std::string rd_name)
             for (int lev = 0; lev < nLevel; ++lev)
             {
                 // Initialize functors for the charge density of each charged species
-                m_rho_functors[lev].push_back(std::make_unique<RhoFunctor>(lev, crse_ratio, i));
+                m_rho_functors[lev].push_back(std::make_unique<RhoFunctor>(lev, crse_ratio, false, i));
             }
         }
     }
@@ -113,7 +113,7 @@ RhoMaximum::RhoMaximum (std::string rd_name)
                                          + "_|rho|_lev" + std::to_string(lev) + "(C/m^3)";
                 }
             }
-            ofs << std::endl;
+            ofs << "\n";
             // close file
             ofs.close();
         }

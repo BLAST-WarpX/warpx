@@ -81,27 +81,9 @@ public:
      * \brief Evolve is the central function PhysicalParticleContainer that
      * advances plasma particles for a time dt (typically one timestep).
      *
+     * \param fields the WarpX field register
      * \param lev level on which particles are living
-     * \param Ex MultiFab from which field Ex is gathered
-     * \param Ey MultiFab from which field Ey is gathered
-     * \param Ez MultiFab from which field Ez is gathered
-     * \param Bx MultiFab from which field Bx is gathered
-     * \param By MultiFab from which field By is gathered
-     * \param Bz MultiFab from which field Bz is gathered
-     * \param jx MultiFab to which the particles' current jx is deposited
-     * \param jy MultiFab to which the particles' current jy is deposited
-     * \param jz MultiFab to which the particles' current jz is deposited
-     * \param cjx Same as jx (coarser, from lev-1), when using deposition buffers
-     * \param cjy Same as jy (coarser, from lev-1), when using deposition buffers
-     * \param cjz Same as jz (coarser, from lev-1), when using deposition buffers
-     * \param rho MultiFab to which the particles' charge is deposited
-     * \param crho Same as rho (coarser, from lev-1), when using deposition buffers
-     * \param cEx Same as Ex (coarser, from lev-1), when using gather buffers
-     * \param cEy Same as Ey (coarser, from lev-1), when using gather buffers
-     * \param cEz Same as Ez (coarser, from lev-1), when using gather buffers
-     * \param cBx Same as Bx (coarser, from lev-1), when using gather buffers
-     * \param cBy Same as By (coarser, from lev-1), when using gather buffers
-     * \param cBz Same as Bz (coarser, from lev-1), when using gather buffers
+     * \param current_fp_string current coarse or fine patch identifier in fields
      * \param t current physical time
      * \param dt time step by which particles are advanced
      * \param a_dt_type type of time step (used for sub-cycling)
@@ -112,32 +94,14 @@ public:
      * field gather, particle push and current deposition for all particles
      * in the box.
      */
-    void Evolve (int lev,
-                         const amrex::MultiFab& Ex,
-                         const amrex::MultiFab& Ey,
-                         const amrex::MultiFab& Ez,
-                         const amrex::MultiFab& Bx,
-                         const amrex::MultiFab& By,
-                         const amrex::MultiFab& Bz,
-                         amrex::MultiFab& jx,
-                         amrex::MultiFab& jy,
-                         amrex::MultiFab& jz,
-                         amrex::MultiFab* cjx,
-                         amrex::MultiFab* cjy,
-                         amrex::MultiFab* cjz,
-                         amrex::MultiFab* rho,
-                         amrex::MultiFab* crho,
-                         const amrex::MultiFab* cEx,
-                         const amrex::MultiFab* cEy,
-                         const amrex::MultiFab* cEz,
-                         const amrex::MultiFab* cBx,
-                         const amrex::MultiFab* cBy,
-                         const amrex::MultiFab* cBz,
-                         amrex::Real t,
-                         amrex::Real dt,
-                         DtType a_dt_type=DtType::Full,
-                         bool skip_deposition=false,
-                         PushType push_type=PushType::Explicit) override;
+    void Evolve (ablastr::fields::MultiFabRegister& fields,
+                 int lev,
+                 const std::string& current_fp_string,
+                 amrex::Real t,
+                 amrex::Real dt,
+                 DtType a_dt_type=DtType::Full,
+                 bool skip_deposition=false,
+                 PushType push_type=PushType::Explicit) override;
 
     virtual void PushPX (WarpXParIter& pti,
                          amrex::FArrayBox const * exfab,
@@ -226,12 +190,7 @@ public:
                                     amrex::ParticleReal& ux, amrex::ParticleReal& uy, amrex::ParticleReal& uz,
                                     amrex::Real t_lab = 0.) const;
 
-    void AddGaussianBeam (
-        PlasmaInjector const& plasma_injector,
-        amrex::Real x_m, amrex::Real y_m, amrex::Real z_m,
-        amrex::Real x_rms, amrex::Real y_rms, amrex::Real z_rms,
-        amrex::Real x_cut, amrex::Real y_cut, amrex::Real z_cut,
-        amrex::Real q_tot, long npart, int do_symmetrize, int symmetrization_order);
+    void AddGaussianBeam (PlasmaInjector const& plasma_injector);
 
     /** Load a particle beam from an external file
      * @param[in] the PlasmaInjector instance holding the input parameters
@@ -268,11 +227,9 @@ public:
      * @param[in] engine the random engine, used in initialization of QED optical depths
      */
     void DefaultInitializeRuntimeAttributes (
-                    amrex::ParticleTile<amrex::Particle<NStructReal, NStructInt>,
-                                        NArrayReal, NArrayInt,
-                                        amrex::PinnedArenaAllocator>& pinned_tile,
-                    int n_external_attr_real,
-                    int n_external_attr_int) final;
+        typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType& pinned_tile,
+        int n_external_attr_real,
+        int n_external_attr_int) final;
 
 /**
  * \brief Apply NCI Godfrey filter to all components of E and B before gather
@@ -359,14 +316,14 @@ public:
      * @param[in] ptr the pointer
      */
     void set_breit_wheeler_engine_ptr
-        (std::shared_ptr<BreitWheelerEngine> ptr) override;
+        (const std::shared_ptr<BreitWheelerEngine>& ptr) override;
 
     /**
      * Acquires a shared smart pointer to a QuantumSynchrotronEngine
      * @param[in] ptr the pointer
      */
     void set_quantum_sync_engine_ptr
-        (std::shared_ptr<QuantumSynchrotronEngine> ptr) override;
+        (const std::shared_ptr<QuantumSynchrotronEngine>& ptr) override;
     //__________
 
     BreitWheelerEngine* get_breit_wheeler_engine_ptr () const override {
@@ -399,6 +356,14 @@ public:
     }
 
 protected:
+
+    /*
+       Finds the box defining the region where refine injection should be used, if that
+       option is enabled. Currently this only works for numLevels() == 2 and static mesh
+       refinement.
+    */
+    bool findRefinedInjectionBox (amrex::Box& fine_injection_box, amrex::IntVect& rrfac);
+
     std::string species_name;
     std::vector<std::unique_ptr<PlasmaInjector>> plasma_injectors;
 

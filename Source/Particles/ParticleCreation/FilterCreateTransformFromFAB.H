@@ -5,11 +5,10 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef FILTER_CREATE_TRANSFORM_FROM_FAB_H_
-#define FILTER_CREATE_TRANSFORM_FROM_FAB_H_
+#ifndef WARPX_FILTER_CREATE_TRANSFORM_FROM_FAB_H_
+#define WARPX_FILTER_CREATE_TRANSFORM_FROM_FAB_H_
 
 #include "Particles/ParticleCreation/DefaultInitialization.H"
-#include "WarpX.H"
 
 #include <AMReX_REAL.H>
 #include <AMReX_TypeTraits.H>
@@ -40,45 +39,42 @@
  * \param[in] create1 callable that defines what will be done for the create step for dst1.
  * \param[in] create2 callable that defines what will be done for the create step for dst2.
  * \param[in] transform callable that defines the transformation to apply on dst1 and dst2.
+ * \param[in] geom_lev_zero the geometry object associated to level zero
  *
  * \return num_added the number of particles that were written to dst1 and dst2.
  */
 template <int N, typename DstPC, typename DstTile, typename FAB, typename Index,
           typename CreateFunc1, typename CreateFunc2, typename TransFunc,
-          amrex::EnableIf_t<std::is_integral<Index>::value, int> foo = 0>
+          amrex::EnableIf_t<std::is_integral_v<Index>, int> foo = 0>
 Index filterCreateTransformFromFAB (DstPC& pc1, DstPC& pc2,
                                     DstTile& dst1, DstTile& dst2, const amrex::Box box,
                                     const FAB *src_FAB, const Index* mask,
                                     const Index dst1_index, const Index dst2_index,
                                     CreateFunc1&& create1, CreateFunc2&& create2,
-                                    TransFunc&& transform) noexcept
+                                    TransFunc&& transform, const amrex::Geometry& geom_lev_zero) noexcept
 {
     using namespace amrex;
 
     const auto ncells = box.volume();
     if (ncells == 0) { return 0; }
 
-    auto & warpx = WarpX::GetInstance();
-    const int level_0 = 0;
-    Geometry const & geom = warpx.Geom(level_0);
-
     constexpr int spacedim = AMREX_SPACEDIM;
 
 #if defined(WARPX_DIM_1D_Z)
-    const Real zlo_global = geom.ProbLo(0);
-    const Real dz         = geom.CellSize(0);
+    const Real zlo_global = geom_lev_zero.ProbLo(0);
+    const Real dz         = geom_lev_zero.CellSize(0);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-    const Real xlo_global = geom.ProbLo(0);
-    const Real dx         = geom.CellSize(0);
-    const Real zlo_global = geom.ProbLo(1);
-    const Real dz         = geom.CellSize(1);
+    const Real xlo_global = geom_lev_zero.ProbLo(0);
+    const Real dx         = geom_lev_zero.CellSize(0);
+    const Real zlo_global = geom_lev_zero.ProbLo(1);
+    const Real dz         = geom_lev_zero.CellSize(1);
 #elif defined(WARPX_DIM_3D)
-    const Real xlo_global = geom.ProbLo(0);
-    const Real dx         = geom.CellSize(0);
-    const Real ylo_global = geom.ProbLo(1);
-    const Real dy         = geom.CellSize(1);
-    const Real zlo_global = geom.ProbLo(2);
-    const Real dz         = geom.CellSize(2);
+    const Real xlo_global = geom_lev_zero.ProbLo(0);
+    const Real dx         = geom_lev_zero.CellSize(0);
+    const Real ylo_global = geom_lev_zero.ProbLo(1);
+    const Real dy         = geom_lev_zero.CellSize(1);
+    const Real zlo_global = geom_lev_zero.ProbLo(2);
+    const Real dz         = geom_lev_zero.CellSize(2);
 #endif
 
     const auto arrNumPartCreation = src_FAB->array();
@@ -140,7 +136,7 @@ Index filterCreateTransformFromFAB (DstPC& pc1, DstPC& pc2,
     ParticleCreation::DefaultInitializeRuntimeAttributes(dst1,
                                        0, 0,
                                        pc1.getUserRealAttribs(), pc1.getUserIntAttribs(),
-                                       pc1.getParticleComps(), pc1.getParticleiComps(),
+                                       pc1.GetRealSoANames(), pc1.GetIntSoANames(),
                                        pc1.getUserRealAttribParser(),
                                        pc1.getUserIntAttribParser(),
 #ifdef WARPX_QED
@@ -154,7 +150,7 @@ Index filterCreateTransformFromFAB (DstPC& pc1, DstPC& pc2,
     ParticleCreation::DefaultInitializeRuntimeAttributes(dst2,
                                        0, 0,
                                        pc2.getUserRealAttribs(), pc2.getUserIntAttribs(),
-                                       pc2.getParticleComps(), pc2.getParticleiComps(),
+                                       pc2.GetRealSoANames(), pc2.GetIntSoANames(),
                                        pc2.getUserRealAttribParser(),
                                        pc2.getUserIntAttribParser(),
 #ifdef WARPX_QED
@@ -199,6 +195,7 @@ Index filterCreateTransformFromFAB (DstPC& pc1, DstPC& pc2,
  * \param[in] create1 callable that defines what will be done for the create step for dst1.
  * \param[in] create2 callable that defines what will be done for the create step for dst2.
  * \param[in] transform callable that defines the transformation to apply on dst1 and dst2.
+ * \param[in] geom_lev_zero the geometry object associated to level zero
  *
  * \return num_added the number of particles that were written to dst1 and dst2.
  */
@@ -209,7 +206,7 @@ Index filterCreateTransformFromFAB (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTi
                                 const FABs& src_FABs, const Index dst1_index,
                                 const Index dst2_index, FilterFunc&& filter,
                                 CreateFunc1&& create1, CreateFunc2&& create2,
-                                TransFunc && transform) noexcept
+                                TransFunc && transform, const amrex::Geometry& geom_lev_zero) noexcept
 {
     using namespace amrex;
 
@@ -241,7 +238,8 @@ Index filterCreateTransformFromFAB (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTi
                                         mask.dataPtr(), dst1_index, dst2_index,
                                         std::forward<CreateFunc1>(create1),
                                         std::forward<CreateFunc2>(create2),
-                                        std::forward<TransFunc>(transform));
+                                        std::forward<TransFunc>(transform),
+                                        geom_lev_zero);
 }
 
-#endif // FILTER_CREATE_TRANSFORM_FROM_FAB_H_
+#endif // WARPX_FILTER_CREATE_TRANSFORM_FROM_FAB_H_

@@ -29,7 +29,7 @@
 
 #include <AMReX_BaseFwd.H>
 
-LevelingThinning::LevelingThinning (const std::string species_name)
+LevelingThinning::LevelingThinning (const std::string& species_name)
 {
     using namespace amrex::literals;
 
@@ -47,9 +47,21 @@ LevelingThinning::LevelingThinning (const std::string species_name)
     }
 
     utils::parser::queryWithParser(
-        pp_species_name, "resampling_algorithm_min_ppc", m_min_ppc);
+        pp_species_name, "resampling_min_ppc", m_min_ppc);
+    BackwardCompatibility(species_name);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_min_ppc >= 1,
                                      "Resampling min_ppc should be greater than or equal to 1");
+}
+
+void LevelingThinning::BackwardCompatibility (const std::string& species_name )
+{
+    const amrex::ParmParse pp_species_name(species_name);
+    int backward_min_ppc;
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !pp_species_name.query("resampling_algorithm_min_ppc", backward_min_ppc),
+        "<species>.resampling_algorithm_min_ppc is no longer a valid option. "
+        "Please use the renamed option <species>.resampling_min_ppc instead."
+    );
 }
 
 void LevelingThinning::operator() (WarpXParIter& pti, const int lev,
@@ -60,8 +72,7 @@ void LevelingThinning::operator() (WarpXParIter& pti, const int lev,
     auto& ptile = pc->ParticlesAt(lev, pti);
     auto& soa = ptile.GetStructOfArrays();
     amrex::ParticleReal * const AMREX_RESTRICT w = soa.GetRealData(PIdx::w).data();
-    WarpXParticleContainer::ParticleType * const AMREX_RESTRICT
-                                 particle_ptr = ptile.GetArrayOfStructs()().data();
+    auto * const AMREX_RESTRICT idcpu = soa.GetIdCPUData().data();
 
     // Using this function means that we must loop over the cells in the ParallelFor. In the case
     // of the leveling thinning algorithm, it would have possibly been more natural and more
@@ -114,7 +125,7 @@ void LevelingThinning::operator() (WarpXParIter& pti, const int lev,
                 // Remove particle with probability 1 - particle_weight/level_weight
                 if (random_number > w[indices[i]]/level_weight)
                 {
-                    particle_ptr[indices[i]].id() = -1;
+                    idcpu[indices[i]] = amrex::ParticleIdCpus::Invalid;
                 }
                 // Set particle weight to level weight otherwise
                 else

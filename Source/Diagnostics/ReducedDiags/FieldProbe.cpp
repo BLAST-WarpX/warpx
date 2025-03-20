@@ -7,6 +7,7 @@
 
 #include "FieldProbe.H"
 #include "FieldProbeParticleContainer.H"
+#include "Fields.H"
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/Pusher/UpdatePosition.H"
@@ -16,6 +17,7 @@
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX_Array.H>
@@ -44,10 +46,11 @@
 #include <vector>
 
 using namespace amrex;
+using warpx::fields::FieldType;
 
 // constructor
 
-FieldProbe::FieldProbe (std::string rd_name)
+FieldProbe::FieldProbe (const std::string& rd_name)
 : ReducedDiags{rd_name}, m_probe(&WarpX::GetInstance())
 {
 
@@ -152,7 +155,12 @@ FieldProbe::FieldProbe (std::string rd_name)
             ablastr::warn_manager::WarnPriority::low);
     }
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(interp_order <= WarpX::nox ,
+    // ensure assumption holds: we read the fields in the interpolation kernel as they are,
+    // without further communication of guard/ghost/halo regions
+    int particle_shape;
+    const ParmParse pp_algo("algo");
+    utils::parser::getWithParser(pp_algo, "particle_shape", particle_shape);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(interp_order <= particle_shape ,
                                      "Field probe interp_order should be less than or equal to algo.particle_shape");
     if (ParallelDescriptor::IOProcessor())
     {
@@ -218,7 +226,7 @@ FieldProbe::FieldProbe (std::string rd_name)
                 ofs << m_sep;
                 ofs << "[" << c++ << "]part_S_lev" + std::to_string(lev) + u_map[FieldProbePIdx::S];
             }
-            ofs << std::endl;
+            ofs << "\n";
 
             // close file
             ofs.close();
@@ -374,6 +382,8 @@ void FieldProbe::ComputeDiags (int step)
     // get number of mesh-refinement levels
     const auto nLevel = warpx.finestLevel() + 1;
 
+    using ablastr::fields::Direction;
+
     // loop over refinement levels
     for (int lev = 0; lev < nLevel; ++lev)
     {
@@ -391,12 +401,12 @@ void FieldProbe::ComputeDiags (int step)
         }
 
         // get MultiFab data at lev
-        const amrex::MultiFab &Ex = warpx.getEfield(lev, 0);
-        const amrex::MultiFab &Ey = warpx.getEfield(lev, 1);
-        const amrex::MultiFab &Ez = warpx.getEfield(lev, 2);
-        const amrex::MultiFab &Bx = warpx.getBfield(lev, 0);
-        const amrex::MultiFab &By = warpx.getBfield(lev, 1);
-        const amrex::MultiFab &Bz = warpx.getBfield(lev, 2);
+        const amrex::MultiFab &Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
+        const amrex::MultiFab &Ey = *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, lev);
+        const amrex::MultiFab &Ez = *warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, lev);
+        const amrex::MultiFab &Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, lev);
+        const amrex::MultiFab &By = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, lev);
+        const amrex::MultiFab &Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, lev);
 
         /*
          * Prepare interpolation of field components to probe_position
@@ -431,8 +441,6 @@ void FieldProbe::ComputeDiags (int step)
         {
             const auto getPosition = GetParticlePosition<FieldProbePIdx>(pti);
             auto setPosition = SetParticlePosition<FieldProbePIdx>(pti);
-            const auto& aos = pti.GetArrayOfStructs();
-            const auto* AMREX_RESTRICT m_structs = aos().dataPtr();
 
             auto const np = pti.numParticles();
             if (update_particles_moving_window)
@@ -482,11 +490,10 @@ void FieldProbe::ComputeDiags (int step)
                 ParticleReal* const AMREX_RESTRICT part_Bz = attribs[FieldProbePIdx::Bz].dataPtr();
                 ParticleReal* const AMREX_RESTRICT part_S = attribs[FieldProbePIdx::S].dataPtr();
 
-                const auto &xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
-                const std::array<Real, 3> &dx = WarpX::CellSize(lev);
+                auto * const AMREX_RESTRICT idcpu = pti.GetStructOfArrays().GetIdCPUData().data();
 
-                const amrex::GpuArray<amrex::Real, 3> dx_arr = {dx[0], dx[1], dx[2]};
-                const amrex::GpuArray<amrex::Real, 3> xyzmin_arr = {xyzmin[0], xyzmin[1], xyzmin[2]};
+                const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+                const amrex::XDim3 dinv = WarpX::InvCellSize(lev);
                 const Dim3 lo = lbound(box);
 
                 // Temporarily defining modes and interp outside ParallelFor to avoid GPU compilation errors.
@@ -507,7 +514,7 @@ void FieldProbe::ComputeDiags (int step)
                     doGatherShapeN(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                    arrEx, arrEy, arrEz, arrBx, arrBy, arrBz,
                                    Extype, Eytype, Eztype, Bxtype, Bytype, Bztype,
-                                   dx_arr, xyzmin_arr, lo, temp_modes,
+                                   dinv, xyzmin, lo, temp_modes,
                                    temp_interp_order, false);
 
                     //Calculate the Poynting Vector S
@@ -556,7 +563,7 @@ void FieldProbe::ComputeDiags (int step)
                         amrex::ParticleReal xp, yp, zp;
                         getPosition(ip, xp, yp, zp);
                         long idx = ip*noutputs;
-                        dvp[idx++] = m_structs[ip].id();
+                        dvp[idx++] = amrex::ParticleIDWrapper{idcpu[ip]};  // all particles created on IO cpu
                         dvp[idx++] = xp;
                         dvp[idx++] = yp;
                         dvp[idx++] = zp;
@@ -674,7 +681,7 @@ void FieldProbe::WriteToFile (int step) const
             ofs << m_sep;
             ofs << sorted_data[i * noutputs + k];
         }
-        ofs << std::endl;
+        ofs << "\n";
     } // end loop over data size
     // close file
     ofs.close();

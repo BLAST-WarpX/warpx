@@ -46,6 +46,13 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
         encoding = openPMD::IterationEncoding::fileBased;
     }
 
+    // BP5 does not support groupBased (metadata explosion)
+    if ((openpmd_backend == "bp5" || openpmd_backend == "bp") &&
+        (encoding == openPMD::IterationEncoding::groupBased))
+    {
+        throw std::runtime_error("BeamMonitor: groupBased encoding not supported for BP5.");
+    }
+
     std::string diag_type_str;
     pp_diag_name.get("diag_type", diag_type_str);
     if (diag_type_str == "BackTransformed")
@@ -123,23 +130,26 @@ FlushFormatOpenPMD::WriteToFile (
     const amrex::Vector<ParticleDiag>& particle_diags, int output_levels,
     const std::string prefix, int file_min_digits, bool plot_raw_fields,
     bool plot_raw_fields_guards,
+    int verbose,
     const bool use_pinned_pc,
     bool isBTD, int snapshotID, int bufferID, int numBuffers,
     const amrex::Geometry& full_BTD_snapshot,
-    bool isLastBTDFlush, const amrex::Vector<int>& totalParticlesFlushedAlready) const
+    bool isLastBTDFlush) const
 {
     WARPX_PROFILE("FlushFormatOpenPMD::WriteToFile()");
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
-    if (!isBTD)
-    {
-        amrex::Print() << Utils::TextMsg::Info("Writing openPMD file " + filename);
-    } else
-    {
-        amrex::Print() << Utils::TextMsg::Info("Writing buffer " + std::to_string(bufferID+1) + " of " + std::to_string(numBuffers)
-                            + " to snapshot " + std::to_string(snapshotID) +  " to openPMD BTD " + prefix);
-        if (isLastBTDFlush)
+    if (verbose > 0) {
+        if (!isBTD)
         {
-            amrex::Print() << Utils::TextMsg::Info("Finished writing snapshot " + std::to_string(snapshotID) + " in openPMD BTD " + prefix);
+            amrex::Print() << Utils::TextMsg::Info("Writing openPMD file " + filename);
+        } else
+        {
+            amrex::Print() << Utils::TextMsg::Info("Writing buffer " + std::to_string(bufferID+1) + " of " + std::to_string(numBuffers)
+                                + " to snapshot " + std::to_string(snapshotID) +  " to openPMD BTD " + prefix);
+            if (isLastBTDFlush)
+            {
+                amrex::Print() << Utils::TextMsg::Info("Finished writing snapshot " + std::to_string(snapshotID) + " in openPMD BTD " + prefix);
+            }
         }
     }
 
@@ -164,7 +174,7 @@ FlushFormatOpenPMD::WriteToFile (
 
     // particles: all (reside only on locally finest level)
     m_OpenPMDPlotWriter->WriteOpenPMDParticles(
-        particle_diags, static_cast<amrex::Real>(time), use_pinned_pc, isBTD, isLastBTDFlush, totalParticlesFlushedAlready);
+        particle_diags, static_cast<amrex::Real>(time), use_pinned_pc, isBTD, isLastBTDFlush);
 
     // signal that no further updates will be written to this iteration
     m_OpenPMDPlotWriter->CloseStep(isBTD, isLastBTDFlush);

@@ -37,7 +37,7 @@ Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
 We use system software modules, add environment hints and further dependencies via the file ``$HOME/summit_warpx.profile``.
 Create it now:
@@ -124,7 +124,7 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
    cd $HOME/src/warpx
    rm -rf build_summit
 
-   cmake -S . -B build_summit -DWarpX_COMPUTE=CUDA -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_summit -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
    cmake --build build_summit -j 8
 
 The WarpX application executables are now in ``$HOME/src/warpx/build_summit/bin/``.
@@ -134,7 +134,7 @@ Additionally, the following commands will install WarpX as a Python module:
 
    rm -rf build_summit_py
 
-   cmake -S . -B build_summit_py -DWarpX_COMPUTE=CUDA -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_summit_py -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
    cmake --build build_summit_py -j 8 --target pip_install
 
 Now, you can :ref:`submit Summit compute jobs <running-cpp-summit>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).
@@ -331,7 +331,7 @@ Known System Issues
    The implementation of barriers in IBM's MPI fork is broken and leads to crashes at scale.
    This is seen with runs using 200 nodes and above.
 
-   Our batch script templates above `apply this work-around <https://github.com/ECP-WarpX/WarpX/pull/2283>`__ *before* the call to ``jsrun``, which avoids the broken routines from IBM and trades them for an OpenMPI implementation of collectives:
+   Our batch script templates above `apply this work-around <https://github.com/BLAST-WarpX/warpx/pull/2283>`__ *before* the call to ``jsrun``, which avoids the broken routines from IBM and trades them for an OpenMPI implementation of collectives:
 
    .. code-block:: bash
 

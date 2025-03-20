@@ -5,9 +5,9 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef EXTERNAL_FIELD_FWD_H_
-#define EXTERNAL_FIELD_FWD_H_
+#ifndef WARPX_EXTERNAL_FIELD_FWD_H_
+#define WARPX_EXTERNAL_FIELD_FWD_H_
 
 struct ExternalFieldParams;
 
-#endif //EXTERNAL_FIELD_FWD_H_
+#endif //WARPX_EXTERNAL_FIELD_FWD_H_

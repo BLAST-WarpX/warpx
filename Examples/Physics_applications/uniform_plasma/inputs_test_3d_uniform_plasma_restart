@@ -1,0 +1,5 @@
+# base input parameters
+FILE = inputs_test_3d_uniform_plasma
+
+# test input parameters
+amr.restart = "../test_3d_uniform_plasma/diags/chk000006"

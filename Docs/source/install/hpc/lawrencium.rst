@@ -27,7 +27,7 @@ Use the following commands to download the WarpX source code and switch to the c
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
 We use the following modules and environments on the system (``$HOME/lawrencium_warpx.profile``).
 
@@ -69,7 +69,7 @@ And since Lawrencium does not yet provide a module for them, install ADIOS2, BLA
    cmake -S src/lapackpp -B src/lapackpp-v100-build -DCMAKE_CXX_STANDARD=17 -Dgpu_backend=cuda -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=$HOME/sw/v100/lapackpp-master -Duse_cmake_find_lapack=ON -DBLAS_LIBRARIES=${LAPACK_DIR}/lib/libblas.a -DLAPACK_LIBRARIES=${LAPACK_DIR}/lib/liblapack.a
    cmake --build src/lapackpp-v100-build --target install --parallel 12
 
-Optionally, download and install Python packages for :ref:`PICMI <usage-picmi>` or dynamic ensemble optimizations (:ref:`libEnsemble <libensemble>`):
+Optionally, download and install Python packages for :ref:`PICMI <usage-picmi>` or dynamic ensemble optimizations (`libEnsemble <https://libensemble.readthedocs.io/en/main/>`__):
 
 .. code-block:: bash
 
@@ -83,7 +83,7 @@ Optionally, download and install Python packages for :ref:`PICMI <usage-picmi>` 
    python3 -m pip install --upgrade build
    python3 -m pip install --upgrade packaging
    python3 -m pip install --upgrade wheel
-   python3 -m pip install --upgrade setuptools
+   python3 -m pip install --upgrade setuptools[core]
    python3 -m pip install --upgrade cython
    python3 -m pip install --upgrade numpy
    python3 -m pip install --upgrade pandas
@@ -102,7 +102,7 @@ Then, ``cd`` into the directory ``$HOME/src/warpx`` and use the following comman
    cd $HOME/src/warpx
    rm -rf build
 
-   cmake -S . -B build -DWarpX_DIMS="1;2;RZ;3" -DWarpX_COMPUTE=CUDA -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON
+   cmake -S . -B build -DWarpX_DIMS="1;2;RZ;3" -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON
    cmake --build build -j 12
 
 The general :ref:`cmake compile-time options <building-cmake>` apply as usual.
@@ -122,14 +122,14 @@ For a *full PICMI install*, follow the :ref:`instructions for Python (PICMI) bin
    python3 -m pip install -r requirements.txt
 
    # compile parallel PICMI interfaces in 3D, 2D, 1D and RZ
-   WARPX_MPI=ON WARPX_COMPUTE=CUDA WARPX_PSATD=ON BUILD_PARALLEL=12 python3 -m pip install --force-reinstall --no-deps -v .
+   WARPX_MPI=ON WARPX_COMPUTE=CUDA WARPX_FFT=ON BUILD_PARALLEL=12 python3 -m pip install --force-reinstall --no-deps -v .
 
 Or, if you are *developing*, do a quick PICMI install of a *single geometry* (see: :ref:`WarpX_DIMS <building-cmake-options>`) using:
 
 .. code-block:: bash
 
    # find dependencies & configure
-   cmake -S . -B build -DWarpX_COMPUTE=CUDA -DWarpX_PSATD=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS=RZ
+   cmake -S . -B build -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS=RZ
 
    # build and then call "python3 -m pip install ..."
    cmake --build build --target pip_install -j 12

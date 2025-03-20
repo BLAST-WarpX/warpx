@@ -8,7 +8,7 @@
 
 #include "SortingUtils.H"
 
-void fillWithConsecutiveIntegers( amrex::Gpu::DeviceVector<long>& v )
+void fillWithConsecutiveIntegers( amrex::Gpu::DeviceVector<int>& v )
 {
 #ifdef AMREX_USE_GPU
     // On GPU: Use amrex

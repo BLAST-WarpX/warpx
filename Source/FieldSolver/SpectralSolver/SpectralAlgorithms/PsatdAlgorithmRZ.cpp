@@ -19,12 +19,14 @@ using namespace amrex::literals;
 PsatdAlgorithmRZ::PsatdAlgorithmRZ (SpectralKSpaceRZ const & spectral_kspace,
                                     amrex::DistributionMapping const & dm,
                                     const SpectralFieldIndex& spectral_index,
-                                    int const n_rz_azimuthal_modes, int const norder_z,
-                                    short const grid_type, amrex::Real const dt,
+                                    int const n_rz_azimuthal_modes,
+                                    int const norder_z,
+                                    ablastr::utils::enums::GridType grid_type,
+                                    amrex::Real const dt,
                                     bool const update_with_rho,
                                     const bool time_averaging,
-                                    const int J_in_time,
-                                    const int rho_in_time,
+                                    const JInTime J_in_time,
+                                    const RhoInTime rho_in_time,
                                     const bool dive_cleaning,
                                     const bool divb_cleaning):
     // Initialize members of base class and member variables
@@ -127,9 +129,9 @@ PsatdAlgorithmRZ::pushSpectralFields(SpectralFieldDataRZ & f)
         amrex::ParallelFor(bx, modes,
         [=] AMREX_GPU_DEVICE(int i, int j, int k, int mode) noexcept
         {
-            int idx_jx = (J_linear) ? static_cast<int>(Idx.Jx_old) : static_cast<int>(Idx.Jx_mid);
-            int idx_jy = (J_linear) ? static_cast<int>(Idx.Jy_old) : static_cast<int>(Idx.Jy_mid);
-            int idx_jz = (J_linear) ? static_cast<int>(Idx.Jz_old) : static_cast<int>(Idx.Jz_mid);
+            const int idx_jx = (J_linear) ? static_cast<int>(Idx.Jx_old) : static_cast<int>(Idx.Jx_mid);
+            const int idx_jy = (J_linear) ? static_cast<int>(Idx.Jy_old) : static_cast<int>(Idx.Jy_mid);
+            const int idx_jz = (J_linear) ? static_cast<int>(Idx.Jz_old) : static_cast<int>(Idx.Jz_mid);
 
             // All of the fields of each mode are grouped together
             int const Ep_m = Idx.Ex + Idx.n_fields*mode;
@@ -432,7 +434,7 @@ PsatdAlgorithmRZ::CurrentCorrection (SpectralFieldDataRZ& field_data)
         amrex::Box const & bx = field_data.fields[mfi].box();
 
         // Extract arrays for the fields to be updated
-        amrex::Array4<Complex> fields = field_data.fields[mfi].array();
+        const amrex::Array4<Complex> fields = field_data.fields[mfi].array();
 
         // Extract pointers for the k vectors
         auto const & kr_modes = field_data.getKrArray(mfi);

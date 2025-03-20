@@ -18,7 +18,7 @@ class CollisionBase
 {
 public:
 
-    CollisionBase (std::string collision_name);
+    CollisionBase (const std::string& collision_name);
 
     virtual void doCollisions (amrex::Real /*cur_time*/, amrex::Real /*dt*/, MultiParticleContainer* /*mypc*/ ){}
 

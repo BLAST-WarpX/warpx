@@ -5,8 +5,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef INJECTOR_POSITION_H_
-#define INJECTOR_POSITION_H_
+#ifndef WARPX_INJECTOR_POSITION_H_
+#define WARPX_INJECTOR_POSITION_H_
 
 #include "InjectorPosition_fwd.H"
 
@@ -227,9 +227,9 @@ struct InjectorPosition
     bool
     overlapsWith (const amrex::XDim3& lo, const amrex::XDim3& hi) const noexcept
     {
-        return ! (   (xmin > hi.x) || (xmax < lo.x)
-                  || (ymin > hi.y) || (ymax < lo.y)
-                  || (zmin > hi.z) || (zmax < lo.z) );
+        return (     (xmin <= hi.x) && (xmax >= lo.x)
+                  && (ymin <= hi.y) && (ymax >= lo.y)
+                  && (zmin <= hi.z) && (zmax >= lo.z) );
     }
 
 private:
@@ -255,4 +255,4 @@ private:
     amrex::Real zmin, zmax;
 };
 
-#endif
+#endif //WARPX_INJECTOR_POSITION_H_

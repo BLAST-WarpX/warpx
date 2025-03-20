@@ -41,12 +41,12 @@ namespace ablastr::coarsen::sample
         const amrex::IntVect stag_src = mf_src.boxArray().ixType().toIntVect();
         const amrex::IntVect stag_dst = mf_dst.boxArray().ixType().toIntVect();
 
-        if ( crse_ratio > amrex::IntVect(1) ) {
+        if ( crse_ratio.allGT(amrex::IntVect(1)) ) {
             ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE( ngrowvect == amrex::IntVect(0),
                                                 "option of filling guard cells of destination MultiFab with coarsening not supported for this interpolation" );
         }
 
-        ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE( mf_src.nGrowVect() >= stag_dst-stag_src+ngrowvect,
+        ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE( mf_src.nGrowVect().allGE(stag_dst-stag_src+ngrowvect),
                                             "source fine MultiFab does not have enough guard cells for this interpolation" );
 
         // Auxiliary integer arrays (always 3D)

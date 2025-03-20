@@ -55,9 +55,9 @@ WarnManager::WarnManager():
 {}
 
 void WarnManager::RecordWarning(
-            std::string topic,
-            std::string text,
-            WarnPriority priority)
+            const std::string& topic,
+            const std::string& text,
+            const WarnPriority& priority)
 {
     auto msg_priority = abl_msg_logger::Priority::high;
     if(priority == WarnPriority::low) {
@@ -316,9 +316,9 @@ WarnManager& ablastr::warn_manager::GetWMInstance()
 }
 
 void ablastr::warn_manager::WMRecordWarning(
-    std::string topic,
-    std::string text,
-    WarnPriority priority)
+    const std::string& topic,
+    const std::string& text,
+    const WarnPriority& priority)
 {
     WarnManager::GetInstance().RecordWarning(
         topic, text, priority);

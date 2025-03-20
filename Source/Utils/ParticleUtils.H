@@ -28,9 +28,10 @@ namespace ParticleUtils {
      * @param[in] mfi the MultiFAB iterator.
      * @param[in] ptile the particle tile.
      */
-    amrex::DenseBins<WarpXParticleContainer::ParticleType>
-    findParticlesInEachCell(int lev, amrex::MFIter const& mfi,
-                             WarpXParticleContainer::ParticleTileType const& ptile);
+    amrex::DenseBins<typename WarpXParticleContainer::ParticleTileType::ParticleTileDataType>
+    findParticlesInEachCell (int lev,
+                             amrex::MFIter const & mfi,
+                             WarpXParticleContainer::ParticleTileType & ptile);
 
     /**
      * \brief Return (relativistic) particle energy given velocity and mass.

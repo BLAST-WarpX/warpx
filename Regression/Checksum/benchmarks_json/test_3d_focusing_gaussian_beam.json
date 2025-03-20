@@ -1,0 +1,14 @@
+{
+  "lev=0": {
+    "rho_beam1": 5637659324885.731
+  },
+  "beam1": {
+    "particle_momentum_x": 2.113335069047891e-14,
+    "particle_momentum_y": 5.653782702472731e-16,
+    "particle_momentum_z": 6.68023056405556e-11,
+    "particle_position_x": 0.5640698094900541,
+    "particle_position_y": 0.011947117763454793,
+    "particle_position_z": 239.4325333696459,
+    "particle_weight": 19999620000.0
+  }
+}

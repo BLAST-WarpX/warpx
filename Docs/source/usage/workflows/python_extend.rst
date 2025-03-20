@@ -90,6 +90,12 @@ This object is the Python equivalent to the C++ ``WarpX`` simulation class.
 
    .. py:method:: get_particle_boundary_buffer
 
+   .. py:method:: set_potential_on_domain_boundary(potential_[lo/hi]_[x/y/z]: str)
+
+      The potential on the domain boundaries can be modified when using the electrostatic solver.
+      This function updates the strings and function parsers which set the domain
+      boundary potentials during the Poisson solve.
+
    .. py:method:: set_potential_on_eb(potential: str)
 
       The embedded boundary (EB) conditions can be modified when using the electrostatic solver.
@@ -128,9 +134,12 @@ This example accesses the :math:`E_x(x,y,z)` field at level 0 after every time s
        warpx = sim.extension.warpx
 
        # data access
-       E_x_mf = warpx.multifab(f"Efield_fp[x][level=0]")
+       #   vector field E, component x, on the fine patch of MR level 0
+       E_x_mf = warpx.multifab("Efield_fp", dir=0, level=0)
+       #   scalar field rho, on the fine patch of MR level 0
+       rho_mf = warpx.multifab("rho_fp", level=0)
 
-       # compute
+       # compute on E_x_mf
        # iterate over mesh-refinement levels
        for lev in range(warpx.finest_level + 1):
            # grow (aka guard/ghost/halo) regions
@@ -190,6 +199,7 @@ Particles
    @callfromafterstep
    def my_after_step_callback():
        warpx = sim.extension.warpx
+       Config = sim.extension.Config
 
        # data access
        multi_pc = warpx.multi_particle_container()
@@ -200,27 +210,27 @@ Particles
        for lvl in range(pc.finest_level + 1):
            # get every local chunk of particles
            for pti in pc.iterator(pc, level=lvl):
-               # default layout: AoS with positions and cpuid
-               aos = pti.aos().to_numpy()
-
-               # additional compile-time and runtime attributes in SoA format
-               soa = pti.soa().to_numpy()
+               # compile-time and runtime attributes in SoA format
+               soa = pti.soa().to_cupy() if Config.have_gpu else \
+                     pti.soa().to_numpy()
 
                # notes:
                # Only the next lines are the "HOT LOOP" of the computation.
-               # For efficiency, use numpy array operation for speed on CPUs.
-               # For GPUs use .to_cupy() above and compute with cupy or numba.
+               # For speed, use array operation.
 
                # write to all particles in the chunk
-               # note: careful, if you change particle positions, you need to
+               # note: careful, if you change particle positions, you might need to
                #       redistribute particles before continuing the simulation step
-               # aos[()]["x"] = 0.30
-               # aos[()]["y"] = 0.35
-               # aos[()]["z"] = 0.40
+               soa.real[0][()] = 0.30  # x
+               soa.real[1][()] = 0.35  # y
+               soa.real[2][()] = 0.40  # z
 
-               for soa_real in soa.real:
+               # all other attributes: weight, momentum x, y, z, ...
+               for soa_real in soa.real[3:]:
                    soa_real[()] = 42.0
 
+               # by default empty unless ionization or QED physics is used
+               # or other runtime attributes were added manually
                for soa_int in soa.int:
                    soa_int[()] = 12
 
@@ -252,7 +262,8 @@ Particles can be added to the simulation at specific positions and with specific
 .. autoclass:: pywarpx.particle_containers.ParticleContainerWrapper
    :members:
 
-The ``get_particle_structs()`` and ``get_particle_arrays()`` functions are called
+The ``get_particle_real_arrays()``, ``get_particle_int_arrays()`` and
+``get_particle_idcpu_arrays()`` functions are called
 by several utility functions of the form ``get_particle_{comp_name}`` where
 ``comp_name`` is one of ``x``, ``y``, ``z``, ``r``, ``theta``, ``id``, ``cpu``,
 ``weight``, ``ux``, ``uy`` or ``uz``.

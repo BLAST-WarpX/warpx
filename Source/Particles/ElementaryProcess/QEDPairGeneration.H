@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef QED_PAIR_GENERATION_H_
-#define QED_PAIR_GENERATION_H_
+#ifndef WARPX_QED_PAIR_GENERATION_H_
+#define WARPX_QED_PAIR_GENERATION_H_
 
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/Gather/GetExternalFields.H"
@@ -41,7 +41,7 @@ public:
     /**
     * \brief Constructor of the PairGenerationFilterFunc functor.
     *
-    * @param[in] opt_depth_runtime_comp index of the optical depth component
+    * @param[in] opt_depth_runtime_comp index of the optical depth runtime component
     */
     PairGenerationFilterFunc(int const opt_depth_runtime_comp)
         : m_opt_depth_runtime_comp(opt_depth_runtime_comp)
@@ -67,7 +67,7 @@ public:
     }
 
 private:
-    int m_opt_depth_runtime_comp = 0; /*!< Index of the optical depth component of the species.*/
+    int m_opt_depth_runtime_comp = 0; /*!< Index of the optical depth runtime component of the species. */
 };
 
 /**
@@ -144,7 +144,7 @@ public:
         doGatherShapeN(xp, yp, zp, ex, ey, ez, bx, by, bz,
                        m_ex_arr, m_ey_arr, m_ez_arr, m_bx_arr, m_by_arr, m_bz_arr,
                        m_ex_type, m_ey_type, m_ez_type, m_bx_type, m_by_type, m_bz_type,
-                       m_dx_arr, m_xyzmin_arr, m_lo, m_n_rz_azimuthal_modes,
+                       m_dinv, m_xyzmin, m_lo, m_n_rz_azimuthal_modes,
                        m_nox, m_galerkin_interpolation);
 
         //Despite the names of the variables, positrons and electrons
@@ -167,12 +167,12 @@ public:
             p_ux, p_uy, p_uz,
             engine);
 
-        src.m_aos[i_src].id() = -1; //destroy photon after pair generation
+        src.m_idcpu[i_src] = amrex::ParticleIdCpus::Invalid;  // destroy photon after pair generation
     }
 
 private:
 
-    const BreitWheelerGeneratePairs
+    BreitWheelerGeneratePairs
     m_generate_functor; /*!< A copy of the functor to generate pairs. It contains only pointers to the lookup tables.*/
 
     GetParticlePosition<PIdx> m_get_position;
@@ -198,8 +198,8 @@ private:
     amrex::IndexType m_by_type;
     amrex::IndexType m_bz_type;
 
-    amrex::GpuArray<amrex::Real, 3> m_dx_arr;
-    amrex::GpuArray<amrex::Real, 3> m_xyzmin_arr;
+    amrex::XDim3 m_dinv;
+    amrex::XDim3 m_xyzmin;
 
     bool m_galerkin_interpolation;
     int m_nox;
@@ -208,4 +208,4 @@ private:
     amrex::Dim3 m_lo;
 };
 
-#endif //QED_PAIR_GENERATION_H_
+#endif //WARPX_QED_PAIR_GENERATION_H_

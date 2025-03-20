@@ -4,7 +4,7 @@ Python/pywarpx/libwarpx*.so
 d/
 f/
 o/
-build/
+build*/
 tmp_build_dir/
 test_dir
 test_dir/

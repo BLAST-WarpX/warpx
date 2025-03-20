@@ -2,7 +2,6 @@ CEXE_sources += WarpXMovingWindow.cpp
 CEXE_sources += WarpXTagging.cpp
 CEXE_sources += WarpXUtil.cpp
 CEXE_sources += WarpXVersion.cpp
-CEXE_sources += WarpXAlgorithmSelection.cpp
 CEXE_sources += Interpolate.cpp
 CEXE_sources += IntervalsParser.cpp
 CEXE_sources += RelativeCellPosition.cpp

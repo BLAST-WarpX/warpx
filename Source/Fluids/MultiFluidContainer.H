@@ -10,6 +10,8 @@
 
 #include "WarpXFluidContainer_fwd.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
+
 #include<AMReX_MultiFab.H>
 #include <AMReX_Vector.H>
 
@@ -34,7 +36,7 @@ class MultiFluidContainer
 
 public:
 
-    MultiFluidContainer (int nlevs_max);
+    MultiFluidContainer ();
 
     ~MultiFluidContainer() = default;
 
@@ -52,25 +54,26 @@ public:
     }
 #endif
 
-    void AllocateLevelMFs (int lev, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm);
+    void AllocateLevelMFs (ablastr::fields::MultiFabRegister& m_fields, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm, int lev);
 
-    void InitData (int lev, amrex::Box init_box, amrex::Real cur_time);
+    void InitData (ablastr::fields::MultiFabRegister& m_fields, amrex::Box init_box, amrex::Real cur_time, int lev);
 
     ///
     /// This evolves all the fluids by one PIC time step, including current deposition, the
     /// field solve, and pushing the fluids, for all the species in the MultiFluidContainer.
     ///
-    void Evolve (int lev,
-                 const amrex::MultiFab& Ex, const amrex::MultiFab& Ey, const amrex::MultiFab& Ez,
-                 const amrex::MultiFab& Bx, const amrex::MultiFab& By, const amrex::MultiFab& Bz,
-                 amrex::MultiFab* rho, amrex::MultiFab& jx,  amrex::MultiFab& jy, amrex::MultiFab& jz,
-                 amrex::Real cur_time, bool skip_deposition=false);
+    void Evolve (ablastr::fields::MultiFabRegister& fields,
+                 int lev,
+                 std::string const& current_fp_string,
+                 amrex::Real cur_time,
+                 bool skip_deposition=false);
 
     [[nodiscard]] int nSpecies() const {return static_cast<int>(species_names.size());}
 
-    void DepositCharge (int lev, amrex::MultiFab &rho);
-    void DepositCurrent (int lev,
-        amrex::MultiFab& jx, amrex::MultiFab& jy, amrex::MultiFab& jz);
+    void DepositCharge (ablastr::fields::MultiFabRegister& m_fields, amrex::MultiFab &rho, int lev);
+    void DepositCurrent (ablastr::fields::MultiFabRegister& m_fields,
+        amrex::MultiFab& jx, amrex::MultiFab& jy, amrex::MultiFab& jz,
+        int lev);
 
 private:
 

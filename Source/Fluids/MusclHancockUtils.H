@@ -36,7 +36,7 @@ amrex::Real V_calc (const amrex::Array4<amrex::Real>& U, int i, int j, int k, in
 {
     using namespace amrex::literals;
     // comp -> x, y, z -> 0, 1, 2, return Vx, Vy, or Vz:
-    amrex::Real gamma = std::sqrt(1.0_rt + (U(i,j,k,1)*U(i,j,k,1) + U(i,j,k,2)*U(i,j,k,2) + U(i,j,k,3)*U(i,j,k,3))/(c*c));
+    const amrex::Real gamma = std::sqrt(1.0_rt + (U(i,j,k,1)*U(i,j,k,1) + U(i,j,k,2)*U(i,j,k,2) + U(i,j,k,3)*U(i,j,k,3))/(c*c));
     return U(i,j,k,comp+1)/gamma;
 }
 // mindmod
@@ -96,7 +96,7 @@ amrex::Real flux_N (const amrex::Array4<amrex::Real>& Um,  const amrex::Array4<a
 int i, int j, int k, amrex::Real Vm, amrex::Real Vp)
 {
     using namespace amrex::literals;
-    amrex::Real c = std::max( std::abs(Vm) , std::abs(Vp) );
+    const amrex::Real c = std::max( std::abs(Vm) , std::abs(Vp) );
     return 0.5_rt*(Vm*Um(i,j,k,0) + Vp*Up(i,j,k,0)) - (0.5_rt*c)*(Up(i,j,k,0) - Um(i,j,k,0));
 }
 // Rusanov Flux (Momentum density x)
@@ -105,7 +105,7 @@ amrex::Real flux_NUx (const amrex::Array4<amrex::Real>& Um,  const amrex::Array4
 int i, int j, int k, amrex::Real Vm, amrex::Real Vp)
 {
     using namespace amrex::literals;
-    amrex::Real c = std::max( std::abs(Vm) , std::abs(Vp) );
+    const amrex::Real c = std::max( std::abs(Vm) , std::abs(Vp) );
     return 0.5_rt*(Vm*Um(i,j,k,0)*Um(i,j,k,1) + Vp*Up(i,j,k,0)*Up(i,j,k,1))
         - (0.5_rt*c)*(Up(i,j,k,0)*Up(i,j,k,1) -    Um(i,j,k,0)*Um(i,j,k,1));
 }
@@ -115,7 +115,7 @@ amrex::Real flux_NUy (const amrex::Array4<amrex::Real>& Um,  const amrex::Array4
 int i, int j, int k, amrex::Real Vm, amrex::Real Vp)
 {
     using namespace amrex::literals;
-    amrex::Real c = std::max( std::abs(Vm) , std::abs(Vp) );
+    const amrex::Real c = std::max( std::abs(Vm) , std::abs(Vp) );
     return 0.5_rt*(Vm*Um(i,j,k,0)*Um(i,j,k,2) + Vp*Up(i,j,k,0)*Up(i,j,k,2))
         - (0.5_rt*c)*(Up(i,j,k,0)*Up(i,j,k,2) -    Um(i,j,k,0)*Um(i,j,k,2));
 }
@@ -125,7 +125,7 @@ amrex::Real flux_NUz (const amrex::Array4<amrex::Real>& Um,  const amrex::Array4
 int i, int j, int k, amrex::Real Vm, amrex::Real Vp)
 {
     using namespace amrex::literals;
-    amrex::Real c = std::max( std::abs(Vm) , std::abs(Vp) );
+    const amrex::Real c = std::max( std::abs(Vm) , std::abs(Vp) );
     return 0.5_rt*(Vm*Um(i,j,k,0)*Um(i,j,k,3) + Vp*Up(i,j,k,0)*Up(i,j,k,3))
         - (0.5_rt*c)*(Up(i,j,k,0)*Up(i,j,k,3) -    Um(i,j,k,0)*Um(i,j,k,3));
 }
@@ -170,7 +170,7 @@ amrex::Real ave_stage2 (amrex::Real dQ, amrex::Real a, amrex::Real b, amrex::Rea
     using namespace amrex::literals;
     // sigma = sqrt(3) -1
     constexpr auto sigma = 0.732050807568877_rt;
-    amrex::Real dq_min = 2.0_rt*std::min( b - min3(a,b,c), max3(a,b,c) - b);
+    const amrex::Real dq_min = 2.0_rt*std::min( b - min3(a,b,c), max3(a,b,c) - b);
     return ( std::abs(dQ)/dQ ) * std::min( std::abs(dQ) , sigma*std::abs(dq_min) );
 }
 // Returns the offset indices for the "plus" grid
@@ -499,10 +499,10 @@ const amrex::Array4<amrex::Real>& U_plus,int i,int j,int k,amrex::Real clight, i
     int ip, jp, kp;
     plus_index_offsets(i, j, k, ip, jp, kp, dir);
 
-    amrex::Real V_L_minus = V_calc(U_minus,ip,jp,kp,dir,clight);
-    amrex::Real V_I_minus = V_calc(U_minus,i,j,k,dir,clight);
-    amrex::Real V_L_plus = V_calc(U_plus,ip,jp,kp,dir,clight);
-    amrex::Real V_I_plus = V_calc(U_plus,i,j,k,dir,clight);
+    const amrex::Real V_L_minus = V_calc(U_minus,ip,jp,kp,dir,clight);
+    const amrex::Real V_I_minus = V_calc(U_minus,i,j,k,dir,clight);
+    const amrex::Real V_L_plus = V_calc(U_plus,ip,jp,kp,dir,clight);
+    const amrex::Real V_I_plus = V_calc(U_plus,i,j,k,dir,clight);
 
     // Flux differences depending on the component to compute
     if (comp == 0){

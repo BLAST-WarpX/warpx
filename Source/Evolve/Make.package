@@ -1,5 +1,4 @@
 CEXE_sources += WarpXEvolve.cpp
 CEXE_sources += WarpXComputeDt.cpp
-CEXE_sources += WarpXOneStepImplicitPicard.cpp
 
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/Evolve

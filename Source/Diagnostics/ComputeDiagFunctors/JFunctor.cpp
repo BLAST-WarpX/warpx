@@ -6,12 +6,18 @@
 
 #include "JFunctor.H"
 
+#include "Fields.H"
 #include "Particles/MultiParticleContainer.H"
 #include "WarpX.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
+
 #include <AMReX.H>
+#include <AMReX_Extension.H>
 #include <AMReX_IntVect.H>
 #include <AMReX_MultiFab.H>
+
+using warpx::fields::FieldType;
 
 JFunctor::JFunctor (const int dir, int lev,
                    amrex::IntVect crse_ratio,
@@ -25,35 +31,34 @@ JFunctor::JFunctor (const int dir, int lev,
 void
 JFunctor::operator() (amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer*/) const
 {
+    using ablastr::fields::Direction;
+
     auto& warpx = WarpX::GetInstance();
     /** pointer to source multifab (can be multi-component) */
-    amrex::MultiFab* m_mf_src = warpx.get_pointer_current_fp(m_lev, m_dir);
+    amrex::MultiFab* m_mf_src = warpx.m_fields.get(FieldType::current_fp,Direction{m_dir},m_lev);
 
     // Deposit current if no solver or the electrostatic solver is being used
     if (m_deposit_current)
     {
         // allocate temporary multifab to deposit current density into
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > > current_fp_temp;
-        current_fp_temp.resize(1);
-
-        const auto& current_fp_x = warpx.getcurrent_fp(m_lev,0);
-        current_fp_temp[0][0] = std::make_unique<amrex::MultiFab>(
-            current_fp_x, amrex::make_alias, 0, current_fp_x.nComp()
-        );
-
-        const auto& current_fp_y = warpx.getcurrent_fp(m_lev,1);
-        current_fp_temp[0][1] = std::make_unique<amrex::MultiFab>(
-            current_fp_y, amrex::make_alias, 0, current_fp_y.nComp()
-        );
-        const auto& current_fp_z = warpx.getcurrent_fp(m_lev,2);
-        current_fp_temp[0][2] = std::make_unique<amrex::MultiFab>(
-            current_fp_z, amrex::make_alias, 0, current_fp_z.nComp()
-        );
+        ablastr::fields::MultiLevelVectorField current_fp_temp {
+            warpx.m_fields.get_alldirs(FieldType::current_fp, m_lev)
+        };
 
         auto& mypc = warpx.GetPartContainer();
         mypc.DepositCurrent(current_fp_temp, warpx.getdt(m_lev), 0.0);
+
+        // sum values in guard cells - note that this does not filter the
+        // current density.
+        for (int idim = 0; idim < 3; ++idim) {
+            current_fp_temp[0][idim]->FillBoundary(warpx.Geom(m_lev).periodicity());
+        }
     }
 
-    InterpolateMFForDiag(mf_dst, *m_mf_src, dcomp, warpx.DistributionMap(m_lev),
-                         m_convertRZmodes2cartesian);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mf_src != nullptr, "m_mf_src can't be a nullptr.");
+    AMREX_ASSUME(m_mf_src != nullptr);
+
+    InterpolateMFForDiag(
+        mf_dst, *m_mf_src, dcomp,
+        warpx.DistributionMap(m_lev), m_convertRZmodes2cartesian);
 }

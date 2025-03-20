@@ -1,0 +1,10 @@
+
+CEXE_sources += MultiFabRegister.cpp
+
+ifeq ($(USE_FFT),TRUE)
+    ifeq ($(DIM),3)
+        CEXE_sources += IntegratedGreenFunctionSolver.cpp
+    endif
+endif
+
+VPATH_LOCATIONS   += $(WARPX_HOME)/Source/ablastr/fields

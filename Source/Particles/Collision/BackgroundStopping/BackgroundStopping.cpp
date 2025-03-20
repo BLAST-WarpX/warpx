@@ -16,7 +16,7 @@
 
 #include <string>
 
-BackgroundStopping::BackgroundStopping (std::string const collision_name)
+BackgroundStopping::BackgroundStopping (std::string const& collision_name)
     : CollisionBase(collision_name)
 {
     using namespace amrex::literals;

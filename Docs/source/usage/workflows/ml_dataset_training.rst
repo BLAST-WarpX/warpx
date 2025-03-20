@@ -14,42 +14,42 @@ For example, a simulation determined by the following input script
     .. literalinclude:: ml_materials/run_warpx_training.py
        :language: python
 
-In this section we walk through a workflow for data processing and model training.
+In this section we walk through a workflow for data processing and model training, using data from this input script as an example.
+The simulation output is stored in an online `Zenodo archive <https://zenodo.org/records/10368972>`__, in the ``lab_particle_diags`` directory.
+In the example scripts provided here, the data is downloaded from the Zenodo archive, properly formatted, and used to train a neural network.
 This workflow was developed and first presented in :cite:t:`ml-SandbergIPAC23,ml-SandbergPASC24`.
-
-This assumes you have an up-to-date environment with PyTorch and openPMD.
+It assumes you have an up-to-date environment with PyTorch and openPMD.
 
 Data Cleaning
 -------------
 
-It is important to inspect the data for artifacts to
+It is important to inspect the data for artifacts, to
 check that input/output data make sense.
-If we plot the final phase space for beams 1-8,
-the particle data is distributed in a single blob,
-as shown by :numref:`fig_phase_space_beam_1` for beam 1.
-This is as we expect and what is optimal for training neural networks.
+If we plot the final phase space of the particle beam,
+shown in :numref:`fig_unclean_phase_space`.
+we see outlying particles.
+Looking closer at the z-pz space, we see that some particles were not trapped in the accelerating region of the wake and have much less energy than the rest of the beam.
 
-.. _fig_phase_space_beam_1:
+.. _fig_unclean_phase_space:
 
-.. figure:: https://user-images.githubusercontent.com/10621396/290010209-c55baf1c-dd98-4d56-a675-ad3729481eee.png
-   :alt: Plot showing the final phase space projections for beam 1 of the training data, for a surrogate to stage 1.
+.. figure:: https://gist.githubusercontent.com/RTSandberg/649a81cc0e7926684f103729483eff90/raw/095ac2daccbcf197fa4e18a8f8505711b27e807a/unclean_stage_0.png
+   :alt: Plot showing the final phase space projections of a particle beam through a laser-plasma acceleration element where some beam particles were not accelerated.
 
-   The final phase space projections for beam 1 of the training data, for a surrogate to stage 1.
+   The final phase space projections of a particle beam through a laser-plasma acceleration element where some beam particles were not accelerated.
 
-.. _fig_phase_space_beam_0:
-
-.. figure:: https://user-images.githubusercontent.com/10621396/290010282-40560ac4-8509-4599-82ca-167bb1739cff.png
-   :alt: Plot showing the final phase space projections for beam 0 of the training data, for a surrogate to stage 0.
-
-   The final phase space projections for beam 0 of the training data, for a surrogate to stage 0
-
-On the other hand, the final phase space for beam 0, shown in :numref:`fig_phase_space_beam_1`,
-has a halo of outlying particles.
-Looking closer at the z-pz space, we see that some particles got caught in a decelerating
-region of the wake, have slipped back and are much slower than the rest of the beam.
 To assist our neural network in learning dynamics of interest, we filter out these particles.
 It is sufficient for our purposes to select particles that are not too far back, setting
-``particle_selection={'z':[0.28002, None]}``. Then a particle tracker is set up to make sure
+``particle_selection={'z':[0.280025, None]}``.
+After filtering, we can see in :numref:`fig_clean_phase_space` that the beam phase space projections are much cleaner -- this is the beam we want to train on.
+
+.. _fig_clean_phase_space:
+
+.. figure:: https://gist.githubusercontent.com/RTSandberg/649a81cc0e7926684f103729483eff90/raw/095ac2daccbcf197fa4e18a8f8505711b27e807a/clean_stage_0.png
+   :alt: Plot showing the final phase space projections of a particle beam through a laser-plasma acceleration element after filtering out outlying particles.
+
+   The final phase space projections of a particle beam through a laser-plasma acceleration element after filtering out outlying particles.
+
+A particle tracker is set up to make sure
 we consistently filter out these particles from both the initial and final data.
 
 .. literalinclude:: ml_materials/create_dataset.py
@@ -57,6 +57,9 @@ we consistently filter out these particles from both the initial and final data.
    :dedent: 4
    :start-after: # Manual: Particle tracking START
    :end-before: # Manual: Particle tracking END
+
+This data cleaning ensures that the particle data is distributed in a single blob,
+as is optimal for training neural networks.
 
 Create Normalized Dataset
 -------------------------
@@ -119,7 +122,12 @@ This data are converted to an :math:`N\times 6` numpy array and then to a PyTorc
 Save Normalizations and Normalized Data
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-With the data properly normalized, it and the normalizations are saved to file for
+The data is split into training and testing subsets.
+We take most of the data (70%) for training, meaning that data is used to update
+the neural network parameters.
+The testing data is reserved to determine how well the neural network generalizes;
+that is, how well the neural network performs on data that wasn't used to update the neural network parameters.
+With the data split and properly normalized, it and the normalizations are saved to file for
 use in training and inference.
 
 .. literalinclude:: ml_materials/create_dataset.py
@@ -131,13 +139,22 @@ use in training and inference.
 Neural Network Structure
 ------------------------
 
-It was found in :cite:t:`ml-SandbergPASC24` that reasonable surrogate models are obtained with
-shallow feedforward neural networks consisting of fewer than 10 hidden layers and
-just under 1000 nodes per layer.
+It was found in :cite:t:`ml-SandbergPASC24` that a reasonable surrogate model is obtained with
+shallow feedforward neural networks consisting of about 5 hidden layers and 700-900 nodes per layer.
 The example shown here uses 3 hidden layers and 20 nodes per layer
 and is trained for 10 epochs.
 
+Some utility functions for creating neural networks are provided in the script below.
+These are mostly convenience wrappers and utilities for working with `PyTorch <https://pytorch.org/>`__ neural network objects.
+This script is imported in the training scripts shown later.
 
+.. dropdown:: Python neural network class definitions
+   :color: light
+   :icon: info
+   :animate: fade-in-slide-down
+
+    .. literalinclude:: ml_materials/neural_network_classes.py
+       :language: python3
 
 Train and Save Neural Network
 -----------------------------
@@ -188,8 +205,8 @@ which is later divided by the size of the dataset in the training loop.
    :start-after: # Manual: Test function START
    :end-before: # Manual: Test function END
 
-Train Loop
-^^^^^^^^^^
+Training Loop
+^^^^^^^^^^^^^
 
 The full training loop performs ``n_epochs`` number of iterations.
 At each iteration the training and testing functions are called,
@@ -228,14 +245,14 @@ When the test-loss starts to trend flat or even upward, the neural network is no
 
 .. _fig_train_test_loss:
 
-.. figure:: https://user-images.githubusercontent.com/10621396/290010428-f83725ab-a08f-494c-b075-314b0d26cb9a.png
+.. figure:: https://gist.githubusercontent.com/RTSandberg/649a81cc0e7926684f103729483eff90/raw/095ac2daccbcf197fa4e18a8f8505711b27e807a/beam_stage_0_training_testing_error.png
    :alt: Plot of training and testing loss curves versus number of training epochs.
 
    Training (in blue) and testing (in green) loss curves versus number of training epochs.
 
 .. _fig_train_evaluation:
 
-.. figure:: https://user-images.githubusercontent.com/10621396/290010486-4a3541e7-e0be-4cf1-b33b-57d5e5985196.png
+.. figure:: https://gist.githubusercontent.com/RTSandberg/649a81cc0e7926684f103729483eff90/raw/095ac2daccbcf197fa4e18a8f8505711b27e807a/beam_stage_0_model_evaluation.png
    :alt: Plot comparing model prediction with simulation output.
 
    A comparison of model prediction (yellow-red dots, colored by mean-squared error) with simulation output (black dots).
@@ -243,7 +260,7 @@ When the test-loss starts to trend flat or even upward, the neural network is no
 A visual inspection of the model prediction can be seen in :numref:`fig_train_evaluation`.
 This plot compares the model prediction, with dots colored by mean-square error, on the testing data with the actual simulation output in black.
 The model obtained with the hyperparameters chosen here trains quickly but is not very accurate.
-A more accurate model is obtained with 5 hidden layers and 800 nodes per layer,
+A more accurate model is obtained with 5 hidden layers and 900 nodes per layer,
 as discussed in :cite:t:`ml-SandbergPASC24`.
 
 These figures can be generated with the following Python script.
@@ -261,7 +278,7 @@ Surrogate Usage in Accelerator Physics
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A neural network such as the one we trained here can be incorporated in other BLAST codes.
-`Consider the example using neural networks in ImpactX <https://impactx.readthedocs.io/en/latest/usage/examples/pytorch_surrogate_model/README.html>`__.
+Consider this `example using neural network surrogates of WarpX simulations in ImpactX <https://impactx.readthedocs.io/en/latest/usage/examples/pytorch_surrogate_model/README.html>`__.
 
 .. bibliography::
    :keyprefix: ml-

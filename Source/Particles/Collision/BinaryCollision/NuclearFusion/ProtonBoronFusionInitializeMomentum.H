@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef PROTON_BORON_FUSION_INITIALIZE_MOMENTUM_H
-#define PROTON_BORON_FUSION_INITIALIZE_MOMENTUM_H
+#ifndef WARPX_PROTON_BORON_FUSION_INITIALIZE_MOMENTUM_H
+#define WARPX_PROTON_BORON_FUSION_INITIALIZE_MOMENTUM_H
 
 #include "TwoProductFusionUtil.H"
 #include "Particles/WarpXParticleContainer.H"
@@ -22,20 +22,22 @@
 
 namespace {
     // Define shortcuts for frequently-used type names
-    using SoaData_type = WarpXParticleContainer::ParticleTileType::ParticleTileDataType;
-    using ParticleType = WarpXParticleContainer::ParticleType;
-    using ParticleBins = amrex::DenseBins<ParticleType>;
-    using index_type = ParticleBins::index_type;
+    using SoaData_type = typename WarpXParticleContainer::ParticleTileType::ParticleTileDataType;
+    using ParticleType = typename WarpXParticleContainer::ParticleType;
+    using ParticleTileType = typename WarpXParticleContainer::ParticleTileType;
+    using ParticleTileDataType = typename ParticleTileType::ParticleTileDataType;
+    using ParticleBins = amrex::DenseBins<ParticleTileDataType>;
+    using index_type = typename ParticleBins::index_type;
 
     /**
      * \brief This function initializes the momentum of the alpha particles produced from
      * proton-boron fusion. The momentum is initialized by assuming that the fusion of a proton
      * with a boron nucleus into 3 alphas takes place in two steps. In the first step, the proton
-     * and the boron fuse into a beryllium nucleus and an alpha particle. In the second step, the
-     * beryllium decays into two alpha particles. The first step produces 8.59009 MeV of kinetic
-     * energy while the second step produces 91.8984 keV of kinetic energy. This two-step process
+     * and the boron fuse into an excited beryllium nucleus and an alpha particle. In the second step, the
+     * excited beryllium decays into two alpha particles. The first step produces ~5.56 MeV of kinetic
+     * energy while the second step produces ~3.12 MeV of kinetic energy. This two-step process
      * is considered to be the dominant process of proton+boron fusion into alphas (see
-     * Becker et al., Zeitschrift für Physik A Atomic Nuclei, 327(3), 341-355 (1987)).
+     * D.R. Tilley et al. / Nuclear Physics A 745 (2004) 155–362).
      * For each step, we assume in this function that the particles are emitted isotropically in
      * the corresponding center of mass frame (center of mass frame of proton + boron for the
      * creation of first alpha+beryllium and rest frame of beryllium for the creation of second and
@@ -71,18 +73,21 @@ namespace {
 
         constexpr amrex::ParticleReal mev_to_joule = PhysConst::q_e*1.e6_prt;
         // Energy produced in the fusion reaction proton + boron11 -> Beryllium8 + alpha
-        // cf. Janis book of proton-induced cross-sections (2019)
-        constexpr amrex::ParticleReal E_fusion = 8.59009_prt*mev_to_joule;
+        // cf. https://doi.org/10.1016/j.radphyschem.2022.110727
+        // Dominant reaction channel is p + B11 -> alpha_1 + 8Be* -> alpha_1 + alpha_11 + alpha_12 + 8.68 MeV
+        // cf. Kelley et al., (2017) http://dx.doi.org/10.1016/j.nuclphysa.2017.07.015
+        constexpr amrex::ParticleReal E_fusion = 5.55610759_prt*mev_to_joule;
         // Energy produced when Beryllium8 decays into two alphas
-        // cf. JEFF-3.3 radioactive decay data library (2017)
-        constexpr amrex::ParticleReal E_decay = 0.0918984_prt*mev_to_joule;
+        // cf. Kelley et al., (2017) http://dx.doi.org/10.1016/j.nuclphysa.2017.07.015
+        constexpr amrex::ParticleReal E_decay = 3.12600414_prt*mev_to_joule;
 
         // The constexprs ma_sq and mBe_sq underflow in single precision because we use SI units,
         // which can cause compilation to fail or generate a warning, so we're explicitly setting
         // them as double. Note that nuclear fusion module does not currently work with single
         // precision anyways.
         constexpr double m_alpha = PhysConst::m_u * 4.00260325413_prt;
-        constexpr double m_beryllium = PhysConst::m_p * 7.94748_prt;
+        // mass of the Be8 excited state (3.03 MeV above ground state)
+        constexpr double m_beryllium = PhysConst::m_u*(8.0053095729_prt+0.00325283863_prt);
         constexpr double mBe_sq = m_beryllium*m_beryllium;
         constexpr amrex::ParticleReal c_sq = PhysConst::c * PhysConst::c;
 
@@ -175,4 +180,4 @@ namespace {
 
 }
 
-#endif // PROTON_BORON_FUSION_INITIALIZE_MOMENTUM_H
+#endif // WARPX_PROTON_BORON_FUSION_INITIALIZE_MOMENTUM_H

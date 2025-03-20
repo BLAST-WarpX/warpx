@@ -7,9 +7,11 @@
 
 #include "FieldMaximum.H"
 
+#include "Fields.H"
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/coarsen/sample.H>
 
 #include <AMReX_Algorithm.H>
@@ -38,9 +40,10 @@
 #include <vector>
 
 using namespace amrex;
+using warpx::fields::FieldType;
 
 // constructor
-FieldMaximum::FieldMaximum (std::string rd_name)
+FieldMaximum::FieldMaximum (const std::string& rd_name)
 : ReducedDiags{rd_name}
 {
     // RZ coordinate is not working
@@ -90,7 +93,7 @@ FieldMaximum::FieldMaximum (std::string rd_name)
                 ofs << m_sep;
                 ofs << "[" << c++ << "]max_|B|_lev" + std::to_string(lev) + "(T)";
             }
-            ofs << std::endl;
+            ofs << "\n";
             // close file
             ofs.close();
         }
@@ -110,16 +113,18 @@ void FieldMaximum::ComputeDiags (int step)
     // get number of level
     const auto nLevel = warpx.finestLevel() + 1;
 
+    using ablastr::fields::Direction;
+
     // loop over refinement levels
     for (int lev = 0; lev < nLevel; ++lev)
     {
         // get MultiFab data at lev
-        const MultiFab & Ex = warpx.getEfield(lev,0);
-        const MultiFab & Ey = warpx.getEfield(lev,1);
-        const MultiFab & Ez = warpx.getEfield(lev,2);
-        const MultiFab & Bx = warpx.getBfield(lev,0);
-        const MultiFab & By = warpx.getBfield(lev,1);
-        const MultiFab & Bz = warpx.getBfield(lev,2);
+        const MultiFab & Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
+        const MultiFab & Ey = *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, lev);
+        const MultiFab & Ez = *warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, lev);
+        const MultiFab & Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, lev);
+        const MultiFab & By = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, lev);
+        const MultiFab & Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, lev);
 
         constexpr int noutputs = 8; // max of Ex,Ey,Ez,|E|,Bx,By,Bz and |B|
         constexpr int index_Ex = 0;

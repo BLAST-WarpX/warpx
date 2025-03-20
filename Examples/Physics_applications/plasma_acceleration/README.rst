@@ -16,7 +16,7 @@ In the Beam, Plasma & Accelerator Simulation Toolkit (BLAST), `HiPACE++ <https:/
 
 .. note::
 
-   TODO: The Python (PICMI) input file should use the boosted frame method, like the ``inputs_3d_boost`` file.
+   TODO: The Python (PICMI) input file should use the boosted frame method, like the ``inputs_test_3d_plasma_acceleration_boosted`` file.
 
 
 Run
@@ -24,8 +24,8 @@ Run
 
 This example can be run **either** as:
 
-* **Python** script: ``python3 PICMI_inputs_plasma_acceleration.py`` or
-* WarpX **executable** using an input file: ``warpx.3d inputs_3d_boost``
+* **Python** script: ``python3 inputs_test_3d_plasma_acceleration_picmi.py`` or
+* WarpX **executable** using an input file: ``warpx.3d inputs_test_3d_plasma_acceleration_boosted``
 
 For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with ``mpiexec -n 4 ...`` or ``srun -n 4 ...``, depending on the system.
 
@@ -35,17 +35,17 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
       .. note::
 
-         TODO: This input file should use the boosted frame method, like the ``inputs_3d_boost`` file.
+         TODO: This input file should use the boosted frame method, like the ``inputs_test_3d_plasma_acceleration_boosted`` file.
 
-      .. literalinclude:: PICMI_inputs_plasma_acceleration.py
+      .. literalinclude:: inputs_test_3d_plasma_acceleration_picmi.py
          :language: python3
-         :caption: You can copy this file from ``Examples/Physics_applications/plasma_acceleration/PICMI_inputs_plasma_acceleration.py``.
+         :caption: You can copy this file from ``Examples/Physics_applications/plasma_acceleration/inputs_test_3d_plasma_acceleration_picmi.py``.
 
    .. tab-item:: Executable: Input File
 
-      .. literalinclude:: inputs_3d_boost
+      .. literalinclude:: inputs_test_3d_plasma_acceleration_boosted
          :language: ini
-         :caption: You can copy this file from ``Examples/Physics_applications/plasma_acceleration/inputs_3d_boost``.
+         :caption: You can copy this file from ``Examples/Physics_applications/plasma_acceleration/inputs_test_3d_plasma_acceleration_boosted``.
 
 Analyze
 -------

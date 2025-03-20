@@ -7,7 +7,6 @@
 
 #include "StreamUtils.H"
 
-#include <ios>
 #include <limits>
 
 void

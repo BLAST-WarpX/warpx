@@ -50,8 +50,8 @@ struct NormalizationType {
 };
 
 // constructor
-ParticleHistogram::ParticleHistogram (std::string rd_name):
-    ReducedDiags{rd_name}
+ParticleHistogram::ParticleHistogram (const std::string& rd_name)
+: ReducedDiags{rd_name}
 {
     const ParmParse pp_rd_name(rd_name);
 
@@ -146,7 +146,7 @@ ParticleHistogram::ParticleHistogram (std::string rd_name):
                 ofs << "bin" + std::to_string(1+i)
                              + "=" + std::to_string(b) + "()";
             }
-            ofs << std::endl;
+            ofs << "\n";
             // close file
             ofs.close();
         }

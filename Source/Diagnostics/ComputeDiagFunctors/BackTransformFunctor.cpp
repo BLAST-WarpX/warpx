@@ -15,6 +15,7 @@
 #include <AMReX_Array4.H>
 #include <AMReX_BoxArray.H>
 #include <AMReX_Config.H>
+#include <AMReX_Extension.H>
 #include <AMReX_FArrayBox.H>
 #include <AMReX_FabArray.H>
 #include <AMReX_Geometry.H>
@@ -58,15 +59,22 @@ BackTransformFunctor::operator ()(amrex::MultiFab& mf_dst, int /*dcomp*/, const 
         const bool interpolate = true;
         std::unique_ptr< amrex::MultiFab > slice = nullptr;
         const int scomp = 0;
+
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mf_src != nullptr, "m_mf_src can't be a nullptr.");
+        AMREX_ASSUME(m_mf_src != nullptr);
+
         // Generate slice of the cell-centered multifab containing boosted-frame field-data
         // at current z-boost location for the ith buffer
-        slice = amrex::get_slice_data(moving_window_dir,
-                                     m_current_z_boost[i_buffer],
-                                     *m_mf_src,
-                                     geom,
-                                     scomp,
-                                     m_mf_src->nComp(),
-                                     interpolate);
+        slice = amrex::get_slice_data(
+            moving_window_dir,
+            m_current_z_boost[i_buffer],
+            *m_mf_src,
+            geom,
+            scomp,
+            m_mf_src->nComp(),
+            interpolate);
+
+
         // Perform in-place Lorentz-transform of all the fields stored in the slice.
         LorentzTransformZ( *slice, gamma_boost, beta_boost);
 
@@ -81,7 +89,7 @@ BackTransformFunctor::operator ()(amrex::MultiFab& mf_dst, int /*dcomp*/, const 
         slice_box.setBig(moving_window_dir, i_boost);
 
         // Make it a BoxArray
-        amrex::BoxArray slice_ba(slice_box);
+        const amrex::BoxArray slice_ba(slice_box);
         // Define MultiFab with the distribution map of the destination multifab and
         // containing all ten components that were in the slice generated from m_mf_src.
         std::unique_ptr< amrex::MultiFab > tmp_slice_ptr = nullptr;

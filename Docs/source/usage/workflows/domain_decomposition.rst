@@ -5,6 +5,9 @@ Domain Decomposition
 
 WarpX relies on a spatial domain decomposition for MPI parallelization. It provides two different ways for users to specify this decomposition, a `simple` way recommended for most users, and a `flexible` way recommended if more control is desired. The `flexible` method is required for dynamic load balancing to be useful.
 
+
+.. _usage_domain_decomposition-simple:
+
 1. Simple Method
 ----------------
 
@@ -13,6 +16,9 @@ The first and simplest method is to provide the ``warpx.numprocs = nx ny nz`` pa
 .. note::
 
    If ``warpx.numprocs`` is *not* specified, WarpX will fall back on using the ``amr.max_grid_size`` and ``amr.blocking_factor`` parameters, described below.
+
+
+.. _usage_domain_decomposition-general:
 
 2. More General Method
 ----------------------

@@ -10,6 +10,8 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "MultiParticleContainer.H"
+
+#include "Fields.H"
 #include "Particles/ElementaryProcess/Ionization.H"
 #ifdef WARPX_QED
 #   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
@@ -19,7 +21,6 @@
 #   include "Particles/ElementaryProcess/QEDPhotonEmission.H"
 #endif
 #include "Particles/LaserParticleContainer.H"
-#include "Particles/NamedComponentParticleContainer.H"
 #include "Particles/ParticleCreation/FilterCopyTransform.H"
 #ifdef WARPX_QED
 #   include "Particles/ParticleCreation/FilterCreateTransformFromFAB.H"
@@ -37,13 +38,12 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXProfilerWrapper.H"
 #include "Utils/WarpXUtil.H"
-#ifdef AMREX_USE_EB
-#   include "EmbeddedBoundary/ParticleScraper.H"
-#   include "EmbeddedBoundary/ParticleBoundaryProcess.H"
-#endif
+#include "EmbeddedBoundary/ParticleScraper.H"
+#include "EmbeddedBoundary/ParticleBoundaryProcess.H"
 
 #include "WarpX.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -80,13 +80,14 @@
 #include <vector>
 
 using namespace amrex;
+using warpx::fields::FieldType;
 
 namespace
 {
     /** A little collection to transport six Array4 that point to the EM fields */
     struct MyFieldList
     {
-        Array4< amrex::Real const > const Ex, Ey, Ez, Bx, By, Bz;
+        Array4< amrex::Real const > Ex, Ey, Ez, Bx, By, Bz;
     };
 }
 
@@ -221,7 +222,7 @@ MultiParticleContainer::ReadParameters ()
                 pp_particles, "repeated_plasma_lens_lengths",
                 h_repeated_plasma_lens_lengths);
 
-            const int n_lenses = static_cast<int>(h_repeated_plasma_lens_starts.size());
+            const auto n_lenses = static_cast<int>(h_repeated_plasma_lens_starts.size());
             d_repeated_plasma_lens_starts.resize(n_lenses);
             d_repeated_plasma_lens_lengths.resize(n_lenses);
             amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
@@ -396,6 +397,15 @@ MultiParticleContainer::GetParticleContainerFromName (const std::string& name) c
     return *allcontainers[i];
 }
 
+amrex::ParticleReal
+MultiParticleContainer::maxParticleVelocity() {
+    amrex::ParticleReal max_v = 0.0_prt;
+    for (const auto &pc : allcontainers) {
+        max_v = std::max(max_v, pc->maxParticleVelocity());
+    }
+    return max_v;
+}
+
 void
 MultiParticleContainer::AllocData ()
 {
@@ -447,30 +457,26 @@ MultiParticleContainer::InitMultiPhysicsModules ()
 }
 
 void
-MultiParticleContainer::Evolve (int lev,
-                                const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
-                                const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
-                                MultiFab& jx, MultiFab& jy, MultiFab& jz,
-                                MultiFab* cjx,  MultiFab* cjy, MultiFab* cjz,
-                                MultiFab* rho, MultiFab* crho,
-                                const MultiFab* cEx, const MultiFab* cEy, const MultiFab* cEz,
-                                const MultiFab* cBx, const MultiFab* cBy, const MultiFab* cBz,
+MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
+                                int lev,
+                                std::string const& current_fp_string,
                                 Real t, Real dt, DtType a_dt_type, bool skip_deposition,
                                 PushType push_type)
 {
     if (! skip_deposition) {
-        jx.setVal(0.0);
-        jy.setVal(0.0);
-        jz.setVal(0.0);
-        if (cjx) { cjx->setVal(0.0); }
-        if (cjy) { cjy->setVal(0.0); }
-        if (cjz) { cjz->setVal(0.0); }
-        if (rho) { rho->setVal(0.0); }
-        if (crho) { crho->setVal(0.0); }
+        using ablastr::fields::Direction;
+
+        fields.get(current_fp_string, Direction{0}, lev)->setVal(0.0);
+        fields.get(current_fp_string, Direction{1}, lev)->setVal(0.0);
+        fields.get(current_fp_string, Direction{2}, lev)->setVal(0.0);
+        if (fields.has(FieldType::current_buf, Direction{0}, lev)) { fields.get(FieldType::current_buf, Direction{0}, lev)->setVal(0.0); }
+        if (fields.has(FieldType::current_buf, Direction{1}, lev)) { fields.get(FieldType::current_buf, Direction{1}, lev)->setVal(0.0); }
+        if (fields.has(FieldType::current_buf, Direction{2}, lev)) { fields.get(FieldType::current_buf, Direction{2}, lev)->setVal(0.0); }
+        if (fields.has(FieldType::rho_fp, lev)) { fields.get(FieldType::rho_fp, lev)->setVal(0.0); }
+        if (fields.has(FieldType::rho_buf, lev)) { fields.get(FieldType::rho_buf, lev)->setVal(0.0); }
     }
     for (auto& pc : allcontainers) {
-        pc->Evolve(lev, Ex, Ey, Ez, Bx, By, Bz, jx, jy, jz, cjx, cjy, cjz,
-                   rho, crho, cEx, cEy, cEz, cBx, cBy, cBz, t, dt, a_dt_type, skip_deposition, push_type);
+        pc->Evolve(fields, lev, current_fp_string, t, dt, a_dt_type, skip_deposition, push_type);
     }
 }
 
@@ -519,11 +525,11 @@ MultiParticleContainer::GetZeroChargeDensity (const int lev)
 
 void
 MultiParticleContainer::DepositCurrent (
-    amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > >& J,
+    ablastr::fields::MultiLevelVectorField const & J,
     const amrex::Real dt, const amrex::Real relative_time)
 {
     // Reset the J arrays
-    for (auto& J_lev : J)
+    for (const auto& J_lev : J)
     {
         J_lev[0]->setVal(0.0_rt);
         J_lev[1]->setVal(0.0_rt);
@@ -540,18 +546,18 @@ MultiParticleContainer::DepositCurrent (
     for (int lev = 0; lev < J.size(); ++lev)
     {
         WarpX::GetInstance().ApplyInverseVolumeScalingToCurrentDensity(
-            J[lev][0].get(), J[lev][1].get(), J[lev][2].get(), lev);
+            J[lev][0], J[lev][1], J[lev][2], lev);
     }
 #endif
 }
 
 void
 MultiParticleContainer::DepositCharge (
-    amrex::Vector<std::unique_ptr<amrex::MultiFab> >& rho,
+    const ablastr::fields::MultiLevelScalarField& rho,
     const amrex::Real relative_time)
 {
     // Reset the rho array
-    for (auto& rho_lev : rho)
+    for (const auto& rho_lev : rho)
     {
         rho_lev->setVal(0.0_rt);
     }
@@ -577,7 +583,7 @@ MultiParticleContainer::DepositCharge (
 #ifdef WARPX_DIM_RZ
     for (int lev = 0; lev < rho.size(); ++lev)
     {
-        WarpX::GetInstance().ApplyInverseVolumeScalingToChargeDensity(rho[lev].get(), lev);
+        WarpX::GetInstance().ApplyInverseVolumeScalingToChargeDensity(rho[lev], lev);
     }
 #endif
 }
@@ -605,11 +611,14 @@ MultiParticleContainer::GetChargeDensity (int lev, bool local)
 }
 
 void
-MultiParticleContainer::SortParticlesByBin (amrex::IntVect bin_size)
+MultiParticleContainer::SortParticlesByBin (
+    const amrex::IntVect& bin_size,
+    const bool sort_particles_for_deposition,
+    const amrex::IntVect& sort_idx_type)
 {
     for (auto& pc : allcontainers) {
-        if (WarpX::sort_particles_for_deposition) {
-            pc->SortParticlesForDeposition(WarpX::sort_idx_type);
+        if (sort_particles_for_deposition) {
+            pc->SortParticlesForDeposition(sort_idx_type);
         } else {
             pc->SortParticlesByBin(bin_size);
         }
@@ -629,6 +638,14 @@ MultiParticleContainer::defineAllParticleTiles ()
 {
     for (auto& pc : allcontainers) {
         pc->defineAllParticleTiles();
+    }
+}
+
+void
+MultiParticleContainer::deleteInvalidParticles ()
+{
+    for (auto& pc : allcontainers) {
+        pc->deleteInvalidParticles();
     }
 }
 
@@ -803,7 +820,7 @@ MultiParticleContainer::mapSpeciesProduct ()
 /* \brief Given a species name, return its ID.
  */
 int
-MultiParticleContainer::getSpeciesID (std::string product_str) const
+MultiParticleContainer::getSpeciesID (const std::string& product_str) const
 {
     auto species_and_lasers_names = GetSpeciesAndLasersNames();
     int i_product = 0;
@@ -832,7 +849,7 @@ MultiParticleContainer::SetDoBackTransformedParticles (const bool do_back_transf
 }
 
 void
-MultiParticleContainer::SetDoBackTransformedParticles (std::string species_name, const bool do_back_transformed_particles) {
+MultiParticleContainer::SetDoBackTransformedParticles (const std::string& species_name, const bool do_back_transformed_particles) {
     auto species_names_list = GetSpeciesNames();
     bool found = false;
     // Loop over species
@@ -841,7 +858,24 @@ MultiParticleContainer::SetDoBackTransformedParticles (std::string species_name,
         if (species_names_list[i] == species_name) {
            found = true;
            auto& pc = allcontainers[i];
+           const bool old_do_btd = pc->GetDoBackTransformedParticles();
            pc->SetDoBackTransformedParticles(do_back_transformed_particles);
+
+           if ((!old_do_btd) && do_back_transformed_particles) {
+               // Set comm to false so that the attributes are not communicated
+               // nor written to the checkpoint files
+               int const comm = 0;
+#if (AMREX_SPACEDIM >= 2)
+               pc->AddRealComp("x_n_btd", comm);
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+               pc->AddRealComp("y_n_btd", comm);
+#endif
+               pc->AddRealComp("z_n_btd", comm);
+               pc->AddRealComp("ux_n_btd", comm);
+               pc->AddRealComp("uy_n_btd", comm);
+               pc->AddRealComp("uz_n_btd", comm);
+           }
         }
     }
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -945,15 +979,12 @@ void MultiParticleContainer::CheckIonizationProductSpecies()
     }
 }
 
-void MultiParticleContainer::ScrapeParticles (const amrex::Vector<const amrex::MultiFab*>& distance_to_eb)
+void MultiParticleContainer::ScrapeParticlesAtEB (
+    ablastr::fields::MultiLevelScalarField const& distance_to_eb)
 {
-#ifdef AMREX_USE_EB
     for (auto& pc : allcontainers) {
-        scrapeParticles(*pc, distance_to_eb, ParticleBoundaryProcess::Absorb());
+        scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::Absorb());
     }
-#else
-    amrex::ignore_unused(distance_to_eb);
-#endif
 }
 
 #ifdef WARPX_QED
@@ -1344,12 +1375,13 @@ MultiParticleContainer::doQEDSchwinger ()
     pc_product_ele->defineAllParticleTiles();
     pc_product_pos->defineAllParticleTiles();
 
-    const MultiFab & Ex = warpx.getEfield(level_0,0);
-    const MultiFab & Ey = warpx.getEfield(level_0,1);
-    const MultiFab & Ez = warpx.getEfield(level_0,2);
-    const MultiFab & Bx = warpx.getBfield(level_0,0);
-    const MultiFab & By = warpx.getBfield(level_0,1);
-    const MultiFab & Bz = warpx.getBfield(level_0,2);
+    using ablastr::fields::Direction;
+    const MultiFab & Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, level_0);
+    const MultiFab & Ey = *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, level_0);
+    const MultiFab & Ez = *warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, level_0);
+    const MultiFab & Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, level_0);
+    const MultiFab & By = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, level_0);
+    const MultiFab & Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, level_0);
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -1388,10 +1420,12 @@ MultiParticleContainer::doQEDSchwinger ()
 
         const auto Transform = SchwingerTransformFunc{m_qed_schwinger_y_size, PIdx::w};
 
+        const amrex::Geometry& geom_level_zero = warpx.Geom(level_0);
+
         const auto num_added = filterCreateTransformFromFAB<1>( *pc_product_ele, *pc_product_pos, dst_ele_tile,
                                dst_pos_tile, box, fieldsEB, np_ele_dst,
                                np_pos_dst,Filter, CreateEle, CreatePos,
-                               Transform);
+                               Transform, geom_level_zero);
 
         setNewParticleIDs(dst_ele_tile, np_ele_dst, num_added);
         setNewParticleIDs(dst_pos_tile, np_pos_dst, num_added);
@@ -1607,7 +1641,7 @@ void MultiParticleContainer::doQedQuantumSync (int lev,
 
             auto Transform = PhotonEmissionTransformFunc(
                   m_shr_p_qs_engine->build_optical_depth_functor(),
-                  pc_source->particle_runtime_comps["opticalDepthQSR"],
+                  pc_source->GetRealCompIndex("opticalDepthQSR") - pc_source->NArrayReal,
                   m_shr_p_qs_engine->build_phot_em_functor(),
                   pti, lev, Ex.nGrowVect(),
                   Ex[pti], Ey[pti], Ez[pti],

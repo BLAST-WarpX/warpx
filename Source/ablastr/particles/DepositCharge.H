@@ -34,7 +34,7 @@ namespace ablastr::particles
  * \param rho MultiFab of the charge density
  * \param local_rho temporary FArrayBox for deposition with OpenMP
  * \param particle_shape shape factor in each direction
- * \param dx cell spacing at level lev
+ * \param dinv cell spacing inverses at level lev
  * \param xyzmin lo corner of the current tile in physical coordinates.
  * \param n_rz_azimuthal_modes number of azimuthal modes in use, irrelevant outside RZ geometry (default: 0)
  * \param num_rho_deposition_guards number of ghost cells to use for rho (default: rho.nGrowVect())
@@ -44,13 +44,9 @@ namespace ablastr::particles
  * \param np_to_deposit number of particles to deposit (default: pti.numParticles())
  * \param icomp component in MultiFab to start depositing to
  * \param nc number of components to deposit
- * \param cost pointer to (load balancing) cost corresponding to box where present
-               particles deposit current. If nullptr, costs are not updated. (default: nullptr)
- * \param load_balance_costs_update_algo selected method for updating load balance costs (default: 0)
- * \param do_device_synchronize call amrex::Gpu::synchronize() for tiny profiler regions (default: true)
  */
 template< typename T_PC >
-static void
+void
 deposit_charge (typename T_PC::ParIterType& pti,
                 typename T_PC::RealVector const& wp,
                 amrex::Real const charge,
@@ -58,25 +54,22 @@ deposit_charge (typename T_PC::ParIterType& pti,
                 amrex::MultiFab* rho,
                 amrex::FArrayBox& local_rho,
                 int const particle_shape,
-                std::array<amrex::Real, 3> const & dx,
-                std::array<amrex::Real, 3> const & xyzmin,
+                const amrex::XDim3 dinv,
+                const amrex::XDim3 xyzmin,
                 int const n_rz_azimuthal_modes = 0,
                 std::optional<amrex::IntVect> num_rho_deposition_guards = std::nullopt,
                 std::optional<int> depos_lev = std::nullopt,
                 std::optional<amrex::IntVect> rel_ref_ratio = std::nullopt,
                 long const offset = 0,
                 std::optional<long> np_to_deposit = std::nullopt,
-                int const icomp = 0, int const nc = 1,
-                amrex::Real * const AMREX_RESTRICT cost = nullptr,
-                long const load_balance_costs_update_algo = 0,
-                bool const do_device_synchronize = true)
+                int const icomp = 0, int const nc = 1)
 {
     // deposition guards
     amrex::IntVect ng_rho = rho->nGrowVect();
     if (num_rho_deposition_guards.has_value()) {
         ng_rho = num_rho_deposition_guards.value();
     }
-    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(ng_rho <= rho->nGrowVect(),
+    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(ng_rho.allLE(rho->nGrowVect()),
                                        "num_rho_deposition_guards are larger than allocated!");
     // particle shape
     auto const[nox, noy, noz] = std::array<int, 3>{particle_shape, particle_shape, particle_shape};
@@ -136,8 +129,8 @@ deposit_charge (typename T_PC::ParIterType& pti,
         amrex::numParticlesOutOfRange(pti, range) == 0,
         "Particles shape does not fit within tile (CPU) or guard cells (GPU) used for charge deposition");
 
-    ABLASTR_PROFILE_VAR_NS("ablastr::particles::deposit_charge::ChargeDeposition", blp_ppc_chd, do_device_synchronize);
-    ABLASTR_PROFILE_VAR_NS("ablastr::particles::deposit_charge::Accumulate", blp_accumulate, do_device_synchronize);
+    ABLASTR_PROFILE_VAR_NS("ablastr::particles::deposit_charge::ChargeDeposition", blp_ppc_chd);
+    ABLASTR_PROFILE_VAR_NS("ablastr::particles::deposit_charge::Accumulate", blp_accumulate);
 
     // Get tile box where charge is deposited.
     // The tile box is different when depositing in the buffers (depos_lev<lev)
@@ -178,31 +171,32 @@ deposit_charge (typename T_PC::ParIterType& pti,
     // Indices of the lower bound
     const amrex::Dim3 lo = lbound(tilebox);
 
-    ABLASTR_PROFILE_VAR_START(blp_ppc_chd, do_device_synchronize);
+    ABLASTR_PROFILE_VAR_START(blp_ppc_chd);
 
     if        (nox == 1){
         doChargeDepositionShapeN<1>(GetPosition, wp.dataPtr()+offset, ion_lev,
-                                    rho_fab, np_to_deposit.value(), dx, xyzmin, lo, charge,
-                                    n_rz_azimuthal_modes, cost,
-                                    load_balance_costs_update_algo);
+                                    rho_fab, np_to_deposit.value(), dinv, xyzmin, lo, charge,
+                                    n_rz_azimuthal_modes);
     } else if (nox == 2){
         doChargeDepositionShapeN<2>(GetPosition, wp.dataPtr()+offset, ion_lev,
-                                    rho_fab, np_to_deposit.value(), dx, xyzmin, lo, charge,
-                                    n_rz_azimuthal_modes, cost,
-                                    load_balance_costs_update_algo);
+                                    rho_fab, np_to_deposit.value(), dinv, xyzmin, lo, charge,
+                                    n_rz_azimuthal_modes);
     } else if (nox == 3){
         doChargeDepositionShapeN<3>(GetPosition, wp.dataPtr()+offset, ion_lev,
-                                    rho_fab, np_to_deposit.value(), dx, xyzmin, lo, charge,
-                                    n_rz_azimuthal_modes, cost,
-                                    load_balance_costs_update_algo);
+                                    rho_fab, np_to_deposit.value(), dinv, xyzmin, lo, charge,
+                                    n_rz_azimuthal_modes);
+    } else if (nox == 4){
+        doChargeDepositionShapeN<4>(GetPosition, wp.dataPtr()+offset, ion_lev,
+                                    rho_fab, np_to_deposit.value(), dinv, xyzmin, lo, charge,
+                                    n_rz_azimuthal_modes);
     }
-    ABLASTR_PROFILE_VAR_STOP(blp_ppc_chd, do_device_synchronize);
+    ABLASTR_PROFILE_VAR_STOP(blp_ppc_chd);
 
 #ifndef AMREX_USE_GPU
     // CPU, tiling: atomicAdd local_rho into rho
-    ABLASTR_PROFILE_VAR_START(blp_accumulate, do_device_synchronize);
-    (*rho)[pti].atomicAdd(local_rho, tb, tb, 0, icomp*nc, nc);
-    ABLASTR_PROFILE_VAR_STOP(blp_accumulate, do_device_synchronize);
+    ABLASTR_PROFILE_VAR_START(blp_accumulate);
+    (*rho)[pti].lockAdd(local_rho, tb, tb, 0, icomp*nc, nc);
+    ABLASTR_PROFILE_VAR_STOP(blp_accumulate);
 #endif
 }
 

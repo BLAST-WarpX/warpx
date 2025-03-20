@@ -54,12 +54,13 @@ using namespace amrex;
 
 
 // constructor
-ParticleHistogram2D::ParticleHistogram2D (std::string rd_name)
+ParticleHistogram2D::ParticleHistogram2D (const std::string& rd_name)
         : ReducedDiags{rd_name}
 {
     ParmParse pp_rd_name(rd_name);
 
     pp_rd_name.query("openpmd_backend", m_openpmd_backend);
+    pp_rd_name.query("file_min_digits", m_file_min_digits);
     // pick first available backend if default is chosen
     if( m_openpmd_backend == "default" ) {
         m_openpmd_backend = WarpXOpenPMDFileType();
@@ -137,7 +138,7 @@ void ParticleHistogram2D::ComputeDiags (int step)
     Array<int,2> tlo{0,0}; // lower bounds
     Array<int,2> thi{m_bin_num_abs-1, m_bin_num_ord-1}; // inclusive upper bounds
     amrex::TableData<amrex::Real,2> d_data_2D(tlo, thi);
-    m_h_data_2D = amrex::TableData<amrex::Real,2> (tlo, thi, The_Pinned_Arena());
+    m_h_data_2D.resize(tlo, thi, The_Pinned_Arena());
     auto const& h_table_data = m_h_data_2D.table();
 
     // Initialize data on the host
@@ -148,6 +149,8 @@ void ParticleHistogram2D::ComputeDiags (int step)
     }
 
     d_data_2D.copy(m_h_data_2D);
+    // Gpu::streamSynchronize() is not needed, because there is a sync in WarpXParIter constructor later
+
     auto d_table = d_data_2D.table();
 
     // get a reference to WarpX instance
@@ -243,6 +246,7 @@ void ParticleHistogram2D::ComputeDiags (int step)
 
     // Copy data from GPU memory
     m_h_data_2D.copy(d_data_2D);
+    Gpu::streamSynchronize();
 
     // reduced sum over mpi ranks
     const int size = static_cast<int> (d_data_2D.size());
@@ -260,10 +264,24 @@ void ParticleHistogram2D::WriteToFile (int step) const
     // only IO processor writes
     if ( !ParallelDescriptor::IOProcessor() ) { return; }
 
+    // TODO: support different filename templates
+    std::string filename = "openpmd";
+    // TODO: support also group-based encoding
+    const std::string fileSuffix = std::string("_%0") + std::to_string(m_file_min_digits) + std::string("T");
+    filename = filename.append(fileSuffix).append(".").append(m_openpmd_backend);
+
+    // transform paths for Windows
+    #ifdef _WIN32
+        const std::string filepath = openPMD::auxiliary::replace_all(
+            m_path + m_rd_name + "/" + filename, "/", "\\");
+    #else
+        const std::string filepath = m_path + m_rd_name + "/" + filename;
+    #endif
+
     // Create the OpenPMD series
     auto series = io::Series(
-            m_path + m_rd_name + "/openpmd_%06T." + m_openpmd_backend,
-            io::Access::APPEND);
+            filepath,
+            io::Access::CREATE);
     auto i = series.iterations[step + 1];
     // record
     auto f_mesh = i.meshes["data"];
@@ -301,6 +319,8 @@ void ParticleHistogram2D::WriteToFile (int step) const
             {static_cast<unsigned long>(m_bin_num_ord), static_cast<unsigned long>(m_bin_num_abs)});
 
     series.flush();
+    i.close();
+    series.close();
 #else
     amrex::ignore_unused(step);
     WARPX_ABORT_WITH_MESSAGE("ParticleHistogram2D: Needs openPMD-api compiled into WarpX, but was not found!");

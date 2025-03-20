@@ -1,0 +1,75 @@
+# Maximum number of time steps
+max_step = 240
+
+# number of grid points
+amr.n_cell =  480 352
+
+# Maximum allowable size of each subdomain in the problem domain;
+#    this is used to decompose the domain for parallel calculations.
+amr.max_grid_size = 32
+
+# Maximum level in hierarchy (for now must be 0, i.e., one level in total)
+amr.max_level = 0
+
+# Geometry
+geometry.dims = 2
+geometry.prob_lo     = -20.e-6    -15.e-6    # physical domain
+geometry.prob_hi     =  20.e-6     15.e-6
+
+boundary.field_lo = pec periodic
+boundary.field_hi = pec periodic
+
+warpx.serialize_initial_conditions = 1
+
+# Verbosity
+warpx.verbose = 1
+
+# Algorithms
+algo.current_deposition = esirkepov
+warpx.use_filter = 0
+
+# implicit evolve scheme
+algo.evolve_scheme = "semi_implicit_em"
+#
+implicit_evolve.nonlinear_solver = "newton"
+newton.verbose = true
+newton.max_iterations = 21
+newton.relative_tolerance = 1.0e-8
+newton.require_convergence = true
+#
+gmres.verbose_int = 2
+gmres.max_iterations = 1000
+gmres.relative_tolerance = 1.0e-4
+
+# CFL
+warpx.cfl = 1.0
+
+# Order of particle shape factors
+algo.particle_shape = 1
+
+# Laser
+lasers.names        = laser1
+laser1.profile      = Gaussian
+laser1.position     = 10.e-6  0.e-6  0.e-6 # This point is on the laser plane
+laser1.direction    = 2.  0.  1.           # The plane normal direction
+laser1.polarization = 1. 1.  -2.           # The main polarization vector
+laser1.e_max        = 4.e12                # Maximum amplitude of the laser field (in V/m)
+laser1.wavelength   = 1.0e-6               # The wavelength of the laser (in meters)
+laser1.profile_waist = 5.e-6               # The waist of the laser (in meters)
+laser1.profile_duration = 10.e-15          # The duration of the laser (in seconds)
+laser1.profile_t_peak = 24.e-15            # The time at which the laser reaches its peak (in seconds)
+laser1.profile_focal_distance = 13.109e-6  # Focal distance from the antenna (in meters)
+                                           #     With this focal distance the laser is at focus
+                                           #     at the end of the simulation.
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 240
+diag1.diag_type = Full
+
+# Moving window
+warpx.do_moving_window = 1
+warpx.moving_window_dir = x
+warpx.moving_window_v = 1.0 # in units of the speed of light
+warpx.start_moving_window_step = 20
+warpx.end_moving_window_step = 200

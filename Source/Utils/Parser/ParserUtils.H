@@ -88,6 +88,20 @@ namespace utils::parser
         std::string& stored_string);
 
 
+    /**
+    * \brief If the input is provided, parse the string (typically a mathematical expression) from the
+    * input file and store it into a variable, replacing its contents.
+    *
+    * \param pp used to read the query_string `pp.<function>=string`
+    * \param query_string ParmParse.query will look for this string
+    * \param stored_string variable in which the string to parse is stored
+    */
+    bool Query_parserString(
+        amrex::ParmParse const& pp,
+        std::string const& query_string,
+        std::string& stored_string);
+
+
     /** Parse a string and return as a double precision floating point number
     *
     * In case the string cannot be interpreted as a double,
@@ -147,7 +161,7 @@ namespace utils::parser
 
             auto parser = makeParser(str_val, {});
 
-            if constexpr (std::is_same<T, int>::value) {
+            if constexpr (std::is_same_v<T, int>) {
 
                 val = safeCastToInt(
                     static_cast<amrex::Real>(std::round(parser.compileHost<0>()())), str);
@@ -174,7 +188,7 @@ namespace utils::parser
             val.resize(n);
             for (int i=0 ; i < n ; i++) {
                 auto parser = makeParser(tmp_str_arr[i], {});
-                if constexpr (std::is_same<T, int>::value) {
+                if constexpr (std::is_same_v<T, int>) {
                     val[i] = safeCastToInt(
                         static_cast<amrex::Real>(std::round(parser.compileHost<0>()())), str);
                 }
@@ -217,7 +231,7 @@ namespace utils::parser
             val.resize(n);
             for (int i=0 ; i < n ; i++) {
                 auto parser = makeParser(tmp_str_arr[i], {});
-                if constexpr (std::is_same<T, int>::value) {
+                if constexpr (std::is_same_v<T, int>) {
                     val[i] = safeCastToInt(
                         static_cast<amrex::Real>(std::round(parser.compileHost<0>()())), str);
                 }
@@ -250,7 +264,7 @@ namespace utils::parser
         Store_parserString(a_pp, str, str_val);
 
         auto parser = makeParser(str_val, {});
-        if constexpr (std::is_same<T, int>::value) {
+        if constexpr (std::is_same_v<T, int>) {
             val = safeCastToInt(
                 static_cast<amrex::Real>(std::round(parser.compileHost<0>()())), str);
         }
@@ -270,7 +284,7 @@ namespace utils::parser
         val.resize(n);
         for (int i=0 ; i < n ; i++) {
             auto parser = makeParser(tmp_str_arr[i], {});
-            if constexpr (std::is_same<T, int>::value) {
+            if constexpr (std::is_same_v<T, int>) {
                 val[i] = safeCastToInt(
                     static_cast<amrex::Real>(std::round(parser.compileHost<0>()())), str);
             }
@@ -308,7 +322,7 @@ namespace utils::parser
         val.resize(n);
         for (int i=0 ; i < n ; i++) {
             auto parser = makeParser(tmp_str_arr[i], {});
-            if constexpr (std::is_same<T, int>::value) {
+            if constexpr (std::is_same_v<T, int>) {
                 val[i] = safeCastToInt(
                     static_cast<amrex::Real>(std::round(parser.compileHost<0>()())), str);
             }

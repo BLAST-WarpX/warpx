@@ -11,6 +11,8 @@
 #include "FieldSolver/SpectralSolver/SpectralKSpace.H"
 #include "SpectralBaseAlgorithm.H"
 
+#include <ablastr/utils/Enums.H>
+
 #include <AMReX_Array.H>
 #include <AMReX_Config.H>
 #include <AMReX_REAL.H>
@@ -20,7 +22,7 @@
 #include <array>
 #include <memory>
 
-#if WARPX_USE_PSATD
+#if WARPX_USE_FFT
 /*
  * \brief Class that updates the fields in spectral space according to the multi-J algorithm
  *        and stores the coefficients of the corresponding update equations. J is assumed to be
@@ -53,11 +55,12 @@ class PsatdAlgorithmJLinearInTime : public SpectralBaseAlgorithm
             int norder_x,
             int norder_y,
             int norder_z,
-            short grid_type,
+            ablastr::utils::enums::GridType grid_type,
             amrex::Real dt,
             bool time_averaging,
             bool dive_cleaning,
-            bool divb_cleaning);
+            bool divb_cleaning
+        );
 
         /**
          * \brief Updates the E and B fields in spectral space, according to the multi-J PSATD equations
@@ -125,5 +128,5 @@ class PsatdAlgorithmJLinearInTime : public SpectralBaseAlgorithm
         bool m_dive_cleaning;
         bool m_divb_cleaning;
 };
-#endif // WARPX_USE_PSATD
+#endif // WARPX_USE_FFT
 #endif // WARPX_PSATD_ALGORITHM_J_LINEAR_IN_TIME_H_

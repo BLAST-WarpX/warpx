@@ -10,7 +10,6 @@
 #include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
-#include <AMReX_ArrayOfStructs.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_GpuDevice.H>
 #include <AMReX_GpuLaunch.H>
@@ -61,7 +60,7 @@ PhysicalParticleContainer::PartitionParticlesInBuffers(
     // Initialize temporary arrays
     Gpu::DeviceVector<int> inexflag;
     inexflag.resize(np);
-    Gpu::DeviceVector<long> pid;
+    Gpu::DeviceVector<int> pid;
     pid.resize(np);
 
     // First, partition particles into the larger buffer
@@ -109,7 +108,7 @@ PhysicalParticleContainer::PartitionParticlesInBuffers(
             // - For each particle in the large buffer, find whether it is in
             // the smaller buffer, by looking up the mask. Store the answer in `inexflag`.
             amrex::ParallelFor( np - n_fine,
-               fillBufferFlagRemainingParticles(pti, bmasks, inexflag, Geom(lev), pid, n_fine) );
+               fillBufferFlagRemainingParticles(pti, bmasks, inexflag, Geom(lev), pid, int(n_fine)) );
             auto *const sep2 = stablePartition( sep, pid.end(), inexflag );
 
             if (bmasks == gather_masks) {

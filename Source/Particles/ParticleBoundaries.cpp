@@ -6,6 +6,7 @@
  */
 
 #include "ParticleBoundaries.H"
+#include "WarpX.H"
 
 #include "Utils/Parser/ParserUtils.H"
 
@@ -30,6 +31,12 @@ ParticleBoundaries::SetAll (ParticleBoundaryType bc)
     data.ymax_bc = bc;
     data.zmin_bc = bc;
     data.zmax_bc = bc;
+}
+
+void
+ParticleBoundaries::SetThermalVelocity (amrex::Real u_th)
+{
+    data.m_uth = u_th;
 }
 
 void

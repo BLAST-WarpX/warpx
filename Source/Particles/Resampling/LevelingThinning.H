@@ -36,7 +36,13 @@ public:
      *
      * @param[in] species_name the name of the resampled species
      */
-    LevelingThinning (std::string species_name);
+    LevelingThinning (const std::string& species_name);
+
+    /**
+     * This function queries deprecated input parameters and aborts
+     * the run if one of them is specified.
+     */
+    void BackwardCompatibility (const std::string& species_name );
 
     /**
      * \brief A method that performs leveling thinning for the considered species.

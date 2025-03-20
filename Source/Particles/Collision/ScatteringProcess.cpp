@@ -87,6 +87,8 @@ ScatteringProcess::parseProcessType(const std::string& scattering_process)
         return ScatteringProcessType::IONIZATION;
     } else if (scattering_process.find("excitation") != std::string::npos) {
         return ScatteringProcessType::EXCITATION;
+    } else if (scattering_process.find("forward") != std::string::npos) {
+        return ScatteringProcessType::FORWARD;
     } else {
         return ScatteringProcessType::INVALID;
     }
@@ -94,7 +96,7 @@ ScatteringProcess::parseProcessType(const std::string& scattering_process)
 
 void
 ScatteringProcess::readCrossSectionFile (
-                                  const std::string cross_section_file,
+                                  const std::string& cross_section_file,
                                   amrex::Vector<amrex::ParticleReal>& energies,
                                   amrex::Gpu::HostVector<amrex::ParticleReal>& sigmas )
 {
