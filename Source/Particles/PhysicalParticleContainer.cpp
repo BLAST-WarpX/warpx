@@ -3421,7 +3421,7 @@ PhysicalParticleContainer::DepositTemperature (
     // Number of guard cells for local deposition of J
     const WarpX& warpx = WarpX::GetInstance();
 
-    const amrex::IntVect& ng_J = warpx.get_ng_depos_J();
+    amrex::IntVect ng_J = warpx.get_ng_depos_J();
 
     // Extract deposition order and check that particles shape fits within the guard cells.
     // NOTE: In specific situations where the staggering of J and the current deposition algorithm
@@ -3464,6 +3464,7 @@ PhysicalParticleContainer::DepositTemperature (
         tilebox = amrex::coarsen(pti.tilebox(),ref_ratio);
     }
 
+    // ng_J.diagShift(1);
     tilebox.grow(ng_J);
 
     amrex::ignore_unused(thread_num);
