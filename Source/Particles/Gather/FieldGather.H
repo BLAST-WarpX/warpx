@@ -152,25 +152,25 @@ void doGatherVectorFieldShapeN (
 
     // Gather vector field F
     amrex::Real weight;
-    for (int i=0; i<=depos_order_para; i++) {
+    for (int k=0; k<=depos_order_perp; k++) {
         for (int j=0; j<=depos_order_perp; j++) {
-            for (int k=0; k<=depos_order_perp; k++) {
+            for (int i=0; i<=depos_order_para; i++) {
                 weight = static_cast<amrex::Real>(sx_Fx[i]*sy_Fx[j]*sz_Fx[k]);
                 Fxp += Fx_arr(lo.x+ip_Fx+i, lo.y+jp_Fx+j, lo.z+kp_Fx+k)*weight;
             }
         }
     }
-    for (int i=0; i<=depos_order_perp; i++) {
+    for (int k=0; k<=depos_order_perp; k++) {
         for (int j=0; j<=depos_order_para; j++) {
-            for (int k=0; k<=depos_order_perp; k++) {
+            for (int i=0; i<=depos_order_perp; i++) {
                 weight = static_cast<amrex::Real>(sx_Fy[i]*sy_Fy[j]*sz_Fy[k]);
                 Fyp += Fy_arr(lo.x+ip_Fy+i, lo.y+jp_Fy+j, lo.z+kp_Fy+k)*weight;
             }
         }
     }
-    for (int i=0; i<=depos_order_perp; i++) {
+    for (int k=0; k<=depos_order_para; k++) {
         for (int j=0; j<=depos_order_perp; j++) {
-            for (int k=0; k<=depos_order_para; k++) {
+            for (int i=0; i<=depos_order_perp; i++) {
                 weight = static_cast<amrex::Real>(sx_Fz[i]*sy_Fz[j]*sz_Fz[k]);
                 Fzp += Fz_arr(lo.x+ip_Fz+i, lo.y+jp_Fz+j, lo.z+kp_Fz+k)*weight;
             }
@@ -180,8 +180,8 @@ void doGatherVectorFieldShapeN (
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
 
     // Gather vector field F
-    for (int i=0; i<=depos_order_para; i++) {
-        for (int k=0; k<=depos_order_perp; k++) {
+    for (int k=0; k<=depos_order_perp; k++) {
+        for (int i=0; i<=depos_order_para; i++) {
             const auto weight_Fx = static_cast<amrex::Real>(sx_Fx[i]*sz_Fx[k]);
             Fxp += Fx_arr(lo.x+ip_Fx+i, lo.y+kp_Fx+k, 0, 0)*weight_Fx;
 #if defined(WARPX_DIM_RZ)
@@ -195,8 +195,8 @@ void doGatherVectorFieldShapeN (
 #endif
         }
     }
-    for (int i=0; i<=depos_order_perp; i++) {
-        for (int k=0; k<=depos_order_perp; k++) {
+    for (int k=0; k<=depos_order_perp; k++) {
+        for (int i=0; i<=depos_order_perp; i++) {
             const auto weight_Fy = static_cast<amrex::Real>(sx_Fy[i]*sz_Fy[k]);
             Fyp += Fy_arr(lo.x+ip_Fy+i, lo.y+kp_Fy+k, 0, 0)*weight_Fy;
 #if defined(WARPX_DIM_RZ)
@@ -210,8 +210,8 @@ void doGatherVectorFieldShapeN (
 #endif
         }
     }
-    for (int i=0; i<=depos_order_perp; i++) {
-        for (int k=0; k<=depos_order_para; k++) {
+    for (int k=0; k<=depos_order_para; k++) {
+        for (int i=0; i<=depos_order_perp; i++) {
             const auto weight_Fz = static_cast<amrex::Real>(sx_Fz[i]*sz_Fz[k]);
             Fzp += Fz_arr(lo.x+ip_Fz+i, lo.y+kp_Fz+k, 0, 0)*weight_Fz;
 #if defined(WARPX_DIM_RZ)
