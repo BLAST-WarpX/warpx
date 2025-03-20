@@ -784,8 +784,8 @@ WarpX::PushPSATD (amrex::Real start_time)
             current_fp_string = "current_fp";
             PSATDBackwardTransformJ(current_fp_string, current_cp_string);
             // TODO Cumulative sums need to be fixed with periodic single box
-            auto cell_size_at_all_levels = amrex::Vector<std::array<Real,3>>(finest_level);
-            for (int lev = 0; lev < finest_level; ++lev){
+            auto cell_size_at_all_levels = amrex::Vector<std::array<Real,3>>(finest_level+1);
+            for (int lev = 0; lev <= finest_level; ++lev){
                 cell_size_at_all_levels[lev] = CellSize(lev);
             }
             ::PSATDSubtractCurrentPartialSumsAvg(cell_size_at_all_levels, m_fields);
@@ -841,8 +841,8 @@ WarpX::PushPSATD (amrex::Real start_time)
             // Inverse FFT of J, subtract cumulative sums of D
             current_fp_string = "current_fp";
             PSATDBackwardTransformJ(current_fp_string, current_cp_string);
-            auto cell_size_at_all_levels = amrex::Vector<std::array<Real,3>>(finest_level);
-            for (int lev = 0; lev < finest_level; ++lev){
+            auto cell_size_at_all_levels = amrex::Vector<std::array<Real,3>>(finest_level+1);
+            for (int lev = 0; lev <= finest_level; ++lev){
                 cell_size_at_all_levels[lev] = CellSize(lev);
             }
             ::PSATDSubtractCurrentPartialSumsAvg(cell_size_at_all_levels, m_fields);
