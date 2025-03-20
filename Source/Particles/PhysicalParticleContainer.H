@@ -64,6 +64,8 @@ public:
     PhysicalParticleContainer(PhysicalParticleContainer&& )                    = default;
     PhysicalParticleContainer& operator=(PhysicalParticleContainer&& )         = default;
 
+    virtual void AllocData () override;
+
     void InitData () override;
 
     void ReadHeader (std::istream& is) override;
@@ -355,6 +357,24 @@ public:
         return GetVecOfPtrs(m_user_real_attrib_parser);
     }
 
+    // By default this returns false, can be overridden in PysicalParticleContainer
+    virtual bool getTemperatureDepositionFlag () const noexcept override {return do_temperature_deposition;}
+
+    virtual void AccumulateVelocitiesAndComputeTemperature (
+        ablastr::fields::MultiLevelVectorField const & T_vf,
+        amrex::Real dt,
+        amrex::Real relative_time) override;
+
+    virtual void DepositTemperature (
+        WarpXParIter& pti,
+        RealVector const & wp, RealVector const & uxp,
+        RealVector const & uyp, RealVector const & uzp,
+        int const * const ion_lev,
+        amrex::MultiFab * const Tx, amrex::MultiFab * const Ty, amrex::MultiFab * const Tz,
+        long const offset, long const np_to_deposit,
+        int const thread_num, const int lev, int const depos_lev,
+        amrex::Real const dt, amrex::Real const relative_time, PushType push_type) override;
+
 protected:
 
     /*
@@ -394,6 +414,11 @@ protected:
 
     // A flag to enable saving of the previous timestep positions
     bool m_save_previous_position = false;
+
+    // Flag controlling whether or not variance and then temperatures are computed per species
+    bool do_temperature_deposition = false;
+
+    std::unique_ptr<warpx::particles::deposition::VarianceAccumulationBuffer> local_temperature_arrays;
 
 #ifdef WARPX_QED
     // A flag to enable quantum_synchrotron process for leptons

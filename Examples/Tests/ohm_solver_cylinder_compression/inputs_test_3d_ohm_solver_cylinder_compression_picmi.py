@@ -57,7 +57,7 @@ class PlasmaCylinderCompression(object):
     NZ = 128
 
     # Starting number of particles per cell
-    NPPC = 100
+    NPPC = 1000
 
     # Number of substeps used to update B
     substeps = 20
@@ -253,7 +253,7 @@ class PlasmaCylinderCompression(object):
         simulation.max_steps = self.total_steps
         simulation.current_deposition_algo = "direct"
         simulation.particle_shape = 1
-        simulation.use_filter = True
+        simulation.use_filter = False
         simulation.verbose = self.verbose
 
         #######################################################################
@@ -318,6 +318,7 @@ class PlasmaCylinderCompression(object):
             name="ions",
             charge="q_e",
             mass=self.M,
+            warpx_do_temperature_deposition=True,
             initial_distribution=picmi.AnalyticDistribution(
                 density_expression="n0_p/(1+exp((sqrt(x*x+y*y)-R_p)/delta_p))",
                 momentum_expressions=momentum_expr,
@@ -396,4 +397,24 @@ args, left = parser.parse_known_args()
 sys.argv = sys.argv[:1] + left
 
 run = PlasmaCylinderCompression(test=args.test, verbose=args.verbose)
-simulation.step()
+simulation.step(1)
+
+import matplotlib.pyplot as plt
+
+plt.ion()
+
+wx = fields.CustomNamedxWrapper("w_ions", include_ghosts=False)
+wy = fields.CustomNamedyWrapper("w_ions", include_ghosts=False)
+wz = fields.CustomNamedzWrapper("w_ions", include_ghosts=False)
+
+w2x = fields.CustomNamedxWrapper("w2_ions", include_ghosts=False)
+w2y = fields.CustomNamedyWrapper("w2_ions", include_ghosts=False)
+w2z = fields.CustomNamedzWrapper("w2_ions", include_ghosts=False)
+
+vbarx = fields.CustomNamedxWrapper("vbar_ions", include_ghosts=False)
+vbary = fields.CustomNamedyWrapper("vbar_ions", include_ghosts=False)
+vbarz = fields.CustomNamedzWrapper("vbar_ions", include_ghosts=False)
+
+Tx = fields.CustomNamedxWrapper("T_ions", include_ghosts=False)
+Ty = fields.CustomNamedyWrapper("T_ions", include_ghosts=False)
+Tz = fields.CustomNamedzWrapper("T_ions", include_ghosts=False)

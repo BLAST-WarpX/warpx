@@ -187,6 +187,10 @@ class Species(picmistandard.PICMI_Species):
     warpx_add_real_attributes: dict
         Dictionary of extra real particle attributes initialized from an
         expression that is a function of the variables (x, y, z, ux, uy, uz, t).
+
+    warpx_do_temperature_deposition: bool, default=False
+        This flag is set per species to do another pass to deposit temperature
+        on each timestep if required.
     """
 
     def init(self, kw):
@@ -318,6 +322,8 @@ class Species(picmistandard.PICMI_Species):
         self.extra_int_attributes = kw.pop("warpx_add_int_attributes", None)
         self.extra_real_attributes = kw.pop("warpx_add_real_attributes", None)
 
+        self.do_temperature_deposition = kw.pop("warpx_do_temperature_deposition", None)
+
     def species_initialize_inputs(
         self,
         layout,
@@ -369,6 +375,7 @@ class Species(picmistandard.PICMI_Species):
             resampling_algorithm_n_theta=self.resampling_algorithm_n_theta,
             resampling_algorithm_n_phi=self.resampling_algorithm_n_phi,
             resampling_algorithm_delta_u=self.resampling_algorithm_delta_u,
+            do_temperature_deposition=self.do_temperature_deposition,
         )
 
         # add reflection models

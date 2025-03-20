@@ -12,6 +12,8 @@
 #include "ablastr/particles/DepositCharge.H"
 #include "Deposition/ChargeDeposition.H"
 #include "Deposition/CurrentDeposition.H"
+#include "Deposition/VarianceAccumulationBuffer.H"
+#include "Deposition/TemperatureDeposition.H"
 #include "Deposition/SharedDepositionUtils.H"
 #include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
@@ -146,6 +148,7 @@ void
 WarpXParticleContainer::ReadParameters ()
 {
     static bool initialized = false;
+
     if (!initialized)
     {
         const ParmParse pp_particles("particles");

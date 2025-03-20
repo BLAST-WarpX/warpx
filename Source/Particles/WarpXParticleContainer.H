@@ -24,6 +24,8 @@
 #endif
 #include "MultiParticleContainer_fwd.H"
 
+#include "Particles/Deposition/VarianceAccumulationBuffer.H"
+
 #include <ablastr/fields/MultiFabRegister.H>
 
 #include <AMReX_Array.H>
@@ -228,7 +230,7 @@ public:
 
     virtual void PostRestart () = 0;
 
-    void AllocData ();
+    virtual void AllocData ();
 
     /**
      * \brief Virtual method to initialize runtime attributes. Must be overriden by each derived
@@ -322,6 +324,42 @@ public:
                                 amrex::Real dt,
                                 amrex::Real relative_time,
                                 PushType push_type);
+    /**
+     * \brief Accumulate velocity moments for matched temperature deposition using particle shapes
+     *
+     * \param[in,out] T_vf vector field of Temperatures (one three-dimensional array of pointers
+     *                to MultiFabs per mesh refinement level)
+     * \param[in] dt Time step for particle level
+     * \param[in] relative_time Time at which to deposit J, relative to the time of the
+     *                          current positions of the particles. When different than 0,
+     *                          the particle position will be temporarily modified to match
+     *                          the time of the deposition.
+     */
+    virtual void AccumulateVelocitiesAndComputeTemperature (
+        [[maybe_unused]]ablastr::fields::MultiLevelVectorField const & T_vf,
+        [[maybe_unused]]amrex::Real dt,
+        [[maybe_unused]]amrex::Real relative_time)
+    {}
+
+    virtual void DepositTemperature (
+        [[maybe_unused]]WarpXParIter& pti,
+        [[maybe_unused]]RealVector const & wp,
+        [[maybe_unused]]RealVector const & uxp,
+        [[maybe_unused]]RealVector const & uyp,
+        [[maybe_unused]]RealVector const & uzp,
+        [[maybe_unused]]int const * const ion_lev,
+        [[maybe_unused]]amrex::MultiFab * const Tx,
+        [[maybe_unused]]amrex::MultiFab * const Ty,
+        [[maybe_unused]]amrex::MultiFab * const Tz,
+        [[maybe_unused]]long const offset,
+        [[maybe_unused]]long const np_to_deposit,
+        [[maybe_unused]]int const thread_num,
+        [[maybe_unused]]const int lev,
+        [[maybe_unused]]int const depos_lev,
+        [[maybe_unused]]amrex::Real const dt,
+        [[maybe_unused]]amrex::Real const relative_time,
+        [[maybe_unused]]PushType push_type)
+    {}
 
     // If particles start outside of the domain, ContinuousInjection
     // makes sure that they are initialized when they enter the domain, and
@@ -572,6 +610,9 @@ public:
     TmpParticles getTmpParticleData () const noexcept {return tmp_particle_data;}
 
     int getIonizationInitialLevel () const noexcept {return ionization_initial_level;}
+
+    // By default this returns false, can be overridden in PysicalParticleContainer
+    virtual bool getTemperatureDepositionFlag () const noexcept {return false;}
 
 protected:
     TmpParticles tmp_particle_data;

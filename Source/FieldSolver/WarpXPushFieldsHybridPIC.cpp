@@ -64,7 +64,12 @@ void WarpX::HybridPICEvolveFields ()
     // Perform charge deposition in component 0 of rho_fp at t_{n+1}.
     mypc->DepositCharge(m_fields.get_mr_levels(FieldType::rho_fp, finest_level), 0._rt);
     // Perform current deposition at t_{n+1/2}.
-    mypc->DepositCurrent(m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), dt[0], -0.5_rt * dt[0]);
+    mypc->DepositCurrent(m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
+        dt[0], -0.5_rt * dt[0]);
+
+    // TODO: Perhaps add flag here for when using temperature accumulation in Hybrid
+    // Perform Temperature Deposition at time t_{n+1/2}
+    mypc->DepositTemperatures(m_fields, dt[0], -0.5_rt * dt[0]);
 
     // Deposit cold-relativistic fluid charge and current
     if (do_fluid_species) {
