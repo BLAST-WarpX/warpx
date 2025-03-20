@@ -2091,7 +2091,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
 * ``<collision_name>.use_global_debye_length`` (`bool`) optional
     Only for ``pairwisecoulomb``. When set, the Debye length used in the Coulomb log
     is calculated including all species in the simulation. The lengths are combined
-    using the square root of one over the sum of one over the sqaures of the Debye lengths
+    using the square root of one over the sum of one over the squares of the Debye lengths
     of each species. By default, this is turned off. Note that if ``<collision_name>.CoulombLog``
     is specified, this Debye length is not used.
 
