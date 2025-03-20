@@ -141,30 +141,24 @@ guardCellManager::Init (
     if (electromagnetic_solver_id != ElectromagneticSolverAlgo::None &&
         electromagnetic_solver_id != ElectromagneticSolverAlgo::HybridPIC)
     {
-        const ParmParse pp_warpx("warpx");
-        bool const nguards_specified = utils::parser::queryWithParser(pp_warpx, "nguards", ng_alloc_Rho);
-        if (nguards_specified) {
-            ng_alloc_J = ng_alloc_Rho;
-        } else {
-            for (int i = 0; i < AMREX_SPACEDIM; i++)
-            {
-                amrex::Real dt_Rho = dt;
-                amrex::Real dt_J = 0.5_rt*dt;
-                if (do_multi_J) {
-                    // With multi_J + time averaging, particles can move during 2*dt per PIC cycle.
-                    if (fft_do_time_averaging){
-                        dt_Rho = 2._rt*dt;
-                        dt_J = 2._rt*dt;
-                    }
-                    // With multi_J but without time averaging, particles can move during dt per PIC
-                    // cycle for the current deposition as well.
-                    else {
-                        dt_J = dt;
-                    }
+        for (int i = 0; i < AMREX_SPACEDIM; i++)
+        {
+            amrex::Real dt_Rho = dt;
+            amrex::Real dt_J = 0.5_rt*dt;
+            if (do_multi_J) {
+                // With multi_J + time averaging, particles can move during 2*dt per PIC cycle.
+                if (fft_do_time_averaging){
+                    dt_Rho = 2._rt*dt;
+                    dt_J = 2._rt*dt;
                 }
-                ng_alloc_Rho[i] += static_cast<int>(std::ceil(PhysConst::c * dt_Rho / dx[i]));
-                ng_alloc_J[i]   += static_cast<int>(std::ceil(PhysConst::c * dt_J / dx[i]));
+                // With multi_J but without time averaging, particles can move during dt per PIC
+                // cycle for the current deposition as well.
+                else {
+                    dt_J = dt;
+                }
             }
+            ng_alloc_Rho[i] += static_cast<int>(std::ceil(PhysConst::c * dt_Rho / dx[i]));
+            ng_alloc_J[i]   += static_cast<int>(std::ceil(PhysConst::c * dt_J / dx[i]));
         }
     }
 
@@ -346,5 +340,25 @@ guardCellManager::Init (
         if (do_moving_window){
             ng_MovingWindow[moving_window_dir] = 1;
         }
+    }
+
+    const ParmParse pp_warpx("warpx");
+    amrex::IntVect nguards_minimum;
+    bool const nguards_specified = utils::parser::queryWithParser(pp_warpx, "nguards_minimum", nguards_minimum);
+    if (nguards_specified) {
+        ng_alloc_EB.max(nguards_minimum);
+        ng_alloc_J.max(nguards_minimum);
+        ng_alloc_Rho.max(nguards_minimum);
+        ng_alloc_F.max(nguards_minimum);
+        ng_alloc_G.max(nguards_minimum);
+        ng_FieldSolver.max(nguards_minimum);
+        ng_FieldSolverF.max(nguards_minimum);
+        ng_FieldSolverG.max(nguards_minimum);
+        ng_FieldGather.max(nguards_minimum);
+        ng_UpdateAux.max(nguards_minimum);
+        ng_MovingWindow.max(nguards_minimum);
+        ng_afterPushPSATD.max(nguards_minimum);
+        ng_depos_J.max(nguards_minimum);
+        ng_depos_rho.max(nguards_minimum);
     }
 }
