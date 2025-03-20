@@ -221,10 +221,11 @@ void doGatherVectorFieldShapeN (
     }
 
 #if defined(WARPX_DIM_RZ)
-    // Convert Fxp and Fyp (which are actually Fr and Fth) to Fx and Fy
-    const amrex::Real Fxp_save = Fxp;
-    Fxp = costheta*Fxp - sintheta*Fyp;
-    Fyp = costheta*Fyp + sintheta*Fxp_save;
+    // Convert Fxp and Fyp (which are actually Frp and Fthp) to Fxp and Fyp
+    const amrex::Real Frp = Fxp;
+    const amrex::Real Fthp = Fyp;
+    Fxp = costheta*Frp  - sintheta*Fthp;
+    Fyp = costheta*Fthp + sintheta*Frp;
 #endif
 
 #elif defined(WARPX_DIM_1D_Z)
