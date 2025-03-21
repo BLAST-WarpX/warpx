@@ -23,6 +23,7 @@ namespace Algorithms{
      * \brief Computes the kinetic energy of a particle.
      * This method should not be used with photons.
      *
+     * @tparam T floating-point type to be used in internal calculations (by default equalt to amrex::ParticleReal)
      * @param[in] ux x component of the particle momentum (code units)
      * @param[in] uy y component of the particle momentum (code units)
      * @param[in] uz z component of the particle momentum (code units)
@@ -30,10 +31,10 @@ namespace Algorithms{
      *
      * @return the kinetic energy of the particle (in S.I. units)
      */
-    template <typename T>
+    template <typename T = amrex::ParticleReal>
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     T KineticEnergy(
-        const T ux, const T uy, const T uz, const T mass)
+        const amrex::ParticleReal ux, const amrex::ParticleReal uy, const amrex::ParticleReal uz, const amrex::ParticleReal mass)
     {
         using namespace amrex;
 
@@ -43,7 +44,7 @@ namespace Algorithms{
         // The expression used is derived by reducing the expression
         // (gamma - 1)*(gamma + 1)/(gamma + 1)
 
-        const auto u2 = ux*ux + uy*uy + uz*uz;
+        const auto u2 = static_cast<T>(ux*ux + uy*uy + uz*uz);
         const auto gamma = std::sqrt(one + u2*inv_c2);
         return one/(one + gamma)*mass*u2;
     }
