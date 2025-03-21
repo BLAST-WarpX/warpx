@@ -437,7 +437,7 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
                                   // projectile energy
                                   if (scattering_process.m_energy_penalty > 0.0_prt) {
                                       constexpr auto eV = PhysConst::q_e;
-                                      E_coll = (Algorithms::KineticEnergy(vx, vy, vz, m) - scattering_process.m_energy_penalty*eV);
+                                      E_coll = (Algorithms::KineticEnergy<double>(vx, vy, vz, m) - scattering_process.m_energy_penalty*eV);
                                       const auto scale_fac = static_cast<amrex::ParticleReal>(
                                         std::sqrt(E_coll * (E_coll + 2.0_prt*mc2) / c2) / m / v_coll);
                                       vx *= scale_fac;
