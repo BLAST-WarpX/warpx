@@ -152,7 +152,7 @@ jobs:
         mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d warpx.serialize_initial_conditions = 0
         mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d warpx.serialize_initial_conditions = 0
 
-        git clone https://github.com/ECP-WarpX/warpx-data ../warpx-data
+        git clone https://github.com/BLAST-WarpX/warpx-data ../warpx-data
         cd Examples/Tests/embedded_circle
 
         ulimit -c unlimited

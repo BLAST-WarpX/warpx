@@ -49,7 +49,7 @@ Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git /p/lustre1/${USER}/tioga/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git /p/lustre1/${USER}/tioga/src/warpx
 
 We use system software modules, add environment hints and further dependencies via the file ``$HOME/tioga_mi300a_warpx.profile``.
 Create it now:

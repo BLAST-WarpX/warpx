@@ -17,7 +17,7 @@ Before you start, you will need a copy of the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
    cd $HOME/src/warpx
 
 WarpX depends on popular third party software.
@@ -222,7 +222,7 @@ PICMI Python Bindings
    .. code-block:: bash
 
       python3 -m pip install -U pip
-      python3 -m pip install -U build packaging setuptools wheel
+      python3 -m pip install -U build packaging setuptools[core] wheel
       python3 -m pip install -U cmake
       python3 -m pip install -r requirements.txt
 

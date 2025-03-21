@@ -97,6 +97,9 @@ public:
      */
     virtual void WriteToFile (int step) const;
 
+    /** Check if diag should be done */
+    [[nodiscard]] bool DoDiags(int step) const { return m_intervals.contains(step+1); }
+
     /**
      * \brief Write out checkpoint related data
      *

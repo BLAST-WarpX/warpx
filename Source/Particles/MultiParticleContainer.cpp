@@ -641,11 +641,92 @@ MultiParticleContainer::GetChargeDensity (int lev, bool local)
 }
 
 void
-MultiParticleContainer::SortParticlesByBin (amrex::IntVect bin_size)
+MultiParticleContainer::GenerateGlobalDebyeLength ()
+{
+    WarpX & warpx = WarpX::GetInstance();
+
+    if (allcontainers.size() == 0) { return; }
+
+    // Is there a nicer way to get the number of levels?
+    // This grabs it from the first species.
+    int const finest_level = allcontainers[0]->finestLevel();
+
+    for (int lev = 0 ; lev <= finest_level ; lev++) {
+
+        if (!warpx.m_fields.has(FieldType::global_debye_length, lev)) {
+            amrex::BoxArray const & ba = warpx.boxArray(lev);
+            amrex::DistributionMapping const & dmap = warpx.DistributionMap(lev);
+            int const ncomps = 1;
+            amrex::IntVect ng = amrex::IntVect::TheZeroVector();
+            bool const remake = true;
+            bool const redistribute_on_remake = false;
+            warpx.m_fields.alloc_init(FieldType::global_debye_length, lev, ba, dmap, ncomps, ng, 0.,
+                                      remake, redistribute_on_remake);
+        }
+
+        amrex::MultiFab & global_debye_length = *warpx.m_fields.get(FieldType::global_debye_length, lev);
+        global_debye_length.setVal(amrex::Real(0.0));
+
+        for (auto& pc : allcontainers) {
+
+            if (pc->getMass() == 0. || pc->getCharge() == 0.) {
+                continue;
+            }
+
+            std::unique_ptr<amrex::MultiFab> debye_length = pc->GetDebyeLength(lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+            for (amrex::MFIter mfi(global_debye_length, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+            {
+                amrex::Box box = mfi.tilebox();
+
+                amrex::Array4<amrex::Real> const& debye_array = debye_length->array(mfi);
+                amrex::Array4<amrex::Real> const& global_debye_array = global_debye_length.array(mfi);
+
+                amrex::ParallelFor(box,
+                    [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                        amrex::Real const LDe = debye_array(i,j,k);
+                        if (LDe > 0.) {
+                            global_debye_array(i,j,k) += 1.0_rt/(LDe*LDe);
+                        }
+                    });
+            }
+
+        }
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(global_debye_length, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+        {
+            amrex::Box box = mfi.tilebox();
+
+            amrex::Array4<amrex::Real> const& global_debye_array = global_debye_length.array(mfi);
+
+            amrex::ParallelFor(box,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    amrex::Real const invLDe_sq = global_debye_array(i,j,k);
+                    if (invLDe_sq > 0.) {
+                        global_debye_array(i,j,k) = std::sqrt(1.0_rt/invLDe_sq);
+                    }
+                });
+        }
+
+    }
+
+}
+
+void
+MultiParticleContainer::SortParticlesByBin (
+    const amrex::IntVect& bin_size,
+    const bool sort_particles_for_deposition,
+    const amrex::IntVect& sort_idx_type)
 {
     for (auto& pc : allcontainers) {
-        if (WarpX::sort_particles_for_deposition) {
-            pc->SortParticlesForDeposition(WarpX::sort_idx_type);
+        if (sort_particles_for_deposition) {
+            pc->SortParticlesForDeposition(sort_idx_type);
         } else {
             pc->SortParticlesByBin(bin_size);
         }
@@ -885,7 +966,24 @@ MultiParticleContainer::SetDoBackTransformedParticles (const std::string& specie
         if (species_names_list[i] == species_name) {
            found = true;
            auto& pc = allcontainers[i];
+           const bool old_do_btd = pc->GetDoBackTransformedParticles();
            pc->SetDoBackTransformedParticles(do_back_transformed_particles);
+
+           if ((!old_do_btd) && do_back_transformed_particles) {
+               // Set comm to false so that the attributes are not communicated
+               // nor written to the checkpoint files
+               int const comm = 0;
+#if (AMREX_SPACEDIM >= 2)
+               pc->AddRealComp("x_n_btd", comm);
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+               pc->AddRealComp("y_n_btd", comm);
+#endif
+               pc->AddRealComp("z_n_btd", comm);
+               pc->AddRealComp("ux_n_btd", comm);
+               pc->AddRealComp("uy_n_btd", comm);
+               pc->AddRealComp("uz_n_btd", comm);
+           }
         }
     }
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(

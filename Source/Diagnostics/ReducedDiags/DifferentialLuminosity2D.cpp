@@ -315,6 +315,7 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
 
         // Copy data from GPU memory
         m_h_data_2D.copy(m_d_data_2D);
+        Gpu::streamSynchronize();
 
         // reduced sum over mpi ranks
         const int size = static_cast<int> (m_d_data_2D.size());

@@ -46,7 +46,7 @@ ExternalVectorPotential::ReadParameters ()
     m_A_external.resize(m_nFields);
 
     m_A_ext_time_function.resize(m_nFields);
-    for (std::string & field_time : m_A_ext_time_function) {field_time = "1.0"; }
+    for (std::string & field_time : m_A_ext_time_function) { field_time = "1.0"; }
 
     m_A_external_time_parser.resize(m_nFields);
     m_A_time_scale.resize(m_nFields);
@@ -272,7 +272,7 @@ ExternalVectorPotential::CalculateExternalCurlA (std::string& coil_name)
 
 AMREX_FORCE_INLINE
 void
-ExternalVectorPotential::PopulateExternalFieldFromVectorPotential (
+ExternalVectorPotential::AddExternalFieldFromVectorPotential (
     ablastr::fields::VectorField const& dstField,
     amrex::Real scale_factor,
     ablastr::fields::VectorField const& srcField,
@@ -313,21 +313,21 @@ ExternalVectorPotential::PopulateExternalFieldFromVectorPotential (
                 // Skip field update in the embedded boundaries
                 if (update_Fx_arr && update_Fx_arr(i, j, k) == 0) { return; }
 
-                Fx(i,j,k) = scale_factor * Sx(i,j,k);
+                Fx(i,j,k) += scale_factor * Sx(i,j,k);
             },
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
                 // Skip field update in the embedded boundaries
                 if (update_Fy_arr && update_Fy_arr(i, j, k) == 0) { return; }
 
-                Fy(i,j,k) = scale_factor * Sy(i,j,k);
+                Fy(i,j,k) += scale_factor * Sy(i,j,k);
             },
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
                 // Skip field update in the embedded boundaries
                 if (update_Fz_arr && update_Fz_arr(i, j, k) == 0) { return; }
 
-                Fz(i,j,k) = scale_factor * Sz(i,j,k);
+                Fz(i,j,k) += scale_factor * Sz(i,j,k);
             }
         );
     }
@@ -339,12 +339,20 @@ ExternalVectorPotential::UpdateHybridExternalFields (const amrex::Real t, const 
     using ablastr::fields::Direction;
     auto& warpx = WarpX::GetInstance();
 
-
     ablastr::fields::MultiLevelVectorField B_ext =
         warpx.m_fields.get_mr_levels_alldirs(FieldType::hybrid_B_fp_external, warpx.finestLevel());
     ablastr::fields::MultiLevelVectorField E_ext =
         warpx.m_fields.get_mr_levels_alldirs(FieldType::hybrid_E_fp_external, warpx.finestLevel());
 
+    // Zero E and B external fields prior to accumulating external fields
+    for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+        for (int idir = 0; idir < 3; ++idir) {
+            B_ext[lev][Direction{idir}]->setVal(0.0_rt);
+            E_ext[lev][Direction{idir}]->setVal(0.0_rt);
+        }
+    }
+
+    // Iterate over external fields and add together with individual time functions.
     for (int i = 0; i < m_nFields; ++i) {
         const std::string Aext_field = m_field_names[i] + std::string{"_Aext"};
         const std::string curlAext_field = m_field_names[i] + std::string{"_curlAext"};
@@ -363,8 +371,8 @@ ExternalVectorPotential::UpdateHybridExternalFields (const amrex::Real t, const 
             warpx.m_fields.get_mr_levels_alldirs(curlAext_field, warpx.finestLevel());
 
         for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
-            PopulateExternalFieldFromVectorPotential(E_ext[lev], scale_factor_E, A_ext[lev], warpx.GetEBUpdateEFlag()[lev]);
-            PopulateExternalFieldFromVectorPotential(B_ext[lev], scale_factor_B, curlA_ext[lev], warpx.GetEBUpdateBFlag()[lev]);
+            AddExternalFieldFromVectorPotential(E_ext[lev], scale_factor_E, A_ext[lev], warpx.GetEBUpdateEFlag()[lev]);
+            AddExternalFieldFromVectorPotential(B_ext[lev], scale_factor_B, curlA_ext[lev], warpx.GetEBUpdateBFlag()[lev]);
 
             for (int idir = 0; idir < 3; ++idir) {
                 E_ext[lev][Direction{idir}]->FillBoundary(warpx.Geom(lev).periodicity());

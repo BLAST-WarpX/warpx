@@ -70,10 +70,10 @@ im = ax1.imshow(
 # Colorbar
 fig.subplots_adjust(right=0.825)
 cbar_ax = fig.add_axes([0.85, 0.2, 0.03, 0.6])
-fig.colorbar(im, cax=cbar_ax, orientation="vertical", label="$B_y/B_0$")
+fig.colorbar(im, cax=cbar_ax, orientation="vertical", label=r"$B_y/B_0$")
 
-ax1.set_xlabel("$x/l_i$")
-ax1.set_ylabel("$t \Omega_i$ (rad)")
+ax1.set_xlabel(r"$x/l_i$")
+ax1.set_ylabel(r"$t \Omega_i$ (rad)")
 
 ax1.set_title(f"Ion beam R instability - {resonant_str} case")
 plt.savefig(
@@ -88,13 +88,13 @@ if sim.resonant:
 
     t_grid = np.arange(num_steps) * dt * sim.w_ci
     plt.plot(
-        t_grid, np.abs(field_kt[:, 4] / sim.B0), "r", label=f"m = 4, $kl_i={k[4]:.2f}$"
+        t_grid, np.abs(field_kt[:, 4] / sim.B0), "r", label=rf"m = 4, $kl_i={k[4]:.2f}$"
     )
     plt.plot(
-        t_grid, np.abs(field_kt[:, 5] / sim.B0), "b", label=f"m = 5, $kl_i={k[5]:.2f}$"
+        t_grid, np.abs(field_kt[:, 5] / sim.B0), "b", label=rf"m = 5, $kl_i={k[5]:.2f}$"
     )
     plt.plot(
-        t_grid, np.abs(field_kt[:, 6] / sim.B0), "k", label=f"m = 6, $kl_i={k[6]:.2f}$"
+        t_grid, np.abs(field_kt[:, 6] / sim.B0), "k", label=rf"m = 6, $kl_i={k[6]:.2f}$"
     )
 
     # The theoretical growth rates for the 4th, 5th and 6th Fourier modes of
@@ -119,8 +119,8 @@ if sim.resonant:
     plt.grid()
     plt.legend()
     plt.yscale("log")
-    plt.ylabel("$|B_y/B_0|$")
-    plt.xlabel("$t\Omega_i$ (rad)")
+    plt.ylabel(r"$|B_y/B_0|$")
+    plt.xlabel(r"$t\Omega_i$ (rad)")
     plt.tight_layout()
     plt.savefig(
         f"diags/ion_beam_R_instability_{resonant_str}_eta_{sim.eta}_substeps_{sim.substeps}_low_modes.png"
@@ -172,11 +172,11 @@ if not sim.test:
     fig.subplots_adjust(bottom=0.15, right=0.815)
     cbar_ax = fig.add_axes([0.83, 0.2, 0.03, 0.6])
     fig.colorbar(
-        im[3], cax=cbar_ax, orientation="vertical", format="%.0e", label="$f(z, v_y)$"
+        im[3], cax=cbar_ax, orientation="vertical", format="%.0e", label=r"$f(z, v_y)$"
     )
 
-    ax1.set_xlabel("$x/l_i$")
-    ax1.set_ylabel("$v_{y}/v_A$")
+    ax1.set_xlabel(r"$x/l_i$")
+    ax1.set_ylabel(r"$v_{y}/v_A$")
 
     ax1.set_title(f"Ion beam R instability - {resonant_str} case")
     plt.savefig(
@@ -207,11 +207,11 @@ if not sim.test:
     fig.subplots_adjust(bottom=0.15, right=0.815)
     cbar_ax = fig.add_axes([0.83, 0.2, 0.03, 0.6])
     fig.colorbar(
-        im[3], cax=cbar_ax, orientation="vertical", format="%.0e", label="$f(z, v_y)$"
+        im[3], cax=cbar_ax, orientation="vertical", format="%.0e", label=r"$f(z, v_y)$"
     )
 
-    ax1.set_xlabel("$x/l_i$")
-    ax1.set_ylabel("$v_{y}/v_A$")
+    ax1.set_xlabel(r"$x/l_i$")
+    ax1.set_ylabel(r"$v_{y}/v_A$")
 
     ax1.set_title(f"Ion beam R instability - {resonant_str} case")
     plt.savefig(
