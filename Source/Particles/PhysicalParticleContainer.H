@@ -145,6 +145,8 @@ public:
                         long np,
                         WarpXParIter& pti,
                         int lev,
+                        int n_field_gather_buffer,
+                        int n_current_deposition_buffer,
                         amrex::iMultiFab const* current_masks,
                         amrex::iMultiFab const* gather_masks );
 

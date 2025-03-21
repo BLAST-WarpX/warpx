@@ -1899,7 +1899,8 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 //    and (thus) the `np-nfine_current`/`np-nfine_gather` last particles
                 //    deposit/gather in the buffer
                 PartitionParticlesInBuffers( nfine_current, nfine_gather, np,
-                    pti, lev, current_masks, gather_masks );
+                    pti, lev, WarpX::n_field_gather_buffer,
+                    WarpX::n_current_deposition_buffer, current_masks, gather_masks );
             }
 
             const long np_current = has_J_buf ? nfine_current : np;
