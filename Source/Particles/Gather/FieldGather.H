@@ -389,14 +389,8 @@ void doGatherShapeNEsirkepovStencilImplicit (
     amrex::Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new);
     amrex::Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old);
     amrex::Real const rp_mid = (rp_new + rp_old)/2._rt;
-    amrex::Real costheta_mid, sintheta_mid;
-    if (rp_mid > 0._rt) {
-        costheta_mid = xp_mid/rp_mid;
-        sintheta_mid = yp_mid/rp_mid;
-    } else {
-        costheta_mid = 1._rt;
-        sintheta_mid = 0._rt;
-    }
+    const amrex::Real costheta_mid = (rp_mid > 0. ? xp_mid/rp_mid: 1._rt);
+    const amrex::Real sintheta_mid = (rp_mid > 0. ? yp_mid/rp_mid: 0.);
     const Complex xy_mid0 = Complex{costheta_mid, -sintheta_mid};
     // Keep these double to avoid bug in single precision
     double const x_new = (rp_new - xyzmin.x)*dinv.x;
@@ -697,13 +691,16 @@ void doGatherShapeNEsirkepovStencilImplicit (
         xy_mid = xy_mid*xy_mid0;
     }
 
-    // Convert Exp and Eyp (which are actually Er and Etheta) to Ex and Ey
-    const amrex::Real Exp_save = Exp;
-    Exp = costheta_mid*Exp - sintheta_mid*Eyp;
-    Eyp = costheta_mid*Eyp + sintheta_mid*Exp_save;
-    const amrex::Real Bxp_save = Bxp;
-    Bxp = costheta_mid*Bxp - sintheta_mid*Byp;
-    Byp = costheta_mid*Byp + sintheta_mid*Bxp_save;
+    // Convert Exp and Eyp (which are actually Erp and Ethp) to Exp and Eyp
+    const amrex::Real Erp = Exp;
+    const amrex::Real Ethp = Eyp;
+    Exp = costheta_mid*Erp  - sintheta_mid*Ethp;
+    Eyp = costheta_mid*Ethp + sintheta_mid*Erp;
+    // Convert Bxp and Byp (which are actually Brp and Bthp) to Bxp and Byp
+    const amrex::Real Brp = Bxp;
+    const amrex::Real Bthp = Byp;
+    Bxp = costheta_mid*Brp  - sintheta_mid*Bthp;
+    Byp = costheta_mid*Bthp + sintheta_mid*Brp;
 
 #endif
 
@@ -806,14 +803,8 @@ void doGatherPicnicShapeN (
     amrex::Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new);
     amrex::Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old);
     amrex::Real const rp_mid = (rp_new + rp_old)/2._rt;
-    amrex::Real costheta_mid, sintheta_mid;
-    if (rp_mid > 0._rt) {
-        costheta_mid = xp_mid/rp_mid;
-        sintheta_mid = yp_mid/rp_mid;
-    } else {
-        costheta_mid = 1._rt;
-        sintheta_mid = 0._rt;
-    }
+    const amrex::Real costheta_mid = (rp_mid > 0. ? xp_mid/rp_mid: 1._rt);
+    const amrex::Real sintheta_mid = (rp_mid > 0. ? yp_mid/rp_mid: 0.);
     const Complex xy_mid0 = Complex{costheta_mid, -sintheta_mid};
     // Keep these double to avoid bug in single precision
     double const x_new = (rp_new - xyzmin.x)*dinv.x;
@@ -1201,10 +1192,11 @@ void doGatherPicnicShapeN (
 
 #ifdef WARPX_DIM_RZ
 
-    // Convert Exp and Eyp (which are actually Er and Etheta) to Ex and Ey
-    const amrex::Real Exp_save = Exp;
-    Exp = costheta_mid*Exp - sintheta_mid*Eyp;
-    Eyp = costheta_mid*Eyp + sintheta_mid*Exp_save;
+    // Convert Exp and Eyp (which are actually Erp and Ethp) to Exp and Eyp
+    const amrex::Real Erp = Exp;
+    const amrex::Real Ethp = Eyp;
+    Exp = costheta_mid*Erp  - sintheta_mid*Ethp;
+    Eyp = costheta_mid*Ethp + sintheta_mid*Erp;
 
 #endif
 
