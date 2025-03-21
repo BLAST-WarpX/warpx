@@ -189,9 +189,9 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
                                 variance_arr(i,j,k) +=  variance_old_arr(i,j,k) + delta*delta*w_a*w_b/w_arr(i,j,k);
                             }
 
-                            // Apply Sample Reliability Normalization in any cell or after combining ghost cells
+                            // Apply Normalization in any owned cell
                             if (w_arr(i,j,k) > 0.0_rt) {
-                                variance_arr(i,j,k) /= (w_arr(i,j,k) - w2_arr(i,j,k)/w_arr(i,j,k));
+                                variance_arr(i,j,k) /= w_arr(i,j,k);
                             }
                         }
                 });
