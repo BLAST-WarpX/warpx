@@ -121,12 +121,6 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
                 variancemf.nGrowVect()
             };
 
-            amrex::IntVect ng_depos_J = warpx.get_ng_depos_J();
-            ng_depos_J.min(variancemf.nGrowVect());
-
-            const amrex::IntVect src_ngrow = ng_depos_J;
-            const amrex::IntVect dst_ngrow = variancemf_old.nGrowVect();
-
             // Sum the overlapping cells together
             WarpXSumGuardCells(wmf_old, wmf, periodicity, wmf.nGrowVect(), 0, 1);
             WarpXSumGuardCells(w2mf_old, w2mf, periodicity, w2mf.nGrowVect(), 0, 1);
@@ -191,7 +185,14 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
 
                             // Apply Normalization in any owned cell
                             if (w_arr(i,j,k) > 0.0_rt) {
-                                variance_arr(i,j,k) /= w_arr(i,j,k);
+                                amrex::Real denom = (w_arr(i,j,k) - w2_arr(i,j,k)/w_arr(i,j,k) );
+                                if (denom > std::numeric_limits<amrex::Real>::epsilon()) {
+                                    variance_arr(i,j,k) /= (w_arr(i,j,k) - w2_arr(i,j,k)/w_arr(i,j,k) );
+                                } else {
+                                    // This occurs when only a single sample is within a bin
+                                    // In this case shoudl be zero variance
+                                    variance_arr(i,j,k) = 0._rt;
+                                }
                             }
                         }
                 });

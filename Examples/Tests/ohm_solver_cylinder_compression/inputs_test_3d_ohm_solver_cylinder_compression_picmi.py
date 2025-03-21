@@ -253,7 +253,7 @@ class PlasmaCylinderCompression(object):
         simulation.max_steps = self.total_steps
         simulation.current_deposition_algo = "direct"
         simulation.particle_shape = 1
-        simulation.use_filter = False
+        simulation.use_filter = True
         simulation.verbose = self.verbose
 
         #######################################################################

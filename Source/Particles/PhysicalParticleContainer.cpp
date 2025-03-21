@@ -3576,6 +3576,20 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
                 WarpX::do_single_precision_comms,
                 WarpX::GetInstance().Geom(lev).periodicity(),
                 true);
+
+            // If filtering, apply filter
+            if (WarpX::use_filter) {
+                WarpX::GetInstance().ApplyFilterMF(T_vf, lev, idim);
+
+                amrex::Gpu::streamSynchronize();
+
+                // Re-synchronize MF after filtering
+                ablastr::utils::communication::FillBoundary(
+                    *T_vf[lev][Direction{idim}],
+                    WarpX::do_single_precision_comms,
+                    WarpX::GetInstance().Geom(lev).periodicity(),
+                    true);
+            }
         }
         amrex::Gpu::streamSynchronize();
     }
