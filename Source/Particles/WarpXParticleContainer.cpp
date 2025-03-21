@@ -1352,6 +1352,267 @@ WarpXParticleContainer::GetChargeDensity (int lev, bool local)
     return rho;
 }
 
+/* \brief Calculate Temperature from the particles
+ * \param temperature Full array of temperature
+ * \param lev         Level of box that contains particles
+ */
+void
+WarpXParticleContainer::DepositTemperature (amrex::MultiFab* temperature, const int lev)
+{
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(mass > 0.,
+        "The temperature can not be calculated for a massless species.");
+
+    // Temporary cell-centered, multi-component MultiFab for storing particles sums
+    int const sum_comps = 4;
+    amrex::MultiFab sum_mf(temperature->boxArray(), temperature->DistributionMap(), sum_comps, temperature->nGrowVect());
+    sum_mf.setVal(0., 0, sum_comps, sum_mf.nGrowVect());
+
+    // Calculate the averages in two steps, first the average velocity <u>, then the
+    // average velocity squared <u - <u>>**2. This method is more robust than the
+    // single step using <u**2> - <u>**2 when <u> >> u_rms.
+    ParticleToMesh(*this, sum_mf, lev,
+            [=] AMREX_GPU_DEVICE (const WarpXParticleContainer::SuperParticleType& p,
+                amrex::Array4<amrex::Real> const& sum_array,
+                amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& plo,
+                amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dxi)
+            {
+                // Get position in AMReX convention to calculate corresponding index.
+                const auto [ii, jj, kk] = amrex::getParticleCell(p, plo, dxi).dim3();
+
+                amrex::ParticleReal const w  = p.rdata(PIdx::w);
+                amrex::ParticleReal const ux = p.rdata(PIdx::ux);
+                amrex::ParticleReal const uy = p.rdata(PIdx::uy);
+                amrex::ParticleReal const uz = p.rdata(PIdx::uz);
+                amrex::Gpu::Atomic::AddNoRet(&sum_array(ii, jj, kk, 0), (amrex::Real)(w));
+                amrex::Gpu::Atomic::AddNoRet(&sum_array(ii, jj, kk, 1), (amrex::Real)(w*ux));
+                amrex::Gpu::Atomic::AddNoRet(&sum_array(ii, jj, kk, 2), (amrex::Real)(w*uy));
+                amrex::Gpu::Atomic::AddNoRet(&sum_array(ii, jj, kk, 3), (amrex::Real)(w*uz));
+            });
+
+    // Divide value by number of particles for average
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(sum_mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        const amrex::Box& box = mfi.tilebox();
+        amrex::Array4<amrex::Real> const& sum_array = sum_mf.array(mfi);
+        amrex::ParallelFor(box,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    if (sum_array(i,j,k,0) > 0) {
+                        const amrex::Real invsum = 1._rt/sum_array(i,j,k,0);
+                        sum_array(i,j,k,1) *= invsum;
+                        sum_array(i,j,k,2) *= invsum;
+                        sum_array(i,j,k,3) *= invsum;
+                    }
+                });
+    }
+
+    // Calculate the sum of the squares, subtracting the averages
+    // These loops must be written out since ParticleToMesh always zeros out the mf.
+    const auto plo = Geom(lev).ProbLoArray();
+    const auto dxi = Geom(lev).InvCellSizeArray();
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
+    {
+        const long np = pti.numParticles();
+        auto& tile = pti.GetParticleTile();
+        auto ptd = tile.getParticleTileData();
+        amrex::ParticleReal* wp = pti.GetAttribs(PIdx::w).dataPtr();
+        amrex::ParticleReal* uxp = pti.GetAttribs(PIdx::ux).dataPtr();
+        amrex::ParticleReal* uyp = pti.GetAttribs(PIdx::uy).dataPtr();
+        amrex::ParticleReal* uzp = pti.GetAttribs(PIdx::uz).dataPtr();
+
+        amrex::Array4<amrex::Real> const& sum_array = sum_mf.array(pti);
+        amrex::Array4<amrex::Real> const& temp_array = temperature->array(pti);
+
+        amrex::ParallelFor(np,
+            [=] AMREX_GPU_DEVICE (long ip) {
+                // Get position in AMReX convention to calculate corresponding index.
+                const auto p = WarpXParticleContainer::ParticleType(ptd, ip);
+                const auto [ii, jj, kk] = getParticleCell(p, plo, dxi).dim3();
+
+                const amrex::ParticleReal w  = wp[ip];
+                const amrex::ParticleReal ux = uxp[ip] - sum_array(ii, jj, kk, 1);
+                const amrex::ParticleReal uy = uyp[ip] - sum_array(ii, jj, kk, 2);
+                const amrex::ParticleReal uz = uzp[ip] - sum_array(ii, jj, kk, 3);
+                const amrex::Real usq = (amrex::Real)(w*(ux*ux + uy*uy + uz*uz));
+                amrex::Gpu::Atomic::AddNoRet(&temp_array(ii, jj, kk), usq);
+            });
+    }
+
+    // Divide the squares by number of particles for average and calculate the temperature
+    amrex::ParticleReal mass_local = mass;
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(sum_mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        const amrex::Box& box = mfi.tilebox();
+        amrex::Array4<amrex::Real> const& sum_array = sum_mf.array(mfi);
+        amrex::Array4<amrex::Real> const& temp_array = temperature->array(mfi);
+        amrex::ParallelFor(box,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                if (sum_array(i,j,k,0) > 0) {
+                    const amrex::Real invsum = 1._rt/sum_array(i,j,k,0);
+                    temp_array(i,j,k) *= mass_local*invsum/(3._rt*PhysConst::q_e);
+                }
+            });
+    }
+
+}
+
+std::unique_ptr<amrex::MultiFab>
+WarpXParticleContainer::GetTemperature (int lev)
+{
+    auto const& ba = m_gdb->ParticleBoxArray(lev);
+    auto const& dm = m_gdb->DistributionMap(lev);
+
+    // Create cell centered MultiFab with no guard cells
+    int const ncomps = 1;
+    int const ng = 0;
+    auto temperature = std::make_unique<amrex::MultiFab>(ba, dm, ncomps, ng);
+    temperature->setVal(0., 0, ncomps, temperature->nGrowVect());
+
+    // Thermodynamic temperature is not defined for massless particles
+    if (mass > 0.) {
+        DepositTemperature(temperature.get(), lev);
+    }
+
+    return temperature;
+}
+
+/* \brief Calculate number density from the particles
+ * \param number_density Full array of number density
+ * \param lev         Level of box that contains particles
+ */
+void
+WarpXParticleContainer::DepositNumberDensity (amrex::MultiFab* number_density, const int lev)
+{
+
+    // Calculate the number density
+    ParticleToMesh(*this, *number_density, lev,
+            [=] AMREX_GPU_DEVICE (const WarpXParticleContainer::SuperParticleType& p,
+                amrex::Array4<amrex::Real> const& num_array,
+                amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& plo,
+                amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dxi)
+            {
+                // Get position in AMReX convention to calculate corresponding index.
+                const auto [ii, jj, kk] = amrex::getParticleCell(p, plo, dxi).dim3();
+                const amrex::ParticleReal w = p.rdata(PIdx::w);
+                amrex::Gpu::Atomic::AddNoRet(&num_array(ii, jj, kk), (amrex::Real)(w));
+            });
+
+    auto const dV = AMREX_D_TERM(Geom(lev).CellSize(0), *Geom(lev).CellSize(1), *Geom(lev).CellSize(2));
+
+    // Divide value by the volume to get the density
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(*number_density, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        const amrex::Box& box = mfi.tilebox();
+
+#if defined WARPX_DIM_RZ
+        int const box_lo_r = box.smallEnd(0);
+        amrex::XDim3 const xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+        amrex::Real const rmin = xyzmin.x;
+        amrex::Real const dr = Geom(lev).CellSize(0);
+#endif
+
+        amrex::Array4<amrex::Real> const& num_array = number_density->array(mfi);
+        amrex::ParallelFor(box,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+#if defined WARPX_DIM_RZ
+                // Return the radial factor for the volume element, dV
+                amrex::Real const r = rmin + (i - box_lo_r)*dr;
+                // This is (pi*(r+dr)**2 - pi*r**2)/dr
+                amrex::Real const volume_factor = MathConst::pi*(2.0_rt*r + dr);
+#else
+                // No factor is needed for Cartesian
+                amrex::Real constexpr volume_factor = 1._rt;
+#endif
+                num_array(i,j,k) /= dV*volume_factor;
+            });
+    }
+
+}
+
+std::unique_ptr<amrex::MultiFab>
+WarpXParticleContainer::GetNumberDensity (int lev)
+{
+    auto const& ba = m_gdb->ParticleBoxArray(lev);
+    auto const& dm = m_gdb->DistributionMap(lev);
+
+    // Create cell centered MultiFab with no guard cells
+    int const ncomps = 1;
+    int const ng = 0;
+    auto number_density = std::make_unique<amrex::MultiFab>(ba, dm, ncomps, ng);
+    number_density->setVal(0., 0, ncomps, number_density->nGrowVect());
+    DepositNumberDensity(number_density.get(), lev);
+
+    return number_density;
+}
+
+std::unique_ptr<amrex::MultiFab>
+WarpXParticleContainer::GetDebyeLength (int lev)
+{
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(mass*charge != 0.,
+        "The Debye length can not be calculated for a massless or neutral species.");
+
+    std::unique_ptr<amrex::MultiFab> temperature = GetTemperature(lev);
+    std::unique_ptr<amrex::MultiFab> number_density = GetNumberDensity(lev);
+
+    amrex::BoxArray const & ba = temperature->boxArray();
+    amrex::DistributionMapping const & dm = temperature->DistributionMap();
+    int const ncomps = 1;
+    int const ng = 0;
+    auto debye_length = std::make_unique<amrex::MultiFab>(ba, dm, ncomps, ng);
+
+    amrex::Real const rmass = (amrex::Real)(mass);
+    amrex::Real const rcharge = (amrex::Real)(charge);
+    amrex::Real const Aconst = PhysConst::ep0/(rcharge*rcharge);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(*debye_length, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        const amrex::Box& box = mfi.tilebox();
+
+        amrex::Array4<amrex::Real> const& num_array = number_density->array(mfi);
+        amrex::Array4<amrex::Real> const& temp_array = temperature->array(mfi);
+        amrex::Array4<amrex::Real> const& debye_array = debye_length->array(mfi);
+
+        amrex::ParallelFor(box,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+
+                amrex::Real const N = num_array(i,j,k);
+                amrex::Real const T = temp_array(i,j,k)*PhysConst::q_e;  // temp_array is in eV
+                amrex::Real const R = 1.0_rt/std::cbrt(4.0_rt/3.0_rt*MathConst::pi*N); // atomic spacing [m]
+
+                // compute the fermi energy. Should only be used for fermions such as
+                // electrons and ions with an odd number of nucleons, but its easiest just
+                // to include it for all charged species and it is insignificant for ions.
+                // EF_Joules = hbar^2/(2*mass)*(3*pi^2*N)^(2/3)
+                amrex::Real const EF = PhysConst::hbar*PhysConst::hbar/(2.0_rt*rmass)*
+                                       std::pow(3.0_rt*MathConst::pi*MathConst::pi*N, 2.0_rt/3.0_rt);
+
+                // Debye length squared
+                amrex::Real const LDe_sq = std::max(Aconst*(T + 2.0_rt/3.0_rt*EF)/N, R*R); // [m^2]
+
+                debye_array(i,j,k) = std::sqrt(LDe_sq);
+
+            });
+    }
+
+    return debye_length;
+}
+
 amrex::ParticleReal WarpXParticleContainer::sumParticleWeight(bool local) {
 
     amrex::ParticleReal total_weight = 0.0;
