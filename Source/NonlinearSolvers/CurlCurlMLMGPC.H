@@ -153,7 +153,6 @@ class CurlCurlMLMGPC : public Preconditioner<T,Ops>
 template <class T, class Ops>
 void CurlCurlMLMGPC<T,Ops>::printParameters() const
 {
-    BL_PROFILE("CurlCurlMLMGPC::printParameters()");
     using namespace amrex;
     auto pc_name = getEnumNameString(PreconditionerType::pc_curl_curl_mlmg);
     Print() << pc_name << " verbose:              " << (m_verbose?"true":"false") << "\n";
@@ -176,7 +175,6 @@ void CurlCurlMLMGPC<T,Ops>::printParameters() const
 template <class T, class Ops>
 void CurlCurlMLMGPC<T,Ops>::readParameters()
 {
-    BL_PROFILE("CurlCurlMLMGPC::readParameters()");
     const amrex::ParmParse pp(amrex::getEnumNameString(PreconditionerType::pc_curl_curl_mlmg));
     pp.query("verbose", m_verbose);
     pp.query("bottom_verbose", m_bottom_verbose);
