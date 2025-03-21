@@ -239,7 +239,6 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
 template <class Vec, class Ops>
 void NewtonSolver<Vec,Ops>::ParseParameters ()
 {
-    BL_PROFILE("NewtonSolver::ParseParameters()");
     const amrex::ParmParse pp_newton("newton");
     pp_newton.query("verbose",             this->m_verbose);
     pp_newton.query("absolute_tolerance",  m_atol);

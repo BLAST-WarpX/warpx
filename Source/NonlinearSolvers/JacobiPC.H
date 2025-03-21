@@ -129,7 +129,6 @@ class JacobiPC : public Preconditioner<T,Ops>
 template <class T, class Ops>
 void JacobiPC<T,Ops>::printParameters() const
 {
-    BL_PROFILE("JacobiPC::printParameters()");
     using namespace amrex;
     auto pc_name = getEnumNameString(PreconditionerType::pc_jacobi);
     Print() << pc_name << " verbose:              " << (m_verbose?"true":"false") << "\n";
@@ -141,7 +140,6 @@ void JacobiPC<T,Ops>::printParameters() const
 template <class T, class Ops>
 void JacobiPC<T,Ops>::readParameters()
 {
-    BL_PROFILE("JacobiPC::readParameters()");
     const amrex::ParmParse pp(amrex::getEnumNameString(PreconditionerType::pc_jacobi));
     pp.query("verbose", m_verbose);
     pp.query("max_iter", m_max_iter);
