@@ -34,26 +34,6 @@ namespace ParticleUtils {
                              WarpXParticleContainer::ParticleTileType & ptile);
 
     /**
-     * \brief Return (relativistic) particle energy given velocity and mass.
-     * Note the use of `double` since this calculation is prone to error with
-     * single precision.
-     *
-     * @param[in] u2 square of particle speed (i.e. u dot u where u = gamma*v)
-     * @param[in] mass particle mass
-     * @param[out] energy particle energy in eV
-     */
-    AMREX_GPU_HOST_DEVICE AMREX_INLINE
-    void getEnergy ( amrex::ParticleReal const u2, double const mass,
-                     double& energy )
-    {
-        using std::sqrt;
-        using namespace amrex::literals;
-
-        constexpr auto c2 = PhysConst::c * PhysConst::c;
-        energy = mass * u2 / (sqrt(1.0_rt + u2 / c2) + 1.0_rt) / PhysConst::q_e;
-    }
-
-    /**
      * \brief Return (relativistic) collision energy assuming the target (with
      * mass M) is stationary and the projectile is approaching with the
      * the given speed and mass m. Note the use of `double` since this
