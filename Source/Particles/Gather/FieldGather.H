@@ -57,9 +57,6 @@ void doDirectGatherVectorField (
     // Compute particle position in grid units
 #if defined(WARPX_DIM_RZ)
     const amrex::Real rp = std::sqrt(xp*xp + yp*yp);
-    const amrex::Real costheta = (rp > 0. ? xp/rp: 1._rt);
-    const amrex::Real sintheta = (rp > 0. ? yp/rp: 0.);
-    const Complex xy0 = Complex{costheta, sintheta};
     const double x_bar = (rp - xyzmin.x)*dinv.x;
 #elif !defined(WARPX_DIM_1D_Z)
     const double x_bar = (xp - xyzmin.x)*dinv.x;
@@ -171,62 +168,97 @@ void doDirectGatherVectorField (
         }
     }
 
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+#elif defined(WARPX_DIM_XZ)
 
     // Gather vector field F
     for (int k=0; k<=depos_order_perp; k++) {
         for (int i=0; i<=depos_order_para; i++) {
             const auto weight_Fx = static_cast<amrex::Real>(sx_Fx[i]*sz_Fx[k]);
             Fxp += Fx_arr(lo.x+ip_Fx+i, lo.y+kp_Fx+k, 0, 0)*weight_Fx;
-#if defined(WARPX_DIM_RZ)
-            Complex xy = xy0; // Throughout the following loop, xy takes the value e^{i m theta}
-            for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
-                const auto dFx = (+ Fx_arr(lo.x+ip_Fx+i, lo.y+kp_Fx+k, 0, 2*imode-1)*xy.real()
-                                  - Fx_arr(lo.x+ip_Fx+i, lo.y+kp_Fx+k, 0, 2*imode)*xy.imag());
-                Fxp += weight_Fx*dFx;
-                xy = xy*xy0;
-            }
-#endif
         }
     }
     for (int k=0; k<=depos_order_perp; k++) {
         for (int i=0; i<=depos_order_perp; i++) {
             const auto weight_Fy = static_cast<amrex::Real>(sx_Fy[i]*sz_Fy[k]);
             Fyp += Fy_arr(lo.x+ip_Fy+i, lo.y+kp_Fy+k, 0, 0)*weight_Fy;
-#if defined(WARPX_DIM_RZ)
-            Complex xy = xy0; // Throughout the following loop, xy takes the value e^{i m theta}
-            for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
-                const auto dFy = (+ Fy_arr(lo.x+ip_Fy+i, lo.y+kp_Fy+k, 0, 2*imode-1)*xy.real()
-                                  - Fy_arr(lo.x+ip_Fy+i, lo.y+kp_Fy+k, 0, 2*imode)*xy.imag());
-                Fyp += weight_Fy*dFy;
-                xy = xy*xy0;
-            }
-#endif
         }
     }
     for (int k=0; k<=depos_order_para; k++) {
         for (int i=0; i<=depos_order_perp; i++) {
             const auto weight_Fz = static_cast<amrex::Real>(sx_Fz[i]*sz_Fz[k]);
             Fzp += Fz_arr(lo.x+ip_Fz+i, lo.y+kp_Fz+k, 0, 0)*weight_Fz;
-#if defined(WARPX_DIM_RZ)
-            Complex xy = xy0; // Throughout the following loop, xy takes the value e^{i m theta}
-            for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
-                const auto dFz = (+ Fz_arr(lo.x+ip_Fz+i, lo.y+kp_Fz+k, 0, 2*imode-1)*xy.real()
-                                  - Fz_arr(lo.x+ip_Fz+i, lo.y+kp_Fz+k, 0, 2*imode)*xy.imag());
-                Fzp += weight_Fz*dFz;
-                xy = xy*xy0;
-            }
-#endif
         }
     }
 
-#if defined(WARPX_DIM_RZ)
-    // Convert Fxp and Fyp (which are actually Frp and Fthp) to Fxp and Fyp
-    const amrex::Real Frp = Fxp;
-    const amrex::Real Fthp = Fyp;
+#elif defined(WARPX_DIM_RZ)
+
+    amrex::ParticleReal Frp = 0.;
+    amrex::ParticleReal Fthp = 0.;
+
+    // Gather vector field F for azimuthal mode = 0
+    for (int k=0; k<=depos_order_perp; k++) {
+        for (int i=0; i<=depos_order_para; i++) {
+            const auto weight_Fr = static_cast<amrex::Real>(sx_Fx[i]*sz_Fx[k]);
+            Frp += Fx_arr(lo.x+ip_Fx+i, lo.y+kp_Fx+k, 0, 0)*weight_Fr;
+        }
+    }
+
+    for (int k=0; k<=depos_order_perp; k++) {
+        for (int i=0; i<=depos_order_perp; i++) {
+            const auto weight_Fth = static_cast<amrex::Real>(sx_Fy[i]*sz_Fy[k]);
+            Fthp += Fy_arr(lo.x+ip_Fy+i, lo.y+kp_Fy+k, 0, 0)*weight_Fth;
+        }
+    }
+
+    for (int k=0; k<=depos_order_para; k++) {
+        for (int i=0; i<=depos_order_perp; i++) {
+            const auto weight_Fz = static_cast<amrex::Real>(sx_Fz[i]*sz_Fz[k]);
+            Fzp += Fz_arr(lo.x+ip_Fz+i, lo.y+kp_Fz+k, 0, 0)*weight_Fz;
+        }
+    }
+
+    const amrex::Real costheta = (rp > 0. ? xp/rp: 1._rt);
+    const amrex::Real sintheta = (rp > 0. ? yp/rp: 0.);
+    const Complex xy0 = Complex{costheta, sintheta};
+    Complex xy = xy0; // Throughout the following loop, xy takes the value e^{i m theta}
+
+    // Gather vector field F for azimuthal modes > 0
+    for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
+
+        for (int k=0; k<=depos_order_perp; k++) {
+            for (int i=0; i<=depos_order_para; i++) {
+                const auto weight_Fr = static_cast<amrex::Real>(sx_Fx[i]*sz_Fx[k]);
+                const auto dFr = (+ Fx_arr(lo.x+ip_Fx+i, lo.y+kp_Fx+k, 0, 2*imode-1)*xy.real()
+                                  - Fx_arr(lo.x+ip_Fx+i, lo.y+kp_Fx+k, 0, 2*imode)*xy.imag());
+                Frp += weight_Fr*dFr;
+            }
+        }
+
+        for (int k=0; k<=depos_order_perp; k++) {
+            for (int i=0; i<=depos_order_perp; i++) {
+                const auto weight_Fth = static_cast<amrex::Real>(sx_Fy[i]*sz_Fy[k]);
+                const auto dFth = (+ Fy_arr(lo.x+ip_Fy+i, lo.y+kp_Fy+k, 0, 2*imode-1)*xy.real()
+                                  - Fy_arr(lo.x+ip_Fy+i, lo.y+kp_Fy+k, 0, 2*imode)*xy.imag());
+                Fthp += weight_Fth*dFth;
+            }
+        }
+
+        for (int k=0; k<=depos_order_para; k++) {
+            for (int i=0; i<=depos_order_perp; i++) {
+                const auto weight_Fz = static_cast<amrex::Real>(sx_Fz[i]*sz_Fz[k]);
+                Fzp += Fz_arr(lo.x+ip_Fz+i, lo.y+kp_Fz+k, 0, 0)*weight_Fz;
+                const auto dFz = (+ Fz_arr(lo.x+ip_Fz+i, lo.y+kp_Fz+k, 0, 2*imode-1)*xy.real()
+                                  - Fz_arr(lo.x+ip_Fz+i, lo.y+kp_Fz+k, 0, 2*imode)*xy.imag());
+                Fzp += weight_Fz*dFz;
+            }
+        }
+        xy = xy*xy0;
+
+    }
+
+    // Convert Frp and Fthp to Fxp and Fyp
     Fxp = costheta*Frp  - sintheta*Fthp;
     Fyp = costheta*Fthp + sintheta*Frp;
-#endif
 
 #elif defined(WARPX_DIM_1D_Z)
 
