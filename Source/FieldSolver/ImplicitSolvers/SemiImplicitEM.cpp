@@ -38,8 +38,6 @@ void SemiImplicitEM::Define ( WarpX*  a_WarpX )
 
 void SemiImplicitEM::PrintParameters () const
 {
-    BL_PROFILE("SemiImplicitEM::PrintParameters()");
-
     if (!m_WarpX->Verbose()) { return; }
     amrex::Print() << "\n";
     amrex::Print() << "-----------------------------------------------------------\n";
