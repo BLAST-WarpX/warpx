@@ -84,6 +84,7 @@ namespace warpx::fields
         B_old, /**< Stores the value of B at the beginning of the timestep, for the implicit solver */
         ECTRhofield,
         Venl,
+        global_debye_length,
         sigmaPC
     );
 

@@ -99,6 +99,8 @@ public:
 
         m_binary_collision_functor = CollisionFunctor(collision_name, mypc, m_isSameSpecies);
 
+        m_use_global_debye_length = m_binary_collision_functor.use_global_debye_length();
+
         const amrex::ParmParse pp_collision_name(collision_name);
         pp_collision_name.queryarr("product_species", m_product_species);
 
@@ -293,6 +295,15 @@ public:
             products_mass.push_back(product_species_vector[i]->getMass());
         }
         auto *tile_products_data = tile_products.data();
+
+        bool const use_global_debye_length = m_use_global_debye_length;
+        amrex::Real * global_debye_length_data = nullptr;
+        if (use_global_debye_length) {
+            WarpX & warpx = WarpX::GetInstance();
+            amrex::MultiFab & global_debye_length = *warpx.m_fields.get(warpx::fields::FieldType::global_debye_length, lev);
+            amrex::FArrayBox & global_debye_length_fab = global_debye_length[mfi];
+            global_debye_length_data = global_debye_length_fab.dataPtr();
+        }
 
         amrex::Geometry const& geom = WarpX::GetInstance().Geom(lev);
         auto const dV = AMREX_D_TERM(geom.CellSize(0), *geom.CellSize(1), *geom.CellSize(2));
@@ -495,6 +506,11 @@ public:
                         T1 = T1_in_each_cell[i_cell];
                     }
 
+                    amrex::Real global_lamdb = 0.;
+                    if (use_global_debye_length) {
+                        global_lamdb = global_debye_length_data[i_cell];
+                    }
+
                     // Call the function in order to perform collisions
                     // If there are product species, mask, p_pair_indices_1/2, and
                     // p_pair_reaction_weight are filled here
@@ -503,7 +519,7 @@ public:
                         cell_half_1, cell_stop_1,
                         indices_1, indices_1,
                         soa_1, soa_1, get_position_1, get_position_1,
-                        n1, n1, T1, T1,
+                        n1, n1, T1, T1, global_lamdb,
                         q1, q1, m1, m1, dt, dV*volume_factor(i_cell), coll_idx,
                         cell_start_pair, p_mask, p_pair_indices_1, p_pair_indices_2,
                         p_pair_reaction_weight, engine);
@@ -760,6 +776,11 @@ public:
                         T2 = T2_in_each_cell[i_cell];
                     }
 
+                    amrex::Real global_lamdb = 0.;
+                    if (use_global_debye_length) {
+                        global_lamdb = global_debye_length_data[i_cell];
+                    }
+
                     // Call the function in order to perform collisions
                     // If there are product species, p_mask, p_pair_indices_1/2, and
                     // p_pair_reaction_weight are filled here
@@ -767,7 +788,7 @@ public:
                         cell_start_1, cell_stop_1, cell_start_2, cell_stop_2,
                         indices_1, indices_2,
                         soa_1, soa_2, get_position_1, get_position_2,
-                        n1, n2, T1, T2,
+                        n1, n2, T1, T2, global_lamdb,
                         q1, q2, m1, m2, dt, dV*volume_factor(i_cell), coll_idx,
                         cell_start_pair, p_mask, p_pair_indices_1, p_pair_indices_2,
                         p_pair_reaction_weight, engine);
