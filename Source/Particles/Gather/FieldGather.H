@@ -217,7 +217,7 @@ void doDirectGatherVectorField (
 
     const amrex::Real costheta = (rp > 0. ? xp/rp: 1._rt);
     const amrex::Real sintheta = (rp > 0. ? yp/rp: 0.);
-    const Complex xy0 = Complex{costheta, sintheta};
+    const Complex xy0 = Complex{costheta, -sintheta};
     Complex xy = xy0; // Throughout the following loop, xy takes the value e^{i m theta}
 
     // Gather vector field F for azimuthal modes > 0
