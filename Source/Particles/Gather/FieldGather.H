@@ -202,14 +202,12 @@ void doDirectGatherVectorField (
             Frp += Fx_arr(lo.x+ip_Fx+i, lo.y+kp_Fx+k, 0, 0)*weight_Fr;
         }
     }
-
     for (int k=0; k<=depos_order_perp; k++) {
         for (int i=0; i<=depos_order_perp; i++) {
             const auto weight_Fth = static_cast<amrex::Real>(sx_Fy[i]*sz_Fy[k]);
             Fthp += Fy_arr(lo.x+ip_Fy+i, lo.y+kp_Fy+k, 0, 0)*weight_Fth;
         }
     }
-
     for (int k=0; k<=depos_order_para; k++) {
         for (int i=0; i<=depos_order_perp; i++) {
             const auto weight_Fz = static_cast<amrex::Real>(sx_Fz[i]*sz_Fz[k]);
@@ -233,7 +231,6 @@ void doDirectGatherVectorField (
                 Frp += weight_Fr*dFr;
             }
         }
-
         for (int k=0; k<=depos_order_perp; k++) {
             for (int i=0; i<=depos_order_perp; i++) {
                 const auto weight_Fth = static_cast<amrex::Real>(sx_Fy[i]*sz_Fy[k]);
@@ -242,11 +239,9 @@ void doDirectGatherVectorField (
                 Fthp += weight_Fth*dFth;
             }
         }
-
         for (int k=0; k<=depos_order_para; k++) {
             for (int i=0; i<=depos_order_perp; i++) {
                 const auto weight_Fz = static_cast<amrex::Real>(sx_Fz[i]*sz_Fz[k]);
-                Fzp += Fz_arr(lo.x+ip_Fz+i, lo.y+kp_Fz+k, 0, 0)*weight_Fz;
                 const auto dFz = (+ Fz_arr(lo.x+ip_Fz+i, lo.y+kp_Fz+k, 0, 2*imode-1)*xy.real()
                                   - Fz_arr(lo.x+ip_Fz+i, lo.y+kp_Fz+k, 0, 2*imode)*xy.imag());
                 Fzp += weight_Fz*dFz;
