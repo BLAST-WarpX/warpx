@@ -175,6 +175,11 @@ public:
 
     void GenerateGlobalDebyeLength ();
 
+    /*
+     * \brief Calculates the global electron-ion collision frequency
+     */
+    void GenerateGlobalNuei ();
+
     void doFieldIonization (int lev,
                             const amrex::MultiFab& Ex, const amrex::MultiFab& Ey, const amrex::MultiFab& Ez,
                             const amrex::MultiFab& Bx, const amrex::MultiFab& By, const amrex::MultiFab& Bz);

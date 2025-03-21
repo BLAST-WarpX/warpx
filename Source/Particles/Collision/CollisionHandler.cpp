@@ -14,6 +14,7 @@
 #include "Particles/Collision/BinaryCollision/DSMC/SplitAndScatterFunc.H"
 #include "Particles/Collision/BinaryCollision/NuclearFusion/NuclearFusionFunc.H"
 #include "Particles/Collision/BinaryCollision/ParticleCreationFunc.H"
+#include "Particles/Collision/InverseBremsstrahlung/InverseBremsstrahlung.H"
 #include "Utils/TextMsg.H"
 
 #include <AMReX_ParmParse.H>
@@ -68,6 +69,11 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
                     collision_names[i], mypc
                 );
         }
+        else if (type == "inverse_bremsstrahlung") {
+            allcollisions[i] = std::make_unique<InverseBremsstrahlung>(collision_names[i], mypc);
+            m_use_global_debye_length = true;
+            m_use_global_nuei = true;
+        }
         else{
             WARPX_ABORT_WITH_MESSAGE("Unknown collision type.");
         }
@@ -86,8 +92,11 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
 void CollisionHandler::doCollisions ( amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
 {
 
-    if (m_use_global_debye_length) {
+    if (m_use_global_debye_length || m_use_global_nuei) {
         mypc->GenerateGlobalDebyeLength();
+    }
+    if (m_use_global_nuei) {
+        mypc->GenerateGlobalNuei();
     }
 
     for (auto& collision : allcollisions) {

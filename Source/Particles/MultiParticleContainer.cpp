@@ -689,6 +689,36 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
 }
 
 void
+MultiParticleContainer::GenerateGlobalNuei ()
+{
+    WarpX & warpx = WarpX::GetInstance();
+
+    if (allcontainers.size() == 0) { return; }
+
+    // Is there a nicer way to get the number of levels?
+    // This grabs it from the first species.
+    int const finest_level = allcontainers[0]->finestLevel();
+
+    for (int lev = 0 ; lev <= finest_level ; lev++) {
+
+        if (!warpx.m_fields.has(FieldType::global_nuei, lev)) {
+            amrex::BoxArray const & ba = warpx.boxArray(lev);
+            amrex::DistributionMapping const & dmap = warpx.DistributionMap(lev);
+            int const ncomps = 1;
+            amrex::IntVect ng = amrex::IntVect::TheZeroVector();
+            bool const remake = true;
+            bool const redistribute_on_remake = false;
+            warpx.m_fields.alloc_init(FieldType::global_nuei, lev, ba, dmap, ncomps, ng, 0.,
+                                      remake, redistribute_on_remake);
+        }
+
+        amrex::MultiFab & global_nuei = *warpx.m_fields.get(FieldType::global_nuei, lev);
+        global_nuei.setVal(amrex::Real(0.0));
+
+    }
+}
+
+void
 MultiParticleContainer::SortParticlesByBin (
     const amrex::IntVect& bin_size,
     const bool sort_particles_for_deposition,
