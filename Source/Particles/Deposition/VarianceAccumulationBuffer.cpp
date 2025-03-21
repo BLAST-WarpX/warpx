@@ -121,35 +121,25 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
                 variancemf.nGrowVect()
             };
 
-            // Do a local copy of ghost and internal cells
-            amrex::Copy(wmf_old, wmf, 0, 0, 1, wmf.nGrowVect());
-            amrex::Copy(w2mf_old, w2mf, 0, 0, 1, w2mf.nGrowVect());
-            amrex::Copy(vbarmf_old, vbarmf, 0, 0, 1, vbarmf.nGrowVect());
-            amrex::Copy(variancemf_old, variancemf, 0, 0, 1, variancemf.nGrowVect());
-
-            amrex::Gpu::streamSynchronize();
-
             amrex::IntVect ng_depos_J = warpx.get_ng_depos_J();
             ng_depos_J.min(variancemf.nGrowVect());
 
             const amrex::IntVect src_ngrow = ng_depos_J;
             const amrex::IntVect dst_ngrow = variancemf_old.nGrowVect();
 
-            ablastr::utils::communication::SumBoundary(wmf_old, 0, 1, src_ngrow,
-                dst_ngrow, WarpX::do_single_precision_comms, periodicity);
-            ablastr::utils::communication::SumBoundary(w2mf_old, 0, 1, src_ngrow,
-                dst_ngrow, WarpX::do_single_precision_comms, periodicity);
-            ablastr::utils::communication::SumBoundary(vbarmf_old, 0, 1, src_ngrow,
-                dst_ngrow, WarpX::do_single_precision_comms, periodicity);
-            ablastr::utils::communication::SumBoundary(variancemf_old, 0, 1, src_ngrow,
-                dst_ngrow, WarpX::do_single_precision_comms, periodicity);
+            // Sum the overlapping cells together
+            WarpXSumGuardCells(wmf_old, wmf, periodicity, wmf.nGrowVect(), 0, 1);
+            WarpXSumGuardCells(w2mf_old, w2mf, periodicity, w2mf.nGrowVect(), 0, 1);
+            WarpXSumGuardCells(vbarmf_old, vbarmf, periodicity, vbarmf.nGrowVect(), 0, 1);
+            WarpXSumGuardCells(variancemf_old, variancemf, periodicity, variancemf.nGrowVect(), 0, 1);
 
             amrex::Gpu::streamSynchronize();
 
-            amrex::Subtract(wmf_old, wmf, 0, 0, 1, wmf_old.nGrowVect());
-            amrex::Subtract(w2mf_old, w2mf, 0, 0, 1, w2mf_old.nGrowVect());
-            amrex::Subtract(vbarmf_old, vbarmf, 0, 0, 1, vbarmf_old.nGrowVect());
-            amrex::Subtract(variancemf_old, variancemf, 0, 0, 1, variancemf_old.nGrowVect());
+            // Since we need to do a weighted combination subtract off the old data
+            amrex::MultiFab::Subtract(wmf_old, wmf, 0, 0, 1, wmf_old.nGrowVect());
+            amrex::MultiFab::Subtract(w2mf_old, w2mf, 0, 0, 1, w2mf_old.nGrowVect());
+            amrex::MultiFab::Subtract(vbarmf_old, vbarmf, 0, 0, 1, vbarmf_old.nGrowVect());
+            amrex::MultiFab::Subtract(variancemf_old, variancemf, 0, 0, 1, variancemf_old.nGrowVect());
 
             amrex::Gpu::streamSynchronize();
 
@@ -175,14 +165,14 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
                 auto const& vbar_arr = vbarmf.array(mfi);
                 auto const& variance_arr = variancemf.array(mfi);
 
-                // auto const& mma = owner_mask->const_array(mfi);
+                auto const& mma = owner_mask->const_array(mfi);
 
                 amrex::ParallelFor(tb,
                     [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                         // Only update if this box is the owner
-                        // if (mma(i,j,k)) {
+                        if (mma(i,j,k)) {
                             // Check if we are in a cell that requires combining variances
-                            if (w_old_arr(i,j,k) != 0.0_rt || w_arr(i,j,k) != 0.0_rt) {
+                            if (w_old_arr(i,j,k) > 0.0_rt || w_arr(i,j,k) > 0.0_rt) {
                                 // Update weights and un-normalized variance
                                 amrex::Real w_a = w_old_arr(i,j,k);
                                 amrex::Real w_b = w_arr(i,j,k);
@@ -195,23 +185,17 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
                                 w2_arr(i,j,k) += w2_old_arr(i,j,k);
 
                                 // Update Mean and Variance
-                                if (w_arr(i,j,k) != 0.0_rt) {
-                                    vbar_arr(i,j,k) = (w_a*v_a + w_b*v_b)/w_arr(i,j,k);
-                                    variance_arr(i,j,k) +=  variance_old_arr(i,j,k) + delta*delta*w_a*w_b/w_arr(i,j,k);
-                                }
+                                vbar_arr(i,j,k) = (w_a*v_a + w_b*v_b)/w_arr(i,j,k);
+                                variance_arr(i,j,k) +=  variance_old_arr(i,j,k) + delta*delta*w_a*w_b/w_arr(i,j,k);
                             }
 
                             // Apply Sample Reliability Normalization in any cell or after combining ghost cells
                             if (w_arr(i,j,k) > 0.0_rt) {
                                 variance_arr(i,j,k) /= (w_arr(i,j,k) - w2_arr(i,j,k)/w_arr(i,j,k));
                             }
-                        // }
+                        }
                 });
             }
-            amrex::Gpu::streamSynchronize();
-            // variancemf.OverrideSync(periodicity);
-            // amrex::Gpu::streamSynchronize();
-            variancemf.FillBoundary(periodicity);
             amrex::Gpu::streamSynchronize();
         }
     }

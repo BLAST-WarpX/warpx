@@ -3489,7 +3489,7 @@ PhysicalParticleContainer::DepositTemperature (
     // Note that this includes guard cells since it is after tilebox.ngrow
     const Dim3 lo = lbound(tilebox);
     // Take into account Galilean shift
-    const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, depos_lev, 0.5_rt*dt);
+    const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, depos_lev, -relative_time);
 
     //WARPX_PROFILE_VAR_START(blp_deposit);
     if        (WarpX::nox == 1){
@@ -3588,7 +3588,8 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
             ablastr::utils::communication::FillBoundary(
                 *T_vf[lev][Direction{idim}],
                 WarpX::do_single_precision_comms,
-                WarpX::GetInstance().Geom(lev).periodicity());
+                WarpX::GetInstance().Geom(lev).periodicity(),
+                true);
         }
         amrex::Gpu::streamSynchronize();
     }

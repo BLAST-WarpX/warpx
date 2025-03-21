@@ -18,6 +18,7 @@
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/utils/Communication.H>
 
 
 using namespace amrex;
@@ -68,7 +69,7 @@ void WarpX::HybridPICEvolveFields ()
 
     // TODO: Perhaps add flag here for when using temperature accumulation in Hybrid
     // Perform Temperature Deposition at time t_{n+1/2}
-    mypc->DepositTemperatures(m_fields, dt[0], -0.5_rt * dt[0]);
+    mypc->DepositTemperatures(m_fields, dt[0], 0.0_rt);
 
     // Deposit cold-relativistic fluid charge and current
     if (do_fluid_species) {
@@ -91,7 +92,13 @@ void WarpX::HybridPICEvolveFields ()
     // a nodal grid
     for (int lev = 0; lev <= finest_level; ++lev) {
         for (int idim = 0; idim < 3; ++idim) {
-            m_fields.get(FieldType::current_fp, Direction{idim}, lev)->FillBoundary(Geom(lev).periodicity());
+            ablastr::utils::communication::FillBoundary(
+                *m_fields.get(FieldType::current_fp, Direction{idim}, lev),
+                m_fields.get(FieldType::current_fp, Direction{idim}, lev)->nGrowVect(),
+                WarpX::do_single_precision_comms,
+                Geom(lev).periodicity(),
+                true
+            );
         }
     }
 
