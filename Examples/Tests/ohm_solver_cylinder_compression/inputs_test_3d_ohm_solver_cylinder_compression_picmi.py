@@ -397,24 +397,4 @@ args, left = parser.parse_known_args()
 sys.argv = sys.argv[:1] + left
 
 run = PlasmaCylinderCompression(test=args.test, verbose=args.verbose)
-simulation.step(1)
-
-import matplotlib.pyplot as plt
-
-plt.ion()
-
-wx = fields.CustomNamedxWrapper("w_ions", include_ghosts=False)
-wy = fields.CustomNamedyWrapper("w_ions", include_ghosts=False)
-wz = fields.CustomNamedzWrapper("w_ions", include_ghosts=False)
-
-w2x = fields.CustomNamedxWrapper("w2_ions", include_ghosts=False)
-w2y = fields.CustomNamedyWrapper("w2_ions", include_ghosts=False)
-w2z = fields.CustomNamedzWrapper("w2_ions", include_ghosts=False)
-
-vbarx = fields.CustomNamedxWrapper("vbar_ions", include_ghosts=False)
-vbary = fields.CustomNamedyWrapper("vbar_ions", include_ghosts=False)
-vbarz = fields.CustomNamedzWrapper("vbar_ions", include_ghosts=False)
-
-Tx = fields.CustomNamedxWrapper("T_ions", include_ghosts=False)
-Ty = fields.CustomNamedyWrapper("T_ions", include_ghosts=False)
-Tz = fields.CustomNamedzWrapper("T_ions", include_ghosts=False)
+simulation.step()

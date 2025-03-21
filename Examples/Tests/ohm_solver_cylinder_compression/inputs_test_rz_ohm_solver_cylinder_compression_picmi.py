@@ -308,6 +308,7 @@ class PlasmaCylinderCompression(object):
             name="ions",
             charge="q_e",
             mass=self.M,
+            warpx_do_temperature_deposition=True,
             initial_distribution=picmi.AnalyticDistribution(
                 density_expression="n0_p/(1+exp((sqrt(x*x+y*y)-R_p)/delta_p))",
                 momentum_expressions=momentum_expr,
