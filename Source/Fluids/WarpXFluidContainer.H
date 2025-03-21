@@ -11,8 +11,10 @@
 #include "Initialization/PlasmaInjector.H"
 #include "MultiFluidContainer.H"
 
-#include<AMReX_MultiFab.H>
-#include<AMReX_Vector.H>
+#include <AMReX_Geometry.H>
+#include <AMReX_MultiFab.H>
+#include <AMReX_Vector.H>
+#include <AMReX_REAL.H>
 
 #include <string>
 
@@ -40,7 +42,9 @@ public:
 
     void AllocateLevelMFs (ablastr::fields::MultiFabRegister& m_fields, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm, int lev) const;
 
-    void InitData (ablastr::fields::MultiFabRegister& m_fields, amrex::Box init_box, amrex::Real cur_time, int lev);
+    void InitData (
+        ablastr::fields::MultiFabRegister& m_fields, amrex::Box init_box, amrex::Real cur_time, int lev,
+        const amrex::Geometry& geom_lev, amrex::Real gamma_boost, amrex::Real beta_boost);
 
     void ReadParameters ();
 

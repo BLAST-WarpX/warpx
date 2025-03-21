@@ -655,7 +655,7 @@ WarpX::MoveWindow (const int step, bool move_j)
         const amrex::Real cur_time = t_new[0];
         for (int i=0; i<n_fluid_species; i++) {
             WarpXFluidContainer& fl = myfl->GetFluidContainer(i);
-            fl.InitData( m_fields, injection_box, cur_time, lev );
+            fl.InitData( m_fields, injection_box, cur_time, lev, geom[lev], gamma_boost, beta_boost);
         }
     }
 
