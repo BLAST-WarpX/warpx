@@ -31,7 +31,7 @@
  */
 template <int depos_order_perp, int depos_order_para>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void doGatherVectorFieldShapeN (
+void doDirectGatherVectorField (
                      [[maybe_unused]] const amrex::ParticleReal xp,
                      [[maybe_unused]] const amrex::ParticleReal yp,
                      const amrex::ParticleReal zp,
@@ -296,7 +296,7 @@ void doGatherShapeN (const amrex::ParticleReal xp,
     // Gather electric field
     const int depos_order_Eperp = depos_order;
     const int depos_order_Epara = depos_order - galerkin_interpolation;
-    doGatherVectorFieldShapeN<depos_order_Eperp,depos_order_Epara>(
+    doDirectGatherVectorField<depos_order_Eperp,depos_order_Epara>(
         xp, yp, zp, Exp, Eyp, Ezp,
         ex_arr, ey_arr, ez_arr, ex_type, ey_type, ez_type,
         dinv, xyzmin, lo, n_rz_azimuthal_modes );
@@ -304,7 +304,7 @@ void doGatherShapeN (const amrex::ParticleReal xp,
     // Gather magnetic field
     const int depos_order_Bperp = depos_order - galerkin_interpolation;
     const int depos_order_Bpara = depos_order;
-    doGatherVectorFieldShapeN<depos_order_Bperp,depos_order_Bpara>(
+    doDirectGatherVectorField<depos_order_Bperp,depos_order_Bpara>(
         xp, yp, zp, Bxp, Byp, Bzp,
         bx_arr, by_arr, bz_arr, bx_type, by_type, bz_type,
         dinv, xyzmin, lo, n_rz_azimuthal_modes );
@@ -1285,7 +1285,7 @@ void doGatherPicnicShapeN (
     // Gather magnetic field
     const int depos_order_perp = 1;
     const int depos_order_para = 1;
-    doGatherVectorFieldShapeN<depos_order_perp,depos_order_para>(
+    doDirectGatherVectorField<depos_order_perp,depos_order_para>(
                                     xp_nph, yp_nph, zp_nph,
                                     Bxp, Byp, Bzp,
                                     Bx_arr, By_arr, Bz_arr,
