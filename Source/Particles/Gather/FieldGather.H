@@ -218,7 +218,7 @@ void doDirectGatherVectorField (
     const amrex::Real costheta = (rp > 0. ? xp/rp: 1._rt);
     const amrex::Real sintheta = (rp > 0. ? yp/rp: 0.);
     const Complex xy0 = Complex{costheta, -sintheta};
-    Complex xy = xy0; // Throughout the following loop, xy takes the value e^{i m theta}
+    Complex xy = xy0; // Throughout the following loop, xy takes the value e^{-i m theta}
 
     // Gather vector field F for azimuthal modes > 0
     for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
@@ -409,16 +409,10 @@ void doGatherShapeNEsirkepovStencilImplicit (
 #if defined(WARPX_DIM_RZ)
     amrex::Real const xp_new = xp_np1;
     amrex::Real const yp_new = yp_np1;
-    amrex::Real const xp_mid = xp_nph;
-    amrex::Real const yp_mid = yp_nph;
     amrex::Real const xp_old = xp_n;
     amrex::Real const yp_old = yp_n;
     amrex::Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new);
     amrex::Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old);
-    amrex::Real const rp_mid = (rp_new + rp_old)/2._rt;
-    const amrex::Real costheta_mid = (rp_mid > 0. ? xp_mid/rp_mid: 1._rt);
-    const amrex::Real sintheta_mid = (rp_mid > 0. ? yp_mid/rp_mid: 0.);
-    const Complex xy_mid0 = Complex{costheta_mid, -sintheta_mid};
     // Keep these double to avoid bug in single precision
     double const x_new = (rp_new - xyzmin.x)*dinv.x;
     double const x_old = (rp_old - xyzmin.x)*dinv.x;
@@ -657,6 +651,12 @@ void doGatherShapeNEsirkepovStencilImplicit (
     }
 
 #ifdef WARPX_DIM_RZ
+    const amrex::Real xp_mid = xp_nph;
+    const amrex::Real yp_mid = yp_nph;
+    const amrex::Real rp_mid = (rp_new + rp_old)/2._rt;
+    const amrex::Real costheta_mid = (rp_mid > 0. ? xp_mid/rp_mid: 1._rt);
+    const amrex::Real sintheta_mid = (rp_mid > 0. ? yp_mid/rp_mid: 0.);
+    const Complex xy_mid0 = Complex{costheta_mid, -sintheta_mid};
     Complex xy_mid = xy_mid0;
 
     for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
@@ -823,13 +823,13 @@ void doGatherPicnicShapeN (
 #if defined(WARPX_DIM_RZ)
     amrex::Real const xp_new = xp_np1;
     amrex::Real const yp_new = yp_np1;
-    amrex::Real const xp_mid = xp_nph;
-    amrex::Real const yp_mid = yp_nph;
     amrex::Real const xp_old = xp_n;
     amrex::Real const yp_old = yp_n;
     amrex::Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new);
     amrex::Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old);
-    amrex::Real const rp_mid = (rp_new + rp_old)/2._rt;
+    const amrex::Real xp_mid = xp_nph;
+    const amrex::Real yp_mid = yp_nph;
+    const amrex::Real rp_mid = (rp_new + rp_old)/2._rt;
     const amrex::Real costheta_mid = (rp_mid > 0. ? xp_mid/rp_mid: 1._rt);
     const amrex::Real sintheta_mid = (rp_mid > 0. ? yp_mid/rp_mid: 0.);
     const Complex xy_mid0 = Complex{costheta_mid, -sintheta_mid};
@@ -1160,7 +1160,7 @@ void doGatherPicnicShapeN (
                 weight = sx_cell[i]*(sz_old_node[k] + sz_new_node[k])/2.0_rt*seg_factor_x;
                 Exp += Ex_arr(lo.x+i0_cell+i, lo.y+k0_node+k, 0, 0)*weight;
 #if defined(WARPX_DIM_RZ)
-                Complex xy_mid = xy_mid0; // Throughout the following loop, xy_mid takes the value e^{i m theta}
+                Complex xy_mid = xy_mid0; // Throughout the following loop, xy_mid takes the value e^{-i m theta}
                 for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
                     const auto dEx = (+ Ex_arr(lo.x+i0_cell+i, lo.y+k0_node+k, 0, 2*imode-1)*xy_mid.real()
                                       - Ex_arr(lo.x+i0_cell+i, lo.y+k0_node+k, 0, 2*imode)*xy_mid.imag());
@@ -1181,7 +1181,7 @@ void doGatherPicnicShapeN (
                        +   sx_new_node[i]*sz_new_node[k]*one_third )*seg_factor_y;
                 Eyp += Ey_arr(lo.x+i0_node+i, lo.y+k0_node+k, 0, 0)*weight;
 #if defined(WARPX_DIM_RZ)
-                Complex xy_mid = xy_mid0; // Throughout the following loop, xy_mid takes the value e^{i m theta}
+                Complex xy_mid = xy_mid0; // Throughout the following loop, xy_mid takes the value e^{-i m theta}
                 for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
                     const auto dEy = (+ Ey_arr(lo.x+i0_node+i, lo.y+k0_node+k, 0, 2*imode-1)*xy_mid.real()
                                       - Ey_arr(lo.x+i0_node+i, lo.y+k0_node+k, 0, 2*imode)*xy_mid.imag());
@@ -1198,7 +1198,7 @@ void doGatherPicnicShapeN (
                 weight = sz_cell[k]*(sx_old_node[i] + sx_new_node[i])/2.0_rt*seg_factor_z;
                 Ezp += Ez_arr(lo.x+i0_node+i, lo.y+k0_cell+k, 0, 0)*weight;
 #if defined(WARPX_DIM_RZ)
-                Complex xy_mid = xy_mid0; // Throughout the following loop, xy_mid takes the value e^{i m theta}
+                Complex xy_mid = xy_mid0; // Throughout the following loop, xy_mid takes the value e^{-i m theta}
                 for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
                     const auto dEz = (+ Ez_arr(lo.x+i0_node+i, lo.y+k0_cell+k, 0, 2*imode-1)*xy_mid.real()
                                       - Ez_arr(lo.x+i0_node+i, lo.y+k0_cell+k, 0, 2*imode)*xy_mid.imag());
