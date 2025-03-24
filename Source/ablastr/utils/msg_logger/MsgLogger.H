@@ -79,10 +79,10 @@ namespace ablastr::utils::msg_logger
         * \brief Same as static Msg deserialize(std::vector<char>::const_iterator& it)
         * but accepting an rvalue as an argument
         *
-        * @param[in] it iterator of a byte array
+        * @param[in] rit iterator of a byte array
         * @return a Msg struct
         */
-        static Msg deserialize(std::vector<char>::const_iterator&& it);
+        static Msg deserialize(std::vector<char>::const_iterator&& rit);
     };
 
     /**
@@ -115,10 +115,10 @@ namespace ablastr::utils::msg_logger
         * \brief Same as static Msg MsgWithCounter(std::vector<char>::const_iterator& it)
         * but accepting an rvalue as an argument
         *
-        * @param[in] it iterator of a byte array
+        * @param[in] rit iterator of a byte array
         * @return a MsgWithCounter struct
         */
-        static MsgWithCounter deserialize(std::vector<char>::const_iterator&& it);
+        static MsgWithCounter deserialize(std::vector<char>::const_iterator&& rit);
     };
 
     /**
@@ -154,10 +154,10 @@ namespace ablastr::utils::msg_logger
         * \brief Same as static Msg MsgWithCounterAndRanks(std::vector<char>::const_iterator& it)
         * but accepting an rvalue as an argument
         *
-        * @param[in] it iterator of a byte array
+        * @param[in] rit iterator of a byte array
         * @return a MsgWithCounterAndRanks struct
         */
-        static MsgWithCounterAndRanks deserialize(std::vector<char>::const_iterator&& it);
+        static MsgWithCounterAndRanks deserialize(std::vector<char>::const_iterator&& rit);
     };
 
     /**

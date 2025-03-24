@@ -1,8 +1,9 @@
-/* Copyright 2023 The WarpX Community
+/* Copyright 2023-2024 The WarpX Community
  *
  * This file is part of WarpX.
  *
  * Authors: Roelof Groenewald (TAE Technologies)
+ *          S. Eric Clark (Helion Energy)
  *
  * License: BSD-3-Clause-LBNL
  */
@@ -32,6 +33,31 @@ void WarpX::HybridPICEvolveFields ()
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         finest_level == 0,
         "Ohm's law E-solve only works with a single level.");
+
+    // Get requested number of substeps to use
+    const int sub_steps = m_hybrid_pic_model->m_substeps;
+
+    // Get flag to include external fields.
+    const bool add_external_fields = m_hybrid_pic_model->m_add_external_fields;
+
+    // Handle field splitting for Hybrid field push
+    if (add_external_fields) {
+        // Get the external fields
+        m_hybrid_pic_model->m_external_vector_potential->UpdateHybridExternalFields(
+            gett_old(0),
+            0.5_rt*dt[0]);
+
+        // If using split fields, subtract the external field at the old time
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            for (int idim = 0; idim < 3; ++idim) {
+                MultiFab::Subtract(
+                    *m_fields.get(FieldType::Bfield_fp, Direction{idim}, lev),
+                    *m_fields.get(FieldType::hybrid_B_fp_external, Direction{idim}, lev),
+                    0, 0, 1,
+                    m_fields.get(FieldType::Bfield_fp, Direction{idim}, lev)->nGrowVect());
+            }
+        }
+    }
 
     // The particles have now been pushed to their t_{n+1} positions.
     // Perform charge deposition in component 0 of rho_fp at t_{n+1}.
@@ -63,9 +89,6 @@ void WarpX::HybridPICEvolveFields ()
             m_fields.get(FieldType::current_fp, Direction{idim}, lev)->FillBoundary(Geom(lev).periodicity());
         }
     }
-
-    // Get requested number of substeps to use
-    const int sub_steps = m_hybrid_pic_model->m_substeps;
 
     // Get the external current
     m_hybrid_pic_model->GetCurrentExternal();
@@ -127,6 +150,13 @@ void WarpX::HybridPICEvolveFields ()
         );
     }
 
+    if (add_external_fields) {
+        // Get the external fields at E^{n+1/2}
+        m_hybrid_pic_model->m_external_vector_potential->UpdateHybridExternalFields(
+            gett_old(0) + 0.5_rt*dt[0],
+            0.5_rt*dt[0]);
+    }
+
     // Now push the B field from t=n+1/2 to t=n+1 using the n+1/2 quantities
     for (int sub_step = 0; sub_step < sub_steps; sub_step++)
     {
@@ -160,6 +190,12 @@ void WarpX::HybridPICEvolveFields ()
         }
     }
 
+    if (add_external_fields) {
+        m_hybrid_pic_model->m_external_vector_potential->UpdateHybridExternalFields(
+            gett_new(0),
+            0.5_rt*dt[0]);
+    }
+
     // Calculate the electron pressure at t=n+1
     m_hybrid_pic_model->CalculateElectronPressure();
 
@@ -174,6 +210,25 @@ void WarpX::HybridPICEvolveFields ()
         m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
         m_eb_update_E, false);
     FillBoundaryE(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
+
+    // Handle field splitting for Hybrid field push
+    if (add_external_fields) {
+        // If using split fields, add the external field at the new time
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            for (int idim = 0; idim < 3; ++idim) {
+                MultiFab::Add(
+                    *m_fields.get(FieldType::Bfield_fp, Direction{idim}, lev),
+                    *m_fields.get(FieldType::hybrid_B_fp_external, Direction{idim}, lev),
+                    0, 0, 1,
+                    m_fields.get(FieldType::Bfield_fp, Direction{idim}, lev)->nGrowVect());
+                MultiFab::Add(
+                    *m_fields.get(FieldType::Efield_fp, Direction{idim}, lev),
+                    *m_fields.get(FieldType::hybrid_E_fp_external, Direction{idim}, lev),
+                    0, 0, 1,
+                    m_fields.get(FieldType::Efield_fp, Direction{idim}, lev)->nGrowVect());
+            }
+        }
+    }
 
     // Copy the rho^{n+1} values to rho_fp_temp and the J_i^{n+1/2} values to
     // current_fp_temp since at the next step those values will be needed as
@@ -231,4 +286,16 @@ void WarpX::HybridPICDepositInitialRhoAndJ ()
             PatchType::fine
         );
     }
+}
+
+void
+WarpX::CalculateExternalCurlA() {
+    WARPX_PROFILE("WarpX::CalculateExternalCurlA()");
+
+    auto & warpx = WarpX::GetInstance();
+
+    // Get reference to External Field Object
+    auto* ext_vector = warpx.m_hybrid_pic_model->m_external_vector_potential.get();
+    ext_vector->CalculateExternalCurlA();
+
 }

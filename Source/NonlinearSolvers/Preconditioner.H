@@ -12,7 +12,11 @@
 /**
  * \brief Types for preconditioners for field solvers
  */
-AMREX_ENUM(PreconditionerType, pc_curl_curl_mlmg, none);
+AMREX_ENUM(PreconditionerType,
+    pc_curl_curl_mlmg,
+    pc_jacobi,
+    none
+);
 
 /**
  * \brief Base class for preconditioners
@@ -52,12 +56,12 @@ class Preconditioner
         /**
          * \brief Define the preconditioner
          */
-        virtual void Define (const T&, Ops*) = 0;
+        virtual void Define (const T&, Ops* const) = 0;
 
         /**
          * \brief Update the preconditioner
          */
-        virtual void Update ( const T& ) = 0;
+        virtual void Update ( const T& a_U ) = 0;
 
         /**
          * \brief Apply (solve) the preconditioner given a RHS

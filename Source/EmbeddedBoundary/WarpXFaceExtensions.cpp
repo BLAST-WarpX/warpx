@@ -287,6 +287,7 @@ WarpX::ComputeFaceExtensions ()
 
 void
 WarpX::InitBorrowing() {
+    using ablastr::fields::Direction;
     int idim = 0;
     for (amrex::MFIter mfi(*m_fields.get(FieldType::Bfield_fp, Direction{idim}, maxLevel())); mfi.isValid(); ++mfi) {
         amrex::Box const &box = mfi.validbox();
@@ -439,6 +440,7 @@ WarpX::ComputeOneWayExtensions ()
         throw std::runtime_error("ComputeOneWayExtensions only works when EBs are enabled at runtime");
     }
 #ifdef AMREX_USE_EB
+    using ablastr::fields::Direction;
 #ifndef WARPX_DIM_RZ
     auto const eb_fact = fieldEBFactory(maxLevel());
 
@@ -567,6 +569,7 @@ WarpX::ComputeEightWaysExtensions ()
     }
 #ifdef AMREX_USE_EB
     using namespace amrex::literals;
+    using ablastr::fields::Direction;
 
 #ifndef WARPX_DIM_RZ
     auto const &cell_size = CellSize(maxLevel());
@@ -731,6 +734,8 @@ WarpX::ApplyBCKCorrection (const int idim)
         throw std::runtime_error("ApplyBCKCorrection only works when EBs are enabled at runtime");
     }
 #if defined(AMREX_USE_EB) and !defined(WARPX_DIM_RZ)
+    using ablastr::fields::Direction;
+
     const std::array<amrex::Real,3> &cell_size = CellSize(maxLevel());
 
     const amrex::Real dx = cell_size[0];
@@ -764,6 +769,8 @@ WarpX::ApplyBCKCorrection (const int idim)
 void
 WarpX::ShrinkBorrowing ()
 {
+    using ablastr::fields::Direction;
+
     for(int idim = 0; idim < AMREX_SPACEDIM; idim++) {
         for (amrex::MFIter mfi(*m_fields.get(FieldType::Bfield_fp, Direction{idim}, maxLevel())); mfi.isValid(); ++mfi) {
             auto &borrowing = (*m_borrowing[maxLevel()][idim])[mfi];

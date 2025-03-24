@@ -83,6 +83,13 @@ WarpX::Synchronize () {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
+    // Note that this is potentially buggy since the PushP will do a field gather
+    // using particles that have been pushed but not yet checked at the boundaries.
+    // Also, this PushP may be inconsistent with the PushP backwards above since
+    // the fields may change between the two (mainly effecting the Python version when
+    // using electrostatics).
+    // When synchronize_velocity_for_diagnostics is true, the PushP at the end of the
+    // step is used so that the correct behavior is obtained.
     FillBoundaryE(guard_cells.ng_FieldGather);
     FillBoundaryB(guard_cells.ng_FieldGather);
     if (fft_do_time_averaging)
@@ -235,9 +242,12 @@ WarpX::Evolve (int numsteps)
         }
 
         // TODO: move out
+        bool const end_of_step_loop = (step == numsteps_max - 1) || (cur_time + dt[0] >= stop_time - 1.e-3*dt[0]);
         if (evolve_scheme == EvolveScheme::Explicit) {
-            // At the end of last step, push p by 0.5*dt to synchronize
-            if (cur_time + dt[0] >= stop_time - 1.e-3*dt[0] || step == numsteps_max-1) {
+            // At the end of step loop, push p by 0.5*dt to synchronize
+            // This synchronization is not at the correct place since it is done before the window is moved,
+            // before particles are scraped, and before the electrostatic field update
+            if (end_of_step_loop && !synchronize_velocity_for_diagnostics) {
                 Synchronize();
             }
         }
@@ -266,7 +276,7 @@ WarpX::Evolve (int numsteps)
         // from either a moving window or a boosted frame
         if (num_moved != 0 || gamma_boost > 1) {
             for (int lev = 0; lev <= finest_level; ++lev) {
-                m_accelerator_lattice[lev]->UpdateElementFinder(lev);
+                m_accelerator_lattice[lev]->UpdateElementFinder(lev, gett_new());
             }
         }
 
@@ -307,6 +317,15 @@ WarpX::Evolve (int numsteps)
                 HybridPICEvolveFields();
             }
             ExecutePythonCallback("afterEsolve");
+        }
+
+        bool const do_diagnostic = (multi_diags->DoComputeAndPack(step) || reduced_diags->DoDiags(step));
+        if (synchronize_velocity_for_diagnostics &&
+            (do_diagnostic || end_of_step_loop)) {
+            // When the diagnostics require synchronization, push p by 0.5*dt to synchronize.
+            // Note that this will be undone at the start of the next step by the half v-push
+            // backwards.
+            Synchronize();
         }
 
         // afterstep callback runs with the updated global time. It is included
@@ -353,8 +372,10 @@ WarpX::Evolve (int numsteps)
     // This if statement is needed for PICMI, which allows the Evolve routine to be
     // called multiple times, otherwise diagnostics will be done at every call,
     // regardless of the diagnostic period parameter provided in the inputs.
-    if (istep[0] == max_step || (stop_time - 1.e-3*dt[0] <= cur_time && cur_time < stop_time + dt[0])
-        || m_exit_loop_due_to_interrupt_signal) {
+    bool const final_time_step = (istep[0] == max_step)
+                                || (cur_time >= stop_time - 1.e-3*dt[0]
+                                 && cur_time < stop_time + dt[0]);
+    if (final_time_step || m_exit_loop_due_to_interrupt_signal) {
         multi_diags->FilterComputePackFlushLastTimestep( istep[0] );
         if (m_exit_loop_due_to_interrupt_signal) { ExecutePythonCallback("onbreaksignal"); }
     }
@@ -363,10 +384,11 @@ WarpX::Evolve (int numsteps)
         ablastr::warn_manager::GetWMInstance().PrintGlobalWarnings("THE END");
 }
 
-/* /brief Perform one PIC iteration, without subcycling
-*  i.e. all levels/patches use the same timestep (that of the finest level)
-*  for the field advance and particle pusher.
-*/
+/**
+ * \brief Perform one PIC iteration, without subcycling
+ * i.e. all levels/patches use the same timestep (that of the finest level)
+ * for the field advance and particle pusher.
+ */
 void
 WarpX::OneStep_nosub (Real cur_time)
 {
@@ -438,10 +460,10 @@ WarpX::OneStep_nosub (Real cur_time)
         EvolveB(0.5_rt * dt[0], DtType::FirstHalf, cur_time); // We now have B^{n+1/2}
         FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
-        if (WarpX::em_solver_medium == MediumForEM::Vacuum) {
+        if (m_em_solver_medium == MediumForEM::Vacuum) {
             // vacuum medium
             EvolveE(dt[0], cur_time); // We now have E^{n+1}
-        } else if (WarpX::em_solver_medium == MediumForEM::Macroscopic) {
+        } else if (m_em_solver_medium == MediumForEM::Macroscopic) {
             // macroscopic medium
             MacroscopicEvolveE(dt[0], cur_time); // We now have E^{n+1}
         } else {
@@ -584,7 +606,8 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         if (verbose) {
             amrex::Print() << Utils::TextMsg::Info("re-sorting particles");
         }
-        mypc->SortParticlesByBin(sort_bin_size);
+        mypc->SortParticlesByBin(
+            sort_bin_size, m_sort_particles_for_deposition, m_sort_idx_type);
     }
 }
 
@@ -847,21 +870,22 @@ WarpX::OneStep_multiJ (const amrex::Real cur_time)
 #endif // WARPX_USE_FFT
 }
 
-/* /brief Perform one PIC iteration, with subcycling
-*  i.e. The fine patch uses a smaller timestep (and steps more often)
-*  than the coarse patch, for the field advance and particle pusher.
-*
-* This version of subcycling only works for 2 levels and with a refinement
-* ratio of 2.
-* The particles and fields of the fine patch are pushed twice
-* (with dt[coarse]/2) in this routine.
-* The particles of the coarse patch and mother grid are pushed only once
-* (with dt[coarse]). The fields on the coarse patch and mother grid
-* are pushed in a way which is equivalent to pushing once only, with
-* a current which is the average of the coarse + fine current at the 2
-* steps of the fine grid.
-*
-*/
+/**
+ *  \brief Perform one PIC iteration, with subcycling
+ *  i.e. The fine patch uses a smaller timestep (and steps more often)
+ *  than the coarse patch, for the field advance and particle pusher.
+ *
+ * This version of subcycling only works for 2 levels and with a refinement
+ * ratio of 2.
+ * The particles and fields of the fine patch are pushed twice
+ * (with dt[coarse]/2) in this routine.
+ * The particles of the coarse patch and mother grid are pushed only once
+ * (with dt[coarse]). The fields on the coarse patch and mother grid
+ * are pushed in a way which is equivalent to pushing once only, with
+ * a current which is the average of the coarse + fine current at the 2
+ * steps of the fine grid.
+ *
+ */
 void
 WarpX::OneStep_sub1 (Real cur_time)
 {
@@ -1077,52 +1101,40 @@ WarpX::OneStep_sub1 (Real cur_time)
 void
 WarpX::doFieldIonization ()
 {
-    for (int lev = 0; lev <= finest_level; ++lev) {
-        doFieldIonization(lev);
-    }
-}
-
-void
-WarpX::doFieldIonization (int lev)
-{
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    mypc->doFieldIonization(
-        lev,
-        *m_fields.get(FieldType::Efield_aux, Direction{0}, lev),
-        *m_fields.get(FieldType::Efield_aux, Direction{1}, lev),
-        *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
-        *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
-        *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
-        *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
-    );
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        mypc->doFieldIonization(
+            lev,
+            *m_fields.get(FieldType::Efield_aux, Direction{0}, lev),
+            *m_fields.get(FieldType::Efield_aux, Direction{1}, lev),
+            *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
+            *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
+            *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
+            *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
+        );
+    }
 }
 
 #ifdef WARPX_QED
 void
 WarpX::doQEDEvents ()
 {
-    for (int lev = 0; lev <= finest_level; ++lev) {
-        doQEDEvents(lev);
-    }
-}
-
-void
-WarpX::doQEDEvents (int lev)
-{
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    mypc->doQedEvents(
-        lev,
-        *m_fields.get(FieldType::Efield_aux, Direction{0}, lev),
-        *m_fields.get(FieldType::Efield_aux, Direction{1}, lev),
-        *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
-        *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
-        *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
-        *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
-    );
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        mypc->doQedEvents(
+            lev,
+            *m_fields.get(FieldType::Efield_aux, Direction{0}, lev),
+            *m_fields.get(FieldType::Efield_aux, Direction{1}, lev),
+            *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
+            *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
+            *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
+            *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
+        );
+    }
 }
 #endif
 

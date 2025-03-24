@@ -1365,8 +1365,8 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
     // we will then call Redistribute on this new container and finally
     // add the new particles to the original container.
     PhysicalParticleContainer tmp_pc(&WarpX::GetInstance());
-    for (int ic = 0; ic < NumRuntimeRealComps(); ++ic) { tmp_pc.AddRealComp(false); }
-    for (int ic = 0; ic < NumRuntimeIntComps(); ++ic) { tmp_pc.AddIntComp(false); }
+    for (int ic = 0; ic < NumRuntimeRealComps(); ++ic) { tmp_pc.AddRealComp(GetRealSoANames()[ic + NArrayReal], false); }
+    for (int ic = 0; ic < NumRuntimeIntComps(); ++ic) { tmp_pc.AddIntComp(GetIntSoANames()[ic + NArrayInt], false); }
     tmp_pc.defineAllParticleTiles();
 
     Box fine_injection_box;
@@ -1829,20 +1829,6 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     amrex::MultiFab & Bx = *fields.get(FieldType::Bfield_aux, Direction{0}, lev);
     amrex::MultiFab & By = *fields.get(FieldType::Bfield_aux, Direction{1}, lev);
     amrex::MultiFab & Bz = *fields.get(FieldType::Bfield_aux, Direction{2}, lev);
-
-    if (m_do_back_transformed_particles)
-    {
-        for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
-        {
-            const auto np = pti.numParticles();
-            const auto t_lev = pti.GetLevel();
-            const auto index = pti.GetPairIndex();
-            tmp_particle_data.resize(finestLevel()+1);
-            for (int i = 0; i < TmpIdx::nattribs; ++i) {
-                tmp_particle_data[t_lev][index][i].resize(np);
-            }
-        }
-    }
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel
@@ -2615,7 +2601,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     const int do_copy = (m_do_back_transformed_particles && (a_dt_type!=DtType::SecondHalf) );
     CopyParticleAttribs copyAttribs;
     if (do_copy) {
-        copyAttribs = CopyParticleAttribs(pti, tmp_particle_data, offset);
+        copyAttribs = CopyParticleAttribs(*this, pti, offset);
     }
 
     int* AMREX_RESTRICT ion_lev = nullptr;
@@ -2872,7 +2858,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
     const int do_copy = (m_do_back_transformed_particles && (a_dt_type!=DtType::SecondHalf) );
     CopyParticleAttribs copyAttribs;
     if (do_copy) {
-        copyAttribs = CopyParticleAttribs(pti, tmp_particle_data, offset);
+        copyAttribs = CopyParticleAttribs(*this, pti, offset);
     }
 
     int* AMREX_RESTRICT ion_lev = nullptr;
