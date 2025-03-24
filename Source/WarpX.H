@@ -998,12 +998,6 @@ public:
     */
     void ApplyBCKCorrection(int idim);
 
-    /**
-     * \brief Subtract the average of the cumulative sums of the preliminary current D
-     *        from the current J (computed from D according to the Vay deposition scheme)
-     */
-    void PSATDSubtractCurrentPartialSumsAvg ();
-
 #ifdef WARPX_USE_FFT
     auto&  get_spectral_solver_fp (int lev) {return *spectral_solver_fp[lev];}
 #endif
