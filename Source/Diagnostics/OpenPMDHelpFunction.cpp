@@ -9,8 +9,6 @@
 
 #include "Utils/TextMsg.H"
 
-#include <map>
-
 std::string
 WarpXOpenPMDFileType ()
 {

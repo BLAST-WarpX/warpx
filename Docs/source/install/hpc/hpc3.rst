@@ -30,7 +30,7 @@ Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
 On HPC3, you recommend to run on the `fast GPU nodes with V100 GPUs <https://rcic.uci.edu/hpc3/slurm.html#memmap>`__.
 

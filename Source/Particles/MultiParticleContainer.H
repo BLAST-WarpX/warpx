@@ -173,6 +173,8 @@ public:
 
     std::unique_ptr<amrex::MultiFab> GetChargeDensity(int lev, bool local = false);
 
+    void GenerateGlobalDebyeLength ();
+
     void doFieldIonization (int lev,
                             const amrex::MultiFab& Ex, const amrex::MultiFab& Ey, const amrex::MultiFab& Ez,
                             const amrex::MultiFab& Bx, const amrex::MultiFab& By, const amrex::MultiFab& Bz);
@@ -211,7 +213,10 @@ public:
 
     void WriteHeader (std::ostream& os) const;
 
-    void SortParticlesByBin (amrex::IntVect bin_size);
+    void SortParticlesByBin (
+        const amrex::IntVect& bin_size,
+        bool sort_particles_for_deposition,
+        const amrex::IntVect& sort_idx_type);
 
     void Redistribute ();
 
@@ -256,6 +261,13 @@ public:
      * \param[in] do_back_transformed_particles The parameter to set if back-transformed particles are set to true/false
      */
     void SetDoBackTransformedParticles (const std::string& species_name, bool do_back_transformed_particles);
+
+    /** Get value of private member m_do_back_transformed_particles
+     */
+    [[nodiscard]] bool getDoBackTransformedParticles () const
+    {
+        return m_do_back_transformed_particles;
+    }
 
     [[nodiscard]] int nSpeciesDepositOnMainGrid () const
     {

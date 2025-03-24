@@ -15,13 +15,13 @@ set -eu -o pipefail
 # Check: ######################################################################
 #
 #   Was lassen_v100_warpx.profile sourced and configured correctly?
-if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your lassen_v100_warpx_toss3.profile file! Please edit its line 2 to continue!"; exit 1; fi
+if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your lassen_v100_warpx.profile file! Please edit its line 2 to continue!"; exit 1; fi
 
 
 # Remove old dependencies #####################################################
 #
-SRC_DIR="/usr/workspace/${USER}/lassen-toss3/src"
-SW_DIR="/usr/workspace/${USER}/lassen-toss3/gpu"
+SRC_DIR="/usr/workspace/${USER}/lassen/src"
+SW_DIR="/usr/workspace/${USER}/lassen/gpu"
 rm -rf ${SW_DIR}
 mkdir -p ${SW_DIR}
 mkdir -p ${SRC_DIR}
@@ -110,22 +110,24 @@ cmake --build ${build_dir}/lapackpp-lassen-build --target install --parallel 10
 export PIP_EXTRA_INDEX_URL="https://pypi.org/simple"
 
 python3 -m pip install --upgrade --user virtualenv
-rm -rf ${SW_DIR}/venvs/warpx-lassen-toss3
-python3 -m venv ${SW_DIR}/venvs/warpx-lassen-toss3
-source ${SW_DIR}/venvs/warpx-lassen-toss3/bin/activate
+rm -rf ${SW_DIR}/venvs/warpx-lassen
+python3 -m venv ${SW_DIR}/venvs/warpx-lassen
+source ${SW_DIR}/venvs/warpx-lassen/bin/activate
 python3 -m pip install --upgrade pip
 # python3 -m pip cache purge  # error: pip cache commands can not function since cache is disabled
 python3 -m pip install --upgrade build
 python3 -m pip install --upgrade packaging
 python3 -m pip install --upgrade wheel
 python3 -m pip install --upgrade setuptools[core]
-python3 -m pip install --upgrade cython
+python3 -m pip install --upgrade scikit-build-core
+python3 -m pip install --upgrade "cython>=3"
 python3 -m pip install --upgrade numpy
 python3 -m pip install --upgrade pandas
 CMAKE_PREFIX_PATH=/usr/lib64:${CMAKE_PREFIX_PATH} python3 -m pip install --upgrade -Ccompile-args="-j10" -Csetup-args=-Dblas=BLAS -Csetup-args=-Dlapack=BLAS scipy
-python3 -m pip install --upgrade mpi4py --no-cache-dir --no-build-isolation --no-binary mpi4py
+# Lassen does not support MPI v4+ yet
+MPI4PY_BUILD_BACKEND="scikit-build-core" python3 -m pip install --upgrade "mpi4py<4" --no-cache-dir --no-build-isolation --no-binary mpi4py
 python3 -m pip install --upgrade openpmd-api
-CC=mpicc H5PY_SETUP_REQUIRES=0 HDF5_DIR=${SW_DIR}/hdf5-1.14.1.2 HDF5_MPI=ON python3 -m pip install --upgrade h5py --no-cache-dir --no-build-isolation --no-binary h5py
+CC=mpigcc H5PY_SETUP_REQUIRES=0 HDF5_DIR=${SW_DIR}/hdf5-1.14.1.2 HDF5_MPI=ON python3 -m pip install --upgrade h5py --no-cache-dir --no-build-isolation --no-binary h5py
 MPLLOCALFREETYPE=1 python3 -m pip install --upgrade matplotlib==3.2.2  # does not try to build freetype itself
 echo "matplotlib==3.2.2" > ${build_dir}/constraints.txt
 python3 -m pip install --upgrade -c ${build_dir}/constraints.txt yt

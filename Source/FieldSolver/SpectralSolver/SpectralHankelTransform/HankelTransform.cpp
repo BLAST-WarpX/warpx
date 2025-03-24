@@ -9,7 +9,6 @@
 #include "BesselRoots.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
-#include "WarpX.H"
 
 #include "Utils/WarpXProfilerWrapper.H"
 

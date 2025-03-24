@@ -16,6 +16,7 @@
 #include "FlushFormats/FlushFormat.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/Algorithms/IsIn.H"
+#include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "WarpX.H"
@@ -132,7 +133,6 @@ FullDiagnostics::ReadParameters ()
         const amrex::ParmParse pp_warpx("warpx");
         std::vector<std::string> dt_interval_vec = {"-1"};
         const bool timestep_may_vary = pp_warpx.queryarr("dt_update_interval", dt_interval_vec);
-        amrex::Print() << Utils::TextMsg::Warn("Time step varies?" + std::to_string(timestep_may_vary));
         if (timestep_may_vary) {
             WARPX_ABORT_WITH_MESSAGE(
                     "Time-averaged diagnostics (encountered in: "
@@ -155,9 +155,8 @@ FullDiagnostics::ReadParameters ()
         const bool averaging_period_steps_specified = pp_diag_name.query(
                 "average_period_steps", m_average_period_steps
         );
-        const bool averaging_period_time_specified = pp_diag_name.queryWithParser(
-                "average_period_time", m_average_period_time
-        );
+        const bool averaging_period_time_specified = utils::parser::queryWithParser
+            (pp_diag_name, "average_period_time", m_average_period_time);
 
         if (m_time_average_mode == TimeAverageType::Static) {
             // This fails if users do not specify a start.

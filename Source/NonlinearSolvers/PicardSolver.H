@@ -118,7 +118,9 @@ void PicardSolver<Vec,Ops>::Define ( const Vec&  a_U,
     this->m_is_defined = true;
 
     // Create diagnostic file and write header
-    if (!this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor()) {
+    if (amrex::ParallelDescriptor::IOProcessor()
+        && !this->m_diagnostic_file.empty()
+        && !amrex::FileExists(this->m_diagnostic_file)) {
 
         std::filesystem::path const diagnostic_path(this->m_diagnostic_file);
         std::filesystem::path const diagnostic_dir = diagnostic_path.parent_path();
@@ -154,6 +156,7 @@ void PicardSolver<Vec,Ops>::ParseParameters ()
     pp_picard.query("max_iterations",      m_maxits);
     pp_picard.query("require_convergence", m_require_convergence);
     pp_picard.query("diagnostic_file",     this->m_diagnostic_file);
+    pp_picard.query("diagnostic_interval", this->m_diagnostic_interval);
 }
 
 template <class Vec, class Ops>
@@ -167,7 +170,6 @@ void PicardSolver<Vec,Ops>::Solve ( Vec&         a_U,
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         this->m_is_defined,
         "PicardSolver::Solve() called on undefined object");
-    amrex::ignore_unused(a_dt);
     using namespace amrex::literals;
 
     //
@@ -242,12 +244,13 @@ void PicardSolver<Vec,Ops>::Solve ( Vec&         a_U,
        }
     }
 
-    if (!this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor()) {
+    if (!this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor() &&
+        (a_step%this->m_diagnostic_interval==0 || a_step==0)) {
         std::ofstream diagnostic_file{this->m_diagnostic_file, std::ofstream::out | std::ofstream::app};
         diagnostic_file << std::setprecision(14);
-        diagnostic_file << a_step;
+        diagnostic_file << a_step+1;
         diagnostic_file << " ";
-        diagnostic_file << a_time;
+        diagnostic_file << a_time + a_dt;
         diagnostic_file << " ";
         diagnostic_file << iter;
         diagnostic_file << " ";
