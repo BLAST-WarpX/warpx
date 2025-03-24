@@ -17,7 +17,7 @@ Before you start, you will need a copy of the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
    cd $HOME/src/warpx
 
 WarpX depends on popular third party software.

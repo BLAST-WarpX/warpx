@@ -146,11 +146,6 @@ int WarpX::field_centering_nox = 2;
 int WarpX::field_centering_noy = 2;
 int WarpX::field_centering_noz = 2;
 
-// Order of finite-order centering of currents (nodal to staggered)
-int WarpX::current_centering_nox = 2;
-int WarpX::current_centering_noy = 2;
-int WarpX::current_centering_noz = 2;
-
 bool WarpX::use_fdtd_nci_corr = false;
 bool WarpX::galerkin_interpolation = true;
 
@@ -163,14 +158,6 @@ bool WarpX::refine_plasma     = false;
 
 utils::parser::IntervalsParser WarpX::sort_intervals;
 amrex::IntVect WarpX::sort_bin_size(AMREX_D_DECL(1,1,1));
-
-#if defined(AMREX_USE_CUDA)
-bool WarpX::sort_particles_for_deposition = true;
-#else
-bool WarpX::sort_particles_for_deposition = false;
-#endif
-
-amrex::IntVect WarpX::sort_idx_type(AMREX_D_DECL(0,0,0));
 
 bool WarpX::do_dynamic_scheduling = true;
 
@@ -774,7 +761,7 @@ WarpX::ReadParameters ()
         }
 
         // Filter currently not working with FDTD solver in RZ geometry: turn OFF by default
-        // (see https://github.com/ECP-WarpX/WarpX/issues/1943)
+        // (see https://github.com/BLAST-WarpX/warpx/issues/1943)
 #ifdef WARPX_DIM_RZ
         if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) { WarpX::use_filter = false; }
 #endif
@@ -806,7 +793,7 @@ WarpX::ReadParameters ()
         {
             if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::HybridPIC) {
                 // Filter currently not working with FDTD solver in RZ geometry along R
-                // (see https://github.com/ECP-WarpX/WarpX/issues/1943)
+                // (see https://github.com/BLAST-WarpX/warpx/issues/1943)
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!use_filter || filter_npass_each_dir[0] == 0,
                     "In RZ geometry with FDTD, filtering can only be applied along z. This can be controlled by setting warpx.filter_npass_each_dir");
             } else {
@@ -1082,9 +1069,9 @@ WarpX::ReadParameters ()
             field_centering_noz = 8;
             // Finite-order centering of currents (nodal to staggered)
             do_current_centering = true;
-            current_centering_nox = 8;
-            current_centering_noy = 8;
-            current_centering_noz = 8;
+            m_current_centering_nox = 8;
+            m_current_centering_noy = 8;
+            m_current_centering_noz = 8;
         }
 
 #ifdef WARPX_DIM_RZ
@@ -1122,18 +1109,18 @@ WarpX::ReadParameters ()
                 "warpx.do_current_centering=1 can be used only with warpx.grid_type=hybrid");
 
             utils::parser::queryWithParser(
-                pp_warpx, "current_centering_nox", current_centering_nox);
+                pp_warpx, "current_centering_nox", m_current_centering_nox);
             utils::parser::queryWithParser(
-                pp_warpx, "current_centering_noy", current_centering_noy);
+                pp_warpx, "current_centering_noy", m_current_centering_noy);
             utils::parser::queryWithParser(
-                pp_warpx, "current_centering_noz", current_centering_noz);
+                pp_warpx, "current_centering_noz", m_current_centering_noz);
 
             ::AllocateCenteringCoefficients(device_current_centering_stencil_coeffs_x,
                                           device_current_centering_stencil_coeffs_y,
                                           device_current_centering_stencil_coeffs_z,
-                                          current_centering_nox,
-                                          current_centering_noy,
-                                          current_centering_noz,
+                                          m_current_centering_nox,
+                                          m_current_centering_noy,
+                                          m_current_centering_noz,
                                           grid_type);
         }
 
@@ -1437,7 +1424,7 @@ WarpX::ReadParameters ()
             }
         }
 
-        pp_warpx.query("sort_particles_for_deposition",sort_particles_for_deposition);
+        pp_warpx.query("sort_particles_for_deposition",m_sort_particles_for_deposition);
         Vector<int> vect_sort_idx_type(AMREX_SPACEDIM,0);
         const bool sort_idx_type_is_specified =
             utils::parser::queryArrWithParser(
@@ -1445,7 +1432,7 @@ WarpX::ReadParameters ()
                 vect_sort_idx_type, 0, AMREX_SPACEDIM);
         if (sort_idx_type_is_specified){
             for (int i=0; i<AMREX_SPACEDIM; i++) {
-                sort_idx_type[i] = vect_sort_idx_type[i];
+                m_sort_idx_type[i] = vect_sort_idx_type[i];
             }
         }
 
@@ -2158,7 +2145,7 @@ WarpX::AllocLevelData (int lev, const BoxArray& ba, const DistributionMapping& d
                   guard_cells.ng_alloc_Rho, guard_cells.ng_alloc_F, guard_cells.ng_alloc_G, aux_is_nodal);
 
     m_accelerator_lattice[lev] = std::make_unique<AcceleratorLattice>();
-    m_accelerator_lattice[lev]->InitElementFinder(lev, gamma_boost, ba, dm);
+    m_accelerator_lattice[lev]->InitElementFinder(lev, gamma_boost, gett_new(), ba, dm);
 
 }
 

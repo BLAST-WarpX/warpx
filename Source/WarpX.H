@@ -293,13 +293,6 @@ public:
     //! Order of finite centering of fields (from staggered grid to nodal grid), along z
     static int field_centering_noz;
 
-    //! Order of finite centering of currents (from nodal grid to staggered grid), along x
-    static int current_centering_nox;
-    //! Order of finite centering of currents (from nodal grid to staggered grid), along y
-    static int current_centering_noy;
-    //! Order of finite centering of currents (from nodal grid to staggered grid), along z
-    static int current_centering_noz;
-
     //! Number of modes for the RZ multi-mode version
     static int n_rz_azimuthal_modes;
     //! Number of MultiFab components
@@ -351,11 +344,6 @@ public:
 
     static utils::parser::IntervalsParser sort_intervals;
     static amrex::IntVect sort_bin_size;
-
-    //! If true, particles will be sorted in the order x -> y -> z -> ppc for faster deposition
-    static bool sort_particles_for_deposition;
-    //! Specifies the type of grid used for the above sorting, i.e. cell-centered, nodal, or mixed
-    static amrex::IntVect sort_idx_type;
 
     static bool do_multi_J;
     static int do_multi_J_n_depositions;
@@ -1010,12 +998,6 @@ public:
     */
     void ApplyBCKCorrection(int idim);
 
-    /**
-     * \brief Subtract the average of the cumulative sums of the preliminary current D
-     *        from the current J (computed from D according to the Vay deposition scheme)
-     */
-    void PSATDSubtractCurrentPartialSumsAvg ();
-
 #ifdef WARPX_USE_FFT
     auto&  get_spectral_solver_fp (int lev) {return *spectral_solver_fp[lev];}
 #endif
@@ -1254,6 +1236,13 @@ private:
     std::unique_ptr<MultiParticleContainer> mypc;
     std::unique_ptr<MultiDiagnostics> multi_diags;
 
+    //! Order of finite centering of currents (from nodal grid to staggered grid), along x
+    int m_current_centering_nox  = 2;
+    //! Order of finite centering of currents (from nodal grid to staggered grid), along y
+    int m_current_centering_noy = 2;
+    //! Order of finite centering of currents (from nodal grid to staggered grid), along z
+    int m_current_centering_noz = 2;
+
     // Fluid container
     bool do_fluid_species = false;
     std::unique_ptr<MultiFluidContainer> myfl;
@@ -1461,6 +1450,18 @@ private:
     int noy_fft = 16;
     int noz_fft = 16;
 
+
+
+    //! If true, particles will be sorted in the order x -> y -> z -> ppc for faster deposition
+#if defined(AMREX_USE_CUDA)
+    bool m_sort_particles_for_deposition = true;
+#else
+    bool m_sort_particles_for_deposition = false;
+#endif
+
+    //! Specifies the type of grid used for the above sorting, i.e. cell-centered, nodal, or mixed
+    amrex::IntVect m_sort_idx_type = amrex::IntVect(AMREX_D_DECL(0,0,0));
+
     //! Solve Poisson equation when loading an external magnetic field to clean divergence
     //! This is useful to remove errors that could lead to non-zero B field divergence
     bool m_do_divb_cleaning_external = false;
@@ -1480,12 +1481,6 @@ private:
 
     // Factory for field data
     amrex::Vector<std::unique_ptr<amrex::FabFactory<amrex::FArrayBox> > > m_field_factory;
-
-    [[nodiscard]]
-    amrex::FabFactory<amrex::FArrayBox> const& fieldFactory (int lev) const noexcept
-    {
-        return *m_field_factory[lev];
-    }
 
     /** Stop the simulation at the end of the current step due to a received Unix signal?
      */

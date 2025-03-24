@@ -510,7 +510,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
         costheta_mid = 1._rt;
         sintheta_mid = 0._rt;
     }
-    const Complex xy_mid0 = Complex{costheta_mid, sintheta_mid};
+    const Complex xy_mid0 = Complex{costheta_mid, -sintheta_mid};
     // Keep these double to avoid bug in single precision
     double const x_new = (rp_new - xyzmin.x)*dinv.x;
     double const x_old = (rp_old - xyzmin.x)*dinv.x;
@@ -927,7 +927,7 @@ void doGatherPicnicShapeN (
         costheta_mid = 1._rt;
         sintheta_mid = 0._rt;
     }
-    const Complex xy_mid0 = Complex{costheta_mid, sintheta_mid};
+    const Complex xy_mid0 = Complex{costheta_mid, -sintheta_mid};
     // Keep these double to avoid bug in single precision
     double const x_new = (rp_new - xyzmin.x)*dinv.x;
     double const x_old = (rp_old - xyzmin.x)*dinv.x;

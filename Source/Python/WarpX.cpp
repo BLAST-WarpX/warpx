@@ -69,7 +69,7 @@ void init_WarpX (py::module& m)
     py::class_<WarpX> warpx(m, "WarpX");
     warpx
         // WarpX is a Singleton Class with a private constructor
-        //   https://github.com/ECP-WarpX/WarpX/pull/4104
+        //   https://github.com/BLAST-WarpX/warpx/pull/4104
         //   https://pybind11.readthedocs.io/en/stable/advanced/classes.html?highlight=singleton#custom-constructors
         .def(py::init([]() {
             return &WarpX::GetInstance();
