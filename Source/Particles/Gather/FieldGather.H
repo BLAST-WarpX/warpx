@@ -50,13 +50,14 @@ void doDirectGatherVectorField (
                      [[maybe_unused]] const int n_rz_azimuthal_modes)
 {
     using namespace amrex;
+
     constexpr int zdir = WARPX_ZINDEX;
     constexpr int NODE = amrex::IndexType::NODE;
     constexpr int CELL = amrex::IndexType::CELL;
 
     // Compute particle position in grid units
 #if defined(WARPX_DIM_RZ)
-    const amrex::Real rp = std::sqrt(xp*xp + yp*yp);
+    const double rp = std::sqrt(xp*xp + yp*yp);
     const double x_bar = (rp - xyzmin.x)*dinv.x;
 #elif !defined(WARPX_DIM_1D_Z)
     const double x_bar = (xp - xyzmin.x)*dinv.x;
@@ -78,7 +79,7 @@ void doDirectGatherVectorField (
         kp_node = shape_factor_perp(sz_node, z_bar);
     }
     if (Fx_type[zdir] == CELL || Fy_type[zdir] == CELL) {
-        kp_cell = shape_factor_perp(sz_cell, z_bar - 0.5_rt);
+        kp_cell = shape_factor_perp(sz_cell, z_bar - 0.5);
     }
 
     const int kp_Fx = ((Fx_type[zdir] == NODE) ? kp_node : kp_cell);
@@ -90,7 +91,7 @@ void doDirectGatherVectorField (
     int kp_Fz = 0;
     double sz_Fz[depos_order_para+1] = {0.};
     if (Fz_type[zdir] == NODE) { kp_Fz = shape_factor_para(sz_Fz, z_bar); }
-    else  { kp_Fz = shape_factor_para(sz_Fz, z_bar - 0.5_rt); }
+    else  { kp_Fz = shape_factor_para(sz_Fz, z_bar - 0.5); }
 
 #if !defined(WARPX_DIM_1D_Z)
     // Compute shape factors for x-direction
@@ -102,7 +103,7 @@ void doDirectGatherVectorField (
         ip_node = shape_factor_perp(sx_node, x_bar);
     }
     if (Fy_type[0] == CELL || Fz_type[0] == CELL) {
-        ip_cell = shape_factor_perp(sx_cell, x_bar - 0.5_rt);
+        ip_cell = shape_factor_perp(sx_cell, x_bar - 0.5);
     }
 
     const int ip_Fy = ((Fy_type[0] == NODE) ? ip_node : ip_cell);
@@ -114,7 +115,7 @@ void doDirectGatherVectorField (
     int ip_Fx = 0;
     double sx_Fx[depos_order_para + 1] = {0.};
     if (Fx_type[0] == NODE) { ip_Fx = shape_factor_para(sx_Fx, x_bar); }
-    else  { ip_Fx = shape_factor_para(sx_Fx, x_bar - 0.5_rt); }
+    else  { ip_Fx = shape_factor_para(sx_Fx, x_bar - 0.5); }
 #endif
 
 #if defined(WARPX_DIM_3D)
@@ -127,7 +128,7 @@ void doDirectGatherVectorField (
         jp_node = shape_factor_perp(sy_node, y_bar);
     }
     if (Fx_type[1] == CELL || Fz_type[1] == CELL) {
-        jp_cell = shape_factor_perp(sy_cell, y_bar - 0.5_rt);
+        jp_cell = shape_factor_perp(sy_cell, y_bar - 0.5);
     }
 
     const int jp_Fx = ((Fx_type[1] == NODE) ? jp_node : jp_cell);
@@ -139,7 +140,7 @@ void doDirectGatherVectorField (
     int jp_Fy = 0;
     double sy_Fy[depos_order_para + 1] = {0.};
     if (Fy_type[1] == NODE) { jp_Fy = shape_factor_para(sy_Fy, y_bar); }
-    else  { jp_Fy = shape_factor_para(sy_Fy, y_bar - 0.5_rt); }
+    else  { jp_Fy = shape_factor_para(sy_Fy, y_bar - 0.5); }
 
     // Gather vector field F
     amrex::Real weight;
