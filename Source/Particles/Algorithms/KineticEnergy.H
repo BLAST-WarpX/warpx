@@ -23,7 +23,7 @@ namespace Algorithms{
      * \brief Computes the kinetic energy of a particle.
      * This method should not be used with photons.
      *
-     * @tparam T floating-point type to be used in internal calculations (by default equalt to amrex::ParticleReal)
+     * @tparam T floating-point type to be used in internal calculations (by default equal to amrex::ParticleReal)
      * @param[in] ux x component of the particle momentum (code units)
      * @param[in] uy y component of the particle momentum (code units)
      * @param[in] uz z component of the particle momentum (code units)
