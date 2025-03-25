@@ -252,8 +252,8 @@ void doDirectGatherVectorField (
     }
 
     // Convert Frp and Fthp to Fxp and Fyp
-    Fxp = costheta*Frp  - sintheta*Fthp;
-    Fyp = costheta*Fthp + sintheta*Frp;
+    Fxp += costheta*Frp  - sintheta*Fthp;
+    Fyp += costheta*Fthp + sintheta*Frp;
 
 #elif defined(WARPX_DIM_1D_Z)
 
