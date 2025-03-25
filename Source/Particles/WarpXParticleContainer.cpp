@@ -10,7 +10,6 @@
 #include "WarpXParticleContainer.H"
 
 #include "ablastr/particles/DepositCharge.H"
-#include "Particles/ShapeFactors.H"
 #include "Deposition/ChargeDeposition.H"
 #include "Deposition/CurrentDeposition.H"
 #include "Deposition/SharedDepositionUtils.H"
