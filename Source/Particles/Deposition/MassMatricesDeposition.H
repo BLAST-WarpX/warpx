@@ -6,7 +6,7 @@
  * License: BSD-3-Clause-LBNL
  */
 #ifndef WARPX_MASS_MATRICES_DEPOSITION_H_
-#define WARPX_MASS_MATRICES_POSITION_H_
+#define WARPX_MASS_MATRICES_DEPOSITION_H_
 
 #include "Particles/Deposition/SharedDepositionUtils.H"
 #include "ablastr/parallelization/KernelTimer.H"
