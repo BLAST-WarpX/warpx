@@ -12,6 +12,7 @@
 
 #include "AMReX_Extension.H"
 #include "AMReX_GpuQualifiers.H"
+#include "AMReX_Math.H"
 #include "AMReX_REAL.H"
 
 #include <cmath>
@@ -22,6 +23,7 @@ namespace Algorithms{
      * \brief Computes the kinetic energy of a particle.
      * This method should not be used with photons.
      *
+     * @tparam T floating-point type to be used in internal calculations (by default equal to amrex::ParticleReal)
      * @param[in] ux x component of the particle momentum (code units)
      * @param[in] uy y component of the particle momentum (code units)
      * @param[in] uz z component of the particle momentum (code units)
@@ -29,21 +31,22 @@ namespace Algorithms{
      *
      * @return the kinetic energy of the particle (in S.I. units)
      */
+    template <typename T = amrex::ParticleReal>
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
-    amrex::ParticleReal KineticEnergy(
-        const amrex::ParticleReal ux, const amrex::ParticleReal uy, const amrex::ParticleReal uz,
-        const amrex::ParticleReal mass)
+    T KineticEnergy(
+        const amrex::ParticleReal ux, const amrex::ParticleReal uy, const amrex::ParticleReal uz, const amrex::ParticleReal mass)
     {
         using namespace amrex;
 
-        constexpr auto inv_c2 = 1.0_prt/(PhysConst::c * PhysConst::c);
+        constexpr auto one = static_cast<T>(1.0);
+        constexpr auto inv_c2 = one/Math::powi<2>(static_cast<T>(PhysConst::c));
 
         // The expression used is derived by reducing the expression
         // (gamma - 1)*(gamma + 1)/(gamma + 1)
 
-        const auto u2 = ux*ux + uy*uy + uz*uz;
-        const auto gamma = std::sqrt(1.0_prt + u2*inv_c2);
-        return 1.0_prt/(1.0_prt + gamma)*mass*u2;
+        const auto u2 = static_cast<T>(ux*ux + uy*uy + uz*uz);
+        const auto gamma = std::sqrt(one + u2*inv_c2);
+        return one/(one + gamma)*static_cast<T>(mass)*u2;
     }
 
     /**

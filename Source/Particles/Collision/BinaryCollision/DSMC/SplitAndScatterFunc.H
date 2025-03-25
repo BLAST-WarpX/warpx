@@ -412,52 +412,58 @@ public:
                     // subtract the energy cost for ionization
                     const amrex::ParticleReal E_out = (E_coll - ionization_energy) * PhysConst::q_e;
 
-                    // Energy division after the ionization event is done as follows:
-                    // The ion product energy is obtained from the target energy as
-                    //      E2_prime = min(E2 / E_coll * E_out, 0.5 * E_out)
-                    // The energy division for the remaining two particles
-                    // must be done such that velocity vectors exist with net
-                    // zero linear momentum in the current frame. A sufficient
-                    // condition for this is that E1_prime, E2_prime and E3_prime
-                    // are valid edge lengths for a triangle - effectively that
-                    // a ellipse can be drawn from the energy components.
-                    // That ellipse has semi-major and semi-minor axis:
-                    //    a = (E_out - E2_prime) / 2.0
-                    //    b = 0.5 * sqrt(E_out^2 - 2 * E_out * E2_prime)
-                    // The energy components are found by randomly sampling an
-                    // x value between -a and a, and finding the corresponding
-                    // y value that falls on the ellipse: y^2 = b^2 - b^2/a^2 * x^2.
-                    // The secondary electron's energy is then:
-                    //    E0_prime = sqrt(y^2 + (x - E2_prime/2)^2)
-                    // and the final particle's is:
-                    //    E1_prime = E_out - E0_prime - E0_prime
+                    // Momentum and energy division after the ionization event
+                    // is done as follows:
+                    // Three numbers are generated that satisfy the triangle
+                    // inequality. These numbers will be scaled to give the
+                    // momentum for each particle (satisfying the triangle
+                    // inequality ensures that the momentum vectors can be
+                    // arranged such that the net linear momentum is zero).
+                    // Product 2 is definitely an ion, so we first choose its
+                    // proportion to be n_2 = min(E2 / E_coll, 0.5 * R), where
+                    // R is a random number between 0 and 1.
+                    // The other two numbers (n_0 & n_1) are then found
+                    // by choosing a random point on the ellipse characterized
+                    // by the semi-major and semi-minor axes
+                    //    a = (1 - n_0) / 2.0
+                    //    b = 0.5 * sqrt(1 - 2 * n_0)
+                    // The numbers are found by randomly sampling an x value
+                    // between -a and a, and finding the corresponding y value
+                    // that falls on the ellipse: y^2 = b^2 - b^2/a^2 * x^2.
+                    // Then n_0 = sqrt(y^2 + (x - n_2/2)^2) and
+                    // n_1 = 1 - n_2 - n_0.
+                    // Next, we need to find the number C, such that if
+                    // p_i = C * n_i, we would have E_0 + E_1 + E_2 = E_out
+                    // where E_i = p_i^2 / (2 M_i), i.e.,
+                    // C^2 * \sum_i [n_i^2 / (2 M_i)] = E_out
+                    // After C is determined the momentum vectors are arranged
+                    // such that the net linear momentum is zero.
 
-                    // The product ordering ensures that product 2 is the
-                    // ion product.
-                    const amrex::ParticleReal E2_prime = std::min(E2 / E_coll * E_out, 0.5_prt * E_out);
+                    const amrex::ParticleReal n_2 = std::min(E2 / E_coll, 0.5_prt * amrex::Random(engine));
 
                     // find ellipse semi-major and minor axis
-                    const amrex::ParticleReal a = 0.5_prt * (E_out - E2_prime);
-                    const amrex::ParticleReal b = 0.5_prt * std::sqrt(E_out*E_out - 2.0_prt * E_out * E2_prime);
+                    const amrex::ParticleReal a = 0.5_prt * (1.0_prt - n_2);
+                    const amrex::ParticleReal b = 0.5_prt * std::sqrt(1.0_prt - 2.0_prt * n_2);
 
                     // sample random x value and calculate y
                     const amrex::ParticleReal x = (2._prt * amrex::Random(engine) - 1.0_prt) * a;
                     const amrex::ParticleReal y2 = b*b - b*b/(a*a) * x*x;
-                    const amrex::ParticleReal E0_prime = std::sqrt(y2 + x*x - x*E2_prime + 0.25_prt*E2_prime*E2_prime);
-                    const amrex::ParticleReal E1_prime = E_out - E0_prime - E2_prime;
+                    const amrex::ParticleReal n_0 = std::sqrt(y2 + x*x - x*n_2 + 0.25_prt*n_2*n_2);
+                    const amrex::ParticleReal n_1 = 1.0_prt - n_0 - n_2;
 
-                    // Now that appropriate energies are set for each outgoing species
+                    // calculate the value of C
+                    const amrex::ParticleReal C = std::sqrt(E_out / (
+                        n_0*n_0 / (2.0_prt * m1) + n_1*n_1 / (2.0_prt * m_ioniz_product1) + n_2*n_2 / (2.0_prt * m_ioniz_product2)
+                    ));
+
+                    // Now that appropriate momenta are set for each outgoing species
                     // the directions for the velocity vectors must be chosen such
                     // that the net linear momentum in the current frame is 0.
                     // This is achieved by arranging the momentum vectors in
                     // a triangle and finding the required angles between the vectors.
-                    const amrex::ParticleReal p0 = std::sqrt(2.0_prt * m1 * E0_prime);
-                    const amrex::ParticleReal p1 = std::sqrt(2.0_prt * m_ioniz_product1 * E1_prime);
-                    const amrex::ParticleReal p2 = std::sqrt(2.0_prt * m_ioniz_product2 * E2_prime);
-
-                    const amrex::ParticleReal cos_alpha = (p0*p0 + p1*p1 - p2*p2) / (2.0_prt * p0 * p1);
+                    const amrex::ParticleReal cos_alpha = (n_0*n_0 + n_1*n_1 - n_2*n_2) / (2.0_prt * n_0 * n_1);
                     const amrex::ParticleReal sin_alpha = std::sqrt(1.0_prt - cos_alpha*cos_alpha);
-                    const amrex::ParticleReal cos_gamma = (p0*p0 + p2*p2 - p1*p1) / (2.0_prt * p0 * p2);
+                    const amrex::ParticleReal cos_gamma = (n_0*n_0 + n_2*n_2 - n_1*n_1) / (2.0_prt * n_0 * n_2);
                     const amrex::ParticleReal sin_gamma = std::sqrt(1.0_prt - cos_gamma*cos_gamma);
 
                     // choose random theta and phi values (orientation of the triangle)
@@ -469,17 +475,19 @@ public:
                     const amrex::ParticleReal cos_phi = std::cos(phi);
                     const amrex::ParticleReal sin_phi = std::sin(phi);
 
-                    ux1 = p0 / m1 * cos_theta * cos_phi;
-                    uy1 = p0 / m1 * cos_theta * sin_phi;
-                    uz1 = -p0 / m1 * sin_theta;
+                    // calculate the velocity components for each particle
+                    ux1 = C * n_0 / m1 * cos_theta * cos_phi;
+                    uy1 = C * n_0 / m1 * cos_theta * sin_phi;
+                    uz1 = -C * n_0 / m1 * sin_theta;
 
-                    ux_p1 = p1 / m_ioniz_product1 * (-cos_alpha * cos_theta * cos_phi - sin_alpha * sin_phi);
-                    uy_p1 = p1 / m_ioniz_product1 * (-cos_alpha * cos_theta * sin_phi + sin_alpha * cos_phi);
-                    uz_p1 = p1 / m_ioniz_product1 * (cos_alpha * sin_theta);
+                    ux_p1 = C * n_1 / m_ioniz_product1 * (-cos_alpha * cos_theta * cos_phi - sin_alpha * sin_phi);
+                    uy_p1 = C * n_1 / m_ioniz_product1 * (-cos_alpha * cos_theta * sin_phi + sin_alpha * cos_phi);
+                    uz_p1 = C * n_1 / m_ioniz_product1 * (cos_alpha * sin_theta);
 
-                    ux_p2 = p2 / m_ioniz_product2 * (-cos_gamma * cos_theta * cos_phi + sin_gamma * sin_phi);
-                    uy_p2 = p2 / m_ioniz_product2 * (-cos_gamma * cos_theta * sin_phi - sin_gamma * cos_phi);
-                    uz_p2 = p2 / m_ioniz_product2 * (cos_gamma * sin_theta);
+                    ux_p2 = C * n_2 / m_ioniz_product2 * (-cos_gamma * cos_theta * cos_phi + sin_gamma * sin_phi);
+                    uy_p2 = C * n_2 / m_ioniz_product2 * (-cos_gamma * cos_theta * sin_phi - sin_gamma * cos_phi);
+                    uz_p2 = C * n_2 / m_ioniz_product2 * (cos_gamma * sin_theta);
+
                 }
                 else {
                     amrex::Abort("Unknown scattering process.");
