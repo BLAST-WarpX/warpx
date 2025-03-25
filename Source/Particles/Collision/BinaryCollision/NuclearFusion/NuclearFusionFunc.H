@@ -16,7 +16,6 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
-#include "WarpX.H"
 
 #include <AMReX_Algorithm.H>
 #include <AMReX_DenseBins.H>
