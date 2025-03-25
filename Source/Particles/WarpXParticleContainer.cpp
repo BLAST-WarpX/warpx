@@ -1053,10 +1053,13 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
         amrex::Abort("Cannot do shared memory deposition with implicit algorithm");
     }
 
-    // Get magnetic field arrays
+    // Get magnetic field arrays and types
     const amrex::Array4<const amrex::Real>& Bx_arr = Bx->array();
     const amrex::Array4<const amrex::Real>& By_arr = By->array();
     const amrex::Array4<const amrex::Real>& Bz_arr = Bz->array();
+    const amrex::IndexType Bx_type = Bx->box().ixType();
+    const amrex::IndexType By_type = By->box().ixType();
+    const amrex::IndexType Bz_type = Bz->box().ixType();
 
     WARPX_PROFILE_VAR_START(blp_deposit);
 
@@ -1087,8 +1090,8 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                 jx_arr, jy_arr, jz_arr, Sx_arr, Sy_arr, Sz_arr,
-                Bx_arr, By_arr, Bz_arr, np_to_deposit, dt, dinv,
-                xyzmin, lo, qs, ms);
+                Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
+                np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
         } else if (WarpX::nox == 2){
             doJandSigmaVillasenorDepositionShapeNImplicit<2>(
                 xp_n_data, yp_n_data, zp_n_data,
@@ -1096,8 +1099,8 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                 jx_arr, jy_arr, jz_arr, Sx_arr, Sy_arr, Sz_arr,
-                Bx_arr, By_arr, Bz_arr, np_to_deposit, dt, dinv,
-                xyzmin, lo, qs, ms);
+                Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
+                np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
         } else {
             WARPX_ABORT_WITH_MESSAGE("mass matrices only used for shape = 1 and 2.");
         }
@@ -1108,16 +1111,16 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                 jx_fab, jy_fab, jz_fab, Sx_arr, Sy_arr, Sz_arr,
-                Bx_arr, By_arr, Bz_arr, np_to_deposit, dt, dinv,
-                xyzmin, lo, qs, ms);
+                Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
+                np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
         } else if (WarpX::nox == 2){
             doJandSigmaDepositionShapeNImplicit<2>(
                 GetPosition, wp.dataPtr() + offset,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                 jx_fab, jy_fab, jz_fab, Sx_arr, Sy_arr, Sz_arr,
-                Bx_arr, By_arr, Bz_arr, np_to_deposit, dt, dinv,
-                xyzmin, lo, qs, ms);
+                Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
+                np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
         } else {
             WARPX_ABORT_WITH_MESSAGE("mass matrices only used for shape = 1 and 2.");
         }

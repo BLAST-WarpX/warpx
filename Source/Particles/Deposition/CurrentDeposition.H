@@ -648,22 +648,25 @@ void doDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPosition,
 /**
  * \brief J and mass matrix direct deposition for thread thread_num for the implicit scheme
  * \tparam depos_order deposition order
- * \param GetPosition  A functor for returning the particle position.
- * \param wp           Pointer to array of particle weights.
- * \param uxp_n,uyp_n,uzp_n  Pointer to arrays of particle momentum at time n.
- * \param uxp,uyp,uzp  Pointer to arrays of particle momentum at time n+1/2.
+ * \param GetPosition              A functor for returning the particle position.
+ * \param wp                       Pointer to array of particle weights.
+ * \param uxp_n,uyp_n,uzp_n        Pointer to arrays of particle momentum at time n.
+ * \param uxp,uyp,uzp              Pointer to arrays of particle momentum at time n+1/2.
  * \param ion_lev      Pointer to array of particle ionization level. This is
                          required to have the charge of each macroparticle
                          since q is a scalar. For non-ionizable species,
                          ion_lev is a null pointer.
- * \param jx_fab,jy_fab,jz_fab FArrayBox of current density, either full array or tile.
- * \param np_to_deposit Number of particles for which current is deposited.
- * \param dt            Time step for particle.
- * \param dinv          3D cell size inverse.
- * \param xyzmin        Physical lower bounds of domain.
- * \param lo            Index lower bounds of domain.
- * \param qs            Species charge.
- * \param ms            Species mass.
+ * \param jx_fab,jy_fab,jz_fab     FArrayBox of current density, either full array or tile.
+ * \param Sx_arr,Sy_arr,Sz_arr     Array4 of the mass matrices, either full array or tile.
+ * \param Bx_arr,By_arr,Bz_arr     Array4 of the magnetic field, either full array or tile.
+ * \param Bx_type,By_type,Bz_type  IndexType of the magnetic field
+ * \param np_to_deposit            Number of particles for which current is deposited.
+ * \param dt                       Time step for particle.
+ * \param dinv                     3D cell size inverse.
+ * \param xyzmin                   Physical lower bounds of domain.
+ * \param lo                       Index lower bounds of domain.
+ * \param qs                       Species charge.
+ * \param ms                       Species mass.
  */
 template <int depos_order>
 void doJandSigmaDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPosition,
@@ -683,6 +686,9 @@ void doJandSigmaDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPos
                                 const amrex::Array4<amrex::Real const>& Bx_arr,
                                 const amrex::Array4<amrex::Real const>& By_arr,
                                 const amrex::Array4<amrex::Real const>& Bz_arr,
+                                const amrex::IndexType Bx_type,
+                                const amrex::IndexType By_type,
+                                const amrex::IndexType Bz_type,
                                 const long np_to_deposit,
                                 const amrex::Real dt,
                                 const amrex::XDim3 & dinv,
@@ -713,10 +719,15 @@ void doJandSigmaDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPos
             amrex::ParticleReal Bxp = 0.0;
             amrex::ParticleReal Byp = 0.0;
             amrex::ParticleReal Bzp = 0.0;
-            doGatherBShapeN<1>( xp_nph, yp_nph, zp_nph,
-                                Bxp, Byp, Bzp,
-                                Bx_arr, By_arr, Bz_arr,
-                                dinv, xyzmin, lo );
+            const int depos_order_perp = 1;
+            const int depos_order_para = 1;
+            const int n_rz_azimuthal_modes = 0;
+            doDirectGatherVectorField<depos_order_perp,depos_order_para>(
+                                    xp_nph, yp_nph, zp_nph,
+                                    Bxp, Byp, Bzp,
+                                    Bx_arr, By_arr, Bz_arr,
+                                    Bx_type, By_type, Bz_type,
+                                    dinv, xyzmin, lo, n_rz_azimuthal_modes );
 
             constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
 
@@ -2938,18 +2949,22 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
  *        for thread thread_num for implicit scheme.
  *
  * \param depos_order  deposition order
- * \param xp_n,yp_n,zp_n  Pointer to arrays of particle position at time level n.
- * \param GetPosition  A functor for returning the particle position.
- * \param wp           Pointer to array of particle weights.
- * \param uxp_n,uyp_n,uzp_n  Pointer to arrays of particle momentum at time level n.
+ * \param xp_n,yp_n,zp_n           Pointer to arrays of particle position at time level n.
+ * \param GetPosition              A functor for returning the particle position.
+ * \param wp                       Pointer to array of particle weights.
+ * \param uxp_n,uyp_n,uzp_n        Pointer to arrays of particle momentum at time level n.
  * \param uxp_nph,uyp_nph,uzp_nph  Pointer to arrays of particle momentum at time level n + 1/2.
- * \param Jx_arr,Jy_arr,Jz_arr  Array4 of current density, either full array or tile.
- * \param np_to_deposit         Number of particles for which current is deposited.
- * \param dt                    Time step for particle level
- * \param dinv                  3D cell size inverse
- * \param xyzmin                Physical lower bounds of domain.
- * \param lo                    Index lower bounds of domain.
- * \param q                     species charge.
+ * \param Jx_arr,Jy_arr,Jz_arr     Array4 of the current density, either full array or tile.
+ * \param Sx_arr,Sy_arr,Sz_arr     Array4 of the mass matrices, either full array or tile.
+ * \param Bx_arr,By_arr,Bz_arr     Array4 of the magnetic field, either full array or tile.
+ * \param Bx_type,By_type,Bz_type  IndexType of the magnetic field
+ * \param np_to_deposit            Number of particles for which current is deposited.
+ * \param dt                       Time step for particle level
+ * \param dinv                     3D cell size inverse
+ * \param xyzmin                   Physical lower bounds of domain.
+ * \param lo                       Index lower bounds of domain.
+ * \param qs                       Species charge.
+ * \param ms                       Species mass.
  */
 template <int depos_order>
 void doJandSigmaVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::ParticleReal * const xp_n,
@@ -2972,6 +2987,9 @@ void doJandSigmaVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex:
                                            const amrex::Array4<amrex::Real const>& Bx_arr,
                                            const amrex::Array4<amrex::Real const>& By_arr,
                                            const amrex::Array4<amrex::Real const>& Bz_arr,
+                                           const amrex::IndexType Bx_type,
+                                           const amrex::IndexType By_type,
+                                           const amrex::IndexType Bz_type,
                                            const long np_to_deposit,
                                            const amrex::Real dt,
                                            const amrex::XDim3 & dinv,
@@ -2995,10 +3013,15 @@ void doJandSigmaVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex:
             amrex::ParticleReal Bxp = 0.0;
             amrex::ParticleReal Byp = 0.0;
             amrex::ParticleReal Bzp = 0.0;
-            doGatherBShapeN<1>( xp_nph, yp_nph, zp_nph,
-                                Bxp, Byp, Bzp,
-                                Bx_arr, By_arr, Bz_arr,
-                                dinv, xyzmin, lo );
+            const int depos_order_perp = 1;
+            const int depos_order_para = 1;
+            const int n_rz_azimuthal_modes = 0;
+            doDirectGatherVectorField<depos_order_perp,depos_order_para>(
+                                    xp_nph, yp_nph, zp_nph,
+                                    Bxp, Byp, Bzp,
+                                    Bx_arr, By_arr, Bz_arr,
+                                    Bx_type, By_type, Bz_type,
+                                    dinv, xyzmin, lo, n_rz_azimuthal_modes );
 
             constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
 
