@@ -90,8 +90,6 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
             amrex::MultiFab & vbarmf = *this->vbar[lev][Direction{idir}];
             amrex::MultiFab & variancemf = *var_vf[lev][Direction{idir}];
 
-            amrex::IndexType var_type = variancemf.ixType();
-
             // Create Temporary MFs for ghost cell buffers
             amrex::MultiFab wmf_old{
                 wmf.boxArray(),
@@ -121,10 +119,22 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
                 variancemf.nGrowVect()
             };
 
-            // Sum the overlapping cells together
+            // Do a local copy of the weights to vbarmf_old
+            amrex::MultiFab::Copy(vbarmf_old, wmf, 0, 0, 1, vbarmf_old.nGrowVect());
+
+            amrex::Gpu::streamSynchronize();
+
+            amrex::MultiFab::Multiply(vbarmf_old, vbarmf, 0, 0, 1, vbarmf_old.nGrowVect());
+
+            amrex::Gpu::streamSynchronize();
+
+            // Combine guard cells so that the summation is over accumulated quantities
+            // vbarmf_old really holds the vsum
+            WarpXSumGuardCells(vbarmf_old, periodicity, vbarmf_old.nGrowVect(), 0, 1);
+
+            // Sum the overlapping cells together and place in temporary MFs
             WarpXSumGuardCells(wmf_old, wmf, periodicity, wmf.nGrowVect(), 0, 1);
             WarpXSumGuardCells(w2mf_old, w2mf, periodicity, w2mf.nGrowVect(), 0, 1);
-            WarpXSumGuardCells(vbarmf_old, vbarmf, periodicity, vbarmf.nGrowVect(), 0, 1);
             WarpXSumGuardCells(variancemf_old, variancemf, periodicity, variancemf.nGrowVect(), 0, 1);
 
             amrex::Gpu::streamSynchronize();
@@ -164,38 +174,37 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
                 amrex::ParallelFor(tb,
                     [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                         // Only update if this box is the owner
-                        if (mma(i,j,k)) {
-                            // Check if we are in a cell that requires combining variances
-                            if (w_old_arr(i,j,k) > 0.0_rt || w_arr(i,j,k) > 0.0_rt) {
-                                // Update weights and un-normalized variance
-                                amrex::Real w_a = w_old_arr(i,j,k);
-                                amrex::Real w_b = w_arr(i,j,k);
-                                amrex::Real v_a = vbar_old_arr(i,j,k);
-                                amrex::Real v_b = vbar_arr(i,j,k);
-                                amrex::Real delta = v_b - v_a;
+                        // Check if we are in a cell that requires combining variances
+                        if (mma(i,j,k) && w_old_arr(i,j,k) > 0.0_rt) {
+                            // Update weights and un-normalized variance
+                            amrex::Real w_a = w_old_arr(i,j,k);
+                            amrex::Real w_b = w_arr(i,j,k);
+                            amrex::Real vsum_a = vbar_old_arr(i,j,k);
+                            amrex::Real v_a = vsum_a/w_a;
+                            amrex::Real v_b = vbar_arr(i,j,k);
+                            amrex::Real delta = v_b - v_a;
 
-                                // Update accumulation arrays
-                                w_arr(i,j,k) += w_a;
-                                w2_arr(i,j,k) += w2_old_arr(i,j,k);
+                            // Update accumulation arrays
+                            w_arr(i,j,k) += w_a;
+                            w2_arr(i,j,k) += w2_old_arr(i,j,k);
 
-                                // Update Mean and Variance
-                                vbar_arr(i,j,k) = (w_a*v_a + w_b*v_b)/w_arr(i,j,k);
-                                variance_arr(i,j,k) +=  variance_old_arr(i,j,k) + delta*delta*w_a*w_b/w_arr(i,j,k);
-                            }
+                            // Update Mean and Variance
+                            vbar_arr(i,j,k) = (vsum_a + w_b*v_b)/w_arr(i,j,k);
+                            variance_arr(i,j,k) +=  variance_old_arr(i,j,k); // + delta*delta*w_a*w_b/w_arr(i,j,k);
+                        }
 
-                            // Apply Normalization in any owned cell
-                            if (w_arr(i,j,k) > 0.0_rt) {
-                                amrex::Real denom = (w_arr(i,j,k) - w2_arr(i,j,k)/w_arr(i,j,k) );
-                                if (denom > std::numeric_limits<amrex::Real>::epsilon()) {
-                                    variance_arr(i,j,k) /= (w_arr(i,j,k) - w2_arr(i,j,k)/w_arr(i,j,k) );
-                                } else {
-                                    // This occurs when only a single sample is within a bin
-                                    // In this case shoudl be zero variance
-                                    variance_arr(i,j,k) = 0._rt;
-                                }
+                        // Apply Normalization in any owned cell
+                        if (w_arr(i,j,k) > 0.0_rt) {
+                            amrex::Real denom = (w_arr(i,j,k) - w2_arr(i,j,k)/w_arr(i,j,k) );
+                            if (denom > 10._rt * std::numeric_limits<amrex::Real>::epsilon()) {
+                                variance_arr(i,j,k) /= (w_arr(i,j,k) - w2_arr(i,j,k)/w_arr(i,j,k) );
+                            } else {
+                                // This occurs when only a single sample is within a bin
+                                // In this case shoudl be zero variance
+                                variance_arr(i,j,k) = 0._rt;
                             }
                         }
-                });
+                    });
             }
             amrex::Gpu::streamSynchronize();
         }

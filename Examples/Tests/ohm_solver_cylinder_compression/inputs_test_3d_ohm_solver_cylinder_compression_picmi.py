@@ -57,7 +57,7 @@ class PlasmaCylinderCompression(object):
     NZ = 128
 
     # Starting number of particles per cell
-    NPPC = 50
+    NPPC = 10
 
     # Number of substeps used to update B
     substeps = 20
@@ -151,7 +151,7 @@ class PlasmaCylinderCompression(object):
 
         # run very low resolution as a CI test
         if self.test:
-            self.total_steps = 20
+            self.total_steps = 100
             self.diag_steps = self.total_steps // 5
             self.NX = 64
             self.NY = 64
@@ -247,7 +247,7 @@ class PlasmaCylinderCompression(object):
             upper_boundary_conditions=["dirichlet", "dirichlet", "periodic"],
             lower_boundary_conditions_particles=["absorbing", "absorbing", "periodic"],
             upper_boundary_conditions_particles=["absorbing", "absorbing", "periodic"],
-            warpx_max_grid_size=self.NZ,
+            warpx_max_grid_size=16,
         )
         simulation.time_step_size = self.dt
         simulation.max_steps = self.total_steps
@@ -397,4 +397,12 @@ args, left = parser.parse_known_args()
 sys.argv = sys.argv[:1] + left
 
 run = PlasmaCylinderCompression(test=args.test, verbose=args.verbose)
-simulation.step()
+simulation.step(1)
+
+
+# Dump out temp arrays to np file
+Tx = fields.CustomNamedxWrapper("T_ions")
+Ty = fields.CustomNamedyWrapper("T_ions")
+Tz = fields.CustomNamedzWrapper("T_ions")
+
+np.savez("TemperatureArrays.npz", Tx=Tx[:], Ty=Ty[:], Tz=Tz[:])
