@@ -166,6 +166,10 @@ option(WarpX_PYTHON_IPO
     ${_WarpX_PYTHON_IPO_DEFAULT}
 )
 
+# Unity builds combine all .cpp files into a single one (a single translation
+# unit, TU).
+option(WarpX_UNITY_BUILD          "WarpX library as unity build" OFF)
+
 set(pyWarpX_VERSION_INFO "" CACHE STRING
     "PEP-440 conformant version (set by setup.py)")
 
@@ -277,6 +281,17 @@ foreach(D IN LISTS WarpX_DIMS)
             POSITION_INDEPENDENT_CODE ON
             WINDOWS_EXPORT_ALL_SYMBOLS ON
         )
+
+        # Optional: build only a single TU
+        if(WarpX_UNITY_BUILD)
+            set_target_properties(lib_${SD} PROPERTIES
+                UNITY_BUILD ON
+                UNITY_BUILD_MODE BATCH
+                UNITY_BUILD_UNIQUE_ID "WARPX_UNITY_ID"
+                # Number must be more than the number of .cpp files in WarpX
+                UNITY_BUILD_BATCH_SIZE 10000
+            )
+        endif()
     endif()
 
     # executable application

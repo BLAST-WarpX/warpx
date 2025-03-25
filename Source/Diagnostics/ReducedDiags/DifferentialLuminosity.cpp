@@ -54,17 +54,12 @@
 #include <memory>
 #include <vector>
 
-using ParticleType = WarpXParticleContainer::ParticleType;
-using ParticleTileType = WarpXParticleContainer::ParticleTileType;
-using ParticleTileDataType = ParticleTileType::ParticleTileDataType;
-using ParticleBins = amrex::DenseBins<ParticleTileDataType>;
-using index_type = ParticleBins::index_type;
-
-using namespace amrex;
 
 DifferentialLuminosity::DifferentialLuminosity (const std::string& rd_name)
 : ReducedDiags{rd_name}
 {
+    using namespace amrex::literals;
+
     // read colliding species names - must be 2
     const amrex::ParmParse pp_rd_name(m_rd_name);
     pp_rd_name.getarr("species", m_beam_name);
@@ -112,7 +107,7 @@ DifferentialLuminosity::DifferentialLuminosity (const std::string& rd_name)
             {
                 ofs << m_sep;
                 ofs << "[" << off++ << "]";
-                const Real b = m_bin_min + m_bin_size*(Real(i)+0.5_rt);
+                const amrex::Real b = m_bin_min + m_bin_size*(amrex::Real(i)+0.5_rt);
                 ofs << "bin" << 1+i << "=" << b << "(eV)";
             }
             ofs << "\n";
@@ -128,6 +123,12 @@ void DifferentialLuminosity::ComputeDiags (int step)
     amrex::ignore_unused(step);
 #else
     WARPX_PROFILE("DifferentialLuminosity::ComputeDiags");
+
+    using namespace amrex;
+    using ParticleTileType = WarpXParticleContainer::ParticleTileType;
+    using ParticleTileDataType = ParticleTileType::ParticleTileDataType;
+    using ParticleBins = amrex::DenseBins<ParticleTileDataType>;
+    using index_type = ParticleBins::index_type;
 
     // Since this diagnostic *accumulates* the luminosity in the
     // array d_data, we add contributions at *each timestep*, but

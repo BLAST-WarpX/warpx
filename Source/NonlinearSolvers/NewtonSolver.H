@@ -180,6 +180,7 @@ template <class Vec, class Ops>
 void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
                                      Ops*        a_ops )
 {
+    BL_PROFILE("NewtonSolver::Define()");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !this->m_is_defined,
         "Newton nonlinear solver object is already defined!");
@@ -389,7 +390,7 @@ void NewtonSolver<Vec,Ops>::EvalResidual ( Vec&         a_F,
                                            amrex::Real  a_time,
                                            int          a_iter ) const
 {
-
+    BL_PROFILE("NewtonSolver::EvalResidual()");
     m_ops->ComputeRHS( m_R, a_U, a_time, a_iter, false );
 
     // set base U and R(U) for matrix-free Jacobian action calculation

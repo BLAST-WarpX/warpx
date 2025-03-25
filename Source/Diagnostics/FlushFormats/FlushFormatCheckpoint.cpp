@@ -22,12 +22,19 @@
 #include <AMReX_Utility.H>
 #include <AMReX_VisMF.H>
 
+#ifndef WARPX_UNITY_ID
+#define WARPX_UNITY_ID
+#endif
+
 using namespace amrex;
 using warpx::fields::FieldType;
 
 namespace
 {
+namespace WARPX_UNITY_ID
+{
     const std::string default_level_prefix {"Level_"};
+}
 }
 
 void
@@ -48,6 +55,7 @@ FlushFormatCheckpoint::WriteToFile (
         bool /*isLastBTDFlush*/) const
 {
     using ablastr::fields::Direction;
+    using WARPX_UNITY_ID::default_level_prefix;
 
     WARPX_PROFILE("FlushFormatCheckpoint::WriteToFile()");
 

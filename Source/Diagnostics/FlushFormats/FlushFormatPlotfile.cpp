@@ -49,12 +49,19 @@
 #include <utility>
 #include <vector>
 
+#ifndef WARPX_UNITY_ID
+#define WARPX_UNITY_ID
+#endif
+
 using namespace amrex;
 using warpx::fields::FieldType;
 
 namespace
 {
+namespace WARPX_UNITY_ID
+{
     const std::string default_level_prefix {"Level_"};
+}
 }
 
 void
@@ -570,6 +577,7 @@ FlushFormatPlotfile::WriteAllRawFields(
     const bool plot_raw_fields_guards) const
 {
     using ablastr::fields::Direction;
+    using WARPX_UNITY_ID::default_level_prefix;
 
     if (!plot_raw_fields) { return; }
     auto & warpx = WarpX::GetInstance();

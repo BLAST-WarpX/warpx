@@ -60,17 +60,10 @@
 #include <memory>
 #include <vector>
 
-using ParticleType = WarpXParticleContainer::ParticleType;
-using ParticleTileType = WarpXParticleContainer::ParticleTileType;
-using ParticleTileDataType = ParticleTileType::ParticleTileDataType;
-using ParticleBins = amrex::DenseBins<ParticleTileDataType>;
-using index_type = ParticleBins::index_type;
-
 #ifdef WARPX_USE_OPENPMD
 namespace io = openPMD;
 #endif
 
-using namespace amrex;
 
 DifferentialLuminosity2D::DifferentialLuminosity2D (const std::string& rd_name)
 : ReducedDiags{rd_name}
@@ -80,6 +73,7 @@ DifferentialLuminosity2D::DifferentialLuminosity2D (const std::string& rd_name)
     WARPX_ABORT_WITH_MESSAGE(
         "DifferentialLuminosity2D diagnostics does not work in RZ geometry.");
 #endif
+    using namespace amrex::literals;
 
     // read colliding species names - must be 2
     amrex::ParmParse pp_rd_name(m_rd_name);
@@ -120,9 +114,9 @@ DifferentialLuminosity2D::DifferentialLuminosity2D (const std::string& rd_name)
     m_bin_size_2 = (bin_max_2 - bin_min_2) / bin_num_2;
 
     // resize data array on the host
-    Array<int,2> tlo{0,0}; // lower bounds
-    Array<int,2> thi{m_bin_num_1-1, m_bin_num_2-1}; // inclusive upper bounds
-    m_h_data_2D.resize(tlo, thi, The_Pinned_Arena());
+    amrex::Array<int,2> tlo{0,0}; // lower bounds
+    amrex::Array<int,2> thi{m_bin_num_1-1, m_bin_num_2-1}; // inclusive upper bounds
+    m_h_data_2D.resize(tlo, thi, amrex::The_Pinned_Arena());
 
     auto const& h_table_data = m_h_data_2D.table();
     // initialize data on the host
@@ -136,7 +130,7 @@ DifferentialLuminosity2D::DifferentialLuminosity2D (const std::string& rd_name)
     m_d_data_2D.resize(tlo, thi);
     // copy data from host to device
     m_d_data_2D.copy(m_h_data_2D);
-    Gpu::streamSynchronize();
+    amrex::Gpu::streamSynchronize();
 } // end constructor
 
 void DifferentialLuminosity2D::ComputeDiags (int step)
@@ -144,8 +138,13 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
 #if defined(WARPX_DIM_RZ)
     amrex::ignore_unused(step);
 #else
-
     WARPX_PROFILE("DifferentialLuminosity2D::ComputeDiags");
+
+    using namespace amrex;
+    using ParticleTileType = WarpXParticleContainer::ParticleTileType;
+    using ParticleTileDataType = ParticleTileType::ParticleTileDataType;
+    using ParticleBins = amrex::DenseBins<ParticleTileDataType>;
+    using index_type = ParticleBins::index_type;
 
     // Since this diagnostic *accumulates* the luminosity in the
     // table m_d_data_2D, we add contributions at *each timestep*, but
@@ -336,7 +335,7 @@ void DifferentialLuminosity2D::WriteToFile (int step) const
 
 #ifdef WARPX_USE_OPENPMD
     // only IO processor writes
-    if ( !ParallelDescriptor::IOProcessor() ) { return; }
+    if ( !amrex::ParallelDescriptor::IOProcessor() ) { return; }
 
     // TODO: support different filename templates
     std::string filename = "openpmd";
