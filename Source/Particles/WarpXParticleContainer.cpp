@@ -12,6 +12,7 @@
 #include "ablastr/particles/DepositCharge.H"
 #include "Deposition/ChargeDeposition.H"
 #include "Deposition/CurrentDeposition.H"
+#include "Deposition/MassMatricesDeposition.H"
 #include "Deposition/SharedDepositionUtils.H"
 #include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
@@ -1083,7 +1084,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
         auto& zp_n = pti.GetAttribs("z_n");
         const ParticleReal* zp_n_data = zp_n.dataPtr() + offset;
         if (WarpX::nox == 1){
-            doJandSigmaVillasenorDepositionShapeNImplicit<1>(
+            doVillasenorJandSigmaDeposition<1>(
                 xp_n_data, yp_n_data, zp_n_data,
                 GetPosition, wp.dataPtr() + offset,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
@@ -1092,7 +1093,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                 np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
         } else if (WarpX::nox == 2){
-            doJandSigmaVillasenorDepositionShapeNImplicit<2>(
+            doVillasenorJandSigmaDeposition<2>(
                 xp_n_data, yp_n_data, zp_n_data,
                 GetPosition, wp.dataPtr() + offset,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
@@ -1105,7 +1106,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
         }
     } else { // Direct deposition
         if        (WarpX::nox == 1){
-            doJandSigmaDepositionShapeNImplicit<1>(
+            doDirectJandSigmaDeposition<1>(
                 GetPosition, wp.dataPtr() + offset,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
@@ -1113,7 +1114,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                 np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
         } else if (WarpX::nox == 2){
-            doJandSigmaDepositionShapeNImplicit<2>(
+            doDirectJandSigmaDeposition<2>(
                 GetPosition, wp.dataPtr() + offset,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
