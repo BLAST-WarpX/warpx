@@ -1035,14 +1035,15 @@ MultiParticleContainer::doCollisions ( Real cur_time, amrex::Real dt )
     collisionhandler->doCollisions(cur_time, dt, this);
 }
 
-void MultiParticleContainer::doResampling (const int timestep, const bool verbose)
+void MultiParticleContainer::doResampling (
+    const amrex::Vector<amrex::Geometry>& geom, const int timestep, const bool verbose)
 {
     for (auto& pc : allcontainers)
     {
         // do_resampling can only be true for PhysicalParticleContainers
         if (!pc->do_resampling){ continue; }
 
-        pc->resample(timestep, verbose);
+        pc->resample(geom, timestep, verbose);
     }
 }
 
