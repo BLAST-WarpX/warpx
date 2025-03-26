@@ -332,26 +332,27 @@ public:
 
     std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);
 
-    virtual void DepositCurrentAndMassMatrices (WarpXParIter& pti,
-                                RealVector const & wp,
-                                RealVector const & uxp,
-                                RealVector const & uyp,
-                                RealVector const & uzp,
-                                amrex::MultiFab* jx,
-                                amrex::MultiFab* jy,
-                                amrex::MultiFab* jz,
-                                amrex::MultiFab* Sx,
-                                amrex::MultiFab* Sy,
-                                amrex::MultiFab* Sz,
-                                amrex::FArrayBox const * bxfab,
-                                amrex::FArrayBox const * byfab,
-                                amrex::FArrayBox const * bzfab,
-                                long offset,
-                                long np_to_deposit,
-                                int thread_num,
-                                int lev,
-                                int depos_lev,
-                                amrex::Real dt);
+    virtual
+    void DepositCurrentAndMassMatrices ( WarpXParIter& pti,
+                                   const RealVector& wp,
+                                   const RealVector& uxp,
+                                   const RealVector& uyp,
+                                   const RealVector& uzp,
+                                         amrex::MultiFab* jx,
+                                         amrex::MultiFab* jy,
+                                         amrex::MultiFab* jz,
+                                         amrex::MultiFab* Sx,
+                                         amrex::MultiFab* Sy,
+                                         amrex::MultiFab* Sz,
+                                   const amrex::FArrayBox* bxfab,
+                                   const amrex::FArrayBox* byfab,
+                                   const amrex::FArrayBox* bzfab,
+                                         long offset,
+                                         long np_to_deposit,
+                                         int thread_num,
+                                         int lev,
+                                         int depos_lev,
+                                         amrex::Real dt );
 
     // If particles start outside of the domain, ContinuousInjection
     // makes sure that they are initialized when they enter the domain, and

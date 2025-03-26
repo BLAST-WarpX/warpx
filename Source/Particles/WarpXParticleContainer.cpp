@@ -874,34 +874,28 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
 }
 
 /* \brief Current + mass matrices deposition for thread thread_num
- * \param pti         Particle iterator
- * \param wp          Array of particle weights
- * \param uxp uyp uzp Array of particle momenta
- * \param jx jy jz    Full array of current density
- * \param Sx Sy Sz    Full array of mass matrices
- * \param Bx By Bz    Full array of magnetic field
- * \param offset      Index of first particle for which current is deposited
+ * \param pti           Particle iterator
+ * \param wp            Array of particle weights
+ * \param uxp uyp uzp   Array of particle momenta
+ * \param jx jy jz      Full array of current density
+ * \param Sx Sy Sz      Full array of mass matrices
+ * \param Bx By Bz      Full array of magnetic field
+ * \param offset        Index of first particle for which current is deposited
  * \param np_to_deposit Number of particles for which current is deposited.
                         Particles [offset,offset+np_to_deposit] deposit current
- * \param thread_num  Thread number (if tiling)
- * \param lev         Level of box that contains particles
- * \param depos_lev   Level on which particles deposit (if buffers are used)
- * \param dt          Time step for particle level
- * \param relative_time  Time at which to deposit J, relative to the time of the
- *                       current positions of the particles. When different than 0,
- *                       the particle position will be temporarily modified to match
- *                       the time of the deposition.
+ * \param thread_num    Thread number (if tiling)
+ * \param lev           Level of box that contains particles
+ * \param depos_lev     Level on which particles deposit (if buffers are used)
+ * \param dt            Time step for particle level
  */
 void
-WarpXParticleContainer::DepositCurrentAndMassMatrices (WarpXParIter& pti,
-                                        RealVector const & wp, RealVector const & uxp,
-                                        RealVector const & uyp, RealVector const & uzp,
-                                        amrex::MultiFab * const jx, amrex::MultiFab * const jy, amrex::MultiFab * const jz,
-                                        amrex::MultiFab * const Sx, amrex::MultiFab * const Sy, amrex::MultiFab * const Sz,
-                                        const amrex::FArrayBox * Bx, const amrex::FArrayBox * By, const amrex::FArrayBox * Bz,
-                                        long const offset, long const np_to_deposit,
-                                        int const thread_num, const int lev, int const depos_lev,
-                                        amrex::Real const dt)
+WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const RealVector& wp,
+                                        const RealVector& uxp, const RealVector& uyp, const RealVector& uzp,
+                                        amrex::MultiFab* jx, amrex::MultiFab* jy, amrex::MultiFab* jz,
+                                        amrex::MultiFab* Sx, amrex::MultiFab* Sy, amrex::MultiFab* Sz,
+                                        const amrex::FArrayBox* Bx, const amrex::FArrayBox* By, const amrex::FArrayBox* Bz,
+                                        long offset, long np_to_deposit, int thread_num, int lev, int depos_lev,
+                                        amrex::Real dt )
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE((depos_lev==(lev-1)) ||
                                      (depos_lev==(lev  )),
