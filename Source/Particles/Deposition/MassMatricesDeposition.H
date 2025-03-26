@@ -29,19 +29,15 @@
 /**
  * \brief Kernel for the direct deposition of J and S (mass matrices) for thread thread_num
  * \tparam depos_order deposition order
- * \param xp, yp, zp    The particle positions.
- * \param wq            The charge of the macroparticle
- * \param vx,vy,vz      The particle velocities
- * \param jx_arr,jy_arr,jz_arr Array4 of current density, either full array or tile.
- * \param jx_type,jy_type,jz_type The grid types along each direction, either NODE or CELL
- * \param relative_time Time at which to deposit J, relative to the time of the
- *                      current positions of the particles. When different than 0,
- *                      the particle position will be temporarily modified to match
- *                      the time of the deposition.
- * \param dinv          3D cell size inverse
- * \param xyzmin        The lower bounds of the domain
- * \param invvol        The inverse volume of a grid cell
- * \param lo            Index lower bounds of domain.
+ * \param xp, yp, zp               The particle positions.
+ * \param wqx,wqy,wqz              The particle velocity multiplied by the charge / volume
+ * \param fpxx,fpyy,fpzz           The diagonal mass matrix kernals
+ * \param jx_arr,jy_arr,jz_arr     Array4 of current density, either full array or tile.
+ * \param Sx_arr,Sy_arr,Sz_arr     Array4 of diagonal mass matrices.
+ * \param jx_type,jy_type,jz_type  The j (and S) grid types along each direction, either NODE or CELL
+ * \param dinv                     3D cell size inverse
+ * \param xyzmin                   The lower bounds of the domain
+ * \param lo                       Index lower bounds of domain.
  */
 template <int depos_order>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
