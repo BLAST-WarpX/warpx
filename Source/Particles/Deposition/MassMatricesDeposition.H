@@ -33,7 +33,7 @@
  * \param wqx,wqy,wqz              The particle velocity multiplied by the charge / volume
  * \param fpxx,fpyy,fpzz           The diagonal mass matrix kernals
  * \param jx_arr,jy_arr,jz_arr     Array4 of current density, either full array or tile.
- * \param Sx_arr,Sy_arr,Sz_arr     Array4 of diagonal mass matrices.
+ * \param Sx_arr,Sy_arr,Sz_arr     Array4 of mass matrices, either full array or tile.
  * \param jx_type,jy_type,jz_type  The j (and S) grid types along each direction, either NODE or CELL
  * \param dinv                     3D cell size inverse
  * \param xyzmin                   The lower bounds of the domain
@@ -377,19 +377,18 @@ void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
 /**
  * \brief Kernel for the Villasenor deposition of J and S (mass matrices) for thread thread_num
  * \param depos_order  deposition order
- * \param xp_old,yp_old,zp_old  Old particle positions (nominally at start of step)
- * \param xp_new,yp_new,zp_new  New particle positions (nominally at end of step)
- * \param wp           Pointer to array of particle weights.
+ * \param xp_old,yp_old,zp_old     Old particle positions (nominally at start of step)
+ * \param xp_new,yp_new,zp_new     New particle positions (nominally at end of step)
+ * \param wp_invvol                Particle charge / volume
  * \param uxp_mid,uyp_mid,uzp_mid  Particle momentum at middle of step
- * \param gaminv       One over gamma for particle at middle of step
- * \param Jx_arr,Jy_arr,Jz_arr  Array4 of current density, either full array or tile
- * \param dt                    Time step for particle level
- * \param dinv                  3D cell size inverse
- * \param xyzmin                Physical lower bounds of domain
- * \param lo                    Index lower bounds of domain
- * \param invvol                One over cell volume
- * \param q                     Species charge
- * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry
+ * \param gaminv                   One over gamma for particle at middle of step
+ * \param fpxx,fpyy,fpzz           The diagonal mass matrix kernals
+ * \param Jx_arr,Jy_arr,Jz_arr     Array4 of current density, either full array or tile
+ * \param Sx_arr,Sy_arr,Sz_arr     Array4 of mass matrices, either full array or tile
+ * \param dt                       Time step for particle level
+ * \param dinv                     3D cell size inverse
+ * \param xyzmin                   Physical lower bounds of domain
+ * \param lo                       Index lower bounds of domain
  */
 template <int depos_order>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
