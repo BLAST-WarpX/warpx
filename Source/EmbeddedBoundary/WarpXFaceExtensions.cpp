@@ -23,6 +23,8 @@ using warpx::fields::FieldType;
 
 namespace
 {
+
+#ifdef AMREX_USE_EB
     /**
     * \brief Auxiliary function to count the amount of faces which still need to be extended
     */
@@ -32,7 +34,7 @@ namespace
         [[maybe_unused]] const int max_level)
     {
         amrex::Array1D<int, 0, 2> sums{0, 0, 0};
-#ifdef AMREX_USE_EB
+
         if (EB::enabled()) {
 #ifndef WARPX_DIM_RZ
 
@@ -63,9 +65,10 @@ namespace
             amrex::ParallelDescriptor::ReduceIntSum(&(sums(0)), AMREX_SPACEDIM);
 #endif
         }
-#endif
         return sums;
     }
+
+#endif
 
 }
 
