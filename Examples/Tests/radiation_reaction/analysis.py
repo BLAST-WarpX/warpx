@@ -41,7 +41,7 @@ inputname = "inputs"
 # ________________________________________
 
 # Physical constants
-classical_electron_radius = physical_constants["classical electron radius"]
+classical_electron_radius = physical_constants["classical electron radius"][0]
 reference_length = 1.0e-6
 very_small_dot_product = 1.0e-4
 very_small_weight = 1.0e-8
