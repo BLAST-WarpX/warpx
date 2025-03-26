@@ -21,6 +21,54 @@
 using namespace ablastr::fields;
 using warpx::fields::FieldType;
 
+namespace
+{
+    /**
+    * \brief Auxiliary function to count the amount of faces which still need to be extended
+    */
+    amrex::Array1D<int, 0, 2>
+    CountExtFaces (
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>, 3 > >& flag_ext_face,
+        int max_level)
+    {
+        amrex::Array1D<int, 0, 2> sums{0, 0, 0};
+#ifdef AMREX_USE_EB
+        if (EB::enabled()) {
+#ifndef WARPX_DIM_RZ
+
+#ifdef WARPX_DIM_XZ
+            // In 2D we change the extrema of the for loop so that we only have the case idim=1
+            for(int idim = 1; idim < AMREX_SPACEDIM; ++idim) {
+#elif defined(WARPX_DIM_3D)
+            for(int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+#else
+                WARPX_ABORT_WITH_MESSAGE(
+                    "CountExtFaces: Only implemented in 2D3V and 3D3V");
+#endif
+                amrex::ReduceOps<amrex::ReduceOpSum> reduce_ops;
+                amrex::ReduceData<int> reduce_data(reduce_ops);
+                for (amrex::MFIter mfi(*flag_ext_face[max_level][idim]); mfi.isValid(); ++mfi) {
+                    amrex::Box const &box = mfi.validbox();
+                    auto const &r_flag_ext_face = flag_ext_face[max_level][idim]->array(mfi);
+                    reduce_ops.eval(box, reduce_data,
+                        [=] AMREX_GPU_DEVICE(int i, int j, int k) -> amrex::GpuTuple<int> {
+                            return r_flag_ext_face(i, j, k);
+                        });
+                }
+
+                auto r = reduce_data.value();
+                sums(idim) = amrex::get<0>(r);
+            }
+
+            amrex::ParallelDescriptor::ReduceIntSum(&(sums(0)), AMREX_SPACEDIM);
+#endif
+        }
+#endif
+        return sums;
+    }
+
+}
+
 /**
 * \brief Get the value of arr in the neighbor (i_n, j_n) on the plane with normal 'dim'.
 *
@@ -167,45 +215,6 @@ ComputeSStab(const int i, const int j, const int k,
     return -1;
 }
 
-
-amrex::Array1D<int, 0, 2>
-WarpX::CountExtFaces () {
-    amrex::Array1D<int, 0, 2> sums{0, 0, 0};
-#ifdef AMREX_USE_EB
-    if (EB::enabled()) {
-#ifndef WARPX_DIM_RZ
-
-#ifdef WARPX_DIM_XZ
-        // In 2D we change the extrema of the for loop so that we only have the case idim=1
-        for(int idim = 1; idim < AMREX_SPACEDIM; ++idim) {
-#elif defined(WARPX_DIM_3D)
-        for(int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-#else
-            WARPX_ABORT_WITH_MESSAGE(
-                "CountExtFaces: Only implemented in 2D3V and 3D3V");
-#endif
-            amrex::ReduceOps<amrex::ReduceOpSum> reduce_ops;
-            amrex::ReduceData<int> reduce_data(reduce_ops);
-            for (amrex::MFIter mfi(*m_flag_ext_face[maxLevel()][idim]); mfi.isValid(); ++mfi) {
-                amrex::Box const &box = mfi.validbox();
-                auto const &flag_ext_face = m_flag_ext_face[maxLevel()][idim]->array(mfi);
-                reduce_ops.eval(box, reduce_data,
-                    [=] AMREX_GPU_DEVICE(int i, int j, int k) -> amrex::GpuTuple<int> {
-                        return flag_ext_face(i, j, k);
-                    });
-            }
-
-            auto r = reduce_data.value();
-            sums(idim) = amrex::get<0>(r);
-        }
-
-        amrex::ParallelDescriptor::ReduceIntSum(&(sums(0)), AMREX_SPACEDIM);
-#endif
-    }
-#endif
-    return sums;
-}
-
 void
 WarpX::ComputeFaceExtensions ()
 {
@@ -213,7 +222,7 @@ WarpX::ComputeFaceExtensions ()
         throw std::runtime_error("ComputeFaceExtensions only works when EBs are enabled at runtime");
     }
 #ifdef AMREX_USE_EB
-    amrex::Array1D<int, 0, 2> N_ext_faces = CountExtFaces();
+    amrex::Array1D<int, 0, 2> N_ext_faces = ::CountExtFaces(m_flag_ext_face, maxLevel());
     ablastr::warn_manager::WMRecordWarning("Embedded Boundary",
             "Faces to be extended in x:\t" + std::to_string(N_ext_faces(0)) + "\n"
             +"Faces to be extended in y:\t" + std::to_string(N_ext_faces(1)) + "\n"
@@ -224,7 +233,7 @@ WarpX::ComputeFaceExtensions ()
     InitBorrowing();
     ComputeOneWayExtensions();
 
-    amrex::Array1D<int, 0, 2> N_ext_faces_after_one_way = CountExtFaces();
+    amrex::Array1D<int, 0, 2> N_ext_faces_after_one_way = ::CountExtFaces(m_flag_ext_face, maxLevel());
     ablastr::warn_manager::WMRecordWarning("Embedded Boundary",
             "Faces to be extended after one way extension in x:\t"
             + std::to_string(N_ext_faces_after_one_way(0)) + "\n"
@@ -238,7 +247,7 @@ WarpX::ComputeFaceExtensions ()
     ComputeEightWaysExtensions();
     ShrinkBorrowing();
 
-    amrex::Array1D<int, 0, 2> N_ext_faces_after_eight_ways = CountExtFaces();
+    amrex::Array1D<int, 0, 2> N_ext_faces_after_eight_ways = ::CountExtFaces(m_flag_ext_face, maxLevel());
     ablastr::warn_manager::WMRecordWarning("Embedded Boundary",
             "Faces to be extended after eight ways extension in x:\t"
             + std::to_string(N_ext_faces_after_eight_ways(0)) + "\n"
