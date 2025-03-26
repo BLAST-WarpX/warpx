@@ -28,8 +28,8 @@ namespace
     */
     amrex::Array1D<int, 0, 2>
     CountExtFaces (
-        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>, 3 > >& flag_ext_face,
-        int max_level)
+        [[maybe_unused]] amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>, 3 > >& flag_ext_face,
+        [[maybe_unused]] const int max_level)
     {
         amrex::Array1D<int, 0, 2> sums{0, 0, 0};
 #ifdef AMREX_USE_EB
