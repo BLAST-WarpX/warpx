@@ -24,6 +24,7 @@ cat check_diff.txt
 # Set paths to ignore (please test grep command below when adding new patterns)
 paths_ignore=()
 paths_ignore+=("Docs/")
+paths_ignore+=(".github/")
 echo "Paths to ignore:"
 echo ${paths_ignore[@]}
 
