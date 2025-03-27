@@ -46,4 +46,3 @@ private:
 };
 
 #endif // WARPX_DIAGNOSTICS_REDUCEDDIAGS_MEMORYDIAGS_H_
-
