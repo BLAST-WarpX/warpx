@@ -31,7 +31,7 @@ jobs:
       skip: ${{ env.SKIP_CHECKS }}
   analyze:
     name: Query code
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: skip_checks
     if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     permissions:

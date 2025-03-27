@@ -179,6 +179,7 @@ inline void interpolatePhiBetweenLevels (
  * \param[in] grids the grids per level (e.g., from AmrMesh)
  * \param[in] grid_type Integer that corresponds to the type of grid used in the simulation (collocated, staggered, hybrid)
  * \param[in] is_solver_igf_on_lev0 boolean to select the Poisson solver: 1 for FFT on level 0 & Multigrid on other levels, 0 for Multigrid on all levels
+ * \param[in] is_igf_2d boolean to select between fully 3D Poisson solver and quasi-3D, i.e. one 2D Poisson solve on every z slice (default: false)
  * \param[in] eb_enabled solve with embedded boundaries
  * \param[in] do_single_precision_comms perform communications in single precision
  * \param[in] rel_ref_ratio mesh refinement ratio between levels (default: 1)

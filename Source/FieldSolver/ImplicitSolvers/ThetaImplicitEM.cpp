@@ -6,6 +6,7 @@
  */
 #include "Fields.H"
 #include "ThetaImplicitEM.H"
+#include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "WarpX.H"
 
 using warpx::fields::FieldType;
@@ -13,6 +14,8 @@ using namespace amrex::literals;
 
 void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
 {
+    BL_PROFILE("ThetaImplicitEM::Define()");
+
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !m_is_defined,
         "ThetaImplicitEM object is already defined!");
@@ -48,6 +51,26 @@ void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
     // Parse nonlinear solver parameters
     parseNonlinearSolverParams( pp );
 
+    // Define sigmaPC mutlifabs
+    using ablastr::fields::Direction;
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        const auto& ba_Ex = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->boxArray();
+        const auto& ba_Ey = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{1}, lev)->boxArray();
+        const auto& ba_Ez = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{2}, lev)->boxArray();
+        const auto& dm = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->DistributionMap();
+        const amrex::IntVect ngb = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->nGrowVect();
+        m_WarpX->m_fields.alloc_init(FieldType::sigmaPC, Direction{0}, lev, ba_Ex, dm, 1, ngb, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::sigmaPC, Direction{1}, lev, ba_Ey, dm, 1, ngb, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::sigmaPC, Direction{2}, lev, ba_Ez, dm, 1, ngb, 0.0_rt);
+    }
+
+    // Set the pointer to mass matrix MultiFab
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        m_sigma_mfarrvec.push_back(m_WarpX->m_fields.get_alldirs(FieldType::sigmaPC, 0));
+        // setting m_sigma to 1.0 right now for testing
+        for (int dim = 0; dim < 3; dim++) { m_sigma_mfarrvec[lev][dim]->setVal(1.0); }
+    }
+
     // Define the nonlinear solver
     m_nlsolver->Define(m_E, this);
     m_is_defined = true;
@@ -56,6 +79,8 @@ void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
 
 void ThetaImplicitEM::PrintParameters () const
 {
+    BL_PROFILE("ThetaImplicitEM::PrintParameters()");
+
     if (!m_WarpX->Verbose()) { return; }
     amrex::Print() << "\n";
     amrex::Print() << "-----------------------------------------------------------\n";
@@ -78,6 +103,8 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  start_time,
                                 const amrex::Real  a_dt,
                                 const int          a_step )
 {
+    BL_PROFILE("ThetaImplicitEM::OneStep()");
+
     amrex::ignore_unused(a_step);
 
     // Fields have Eg^{n} and Bg^{n}
@@ -105,10 +132,11 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  start_time,
     // Solve nonlinear system for Eg at t_{n+theta}
     // Particles will be advanced to t_{n+1/2}
     m_E.Copy(m_Eold); // initial guess for Eg^{n+theta}
-    m_nlsolver->Solve( m_E, m_Eold, start_time, m_theta*m_dt );
+    m_nlsolver->Solve( m_E, m_Eold, start_time, m_dt, a_step );
 
     // Update WarpX owned Efield_fp and Bfield_fp to t_{n+theta}
     UpdateWarpXFields( m_E, start_time );
+    m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
     // Advance particles from time n+1/2 to time n+1
     m_WarpX->FinishImplicitParticleUpdate();
@@ -125,6 +153,8 @@ void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
                                    int              a_nl_iter,
                                    bool             a_from_jacobian )
 {
+    BL_PROFILE("ThetaImplicitEM::ComputeRHS()");
+
     // Update WarpX-owned Efield_fp and Bfield_fp using current state of
     // Eg from the nonlinear solver at time n+theta
     UpdateWarpXFields( a_E, start_time );
@@ -141,6 +171,7 @@ void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
 void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
                                           amrex::Real start_time )
 {
+    BL_PROFILE("ThetaImplicitEM::UpdateWarpXFields()");
 
     // Update Efield_fp owned by WarpX
     const amrex::Real theta_time = start_time + m_theta*m_dt;
@@ -154,6 +185,7 @@ void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
 
 void ThetaImplicitEM::FinishFieldUpdate ( amrex::Real end_time )
 {
+    BL_PROFILE("ThetaImplicitEM::FinishFieldUpdate()");
 
     // Eg^{n+1} = (1/theta)*Eg^{n+theta} + (1-1/theta)*Eg^n
     // Bg^{n+1} = (1/theta)*Bg^{n+theta} + (1-1/theta)*Bg^n

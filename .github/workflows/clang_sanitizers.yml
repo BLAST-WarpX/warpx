@@ -42,7 +42,7 @@ jobs:
       uses: actions/checkout@v4
     - name: Install dependencies
       run: |
-        .github/workflows/dependencies/clang17.sh
+        .github/workflows/dependencies/clang.sh 17
     - name: CCache Cache
       uses: actions/cache@v4
       with:
@@ -98,7 +98,7 @@ jobs:
       uses: actions/checkout@v4
     - name: Install dependencies
       run: |
-        .github/workflows/dependencies/clang17.sh
+        .github/workflows/dependencies/clang.sh 17
     - name: CCache Cache
       uses: actions/cache@v4
       with:
@@ -153,7 +153,7 @@ jobs:
         mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d warpx.serialize_initial_conditions = 0
         mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d warpx.serialize_initial_conditions = 0
         mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d warpx.serialize_initial_conditions = 0
-        git clone https://github.com/ECP-WarpX/warpx-data ../warpx-data
+        git clone https://github.com/BLAST-WarpX/warpx-data ../warpx-data
         cd Examples/Tests/embedded_circle
         ulimit -c unlimited
         mpirun -n 2 ../../../build_EB/bin/warpx.2d inputs_test_2d_embedded_circle warpx.serialize_initial_conditions = 0

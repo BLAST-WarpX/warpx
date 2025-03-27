@@ -57,12 +57,20 @@ public:
         a_particle_tol = m_particle_tolerance;
     }
 
+    void CreateParticleAttributes () const;
+
     /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
      */
     virtual void OneStep ( amrex::Real  a_time,
                            amrex::Real  a_dt,
                            int          a_step ) = 0;
+
+
+    /**
+     * \brief Return pointer to MultiFab array for mass matrix
+     */
+    [[nodiscard]] virtual const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetSigmaCoeff() const { return nullptr; }
 
     //
     // the following routines are called by the linear and nonlinear solvers
@@ -94,6 +102,8 @@ public:
     [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> GetLinOpBCLo () const;
     [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> GetLinOpBCHi () const;
 
+    [[nodiscard]] amrex::Real  GetTheta () const { return m_theta; }
+
 protected:
 
     /**
@@ -112,6 +122,11 @@ protected:
      * \brief Time step
      */
     mutable amrex::Real m_dt = 0.0;
+
+    /**
+     * \brief Time-biasing parameter for fields used on RHS to advance system.
+     */
+    amrex::Real m_theta = 0.5;
 
     /**
      * \brief Nonlinear solver type and object

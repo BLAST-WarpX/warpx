@@ -33,6 +33,7 @@ namespace PEC {
                         std::array<amrex::MultiFab*, 3> Efield,
                         const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_lo,
                         const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_hi,
+                        FieldBoundaryType bc_type,
                         const amrex::IntVect& ng_fieldgather, const amrex::Geometry& geom,
                         int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios,
                         bool split_pml_field = false);
@@ -54,8 +55,10 @@ namespace PEC {
                         std::array<amrex::MultiFab*, 3> Bfield,
                         const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_lo,
                         const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_hi,
+                        FieldBoundaryType bc_type,
                         const amrex::IntVect& ng_fieldgather, const amrex::Geometry& geom,
-                        int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios);
+                        int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios,
+                        bool split_pml_field = false);
 
     /**
      * \brief Reflects charge density deposited over the PEC boundary back into

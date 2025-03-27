@@ -16,14 +16,10 @@
 # tolerance: 1.0e-8
 # Possible running time: 2.756646401 s
 
-import os
 import sys
 
 import numpy as np
 import yt
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 tolerance = 1.0e-8
 x0 = 0.12238072
@@ -43,9 +39,3 @@ error = np.min(np.sqrt((x - x0) ** 2 + (y - y0) ** 2 + (z - z0) ** 2))
 print("error = ", error)
 print("tolerance = ", tolerance)
 assert error < tolerance
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

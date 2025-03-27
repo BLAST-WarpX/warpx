@@ -30,6 +30,7 @@
  * @param[in] q1,q2 charge of species 1/2
  * @param[in] m1,m2 mass of species 1/2
  * @param[in] dt is the time step length between two collision calls.
+ * @param[in] global_lamdb is the global Debye length and will be used if greater than zero
  * @param[in] L is the Coulomb log and will be used if greater than zero,
  *            otherwise will be computed.
  * @param[in] dV is the volume of the corresponding cell.
@@ -50,7 +51,7 @@ void ElasticCollisionPerez (
     T_PR const  T1, T_PR const  T2,
     T_PR const  q1, T_PR const  q2,
     T_PR const  m1, T_PR const  m2,
-    T_R const  dt, T_PR const  L, T_R const  dV,
+    T_R const  dt, T_R const global_lamdb, T_PR const  L, T_R const  dV,
     amrex::RandomEngine const& engine,
     bool const isSameSpecies, T_index coll_idx)
 {
@@ -72,8 +73,12 @@ void ElasticCollisionPerez (
     // compute Debye length lmdD (if not using a fixed L = Coulomb log)
     T_PR lmdD = T_PR(-1.0);
     if ( L <= T_PR(0.0) ) {
-        lmdD = T_PR(1.0)/std::sqrt( n1*q1*q1/(T1*PhysConst::ep0) +
-                                    n2*q2*q2/(T2*PhysConst::ep0) );
+        if (global_lamdb <= T_PR(0.0)) {
+            lmdD = T_PR(1.0)/std::sqrt( n1*q1*q1/(T1*PhysConst::ep0) +
+                                        n2*q2*q2/(T2*PhysConst::ep0) );
+        } else {
+            lmdD = global_lamdb;
+        }
     }
 
     // compute atomic spacing

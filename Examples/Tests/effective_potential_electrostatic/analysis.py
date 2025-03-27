@@ -7,9 +7,6 @@
 # --- with the analytically calculated density based on the input parameters
 # --- of the test simulation at each output timestep.
 
-import os
-import sys
-
 import dill
 import matplotlib.pyplot as plt
 import numpy as np
@@ -69,7 +66,7 @@ for ii, it in enumerate(ts.iterations):
     )
 
     plt.plot(r_grid, n_e_analytic, "k--", alpha=0.6)
-    plt.plot(r_grid, n_e, label=f"t = {ts.t[ii]*1e6:.2f} $\mu$s")
+    plt.plot(r_grid, n_e, label=f"t = {ts.t[ii] * 1e6:.2f} $\mu$s")
 
 print("RMS error (%) in density: ", rms_errors)
 assert np.all(rms_errors < 0.05)
@@ -79,12 +76,3 @@ plt.xlabel("r (m)")
 plt.grid()
 plt.legend()
 plt.show()
-
-if len(sys.argv) > 1:
-    sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-    import checksumAPI
-
-    filename = sys.argv[1]
-
-    test_name = os.path.split(os.getcwd())[1]
-    checksumAPI.evaluate_checksum(test_name, filename, output_format="openpmd")

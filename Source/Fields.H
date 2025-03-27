@@ -50,6 +50,8 @@ namespace warpx::fields
         hybrid_current_fp_temp,      /**< Used with Ohm's law solver. Stores the time interpolated/extrapolated current density */
         hybrid_current_fp_plasma,    /**< Used with Ohm's law solver. Stores plasma current calculated as J_plasma = curl x B / mu0 - J_ext */
         hybrid_current_fp_external,  /**< Used with Ohm's law solver. Stores external current */
+        hybrid_B_fp_external,       /**< Used with Ohm's law solver. Stores external B field */
+        hybrid_E_fp_external,       /**< Used with Ohm's law solver. Stores external E field */
         Efield_cp,  /**< Only used with MR. The field that is updated by the field solver at each timestep, on the coarse patch of each level */
         Bfield_cp,  /**< Only used with MR. The field that is updated by the field solver at each timestep, on the coarse patch of each level */
         current_cp, /**< Only used with MR. The current that is used as a source for the field solver, on the coarse patch of each level */
@@ -61,8 +63,8 @@ namespace warpx::fields
         E_external_particle_field, /**< Stores external particle fields provided by the user as  through an openPMD file */
         B_external_particle_field, /**< Stores external particle fields provided by the user as  through an openPMD file */
         distance_to_eb, /**< Only used with embedded boundaries (EB). Stores the distance to the nearest EB */
-        edge_lengths,   /**< Only used with embedded boundaries (EB). Indicates the length of the cell edge that is covered by the EB, in SI units */
-        face_areas,     /**< Only used with embedded boundaries (EB). Indicates the area of the cell face that is covered by the EB, in SI units */
+        edge_lengths,   /**< Only used with the ECT solver. Indicates the length of the cell edge that is covered by the EB, in SI units */
+        face_areas,     /**< Only used with the ECT solver. Indicates the area of the cell face that is covered by the EB, in SI units */
         area_mod,
         pml_E_fp,
         pml_B_fp,
@@ -81,7 +83,9 @@ namespace warpx::fields
         Bfield_avg_cp,
         B_old, /**< Stores the value of B at the beginning of the timestep, for the implicit solver */
         ECTRhofield,
-        Venl
+        Venl,
+        global_debye_length,
+        sigmaPC
     );
 
     /** these are vector fields */
@@ -102,6 +106,8 @@ namespace warpx::fields
         FieldType::hybrid_current_fp_temp,
         FieldType::hybrid_current_fp_plasma,
         FieldType::hybrid_current_fp_external,
+        FieldType::hybrid_B_fp_external,
+        FieldType::hybrid_E_fp_external,
         FieldType::Efield_cp,
         FieldType::Bfield_cp,
         FieldType::current_cp,
@@ -121,7 +127,8 @@ namespace warpx::fields
         FieldType::Bfield_avg_cp,
         FieldType::B_old,
         FieldType::ECTRhofield,
-        FieldType::Venl
+        FieldType::Venl,
+        FieldType::sigmaPC
     };
 
     /** Returns true if a FieldType represents a vector field */

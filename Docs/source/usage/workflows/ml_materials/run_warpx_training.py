@@ -260,7 +260,7 @@ diag_field_list = ["B", "E", "J", "rho"]
 diag_particle_list = ["weighting", "position", "momentum"]
 coarse_btd_end = int((L_plasma_bulk + 0.001 + stage_spacing * (N_stage - 1)) * 100000)
 stage_end_snapshots = [
-    f"{int((L_plasma_bulk+stage_spacing*ii)*100000)}:{int((L_plasma_bulk+stage_spacing*ii)*100000+50)}:5"
+    f"{int((L_plasma_bulk + stage_spacing * ii) * 100000)}:{int((L_plasma_bulk + stage_spacing * ii) * 100000 + 50)}:5"
     for ii in range(1)
 ]
 btd_particle_diag = picmi.LabFrameParticleDiagnostic(
@@ -274,7 +274,7 @@ btd_particle_diag = picmi.LabFrameParticleDiagnostic(
     data_list=diag_particle_list,
     write_dir="lab_particle_diags",
     warpx_format="openpmd",
-    warpx_openpmd_backend="bp",
+    warpx_openpmd_backend="bp5",
 )
 
 btd_field_diag = picmi.LabFrameFieldDiagnostic(
@@ -287,7 +287,7 @@ btd_field_diag = picmi.LabFrameFieldDiagnostic(
     warpx_upper_bound=[128.0e-6, 0.0e-6, 0.0],
     write_dir="lab_field_diags",
     warpx_format="openpmd",
-    warpx_openpmd_backend="bp",
+    warpx_openpmd_backend="bp5",
 )
 
 field_diag = picmi.FieldDiagnostic(

@@ -29,7 +29,7 @@ jobs:
       skip: ${{ env.SKIP_CHECKS }}
   build_cxxminimal:
     name: GCC Minimal w/o MPI
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     needs: skip_checks
     if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     env:
@@ -66,7 +66,7 @@ jobs:
         du -hs ~/.cache/ccache
   build_1D_2D:
     name: GCC 1D & 2D w/ MPI, QED tools
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: skip_checks
     if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     env:
@@ -154,7 +154,7 @@ jobs:
         du -hs ~/.cache/ccache
   build_gcc_ablastr:
     name: GCC ABLASTR w/o MPI
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     needs: skip_checks
     if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     env:
@@ -189,7 +189,7 @@ jobs:
         du -hs ~/.cache/ccache
   build_pyfull:
     name: Clang pywarpx
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     needs: skip_checks
     if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     env:
@@ -217,7 +217,8 @@ jobs:
         export CCACHE_MAXSIZE=100M
         ccache -z
         python3 -m pip install --upgrade pip
-        python3 -m pip install --upgrade build packaging setuptools wheel
+        python3 -m pip install --upgrade build packaging setuptools[core] wheel
+
         export CXXFLAGS="-Werror -Wno-error=pass-failed"
         cmake -S . -B build            \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \

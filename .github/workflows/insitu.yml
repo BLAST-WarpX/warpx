@@ -29,7 +29,7 @@ jobs:
       skip: ${{ env.SKIP_CHECKS }}
   sensei:
     name: SENSEI
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     needs: skip_checks
     if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     env:
@@ -56,7 +56,7 @@ jobs:
         cmake --build build -j 4
   ascent:
     name: Ascent
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     needs: skip_checks
     if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     env:
@@ -97,7 +97,7 @@ jobs:
         if-no-files-found: error
   catalyst:
     name: Catalyst
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: skip_checks
     if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
     env:

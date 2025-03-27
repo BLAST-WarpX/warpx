@@ -28,7 +28,7 @@ In order to create a GitHub release, you need to:
  1. Create a new branch from ``development`` and update the version number in all source files.
     We usually wait for the AMReX release to be tagged first, then we also point to its tag.
 
-    There is a script for updating core dependencies of WarpX and the WarpX version:
+    There are scripts for updating core dependencies of WarpX and the WarpX version:
 
     .. code-block:: sh
 
@@ -42,9 +42,12 @@ In order to create a GitHub release, you need to:
 
     Then open a PR, wait for tests to pass and then merge.
 
+    The maintainer script ``Tools/Release/releasePR.py`` automates the steps above.
+    Please read through the instructions in the script before running.
+
  2. **Local Commit** (Optional): at the moment, ``@ax3l`` is managing releases and signs tags (naming: ``YY.MM``) locally with his GPG key before uploading them to GitHub.
 
-    **Publish**: On the `GitHub Release page <https://github.com/ECP-WarpX/WarpX/releases>`__, create a new release via ``Draft a new release``.
+    **Publish**: On the `GitHub Release page <https://github.com/BLAST-WarpX/warpx/releases>`__, create a new release via ``Draft a new release``.
     Either select the locally created tag or create one online (naming: ``YY.MM``) on the merged commit of the PR from step 1.
 
     In the *release description*, please specify the compatible versions of dependencies (see previous releases), and provide info on the content of the release.

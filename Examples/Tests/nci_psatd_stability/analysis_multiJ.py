@@ -10,7 +10,6 @@ energy corresponds to unstable results due to NCI (suppressed by the use of
 both J and rho constant in time, and with divergence cleaning).
 """
 
-import os
 import sys
 
 import numpy as np
@@ -18,8 +17,6 @@ import scipy.constants as scc
 import yt
 
 yt.funcs.mylog.setLevel(0)
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 filename = sys.argv[1]
 
@@ -49,9 +46,3 @@ print("\nCheck numerical stability:")
 print(f"err_energy = {err_energy}")
 print(f"tol_energy = {tol_energy}")
 assert err_energy < tol_energy
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)
