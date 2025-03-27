@@ -4796,6 +4796,26 @@ This shifts analysis from post-processing to runtime calculation of reduction op
         at earliest, the load balance efficiency can be output starting at step
         ``2``, since costs are not recorded until step ``1``.
 
+    * ``MemoryPerRank``
+        This diagnostic uses ``AMReX::Arena::PrintUsageToFiles`` to output detailed memory
+        usage information for each MPI rank. It logs information including:
+
+        * Total/free GPU memory when applicable
+        * Memory usage statistics for different Arena memory pools (Main, Device, Managed, Pinned, Comms)
+        * Per-rank memory allocation and usage details
+
+        This is useful for tracking memory consumption patterns throughout simulation runs,
+        particularly when debugging memory usage issues or optimizing performance on GPUs.
+        The data is saved into separate text files (one per MPI rank) in the specified output directory.
+
+        * ``<reduced_diags_name>.file_prefix`` (`string`)
+            The prefix for the output files. The default is `"<reduced_diags_name>"`.
+
+        .. note::
+
+            Use sparingly on larger production runs.
+            The diagnostic produces one text file per rank and appends to it at each timestep according to ``<reduced_diags_name>.intervals``.
+
     * ``ParticleHistogram``
         This type computes a user defined particle histogram.
 
