@@ -322,7 +322,7 @@ LBC.intervals = 100
 # NOTE: use sparingly for large-scale runs as it produces a text file per rank
 MPR.type = MemoryPerRank
 MPR.intervals = 100
-MPR.path = "diags/reducedfiles/MemoryPerRank"
+MPR.path = "diags/reducedfiles/MemoryPerRank/"
 MPR.file_prefix = "MPR"
 
 PhaseSpaceIons.type                                 = ParticleHistogram2D
