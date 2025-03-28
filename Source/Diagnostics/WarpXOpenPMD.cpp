@@ -1565,7 +1565,7 @@ WarpXParticleCounter::WarpXParticleCounter (ParticleContainer* pc, bool doLazyCo
            }
           m_Total += numParticles;
         }
-	return;
+    return;
     }
 
     {// MPI gather to get offsets from each rank
