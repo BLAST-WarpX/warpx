@@ -43,7 +43,7 @@ public:
   using ParticleContainer = typename WarpXParticleContainer::ContainerLike<amrex::PinnedArenaAllocator>;
   using ParticleIter = typename amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PinnedArenaAllocator>;
 
-  WarpXParticleCounter (ParticleContainer* pc);
+  WarpXParticleCounter (ParticleContainer* pc, bool doLazyCount);
   [[nodiscard]] unsigned long GetTotalNumParticles () const {return m_Total;}
 
   std::vector<unsigned long long> m_ParticleOffsetAtRank;
@@ -348,6 +348,9 @@ private:
 
   int m_MPIRank = 0;
   int m_MPISize = 1;
+
+  bool m_ApplyJoinedArray = false; // joined array
+  [[nodiscard]] openPMD::Extent ProperExtent(unsigned long long n, [[maybe_unused]] bool init) const;
 
   openPMD::IterationEncoding m_Encoding = openPMD::IterationEncoding::fileBased;
   std::string m_OpenPMDFileType = "bp5"; //! MPI-parallel openPMD backend: bp5, bp4 or h5
