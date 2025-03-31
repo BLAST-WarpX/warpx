@@ -383,8 +383,8 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
         const Dim3 lo = lbound(box);
 
         // Loop over the particles and compute the EM field using the doGatherShapeN function
-        amrex::ParallelFor( 
-            TypeList<CompileTimeOptions<doEx, noEx>, CompileTimeOptions<doEy, noEy>, CompileTimeOptions<doEz, noEz>, 
+        amrex::ParallelFor(
+            TypeList<CompileTimeOptions<doEx, noEx>, CompileTimeOptions<doEy, noEy>, CompileTimeOptions<doEz, noEz>,
             CompileTimeOptions<doBx, noBx>, CompileTimeOptions<doBy, noBy>, CompileTimeOptions<doBz, noBz>>{},
             {Ex_runtime_flag, Ey_runtime_flag, Ez_runtime_flag, Bx_runtime_flag, By_runtime_flag, Bz_runtime_flag},
             pti.numParticles(),
