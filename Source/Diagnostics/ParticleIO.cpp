@@ -304,34 +304,19 @@ storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
 
 void
 storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
-    ElectromagneticSolverAlgo electromagnetic_solver_id, bool is_full_diagnostic  ) {
+    ElectromagneticSolverAlgo electromagnetic_solver_id, const bool (&fields_to_plot)[6], bool is_full_diagnostic) {
 
     using PinnedParIter = typename PinnedMemoryParticleContainer::ParIterType;
     using Dir = ablastr::fields::Direction;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        electromagnetic_solver_id != ElectromagneticSolverAlgo::None ,
+        electromagnetic_solver_id != ElectromagneticSolverAlgo::None,
         "output of the electromagnetic fields on the particles was requested, "
         "but this is only available with an electromagnetic solver.");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         is_full_diagnostic,
         "Output of the electromagnetic fields on the particles was requested, "
         "but this is only available with `diag_type = Full`.");
-
-
-    tmp.AddRealComp("Ex");
-    tmp.AddRealComp("Ey");
-    tmp.AddRealComp("Ez");
-    tmp.AddRealComp("Bx");
-    tmp.AddRealComp("By");
-    tmp.AddRealComp("Bz");
-
-    int const Ex_index = tmp.GetRealCompIndex("Ex");
-    int const Ey_index = tmp.GetRealCompIndex("Ey");
-    int const Ez_index = tmp.GetRealCompIndex("Ez");
-    int const Bx_index = tmp.GetRealCompIndex("Bx");
-    int const By_index = tmp.GetRealCompIndex("By");
-    int const Bz_index = tmp.GetRealCompIndex("Bz");
 
     auto& warpx = WarpX::GetInstance();
 
@@ -341,6 +326,23 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
     );
 
     constexpr auto lev0=0;
+    const amrex::XDim3 dinv = WarpX::InvCellSize(lev0);
+    const bool galerkin_interpolation = WarpX::galerkin_interpolation;
+    const int nox = WarpX::nox;
+    const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
+
+    static constexpr const fields_names[6] = {"Ex", "Ey", "Ez", "Bx", "By", "Bz"};
+
+    int fields_Index[6];
+
+    for (int i = 0; i < 6; i++)
+    {
+        if (fields_to_plot[i])
+        {
+            tmp.AddRealComp(fields_names[i]);
+            fields_Index[i] = tmp.GetRealCompIndex(fields_names[i]); // To check -> /!\ accessing unset values ?
+        }
+    }
 
     amrex::MultiFab const& Ex = *warpx.m_fields.get(FieldType::Efield_aux, Dir{0}, lev0);
     amrex::MultiFab const& Ey = *warpx.m_fields.get(FieldType::Efield_aux, Dir{1}, lev0);
@@ -348,11 +350,6 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
     amrex::MultiFab const& Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Dir{0}, lev0);
     amrex::MultiFab const& By = *warpx.m_fields.get(FieldType::Bfield_aux, Dir{1}, lev0);
     amrex::MultiFab const& Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Dir{2}, lev0);
-
-    const amrex::XDim3 dinv = WarpX::InvCellSize(lev0);
-    const bool galerkin_interpolation = WarpX::galerkin_interpolation;
-    const int nox = WarpX::nox;
-    const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -387,10 +384,14 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
         const Dim3 lo = lbound(box);
 
         // Loop over the particles and compute the EM field using the doGatherShapeN function
-        amrex::ParallelFor( pti.numParticles(),
+        amrex::ParallelFor( 
+            TypeList<CompileTimeOptions<doEx, noEx>, CompileTimeOptions<doEy, noEy>, CompileTimeOptions<doEz, noEz>, 
+            CompileTimeOptions<doBx, noBx>, CompileTimeOptions<doBy, noBy>, CompileTimeOptions<doBz, noBz>>{},
+            {Ex_runtime_flag, Ey_runtime_flag, Ez_runtime_flag, Bx_runtime_flag, By_runtime_flag, Bz_runtime_flag},
+            pti.numParticles(),
             [=] AMREX_GPU_DEVICE (long ip) {
-               amrex::ParticleReal xp, yp, zp;
-               getPosition(ip, xp, yp, zp);
+                amrex::ParticleReal xp, yp, zp;
+                getPosition(ip, xp, yp, zp);
 
                 Ex_particle_arr[ip] = 0._rt;
                 Ey_particle_arr[ip] = 0._rt;
@@ -402,7 +403,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                 getExternalEB(ip, Ex_particle_arr[ip], Ey_particle_arr[ip], Ez_particle_arr[ip],
                     Bx_particle_arr[ip], By_particle_arr[ip], Bz_particle_arr[ip]);
 
-               doGatherShapeN(
+                doGatherShapeN(
                     xp, yp, zp,
                     Ex_particle_arr[ip], Ey_particle_arr[ip], Ez_particle_arr[ip],
                     Bx_particle_arr[ip], By_particle_arr[ip], Bz_particle_arr[ip],
