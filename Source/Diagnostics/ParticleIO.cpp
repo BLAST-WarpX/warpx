@@ -337,8 +337,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
     for (int i = 0; i < 6; i++)
     {
-        if (fields_to_plot[i])
-        {
+        if (fields_to_plot[i]){
             tmp.AddRealComp(fields_names[i]);
             fields_Index[i] = tmp.GetRealCompIndex(fields_names[i]); // To check -> /!\ accessing unset values ?
         }
