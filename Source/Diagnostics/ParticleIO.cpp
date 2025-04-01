@@ -388,9 +388,22 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
             {Ex_runtime_flag, Ey_runtime_flag, Ez_runtime_flag, Bx_runtime_flag, By_runtime_flag, Bz_runtime_flag},
             pti.numParticles(),
             [=] AMREX_GPU_DEVICE (long ip) {
-                amrex::ParticleReal xp, yp, zp;
+                amrex::ParticleReal xp, yp, zp, Ex_particle, Ey_particle, Ez_particle, Bx_particle, By_particle, Bz_particle;
                 getPosition(ip, xp, yp, zp);
 
+                Ex_particle = 0._rt;
+                Ey_particle = 0._rt;
+                Ez_particle = 0._rt;
+                Bx_particle = 0._rt;
+                By_particle = 0._rt;
+                Bz_particle = 0._rt;
+
+                getExternalEB(ip, Ex_particle, Ey_particle, Ez_particle,
+                    Bx_particle, By_particle, Bz_particle);
+
+                
+                
+                /*
                 Ex_particle_arr[ip] = 0._rt;
                 Ey_particle_arr[ip] = 0._rt;
                 Ez_particle_arr[ip] = 0._rt;
@@ -410,6 +423,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                     ex_type, ey_type, ez_type,
                     bx_type, by_type, bz_type,
                     dinv, xyzmin, lo, n_rz_azimuthal_modes, nox, galerkin_interpolation);
+                */
             });
     }
 
