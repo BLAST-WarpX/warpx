@@ -418,10 +418,13 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
                 getExternalEB(ip, Ex_particle, Ey_particle, Ez_particle,
                     Bx_particle, By_particle, Bz_particle);
+                
+                const int depos_order_perp = 1; // who are you ?
+                const int depos_order_para = 1;
 
                 if constexpr (ex_control == doEx || ey_control == doEy || ez_control == doEz)
                 {
-                    doDirectGatherVectorField(
+                    doDirectGatherVectorField<depos_order_perp, depos_order_para>(
                         xp, yp, zp,
                         Ex_particle, Ey_particle, Ez_particle,
                         Ex_grid, Ey_grid, Ez_grid,
@@ -432,7 +435,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
                 if constexpr (bx_control == doBx || by_control == doBy || bz_control == doBz)
                 {
-                    doDirectGatherVectorField(
+                    doDirectGatherVectorField<depos_order_perp, depos_order_para>(
                         xp, yp, zp,
                         Bx_particle, By_particle, Bz_particle,
                         Bx_grid, By_grid, Bz_grid,
