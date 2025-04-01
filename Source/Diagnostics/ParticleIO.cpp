@@ -430,7 +430,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                             Bx_grid, By_grid, Bz_grid, ex_type, ey_type, ez_type,
                             bx_type, by_type, bz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
                 }
-                
+
 
                 if constexpr (ex_control == doEx || ey_control == doEy || ez_control == doEz)
                 {
