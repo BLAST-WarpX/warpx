@@ -331,7 +331,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
     //const int nox = WarpX::nox;
     const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
 
-    static constexpr const fields_names[6] = {"Ex", "Ey", "Ez", "Bx", "By", "Bz"};
+    static constexpr const char* fields_names[6] = {"Ex", "Ey", "Ez", "Bx", "By", "Bz"};
 
     auto fields_index = amrex::Array<int, 6>{0,0,0,0,0,0};
 
