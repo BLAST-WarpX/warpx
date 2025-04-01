@@ -333,7 +333,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
     static constexpr const fields_names[6] = {"Ex", "Ey", "Ez", "Bx", "By", "Bz"};
 
-    int fields_index[6];
+    auto fields_index = amrex::Array<int, 6>{0,0,0,0,0,0};
 
     enum Ex_flags { doEx, noEx };
     enum Ey_flags { doEy, noEy };
@@ -384,12 +384,13 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
         const auto getPosition = GetParticlePosition<PIdx>(pti);
         const auto getExternalEB = GetExternalEBField(pti);
-        if (fields_to_plot[0]) amrex::ParticleReal* Ex_particle_arr = pti.GetStructOfArrays().GetRealData(fields_index[0]).dataPtr();
-        if (fields_to_plot[1]) amrex::ParticleReal* Ey_particle_arr = pti.GetStructOfArrays().GetRealData(fields_index[1]).dataPtr();
-        if (fields_to_plot[2]) amrex::ParticleReal* Ez_particle_arr = pti.GetStructOfArrays().GetRealData(fields_index[2]).dataPtr();
-        if (fields_to_plot[3]) amrex::ParticleReal* Bx_particle_arr = pti.GetStructOfArrays().GetRealData(fields_index[3]).dataPtr();
-        if (fields_to_plot[4]) amrex::ParticleReal* By_particle_arr = pti.GetStructOfArrays().GetRealData(fields_index[4]).dataPtr();
-        if (fields_to_plot[5]) amrex::ParticleReal* Bz_particle_arr = pti.GetStructOfArrays().GetRealData(fields_index[5]).dataPtr();
+
+        amrex::ParticleReal* Ex_particle_arr = (fields_to_plot[0]) ? pti.GetStructOfArrays().GetRealData(fields_index[0]).dataPtr() : nullptr;
+        amrex::ParticleReal* Ey_particle_arr = (fields_to_plot[1]) ? pti.GetStructOfArrays().GetRealData(fields_index[1]).dataPtr() : nullptr;
+        amrex::ParticleReal* Ez_particle_arr = (fields_to_plot[2]) ? pti.GetStructOfArrays().GetRealData(fields_index[2]).dataPtr() : nullptr;
+        amrex::ParticleReal* Bx_particle_arr = (fields_to_plot[3]) ? pti.GetStructOfArrays().GetRealData(fields_index[3]).dataPtr() : nullptr;
+        amrex::ParticleReal* By_particle_arr = (fields_to_plot[4]) ? pti.GetStructOfArrays().GetRealData(fields_index[4]).dataPtr() : nullptr;
+        amrex::ParticleReal* Bz_particle_arr = (fields_to_plot[5]) ? pti.GetStructOfArrays().GetRealData(fields_index[5]).dataPtr() : nullptr;
 
         const auto box = pti.tilebox();
         const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev0, 0._rt);
@@ -440,22 +441,22 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                     );
                 }
 
-                if (ex_control == doEx) {
+                if constexpr (ex_control == doEx) {
                     Ex_particle_arr[ip] = Ex_particle;
                 }
-                if (ey_control == doEy) {
+                if constexpr (ey_control == doEy) {
                     Ey_particle_arr[ip] = Ey_particle;
                 }
-                if (ez_control == doEz) {
+                if constexpr (ez_control == doEz) {
                     Ez_particle_arr[ip] = Ez_particle;
                 }
-                if (bx_control == doBx) {
+                if constexpr (bx_control == doBx) {
                     Bx_particle_arr[ip] = Bx_particle;
                 }
-                if (by_control == doBy) {
+                if constexpr (by_control == doBy) {
                     By_particle_arr[ip] = By_particle;
                 }
-                if (bz_control == doBz) {
+                if constexpr (bz_control == doBz) {
                     Bz_particle_arr[ip] = Bz_particle;
                 }
             });
