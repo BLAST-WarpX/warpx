@@ -418,7 +418,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
                 getExternalEB(ip, Ex_particle, Ey_particle, Ez_particle,
                     Bx_particle, By_particle, Bz_particle);
-                
+
                 const int depos_order_perp = 1; // who are you ?
                 const int depos_order_para = 1;
 
