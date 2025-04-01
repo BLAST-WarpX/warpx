@@ -25,6 +25,7 @@ public:
     amrex::Vector<int> m_plot_flags;
     bool m_plot_phi = false; // Whether to output the potential phi on the particles
     bool m_plot_EM = false; // Whether to output the E and B fields on the particles
+    bool m_plot_EM_flags[6] = {false, false, false, false, false, false}; // E and B fields
 
     bool m_do_random_filter  = false;
     bool m_do_uniform_filter = false;

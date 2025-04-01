@@ -304,7 +304,7 @@ storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
 
 void
 storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
-    ElectromagneticSolverAlgo electromagnetic_solver_id, const bool (&fields_to_plot)[6], bool is_full_diagnostic) {
+    ElectromagneticSolverAlgo electromagnetic_solver_id, bool (&fields_to_plot)[6], bool is_full_diagnostic) {
 
     using PinnedParIter = typename PinnedMemoryParticleContainer::ParIterType;
     using Dir = ablastr::fields::Direction;
@@ -327,18 +327,32 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
     constexpr auto lev0=0;
     const amrex::XDim3 dinv = WarpX::InvCellSize(lev0);
-    const bool galerkin_interpolation = WarpX::galerkin_interpolation;
-    const int nox = WarpX::nox;
+    //const bool galerkin_interpolation = WarpX::galerkin_interpolation;
+    //const int nox = WarpX::nox;
     const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
 
     static constexpr const fields_names[6] = {"Ex", "Ey", "Ez", "Bx", "By", "Bz"};
 
-    int fields_Index[6];
+    int fields_index[6];
+
+    enum Ex_flags { doEx, noEx };
+    enum Ey_flags { doEy, noEy };
+    enum Ez_flags { doEz, noEz };
+    enum Bx_flags { doBx, noBx };
+    enum By_flags { doBy, noBy };
+    enum Bz_flags { doBz, noBz };
+
+    const auto Ex_runtime_flag = (fields_to_plot[0]) ? doEx : noEx;
+    const auto Ey_runtime_flag = (fields_to_plot[1]) ? doEy : noEy;
+    const auto Ez_runtime_flag = (fields_to_plot[2]) ? doEz : noEz;
+    const auto Bx_runtime_flag = (fields_to_plot[3]) ? doBx : noBx;
+    const auto By_runtime_flag = (fields_to_plot[4]) ? doBy : noBy;
+    const auto Bz_runtime_flag = (fields_to_plot[5]) ? doBz : noBz;
 
     for (int i = 0; i < 6; i++){
         if (fields_to_plot[i]){
             tmp.AddRealComp(fields_names[i]);
-            fields_Index[i] = tmp.GetRealCompIndex(fields_names[i]); // To check -> /!\ accessing unset values ?
+            fields_index[i] = tmp.GetRealCompIndex(fields_names[i]); // To check -> /!\ accessing unset values ?
         }
     }
 
@@ -370,12 +384,12 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
         const auto getPosition = GetParticlePosition<PIdx>(pti);
         const auto getExternalEB = GetExternalEBField(pti);
-        amrex::ParticleReal* Ex_particle_arr = pti.GetStructOfArrays().GetRealData(Ex_index).dataPtr();
-        amrex::ParticleReal* Ey_particle_arr = pti.GetStructOfArrays().GetRealData(Ey_index).dataPtr();
-        amrex::ParticleReal* Ez_particle_arr = pti.GetStructOfArrays().GetRealData(Ez_index).dataPtr();
-        amrex::ParticleReal* Bx_particle_arr = pti.GetStructOfArrays().GetRealData(Bx_index).dataPtr();
-        amrex::ParticleReal* By_particle_arr = pti.GetStructOfArrays().GetRealData(By_index).dataPtr();
-        amrex::ParticleReal* Bz_particle_arr = pti.GetStructOfArrays().GetRealData(Bz_index).dataPtr();
+        if (fields_to_plot[0]) amrex::ParticleReal* Ex_particle_arr = pti.GetStructOfArrays().GetRealData(fields_index[0]).dataPtr();
+        if (fields_to_plot[1]) amrex::ParticleReal* Ey_particle_arr = pti.GetStructOfArrays().GetRealData(fields_index[1]).dataPtr();
+        if (fields_to_plot[2]) amrex::ParticleReal* Ez_particle_arr = pti.GetStructOfArrays().GetRealData(fields_index[2]).dataPtr();
+        if (fields_to_plot[3]) amrex::ParticleReal* Bx_particle_arr = pti.GetStructOfArrays().GetRealData(fields_index[3]).dataPtr();
+        if (fields_to_plot[4]) amrex::ParticleReal* By_particle_arr = pti.GetStructOfArrays().GetRealData(fields_index[4]).dataPtr();
+        if (fields_to_plot[5]) amrex::ParticleReal* Bz_particle_arr = pti.GetStructOfArrays().GetRealData(fields_index[5]).dataPtr();
 
         const auto box = pti.tilebox();
         const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev0, 0._rt);
@@ -387,8 +401,11 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
             CompileTimeOptions<doBx, noBx>, CompileTimeOptions<doBy, noBy>, CompileTimeOptions<doBz, noBz>>{},
             {Ex_runtime_flag, Ey_runtime_flag, Ez_runtime_flag, Bx_runtime_flag, By_runtime_flag, Bz_runtime_flag},
             pti.numParticles(),
-            [=] AMREX_GPU_DEVICE (long ip) {
-                amrex::ParticleReal xp, yp, zp, Ex_particle, Ey_particle, Ez_particle, Bx_particle, By_particle, Bz_particle;
+            [=] AMREX_GPU_DEVICE (long ip, auto ex_control, auto ey_control, auto ez_control,
+                auto bx_control, auto by_control, auto bz_control) 
+                {
+                amrex::ParticleReal xp, yp, zp;
+                [[maybe_unused]] amrex::ParticleReal Ex_particle, Ey_particle, Ez_particle, Bx_particle, By_particle, Bz_particle;
                 getPosition(ip, xp, yp, zp);
 
                 Ex_particle = 0._rt;
@@ -401,57 +418,44 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                 getExternalEB(ip, Ex_particle, Ey_particle, Ez_particle,
                     Bx_particle, By_particle, Bz_particle);
 
-<<<<<<< HEAD
-                if constexpr (Ex_runtime_flag == doEx || Ey_runtime_flag == doEy || Ez_runtime_flag == doEz)
+                if constexpr (ex_control == doEx || ey_control == doEy || ez_control == doEz) 
                 {
                     doDirectGatherVectorField(
                         xp, yp, zp,
                         Ex_particle, Ey_particle, Ez_particle,
                         Ex_grid, Ey_grid, Ez_grid,
                         ex_type, ey_type, ez_type,
-                        dinv, xyzmin, lo, n_rz_azimuthal_modes, nox, galerkin_interpolation
+                        dinv, xyzmin, lo, n_rz_azimuthal_modes //, nox, galerkin_interpolation
                     );
-
                 }
-=======
 
-
-                /*
-                Ex_particle_arr[ip] = 0._rt;
-                Ey_particle_arr[ip] = 0._rt;
-                Ez_particle_arr[ip] = 0._rt;
-                Bx_particle_arr[ip] = 0._rt;
-                By_particle_arr[ip] = 0._rt;
-                Bz_particle_arr[ip] = 0._rt;
->>>>>>> 1c4801ab249f9e90eda89cd521af4d3139e6ab2b
-
-                if constexpr (Bx_runtime_flag == doBx || By_runtime_flag == doBy || Bz_runtime_flag == doBz)
+                if constexpr (bx_control == doBx || by_control == doBy || bz_control == doBz) 
                 {
                     doDirectGatherVectorField(
                         xp, yp, zp,
                         Bx_particle, By_particle, Bz_particle,
                         Bx_grid, By_grid, Bz_grid,
                         bx_type, by_type, bz_type,
-                        dinv, xyzmin, lo, n_rz_azimuthal_modes, nox, galerkin_interpolation
+                        dinv, xyzmin, lo, n_rz_azimuthal_modes //, nox, galerkin_interpolation
                     );
                 }
-
-                if (Ex_runtime_flag == doEx) {
+            
+                if (ex_control == doEx) {
                     Ex_particle_arr[ip] = Ex_particle;
                 }
-                if (Ey_runtime_flag == doEy) {
+                if (ey_control == doEy) {
                     Ey_particle_arr[ip] = Ey_particle;
                 }
-                if (Ez_runtime_flag == doEz) {
+                if (ez_control == doEz) {
                     Ez_particle_arr[ip] = Ez_particle;
                 }
-                if (Bx_runtime_flag == doBx) {
+                if (bx_control == doBx) {
                     Bx_particle_arr[ip] = Bx_particle;
                 }
-                if (By_runtime_flag == doBy) {
+                if (by_control == doBy) {
                     By_particle_arr[ip] = By_particle;
                 }
-                if (Bz_runtime_flag == doBz) {
+                if (bz_control == doBz) {
                     Bz_particle_arr[ip] = Bz_particle;
                 }
             });

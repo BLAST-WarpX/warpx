@@ -610,7 +610,7 @@ for (const auto & particle_diag : particle_diags) {
         storePhiOnParticles( tmp, WarpX::electrostatic_solver_id, is_full_diagnostic);
     }
     if ( particle_diag.m_plot_EM ) {
-        storeEMFieldsOnParticles( tmp, WarpX::electromagnetic_solver_id, is_full_diagnostic);
+        storeEMFieldsOnParticles( tmp, WarpX::electromagnetic_solver_id, particle_diag.m_plot_EM_flags, is_full_diagnostic);
     }
 
     // names of amrex::ParticleReal and int particle attributes in SoA data
