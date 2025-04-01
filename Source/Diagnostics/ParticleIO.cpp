@@ -384,8 +384,8 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
         const auto getPosition = GetParticlePosition<PIdx>(pti);
 
-        WarpXParIter const& pti_const = static_cast<WarpXParIter const&>(pti);
-        const auto getExternalEB = GetExternalEBField(pti_const, lev0);
+        // const auto getExternalEB = GetExternalEBField(a_pti, lev0);
+        // a_pti is a WarpXParIter, currently undefined
 
         amrex::ParticleReal* Ex_particle_arr = (fields_to_plot[0]) ? pti.GetStructOfArrays().GetRealData(fields_index[0]).dataPtr() : nullptr;
         amrex::ParticleReal* Ey_particle_arr = (fields_to_plot[1]) ? pti.GetStructOfArrays().GetRealData(fields_index[1]).dataPtr() : nullptr;
@@ -418,8 +418,8 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                 By_particle = 0._rt;
                 Bz_particle = 0._rt;
 
-                getExternalEB(ip, Ex_particle, Ey_particle, Ez_particle,
-                    Bx_particle, By_particle, Bz_particle);
+                //getExternalEB(ip, Ex_particle, Ey_particle, Ez_particle,
+                //    Bx_particle, By_particle, Bz_particle);
 
                 const int depos_order_perp = 1; // who are you ?
                 const int depos_order_para = 1;
