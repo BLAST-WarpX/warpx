@@ -401,29 +401,47 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                 getExternalEB(ip, Ex_particle, Ey_particle, Ez_particle,
                     Bx_particle, By_particle, Bz_particle);
 
-                
-                
-                /*
-                Ex_particle_arr[ip] = 0._rt;
-                Ey_particle_arr[ip] = 0._rt;
-                Ez_particle_arr[ip] = 0._rt;
-                Bx_particle_arr[ip] = 0._rt;
-                By_particle_arr[ip] = 0._rt;
-                Bz_particle_arr[ip] = 0._rt;
+                if constexpr (Ex_runtime_flag == doEx || Ey_runtime_flag == doEy || Ez_runtime_flag == doEz) 
+                {
+                    doDirectGatherVectorField(
+                        xp, yp, zp,
+                        Ex_particle, Ey_particle, Ez_particle,
+                        Ex_grid, Ey_grid, Ez_grid,
+                        ex_type, ey_type, ez_type,
+                        dinv, xyzmin, lo, n_rz_azimuthal_modes, nox, galerkin_interpolation
+                    );
+                    
+                }
 
-                getExternalEB(ip, Ex_particle_arr[ip], Ey_particle_arr[ip], Ez_particle_arr[ip],
-                    Bx_particle_arr[ip], By_particle_arr[ip], Bz_particle_arr[ip]);
-
-                doGatherShapeN(
-                    xp, yp, zp,
-                    Ex_particle_arr[ip], Ey_particle_arr[ip], Ez_particle_arr[ip],
-                    Bx_particle_arr[ip], By_particle_arr[ip], Bz_particle_arr[ip],
-                    Ex_grid, Ey_grid, Ez_grid,
-                    Bx_grid, By_grid, Bz_grid,
-                    ex_type, ey_type, ez_type,
-                    bx_type, by_type, bz_type,
-                    dinv, xyzmin, lo, n_rz_azimuthal_modes, nox, galerkin_interpolation);
-                */
+                if constexpr (Bx_runtime_flag == doBx || By_runtime_flag == doBy || Bz_runtime_flag == doBz) 
+                {
+                    doDirectGatherVectorField(
+                        xp, yp, zp,
+                        Bx_particle, By_particle, Bz_particle,
+                        Bx_grid, By_grid, Bz_grid,
+                        bx_type, by_type, bz_type,
+                        dinv, xyzmin, lo, n_rz_azimuthal_modes, nox, galerkin_interpolation
+                    );
+                }
+                
+                if (Ex_runtime_flag == doEx) {
+                    Ex_particle_arr[ip] = Ex_particle;
+                }
+                if (Ey_runtime_flag == doEy) {
+                    Ey_particle_arr[ip] = Ey_particle;
+                }
+                if (Ez_runtime_flag == doEz) {
+                    Ez_particle_arr[ip] = Ez_particle;
+                }
+                if (Bx_runtime_flag == doBx) {
+                    Bx_particle_arr[ip] = Bx_particle;
+                }
+                if (By_runtime_flag == doBy) {
+                    By_particle_arr[ip] = By_particle;
+                }
+                if (Bz_runtime_flag == doBz) {
+                    Bz_particle_arr[ip] = Bz_particle;
+                }
             });
     }
 
