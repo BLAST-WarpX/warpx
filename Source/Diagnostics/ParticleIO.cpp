@@ -304,7 +304,7 @@ storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
 
 void
 storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
-    ElectromagneticSolverAlgo electromagnetic_solver_id, bool (&fields_to_plot)[6], bool is_full_diagnostic) {
+    ElectromagneticSolverAlgo electromagnetic_solver_id, bool fields_to_plot[6], bool is_full_diagnostic) {
 
     using PinnedParIter = typename PinnedMemoryParticleContainer::ParIterType;
     using Dir = ablastr::fields::Direction;
