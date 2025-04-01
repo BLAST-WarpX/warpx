@@ -404,7 +404,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
             CompileTimeOptions<doBx, noBx>, CompileTimeOptions<doBy, noBy>, CompileTimeOptions<doBz, noBz>>{},
             {Ex_runtime_flag, Ey_runtime_flag, Ez_runtime_flag, Bx_runtime_flag, By_runtime_flag, Bz_runtime_flag},
             pti.numParticles(),
-            [=] AMREX_GPU_DEVICE (long ip, auto ex_control, auto ey_control, auto ez_control,
+            [=, Ex_particle_arr, Ey_particle_arr, Ez_particle_arr, Bx_particle_arr, By_particle_arr, Bz_particle_arr] AMREX_GPU_DEVICE (long ip, auto ex_control, auto ey_control, auto ez_control,
                 auto bx_control, auto by_control, auto bz_control)
                 {
                 amrex::ParticleReal xp, yp, zp;
@@ -454,7 +454,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                     );
                 }
 
-                if (ex_control == doEx) {
+                if constexpr (ex_control == doEx) {
                     Ex_particle_arr[ip] = Ex_particle;
                 }
                 if constexpr (ey_control == doEy) {
