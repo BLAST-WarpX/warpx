@@ -402,7 +402,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                     Bx_particle, By_particle, Bz_particle);
 
 <<<<<<< HEAD
-                if constexpr (Ex_runtime_flag == doEx || Ey_runtime_flag == doEy || Ez_runtime_flag == doEz) 
+                if constexpr (Ex_runtime_flag == doEx || Ey_runtime_flag == doEy || Ez_runtime_flag == doEz)
                 {
                     doDirectGatherVectorField(
                         xp, yp, zp,
@@ -411,7 +411,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                         ex_type, ey_type, ez_type,
                         dinv, xyzmin, lo, n_rz_azimuthal_modes, nox, galerkin_interpolation
                     );
-                    
+
                 }
 =======
 
@@ -425,7 +425,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                 Bz_particle_arr[ip] = 0._rt;
 >>>>>>> 1c4801ab249f9e90eda89cd521af4d3139e6ab2b
 
-                if constexpr (Bx_runtime_flag == doBx || By_runtime_flag == doBy || Bz_runtime_flag == doBz) 
+                if constexpr (Bx_runtime_flag == doBx || By_runtime_flag == doBy || Bz_runtime_flag == doBz)
                 {
                     doDirectGatherVectorField(
                         xp, yp, zp,
@@ -435,7 +435,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                         dinv, xyzmin, lo, n_rz_azimuthal_modes, nox, galerkin_interpolation
                     );
                 }
-                
+
                 if (Ex_runtime_flag == doEx) {
                     Ex_particle_arr[ip] = Ex_particle;
                 }
