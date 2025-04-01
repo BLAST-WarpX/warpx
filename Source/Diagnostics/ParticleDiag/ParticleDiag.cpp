@@ -43,7 +43,7 @@ ParticleDiag::ParticleDiag (
 #endif
                 if (var == "phi") {
                     m_plot_phi = true;
-                } else if (var == "Ex" || var == "Ey" || var == "Ez" || 
+                } else if (var == "Ex" || var == "Ey" || var == "Ez" ||
                            var == "Bx" || var == "By" || var == "Bz") {
                     m_plot_EM = true;
                     static bool m_plot_EM_flags[6] = {false, false, false, false, false, false};

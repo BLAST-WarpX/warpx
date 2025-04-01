@@ -402,7 +402,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
             {Ex_runtime_flag, Ey_runtime_flag, Ez_runtime_flag, Bx_runtime_flag, By_runtime_flag, Bz_runtime_flag},
             pti.numParticles(),
             [=] AMREX_GPU_DEVICE (long ip, auto ex_control, auto ey_control, auto ez_control,
-                auto bx_control, auto by_control, auto bz_control) 
+                auto bx_control, auto by_control, auto bz_control)
                 {
                 amrex::ParticleReal xp, yp, zp;
                 [[maybe_unused]] amrex::ParticleReal Ex_particle, Ey_particle, Ez_particle, Bx_particle, By_particle, Bz_particle;
@@ -418,7 +418,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                 getExternalEB(ip, Ex_particle, Ey_particle, Ez_particle,
                     Bx_particle, By_particle, Bz_particle);
 
-                if constexpr (ex_control == doEx || ey_control == doEy || ez_control == doEz) 
+                if constexpr (ex_control == doEx || ey_control == doEy || ez_control == doEz)
                 {
                     doDirectGatherVectorField(
                         xp, yp, zp,
@@ -429,7 +429,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                     );
                 }
 
-                if constexpr (bx_control == doBx || by_control == doBy || bz_control == doBz) 
+                if constexpr (bx_control == doBx || by_control == doBy || bz_control == doBz)
                 {
                     doDirectGatherVectorField(
                         xp, yp, zp,
@@ -439,7 +439,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                         dinv, xyzmin, lo, n_rz_azimuthal_modes //, nox, galerkin_interpolation
                     );
                 }
-            
+
                 if (ex_control == doEx) {
                     Ex_particle_arr[ip] = Ex_particle;
                 }
