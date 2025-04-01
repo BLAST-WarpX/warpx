@@ -401,8 +401,8 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                 getExternalEB(ip, Ex_particle, Ey_particle, Ez_particle,
                     Bx_particle, By_particle, Bz_particle);
 
-                
-                
+
+
                 /*
                 Ex_particle_arr[ip] = 0._rt;
                 Ey_particle_arr[ip] = 0._rt;
