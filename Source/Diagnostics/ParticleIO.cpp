@@ -423,6 +423,14 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
                 const int depos_order_perp = 1; // who are you ?
                 const int depos_order_para = 1;
+                if (ex_control == noEx && ey_control == noEy && ez_control == noEz &&
+                    bx_control == noBx && by_control == noBy && bz_control == noBz) {
+                        // only for compiling the kernel where nothing is asked (but the function won't be called anyway)
+                        amrex::ignore_unused(depos_order_para, depos_order_perp, Ex_grid, Ey_grid, Ez_grid,
+                            Bx_grid, By_grid, Bz_grid, ex_type, ey_type, ez_type,
+                            bx_type, by_type, bz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                }
+                
 
                 if constexpr (ex_control == doEx || ey_control == doEy || ez_control == doEz)
                 {
@@ -446,7 +454,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                     );
                 }
 
-                if constexpr (ex_control == doEx) {
+                if (ex_control == doEx) {
                     Ex_particle_arr[ip] = Ex_particle;
                 }
                 if constexpr (ey_control == doEy) {
