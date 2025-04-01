@@ -383,7 +383,9 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
         const auto bz_type = Bz.ixType();
 
         const auto getPosition = GetParticlePosition<PIdx>(pti);
-        const auto getExternalEB = GetExternalEBField(pti);
+
+        WarpXParIter const& pti_const = static_cast<WarpXParIter const&>(pti);
+        const auto getExternalEB = GetExternalEBField(pti_const, lev0);
 
         amrex::ParticleReal* Ex_particle_arr = (fields_to_plot[0]) ? pti.GetStructOfArrays().GetRealData(fields_index[0]).dataPtr() : nullptr;
         amrex::ParticleReal* Ey_particle_arr = (fields_to_plot[1]) ? pti.GetStructOfArrays().GetRealData(fields_index[1]).dataPtr() : nullptr;
