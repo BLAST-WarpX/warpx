@@ -45,7 +45,9 @@ namespace ablastr::constant
         //! vacuum permittivity: dielectric permittivity of vacuum [F/m]
         static constexpr auto ep0 = 8.8541878188e-12_rt;
         //! vacuum permeability: magnetic permeability of vacuum = 4.0e-7 * pi [H/m]
-        static constexpr auto mu0 = 1.25663706127e-06_rt;
+        //! Note that this is adjusted from the CODATA2022 value, 1.25663706127e-06
+        //! So that the relation between mu0, ep0, and c is exact.
+        static constexpr auto mu0 = 1.2566370612685e-06_rt;
         //! elementary charge [C]
         static constexpr auto q_e = 1.602176634e-19_rt;
         //! electron mass [kg]
@@ -58,7 +60,9 @@ namespace ablastr::constant
         //! reduced Planck Constant = h / tau [J*s]
         static constexpr auto hbar = 1.0545718176461565e-34_rt;
         //! fine-structure constant = mu0/(4*pi)*q_e*q_e*c/hbar [dimensionless]
-        static constexpr auto alpha = 0.0072973525643_rt;
+        //! The value is calculated from the espression. This differs
+        //! slightly from the CODATA2022 value 0.0072973525643.
+        static constexpr auto alpha = 0.0072973525643330135_rt;
         //! classical electron radius = 1./(4*pi*ep0) * q_e*q_e/(m_e*c*c) [m]
         static constexpr auto r_e = 2.8179403205e-15_rt;
         //! xi: nonlinearity parameter of Heisenberg-Euler effective theory = (2.*alpha*alpha*ep0*ep0*hbar*hbar*hbar)/(45.*m_e*m_e*m_e*m_e*c*c*c*c*c)
