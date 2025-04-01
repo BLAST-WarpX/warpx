@@ -401,6 +401,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                 getExternalEB(ip, Ex_particle, Ey_particle, Ez_particle,
                     Bx_particle, By_particle, Bz_particle);
 
+<<<<<<< HEAD
                 if constexpr (Ex_runtime_flag == doEx || Ey_runtime_flag == doEy || Ez_runtime_flag == doEz) 
                 {
                     doDirectGatherVectorField(
@@ -412,6 +413,17 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                     );
                     
                 }
+=======
+
+
+                /*
+                Ex_particle_arr[ip] = 0._rt;
+                Ey_particle_arr[ip] = 0._rt;
+                Ez_particle_arr[ip] = 0._rt;
+                Bx_particle_arr[ip] = 0._rt;
+                By_particle_arr[ip] = 0._rt;
+                Bz_particle_arr[ip] = 0._rt;
+>>>>>>> 1c4801ab249f9e90eda89cd521af4d3139e6ab2b
 
                 if constexpr (Bx_runtime_flag == doBx || By_runtime_flag == doBy || Bz_runtime_flag == doBz) 
                 {
