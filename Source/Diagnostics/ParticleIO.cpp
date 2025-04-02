@@ -416,7 +416,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                 [[maybe_unused]] amrex::ParticleReal Ez_particle = 0._rt;
                 [[maybe_unused]] amrex::ParticleReal Bx_particle = 0._rt;
                 [[maybe_unused]] amrex::ParticleReal By_particle = 0._rt;
-                [[maybe_unused]] amrex::ParticleReal Bz_particle = 0._rt;  
+                [[maybe_unused]] amrex::ParticleReal Bz_particle = 0._rt;
 
                 //getExternalEB(ip, Ex_particle, Ey_particle, Ez_particle,
                 //    Bx_particle, By_particle, Bz_particle);
