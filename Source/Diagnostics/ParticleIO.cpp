@@ -327,8 +327,6 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
     constexpr auto lev0=0;
     const amrex::XDim3 dinv = WarpX::InvCellSize(lev0);
-    //const bool galerkin_interpolation = WarpX::galerkin_interpolation;
-    //const int nox = WarpX::nox;
     const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
 
     auto fields_names = amrex::Array<std::string, 6>{
@@ -420,6 +418,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
                 //getExternalEB(ip, Ex_particle, Ey_particle, Ez_particle,
                 //    Bx_particle, By_particle, Bz_particle);
+                // need to implement externalEB
 
                 const int depos_order_perp = 1; // adapt w/ shape function
                 const int depos_order_para = 1;
@@ -439,7 +438,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                         Ex_particle, Ey_particle, Ez_particle,
                         Ex_grid, Ey_grid, Ez_grid,
                         ex_type, ey_type, ez_type,
-                        dinv, xyzmin, lo, n_rz_azimuthal_modes //, nox, galerkin_interpolation
+                        dinv, xyzmin, lo, n_rz_azimuthal_modes 
                     );
                 }
 
@@ -450,7 +449,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                         Bx_particle, By_particle, Bz_particle,
                         Bx_grid, By_grid, Bz_grid,
                         bx_type, by_type, bz_type,
-                        dinv, xyzmin, lo, n_rz_azimuthal_modes //, nox, galerkin_interpolation
+                        dinv, xyzmin, lo, n_rz_azimuthal_modes
                     );
                 }
 
@@ -460,15 +459,6 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                 auto& rBx_particle = Bx_particle_arr;
                 auto& rBy_particle = By_particle_arr;
                 auto& rBz_particle = Bz_particle_arr;
-
-                /*
-                amrex::ParticleReal* Ex_particle_ptr = (ex_control == doEx) ? &Ex_particle_arr[ip] : nullptr;
-                amrex::ParticleReal* Ey_particle_ptr = (ey_control == doEy) ? &Ey_particle_arr[ip] : nullptr;
-                amrex::ParticleReal* Ez_particle_ptr = (ez_control == doEz) ? &Ez_particle_arr[ip] : nullptr;
-                amrex::ParticleReal* Bx_particle_ptr = (bx_control == doBx) ? &Bx_particle_arr[ip] : nullptr;
-                amrex::ParticleReal* By_particle_ptr = (by_control == doBy) ? &By_particle_arr[ip] : nullptr;
-                amrex::ParticleReal* Bz_particle_ptr = (bz_control == doBz) ? &Bz_particle_arr[ip] : nullptr;
-                */
 
                 amrex::ignore_unused(rEx_particle, rEy_particle, rEz_particle,
                     rBx_particle, rBy_particle, rBz_particle);
