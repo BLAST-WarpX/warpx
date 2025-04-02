@@ -81,4 +81,4 @@ diag_checksum.openpmd_backend = h5
 diag_checksum.fields_to_plot = Ex Ey Ez Bx By Bz
 diag_checksum.write_species = 1
 diag_checksum.species = electron
-diag_checksum.electron.variables = x z ux uy uz w Ex Ey Ez Bx By Bz 
+diag_checksum.electron.variables = x z ux uy uz w Ex Ey Ez Bx By Bz
