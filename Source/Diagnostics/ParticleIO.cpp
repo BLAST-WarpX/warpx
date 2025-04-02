@@ -461,6 +461,9 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                 amrex::ParticleReal* By_particle_ptr = (by_control == doBy) ? &By_particle_arr[ip] : nullptr;
                 amrex::ParticleReal* Bz_particle_ptr = (bz_control == doBz) ? &Bz_particle_arr[ip] : nullptr;
 
+                amrex::ignore_unused(Ex_particle_ptr, Ey_particle_ptr, Ez_particle_ptr,
+                    Bx_particle_ptr, By_particle_ptr, Bz_particle_ptr);
+
                 if constexpr (ex_control == doEx) {
                     *Ex_particle_ptr = Ex_particle;
                 }
