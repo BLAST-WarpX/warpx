@@ -404,7 +404,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
             CompileTimeOptions<doBx, noBx>, CompileTimeOptions<doBy, noBy>, CompileTimeOptions<doBz, noBz>>{},
             {Ex_runtime_flag, Ey_runtime_flag, Ez_runtime_flag, Bx_runtime_flag, By_runtime_flag, Bz_runtime_flag},
             pti.numParticles(),
-            [=, &Ex_particle_arr, &Ey_particle_arr, &Ez_particle_arr, &Bx_particle_arr, &By_particle_arr, &Bz_particle_arr] AMREX_GPU_DEVICE (long ip, auto ex_control, auto ey_control, auto ez_control,
+            [=] AMREX_GPU_DEVICE (long ip, auto ex_control, auto ey_control, auto ez_control,
                 auto bx_control, auto by_control, auto bz_control)
                 {
                 amrex::ParticleReal xp, yp, zp;
@@ -454,23 +454,30 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                     );
                 }
 
+                amrex::ParticleReal* Ex_particle_ptr = (ex_control == doEx) ? &Ex_particle_arr[ip] : nullptr;
+                amrex::ParticleReal* Ey_particle_ptr = (ey_control == doEy) ? &Ey_particle_arr[ip] : nullptr;
+                amrex::ParticleReal* Ez_particle_ptr = (ez_control == doEz) ? &Ez_particle_arr[ip] : nullptr;
+                amrex::ParticleReal* Bx_particle_ptr = (bx_control == doBx) ? &Bx_particle_arr[ip] : nullptr;
+                amrex::ParticleReal* By_particle_ptr = (by_control == doBy) ? &By_particle_arr[ip] : nullptr;
+                amrex::ParticleReal* Bz_particle_ptr = (bz_control == doBz) ? &Bz_particle_arr[ip] : nullptr;
+
                 if constexpr (ex_control == doEx) {
-                    Ex_particle_arr[ip] = Ex_particle;
+                    *Ex_particle_ptr = Ex_particle;
                 }
                 if constexpr (ey_control == doEy) {
-                    Ey_particle_arr[ip] = Ey_particle;
+                    *Ey_particle_ptr = Ey_particle;
                 }
                 if constexpr (ez_control == doEz) {
-                    Ez_particle_arr[ip] = Ez_particle;
+                    *Ez_particle_ptr = Ez_particle;
                 }
                 if constexpr (bx_control == doBx) {
-                    Bx_particle_arr[ip] = Bx_particle;
+                    *Bx_particle_ptr = Bx_particle;
                 }
                 if constexpr (by_control == doBy) {
-                    By_particle_arr[ip] = By_particle;
+                    *By_particle_ptr = By_particle;
                 }
                 if constexpr (bz_control == doBz) {
-                    Bz_particle_arr[ip] = Bz_particle;
+                    *Bz_particle_ptr = Bz_particle;
                 }
             });
     }
