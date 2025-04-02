@@ -72,7 +72,7 @@ diag1.openpmd_backend = h5
 diag1.fields_to_plot = none
 diag1.write_species = 1
 diag1.species = electron
-diag1.electron.variables = EM # will emit a warning because no position
+diag1.electron.variables = Ex Ey Ez Bx By Bz # will emit a warning because no position
 
 diag_checksum.intervals = 400:400
 diag_checksum.diag_type = Full
@@ -81,4 +81,4 @@ diag_checksum.openpmd_backend = h5
 diag_checksum.fields_to_plot = Ex Ey Ez Bx By Bz
 diag_checksum.write_species = 1
 diag_checksum.species = electron
-diag_checksum.electron.variables = x z ux uy uz w EM # will emit a warning because no position
+diag_checksum.electron.variables = x z ux uy uz w Ex Ey Ez Bx By Bz 
