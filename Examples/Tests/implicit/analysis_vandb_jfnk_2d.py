@@ -26,7 +26,7 @@ max_delta_E = np.abs(delta_E).max()
 
 # This case should have near machine precision conservation of energy
 tolerance_rel_energy = 2.0e-14
-tolerance_rel_charge = 5.0e-15
+tolerance_rel_charge = 2.0e-15
 
 print(f"max change in energy: {max_delta_E}")
 print(f"tolerance: {tolerance_rel_energy}")
