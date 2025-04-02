@@ -82,7 +82,6 @@ elif dims == "RZ":
         energy_ref = 191002.6526271543
     if current_correction and periodic_single_box:
         energy_ref = 472779.70801323955
-        tol_charge = 1.2e-9
     if current_correction and not periodic_single_box:
         energy_ref = 511671.4108624746
         tol_charge = 3e-4
