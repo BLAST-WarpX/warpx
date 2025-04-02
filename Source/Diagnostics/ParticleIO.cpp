@@ -438,7 +438,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                         Ex_particle, Ey_particle, Ez_particle,
                         Ex_grid, Ey_grid, Ez_grid,
                         ex_type, ey_type, ez_type,
-                        dinv, xyzmin, lo, n_rz_azimuthal_modes 
+                        dinv, xyzmin, lo, n_rz_azimuthal_modes
                     );
                 }
 
