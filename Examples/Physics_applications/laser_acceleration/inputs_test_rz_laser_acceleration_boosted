@@ -5,9 +5,9 @@ my_constants.plasma_length = 0.15 # m : total plasma length
 warpx.numprocs = 1 1
 
 warpx.zmax_plasma_to_compute_max_step = plasma_length
-amr.n_cell =  64  600 # TODO: more cells
+amr.n_cell =  64  900 # TODO: increase resolution
 geometry.dims = RZ
-geometry.prob_lo     =   0.      -30.e-6    # physical domain  # TODO: longer plasma
+geometry.prob_lo     =   0.      -45.e-6
 geometry.prob_hi     =  120.e-6    0.e-6
 amr.max_level = 0
 
@@ -37,7 +37,7 @@ warpx.use_filter = 1
 warpx.filter_npass_each_dir = 1 1
 
 # Boosted frame
-warpx.gamma_boost = 10.
+warpx.gamma_boost = 30.
 warpx.boost_direction = z
 psatd.use_default_v_galilean = 1
 
@@ -49,7 +49,8 @@ warpx.moving_window_v = 1.0 # units of speed of light
 #################################
 ############ PLASMA #############
 #################################
-particles.species_names = electrons beam
+particles.species_names = electrons ions beam
+particles.rigid_injected_species = beam
 
 electrons.charge = -q_e
 electrons.mass = m_e
@@ -93,22 +94,20 @@ beam.uy_th = 1.0
 beam.uz_th = 39.138943248532286
 beam.zinject_plane = 0.0
 beam.rigid_advance = true
-beam.projected = true
-beam.focused = false
 
 #################################
 ############ LASER ##############
 #################################
 lasers.names        = laser
 laser.profile      = Gaussian
-laser.position = 0. 0. -1.e-9  # This point is on the laser plane
-laser.direction    = 0. 0. 1.  # The plane normal direction
-laser.polarization = 0. 1. 0.   # The main polarization vector
-laser.e_max        = 6.82274e12  # Maximum amplitude of the laser field (in V/m)
+laser.position = 0. 0. -1.e-9    # This point is on the laser plane
+laser.direction    = 0. 0. 1.    # The plane normal direction
+laser.polarization = 0. 1. 0.    # The main polarization vector
+laser.a0           = 0.2  # Maximum amplitude of the laser field (in V/m) # TODO: increase
 laser.profile_waist = 50.e-6     # The waist of the laser (in meters)
-laser.profile_duration = 7.33841e-14  # The duration of the laser (in seconds)
-laser.profile_t_peak = 1.46764864e-13 # The time at which the laser reaches its peak (in seconds)
-laser.wavelength = 0.8e-6             # The wavelength of the laser (in meters)
+laser.profile_duration = 30e-15  # The duration of the laser (in seconds)
+laser.profile_t_peak = 60e-15    # The time at which the laser reaches its peak (in seconds)
+laser.wavelength = 0.8e-6        # The wavelength of the laser (in meters)
 laser.profile_focal_distance = 0
 
 # Diagnostics
@@ -120,6 +119,7 @@ diag1.dz_snapshots_lab = plasma_length/20
 diag1.format = openpmd
 diag1.species = beam
 
+# TODO: remove diag0
 diag0.diag_type = Full
 diag0.intervals = 10
 diag0.format = openpmd
