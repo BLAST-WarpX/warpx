@@ -5,9 +5,9 @@ my_constants.plasma_length = 0.15 # m : total plasma length
 warpx.numprocs = 1 1
 
 warpx.zmax_plasma_to_compute_max_step = plasma_length
-amr.n_cell =  64  600
+amr.n_cell =  64  600 # TODO: more cells
 geometry.dims = RZ
-geometry.prob_lo     =   0.      -30.e-6    # physical domain
+geometry.prob_lo     =   0.      -30.e-6    # physical domain  # TODO: longer plasma
 geometry.prob_hi     =  120.e-6    0.e-6
 amr.max_level = 0
 
@@ -122,3 +122,4 @@ diag1.species = beam
 
 diag0.diag_type = Full
 diag0.intervals = 10
+diag0.format = openpmd
