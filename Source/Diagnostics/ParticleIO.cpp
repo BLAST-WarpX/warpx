@@ -354,7 +354,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
         } else if (nox == 3) {
             gatherE = doDirectGatherVectorField<3,2>;
             gatherB = doDirectGatherVectorField<2,3>;
-        } else if (nox == 4) {
+        } else { // if (nox == 4) {
             gatherE = doDirectGatherVectorField<4,3>;
             gatherB = doDirectGatherVectorField<3,4>;
         }
@@ -368,7 +368,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
         } else if (nox == 3) {
             gatherE = doDirectGatherVectorField<3,3>;
             gatherB = doDirectGatherVectorField<3,3>;
-        } else if (nox == 4) {
+        } else { // if (nox == 4) {
             gatherE = doDirectGatherVectorField<4,4>;
             gatherB = doDirectGatherVectorField<4,4>;
         }
