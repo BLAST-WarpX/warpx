@@ -331,6 +331,37 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
     const int nox = WarpX::nox;
     const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
 
+    // need to do that for constant expression for compilation 
+    if (galerkin_interpolation) {
+        if (nox == 1) {
+            const int depos_order_E_perp_B_para = 1;
+            const int depos_order_E_para_B_perp = 0;
+        } else if (nox == 2) {
+            const int depos_order_E_perp_B_para = 2;
+            const int depos_order_E_para_B_perp = 1;
+        } else if (nox == 3) {
+            const int depos_order_E_perp_B_para = 3;
+            const int depos_order_E_para_B_perp = 2;
+        } else if (nox == 4) {
+            const int depos_order_E_perp_B_para = 4;
+            const int depos_order_E_para_B_perp = 3;
+        }
+    } else {
+        if (nox == 1) {
+            const int depos_order_E_perp_B_para = 1;
+            const int depos_order_E_para_B_perp = 1;
+        } else if (nox == 2) {
+            const int depos_order_E_perp_B_para = 2;
+            const int depos_order_E_para_B_perp = 2;
+        } else if (nox == 3) {
+            const int depos_order_E_perp_B_para = 3;
+            const int depos_order_E_para_B_perp = 3;
+        } else if (nox == 4) {
+            const int depos_order_E_perp_B_para = 4;
+            const int depos_order_E_para_B_perp = 4;
+        }
+    }
+
     auto fields_names = amrex::Array<std::string, 6>{
         "Ex", "Ey", "Ez", "Bx", "By", "Bz"};
 
@@ -433,7 +464,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
                 if constexpr (ex_control == doEx || ey_control == doEy || ez_control == doEz)
                 {
-                    doDirectGatherVectorField<nox, nox-galerkin_interpolation>(
+                    doDirectGatherVectorField<depos_order_E_perp_B_para, depos_order_E_para_B_perp>(
                         xp, yp, zp,
                         Ex_particle, Ey_particle, Ez_particle,
                         Ex_grid, Ey_grid, Ez_grid,
@@ -446,7 +477,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                 {
                     // constexpr int depos_order_para = nox;
                     // constexpr int depos_order_perp = nox - galerkin_interpolation;
-                    doDirectGatherVectorField<nox-galerkin_interpolation, nox>(
+                    doDirectGatherVectorField<depos_order_E_para_B_perp, depos_order_E_perp_B_para>(
                         xp, yp, zp,
                         Bx_particle, By_particle, Bz_particle,
                         Bx_grid, By_grid, Bz_grid,
