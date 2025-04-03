@@ -43,10 +43,10 @@ export LD_LIBRARY_PATH=${SW_DIR}/boost-1.82.0/lib:$LD_LIBRARY_PATH
 # optional: for openPMD support (hdf5 and adios2)
 module load hdf5/1.12.2
 export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-1.21.6:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.10.1:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.10.2:$CMAKE_PREFIX_PATH
 export LD_LIBRARY_PATH=${SW_DIR}/c-blosc-1.21.6/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=${SW_DIR}/adios2-2.10.1/lib64:$LD_LIBRARY_PATH
-export PATH=${SW_DIR}/adios2-2.10.1/bin:${PATH}
+export LD_LIBRARY_PATH=${SW_DIR}/adios2-2.10.2/lib64:$LD_LIBRARY_PATH
+export PATH=${SW_DIR}/adios2-2.10.2/bin:${PATH}
 
 # compiler environment hints
 export CC=$(which gcc)

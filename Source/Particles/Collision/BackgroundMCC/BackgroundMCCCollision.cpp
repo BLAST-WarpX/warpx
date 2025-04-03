@@ -7,6 +7,7 @@
 #include "BackgroundMCCCollision.H"
 
 #include "ImpactIonization.H"
+#include "Particles/Algorithms/KineticEnergy.H"
 #include "Particles/ParticleCreation/FilterCopyTransform.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Utils/Parser/ParserUtils.H"
@@ -40,7 +41,7 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
     }
     else {
         std::string background_density_str;
-        pp_collision_name.get("background_density(x,y,z,t)", background_density_str);
+        utils::parser::Store_parserString(pp_collision_name, "background_density(x,y,z,t)", background_density_str);
         m_background_density_parser =
             utils::parser::makeParser(background_density_str, {"x", "y", "z", "t"});
     }
@@ -55,7 +56,7 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
     }
     else {
         std::string background_temperature_str;
-        pp_collision_name.get("background_temperature(x,y,z,t)", background_temperature_str);
+        utils::parser::Store_parserString(pp_collision_name, "background_temperature(x,y,z,t)", background_temperature_str);
         m_background_temperature_parser =
             utils::parser::makeParser(background_temperature_str, {"x", "y", "z", "t"});
     }
@@ -276,7 +277,7 @@ BackgroundMCCCollision::doCollisions (amrex::Real cur_time, amrex::Real dt, Mult
         }
 
         amrex::Print() << Utils::TextMsg::Info(
-            "Setting up collisions for " + m_species_names[0] + " with:\n"
+            "Setting up Monte-Carlo collisions for " + m_species_names[0] + " with:\n"
             + "     total non-ionization collision probability: "
             + std::to_string(m_total_collision_prob)
             + "\n     total ionization collision probability: "
@@ -435,8 +436,8 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
                                   // subtract any energy penalty of the collision from the
                                   // projectile energy
                                   if (scattering_process.m_energy_penalty > 0.0_prt) {
-                                      ParticleUtils::getEnergy(v_coll2, m, E_coll);
-                                      E_coll = (E_coll - scattering_process.m_energy_penalty) * PhysConst::q_e;
+                                      constexpr auto eV = PhysConst::q_e;
+                                      E_coll = (Algorithms::KineticEnergy<double>(vx, vy, vz, m) - scattering_process.m_energy_penalty*eV);
                                       const auto scale_fac = static_cast<amrex::ParticleReal>(
                                         std::sqrt(E_coll * (E_coll + 2.0_prt*mc2) / c2) / m / v_coll);
                                       vx *= scale_fac;
