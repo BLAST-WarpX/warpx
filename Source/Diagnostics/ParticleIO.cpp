@@ -327,6 +327,8 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
     constexpr auto lev0=0;
     const amrex::XDim3 dinv = WarpX::InvCellSize(lev0);
+    const bool galerkin_interpolation = WarpX::galerkin_interpolation;
+    const int nox = WarpX::nox;
     const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
 
     auto fields_names = amrex::Array<std::string, 6>{
@@ -420,8 +422,6 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                 //    Bx_particle, By_particle, Bz_particle);
                 // need to implement externalEB
 
-                const int depos_order_perp = 1; // adapt w/ shape function
-                const int depos_order_para = 1;
                 if (ex_control == noEx && ey_control == noEy && ez_control == noEz &&
                     bx_control == noBx && by_control == noBy && bz_control == noBz) {
                         // only for compiling the kernel where nothing is asked (but the function won't be called anyway)
@@ -432,7 +432,9 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
 
                 if constexpr (ex_control == doEx || ey_control == doEy || ez_control == doEz)
-                {
+                {   
+                    const int depos_order_perp = nox;
+                    const int depos_order_para = nox - galerkin_interpolation;
                     doDirectGatherVectorField<depos_order_perp, depos_order_para>(
                         xp, yp, zp,
                         Ex_particle, Ey_particle, Ez_particle,
@@ -444,6 +446,8 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
                 if constexpr (bx_control == doBx || by_control == doBy || bz_control == doBz)
                 {
+                    const int depos_order_para = nox;
+                    const int depos_order_perp = nox - galerkin_interpolation;
                     doDirectGatherVectorField<depos_order_perp, depos_order_para>(
                         xp, yp, zp,
                         Bx_particle, By_particle, Bz_particle,
