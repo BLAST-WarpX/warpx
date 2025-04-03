@@ -332,33 +332,45 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
     const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
 
     // need to do that for constant expression for compilation
+    void (*gatherE)(amrex::ParticleReal, amrex::ParticleReal, amrex::ParticleReal,
+                    amrex::ParticleReal&, amrex::ParticleReal&, amrex::ParticleReal&,
+                    const amrex::Array4<const amrex::Real>&, const amrex::Array4<const amrex::Real>&, const amrex::Array4<const amrex::Real>&,
+                    const amrex::IndexType&, const amrex::IndexType&, const amrex::IndexType&,
+                    const amrex::XDim3&, const amrex::XDim3&, const Dim3&, int);
+
+    void (*gatherB)(amrex::ParticleReal, amrex::ParticleReal, amrex::ParticleReal,
+                    amrex::ParticleReal&, amrex::ParticleReal&, amrex::ParticleReal&,
+                    const amrex::Array4<const amrex::Real>&, const amrex::Array4<const amrex::Real>&, const amrex::Array4<const amrex::Real>&,
+                    const amrex::IndexType&, const amrex::IndexType&, const amrex::IndexType&,
+                    const amrex::XDim3&, const amrex::XDim3&, const Dim3&, int);
+
     if (galerkin_interpolation) {
         if (nox == 1) {
-            auto gatherE = doDirectGatherVectorField<1,0>;
-            auto gatherB = doDirectGatherVectorField<0,1>;
+            gatherE = doDirectGatherVectorField<1,0>;
+            gatherB = doDirectGatherVectorField<0,1>;
         } else if (nox == 2) {
-            auto gatherE = doDirectGatherVectorField<2,1>;
-            auto gatherB = doDirectGatherVectorField<1,2>;
+            gatherE = doDirectGatherVectorField<2,1>;
+            gatherB = doDirectGatherVectorField<1,2>;
         } else if (nox == 3) {
-            auto gatherE = doDirectGatherVectorField<3,2>;
-            auto gatherB = doDirectGatherVectorField<2,3>;
+            gatherE = doDirectGatherVectorField<3,2>;
+            gatherB = doDirectGatherVectorField<2,3>;
         } else if (nox == 4) {
-            auto gatherE = doDirectGatherVectorField<4,3>;
-            auto gatherB = doDirectGatherVectorField<3,4>;
+            gatherE = doDirectGatherVectorField<4,3>;
+            gatherB = doDirectGatherVectorField<3,4>;
         }
     } else {
         if (nox == 1) {
-            auto gatherE = doDirectGatherVectorField<1,1>;
-            auto gatherB = doDirectGatherVectorField<1,1>;
+            gatherE = doDirectGatherVectorField<1,1>;
+            gatherB = doDirectGatherVectorField<1,1>;
         } else if (nox == 2) {
-            auto gatherE = doDirectGatherVectorField<2,2>;
-            auto gatherB = doDirectGatherVectorField<2,2>;
+            gatherE = doDirectGatherVectorField<2,2>;
+            gatherB = doDirectGatherVectorField<2,2>;
         } else if (nox == 3) {
-            auto gatherE = doDirectGatherVectorField<3,3>;
-            auto gatherB = doDirectGatherVectorField<3,3>;
+            gatherE = doDirectGatherVectorField<3,3>;
+            gatherB = doDirectGatherVectorField<3,3>;
         } else if (nox == 4) {
-            auto gatherE = doDirectGatherVectorField<4,4>;
-            auto gatherB = doDirectGatherVectorField<4,4>;
+            gatherE = doDirectGatherVectorField<4,4>;
+            gatherB = doDirectGatherVectorField<4,4>;
         }
     }
 
