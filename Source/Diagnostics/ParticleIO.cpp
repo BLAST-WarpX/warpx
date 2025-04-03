@@ -334,31 +334,31 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
     // need to do that for constant expression for compilation
     if (galerkin_interpolation) {
         if (nox == 1) {
-            const int depos_order_E_perp_B_para = 1;
-            const int depos_order_E_para_B_perp = 0;
+            auto gatherE = doDirectGatherVectorField<1,0>;
+            auto gatherB = doDirectGatherVectorField<0,1>;
         } else if (nox == 2) {
-            const int depos_order_E_perp_B_para = 2;
-            const int depos_order_E_para_B_perp = 1;
+            auto gatherE = doDirectGatherVectorField<2,1>;
+            auto gatherB = doDirectGatherVectorField<1,2>;
         } else if (nox == 3) {
-            const int depos_order_E_perp_B_para = 3;
-            const int depos_order_E_para_B_perp = 2;
+            auto gatherE = doDirectGatherVectorField<3,2>;
+            auto gatherB = doDirectGatherVectorField<2,3>;
         } else if (nox == 4) {
-            const int depos_order_E_perp_B_para = 4;
-            const int depos_order_E_para_B_perp = 3;
+            auto gatherE = doDirectGatherVectorField<4,3>;
+            auto gatherB = doDirectGatherVectorField<3,4>;
         }
     } else {
         if (nox == 1) {
-            const int depos_order_E_perp_B_para = 1;
-            const int depos_order_E_para_B_perp = 1;
+            auto gatherE = doDirectGatherVectorField<1,1>;
+            auto gatherB = doDirectGatherVectorField<1,1>;
         } else if (nox == 2) {
-            const int depos_order_E_perp_B_para = 2;
-            const int depos_order_E_para_B_perp = 2;
+            auto gatherE = doDirectGatherVectorField<2,2>;
+            auto gatherB = doDirectGatherVectorField<2,2>;
         } else if (nox == 3) {
-            const int depos_order_E_perp_B_para = 3;
-            const int depos_order_E_para_B_perp = 3;
+            auto gatherE = doDirectGatherVectorField<3,3>;
+            auto gatherB = doDirectGatherVectorField<3,3>;
         } else if (nox == 4) {
-            const int depos_order_E_perp_B_para = 4;
-            const int depos_order_E_para_B_perp = 4;
+            auto gatherE = doDirectGatherVectorField<4,4>;
+            auto gatherB = doDirectGatherVectorField<4,4>;
         }
     }
 
@@ -464,7 +464,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
                 if constexpr (ex_control == doEx || ey_control == doEy || ez_control == doEz)
                 {
-                    doDirectGatherVectorField<depos_order_E_perp_B_para, depos_order_E_para_B_perp>(
+                    gatherE(
                         xp, yp, zp,
                         Ex_particle, Ey_particle, Ez_particle,
                         Ex_grid, Ey_grid, Ez_grid,
@@ -477,7 +477,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                 {
                     // constexpr int depos_order_para = nox;
                     // constexpr int depos_order_perp = nox - galerkin_interpolation;
-                    doDirectGatherVectorField<depos_order_E_para_B_perp, depos_order_E_perp_B_para>(
+                    gatherB(
                         xp, yp, zp,
                         Bx_particle, By_particle, Bz_particle,
                         Bx_grid, By_grid, Bz_grid,
