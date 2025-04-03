@@ -1,12 +1,13 @@
 #################################
 ####### GENERAL PARAMETERS ######
 #################################
-my_constants.plasma_length = 0.3 # m : total plasma length
+my_constants.plasma_length = 0.15 # m : total plasma length
+warpx.numprocs = 1 1
 
 warpx.zmax_plasma_to_compute_max_step = plasma_length
-amr.n_cell =  64  3840
+amr.n_cell =  64  600
 geometry.dims = RZ
-geometry.prob_lo     =   0.      -160.e-6    # physical domain
+geometry.prob_lo     =   0.      -30.e-6    # physical domain
 geometry.prob_hi     =  120.e-6    0.e-6
 amr.max_level = 0
 
@@ -108,11 +109,16 @@ laser.profile_waist = 50.e-6     # The waist of the laser (in meters)
 laser.profile_duration = 7.33841e-14  # The duration of the laser (in seconds)
 laser.profile_t_peak = 1.46764864e-13 # The time at which the laser reaches its peak (in seconds)
 laser.wavelength = 0.8e-6             # The wavelength of the laser (in meters)
+laser.profile_focal_distance = 0
 
 # Diagnostics
-diagnostics.diags_names = diag1
-diag1.intervals = 10
-diag1.diag_type = Full
-diag1.fields_to_plot = Er Et Ez Br Bt Bz jr jt jz rho
-diag1.electrons.variables = x y z w ux uy uz orig_x orig_z
-diag1.beam.variables = x y z w ux uy uz
+diagnostics.diags_names = diag1 diag0
+
+diag1.diag_type = BackTransformed
+diag1.num_snapshots_lab = 20
+diag1.dz_snapshots_lab = plasma_length/20
+diag1.format = openpmd
+diag1.species = beam
+
+diag0.diag_type = Full
+diag0.intervals = 10
