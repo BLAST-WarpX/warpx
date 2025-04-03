@@ -334,15 +334,15 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
     // need to do that for constant expression for compilation
     void (*gatherE)(amrex::ParticleReal, amrex::ParticleReal, amrex::ParticleReal,
                     amrex::ParticleReal&, amrex::ParticleReal&, amrex::ParticleReal&,
-                    const amrex::Array4<const double>&, const amrex::Array4<const double>&, const amrex::Array4<const double>&,
+                    const amrex::Array4<amrex::Real const>&, const amrex::Array4<amrex::Real const>&, const amrex::Array4<amrex::Real const>&,
                     amrex::IndexType, amrex::IndexType, amrex::IndexType,
-                    const amrex::XDim3&, const amrex::XDim3&, const amrex::Dim3&, int);
+                    const amrex::XDim3&, const amrex::XDim3&, const amrex::Dim3&, const int);
 
     void (*gatherB)(amrex::ParticleReal, amrex::ParticleReal, amrex::ParticleReal,
                     amrex::ParticleReal&, amrex::ParticleReal&, amrex::ParticleReal&,
-                    const amrex::Array4<const double>&, const amrex::Array4<const double>&, const amrex::Array4<const double>&,
+                    const amrex::Array4<amrex::Real const>&, const amrex::Array4<amrex::Real const>&, const amrex::Array4<amrex::Real const>&,
                     amrex::IndexType, amrex::IndexType, amrex::IndexType,
-                    const amrex::XDim3&, const amrex::XDim3&, const amrex::Dim3&, int);
+                    const amrex::XDim3&, const amrex::XDim3&, const amrex::Dim3&, const int);
 
     if (galerkin_interpolation) {
         if (nox == 1) {
