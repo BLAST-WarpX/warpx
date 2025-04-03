@@ -192,10 +192,6 @@ void HybridPICModel::InitData ()
     const std::set<std::string> hyper_resistivity_symbols = m_hyper_resistivity_parser->symbols();
     m_hyper_resistivity_has_B_dependence += hyper_resistivity_symbols.count("B");
 
-    m_nu_ei_parser = std::make_unique<amrex::Parser>(
-        utils::parser::makeParser(m_nu_ei_expression, {"ne","Te"}));
-    m_nu_ei = m_nu_ei_parser->compile<2>();
-
     m_J_external_parser[0] = std::make_unique<amrex::Parser>(
         utils::parser::makeParser(m_Jx_ext_grid_function,{"x","y","z","t"}));
     m_J_external_parser[1] = std::make_unique<amrex::Parser>(
