@@ -331,7 +331,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
     const int nox = WarpX::nox;
     const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
 
-    // need to do that for constant expression for compilation 
+    // need to do that for constant expression for compilation
     if (galerkin_interpolation) {
         if (nox == 1) {
             const int depos_order_E_perp_B_para = 1;
