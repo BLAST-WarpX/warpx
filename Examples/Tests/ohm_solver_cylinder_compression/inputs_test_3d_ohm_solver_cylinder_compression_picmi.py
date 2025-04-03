@@ -247,7 +247,7 @@ class PlasmaCylinderCompression(object):
             upper_boundary_conditions=["dirichlet", "dirichlet", "periodic"],
             lower_boundary_conditions_particles=["absorbing", "absorbing", "periodic"],
             upper_boundary_conditions_particles=["absorbing", "absorbing", "periodic"],
-            warpx_max_grid_size=16,
+            warpx_max_grid_size=self.NZ,
         )
         simulation.time_step_size = self.dt
         simulation.max_steps = self.total_steps
@@ -342,23 +342,25 @@ class PlasmaCylinderCompression(object):
         # Add diagnostics                                                     #
         #######################################################################
 
-        if self.test:
-            particle_diag = picmi.ParticleDiagnostic(
-                name="diag1",
-                period=self.diag_steps,
-                species=[self.ions],
-                data_list=["ux", "uy", "uz", "x", "z", "weighting"],
-                write_dir="diags",
-                warpx_format="plotfile",
-            )
-            simulation.add_diagnostic(particle_diag)
+        # if self.test:
+        #     particle_diag = picmi.ParticleDiagnostic(
+        #         name="diag1",
+        #         period=self.diag_steps,
+        #         species=[self.ions],
+        #         data_list=["ux", "uy", "uz", "x", "z", "weighting"],
+        #         write_dir="diags",
+        #         warpx_format="plotfile",
+        #     )
+        #     simulation.add_diagnostic(particle_diag)
         field_diag = picmi.FieldDiagnostic(
             name="diag1",
             grid=self.grid,
             period=self.diag_steps,
-            data_list=["B", "E", "rho"],
+            data_list=["B", "E", "rho", "Tx_ions", "Ty_ions", "Tz_ions"],
             write_dir="diags",
-            warpx_format="plotfile",
+            warpx_file_prefix="field_diags",
+            warpx_format="openpmd",
+            warpx_openpmd_backend="h5",
         )
         simulation.add_diagnostic(field_diag)
 
@@ -397,12 +399,4 @@ args, left = parser.parse_known_args()
 sys.argv = sys.argv[:1] + left
 
 run = PlasmaCylinderCompression(test=args.test, verbose=args.verbose)
-simulation.step(1)
-
-
-# Dump out temp arrays to np file
-Tx = fields.CustomNamedxWrapper("T_ions")
-Ty = fields.CustomNamedyWrapper("T_ions")
-Tz = fields.CustomNamedzWrapper("T_ions")
-
-np.savez("TemperatureArrays.npz", Tx=Tx[:], Ty=Ty[:], Tz=Tz[:])
+simulation.step()

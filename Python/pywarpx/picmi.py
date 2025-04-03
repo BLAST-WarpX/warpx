@@ -3392,6 +3392,7 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                 "Jz_displacement",
             ]
             A_fields_list = ["Ar", "At", "Az"]
+            T_fields_list = ["Tr_", "Tt_", "Tz_"]
         else:
             E_fields_list = ["Ex", "Ey", "Ez"]
             B_fields_list = ["Bx", "By", "Bz"]
@@ -3402,6 +3403,7 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                 "Jz_displacement",
             ]
             A_fields_list = ["Ax", "Ay", "Az"]
+            T_fields_list = ["Tx_", "Ty_", "Tz_"]
         if self.data_list is not None:
             for dataname in self.data_list:
                 if dataname == "E":
@@ -3445,6 +3447,8 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                     fields_to_plot.add(dataname)
                 elif dataname.startswith("T_"):
                     # Adds T_species diagnostic
+                    fields_to_plot.add(dataname)
+                elif any([dataname.startswith(tstr) for tstr in T_fields_list]):
                     fields_to_plot.add(dataname)
                 elif dataname == "dive":
                     fields_to_plot.add("divE")
