@@ -52,8 +52,6 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("plasma_resistivity(rho,J,Te)", m_eta_expression);
     pp_hybrid.query("plasma_hyper_resistivity(rho,B)", m_eta_h_expression);
 
-    pp_hybrid.query("nu_ei_function(ne,Te)", m_nu_ei_expression);
-
     utils::parser::queryWithParser(pp_hybrid, "n_floor", m_n_floor);
 
     // convert electron temperature from eV to J
@@ -81,10 +79,6 @@ void HybridPICModel::ReadParameters ()
 
     //bool to indicate if classical Bremsstrahlung loss is included (when m_solve_electron_energy_equation is True)
     utils::parser::queryWithParser(pp_hybrid, "include_Bremsstrahlung", m_include_Bremsstrahlung);
-
-    // bool to indicate if electron ion collisions are included
-    // this requires to use MCC on the input file
-    utils::parser::queryWithParser(pp_hybrid, "include_Qei", m_include_Qei);
 
     // Z effective for Bremsstrahlung power loss.
     pp_hybrid.query("Zeff", m_Zeff);
