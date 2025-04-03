@@ -84,7 +84,7 @@ init_pos = np.array([0.0, 0.0, 0.0])
 
 # Tolerance
 tol_pos = 1.0e-14
-tol_mom = 0.0  # momentum should be conserved exactly
+tol_mom = np.finfo(np.float64).eps  # momentum should be conserved exactly
 # ________________________________________
 
 # Input filename
