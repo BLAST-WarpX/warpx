@@ -1,0 +1,118 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+my_constants.plasma_length = 0.3 # m : total plasma length
+
+warpx.zmax_plasma_to_compute_max_step = plasma_length
+amr.n_cell =  64  3840
+geometry.dims = RZ
+geometry.prob_lo     =   0.      -160.e-6    # physical domain
+geometry.prob_hi     =  120.e-6    0.e-6
+amr.max_level = 0
+
+boundary.field_lo = none damped
+boundary.field_hi = none damped
+
+# PSATD Maxwell solver
+algo.maxwell_solver = psatd
+algo.particle_shape = 3
+psatd.current_correction = 1
+psatd.nox = 8
+psatd.noz = 16
+psatd.nx_guard = 32
+psatd.nz_guard = 32
+psatd.update_with_rho = 1
+
+# Other algorithm parameters
+warpx.cfl = 1
+algo.particle_shape = 3
+warpx.n_rz_azimuthal_modes = 2
+algo.charge_deposition = standard
+algo.current_deposition = direct
+algo.field_gathering = momentum-conserving
+algo.particle_pusher = vay
+warpx.do_dive_cleaning = 0
+warpx.use_filter = 1
+warpx.filter_npass_each_dir = 1 1
+
+# Boosted frame
+warpx.gamma_boost = 10.
+warpx.boost_direction = z
+psatd.use_default_v_galilean = 1
+
+# Moving window
+warpx.do_moving_window = 1
+warpx.moving_window_dir = z
+warpx.moving_window_v = 1.0 # units of speed of light
+
+#################################
+############ PLASMA #############
+#################################
+particles.species_names = electrons beam
+
+electrons.charge = -q_e
+electrons.mass = m_e
+electrons.injection_style = "NUniformPerCell"
+electrons.num_particles_per_cell_each_dim = 2 6 2
+electrons.xmax =  100.e-6
+electrons.zmin =  0.e-6
+electrons.profile = parse_density_function
+electrons.density_function(x,y,z) = "w_matched = 50e-6; n_on_axis = 3e24 ; rel_delta_n_over_w2 = 1./( pi * 2.81e-15 * w_matched**4 * n_on_axis ) ; n_on_axis * ( 1. + rel_delta_n_over_w2 * (x**2 + y**2) )"
+electrons.momentum_distribution_type = constant
+electrons.do_continuous_injection = 1
+
+ions.charge = q_e
+ions.mass = m_p
+ions.injection_style = "NUniformPerCell"
+ions.num_particles_per_cell_each_dim = 2 6 2
+ions.xmax =  100.e-6
+ions.zmin =  0.e-6
+ions.profile = parse_density_function
+ions.density_function(x,y,z) = "w_matched = 50e-6; n_on_axis = 3e24 ; rel_delta_n_over_w2 = 1./( pi * 2.81e-15 * w_matched**4 * n_on_axis ) ; n_on_axis * ( 1. + rel_delta_n_over_w2 * (x**2 + y**2) )"
+ions.momentum_distribution_type = constant
+ions.do_continuous_injection = 1
+
+beam.charge = -q_e
+beam.mass = m_e
+beam.injection_style = "gaussian_beam"
+beam.x_rms = 3.0e-6
+beam.y_rms = 3.0e-6
+beam.z_rms = 2.0e-6
+beam.x_m = 0.
+beam.y_m = 0.
+beam.z_m = -109.e-6
+beam.npart = 50000
+beam.q_tot = -1.5e-10
+beam.momentum_distribution_type = "gaussian"
+beam.ux_m = 0.
+beam.uy_m = 0.
+beam.uz_m = 1956.9469069265976
+beam.ux_th = 1.0
+beam.uy_th = 1.0
+beam.uz_th = 39.138943248532286
+beam.zinject_plane = 0.0
+beam.rigid_advance = true
+beam.projected = true
+beam.focused = false
+
+#################################
+############ LASER ##############
+#################################
+lasers.names        = laser
+laser.profile      = Gaussian
+laser.position = 0. 0. -1.e-9  # This point is on the laser plane
+laser.direction    = 0. 0. 1.  # The plane normal direction
+laser.polarization = 0. 1. 0.   # The main polarization vector
+laser.e_max        = 6.82274e12  # Maximum amplitude of the laser field (in V/m)
+laser.profile_waist = 50.e-6     # The waist of the laser (in meters)
+laser.profile_duration = 7.33841e-14  # The duration of the laser (in seconds)
+laser.profile_t_peak = 1.46764864e-13 # The time at which the laser reaches its peak (in seconds)
+laser.wavelength = 0.8e-6             # The wavelength of the laser (in meters)
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 10
+diag1.diag_type = Full
+diag1.fields_to_plot = Er Et Ez Br Bt Bz jr jt jz rho
+diag1.electrons.variables = x y z w ux uy uz orig_x orig_z
+diag1.beam.variables = x y z w ux uy uz
