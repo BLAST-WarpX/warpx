@@ -433,8 +433,8 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
                 if constexpr (ex_control == doEx || ey_control == doEy || ez_control == doEz)
                 {
-                    const int depos_order_perp = nox;
-                    const int depos_order_para = nox - galerkin_interpolation;
+                    constexpr int depos_order_perp = nox;
+                    constexpr int depos_order_para = nox - galerkin_interpolation;
                     doDirectGatherVectorField<depos_order_perp, depos_order_para>(
                         xp, yp, zp,
                         Ex_particle, Ey_particle, Ez_particle,
@@ -446,8 +446,8 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
                 if constexpr (bx_control == doBx || by_control == doBy || bz_control == doBz)
                 {
-                    const int depos_order_para = nox;
-                    const int depos_order_perp = nox - galerkin_interpolation;
+                    constexpr int depos_order_para = nox;
+                    constexpr int depos_order_perp = nox - galerkin_interpolation;
                     doDirectGatherVectorField<depos_order_perp, depos_order_para>(
                         xp, yp, zp,
                         Bx_particle, By_particle, Bz_particle,
