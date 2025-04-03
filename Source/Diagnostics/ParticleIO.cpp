@@ -354,7 +354,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
         } else if (nox == 3) {
             gatherE = doDirectGatherVectorField<3,2>;
             gatherB = doDirectGatherVectorField<2,3>;
-        } else { // if (nox == 4) {
+        } else { 
             gatherE = doDirectGatherVectorField<4,3>;
             gatherB = doDirectGatherVectorField<3,4>;
         }
@@ -368,7 +368,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
         } else if (nox == 3) {
             gatherE = doDirectGatherVectorField<3,3>;
             gatherB = doDirectGatherVectorField<3,3>;
-        } else { // if (nox == 4) {
+        } else { 
             gatherE = doDirectGatherVectorField<4,4>;
             gatherB = doDirectGatherVectorField<4,4>;
         }
@@ -473,10 +473,13 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                             bx_type, by_type, bz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
                 }
 
+                auto& rGatherE = gatherE;
+                auto& rGatherB = gatherB;
+                amrex::ignore_unused(rGatherE, rGatherB);
 
                 if constexpr (ex_control == doEx || ey_control == doEy || ez_control == doEz)
                 {
-                    gatherE(
+                    rGatherE(
                         xp, yp, zp,
                         Ex_particle, Ey_particle, Ez_particle,
                         Ex_grid, Ey_grid, Ez_grid,
@@ -487,9 +490,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
                 if constexpr (bx_control == doBx || by_control == doBy || bz_control == doBz)
                 {
-                    // constexpr int depos_order_para = nox;
-                    // constexpr int depos_order_perp = nox - galerkin_interpolation;
-                    gatherB(
+                    rGatherB(
                         xp, yp, zp,
                         Bx_particle, By_particle, Bz_particle,
                         Bx_grid, By_grid, Bz_grid,
