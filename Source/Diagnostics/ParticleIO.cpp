@@ -332,17 +332,17 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
     const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
 
     // need to do that for constant expression for compilation
-    void (*gatherE)(amrex::ParticleReal, amrex::ParticleReal, amrex::ParticleReal,
-                    amrex::ParticleReal&, amrex::ParticleReal&, amrex::ParticleReal&,
-                    const amrex::Array4<const amrex::Real>&, const amrex::Array4<const amrex::Real>&, const amrex::Array4<const amrex::Real>&,
-                    const amrex::IndexType&, const amrex::IndexType&, const amrex::IndexType&,
-                    const amrex::XDim3&, const amrex::XDim3&, const Dim3&, int);
+    void (*gatherE)(amrex::ParticleReal, amrex::ParticleReal, amrex::ParticleReal, 
+                    amrex::ParticleReal&, amrex::ParticleReal&, amrex::ParticleReal&, 
+                    const amrex::Array4<const double>&, const amrex::Array4<const double>&, const amrex::Array4<const double>&, 
+                    amrex::IndexType, amrex::IndexType, amrex::IndexType, 
+                    const amrex::XDim3&, const amrex::XDim3&, const amrex::Dim3&, int);
 
-    void (*gatherB)(amrex::ParticleReal, amrex::ParticleReal, amrex::ParticleReal,
-                    amrex::ParticleReal&, amrex::ParticleReal&, amrex::ParticleReal&,
-                    const amrex::Array4<const amrex::Real>&, const amrex::Array4<const amrex::Real>&, const amrex::Array4<const amrex::Real>&,
-                    const amrex::IndexType&, const amrex::IndexType&, const amrex::IndexType&,
-                    const amrex::XDim3&, const amrex::XDim3&, const Dim3&, int);
+    void (*gatherB)(amrex::ParticleReal, amrex::ParticleReal, amrex::ParticleReal, 
+                    amrex::ParticleReal&, amrex::ParticleReal&, amrex::ParticleReal&, 
+                    const amrex::Array4<const double>&, const amrex::Array4<const double>&, const amrex::Array4<const double>&, 
+                    amrex::IndexType, amrex::IndexType, amrex::IndexType, 
+                    const amrex::XDim3&, const amrex::XDim3&, const amrex::Dim3&, int);
 
     if (galerkin_interpolation) {
         if (nox == 1) {
