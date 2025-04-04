@@ -302,6 +302,9 @@ storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
     }
 }
 
+namespace
+{
+template <int depos_order, int galerkin_interpolation>
 void
 storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
     ElectromagneticSolverAlgo electromagnetic_solver_id, const bool fields_to_plot[], bool is_full_diagnostic) {
@@ -327,52 +330,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
     constexpr auto lev0=0;
     const amrex::XDim3 dinv = WarpX::InvCellSize(lev0);
-    const bool galerkin_interpolation = WarpX::galerkin_interpolation;
-    const int nox = WarpX::nox;
     const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
-
-    // need to do that for constant expression for compilation
-    void (*gatherE)(amrex::ParticleReal, amrex::ParticleReal, amrex::ParticleReal,
-                    amrex::ParticleReal&, amrex::ParticleReal&, amrex::ParticleReal&,
-                    const amrex::Array4<amrex::Real const>&, const amrex::Array4<amrex::Real const>&, const amrex::Array4<amrex::Real const>&,
-                    amrex::IndexType, amrex::IndexType, amrex::IndexType,
-                    const amrex::XDim3&, const amrex::XDim3&, const amrex::Dim3&, const int);
-
-    void (*gatherB)(amrex::ParticleReal, amrex::ParticleReal, amrex::ParticleReal,
-                    amrex::ParticleReal&, amrex::ParticleReal&, amrex::ParticleReal&,
-                    const amrex::Array4<amrex::Real const>&, const amrex::Array4<amrex::Real const>&, const amrex::Array4<amrex::Real const>&,
-                    amrex::IndexType, amrex::IndexType, amrex::IndexType,
-                    const amrex::XDim3&, const amrex::XDim3&, const amrex::Dim3&, const int);
-
-    if (galerkin_interpolation) {
-        if (nox == 1) {
-            gatherE = doDirectGatherVectorField<1,0>;
-            gatherB = doDirectGatherVectorField<0,1>;
-        } else if (nox == 2) {
-            gatherE = doDirectGatherVectorField<2,1>;
-            gatherB = doDirectGatherVectorField<1,2>;
-        } else if (nox == 3) {
-            gatherE = doDirectGatherVectorField<3,2>;
-            gatherB = doDirectGatherVectorField<2,3>;
-        } else {
-            gatherE = doDirectGatherVectorField<4,3>;
-            gatherB = doDirectGatherVectorField<3,4>;
-        }
-    } else {
-        if (nox == 1) {
-            gatherE = doDirectGatherVectorField<1,1>;
-            gatherB = doDirectGatherVectorField<1,1>;
-        } else if (nox == 2) {
-            gatherE = doDirectGatherVectorField<2,2>;
-            gatherB = doDirectGatherVectorField<2,2>;
-        } else if (nox == 3) {
-            gatherE = doDirectGatherVectorField<3,3>;
-            gatherB = doDirectGatherVectorField<3,3>;
-        } else {
-            gatherE = doDirectGatherVectorField<4,4>;
-            gatherB = doDirectGatherVectorField<4,4>;
-        }
-    }
 
     auto fields_names = amrex::Array<std::string, 6>{
         "Ex", "Ey", "Ez", "Bx", "By", "Bz"};
@@ -473,13 +431,9 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
                             bx_type, by_type, bz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
                 }
 
-                auto& rGatherE = gatherE;
-                auto& rGatherB = gatherB;
-                amrex::ignore_unused(rGatherE, rGatherB);
-
                 if constexpr (ex_control == doEx || ey_control == doEy || ez_control == doEz)
                 {
-                    rGatherE(
+                    doDirectGatherVectorField<depos_order, depos_order - galerkin_interpolation>(
                         xp, yp, zp,
                         Ex_particle, Ey_particle, Ez_particle,
                         Ex_grid, Ey_grid, Ez_grid,
@@ -490,7 +444,7 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 
                 if constexpr (bx_control == doBx || by_control == doBy || bz_control == doBz)
                 {
-                    rGatherB(
+                    doDirectGatherVectorField<depos_order - galerkin_interpolation, depos_order>(
                         xp, yp, zp,
                         Bx_particle, By_particle, Bz_particle,
                         Bx_grid, By_grid, Bz_grid,
@@ -530,4 +484,35 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
             });
     }
 
+}
+}
+
+void storeEMFieldsOnParticles(PinnedMemoryParticleContainer& tmp,
+                              ElectromagneticSolverAlgo electromagnetic_solver_id, 
+                              const bool fields_to_plot[], 
+                              const int depos_order,
+                              const bool galerkin_interpolation, 
+                              bool is_full_diagnostic)
+{
+    if (galerkin_interpolation) {
+        if (depos_order == 1) {
+            ::storeEMFieldsOnParticles<1, 1>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
+        } else if (depos_order == 2) {
+            ::storeEMFieldsOnParticles<2, 1>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
+        } else if (depos_order == 3) {
+            ::storeEMFieldsOnParticles<3, 1>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
+        } else if (depos_order == 4) {
+            ::storeEMFieldsOnParticles<4, 1>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
+        }
+    } else {
+        if (depos_order == 1) {
+            ::storeEMFieldsOnParticles<1, 0>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
+        } else if (depos_order == 2) {
+            ::storeEMFieldsOnParticles<2, 0>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
+        } else if (depos_order == 3) {
+            ::storeEMFieldsOnParticles<3, 0>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
+        } else if (depos_order == 4) {
+            ::storeEMFieldsOnParticles<4, 0>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
+        }
+    }
 }
