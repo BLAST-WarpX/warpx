@@ -74,6 +74,7 @@ jobs:
         mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d
         mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d
         mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d
+        mpirun -n 2 ./build/bin/warpx.2d Examples/Tests/implicit/inputs_test_2d_theta_implicit_jfnk_vandb
 
   build_thread_sanitizer:
     name: Clang thread sanitizer
