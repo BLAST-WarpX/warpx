@@ -306,7 +306,7 @@ namespace
 {
 template <typename depos_order, typename galerkin_interpolation>
 void
-storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
+storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
     ElectromagneticSolverAlgo electromagnetic_solver_id, const bool fields_to_plot[], bool is_full_diagnostic) {
 
     using PinnedParIter = typename PinnedMemoryParticleContainer::ParIterType;
@@ -496,23 +496,23 @@ void storeEMFieldsOnParticles(PinnedMemoryParticleContainer& tmp,
 {
     if (galerkin_interpolation) {
         if (depos_order == 1) {
-            ::storeEMFieldsOnParticles<1, 1>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
+            ::storeEMFieldsOnParticles_t<1, 1>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
         } else if (depos_order == 2) {
-            ::storeEMFieldsOnParticles<2, 1>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
+            ::storeEMFieldsOnParticles_t<2, 1>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
         } else if (depos_order == 3) {
-            ::storeEMFieldsOnParticles<3, 1>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
+            ::storeEMFieldsOnParticles_t<3, 1>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
         } else if (depos_order == 4) {
-            ::storeEMFieldsOnParticles<4, 1>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
+            ::storeEMFieldsOnParticles_t<4, 1>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
         }
     } else {
         if (depos_order == 1) {
-            ::storeEMFieldsOnParticles<1, 0>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
+            ::storeEMFieldsOnParticles_t<1, 0>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
         } else if (depos_order == 2) {
-            ::storeEMFieldsOnParticles<2, 0>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
+            ::storeEMFieldsOnParticles_t<2, 0>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
         } else if (depos_order == 3) {
-            ::storeEMFieldsOnParticles<3, 0>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
+            ::storeEMFieldsOnParticles_t<3, 0>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
         } else if (depos_order == 4) {
-            ::storeEMFieldsOnParticles<4, 0>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
+            ::storeEMFieldsOnParticles_t<4, 0>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
         }
     }
 }
