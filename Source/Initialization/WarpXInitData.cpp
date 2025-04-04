@@ -261,8 +261,9 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
             std::string profile;
             pp.query("profile", profile);
             if (profile == "parse_density_function") {
-                if (pp.queryline("density_function(x,y,z)", density_function) &&
-                    pp.query("density_min", density_min))
+                utils::parser::Store_parserString(pp, "density_function(x,y,z)",
+                                                  density_function);
+                if (!density_function.empty() && pp.query("density_min", density_min))
                 {
                     init_partition_species = true;
                 }
