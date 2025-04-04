@@ -23,7 +23,7 @@ Use the following commands to download the WarpX source code and switch to the c
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
 
 Compiling WarpX on Fugaku is more practical on a compute node. Use the following commands to acquire a compute node for one hour:

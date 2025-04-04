@@ -58,7 +58,7 @@ This section documents quick-start guides for a selection of supercomputers that
 .. tip::
 
    Your HPC system is not in the list?
-   `Open an issue <https://github.com/ECP-WarpX/WarpX/issues>`__ and together we can document it!
+   `Open an issue <https://github.com/BLAST-WarpX/warpx/issues>`__ and together we can document it!
 
 
 .. _install-hpc-batch:

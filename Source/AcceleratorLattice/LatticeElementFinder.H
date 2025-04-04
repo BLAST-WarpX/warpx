@@ -31,10 +31,12 @@ struct LatticeElementFinder
      *
      * @param[in] lev the refinement level
      * @param[in] gamma_boost the Lorentz factor of the boosted frame
+     * @param[in] time the current time on all refinement levels
      * @param[in] a_mfi specifies the grid where the finder is defined
      * @param[in] accelerator_lattice a reference to the accelerator lattice at the refinement level
      */
     void InitElementFinder (int lev, amrex::Real gamma_boost,
+                            const amrex::Vector<amrex::Real>& time,
                             amrex::MFIter const& a_mfi,
                             AcceleratorLattice const& accelerator_lattice);
 
@@ -51,9 +53,11 @@ struct LatticeElementFinder
      * @param[in] lev the refinement level
      * @param[in] a_mfi specifies the grid where the finder is defined
      * @param[in] accelerator_lattice a reference to the accelerator lattice at the refinement level
+     * @param[in] time the current time on all refinement levels
      */
     void UpdateIndices (int lev, amrex::MFIter const& a_mfi,
-                        AcceleratorLattice const& accelerator_lattice);
+                        AcceleratorLattice const& accelerator_lattice,
+                        const amrex::Vector<amrex::Real>& time);
 
     /* Define the location and size of the index lookup table */
     /* Use the type Real to be consistent with the way the main grid is defined */
@@ -73,9 +77,11 @@ struct LatticeElementFinder
      * @param[in] a_pti specifies the grid where the finder is defined
      * @param[in] a_offset particle index offset needed to access particle info
      * @param[in] accelerator_lattice a reference to the accelerator lattice at the refinement level
+     * @param[in] dts vector containing the timestep sizes at all refinement levels
      */
     [[nodiscard]] LatticeElementFinderDevice GetFinderDeviceInstance (
-        WarpXParIter const& a_pti, int a_offset, AcceleratorLattice const& accelerator_lattice) const;
+        WarpXParIter const& a_pti, int a_offset, AcceleratorLattice const& accelerator_lattice,
+        const amrex::Vector<amrex::Real>&  dts) const;
 
     /* The index lookup tables for each lattice element type */
     amrex::Gpu::DeviceVector<int> d_quad_indices;
@@ -108,11 +114,13 @@ struct LatticeElementFinderDevice
      * @param[in] a_offset particle index offset needed to access particle info
      * @param[in] accelerator_lattice a reference to the accelerator lattice at the refinement level
      * @param[in] h_finder The host level instance of the element finder that this is associated with
+     * @param[in] dts vector containing the timestep sizes at all refinement levels
      */
     void
     InitLatticeElementFinderDevice (WarpXParIter const& a_pti, int a_offset,
                                     AcceleratorLattice const& accelerator_lattice,
-                                    LatticeElementFinder const & h_finder);
+                                    LatticeElementFinder const & h_finder,
+                                    const amrex::Vector<amrex::Real>& dts);
 
     /* Whether the class has been initialized */
     bool m_initialized = false;

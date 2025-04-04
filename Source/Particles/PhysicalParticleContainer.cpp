@@ -1830,20 +1830,6 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     amrex::MultiFab & By = *fields.get(FieldType::Bfield_aux, Direction{1}, lev);
     amrex::MultiFab & Bz = *fields.get(FieldType::Bfield_aux, Direction{2}, lev);
 
-    if (m_do_back_transformed_particles)
-    {
-        for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
-        {
-            const auto np = pti.numParticles();
-            const auto t_lev = pti.GetLevel();
-            const auto index = pti.GetPairIndex();
-            tmp_particle_data.resize(finestLevel()+1);
-            for (int i = 0; i < TmpIdx::nattribs; ++i) {
-                tmp_particle_data[t_lev][index][i].resize(np);
-            }
-        }
-    }
-
 #ifdef AMREX_USE_OMP
 #pragma omp parallel
 #endif
@@ -1913,7 +1899,8 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 //    and (thus) the `np-nfine_current`/`np-nfine_gather` last particles
                 //    deposit/gather in the buffer
                 PartitionParticlesInBuffers( nfine_current, nfine_gather, np,
-                    pti, lev, current_masks, gather_masks );
+                    pti, lev, WarpX::n_field_gather_buffer,
+                    WarpX::n_current_deposition_buffer, current_masks, gather_masks );
             }
 
             const long np_current = has_J_buf ? nfine_current : np;
@@ -2615,7 +2602,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     const int do_copy = (m_do_back_transformed_particles && (a_dt_type!=DtType::SecondHalf) );
     CopyParticleAttribs copyAttribs;
     if (do_copy) {
-        copyAttribs = CopyParticleAttribs(pti, tmp_particle_data, offset);
+        copyAttribs = CopyParticleAttribs(*this, pti, offset);
     }
 
     int* AMREX_RESTRICT ion_lev = nullptr;
@@ -2890,7 +2877,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
     const int do_copy = (m_do_back_transformed_particles && (a_dt_type!=DtType::SecondHalf) );
     CopyParticleAttribs copyAttribs;
     if (do_copy) {
-        copyAttribs = CopyParticleAttribs(pti, tmp_particle_data, offset);
+        copyAttribs = CopyParticleAttribs(*this, pti, offset);
     }
 
     int* AMREX_RESTRICT ion_lev = nullptr;
@@ -3225,7 +3212,7 @@ PlasmaInjector* PhysicalParticleContainer::GetPlasmaInjector (int i)
     }
 }
 
-void PhysicalParticleContainer::resample (const int timestep, const bool verbose)
+void PhysicalParticleContainer::resample (const amrex::Vector<amrex::Geometry>& geom, const int timestep, const bool verbose)
 {
     // In heavily load imbalanced simulations, MPI processes with few particles will spend most of
     // the time at the MPI synchronization in TotalNumberOfParticles(). Having two profiler entries
@@ -3248,7 +3235,7 @@ void PhysicalParticleContainer::resample (const int timestep, const bool verbose
         {
             for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
             {
-                m_resampler(pti, lev, this);
+                m_resampler(geom[lev], pti, lev, this);
             }
         }
         deleteInvalidParticles();

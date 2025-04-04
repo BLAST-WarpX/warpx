@@ -22,13 +22,13 @@ In addition, WarpX is also a *multi-platform code* and runs on Linux, macOS and 
 Contact us
 ^^^^^^^^^^
 
-If you are starting using WarpX, or if you have a user question, please pop in our `discussions page <https://github.com/ECP-WarpX/WarpX/discussions>`__ and get in touch with the community.
+If you are starting using WarpX, or if you have a user question, please pop in our `discussions page <https://github.com/BLAST-WarpX/warpx/discussions>`__ and get in touch with the community.
 
-The `WarpX GitHub repo <https://github.com/ECP-WarpX/WarpX>`__ is the main communication platform.
+The `WarpX GitHub repo <https://github.com/BLAST-WarpX/warpx>`__ is the main communication platform.
 Have a look at the action icons on the top right of the web page: feel free to watch the repo if you want to receive updates, or to star the repo to support the project.
-For bug reports or to request new features, you can also open a new `issue <https://github.com/ECP-WarpX/WarpX/issues>`__.
+For bug reports or to request new features, you can also open a new `issue <https://github.com/BLAST-WarpX/warpx/issues>`__.
 
-We also have a `discussion page <https://github.com/ECP-WarpX/WarpX/discussions>`__ on which you can find already answered questions, add new questions, get help with installation procedures, discuss ideas or share comments.
+We also have a `discussion page <https://github.com/BLAST-WarpX/warpx/discussions>`__ on which you can find already answered questions, add new questions, get help with installation procedures, discuss ideas or share comments.
 
 .. raw:: html
 

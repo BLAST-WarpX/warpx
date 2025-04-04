@@ -28,20 +28,27 @@ sudo apt install -y     \
 # ccache
 $(dirname "$0")/ccache.sh
 
-echo 'deb [trusted=yes] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | \
-  sudo tee /etc/apt/sources.list.d/nvhpc.list
-sudo apt update -y && \
-sudo apt install -y --no-install-recommends nvhpc-24-1 && \
-sudo rm -rf /var/lib/apt/lists/* && \
-  sudo rm -rf /opt/nvidia/hpc_sdk/Linux_x86_64/24.1/examples \
-              /opt/nvidia/hpc_sdk/Linux_x86_64/24.1/profilers \
-              /opt/nvidia/hpc_sdk/Linux_x86_64/24.1/math_libs/11.5/targets/x86_64-linux/lib/lib*_static*.a
+# parse version number from command line argument
+VERSION_DOTTED=${1:-25.1}
+VERSION_DASHED=${VERSION_DOTTED/./-}  # replace first occurence of "." with "-"
+
+# install nvhpc
+curl https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg
+echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | sudo tee /etc/apt/sources.list.d/nvhpc.list
+sudo apt update -y
+sudo apt install -y --no-install-recommends nvhpc-${VERSION_DASHED}
+
+# clean up space
+sudo rm -rf /var/lib/apt/lists/*
+sudo rm -rf /opt/nvidia/hpc_sdk/Linux_x86_64/${VERSION_DOTTED}/examples
+sudo rm -rf /opt/nvidia/hpc_sdk/Linux_x86_64/${VERSION_DOTTED}/profilers
+sudo rm -rf /opt/nvidia/hpc_sdk/Linux_x86_64/${VERSION_DOTTED}/math_libs/12.6/targets/x86_64-linux/lib/lib*_static*.a
 
 # things should reside in /opt/nvidia/hpc_sdk now
 
 # activation via:
 #   source /etc/profile.d/modules.sh
-#   module load /opt/nvidia/hpc_sdk/modulefiles/nvhpc/24.1
+#   module load /opt/nvidia/hpc_sdk/modulefiles/nvhpc/${VERSION_DOTTED}
 
 # cmake-easyinstall
 #
