@@ -1007,6 +1007,10 @@ public:
     // Field container
     ablastr::fields::MultiFabRegister m_fields;
 
+    //! Use this function to override the Level 0 grids made by AMReX.
+    //! This function is called in amrex::AmrCore::InitFromScratch.
+    void PostProcessBaseGrids (amrex::BoxArray& ba0) const final;
+
 protected:
 
     /**
@@ -1035,10 +1039,6 @@ protected:
      *  can be used in the function used to define the E and B fields on the grid.
      */
     void InitLevelData (int lev, amrex::Real time);
-
-    //! Use this function to override the Level 0 grids made by AMReX.
-    //! This function is called in amrex::AmrCore::InitFromScratch.
-    void PostProcessBaseGrids (amrex::BoxArray& ba0) const final;
 
     //! Use this function to override how DistributionMapping is made.
     [[nodiscard]] amrex::DistributionMapping
