@@ -488,10 +488,10 @@ storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
 }
 
 void storeEMFieldsOnParticles(PinnedMemoryParticleContainer& tmp,
-                              ElectromagneticSolverAlgo electromagnetic_solver_id, 
-                              const bool fields_to_plot[], 
+                              ElectromagneticSolverAlgo electromagnetic_solver_id,
+                              const bool fields_to_plot[],
                               const int depos_order,
-                              const bool galerkin_interpolation, 
+                              const bool galerkin_interpolation,
                               bool is_full_diagnostic)
 {
     if (galerkin_interpolation) {
