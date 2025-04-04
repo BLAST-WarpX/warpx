@@ -2962,7 +2962,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     When using the lab-frame electrostatic solver, ``phi`` (electrostatic potential, on the macroparticles) is also available.
     By default, positions, momenta and particle weight are written.
     If ``<diag_name>.<species_name>.variables = none``, no particle data are written.
-    
+
     .. note::
         The electromagnetic fields diagnostics will not display the external fields.
 

@@ -309,9 +309,9 @@ namespace
 template <int depos_order, bool galerkin_interpolation>
 void
 storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
-                            ElectromagneticSolverAlgo electromagnetic_solver_id, 
-                            const bool fields_to_plot[], 
-                            bool is_full_diagnostic) 
+                            ElectromagneticSolverAlgo electromagnetic_solver_id,
+                            const bool fields_to_plot[],
+                            bool is_full_diagnostic)
 {
 
     using PinnedParIter = typename PinnedMemoryParticleContainer::ParIterType;
