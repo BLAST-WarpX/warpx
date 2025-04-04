@@ -2243,7 +2243,7 @@ Filtering
 
     .. warning::
 
-       Known bug: filter currently not working with FDTD solver in RZ geometry (see https://github.com/ECP-WarpX/WarpX/issues/1943).
+       Known bug: filter currently not working with FDTD solver in RZ geometry (see https://github.com/BLAST-WarpX/warpx/issues/1943).
 
 * ``warpx.filter_npass_each_dir`` (`3 int`) optional (default `1 1 1`)
     Number of passes along each direction for the bilinear filter.
@@ -2813,14 +2813,13 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
 
 * ``<diag_name>.openpmd_backend`` (``bp5``, ``bp4``, ``h5`` or ``json``) optional, only used if ``<diag_name>.format = openpmd``
     `I/O backend <https://openpmd-api.readthedocs.io/en/latest/backends/overview.html>`_ for `openPMD <https://www.openPMD.org>`_ data dumps.
-    ``bp`` is the `ADIOS I/O library <https://csmd.ornl.gov/adios>`_, ``h5`` is the `HDF5 format <https://www.hdfgroup.org/solutions/hdf5/>`_, and ``json`` is a `simple text format <https://en.wikipedia.org/wiki/JSON>`_.
-    ``json`` only works with serial/single-rank jobs.
-    When WarpX is compiled with openPMD support, the first available backend in the order given above is taken.
+    ``bp5``/``bp4`` is the `ADIOS I/O library <https://csmd.ornl.gov/adios>`_, ``h5`` is the `HDF5 format <https://www.hdfgroup.org/solutions/hdf5/>`_, and ``json`` is a `simple text format <https://en.wikipedia.org/wiki/JSON>`_.
+    ``json`` is for debugging and only works with serial/single-rank jobs.
 
 * ``<diag_name>.openpmd_encoding`` (optional, ``v`` (variable based), ``f`` (file based) or ``g`` (group based) ) only read if ``<diag_name>.format = openpmd``.
      openPMD `file output encoding <https://openpmd-api.readthedocs.io/en/0.16.1/usage/concepts.html#iteration-and-series>`__.
      File based: one file per timestep (slower), group/variable based: one file for all steps (faster)).
-     ``variable based`` is an `experimental feature with ADIOS2 <https://openpmd-api.readthedocs.io/en/0.16.1/backends/adios2.html#experimental-new-adios2-schema>`__ and not supported for back-transformed diagnostics. This format is also not supported by OpenPMDTimeSeries at the moment, the script :download:`read_variable_based_adios2.py <../../../Tools/PostProcessing/read_variable_based_adios2.py>` provides basic functions to read variable-based particle diagnostics directly with the ``adios2`` module.
+     ``variable based`` is an `experimental feature with ADIOS2 BP5 <https://openpmd-api.readthedocs.io/en/0.16.1/backends/adios2.html#experimental-new-adios2-schema>`__ that will replace ``g``.
      Default: ``f`` (full diagnostics)
 
 * ``<diag_name>.adios2_operator.type`` (``zfp``, ``blosc``) optional,
@@ -2854,7 +2853,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
        <diag_name>.openpmd_backend = bp5
        <diag_name>.adios2_engine.parameters.FlattenSteps = on
 
-* ``<diag_name>.adios2_engine.type`` (``bp4``, ``sst``, ``ssc``, ``dataman``) optional,
+* ``<diag_name>.adios2_engine.type`` (``bp5``, ``bp4``, ``sst``, ``ssc``, ``dataman``) optional,
     `ADIOS2 Engine type <https://openpmd-api.readthedocs.io/en/0.16.1/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.
     See full list of engines at `ADIOS2 readthedocs <https://adios2.readthedocs.io/en/latest/engines/engines.html>`__
 
@@ -2959,10 +2958,13 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
 * ``<diag_name>.<species_name>.variables`` (list of `strings` separated by spaces, optional)
     List of particle quantities to write to output.
     Choices are ``x``, ``y``, ``z`` for the particle positions (3D and RZ), ``x`` & ``z`` in 2D, ``z`` in 1D,
-    ``w`` for the particle weight, ``ux``, ``uy``, ``uz`` for the particle momenta, and ``EM`` for the electromagnetic fields.
+    ``w`` for the particle weight, ``ux``, ``uy``, ``uz`` for the particle momenta, and ``Ex``, ``Ey``, ``Ez``, ``Bx``, ``By``, ``Bz`` for the electromagnetic fields.
     When using the lab-frame electrostatic solver, ``phi`` (electrostatic potential, on the macroparticles) is also available.
-    By default, all particle quantities (except ``phi`` and ``EM``) are written.
+    By default, positions, momenta and particle weight are written.
     If ``<diag_name>.<species_name>.variables = none``, no particle data are written.
+    
+    .. note::
+        The electromagnetic fields diagnostics will not display the external fields.
 
 * ``<diag_name>.<species_name>.random_fraction`` (`float`) optional
     If provided ``<diag_name>.<species_name>.random_fraction = a``, only `a` fraction of the particle data of this species will be dumped randomly in diag ``<diag_name>``, i.e. if `rand() < a`, this particle will be dumped, where `rand()` denotes a random number generator.

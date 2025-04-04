@@ -304,10 +304,15 @@ storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
 
 namespace
 {
+// This template is isolated in a separate namespace to simplify the usage of
+// the doDirectGatherVectorField template and avoid branching
 template <int depos_order, bool galerkin_interpolation>
 void
 storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
-    ElectromagneticSolverAlgo electromagnetic_solver_id, const bool fields_to_plot[], bool is_full_diagnostic) {
+                            ElectromagneticSolverAlgo electromagnetic_solver_id, 
+                            const bool fields_to_plot[], 
+                            bool is_full_diagnostic) 
+{
 
     using PinnedParIter = typename PinnedMemoryParticleContainer::ParIterType;
     using Dir = ablastr::fields::Direction;
@@ -386,9 +391,6 @@ storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
 
         const auto getPosition = GetParticlePosition<PIdx>(pti);
 
-        // const auto getExternalEB = GetExternalEBField(a_pti, lev0);
-        // a_pti is a WarpXParIter, currently undefined
-
         amrex::ParticleReal* Ex_particle_arr = (fields_to_plot[0]) ? pti.GetStructOfArrays().GetRealData(fields_index[0]).dataPtr() : nullptr;
         amrex::ParticleReal* Ey_particle_arr = (fields_to_plot[1]) ? pti.GetStructOfArrays().GetRealData(fields_index[1]).dataPtr() : nullptr;
         amrex::ParticleReal* Ez_particle_arr = (fields_to_plot[2]) ? pti.GetStructOfArrays().GetRealData(fields_index[2]).dataPtr() : nullptr;
@@ -400,7 +402,7 @@ storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
         const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev0, 0._rt);
         const Dim3 lo = lbound(box);
 
-        // Loop over the particles and compute the EM field using the doGatherShapeN function
+        // Loop over the particles and compute the EM field using the doDirectGatherVectorField function
         amrex::ParallelFor(
             TypeList<CompileTimeOptions<doEx, noEx>, CompileTimeOptions<doEy, noEy>, CompileTimeOptions<doEz, noEz>,
             CompileTimeOptions<doBx, noBx>, CompileTimeOptions<doBy, noBy>, CompileTimeOptions<doBz, noBz>>{},
@@ -418,10 +420,6 @@ storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
                 [[maybe_unused]] amrex::ParticleReal Bx_particle = 0._rt;
                 [[maybe_unused]] amrex::ParticleReal By_particle = 0._rt;
                 [[maybe_unused]] amrex::ParticleReal Bz_particle = 0._rt;
-
-                //getExternalEB(ip, Ex_particle, Ey_particle, Ez_particle,
-                //    Bx_particle, By_particle, Bz_particle);
-                // need to implement externalEB
 
                 if (ex_control == noEx && ey_control == noEy && ez_control == noEz &&
                     bx_control == noBx && by_control == noBy && bz_control == noBz) {
@@ -453,6 +451,7 @@ storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
                     );
                 }
 
+                // first capture of the variables in constexpr is not supported
                 auto& rEx_particle = Ex_particle_arr;
                 auto& rEy_particle = Ey_particle_arr;
                 auto& rEz_particle = Ez_particle_arr;
