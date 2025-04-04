@@ -304,7 +304,7 @@ storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
 
 namespace
 {
-template <typename depos_order, typename galerkin_interpolation>
+template <int depos_order, bool galerkin_interpolation>
 void
 storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
     ElectromagneticSolverAlgo electromagnetic_solver_id, const bool fields_to_plot[], bool is_full_diagnostic) {
