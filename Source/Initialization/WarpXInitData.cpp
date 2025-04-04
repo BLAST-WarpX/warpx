@@ -245,6 +245,95 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
         AMREX_D_TERM(},},})
         ba0 = BoxArray(std::move(bl));
     }
+
+    bool init_partition_species = false;
+    std::string density_function;
+    Real density_min=0;
+    Real efficiency_target = 0.7;
+    if (ParallelDescriptor::NProcs() > 1)
+    {
+        ParmParse pp_warpx("warpx");
+        std::string species;
+        pp_warpx.query("init_partition_species", species);
+        pp_warpx.query("init_partition_efficiency", efficiency_target);
+        if ( ! species.empty()) {
+            ParmParse pp(species);
+            std::string profile;
+            pp.query("profile", profile);
+            if (profile == "parse_density_function") {
+                if (pp.queryline("density_function(x,y,z)", density_function) &&
+                    pp.query("density_min", density_min))
+                {
+                    init_partition_species = true;
+                }
+            }
+        }
+    }
+    if (init_partition_species) {
+        auto density_parser = utils::parser::makeParser(density_function, {"x","y","z"});
+        auto density_exe = density_parser.compile<3>();
+
+        auto const dx = Geom(0).CellSizeArray();
+        auto const problo = Geom(0).ProbLoArray();
+
+        MultiFab rho(ba0, DistributionMapping{ba0}, 1, 0);
+        auto const& rhoma = rho.arrays();
+        auto wtot = ParReduce(TypeList<ReduceOpSum>{}, TypeList<Real>{}, rho,
+                              [=] AMREX_GPU_DEVICE (int b, int i, int j, int k)
+        {
+            Real x = 0, y = 0, z = 0;
+#if defined(WARPX_DIM_1D_Z)
+            z = problo[0] + (i+Real(0.5))*dx[0];
+#elif (defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ))
+            x = problo[0] + (i+Real(0.5))*dx[0];
+            z = problo[1] + (j+Real(0.5))*dx[1];
+#else
+            AMREX_D_TERM(x = problo[0] + (i+Real(0.5))*dx[0];,
+                         y = problo[1] + (j+Real(0.5))*dx[1];,
+                         z = problo[2] + (k+Real(0.5))*dx[2]);
+#endif
+            Real v = density_exe(x,y,z);
+            Real r = (v >= density_min) ? Real(1) : Real(0);
+            rhoma[b](i,j,k) = r;
+            return r;
+        });
+        ParallelDescriptor::ReduceRealSum(wtot);
+
+        auto nprocs = Real(ParallelDescriptor::NProcs());
+        auto wtarget = wtot / nprocs * efficiency_target;
+
+        Vector<Box> new_boxes;
+        for (MFIter mfi(rho); mfi.isValid(); ++mfi) {
+            auto const& fab = rho[mfi];
+            Vector<Box> test_boxes{mfi.validbox()};
+            while ( ! test_boxes.empty()) {
+                auto bx = test_boxes.back();
+                test_boxes.pop_back();
+                auto w = fab.template sum<RunOn::Device>(bx,0);
+                if (w <= wtarget) {
+                    new_boxes.push_back(bx);
+                } else {
+                    int dir;
+                    int len = bx.longside(dir);
+                    if (len <= 8) { // Box is already very small.
+                        new_boxes.push_back(bx);
+                    } else {
+                        int chop_pnt = bx.smallEnd(dir) + len/2;
+                        auto bx2 = bx.chop(dir, chop_pnt);
+                        test_boxes.push_back(bx);
+                        test_boxes.push_back(bx2);
+                    }
+                }
+            }
+        }
+
+        amrex::AllGatherBoxes(new_boxes);
+
+        AMREX_ALWAYS_ASSERT(new_boxes.size() >= ba0.size());
+        if (new_boxes.size() > ba0.size()) {
+            ba0 = BoxArray(new_boxes.data(), new_boxes.size());
+        }
+    }
 }
 
 void
