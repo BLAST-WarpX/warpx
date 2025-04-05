@@ -973,9 +973,9 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
  * \param ms                       Species mass.
  */
 template <int depos_order>
-void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleReal* xp_n,
-                                       [[maybe_unused]] const amrex::ParticleReal* yp_n,
-                                       [[maybe_unused]] const amrex::ParticleReal* zp_n,
+void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleReal* xp_n_data,
+                                       [[maybe_unused]] const amrex::ParticleReal* yp_n_data,
+                                       [[maybe_unused]] const amrex::ParticleReal* zp_n_data,
                                        const GetParticlePosition<PIdx>& GetPosition,
                                        const amrex::ParticleReal* wp,
                                        const amrex::ParticleReal* uxp_n,
@@ -1058,12 +1058,24 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
             amrex::ignore_unused(fpyx,fpyz);
             amrex::ignore_unused(fpzx,fpzy);
 
-            // Compute position at time n + 1
-            amrex::ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n[ip];
-            amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n[ip];
-            amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n[ip];
+#if (AMREX_SPACEDIM >= 2)
+            amrex::ParticleReal const xp_n = xp_n_data[ip];
+#else
+            amrex::ParticleReal const xp_n = 0._prt;
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+            amrex::ParticleReal const yp_n = yp_n_data[ip];
+#else
+            amrex::ParticleReal const yp_n = 0._prt;
+#endif
+            amrex::ParticleReal const zp_n = zp_n_data[ip];
 
-            doVillasenorJandSigmaDepositionKernel<depos_order>( xp_n[ip], yp_n[ip], zp_n[ip],
+            // Compute position at time n + 1
+            amrex::ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n;
+            amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n;
+            amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n;
+
+            doVillasenorJandSigmaDepositionKernel<depos_order>( xp_n, yp_n, zp_n,
                                                                 xp_np1, yp_np1, zp_np1,
                                                                 wq_invvol,
                                                                 uxp[ip], uyp[ip], uzp[ip],
