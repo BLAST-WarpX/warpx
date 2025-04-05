@@ -27,11 +27,73 @@
 #include <AMReX_REAL.H>
 
 /**
+ * \brief Set the mass matrices kernels for thread thread_num
+ * \param qs              Species charge
+ * \param ms              Species mass
+ * \param dt              Simulation time step
+ * \param inv_c2          1/c^2
+ * \param rhop            qs*wp*invvol*2.0/(gamma_n + gamma_np1)
+ * \param uxp,uyp,uzp     Proper velocity of particle (time-centered)
+ * \param Bxp,Byp,Bzp     Magnetic field vector components on particle
+ * \param fpxx,fpxy,fpxz  Mass matrices kernels corresponding to dJx
+ * \param fpyx,fpyy,fpyz  Mass matrices kernels corresponding to dJy
+ * \param fpzx,fpzy,fpzz  Mass matrices kernels corresponding to dJz
+ */
+AMREX_GPU_HOST_DEVICE AMREX_INLINE
+void setMassMatricesKernels ( const amrex::ParticleReal qs,
+                              const amrex::ParticleReal ms,
+                              const amrex::ParticleReal dt,
+                              const amrex::ParticleReal inv_c2,
+                              const amrex::ParticleReal rhop,
+                              const amrex::ParticleReal uxp,
+                              const amrex::ParticleReal uyp,
+                              const amrex::ParticleReal uzp,
+                              const amrex::ParticleReal Bxp,
+                              const amrex::ParticleReal Byp,
+                              const amrex::ParticleReal Bzp,
+                              amrex::ParticleReal& fpxx,
+                              amrex::ParticleReal& fpxy,
+                              amrex::ParticleReal& fpxz,
+                              amrex::ParticleReal& fpyx,
+                              amrex::ParticleReal& fpyy,
+                              amrex::ParticleReal& fpyz,
+                              amrex::ParticleReal& fpzx,
+                              amrex::ParticleReal& fpzy,
+                              amrex::ParticleReal& fpzz )
+{
+    using namespace amrex::literals;
+
+    // Convert B on particle to normalized cyclotron units with dt/2.0
+    const amrex::ParticleReal gamma_bar = std::sqrt(1._prt + (uxp*uxp + uyp*uyp + uzp*uzp)*inv_c2);
+    const amrex::ParticleReal alpha = qs/ms*0.5_prt*dt/gamma_bar;
+    const amrex::ParticleReal bxp = alpha*Bxp;
+    const amrex::ParticleReal byp = alpha*Byp;
+    const amrex::ParticleReal bzp = alpha*Bzp;
+
+    // Compute Mass Matrix kernels (non-relativistic for now)
+    amrex::ParticleReal bpsq = bxp*bxp + byp*byp + bzp*bzp;
+    amrex::ParticleReal arogp = alpha*rhop/(1.0_prt + bpsq);
+
+    fpxx = arogp*(bxp*bxp + 1.0_rt);
+    fpxy = arogp*(bxp*byp + bzp);
+    fpxz = arogp*(bxp*bzp - byp);
+
+    fpyx = arogp*(byp*bxp - bzp);
+    fpyy = arogp*(byp*byp + 1.0_rt);
+    fpyz = arogp*(byp*bzp + Bxp);
+
+    fpzx = arogp*(bzp*bxp + byp);
+    fpzy = arogp*(bzp*byp - bxp);
+    fpzz = arogp*(bzp*bzp + 1.0_rt);
+
+}
+
+/**
  * \brief Kernel for the direct deposition of J and S (mass matrices) for thread thread_num
  * \tparam depos_order deposition order
  * \param xp, yp, zp               The particle positions.
  * \param wqx,wqy,wqz              The particle velocity multiplied by the charge / volume
- * \param fpxx,fpyy,fpzz           The diagonal mass matrix kernals
+ * \param fpxx,fpyy,fpzz           The diagonal mass matrix kernels
  * \param jx_arr,jy_arr,jz_arr     Array4 of current density, either full array or tile.
  * \param Sx_arr,Sy_arr,Sz_arr     Array4 of mass matrices, either full array or tile.
  * \param jx_type,jy_type,jz_type  The j (and S) grid types along each direction, either NODE or CELL
@@ -162,7 +224,7 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
     int const l_jy = ((jy_type[zdir] == NODE) ? l_node : l_cell);
     int const l_jz = ((jz_type[zdir] == NODE) ? l_node : l_cell);
 
-    // Deposit mass matrix kernals into Sx_arr, Sy_arr and Sz_arr
+    // Deposit mass matrix kernels into Sx_arr, Sy_arr and Sz_arr
 #if defined(WARPX_DIM_1D_Z)
     for (int iz=0; iz<=depos_order; iz++){
         amrex::Gpu::Atomic::AddNoRet(
@@ -321,13 +383,6 @@ void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
 
             constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
 
-            // Convert B on particle to normalized cyclotron units with dt/2.0
-            const amrex::ParticleReal gamma_bar = std::sqrt(1._prt + (uxp[ip]*uxp[ip] + uyp[ip]*uyp[ip] + uzp[ip]*uzp[ip])*inv_c2);
-            const amrex::Real alpha = qs/ms*0.5_rt*dt/gamma_bar;
-            Bxp *= alpha;
-            Byp *= alpha;
-            Bzp *= alpha;
-
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
             // The uxp,uyp,uzp are the velocities at time level n+1/2
             const amrex::ParticleReal uxp_np1 = 2._prt*uxp[ip] - uxp_n[ip];
@@ -337,29 +392,24 @@ void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
             const amrex::ParticleReal gamma_np1 = std::sqrt(1._prt + (uxp_np1*uxp_np1 + uyp_np1*uyp_np1 + uzp_np1*uzp_np1)*inv_c2);
             const amrex::ParticleReal gaminv = 2.0_prt/(gamma_n + gamma_np1);
 
-            // Compute current density kernals to deposit
+            // Compute current density kernels to deposit
             const amrex::Real rhop = qs*wp[ip]*invvol*gaminv;
             amrex::Real wqx  = rhop*uxp[ip];
             amrex::Real wqy  = rhop*uyp[ip];
             amrex::Real wqz  = rhop*uzp[ip];
 
-            // Compute Mass Matrix kernals (non-relativistic for now)
-            amrex::Real Bpsq = Bxp*Bxp + Byp*Byp + Bzp*Bzp;
-            amrex::Real arogp = alpha*rhop/(1.0_rt + Bpsq);
-
-            amrex::Real fpxx = arogp*(Bxp*Bxp + 1.0_rt);
-            amrex::Real fpxy = arogp*(Bxp*Byp + Bzp);
-            amrex::Real fpxz = arogp*(Bxp*Bzp - Byp);
+            // Set the Mass Matrices kernels
+            amrex::ParticleReal fpxx, fpxy, fpxz;
+            amrex::ParticleReal fpyx, fpyy, fpyz;
+            amrex::ParticleReal fpzx, fpzy, fpzz;
+            setMassMatricesKernels( qs, ms, dt, inv_c2, rhop,
+                                    uxp[ip], uyp[ip], uzp[ip],
+                                    Bxp, Byp, Bzp,
+                                    fpxx, fpxy, fpxz,
+                                    fpyx, fpyy, fpyz,
+                                    fpzx, fpzy, fpzz );
             amrex::ignore_unused(fpxy,fpxz);
-
-            amrex::Real fpyx = arogp*(Byp*Bxp - Bzp);
-            amrex::Real fpyy = arogp*(Byp*Byp + 1.0_rt);
-            amrex::Real fpyz = arogp*(Byp*Bzp + Bxp);
             amrex::ignore_unused(fpyx,fpyz);
-
-            amrex::Real fpzx = arogp*(Bzp*Bxp + Byp);
-            amrex::Real fpzy = arogp*(Bzp*Byp - Bxp);
-            amrex::Real fpzz = arogp*(Bzp*Bzp + 1.0_rt);
             amrex::ignore_unused(fpzx,fpzy);
 
             doDirectJandSigmaDepositionKernel<depos_order>( xp_nph, yp_nph, zp_nph,
@@ -382,7 +432,7 @@ void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
  * \param wp_invvol                Particle charge / volume
  * \param uxp_mid,uyp_mid,uzp_mid  Particle momentum at middle of step
  * \param gaminv                   One over gamma for particle at middle of step
- * \param fpxx,fpyy,fpzz           The diagonal mass matrix kernals
+ * \param fpxx,fpyy,fpzz           The diagonal mass matrix kernels
  * \param Jx_arr,Jy_arr,Jz_arr     Array4 of current density, either full array or tile
  * \param Sx_arr,Sy_arr,Sz_arr     Array4 of mass matrices, either full array or tile
  * \param dt                       Time step for particle level
@@ -464,7 +514,7 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     double const z_old = (zp_old - xyzmin.z)*dinv.z;
     amrex::Real const vz = (zp_new - zp_old)/dt;
 
-    // Define velocity kernals to deposit
+    // Define velocity kernels to deposit
     amrex::Real const wqx = wq_invvol*vx;
     amrex::Real const wqy = wq_invvol*vy;
     amrex::Real const wqz = wq_invvol*vz;
@@ -981,13 +1031,6 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
 
             constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
 
-            // Convert B on particle to normalized cyclotron units with dt/2.0
-            const amrex::ParticleReal gamma_bar = std::sqrt(1._prt + (uxp[ip]*uxp[ip] + uyp[ip]*uyp[ip] + uzp[ip]*uzp[ip])*inv_c2);
-            const amrex::Real alpha = qs/ms*0.5_rt*dt/gamma_bar;
-            Bxp *= alpha;
-            Byp *= alpha;
-            Bzp *= alpha;
-
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
             // The uxp,uyp,uzp are the velocities at time level n+1/2
             const amrex::ParticleReal uxp_np1 = 2._prt*uxp[ip] - uxp_n[ip];
@@ -997,27 +1040,22 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
             const amrex::ParticleReal gamma_np1 = std::sqrt(1._prt + (uxp_np1*uxp_np1 + uyp_np1*uyp_np1 + uzp_np1*uzp_np1)*inv_c2);
             const amrex::ParticleReal gaminv = 2.0_prt/(gamma_n + gamma_np1);
 
-            // Compute current density kernals to deposit
+            // Compute current density kernels to deposit
             const amrex::Real wq_invvol = qs*wp[ip]*invvol;
             const amrex::Real rhop = wq_invvol*gaminv;
 
-            // Compute Mass Matrix kernals (non-relativistic for now)
-            amrex::Real Bpsq = Bxp*Bxp + Byp*Byp + Bzp*Bzp;
-            amrex::Real arogp = alpha*rhop/(1.0_rt + Bpsq);
-
-            amrex::Real fpxx = arogp*(Bxp*Bxp + 1.0_rt);
-            amrex::Real fpxy = arogp*(Bxp*Byp + Bzp);
-            amrex::Real fpxz = arogp*(Bxp*Bzp - Byp);
+            // Set the Mass Matrices kernels
+            amrex::ParticleReal fpxx, fpxy, fpxz;
+            amrex::ParticleReal fpyx, fpyy, fpyz;
+            amrex::ParticleReal fpzx, fpzy, fpzz;
+            setMassMatricesKernels( qs, ms, dt, inv_c2, rhop,
+                                    uxp[ip], uyp[ip], uzp[ip],
+                                    Bxp, Byp, Bzp,
+                                    fpxx, fpxy, fpxz,
+                                    fpyx, fpyy, fpyz,
+                                    fpzx, fpzy, fpzz );
             amrex::ignore_unused(fpxy,fpxz);
-
-            amrex::Real fpyx = arogp*(Byp*Bxp - Bzp);
-            amrex::Real fpyy = arogp*(Byp*Byp + 1.0_rt);
-            amrex::Real fpyz = arogp*(Byp*Bzp + Bxp);
             amrex::ignore_unused(fpyx,fpyz);
-
-            amrex::Real fpzx = arogp*(Bzp*Bxp + Byp);
-            amrex::Real fpzy = arogp*(Bzp*Byp - Bxp);
-            amrex::Real fpzz = arogp*(Bzp*Bzp + 1.0_rt);
             amrex::ignore_unused(fpzx,fpzy);
 
             // Compute position at time n + 1
