@@ -102,17 +102,18 @@ void ImplicitSolver::InitializeMassMatrices ()
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        const auto& ba_Ex = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->boxArray();
-        const auto& ba_Ey = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{1}, lev)->boxArray();
-        const auto& ba_Ez = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{2}, lev)->boxArray();
-        const auto& dm = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->DistributionMap();
-        const amrex::IntVect ngb = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->nGrowVect();
-        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices, Direction{0}, lev, ba_Ex, dm, 1, ngb, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices, Direction{1}, lev, ba_Ey, dm, 1, ngb, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices, Direction{2}, lev, ba_Ez, dm, 1, ngb, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{0}, lev, ba_Ex, dm, 1, ngb, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{1}, lev, ba_Ey, dm, 1, ngb, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{2}, lev, ba_Ez, dm, 1, ngb, 0.0_rt);
+        const auto& ba_Jx = m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, lev)->boxArray();
+        const auto& ba_Jy = m_WarpX->m_fields.get(FieldType::current_fp, Direction{1}, lev)->boxArray();
+        const auto& ba_Jz = m_WarpX->m_fields.get(FieldType::current_fp, Direction{2}, lev)->boxArray();
+        const auto& dm = m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, lev)->DistributionMap();
+        const amrex::IntVect ngb = m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, lev)->nGrowVect();
+        const amrex::IntVect ngbJ = m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, lev)->nGrowVect();
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices, Direction{0}, lev, ba_Jx, dm, 1, ngb, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices, Direction{1}, lev, ba_Jy, dm, 1, ngb, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices, Direction{2}, lev, ba_Jz, dm, 1, ngb, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{0}, lev, ba_Jx, dm, 1, ngb, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{1}, lev, ba_Jy, dm, 1, ngb, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{2}, lev, ba_Jz, dm, 1, ngb, 0.0_rt);
     }
 
     // Set the pointer to mass matrix MultiFab
