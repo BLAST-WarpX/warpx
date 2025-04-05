@@ -53,8 +53,8 @@ export LD_LIBRARY_PATH=${SW_DIR}/adios2-2.10.2/lib64:$LD_LIBRARY_PATH
 export PATH=${SW_DIR}/adios2-2.10.2/bin:${PATH}
 
 # avoid relocation truncation error which result from large executable size
-export CUDAFLAGS="--host-linker-script=use-lcs" # https://github.com/ECP-WarpX/WarpX/pull/3673
-export AMREX_CUDA_ARCH=7.0 # 7.0: V100, 8.0: V100, 9.0: H100 https://github.com/ECP-WarpX/WarpX/issues/3214
+export CUDAFLAGS="--host-linker-script=use-lcs" # https://github.com/BLAST-WarpX/warpx/pull/3673
+export AMREX_CUDA_ARCH=7.0 # 7.0: V100, 8.0: V100, 9.0: H100 https://github.com/BLAST-WarpX/warpx/issues/3214
 
 # compiler environment hints
 export CC=$(which gcc)

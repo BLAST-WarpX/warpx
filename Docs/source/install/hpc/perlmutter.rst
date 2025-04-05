@@ -30,7 +30,7 @@ Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
 On Perlmutter, you can run either on GPU nodes with fast A100 GPUs (recommended) or CPU nodes.
 

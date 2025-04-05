@@ -152,6 +152,7 @@ public:
          const amrex::IntVect& fill_guards_current,
          bool eb_enabled,
          int max_guard_EB, amrex::Real v_sigma_sb,
+         ablastr::fields::MultiFabRegister& fields,
          amrex::IntVect do_pml_Lo = amrex::IntVect::TheUnitVector(),
          amrex::IntVect do_pml_Hi = amrex::IntVect::TheUnitVector());
 
@@ -220,11 +221,6 @@ private:
 
     // Factory for field data
     std::unique_ptr<amrex::FabFactory<amrex::FArrayBox> > pml_field_factory;
-
-    [[nodiscard]] amrex::FabFactory<amrex::FArrayBox> const& fieldFactory () const noexcept
-    {
-        return *pml_field_factory;
-    }
 
 #ifdef AMREX_USE_EB
     [[nodiscard]] amrex::EBFArrayBoxFactory const& fieldEBFactory () const noexcept {

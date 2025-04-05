@@ -28,6 +28,7 @@
 
 #include <AMReX_Array.H>
 #include <AMReX_FArrayBox.H>
+#include <AMReX_Geometry.H>
 #include <AMReX_GpuAllocators.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_INT.H>
@@ -323,6 +324,14 @@ public:
                                 amrex::Real relative_time,
                                 PushType push_type);
 
+    void DepositTemperature (amrex::MultiFab* temperature, const int lev);
+    std::unique_ptr<amrex::MultiFab> GetTemperature (int lev);
+
+    void DepositNumberDensity (amrex::MultiFab* number_density, const int lev);
+    std::unique_ptr<amrex::MultiFab> GetNumberDensity (int lev);
+
+    std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);
+
     // If particles start outside of the domain, ContinuousInjection
     // makes sure that they are initialized when they enter the domain, and
     // NOT before. Virtual function, overriden by derived classes.
@@ -433,8 +442,12 @@ public:
      *
      * \param[in] do_back_transformed_particles The parameter to set if back-transformed particles are set to true/false
      */
-    void SetDoBackTransformedParticles(const bool do_back_transformed_particles) {
+    void SetDoBackTransformedParticles (const bool do_back_transformed_particles) {
         m_do_back_transformed_particles = do_back_transformed_particles;
+    }
+
+    bool GetDoBackTransformedParticles () const {
+        return m_do_back_transformed_particles;
     }
 
     //amrex::Real getCharge () {return charge;}
@@ -473,7 +486,7 @@ public:
      * override the method for every derived class. Note that in practice this function is never
      * called because resample() is only called for PhysicalParticleContainers.
      */
-    virtual void resample (const int /*timestep*/, bool /*verbose*/) {}
+    virtual void resample (const amrex::Vector<amrex::Geometry>& /*geom*/, const int /*timestep*/, bool /*verbose*/) {}
 
     /**
      * When using runtime components, AMReX requires to touch all tiles
@@ -565,16 +578,8 @@ protected:
 
 public:
     using PairIndex = std::pair<int, int>;
-    using TmpParticleTile = std::array<amrex::Gpu::DeviceVector<amrex::ParticleReal>,
-                                       TmpIdx::nattribs>;
-    using TmpParticles = amrex::Vector<std::map<PairIndex, TmpParticleTile> >;
-
-    TmpParticles getTmpParticleData () const noexcept {return tmp_particle_data;}
 
     int getIonizationInitialLevel () const noexcept {return ionization_initial_level;}
-
-protected:
-    TmpParticles tmp_particle_data;
 
 private:
     void particlePostLocate(ParticleType& p, const amrex::ParticleLocData& pld, int lev) override;

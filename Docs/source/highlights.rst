@@ -219,6 +219,11 @@ Related works using WarpX:
 Nuclear Fusion and Plasma Confinement
 *************************************
 
+#. Tyushev M., Smolyakov A., Sabo A., Groenewald R., Necas A., and Yushmanov P.
+   **Drift-kinetic PIC simulations of plasma flow and energy transport in the magnetic mirror configuration**.
+   Physics of Plasmas **32**, 032514, 2025.
+   `DOI:10.1063/5.0227040 <https://doi.org/10.1063/5.0227040>`__
+
 #. Tyushev M., Papahn Zadeh M., Chopra N. S., Raitses Y., Romadanov I., Likhanskii A., Fubiani G., Garrigues L., Groenewald R. and Smolyakov A.
    **Mode transitions and spoke structures in  E×B Penning discharge**.
    Physics of Plasmas **32**, 013511, 2025.

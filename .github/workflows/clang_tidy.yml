@@ -19,7 +19,7 @@ jobs:
       matrix:
         dim: [1, 2, RZ, 3]
     name: clang-tidy-${{ matrix.dim }}D
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 250
     if: github.event.pull_request.draft == false
     steps:
