@@ -69,7 +69,7 @@ newton.relative_tolerance = 1.0e-8
 newton.absolute_tolerance = 0.0
 newton.require_convergence = false
 newton.diagnostic_file = "diags/reduced_files/newton_solver.txt"
-newton.diagnostic_interval = 100
+newton.diagnostic_interval = 10
 
 gmres.verbose_int = 2
 gmres.max_iterations = 1000
@@ -128,17 +128,17 @@ diag1.deuterium.variables = z w ux uy uz
 warpx.reduced_diags_names = particle_energy field_energy poynting_flux
 
 particle_energy.type = ParticleEnergy
-particle_energy.intervals = 100
+particle_energy.intervals = 10
 particle_energy.precision = 18
 particle_energy.path = diags/reduced_files/
 
 field_energy.type = FieldEnergy
-field_energy.intervals = 100
+field_energy.intervals = 10
 field_energy.precision = 18
 field_energy.path = diags/reduced_files/
 
 poynting_flux.type = FieldPoyntingFlux
-poynting_flux.intervals = 100
+poynting_flux.intervals = 10
 poynting_flux.precision = 18
 poynting_flux.path = diags/reduced_files/
 
