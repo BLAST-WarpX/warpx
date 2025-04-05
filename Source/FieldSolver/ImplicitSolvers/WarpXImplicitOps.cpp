@@ -85,16 +85,11 @@ WarpX::SyncMassMatricesAndApplyBCs ()
 
     // Copy mass matrices elements used for the preconditioner
     for (int lev = 0; lev <= finest_level; ++lev) {
-
-        const int ncomp0 = m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev)->nComp();
-        const int ncomp1 = m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev)->nComp();
-        const int ncomp2 = m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev)->nComp();
-
         ablastr::fields::VectorField MM = m_fields.get_alldirs(FieldType::MassMatrices, lev);
         ablastr::fields::VectorField MM_PC = m_fields.get_alldirs(FieldType::MassMatrices_PC, lev);
-        amrex::MultiFab::Copy(*MM_PC[0], *MM[0], 0, 0, ncomp0, MM[0]->nGrowVect());
-        amrex::MultiFab::Copy(*MM_PC[1], *MM[1], 0, 0, ncomp1, MM[1]->nGrowVect());
-        amrex::MultiFab::Copy(*MM_PC[2], *MM[2], 0, 0, ncomp2, MM[2]->nGrowVect());
+        amrex::MultiFab::Copy(*MM_PC[0], *MM[0], 0, 0, MM[0]->nComp(), MM[0]->nGrowVect());
+        amrex::MultiFab::Copy(*MM_PC[1], *MM[1], 0, 0, MM[1]->nComp(), MM[1]->nGrowVect());
+        amrex::MultiFab::Copy(*MM_PC[2], *MM[2], 0, 0, MM[2]->nComp(), MM[2]->nGrowVect());
     }
 
     // Do addOp Exchange on MassMatrices_PC
@@ -114,32 +109,21 @@ void
 WarpX::SetMassMatricesForPC ( amrex::Real a_theta_dt )
 {
 
+    using namespace amrex::literals;
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    // Scale mass matrices used by preconditioner by c^2*mu0*theta*dt
+    // Scale mass matrices used by preconditioner by c^2*mu0*theta*dt and add 1 to diagonal terms
     // Note: This should be done after Sync/communication has been called
 
     const amrex::Real pc_factor = PhysConst::c * PhysConst::c * PhysConst::mu0 * a_theta_dt;
-
-    for (int lev = 0; lev <= finest_level; ++lev) {
-
-        const int ncomp0 = m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev)->nComp();
-        const int ncomp1 = m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev)->nComp();
-        const int ncomp2 = m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev)->nComp();
-
-        m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev)->mult(pc_factor,0,ncomp0);
-        m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev)->mult(pc_factor,0,ncomp1);
-        m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev)->mult(pc_factor,0,ncomp2);
-
-    }
-
-    // Add one to diagonal terms
     const int diag_comp = 0;
     for (int lev = 0; lev <= finest_level; ++lev) {
-        m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev)->plus(1.0,diag_comp,1,0);
-        m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev)->plus(1.0,diag_comp,1,0);
-        m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev)->plus(1.0,diag_comp,1,0);
+        for (int idir = 0 ; idir < 3 ; idir++) {
+            amrex::MultiFab* mass_matrix = m_fields.get(FieldType::MassMatrices_PC, Direction{idir}, lev);
+            mass_matrix->mult(pc_factor, 0, mass_matrix->nComp());
+            mass_matrix->plus(1.0_rt, diag_comp, 1, 0);
+        }
     }
 
 }
