@@ -153,4 +153,3 @@ collision3.species = electrons deuterium
 collision1.CoulombLog = 10.0
 collision2.CoulombLog = 10.0
 collision3.CoulombLog = 10.0
-

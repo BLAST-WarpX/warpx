@@ -8,31 +8,29 @@
 # the script `inputs_test_1d_planar_pinch_withPC`.
 # This simulates a 1D planar pinch using the implicit solver with
 # the curl curl PC including the diagonal response from mass matrices.
-import os
-import re
 
 import numpy as np
 
 newton_solver = np.loadtxt("diags/reduced_files/newton_solver.txt", skiprows=1)
-gmres_iters = newton_solver[:,5]
+gmres_iters = newton_solver[:, 5]
 
 field_energy = np.loadtxt("diags/reduced_files/field_energy.txt", skiprows=1)
 particle_energy = np.loadtxt("diags/reduced_files/particle_energy.txt", skiprows=1)
 poynting_flux = np.loadtxt("diags/reduced_files/poynting_flux.txt", skiprows=1)
 
-E_energy = field_energy[:,3]
-B_energy = field_energy[:,4]
+E_energy = field_energy[:, 3]
+B_energy = field_energy[:, 4]
 Efields = E_energy + B_energy
-ele_energy = particle_energy[:,3]
-ion_energy = particle_energy[:,4]
+ele_energy = particle_energy[:, 3]
+ion_energy = particle_energy[:, 4]
 Eplasma = ele_energy + ion_energy
 
-Eout_lo_x = poynting_flux[:,4]
-Eout_hi_x = poynting_flux[:,5]
+Eout_lo_x = poynting_flux[:, 4]
+Eout_hi_x = poynting_flux[:, 5]
 
 # check that violation of energy conservation is below tolerance
 dE = Efields + Eplasma + Eout_hi_x + Eout_lo_x
-rel_net_energy = np.abs(dE - dE[0])/Eplasma
+rel_net_energy = np.abs(dE - dE[0]) / Eplasma
 max_rel_net_energy = rel_net_energy.max()
 rel_net_energy_tol = 1.0e-9
 print(f"max relative delta energy : {max_rel_net_energy}")
