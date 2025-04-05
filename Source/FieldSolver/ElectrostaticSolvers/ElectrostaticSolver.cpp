@@ -10,6 +10,7 @@
 #include "ElectrostaticSolver.H"
 #include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
+#include "WarpX.H"
 
 #include <ablastr/fields/PoissonSolver.H>
 

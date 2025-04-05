@@ -86,7 +86,7 @@ public:
     void CalculateExternalCurlA (std::string& coil_name);
 
     AMREX_FORCE_INLINE
-    void PopulateExternalFieldFromVectorPotential (
+    void AddExternalFieldFromVectorPotential (
         ablastr::fields::VectorField const& dstField,
         amrex::Real scale_factor,
         ablastr::fields::VectorField const& srcField,

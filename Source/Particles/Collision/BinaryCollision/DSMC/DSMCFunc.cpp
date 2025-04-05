@@ -32,26 +32,22 @@ DSMCFunc::DSMCFunc (
 
     // create a vector of ScatteringProcess objects from each scattering
     // process name
+    bool ionization_flag = false;
     for (const auto& scattering_process : scattering_process_names) {
         const std::string kw_cross_section = scattering_process + "_cross_section";
         std::string cross_section_file;
         pp_collision_name.query(kw_cross_section.c_str(), cross_section_file);
 
-        // if the scattering process is excitation or ionization get the
-        // energy associated with that process
+        // if the scattering process is excitation, ionization or forward get
+        // the energy associated with that process
+        // (note that this allows forward scattering to be used both with and
+        // without a fixed energy loss)
         amrex::ParticleReal energy = 0._prt;
         if (scattering_process.find("excitation") != std::string::npos ||
-            scattering_process.find("ionization") != std::string::npos) {
+            scattering_process.find("ionization") != std::string::npos ||
+            scattering_process.find("forward") != std::string::npos ) {
             const std::string kw_energy = scattering_process + "_energy";
             utils::parser::getWithParser(
-                pp_collision_name, kw_energy.c_str(), energy);
-        }
-        // if the scattering process is forward scattering get the energy
-        // associated with the process if it is given (this allows forward
-        // scattering to be used both with and without a fixed energy loss)
-        else if (scattering_process.find("forward") != std::string::npos) {
-            const std::string kw_energy = scattering_process + "_energy";
-            utils::parser::queryWithParser(
                 pp_collision_name, kw_energy.c_str(), energy);
         }
 
@@ -60,10 +56,20 @@ DSMCFunc::DSMCFunc (
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::INVALID,
                                         "Cannot add an unknown scattering process type");
 
+        // Only one ionization process is currently supported as part of a given
+        // collision set.
+        if (process.type() == ScatteringProcessType::IONIZATION) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !ionization_flag,
+                "DSMC only supports a single ionization process"
+            );
+            ionization_flag = true;
+
+            // And add a check that the ionization species has the same mass
+            // (and a positive charge), compared to the target species
+        }
         m_scattering_processes.push_back(std::move(process));
     }
-
-    const int process_count = static_cast<int>(m_scattering_processes.size());
 
     // Store ScatteringProcess::Executor(s).
 #ifdef AMREX_USE_GPU
@@ -71,9 +77,9 @@ DSMCFunc::DSMCFunc (
     for (auto const& p : m_scattering_processes) {
         h_scattering_processes_exe.push_back(p.executor());
     }
-    m_scattering_processes_exe.resize(process_count);
+    m_scattering_processes_exe.resize(h_scattering_processes_exe.size());
     amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, h_scattering_processes_exe.begin(),
-                        h_scattering_processes_exe.end(), m_scattering_processes_exe.begin());
+                          h_scattering_processes_exe.end(), m_scattering_processes_exe.begin());
     amrex::Gpu::streamSynchronize();
 #else
     for (auto const& p : m_scattering_processes) {
@@ -83,6 +89,6 @@ DSMCFunc::DSMCFunc (
 
     // Link executor to appropriate ScatteringProcess executors
     m_exe.m_scattering_processes_data = m_scattering_processes_exe.data();
-    m_exe.m_process_count = process_count;
+    m_exe.m_process_count = static_cast<int>(m_scattering_processes_exe.size());
     m_exe.m_isSameSpecies = m_isSameSpecies;
 }

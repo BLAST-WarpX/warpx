@@ -27,7 +27,7 @@ Use the following commands to download the WarpX source code and switch to the c
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
 We use the following modules and environments on the system (``$HOME/lawrencium_warpx.profile``).
 
@@ -83,7 +83,7 @@ Optionally, download and install Python packages for :ref:`PICMI <usage-picmi>` 
    python3 -m pip install --upgrade build
    python3 -m pip install --upgrade packaging
    python3 -m pip install --upgrade wheel
-   python3 -m pip install --upgrade setuptools
+   python3 -m pip install --upgrade setuptools[core]
    python3 -m pip install --upgrade cython
    python3 -m pip install --upgrade numpy
    python3 -m pip install --upgrade pandas

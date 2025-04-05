@@ -43,12 +43,14 @@ public:
      *
      * @param[in] lev the level of refinement
      * @param[in] gamma_boost the Lorentz factor of the boosted frame
+     * @param[in] time the current time at all refinement levels
      * @param[in] ba the box array at the level of refinement
      * @param[in] dm the distribution map at the level of refinement
      */
     void InitElementFinder (
         int lev,
         amrex::Real gamma_boost,
+        const amrex::Vector<amrex::Real>& time,
         amrex::BoxArray const & ba,
         amrex::DistributionMapping const & dm);
 
@@ -56,8 +58,9 @@ public:
      * \brief Update the element finder, needed when the simulation frame has moved relative to the lab frame
      *
      * @param[in] lev the level of refinement
+     * @param[in] time the current time at all refinement levels
      */
-    void UpdateElementFinder (int lev);
+    void UpdateElementFinder (int lev, const amrex::Vector<amrex::Real>& time);
 
     /* The lattice element finder handles the lookup that finds the elements at the particle locations.
      * It should follow the same grid layout as the main grids.
@@ -70,9 +73,10 @@ public:
      *
      * @param[in] a_pti the grid where the finder is needed
      * @param[in] a_offset the particle offset since the finded needs information about the particles as well
+     * @param[in] dts vector containing the timestep sizes at all refinement levels
      */
     [[nodiscard]] LatticeElementFinderDevice
-    GetFinderDeviceInstance (WarpXParIter const& a_pti, int a_offset) const;
+    GetFinderDeviceInstance (WarpXParIter const& a_pti, int a_offset, const amrex::Vector<amrex::Real>& dts) const;
 
     /* All of the available lattice element types */
     Drift h_drift;

@@ -1,24 +1,25 @@
-/* Copyright 2022 Luca Fedeli
+/* Copyright 2022-2025 Luca Fedeli
  *
  * This file is part of WarpX.
  *
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef WARPX_UTILS_ALGORITHMS_LINEAR_INTERPOLATION_H_
-#define WARPX_UTILS_ALGORITHMS_LINEAR_INTERPOLATION_H_
+#ifndef ABLASTR_MATH_LINEAR_INTERPOLATION_H_
+#define ABLASTR_MATH_LINEAR_INTERPOLATION_H_
 
 #include <AMReX_Extension.H>
 #include <AMReX_GpuQualifiers.H>
 
-namespace utils::algorithms
+namespace ablastr::math
 {
     /** \brief Performs a linear interpolation
      *
      * Performs a linear interpolation at x given the 2 points
      * (x0, f0) and (x1, f1)
      */
-    template<typename TCoord, typename TVal> AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    template<typename TCoord, typename TVal>
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     constexpr auto linear_interp(
         TCoord x0, TCoord x1,
         TVal f0, TVal f1,
@@ -32,7 +33,8 @@ namespace utils::algorithms
      * Performs a bilinear interpolation at (x,y) given the 4 points
      * (x0, y0, f00), (x0, y1, f01), (x1, y0, f10), (x1, y1, f11).
      */
-    template<typename TCoord, typename TVal> AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    template<typename TCoord, typename TVal>
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     constexpr auto bilinear_interp(
         TCoord x0, TCoord x1, TCoord y0, TCoord y1,
         TVal f00, TVal f01, TVal f10, TVal f11,
@@ -49,7 +51,8 @@ namespace utils::algorithms
      * (x0, y0, z0, f000), (x0, y0, z1, f001), (x0, y1, z0, f010), (x0, y1, z1, f011),
      * (x1, y0, z0, f100), (x1, y0, z1, f101), (x1, y1, z0, f110), (x1, y1, z1, f111)
      */
-    template<typename TCoord, typename TVal> AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    template<typename TCoord, typename TVal>
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     constexpr auto trilinear_interp(
         TCoord x0, TCoord x1, TCoord y0, TCoord y1, TCoord z0, TCoord z1,
         TVal f000, TVal f001, TVal f010, TVal f011, TVal f100, TVal f101, TVal f110, TVal f111,
@@ -63,4 +66,4 @@ namespace utils::algorithms
     }
 }
 
-#endif //WARPX_UTILS_ALGORITHMS_LINEAR_INTERPOLATION_H_
+#endif //ABLASTR_MATH_LINEAR_INTERPOLATION_H_
