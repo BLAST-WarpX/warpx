@@ -424,7 +424,7 @@ storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
                 [[maybe_unused]] amrex::ParticleReal By_particle = 0._rt;
                 [[maybe_unused]] amrex::ParticleReal Bz_particle = 0._rt;
 
-                
+
                 amrex::ignore_unused(Ex_grid, Ey_grid, Ez_grid,
                     Bx_grid, By_grid, Bz_grid, ex_type, ey_type, ez_type,
                     bx_type, by_type, bz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
