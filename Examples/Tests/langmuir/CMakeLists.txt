@@ -85,6 +85,18 @@ add_warpx_test(
 
 if(WarpX_FFT)
     add_warpx_test(
+        test_2d_langmuir_multi_psatd_JRhom_LL2_picmi  # name
+        2  # dims
+        2  # nprocs
+        inputs_test_2d_langmuir_multi_psatd_JRhom_LL2_picmi.py  # inputs
+        OFF  # analysis
+        "analysis_default_regression.py --path diags/diag1000040"  # checksum
+        OFF  # dependency
+    )
+    endif()
+
+if(WarpX_FFT)
+    add_warpx_test(
         test_2d_langmuir_multi_psatd  # name
         2  # dims
         2  # nprocs
