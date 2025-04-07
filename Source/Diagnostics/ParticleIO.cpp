@@ -454,7 +454,7 @@ storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
                     );
                 }
 
-                // first capture of the variables in constexpr is not supported with NVCC 
+                // first capture of the variables in constexpr is not supported with NVCC
                 // so we have to define these references here
                 auto& rEx_particle = Ex_particle_arr;
                 auto& rEy_particle = Ey_particle_arr;
