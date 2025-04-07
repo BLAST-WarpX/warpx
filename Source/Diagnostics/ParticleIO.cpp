@@ -494,7 +494,7 @@ void storeEMFieldsOnParticles(PinnedMemoryParticleContainer& tmp,
                               const bool fields_to_plot[],
                               const int depos_order,
                               const bool galerkin_interpolation,
-                              bool is_full_diagnostic)
+                              const bool is_full_diagnostic)
 {
     if (galerkin_interpolation) {
         if (depos_order == 1) {
