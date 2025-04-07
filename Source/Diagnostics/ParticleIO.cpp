@@ -304,7 +304,7 @@ storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
 
 namespace
 {
-// This template function is called with all the possible combinations 
+// This template function is called with all the possible combinations
 // of the template parameters by storeEMFieldsOnParticles.
 // depos_order and galerkin_interpolation must be template parameters
 // because they are template parameters of doDirectGatherVectorField,
