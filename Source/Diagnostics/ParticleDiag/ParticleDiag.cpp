@@ -46,12 +46,12 @@ ParticleDiag::ParticleDiag (
                 } else if (var == "Ex" || var == "Ey" || var == "Ez" ||
                            var == "Bx" || var == "By" || var == "Bz") {
                     m_plot_EM = true;
-                    if (var == "Ex") m_plot_EM_flags[0] = true;
-                    if (var == "Ey") m_plot_EM_flags[1] = true;
-                    if (var == "Ez") m_plot_EM_flags[2] = true;
-                    if (var == "Bx") m_plot_EM_flags[3] = true;
-                    if (var == "By") m_plot_EM_flags[4] = true;
-                    if (var == "Bz") m_plot_EM_flags[5] = true;
+                    if (var == "Ex") {m_plot_EM_flags[0] = true;}
+                    if (var == "Ey") {m_plot_EM_flags[1] = true;}
+                    if (var == "Ez") {m_plot_EM_flags[2] = true;}
+                    if (var == "Bx") {m_plot_EM_flags[3] = true;}
+                    if (var == "By") {m_plot_EM_flags[4] = true;}
+                    if (var == "Bz") {m_plot_EM_flags[5] = true;}
                 } else {
                     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(pc->HasRealComp(var),
                         "variables argument '" + var

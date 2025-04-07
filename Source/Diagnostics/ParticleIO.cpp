@@ -340,7 +340,7 @@ storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
     auto fields_names = amrex::Array<std::string, 6>{
         "Ex", "Ey", "Ez", "Bx", "By", "Bz"};
 
-    auto fields_index = amrex::Array<int, 6>{0,0,0,0,0,0};
+    auto fields_index = amrex::Array<int, 6>{-1,-1,-1,-1,-1,-1};
 
     enum Ex_flags { doEx, noEx };
     enum Ey_flags { doEy, noEy };
@@ -421,7 +421,7 @@ storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
                 [[maybe_unused]] amrex::ParticleReal By_particle = 0._rt;
                 [[maybe_unused]] amrex::ParticleReal Bz_particle = 0._rt;
 
-                if (ex_control == noEx && ey_control == noEy && ez_control == noEz &&
+                if constexpr (ex_control == noEx && ey_control == noEy && ez_control == noEz &&
                     bx_control == noBx && by_control == noBy && bz_control == noBz) {
                         // only for compiling the kernel where nothing is asked (but the function won't be called anyway)
                         amrex::ignore_unused(Ex_grid, Ey_grid, Ez_grid,
@@ -451,7 +451,8 @@ storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
                     );
                 }
 
-                // first capture of the variables in constexpr is not supported
+                // first capture of the variables in constexpr is not supported with NVCC 
+                // so we have to define these references here
                 auto& rEx_particle = Ex_particle_arr;
                 auto& rEy_particle = Ey_particle_arr;
                 auto& rEz_particle = Ez_particle_arr;
