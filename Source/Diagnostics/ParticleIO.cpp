@@ -314,7 +314,7 @@ void
 storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
                             ElectromagneticSolverAlgo electromagnetic_solver_id,
                             const bool fields_to_plot[],
-                            bool is_full_diagnostic)
+                            const bool is_full_diagnostic)
 {
 
     using PinnedParIter = typename PinnedMemoryParticleContainer::ParIterType;
