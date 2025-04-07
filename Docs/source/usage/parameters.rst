@@ -2972,7 +2972,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     If ``<diag_name>.<species_name>.variables = none``, no particle data are written.
 
     .. note::
-        The electromagnetic fields diagnostics will not display the external fields.
+        The electromagnetic fields diagnostics will not include the external fields.
 
 * ``<diag_name>.<species_name>.random_fraction`` (`float`) optional
     If provided ``<diag_name>.<species_name>.random_fraction = a``, only `a` fraction of the particle data of this species will be dumped randomly in diag ``<diag_name>``, i.e. if `rand() < a`, this particle will be dumped, where `rand()` denotes a random number generator.
