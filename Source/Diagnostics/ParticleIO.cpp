@@ -411,6 +411,7 @@ storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
             [=] AMREX_GPU_DEVICE (long ip, auto ex_control, auto ey_control, auto ez_control,
                 auto bx_control, auto by_control, auto bz_control)
                 {
+                if (ip >= pti.numParticles()) return; // Ensure valid particle index
                 amrex::ParticleReal xp, yp, zp;
                 getPosition(ip, xp, yp, zp);
 
