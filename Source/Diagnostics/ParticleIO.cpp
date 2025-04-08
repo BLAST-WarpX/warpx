@@ -316,7 +316,14 @@ storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
                             const bool fields_to_plot[],
                             const bool is_full_diagnostic)
 {
-
+/**
+    * \brief stores the electromagnetic fields on the particles as additional outputs
+    *
+    * \param tmp Particle container to store the gathered fields
+    * \param electromagnetic_solver_id The type of electromagnetic solver used
+    * \param fields_to_plot Array of booleans indicating which fields to plot
+    * \param is_full_diagnostic Whether this diagnostic is a full diagnostic
+*/
     using PinnedParIter = typename PinnedMemoryParticleContainer::ParIterType;
     using Dir = ablastr::fields::Direction;
 
