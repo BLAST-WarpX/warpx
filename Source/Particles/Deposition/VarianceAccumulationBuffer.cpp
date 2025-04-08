@@ -20,7 +20,8 @@
 using namespace amrex::literals;
 using namespace warpx::particles::deposition;
 
-VarianceAccumulationBuffer::VarianceAccumulationBuffer (ablastr::fields::MultiLevelVectorField const& T_vf, std::string const& species_name )
+VarianceAccumulationBuffer::VarianceAccumulationBuffer (ablastr::fields::MultiLevelVectorField const& T_vf, std::string const& species_name ) :
+    m_species_name(species_name)
 {
     using ablastr::fields::Direction;
     auto & warpx = WarpX::GetInstance();
@@ -28,35 +29,16 @@ VarianceAccumulationBuffer::VarianceAccumulationBuffer (ablastr::fields::MultiLe
     const int ncomps = 1;
 
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
-        amrex::BoxArray const& bax = T_vf[lev][Direction{0}]->boxArray();
-        amrex::BoxArray const& bay = T_vf[lev][Direction{1}]->boxArray();
-        amrex::BoxArray const& baz = T_vf[lev][Direction{2}]->boxArray();
+        for (int idir = 0; idir < 3; ++idir) {
+            amrex::BoxArray const& ba = T_vf[lev][Direction{idir}]->boxArray();
+            amrex::DistributionMapping const& dm = T_vf[lev][Direction{idir}]->DistributionMap();
+            amrex::IntVect const& ng = T_vf[lev][Direction{idir}]->nGrowVect();
 
-        amrex::DistributionMapping const& dmx = T_vf[lev][Direction{0}]->DistributionMap();
-        amrex::DistributionMapping const& dmy = T_vf[lev][Direction{1}]->DistributionMap();
-        amrex::DistributionMapping const& dmz = T_vf[lev][Direction{2}]->DistributionMap();
-
-        amrex::IntVect const& ngx = T_vf[lev][Direction{0}]->nGrowVect();
-        amrex::IntVect const& ngy = T_vf[lev][Direction{1}]->nGrowVect();
-        amrex::IntVect const& ngz = T_vf[lev][Direction{2}]->nGrowVect();
-
-        warpx.m_fields.alloc_init("w_" + species_name, Direction{0}, lev, bax, dmx, ncomps, ngx, 0.0_rt);
-        warpx.m_fields.alloc_init("w_" + species_name, Direction{1}, lev, bay, dmy, ncomps, ngy, 0.0_rt);
-        warpx.m_fields.alloc_init("w_" + species_name, Direction{2}, lev, baz, dmz, ncomps, ngz, 0.0_rt);
-
-        warpx.m_fields.alloc_init("w2_" + species_name, Direction{0}, lev, bax, dmx, ncomps, ngx, 0.0_rt);
-        warpx.m_fields.alloc_init("w2_" + species_name, Direction{1}, lev, bay, dmy, ncomps, ngy, 0.0_rt);
-        warpx.m_fields.alloc_init("w2_" + species_name, Direction{2}, lev, baz, dmz, ncomps, ngz, 0.0_rt);
-
-        warpx.m_fields.alloc_init("vbar_" + species_name, Direction{0}, lev, bax, dmx, ncomps, ngx, 0.0_rt);
-        warpx.m_fields.alloc_init("vbar_" + species_name, Direction{1}, lev, bay, dmy, ncomps, ngy, 0.0_rt);
-        warpx.m_fields.alloc_init("vbar_" + species_name, Direction{2}, lev, baz, dmz, ncomps, ngz, 0.0_rt);
+            warpx.m_fields.alloc_init("w_" + m_species_name, Direction{idir}, lev, ba, dm, ncomps, ng, 0.0_rt);
+            warpx.m_fields.alloc_init("w2_" + m_species_name, Direction{idir}, lev, ba, dm, ncomps, ng, 0.0_rt);
+            warpx.m_fields.alloc_init("vbar_" + m_species_name, Direction{idir}, lev, ba, dm, ncomps, ng, 0.0_rt);
+        }
     }
-
-    // Grab references to these arrays to store in this data structure
-    this->w = warpx.m_fields.get_mr_levels_alldirs("w_" + species_name, warpx.finestLevel());
-    this->w2 = warpx.m_fields.get_mr_levels_alldirs("w2_" + species_name, warpx.finestLevel());
-    this->vbar = warpx.m_fields.get_mr_levels_alldirs("vbar_" + species_name, warpx.finestLevel());
 }
 
 void
@@ -67,11 +49,18 @@ VarianceAccumulationBuffer::setAllValues (amrex::Real val)
 
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
         for (int idir = 0; idir < 3; ++idir) {
-            this->w[lev][Direction{idir}]->setVal(val);
-            this->w2[lev][Direction{idir}]->setVal(val);
-            this->vbar[lev][Direction{idir}]->setVal(val);
+            get("w", Direction{idir}, lev)->setVal(val);
+            get("w2", Direction{idir}, lev)->setVal(val);
+            get("vbar", Direction{idir}, lev)->setVal(val);
         }
     }
+}
+
+amrex::MultiFab*
+VarianceAccumulationBuffer::get(std::string arr, ablastr::fields::Direction dir, int lev)
+{
+    auto &warpx = WarpX::GetInstance();
+    return warpx.m_fields.get(arr + "_" + m_species_name, dir, lev);
 }
 
 void
@@ -85,9 +74,9 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
 
         for (int idir = 0; idir < 3; ++idir) {
             // Grab references for the appropriate MFs
-            amrex::MultiFab & wmf = *this->w[lev][Direction{idir}];
-            amrex::MultiFab & w2mf = *this->w2[lev][Direction{idir}];
-            amrex::MultiFab & vbarmf = *this->vbar[lev][Direction{idir}];
+            amrex::MultiFab & wmf = *get("w", Direction{idir}, lev);
+            amrex::MultiFab & w2mf = *get("w2", Direction{idir}, lev);
+            amrex::MultiFab & vbarmf = *get("vbar", Direction{idir}, lev);
             amrex::MultiFab & variancemf = *var_vf[lev][Direction{idir}];
 
             // Create Temporary MFs for ghost cell buffers
@@ -182,7 +171,15 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
                             amrex::Real vsum_a = vbar_old_arr(i,j,k);
                             amrex::Real v_a = vsum_a/w_a;
                             amrex::Real v_b = vbar_arr(i,j,k);
+                            // Delta squared is ill-behaved when v_b and v_a are close.
+                            // Check this for underflow when squaring.
                             amrex::Real delta = v_b - v_a;
+                            if (2.*delta/(v_a+v_b) < 10._rt * std::numeric_limits<amrex::Real>::epsilon()) {
+                                delta = 0._rt;
+                            }
+
+                            const amrex::Real dwa = delta*w_a;
+                            const amrex::Real dwb = delta*w_b;
 
                             // Update accumulation arrays
                             w_arr(i,j,k) += w_a;
@@ -190,7 +187,7 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
 
                             // Update Mean and Variance
                             vbar_arr(i,j,k) = (vsum_a + w_b*v_b)/w_arr(i,j,k);
-                            variance_arr(i,j,k) +=  variance_old_arr(i,j,k); // + delta*delta*w_a*w_b/w_arr(i,j,k);
+                            variance_arr(i,j,k) +=  variance_old_arr(i,j,k) + dwa*dwb/w_arr(i,j,k);
                         }
 
                         // Apply Normalization in any owned cell
@@ -200,7 +197,7 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
                                 variance_arr(i,j,k) /= (w_arr(i,j,k) - w2_arr(i,j,k)/w_arr(i,j,k) );
                             } else {
                                 // This occurs when only a single sample is within a bin
-                                // In this case shoudl be zero variance
+                                // In this case should be zero variance
                                 variance_arr(i,j,k) = 0._rt;
                             }
                         }

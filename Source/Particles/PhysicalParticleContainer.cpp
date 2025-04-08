@@ -445,24 +445,14 @@ PhysicalParticleContainer::AllocData ()
         const std::string T_field_name = "T_" + species_name;
 
         for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
-            amrex::BoxArray const& bax = J_vf[lev][Direction{0}]->boxArray();
-            amrex::BoxArray const& bay = J_vf[lev][Direction{1}]->boxArray();
-            amrex::BoxArray const& baz = J_vf[lev][Direction{2}]->boxArray();
+            for (int idir = 0; idir < 3; ++idir) {
+                amrex::BoxArray const& ba = J_vf[lev][Direction{idir}]->boxArray();
+                amrex::DistributionMapping const& dm = J_vf[lev][Direction{idir}]->DistributionMap();
+                amrex::IntVect const& ng = J_vf[lev][Direction{idir}]->nGrowVect();
 
-            amrex::DistributionMapping const& dmx = J_vf[lev][Direction{0}]->DistributionMap();
-            amrex::DistributionMapping const& dmy = J_vf[lev][Direction{1}]->DistributionMap();
-            amrex::DistributionMapping const& dmz = J_vf[lev][Direction{2}]->DistributionMap();
-
-            amrex::IntVect const& ngx = J_vf[lev][Direction{0}]->nGrowVect();
-            amrex::IntVect const& ngy = J_vf[lev][Direction{1}]->nGrowVect();
-            amrex::IntVect const& ngz = J_vf[lev][Direction{2}]->nGrowVect();
-
-            warpx.m_fields.alloc_init(T_field_name, Direction{0},
-                lev, bax, dmx, WarpX::ncomps, ngx, 0.0_rt);
-            warpx.m_fields.alloc_init(T_field_name, Direction{1},
-                lev, bay, dmy, WarpX::ncomps, ngy, 0.0_rt);
-            warpx.m_fields.alloc_init(T_field_name, Direction{2},
-                lev, baz, dmz, WarpX::ncomps, ngz, 0.0_rt);
+                warpx.m_fields.alloc_init(T_field_name, Direction{idir},
+                    lev, ba, dm, WarpX::ncomps, ng, 0.0_rt);
+            }
         }
 
         ablastr::fields::MultiLevelVectorField T_vf =
@@ -3459,15 +3449,15 @@ PhysicalParticleContainer::DepositTemperature (
     auto & Ty_fab = Ty->get(pti);
     auto & Tz_fab = Tz->get(pti);
 
-    auto & wx_fab =    local_temperature_arrays->w[lev][Direction{0}]->get(pti);
-    auto & wy_fab =    local_temperature_arrays->w[lev][Direction{1}]->get(pti);
-    auto & wz_fab =    local_temperature_arrays->w[lev][Direction{2}]->get(pti);
-    auto & w2x_fab =   local_temperature_arrays->w2[lev][Direction{0}]->get(pti);
-    auto & w2y_fab =   local_temperature_arrays->w2[lev][Direction{1}]->get(pti);
-    auto & w2z_fab =   local_temperature_arrays->w2[lev][Direction{2}]->get(pti);
-    auto & vxbar_fab = local_temperature_arrays->vbar[lev][Direction{0}]->get(pti);
-    auto & vybar_fab = local_temperature_arrays->vbar[lev][Direction{1}]->get(pti);
-    auto & vzbar_fab = local_temperature_arrays->vbar[lev][Direction{2}]->get(pti);
+    auto & wx_fab =    local_temperature_arrays->get("w", Direction{0}, lev)->get(pti);
+    auto & wy_fab =    local_temperature_arrays->get("w", Direction{1}, lev)->get(pti);
+    auto & wz_fab =    local_temperature_arrays->get("w", Direction{2}, lev)->get(pti);
+    auto & w2x_fab =   local_temperature_arrays->get("w2", Direction{0}, lev)->get(pti);
+    auto & w2y_fab =   local_temperature_arrays->get("w2", Direction{1}, lev)->get(pti);
+    auto & w2z_fab =   local_temperature_arrays->get("w2", Direction{2}, lev)->get(pti);
+    auto & vxbar_fab = local_temperature_arrays->get("vbar", Direction{0}, lev)->get(pti);
+    auto & vybar_fab = local_temperature_arrays->get("vbar", Direction{1}, lev)->get(pti);
+    auto & vzbar_fab = local_temperature_arrays->get("vbar", Direction{2}, lev)->get(pti);
 
     const auto GetPosition = GetParticlePosition<PIdx>(pti, offset);
 
