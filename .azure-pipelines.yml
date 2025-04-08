@@ -1,7 +1,7 @@
 # -*- mode: yaml -*-
 
 pool:
-  vmImage: 'ubuntu-20.04'
+  vmImage: 'ubuntu-24.04'
 
 trigger:
   branches:
@@ -111,6 +111,10 @@ jobs:
           -DCMAKE_CXX_STANDARD=17                         \
           -Duse_cmake_find_lapack=ON -Dbuild_tests=OFF -DCMAKE_VERBOSE_MAKEFILE=ON
       fi
+      # Remove system copy of Matplotlib to avoid conflict
+      # with version set in the requirements file - see, e.g.,
+      # https://github.com/matplotlib/matplotlib/issues/28768.
+      sudo apt remove python3-matplotlib
       # Python modules required for test analysis
       python3 -m pip install --upgrade -r Regression/requirements.txt
       python3 -m pip cache purge
