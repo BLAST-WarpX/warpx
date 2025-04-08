@@ -340,7 +340,7 @@ storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
     auto& warpx = WarpX::GetInstance();
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        finestLevel == 0,
+        warpx.finestLevel() == 0,
         "output of the electromagnetic fields on particles only works without mesh refinement"
     );
 
