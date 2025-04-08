@@ -112,7 +112,7 @@ jobs:
           -GNinja                           \
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-          -DWarpX_DIMS="2"                  \
+          -DWarpX_DIMS="1;2;RZ;3"           \
           -DWarpX_FFT=ON                    \
           -DWarpX_QED=ON                    \
           -DWarpX_QED_TABLE_GEN=ON          \
