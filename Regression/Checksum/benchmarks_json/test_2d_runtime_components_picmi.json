@@ -1,11 +1,11 @@
 {
   "lev=0": {
-    "phi": 0.001516261626005395
+    "phi": 0.0015162616249779154
   },
   "electrons": {
-    "particle_momentum_x": 7.75165529536844e-26,
-    "particle_momentum_y": 6.938526597814195e-26,
-    "particle_momentum_z": 6.572519525636007e-26,
+    "particle_momentum_x": 7.751655305920357e-26,
+    "particle_momentum_y": 6.938526607259151e-26,
+    "particle_momentum_z": 6.572519534582735e-26,
     "particle_newPid": 500.0,
     "particle_position_x": 1.4999588764814886,
     "particle_position_y": 1.4999551809410656,
