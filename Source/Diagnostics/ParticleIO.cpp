@@ -313,7 +313,7 @@ template <int depos_order, bool galerkin_interpolation>
 void
 storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
                             ElectromagneticSolverAlgo electromagnetic_solver_id,
-                            const bool fields_to_plot[],
+                            const amrex::Array<bool, 6> fields_to_plot,
                             const bool is_full_diagnostic)
 {
 /**
@@ -496,7 +496,7 @@ storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
 
 void storeEMFieldsOnParticles(PinnedMemoryParticleContainer& tmp,
                               ElectromagneticSolverAlgo electromagnetic_solver_id,
-                              const bool fields_to_plot[],
+                              const amrex::Array<bool, 6> fields_to_plot,
                               const int depos_order,
                               const bool galerkin_interpolation,
                               const bool is_full_diagnostic)

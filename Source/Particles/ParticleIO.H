@@ -94,5 +94,5 @@ storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
 
 void
 storeEMFieldsOnParticles (PinnedMemoryParticleContainer& tmp,
-    ElectromagneticSolverAlgo electromagnetic_solver_id, const bool fields_to_plot[], const int depos_order, const bool galerkin_interpolation, const bool is_full_diagnostic );
+    ElectromagneticSolverAlgo electromagnetic_solver_id, const amrex::Array<bool, 6> fields_to_plot, const int depos_order, const bool galerkin_interpolation, const bool is_full_diagnostic );
 #endif /* WARPX_PARTICLEIO_H_ */
