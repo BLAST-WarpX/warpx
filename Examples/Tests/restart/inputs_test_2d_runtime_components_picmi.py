@@ -107,7 +107,8 @@ sim.initialize_warpx()
 np.random.seed(30025025)
 
 electron_wrapper = particle_containers.ParticleContainerWrapper("electrons")
-electron_wrapper.add_real_comp("newPid")
+if not sim.amr_restart:
+    electron_wrapper.add_real_comp("newPid")
 
 
 def add_particles():
@@ -140,8 +141,8 @@ sim.step(max_steps - 1 - step_number)
 ##########################
 
 assert electron_wrapper.nps == 90
-assert electron_wrapper.particle_container.get_comp_index("w") == 2
-assert electron_wrapper.particle_container.get_comp_index("newPid") == 6
+assert electron_wrapper.particle_container.get_real_comp_index("w") == 2
+assert electron_wrapper.particle_container.get_real_comp_index("newPid") == 6
 
 new_pid_vals = electron_wrapper.get_particle_real_arrays("newPid", 0)
 for vals in new_pid_vals:

@@ -35,7 +35,7 @@ class ParticleContainerWrapper(object):
                     self.name
                 )
             except AttributeError as e:
-                msg = "This is likely caused by attempting to access a ParticleContainerWrapper before initialize_warpx has been called"
+                msg = "You must initialize WarpX before accessing a ParticleContainerWrapper's particle_container."
                 raise AttributeError(msg) from e
 
         return self._particle_container
@@ -170,7 +170,9 @@ class ParticleContainerWrapper(object):
         # --- Note that the velocities are handled separately and not included in attr
         # --- (even though they are stored as attributes in the C++)
         for key, vals in kwargs.items():
-            attr[:, self.particle_container.get_comp_index(key) - built_in_attrs] = vals
+            attr[
+                :, self.particle_container.get_real_comp_index(key) - built_in_attrs
+            ] = vals
 
         nattr_int = 0
         attr_int = np.empty([0], dtype=np.int32)
@@ -264,7 +266,7 @@ class ParticleContainerWrapper(object):
         List of arrays
             The requested particle array data
         """
-        comp_idx = self.particle_container.get_comp_index(comp_name)
+        comp_idx = self.particle_container.get_real_comp_index(comp_name)
 
         data_array = []
         for pti in libwarpx.libwarpx_so.WarpXParIter(self.particle_container, level):
@@ -309,7 +311,7 @@ class ParticleContainerWrapper(object):
         List of arrays
             The requested particle array data
         """
-        comp_idx = self.particle_container.get_icomp_index(comp_name)
+        comp_idx = self.particle_container.get_int_comp_index(comp_name)
 
         data_array = []
         for pti in libwarpx.libwarpx_so.WarpXParIter(self.particle_container, level):
@@ -777,7 +779,7 @@ class ParticleBoundaryBufferWrapper(object):
             try:
                 self._particle_buffer = libwarpx.warpx.get_particle_boundary_buffer()
             except AttributeError as e:
-                msg = "This is likely caused by attempting to access a ParticleBoundaryBufferWrapper before initialize_warpx has been called"
+                msg = "You must initialize WarpX before accessing a ParticleBoundaryBufferWrapper's particle_buffer."
                 raise AttributeError(msg) from e
 
         return self._particle_buffer
@@ -813,7 +815,7 @@ class ParticleBoundaryBufferWrapper(object):
         The data for the arrays are not copied, but share the underlying
         memory buffer with WarpX. The arrays are fully writeable.
 
-        You can find `here https://github.com/ECP-WarpX/WarpX/blob/319e55b10ad4f7c71b84a4fb21afbafe1f5b65c2/Examples/Tests/particle_boundary_interaction/PICMI_inputs_rz.py`
+        You can find `here https://github.com/BLAST-WarpX/warpx/blob/319e55b10ad4f7c71b84a4fb21afbafe1f5b65c2/Examples/Tests/particle_boundary_interaction/PICMI_inputs_rz.py`
         an example of a simple case of particle-boundary interaction (reflection).
 
         Parameters
@@ -842,16 +844,16 @@ class ParticleBoundaryBufferWrapper(object):
         )
         data_array = []
         # loop over the real attributes
-        if comp_name in part_container.real_comp_names:
-            comp_idx = part_container.real_comp_names[comp_name]
+        if comp_name in part_container.real_soa_names:
+            comp_idx = part_container.get_real_comp_index(comp_name)
             for ii, pti in enumerate(
                 libwarpx.libwarpx_so.BoundaryBufferParIter(part_container, level)
             ):
                 soa = pti.soa()
                 data_array.append(xp.array(soa.get_real_data(comp_idx), copy=False))
         # loop over the integer attributes
-        elif comp_name in part_container.int_comp_names:
-            comp_idx = part_container.int_comp_names[comp_name]
+        elif comp_name in part_container.int_soa_names:
+            comp_idx = part_container.get_int_comp_index(comp_name)
             for ii, pti in enumerate(
                 libwarpx.libwarpx_so.BoundaryBufferParIter(part_container, level)
             ):
@@ -860,6 +862,51 @@ class ParticleBoundaryBufferWrapper(object):
         else:
             raise RuntimeError("Name %s not found" % comp_name)
         return data_array
+
+    def get_particle_scraped_this_step(self, species_name, boundary, comp_name, level):
+        """
+        This returns a list of numpy or cupy arrays containing the particle array data
+        for particles that have been scraped at the current timestep,
+        for a specific species and simulation boundary.
+
+        The data for the arrays is a view of the underlying boundary buffer in WarpX ;
+        writing to these arrays will therefore also modify the underlying boundary buffer.
+
+        Parameters
+        ----------
+
+            species_name   : str
+                The species name that the data will be returned for.
+
+            boundary       : str
+                The boundary from which to get the scraped particle data in the
+                form x/y/z_hi/lo or eb.
+
+            comp_name      : str
+                The component of the array data that will be returned.
+                "x", "y", "z", "ux", "uy", "uz", "w"
+                "stepScraped","deltaTimeScraped",
+                if boundary='eb': "nx", "ny", "nz"
+
+            level          : int
+                Which AMR level to retrieve scraped particle data from.
+        """
+        # Extract the integer number of the current timestep
+        current_step = libwarpx.libwarpx_so.get_instance().getistep(level)
+
+        # Extract the data requested by the user
+        data_array = self.get_particle_boundary_buffer(
+            species_name, boundary, comp_name, level
+        )
+        step_scraped_array = self.get_particle_boundary_buffer(
+            species_name, boundary, "stepScraped", level
+        )
+
+        # Select on the particles from the previous step
+        data_array_this_step = []
+        for data, step in zip(data_array, step_scraped_array):
+            data_array_this_step.append(data[step == current_step])
+        return data_array_this_step
 
     def clear_buffer(self):
         """

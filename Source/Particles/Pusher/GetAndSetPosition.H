@@ -9,7 +9,6 @@
 #define WARPX_PARTICLES_PUSHER_GETANDSETPOSITION_H_
 
 #include "Particles/WarpXParticleContainer.H"
-#include "Particles/NamedComponentParticleContainer.H"
 
 #include <AMReX.H>
 #include <AMReX_REAL.H>

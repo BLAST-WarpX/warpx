@@ -6,7 +6,7 @@ Dependencies
 WarpX depends on the following popular third party software.
 Please see installation instructions below.
 
-- a mature `C++17 <https://en.wikipedia.org/wiki/C%2B%2B17>`__ compiler, e.g., GCC 8.4+, Clang 7, NVCC 11.0, MSVC 19.15 or newer
+- a mature `C++17 <https://en.wikipedia.org/wiki/C%2B%2B17>`__ compiler, e.g., GCC 9.1+, Clang 7, NVCC 11.0, MSVC 19.15 or newer
 - `CMake 3.24.0+ <https://cmake.org>`__
 - `Git 2.18+ <https://git-scm.com>`__
 - `AMReX <https://amrex-codes.github.io>`__: we automatically download and compile a copy of AMReX
@@ -52,20 +52,12 @@ For all other systems, we recommend to use a **package dependency manager**:
 Pick *one* of the installation methods below to install all dependencies for WarpX development in a consistent manner.
 
 
-Conda (Linux/macOS/Windows)
----------------------------
+Conda-Forge (Linux/macOS/Windows)
+---------------------------------
 
-`Conda <https://conda.io>`__/`Mamba <https://mamba.readthedocs.io>`__ are cross-compatible, user-level package managers.
+`Conda-Forge <https://conda-forge.org/download/>`__ is a repository for cross-compatible, user-level packages.
 
 .. tip::
-
-   We recommend to configure your conda to use the faster ``libmamba`` `dependency solver <https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community>`__.
-
-   .. code-block:: bash
-
-      conda update -y -n base conda
-      conda install -y -n base conda-libmamba-solver
-      conda config --set solver libmamba
 
    We recommend to deactivate that conda self-activates its ``base`` environment.
    This `avoids interference with the system and other package managers <https://collegeville.github.io/CW20/WorkshopResources/WhitePapers/huebl-working-with-multiple-pkg-mgrs.pdf>`__.
@@ -73,6 +65,13 @@ Conda (Linux/macOS/Windows)
    .. code-block:: bash
 
       conda config --set auto_activate_base false
+
+   In order to make sure that the conda configuration uses ``conda-forge`` as the only channel, which will help avoid issues with blocked ``defaults`` or ``anaconda`` repositories, please set the following configurations:
+
+   .. code-block:: bash
+
+      conda config --add channels conda-forge
+      conda config --set channel_priority strict
 
 .. tab-set::
 
@@ -104,19 +103,19 @@ For OpenMP support, you will further need:
 
       .. code-block:: bash
 
-         conda install -c conda-forge libgomp
+         mamba install -c conda-forge libgomp
 
    .. tab-item:: macOS or Windows
 
       .. code-block:: bash
 
-         conda install -c conda-forge llvm-openmp
+         mamba install -c conda-forge llvm-openmp
 
 For Nvidia CUDA GPU support, you will need to have `a recent CUDA driver installed <https://developer.nvidia.com/cuda-downloads>`__ or you can lower the CUDA version of `the Nvidia cuda package <https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#conda-installation>`__ and `conda-forge to match your drivers <https://docs.cupy.dev/en/stable/install.html#install-cupy-from-conda-forge>`__ and then add these packages:
 
 .. code-block:: bash
 
-   conda install -c nvidia -c conda-forge cuda cuda-nvtx-dev cupy
+   mamba install -c nvidia -c conda-forge cuda cuda-nvtx-dev cupy
 
 More info for `CUDA-enabled ML packages <https://twitter.com/jeremyphoward/status/1697435241152127369>`__.
 
@@ -127,7 +126,7 @@ Spack (Linux/macOS)
 `Spack <https://spack.readthedocs.io>`__ is a user-level package manager.
 It is primarily written for Linux, with slightly less support for macOS, and future support for Windows.
 
-First, download a `WarpX Spack desktop development environment <https://github.com/ECP-WarpX/WarpX/blob/development/Tools/machines/desktop>`__ of your choice.
+First, download a `WarpX Spack desktop development environment <https://github.com/BLAST-WarpX/warpx/blob/development/Tools/machines/desktop>`__ of your choice.
 For most desktop developments, pick the OpenMP environment for CPUs unless you have a supported GPU.
 
 * **Debian/Ubuntu** Linux:
@@ -152,7 +151,7 @@ Now install the WarpX dependencies in a new WarpX development environment:
 .. code-block:: bash
 
    # download environment file
-   curl -sLO https://raw.githubusercontent.com/ECP-WarpX/WarpX/development/Tools/machines/desktop/spack-${system}-${compute}.yaml
+   curl -sLO https://raw.githubusercontent.com/BLAST-WarpX/warpx/development/Tools/machines/desktop/spack-${system}-${compute}.yaml
 
    # create new development environment
    spack env create warpx-${compute}-dev spack-${system}-${compute}.yaml

@@ -6,6 +6,7 @@
  */
 #include "Fields.H"
 #include "StrangImplicitSpectralEM.H"
+#include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "WarpX.H"
 
 using namespace warpx::fields;
@@ -80,10 +81,11 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real start_time,
 
     // Solve nonlinear system for E at t_{n+1/2}
     // Particles will be advanced to t_{n+1/2}
-    m_nlsolver->Solve( m_E, m_Eold, half_time, 0.5_rt*m_dt );
+    m_nlsolver->Solve( m_E, m_Eold, start_time, m_dt, a_step );
 
     // Update WarpX owned Efield_fp and Bfield_fp to t_{n+1/2}
     UpdateWarpXFields( m_E, half_time );
+    m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
     // Advance particles from time n+1/2 to time n+1
     m_WarpX->FinishImplicitParticleUpdate();
@@ -99,12 +101,13 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real start_time,
 
 void StrangImplicitSpectralEM::ComputeRHS ( WarpXSolverVec& a_RHS,
                                             WarpXSolverVec const & a_E,
-                                            amrex::Real half_time,
+                                            amrex::Real start_time,
                                             int a_nl_iter,
                                             bool a_from_jacobian )
 {
     // Update WarpX-owned Efield_fp and Bfield_fp using current state of
     // E from the nonlinear solver at time n+1/2
+    const amrex::Real half_time = start_time + 0.5_rt*m_dt;
     UpdateWarpXFields( a_E, half_time );
 
     // Self consistently update particle positions and velocities using the

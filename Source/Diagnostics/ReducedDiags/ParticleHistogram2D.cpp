@@ -149,6 +149,8 @@ void ParticleHistogram2D::ComputeDiags (int step)
     }
 
     d_data_2D.copy(m_h_data_2D);
+    // Gpu::streamSynchronize() is not needed, because there is a sync in WarpXParIter constructor later
+
     auto d_table = d_data_2D.table();
 
     // get a reference to WarpX instance
@@ -244,6 +246,7 @@ void ParticleHistogram2D::ComputeDiags (int step)
 
     // Copy data from GPU memory
     m_h_data_2D.copy(d_data_2D);
+    Gpu::streamSynchronize();
 
     // reduced sum over mpi ranks
     const int size = static_cast<int> (d_data_2D.size());

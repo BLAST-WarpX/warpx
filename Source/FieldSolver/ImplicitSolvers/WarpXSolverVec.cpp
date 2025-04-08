@@ -149,7 +149,7 @@ void WarpXSolverVec::Copy ( FieldType  a_array_type,
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         if (m_array_type != FieldType::None) {
             for (int n = 0; n < 3; ++n) {
-                const amrex::iMultiFab* dotMask = m_WarpX->getFieldDotMaskPointer(m_array_type,lev,n);
+                const amrex::iMultiFab* dotMask = m_WarpX->getFieldDotMaskPointer(m_array_type, lev, ablastr::fields::Direction{n});
                 auto rtmp = amrex::MultiFab::Dot( *dotMask,
                                                   *m_array_vec[lev][n], 0,
                                                   *a_X.getArrayVec()[lev][n], 0, 1, 0, local);
@@ -157,7 +157,7 @@ void WarpXSolverVec::Copy ( FieldType  a_array_type,
             }
         }
         if (m_scalar_type != FieldType::None) {
-            const amrex::iMultiFab* dotMask = m_WarpX->getFieldDotMaskPointer(m_scalar_type,lev,0);
+            const amrex::iMultiFab* dotMask = m_WarpX->getFieldDotMaskPointer(m_scalar_type,lev, ablastr::fields::Direction{0});
             auto rtmp = amrex::MultiFab::Dot( *dotMask,
                                               *m_scalar_vec[lev], 0,
                                               *a_X.getScalarVec()[lev], 0, 1, 0, local);

@@ -16,7 +16,7 @@ concurrency:
 jobs:
   build_hip_3d_sp:
     name: HIP 3D SP
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     env:
       CXXFLAGS: "-Werror -Wno-deprecated-declarations -Wno-error=pass-failed"
       CMAKE_GENERATOR: Ninja
@@ -25,7 +25,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: install dependencies
       shell: bash
-      run: .github/workflows/dependencies/hip.sh
+      run: .github/workflows/dependencies/hip.sh 6.3.2
     - name: CCache Cache
       uses: actions/cache@v4
       with:
@@ -47,11 +47,6 @@ jobs:
         which clang++
         export CXX=$(which clang++)
         export CC=$(which clang)
-
-        # "mpic++ --showme" forgets open-pal in Ubuntu 20.04 + OpenMPI 4.0.3
-        #   https://bugs.launchpad.net/ubuntu/+source/openmpi/+bug/1941786
-        #   https://github.com/open-mpi/ompi/issues/9317
-        export LDFLAGS="-lopen-pal"
 
         cmake -S . -B build_sp \
           -DCMAKE_VERBOSE_MAKEFILE=ON \
@@ -75,7 +70,7 @@ jobs:
 
   build_hip_2d_dp:
     name: HIP 2D DP
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     env:
       CXXFLAGS: "-Werror -Wno-deprecated-declarations -Wno-error=pass-failed"
       CMAKE_GENERATOR: Ninja
@@ -84,7 +79,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: install dependencies
       shell: bash
-      run: .github/workflows/dependencies/hip.sh
+      run: .github/workflows/dependencies/hip.sh 6.3.2
     - name: CCache Cache
       uses: actions/cache@v4
       with:
@@ -106,11 +101,6 @@ jobs:
         which clang++
         export CXX=$(which clang++)
         export CC=$(which clang)
-
-        # "mpic++ --showme" forgets open-pal in Ubuntu 20.04 + OpenMPI 4.0.3
-        #   https://bugs.launchpad.net/ubuntu/+source/openmpi/+bug/1941786
-        #   https://github.com/open-mpi/ompi/issues/9317
-        export LDFLAGS="-lopen-pal"
 
         cmake -S . -B build_2d \
           -DCMAKE_VERBOSE_MAKEFILE=ON \

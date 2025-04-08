@@ -50,7 +50,7 @@ Timestep::Timestep (const std::string& rd_name)
         }
 
         // close file
-        ofs << std::endl;
+        ofs << "\n";
         ofs.close();
     }
 }
