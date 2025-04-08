@@ -176,6 +176,13 @@ jobs:
         rm -rf ./diags
         cd -
 
+        echo "=================================================================================================== "
+        echo "===============  Examples/Tests/implicit/inputs_test_2d_theta_implicit_jfnk_vandb ================= "
+        echo "=================================================================================================== "
+
+        mpirun -n 2 ./build/bin/warpx.2d Examples/Tests/implicit/inputs_test_2d_theta_implicit_jfnk_vandb
+        rm -rf ./diags
+
   build_UB_sanitizer_double_precision:
     name: Clang UB sanitizer (DP)
     runs-on: ubuntu-24.04
@@ -254,13 +261,6 @@ jobs:
         echo "=================================================================================================== "
 
         mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/free_electron_laser/inputs_test_1d_fel
-        rm -rf ./diags
-
-        echo "=================================================================================================== "
-        echo "===============  Examples/Tests/implicit/inputs_test_2d_theta_implicit_jfnk_vandb ================= "
-        echo "=================================================================================================== "
-
-        mpirun -n 2 ./build/bin/warpx.2d Examples/Tests/implicit/inputs_test_2d_theta_implicit_jfnk_vandb
         rm -rf ./diags
 
   build_thread_sanitizer:
