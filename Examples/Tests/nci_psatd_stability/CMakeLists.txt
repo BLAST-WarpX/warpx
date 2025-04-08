@@ -203,5 +203,4 @@ if(WarpX_FFT)
         "analysis_default_regression.py --path diags/diag1000025"  # checksum
         OFF  # dependency
     )
-    label_warpx_test(test_test_rz_psatd_JRhom_LL2 slow)
 endif()

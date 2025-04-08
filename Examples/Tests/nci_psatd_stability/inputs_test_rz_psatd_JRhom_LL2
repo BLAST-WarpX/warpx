@@ -1,5 +1,5 @@
 # Iterations
-max_step = 25
+max_step = 1000
 
 # Domain
 amr.n_cell = 32 64
@@ -57,7 +57,7 @@ driver.z_rms = 20.1e-6
 driver.x_m = 0.
 driver.y_m = 0.
 driver.z_m = -80e-6
-driver.npart = 1000000
+driver.npart = 1000
 driver.q_tot = -1e-9
 driver.momentum_distribution_type = "gaussian"
 driver.ux_m = 0.
@@ -80,7 +80,7 @@ driver_back.z_rms = 20.1e-6
 driver_back.x_m = 0.
 driver_back.y_m = 0.
 driver_back.z_m = -80e-6
-driver_back.npart = 1000000
+driver_back.npart = 1000
 driver_back.q_tot = 1e-9
 driver_back.momentum_distribution_type = "at_rest"
 driver_back.initialize_self_fields = 0
