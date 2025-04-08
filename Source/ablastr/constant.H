@@ -60,7 +60,7 @@ namespace ablastr::constant
         //! reduced Planck Constant = h / tau [J*s]
         static constexpr auto hbar = 1.0545718176461565e-34_rt;
         //! fine-structure constant = mu0/(4*pi)*q_e*q_e*c/hbar [dimensionless]
-        //! The value is calculated from the espression. This differs
+        //! The value is calculated from the expression. This differs
         //! slightly from the CODATA2022 value 0.0072973525643.
         static constexpr auto alpha = 0.0072973525643330135_rt;
         //! classical electron radius = 1./(4*pi*ep0) * q_e*q_e/(m_e*c*c) [m]
