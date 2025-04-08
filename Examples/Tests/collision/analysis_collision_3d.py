@@ -30,6 +30,7 @@ import sys
 import numpy
 import post_processing_utils
 import yt
+from scipy.constants import c, m_e
 
 tolerance = 0.001
 
@@ -38,9 +39,7 @@ ne = ng * 200
 ni = ng * 200
 np = ne + ni
 
-c = 299792458.0
-me = 9.10938356e-31
-mi = me * 5.0
+mi = m_e * 5.0
 
 ## In the first part of the test we verify that the output data is consistent with the exponential
 ## fit.
@@ -69,7 +68,7 @@ for fn in fn_list:
     # get time index j
     j = int(fn[-5:])
     # compute error
-    vxe = numpy.mean(pxe) / me / c
+    vxe = numpy.mean(pxe) / m_e / c
     vxi = numpy.mean(pxi) / mi / c
     vxd = vxe - vxi
     fit = a * math.exp(b * j)
