@@ -131,7 +131,7 @@ public:
     /** Push momentum one half step forward to synchronize with position.
      *  Also sets is_synchronized to `true`.
      */
-    void Synchronize ();
+    void SynchronizeVelocityWithPosition ();
 
     //
     // Functions used by implicit solvers
