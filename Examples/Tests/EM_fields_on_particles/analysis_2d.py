@@ -89,7 +89,7 @@ Ez_aligned = interp_func_ez(T + opt_shift)
 By_aligned = interp_func_by(T + opt_shift)
 Bz_aligned = interp_func_bz(T + opt_shift)
 
-# verif
+# test cases
 
 # E.1
 
@@ -101,6 +101,10 @@ ey_p = ey_t[T >= delta_t]
 Ey_p = Ey_aligned[T >= delta_t]
 ey_p += 1e11
 Ey_p += 1e11
+
+# np.allclose will almost always be false when values are very close to zero
+# unless we give a high absolute tolerance
+# Here I offset the values by 1e11 to avoid this problem
 
 ez_p = ez_t[T >= delta_t]
 Ez_p = Ez_aligned[T >= delta_t]
@@ -134,6 +138,9 @@ by_p = by_t[T >= delta_t]
 By_p = By_aligned[T >= delta_t]
 by_p += 1e3
 By_p += 1e3
+
+# same as for E.2
+# np.allclose will almost always be false when values are very close to zero
 
 bz_p = bz_t[T >= delta_t]
 Bz_p = Bz_aligned[T >= delta_t]
