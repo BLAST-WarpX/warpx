@@ -79,8 +79,7 @@ jobs:
   build_thread_sanitizer:
     name: Clang thread sanitizer
     runs-on: ubuntu-24.04
-    # TODO Fix data race conditions and re-enable job
-    if: 0 #github.event.pull_request.draft == false
+    if: github.event.pull_request.draft == false
     env:
       CC: clang
       CXX: clang++
@@ -109,21 +108,7 @@ jobs:
         export CC=$(which clang-17)
         export CXXFLAGS="-fsanitize=thread"
 
-        cmake -S . -B build                 \
-          -GNinja                           \
-          -DCMAKE_VERBOSE_MAKEFILE=ON       \
-          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-          -DWarpX_DIMS="RZ;1;2;3"           \
-          -DWarpX_FFT=ON                    \
-          -DWarpX_QED=ON                    \
-          -DWarpX_QED_TABLE_GEN=ON          \
-          -DWarpX_OPENPMD=ON                \
-          -DWarpX_EB=OFF                    \
-          -DWarpX_PRECISION=DOUBLE          \
-          -DWarpX_PARTICLE_PRECISION=DOUBLE
-        cmake --build build -j 4
-
-        cmake -S . -B build_EB              \
+        cmake -S . -B build              \
           -GNinja                           \
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
@@ -135,7 +120,7 @@ jobs:
           -DWarpX_EB=ON                     \
           -DWarpX_PRECISION=DOUBLE          \
           -DWarpX_PARTICLE_PRECISION=DOUBLE
-        cmake --build build_EB -j 4
+        cmake --build build -j 4
 
         ccache -s
         du -hs ~/.cache/ccache
@@ -158,4 +143,4 @@ jobs:
 
         ulimit -c unlimited
 
-        mpirun -n 2 ../../../build_EB/bin/warpx.2d inputs_test_2d_embedded_circle warpx.serialize_initial_conditions = 0
+        mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_embedded_circle warpx.serialize_initial_conditions = 0
