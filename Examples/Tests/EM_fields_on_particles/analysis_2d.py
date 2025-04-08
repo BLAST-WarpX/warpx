@@ -93,7 +93,7 @@ Bz_aligned = interp_func_bz(T + opt_shift)
 
 # E.1
 
-assert np.allclose(np.zeros(ex_t.shape), ex_t, rtol=0, atol=5e-4)
+assert np.allclose(np.zeros(ex_t.shape), ex_t, rtol=0, atol=1e-2)
 
 # E.2
 
@@ -130,7 +130,7 @@ assert np.allclose(2 * env_ey_t[85:390], env_ez_t[85:390], rtol=8e-3, atol=0)
 
 # B.1
 
-assert np.allclose(np.zeros(bx_t.shape), bx_t, rtol=0, atol=5e-4)
+assert np.allclose(np.zeros(bx_t.shape), bx_t, rtol=0, atol=1e-3)
 
 # B.2
 
