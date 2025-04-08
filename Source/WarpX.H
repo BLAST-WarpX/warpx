@@ -1419,7 +1419,7 @@ private:
     amrex::VisMF::Header::Version plotfile_headerversion  = amrex::VisMF::Header::Version_v1;
     amrex::VisMF::Header::Version slice_plotfile_headerversion  = amrex::VisMF::Header::Version_v1;
 
-    bool synchronize_velocity_for_diagnostics = false;
+    bool synchronize_velocity_for_diagnostics = true;
 
     bool use_single_read = true;
     bool use_single_write = true;
