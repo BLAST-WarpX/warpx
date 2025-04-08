@@ -23,6 +23,7 @@
 #include "WarpX.H"
 
 #include <ablastr/utils/text/StreamUtils.H>
+#include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX_BLassert.H>
 #include <AMReX_Config.H>
@@ -339,7 +340,7 @@ storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
     auto& warpx = WarpX::GetInstance();
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        warpx.finestLevel() ==0,
+        finestLevel == 0,
         "output of the electromagnetic fields on particles only works without mesh refinement"
     );
 
@@ -501,6 +502,13 @@ void storeEMFieldsOnParticles(PinnedMemoryParticleContainer& tmp,
                               const bool galerkin_interpolation,
                               const bool is_full_diagnostic)
 {
+    if (depos_order < 1 || depos_order > 4) {
+        ablastr::warn_manager::WMRecordWarning(
+            "Diagnostics",
+            "Particle shape order must be 1, 2, 3 or 4",
+            ablastr::warn_manager::WarnPriority::medium
+        );
+    }
     if (galerkin_interpolation) {
         if (depos_order == 1) {
             ::storeEMFieldsOnParticles_t<1, 1>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
