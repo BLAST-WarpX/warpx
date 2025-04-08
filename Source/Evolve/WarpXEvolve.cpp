@@ -306,6 +306,7 @@ WarpX::Evolve (int numsteps)
         }
 
         bool const do_diagnostic = (multi_diags->DoComputeAndPack(step) || reduced_diags->DoDiags(step));
+        bool const end_of_step_loop = (step == numsteps_max - 1) || (cur_time + dt[0] >= stop_time - 1.e-3*dt[0]);
         if (synchronize_velocity_for_diagnostics &&
             (do_diagnostic || end_of_step_loop)) {
             // When the diagnostics require synchronization, push p by 0.5*dt to synchronize.
