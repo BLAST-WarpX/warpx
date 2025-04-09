@@ -107,11 +107,8 @@ jobs:
         # ThreadSanitizer finds some false positives in AMReX.
         # thread_sanitizer_blacklist_file contains a list of
         # blacklisted functions which are ingored by the sanitizer.
-        echo "# Ignore exactly this function (the names are mangled)" > thread_sanitizer_blacklist_file
-        echo "fun:amrex::InitRandom" >> thread_sanitizer_blacklist_file
-        blacklist_file_path="${pwd}/thread_sanitizer_blacklist_file"
-        echo $blacklist_file_path
-
+        echo "# Ignore exactly this function (the names are mangled)" >/home/runner/work/warpx/warpx/thread_sanitizer_blacklist_file
+        echo "fun:amrex::InitRandom" >> /home/runner/work/warpx/warpx/thread_sanitizer_blacklist_file
         export CXX=$(which clang++-17)
         export CC=$(which clang-17)
         export CXXFLAGS="-fsanitize=thread -fsanitize-blacklist=${blacklist_file_path}"
