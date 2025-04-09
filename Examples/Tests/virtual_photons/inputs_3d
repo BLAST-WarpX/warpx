@@ -70,14 +70,14 @@ beam.momentum_distribution_type = gaussian
 beam.uz_m = beam_gamma
 beam.uy_m = 0.0
 beam.ux_m = 0.0
-beam.ux_th = 0.01*beam_gamma
-beam.uy_th = 0.02*beam_gamma
+beam.ux_th = 0.0
+beam.uy_th = 0.0
 beam.uz_th = 0
 
 beam.do_not_deposit = 1
 beam.do_not_push = 1
 
-my_constants.nmacropart = 15
+my_constants.nmacropart = 1
 
 beam.species_type = electron
 beam.injection_style = gaussian_beam

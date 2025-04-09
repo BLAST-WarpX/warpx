@@ -41,15 +41,22 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
     auto& primary  = mypc->GetParticleContainerFromName("beam");
     auto& vphotons = mypc->GetParticleContainerFromName("virtual_photons");
     // TO DO: minimum photon energy should be an input parameter
-    amrex::Real const hw_min = PhysConst::m_e * PhysConst::c * PhysConst::c * 0.001_rt; // 0.1 * m_e * c^2
+    amrex::Real const hw_min = PhysConst::m_e * PhysConst::c * PhysConst::c * 0.0001_rt; // 0.1 * m_e * c^2
     //amrex::Real const c_arb = 0.2_rt; // arbitrary constant which should be >~ 0.1
     //amrex::Real const eta_max = 0.5_rt * ( std::pow( std::log(hw_min), 2._rt) + std::sqrt( std::pow( std::log(hw_min), 4._rt) + 4._rt * c_arb * std::pow( std::log(hw_min), 2._rt) ) );
     amrex::Real const alpha_pi = PhysConst::alpha / MathConst::pi;
+    amrex::Real const sampling_factor = 1000000._rt;
+    amrex::Real const inv_c2 = 1._rt / (PhysConst::c * PhysConst::c);
 
     amrex::Real const mass = primary.getMass();
 
     amrex::Real const gamma_em = 0.57721566490153286060_rt; // Euler-Mascheroni constant
     amrex::Real const coeff = + std::log(4._rt) - 2._rt*gamma_em - 1._rt;
+
+    amrex::Real umin = 0.25_rt * coeff * coeff;
+
+
+
 
     int const nlevs = std::max(0, primary.finestLevel()+1);
     for (int lev = 0; lev < nlevs; ++lev) {
@@ -73,22 +80,30 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
 
             // First pass: compute the number of virtual photons for each primary particle
             // and fill the corresponding vector
-            amrex::ParallelFor(num,
-             [=] AMREX_GPU_DEVICE (amrex::Long i) noexcept
+            amrex::ParallelForRNG(num,
+             [=] AMREX_GPU_DEVICE (amrex::Long i, amrex::RandomEngine const& engine) noexcept
             {
-                amrex::ParticleReal ux = soa.m_rdata[PIdx::ux][i];
+                amrex::ParticleReal ux = soa.m_rdata[PIdx::ux][i]; // u=v*gamma=p/m
                 amrex::ParticleReal uy = soa.m_rdata[PIdx::uy][i];
                 amrex::ParticleReal uz = soa.m_rdata[PIdx::uz][i];
 
                 // same as Cain
                 // similar to Jackson's formula 15.58, but neglect longitudinal field, assume relativistic velocities, and integrate in energy
-                amrex::ParticleReal gamma = std::sqrt( 1.0_rt + ux*ux + uy*uy + uz*uz);
-                amrex::ParticleReal y_min = hw_min / (gamma * mass * PhysConst::c * PhysConst::c); // min fractional photon energy
+                amrex::ParticleReal gamma = std::sqrt( 1.0_rt +  (ux*ux + uy*uy + uz*uz) * inv_c2 );
+                amrex::ParticleReal y_min = hw_min * inv_c2 / (gamma * mass); // min fractional photon energy
                 amrex::ParticleReal lny = std::log( y_min );
-                amrex::Real r_photons = alpha_pi * (lny * lny + coeff * lny) * 100.0_rt; // number of virtual photons per primary particle
-                amrex::Long n_photons = (amrex::Long)r_photons;
+                amrex::Real r_photons = alpha_pi * (lny * lny - coeff * lny) * sampling_factor; // number of virtual photons per primary particle
 
-                amrex::Print(0) << " VPHOTONSSSS = " << n_photons << std::endl;
+                amrex::Real i_photons;
+                amrex::Real f_photons = std::modf(r_photons, &i_photons);
+
+                amrex::Long n_photons = (amrex::Long)i_photons;
+
+                amrex::Print(0) << " VPHOTONSSSS = " << r_photons << " ymin " << y_min << "gamma " << gamma << std::endl;
+
+                if(amrex::Random(engine) < f_photons){
+                     n_photons += amrex::Long(1);
+                }
 
                 num_vp_data[i] = n_photons;
             });
@@ -122,41 +137,48 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
             amrex::ParallelForRNG (num,
              [=] AMREX_GPU_DEVICE (amrex::Long i,  amrex::RandomEngine const& engine) noexcept
             {
-                amrex::ParticleReal rnd = amrex::Random(engine);
-                amrex::Print(0) << "rnd = " << rnd << std::endl;
-                amrex::ParticleReal frac_energy = std::exp( 0.5_rt * coeff - std::sqrt(rnd)); // fractional energy of the photon, often denoted as y (or x)
-
                 // primary energy
                 amrex::ParticleReal ux_primary = soa.m_rdata[PIdx::ux][i];
                 amrex::ParticleReal uy_primary = soa.m_rdata[PIdx::uy][i];
                 amrex::ParticleReal uz_primary = soa.m_rdata[PIdx::uz][i];
-                amrex::ParticleReal gamma_primary = std::sqrt( 1.0_rt + ux_primary*ux_primary + uy_primary*uy_primary + uz_primary*uz_primary);
+                amrex::ParticleReal gamma_primary = std::sqrt( 1.0_rt + (ux_primary*ux_primary + uy_primary*uy_primary + uz_primary*uz_primary)*inv_c2 );
 
-                amrex::ParticleReal ux = 0._rt;
-                amrex::ParticleReal uy = 0._rt;
-                amrex::ParticleReal uz = frac_energy * gamma_primary; // uz = energy of the photon / (m_e c^2) = gamma of the photon
-                amrex::Print(0) << "uz = " << uz << std::endl;
-
-
+                amrex::Real y_min = hw_min / (mass * gamma_primary * PhysConst::c * PhysConst::c);
+                // primary position, weight and id
                 amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
                 amrex::ParticleReal y  = soa.m_rdata[PIdx::y][i];
                 amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
                 amrex::ParticleReal w  = soa.m_rdata[PIdx::w][i];
                 uint64_t pid = soa.m_idcpu[i];
 
+                amrex::Real umax = std::pow( 0.5_rt * coeff + std::log(y_min), 2._rt);
+
+                // not sure about this:
+                //WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                //    std::exp(0.5_rt * coeff) > y_min,
+                //    "should never happen, but check"
+                //);
+
 
                 for (int j = 0; j < num_vp_data[i]; j++)
                 {
+
+
+
+                    amrex::ParticleReal rnd = (umax - umin) * amrex::Random(engine) + umin ;
+                    amrex::ParticleReal frac_energy = std::exp( 0.5_rt * coeff - std::sqrt(rnd)); // fractional energy of the photon, often denoted as y (or x)
+
                     // photon index for the current primary
                     amrex::Long ip = offset_vp_data[i] + j;
-                    pa_vp[PIdx::ux][ip] = ux;
-                    pa_vp[PIdx::uy][ip] = uy;
-                    pa_vp[PIdx::uz][ip] = uz;
+                    pa_vp[PIdx::ux][ip] = 0._rt;
+                    pa_vp[PIdx::uy][ip] = 0._rt;
+                    pa_vp[PIdx::uz][ip] = frac_energy * gamma_primary * PhysConst::c; // this will be multiplied by m_e before damping the outputs
                     pa_vp[PIdx::x][ip] = x;
                     pa_vp[PIdx::y][ip] = y;
                     pa_vp[PIdx::z][ip] = z;
-                    pa_vp[PIdx::w][ip] = w;
+                    pa_vp[PIdx::w][ip] = w / sampling_factor;
                     pid_vp[ip] = pid;
+                    //amrex::Print(0) << " INFO ==== >  " << frac_energy << " ----- " << frac_energy * gamma_primary << std::endl;
                 }
             });
         } // mfi
