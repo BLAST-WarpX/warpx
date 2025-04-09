@@ -190,7 +190,7 @@ class Species(picmistandard.PICMI_Species):
 
     warpx_do_temperature_deposition: bool, default=False
         This flag is set per species to do another pass to deposit temperature
-        on each timestep if required.
+        on each timestep if required. Currently only works with Ohm's Law Hybrid Solver.
     """
 
     def init(self, kw):

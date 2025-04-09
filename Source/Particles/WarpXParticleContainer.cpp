@@ -1360,7 +1360,7 @@ WarpXParticleContainer::GetChargeDensity (int lev, bool local)
  * \param lev         Level of box that contains particles
  */
 void
-WarpXParticleContainer::DepositTemperature (amrex::MultiFab* temperature, const int lev)
+WarpXParticleContainer::DepositIsotropicNGPTemperature (amrex::MultiFab* temperature, const int lev)
 {
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(mass > 0.,
@@ -1469,7 +1469,7 @@ WarpXParticleContainer::DepositTemperature (amrex::MultiFab* temperature, const 
 }
 
 std::unique_ptr<amrex::MultiFab>
-WarpXParticleContainer::GetTemperature (int lev)
+WarpXParticleContainer::GetIsotropicNGPTemperature (int lev)
 {
     auto const& ba = m_gdb->ParticleBoxArray(lev);
     auto const& dm = m_gdb->DistributionMap(lev);
@@ -1482,7 +1482,7 @@ WarpXParticleContainer::GetTemperature (int lev)
 
     // Thermodynamic temperature is not defined for massless particles
     if (mass > 0.) {
-        DepositTemperature(temperature.get(), lev);
+        DepositIsotropicNGPTemperature(temperature.get(), lev);
     }
 
     return temperature;
@@ -1567,7 +1567,7 @@ WarpXParticleContainer::GetDebyeLength (int lev)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(mass*charge != 0.,
         "The Debye length can not be calculated for a massless or neutral species.");
 
-    std::unique_ptr<amrex::MultiFab> temperature = GetTemperature(lev);
+    std::unique_ptr<amrex::MultiFab> temperature = GetIsotropicNGPTemperature(lev);
     std::unique_ptr<amrex::MultiFab> number_density = GetNumberDensity(lev);
 
     amrex::BoxArray const & ba = temperature->boxArray();

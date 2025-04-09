@@ -171,6 +171,7 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
                             amrex::Real vsum_a = vbar_old_arr(i,j,k);
                             amrex::Real v_a = vsum_a/w_a;
                             amrex::Real v_b = vbar_arr(i,j,k);
+
                             // Delta squared is ill-behaved when v_b and v_a are close.
                             // Check this for underflow when squaring.
                             amrex::Real delta = v_b - v_a;
