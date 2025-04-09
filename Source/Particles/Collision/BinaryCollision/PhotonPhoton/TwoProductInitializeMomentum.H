@@ -24,7 +24,9 @@ namespace {
     // Define shortcuts for frequently-used type names
     using SoaData_type = WarpXParticleContainer::ParticleTileType::ParticleTileDataType;
     using ParticleType = WarpXParticleContainer::ParticleType;
-    using ParticleBins = amrex::DenseBins<ParticleType>;
+    using ParticleTileType = WarpXParticleContainer::ParticleTileType;
+    using ParticleTileDataType = ParticleTileType::ParticleTileDataType;
+    using ParticleBins = amrex::DenseBins<ParticleTileDataType>;
     using index_type = ParticleBins::index_type;
 
     /**
