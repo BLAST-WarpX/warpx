@@ -39,12 +39,12 @@ class constants:
     # --- Put the constants in their own namespace
     # --- Values from WarpXConst.H
     c = 299792458.0
-    ep0 = 8.8541878128e-12
-    mu0 = 1.25663706212e-06
+    ep0 = 8.8541878188e-12
+    mu0 = 1.2566370612685e-06
     q_e = 1.602176634e-19
-    m_e = 9.1093837015e-31
-    m_p = 1.67262192369e-27
-    hbar = 1.054571817e-34
+    m_e = 9.1093837139e-31
+    m_p = 1.67262192595e-27
+    hbar = 1.0545718176461565e-34
     kb = 1.380649e-23
 
 
@@ -1951,7 +1951,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                 self.plasma_resistivity, self.mangle_dict
             ),
         )
-        pywarpx.hybridpicmodel.plasma_hyper_resistivity = self.plasma_hyper_resistivity
+        pywarpx.hybridpicmodel.__setattr__(
+            "plasma_hyper_resistivity(rho,B)",
+            pywarpx.my_constants.mangle_expression(
+                self.plasma_hyper_resistivity, self.mangle_dict
+            ),
+        )
         pywarpx.hybridpicmodel.substeps = self.substeps
         pywarpx.hybridpicmodel.holmstrom_vacuum_region = self.holmstrom_vacuum_region
         pywarpx.hybridpicmodel.__setattr__(
@@ -2558,14 +2563,21 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
     scattering_processes: dictionary
         The scattering process to use and any needed information
 
+    product_species: list
+        The species produced by collision processes (currently only ionization
+        products are supported).
+
     ndt: integer, optional
         The collisions will be applied every "ndt" steps. Must be 1 or larger.
     """
 
-    def __init__(self, name, species, scattering_processes, ndt=None, **kw):
+    def __init__(
+        self, name, species, scattering_processes, product_species=None, ndt=None, **kw
+    ):
         self.name = name
         self.species = species
         self.scattering_processes = scattering_processes
+        self.product_species = product_species
         self.ndt = ndt
 
         self.handle_init(kw)
@@ -2574,12 +2586,16 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
         collision = pywarpx.Collisions.newcollision(self.name)
         collision.type = "dsmc"
         collision.species = [species.name for species in self.species]
+        if self.product_species is not None:
+            collision.product_species = [
+                species.name for species in self.product_species
+            ]
         collision.ndt = self.ndt
 
         collision.scattering_processes = self.scattering_processes.keys()
         for process, kw in self.scattering_processes.items():
             for key, val in kw.items():
-                if key == "species":
+                if "species" in key:
                     val = val.name
                 collision.add_new_attr(process + "_" + key, val)
 
@@ -2893,6 +2909,11 @@ class Simulation(picmistandard.PICMI_Simulation):
     warpx_checkpoint_signals: list of strings
         Signals on which to write out a checkpoint
 
+    warpx_synchronize_velocity: bool, default=False
+        Flags whether the particle velocities are synchronized in time with
+        the positions in the diagnostics. When False, the particles are
+        one half step behind the positions (except for the final diagnostic).
+
     warpx_numprocs: list of ints (1 in 1D, 2 in 2D, 3 in 3D)
         Domain decomposition on the coarsest level.
         The domain will be chopped into the exact number of pieces in each dimension as specified by this parameter.
@@ -3012,6 +3033,8 @@ class Simulation(picmistandard.PICMI_Simulation):
         self.reduced_diags_separator = kw.pop("warpx_reduced_diags_separator", None)
         self.reduced_diags_precision = kw.pop("warpx_reduced_diags_precision", None)
 
+        self.synchronize_velocity = kw.pop("warpx_synchronize_velocity", None)
+
         self.inputs_initialized = False
         self.warpx_initialized = False
 
@@ -3075,6 +3098,8 @@ class Simulation(picmistandard.PICMI_Simulation):
 
         pywarpx.warpx.break_signals = self.break_signals
         pywarpx.warpx.checkpoint_signals = self.checkpoint_signals
+
+        pywarpx.warpx.synchronize_velocity_for_diagnostics = self.synchronize_velocity
 
         pywarpx.warpx.numprocs = self.numprocs
 
@@ -4061,7 +4086,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
 
     species: species instance
         The name of the species for which to calculate the diagnostic, required for
-        diagnostic types 'BeamRelevant', 'ParticleHistogram', and 'ParticleExtrema'
+        diagnostic types 'BeamRelevant', 'ParticleHistogram', 'ParticleHistogram2D', and 'ParticleExtrema'
 
     bin_number: integer
         For diagnostic type 'ParticleHistogram', the number of bins used for the histogram
@@ -4079,7 +4104,34 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
         For diagnostic type 'ParticleHistogram', the function evaluated to produce the histogram data
 
     filter_function: string, optional
-        For diagnostic type 'ParticleHistogram', the function to filter whether particles are included in the histogram
+        For diagnostic types 'ParticleHistogram' and 'ParticleHistogram2D', the function to filter whether particles are included in the histogram
+
+    bin_max_abs: float
+        For diagnostic type 'ParticleHistogram2D', the maximum value of the bins for the abscissa axis.
+
+    bin_max_ord: float
+        For diagnostic type 'ParticleHistogram2D', the maximum value of the bins for the ordinate axis.
+
+    bin_min_abs: float
+        For diagnostic type 'ParticleHistogram2D', the minimum value of the bins for the abscissa axis.
+
+    bin_min_ord: float
+        For diagnostic type 'ParticleHistogram2D', the minimum value of the bins for the ordinate axis.
+
+    bin_number_abs: integer
+        For diagnostic type 'ParticleHistogram2D', the number of bins used for the histogram for the abscissa axis.
+
+    bin_number_ord: integer
+        For diagnostic type 'ParticleHistogram2D', the number of bins used for the histogram for the ordinate axis.
+
+    histogram_function_abs: string
+        For diagnostic type 'ParticleHistogram2D', the histogram function for the abscissa axis.
+
+    histogram_function_ord: string
+        For diagnostic type 'ParticleHistogram2D', the histogram function for the ordinate axis.
+
+    value_function: string, optional
+        For diagnostic type 'ParticleHistogram2D', the expression for the weight used to calculate the histogram.
 
     reduced_function: string
         For diagnostic type 'FieldReduction', the function of the fields to evaluate
@@ -4162,6 +4214,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
         self._species_reduced_diagnostics = [
             "BeamRelevant",
             "ParticleHistogram",
+            "ParticleHistogram2D",
             "ParticleExtrema",
         ]
 
@@ -4172,6 +4225,8 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
             self.species = species.name
             if self.type == "ParticleHistogram":
                 kw = self._handle_particle_histogram(**kw)
+            elif self.type == "ParticleHistogram2D":
+                kw = self._handle_particle_histogram2d(**kw)
         elif self.type == "FieldProbe":
             kw = self._handle_field_probe(**kw)
         elif self.type == "FieldReduction":
@@ -4246,6 +4301,44 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
             ):
                 self.user_defined_kw[k] = kw[k]
                 del kw[k]
+
+        return kw
+
+    def _handle_particle_histogram2d(self, **kw):
+        self.bin_number_abs = kw.pop("bin_number_abs")
+        self.bin_number_ord = kw.pop("bin_number_ord")
+        self.bin_min_abs = kw.pop("bin_min_abs")
+        self.bin_max_abs = kw.pop("bin_max_abs")
+        self.bin_min_ord = kw.pop("bin_min_ord")
+        self.bin_max_ord = kw.pop("bin_max_ord")
+        histogram_function_abs = kw.pop("histogram_function_abs")
+        histogram_function_ord = kw.pop("histogram_function_ord")
+        self.__setattr__(
+            "histogram_function_abs(t,x,y,z,ux,uy,uz,w)", histogram_function_abs
+        )
+        self.__setattr__(
+            "histogram_function_ord(t,x,y,z,ux,uy,uz,w)", histogram_function_ord
+        )
+
+        filter_function = kw.pop("filter_function", None)
+        value_function = kw.pop("value_function", None)
+
+        self.__setattr__("filter_function(t,x,y,z,ux,uy,uz,w)", filter_function)
+        self.__setattr__("value_function(t,x,y,z,ux,uy,uz,w)", value_function)
+
+        # Check the function expressions for constants
+        for k in list(kw.keys()):
+            if any(
+                re.search(r"\b%s\b" % k, expr)
+                for expr in [
+                    histogram_function_abs,
+                    histogram_function_ord,
+                    filter_function,
+                    value_function,
+                ]
+                if expr is not None
+            ):
+                self.user_defined_kw[k] = kw.pop(k)
 
         return kw
 

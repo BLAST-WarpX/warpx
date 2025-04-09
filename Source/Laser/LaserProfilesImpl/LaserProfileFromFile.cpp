@@ -6,12 +6,12 @@
  */
 #include "Laser/LaserProfiles.H"
 
-#include "Utils/Algorithms/LinearInterpolation.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpX_Complex.H"
 #include "Utils/WarpXConst.H"
 
+#include <ablastr/math/LinearInterpolation.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX.H>
@@ -489,7 +489,7 @@ WarpXLaserProfiles::FromFileLaserProfile::internal_fill_amplitude_uniform_cartes
                 (i_interp-tmp_idx_first_time)*tmp_nx*tmp_ny+
                 j_interp*tmp_nx + k_interp;
         };
-        const Complex val = utils::algorithms::trilinear_interp(
+        const Complex val = ablastr::math::trilinear_interp(
             t_left, t_right,
             x_0, x_1,
             y_0, y_1,
@@ -574,33 +574,35 @@ WarpXLaserProfiles::FromFileLaserProfile::internal_fill_amplitude_uniform_cylind
         Complex fact = Complex{costheta, sintheta};
 
         // azimuthal mode 0
-        val += utils::algorithms::bilinear_interp(
-            t_left, t_right,
-            r_0, r_1,
-            p_E_lasy_data[idx(0, idx_t_left, idx_r_left)],
-            p_E_lasy_data[idx(0, idx_t_left, idx_r_right)],
-            p_E_lasy_data[idx(0, idx_t_right, idx_r_left)],
-            p_E_lasy_data[idx(0, idx_t_right, idx_r_right)],
-            t, Rp_i);
+        val +=
+            ablastr::math::bilinear_interp(
+                t_left, t_right,
+                r_0, r_1,
+                p_E_lasy_data[idx(0, idx_t_left, idx_r_left)],
+                p_E_lasy_data[idx(0, idx_t_left, idx_r_right)],
+                p_E_lasy_data[idx(0, idx_t_right, idx_r_left)],
+                p_E_lasy_data[idx(0, idx_t_right, idx_r_right)],
+                t, Rp_i);
 
         // higher modes
         for (int m=1 ; m <= tmp_n_rz_azimuthal_components/2; m++) {
-            val += utils::algorithms::bilinear_interp(
-                t_left, t_right,
-                r_0, r_1,
-                p_E_lasy_data[idx(2*m-1, idx_t_left, idx_r_left)],
-                p_E_lasy_data[idx(2*m-1, idx_t_left, idx_r_right)],
-                p_E_lasy_data[idx(2*m-1, idx_t_right, idx_r_left)],
-                p_E_lasy_data[idx(2*m-1, idx_t_right, idx_r_right)],
-                t, Rp_i)*(fact.real()) +
-                utils::algorithms::bilinear_interp(
-                t_left, t_right,
-                r_0, r_1,
-                p_E_lasy_data[idx(2*m, idx_t_left, idx_r_left)],
-                p_E_lasy_data[idx(2*m, idx_t_left, idx_r_right)],
-                p_E_lasy_data[idx(2*m, idx_t_right, idx_r_left)],
-                p_E_lasy_data[idx(2*m, idx_t_right, idx_r_right)],
-                t, Rp_i)*(fact.imag()) ;
+            val +=
+                ablastr::math::bilinear_interp(
+                    t_left, t_right,
+                    r_0, r_1,
+                    p_E_lasy_data[idx(2*m-1, idx_t_left, idx_r_left)],
+                    p_E_lasy_data[idx(2*m-1, idx_t_left, idx_r_right)],
+                    p_E_lasy_data[idx(2*m-1, idx_t_right, idx_r_left)],
+                    p_E_lasy_data[idx(2*m-1, idx_t_right, idx_r_right)],
+                    t, Rp_i)*(fact.real()) +
+                ablastr::math::bilinear_interp(
+                    t_left, t_right,
+                    r_0, r_1,
+                    p_E_lasy_data[idx(2*m, idx_t_left, idx_r_left)],
+                    p_E_lasy_data[idx(2*m, idx_t_left, idx_r_right)],
+                    p_E_lasy_data[idx(2*m, idx_t_right, idx_r_left)],
+                    p_E_lasy_data[idx(2*m, idx_t_right, idx_r_right)],
+                    t, Rp_i)*(fact.imag()) ;
             fact = fact*Complex{costheta, sintheta};
         }
         amplitude[i] = (val*exp_omega_t).real();
@@ -683,7 +685,7 @@ WarpXLaserProfiles::FromFileLaserProfile::internal_fill_amplitude_uniform_binary
                 (i_interp-tmp_idx_first_time)*tmp_nx*tmp_ny+
                 j_interp*tmp_ny + k_interp;
         };
-        amplitude[i] = utils::algorithms::trilinear_interp(
+        amplitude[i] = ablastr::math::trilinear_interp(
             t_left, t_right,
             x_0, x_1,
             y_0, y_1,
@@ -702,7 +704,7 @@ WarpXLaserProfiles::FromFileLaserProfile::internal_fill_amplitude_uniform_binary
         const auto idx = [=](int i_interp, int j_interp){
             return (i_interp-tmp_idx_first_time) * tmp_nx + j_interp;
         };
-        amplitude[i] = utils::algorithms::bilinear_interp(
+        amplitude[i] = ablastr::math::bilinear_interp(
             t_left, t_right,
             x_0, x_1,
             p_E_binary_data[idx(idx_t_left, idx_x_left)],

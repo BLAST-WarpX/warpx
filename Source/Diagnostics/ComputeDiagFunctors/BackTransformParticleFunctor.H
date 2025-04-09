@@ -21,18 +21,16 @@
  */
 struct SelectParticles
 {
-    using TmpParticles = WarpXParticleContainer::TmpParticles;
-
     /**
      * \brief Constructor of SelectParticles functor.
      *
      * @param[in] a_pti              WarpX particle iterator
-     * @param[in] tmp_particle_data  temporary particle data
      * @param[in] current_z_boost    current z-position of the slice in boosted frame
      * @param[in] old_z_boost        previous z-position of the slice in boosted frame
      * @param[in] a_offset           index offset for particles to be selected
      */
-    SelectParticles( const WarpXParIter& a_pti, TmpParticles& tmp_particle_data,
+    SelectParticles (const WarpXParticleContainer& pc,
+                     WarpXParIter& a_pti,
                      amrex::Real current_z_boost, amrex::Real old_z_boost,
                      int a_offset = 0);
 
@@ -77,21 +75,19 @@ struct SelectParticles
 struct LorentzTransformParticles
 {
 
-    using TmpParticles = WarpXParticleContainer::TmpParticles;
-
     /**
      * \brief Constructor of the LorentzTransformParticles functor.
      *
      * @param[in] a_pti              WarpX particle iterator
-     * @param[in] tmp_particle_data  temporary particle data
      * @param[in] t_boost            time in boosted frame
      * @param[in] dt                 timestep in boosted-frame
      * @param[in] t_lab              time in lab-frame
      * @param[in] a_offset           index offset for particles to be transformed
      */
-    LorentzTransformParticles ( const WarpXParIter& a_pti, TmpParticles& tmp_particle_data,
-                                amrex::Real t_boost, amrex::Real dt,
-                                amrex::Real t_lab, int a_offset = 0);
+    LorentzTransformParticles (const WarpXParticleContainer& pc,
+                               WarpXParIter& a_pti,
+                               amrex::Real t_boost, amrex::Real dt,
+                               amrex::Real t_lab, int a_offset = 0);
 
     /**
      * \brief Functor call. This method computes the Lorentz-transform for particle
@@ -133,9 +129,15 @@ struct LorentzTransformParticles
         const amrex::Real weight_new = (m_t_lab - t_old_p)
                                      / (t_new_p - t_old_p);
         // weighted sum of old and new values
+#if !defined(WARPX_DIM_1D_Z)
         const amrex::ParticleReal xp = m_xpold[i_src] * weight_old + xpnew * weight_new;
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         const amrex::ParticleReal yp = m_ypold[i_src] * weight_old + ypnew * weight_new;
+#endif
+#if !defined(WARPX_DIM_RCYLINDER)
         const amrex::ParticleReal zp = z_old_p * weight_old + z_new_p * weight_new;
+#endif
         const amrex::ParticleReal uxp = m_uxpold[i_src] * weight_old
                                       + m_uxpnew[i_src] * weight_new;
         const amrex::ParticleReal uyp = m_uypold[i_src] * weight_old
@@ -150,21 +152,34 @@ struct LorentzTransformParticles
         dst.m_rdata[PIdx::x][i_dst] = std::sqrt(xp*xp + yp*yp);
         dst.m_rdata[PIdx::z][i_dst] = zp;
         dst.m_rdata[PIdx::theta][i_dst] = std::atan2(yp, xp);
+#elif defined(WARPX_DIM_RCYLINDER)
+        dst.m_rdata[PIdx::x][i_dst] = std::sqrt(xp*xp + yp*yp);
+        dst.m_rdata[PIdx::theta][i_dst] = std::atan2(yp, xp);
+#elif defined(WARPX_DIM_RSPHERE)
+        amrex::ParticleReal const rpxy = std::sqrt(xp*xp + yp*yp);
+        dst.m_rdata[PIdx::x][i_dst] = std::sqrt(xp*xp + yp*yp + zp*zp);
+        dst.m_rdata[PIdx::theta][i_dst] = std::atan2(yp, xp);
+        dst.m_rdata[PIdx::phi][i_dst] = std::atan2(rpxy, zp);
 #elif defined (WARPX_DIM_XZ)
         dst.m_rdata[PIdx::x][i_dst] = xp;
         dst.m_rdata[PIdx::z][i_dst] = zp;
-        amrex::ignore_unused(yp);
 #elif defined (WARPX_DIM_1D_Z)
         dst.m_rdata[PIdx::z][i_dst] = zp;
-        amrex::ignore_unused(xp, yp);
-#else
-        amrex::ignore_unused(xp, yp, zp);
 #endif
         dst.m_rdata[PIdx::w][i_dst] = m_wpnew[i_src];
         dst.m_rdata[PIdx::ux][i_dst] = uxp;
         dst.m_rdata[PIdx::uy][i_dst] = uyp;
         dst.m_rdata[PIdx::uz][i_dst] = uzp;
     }
+
+    amrex::Real m_t_boost;
+    amrex::Real m_dt;
+    amrex::Real m_t_lab;
+    amrex::Real m_gammaboost;
+    amrex::Real m_betaboost;
+    amrex::Real m_Phys_c;
+    amrex::Real m_inv_c2;
+    amrex::Real m_uzfrm;
 
     GetParticlePosition<PIdx> m_get_position;
 
@@ -180,15 +195,6 @@ struct LorentzTransformParticles
     const amrex::ParticleReal* AMREX_RESTRICT m_uypnew = nullptr;
     const amrex::ParticleReal* AMREX_RESTRICT m_uzpnew = nullptr;
     const amrex::ParticleReal* AMREX_RESTRICT m_wpnew = nullptr;
-
-    amrex::Real m_gammaboost;
-    amrex::Real m_betaboost;
-    amrex::Real m_Phys_c;
-    amrex::Real m_uzfrm;
-    amrex::Real m_inv_c2;
-    amrex::Real m_t_boost;
-    amrex::Real m_dt;
-    amrex::Real m_t_lab;
 };
 
 /**

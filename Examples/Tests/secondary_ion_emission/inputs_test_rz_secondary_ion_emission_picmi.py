@@ -188,26 +188,29 @@ def secondary_emission():
     elect_pc = particle_containers.ParticleContainerWrapper("electrons")
 
     if n != 0:
-        r = concat(buffer.get_particle_boundary_buffer("ions", "eb", "x", lev))
-        theta = concat(buffer.get_particle_boundary_buffer("ions", "eb", "theta", lev))
-        z = concat(buffer.get_particle_boundary_buffer("ions", "eb", "z", lev))
+        r = concat(buffer.get_particle_scraped_this_step("ions", "eb", "x", lev))
+        theta = concat(
+            buffer.get_particle_scraped_this_step("ions", "eb", "theta", lev)
+        )
+        z = concat(buffer.get_particle_scraped_this_step("ions", "eb", "z", lev))
         x = r * np.cos(theta)  # from RZ coordinates to 3D coordinates
         y = r * np.sin(theta)
-        ux = concat(buffer.get_particle_boundary_buffer("ions", "eb", "ux", lev))
-        uy = concat(buffer.get_particle_boundary_buffer("ions", "eb", "uy", lev))
-        uz = concat(buffer.get_particle_boundary_buffer("ions", "eb", "uz", lev))
-        w = concat(buffer.get_particle_boundary_buffer("ions", "eb", "w", lev))
-        nx = concat(buffer.get_particle_boundary_buffer("ions", "eb", "nx", lev))
-        ny = concat(buffer.get_particle_boundary_buffer("ions", "eb", "ny", lev))
-        nz = concat(buffer.get_particle_boundary_buffer("ions", "eb", "nz", lev))
+        ux = concat(buffer.get_particle_scraped_this_step("ions", "eb", "ux", lev))
+        uy = concat(buffer.get_particle_scraped_this_step("ions", "eb", "uy", lev))
+        uz = concat(buffer.get_particle_scraped_this_step("ions", "eb", "uz", lev))
+        w = concat(buffer.get_particle_scraped_this_step("ions", "eb", "w", lev))
+        nx = concat(buffer.get_particle_scraped_this_step("ions", "eb", "nx", lev))
+        ny = concat(buffer.get_particle_scraped_this_step("ions", "eb", "ny", lev))
+        nz = concat(buffer.get_particle_scraped_this_step("ions", "eb", "nz", lev))
         delta_t = concat(
-            buffer.get_particle_boundary_buffer("ions", "eb", "deltaTimeScraped", lev)
+            buffer.get_particle_scraped_this_step("ions", "eb", "deltaTimeScraped", lev)
         )
+
         energy_ions = 0.5 * proton_mass * w * (ux**2 + uy**2 + uz**2)
         energy_ions_in_kEv = energy_ions / (e * 1000)
         sigma_nascap_ions = sigma_nascap(energy_ions_in_kEv, delta_H, E_HMax)
-        # Loop over all ions in the EB buffer
-        for i in range(0, n):
+        # Loop over all ions that have been scraped in the last timestep
+        for i in range(0, len(w)):
             sigma = sigma_nascap_ions[i]
             # Ne_sec is number of the secondary electrons to be emitted
             Ne_sec = int(sigma + np.random.uniform())
@@ -258,7 +261,6 @@ def secondary_emission():
                     uz=uze,
                     w=we,
                 )
-        buffer.clear_buffer()  # reinitialise the boundary buffer
 
 
 # using the new particle container modified at the last step

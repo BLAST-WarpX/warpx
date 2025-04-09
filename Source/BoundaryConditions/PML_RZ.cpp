@@ -43,6 +43,8 @@ PML_RZ::PML_RZ (int lev, amrex::BoxArray const& grid_ba, amrex::DistributionMapp
       m_do_pml_in_domain(do_pml_in_domain),
       m_geom(geom)
 {
+    using ablastr::fields::Direction;
+
     auto & warpx = WarpX::GetInstance();
 
     bool const remake = false;
@@ -73,6 +75,7 @@ PML_RZ::ApplyDamping (amrex::MultiFab* Et_fp, amrex::MultiFab* Ez_fp,
                       amrex::MultiFab* Bt_fp, amrex::MultiFab* Bz_fp,
                       amrex::Real dt, ablastr::fields::MultiFabRegister& fields)
 {
+    using ablastr::fields::Direction;
 
     amrex::Real const dr = m_geom->CellSize(0);
     amrex::Real const cdt_over_dr = PhysConst::c*dt/dr;
@@ -132,6 +135,8 @@ PML_RZ::ApplyDamping (amrex::MultiFab* Et_fp, amrex::MultiFab* Ez_fp,
 void
 PML_RZ::FillBoundaryE (ablastr::fields::MultiFabRegister& fields, PatchType patch_type, std::optional<bool> nodal_sync)
 {
+    using ablastr::fields::Direction;
+
     amrex::MultiFab * pml_Er = fields.get(FieldType::pml_E_fp, Direction{0}, 0);
     amrex::MultiFab * pml_Et = fields.get(FieldType::pml_E_fp, Direction{1}, 0);
 
@@ -148,6 +153,8 @@ PML_RZ::FillBoundaryB (ablastr::fields::MultiFabRegister& fields, PatchType patc
 {
     if (patch_type == PatchType::fine)
     {
+        using ablastr::fields::Direction;
+
         amrex::MultiFab * pml_Br = fields.get(FieldType::pml_B_fp, Direction{0}, 0);
         amrex::MultiFab * pml_Bt = fields.get(FieldType::pml_B_fp, Direction{1}, 0);
 
@@ -160,6 +167,8 @@ PML_RZ::FillBoundaryB (ablastr::fields::MultiFabRegister& fields, PatchType patc
 void
 PML_RZ::CheckPoint (ablastr::fields::MultiFabRegister& fields, std::string const& dir) const
 {
+    using ablastr::fields::Direction;
+
     if (fields.has(FieldType::pml_E_fp, Direction{0}, 0)) {
         amrex::VisMF::AsyncWrite(*fields.get(FieldType::pml_E_fp, Direction{0}, 0), dir+"_Er_fp");
         amrex::VisMF::AsyncWrite(*fields.get(FieldType::pml_E_fp, Direction{1}, 0), dir+"_Et_fp");
@@ -171,6 +180,8 @@ PML_RZ::CheckPoint (ablastr::fields::MultiFabRegister& fields, std::string const
 void
 PML_RZ::Restart (ablastr::fields::MultiFabRegister& fields, std::string const& dir)
 {
+    using ablastr::fields::Direction;
+
     if (fields.has(FieldType::pml_E_fp, Direction{0}, 0)) {
         amrex::VisMF::Read(*fields.get(FieldType::pml_E_fp, Direction{0}, 0), dir+"_Er_fp");
         amrex::VisMF::Read(*fields.get(FieldType::pml_E_fp, Direction{1}, 0), dir+"_Et_fp");
@@ -195,6 +206,8 @@ PML_RZ::PushPMLPSATDSinglePatchRZ (
     SpectralSolverRZ& solver,
     ablastr::fields::MultiFabRegister& fields)
 {
+    using ablastr::fields::Direction;
+
     SpectralFieldIndex const& Idx = solver.m_spectral_index;
     amrex::MultiFab * pml_Er = fields.get(FieldType::pml_E_fp, Direction{0}, 0);
     amrex::MultiFab * pml_Et = fields.get(FieldType::pml_E_fp, Direction{1}, 0);

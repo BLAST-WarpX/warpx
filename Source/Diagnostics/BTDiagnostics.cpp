@@ -127,9 +127,8 @@ void BTDiagnostics::DerivedInitData ()
     m_do_back_transformed_particles =
         ((!m_output_species_names.empty()) && (write_species == 1));
 
-    // Turn on do_back_transformed_particles in the particle containers so that
-    // the tmp_particle_data is allocated and the data of the corresponding species is
-    // copied and stored in tmp_particle_data before particles are pushed.
+    // Turn on do_back_transformed_particles in the particle containers so as
+    // the data of the corresponding species is stored in before particles are pushed.
     if (m_do_back_transformed_particles) {
         mpc.SetDoBackTransformedParticles(m_do_back_transformed_particles);
         for (auto const& species : m_output_species_names){
@@ -1471,8 +1470,8 @@ BTDiagnostics::InitializeParticleBuffer ()
         m_totalParticles_in_buffer[i].resize(m_output_species_names.size());
         for (int isp = 0; isp < m_particles_buffer[i].size(); ++isp) {
             m_totalParticles_in_buffer[i][isp] = 0;
-            m_particles_buffer[i][isp] = std::make_unique<PinnedMemoryParticleContainer>(WarpX::GetInstance().GetParGDB());
             const int idx = mpc.getSpeciesID(m_output_species_names[isp]);
+            m_particles_buffer[i][isp] = std::make_unique<PinnedMemoryParticleContainer>(mpc.GetParticleContainer(idx).make_alike<amrex::PinnedArenaAllocator>());
 
             // SoA component names
             {

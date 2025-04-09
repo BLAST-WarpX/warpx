@@ -4,7 +4,7 @@ export WORK=/afs/cern.ch/work/${USER:0:1}/$USER/
 # clone warpx
 if [ ! -d "$WORK/warpx" ]
 then
-    git clone https://github.com/ECP-WarpX/WarpX.git $WORK/warpx
+    git clone https://github.com/BLAST-WarpX/warpx.git $WORK/warpx
 fi
 
 # activate the compiler
