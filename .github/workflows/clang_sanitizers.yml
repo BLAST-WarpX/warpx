@@ -107,6 +107,20 @@ jobs:
         export CXX=$(which clang++-21)
         export CC=$(which clang-21)
         export CXXFLAGS="-fsanitize=thread"
+        export LD_LIBRARY_PATH=/usr/lib/llvm-21/lib
+
+        ###### DEBUG
+        echo "-----------------------------------/lib"
+        ls -ltrh /lib
+        echo "-----------------------------------/lib/x86_64-linux-gnu/"
+        ls -ltrh /lib/x86_64-linux-gnu/
+        echo "-----------------------------------/usr/lib/"
+        ls -ltrh /usr/lib/
+        echo "-----------------------------------/usr/lib/llvm-21"
+        ls -ltrh /usr/lib/llvm-21
+        echo "-----------------------------------/usr/lib/llvm-21/lib"
+        ls -ltrh /usr/lib/llvm-21/lib
+        ######
 
         cmake -S . -B build                 \
           -GNinja                           \
@@ -122,8 +136,6 @@ jobs:
         cmake --build build -j 4
 
         ###### DEBUG
-        lscpu
-
         ldd ./build/bin/warpx.3d
         ######
 
