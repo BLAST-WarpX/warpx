@@ -111,7 +111,7 @@ jobs:
         echo "fun:amrex::InitRandom" >> /home/runner/work/warpx/warpx/thread_sanitizer_blacklist_file
         export CXX=$(which clang++-17)
         export CC=$(which clang-17)
-        export CXXFLAGS="-fsanitize=thread -fsanitize-blacklist=${blacklist_file_path}"
+        export CXXFLAGS="-fsanitize=thread -fsanitize-blacklist=/home/runner/work/warpx/warpx/thread_sanitizer_blacklist_file"
         echo $CXXFLAGS
 
         cmake -S . -B build              \
