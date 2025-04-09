@@ -109,10 +109,13 @@ jobs:
         # blacklisted functions which are ingored by the sanitizer.
         echo "# Ignore exactly this function (the names are mangled)" > thread_sanitizer_blacklist_file
         echo "fun:amrex::InitRandom" >> thread_sanitizer_blacklist_file
+        blacklist_file_path="${pwd}/thread_sanitizer_blacklist_file"
+        echo $blacklist_file_path
 
         export CXX=$(which clang++-17)
         export CC=$(which clang-17)
-        export CXXFLAGS="-fsanitize=thread -fsanitize-blacklist=./thread_sanitizer_blacklist_file"
+        export CXXFLAGS="-fsanitize=thread -fsanitize-blacklist=${blacklist_file_path}"
+        echo $CXXFLAGS
 
         cmake -S . -B build              \
           -GNinja                           \
