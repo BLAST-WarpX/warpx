@@ -104,9 +104,15 @@ jobs:
         export CCACHE_MAXSIZE=100M
         ccache -z
 
+        # ThreadSanitizer finds some false positives in AMReX.
+        # thread_sanitizer_blacklist_file contains a list of
+        # blacklisted functions which are ingored by the sanitizer.
+        echo "# Ignore exactly this function (the names are mangled)" > thread_sanitizer_blacklist_file
+        echo "fun:amrex::InitRandom" >> thread_sanitizer_blacklist_file
+
         export CXX=$(which clang++-17)
         export CC=$(which clang-17)
-        export CXXFLAGS="-fsanitize=thread"
+        export CXXFLAGS="-fsanitize=thread -fsanitize-blacklist=./thread_sanitizer_blacklist_file"
 
         cmake -S . -B build              \
           -GNinja                           \
