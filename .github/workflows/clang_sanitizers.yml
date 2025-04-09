@@ -110,15 +110,16 @@ jobs:
         export LD_LIBRARY_PATH=/usr/lib/llvm-21/lib
 
         ###### DEBUG
-        echo "-----------------------------------/lib"
+        which clang++-21
+        echo "-----------------------------------lib"
         ls -ltrh /lib
-        echo "-----------------------------------/lib/x86_64-linux-gnu/"
+        echo "-----------------------------------lib_x86_64-linux-gnu_"
         ls -ltrh /lib/x86_64-linux-gnu/
-        echo "-----------------------------------/usr/lib/"
+        echo "-----------------------------------usr_lib"
         ls -ltrh /usr/lib/
-        echo "-----------------------------------/usr/lib/llvm-21"
+        echo "-----------------------------------usr_lib_llvm-21"
         ls -ltrh /usr/lib/llvm-21
-        echo "-----------------------------------/usr/lib/llvm-21/lib"
+        echo "-----------------------------------usr_lib_llvm-21_lib"
         ls -ltrh /usr/lib/llvm-21/lib
         ######
 
