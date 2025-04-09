@@ -121,6 +121,12 @@ jobs:
           -DWarpX_PARTICLE_PRECISION=DOUBLE
         cmake --build build -j 4
 
+        ###### DEBUG
+        lscpu
+
+        ldd ./build/bin/warpx.3d
+        ######
+
         ccache -s
         du -hs ~/.cache/ccache
 
