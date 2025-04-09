@@ -153,8 +153,9 @@ public:
         const auto chi_part = QedUtils::chi_ele_pos(
             m_e*ux, m_e*uy, m_e*uz, ex, ey, ez, bx, by, bz);
 
-        if (chi_part < m_qs_minimum_chi_part)
+        if (chi_part < m_qs_minimum_chi_part) {
             return 0;
+        }
 
         const auto is_out = pxr_qs::evolve_optical_depth<
             amrex::ParticleReal,

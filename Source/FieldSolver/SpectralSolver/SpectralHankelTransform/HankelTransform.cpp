@@ -9,7 +9,6 @@
 #include "BesselRoots.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
-#include "WarpX.H"
 
 #include "Utils/WarpXProfilerWrapper.H"
 
@@ -36,7 +35,8 @@ HankelTransform::HankelTransform (int const hankel_order,
     //   SYCL note: we need to double check AMReX device ID conventions and
     //   BLAS++ device ID conventions are the same
     int const device_id = amrex::Gpu::Device::deviceId();
-    m_queue = std::make_unique<blas::Queue>( device_id, 0 );
+    blas::Queue::stream_t stream_id = amrex::Gpu::gpuStream();
+    m_queue = std::make_unique<blas::Queue>( device_id, stream_id );
 #endif
 
     amrex::Vector<amrex::Real> alphas;
@@ -54,7 +54,7 @@ HankelTransform::HankelTransform (int const hankel_order,
 
     // Calculate the spatial grid (Uniform grid with a half-cell offset)
     amrex::Vector<amrex::Real> rmesh(m_nr);
-    amrex::Real dr = rmax/m_nr;
+    const amrex::Real dr = rmax/m_nr;
     for (int ir=0 ; ir < m_nr ; ir++) {
         rmesh[ir] = dr*(ir + 0.5_rt);
     }
@@ -122,7 +122,7 @@ HankelTransform::HankelTransform (int const hankel_order,
     // Calculate the matrix M by inverting invM
     if (azimuthal_mode !=0 && hankel_order != azimuthal_mode-1) {
         // In this case, invM is singular, thus we calculate the pseudo-inverse.
-        // The Moore-Penrose psuedo-inverse is calculated using the SVD method.
+        // The Moore-Penrose pseudo-inverse is calculated using the SVD method.
 
         M.resize(m_nk*m_nr, 0.);
         amrex::Vector<amrex::Real> invMcopy(invM);
@@ -132,7 +132,7 @@ HankelTransform::HankelTransform (int const hankel_order,
         amrex::Vector<amrex::Real> sp((m_nr)*(m_nk-1), 0.);
         amrex::Vector<amrex::Real> temp((m_nr)*(m_nk-1), 0.);
 
-        // Calculate the singlular-value-decomposition of invM (leaving out the first row).
+        // Calculate the singular-value-decomposition of invM (leaving out the first row).
         // invM = u*sdiag*vt
         // Note that invMcopy.dataPtr()+1 is passed in so that the first ik row is skipped
         // A copy is passed in since the matrix is destroyed

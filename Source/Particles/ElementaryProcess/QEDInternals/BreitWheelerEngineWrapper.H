@@ -170,8 +170,9 @@ public:
                 amrex::ParticleReal, pxr_p::unit_system::SI>(
                     px, py, pz);
         if (gamma_photon < pxr_m::two<amrex::ParticleReal> ||
-            chi_phot < m_bw_minimum_chi_phot)
+            chi_phot < m_bw_minimum_chi_phot) {
             return 0;
+        }
 
         const auto is_out = pxr_bw::evolve_optical_depth<
             amrex::ParticleReal,

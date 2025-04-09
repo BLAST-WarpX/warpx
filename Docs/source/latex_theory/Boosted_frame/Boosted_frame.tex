@@ -175,7 +175,7 @@ the use of a small timestep proportionally slows down the progress of
 the simulation, and the artificial ``bump'' is again an arbitrary correction
 that departs from the underlying physics.
 
-A new scheme was recently proposed, in \cite{KirchenARXIV2016,LeheARXIV2016}, which
+A new scheme was recently proposed, in \cite{KirchenPOP2016,LehePRE2016}, which
 completely eliminates the NCI for a plasma drifting at a uniform relativistic velocity
 -- with no arbitrary correction -- by simply integrating
 the PIC equations in \emph{Galilean coordinates} (also known as
@@ -217,7 +217,7 @@ translate the boundaries, in the Galilean scheme the gridpoints
 \emph{themselves} are not only translated but in this case, the physical equations
 are modified accordingly. Most importantly, the assumed time evolution of
 the current $\vec{J}$ within one timestep is different in a standard PSATD scheme with moving
-window and in a Galilean PSATD scheme \cite{LeheARXIV2016}.
+window and in a Galilean PSATD scheme \cite{LehePRE2016}.
 
 In the Galilean coordinates $\vec{x}'$, the equations of particle
 motion and the Maxwell equations take the form
@@ -235,7 +235,7 @@ Galilean coordinates $\vec{x}'$.
 
 Integrating these equations from $t=n\Delta
 t$ to $t=(n+1)\Delta t$ results in the following update equations (see
-\cite{LeheARXIV2016} for the details of the derivation):
+\cite{LehePRE2016} for the details of the derivation):
 %
 \begin{subequations}
 \begin{align}
@@ -271,5 +271,5 @@ where we used the short-hand notations $\fe^n \equiv
 Note that, in the limit $\vgal=\vec{0}$,
 (\ref{eq:disc-maxwell1}) and (\ref{eq:disc-maxwell2}) reduce to the standard PSATD
 equations \cite{Habericnsp73}, as expected.
-As shown in \cite{KirchenARXIV2016,LeheARXIV2016},
+As shown in \cite{KirchenPOP2016,LehePRE2016},
 the elimination of the NCI with the new Galilean integration is verified empirically via PIC simulations of uniform drifting plasmas and laser-driven plasma acceleration stages, and confirmed by a theoretical analysis of the instability.

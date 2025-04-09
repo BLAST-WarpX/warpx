@@ -1,0 +1,13 @@
+# base input parameters
+FILE = inputs_base_3d
+
+# test input parameters
+amr.max_level = 1
+amr.ref_ratio_vect = 2 2 2
+diag2.electron.variables = x y z ux uy uz w
+electron.mass = 10
+max_step = 2
+warpx.abort_on_warning_threshold = medium
+warpx.do_electrostatic = labframe
+warpx.fine_tag_hi =  0.5  0.5  0.5
+warpx.fine_tag_lo = -0.5 -0.5 -0.5

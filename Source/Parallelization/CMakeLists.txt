@@ -5,5 +5,6 @@ foreach(D IN LISTS WarpX_DIMS)
         GuardCellManager.cpp
         WarpXComm.cpp
         WarpXRegrid.cpp
+        WarpXSumGuardCells.cpp
     )
 endforeach()

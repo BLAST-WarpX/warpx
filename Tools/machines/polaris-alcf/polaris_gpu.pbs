@@ -1,0 +1,36 @@
+#!/bin/bash -l
+
+#PBS -A <proj>
+#PBS -l select=<NODES>:system=polaris
+#PBS -l place=scatter
+#PBS -l walltime=0:10:00
+#PBS -l filesystems=home:eagle
+#PBS -q debug
+#PBS -N test_warpx
+
+# Set required environment variables
+# support gpu-aware-mpi
+# export MPICH_GPU_SUPPORT_ENABLED=1
+
+# Change to working directory
+echo Working directory is $PBS_O_WORKDIR
+cd ${PBS_O_WORKDIR}
+
+echo Jobid: $PBS_JOBID
+echo Running on host `hostname`
+echo Running on nodes `cat $PBS_NODEFILE`
+
+# executable & inputs file or python interpreter & PICMI script here
+EXE=./warpx
+INPUTS=input1d
+
+# MPI and OpenMP settings
+NNODES=`wc -l < $PBS_NODEFILE`
+NRANKS_PER_NODE=4
+NDEPTH=1
+NTHREADS=1
+
+NTOTRANKS=$(( NNODES * NRANKS_PER_NODE ))
+echo "NUM_OF_NODES= ${NNODES} TOTAL_NUM_RANKS= ${NTOTRANKS} RANKS_PER_NODE= ${NRANKS_PER_NODE} THREADS_PER_RANK= ${NTHREADS}"
+
+mpiexec -np ${NTOTRANKS} ${EXE} ${INPUTS} > output.txt

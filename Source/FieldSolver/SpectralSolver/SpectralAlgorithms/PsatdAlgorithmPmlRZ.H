@@ -9,6 +9,9 @@
 
 #include "SpectralBaseAlgorithmRZ.H"
 
+#include <ablastr/utils/Enums.H>
+
+
 /* \brief Class that updates the field in spectral space
  * and stores the coefficients of the corresponding update equation.
  */
@@ -19,8 +22,10 @@ class PsatdAlgorithmPmlRZ : public SpectralBaseAlgorithmRZ
         PsatdAlgorithmPmlRZ (SpectralKSpaceRZ const & spectral_kspace,
                              amrex::DistributionMapping const & dm,
                              const SpectralFieldIndex& spectral_index,
-                             int n_rz_azimuthal_modes, int norder_z,
-                             short grid_type, amrex::Real dt_step);
+                             int n_rz_azimuthal_modes,
+                             int norder_z,
+                             ablastr::utils::enums::GridType grid_type,
+                             amrex::Real dt_step);
 
         // Redefine functions from base class
         void pushSpectralFields (SpectralFieldDataRZ & f) final;

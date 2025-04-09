@@ -41,10 +41,10 @@ class WarpXParticleCounter
 {
 public:
   using ParticleContainer = typename WarpXParticleContainer::ContainerLike<amrex::PinnedArenaAllocator>;
-  using ParticleIter = typename amrex::ParIter<0, 0, PIdx::nattribs, 0, amrex::PinnedArenaAllocator>;
+  using ParticleIter = typename amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PinnedArenaAllocator>;
 
   WarpXParticleCounter (ParticleContainer* pc);
-  unsigned long GetTotalNumParticles () {return m_Total;}
+  [[nodiscard]] unsigned long GetTotalNumParticles () const {return m_Total;}
 
   std::vector<unsigned long long> m_ParticleOffsetAtRank;
   std::vector<unsigned long long> m_ParticleSizeAtRank;
@@ -77,12 +77,12 @@ class WarpXOpenPMDPlot
 {
 public:
   using ParticleContainer = typename WarpXParticleContainer::ContainerLike<amrex::PinnedArenaAllocator>;
-  using ParticleIter = typename amrex::ParConstIter<0, 0, PIdx::nattribs, 0, amrex::PinnedArenaAllocator>;
+  using ParticleIter = typename amrex::ParConstIterSoA<PIdx::nattribs, 0, amrex::PinnedArenaAllocator>;
 
   /** Initialize openPMD I/O routines
    *
    * @param ie  iteration encoding from openPMD: "group, file, variable"
-   * @param filetype file backend, e.g. "bp" or "h5"
+   * @param filetype file backend, e.g. "bp5", "bp4", or "h5"
    * @param operator_type openPMD-api backend operator (compressor) for ADIOS2
    * @param operator_parameters openPMD-api backend operator parameters for ADIOS2
    * @param engine_type ADIOS engine for output
@@ -91,12 +91,12 @@ public:
    * @param authors a string specifying the authors of the simulation (can be empty)
    */
   WarpXOpenPMDPlot (openPMD::IterationEncoding ie,
-                    std::string filetype,
-                    std::string operator_type,
-                    std::map< std::string, std::string > operator_parameters,
-                    std::string engine_type,
-                    std::map< std::string, std::string > engine_parameters,
-                    std::vector<bool> fieldPMLdirections,
+                    const std::string& filetype,
+                    const std::string& operator_type,
+                    const std::map< std::string, std::string >& operator_parameters,
+                    const std::string& engine_type,
+                    const std::map< std::string, std::string >& engine_parameters,
+                    const std::vector<bool>& fieldPMLdirections,
                     const std::string& authors);
 
   ~WarpXOpenPMDPlot ();
@@ -125,8 +125,7 @@ public:
               amrex::Real time,
               bool use_pinned_pc = false,
               bool isBTD = false,
-              bool isLastBTDFlush = false,
-              const amrex::Vector<int>& totalParticlesFlushedAlready = amrex::Vector<int>());
+              bool isLastBTDFlush = false);
 
   /** Write out all openPMD fields for all active MR levels
    *
@@ -150,7 +149,7 @@ public:
               bool isBTD = false,
               const amrex::Geometry& full_BTD_snapshot=amrex::Geometry() ) const;
 
-  /** Return OpenPMD File type ("bp" or "h5" or "json")*/
+  /** Return OpenPMD File type ("bp5", "bp4", "h5" or "json")*/
   std::string OpenPMDFileType () { return m_OpenPMDFileType; }
 
 private:
@@ -177,6 +176,19 @@ private:
     }
   }
 
+  /** Flushing out data of the current openPMD iteration
+   *
+   * @param[in] isBTD if the current diagnostic is BTD
+   *
+   * if isBTD=false, apply the default flush behaviour
+   * if isBTD=true,  advice to use ADIOS Put() instead of PDW for better performance.
+   *
+   * iteration.seriesFlush() is used instead of series.flush()
+   *  because the latter flushes only if data is dirty
+   *  this causes trouble when the underlying writing function is collective (like PDW)
+   *
+   */
+  void flushCurrent (bool isBTD) const;
 
   /** This function does initial setup for the fields when interation is newly created
    *  @param[in] meshes   The meshes in a series
@@ -189,9 +201,9 @@ private:
 
   void SetupMeshComp (
       openPMD::Mesh& mesh,
-      amrex::Geometry& full_geom,
-      std::string comp_name,
-      std::string field_name,
+      amrex::Geometry const& full_geom,
+      std::string const& comp_name,
+      std::string const& field_name,
       amrex::MultiFab const& mf,
       bool var_in_theta_mode
   ) const;
@@ -205,25 +217,27 @@ private:
    * @param[in] varname       name from WarpX
    * @param[out] field_name   field name for openPMD-api output
    * @param[in] comp_name     comp name for openPMD-api output
-   * @param[in] is_theta_mode indicate if this field will be output with theta
-   *                          modes (instead of a reconstructed 2D slice)
+   * @param[in] var_in_theta_mode indicate if this field will be output with theta
+   *                              modes (instead of a reconstructed 2D slice)
    */
   void GetMeshCompNames (
       int meshLevel,
       const std::string& varname,
       std::string& field_name,
       std::string& comp_name,
-      bool is_theta_mode
+      bool var_in_theta_mode
   ) const;
 
   /** This function sets up the entries for storing the particle positions and global IDs
   *
   * @param[in] currSpecies Corresponding openPMD species
+  * @param[in] positionComponents user-selected components of the particle position
   * @param[in] np          Number of particles
   * @param[in] isBTD       Is this a back-transformed diagnostics output?
   */
   void SetupPos (
         openPMD::ParticleSpecies& currSpecies,
+        std::vector<std::string> const & positionComponents,
         const unsigned long long& np,
         bool isBTD = false);
 
@@ -232,12 +246,14 @@ private:
    * Sets the entries for storing particle position offset, constant records (charge, mass) and ED-PIC attributes.
    *
    * @param[in] currSpecies Corresponding openPMD species
+   * @param[in] positionComponents user-selected components of the particle position
    * @param[in] np          Number of particles
    * @param[in] charge      Charge of the particles (note: fix for ions)
    * @param[in] mass        Mass of the particles
    */
   void SetConstParticleRecordsEDPIC (
         openPMD::ParticleSpecies& currSpecies,
+        std::vector<std::string> const & positionComponents,
         const unsigned long long& np,
         amrex::ParticleReal charge,
         amrex::ParticleReal mass);
@@ -285,14 +301,14 @@ private:
    * @param[in] name species name
    * @param[in] iteration timestep
    * @param[in] write_real_comp The real attribute ids, from WarpX
-   * @param[in] real_comp_names The real attribute names, from WarpX
    * @param[in] write_int_comp The int attribute ids, from WarpX
+   * @param[in] real_comp_names The real attribute names, from WarpX
    * @param[in] int_comp_names The int attribute names, from WarpX
    * @param[in] charge         Charge of the particles (note: fix for ions)
    * @param[in] mass           Mass of the particles
+   * @param[inout] ParticleFlushOffset previously flushed number of particles in BTD
    * @param[in] isBTD is this a backtransformed diagnostics (BTD) write?
    * @param[in] isLastBTDFlush is this the last time we will flush this BTD station?
-   * @param[in] ParticleFlushOffset previously flushed number of particles in BTD
    */
   void DumpToFile (ParticleContainer* pc,
             const std::string& name,
@@ -304,8 +320,7 @@ private:
             amrex::ParticleReal charge,
             amrex::ParticleReal mass,
             bool isBTD = false,
-            bool isLastBTDFlush = false,
-            int ParticleFlushOffset = 0);
+            bool isLastBTDFlush = false);
 
   /** Get the openPMD-api filename for openPMD::Series
    *
@@ -335,7 +350,7 @@ private:
   int m_MPISize = 1;
 
   openPMD::IterationEncoding m_Encoding = openPMD::IterationEncoding::fileBased;
-  std::string m_OpenPMDFileType = "bp"; //! MPI-parallel openPMD backend: bp or h5
+  std::string m_OpenPMDFileType = "bp5"; //! MPI-parallel openPMD backend: bp5, bp4 or h5
   std::string m_OpenPMDoptions = "{}"; //! JSON option string for openPMD::Series constructor
   int m_CurrentStep  = -1;
 

@@ -49,12 +49,12 @@ WarpX axis labels     ``x, y, z``   ``x, z``    ``z``        ``x, z``
 --------------------  -----------  -----------  -----------  -----------
 *Particles*
 ------------------------------------------------------------------------
-AMReX AoS ``.pos()``  ``0, 1, 2``  ``0, 1``     ``0``        ``0, 1``
+AMReX ``.pos()``      ``0, 1, 2``  ``0, 1``     ``0``        ``0, 1``
 WarpX position names  ``x, y, z``  ``x, z``     ``z``        ``r, z``
 extra SoA attribute                                          ``theta``
 ====================  ===========  ===========  ===========  ===========
 
-Please see the following sections for particle AoS and SoA details.
+Please see the following sections for particle SoA details.
 
 Conventions
 -----------

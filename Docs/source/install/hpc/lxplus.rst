@@ -36,7 +36,7 @@ We clone WarpX in ``$WORK``:
 .. code-block:: bash
 
     cd $WORK
-    git clone https://github.com/ECP-WarpX/WarpX.git warpx
+    git clone https://github.com/BLAST-WarpX/warpx.git warpx
 
 Installation profile file
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -44,7 +44,7 @@ The easiest way to install the dependencies is to use the pre-prepared ``warpx.p
 
 .. code-block:: bash
 
-    cp $WORK/warpx/WarpX/Tools/machines/lxplus-cern/lxplus_warpx.profile.example $WORK/lxplus_warpx.profile
+    cp $WORK/warpx/Tools/machines/lxplus-cern/lxplus_warpx.profile.example $WORK/lxplus_warpx.profile
     source $WORK/lxplus_warpx.profile
 
 When doing this one can directly skip to the :ref:`Building WarpX <building-lxplus-warpx>` section.
@@ -148,7 +148,7 @@ Now, ensure Python tooling is up-to-date:
 .. code-block:: bash
 
    python3 -m pip install -U pip
-   python3 -m pip install -U build packaging setuptools wheel
+   python3 -m pip install -U build packaging setuptools[core] wheel
    python3 -m pip install -U cmake
 
 Then we compile WarpX as in the previous section (with or without CUDA) adding ``-DWarpX_PYTHON=ON`` and then we install it into our Python:

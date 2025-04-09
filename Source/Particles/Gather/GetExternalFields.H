@@ -15,8 +15,6 @@
 #include <AMReX_Parser.H>
 #include <AMReX_REAL.H>
 
-#include <optional>
-
 
 /** \brief Functor class that assigns external
  *         field values (E and B) to particles.
@@ -56,10 +54,10 @@ struct GetExternalEBField
     const amrex::ParticleReal* AMREX_RESTRICT m_uy = nullptr;
     const amrex::ParticleReal* AMREX_RESTRICT m_uz = nullptr;
 
-    std::optional<LatticeElementFinderDevice> d_lattice_element_finder;
+    LatticeElementFinderDevice d_lattice_element_finder;
 
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    bool isNoOp () const { return (m_Etype == None && m_Btype == None && !d_lattice_element_finder.has_value()); }
+    [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    bool isNoOp () const { return (m_Etype == None && m_Btype == None && !d_lattice_element_finder.m_initialized); }
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void operator () (long i,
@@ -72,13 +70,12 @@ struct GetExternalEBField
     {
         using namespace amrex::literals;
 
-        if (d_lattice_element_finder) {
-            // Note that the "*" is needed since d_lattice_element_finder is optional
-            (*d_lattice_element_finder)(i, field_Ex, field_Ey, field_Ez,
-                                           field_Bx, field_By, field_Bz);
+        if (d_lattice_element_finder.m_initialized) {
+            d_lattice_element_finder(i, field_Ex, field_Ey, field_Ez,
+                                        field_Bx, field_By, field_Bz);
         }
 
-        if (m_Etype == None && m_Btype == None) return;
+        if (m_Etype == None && m_Btype == None) { return; }
 
         amrex::ParticleReal Ex = 0._prt;
         amrex::ParticleReal Ey = 0._prt;
@@ -112,9 +109,9 @@ struct GetExternalEBField
                 lab_time = m_gamma_boost*m_time + m_uz_boost*z*inv_c2;
                 z = m_gamma_boost*z + m_uz_boost*m_time;
             }
-            Bx = m_Bxfield_partparser(x, y, z, lab_time);
-            By = m_Byfield_partparser(x, y, z, lab_time);
-            Bz = m_Bzfield_partparser(x, y, z, lab_time);
+            Bx = m_Bxfield_partparser((amrex::ParticleReal) x, (amrex::ParticleReal) y, (amrex::ParticleReal) z, lab_time);
+            By = m_Byfield_partparser((amrex::ParticleReal) x, (amrex::ParticleReal) y, (amrex::ParticleReal) z, lab_time);
+            Bz = m_Bzfield_partparser((amrex::ParticleReal) x, (amrex::ParticleReal) y, (amrex::ParticleReal) z, lab_time);
         }
 
         if (m_Etype == RepeatedPlasmaLens ||
@@ -142,7 +139,7 @@ struct GetExternalEBField
             // the plasma lens periods do not start before z=0
             if (zl > 0) {
                 // find which is the next lens
-                int i_lens = static_cast<int>(std::floor(zl/m_repeated_plasma_lens_period));
+                const auto i_lens = static_cast<int>(std::floor(zl/m_repeated_plasma_lens_period));
                 if (i_lens < m_n_lenses) {
                     amrex::ParticleReal const lens_start = m_repeated_plasma_lens_starts[i_lens] + i_lens*m_repeated_plasma_lens_period;
                     amrex::ParticleReal const lens_end = lens_start + m_repeated_plasma_lens_lengths[i_lens];

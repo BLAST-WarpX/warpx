@@ -1,0 +1,8 @@
+# base input parameters
+FILE = inputs_base_2d
+
+# test input paramters
+algo.current_deposition = direct
+psatd.current_correction = 0
+warpx.grid_type = collocated
+warpx.abort_on_warning_threshold = medium

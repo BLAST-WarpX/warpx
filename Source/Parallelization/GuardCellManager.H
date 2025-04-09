@@ -4,8 +4,11 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef GUARDCELLMANAGER_H_
-#define GUARDCELLMANAGER_H_
+#ifndef WARPX_GUARDCELLMANAGER_H_
+#define WARPX_GUARDCELLMANAGER_H_
+
+#include <Utils/WarpXAlgorithmSelection.H>
+#include <ablastr/utils/Enums.H>
 
 #include <AMReX_Array.H>
 #include <AMReX_IntVect.H>
@@ -52,19 +55,19 @@ public:
      */
     void Init(
         amrex::Real dt,
-        amrex::RealVect dx,
+        const amrex::Real * dx,
         bool do_subcycling,
         bool do_fdtd_nci_corr,
-        short grid_type,
+        ablastr::utils::enums::GridType grid_type,
         bool do_moving_window,
         int moving_window_dir,
         int nox,
         int nox_fft, int noy_fft, int noz_fft,
         int nci_corr_stencil,
-        int electromagnetic_solver_id,
+        ElectromagneticSolverAlgo electromagnetic_solver_id,
         int max_level,
-        amrex::Vector<amrex::Real> v_galilean,
-        amrex::Vector<amrex::Real> v_comoving,
+        const amrex::Vector<amrex::Real>& v_galilean,
+        const amrex::Vector<amrex::Real>& v_comoving,
         bool safe_guard_cells,
         int do_multi_J,
         bool fft_do_time_averaging,
@@ -100,7 +103,7 @@ public:
     amrex::IntVect ng_UpdateAux = amrex::IntVect::TheZeroVector();
     // Number of guard cells of all MultiFabs that must exchanged before moving window
     amrex::IntVect ng_MovingWindow = amrex::IntVect::TheZeroVector();
-    // Number of guard cells of E and B that are exchanged immediatly after the main PSATD push
+    // Number of guard cells of E and B that are exchanged immediately after the main PSATD push
     amrex::IntVect ng_afterPushPSATD = amrex::IntVect::TheZeroVector();
 
     // Number of guard cells for local deposition of J and rho
@@ -108,4 +111,4 @@ public:
     amrex::IntVect ng_depos_rho = amrex::IntVect::TheZeroVector();
 };
 
-#endif // GUARDCELLMANAGER_H_
+#endif // WARPX_GUARDCELLMANAGER_H_

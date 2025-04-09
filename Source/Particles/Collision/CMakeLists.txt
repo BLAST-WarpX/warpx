@@ -4,6 +4,7 @@ foreach(D IN LISTS WarpX_DIMS)
       PRIVATE
         CollisionHandler.cpp
         CollisionBase.cpp
+        ScatteringProcess.cpp
     )
 endforeach()
 

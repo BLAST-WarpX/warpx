@@ -1,0 +1,8 @@
+# base input parameters
+FILE = inputs_base_3d_schwinger
+
+# test input parameters
+warpx.B_external_grid = 1679288857.0516706 525665014.1557486 1836353079.9561853
+warpx.E_external_grid = 1.e18 0 0
+qed_schwinger.xmin = -2.5e-7
+qed_schwinger.xmax = 2.49e-7

@@ -6,8 +6,6 @@
  */
 #include "ParticleUtils.H"
 
-#include "WarpX.H"
-
 #include <AMReX_Algorithm.H>
 #include <AMReX_Array.H>
 #include <AMReX_Box.H>
@@ -22,38 +20,40 @@
 #include <AMReX_REAL.H>
 #include <AMReX_SPACE.H>
 
-namespace ParticleUtils {
+namespace ParticleUtils
+{
 
     using namespace amrex;
+
     // Define shortcuts for frequently-used type names
-    using ParticleType = WarpXParticleContainer::ParticleType;
-    using ParticleTileType = WarpXParticleContainer::ParticleTileType;
-    using ParticleBins = DenseBins<ParticleType>;
-    using index_type = ParticleBins::index_type;
+    using ParticleType = typename WarpXParticleContainer::ParticleType;
+    using ParticleTileType = typename WarpXParticleContainer::ParticleTileType;
+    using ParticleTileDataType = typename ParticleTileType::ParticleTileDataType;
+    using ParticleBins = DenseBins<ParticleTileDataType>;
 
     /* Find the particles and count the particles that are in each cell.
        Note that this does *not* rearrange particle arrays */
     ParticleBins
-    findParticlesInEachCell( int const lev, MFIter const& mfi,
-                             ParticleTileType const& ptile) {
+    findParticlesInEachCell (Geometry const& geom_lev,
+                             MFIter const & mfi,
+                             ParticleTileType & ptile) {
 
         // Extract particle structures for this tile
         int const np = ptile.numParticles();
-        ParticleType const* particle_ptr = ptile.GetArrayOfStructs()().data();
+        auto ptd = ptile.getParticleTileData();
 
         // Extract box properties
-        Geometry const& geom = WarpX::GetInstance().Geom(lev);
         Box const& cbx = mfi.tilebox(IntVect::TheZeroVector()); //Cell-centered box
         const auto lo = lbound(cbx);
-        const auto dxi = geom.InvCellSizeArray();
-        const auto plo = geom.ProbLoArray();
+        const auto dxi = geom_lev.InvCellSizeArray();
+        const auto plo = geom_lev.ProbLoArray();
 
         // Find particles that are in each cell;
         // results are stored in the object `bins`.
         ParticleBins bins;
-        bins.build(np, particle_ptr, cbx,
+        bins.build(np, ptd, cbx,
             // Pass lambda function that returns the cell index
-            [=] AMREX_GPU_DEVICE (const ParticleType& p) noexcept
+            [=] AMREX_GPU_DEVICE (ParticleType const & p) noexcept -> amrex::IntVect
             {
                 return IntVect{AMREX_D_DECL(
                                    static_cast<int>((p.pos(0)-plo[0])*dxi[0] - lo.x),
@@ -64,4 +64,4 @@ namespace ParticleUtils {
         return bins;
     }
 
-}
+} // namespace ParticleUtils

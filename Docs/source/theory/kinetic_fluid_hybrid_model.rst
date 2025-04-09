@@ -18,8 +18,8 @@ has to resolve the electron Debye length and CFL-condition based on the speed
 of light.
 
 Many authors have described variations of the kinetic ion & fluid electron model,
-generally referred to as particle-fluid hybrid or just hybrid-PIC models. The implementation
-in WarpX follows the outline from :cite:t:`c-winske2022hybrid`.
+generally referred to as particle-fluid hybrid or just hybrid-PIC models. The
+implementation in WarpX is described in detail in :cite:t:`kfhm-Groenewald2023`.
 This description follows mostly from that reference.
 
 Model
@@ -29,31 +29,57 @@ The basic justification for the hybrid model is that the system to which it is
 applied is dominated by ion kinetics, with ions moving much slower than electrons
 and photons. In this scenario two critical approximations can be made, namely,
 neutrality (:math:`n_e=n_i`) and the Maxwell-Ampere equation can be simplified by
-neglecting the displacement current term :cite:p:`c-NIELSON1976`, giving,
+neglecting the displacement current term :cite:p:`kfhm-Nielson1976`, giving,
 
     .. math::
 
         \mu_0\vec{J} = \vec{\nabla}\times\vec{B},
 
-where :math:`\vec{J} = \vec{J}_i - \vec{J}_e` is the total electrical current, i.e.
-the sum of electron and ion currents. Since ions are treated in the regular
-PIC manner, the ion current, :math:`\vec{J}_i`, is known during a simulation. Therefore,
+where :math:`\vec{J} = \sum_{s\neq e}\vec{J}_s + \vec{J}_e + \vec{J}_{ext}` is the total electrical current,
+i.e. the sum of electron and ion currents as well as any external current (not captured through plasma
+particles). Since ions are treated in the regular
+PIC manner, the ion current, :math:`\sum_{s\neq e}\vec{J}_s`, is known during a simulation. Therefore,
 given the magnetic field, the electron current can be calculated.
 
-If we now further assume electrons are inertialess, the electron momentum
-equation yields,
+The electron momentum transport equation (obtained from multiplying the Vlasov equation by mass and
+integrating over velocity), also called the generalized Ohm's law, is given by:
 
     .. math::
 
-        \frac{d(n_em_e\vec{V}_e)}{dt} = 0 = -en_e\vec{E}-\vec{J}_e\times\vec{B}-\nabla\cdot\vec{P}_e+en_e\vec{\eta}\cdot\vec{J},
+        en_e\vec{E} = \frac{m}{e}\frac{\partial \vec{J}_e}{\partial t} + \frac{m}{e}\left( \vec{U}_e\cdot\nabla \right) \vec{J}_e - \nabla\cdot {\overleftrightarrow P}_e - \vec{J}_e\times\vec{B}+\vec{R}_e
 
-where :math:`\vec{V_e}=\vec{J}_e/(en_e)`, :math:`\vec{P}_e` is the electron pressure
-tensor and :math:`\vec{\eta}` is the resistivity tensor. An expression for the electric field
-(generalized Ohm's law) can be obtained from the above as:
+where :math:`\vec{U}_e = \vec{J}_e/(en_e)` is the electron fluid velocity,
+:math:`{\overleftrightarrow P}_e` is the electron pressure tensor and
+:math:`\vec{R}_e` is the drag force due to collisions between electrons and ions.
+Applying the above momentum equation to the Maxwell-Faraday equation (:math:`\frac{\partial\vec{B}}{\partial t} = -\nabla\times\vec{E}`)
+and substituting in :math:`\vec{J}` calculated from the Maxwell-Ampere equation, gives,
 
     .. math::
 
-        \vec{E} = -\frac{1}{en_e}\left( \vec{J}_e\times\vec{B} + \nabla\cdot\vec{P}_e \right)+\vec{\eta}\cdot\vec{J}.
+        \frac{\partial\vec{J}_e}{\partial t} = -\frac{1}{\mu_0}\nabla\times\left(\nabla\times\vec{E}\right) - \frac{\partial\vec{J}_{ext}}{\partial t} - \sum_{s\neq e}\frac{\partial\vec{J}_s}{\partial t}.
+
+Plugging this back into the generalized Ohm' law gives:
+
+    .. math::
+
+        \left(en_e +\frac{m}{e\mu_0}\nabla\times\nabla\times\right)\vec{E} =&
+        - \frac{m}{e}\left( \frac{\partial\vec{J}_{ext}}{\partial t} + \sum_{s\neq e}\frac{\partial\vec{J}_s}{\partial t} \right) \\
+        &+ \frac{m}{e}\left( \vec{U}_e\cdot\nabla \right) \vec{J}_e - \nabla\cdot {\overleftrightarrow P}_e - \vec{J}_e\times\vec{B}+\vec{R}_e.
+
+If we now further assume electrons are inertialess (i.e. :math:`m=0`), the above equation simplifies to,
+
+    .. math::
+
+        en_e\vec{E} = -\vec{J}_e\times\vec{B}-\nabla\cdot{\overleftrightarrow P}_e+\vec{R}_e.
+
+Making the further simplifying assumptions that the electron pressure is isotropic and that
+the electron drag term can be written using a simple resistivity (:math:`\eta`) and hyper-resistivity (:math:`\eta_h`)
+i.e. :math:`\vec{R}_e = en_e(\eta-\eta_h \nabla^2)\vec{J}`, brings us to the implemented form of
+Ohm's law:
+
+    .. math::
+
+        \vec{E} = -\frac{1}{en_e}\left( \vec{J}_e\times\vec{B} + \nabla P_e \right)+\eta\vec{J}-\eta_h \nabla^2\vec{J}.
 
 Lastly, if an electron temperature is given from which the electron pressure can
 be calculated, the model is fully constrained and can be evolved given initial
@@ -90,8 +116,7 @@ be interpolated to the correct time, using :math:`\vec{J}_i^n = 1/2(\vec{J}_i^{n
 The electron pressure is simply calculated using :math:`\rho^n` and the B-field is also already
 known at the correct time since it was calculated for :math:`t=t_n` at the end of the last step.
 Once :math:`\vec{E}^n` is calculated, it is used to push :math:`\vec{B}^n` forward in time
-(using the Maxwell-Faraday equation, i.e. the same as in the regular PIC routine with ``WarpX::EvolveB()``)
-to :math:`\vec{B}^{n+1/2}`.
+(using the Maxwell-Faraday equation) to :math:`\vec{B}^{n+1/2}`.
 
 Second half step
 """"""""""""""""
@@ -108,7 +133,7 @@ Extrapolation step
 
 Obtaining the E-field at timestep :math:`t=t_{n+1}` is a well documented issue for
 the hybrid model. Currently the approach in WarpX is to simply extrapolate
-:math:`\vec{J}_i` foward in time, using
+:math:`\vec{J}_i` forward in time, using
 
     .. math::
 
@@ -121,10 +146,11 @@ Sub-stepping
 ^^^^^^^^^^^^
 
 It is also well known that hybrid PIC routines require the B-field to be
-updated with a smaller timestep than needed for the particles. The update steps
-as outlined above are therefore wrapped in loops that enable the B-field to be
-sub-stepped. The exact number of sub-steps used can be specified by the user
-through a runtime simulation parameter (see :ref:`input parameters section <running-cpp-parameters-hybrid-model>`).
+updated with a smaller timestep than needed for the particles. A 4th order
+Runge-Kutta scheme is used to update the B-field. The RK scheme is repeated a
+number of times during each half-step outlined above. The number of sub-steps
+used can be specified by the user through a runtime simulation parameter
+(see :ref:`input parameters section <running-cpp-parameters-hybrid-model>`).
 
 .. _theory-hybrid-model-elec-temp:
 
@@ -141,5 +167,13 @@ input parameters, :math:`T_{e0}`, :math:`n_0` and :math:`\gamma` using
 The isothermal limit is given by :math:`\gamma = 1` while :math:`\gamma = 5/3`
 (default) produces the adiabatic limit.
 
+Electron current
+^^^^^^^^^^^^^^^^
+
+WarpX's displacement current diagnostic can be used to output the electron current in
+the kinetic-fluid hybrid model since in the absence of kinetic electrons, and under
+the assumption of zero displacement current, that diagnostic simply calculates the
+hybrid model's electron current.
+
 .. bibliography::
-    :keyprefix: c-
+    :keyprefix: kfhm-

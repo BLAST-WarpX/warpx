@@ -25,7 +25,7 @@
 
 #include <cmath>
 
-#if WARPX_USE_PSATD
+#if WARPX_USE_FFT
 
 using namespace amrex;
 
@@ -36,7 +36,7 @@ PsatdAlgorithmJConstantInTime::PsatdAlgorithmJConstantInTime(
     const int norder_x,
     const int norder_y,
     const int norder_z,
-    const short grid_type,
+    ablastr::utils::enums::GridType grid_type,
     const amrex::Vector<amrex::Real>& v_galilean,
     const amrex::Real dt,
     const bool update_with_rho,
@@ -845,20 +845,20 @@ PsatdAlgorithmJConstantInTime::VayDeposition (SpectralFieldData& field_data)
 #endif
 
             // Compute Jx
-            if (kx_mod != 0._rt) fields(i,j,k,Idx.Jx_mid) = I * Dx / kx_mod;
-            else                 fields(i,j,k,Idx.Jx_mid) = 0._rt;
+            if (kx_mod != 0._rt) { fields(i,j,k,Idx.Jx_mid) = I * Dx / kx_mod; }
+            else                 { fields(i,j,k,Idx.Jx_mid) = 0._rt; }
 
 #if defined(WARPX_DIM_3D)
             // Compute Jy
-            if (ky_mod != 0._rt) fields(i,j,k,Idx.Jy_mid) = I * Dy / ky_mod;
-            else                 fields(i,j,k,Idx.Jy_mid) = 0._rt;
+            if (ky_mod != 0._rt) { fields(i,j,k,Idx.Jy_mid) = I * Dy / ky_mod; }
+            else                 { fields(i,j,k,Idx.Jy_mid) = 0._rt; }
 #endif
 
             // Compute Jz
-            if (kz_mod != 0._rt) fields(i,j,k,Idx.Jz_mid) = I * Dz / kz_mod;
-            else                 fields(i,j,k,Idx.Jz_mid) = 0._rt;
+            if (kz_mod != 0._rt) { fields(i,j,k,Idx.Jz_mid) = I * Dz / kz_mod; }
+            else                 { fields(i,j,k,Idx.Jz_mid) = 0._rt; }
         });
     }
 }
 
-#endif // WARPX_USE_PSATD
+#endif // WARPX_USE_FFT

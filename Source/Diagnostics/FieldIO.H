@@ -5,8 +5,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef WARPX_FielIO_H_
-#define WARPX_FielIO_H_
+#ifndef WARPX_FieldIO_H_
+#define WARPX_FieldIO_H_
 
 #include <AMReX_REAL.H>
 
@@ -53,4 +53,4 @@ getReversedVec( const amrex::IntVect& v );
 std::vector<double>
 getReversedVec( const amrex::Real* v );
 
-#endif // WARPX_FielIO_H_
+#endif // WARPX_FieldIO_H_

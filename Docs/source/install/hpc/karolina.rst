@@ -12,83 +12,60 @@ Introduction
 If you are new to this system, **please see the following resources**:
 
 * `IT4I user guide <https://docs.it4i.cz>`__
-* Batch system: `PBS <https://docs.it4i.cz/general/job-submission-and-execution/>`__
+* Batch system: `SLURM <https://docs.it4i.cz/general/job-submission-and-execution/>`__
 * Jupyter service: not provided/documented (yet)
 * `Filesystems <https://docs.it4i.cz/karolina/storage/>`__:
 
   * ``$HOME``: per-user directory, use only for inputs, source and scripts; backed up (25GB default quota)
-  * ``/scatch/``: `production directory <https://docs.it4i.cz/karolina/storage/#scratch-file-system>`__; very fast for parallel jobs (20TB default)
+  * ``/scratch/``: `production directory <https://docs.it4i.cz/karolina/storage/#scratch-file-system>`__; very fast for parallel jobs (10TB default)
+  * ``/mnt/proj<N>/<proj>``: per-project work directory, used for long term data storage (20TB default)
 
 
 .. _building-karolina-preparation:
 
-Preparation
------------
+Installation
+------------
 
-Use the following commands to download the WarpX source code:
+We show how to install from scratch all the dependencies using `Spack <https://spack.io>`__.
 
-.. code-block:: bash
-
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+For size reasons it is not advisable to install WarpX in the ``$HOME`` directory, it should be installed in the "work directory". For this purpose we set an environment variable ``$WORK`` with the path to the "work directory".
 
 On Karolina, you can run either on GPU nodes with fast A100 GPUs (recommended) or CPU nodes.
 
-.. tab-set::
+Profile file
+^^^^^^^^^^^^
 
-   .. tab-item:: A100 GPUs
+One can use the pre-prepared ``karolina_warpx.profile`` script below,
+which you can copy to ``${HOME}/karolina_warpx.profile``, edit as required and then ``source``.
 
-      We use system software modules, add environment hints and further dependencies via the file ``$HOME/karolina_gpu_warpx.profile``.
-      Create it now:
+.. dropdown:: Script Details
+   :color: light
+   :icon: info
+   :animate: fade-in-slide-down
 
-      .. code-block:: bash
+   .. literalinclude:: ../../../../Tools/machines/karolina-it4i/karolina_warpx.profile.example
+      :language: bash
+      :caption: Copy the contents of this file to ``${HOME}/karolina_warpx.profile``.
 
-         cp $HOME/src/warpx/Tools/machines/karolina-it4i/karolina_gpu_warpx.profile.example $HOME/karolina_gpu_warpx.profile
+To have the environment activated on every login, add the following line to ``${HOME}/.bashrc``:
 
-      .. dropdown:: Script Details
-         :color: light
-         :icon: info
-         :animate: fade-in-slide-down
+.. code-block:: bash
 
-         .. literalinclude:: ../../../../Tools/machines/karolina-it4i/karolina_gpu_warpx.profile.example
-            :language: bash
+    source $HOME/karolina_warpx.profile
 
-      Edit the 2nd line of this script, which sets the ``export proj=""`` variable.
-      For example, if you are member of the project ``DD-23-83``, then run ``vi $HOME/karolina_gpu_warpx.profile``.
-      Enter the edit mode by typing ``i`` and edit line 2 to read:
+To install the ``spack`` environment and Python packages:
 
-      .. code-block:: bash
+.. code-block:: bash
 
-         export proj="DD-23-83"
+   bash $WORK/src/warpx/Tools/machines/karolina-it4i/install_dependencies.sh
 
-      Exit the ``vi`` editor with ``Esc`` and then type ``:wq`` (write & quit).
+.. dropdown:: Script Details
+   :color: light
+   :icon: info
+   :animate: fade-in-slide-down
 
-      .. important::
-
-         Now, and as the first step on future logins to Karolina, activate these environment settings:
-
-         .. code-block:: bash
-
-            source $HOME/karolina_gpu_warpx.profile
-
-      Finally, since Karolina does not yet provide software modules for some of our dependencies, install them once:
-
-      .. code-block:: bash
-
-         bash $HOME/src/warpx/Tools/machines/karolina-it4i/install_gpu_dependencies.sh
-         source $HOME/sw/karolina/gpu/venvs/warpx-gpu/bin/activate
-
-      .. dropdown:: Script Details
-         :color: light
-         :icon: info
-         :animate: fade-in-slide-down
-
-         .. literalinclude:: ../../../../Tools/machines/karolina-it4i/install_gpu_dependencies.sh
-            :language: bash
-
-
-   .. tab-item:: CPU Nodes
-
-      CPU usage is documentation is TODO.
+   .. literalinclude:: ../../../../Tools/machines/karolina-it4i/install_dependencies.sh
+      :language: bash
 
 
 .. _building-karolina-compilation:
@@ -98,83 +75,28 @@ Compilation
 
 Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
 
-.. tab-set::
+.. code-block:: bash
 
-   .. tab-item:: A100 GPUs
+   cd $WORK/src/warpx
+   rm -rf build_gpu
 
-      .. code-block:: bash
+   cmake -S . -B build_gpu -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake --build build_gpu -j 48
 
-         cd $HOME/src/warpx
-         rm -rf build_gpu
-
-         cmake -S . -B build_gpu -DWarpX_COMPUTE=CUDA -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
-         cmake --build build_gpu -j 12
-
-      The WarpX application executables are now in ``$HOME/src/warpx/build_gpu/bin/``.
-      Additionally, the following commands will install WarpX as a Python module:
-
-      .. code-block:: bash
-
-         rm -rf build_gpu_py
-
-         cmake -S . -B build_gpu_py -DWarpX_COMPUTE=CUDA -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
-         cmake --build build_gpu_py -j 12 --target pip_install
-
-   .. tab-item:: CPU Nodes
-
-      .. code-block:: bash
-
-         cd $HOME/src/warpx
-         rm -rf build_cpu
-
-         cmake -S . -B build_cpu -DWarpX_COMPUTE=OMP -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
-         cmake --build build_cpu -j 12
-
-      The WarpX application executables are now in ``$HOME/src/warpx/build_cpu/bin/``.
-      Additionally, the following commands will install WarpX as a Python module:
-
-      .. code-block:: bash
-
-         cd $HOME/src/warpx
-         rm -rf build_cpu_py
-
-         cmake -S . -B build_cpu_py -DWarpX_COMPUTE=OMP -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
-         cmake --build build_cpu_py -j 12 --target pip_install
-
-Now, you can :ref:`submit Karolina compute jobs <running-cpp-karolina>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).
-Or, you can use the WarpX executables to submit Karolina jobs (:ref:`example inputs <usage-examples>`).
-For executables, you can reference their location in your :ref:`job script <running-cpp-karolina>` or copy them to a location in ``/scatch/``.
-
-
-.. _building-karolina-update:
-
-Update WarpX & Dependencies
----------------------------
-
-If you already installed WarpX in the past and want to update it, start by getting the latest source code:
+The WarpX application executables are now in ``$WORK/src/warpx/build_gpu/bin/``.
+Additionally, the following commands will install WarpX as a Python module:
 
 .. code-block:: bash
 
-   cd $HOME/src/warpx
+   cd $WORK/src/warpx
+   rm -rf build_gpu_py
 
-   # read the output of this command - does it look ok?
-   git status
+   cmake -S . -B build_gpu_py -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake --build build_gpu_py -j 48 --target pip_install
 
-   # get the latest WarpX source code
-   git fetch
-   git pull
-
-   # read the output of these commands - do they look ok?
-   git status
-   git log # press q to exit
-
-And, if needed,
-
-- :ref:`update the karolina_gpu_warpx.profile or karolina_cpu_warpx.profile files <building-karolina-preparation>`,
-- log out and into the system, activate the now updated environment profile as usual,
-- :ref:`execute the dependency install scripts <building-karolina-preparation>`.
-
-As a last step, clean the build directory ``rm -rf $HOME/src/warpx/build_*`` and rebuild WarpX.
+Now, you can :ref:`submit Karolina compute jobs <running-cpp-karolina>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).
+Or, you can use the WarpX executables to submit Karolina jobs (:ref:`example inputs <usage-examples>`).
+For executables, you can reference their location in your :ref:`job script <running-cpp-karolina>` or copy them to a location in ``/scratch/``.
 
 
 .. _running-cpp-karolina:
@@ -182,33 +104,24 @@ As a last step, clean the build directory ``rm -rf $HOME/src/warpx/build_*`` and
 Running
 -------
 
-.. tab-set::
+The batch script below can be used to run a WarpX simulation on multiple GPU nodes (change ``#SBATCH --nodes=`` accordingly) on the supercomputer Karolina at IT4I.
+This partition has up to `72 nodes <https://docs.it4i.cz/karolina/hardware-overview/>`__.
+Every node has 8x A100 (40GB) GPUs and 2x AMD EPYC 7763, 64-core, 2.45 GHz processors.
 
-   .. tab-item:: A100 (40GB) GPUs
+Replace descriptions between chevrons ``<>`` by relevant values, for instance ``<proj>`` could be ``DD-23-83``.
+Note that we run one MPI rank per GPU.
 
-      The batch script below can be used to run a WarpX simulation on multiple GPU nodes (change ``#PBS -l select=`` accordingly) on the supercomputer Karolina at IT4I.
-      This partition as up to `72 nodes <https://docs.it4i.cz/karolina/hardware-overview/>`__.
-      Every node has 8x A100 (40GB) GPUs and 2x AMD EPYC 7763, 64-core, 2.45 GHz processors.
+.. literalinclude:: ../../../../Tools/machines/karolina-it4i/karolina_gpu.sbatch
+   :language: bash
+   :caption: You can copy this file from ``$WORK/src/warpx/Tools/machines/karolina-it4i/karolina_gpu.sbatch``.
 
-      Replace descriptions between chevrons ``<>`` by relevant values, for instance ``<proj>`` could be ``DD-23-83``.
-      Note that we run one MPI rank per GPU.
+To run a simulation, copy the lines above to a file ``karolina_gpu.sbatch`` and run
 
-      .. literalinclude:: ../../../../Tools/machines/karolina-it4i/karolina_gpu.qsub
-         :language: bash
-         :caption: You can copy this file from ``$HOME/src/warpx/Tools/machines/karolina-it4i/karolina_gpu.qsub``.
+.. code-block:: bash
 
-      To run a simulation, copy the lines above to a file ``karolina_gpu.qsub`` and run
+   sbatch karolina_gpu.sbatch
 
-      .. code-block:: bash
-
-         qsub karolina_gpu.qsub
-
-      to submit the job.
-
-
-   .. tab-item:: CPU Nodes
-
-      CPU usage is documentation is TODO.
+to submit the job.
 
 
 .. _post-processing-karolina:

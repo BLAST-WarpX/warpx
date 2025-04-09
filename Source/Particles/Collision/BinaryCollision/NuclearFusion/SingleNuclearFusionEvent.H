@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef SINGLE_NUCLEAR_FUSION_EVENT_H_
-#define SINGLE_NUCLEAR_FUSION_EVENT_H_
+#ifndef WARPX_SINGLE_NUCLEAR_FUSION_EVENT_H_
+#define WARPX_SINGLE_NUCLEAR_FUSION_EVENT_H_
 
 #include "BoschHaleFusionCrossSection.H"
 #include "ProtonBoronFusionCrossSection.H"
@@ -15,7 +15,6 @@
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_Algorithm.H>
-#include <AMReX_Math.H>
 #include <AMReX_Random.H>
 #include <AMReX_REAL.H>
 
@@ -67,89 +66,33 @@ void SingleNuclearFusionEvent (const amrex::ParticleReal& u1x, const amrex::Part
                                const NuclearFusionType& fusion_type,
                                const amrex::RandomEngine& engine)
 {
-    // General notations in this function:
-    //     x_sq denotes the square of x
-    //     x_star denotes the value of x in the center of mass frame
+    amrex::ParticleReal E_coll, v_coll, lab_to_COM_factor;
+
+    BinaryCollisionUtils::get_collision_parameters(
+        u1x, u1y, u1z, u2x, u2y, u2z, m1, m2,
+        E_coll, v_coll, lab_to_COM_factor);
 
     using namespace amrex::literals;
-    using namespace amrex::Math;
 
     const amrex::ParticleReal w_min = amrex::min(w1, w2);
     const amrex::ParticleReal w_max = amrex::max(w1, w2);
-
-    constexpr auto one_pr = amrex::ParticleReal(1.);
-    constexpr auto inv_four_pr = amrex::ParticleReal(1./4.);
-    constexpr amrex::ParticleReal c_sq = PhysConst::c * PhysConst::c;
-    constexpr amrex::ParticleReal inv_csq = one_pr / ( c_sq );
-
-    const amrex::ParticleReal m1_sq = m1*m1;
-    const amrex::ParticleReal m2_sq = m2*m2;
-
-    // Compute Lorentz factor gamma in the lab frame
-    const amrex::ParticleReal g1 = std::sqrt( one_pr + (u1x*u1x+u1y*u1y+u1z*u1z)*inv_csq );
-    const amrex::ParticleReal g2 = std::sqrt( one_pr + (u2x*u2x+u2y*u2y+u2z*u2z)*inv_csq );
-
-    // Compute momenta
-    const amrex::ParticleReal p1x = u1x * m1;
-    const amrex::ParticleReal p1y = u1y * m1;
-    const amrex::ParticleReal p1z = u1z * m1;
-    const amrex::ParticleReal p2x = u2x * m2;
-    const amrex::ParticleReal p2y = u2y * m2;
-    const amrex::ParticleReal p2z = u2z * m2;
-    // Square norm of the total (sum between the two particles) momenta in the lab frame
-    const amrex::ParticleReal p_total_sq = powi<2>(p1x + p2x) +
-                                           powi<2>(p1y+p2y) +
-                                           powi<2>(p1z+p2z);
-
-    // Total energy in the lab frame
-    const amrex::ParticleReal E_lab = (m1 * g1 + m2 * g2) * c_sq;
-    // Total energy squared in the center of mass frame, calculated using the Lorentz invariance
-    // of the four-momentum norm
-    const amrex::ParticleReal E_star_sq = E_lab*E_lab - c_sq*p_total_sq;
-
-    // Kinetic energy in the center of mass frame
-    const amrex::ParticleReal E_star = std::sqrt(E_star_sq);
-    const amrex::ParticleReal E_kin_star = E_star - (m1 + m2)*c_sq;
 
     // Compute fusion cross section as a function of kinetic energy in the center of mass frame
     auto fusion_cross_section = amrex::ParticleReal(0.);
     if (fusion_type == NuclearFusionType::ProtonBoronToAlphas)
     {
-        fusion_cross_section = ProtonBoronFusionCrossSection(E_kin_star);
+        fusion_cross_section = ProtonBoronFusionCrossSection(E_coll);
     }
     else if ((fusion_type == NuclearFusionType::DeuteriumTritiumToNeutronHelium)
           || (fusion_type == NuclearFusionType::DeuteriumDeuteriumToProtonTritium)
           || (fusion_type == NuclearFusionType::DeuteriumDeuteriumToNeutronHelium))
     {
-        fusion_cross_section = BoschHaleFusionCrossSection(E_kin_star, fusion_type, m1, m2);
+        fusion_cross_section = BoschHaleFusionCrossSection(E_coll, fusion_type, m1, m2);
     }
-
-    // Square of the norm of the momentum of one of the particles in the center of mass frame
-    // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle
-    // The expression below is specifically written in a form that avoids returning
-    // small negative numbers due to machine precision errors, for low-energy particles
-    const amrex::ParticleReal E_ratio = E_star/((m1 + m2)*c_sq);
-    const amrex::ParticleReal p_star_sq = m1*m2*c_sq * ( powi<2>(E_ratio) - one_pr )
-            + powi<2>(m1 - m2)*c_sq*inv_four_pr * powi<2>( E_ratio - 1._prt/E_ratio );
-
-    // Lorentz factors in the center of mass frame
-    const amrex::ParticleReal g1_star = std::sqrt(one_pr + p_star_sq / (m1_sq*c_sq));
-    const amrex::ParticleReal g2_star = std::sqrt(one_pr + p_star_sq / (m2_sq*c_sq));
-
-    // relative velocity in the center of mass frame
-    const amrex::ParticleReal v_rel = std::sqrt(p_star_sq) * (one_pr/(m1*g1_star) +
-                                                              one_pr/(m2*g2_star));
-
-    // Fusion cross section and relative velocity are computed in the center of mass frame.
-    // On the other hand, the particle densities (weight over volume) in the lab frame are used. To
-    // take into account this discrepancy, we need to multiply the fusion probability by the ratio
-    // between the Lorentz factors in the COM frame and the Lorentz factors in the lab frame
-    // (see Perez et al., Phys.Plasmas.19.083104 (2012))
-    const amrex::ParticleReal lab_to_COM_factor = g1_star*g2_star/(g1*g2);
 
     // First estimate of probability to have fusion reaction
     amrex::ParticleReal probability_estimate = multiplier_ratio * fusion_multiplier *
-                                lab_to_COM_factor * w_max * fusion_cross_section * v_rel * dt / dV;
+                                lab_to_COM_factor * w_max * fusion_cross_section * v_coll * dt / dV;
 
     // Effective fusion multiplier
     amrex::ParticleReal fusion_multiplier_eff = fusion_multiplier;
@@ -162,7 +105,7 @@ void SingleNuclearFusionEvent (const amrex::ParticleReal& u1x, const amrex::Part
         // We aim for a fusion probability of probability_target_value but take into account
         // the constraint that the fusion_multiplier cannot be smaller than one
         fusion_multiplier_eff  = amrex::max(fusion_multiplier *
-                                         probability_target_value / probability_estimate , one_pr);
+                                         probability_target_value / probability_estimate , 1._prt);
         probability_estimate *= fusion_multiplier_eff/fusion_multiplier;
     }
 
@@ -170,18 +113,8 @@ void SingleNuclearFusionEvent (const amrex::ParticleReal& u1x, const amrex::Part
     // In principle this is obtained by computing 1 - exp(-probability_estimate)
     // However, the computation of this quantity can fail numerically when probability_estimate is
     // too small (e.g. exp(-probability_estimate) returns 1 and the computation returns 0).
-    // In this case, we simply use "probability_estimate" instead of 1 - exp(-probability_estimate)
-    // The threshold exp_threshold at which we switch between the two formulas is determined by the
-    // fact that computing the exponential is only useful if it can resolve the x^2/2 term of its
-    // Taylor expansion, i.e. the square of probability_estimate should be greater than the
-    // machine epsilon.
-#ifdef AMREX_SINGLE_PRECISION_PARTICLES
-    constexpr auto exp_threshold = amrex::ParticleReal(1.e-3);
-#else
-    constexpr auto exp_threshold = amrex::ParticleReal(5.e-8);
-#endif
-    const amrex::ParticleReal probability = (probability_estimate < exp_threshold) ?
-                                    probability_estimate: one_pr - std::exp(-probability_estimate);
+    // std::expm1 is used since it maintains correctness for small exponent.
+    const amrex::ParticleReal probability = -std::expm1(-probability_estimate);
 
     // Get a random number
     const amrex::ParticleReal random_number = amrex::Random(engine);
@@ -198,6 +131,4 @@ void SingleNuclearFusionEvent (const amrex::ParticleReal& u1x, const amrex::Part
     }
 
 }
-
-
-#endif // SINGLE_NUCLEAR_FUSION_EVENT_H_
+#endif // WARPX_SINGLE_NUCLEAR_FUSION_EVENT_H_

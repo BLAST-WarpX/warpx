@@ -6,8 +6,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef TEMPERATURE_PROPERTIES_H_
-#define TEMPERATURE_PROPERTIES_H_
+#ifndef WARPX_TEMPERATURE_PROPERTIES_H_
+#define WARPX_TEMPERATURE_PROPERTIES_H_
 
 #include <AMReX_ParmParse.H>
 #include <AMReX_Parser.H>
@@ -43,4 +43,4 @@ struct TemperatureProperties
     std::unique_ptr<amrex::Parser> m_ptr_temperature_parser;
 };
 
-#endif
+#endif //WARPX_TEMPERATURE_PROPERTIES_H_

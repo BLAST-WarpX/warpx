@@ -30,7 +30,7 @@ using namespace std;
 using namespace amrex;
 namespace pxr_sr = picsar::multi_physics::utils::serialization;
 
-//This file provides a wrapper aroud the breit_wheeler engine
+//This file provides a wrapper around the breit_wheeler engine
 //provided by the PICSAR library
 
 // Factory class =============================
@@ -69,7 +69,7 @@ BreitWheelerEngine::init_lookup_tables_from_raw_data (
 {
     auto raw_iter = raw_data.begin();
     const auto size_first = pxr_sr::get_out<uint64_t>(raw_iter);
-    if(size_first <= 0 || size_first >= raw_data.size() ) return false;
+    if(size_first <= 0 || size_first >= raw_data.size() ) { return false; }
 
     const auto raw_dndt_table = vector<char>{
         raw_iter, raw_iter+static_cast<long>(size_first)};
@@ -80,8 +80,9 @@ BreitWheelerEngine::init_lookup_tables_from_raw_data (
     m_dndt_table = BW_dndt_table{raw_dndt_table};
     m_pair_prod_table = BW_pair_prod_table{raw_pair_prod_table};
 
-    if (!m_dndt_table.is_init() || !m_pair_prod_table.is_init())
+    if (!m_dndt_table.is_init() || !m_pair_prod_table.is_init()) {
         return false;
+    }
 
     m_bw_minimum_chi_phot = bw_minimum_chi_phot;
 
@@ -104,8 +105,9 @@ void BreitWheelerEngine::init_builtin_tables(
 
 vector<char> BreitWheelerEngine::export_lookup_tables_data () const
 {
-    if(!m_lookup_tables_initialized)
+    if(!m_lookup_tables_initialized) {
         return vector<char>{};
+    }
 
     const auto data_dndt = m_dndt_table.serialize();
     const auto data_pair_prod = m_pair_prod_table.serialize();
@@ -114,10 +116,12 @@ vector<char> BreitWheelerEngine::export_lookup_tables_data () const
 
     vector<char> res{};
     pxr_sr::put_in(size_first, res);
-    for (const auto& tmp : data_dndt)
+    for (const auto& tmp : data_dndt) {
         pxr_sr::put_in(tmp, res);
-    for (const auto& tmp : data_pair_prod)
+    }
+    for (const auto& tmp : data_pair_prod) {
         pxr_sr::put_in(tmp, res);
+    }
 
     return res;
 }

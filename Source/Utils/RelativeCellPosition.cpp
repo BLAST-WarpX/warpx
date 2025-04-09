@@ -22,8 +22,9 @@ utils::getRelativeCellPosition(amrex::MultiFab const& mf)
     // WarpX::grid_type==GridType::Collocated means: all indices/directions on CellIndex::NODE
     for (int d = 0; d < AMREX_SPACEDIM; d++)
     {
-        if (idx_type.cellCentered(d))
+        if (idx_type.cellCentered(d)) {
             relative_position.at(d) = 0.5;
+        }
     }
 
     return relative_position;

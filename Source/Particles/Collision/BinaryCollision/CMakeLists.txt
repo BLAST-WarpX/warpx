@@ -6,3 +6,5 @@ foreach(D IN LISTS WarpX_DIMS)
         ParticleCreationFunc.cpp
     )
 endforeach()
+
+add_subdirectory(DSMC)

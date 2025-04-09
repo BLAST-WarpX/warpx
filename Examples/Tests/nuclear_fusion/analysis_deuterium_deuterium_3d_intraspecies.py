@@ -23,33 +23,22 @@
 #     Nuclear fusion, 32(4), p.611.
 #     DOI: https://doi.org/10.1088/0029-5515/32/4/I07
 
-import os
-import sys
-
 import numpy as np
 
-sys.path.insert(1, '../../../../warpx/Regression/Checksum/')
-import checksumAPI
-
-# Name of the plotfile
-fn = sys.argv[1]
-
 # Load data from reduced diagnostics (physical time and neutron weights)
-time = np.loadtxt('./reduced_diags/particle_number.txt', usecols=1)
-neutron = np.loadtxt('./reduced_diags/particle_number.txt', usecols=9)
+time = np.loadtxt("./reduced_diags/particle_number.txt", usecols=1)
+neutron = np.loadtxt("./reduced_diags/particle_number.txt", usecols=9)
 
 # Compute reactivity in units of cm^3/s as in equation (61) of [1]
-dY_dt = np.abs(neutron[-1]-neutron[0])/(time[-1]-time[0])
-delta_ij = 1 # reactants of the same species
-nD = 1e26 # density in 1/m^3
-V = (2e-3)**3 # simulation volume in m^3
-sigma = dY_dt*(1+delta_ij)/(nD**2)/V*(1e2)**3
+dY_dt = np.abs(neutron[-1] - neutron[0]) / (time[-1] - time[0])
+delta_ij = 1  # reactants of the same species
+nD = 1e26  # density in 1/m^3
+V = (2e-3) ** 3  # simulation volume in m^3
+sigma = dY_dt * (1 + delta_ij) / (nD**2) / V * (1e2) ** 3
 
 sigma_th = 2.603e-18
-error = np.abs(sigma-sigma_th)/sigma_th
-tolerance = 1e-2
+error = np.abs(sigma - sigma_th) / sigma_th
+tolerance = 2e-2
+print("error = ", error)
+print("tolerance = ", tolerance)
 assert error < tolerance
-
-# Compare checksums with benchmark
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn)

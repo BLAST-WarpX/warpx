@@ -1,0 +1,15 @@
+# base input parameters
+FILE = inputs_base_rz
+
+# test input parameters
+algo.current_deposition = direct
+algo.maxwell_solver = psatd
+diag1.dump_rz_modes = 0
+diag1.electrons.variables = x y z w ux uy uz
+diag1.ions.variables = x y z w ux uy uz
+electrons.random_theta = 0
+ions.random_theta = 0
+psatd.current_correction = 0
+psatd.update_with_rho = 1
+warpx.abort_on_warning_threshold = medium
+warpx.do_dive_cleaning = 0

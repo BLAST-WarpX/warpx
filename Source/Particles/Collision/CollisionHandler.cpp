@@ -8,8 +8,10 @@
 
 #include "Particles/Collision/BackgroundMCC/BackgroundMCCCollision.H"
 #include "Particles/Collision/BackgroundStopping/BackgroundStopping.H"
-#include "Particles/Collision/BinaryCollision/Coulomb/PairWiseCoulombCollisionFunc.H"
 #include "Particles/Collision/BinaryCollision/BinaryCollision.H"
+#include "Particles/Collision/BinaryCollision/Coulomb/PairWiseCoulombCollisionFunc.H"
+#include "Particles/Collision/BinaryCollision/DSMC/DSMCFunc.H"
+#include "Particles/Collision/BinaryCollision/DSMC/SplitAndScatterFunc.H"
 #include "Particles/Collision/BinaryCollision/NuclearFusion/NuclearFusionFunc.H"
 #include "Particles/Collision/BinaryCollision/PhotonPhoton/PhotonPhotonCollisionFunc.H"
 #include "Particles/Collision/BinaryCollision/ParticleCreationFunc.H"
@@ -45,7 +47,9 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
         if (type == "pairwisecoulomb") {
             allcollisions[i] =
                std::make_unique<BinaryCollision<PairWiseCoulombCollisionFunc>>(
-                                                                        collision_names[i], mypc);
+                    collision_names[i], mypc
+                );
+            m_use_global_debye_length |= allcollisions[i]->use_global_debye_length();
         }
         else if (type == "background_mcc") {
             allcollisions[i] = std::make_unique<BackgroundMCCCollision>(collision_names[i]);
@@ -53,10 +57,17 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
         else if (type == "background_stopping") {
             allcollisions[i] = std::make_unique<BackgroundStopping>(collision_names[i]);
         }
+        else if (type == "dsmc") {
+            allcollisions[i] =
+                std::make_unique<BinaryCollision<DSMCFunc, SplitAndScatterFunc>>(
+                    collision_names[i], mypc
+                );
+        }
         else if (type == "nuclearfusion") {
             allcollisions[i] =
                std::make_unique<BinaryCollision<NuclearFusionFunc, ParticleCreationFunc>>(
-                                                                        collision_names[i], mypc);
+                    collision_names[i], mypc
+                );
         }
         else if (type == "photonphoton") {
             allcollisions[i] =
@@ -80,6 +91,10 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
  */
 void CollisionHandler::doCollisions ( amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
 {
+
+    if (m_use_global_debye_length) {
+        mypc->GenerateGlobalDebyeLength();
+    }
 
     for (auto& collision : allcollisions) {
         int const ndt = collision->get_ndt();

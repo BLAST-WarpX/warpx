@@ -33,19 +33,19 @@ using namespace amrex;
 void
 guardCellManager::Init (
     const amrex::Real dt,
-    const amrex::RealVect dx,
+    const amrex::Real *dx,
     const bool do_subcycling,
     const bool do_fdtd_nci_corr,
-    const short grid_type,
+    ablastr::utils::enums::GridType grid_type,
     const bool do_moving_window,
     const int moving_window_dir,
     const int nox,
     const int nox_fft, const int noy_fft, const int noz_fft,
     const int nci_corr_stencil,
-    const int electromagnetic_solver_id,
+    const ElectromagneticSolverAlgo electromagnetic_solver_id,
     const int max_level,
-    const amrex::Vector<amrex::Real> v_galilean,
-    const amrex::Vector<amrex::Real> v_comoving,
+    const amrex::Vector<amrex::Real>& v_galilean,
+    const amrex::Vector<amrex::Real>& v_comoving,
     const bool safe_guard_cells,
     const int do_multi_J,
     const bool fft_do_time_averaging,
@@ -59,9 +59,9 @@ guardCellManager::Init (
     // When using subcycling, the particles on the fine level perform two pushes
     // before being redistributed ; therefore, we need one extra guard cell
     // (the particles may move by 2*c*dt)
-    int ngx_tmp = (max_level > 0 && do_subcycling == 1) ? nox+1 : nox;
-    int ngy_tmp = (max_level > 0 && do_subcycling == 1) ? nox+1 : nox;
-    int ngz_tmp = (max_level > 0 && do_subcycling == 1) ? nox+1 : nox;
+    int ngx_tmp = (max_level > 0 && do_subcycling) ? nox+1 : nox;
+    int ngy_tmp = (max_level > 0 && do_subcycling) ? nox+1 : nox;
+    int ngz_tmp = (max_level > 0 && do_subcycling) ? nox+1 : nox;
 
     const bool galilean = (v_galilean[0] != 0. || v_galilean[1] != 0. || v_galilean[2] != 0.);
     const bool comoving = (v_comoving[0] != 0. || v_comoving[1] != 0. || v_comoving[2] != 0.);
@@ -101,9 +101,9 @@ guardCellManager::Init (
     // the fine grid by a number of cells equal to the ref_ratio in the moving
     // window direction.
     if (do_moving_window) {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(ref_ratios.size() <= 1,
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_level <= 1,
             "The number of grow cells for the moving window currently assumes 2 levels max.");
-        const auto nlevs = static_cast<int>(ref_ratios.size()+1);
+        const auto nlevs = static_cast<int>(max_level+1);
         const int max_r = (nlevs > 1) ? ref_ratios[0][moving_window_dir] : 2;
 
         ngx = std::max(ngx,max_r);
@@ -120,9 +120,11 @@ guardCellManager::Init (
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     ng_alloc_EB = IntVect(ngx,ngz);
     ng_alloc_J = IntVect(ngJx,ngJz);
+    amrex::ignore_unused(ngy, ngJy);
 #elif defined(WARPX_DIM_1D_Z)
     ng_alloc_EB = IntVect(ngz);
     ng_alloc_J = IntVect(ngJz);
+    amrex::ignore_unused(ngx, ngJx, ngy, ngJy);
 #endif
 
     // TODO Adding one cell for rho should not be necessary, given that the number of guard cells
@@ -172,7 +174,7 @@ guardCellManager::Init (
     // After pushing particle
     int ng_alloc_F_int = (do_moving_window) ? 2 : 0;
     // CKC solver requires one additional guard cell
-    if (electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC) ng_alloc_F_int = std::max( ng_alloc_F_int, 1 );
+    if (electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC) { ng_alloc_F_int = std::max( ng_alloc_F_int, 1 ); }
     ng_alloc_F = IntVect(AMREX_D_DECL(ng_alloc_F_int, ng_alloc_F_int, ng_alloc_F_int));
 
     // Used if warpx.do_divb_cleaning = 1
@@ -198,6 +200,7 @@ guardCellManager::Init (
         // currents in the latter case). This does not seem to be necessary in x and y,
         // where it still seems fine to set half the number of guard cells of the nodal case.
 
+        using namespace ablastr::utils::enums;
         int ngFFt_x = (grid_type == GridType::Collocated) ? nox_fft : nox_fft / 2;
         int ngFFt_y = (grid_type == GridType::Collocated) ? noy_fft : noy_fft / 2;
         int ngFFt_z = (grid_type == GridType::Collocated || galilean) ? noz_fft : noz_fft / 2;
@@ -314,8 +317,9 @@ guardCellManager::Init (
 
         // If NCI filter, add guard cells in the z direction
         IntVect ng_NCIFilter = IntVect::TheZeroVector();
-        if (do_fdtd_nci_corr)
+        if (do_fdtd_nci_corr) {
             ng_NCIFilter[WARPX_ZINDEX] = NCIGodfreyFilter::m_stencil_width;
+        }
 
         // Note: communications of guard cells for bilinear filter are handled
         // separately.

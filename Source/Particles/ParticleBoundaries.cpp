@@ -33,6 +33,12 @@ ParticleBoundaries::SetAll (ParticleBoundaryType bc)
 }
 
 void
+ParticleBoundaries::SetThermalVelocity (amrex::Real u_th)
+{
+    data.m_uth = u_th;
+}
+
+void
 ParticleBoundaries::SetBoundsX (ParticleBoundaryType bc_lo, ParticleBoundaryType bc_hi)
 {
     data.xmin_bc = bc_lo;
@@ -54,7 +60,7 @@ ParticleBoundaries::SetBoundsZ (ParticleBoundaryType bc_lo, ParticleBoundaryType
 }
 
 bool
-ParticleBoundaries::CheckAll (ParticleBoundaryType bc)
+ParticleBoundaries::CheckAll (ParticleBoundaryType bc) const
 {
     return (data.xmin_bc == bc && data.xmax_bc == bc
 #ifdef WARPX_DIM_3D

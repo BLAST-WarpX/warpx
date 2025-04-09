@@ -25,13 +25,13 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    ParticleExtrema(std::string rd_name);
+    ParticleExtrema(const std::string& rd_name);
 
     /// name of species
     std::string m_species_name;
 
     /**
-     * This funciton computes the particle extrema
+     * This function computes the particle extrema
      *
      * @param[in] step current time step
      */

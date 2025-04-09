@@ -24,27 +24,9 @@ If you are new to this system, **please see the following resources**:
 Login
 -----
 
-.. tab-set::
+.. code-block:: bash
 
-   .. tab-item:: TOSS4 (RHEL8)
-
-      Lassen is currently transitioning to RHEL8.
-      During this transition, first SSH into lassen and then to the updated RHEL8/TOSS4 nodes.
-
-      .. code-block:: bash
-
-         ssh lassen.llnl.gov
-         ssh eatoss4
-
-      Approximately October/November 2023, the new software environment on these nodes will be the new default.
-
-   .. tab-item:: TOSS3 (RHEL7)
-
-      .. code-block:: bash
-
-         ssh lassen.llnl.gov
-
-      Approximately October/November 2023, this partition will become TOSS4 (RHEL8) as well.
+   ssh lassen.llnl.gov
 
 
 .. _building-lassen-preparation:
@@ -56,137 +38,56 @@ Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git /usr/workspace/${USER}/lassen/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git /usr/workspace/${USER}/lassen/src/warpx
 
-.. tab-set::
+We use system software modules, add environment hints and further dependencies via the file ``$HOME/lassen_v100_warpx.profile``.
+Create it now:
 
-   .. tab-item:: TOSS4 (RHEL8)
+.. code-block:: bash
 
-      We use system software modules, add environment hints and further dependencies via the file ``$HOME/lassen_v100_warpx.profile``.
-      Create it now:
+   cp /usr/workspace/${USER}/lassen/src/warpx/Tools/machines/lassen-llnl/lassen_v100_warpx.profile.example $HOME/lassen_v100_warpx.profile
 
-      .. code-block:: bash
+.. dropdown:: Script Details
+   :color: light
+   :icon: info
+   :animate: fade-in-slide-down
 
-         cp /usr/workspace/${USER}/lassen/src/warpx/Tools/machines/lassen-llnl/lassen_v100_warpx.profile.example $HOME/lassen_v100_warpx.profile
+   .. literalinclude:: ../../../../Tools/machines/lassen-llnl/lassen_v100_warpx.profile.example
+      :language: bash
 
-      .. dropdown:: Script Details
-         :color: light
-         :icon: info
-         :animate: fade-in-slide-down
+Edit the 2nd line of this script, which sets the ``export proj=""`` variable.
+For example, if you are member of the project ``nsldt``, then run ``vi $HOME/lassen_v100_warpx.profile``.
+Enter the edit mode by typing ``i`` and edit line 2 to read:
 
-         .. literalinclude:: ../../../../Tools/machines/lassen-llnl/lassen_v100_warpx.profile.example
-            :language: bash
+.. code-block:: bash
 
-      Edit the 2nd line of this script, which sets the ``export proj=""`` variable.
-      For example, if you are member of the project ``nsldt``, then run ``vi $HOME/lassen_v100_warpx.profile``.
-      Enter the edit mode by typing ``i`` and edit line 2 to read:
+   export proj="nsldt"
 
-      .. code-block:: bash
+Exit the ``vi`` editor with ``Esc`` and then type ``:wq`` (write & quit).
 
-         export proj="nsldt"
+.. important::
 
-      Exit the ``vi`` editor with ``Esc`` and then type ``:wq`` (write & quit).
+   Now, and as the first step on future logins to lassen, activate these environment settings:
 
-      .. important::
+   .. code-block:: bash
 
-         Now, and as the first step on future logins to lassen, activate these environment settings:
-
-         .. code-block:: bash
-
-            source $HOME/lassen_v100_warpx.profile
-
-   .. tab-item:: TOSS3 (RHEL7)
-
-      We use system software modules, add environment hints and further dependencies via the file ``$HOME/lassen_v100_warpx_toss3.profile``.
-      Create it now:
-
-      .. code-block:: bash
-
-         cp /usr/workspace/${USER}/lassen/src/warpx/Tools/machines/lassen-llnl/lassen_v100_warpx_toss3.profile.example $HOME/lassen_v100_warpx_toss3.profile
-
-      .. dropdown:: Script Details
-         :color: light
-         :icon: info
-         :animate: fade-in-slide-down
-
-         .. literalinclude:: ../../../../Tools/machines/lassen-llnl/lassen_v100_warpx_toss3.profile.example
-            :language: bash
-
-      Edit the 2nd line of this script, which sets the ``export proj=""`` variable.
-      For example, if you are member of the project ``nsldt``, then run ``vi $HOME/lassen_v100_warpx_toss3.profile``.
-      Enter the edit mode by typing ``i`` and edit line 2 to read:
-
-      .. code-block:: bash
-
-         export proj="nsldt"
-
-      Exit the ``vi`` editor with ``Esc`` and then type ``:wq`` (write & quit).
-
-      .. important::
-
-         Now, and as the first step on future logins to lassen, activate these environment settings:
-
-         .. code-block:: bash
-
-            source $HOME/lassen_v100_warpx_toss3.profile
+      source $HOME/lassen_v100_warpx.profile
 
 Finally, since lassen does not yet provide software modules for some of our dependencies, install them once:
 
-.. tab-set::
+.. code-block:: bash
 
-   .. tab-item:: TOSS4 (RHEL8)
+   bash /usr/workspace/${USER}/lassen/src/warpx/Tools/machines/lassen-llnl/install_v100_dependencies.sh
+   source /usr/workspace/${USER}/lassen/gpu/venvs/warpx-lassen/bin/activate
 
-      .. code-block:: bash
+.. dropdown:: Script Details
+   :color: light
+   :icon: info
+   :animate: fade-in-slide-down
 
-         bash /usr/workspace/${USER}/lassen/src/warpx/Tools/machines/lassen-llnl/install_v100_dependencies.sh
-         source /usr/workspace/${USER}/lassen/gpu/venvs/warpx-lassen/bin/activate
+   .. literalinclude:: ../../../../Tools/machines/lassen-llnl/install_v100_dependencies.sh
+      :language: bash
 
-      .. dropdown:: Script Details
-         :color: light
-         :icon: info
-         :animate: fade-in-slide-down
-
-         .. literalinclude:: ../../../../Tools/machines/lassen-llnl/install_v100_dependencies.sh
-            :language: bash
-
-      .. dropdown:: AI/ML Dependencies (Optional)
-         :animate: fade-in-slide-down
-
-         If you plan to run AI/ML workflows depending on pyTorch, run the next step as well.
-         This will take a while and should be skipped if not needed.
-
-         .. code-block:: bash
-
-            runNode bash /usr/workspace/${USER}/lassen/src/warpx/Tools/machines/lassen-llnl/install_v100_ml.sh
-
-         .. dropdown:: Script Details
-            :color: light
-            :icon: info
-            :animate: fade-in-slide-down
-
-            .. literalinclude:: ../../../../Tools/machines/lassen-llnl/install_v100_ml.sh
-               :language: bash
-
-         For `optimas dependencies <https://github.com/optimas-org/optimas>`__ (incl. scikit-learn), plan another hour of build time:
-
-         .. code-block:: bash
-
-            python3 -m pip install -r /usr/workspace/${USER}/lassen/src/warpx/Tools/optimas/requirements.txt
-
-   .. tab-item:: TOSS3 (RHEL7)
-
-      .. code-block:: bash
-
-         bash /usr/workspace/${USER}/lassen/src/warpx/Tools/machines/lassen-llnl/install_v100_dependencies_toss3.sh
-         source /usr/workspace/${USER}/lassen/gpu/venvs/warpx-lassen-toss3/bin/activate
-
-      .. dropdown:: Script Details
-         :color: light
-         :icon: info
-         :animate: fade-in-slide-down
-
-         .. literalinclude:: ../../../../Tools/machines/lassen-llnl/install_v100_dependencies_toss3.sh
-            :language: bash
 
 .. _building-lassen-compilation:
 
@@ -200,7 +101,7 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
    cd /usr/workspace/${USER}/lassen/src/warpx
    rm -rf build_lassen
 
-   cmake -S . -B build_lassen -DWarpX_COMPUTE=CUDA -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_lassen -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
    cmake --build build_lassen -j 8
 
 The WarpX application executables are now in ``/usr/workspace/${USER}/lassen/src/warpx/build_lassen/bin/``.
@@ -210,7 +111,7 @@ Additionally, the following commands will install WarpX as a Python module:
 
    rm -rf build_lassen_py
 
-   cmake -S . -B build_lassen_py -DWarpX_COMPUTE=CUDA -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_lassen_py -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
    cmake --build build_lassen_py -j 8 --target pip_install
 
 Now, you can :ref:`submit lassen compute jobs <running-cpp-lassen>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).
@@ -240,7 +141,7 @@ If you already installed WarpX in the past and want to update it, start by getti
    git status
    git log     # press q to exit
 
-And, if needed,
+Then
 
 - :ref:`update the lassen_v100_warpx.profile file <building-lassen-preparation>`,
 - log out and into the system, activate the now updated environment profile as usual,
@@ -263,15 +164,15 @@ The batch script below can be used to run a WarpX simulation on 2 nodes on the s
 Replace descriptions between chevrons ``<>`` by relevant values, for instance ``<input file>`` could be ``plasma_mirror_inputs``.
 Note that the only option so far is to run with one MPI rank per GPU.
 
-.. literalinclude:: ../../../../Tools/machines/lassen-llnl/lassen.bsub
+.. literalinclude:: ../../../../Tools/machines/lassen-llnl/lassen_v100.bsub
    :language: bash
-   :caption: You can copy this file from ``Tools/machines/lassen-llnl/lassen.bsub``.
+   :caption: You can copy this file from ``Tools/machines/lassen-llnl/lassen_v100.bsub``.
 
-To run a simulation, copy the lines above to a file ``lassen.bsub`` and run
+To run a simulation, copy the lines above to a file ``lassen_v100.bsub`` and run
 
 .. code-block:: bash
 
-   bsub lassen.bsub
+   bsub lassen_v100.bsub
 
 to submit the job.
 
@@ -298,7 +199,7 @@ Known System Issues
    Feb 17th, 2022 (INC0278922):
    The implementation of ``AllGatherv`` in IBM's MPI optimization library "libcollectives" is broken and leads to HDF5 crashes for multi-node runs.
 
-   Our batch script templates above `apply this work-around <https://github.com/ECP-WarpX/WarpX/pull/2874>`__ *before* the call to ``jsrun``, which avoids the broken routines from IBM and trades them for an OpenMPI implementation of collectives:
+   Our batch script templates above `apply this work-around <https://github.com/BLAST-WarpX/warpx/pull/2874>`__ *before* the call to ``jsrun``, which avoids the broken routines from IBM and trades them for an OpenMPI implementation of collectives:
 
    .. code-block:: bash
 

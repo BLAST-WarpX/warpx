@@ -30,10 +30,14 @@ struct LatticeElementFinder
      * \brief Initialize the element finder at the level and grid
      *
      * @param[in] lev the refinement level
+     * @param[in] gamma_boost the Lorentz factor of the boosted frame
+     * @param[in] time the current time on all refinement levels
      * @param[in] a_mfi specifies the grid where the finder is defined
      * @param[in] accelerator_lattice a reference to the accelerator lattice at the refinement level
      */
-    void InitElementFinder (int lev, amrex::MFIter const& a_mfi,
+    void InitElementFinder (int lev, amrex::Real gamma_boost,
+                            const amrex::Vector<amrex::Real>& time,
+                            amrex::MFIter const& a_mfi,
                             AcceleratorLattice const& accelerator_lattice);
 
     /**
@@ -49,9 +53,11 @@ struct LatticeElementFinder
      * @param[in] lev the refinement level
      * @param[in] a_mfi specifies the grid where the finder is defined
      * @param[in] accelerator_lattice a reference to the accelerator lattice at the refinement level
+     * @param[in] time the current time on all refinement levels
      */
     void UpdateIndices (int lev, amrex::MFIter const& a_mfi,
-                        AcceleratorLattice const& accelerator_lattice);
+                        AcceleratorLattice const& accelerator_lattice,
+                        const amrex::Vector<amrex::Real>& time);
 
     /* Define the location and size of the index lookup table */
     /* Use the type Real to be consistent with the way the main grid is defined */
@@ -71,9 +77,11 @@ struct LatticeElementFinder
      * @param[in] a_pti specifies the grid where the finder is defined
      * @param[in] a_offset particle index offset needed to access particle info
      * @param[in] accelerator_lattice a reference to the accelerator lattice at the refinement level
+     * @param[in] dts vector containing the timestep sizes at all refinement levels
      */
-    LatticeElementFinderDevice GetFinderDeviceInstance (WarpXParIter const& a_pti, int a_offset,
-                                                        AcceleratorLattice const& accelerator_lattice);
+    [[nodiscard]] LatticeElementFinderDevice GetFinderDeviceInstance (
+        WarpXParIter const& a_pti, int a_offset, AcceleratorLattice const& accelerator_lattice,
+        const amrex::Vector<amrex::Real>&  dts) const;
 
     /* The index lookup tables for each lattice element type */
     amrex::Gpu::DeviceVector<int> d_quad_indices;
@@ -89,52 +97,7 @@ struct LatticeElementFinder
      */
     void setup_lattice_indices (amrex::Gpu::DeviceVector<amrex::ParticleReal> const & zs,
                                 amrex::Gpu::DeviceVector<amrex::ParticleReal> const & ze,
-                                amrex::Gpu::DeviceVector<int> & indices)
-    {
-
-        using namespace amrex::literals;
-
-        const auto nelements = static_cast<int>(zs.size());
-        amrex::ParticleReal const * zs_arr = zs.data();
-        amrex::ParticleReal const * ze_arr = ze.data();
-        int * indices_arr = indices.data();
-
-        amrex::Real const zmin = m_zmin;
-        amrex::Real const dz = m_dz;
-
-        amrex::ParticleReal const gamma_boost = m_gamma_boost;
-        amrex::ParticleReal const uz_boost = m_uz_boost;
-        amrex::Real const time = m_time;
-
-        amrex::ParallelFor( m_nz,
-            [=] AMREX_GPU_DEVICE (int iz) {
-
-                // Get the location of the grid node
-                amrex::Real z_node = zmin + iz*dz;
-
-                if (gamma_boost > 1._prt) {
-                    // Transform to lab frame
-                    z_node = gamma_boost*z_node + uz_boost*time;
-                }
-
-                // Find the index to the element that is closest to the grid cell.
-                // For now, this assumes that there is no overlap among elements of the same type.
-                for (int ie = 0 ; ie < nelements ; ie++) {
-                    // Find the mid points between element ie and the ones before and after it.
-                    // The first and last element need special handling.
-                    const amrex::ParticleReal zcenter_left = (ie == 0)?
-                        (std::numeric_limits<amrex::ParticleReal>::lowest()) : (0.5_prt*(ze_arr[ie-1] + zs_arr[ie]));
-                    const amrex::ParticleReal zcenter_right = (ie < nelements - 1)?
-                        (0.5_prt*(ze_arr[ie] + zs_arr[ie+1])) : (std::numeric_limits<amrex::ParticleReal>::max());
-                    if (zcenter_left <= z_node && z_node < zcenter_right) {
-                        indices_arr[iz] = ie;
-                    }
-
-                }
-            }
-        );
-    }
-
+                                amrex::Gpu::DeviceVector<int> & indices) const;
 };
 
 /**
@@ -151,11 +114,16 @@ struct LatticeElementFinderDevice
      * @param[in] a_offset particle index offset needed to access particle info
      * @param[in] accelerator_lattice a reference to the accelerator lattice at the refinement level
      * @param[in] h_finder The host level instance of the element finder that this is associated with
+     * @param[in] dts vector containing the timestep sizes at all refinement levels
      */
     void
     InitLatticeElementFinderDevice (WarpXParIter const& a_pti, int a_offset,
                                     AcceleratorLattice const& accelerator_lattice,
-                                    LatticeElementFinder const & h_finder);
+                                    LatticeElementFinder const & h_finder,
+                                    const amrex::Vector<amrex::Real>& dts);
+
+    /* Whether the class has been initialized */
+    bool m_initialized = false;
 
     /* Size and location of the index lookup table */
     amrex::Real m_zmin;

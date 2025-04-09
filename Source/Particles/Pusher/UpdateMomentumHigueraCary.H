@@ -46,7 +46,7 @@ void UpdateMomentumHigueraCary(
     const T sigma = gamma - betam;
     // Get u*
     const T ust = (umx*betax + umy*betay + umz*betaz)*invclight;
-    // Get new gamma inversed
+    // Get new gamma inverse
     gamma = 1._prt/std::sqrt(0.5_prt*(sigma + std::sqrt(sigma*sigma + 4._prt*(betam + ust*ust)) ));
     // Compute t
     const T tx = gamma*betax;

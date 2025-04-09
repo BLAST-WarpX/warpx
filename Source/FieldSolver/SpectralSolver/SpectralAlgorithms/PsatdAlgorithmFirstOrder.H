@@ -11,6 +11,8 @@
 #include "FieldSolver/SpectralSolver/SpectralKSpace.H"
 #include "SpectralBaseAlgorithm.H"
 
+#include <ablastr/utils/Enums.H>
+
 #include <AMReX_Array.H>
 #include <AMReX_Config.H>
 #include <AMReX_REAL.H>
@@ -20,7 +22,7 @@
 #include <array>
 #include <memory>
 
-#if WARPX_USE_PSATD
+#if WARPX_USE_FFT
 /*
  * \brief Class that updates the fields in spectral space according to the first-order PSATD equations.
  */
@@ -50,11 +52,11 @@ class PsatdAlgorithmFirstOrder : public SpectralBaseAlgorithm
             int norder_x,
             int norder_y,
             int norder_z,
-            short grid_type,
+            ablastr::utils::enums::GridType grid_type,
             amrex::Real dt,
             bool div_cleaning,
-            int J_in_time,
-            int rho_in_time);
+            JInTime J_in_time,
+            RhoInTime rho_in_time);
 
         /**
          * \brief Updates E, B, F, and G fields in spectral space,
@@ -91,8 +93,8 @@ class PsatdAlgorithmFirstOrder : public SpectralBaseAlgorithm
         // Other member variables
         amrex::Real m_dt;
         bool m_div_cleaning;
-        int m_J_in_time;
-        int m_rho_in_time;
+        JInTime m_J_in_time;
+        RhoInTime m_rho_in_time;
 };
-#endif // WARPX_USE_PSATD
+#endif // WARPX_USE_FFT
 #endif // WARPX_PSATD_ALGORITHM_FIRST_ORDER_H_

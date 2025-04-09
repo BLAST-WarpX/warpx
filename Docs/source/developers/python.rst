@@ -56,10 +56,10 @@ This is part of the standard - each of the PICMI classes call the method ``handl
 The main purpose is to process application specific keyword arguments (those that start with ``warpx_`` for example).
 These are then passed into the ``init`` methods.
 In the WarpX implementation, in the ``init``, each of the WarpX specific arguments are saved as attributes of the implementation
-class instancles.
+class instances.
 
 It is in the second method, ``initialize_inputs``, where the PICMI input parameters are translated into WarpX input parameters.
-This method is called later during the intialization.
+This method is called later during the initialization.
 The prefix instances described above are all accessible in the implementation classes (via the ``pywarpx`` module).
 For each PICMI input quantity, the appropriate WarpX input parameters are set in the prefix classes.
 As needed, for example in the ``Species`` class, the dynamic prefix instances are created and the attributes set.

@@ -1,0 +1,6 @@
+.eqno {
+    /* As of 2023 Dec, sphinx_rtd_theme has a bug where equation numbers appear above the equations instead of on the right */
+    /* The following is a make-shift fix, but comes at the cost of "making the header link invisible," though I'm not sure what that means */
+    /* Copied from https://github.com/readthedocs/sphinx_rtd_theme/issues/301#issuecomment-1205755904 */
+    float: right;
+}

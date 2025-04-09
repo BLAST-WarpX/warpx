@@ -13,4 +13,4 @@
 
 import analysis_reduced_diags_impl as an
 
-an.do_analysis(single_precision = False)
+an.do_analysis(single_precision=False)

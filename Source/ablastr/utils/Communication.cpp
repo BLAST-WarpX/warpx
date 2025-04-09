@@ -124,7 +124,7 @@ void
 FillBoundary (amrex::Vector<amrex::MultiFab *> const &mf, bool do_single_precision_comms,
              const amrex::Periodicity &period, std::optional<bool> nodal_sync)
 {
-    for (auto x : mf) {
+    for (auto *x : mf) {
         ablastr::utils::communication::FillBoundary(*x, do_single_precision_comms, period, nodal_sync);
     }
 }
@@ -180,7 +180,7 @@ void OverrideSync (amrex::MultiFab &mf,
 {
     BL_PROFILE("ablastr::utils::communication::OverrideSync");
 
-    if (mf.ixType().cellCentered()) return;
+    if (mf.ixType().cellCentered()) { return; }
 
     if (do_single_precision_comms)
     {

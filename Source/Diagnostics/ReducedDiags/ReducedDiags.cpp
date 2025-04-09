@@ -23,24 +23,27 @@
 using namespace amrex;
 
 // constructor
-ReducedDiags::ReducedDiags (std::string rd_name)
-    : m_rd_name(std::move(rd_name))
+ReducedDiags::ReducedDiags (const std::string& rd_name):
+m_rd_name{rd_name}
 {
     BackwardCompatibility();
 
+    const ParmParse pp_rd("reduced_diags");
     const ParmParse pp_rd_name(m_rd_name);
 
     // read path
+    pp_rd.query("path", m_path);
     pp_rd_name.query("path", m_path);
 
     // read extension
+    pp_rd.query("extension", m_extension);
     pp_rd_name.query("extension", m_extension);
 
     // check if it is a restart run
     std::string restart_chkfile;
     const ParmParse pp_amr("amr");
     pp_amr.query("restart", restart_chkfile);
-    bool IsNotRestart = restart_chkfile.empty();
+    const bool IsNotRestart = restart_chkfile.empty();
 
     if (ParallelDescriptor::IOProcessor())
     {
@@ -50,7 +53,7 @@ ReducedDiags::ReducedDiags (std::string rd_name)
         { amrex::CreateDirectoryFailed(m_path); }
 
         // replace / create output file
-        std::string rd_full_file_name = m_path + m_rd_name + "." + m_extension;
+        const std::string rd_full_file_name = m_path + m_rd_name + "." + m_extension;
         m_write_header = IsNotRestart || !amrex::FileExists(rd_full_file_name); // not a restart or file doesn't exist
         if (m_write_header)
         {
@@ -61,13 +64,16 @@ ReducedDiags::ReducedDiags (std::string rd_name)
 
     // read reduced diags intervals
     std::vector<std::string> intervals_string_vec = {"1"};
-    pp_rd_name.getarr("intervals", intervals_string_vec);
+    pp_rd.queryarr("intervals", intervals_string_vec);
+    pp_rd_name.queryarr("intervals", intervals_string_vec);
     m_intervals = utils::parser::IntervalsParser(intervals_string_vec);
 
     // read separator
+    pp_rd.query("separator", m_sep);
     pp_rd_name.query("separator", m_sep);
 
     // precision of data in the output file
+    utils::parser::queryWithParser(pp_rd, "precision", m_precision);
     utils::parser::queryWithParser(pp_rd_name, "precision", m_precision);
 }
 // end constructor
@@ -86,7 +92,28 @@ void ReducedDiags::LoadBalance ()
     // load balancing operations
 }
 
-void ReducedDiags::BackwardCompatibility ()
+void ReducedDiags::ComputeDiagsMidStep (int /*step*/)
+{
+    // Defines an empty function ComputeDiagsMidStep() to be overwritten if needed.
+    // Function used to calculate the diagnostic at the mid step time leve
+    // (instead of at the end of the step).
+}
+
+void ReducedDiags::WriteCheckpointData (std::string const & /*dir*/)
+{
+    // Defines an empty function WriteCheckpointData() to be overwritten if needed.
+    // Function used to write out and data needed by the diagnostic in
+    // the checkpoint.
+}
+
+void ReducedDiags::ReadCheckpointData (std::string const & /*dir*/)
+{
+    // Defines an empty function ReadCheckpointData() to be overwritten if needed.
+    // Function used to read in any data that was written out in the checkpoint
+    // when doing a restart.
+}
+
+void ReducedDiags::BackwardCompatibility () const
 {
     const amrex::ParmParse pp_rd_name(m_rd_name);
     std::vector<std::string> backward_strings;
@@ -116,12 +143,12 @@ void ReducedDiags::WriteToFile (int step) const
     ofs << WarpX::GetInstance().gett_new(0);
 
     // loop over data size and write
-    for (const auto& item : m_data) ofs << m_sep << item;
+    for (const auto& item : m_data) { ofs << m_sep << item; }
 
     // end loop over data size
 
     // end line
-    ofs << std::endl;
+    ofs << "\n";
 
     // close file
     ofs.close();

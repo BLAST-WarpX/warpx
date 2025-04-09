@@ -16,6 +16,8 @@
 #   include "FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
 #endif
 
+#include <ablastr/fields/MultiFabRegister.H>
+
 #include <AMReX.H>
 #include <AMReX_Array4.H>
 #include <AMReX_Config.H>
@@ -40,9 +42,10 @@ using namespace amrex;
  * \brief Update the F field, over one timestep
  */
 void FiniteDifferenceSolver::ComputeDivE (
-    const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
-    amrex::MultiFab& divEfield ) {
-
+    ablastr::fields::VectorField const & Efield,
+    amrex::MultiFab& divEfield
+)
+{
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
 #ifdef WARPX_DIM_RZ
@@ -52,7 +55,7 @@ void FiniteDifferenceSolver::ComputeDivE (
         ComputeDivECylindrical <CylindricalYeeAlgorithm> ( Efield, divEfield );
 
 #else
-    if (m_grid_type == GridType::Collocated) {
+    if (m_grid_type == ablastr::utils::enums::GridType::Collocated) {
 
         ComputeDivECartesian <CartesianNodalAlgorithm> ( Efield, divEfield );
 
@@ -77,7 +80,7 @@ void FiniteDifferenceSolver::ComputeDivE (
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::ComputeDivECartesian (
-    const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
+    ablastr::fields::VectorField const & Efield,
     amrex::MultiFab& divEfield ) {
 
     // Loop through the grids, and over the tiles within each grid
@@ -123,9 +126,10 @@ void FiniteDifferenceSolver::ComputeDivECartesian (
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::ComputeDivECylindrical (
-    const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
-    amrex::MultiFab& divEfield ) {
-
+    ablastr::fields::VectorField const & Efield,
+    amrex::MultiFab& divEfield
+)
+{
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -133,7 +137,7 @@ void FiniteDifferenceSolver::ComputeDivECylindrical (
     for ( MFIter mfi(divEfield, TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
 
         // Extract field data for this grid/tile
-        Array4<Real> divE = divEfield.array(mfi);
+        const Array4<Real> divE = divEfield.array(mfi);
         Array4<Real> const& Er = Efield[0]->array(mfi);
         Array4<Real> const& Et = Efield[1]->array(mfi);
         Array4<Real> const& Ez = Efield[2]->array(mfi);

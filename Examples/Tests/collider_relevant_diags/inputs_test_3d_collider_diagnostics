@@ -1,0 +1,131 @@
+#################################
+########## MY CONSTANTS #########
+#################################
+my_constants.nx = 8
+my_constants.ny = 8
+my_constants.nz = 8
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 1
+amr.n_cell = nx ny nz
+amr.max_grid_size = 4
+amr.blocking_factor = 4
+amr.max_level = 0
+geometry.dims = 3
+geometry.prob_lo = 0 0 0
+geometry.prob_hi =  8 8 8
+particles.do_tiling = 0
+warpx.use_filter = 0
+warpx.abort_on_warning_threshold = high
+
+#################################
+######## BOUNDARY CONDITION #####
+#################################
+boundary.field_lo = periodic periodic periodic
+boundary.field_hi = periodic periodic periodic
+boundary.particle_lo = periodic periodic periodic
+boundary.particle_hi = periodic periodic periodic
+
+#################################
+############ NUMERICS ###########
+#################################
+algo.maxwell_solver = ckc
+warpx.cfl = 0.99
+algo.particle_shape = 1
+
+#################################
+############ FIELDS #############
+#################################
+particles.E_ext_particle_init_style = constant
+particles.B_ext_particle_init_style = constant
+particles.E_external_particle = 10000. 0. 0.
+particles.B_external_particle = 0. 5000. 0.
+
+#################################
+########### PARTICLES ###########
+#################################
+particles.species_names = pho beam_p beam_e
+particles.photon_species = pho
+
+beam_e.species_type = electron
+beam_e.injection_style = MultipleParticles
+beam_e.multiple_particles_pos_x = 4.5  3.5  0.5
+beam_e.multiple_particles_pos_y = 4.5  2.5  1.5
+beam_e.multiple_particles_pos_z = 4.5  1.5  1.5
+beam_e.multiple_particles_ux = 0.3 0.2 0.1
+beam_e.multiple_particles_uy = 0.4 -0.3 -0.1
+beam_e.multiple_particles_uz = 0.3 0.1 -10.
+beam_e.multiple_particles_weight = 1. 2 3
+beam_e.initialize_self_fields = 0
+beam_e.self_fields_required_precision = 5e-10
+beam_e.do_qed_quantum_sync = 1
+beam_e.qed_quantum_sync_phot_product_species = pho
+beam_e.do_not_push = 1
+beam_e.do_not_deposit = 1
+
+beam_p.species_type = positron
+beam_p.injection_style = MultipleParticles
+beam_p.multiple_particles_pos_x = 4.5 3.5 0.5
+beam_p.multiple_particles_pos_y = 4.5 2.5 1.5
+beam_p.multiple_particles_pos_z = 4.5 1.5 1.5
+beam_p.multiple_particles_ux = 0.3 0.2 0.1
+beam_p.multiple_particles_uy = 0.4 -0.3 -0.1
+beam_p.multiple_particles_uz = 0.3 0.1 -10.
+beam_p.multiple_particles_weight = 1. 2 3
+beam_p.initialize_self_fields = 0
+beam_p.self_fields_required_precision = 5e-10
+beam_p.do_qed_quantum_sync = 1
+beam_p.qed_quantum_sync_phot_product_species = pho
+beam_p.do_not_push = 1
+beam_p.do_not_deposit = 1
+
+pho.species_type = photon
+pho.injection_style = none
+
+#################################
+############# QED ###############
+#################################
+qed_qs.photon_creation_energy_threshold = 0.
+qed_qs.lookup_table_mode = builtin
+qed_qs.chi_min = 1.e-3
+warpx.do_qed_schwinger = 0
+
+#################################
+######### DIAGNOSTICS ###########
+#################################
+# FULL
+diagnostics.diags_names = diag1 diag2
+
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.write_species = 1
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho_beam_e rho_beam_p rho
+diag1.species = pho beam_e beam_p
+diag1.format = plotfile
+#diag1.dump_last_timestep = 1
+
+diag2.intervals = 1
+diag2.diag_type = Full
+diag2.write_species = 1
+diag2.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho_beam_e rho_beam_p rho
+diag2.species = pho beam_e beam_p
+diag2.format = openpmd
+diag2.openpmd_backend = h5
+#diag2.dump_last_timestep = 1
+
+# REDUCED
+warpx.reduced_diags_names = ParticleExtrema_beam_e ParticleExtrema_beam_p ColliderRelevant_beam_e_beam_p
+
+ColliderRelevant_beam_e_beam_p.type = ColliderRelevant
+ColliderRelevant_beam_e_beam_p.intervals = 1
+ColliderRelevant_beam_e_beam_p.species =beam_e beam_p
+
+ParticleExtrema_beam_e.type = ParticleExtrema
+ParticleExtrema_beam_e.intervals = 1
+ParticleExtrema_beam_e.species = beam_e
+
+ParticleExtrema_beam_p.type = ParticleExtrema
+ParticleExtrema_beam_p.intervals = 1
+ParticleExtrema_beam_p.species = beam_p

@@ -73,10 +73,11 @@ WarpXLaserProfiles::GaussianLaserProfile::init (
         m_params.stc_direction[1]*m_common_params.p_X[1] +
         m_params.stc_direction[2]*m_common_params.p_X[2];
 
-    if (arg < -1.0_rt || arg > 1.0_rt)
+    if (arg < -1.0_rt || arg > 1.0_rt) {
         m_params.theta_stc = 0._rt;
-    else
+    } else {
         m_params.theta_stc = std::acos(arg);
+    }
 #else
     m_params.theta_stc = 0.;
 #endif
@@ -116,8 +117,8 @@ WarpXLaserProfiles::GaussianLaserProfile::fill_amplitude (
     // Time stretching due to STCs and phi2 complex envelope
     // (1 if zeta=0, beta=0, phi2=0)
     const Complex stretch_factor = 1._rt + 4._rt *
-        (m_params.zeta+m_params.beta*m_params.focal_distance*inv_tau2)
-        * (m_params.zeta+m_params.beta*m_params.focal_distance*inv_complex_waist_2)
+        ((m_params.zeta+m_params.beta*m_params.focal_distance)*inv_tau2)
+        * ((m_params.zeta+m_params.beta*m_params.focal_distance)*inv_complex_waist_2)
         + 2._rt*I*(m_params.phi2-m_params.beta*m_params.beta*k0*m_params.focal_distance)*inv_tau2;
 
     // Amplitude and monochromatic oscillations

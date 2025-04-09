@@ -35,12 +35,14 @@ using namespace amrex;
  * \brief Update the B field at the boundary, using the Silver-Mueller condition
  */
 void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Efield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Bfield,
+    ablastr::fields::VectorField& Efield,
+    ablastr::fields::VectorField& Bfield,
     amrex::Box domain_box,
     amrex::Real const dt,
-    amrex::Vector<int> field_boundary_lo,
-    amrex::Vector<int> field_boundary_hi) {
+    amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> field_boundary_lo,
+    amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> field_boundary_hi) {
+
+    using ablastr::fields::Direction;
 
     // Ensure that we are using the Yee solver
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -79,14 +81,14 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
     // tiling is usually set by TilingIfNotGPU()
     // but here, we set it to false because of potential race condition,
     // since we grow the tiles by one guard cell after creating them.
-    for ( MFIter mfi(*Efield[0], false); mfi.isValid(); ++mfi ) {
+    for ( MFIter mfi(*Efield[Direction{0}], false); mfi.isValid(); ++mfi ) {
         // Extract field data for this grid/tile
-        Array4<Real> const& Er = Efield[0]->array(mfi);
-        Array4<Real> const& Et = Efield[1]->array(mfi);
-        Array4<Real> const& Ez = Efield[2]->array(mfi);
-        Array4<Real> const& Br = Bfield[0]->array(mfi);
-        Array4<Real> const& Bt = Bfield[1]->array(mfi);
-        Array4<Real> const& Bz = Bfield[2]->array(mfi);
+        Array4<Real> const& Er = Efield[Direction{0}]->array(mfi);
+        Array4<Real> const& Et = Efield[Direction{1}]->array(mfi);
+        Array4<Real> const& Ez = Efield[Direction{2}]->array(mfi);
+        Array4<Real> const& Br = Bfield[Direction{0}]->array(mfi);
+        Array4<Real> const& Bt = Bfield[Direction{1}]->array(mfi);
+        Array4<Real> const& Bz = Bfield[Direction{2}]->array(mfi);
 
         // Extract tileboxes for which to loop
         Box tbr  = mfi.tilebox(Bfield[0]->ixType().toIntVect());
@@ -106,13 +108,15 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
 
                 // At the +z boundary (innermost guard cell)
                 if ( apply_hi_z && (j==domain_box.bigEnd(1)+1) ){
-                    for (int m=0; m<2*nmodes-1; m++)
+                    for (int m=0; m<2*nmodes-1; m++) {
                         Br(i,j,0,m) = coef1_z*Br(i,j,0,m) - coef2_z*Et(i,j,0,m);
+                    }
                 }
                 // At the -z boundary (innermost guard cell)
                 if ( apply_lo_z && (j==domain_box.smallEnd(1)-1) ){
-                    for (int m=0; m<2*nmodes-1; m++)
+                    for (int m=0; m<2*nmodes-1; m++) {
                         Br(i,j,0,m) = coef1_z*Br(i,j,0,m) + coef2_z*Et(i,j+1,0,m);
+                    }
                 }
 
             },
@@ -120,13 +124,15 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
 
                 // At the +z boundary (innermost guard cell)
                 if ( apply_hi_z && (j==domain_box.bigEnd(1)+1) ){
-                    for (int m=0; m<2*nmodes-1; m++)
+                    for (int m=0; m<2*nmodes-1; m++) {
                         Bt(i,j,0,m) = coef1_z*Bt(i,j,0,m) + coef2_z*Er(i,j,0,m);
+                    }
                 }
                 // At the -z boundary (innermost guard cell)
                 if ( apply_lo_z && (j==domain_box.smallEnd(1)-1) ){
-                    for (int m=0; m<2*nmodes-1; m++)
+                    for (int m=0; m<2*nmodes-1; m++) {
                         Bt(i,j,0,m) = coef1_z*Bt(i,j,0,m) - coef2_z*Er(i,j+1,0,m);
+                    }
                 }
                 // At the +r boundary (innermost guard cell)
                 if ( apply_hi_r && (i==domain_box.bigEnd(0)+1) ){
@@ -199,18 +205,18 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
     // tiling is usually set by TilingIfNotGPU()
     // but here, we set it to false because of potential race condition,
     // since we grow the tiles by one guard cell after creating them.
-    for ( MFIter mfi(*Efield[0], false); mfi.isValid(); ++mfi ) {
+    for ( MFIter mfi(*Efield[Direction{0}], false); mfi.isValid(); ++mfi ) {
 
         // Extract field data for this grid/tile
-        Array4<Real> const& Ex = Efield[0]->array(mfi);
-        Array4<Real> const& Ey = Efield[1]->array(mfi);
+        Array4<Real> const& Ex = Efield[Direction{0}]->array(mfi);
+        Array4<Real> const& Ey = Efield[Direction{1}]->array(mfi);
 #ifndef WARPX_DIM_1D_Z
-        Array4<Real> const& Ez = Efield[2]->array(mfi);
+        Array4<Real> const& Ez = Efield[Direction{2}]->array(mfi);
 #endif
-        Array4<Real> const& Bx = Bfield[0]->array(mfi);
-        Array4<Real> const& By = Bfield[1]->array(mfi);
+        Array4<Real> const& Bx = Bfield[Direction{0}]->array(mfi);
+        Array4<Real> const& By = Bfield[Direction{1}]->array(mfi);
 #ifndef WARPX_DIM_1D_Z
-        Array4<Real> const& Bz = Bfield[2]->array(mfi);
+        Array4<Real> const& Bz = Bfield[Direction{2}]->array(mfi);
 #endif
 
         // Extract the tileboxes for which to loop
@@ -233,31 +239,39 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
 
 #ifdef WARPX_DIM_3D
                 // At the +y boundary (innermost guard cell)
-                if ( apply_hi_y && ( j==domain_box.bigEnd(1)+1 ) )
+                if ( apply_hi_y && ( j==domain_box.bigEnd(1)+1 ) ) {
                     Bx(i,j,k) = coef1_y * Bx(i,j,k) + coef2_y * Ez(i,j,k);
+                }
                 // At the -y boundary (innermost guard cell)
-                if ( apply_lo_y && ( j==domain_box.smallEnd(1)-1 ) )
+                if ( apply_lo_y && ( j==domain_box.smallEnd(1)-1 ) ) {
                     Bx(i,j,k) = coef1_y * Bx(i,j,k) - coef2_y * Ez(i,j+1,k);
+                }
                 // At the +z boundary (innermost guard cell)
-                if ( apply_hi_z && ( k==domain_box.bigEnd(2)+1 ) )
+                if ( apply_hi_z && ( k==domain_box.bigEnd(2)+1 ) ) {
                     Bx(i,j,k) = coef1_z * Bx(i,j,k) - coef2_z * Ey(i,j,k);
+                }
                 // At the -z boundary (innermost guard cell)
-                if ( apply_lo_z && ( k==domain_box.smallEnd(2)-1 ) )
+                if ( apply_lo_z && ( k==domain_box.smallEnd(2)-1 ) ) {
                     Bx(i,j,k) = coef1_z * Bx(i,j,k) + coef2_z * Ey(i,j,k+1);
+                }
 #elif WARPX_DIM_XZ
                 // At the +z boundary (innermost guard cell)
-                if ( apply_hi_z && ( j==domain_box.bigEnd(1)+1 ) )
+                if ( apply_hi_z && ( j==domain_box.bigEnd(1)+1 ) ) {
                     Bx(i,j,k) = coef1_z * Bx(i,j,k) - coef2_z * Ey(i,j,k);
+                }
                 // At the -z boundary (innermost guard cell)
-                if ( apply_lo_z && ( j==domain_box.smallEnd(1)-1 ) )
+                if ( apply_lo_z && ( j==domain_box.smallEnd(1)-1 ) ) {
                     Bx(i,j,k) = coef1_z * Bx(i,j,k) + coef2_z * Ey(i,j+1,k);
+                }
 #elif WARPX_DIM_1D_Z
                 // At the +z boundary (innermost guard cell)
-                if ( apply_hi_z && ( i==domain_box.bigEnd(0)+1 ) )
+                if ( apply_hi_z && ( i==domain_box.bigEnd(0)+1 ) ) {
                     Bx(i,j,k) = coef1_z * Bx(i,j,k) - coef2_z * Ey(i,j,k);
+                }
                 // At the -z boundary (innermost guard cell)
-                if ( apply_lo_z && ( i==domain_box.smallEnd(0)-1 ) )
+                if ( apply_lo_z && ( i==domain_box.smallEnd(0)-1 ) ) {
                     Bx(i,j,k) = coef1_z * Bx(i,j,k) + coef2_z * Ey(i+1,j,k);
+                }
 #endif
             },
 
@@ -266,33 +280,41 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
 
 #if (defined WARPX_DIM_3D || WARPX_DIM_XZ)
                 // At the +x boundary (innermost guard cell)
-                if ( apply_hi_x && ( i==domain_box.bigEnd(0)+1 ) )
+                if ( apply_hi_x && ( i==domain_box.bigEnd(0)+1 ) ) {
                     By(i,j,k) = coef1_x * By(i,j,k) - coef2_x * Ez(i,j,k);
+                }
                 // At the -x boundary (innermost guard cell)
-                if ( apply_lo_x && ( i==domain_box.smallEnd(0)-1 ) )
+                if ( apply_lo_x && ( i==domain_box.smallEnd(0)-1 ) ) {
                     By(i,j,k) = coef1_x * By(i,j,k) + coef2_x * Ez(i+1,j,k);
+                }
 #endif
 #ifdef WARPX_DIM_3D
                 // At the +z boundary (innermost guard cell)
-                if ( apply_hi_z && ( k==domain_box.bigEnd(2)+1 ) )
+                if ( apply_hi_z && ( k==domain_box.bigEnd(2)+1 ) ) {
                     By(i,j,k) = coef1_z * By(i,j,k) + coef2_z * Ex(i,j,k);
+                }
                 // At the -z boundary (innermost guard cell)
-                if ( apply_lo_z && ( k==domain_box.smallEnd(2)-1 ) )
+                if ( apply_lo_z && ( k==domain_box.smallEnd(2)-1 ) ) {
                     By(i,j,k) = coef1_z * By(i,j,k) - coef2_z * Ex(i,j,k+1);
+                }
 #elif WARPX_DIM_XZ
                 // At the +z boundary (innermost guard cell)
-                if ( apply_hi_z && ( j==domain_box.bigEnd(1)+1 ) )
+                if ( apply_hi_z && ( j==domain_box.bigEnd(1)+1 ) ) {
                     By(i,j,k) = coef1_z * By(i,j,k) + coef2_z * Ex(i,j,k);
+                }
                 // At the -z boundary (innermost guard cell)
-                if ( apply_lo_z && ( j==domain_box.smallEnd(1)-1 ) )
+                if ( apply_lo_z && ( j==domain_box.smallEnd(1)-1 ) ) {
                     By(i,j,k) = coef1_z * By(i,j,k) - coef2_z * Ex(i,j+1,k);
+                }
 #elif WARPX_DIM_1D_Z
                 // At the +z boundary (innermost guard cell)
-                if ( apply_hi_z && ( i==domain_box.bigEnd(0)+1 ) )
+                if ( apply_hi_z && ( i==domain_box.bigEnd(0)+1 ) ) {
                     By(i,j,k) = coef1_z * By(i,j,k) + coef2_z * Ex(i,j,k);
+                }
                 // At the -z boundary (innermost guard cell)
-                if ( apply_lo_z && ( i==domain_box.smallEnd(0)-1 ) )
+                if ( apply_lo_z && ( i==domain_box.smallEnd(0)-1 ) ) {
                     By(i,j,k) = coef1_z * By(i,j,k) - coef2_z * Ex(i+1,j,k);
+                }
 #endif
             },
 
@@ -301,19 +323,23 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
 
 #if (defined WARPX_DIM_3D || WARPX_DIM_XZ)
                 // At the +x boundary (innermost guard cell)
-                if ( apply_hi_x && ( i==domain_box.bigEnd(0)+1 ) )
+                if ( apply_hi_x && ( i==domain_box.bigEnd(0)+1 ) ) {
                     Bz(i,j,k) = coef1_x * Bz(i,j,k) + coef2_x * Ey(i,j,k);
+                }
                 // At the -x boundary (innermost guard cell)
-                if ( apply_lo_x && ( i==domain_box.smallEnd(0)-1 ) )
+                if ( apply_lo_x && ( i==domain_box.smallEnd(0)-1 ) ) {
                     Bz(i,j,k) = coef1_x * Bz(i,j,k) - coef2_x * Ey(i+1,j,k);
+                }
 #endif
 #ifdef WARPX_DIM_3D
                 // At the +y boundary (innermost guard cell)
-                if ( apply_hi_y && ( j==domain_box.bigEnd(1)+1 ) )
+                if ( apply_hi_y && ( j==domain_box.bigEnd(1)+1 ) ) {
                     Bz(i,j,k) = coef1_y * Bz(i,j,k) - coef2_y * Ex(i,j,k);
+                }
                 // At the -y boundary (innermost guard cell)
-                if ( apply_lo_y && ( j==domain_box.smallEnd(1)-1 ) )
+                if ( apply_lo_y && ( j==domain_box.smallEnd(1)-1 ) ) {
                     Bz(i,j,k) = coef1_y * Bz(i,j,k) + coef2_y * Ex(i,j+1,k);
+                }
 #elif WARPX_DIM_1D_Z
                 ignore_unused(i,j,k);
 #endif

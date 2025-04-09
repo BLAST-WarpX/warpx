@@ -44,7 +44,7 @@ namespace ablastr::utils::timer
         *
         * @return the duration
         */
-        double get_duration () noexcept;
+        [[nodiscard]] double get_duration () const noexcept;
 
 
         /**
@@ -53,7 +53,7 @@ namespace ablastr::utils::timer
         *
         * @return the maximum duration across all the MPI ranks
         */
-        double get_global_duration ();
+        [[nodiscard]] double get_global_duration () const;
 
         private:
 

@@ -1,0 +1,51 @@
+max_step = 50
+amr.n_cell = 8 8 32
+amr.max_level = 0
+geometry.dims = 3
+geometry.prob_lo     = -0.2 -0.2 -0.025
+geometry.prob_hi     = +0.2 +0.2 1.575
+
+warpx.const_dt = 1e-9
+warpx.do_electrostatic = labframe
+
+# Boundary condition
+boundary.field_lo = pec pec pec
+boundary.field_hi = pec pec pec
+
+# Order of particle shape factors
+algo.particle_shape = 1
+
+particles.species_names = electron
+electron.charge = -q_e
+electron.mass = m_e
+electron.injection_style = "SingleParticle"
+electron.single_particle_pos = 0.05 0.0 0.0
+electron.single_particle_u = 0.0 0.0 0.1  # gamma*beta
+electron.single_particle_weight = 1.0
+
+lattice.elements = line1 line2
+
+line1.type = line
+line1.elements = drift1 quad1
+
+line2.type = line
+line2.elements = drift2 quad2
+
+drift1.type = drift
+drift1.ds = 0.2
+
+quad1.type = quad
+quad1.ds = 0.2
+quad1.dEdx = 1.e4
+
+drift2.type = drift
+drift2.ds = 0.6
+
+quad2.type = quad
+quad2.ds = 0.4
+quad2.dEdx = -1.e4
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 50
+diag1.diag_type = Full

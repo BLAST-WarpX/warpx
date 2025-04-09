@@ -1,0 +1,6 @@
+# base input parameters
+FILE = inputs_base_3d
+
+# test input parameters
+algo.maxwell_solver = psatd
+warpx.cfl = 0.5773502691896258

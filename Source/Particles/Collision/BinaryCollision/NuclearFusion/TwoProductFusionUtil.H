@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef TWO_PRODUCT_FUSION_UTIL_H
-#define TWO_PRODUCT_FUSION_UTIL_H
+#ifndef WARPX_TWO_PRODUCT_FUSION_UTIL_H
+#define WARPX_TWO_PRODUCT_FUSION_UTIL_H
 
 #include "Utils/ParticleUtils.H"
 #include "Utils/WarpXConst.H"
@@ -165,4 +165,4 @@ namespace {
     }
 }
 
-#endif // TWO_PRODUCT_FUSION_UTIL_H
+#endif // WARPX_TWO_PRODUCT_FUSION_UTIL_H

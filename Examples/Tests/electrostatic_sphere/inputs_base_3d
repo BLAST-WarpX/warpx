@@ -1,0 +1,41 @@
+max_step = 30
+amr.n_cell = 64 64 64
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 128
+geometry.dims = 3
+geometry.prob_lo = -0.5 -0.5 -0.5
+geometry.prob_hi =  0.5  0.5  0.5
+boundary.field_lo = pec pec pec
+boundary.field_hi = pec pec pec
+warpx.const_dt = 1e-6
+warpx.do_electrostatic = relativistic
+
+particles.species_names = electron
+
+algo.field_gathering = momentum-conserving
+
+# Order of particle shape factors
+algo.particle_shape = 1
+
+my_constants.n0 = 1.49e6
+my_constants.R0 = 0.1
+
+electron.charge = -q_e
+electron.mass = m_e
+electron.injection_style = "NUniformPerCell"
+electron.num_particles_per_cell_each_dim = 2 2 2
+electron.profile = parse_density_function
+electron.density_function(x,y,z) = "(x*x + y*y + z*z < R0*R0)*n0"
+electron.momentum_distribution_type = at_rest
+
+diagnostics.diags_names = diag1 diag2
+
+diag1.intervals = 30
+diag1.diag_type = Full
+diag1.fields_to_plot = Ex Ey Ez rho
+
+diag2.intervals = 30
+diag2.diag_type = Full
+diag2.fields_to_plot = none
+diag2.format = openpmd

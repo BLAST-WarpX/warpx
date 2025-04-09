@@ -11,6 +11,8 @@
 #include "FieldSolver/SpectralSolver/SpectralKSpace.H"
 #include "SpectralBaseAlgorithm.H"
 
+#include <ablastr/utils/Enums.H>
+
 #include <AMReX_Array.H>
 #include <AMReX_Config.H>
 #include <AMReX_REAL.H>
@@ -20,7 +22,7 @@
 #include <array>
 #include <memory>
 
-#if WARPX_USE_PSATD
+#if WARPX_USE_FFT
 /* \brief Class that updates the field in spectral space
  * and stores the coefficients of the corresponding update equation.
  */
@@ -52,7 +54,7 @@ class PsatdAlgorithmJConstantInTime : public SpectralBaseAlgorithm
             int norder_x,
             int norder_y,
             int norder_z,
-            short grid_type,
+            ablastr::utils::enums::GridType grid_type,
             const amrex::Vector<amrex::Real>& v_galilean,
             amrex::Real dt,
             bool update_with_rho,
@@ -139,5 +141,5 @@ class PsatdAlgorithmJConstantInTime : public SpectralBaseAlgorithm
         bool m_divb_cleaning;
         bool m_is_galilean;
 };
-#endif // WARPX_USE_PSATD
+#endif // WARPX_USE_FFT
 #endif // WARPX_PSATD_ALGORITHM_J_CONSTANT_IN_TIME_H_

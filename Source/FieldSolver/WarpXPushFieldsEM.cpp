@@ -10,8 +10,9 @@
 
 #include "BoundaryConditions/PML.H"
 #include "Evolve/WarpXDtType.H"
+#include "Fields.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
-#if defined(WARPX_USE_PSATD)
+#if defined(WARPX_USE_FFT)
 #   include "FieldSolver/SpectralSolver/SpectralFieldData.H"
 #   ifdef WARPX_DIM_RZ
 #       include "FieldSolver/SpectralSolver/SpectralSolverRZ.H"
@@ -20,6 +21,7 @@
 #       include "FieldSolver/SpectralSolver/SpectralSolver.H"
 #   endif
 #endif
+#include "Python/callbacks.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
@@ -52,8 +54,9 @@
 #include <memory>
 
 using namespace amrex;
+using warpx::fields::FieldType;
 
-#ifdef WARPX_USE_PSATD
+#ifdef WARPX_USE_FFT
 namespace {
 
     void ForwardTransformVect (
@@ -63,7 +66,7 @@ namespace {
 #else
         SpectralSolver& solver,
 #endif
-        const std::array<std::unique_ptr<amrex::MultiFab>,3>& vector_field,
+        const ablastr::fields::VectorField& vector_field,
         const int compx, const int compy, const int compz)
     {
 #ifdef WARPX_DIM_RZ
@@ -83,7 +86,7 @@ namespace {
 #else
         SpectralSolver& solver,
 #endif
-        const std::array<std::unique_ptr<amrex::MultiFab>,3>& vector_field,
+        const ablastr::fields::VectorField& vector_field,
         const int compx, const int compy, const int compz,
         const amrex::IntVect& fill_guards)
     {
@@ -97,65 +100,258 @@ namespace {
         solver.BackwardTransform(lev, *vector_field[2], compz, fill_guards);
 #endif
     }
+
+    /**
+     * \brief Correct current in Fourier space so that the continuity equation is satisfied
+     */
+    template <typename SpectralSolverType>
+    void PSATDCurrentCorrection (
+        const int finest_level,
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_fp,
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_cp)
+    {
+        for (int lev = 0; lev <= finest_level; ++lev)
+        {
+            spectral_solver_fp[lev]->CurrentCorrection();
+            if (spectral_solver_cp[lev])
+            {
+                spectral_solver_cp[lev]->CurrentCorrection();
+            }
+        }
+    }
+
+    /**
+     * \brief Vay deposition in Fourier space (https://doi.org/10.1016/j.jcp.2013.03.010)
+     */
+    template <typename SpectralSolverType>
+    void PSATDVayDeposition (
+        const int finest_level,
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_fp,
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_cp)
+    {
+        for (int lev = 0; lev <= finest_level; ++lev)
+        {
+            spectral_solver_fp[lev]->VayDeposition();
+            if (spectral_solver_cp[lev])
+            {
+                spectral_solver_cp[lev]->VayDeposition();
+            }
+        }
+    }
+
+    /**
+     * \brief Subtract the average of the cumulative sums of the preliminary current D
+     *        from the current J (computed from D according to the Vay deposition scheme)
+     */
+    void PSATDSubtractCurrentPartialSumsAvg (
+        [[maybe_unused]] const amrex::Vector<std::array<Real,3>> cell_size_at_all_levels,
+        [[maybe_unused]] ablastr::fields::MultiFabRegister& fields)
+    {
+        using ablastr::fields::Direction;
+
+        // Subtraction of cumulative sum for Vay deposition
+        // implemented only in 2D and 3D Cartesian geometry
+    #if !defined (WARPX_DIM_1D_Z) && !defined (WARPX_DIM_RZ)
+
+        // TODO Implementation with coarse patches
+        // TODO Implementation with current centering
+
+        const auto num_levels = cell_size_at_all_levels.size();
+        for (int lev = 0; lev < num_levels; ++lev)
+        {
+            const std::array<amrex::Real,3>& dx = cell_size_at_all_levels[lev];
+
+            amrex::MultiFab const& Dx = *fields.get(FieldType::current_fp_vay, Direction{0}, lev);
+            amrex::MultiFab const& Dy = *fields.get(FieldType::current_fp_vay, Direction{1}, lev);
+            amrex::MultiFab const& Dz = *fields.get(FieldType::current_fp_vay, Direction{2}, lev);
+
+    #if defined (WARPX_DIM_XZ)
+            amrex::ignore_unused(Dy);
+    #endif
+
+        amrex::MultiFab& Jx = *fields.get(FieldType::current_fp, Direction{0}, lev);
+
+
+    #ifdef AMREX_USE_OMP
+    #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+    #endif
+            // Subtract average of cumulative sum from Jx
+            for (amrex::MFIter mfi(Jx); mfi.isValid(); ++mfi)
+            {
+                const amrex::Box& bx = mfi.fabbox();
+
+                amrex::Array4<amrex::Real> const& Jx_arr = Jx.array(mfi);
+                amrex::Array4<amrex::Real const> const& Dx_arr = Dx.const_array(mfi);
+
+                const amrex::Dim3 lo = amrex::lbound(bx);
+                const amrex::Dim3 hi = amrex::ubound(bx);
+                const int nx = hi.x - lo.x + 1;
+                const amrex::Real facx = dx[0] / static_cast<amrex::Real>(nx);
+
+                // Subtract average of cumulative sum along x only
+                amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+                {
+                    for (int ii = lo.x; ii <= hi.x; ++ii)
+                    {
+                        Jx_arr(i,j,k) -= (nx-ii) * Dx_arr(ii,j,k) * facx;
+                    }
+                });
+            }
+
+    #if defined (WARPX_DIM_3D)
+            // Subtract average of cumulative sum from Jy
+            amrex::MultiFab& Jy = *fields.get(FieldType::current_fp, Direction{1}, lev);;
+            for (amrex::MFIter mfi(Jy); mfi.isValid(); ++mfi)
+            {
+                const amrex::Box& bx = mfi.fabbox();
+
+                amrex::Array4<amrex::Real> const& Jy_arr = Jy.array(mfi);
+                amrex::Array4<amrex::Real const> const& Dy_arr = Dy.const_array(mfi);
+
+                const amrex::Dim3 lo = amrex::lbound(bx);
+                const amrex::Dim3 hi = amrex::ubound(bx);
+                const int ny = hi.y - lo.y + 1;
+                const amrex::Real facy = dx[1] / static_cast<amrex::Real>(ny);
+
+                // Subtract average of cumulative sum along y only
+                amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+                {
+                    for (int jj = lo.y; jj <= hi.y; ++jj)
+                    {
+                        Jy_arr(i,j,k) -= (ny-jj) * Dy_arr(i,jj,k) * facy;
+                    }
+                });
+            }
+    #endif
+
+            // Subtract average of cumulative sum from Jz
+            amrex::MultiFab& Jz = *fields.get(FieldType::current_fp, Direction{2}, lev);
+            for (amrex::MFIter mfi(Jz); mfi.isValid(); ++mfi)
+            {
+                const amrex::Box& bx = mfi.fabbox();
+
+                amrex::Array4<amrex::Real> const& Jz_arr = Jz.array(mfi);
+                amrex::Array4<amrex::Real const> const& Dz_arr = Dz.const_array(mfi);
+
+                const amrex::Dim3 lo = amrex::lbound(bx);
+                const amrex::Dim3 hi = amrex::ubound(bx);
+    #if defined (WARPX_DIM_XZ)
+                const int nz = hi.y - lo.y + 1;
+    #elif defined (WARPX_DIM_3D)
+                const int nz = hi.z - lo.z + 1;
+    #endif
+                const amrex::Real facz = dx[2] / static_cast<amrex::Real>(nz);
+
+                // Subtract average of cumulative sum along z only
+                amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+                {
+    #if defined (WARPX_DIM_XZ)
+                    // z direction is in the second component
+                    for (int jj = lo.y; jj <= hi.y; ++jj)
+                    {
+                        Jz_arr(i,j,k) -= (nz-jj) * Dz_arr(i,jj,k) * facz;
+                    }
+    #elif defined (WARPX_DIM_3D)
+                    // z direction is in the third component
+                    for (int kk = lo.z; kk <= hi.z; ++kk)
+                    {
+                        Jz_arr(i,j,k) -= (nz-kk) * Dz_arr(i,j,kk) * facz;
+                    }
+    #endif
+                });
+            }
+        }
+    #endif
+    }
 }
 
-void WarpX::PSATDForwardTransformEB (
-    const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>,3>>& E_fp,
-    const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>,3>>& B_fp,
-    const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>,3>>& E_cp,
-    const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>,3>>& B_cp)
+void WarpX::PSATDForwardTransformEB ()
 {
     const SpectralFieldIndex& Idx = spectral_solver_fp[0]->m_spectral_index;
 
+    const std::string Efield_fp_string = "Efield_fp";
+    const std::string Efield_cp_string = "Efield_cp";
+    const std::string Bfield_fp_string = "Bfield_fp";
+    const std::string Bfield_cp_string = "Bfield_cp";
+
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        ForwardTransformVect(lev, *spectral_solver_fp[lev], E_fp[lev], Idx.Ex, Idx.Ey, Idx.Ez);
-        ForwardTransformVect(lev, *spectral_solver_fp[lev], B_fp[lev], Idx.Bx, Idx.By, Idx.Bz);
+        if (m_fields.has_vector(Efield_fp_string, lev)) {
+            ablastr::fields::VectorField const E_fp =  m_fields.get_alldirs(Efield_fp_string, lev);
+            ForwardTransformVect(lev, *spectral_solver_fp[lev], E_fp, Idx.Ex, Idx.Ey, Idx.Ez);
+        }
+        if (m_fields.has_vector(Bfield_fp_string, lev)) {
+            ablastr::fields::VectorField const B_fp =  m_fields.get_alldirs(Bfield_fp_string, lev);
+            ForwardTransformVect(lev, *spectral_solver_fp[lev], B_fp, Idx.Bx, Idx.By, Idx.Bz);
+        }
 
         if (spectral_solver_cp[lev])
         {
-            ForwardTransformVect(lev, *spectral_solver_cp[lev], E_cp[lev], Idx.Ex, Idx.Ey, Idx.Ez);
-            ForwardTransformVect(lev, *spectral_solver_cp[lev], B_cp[lev], Idx.Bx, Idx.By, Idx.Bz);
+            if (m_fields.has_vector(Efield_cp_string, lev)) {
+                ablastr::fields::VectorField const E_cp =  m_fields.get_alldirs(Efield_cp_string, lev);
+                ForwardTransformVect(lev, *spectral_solver_cp[lev], E_cp, Idx.Ex, Idx.Ey, Idx.Ez);
+            }
+            if (m_fields.has_vector(Bfield_cp_string, lev)) {
+                ablastr::fields::VectorField const B_cp =  m_fields.get_alldirs(Bfield_cp_string, lev);
+                ForwardTransformVect(lev, *spectral_solver_cp[lev], B_cp, Idx.Bx, Idx.By, Idx.Bz);
+            }
         }
     }
 }
 
-void WarpX::PSATDBackwardTransformEB (
-    const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>,3>>& E_fp,
-    const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>,3>>& B_fp,
-    const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>,3>>& E_cp,
-    const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>,3>>& B_cp)
+void WarpX::PSATDBackwardTransformEB ()
 {
     const SpectralFieldIndex& Idx = spectral_solver_fp[0]->m_spectral_index;
 
+    const std::string Efield_fp_string = "Efield_fp";
+    const std::string Efield_cp_string = "Efield_cp";
+    const std::string Bfield_fp_string = "Bfield_fp";
+    const std::string Bfield_cp_string = "Bfield_cp";
+
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        BackwardTransformVect(lev, *spectral_solver_fp[lev], E_fp[lev],
-                              Idx.Ex, Idx.Ey, Idx.Ez, m_fill_guards_fields);
-        BackwardTransformVect(lev, *spectral_solver_fp[lev], B_fp[lev],
-                              Idx.Bx, Idx.By, Idx.Bz, m_fill_guards_fields);
+        if (m_fields.has_vector(Efield_fp_string, lev)) {
+            ablastr::fields::VectorField const E_fp =  m_fields.get_alldirs(Efield_fp_string, lev);
+            BackwardTransformVect(lev, *spectral_solver_fp[lev], E_fp,
+                                  Idx.Ex, Idx.Ey, Idx.Ez, m_fill_guards_fields);
+        }
+        if (m_fields.has_vector(Bfield_fp_string, lev)) {
+            ablastr::fields::VectorField const B_fp =  m_fields.get_alldirs(Bfield_fp_string, lev);
+            BackwardTransformVect(lev, *spectral_solver_fp[lev], B_fp,
+                                  Idx.Bx, Idx.By, Idx.Bz, m_fill_guards_fields);
+        }
 
         if (spectral_solver_cp[lev])
         {
-            BackwardTransformVect(lev, *spectral_solver_cp[lev], E_cp[lev],
-                                  Idx.Ex, Idx.Ey, Idx.Ez, m_fill_guards_fields);
-            BackwardTransformVect(lev, *spectral_solver_cp[lev], B_cp[lev],
-                                  Idx.Bx, Idx.By, Idx.Bz, m_fill_guards_fields);
+            if (m_fields.has_vector(Efield_cp_string, lev)) {
+                ablastr::fields::VectorField const E_cp =  m_fields.get_alldirs(Efield_cp_string, lev);
+                BackwardTransformVect(lev, *spectral_solver_cp[lev], E_cp,
+                                      Idx.Ex, Idx.Ey, Idx.Ez, m_fill_guards_fields);
+            }
+            if (m_fields.has_vector(Bfield_cp_string, lev)) {
+                ablastr::fields::VectorField const B_cp =  m_fields.get_alldirs(Bfield_cp_string, lev);
+                BackwardTransformVect(lev, *spectral_solver_cp[lev], B_cp,
+                                      Idx.Bx, Idx.By, Idx.Bz, m_fill_guards_fields);
+            }
         }
     }
 
     // Damp the fields in the guard cells
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        DampFieldsInGuards(lev, E_fp[lev], B_fp[lev]);
+        if (m_fields.has_vector(Efield_fp_string, lev) && m_fields.has_vector(Bfield_fp_string, lev)) {
+            ablastr::fields::VectorField const E_fp =  m_fields.get_alldirs(Efield_fp_string, lev);
+            ablastr::fields::VectorField const B_fp =  m_fields.get_alldirs(Bfield_fp_string, lev);
+            DampFieldsInGuards(lev, E_fp, B_fp);
+        }
     }
 }
 
 void WarpX::PSATDBackwardTransformEBavg (
-    const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>,3>>& E_avg_fp,
-    const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>,3>>& B_avg_fp,
-    const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>,3>>& E_avg_cp,
-    const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>,3>>& B_avg_cp)
+    ablastr::fields::MultiLevelVectorField const& E_avg_fp,
+    ablastr::fields::MultiLevelVectorField const& B_avg_fp,
+    ablastr::fields::MultiLevelVectorField const& E_avg_cp,
+    ablastr::fields::MultiLevelVectorField const& B_avg_cp)
 {
     const SpectralFieldIndex& Idx = spectral_solver_fp[0]->m_spectral_index;
 
@@ -183,11 +379,15 @@ WarpX::PSATDForwardTransformF ()
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        if (F_fp[lev]) spectral_solver_fp[lev]->ForwardTransform(lev, *F_fp[lev], Idx.F);
+        if (m_fields.has(FieldType::F_fp, lev)) {
+            spectral_solver_fp[lev]->ForwardTransform(lev, *m_fields.get(FieldType::F_fp, lev), Idx.F);
+        }
 
         if (spectral_solver_cp[lev])
         {
-            if (F_cp[lev]) spectral_solver_cp[lev]->ForwardTransform(lev, *F_cp[lev], Idx.F);
+            if (m_fields.has(FieldType::F_cp, lev)) {
+                spectral_solver_cp[lev]->ForwardTransform(lev, *m_fields.get(FieldType::F_cp, lev), Idx.F);
+            }
         }
     }
 }
@@ -200,17 +400,17 @@ WarpX::PSATDBackwardTransformF ()
     for (int lev = 0; lev <= finest_level; ++lev)
     {
 #ifdef WARPX_DIM_RZ
-        if (F_fp[lev]) spectral_solver_fp[lev]->BackwardTransform(lev, *F_fp[lev], Idx.F);
+        if (m_fields.has(FieldType::F_fp, lev)) { spectral_solver_fp[lev]->BackwardTransform(lev, *m_fields.get(FieldType::F_fp, lev), Idx.F); }
 #else
-        if (F_fp[lev]) spectral_solver_fp[lev]->BackwardTransform(lev, *F_fp[lev], Idx.F, m_fill_guards_fields);
+        if (m_fields.has(FieldType::F_fp, lev)) { spectral_solver_fp[lev]->BackwardTransform(lev, *m_fields.get(FieldType::F_fp, lev), Idx.F, m_fill_guards_fields); }
 #endif
 
         if (spectral_solver_cp[lev])
         {
 #ifdef WARPX_DIM_RZ
-            if (F_cp[lev]) spectral_solver_cp[lev]->BackwardTransform(lev, *F_cp[lev], Idx.F);
+            if (m_fields.has(FieldType::F_cp, lev)) { spectral_solver_cp[lev]->BackwardTransform(lev, *m_fields.get(FieldType::F_cp, lev), Idx.F); }
 #else
-            if (F_cp[lev]) spectral_solver_cp[lev]->BackwardTransform(lev, *F_cp[lev], Idx.F, m_fill_guards_fields);
+            if (m_fields.has(FieldType::F_cp, lev)) { spectral_solver_cp[lev]->BackwardTransform(lev, *m_fields.get(FieldType::F_cp, lev), Idx.F, m_fill_guards_fields); }
 #endif
         }
     }
@@ -218,7 +418,7 @@ WarpX::PSATDBackwardTransformF ()
     // Damp the field in the guard cells
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        DampFieldsInGuards(lev, F_fp[lev]);
+        DampFieldsInGuards(lev, m_fields.get(FieldType::F_fp, lev));
     }
 }
 
@@ -229,11 +429,15 @@ WarpX::PSATDForwardTransformG ()
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        if (G_fp[lev]) spectral_solver_fp[lev]->ForwardTransform(lev, *G_fp[lev], Idx.G);
+        if (m_fields.has(FieldType::G_fp, lev)) {
+            spectral_solver_fp[lev]->ForwardTransform(lev, *m_fields.get(FieldType::G_fp, lev), Idx.G);
+        }
 
         if (spectral_solver_cp[lev])
         {
-            if (G_cp[lev]) spectral_solver_cp[lev]->ForwardTransform(lev, *G_cp[lev], Idx.G);
+            if (m_fields.has(FieldType::G_cp, lev)) {
+                spectral_solver_fp[lev]->ForwardTransform(lev, *m_fields.get(FieldType::G_cp, lev), Idx.G);
+            }
         }
     }
 }
@@ -245,34 +449,38 @@ WarpX::PSATDBackwardTransformG ()
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {
+        if (m_fields.has(FieldType::G_fp, lev)) {
+            MultiFab* G_fp = m_fields.get(FieldType::G_fp, lev);
 #ifdef WARPX_DIM_RZ
-        if (G_fp[lev]) spectral_solver_fp[lev]->BackwardTransform(lev, *G_fp[lev], Idx.G);
+            spectral_solver_fp[lev]->BackwardTransform(lev, *G_fp, Idx.G);
 #else
-        if (G_fp[lev]) spectral_solver_fp[lev]->BackwardTransform(lev, *G_fp[lev], Idx.G, m_fill_guards_fields);
+            spectral_solver_fp[lev]->BackwardTransform(lev, *G_fp, Idx.G, m_fill_guards_fields);
 #endif
+
+            DampFieldsInGuards(lev, G_fp);
+        }
 
         if (spectral_solver_cp[lev])
         {
+            if (m_fields.has(FieldType::G_cp, lev)) {
+                MultiFab* G_cp = m_fields.get(FieldType::G_cp, lev);
 #ifdef WARPX_DIM_RZ
-            if (G_cp[lev]) spectral_solver_cp[lev]->BackwardTransform(lev, *G_cp[lev], Idx.G);
+                spectral_solver_fp[lev]->BackwardTransform(lev, *G_cp, Idx.G);
 #else
-            if (G_cp[lev]) spectral_solver_cp[lev]->BackwardTransform(lev, *G_cp[lev], Idx.G, m_fill_guards_fields);
+                spectral_solver_fp[lev]->BackwardTransform(lev, *G_cp, Idx.G, m_fill_guards_fields);
 #endif
+            }
         }
-    }
-
-    // Damp the field in the guard cells
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        DampFieldsInGuards(lev, G_fp[lev]);
     }
 }
 
 void WarpX::PSATDForwardTransformJ (
-    const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>,3>>& J_fp,
-    const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>,3>>& J_cp,
+    std::string const & J_fp_string,
+    std::string const & J_cp_string,
     const bool apply_kspace_filter)
 {
+    if (!m_fields.has_vector(J_fp_string, 0)) { return; }
+
     SpectralFieldIndex Idx;
     int idx_jx, idx_jy, idx_jz;
 
@@ -284,7 +492,10 @@ void WarpX::PSATDForwardTransformJ (
         idx_jy = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jy_new) : static_cast<int>(Idx.Jy_mid);
         idx_jz = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jz_new) : static_cast<int>(Idx.Jz_mid);
 
-        ForwardTransformVect(lev, *spectral_solver_fp[lev], J_fp[lev], idx_jx, idx_jy, idx_jz);
+        if (m_fields.has_vector(J_fp_string, lev)) {
+            ablastr::fields::VectorField const J_fp = m_fields.get_alldirs(J_fp_string, lev);
+            ForwardTransformVect(lev, *spectral_solver_fp[lev], J_fp, idx_jx, idx_jy, idx_jz);
+        }
 
         if (spectral_solver_cp[lev])
         {
@@ -294,7 +505,10 @@ void WarpX::PSATDForwardTransformJ (
             idx_jy = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jy_new) : static_cast<int>(Idx.Jy_mid);
             idx_jz = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jz_new) : static_cast<int>(Idx.Jz_mid);
 
-            ForwardTransformVect(lev, *spectral_solver_cp[lev], J_cp[lev], idx_jx, idx_jy, idx_jz);
+            if (m_fields.has_vector(J_cp_string, lev)) {
+                ablastr::fields::VectorField const J_cp =  m_fields.get_alldirs(J_cp_string, lev);
+                ForwardTransformVect(lev, *spectral_solver_cp[lev], J_cp, idx_jx, idx_jy, idx_jz);
+            }
         }
     }
 
@@ -330,9 +544,11 @@ void WarpX::PSATDForwardTransformJ (
 }
 
 void WarpX::PSATDBackwardTransformJ (
-    const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>,3>>& J_fp,
-    const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>,3>>& J_cp)
+    std::string const & J_fp_string,
+    std::string const & J_cp_string)
 {
+    if (!m_fields.has_vector(J_fp_string, 0)) { return; }
+
     SpectralFieldIndex Idx;
     int idx_jx, idx_jy, idx_jz;
 
@@ -346,8 +562,11 @@ void WarpX::PSATDBackwardTransformJ (
         idx_jy = static_cast<int>(Idx.Jy_mid);
         idx_jz = static_cast<int>(Idx.Jz_mid);
 
-        BackwardTransformVect(lev, *spectral_solver_fp[lev], J_fp[lev],
-                              idx_jx, idx_jy, idx_jz, m_fill_guards_current);
+        if (m_fields.has_vector(J_fp_string, lev)) {
+            ablastr::fields::VectorField const J_fp =  m_fields.get_alldirs(J_fp_string, lev);
+            BackwardTransformVect(lev, *spectral_solver_fp[lev], J_fp,
+                                  idx_jx, idx_jy, idx_jz, m_fill_guards_current);
+        }
 
         if (spectral_solver_cp[lev])
         {
@@ -359,26 +578,35 @@ void WarpX::PSATDBackwardTransformJ (
             idx_jy = static_cast<int>(Idx.Jy_mid);
             idx_jz = static_cast<int>(Idx.Jz_mid);
 
-            BackwardTransformVect(lev, *spectral_solver_cp[lev], J_cp[lev],
-                                  idx_jx, idx_jy, idx_jz, m_fill_guards_current);
+            if (m_fields.has_vector(J_cp_string, lev)) {
+                ablastr::fields::VectorField const J_cp =  m_fields.get_alldirs(J_cp_string, lev);
+                BackwardTransformVect(lev, *spectral_solver_cp[lev], J_cp,
+                                      idx_jx, idx_jy, idx_jz, m_fill_guards_current);
+            }
         }
     }
 }
 
 void WarpX::PSATDForwardTransformRho (
-    const amrex::Vector<std::unique_ptr<amrex::MultiFab>>& charge_fp,
-    const amrex::Vector<std::unique_ptr<amrex::MultiFab>>& charge_cp,
+    std::string const & charge_fp_string,
+    std::string const & charge_cp_string,
     const int icomp, const int dcomp, const bool apply_kspace_filter)
 {
-    if (charge_fp[0] == nullptr) return;
+    if (!m_fields.has(charge_fp_string, 0)) { return; }
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        if (charge_fp[lev]) spectral_solver_fp[lev]->ForwardTransform(lev, *charge_fp[lev], dcomp, icomp);
+        if (m_fields.has(charge_fp_string, lev)) {
+            amrex::MultiFab const & charge_fp =  *m_fields.get(charge_fp_string, lev);
+            spectral_solver_fp[lev]->ForwardTransform(lev, charge_fp, dcomp, icomp);
+        }
 
         if (spectral_solver_cp[lev])
         {
-            if (charge_cp[lev]) spectral_solver_cp[lev]->ForwardTransform(lev, *charge_cp[lev], dcomp, icomp);
+            if (m_fields.has(charge_cp_string, lev)) {
+                amrex::MultiFab const & charge_cp =  *m_fields.get(charge_cp_string, lev);
+                spectral_solver_cp[lev]->ForwardTransform(lev, charge_cp, dcomp, icomp);
+            }
         }
     }
 
@@ -398,148 +626,6 @@ void WarpX::PSATDForwardTransformRho (
     }
 #else
     amrex::ignore_unused(apply_kspace_filter);
-#endif
-}
-
-void WarpX::PSATDCurrentCorrection ()
-{
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        spectral_solver_fp[lev]->CurrentCorrection();
-
-        if (spectral_solver_cp[lev])
-        {
-            spectral_solver_cp[lev]->CurrentCorrection();
-        }
-    }
-}
-
-void WarpX::PSATDVayDeposition ()
-{
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        spectral_solver_fp[lev]->VayDeposition();
-
-        if (spectral_solver_cp[lev])
-        {
-            spectral_solver_cp[lev]->VayDeposition();
-        }
-    }
-}
-
-void WarpX::PSATDSubtractCurrentPartialSumsAvg ()
-{
-    // Subtraction of cumulative sum for Vay deposition
-    // implemented only in 2D and 3D Cartesian geometry
-#if !defined (WARPX_DIM_1D_Z) && !defined (WARPX_DIM_RZ)
-
-    // TODO Implementation with coarse patches
-    // TODO Implementation with current centering
-
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        const std::array<amrex::Real,3>& dx = WarpX::CellSize(lev);
-
-        amrex::MultiFab const& Dx = *current_fp_vay[lev][0];
-        amrex::MultiFab const& Dy = *current_fp_vay[lev][1];
-        amrex::MultiFab const& Dz = *current_fp_vay[lev][2];
-
-#if defined (WARPX_DIM_XZ)
-        amrex::ignore_unused(Dy);
-#endif
-
-    amrex::MultiFab& Jx = *current_fp[lev][0];
-
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-        // Subtract average of cumulative sum from Jx
-        for (amrex::MFIter mfi(Jx); mfi.isValid(); ++mfi)
-        {
-            const amrex::Box& bx = mfi.fabbox();
-
-            amrex::Array4<amrex::Real> const& Jx_arr = Jx.array(mfi);
-            amrex::Array4<amrex::Real const> const& Dx_arr = Dx.const_array(mfi);
-
-            const amrex::Dim3 lo = amrex::lbound(bx);
-            const amrex::Dim3 hi = amrex::ubound(bx);
-            const int nx = hi.x - lo.x + 1;
-            const amrex::Real facx = dx[0] / static_cast<amrex::Real>(nx);
-
-            // Subtract average of cumulative sum along x only
-            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-            {
-                for (int ii = lo.x; ii <= hi.x; ++ii)
-                {
-                    Jx_arr(i,j,k) -= (nx-ii) * Dx_arr(ii,j,k) * facx;
-                }
-            });
-        }
-
-#if defined (WARPX_DIM_3D)
-        // Subtract average of cumulative sum from Jy
-        amrex::MultiFab& Jy = *current_fp[lev][1];
-        for (amrex::MFIter mfi(Jy); mfi.isValid(); ++mfi)
-        {
-            const amrex::Box& bx = mfi.fabbox();
-
-            amrex::Array4<amrex::Real> const& Jy_arr = Jy.array(mfi);
-            amrex::Array4<amrex::Real const> const& Dy_arr = Dy.const_array(mfi);
-
-            const amrex::Dim3 lo = amrex::lbound(bx);
-            const amrex::Dim3 hi = amrex::ubound(bx);
-            const int ny = hi.y - lo.y + 1;
-            const amrex::Real facy = dx[1] / static_cast<amrex::Real>(ny);
-
-            // Subtract average of cumulative sum along y only
-            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-            {
-                for (int jj = lo.y; jj <= hi.y; ++jj)
-                {
-                    Jy_arr(i,j,k) -= (ny-jj) * Dy_arr(i,jj,k) * facy;
-                }
-            });
-        }
-#endif
-
-        // Subtract average of cumulative sum from Jz
-        amrex::MultiFab& Jz = *current_fp[lev][2];
-        for (amrex::MFIter mfi(Jz); mfi.isValid(); ++mfi)
-        {
-            const amrex::Box& bx = mfi.fabbox();
-
-            amrex::Array4<amrex::Real> const& Jz_arr = Jz.array(mfi);
-            amrex::Array4<amrex::Real const> const& Dz_arr = Dz.const_array(mfi);
-
-            const amrex::Dim3 lo = amrex::lbound(bx);
-            const amrex::Dim3 hi = amrex::ubound(bx);
-#if defined (WARPX_DIM_XZ)
-            const int nz = hi.y - lo.y + 1;
-#elif defined (WARPX_DIM_3D)
-            const int nz = hi.z - lo.z + 1;
-#endif
-            const amrex::Real facz = dx[2] / static_cast<amrex::Real>(nz);
-
-            // Subtract average of cumulative sum along z only
-            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-            {
-#if defined (WARPX_DIM_XZ)
-                // z direction is in the second component
-                for (int jj = lo.y; jj <= hi.y; ++jj)
-                {
-                    Jz_arr(i,j,k) -= (nz-jj) * Dz_arr(i,jj,k) * facz;
-                }
-#elif defined (WARPX_DIM_3D)
-                // z direction is in the third component
-                for (int kk = lo.z; kk <= hi.z; ++kk)
-                {
-                    Jz_arr(i,j,k) -= (nz-kk) * Dz_arr(i,j,kk) * facz;
-                }
-#endif
-            });
-        }
-    }
 #endif
 }
 
@@ -644,59 +730,75 @@ WarpX::PSATDScaleAverageFields (const amrex::Real scale_factor)
         }
     }
 }
-#endif // WARPX_USE_PSATD
+#endif // WARPX_USE_FFT
 
 void
-WarpX::PushPSATD ()
+WarpX::PushPSATD (amrex::Real start_time)
 {
-#ifndef WARPX_USE_PSATD
+#ifndef WARPX_USE_FFT
+    amrex::ignore_unused(start_time);
     WARPX_ABORT_WITH_MESSAGE(
         "PushFieldsEM: PSATD solver selected but not built");
 #else
 
+    bool const skip_lev0_coarse_patch = true;
+
     const int rho_old = spectral_solver_fp[0]->m_spectral_index.rho_old;
     const int rho_new = spectral_solver_fp[0]->m_spectral_index.rho_new;
+
+    std::string const rho_fp_string = "rho_fp";
+    std::string const rho_cp_string = "rho_cp";
+
+    const ablastr::fields::MultiLevelVectorField current_fp = m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level);
+    std::string current_fp_string = "current_fp";
+    std::string const current_cp_string = "current_cp";
 
     if (fft_periodic_single_box)
     {
         if (current_correction)
         {
             // FFT of J and rho
-            PSATDForwardTransformJ(current_fp, current_cp);
-            PSATDForwardTransformRho(rho_fp, rho_cp, 0, rho_old);
-            PSATDForwardTransformRho(rho_fp, rho_cp, 1, rho_new);
+            PSATDForwardTransformJ(current_fp_string, current_cp_string);
+            PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 0, rho_old);
+            PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 1, rho_new);
 
             // Correct J in k-space
-            PSATDCurrentCorrection();
+            ::PSATDCurrentCorrection(finest_level, spectral_solver_fp, spectral_solver_cp);
 
             // Inverse FFT of J
-            PSATDBackwardTransformJ(current_fp, current_cp);
+            PSATDBackwardTransformJ(current_fp_string, current_cp_string);
         }
         else if (current_deposition_algo == CurrentDepositionAlgo::Vay)
         {
             // FFT of D and rho (if used)
             // TODO Replace current_cp with current_cp_vay once Vay deposition is implemented with MR
-            PSATDForwardTransformJ(current_fp_vay, current_cp);
-            PSATDForwardTransformRho(rho_fp, rho_cp, 0, rho_old);
-            PSATDForwardTransformRho(rho_fp, rho_cp, 1, rho_new);
+            current_fp_string = "current_fp_vay";
+            PSATDForwardTransformJ(current_fp_string, current_cp_string);
+            PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 0, rho_old);
+            PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 1, rho_new);
 
             // Compute J from D in k-space
-            PSATDVayDeposition();
+            ::PSATDVayDeposition(finest_level, spectral_solver_fp, spectral_solver_cp);
 
             // Inverse FFT of J, subtract cumulative sums of D
-            PSATDBackwardTransformJ(current_fp, current_cp);
+            current_fp_string = "current_fp";
+            PSATDBackwardTransformJ(current_fp_string, current_cp_string);
             // TODO Cumulative sums need to be fixed with periodic single box
-            PSATDSubtractCurrentPartialSumsAvg();
+            auto cell_size_at_all_levels = amrex::Vector<std::array<Real,3>>{};
+            for (int lev = 0; lev <= finest_level; ++lev){
+                cell_size_at_all_levels.push_back(CellSize(lev));
+            }
+            ::PSATDSubtractCurrentPartialSumsAvg(cell_size_at_all_levels, m_fields);
 
             // FFT of J after subtraction of cumulative sums
-            PSATDForwardTransformJ(current_fp, current_cp);
+            PSATDForwardTransformJ(current_fp_string, current_cp_string);
         }
         else // no current correction, no Vay deposition
         {
             // FFT of J and rho (if used)
-            PSATDForwardTransformJ(current_fp, current_cp);
-            PSATDForwardTransformRho(rho_fp, rho_cp, 0, rho_old);
-            PSATDForwardTransformRho(rho_fp, rho_cp, 1, rho_new);
+            PSATDForwardTransformJ(current_fp_string, current_cp_string);
+            PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 0, rho_old);
+            PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 1, rho_new);
         }
     }
     else // no periodic single box
@@ -708,36 +810,42 @@ WarpX::PushPSATD ()
             // In RZ geometry, do not apply filtering here, since it is
             // applied in the subsequent calls to these functions (below)
             const bool apply_kspace_filter = false;
-            PSATDForwardTransformJ(current_fp, current_cp, apply_kspace_filter);
-            PSATDForwardTransformRho(rho_fp, rho_cp, 0, rho_old, apply_kspace_filter);
-            PSATDForwardTransformRho(rho_fp, rho_cp, 1, rho_new, apply_kspace_filter);
+            PSATDForwardTransformJ(current_fp_string, current_cp_string, apply_kspace_filter);
+            PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 0, rho_old, apply_kspace_filter);
+            PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 1, rho_new, apply_kspace_filter);
 #else
-            PSATDForwardTransformJ(current_fp, current_cp);
-            PSATDForwardTransformRho(rho_fp, rho_cp, 0, rho_old);
-            PSATDForwardTransformRho(rho_fp, rho_cp, 1, rho_new);
+            PSATDForwardTransformJ(current_fp_string, current_cp_string);
+            PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 0, rho_old);
+            PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 1, rho_new);
 #endif
 
             // Correct J in k-space
-            PSATDCurrentCorrection();
+            ::PSATDCurrentCorrection(finest_level, spectral_solver_fp, spectral_solver_cp);
 
             // Inverse FFT of J
-            PSATDBackwardTransformJ(current_fp, current_cp);
+            PSATDBackwardTransformJ(current_fp_string, current_cp_string);
 
             // Synchronize J and rho
-            SyncCurrent(current_fp, current_cp, current_buf);
-            SyncRho(rho_fp, rho_cp, charge_buf);
+            SyncCurrent("current_fp");
+            SyncRho();
         }
         else if (current_deposition_algo == CurrentDepositionAlgo::Vay)
         {
             // FFT of D
-            PSATDForwardTransformJ(current_fp_vay, current_cp);
+            current_fp_string = "current_fp_vay";
+            PSATDForwardTransformJ(current_fp_string, current_cp_string);
 
             // Compute J from D in k-space
-            PSATDVayDeposition();
+            ::PSATDVayDeposition(finest_level, spectral_solver_fp, spectral_solver_cp);
 
             // Inverse FFT of J, subtract cumulative sums of D
-            PSATDBackwardTransformJ(current_fp, current_cp);
-            PSATDSubtractCurrentPartialSumsAvg();
+            current_fp_string = "current_fp";
+            PSATDBackwardTransformJ(current_fp_string, current_cp_string);
+            auto cell_size_at_all_levels = amrex::Vector<std::array<Real,3>>{};
+            for (int lev = 0; lev <= finest_level; ++lev){
+                cell_size_at_all_levels.push_back(CellSize(lev));
+            }
+            ::PSATDSubtractCurrentPartialSumsAvg(cell_size_at_all_levels, m_fields);
 
             // Synchronize J and rho (if used).
             // Here we call SumBoundaryJ instead of SyncCurrent, because
@@ -746,167 +854,193 @@ WarpX::PushPSATD ()
             // TODO This works only without mesh refinement
             const int lev = 0;
             SumBoundaryJ(current_fp, lev, Geom(lev).periodicity());
-            SyncRho(rho_fp, rho_cp, charge_buf);
+            SyncRho();
         }
 
         // FFT of J and rho (if used)
-        PSATDForwardTransformJ(current_fp, current_cp);
-        PSATDForwardTransformRho(rho_fp, rho_cp, 0, rho_old);
-        PSATDForwardTransformRho(rho_fp, rho_cp, 1, rho_new);
+        PSATDForwardTransformJ(current_fp_string, current_cp_string);
+        PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 0, rho_old);
+        PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 1, rho_new);
     }
 
     // FFT of E and B
-    PSATDForwardTransformEB(Efield_fp, Bfield_fp, Efield_cp, Bfield_cp);
+    PSATDForwardTransformEB();
 
 #ifdef WARPX_DIM_RZ
-    if (pml_rz[0]) pml_rz[0]->PushPSATD(0);
+    if (pml_rz[0]) { pml_rz[0]->PushPSATD(0); }
 #endif
 
     // FFT of F and G
-    if (WarpX::do_dive_cleaning) PSATDForwardTransformF();
-    if (WarpX::do_divb_cleaning) PSATDForwardTransformG();
+    if (WarpX::do_dive_cleaning) { PSATDForwardTransformF(); }
+    if (WarpX::do_divb_cleaning) { PSATDForwardTransformG(); }
 
     // Update E, B, F, and G in k-space
     PSATDPushSpectralFields();
 
     // Inverse FFT of E, B, F, and G
-    PSATDBackwardTransformEB(Efield_fp, Bfield_fp, Efield_cp, Bfield_cp);
-    if (WarpX::fft_do_time_averaging)
+    PSATDBackwardTransformEB();
+    if (WarpX::fft_do_time_averaging) {
+        auto Efield_avg_fp = m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_fp, finest_level);
+        auto Bfield_avg_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_fp, finest_level);
+        auto Efield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_cp, finest_level, skip_lev0_coarse_patch);
+        auto Bfield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_cp, finest_level, skip_lev0_coarse_patch);
         PSATDBackwardTransformEBavg(Efield_avg_fp, Bfield_avg_fp, Efield_avg_cp, Bfield_avg_cp);
-    if (WarpX::do_dive_cleaning) PSATDBackwardTransformF();
-    if (WarpX::do_divb_cleaning) PSATDBackwardTransformG();
+    }
+    if (WarpX::do_dive_cleaning) { PSATDBackwardTransformF(); }
+    if (WarpX::do_divb_cleaning) { PSATDBackwardTransformG(); }
 
-    // Evolve the fields in the PML boxes
     for (int lev = 0; lev <= finest_level; ++lev)
     {
+        // Evolve the fields in the PML boxes
         if (pml[lev] && pml[lev]->ok())
         {
-            pml[lev]->PushPSATD(lev);
+            pml[lev]->PushPSATD(m_fields, lev);
         }
-        ApplyEfieldBoundary(lev, PatchType::fine);
-        if (lev > 0) ApplyEfieldBoundary(lev, PatchType::coarse);
-        ApplyBfieldBoundary(lev, PatchType::fine, DtType::FirstHalf);
-        if (lev > 0) ApplyBfieldBoundary(lev, PatchType::coarse, DtType::FirstHalf);
+
+        amrex::Real const new_time = start_time + spectral_solver_fp[lev]->m_dt;
+        ApplyEfieldBoundary(lev, PatchType::fine, new_time);
+        if (lev > 0) { ApplyEfieldBoundary(lev, PatchType::coarse, new_time); }
+        ApplyBfieldBoundary(lev, PatchType::fine, DtType::FirstHalf, new_time);
+        if (lev > 0) { ApplyBfieldBoundary(lev, PatchType::coarse, DtType::FirstHalf, new_time); }
     }
 #endif
 }
 
 void
-WarpX::EvolveB (amrex::Real a_dt, DtType a_dt_type)
+WarpX::EvolveB (amrex::Real a_dt, DtType a_dt_type, amrex::Real start_time)
 {
     for (int lev = 0; lev <= finest_level; ++lev) {
-        EvolveB(lev, a_dt, a_dt_type);
+        EvolveB(lev, a_dt, a_dt_type, start_time);
     }
+
+    // Allow execution of Python callback after B-field push
+    ExecutePythonCallback("afterBpush");
 }
 
 void
-WarpX::EvolveB (int lev, amrex::Real a_dt, DtType a_dt_type)
+WarpX::EvolveB (int lev, amrex::Real a_dt, DtType a_dt_type, amrex::Real start_time)
 {
     WARPX_PROFILE("WarpX::EvolveB()");
-    EvolveB(lev, PatchType::fine, a_dt, a_dt_type);
+    EvolveB(lev, PatchType::fine, a_dt, a_dt_type, start_time);
     if (lev > 0)
     {
-        EvolveB(lev, PatchType::coarse, a_dt, a_dt_type);
+        EvolveB(lev, PatchType::coarse, a_dt, a_dt_type, start_time);
     }
 }
 
 void
-WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt, DtType a_dt_type)
+WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt, DtType a_dt_type, amrex::Real start_time)
 {
-
     // Evolve B field in regular cells
     if (patch_type == PatchType::fine) {
-        m_fdtd_solver_fp[lev]->EvolveB(Bfield_fp[lev], Efield_fp[lev], G_fp[lev],
-                                       m_face_areas[lev], m_area_mod[lev], ECTRhofield[lev], Venl[lev],
-                                       m_flag_info_face[lev], m_borrowing[lev], lev, a_dt);
+        m_fdtd_solver_fp[lev]->EvolveB( m_fields,
+                                        lev,
+                                        patch_type,
+                                        m_flag_info_face[lev], m_borrowing[lev], a_dt );
     } else {
-        m_fdtd_solver_cp[lev]->EvolveB(Bfield_cp[lev], Efield_cp[lev], G_cp[lev],
-                                       m_face_areas[lev], m_area_mod[lev], ECTRhofield[lev], Venl[lev],
-                                       m_flag_info_face[lev], m_borrowing[lev], lev, a_dt);
+        m_fdtd_solver_cp[lev]->EvolveB( m_fields,
+                                        lev,
+                                        patch_type,
+                                        m_flag_info_face[lev], m_borrowing[lev], a_dt );
     }
 
     // Evolve B field in PML cells
     if (do_pml && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveBPML(
-                pml[lev]->GetB_fp(), pml[lev]->GetE_fp(), a_dt, WarpX::do_dive_cleaning);
+                m_fields, patch_type, lev, a_dt, WarpX::do_dive_cleaning);
         } else {
             m_fdtd_solver_cp[lev]->EvolveBPML(
-                pml[lev]->GetB_cp(), pml[lev]->GetE_cp(), a_dt, WarpX::do_dive_cleaning);
+                m_fields, patch_type, lev, a_dt, WarpX::do_dive_cleaning);
         }
     }
 
-    ApplyBfieldBoundary(lev, patch_type, a_dt_type);
+    amrex::Real const new_time = start_time + a_dt;
+    ApplyBfieldBoundary(lev, patch_type, a_dt_type, new_time);
 }
 
 
 void
-WarpX::EvolveE (amrex::Real a_dt)
+WarpX::EvolveE (amrex::Real a_dt, amrex::Real start_time)
 {
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        EvolveE(lev, a_dt);
+        EvolveE(lev, a_dt, start_time);
     }
+
+    // Allow execution of Python callback after E-field push
+    ExecutePythonCallback("afterEpush");
 }
 
 void
-WarpX::EvolveE (int lev, amrex::Real a_dt)
+WarpX::EvolveE (int lev, amrex::Real a_dt, amrex::Real start_time)
 {
     WARPX_PROFILE("WarpX::EvolveE()");
-    EvolveE(lev, PatchType::fine, a_dt);
+    EvolveE(lev, PatchType::fine, a_dt, start_time);
     if (lev > 0)
     {
-        EvolveE(lev, PatchType::coarse, a_dt);
+        EvolveE(lev, PatchType::coarse, a_dt, start_time);
     }
 }
 
 void
-WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt)
+WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real start_time)
 {
     // Evolve E field in regular cells
     if (patch_type == PatchType::fine) {
-        m_fdtd_solver_fp[lev]->EvolveE(Efield_fp[lev], Bfield_fp[lev],
-                                       current_fp[lev], m_edge_lengths[lev],
-                                       m_face_areas[lev], ECTRhofield[lev],
-                                       F_fp[lev], lev, a_dt );
+        m_fdtd_solver_fp[lev]->EvolveE( m_fields,
+                                        lev,
+                                        patch_type,
+                                        m_fields.get_alldirs(FieldType::Efield_fp, lev),
+                                        m_eb_update_E[lev],
+                                        a_dt );
     } else {
-        m_fdtd_solver_cp[lev]->EvolveE(Efield_cp[lev], Bfield_cp[lev],
-                                       current_cp[lev], m_edge_lengths[lev],
-                                       m_face_areas[lev], ECTRhofield[lev],
-                                       F_cp[lev], lev, a_dt );
+        m_fdtd_solver_cp[lev]->EvolveE( m_fields,
+                                        lev,
+                                        patch_type,
+                                        m_fields.get_alldirs(FieldType::Efield_cp, lev),
+                                        m_eb_update_E[lev],
+                                        a_dt );
     }
 
     // Evolve E field in PML cells
     if (do_pml && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveEPML(
-                pml[lev]->GetE_fp(), pml[lev]->GetB_fp(),
-                pml[lev]->Getj_fp(), pml[lev]->Get_edge_lengths(),
-                pml[lev]->GetF_fp(),
+                m_fields,
+                patch_type,
+                lev,
                 pml[lev]->GetMultiSigmaBox_fp(),
                 a_dt, pml_has_particles );
         } else {
             m_fdtd_solver_cp[lev]->EvolveEPML(
-                pml[lev]->GetE_cp(), pml[lev]->GetB_cp(),
-                pml[lev]->Getj_cp(), pml[lev]->Get_edge_lengths(),
-                pml[lev]->GetF_cp(),
+                m_fields,
+                patch_type,
+                lev,
                 pml[lev]->GetMultiSigmaBox_cp(),
                 a_dt, pml_has_particles );
         }
     }
 
-    ApplyEfieldBoundary(lev, patch_type);
+    amrex::Real const new_time = start_time + a_dt;
+    ApplyEfieldBoundary(lev, patch_type, new_time);
 
     // ECTRhofield must be recomputed at the very end of the Efield update to ensure
     // that ECTRhofield is consistent with Efield
 #ifdef AMREX_USE_EB
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
         if (patch_type == PatchType::fine) {
-            m_fdtd_solver_fp[lev]->EvolveECTRho(Efield_fp[lev], m_edge_lengths[lev],
-                                                m_face_areas[lev], ECTRhofield[lev], lev);
+            m_fdtd_solver_fp[lev]->EvolveECTRho( m_fields.get_alldirs(FieldType::Efield_fp, lev),
+                                                 m_fields.get_alldirs(FieldType::edge_lengths, lev),
+                                                 m_fields.get_alldirs(FieldType::face_areas, lev),
+                                                 m_fields.get_alldirs(FieldType::ECTRhofield, lev),
+                                                 lev );
         } else {
-            m_fdtd_solver_cp[lev]->EvolveECTRho(Efield_cp[lev], m_edge_lengths[lev],
-                                                m_face_areas[lev], ECTRhofield[lev], lev);
+            m_fdtd_solver_cp[lev]->EvolveECTRho( m_fields.get_alldirs(FieldType::Efield_cp, lev),
+                                                 m_fields.get_alldirs(FieldType::edge_lengths, lev),
+                                                 m_fields.get_alldirs(FieldType::face_areas, lev),
+                                                 m_fields.get_alldirs(FieldType::ECTRhofield, lev),
+                                                 lev);
         }
     }
 #endif
@@ -916,7 +1050,7 @@ WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt)
 void
 WarpX::EvolveF (amrex::Real a_dt, DtType a_dt_type)
 {
-    if (!do_dive_cleaning) return;
+    if (!do_dive_cleaning) { return; }
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {
@@ -927,16 +1061,16 @@ WarpX::EvolveF (amrex::Real a_dt, DtType a_dt_type)
 void
 WarpX::EvolveF (int lev, amrex::Real a_dt, DtType a_dt_type)
 {
-    if (!do_dive_cleaning) return;
+    if (!do_dive_cleaning) { return; }
 
     EvolveF(lev, PatchType::fine, a_dt, a_dt_type);
-    if (lev > 0) EvolveF(lev, PatchType::coarse, a_dt, a_dt_type);
+    if (lev > 0) { EvolveF(lev, PatchType::coarse, a_dt, a_dt_type); }
 }
 
 void
 WarpX::EvolveF (int lev, PatchType patch_type, amrex::Real a_dt, DtType a_dt_type)
 {
-    if (!do_dive_cleaning) return;
+    if (!do_dive_cleaning) { return; }
 
     WARPX_PROFILE("WarpX::EvolveF()");
 
@@ -944,21 +1078,27 @@ WarpX::EvolveF (int lev, PatchType patch_type, amrex::Real a_dt, DtType a_dt_typ
 
     // Evolve F field in regular cells
     if (patch_type == PatchType::fine) {
-        m_fdtd_solver_fp[lev]->EvolveF( F_fp[lev], Efield_fp[lev],
-                                        rho_fp[lev], rhocomp, a_dt );
+        m_fdtd_solver_fp[lev]->EvolveF( m_fields.get(FieldType::F_fp, lev),
+                                        m_fields.get_alldirs(FieldType::Efield_fp, lev),
+                                        m_fields.get(FieldType::rho_fp,lev), rhocomp, a_dt );
     } else {
-        m_fdtd_solver_cp[lev]->EvolveF( F_cp[lev], Efield_cp[lev],
-                                        rho_cp[lev], rhocomp, a_dt );
+        m_fdtd_solver_cp[lev]->EvolveF( m_fields.get(FieldType::F_cp, lev),
+                                        m_fields.get_alldirs(FieldType::Efield_cp, lev),
+                                        m_fields.get(FieldType::rho_cp,lev), rhocomp, a_dt );
     }
 
     // Evolve F field in PML cells
     if (do_pml && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveFPML(
-                pml[lev]->GetF_fp(), pml[lev]->GetE_fp(), a_dt );
+                m_fields.get(FieldType::pml_F_fp, lev),
+                m_fields.get_alldirs(FieldType::pml_E_fp, lev),
+                a_dt );
         } else {
             m_fdtd_solver_cp[lev]->EvolveFPML(
-                pml[lev]->GetF_cp(), pml[lev]->GetE_cp(), a_dt );
+                m_fields.get(FieldType::pml_F_cp, lev),
+                m_fields.get_alldirs(FieldType::pml_E_cp, lev),
+                a_dt );
         }
     }
 }
@@ -966,7 +1106,7 @@ WarpX::EvolveF (int lev, PatchType patch_type, amrex::Real a_dt, DtType a_dt_typ
 void
 WarpX::EvolveG (amrex::Real a_dt, DtType a_dt_type)
 {
-    if (!do_divb_cleaning) return;
+    if (!do_divb_cleaning) { return; }
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {
@@ -977,7 +1117,7 @@ WarpX::EvolveG (amrex::Real a_dt, DtType a_dt_type)
 void
 WarpX::EvolveG (int lev, amrex::Real a_dt, DtType a_dt_type)
 {
-    if (!do_divb_cleaning) return;
+    if (!do_divb_cleaning) { return; }
 
     EvolveG(lev, PatchType::fine, a_dt, a_dt_type);
 
@@ -990,33 +1130,41 @@ WarpX::EvolveG (int lev, amrex::Real a_dt, DtType a_dt_type)
 void
 WarpX::EvolveG (int lev, PatchType patch_type, amrex::Real a_dt, DtType /*a_dt_type*/)
 {
-    if (!do_divb_cleaning) return;
+    if (!do_divb_cleaning) { return; }
 
     WARPX_PROFILE("WarpX::EvolveG()");
+
+    bool const skip_lev0_coarse_patch = true;
 
     // Evolve G field in regular cells
     if (patch_type == PatchType::fine)
     {
-        m_fdtd_solver_fp[lev]->EvolveG(G_fp[lev], Bfield_fp[lev], a_dt);
+        ablastr::fields::MultiLevelVectorField const& Bfield_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level);
+        m_fdtd_solver_fp[lev]->EvolveG(
+            m_fields.get(FieldType::G_fp, lev),
+            Bfield_fp[lev], a_dt);
     }
     else // coarse patch
     {
-        m_fdtd_solver_cp[lev]->EvolveG(G_cp[lev], Bfield_cp[lev], a_dt);
+        ablastr::fields::MultiLevelVectorField const& Bfield_cp_new = m_fields.get_mr_levels_alldirs(FieldType::Bfield_cp, finest_level, skip_lev0_coarse_patch);
+        m_fdtd_solver_cp[lev]->EvolveG(
+            m_fields.get(FieldType::G_cp, lev),
+            Bfield_cp_new[lev], a_dt);
     }
 
     // TODO Evolution in PML cells will go here
 }
 
 void
-WarpX::MacroscopicEvolveE (amrex::Real a_dt)
+WarpX::MacroscopicEvolveE (amrex::Real a_dt, amrex::Real start_time)
 {
     for (int lev = 0; lev <= finest_level; ++lev ) {
-        MacroscopicEvolveE(lev, a_dt);
+        MacroscopicEvolveE(lev, a_dt, start_time);
     }
 }
 
 void
-WarpX::MacroscopicEvolveE (int lev, amrex::Real a_dt) {
+WarpX::MacroscopicEvolveE (int lev, amrex::Real a_dt, amrex::Real start_time) {
 
     WARPX_PROFILE("WarpX::MacroscopicEvolveE()");
 
@@ -1025,11 +1173,11 @@ WarpX::MacroscopicEvolveE (int lev, amrex::Real a_dt) {
         "Macroscopic EvolveE is not implemented for lev>0, yet."
     );
 
-    MacroscopicEvolveE(lev, PatchType::fine, a_dt);
+    MacroscopicEvolveE(lev, PatchType::fine, a_dt, start_time);
 }
 
 void
-WarpX::MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real a_dt) {
+WarpX::MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real start_time) {
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         patch_type == PatchType::fine,
@@ -1037,35 +1185,38 @@ WarpX::MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real a_dt) {
     );
 
     m_fdtd_solver_fp[lev]->MacroscopicEvolveE(
-        Efield_fp[lev], Bfield_fp[lev],
-        current_fp[lev], m_edge_lengths[lev],
+        m_fields.get_alldirs(FieldType::Efield_fp, lev),
+        m_fields.get_alldirs(FieldType::Bfield_fp, lev),
+        m_fields.get_alldirs(FieldType::current_fp, lev),
+        m_eb_update_E[lev],
         a_dt, m_macroscopic_properties);
 
     if (do_pml && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveEPML(
-                pml[lev]->GetE_fp(), pml[lev]->GetB_fp(),
-                pml[lev]->Getj_fp(), pml[lev]->Get_edge_lengths(),
-                pml[lev]->GetF_fp(),
+                m_fields,
+                patch_type,
+                lev,
                 pml[lev]->GetMultiSigmaBox_fp(),
                 a_dt, pml_has_particles );
         } else {
             m_fdtd_solver_cp[lev]->EvolveEPML(
-                pml[lev]->GetE_cp(), pml[lev]->GetB_cp(),
-                pml[lev]->Getj_cp(), pml[lev]->Get_edge_lengths(),
-                pml[lev]->GetF_cp(),
+                m_fields,
+                patch_type,
+                lev,
                 pml[lev]->GetMultiSigmaBox_cp(),
                 a_dt, pml_has_particles );
         }
     }
 
-    ApplyEfieldBoundary(lev, patch_type);
+    amrex::Real const new_time = start_time + a_dt;
+    ApplyEfieldBoundary(lev, patch_type, new_time);
 }
 
 void
 WarpX::DampFieldsInGuards(const int lev,
-                          const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
-                          const std::array<std::unique_ptr<amrex::MultiFab>,3>& Bfield) {
+                          const ablastr::fields::VectorField& Efield,
+                          const ablastr::fields::VectorField& Bfield) {
 
     // Loop over dimensions
     for (int dampdir = 0 ; dampdir < AMREX_SPACEDIM ; dampdir++)
@@ -1076,8 +1227,8 @@ WarpX::DampFieldsInGuards(const int lev,
         {
 
             // Only apply to damped boundaries
-            if (iside == 0 && WarpX::field_boundary_lo[dampdir] != FieldBoundaryType::Damped) continue;
-            if (iside == 1 && WarpX::field_boundary_hi[dampdir] != FieldBoundaryType::Damped) continue;
+            if (iside == 0 && WarpX::field_boundary_lo[dampdir] != FieldBoundaryType::Damped) { continue; }
+            if (iside == 1 && WarpX::field_boundary_hi[dampdir] != FieldBoundaryType::Damped) { continue; }
 
             for ( amrex::MFIter mfi(*Efield[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi )
             {
@@ -1161,7 +1312,7 @@ WarpX::DampFieldsInGuards(const int lev,
     }
 }
 
-void WarpX::DampFieldsInGuards(const int lev, std::unique_ptr<amrex::MultiFab>& mf)
+void WarpX::DampFieldsInGuards(const int lev, amrex::MultiFab* mf)
 {
     // Loop over dimensions
     for (int dampdir = 0; dampdir < AMREX_SPACEDIM; dampdir++)
@@ -1170,8 +1321,8 @@ void WarpX::DampFieldsInGuards(const int lev, std::unique_ptr<amrex::MultiFab>& 
         for (int iside = 0; iside < 2; iside++)
         {
             // Only apply to damped boundaries
-            if (iside == 0 && WarpX::field_boundary_lo[dampdir] != FieldBoundaryType::Damped) continue;
-            if (iside == 1 && WarpX::field_boundary_hi[dampdir] != FieldBoundaryType::Damped) continue;
+            if (iside == 0 && WarpX::field_boundary_lo[dampdir] != FieldBoundaryType::Damped) { continue; }
+            if (iside == 1 && WarpX::field_boundary_hi[dampdir] != FieldBoundaryType::Damped) { continue; }
 
             for (amrex::MFIter mfi(*mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
             {
@@ -1207,11 +1358,11 @@ void WarpX::DampFieldsInGuards(const int lev, std::unique_ptr<amrex::MultiFab>& 
 }
 
 #ifdef WARPX_DIM_RZ
-// This scales the current by the inverse volume and wraps around the depostion at negative radius.
+// This scales the current by the inverse volume and wraps around the deposition at negative radius.
 // It is faster to apply this on the grid than to do it particle by particle.
 // It is put here since there isn't another nice place for it.
 void
-WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, MultiFab* Jz, int lev)
+WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, MultiFab* Jz, int lev) const
 {
     const amrex::IntVect ngJ = Jx->nGrowVect();
     const std::array<Real,3>& dx = WarpX::CellSize(lev);
@@ -1220,7 +1371,7 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
     constexpr int NODE = amrex::IndexType::NODE;
 
     // See Verboncoeur JCP 174, 421-427 (2001) for the modified volume factor
-    const amrex::Real axis_volume_factor = (verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
+    const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
 
     for ( MFIter mfi(*Jx, TilingIfNotGPU()); mfi.isValid(); ++mfi )
     {
@@ -1237,11 +1388,11 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
         // Lower corner of tile box physical domain
         // Note that this is done before the tilebox.grow so that
         // these do not include the guard cells.
-        const std::array<amrex::Real, 3>& xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
-        const Real rmin  = xyzmin[0];
-        const Real rminr = xyzmin[0] + (tbr.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const Real rmint = xyzmin[0] + (tbt.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const Real rminz = xyzmin[0] + (tbz.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
+        const Real rmin  = xyzmin.x;
+        const Real rminr = xyzmin.x + (tbr.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const Real rmint = xyzmin.x + (tbt.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const Real rminz = xyzmin.x + (tbz.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
         const Dim3 lo = lbound(tilebox);
         const int irmin = lo.x;
 
@@ -1384,7 +1535,7 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
 }
 
 void
-WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev)
+WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev) const
 {
     const amrex::IntVect ngRho = Rho->nGrowVect();
     const std::array<Real,3>& dx = WarpX::CellSize(lev);
@@ -1393,7 +1544,7 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev)
     constexpr int NODE = amrex::IndexType::NODE;
 
     // See Verboncoeur JCP 174, 421-427 (2001) for the modified volume factor
-    const amrex::Real axis_volume_factor = (verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
+    const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
 
     Box tilebox;
 
@@ -1408,10 +1559,10 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev)
         // Lower corner of tile box physical domain
         // Note that this is done before the tilebox.grow so that
         // these do not include the guard cells.
-        const std::array<amrex::Real, 3>& xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
+        const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
         const Dim3 lo = lbound(tilebox);
-        const Real rmin = xyzmin[0];
-        const Real rminr = xyzmin[0] + (tb.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const Real rmin = xyzmin.x;
+        const Real rminr = xyzmin.x + (tb.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
         const int irmin = lo.x;
         const int ishift = (rminr > rmin ? 1 : 0);
 

@@ -6,8 +6,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef PLASMA_INJECTOR_H_
-#define PLASMA_INJECTOR_H_
+#ifndef WARPX_PLASMA_INJECTOR_H_
+#define WARPX_PLASMA_INJECTOR_H_
 
 #include "InjectorDensity.H"
 #include "InjectorFlux.H"
@@ -112,6 +112,8 @@ public:
     long npart;
     int do_symmetrize = 0;
     int symmetrization_order = 4;
+    bool do_focusing = false;
+    amrex::Real focal_distance;
 
     bool external_file = false; //! initialize from an openPMD file
     amrex::Real z_shift = 0.0; //! additional z offset for particle positions
@@ -128,6 +130,8 @@ public:
     // When compiled in cylindrical geometry, 0 = radial, 1 = azimuthal, 2 = z
     int flux_normal_axis;
     int flux_direction; // -1 for left, +1 for right
+
+    bool m_inject_from_eb = false; // whether to inject from the embedded boundary
 
     bool radially_weighted = true;
 
@@ -200,4 +204,4 @@ protected:
     void parseFlux (amrex::ParmParse const& pp_species);
 };
 
-#endif
+#endif //WARPX_PLASMA_INJECTOR_H_

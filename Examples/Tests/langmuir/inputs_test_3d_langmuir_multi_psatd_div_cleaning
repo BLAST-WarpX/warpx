@@ -1,0 +1,13 @@
+# base input parameters
+FILE = inputs_base_3d
+
+# test input parameters
+algo.current_deposition = direct
+algo.maxwell_solver = psatd
+diag1.intervals = 0, 38:40:1
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz part_per_cell rho divE F
+psatd.update_with_rho = 1
+warpx.abort_on_warning_threshold = medium
+warpx.cfl = 0.5773502691896258
+warpx.do_dive_cleaning = 1
+warpx.do_divb_cleaning = 1

@@ -6,6 +6,7 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "OpenPMDHelpFunction.H"
+
 #include "Utils/TextMsg.H"
 
 std::string
@@ -14,9 +15,9 @@ WarpXOpenPMDFileType ()
     std::string openPMDFileType;
 #ifdef WARPX_USE_OPENPMD
 #if openPMD_HAVE_ADIOS2==1
-    openPMDFileType = "bp";
+    openPMDFileType = "bp5";
 #elif openPMD_HAVE_ADIOS1==1
-    openPMDFileType = "bp";
+    openPMDFileType = "bp";  // bp3
 #elif openPMD_HAVE_HDF5==1
     openPMDFileType = "h5";
 #else
@@ -27,3 +28,23 @@ WarpXOpenPMDFileType ()
 #endif // WARPX_USE_OPENPMD
     return openPMDFileType;
 }
+
+#ifdef WARPX_USE_OPENPMD
+unsigned long
+num_already_flushed (openPMD::ParticleSpecies & currSpecies)
+{
+    const auto *const scalar = openPMD::RecordComponent::SCALAR;
+
+    unsigned long ParticleFlushOffset = 0;
+
+    if (currSpecies.contains("id")) {
+        if (currSpecies["id"].contains(scalar)) {
+            if (!currSpecies["id"][scalar].empty()) {
+                ParticleFlushOffset = currSpecies["id"][scalar].getExtent().at(0);
+            }
+        }
+    }
+
+    return ParticleFlushOffset;
+}
+#endif

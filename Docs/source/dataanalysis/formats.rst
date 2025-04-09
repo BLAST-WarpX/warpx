@@ -41,8 +41,9 @@ files to disk).
 .. toctree::
    :maxdepth: 1
 
-   sensei
    ascent
+   catalyst
+   sensei
 
 If you like the 3D rendering of laser wakefield acceleration
 on the WarpX documentation front page (which is

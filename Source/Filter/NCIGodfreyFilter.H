@@ -16,7 +16,7 @@
 enum class godfrey_coeff_set { Ex_Ey_Bz=0, Bx_By_Ez=1 };
 
 /**
- * \brief Class for Godrey's filter to suppress Numerical Cherenkov Instability
+ * \brief Class for Godfrey's filter to suppress Numerical Cherenkov Instability
  *
  * It derives from the base class Filter.
  * The filter stencil is initialized in method ComputeStencils. Computing the

@@ -4,8 +4,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef FILTERFUNCTORS_H
-#define FILTERFUNCTORS_H
+#ifndef WARPX_FILTERFUNCTORS_H
+#define WARPX_FILTERFUNCTORS_H
 
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/WarpXParticleContainer.H"
@@ -50,8 +50,8 @@ struct RandomFilter
         return ( (!m_is_active) || (amrex::Random(engine) < m_fraction) );
     }
 private:
-    const bool m_is_active; //! select all particles if false
-    const amrex::Real m_fraction = 1.0; //! range: [0.0:1.0] where 0 is no & 1 is all particles
+    bool m_is_active; //! select all particles if false
+    amrex::Real m_fraction = 1.0; //! range: [0.0:1.0] where 0 is no & 1 is all particles
 };
 
 /**
@@ -77,8 +77,8 @@ struct UniformFilter
         return ( (!m_is_active) || ( p.id()%m_stride == 0 ) );
     }
 private:
-    const bool m_is_active; //! select all particles if false
-    const int m_stride = 0; //! selection of every n-th particle
+    bool m_is_active; //! select all particles if false
+    int m_stride = 0; //! selection of every n-th particle
 };
 
 /**
@@ -134,10 +134,10 @@ struct ParserFilter
     }
 private:
     /** Whether this diagnostics is activated. Select all particles if false */
-    const bool m_is_active;
+    bool m_is_active;
 public:
     /** Parser function with 7 input variables, t,x,y,z,ux,uy,uz */
-    amrex::ParserExecutor<7> const m_function_partparser;
+    amrex::ParserExecutor<7> m_function_partparser;
     /** Mass of particle species */
     amrex::ParticleReal m_mass;
     /** Store physical time on the coarsest level. */
@@ -157,23 +157,23 @@ struct GeometryFilter
     GeometryFilter(bool a_is_active, amrex::RealBox a_domain)
         : m_is_active(a_is_active), m_domain(a_domain) {}
     /**
-     * \brief return 1 if the partcile is within the region described by the RealBox
+     * \brief return 1 if the particle is within the region described by the RealBox
      * \param p one particle
      * \return whether or not the particle is inside the region defined by m_domain
      */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     bool operator () (const SuperParticleType& p, const amrex::RandomEngine&) const noexcept
     {
-        if ( !m_is_active ) return true;
-        return ! (AMREX_D_TERM( (p.pos(0) < m_domain.lo(0)) || (p.pos(0) > m_domain.hi(0) ),
-                            ||  (p.pos(1) < m_domain.lo(1)) || (p.pos(1) > m_domain.hi(1) ),
-                            ||  (p.pos(2) < m_domain.lo(2)) || (p.pos(2) > m_domain.hi(2) )));
+        if ( !m_is_active ) { return true; }
+        return AMREX_D_TERM(    (p.pos(0) >= m_domain.lo(0)) && (p.pos(0) <= m_domain.hi(0) ),
+                            &&  (p.pos(1) >= m_domain.lo(1)) && (p.pos(1) <= m_domain.hi(1) ),
+                            &&  (p.pos(2) >= m_domain.lo(2)) && (p.pos(2) <= m_domain.hi(2) ));
     }
 private:
     /** Whether this diagnostics is activated. Select all particles if false */
-    const bool m_is_active;
+    bool m_is_active;
     /** Physical extent of the axis-aligned region used for particle check */
-    const amrex::RealBox m_domain;
+    amrex::RealBox m_domain;
 };
 
-#endif // FILTERFUNCTORS_H
+#endif // WARPX_FILTERFUNCTORS_H

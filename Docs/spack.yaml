@@ -19,10 +19,13 @@ spack:
   - doxygen
   - graphviz
   - python
-  - py-sphinx
+  - py-openpmd-viewer
   - py-breathe
-  - py-recommonmark
+  - py-pybtex
   - py-pygments
+  - py-recommonmark
+  - py-sphinx
   - py-sphinx-copybutton
   - py-sphinx-design
   - py-sphinx-rtd-theme
+  - py-yt

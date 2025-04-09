@@ -4,7 +4,7 @@ export WORK=/afs/cern.ch/work/${USER:0:1}/$USER/
 # clone warpx
 if [ ! -d "$WORK/warpx" ]
 then
-    git clone https://github.com/ECP-WarpX/WarpX.git $WORK/warpx
+    git clone https://github.com/BLAST-WarpX/warpx.git $WORK/warpx
 fi
 
 # activate the compiler
@@ -22,7 +22,7 @@ then
     # create and activate the spack environment
     export SPACK_STACK_USE_PYTHON=1
     export SPACK_STACK_USE_CUDA=1
-    spack env create warpx-lxplus-cuda-py $WORK/WarpX/Tools/machines/lxplus-cern/spack.yaml
+    spack env create warpx-lxplus-cuda-py $WORK/warpx/Tools/machines/lxplus-cern/spack.yaml
     spack env activate warpx-lxplus-cuda-py
     spack install
 else

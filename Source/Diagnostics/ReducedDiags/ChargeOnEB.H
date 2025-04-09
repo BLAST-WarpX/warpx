@@ -33,7 +33,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    ChargeOnEB (std::string rd_name);
+    ChargeOnEB (const std::string& rd_name);
 
     /**
      * This function computes the charge at the surface of the EB:

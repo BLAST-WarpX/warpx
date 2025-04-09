@@ -17,7 +17,7 @@ Abbreviations
 * **AMR:** adaptive mesh-refinement
 * **BC:** boundary condition (of a simulation)
 * **BCK:** `Benkler-Chavannes-Kuster <https://ieeexplore.ieee.org/document/1638381>`__ method, a stabilization technique for small cells in the electromagnetic solver
-* **BTD:** backtransformed diagnosics, a method to collect data for analysis from a *boosted frame* simulation
+* **BTD:** backtransformed diagnostics, a method to collect data for analysis from a *boosted frame* simulation
 * **CEX:** charge-exchange collisions
 * **CFL:** the Courant-Friedrichs-Lewy condition, a numerical parameter for the numerical convergence of PDE solvers
 * **CI:** continuous integration, automated tests that we perform before a proposed code-change is accepted; see PR
