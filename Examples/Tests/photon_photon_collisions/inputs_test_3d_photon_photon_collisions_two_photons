@@ -60,9 +60,9 @@ collisions.collision_names = lbw # linear Breit-Wheeler
 lbw.species = photonA photonB
 lbw.product_species = electron positron
 lbw.type = photonphoton
-lbw.fusion_multiplier = 1.
-lbw.fusion_probability_threshold = 0.5
-lbw.fusion_probability_target_values = 0.02
+lbw.event_multiplier = 1.
+lbw.probability_threshold = 0.5
+lbw.probability_target_value = 0.02
 
 # Full diagnostics
 diagnostics.diags_names = diag1
