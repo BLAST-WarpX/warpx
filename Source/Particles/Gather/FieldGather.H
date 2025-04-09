@@ -33,9 +33,9 @@
 template <int depos_order_perp, int depos_order_para>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void doDirectGatherVectorField (
-                     [[maybe_unused]] const double x_bar,
-                     [[maybe_unused]] const double y_bar,
-                     const double z_bar,
+                     [[maybe_unused]] const amrex::ParticleReal xp,
+                     [[maybe_unused]] const amrex::ParticleReal yp,
+                     const amrex::ParticleReal zp,
                      amrex::ParticleReal& Fxp,
                      amrex::ParticleReal& Fyp,
                      amrex::ParticleReal& Fzp,
@@ -45,6 +45,8 @@ void doDirectGatherVectorField (
                      const amrex::IndexType Fx_type,
                      const amrex::IndexType Fy_type,
                      const amrex::IndexType Fz_type,
+                     const amrex::XDim3 & dinv,
+                     const amrex::XDim3 & xyzmin,
                      const amrex::Dim3& lo,
                      [[maybe_unused]] const int n_rz_azimuthal_modes)
 {
@@ -52,6 +54,18 @@ void doDirectGatherVectorField (
     constexpr int zdir = WARPX_ZINDEX;
     constexpr int NODE = amrex::IndexType::NODE;
     constexpr int CELL = amrex::IndexType::CELL;
+
+    // Compute particle position in grid units
+#if defined(WARPX_DIM_RZ)
+    const double rp = std::sqrt(xp*xp + yp*yp);
+    const double x_bar = (rp - xyzmin.x)*dinv.x;
+#elif !defined(WARPX_DIM_1D_Z)
+    const double x_bar = (xp - xyzmin.x)*dinv.x;
+#endif
+#if defined(WARPX_DIM_3D)
+    const double y_bar = (yp - xyzmin.y)*dinv.y;
+#endif
+    const double z_bar = (zp - xyzmin.z)*dinv.z;
 
     const Compute_shape_factor< depos_order_perp > shape_factor_perp;
     const Compute_shape_factor< depos_order_para > shape_factor_para;
@@ -1697,27 +1711,17 @@ void doGatherPicnicShapeN (
 #endif
 
     // Gather magnetic field
-    // The average is taken using the possibly cropped value
-#if !defined(WARPX_DIM_1D_Z)
-    double const x_bar = 0.5*(x_old + x_new);
-#else
-    double const x_bar = 0.;
-#endif
-#if defined(WARPX_DIM_3D)
-    double const y_bar = 0.5*(y_old + y_new);
-#else
-    double const y_bar = 0.;
-#endif
-    double const z_bar = 0.5*(z_old + z_new);
-
+    // This passes in the uncropped values of the half step position.
+    // A future fix could pass in the average of the cropped values so
+    // that the position would be within the domain.
     const int depos_order_perp = 1;
     const int depos_order_para = 1;
     doDirectGatherVectorField<depos_order_perp,depos_order_para>(
-                                    x_bar, y_bar, z_bar,
+                                    xp_nph, yp_nph, zp_nph,
                                     Bxp, Byp, Bzp,
                                     Bx_arr, By_arr, Bz_arr,
                                     Bx_type, By_type, Bz_type,
-                                    lo, n_rz_azimuthal_modes );
+                                    dinv, xyzmin, lo, n_rz_azimuthal_modes );
 
 }
 
