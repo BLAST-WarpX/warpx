@@ -1028,7 +1028,7 @@ Particle initialization
 
       If ``do_gaussian_beam_rotation = 1`` then the user needs to specify:
 
-          * ``<species_name>.rotation_axis``: (list of 3 `doubles`) axis around which the rotation takes place
+          * ``<species_name>.gaussian_beam_rotation_axis``: (list of 3 `doubles`) axis around which the rotation takes place
 
           * ``<species_name>.gaussian_beam_rotation_angle``: (`double`) angle of rotation around the specified axis, in radians.
 
