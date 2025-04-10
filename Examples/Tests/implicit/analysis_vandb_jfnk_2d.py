@@ -14,13 +14,7 @@ import sys
 
 import numpy as np
 import yt
-from scipy.constants import e
-from scipy.constants import epsilon_0 as epsilon_0_old
-
-print(f"epsilon_0_old = {epsilon_0_old}")
-
-# Use the same value of epsilon_0 as in Source/ablastr/constant.H
-epsilon_0 = 8.8541878128e-12
+from scipy.constants import e, epsilon_0
 
 field_energy = np.loadtxt("diags/reducedfiles/field_energy.txt", skiprows=1)
 particle_energy = np.loadtxt("diags/reducedfiles/particle_energy.txt", skiprows=1)
