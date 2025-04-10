@@ -953,7 +953,7 @@ Particle initialization
 
       * ``<species_name>.do_rotation`` (`bool`, optional) the beam is rotated around its centroid.
 
-      If ``do_rotation = 1`` then the user needs to specify:
+      If ``do_gaussian_beam_rotation = 1`` then the user needs to specify:
 
           * ``<species_name>.rotation_axis``: (list of 3 `doubles`) axis around which the rotation takes place
 
