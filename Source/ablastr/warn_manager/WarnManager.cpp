@@ -98,7 +98,8 @@ void WarnManager::RecordWarning(
             msg_priority < abort_priority,
             "A warning with priority '"
             + abl_msg_logger::PriorityToString(msg_priority)
-            + "' has been raised."
+            + "' has been raised"
+            + ((m_always_warn_immediately) ? "." : ("[" + topic + "] " + text))
         );
     }
 }
