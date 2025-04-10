@@ -951,7 +951,7 @@ Particle initialization
 
           \sigma_{x,y}(z) &= \sigma^*_{x,y} \sqrt{1 + \left( \frac{z - z^*}{\beta^*_{x,y}} \right)^2}
 
-      * ``<species_name>.do_rotation`` (`bool`, optional) the beam is rotated around its centroid.
+      * ``<species_name>.do_gaussian_beam_rotation`` (`bool`, optional) the beam is rotated around its centroid.
 
       If ``do_gaussian_beam_rotation = 1`` then the user needs to specify:
 
