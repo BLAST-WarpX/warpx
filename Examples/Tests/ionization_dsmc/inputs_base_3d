@@ -104,6 +104,8 @@ counts.intervals = 5
 counts.path = diags/
 counts.type = ParticleNumber
 
+warpx.synchronize_velocity_for_diagnostics = 1
+
 # Diagnostics
 diag1.intervals = 250
 diag1.diag_type = Full
