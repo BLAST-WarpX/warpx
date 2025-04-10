@@ -881,6 +881,12 @@ MultiParticleContainer::mapSpeciesProduct ()
                 pc->m_qed_quantum_sync_phot_product_name);
             pc->m_qed_quantum_sync_phot_product = i_product_phot;
         }
+
+        if(pc->has_virtual_photons()){
+            const int i_vphot = getSpeciesID(
+                pc->m_qed_virtual_photon_species_name);
+            pc->m_qed_virtual_photon_species = i_vphot;
+        }
 #endif
 
     }
@@ -1785,6 +1791,12 @@ void MultiParticleContainer::CheckQEDProductSpecies()
                 allcontainers[pc->m_qed_quantum_sync_phot_product]->
                     AmIA<PhysicalSpecies::photon>(),
                 "ERROR: Quantum Synchrotron product species is of wrong type");
+        }
+        if(pc->has_virtual_photons()){
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                allcontainers[pc->m_qed_virtual_photon_species]->
+                    AmIA<PhysicalSpecies::photon>(),
+                "ERROR: virtual photons species has to be a...photon species!");
         }
     }
 

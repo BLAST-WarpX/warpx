@@ -88,7 +88,9 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
  */
 void CollisionHandler::doCollisions ( amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
 {
+#ifdef WARPX_QED
     collision::binarycollision::virtualphotons::GenerateVirtualPhotons(mypc);
+#endif
 
     if (m_use_global_debye_length) {
         mypc->GenerateGlobalDebyeLength();
