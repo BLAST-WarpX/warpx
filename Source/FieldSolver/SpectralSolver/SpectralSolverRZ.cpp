@@ -40,7 +40,7 @@ SpectralSolverRZ::SpectralSolverRZ (const int lev,
                                     const RhoInTime rho_in_time,
                                     const bool dive_cleaning,
                                     const bool divb_cleaning)
-    : k_space(realspace_ba, dm, dx)
+    : m_dt(dt), k_space(realspace_ba, dm, dx)
 {
     // Initialize all structures using the same distribution mapping dm
 
@@ -142,8 +142,10 @@ SpectralSolverRZ::pushSpectralFields (const bool doing_pml) {
   */
 void
 SpectralSolverRZ::ComputeSpectralDivE (const int lev,
-                                       const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
-                                       amrex::MultiFab& divE) {
+                                       ablastr::fields::VectorField const & Efield,
+                                       amrex::MultiFab& divE
+)
+{
     algorithm->ComputeSpectralDivE(lev, field_data, Efield, divE);
 }
 

@@ -11,7 +11,7 @@
  */
 #include "MultiParticleContainer.H"
 
-#include "FieldSolver/Fields.H"
+#include "Fields.H"
 #include "Particles/ElementaryProcess/Ionization.H"
 #ifdef WARPX_QED
 #   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
@@ -21,7 +21,6 @@
 #   include "Particles/ElementaryProcess/QEDPhotonEmission.H"
 #endif
 #include "Particles/LaserParticleContainer.H"
-#include "Particles/NamedComponentParticleContainer.H"
 #include "Particles/ParticleCreation/FilterCopyTransform.H"
 #ifdef WARPX_QED
 #   include "Particles/ParticleCreation/FilterCreateTransformFromFAB.H"
@@ -44,6 +43,7 @@
 
 #include "WarpX.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -80,14 +80,14 @@
 #include <vector>
 
 using namespace amrex;
-using namespace warpx::fields;
+using warpx::fields::FieldType;
 
 namespace
 {
     /** A little collection to transport six Array4 that point to the EM fields */
     struct MyFieldList
     {
-        Array4< amrex::Real const > const Ex, Ey, Ez, Bx, By, Bz;
+        Array4< amrex::Real const > Ex, Ey, Ez, Bx, By, Bz;
     };
 }
 
@@ -222,7 +222,7 @@ MultiParticleContainer::ReadParameters ()
                 pp_particles, "repeated_plasma_lens_lengths",
                 h_repeated_plasma_lens_lengths);
 
-            const int n_lenses = static_cast<int>(h_repeated_plasma_lens_starts.size());
+            const auto n_lenses = static_cast<int>(h_repeated_plasma_lens_starts.size());
             d_repeated_plasma_lens_starts.resize(n_lenses);
             d_repeated_plasma_lens_lengths.resize(n_lenses);
             amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
@@ -457,30 +457,26 @@ MultiParticleContainer::InitMultiPhysicsModules ()
 }
 
 void
-MultiParticleContainer::Evolve (int lev,
-                                const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
-                                const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
-                                MultiFab& jx, MultiFab& jy, MultiFab& jz,
-                                MultiFab* cjx,  MultiFab* cjy, MultiFab* cjz,
-                                MultiFab* rho, MultiFab* crho,
-                                const MultiFab* cEx, const MultiFab* cEy, const MultiFab* cEz,
-                                const MultiFab* cBx, const MultiFab* cBy, const MultiFab* cBz,
+MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
+                                int lev,
+                                std::string const& current_fp_string,
                                 Real t, Real dt, DtType a_dt_type, bool skip_deposition,
                                 PushType push_type)
 {
     if (! skip_deposition) {
-        jx.setVal(0.0);
-        jy.setVal(0.0);
-        jz.setVal(0.0);
-        if (cjx) { cjx->setVal(0.0); }
-        if (cjy) { cjy->setVal(0.0); }
-        if (cjz) { cjz->setVal(0.0); }
-        if (rho) { rho->setVal(0.0); }
-        if (crho) { crho->setVal(0.0); }
+        using ablastr::fields::Direction;
+
+        fields.get(current_fp_string, Direction{0}, lev)->setVal(0.0);
+        fields.get(current_fp_string, Direction{1}, lev)->setVal(0.0);
+        fields.get(current_fp_string, Direction{2}, lev)->setVal(0.0);
+        if (fields.has(FieldType::current_buf, Direction{0}, lev)) { fields.get(FieldType::current_buf, Direction{0}, lev)->setVal(0.0); }
+        if (fields.has(FieldType::current_buf, Direction{1}, lev)) { fields.get(FieldType::current_buf, Direction{1}, lev)->setVal(0.0); }
+        if (fields.has(FieldType::current_buf, Direction{2}, lev)) { fields.get(FieldType::current_buf, Direction{2}, lev)->setVal(0.0); }
+        if (fields.has(FieldType::rho_fp, lev)) { fields.get(FieldType::rho_fp, lev)->setVal(0.0); }
+        if (fields.has(FieldType::rho_buf, lev)) { fields.get(FieldType::rho_buf, lev)->setVal(0.0); }
     }
     for (auto& pc : allcontainers) {
-        pc->Evolve(lev, Ex, Ey, Ez, Bx, By, Bz, jx, jy, jz, cjx, cjy, cjz,
-                   rho, crho, cEx, cEy, cEz, cBx, cBy, cBz, t, dt, a_dt_type, skip_deposition, push_type);
+        pc->Evolve(fields, lev, current_fp_string, t, dt, a_dt_type, skip_deposition, push_type);
     }
 }
 
@@ -529,11 +525,11 @@ MultiParticleContainer::GetZeroChargeDensity (const int lev)
 
 void
 MultiParticleContainer::DepositCurrent (
-    amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > >& J,
+    ablastr::fields::MultiLevelVectorField const & J,
     const amrex::Real dt, const amrex::Real relative_time)
 {
     // Reset the J arrays
-    for (auto& J_lev : J)
+    for (const auto& J_lev : J)
     {
         J_lev[0]->setVal(0.0_rt);
         J_lev[1]->setVal(0.0_rt);
@@ -550,18 +546,18 @@ MultiParticleContainer::DepositCurrent (
     for (int lev = 0; lev < J.size(); ++lev)
     {
         WarpX::GetInstance().ApplyInverseVolumeScalingToCurrentDensity(
-            J[lev][0].get(), J[lev][1].get(), J[lev][2].get(), lev);
+            J[lev][0], J[lev][1], J[lev][2], lev);
     }
 #endif
 }
 
 void
 MultiParticleContainer::DepositCharge (
-    amrex::Vector<std::unique_ptr<amrex::MultiFab> >& rho,
+    const ablastr::fields::MultiLevelScalarField& rho,
     const amrex::Real relative_time)
 {
     // Reset the rho array
-    for (auto& rho_lev : rho)
+    for (const auto& rho_lev : rho)
     {
         rho_lev->setVal(0.0_rt);
     }
@@ -587,7 +583,7 @@ MultiParticleContainer::DepositCharge (
 #ifdef WARPX_DIM_RZ
     for (int lev = 0; lev < rho.size(); ++lev)
     {
-        WarpX::GetInstance().ApplyInverseVolumeScalingToChargeDensity(rho[lev].get(), lev);
+        WarpX::GetInstance().ApplyInverseVolumeScalingToChargeDensity(rho[lev], lev);
     }
 #endif
 }
@@ -615,11 +611,92 @@ MultiParticleContainer::GetChargeDensity (int lev, bool local)
 }
 
 void
-MultiParticleContainer::SortParticlesByBin (amrex::IntVect bin_size)
+MultiParticleContainer::GenerateGlobalDebyeLength ()
+{
+    WarpX & warpx = WarpX::GetInstance();
+
+    if (allcontainers.size() == 0) { return; }
+
+    // Is there a nicer way to get the number of levels?
+    // This grabs it from the first species.
+    int const finest_level = allcontainers[0]->finestLevel();
+
+    for (int lev = 0 ; lev <= finest_level ; lev++) {
+
+        if (!warpx.m_fields.has(FieldType::global_debye_length, lev)) {
+            amrex::BoxArray const & ba = warpx.boxArray(lev);
+            amrex::DistributionMapping const & dmap = warpx.DistributionMap(lev);
+            int const ncomps = 1;
+            amrex::IntVect ng = amrex::IntVect::TheZeroVector();
+            bool const remake = true;
+            bool const redistribute_on_remake = false;
+            warpx.m_fields.alloc_init(FieldType::global_debye_length, lev, ba, dmap, ncomps, ng, 0.,
+                                      remake, redistribute_on_remake);
+        }
+
+        amrex::MultiFab & global_debye_length = *warpx.m_fields.get(FieldType::global_debye_length, lev);
+        global_debye_length.setVal(amrex::Real(0.0));
+
+        for (auto& pc : allcontainers) {
+
+            if (pc->getMass() == 0. || pc->getCharge() == 0.) {
+                continue;
+            }
+
+            std::unique_ptr<amrex::MultiFab> debye_length = pc->GetDebyeLength(lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+            for (amrex::MFIter mfi(global_debye_length, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+            {
+                amrex::Box box = mfi.tilebox();
+
+                amrex::Array4<amrex::Real> const& debye_array = debye_length->array(mfi);
+                amrex::Array4<amrex::Real> const& global_debye_array = global_debye_length.array(mfi);
+
+                amrex::ParallelFor(box,
+                    [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                        amrex::Real const LDe = debye_array(i,j,k);
+                        if (LDe > 0.) {
+                            global_debye_array(i,j,k) += 1.0_rt/(LDe*LDe);
+                        }
+                    });
+            }
+
+        }
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(global_debye_length, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+        {
+            amrex::Box box = mfi.tilebox();
+
+            amrex::Array4<amrex::Real> const& global_debye_array = global_debye_length.array(mfi);
+
+            amrex::ParallelFor(box,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    amrex::Real const invLDe_sq = global_debye_array(i,j,k);
+                    if (invLDe_sq > 0.) {
+                        global_debye_array(i,j,k) = std::sqrt(1.0_rt/invLDe_sq);
+                    }
+                });
+        }
+
+    }
+
+}
+
+void
+MultiParticleContainer::SortParticlesByBin (
+    const amrex::IntVect& bin_size,
+    const bool sort_particles_for_deposition,
+    const amrex::IntVect& sort_idx_type)
 {
     for (auto& pc : allcontainers) {
-        if (WarpX::sort_particles_for_deposition) {
-            pc->SortParticlesForDeposition(WarpX::sort_idx_type);
+        if (sort_particles_for_deposition) {
+            pc->SortParticlesForDeposition(sort_idx_type);
         } else {
             pc->SortParticlesByBin(bin_size);
         }
@@ -859,7 +936,24 @@ MultiParticleContainer::SetDoBackTransformedParticles (const std::string& specie
         if (species_names_list[i] == species_name) {
            found = true;
            auto& pc = allcontainers[i];
+           const bool old_do_btd = pc->GetDoBackTransformedParticles();
            pc->SetDoBackTransformedParticles(do_back_transformed_particles);
+
+           if ((!old_do_btd) && do_back_transformed_particles) {
+               // Set comm to false so that the attributes are not communicated
+               // nor written to the checkpoint files
+               int const comm = 0;
+#if (AMREX_SPACEDIM >= 2)
+               pc->AddRealComp("x_n_btd", comm);
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+               pc->AddRealComp("y_n_btd", comm);
+#endif
+               pc->AddRealComp("z_n_btd", comm);
+               pc->AddRealComp("ux_n_btd", comm);
+               pc->AddRealComp("uy_n_btd", comm);
+               pc->AddRealComp("uz_n_btd", comm);
+           }
         }
     }
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -941,14 +1035,15 @@ MultiParticleContainer::doCollisions ( Real cur_time, amrex::Real dt )
     collisionhandler->doCollisions(cur_time, dt, this);
 }
 
-void MultiParticleContainer::doResampling (const int timestep, const bool verbose)
+void MultiParticleContainer::doResampling (
+    const amrex::Vector<amrex::Geometry>& geom, const int timestep, const bool verbose)
 {
     for (auto& pc : allcontainers)
     {
         // do_resampling can only be true for PhysicalParticleContainers
         if (!pc->do_resampling){ continue; }
 
-        pc->resample(timestep, verbose);
+        pc->resample(geom, timestep, verbose);
     }
 }
 
@@ -963,7 +1058,8 @@ void MultiParticleContainer::CheckIonizationProductSpecies()
     }
 }
 
-void MultiParticleContainer::ScrapeParticlesAtEB (const amrex::Vector<const amrex::MultiFab*>& distance_to_eb)
+void MultiParticleContainer::ScrapeParticlesAtEB (
+    ablastr::fields::MultiLevelScalarField const& distance_to_eb)
 {
     for (auto& pc : allcontainers) {
         scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::Absorb());
@@ -1358,12 +1454,13 @@ MultiParticleContainer::doQEDSchwinger ()
     pc_product_ele->defineAllParticleTiles();
     pc_product_pos->defineAllParticleTiles();
 
-    const MultiFab & Ex = warpx.getField(FieldType::Efield_aux, level_0,0);
-    const MultiFab & Ey = warpx.getField(FieldType::Efield_aux, level_0,1);
-    const MultiFab & Ez = warpx.getField(FieldType::Efield_aux, level_0,2);
-    const MultiFab & Bx = warpx.getField(FieldType::Bfield_aux, level_0,0);
-    const MultiFab & By = warpx.getField(FieldType::Bfield_aux, level_0,1);
-    const MultiFab & Bz = warpx.getField(FieldType::Bfield_aux, level_0,2);
+    using ablastr::fields::Direction;
+    const MultiFab & Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, level_0);
+    const MultiFab & Ey = *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, level_0);
+    const MultiFab & Ez = *warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, level_0);
+    const MultiFab & Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, level_0);
+    const MultiFab & By = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, level_0);
+    const MultiFab & Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, level_0);
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -1623,7 +1720,7 @@ void MultiParticleContainer::doQedQuantumSync (int lev,
 
             auto Transform = PhotonEmissionTransformFunc(
                   m_shr_p_qs_engine->build_optical_depth_functor(),
-                  pc_source->particle_runtime_comps["opticalDepthQSR"],
+                  pc_source->GetRealCompIndex("opticalDepthQSR") - pc_source->NArrayReal,
                   m_shr_p_qs_engine->build_phot_em_functor(),
                   pti, lev, Ex.nGrowVect(),
                   Ex[pti], Ey[pti], Ez[pti],

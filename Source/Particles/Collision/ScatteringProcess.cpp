@@ -87,6 +87,8 @@ ScatteringProcess::parseProcessType(const std::string& scattering_process)
         return ScatteringProcessType::IONIZATION;
     } else if (scattering_process.find("excitation") != std::string::npos) {
         return ScatteringProcessType::EXCITATION;
+    } else if (scattering_process.find("forward") != std::string::npos) {
+        return ScatteringProcessType::FORWARD;
     } else {
         return ScatteringProcessType::INVALID;
     }

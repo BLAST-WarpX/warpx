@@ -87,7 +87,7 @@ Visualize
    :alt: Particle densities for electrons (top), protons (middle), and electrons again in logarithmic scale (bottom).
    :width: 80%
 
-    Particle densities for electrons (top), protons (middle), and electrons again in logarithmic scale (bottom).
+   Particle densities for electrons (top), protons (middle), and electrons again in logarithmic scale (bottom).
 
 Particle density output illustrates the evolution of the target in time and space.
 Logarithmic scales can help to identify where the target becomes transparent for the laser pulse (bottom panel in :numref:`fig-tnsa-densities` ).

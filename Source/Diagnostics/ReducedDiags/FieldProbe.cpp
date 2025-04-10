@@ -7,7 +7,7 @@
 
 #include "FieldProbe.H"
 #include "FieldProbeParticleContainer.H"
-#include "FieldSolver/Fields.H"
+#include "Fields.H"
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/Pusher/UpdatePosition.H"
@@ -17,6 +17,7 @@
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX_Array.H>
@@ -45,7 +46,7 @@
 #include <vector>
 
 using namespace amrex;
-using namespace warpx::fields;
+using warpx::fields::FieldType;
 
 // constructor
 
@@ -381,6 +382,8 @@ void FieldProbe::ComputeDiags (int step)
     // get number of mesh-refinement levels
     const auto nLevel = warpx.finestLevel() + 1;
 
+    using ablastr::fields::Direction;
+
     // loop over refinement levels
     for (int lev = 0; lev < nLevel; ++lev)
     {
@@ -398,12 +401,12 @@ void FieldProbe::ComputeDiags (int step)
         }
 
         // get MultiFab data at lev
-        const amrex::MultiFab &Ex = warpx.getField(FieldType::Efield_aux, lev, 0);
-        const amrex::MultiFab &Ey = warpx.getField(FieldType::Efield_aux, lev, 1);
-        const amrex::MultiFab &Ez = warpx.getField(FieldType::Efield_aux, lev, 2);
-        const amrex::MultiFab &Bx = warpx.getField(FieldType::Bfield_aux, lev, 0);
-        const amrex::MultiFab &By = warpx.getField(FieldType::Bfield_aux, lev, 1);
-        const amrex::MultiFab &Bz = warpx.getField(FieldType::Bfield_aux, lev, 2);
+        const amrex::MultiFab &Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
+        const amrex::MultiFab &Ey = *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, lev);
+        const amrex::MultiFab &Ez = *warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, lev);
+        const amrex::MultiFab &Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, lev);
+        const amrex::MultiFab &By = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, lev);
+        const amrex::MultiFab &Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, lev);
 
         /*
          * Prepare interpolation of field components to probe_position

@@ -203,6 +203,12 @@ qed_bw.chi_min = 1.e-2
 #qed_bw.tab_pair_frac_how_many=512
 #qed_bw.save_table_in=my_bw_table.txt
 
+# if you wish to use existing tables:
+#qed_qs.lookup_table_mode=load
+#qed_qs.load_table_from = /path/to/my_qs_table.txt
+#qed_bw.lookup_table_mode=load
+#qed_bw.load_table_from = /path/to/my_bw_table.txt
+
 warpx.do_qed_schwinger = 0.
 
 #################################
@@ -211,7 +217,7 @@ warpx.do_qed_schwinger = 0.
 # FULL
 diagnostics.diags_names = diag1
 
-diag1.intervals = 0
+diag1.intervals = 15
 diag1.diag_type = Full
 diag1.write_species = 1
 diag1.fields_to_plot = Ex Ey Ez Bx By Bz rho_beam1 rho_beam2 rho_ele1 rho_pos1 rho_ele2 rho_pos2

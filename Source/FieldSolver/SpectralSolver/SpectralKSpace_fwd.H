@@ -8,7 +8,7 @@
 #ifndef WARPX_SPECTRALKSPACE_FWD_H
 #define WARPX_SPECTRALKSPACE_FWD_H
 
-struct ShiftType;
+enum class ShiftType;
 
 class SpectralKSpace;
 

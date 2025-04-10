@@ -1,4 +1,4 @@
-/* Copyright 2024 Justin Angus
+/* Copyright 2024 Justin Angus, Debojyoti Ghosh
  *
  * This file is part of WarpX.
  *
@@ -9,9 +9,11 @@
 
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "NonlinearSolvers/NonlinearSolverLibrary.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 
 #include <AMReX_Array.H>
 #include <AMReX_REAL.H>
+#include <AMReX_LO_BCTYPES.H>
 
 /**
  * \brief Base class for implicit time solvers. The base functions are those
@@ -55,12 +57,20 @@ public:
         a_particle_tol = m_particle_tolerance;
     }
 
+    void CreateParticleAttributes () const;
+
     /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
      */
     virtual void OneStep ( amrex::Real  a_time,
                            amrex::Real  a_dt,
                            int          a_step ) = 0;
+
+
+    /**
+     * \brief Return pointer to MultiFab array for mass matrix
+     */
+    [[nodiscard]] virtual const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetSigmaCoeff() const { return nullptr; }
 
     //
     // the following routines are called by the linear and nonlinear solvers
@@ -81,9 +91,18 @@ public:
     virtual void ComputeRHS ( WarpXSolverVec&  a_RHS,
                         const WarpXSolverVec&  a_E,
                               amrex::Real      a_time,
-                              amrex::Real      a_dt,
                               int              a_nl_iter,
                               bool             a_from_jacobian ) = 0;
+
+    [[nodiscard]] int numAMRLevels () const { return m_num_amr_levels; }
+
+    [[nodiscard]] const amrex::Geometry& GetGeometry (int) const;
+    [[nodiscard]] const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& GetFieldBoundaryLo () const;
+    [[nodiscard]] const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& GetFieldBoundaryHi () const;
+    [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> GetLinOpBCLo () const;
+    [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> GetLinOpBCHi () const;
+
+    [[nodiscard]] amrex::Real  GetTheta () const { return m_theta; }
 
 protected:
 
@@ -93,6 +112,21 @@ protected:
     WarpX* m_WarpX;
 
     bool m_is_defined = false;
+
+    /**
+     * \brief Number of AMR levels
+     */
+    int m_num_amr_levels = 1;
+
+    /**
+     * \brief Time step
+     */
+    mutable amrex::Real m_dt = 0.0;
+
+    /**
+     * \brief Time-biasing parameter for fields used on RHS to advance system.
+     */
+    amrex::Real m_theta = 0.5;
 
     /**
      * \brief Nonlinear solver type and object
@@ -139,6 +173,11 @@ protected:
         }
 
     }
+
+    /**
+     * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType
+     */
+    [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> convertFieldBCToLinOpBC ( const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& ) const;
 
 };
 

@@ -5,16 +5,12 @@
 #
 # License: BSD-3-Clause-LBNL
 
-import os
 import re
 import sys
 
-import yt
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
 import numpy as np
 import scipy.constants as scc
+import yt
 
 ## This script performs various checks for the fusion module. The simulation
 ## that we check is made of 2 different tests, each with different reactant and product species.
@@ -86,7 +82,7 @@ mass = {
     "helium4": 4.00260325413 * scc.m_u,
     "neutron": 1.0013784193052508 * scc.m_p,
 }
-m_reduced = np.product([mass[s] for s in reactant_species]) / np.sum(
+m_reduced = np.prod([mass[s] for s in reactant_species]) / np.sum(
     [mass[s] for s in reactant_species]
 )
 
@@ -554,9 +550,6 @@ def main():
     rho_start = field_data_start["rho"].to_ndarray()
     rho_end = field_data_end["rho"].to_ndarray()
     check_charge_conservation(rho_start, rho_end)
-
-    test_name = os.path.split(os.getcwd())[1]
-    checksumAPI.evaluate_checksum(test_name, filename_end)
 
 
 if __name__ == "__main__":

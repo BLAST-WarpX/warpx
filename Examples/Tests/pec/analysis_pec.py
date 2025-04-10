@@ -11,8 +11,6 @@
 # The electric field (Ey) is a standing wave due to the PEC boundary condition,
 # and as a result, the minimum and maximum value after reflection would be two times the value at initialization due to constructive interference.
 # Additionally, the value of Ey at the boundary must be equal to zero.
-import os
-import re
 import sys
 
 import matplotlib
@@ -24,9 +22,6 @@ import yt
 yt.funcs.mylog.setLevel(50)
 
 import numpy as np
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
 
 # this will be the name of the plot file
 fn = sys.argv[1]
@@ -90,10 +85,3 @@ print("tolerance_rel: " + str(tolerance_rel))
 
 assert max_Ey_error_rel < tolerance_rel
 assert min_Ey_error_rel < tolerance_rel
-
-test_name = os.path.split(os.getcwd())[1]
-
-if re.search("single_precision", fn):
-    checksumAPI.evaluate_checksum(test_name, fn, rtol=1.0e-3)
-else:
-    checksumAPI.evaluate_checksum(test_name, fn)

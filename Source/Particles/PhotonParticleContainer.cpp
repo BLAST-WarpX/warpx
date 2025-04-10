@@ -122,12 +122,15 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
     const bool local_has_breit_wheeler = has_breit_wheeler();
     if (local_has_breit_wheeler) {
         evolve_opt = m_shr_p_bw_engine->build_evolve_functor();
-        p_optical_depth_BW = pti.GetAttribs(particle_comps["opticalDepthBW"]).dataPtr() + offset;
+        p_optical_depth_BW = pti.GetAttribs("opticalDepthBW").dataPtr() + offset;
     }
 #endif
 
-    auto copyAttribs = CopyParticleAttribs(pti, tmp_particle_data, offset);
     const int do_copy = (m_do_back_transformed_particles && (a_dt_type!=DtType::SecondHalf) );
+    CopyParticleAttribs copyAttribs;
+    if (do_copy) {
+        copyAttribs = CopyParticleAttribs(*this, pti, offset);
+    }
 
     const auto GetPosition = GetParticlePosition<PIdx>(pti, offset);
     auto SetPosition = SetParticlePosition<PIdx>(pti, offset);
@@ -229,27 +232,17 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
 }
 
 void
-PhotonParticleContainer::Evolve (int lev,
-                                 const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
-                                 const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
-                                 MultiFab& jx, MultiFab& jy, MultiFab& jz,
-                                 MultiFab* cjx, MultiFab* cjy, MultiFab* cjz,
-                                 MultiFab* rho, MultiFab* crho,
-                                 const MultiFab* cEx, const MultiFab* cEy, const MultiFab* cEz,
-                                 const MultiFab* cBx, const MultiFab* cBy, const MultiFab* cBz,
+PhotonParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
+                                 int lev,
+                                 const std::string& current_fp_string,
                                  Real t, Real dt, DtType a_dt_type, bool skip_deposition,
                                  PushType push_type)
 {
     // This does gather, push and deposit.
     // Push and deposit have been re-written for photons
-    PhysicalParticleContainer::Evolve (lev,
-                                       Ex, Ey, Ez,
-                                       Bx, By, Bz,
-                                       jx, jy, jz,
-                                       cjx, cjy, cjz,
-                                       rho, crho,
-                                       cEx, cEy, cEz,
-                                       cBx, cBy, cBz,
+    PhysicalParticleContainer::Evolve (fields,
+                                       lev,
+                                       current_fp_string,
                                        t, dt, a_dt_type, skip_deposition, push_type);
 
 }

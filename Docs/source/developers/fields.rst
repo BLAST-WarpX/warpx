@@ -37,6 +37,13 @@ The ``MultiFab`` constructor (for, e.g., ``Ex`` on level ``lev``) is called in `
 
 By default, the ``MultiFab`` are set to ``0`` at initialization. They can be assigned a different value in ``WarpX::InitLevelData``.
 
+Field Names
+-----------
+
+The commonly used WarpX field names are defined in:
+
+.. doxygenenum:: warpx::fields::FieldType
+
 Field solver
 ------------
 
@@ -112,9 +119,9 @@ Bilinear filter
 
 The multi-pass bilinear filter (applied on the current density) is implemented in ``Source/Filter/``, and class ``WarpX`` holds an instance of this class in member variable ``WarpX::bilinear_filter``. For performance reasons (to avoid creating too many guard cells), this filter is directly applied in communication routines, see ``WarpX::AddCurrentFromFineLevelandSumBoundary`` above and
 
-.. doxygenfunction:: WarpX::ApplyFilterJ(const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>, 3>> &current, int lev, int idim)
+.. doxygenfunction:: WarpX::ApplyFilterMF(const ablastr::fields::MultiLevelVectorField &mfvec, int lev, int idim)
 
-.. doxygenfunction:: WarpX::SumBoundaryJ(const amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>, 3>> &current, int lev, int idim, const amrex::Periodicity &period)
+.. doxygenfunction:: WarpX::SumBoundaryJ(const ablastr::fields::MultiLevelVectorField &current, int lev, int idim, const amrex::Periodicity &period)
 
 Godfrey's anti-NCI filter for FDTD simulations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

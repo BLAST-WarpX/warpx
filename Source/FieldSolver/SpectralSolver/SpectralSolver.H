@@ -11,9 +11,9 @@
 
 #include "SpectralAlgorithms/SpectralBaseAlgorithm.H"
 #include "SpectralFieldData.H"
-
 #include "Utils/WarpXAlgorithmSelection.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/utils/Enums.H>
 
 #include <AMReX_Array.H>
@@ -127,9 +127,12 @@ class SpectralSolver
           * \brief Public interface to call the member function ComputeSpectralDivE
           * of the base class SpectralBaseAlgorithm from objects of class SpectralSolver
           */
-        void ComputeSpectralDivE ( int lev,
-                                   const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
-                                   amrex::MultiFab& divE ) {
+        void ComputeSpectralDivE (
+            int lev,
+            ablastr::fields::VectorField const & Efield,
+            amrex::MultiFab& divE
+        )
+        {
             algorithm->ComputeSpectralDivE( lev, field_data, Efield, divE );
         }
 
@@ -194,6 +197,9 @@ class SpectralSolver
         }
 
         SpectralFieldIndex m_spectral_index;
+
+        // Solve time step size
+        amrex::Real m_dt;
 
     protected:
 

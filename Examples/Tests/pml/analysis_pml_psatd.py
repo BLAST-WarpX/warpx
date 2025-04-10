@@ -16,8 +16,6 @@ import scipy.constants as scc
 import yt
 
 yt.funcs.mylog.setLevel(0)
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
 
 filename = sys.argv[1]
 
@@ -27,9 +25,9 @@ filename_init = os.path.join(cwd, "diags/diag1000050")
 galilean = True if re.search("galilean", cwd) else False
 # Initial laser energy (at iteration 50)
 if galilean:
-    energy_start = 4.439376199524034e-08
+    energy_start = 4.439376202529614e-08
 else:
-    energy_start = 7.282940107273505e-08
+    energy_start = 7.282940112203595e-08
 
 # Check consistency of field energy diagnostics with initial energy above
 ds = yt.load(filename_init)
@@ -74,6 +72,3 @@ print("reflectivity     = " + str(reflectivity))
 print("reflectivity_max = " + str(reflectivity_max))
 
 assert reflectivity < reflectivity_max
-
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename)

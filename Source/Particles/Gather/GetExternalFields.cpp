@@ -20,9 +20,11 @@ GetExternalEBField::GetExternalEBField (const WarpXParIter& a_pti, long a_offset
 
     const int lev = a_pti.GetLevel();
 
+    const auto& dts = warpx.getdt();
+
     AcceleratorLattice const & accelerator_lattice = warpx.get_accelerator_lattice(lev);
     if (accelerator_lattice.m_lattice_defined) {
-        d_lattice_element_finder = accelerator_lattice.GetFinderDeviceInstance(a_pti, static_cast<int>(a_offset));
+        d_lattice_element_finder = accelerator_lattice.GetFinderDeviceInstance(a_pti, static_cast<int>(a_offset), dts);
     }
 
     m_gamma_boost = WarpX::gamma_boost;
@@ -50,19 +52,17 @@ GetExternalEBField::GetExternalEBField (const WarpXParIter& a_pti, long a_offset
     if (mypc.m_E_ext_particle_s == "parse_e_ext_particle_function")
     {
         m_Etype = ExternalFieldInitType::Parser;
-        constexpr auto num_arguments = 4; //x,y,z,t
-        m_Exfield_partparser = mypc.m_Ex_particle_parser->compile<num_arguments>();
-        m_Eyfield_partparser = mypc.m_Ey_particle_parser->compile<num_arguments>();
-        m_Ezfield_partparser = mypc.m_Ez_particle_parser->compile<num_arguments>();
+        m_Exfield_partparser = mypc.m_Ex_particle_parser->compile<4>();
+        m_Eyfield_partparser = mypc.m_Ey_particle_parser->compile<4>();
+        m_Ezfield_partparser = mypc.m_Ez_particle_parser->compile<4>();
     }
 
     if (mypc.m_B_ext_particle_s == "parse_b_ext_particle_function")
     {
         m_Btype = ExternalFieldInitType::Parser;
-        constexpr auto num_arguments = 4; //x,y,z,t
-        m_Bxfield_partparser = mypc.m_Bx_particle_parser->compile<num_arguments>();
-        m_Byfield_partparser = mypc.m_By_particle_parser->compile<num_arguments>();
-        m_Bzfield_partparser = mypc.m_Bz_particle_parser->compile<num_arguments>();
+        m_Bxfield_partparser = mypc.m_Bx_particle_parser->compile<4>();
+        m_Byfield_partparser = mypc.m_By_particle_parser->compile<4>();
+        m_Bzfield_partparser = mypc.m_Bz_particle_parser->compile<4>();
     }
 
     if (mypc.m_E_ext_particle_s == "repeated_plasma_lens" ||

@@ -180,7 +180,7 @@ for epoch in range(n_epochs):
         )
 # Manual: Training loop END
 t4 = time.time()
-print(f"total training time: {t4-t3:.3f}s")
+print(f"total training time: {t4 - t3:.3f}s")
 
 ######### save model #########
 

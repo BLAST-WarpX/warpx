@@ -12,9 +12,12 @@
 #   include "BoundaryConditions/PML_RZ.H"
 #endif
 #include "EmbeddedBoundary/Enabled.H"
+#include "Fields.H"
 #include "PML_current.H"
 #include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX_PML_kernels.H"
+
+#include <ablastr/fields/MultiFabRegister.H>
 
 #ifdef AMREX_USE_SENSEI_INSITU
 #   include <AMReX_AmrMeshInSituBridge.H>
@@ -63,9 +66,13 @@ WarpX::DampPML (const int lev, PatchType patch_type)
     WARPX_PROFILE("WarpX::DampPML()");
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
     if (pml_rz[lev]) {
-        pml_rz[lev]->ApplyDamping(Efield_fp[lev][1].get(), Efield_fp[lev][2].get(),
-                                  Bfield_fp[lev][1].get(), Bfield_fp[lev][2].get(),
-                                  dt[lev]);
+        using ablastr::fields::Direction;
+        using warpx::fields::FieldType;
+        pml_rz[lev]->ApplyDamping( m_fields.get(FieldType::Efield_fp, Direction{1}, lev),
+                                   m_fields.get(FieldType::Efield_fp, Direction{2}, lev),
+                                   m_fields.get(FieldType::Bfield_fp, Direction{1}, lev),
+                                   m_fields.get(FieldType::Bfield_fp, Direction{2}, lev),
+                                   dt[lev], m_fields);
     }
 #endif
     if (pml[lev]) {
@@ -81,12 +88,11 @@ WarpX::DampPML_Cartesian (const int lev, PatchType patch_type)
 
     if (pml[lev]->ok())
     {
-        const auto& pml_E = (patch_type == PatchType::fine) ? pml[lev]->GetE_fp() : pml[lev]->GetE_cp();
-        const auto& pml_B = (patch_type == PatchType::fine) ? pml[lev]->GetB_fp() : pml[lev]->GetB_cp();
-        const auto& pml_F = (patch_type == PatchType::fine) ? pml[lev]->GetF_fp() : pml[lev]->GetF_cp();
-        const auto& pml_G = (patch_type == PatchType::fine) ? pml[lev]->GetG_fp() : pml[lev]->GetG_cp();
-        const auto& sigba = (patch_type == PatchType::fine) ? pml[lev]->GetMultiSigmaBox_fp()
-                                                            : pml[lev]->GetMultiSigmaBox_cp();
+        using warpx::fields::FieldType;
+
+        const auto& pml_E = (patch_type == PatchType::fine) ? m_fields.get_alldirs(FieldType::pml_E_fp, lev) : m_fields.get_alldirs(FieldType::pml_E_cp, lev);
+        const auto& pml_B = (patch_type == PatchType::fine) ? m_fields.get_alldirs(FieldType::pml_B_fp, lev) : m_fields.get_alldirs(FieldType::pml_B_cp, lev);
+        const auto& sigba = (patch_type == PatchType::fine) ? pml[lev]->GetMultiSigmaBox_fp() : pml[lev]->GetMultiSigmaBox_cp();
 
         const amrex::IntVect Ex_stag = pml_E[0]->ixType().toIntVect();
         const amrex::IntVect Ey_stag = pml_E[1]->ixType().toIntVect();
@@ -97,12 +103,16 @@ WarpX::DampPML_Cartesian (const int lev, PatchType patch_type)
         const amrex::IntVect Bz_stag = pml_B[2]->ixType().toIntVect();
 
         amrex::IntVect F_stag;
-        if (pml_F) {
+        if (m_fields.has(FieldType::pml_F_fp, lev)) {
+            amrex::MultiFab* pml_F = (patch_type == PatchType::fine) ?
+                m_fields.get(FieldType::pml_F_fp, lev) : m_fields.get(FieldType::pml_F_cp, lev);
             F_stag = pml_F->ixType().toIntVect();
         }
 
         amrex::IntVect G_stag;
-        if (pml_G) {
+        if (m_fields.has(FieldType::pml_G_fp, lev)) {
+            amrex::MultiFab* pml_G = (patch_type == PatchType::fine) ?
+                m_fields.get(FieldType::pml_G_fp, lev) : m_fields.get(FieldType::pml_G_cp, lev);
             G_stag = pml_G->ixType().toIntVect();
         }
 
@@ -193,7 +203,9 @@ WarpX::DampPML_Cartesian (const int lev, PatchType patch_type)
             // For warpx_damp_pml_F(), mfi.nodaltilebox is used in the ParallelFor loop and here we
             // use mfi.tilebox. However, it does not matter because in damp_pml, where nodaltilebox
             // is used, only a simple multiplication is performed.
-            if (pml_F) {
+            if (m_fields.has(FieldType::pml_F_fp, lev)) {
+                amrex::MultiFab* pml_F = (patch_type == PatchType::fine) ?
+                    m_fields.get(FieldType::pml_F_fp, lev) : m_fields.get(FieldType::pml_F_cp, lev);
                 const Box& tnd = mfi.nodaltilebox();
                 auto const& pml_F_fab = pml_F->array(mfi);
                 amrex::ParallelFor(tnd, [=] AMREX_GPU_DEVICE (int i, int j, int k)
@@ -204,7 +216,10 @@ WarpX::DampPML_Cartesian (const int lev, PatchType patch_type)
             }
 
             // Damp G when WarpX::do_divb_cleaning = true
-            if (pml_G) {
+            if (m_fields.has(FieldType::pml_G_fp, lev)) {
+                amrex::MultiFab* pml_G = (patch_type == PatchType::fine) ?
+                    m_fields.get(FieldType::pml_G_fp, lev) : m_fields.get(FieldType::pml_G_cp, lev);
+
                 const Box& tb = mfi.tilebox(G_stag);
                 auto const& pml_G_fab = pml_G->array(mfi);
                 amrex::ParallelFor(tb, [=] AMREX_GPU_DEVICE (int i, int j, int k)
@@ -243,8 +258,9 @@ WarpX::DampJPML (int lev, PatchType patch_type)
 
     if (pml[lev]->ok())
     {
+        using warpx::fields::FieldType;
 
-        const auto& pml_j = (patch_type == PatchType::fine) ? pml[lev]->Getj_fp() : pml[lev]->Getj_cp();
+        const auto& pml_j = (patch_type == PatchType::fine) ? m_fields.get_alldirs(FieldType::pml_j_fp, lev) : m_fields.get_alldirs(FieldType::pml_j_cp, lev);
         const auto& sigba = (patch_type == PatchType::fine) ? pml[lev]->GetMultiSigmaBox_fp()
                                                             : pml[lev]->GetMultiSigmaBox_cp();
 
@@ -273,7 +289,7 @@ WarpX::DampJPML (int lev, PatchType patch_type)
             // Skip the field update if this gridpoint is inside the embedded boundary
             amrex::Array4<amrex::Real> eb_lxfab, eb_lyfab, eb_lzfab;
             if (EB::enabled()) {
-                const auto &pml_edge_lenghts = pml[lev]->Get_edge_lengths();
+                const auto &pml_edge_lenghts = m_fields.get_alldirs(FieldType::pml_edge_lengths, lev);
 
                 eb_lxfab = pml_edge_lenghts[0]->array(mfi);
                 eb_lyfab = pml_edge_lenghts[1]->array(mfi);
@@ -338,15 +354,12 @@ WarpX::DampJPML (int lev, PatchType patch_type)
 void
 WarpX::CopyJPML ()
 {
+    using ablastr::fields::Direction;
+
     for (int lev = 0; lev <= finest_level; ++lev)
     {
         if (pml[lev] && pml[lev]->ok()){
-            pml[lev]->CopyJtoPMLs({ current_fp[lev][0].get(),
-                                  current_fp[lev][1].get(),
-                                  current_fp[lev][2].get() },
-                                { current_cp[lev][0].get(),
-                                  current_cp[lev][1].get(),
-                                  current_cp[lev][2].get() });
+            pml[lev]->CopyJtoPMLs(m_fields, lev);
         }
     }
 }

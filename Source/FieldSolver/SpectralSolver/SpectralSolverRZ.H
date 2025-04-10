@@ -12,6 +12,7 @@
 #include "SpectralAlgorithms/SpectralBaseAlgorithmRZ.H"
 #include "SpectralFieldDataRZ.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/utils/Enums.H>
 
 
@@ -95,7 +96,8 @@ class SpectralSolverRZ
           * \brief Public interface to call the member function ComputeSpectralDivE
           * of the base class SpectralBaseAlgorithmRZ from objects of class SpectralSolverRZ
           */
-        void ComputeSpectralDivE (int lev, const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
+        void ComputeSpectralDivE (int lev,
+                                  ablastr::fields::VectorField const & Efield,
                                   amrex::MultiFab& divE);
 
         /**
@@ -149,6 +151,9 @@ class SpectralSolverRZ
         }
 
         SpectralFieldIndex m_spectral_index;
+
+        // Solve time step size
+        amrex::Real m_dt;
 
     private:
 

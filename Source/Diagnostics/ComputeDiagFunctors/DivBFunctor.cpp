@@ -7,8 +7,13 @@
 #include <AMReX_IntVect.H>
 #include <AMReX_MultiFab.H>
 
-DivBFunctor::DivBFunctor(const std::array<const amrex::MultiFab* const, 3> arr_mf_src, const int lev, const amrex::IntVect crse_ratio,
-                         bool convertRZmodes2cartesian, const int ncomp)
+DivBFunctor::DivBFunctor (
+    ablastr::fields::VectorField const & arr_mf_src,
+    const int lev,
+    const amrex::IntVect crse_ratio,
+    bool convertRZmodes2cartesian,
+    const int ncomp
+)
     : ComputeDiagFunctor(ncomp, crse_ratio), m_arr_mf_src(arr_mf_src), m_lev(lev),
       m_convertRZmodes2cartesian(convertRZmodes2cartesian)
 {}

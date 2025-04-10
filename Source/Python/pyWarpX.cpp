@@ -32,8 +32,8 @@
 // forward declarations of exposed classes
 void init_BoundaryBufferParIter (py::module&);
 void init_MultiParticleContainer (py::module&);
+void init_MultiFabRegister (py::module&);
 void init_ParticleBoundaryBuffer (py::module&);
-void init_PinnedMemoryParticleContainer (py::module&);
 void init_WarpXParIter (py::module&);
 void init_WarpXParticleContainer (py::module&);
 void init_WarpX(py::module&);
@@ -59,7 +59,7 @@ PYBIND11_MODULE(PYWARPX_MODULE_NAME, m) {
     )pbdoc";
 
     // note: order from parent to child classes
-    init_PinnedMemoryParticleContainer(m);
+    init_MultiFabRegister(m);
     init_WarpXParticleContainer(m);
     init_WarpXParIter(m);
     init_BoundaryBufferParIter(m);
@@ -93,7 +93,7 @@ PYBIND11_MODULE(PYWARPX_MODULE_NAME, m) {
     // TODO broken numpy if not at least v1.15.0: raise warning
     // auto numpy = py::module::import("numpy");
     // auto npversion = numpy.attr("__version__");
-    // std::cout << "numpy version: " << py::str(npversion) << std::endl;
+    // std::cout << "numpy version: " << py::str(npversion) << "\n";
 
     m.def("amrex_init",
         [](const py::list args) {
