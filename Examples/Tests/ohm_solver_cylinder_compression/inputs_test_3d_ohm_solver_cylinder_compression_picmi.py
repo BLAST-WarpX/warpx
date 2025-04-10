@@ -342,25 +342,23 @@ class PlasmaCylinderCompression(object):
         # Add diagnostics                                                     #
         #######################################################################
 
-        # if self.test:
-        #     particle_diag = picmi.ParticleDiagnostic(
-        #         name="diag1",
-        #         period=self.diag_steps,
-        #         species=[self.ions],
-        #         data_list=["ux", "uy", "uz", "x", "z", "weighting"],
-        #         write_dir="diags",
-        #         warpx_format="plotfile",
-        #     )
-        #     simulation.add_diagnostic(particle_diag)
+        if self.test:
+            particle_diag = picmi.ParticleDiagnostic(
+                name="diag1",
+                period=self.diag_steps,
+                species=[self.ions],
+                data_list=["ux", "uy", "uz", "x", "z", "weighting"],
+                write_dir="diags",
+                warpx_format="plotfile",
+            )
+            simulation.add_diagnostic(particle_diag)
         field_diag = picmi.FieldDiagnostic(
             name="diag1",
             grid=self.grid,
             period=self.diag_steps,
             data_list=["B", "E", "rho", "Tx_ions", "Ty_ions", "Tz_ions"],
             write_dir="diags",
-            warpx_file_prefix="field_diags",
-            warpx_format="openpmd",
-            warpx_openpmd_backend="h5",
+            warpx_format="plotfile",
         )
         simulation.add_diagnostic(field_diag)
 

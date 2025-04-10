@@ -346,7 +346,7 @@ class PlasmaCylinderCompression(object):
             name="diag1",
             grid=self.grid,
             period=self.diag_steps,
-            data_list=["B", "E", "rho"],
+            data_list=["B", "E", "rho", "Tr_ions", "Tt_ions", "Tz_ions"],
             write_dir="diags",
             warpx_format="plotfile",
         )
