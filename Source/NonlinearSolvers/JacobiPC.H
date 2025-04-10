@@ -151,6 +151,7 @@ template <class T, class Ops>
 void JacobiPC<T,Ops>::Define ( const T& a_U,
                                Ops* const a_ops )
 {
+    BL_PROFILE("JacobiPC::Define()");
     using namespace amrex;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -177,6 +178,7 @@ void JacobiPC<T,Ops>::Define ( const T& a_U,
 template <class T, class Ops>
 void JacobiPC<T,Ops>::Update (const T& a_U)
 {
+    BL_PROFILE("JacobiPC::Update()");
     using namespace amrex;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -199,6 +201,7 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
     //      A x = b
     //  where A is the linear operator.
 
+    BL_PROFILE("JacobiPC::Apply()");
     using namespace amrex;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(

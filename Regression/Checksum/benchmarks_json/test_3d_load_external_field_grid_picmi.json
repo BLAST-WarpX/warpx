@@ -1,6 +1,6 @@
 {
   "lev=0": {
-    "Bx": 29.8448958859583,
+    "Bx": 29.84489588595831,
     "By": 29.844895885958305,
     "Bz": 197.55124310523018,
     "Ex": 0.0,
@@ -11,12 +11,12 @@
     "jz": 0.0
   },
   "proton": {
-    "particle_momentum_x": 1.2118953253556959e-23,
-    "particle_momentum_y": 7.822512598009088e-23,
-    "particle_momentum_z": 2.2761898274347412e-23,
-    "particle_position_x": 0.12238072371983327,
-    "particle_position_y": 0.009653941154598592,
-    "particle_position_z": 4.317544769595657,
+    "particle_momentum_x": 1.2118959018435722e-23,
+    "particle_momentum_y": 7.822512514550813e-23,
+    "particle_momentum_z": 2.2761898475893665e-23,
+    "particle_position_x": 0.122380722759106,
+    "particle_position_y": 0.009653949671674482,
+    "particle_position_z": 4.317544766532689,
     "particle_weight": 1.0
   }
 }

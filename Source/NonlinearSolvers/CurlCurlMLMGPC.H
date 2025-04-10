@@ -192,6 +192,7 @@ template <class T, class Ops>
 void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
                                      Ops* const a_ops )
 {
+    BL_PROFILE("CurlCurlMLMGPC::Define()");
     using namespace amrex;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -265,6 +266,7 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
 template <class T, class Ops>
 void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
 {
+    BL_PROFILE("CurlCurlMLMGPC::Update()");
     using namespace amrex;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -316,6 +318,7 @@ void CurlCurlMLMGPC<T,Ops>::Apply (T& a_x, const T& a_b)
     //  operator:
     //      A x = curl (alpha * curl (x) ) + beta * x
 
+    BL_PROFILE("CurlCurlMLMGPC::Apply()");
     using namespace amrex;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(

@@ -7,6 +7,7 @@
 #include "BackgroundMCCCollision.H"
 
 #include "ImpactIonization.H"
+#include "Particles/Algorithms/KineticEnergy.H"
 #include "Particles/ParticleCreation/FilterCopyTransform.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Utils/Parser/ParserUtils.H"
@@ -435,8 +436,8 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
                                   // subtract any energy penalty of the collision from the
                                   // projectile energy
                                   if (scattering_process.m_energy_penalty > 0.0_prt) {
-                                      ParticleUtils::getEnergy(v_coll2, m, E_coll);
-                                      E_coll = (E_coll - scattering_process.m_energy_penalty) * PhysConst::q_e;
+                                      constexpr auto eV = PhysConst::q_e;
+                                      E_coll = (Algorithms::KineticEnergy<double>(vx, vy, vz, m) - scattering_process.m_energy_penalty*eV);
                                       const auto scale_fac = static_cast<amrex::ParticleReal>(
                                         std::sqrt(E_coll * (E_coll + 2.0_prt*mc2) / c2) / m / v_coll);
                                       vx *= scale_fac;

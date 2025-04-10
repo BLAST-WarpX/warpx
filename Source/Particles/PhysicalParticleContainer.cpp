@@ -1899,7 +1899,8 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 //    and (thus) the `np-nfine_current`/`np-nfine_gather` last particles
                 //    deposit/gather in the buffer
                 PartitionParticlesInBuffers( nfine_current, nfine_gather, np,
-                    pti, lev, current_masks, gather_masks );
+                    pti, lev, WarpX::n_field_gather_buffer,
+                    WarpX::n_current_deposition_buffer, current_masks, gather_masks );
             }
 
             const long np_current = has_J_buf ? nfine_current : np;
@@ -3193,7 +3194,7 @@ PlasmaInjector* PhysicalParticleContainer::GetPlasmaInjector (int i)
     }
 }
 
-void PhysicalParticleContainer::resample (const int timestep, const bool verbose)
+void PhysicalParticleContainer::resample (const amrex::Vector<amrex::Geometry>& geom, const int timestep, const bool verbose)
 {
     // In heavily load imbalanced simulations, MPI processes with few particles will spend most of
     // the time at the MPI synchronization in TotalNumberOfParticles(). Having two profiler entries
@@ -3216,7 +3217,7 @@ void PhysicalParticleContainer::resample (const int timestep, const bool verbose
         {
             for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
             {
-                m_resampler(pti, lev, this);
+                m_resampler(geom[lev], pti, lev, this);
             }
         }
         deleteInvalidParticles();

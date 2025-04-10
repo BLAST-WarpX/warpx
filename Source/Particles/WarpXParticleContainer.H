@@ -28,6 +28,7 @@
 
 #include <AMReX_Array.H>
 #include <AMReX_FArrayBox.H>
+#include <AMReX_Geometry.H>
 #include <AMReX_GpuAllocators.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_INT.H>
@@ -485,7 +486,7 @@ public:
      * override the method for every derived class. Note that in practice this function is never
      * called because resample() is only called for PhysicalParticleContainers.
      */
-    virtual void resample (const int /*timestep*/, bool /*verbose*/) {}
+    virtual void resample (const amrex::Vector<amrex::Geometry>& /*geom*/, const int /*timestep*/, bool /*verbose*/) {}
 
     /**
      * When using runtime components, AMReX requires to touch all tiles
