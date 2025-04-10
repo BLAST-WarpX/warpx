@@ -72,7 +72,8 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
         else if (type == "photonphoton") {
             allcollisions[i] =
                std::make_unique<BinaryCollision<PhotonPhotonCollisionFunc, ParticleCreationFunc>>(
-                                                                        collision_names[i], mypc);
+                    collision_names[i], mypc
+               );
         }
         else{
             WARPX_ABORT_WITH_MESSAGE("Unknown collision type.");

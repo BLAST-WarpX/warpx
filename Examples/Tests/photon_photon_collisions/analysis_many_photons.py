@@ -8,7 +8,7 @@ from analysis_base import (
     find_num_in_line,
 )
 from scipy.constants import c, m_e, physical_constants, pi
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumulative_trapezoid
 
 # constants
 r_e = physical_constants["classical electron radius"][0]
@@ -94,7 +94,13 @@ def check_pair_rate():
     # number of <<real>> photons of species photonA in time from simulation
     NB = np.loadtxt("diags/reducedfiles/ParticleNumber.txt")[:, 9]
     # estimated number of real positrons in time
-    Nplus_est = 2.0 * sigma * c / V * cumtrapz(NA_est * NB_est, x=t, dx=dt, initial=0)
+    Nplus_est = (
+        2.0
+        * sigma
+        * c
+        / V
+        * cumulative_trapezoid(NA_est * NB_est, x=t, dx=dt, initial=0)
+    )
     # number of <<real>> positrons in time from simulation
     Nplus = np.loadtxt("diags/reducedfiles/ParticleNumber.txt")[:, 11]
 

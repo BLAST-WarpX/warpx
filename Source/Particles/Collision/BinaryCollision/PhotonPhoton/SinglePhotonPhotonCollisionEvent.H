@@ -54,17 +54,17 @@
 template <typename index_type>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void SinglePhotonPhotonCollisionEvent (const amrex::ParticleReal& u1x, const amrex::ParticleReal& u1y,
-                               const amrex::ParticleReal& u1z, const amrex::ParticleReal& u2x,
-                               const amrex::ParticleReal& u2y, const amrex::ParticleReal& u2z,
-                               amrex::ParticleReal w1, amrex::ParticleReal w2,
-                               const amrex::Real& dt, const amrex::ParticleReal& dV, const int& pair_index,
-                               index_type* AMREX_RESTRICT p_mask,
-                               amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
-                               const amrex::ParticleReal& event_multiplier,
-                               const int& multiplier_ratio,
-                               const amrex::ParticleReal& probability_threshold,
-                               const amrex::ParticleReal& probability_target_value,
-                               const amrex::RandomEngine& engine)
+                                       const amrex::ParticleReal& u1z, const amrex::ParticleReal& u2x,
+                                       const amrex::ParticleReal& u2y, const amrex::ParticleReal& u2z,
+                                       amrex::ParticleReal w1, amrex::ParticleReal w2,
+                                       const amrex::Real& dt, const amrex::ParticleReal& dV, const int& pair_index,
+                                       index_type* AMREX_RESTRICT p_mask,
+                                       amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
+                                       const amrex::ParticleReal& event_multiplier,
+                                       const int& multiplier_ratio,
+                                       const amrex::ParticleReal& probability_threshold,
+                                       const amrex::ParticleReal& probability_target_value,
+                                       const amrex::RandomEngine& engine)
 {
     // General notations in this function:
     //     x_sq denotes the square of x
@@ -156,16 +156,10 @@ void SinglePhotonPhotonCollisionEvent (const amrex::ParticleReal& u1x, const amr
     // fact that computing the exponential is only useful if it can resolve the x^2/2 term of its
     // Taylor expansion, i.e. the square of probability_estimate should be greater than the
     // machine epsilon.
-#ifdef AMREX_SINGLE_PRECISION_PARTICLES
-    constexpr auto exp_threshold = amrex::ParticleReal(1.e-3);
-#else
-    constexpr auto exp_threshold = amrex::ParticleReal(5.e-8);
-#endif
-    const amrex::ParticleReal probability = (probability_estimate < exp_threshold) ?
-                                    probability_estimate: one_pr - std::exp(-probability_estimate);
+    const amrex::ParticleReal probability = -std::expm1(-probability_estimate);
 
     // Get a random number
-    amrex::ParticleReal random_number = amrex::Random(engine);
+    const amrex::ParticleReal random_number = amrex::Random(engine);
 
     // If we have a pair-production event, set the mask to true and fill the product weight array
     if (random_number < probability)
@@ -177,7 +171,6 @@ void SinglePhotonPhotonCollisionEvent (const amrex::ParticleReal& u1x, const amr
     {
         p_mask[pair_index] = false;
     }
-
 }
 
 #endif // SINGLE_PHOTON_PHOTON_COLLISION_EVENT_H_

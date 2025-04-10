@@ -92,7 +92,6 @@ public:
         m_exe.m_isSameSpecies = m_isSameSpecies;
     }
 
-    // FIXME Indentation
     struct Executor {
         /**
          * \brief Executor of the PhotonPhotonCollisionFunc class.
@@ -148,60 +147,53 @@ public:
             amrex::Real const /*global_lamdb*/,
             amrex::ParticleReal const  /*q1*/, amrex::ParticleReal const  /*q2*/,
             amrex::ParticleReal const  /*m1*/, amrex::ParticleReal const  /*m2*/,
-            amrex::Real const  dt, amrex::Real const dV, index_type /*coll_idx*/,
+            amrex::Real const  dt, amrex::Real const dV, index_type coll_idx,
             index_type const cell_start_pair, index_type* AMREX_RESTRICT p_mask,
             index_type* AMREX_RESTRICT p_pair_indices_1, index_type* AMREX_RESTRICT p_pair_indices_2,
             amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
             amrex::RandomEngine const& engine) const
-            {
-                amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
-                amrex::ParticleReal * const AMREX_RESTRICT u1x = soa_1.m_rdata[PIdx::ux];
-                amrex::ParticleReal * const AMREX_RESTRICT u1y = soa_1.m_rdata[PIdx::uy];
-                amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
+        {
+            amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
+            amrex::ParticleReal * const AMREX_RESTRICT u1x = soa_1.m_rdata[PIdx::ux];
+            amrex::ParticleReal * const AMREX_RESTRICT u1y = soa_1.m_rdata[PIdx::uy];
+            amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
+            uint64_t* AMREX_RESTRICT idcpu1 = soa_1.m_idcpu;
 
-                amrex::ParticleReal * const AMREX_RESTRICT w2 = soa_2.m_rdata[PIdx::w];
-                amrex::ParticleReal * const AMREX_RESTRICT u2x = soa_2.m_rdata[PIdx::ux];
-                amrex::ParticleReal * const AMREX_RESTRICT u2y = soa_2.m_rdata[PIdx::uy];
-                amrex::ParticleReal * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];
+            amrex::ParticleReal * const AMREX_RESTRICT w2 = soa_2.m_rdata[PIdx::w];
+            amrex::ParticleReal * const AMREX_RESTRICT u2x = soa_2.m_rdata[PIdx::ux];
+            amrex::ParticleReal * const AMREX_RESTRICT u2y = soa_2.m_rdata[PIdx::uy];
+            amrex::ParticleReal * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];
+            uint64_t* AMREX_RESTRICT idcpu2 = soa_2.m_idcpu;
 
-                // Number of macroparticles of each species
-                const int NI1 = I1e - I1s;
-                const int NI2 = I2e - I2s;
-                const int max_N = amrex::max(NI1,NI2);
+            // Number of macroparticles of each species
+            const index_type NI1 = I1e - I1s;
+            const index_type NI2 = I2e - I2s;
+            const index_type max_N = amrex::max(NI1,NI2);
+            const index_type min_N = amrex::min(NI1,NI2);
 
-                int i1 = I1s;
-                int i2 = I2s;
-                int pair_index = cell_start_pair;
+            index_type pair_index = cell_start_pair + coll_idx;
 
-                // Because the number of particles of each species is not always equal (NI1 != NI2
-                // in general), some macroparticles will be paired with multiple macroparticles of the
-                // other species and we need to decrease their weight accordingly.
-                // c1 corresponds to the minimum number of times a particle of species 1 will be paired
-                // with a particle of species 2. Same for c2.
-                const int c1 = amrex::max(NI2/NI1,1);
-                const int c2 = amrex::max(NI1/NI2,1);
-
-                // multiplier ratio to take into account unsampled pairs
-                int multiplier_ratio;
-                if (m_isSameSpecies)
-                {
-                    multiplier_ratio = 2*max_N - 1;
-                }
-                else
-                {
-                    multiplier_ratio = max_N;
-                }
+            // multiplier ratio to take into account unsampled pairs
+            const auto multiplier_ratio = static_cast<int>(
+                m_isSameSpecies ? min_N + max_N - 1 : min_N);
 
 #if (defined WARPX_DIM_RZ)
-                amrex::ParticleReal * const AMREX_RESTRICT theta1 = soa_1.m_rdata[PIdx::theta];
-                amrex::ParticleReal * const AMREX_RESTRICT theta2 = soa_2.m_rdata[PIdx::theta];
+            amrex::ParticleReal * const AMREX_RESTRICT theta1 = soa_1.m_rdata[PIdx::theta];
+            amrex::ParticleReal * const AMREX_RESTRICT theta2 = soa_2.m_rdata[PIdx::theta];
 #endif
-                for (int k = 0; k < max_N; ++k)
-                {
-                    // c1k : how many times the current particle of species 1 is paired with a particle
-                    // of species 2. Same for c2k.
-                    const int c1k = (k%NI1 < max_N%NI1) ? c1 + 1: c1;
-                    const int c2k = (k%NI2 < max_N%NI2) ? c2 + 1: c2;
+            index_type i1 = I1s + coll_idx;
+            index_type i2 = I2s + coll_idx;
+            // we will start from collision number = coll_idx and then add
+            // stride (smaller set size) until we do all collisions (larger set size)
+            for (index_type k = coll_idx; k < max_N; k += min_N)
+            {
+                // do not check for collision if a particle's weight was
+                // reduced to zero from a previous collision
+                if (idcpu1[ I1[i1] ]==amrex::ParticleIdCpus::Invalid ||
+                    idcpu2[ I2[i2] ]==amrex::ParticleIdCpus::Invalid ) {
+                    p_mask[pair_index] = false;
+                }
+                else {
 #if (defined WARPX_DIM_RZ)
                     /* In RZ geometry, macroparticles can collide with other macroparticles
                      * in the same *cylindrical* cell. For this reason, collisions between macroparticles
@@ -219,8 +211,8 @@ public:
                     SinglePhotonPhotonCollisionEvent(
                         u1x[ I1[i1] ], u1y[ I1[i1] ], u1z[ I1[i1] ],
                         u2x[ I2[i2] ], u2y[ I2[i2] ], u2z[ I2[i2] ],
-                        w1[ I1[i1] ]/c1k, w2[ I2[i2] ]/c2k,
-                        dt, dV, pair_index, p_mask, p_pair_reaction_weight,
+                        w1[ I1[i1] ], w2[ I2[i2] ],
+                        dt, dV, static_cast<int>(pair_index), p_mask, p_pair_reaction_weight,
                         m_event_multiplier, multiplier_ratio,
                         m_probability_threshold,
                         m_probability_target_value,
@@ -230,13 +222,22 @@ public:
                     u1x[I1[i1]] = u1xbuf_new*std::cos(-theta) - u1y[I1[i1]]*std::sin(-theta);
                     u1y[I1[i1]] = u1xbuf_new*std::sin(-theta) + u1y[I1[i1]]*std::cos(-theta);
 #endif
-                    p_pair_indices_1[pair_index] = I1[i1];
-                    p_pair_indices_2[pair_index] = I2[i2];
-                    ++i1; if ( i1 == static_cast<int>(I1e) ) { i1 = I1s; }
-                    ++i2; if ( i2 == static_cast<int>(I2e) ) { i2 = I2s; }
-                    ++pair_index;
+                    // Remove pair reaction weight from the colliding particles' weights
+                    if (p_mask[pair_index]) {
+                        BinaryCollisionUtils::remove_weight_from_colliding_particle(
+                            w1[ I1[i1] ], idcpu1[ I1[i1] ], p_pair_reaction_weight[pair_index]);
+                        BinaryCollisionUtils::remove_weight_from_colliding_particle(
+                            w2[ I2[i2] ], idcpu2[ I2[i2] ], p_pair_reaction_weight[pair_index]);
+                    }
                 }
+
+                p_pair_indices_1[pair_index] = I1[i1];
+                p_pair_indices_2[pair_index] = I2[i2];
+                if (max_N == NI1) { i1 += min_N; }
+                if (max_N == NI2) { i2 += min_N; }
+                pair_index += min_N;
             }
+        }
 
         amrex::ParticleReal m_event_multiplier;
         amrex::ParticleReal m_probability_threshold;
@@ -262,7 +263,6 @@ private:
     // the event multiplier should be reduced.
     amrex::ParticleReal m_probability_threshold;
     amrex::ParticleReal m_probability_target_value;
-
     bool m_isSameSpecies;
 
     Executor m_exe;

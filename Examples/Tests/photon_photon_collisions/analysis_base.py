@@ -8,7 +8,7 @@ import yt
 from scipy.constants import c, m_e
 
 # default relative tolerance
-rtol = 5.0e-11
+rtol = 5e-10
 
 
 # extract numbers from a string
