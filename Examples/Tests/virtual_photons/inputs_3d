@@ -61,6 +61,17 @@ particles.do_tiling = 1
 particles.species_names = beam virtual_photons
 particles.photon_species = virtual_photons
 
+
+my_constants.hwmin = 1e-3*m_e*clight*clight # has to be small enough
+beam.do_qed_virtual_photons = 1
+beam.qed_virtual_photon_species_name = virtual_photons
+
+
+virtual_photons.min_energy = hwmin
+virtual_photons.sampling_factor = 10000000
+
+#beam.qed_virtual_photon_min_energy = hwmin
+# add sampling factor
 virtual_photons.species_type = photon
 virtual_photons.injection_style = none
 virtual_photons.do_not_push = 1
