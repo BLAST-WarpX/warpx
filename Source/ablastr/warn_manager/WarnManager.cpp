@@ -97,7 +97,7 @@ void WarnManager::RecordWarning(
             + abl_msg_logger::PriorityToString(abort_priority)
             + "' has been raised";
         abort_msg += ((m_always_warn_immediately) ? "." : ("[" + topic + "] " + text));
-        
+
         ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(
             msg_priority < abort_priority,
             abort_msg
