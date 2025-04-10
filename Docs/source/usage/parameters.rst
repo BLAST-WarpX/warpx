@@ -957,7 +957,7 @@ Particle initialization
 
           * ``<species_name>.rotation_axis``: (list of 3 `doubles`) axis around which the rotation takes place
 
-          * ``<species_name>.rotation_angle``: (`double`) angle of rotation around the specified axis, in radians.
+          * ``<species_name>.gaussian_beam_rotation_angle``: (`double`) angle of rotation around the specified axis, in radians.
 
 
       Note that the other beam parameters (e.g. ``<species_name>.x/y/z_rms``, etc.) are used in the initialization process `before` performing the rotation.
