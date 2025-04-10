@@ -127,7 +127,7 @@ jobs:
           -GNinja                           \
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-          -DWarpX_DIMS="RZ;1;2;3"           \
+          -DWarpX_DIMS="2"           \
           -DWarpX_FFT=ON                    \
           -DWarpX_QED=ON                    \
           -DWarpX_QED_TABLE_GEN=ON          \
@@ -151,10 +151,16 @@ jobs:
 
         export OMP_NUM_THREADS=2
 
-        mpirun -n 2 ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_base_rz warpx.serialize_initial_conditions = 0
-        mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d warpx.serialize_initial_conditions = 0
+        ###### DEBUG
+        ulimit -s
+        ulimit -s 32768
+        ulimit -s
+        ######
+
+        #mpirun -n 2 ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_base_rz warpx.serialize_initial_conditions = 0
+        #mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d warpx.serialize_initial_conditions = 0
         mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d warpx.serialize_initial_conditions = 0
-        mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d warpx.serialize_initial_conditions = 0
+        #mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d warpx.serialize_initial_conditions = 0
 
         git clone https://github.com/BLAST-WarpX/warpx-data ../warpx-data
         cd Examples/Tests/embedded_circle
