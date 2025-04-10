@@ -137,7 +137,7 @@ jobs:
         cmake --build build -j 4
 
         ###### DEBUG
-        ldd ./build/bin/warpx.3d
+        ldd ./build/bin/warpx.2d
         ######
 
         ccache -s
@@ -146,7 +146,7 @@ jobs:
     - name: run with thread sanitizer
       run: |
         export PMIX_MCA_gds=hash
-        export TSAN_OPTIONS='ignore_noninstrumented_modules=1'
+        export TSAN_OPTIONS='verbosity=2 ignore_noninstrumented_modules=1'
         export ARCHER_OPTIONS="verbose=1"
 
         export OMP_NUM_THREADS=2
