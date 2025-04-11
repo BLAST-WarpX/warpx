@@ -17,13 +17,24 @@ namespace ablastr::constant
     /** Mathematical constants */
     namespace math
     {
-        using namespace amrex::literals;
+        namespace variable_templates
+        {
+            //! ratio of a circle's circumference to its diameter (variable template)
+            template<typename T>
+            constexpr auto pi = static_cast<T>(3.14159265358979323846);
+
+            //! https://tauday.com/tau-manifesto (variable template)
+            template<typename T>
+            constexpr auto tau = static_cast<T>(2.0 * pi<double>);
+
+        } // namespace variable_templates
 
         //! ratio of a circle's circumference to its diameter
-        static constexpr amrex::Real pi = 3.14159265358979323846_rt;
+        constexpr auto pi = variable_templates::pi<amrex::Real>;
 
         //! https://tauday.com/tau-manifesto
-        static constexpr amrex::Real tau = 2.0_rt * pi;
+        constexpr auto tau = variable_templates::tau<amrex::Real>;
+
     } // namespace math
 
     /** Physical constants
@@ -38,54 +49,158 @@ namespace ablastr::constant
      */
     namespace SI
     {
-        using namespace amrex::literals;
+        namespace variable_templates
+        {
+            //! vacuum speed of light [m/s] (variable template)
+            template<typename T>
+            constexpr auto c = static_cast<T>(299'792'458);
+
+            //! vacuum permittivity: dielectric permittivity of vacuum [F/m] (variable template)
+            template<typename T>
+            constexpr auto ep0 = static_cast<T>(8.8541878188e-12);
+
+            //! vacuum permeability: magnetic permeability of vacuum = 4.0e-7 * pi [H/m] (variable template)
+            //! Note that this is adjusted from the CODATA2022 value, 1.25663706127e-06
+            //! So that the relation between mu0, ep0, and c is exact
+            template<typename T>
+            constexpr auto mu0 = static_cast<T>(1.2566370612685e-06);
+
+            //! elementary charge [C] (variable template)
+            template<typename T>
+            constexpr auto q_e = static_cast<T>(1.602176634e-19);
+
+            //! electron mass [kg] (variable template)
+            template<typename T>
+            constexpr auto m_e = static_cast<T>(9.1093837139e-31);
+
+            //! proton mass [kg] (variable template)
+            template<typename T>
+            constexpr auto m_p = static_cast<T>(1.67262192595e-27);
+
+            //! dalton: unified atomic mass unit [kg] (variable template)
+            template<typename T>
+            constexpr auto m_u = static_cast<T>(1.66053906892e-27);
+
+            //! reduced Planck Constant = h / tau [J*s] (variable template)
+            template<typename T>
+            constexpr auto hbar = static_cast<T>(1.0545718176461565e-34);
+
+            //! fine-structure constant = mu0/(4*pi)*q_e*q_e*c/hbar [dimensionless] (variable template)
+            //! The value is calculated from the expression. This differs
+            //! slightly from the CODATA2022 value 0.0072973525643.
+            template<typename T>
+            constexpr auto alpha = static_cast<T>(0.0072973525643330135);
+
+            //! classical electron radius = 1./(4*pi*ep0) * q_e*q_e/(m_e*c*c) [m] (variable template)
+            template<typename T>
+            constexpr auto r_e = static_cast<T>(2.8179403205e-15);
+
+            //! xi times c2 = xi*c*c. This should be usable for single precision instead of xi; very close to smallest float32 number possible (1.2e-38) (variable template)
+            template<typename T>
+            constexpr auto xi_c2 = static_cast<T>(1.1728865075613984e-35);
+
+            //! Schwinger field [V/m] (variable template)
+            template<typename T>
+            constexpr auto schwinger_field = static_cast<T>(
+                (m_e<double>*m_e<double>)*(c<double>*c<double>*c<double>)/(hbar<double>*q_e<double>));
+
+            //! Boltzmann constant (exact) [J/K] (variable template)
+            template<typename T>
+            constexpr auto kb = static_cast<T>(1.380649e-23);
+
+            //! 1 eV in [J] (variable template)
+            template<typename T>
+            constexpr auto eV = q_e<T>;
+
+            //! 1 MeV in [J] (variable template)
+            template<typename T>
+            constexpr auto MeV = static_cast<T>(q_e<double> * 1e6);
+
+            //! 1 eV/c in [kg*m/s] (variable template)
+            template<typename T>
+            constexpr auto eV_invc = static_cast<T>(eV<double> / c<double>);
+
+            //! 1 MeV/c in [kg*m/s] (variable template)
+            template<typename T>
+            constexpr auto MeV_invc = static_cast<T>(MeV<double>  / c<double>);
+
+            //! 1 eV/c^2 in [kg] (variable template)
+            template<typename T>
+            constexpr auto eV_invc2 = static_cast<T>(eV<double> / (c<double> * c<double>));
+
+            //! 1 MeV/c^2 in [kg] (variable template)
+            template<typename T>
+            constexpr auto MeV_invc2 = static_cast<T>(MeV<double> / (c<double> * c<double>));
+
+            //! sqrt(4*pi*alpha) is a constant used for the Heaviside Lorentz unit system (variable template)
+            template<typename T>
+            constexpr auto sqrt_4_pi_fine_structure = static_cast<T>(0.3028221207690299);
+
+        } // namespace variable_templates
 
         //! vacuum speed of light [m/s]
-        static constexpr auto c = 299'792'458._rt;
+        constexpr auto c = variable_templates::c<amrex::Real>;
+
         //! vacuum permittivity: dielectric permittivity of vacuum [F/m]
-        static constexpr auto ep0 = 8.8541878188e-12_rt;
+        constexpr auto ep0 = variable_templates::ep0<amrex::Real>;
+
         //! vacuum permeability: magnetic permeability of vacuum = 4.0e-7 * pi [H/m]
-        //! Note that this is adjusted from the CODATA2022 value, 1.25663706127e-06
-        //! So that the relation between mu0, ep0, and c is exact.
-        static constexpr auto mu0 = 1.2566370612685e-06_rt;
+        constexpr auto mu0 = variable_templates::mu0<amrex::Real>;
+
         //! elementary charge [C]
-        static constexpr auto q_e = 1.602176634e-19_rt;
+        constexpr auto q_e = variable_templates::q_e<amrex::Real>;
+
         //! electron mass [kg]
-        static constexpr auto m_e = 9.1093837139e-31_rt;
+        constexpr auto m_e = variable_templates::m_e<amrex::Real>;
+
         //! proton mass [kg]
-        static constexpr auto m_p = 1.67262192595e-27_rt;
+        constexpr auto m_p = variable_templates::m_p<amrex::Real>;
+
         //! dalton: unified atomic mass unit [kg]
-        static constexpr auto m_u = 1.66053906892e-27_rt;
+        constexpr auto m_u = variable_templates::m_u<amrex::Real>;
 
         //! reduced Planck Constant = h / tau [J*s]
-        static constexpr auto hbar = 1.0545718176461565e-34_rt;
+        constexpr auto hbar = variable_templates::hbar<amrex::Real>;
+
         //! fine-structure constant = mu0/(4*pi)*q_e*q_e*c/hbar [dimensionless]
-        //! The value is calculated from the expression. This differs
-        //! slightly from the CODATA2022 value 0.0072973525643.
-        static constexpr auto alpha = 0.0072973525643330135_rt;
+        constexpr auto alpha = variable_templates::alpha<amrex::Real>;
+
         //! classical electron radius = 1./(4*pi*ep0) * q_e*q_e/(m_e*c*c) [m]
-        static constexpr auto r_e = 2.8179403205e-15_rt;
+        constexpr auto r_e = variable_templates::r_e<amrex::Real>;
+
         //! xi: nonlinearity parameter of Heisenberg-Euler effective theory = (2.*alpha*alpha*ep0*ep0*hbar*hbar*hbar)/(45.*m_e*m_e*m_e*m_e*c*c*c*c*c)
-        static constexpr double xi = 1.3050122383827227e-52;
+        constexpr double xi = 1.3050122383827227e-52;
+
         //! xi times c2 = xi*c*c. This should be usable for single precision instead of xi; very close to smallest float32 number possible (1.2e-38)
-        static constexpr auto xi_c2 = 1.1728865075613984e-35_rt;
+        constexpr auto xi_c2 = variable_templates::xi_c2<amrex::Real>;
+
+        //! Schwinger field [V/m] (variable template)
+        template<typename T>
+        constexpr auto schwinger_field = variable_templates::schwinger_field<amrex::Real>;
 
         //! Boltzmann constant (exact) [J/K]
-        static constexpr auto kb = 1.380649e-23_rt;
+        constexpr auto kb = variable_templates::kb<amrex::Real>;
 
         //! 1 eV in [J]
-        static constexpr auto eV = q_e;
+        constexpr auto eV = variable_templates::eV<amrex::Real>;
+
         //! 1 MeV in [J]
-        static constexpr auto MeV = q_e * 1e6_rt;
+        constexpr auto MeV = variable_templates::MeV<amrex::Real>;
+
         //! 1 eV/c in [kg*m/s]
-        static constexpr auto eV_invc = eV / c;
+        constexpr auto eV_invc = variable_templates::eV_invc<amrex::Real>;
+
         //! 1 MeV/c in [kg*m/s]
-        static constexpr auto MeV_invc = MeV / c;
+        constexpr auto MeV_invc = variable_templates::MeV_invc<amrex::Real>;
+
         //! 1 eV/c^2 in [kg]
-        static constexpr auto eV_invc2 = eV / (c * c);
+        constexpr auto eV_invc2 = variable_templates::eV_invc2<amrex::Real>;
+
         //! 1 MeV/c^2 in [kg]
-        static constexpr auto MeV_invc2 = MeV / (c * c);
+        constexpr auto MeV_invc2 = variable_templates::MeV_invc2<amrex::Real>;
+
     } // namespace SI
+
 } // namespace ablastr::constant
 
 #endif // ABLASTR_CONSTANT_H_
