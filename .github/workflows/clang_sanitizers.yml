@@ -79,8 +79,7 @@ jobs:
   build_thread_sanitizer:
     name: Clang thread sanitizer
     runs-on: ubuntu-24.04
-    # TODO Fix data race conditions and re-enable job
-    if: 0 #github.event.pull_request.draft == false
+    if: github.event.pull_request.draft == false
     env:
       CC: clang
       CXX: clang++
