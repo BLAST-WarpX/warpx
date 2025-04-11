@@ -177,9 +177,10 @@ public:
     void GenerateGlobalDebyeLength ();
 
     /*
-     * \brief Calculates the global electron-ion collision frequency
+     * \brief Calculates the electron-ion collision frequency for the specified species
+     * @param[in] electron_species_name name of the electon species
      */
-    void GenerateGlobalNuei ();
+    void CalculateNuei (std::string const & electron_species_name);
 
     void doFieldIonization (int lev,
                             const amrex::MultiFab& Ex, const amrex::MultiFab& Ey, const amrex::MultiFab& Ez,

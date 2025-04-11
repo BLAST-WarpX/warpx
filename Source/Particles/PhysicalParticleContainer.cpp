@@ -215,8 +215,7 @@ namespace
 
 PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int ispecies,
                                                       const std::string& name)
-    : WarpXParticleContainer(amr_core, ispecies),
-      species_name(name)
+    : WarpXParticleContainer(amr_core, ispecies, name)
 {
     BackwardCompatibility();
 
@@ -426,7 +425,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
 }
 
 PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core)
-    : WarpXParticleContainer(amr_core, 0)
+    : WarpXParticleContainer(amr_core, 0, "")
 {
 }
 

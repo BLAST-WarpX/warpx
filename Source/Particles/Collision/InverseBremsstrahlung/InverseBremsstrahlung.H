@@ -53,7 +53,7 @@ public:
      * @param t current time
      *
      */
-    void doInverseBremsstrahlungWithinTile (amrex::Real dt, int const lev, amrex::MFIter const& mfi,
+    void doInverseBremsstrahlungWithinTile (amrex::Real dt, int lev, amrex::MFIter const& mfi,
                                             WarpXParticleContainer& species_1,
                                             WarpXParticleContainer& species_2);
 

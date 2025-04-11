@@ -689,11 +689,13 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
 }
 
 void
-MultiParticleContainer::GenerateGlobalNuei ()
+MultiParticleContainer::CalculateNuei (std::string const & electron_species_name)
 {
     WarpX & warpx = WarpX::GetInstance();
 
     if (allcontainers.size() == 0) { return; }
+
+    auto& electron_species = GetParticleContainerFromName(electron_species_name);
 
     // Is there a nicer way to get the number of levels?
     // This grabs it from the first species.
@@ -701,20 +703,31 @@ MultiParticleContainer::GenerateGlobalNuei ()
 
     for (int lev = 0 ; lev <= finest_level ; lev++) {
 
-        if (!warpx.m_fields.has(FieldType::global_nuei, lev)) {
+        std::string const field_name = "nuei_" + electron_species_name;
+        if (!warpx.m_fields.has(field_name, lev)) {
             amrex::BoxArray const & ba = warpx.boxArray(lev);
             amrex::DistributionMapping const & dmap = warpx.DistributionMap(lev);
             int const ncomps = 1;
             amrex::IntVect ng = amrex::IntVect::TheZeroVector();
             bool const remake = true;
             bool const redistribute_on_remake = false;
-            warpx.m_fields.alloc_init(FieldType::global_nuei, lev, ba, dmap, ncomps, ng, 0.,
+            warpx.m_fields.alloc_init(field_name, lev, ba, dmap, ncomps, ng, 0.,
                                       remake, redistribute_on_remake);
         }
 
-        amrex::MultiFab & global_nuei = *warpx.m_fields.get(FieldType::global_nuei, lev);
-        global_nuei.setVal(amrex::Real(0.0));
+        amrex::MultiFab & species_nuei = *warpx.m_fields.get(field_name, lev);
+        species_nuei.setVal(amrex::Real(0.0));
 
+        electron_species.CalculateAverageVelocity(lev);
+
+        for (auto& pc : allcontainers) {
+            // Only include interactions with ion species
+            if (pc->species_name == electron_species_name ||
+                pc->getCharge() <= 0. || pc->getMass() == 0.) {
+                continue;
+            }
+            pc->CalculateNuei(species_nuei, electron_species, lev);
+        }
     }
 }
 

@@ -72,7 +72,6 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
         else if (type == "inverse_bremsstrahlung") {
             allcollisions[i] = std::make_unique<InverseBremsstrahlung>(collision_names[i], mypc);
             m_use_global_debye_length = true;
-            m_use_global_nuei = true;
         }
         else{
             WARPX_ABORT_WITH_MESSAGE("Unknown collision type.");
@@ -92,11 +91,8 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
 void CollisionHandler::doCollisions ( amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
 {
 
-    if (m_use_global_debye_length || m_use_global_nuei) {
+    if (m_use_global_debye_length) {
         mypc->GenerateGlobalDebyeLength();
-    }
-    if (m_use_global_nuei) {
-        mypc->GenerateGlobalNuei();
     }
 
     for (auto& collision : allcollisions) {

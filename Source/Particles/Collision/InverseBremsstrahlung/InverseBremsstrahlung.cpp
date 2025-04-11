@@ -40,6 +40,8 @@ InverseBremsstrahlung::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, M
     auto& species1 = mypc->GetParticleContainerFromName(m_species_names[0]);
     auto& species2 = mypc->GetParticleContainerFromName(m_species_names[1]);
 
+    mypc->CalculateNuei(m_species_names[0]);
+
     // Enable tiling
     amrex::MFItInfo info;
     if (amrex::Gpu::notInLaunchRegion()) { info.EnableTiling(species1.tile_size); }
@@ -76,7 +78,7 @@ InverseBremsstrahlung::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, M
 
 
 void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile(
-        amrex::Real dt, int const lev, amrex::MFIter const& mfi,
+        amrex::Real dt, int lev, amrex::MFIter const& mfi,
         WarpXParticleContainer& species_1,
         WarpXParticleContainer& species_2)
 {
@@ -86,8 +88,8 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile(
    ParticleTileType& ptile_2 = species_2.ParticlesAt(lev, mfi);
 
    // Find the particles that are in each cell of this tile
-   ParticleBins bins_1 = ParticleUtils::findParticlesInEachCell(lev, mfi, ptile_1);
-   ParticleBins bins_2 = ParticleUtils::findParticlesInEachCell(lev, mfi, ptile_2);
+   ParticleBins bins_1 = ParticleUtils::findParticlesInEachCell(species_1.Geom(lev), mfi, ptile_1);
+   ParticleBins bins_2 = ParticleUtils::findParticlesInEachCell(species_1.Geom(lev), mfi, ptile_2);
 
     // Extract low-level data
     auto const n_cells = static_cast<int>(bins_1.numBins());
@@ -101,13 +103,13 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile(
     const auto soa_2 = ptile_2.getParticleTileData();
     index_type* AMREX_RESTRICT indices_2 = bins_2.permutationPtr();
     index_type const* AMREX_RESTRICT cell_offsets_2 = bins_2.offsetsPtr();
-    const amrex::ParticleReal q2 = species_2.getCharge();
-    const amrex::ParticleReal m2 = species_2.getMass();
+    /* const amrex::ParticleReal q2 = species_2.getCharge(); */
+    /* const amrex::ParticleReal m2 = species_2.getMass(); */
 
     WarpX & warpx = WarpX::GetInstance();
-    amrex::MultiFab const & global_nuei = *warpx.m_fields.get(warpx::fields::FieldType::global_nuei, lev);
-    amrex::FArrayBox const & global_nuei_fab = global_nuei[mfi];
-    amrex::Real const * global_nuei_data = global_nuei_fab.dataPtr();
+    amrex::MultiFab const & nuei = *warpx.m_fields.get("nuei_" + species_1.getName(), lev);
+    amrex::FArrayBox const & nuei_fab = nuei[mfi];
+    amrex::Real const * nuei_data = nuei_fab.dataPtr();
 
     amrex::Geometry const& geom = warpx.Geom(lev);
     auto const dV = AMREX_D_TERM(geom.CellSize(0), *geom.CellSize(1), *geom.CellSize(2));
@@ -163,14 +165,14 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile(
             amrex::ParticleReal const cell_wpe = PhysConst::q_e*std::sqrt(cell_ne/PhysConst::m_e/PhysConst::ep0);
             amrex::ParticleReal const cell_Ewpe_eV = PhysConst::hbar*cell_wpe/PhysConst::q_e;
 
-            amrex::ParticleReal const cell_nuei = global_nuei_data[i_cell];
+            amrex::ParticleReal const cell_nuei = nuei_data[i_cell];
 
             // loop over photons, adjust weight based on abosrpotion
             // tabulate total momentum and energy absorbed
-            amrex::ParticleReal sum_deltaE_eV = 0.0_prt;
-            amrex::ParticleReal sum_dPx = 0.0_prt;
-            amrex::ParticleReal sum_dPy = 0.0_prt;
-            amrex::ParticleReal sum_dPz = 0.0_prt;
+            /* amrex::ParticleReal sum_deltaE_eV = 0.0_prt; */
+            /* amrex::ParticleReal sum_dPx = 0.0_prt; */
+            /* amrex::ParticleReal sum_dPy = 0.0_prt; */
+            /* amrex::ParticleReal sum_dPz = 0.0_prt; */
 
             for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
 
@@ -198,12 +200,12 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile(
                 }
 
                 // update total energy lost
-                sum_deltaE_eV += dw*Ephoton_eV;
+                /* sum_deltaE_eV += dw*Ephoton_eV; */
 
                 // update total momentum lost
-                sum_dPx += dw*upx;
-                sum_dPy += dw*upy;
-                sum_dPz += dw*upz;
+                /* sum_dPx += dw*upx; */
+                /* sum_dPy += dw*upy; */
+                /* sum_dPz += dw*upz; */
 
             }
 

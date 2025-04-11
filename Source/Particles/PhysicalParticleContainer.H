@@ -369,7 +369,6 @@ protected:
     */
     bool findRefinedInjectionBox (amrex::Box& fine_injection_box, amrex::IntVect& rrfac);
 
-    std::string species_name;
     std::vector<std::unique_ptr<PlasmaInjector>> plasma_injectors;
 
     // When true, adjust the transverse particle positions accounting

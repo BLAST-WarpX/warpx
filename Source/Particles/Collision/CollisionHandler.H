@@ -35,7 +35,6 @@ private:
     amrex::Vector< std::unique_ptr<CollisionBase> > allcollisions;
 
     bool m_use_global_debye_length = false;
-    bool m_use_global_nuei = false;  // Electron-ion collision frequency
 
 };
 

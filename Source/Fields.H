@@ -85,7 +85,6 @@ namespace warpx::fields
         ECTRhofield,
         Venl,
         global_debye_length,
-        global_nuei,  /**< The electron-ion collision frequency */
         sigmaPC
     );
 

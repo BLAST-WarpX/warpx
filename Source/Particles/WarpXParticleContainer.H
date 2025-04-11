@@ -197,7 +197,7 @@ public:
     // DiagnosticParticleData (see above) on this tile.
     using DiagnosticParticles = amrex::Vector<std::map<std::pair<int, int>, DiagnosticParticleData> >;
 
-    WarpXParticleContainer (amrex::AmrCore* amr_core, int ispecies);
+    WarpXParticleContainer (amrex::AmrCore* amr_core, int ispecies, const std::string& name);
     ~WarpXParticleContainer() override = default;
 
     // Move and copy operations
@@ -324,11 +324,13 @@ public:
                                 amrex::Real relative_time,
                                 PushType push_type);
 
-    void DepositTemperature (amrex::MultiFab* temperature, const int lev);
-    std::unique_ptr<amrex::MultiFab> GetTemperature (int lev);
+    void DepositTemperature (amrex::MultiFab & temperature, const int lev);
+    void CalculateTemperature (int lev);
 
-    void DepositNumberDensity (amrex::MultiFab* number_density, const int lev);
-    std::unique_ptr<amrex::MultiFab> GetNumberDensity (int lev);
+    void CalculateNumberDensity (int lev);
+    void CalculateAverageVelocity (int lev);
+    void CalculateNuei(amrex::MultiFab & species_nuei,
+                       WarpXParticleContainer const & electron_species, int lev);
 
     std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);
 
@@ -511,8 +513,11 @@ public:
 
     void setDoNotPush (bool flag) { do_not_push = flag; }
 
+    std::string const & getName() { return species_name; }
+
 protected:
     int species_id;
+    std::string species_name;
 
     amrex::ParticleReal charge;
     amrex::ParticleReal mass;
