@@ -52,9 +52,12 @@ jobs:
   timeoutInMinutes: 240
 
   steps:
-  # set up caches:
+  # Ccache caching:
   # - once stored under a key, they become immutable (even if cache content changes)
   # - for a refresh the key has to change, e.g., hash of a tracked file in the key
+  - bash: |
+      mkdir -p /home/vsts/.ccache
+    displayName: 'Create Ccache Directory'
   - task: Cache@2
     continueOnError: true
     inputs:
@@ -64,7 +67,7 @@ jobs:
          Ccache | "$(System.JobName)" | .azure-pipelines.yml
       path: /home/vsts/.ccache
       cacheHitVar: CCACHE_CACHE_RESTORED
-    displayName: Cache Ccache Objects
+    displayName: 'Cache Ccache Objects'
 
   - bash: |
       set -o nounset errexit pipefail
