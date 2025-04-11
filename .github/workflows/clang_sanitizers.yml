@@ -126,8 +126,9 @@ jobs:
 
     - name: run with thread sanitizer
       run: |
+        # Disabling the gds/shmem component by using gds/hash instead
+        # is required to avoid issues with shared memory.
         export PMIX_MCA_gds=hash
-        export TSAN_OPTIONS='ignore_noninstrumented_modules=1'
 
         # Archer is a data race detector for OpenMP programs.
         # It is required to avoid false positives with OpenMP and it is
@@ -139,6 +140,9 @@ jobs:
         # Archer detected OpenMP application with TSan, supplying OpenMP synchronization semantics
         export OMP_TOOL_LIBRARIES=/usr/lib/llvm-17/lib/libarcher.so
         export ARCHER_OPTIONS="verbose=1"
+
+        # This option is required to avoid false positive reports from the OpenMP runtime
+        export TSAN_OPTIONS='ignore_noninstrumented_modules=1'
 
         export OMP_NUM_THREADS=2
 
