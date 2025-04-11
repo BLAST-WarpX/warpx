@@ -291,3 +291,33 @@ jobs:
         cd Examples/Tests/embedded_circle
         mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_embedded_circle warpx.serialize_initial_conditions = 0
         rm -rf ./diags
+
+        echo "=================================================================================================== "
+        echo "===========  Examples/Physics_applications/laser_acceleration/ (1 task, 3 threads) ================ "
+        echo "=================================================================================================== "
+
+        export OMP_NUM_THREADS=3
+
+        mpirun -n 1 ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_base_rz warpx.serialize_initial_conditions = 0
+        rm -rf ./diags
+        mpirun -n 1 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d warpx.serialize_initial_conditions = 0
+        rm -rf ./diags
+        mpirun -n 1 ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d warpx.serialize_initial_conditions = 0
+        rm -rf ./diags
+        mpirun -n 1 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d warpx.serialize_initial_conditions = 0
+        rm -rf ./diags
+
+        echo "=================================================================================================== "
+        echo "===========  Examples/Physics_applications/laser_acceleration/ (1 task, 4 threads) ================ "
+        echo "=================================================================================================== "
+
+        export OMP_NUM_THREADS=4
+
+        mpirun -n 1 ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_base_rz warpx.serialize_initial_conditions = 0
+        rm -rf ./diags
+        mpirun -n 1 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d warpx.serialize_initial_conditions = 0
+        rm -rf ./diags
+        mpirun -n 1 ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d warpx.serialize_initial_conditions = 0
+        rm -rf ./diags
+        mpirun -n 1 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d warpx.serialize_initial_conditions = 0
+        rm -rf ./diags
