@@ -7,15 +7,9 @@
 # License: BSD-3-Clause-LBNL
 
 
-import os
-import sys
-
 import numpy as np
 from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import c, eV, m_e, micro, milli
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
 
 sigmax = 2 * micro
 sigmay = 1 * micro
@@ -35,8 +29,6 @@ def s(z, sigma, emit):
     at position z, given its emittance and size at focus."""
     return np.sqrt(sigma**2 + emit**2 * (z - z_m - focal_distance) ** 2 / (sigma**2))
 
-
-filename = sys.argv[1]
 
 series = OpenPMDTimeSeries("./diags/openpmd/")
 
@@ -90,7 +82,3 @@ assert np.isclose(uz_m, gamma, rtol=1e-8, atol=0)
 assert np.abs(uz_th) < 1e-8
 assert np.abs(ux_m) < 4
 assert np.isclose(ux_th, emitx / sigmax, rtol=1e-3, atol=0)
-
-
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename)

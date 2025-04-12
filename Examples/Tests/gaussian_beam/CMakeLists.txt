@@ -6,7 +6,7 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_focusing_gaussian_beam  # inputs
-    "analysis.py"  # analysis
+    "analysis_focusing_beam.py"  # analysis
     "analysis_default_regression.py --path diags/diag1000000"  # checksum
     OFF  # dependency
 )
@@ -26,7 +26,7 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_rotated_gaussian_beam  # inputs
-    analysis_rotated_beam.py  # analysis
-    diags/diag1000000  # output
+    "analysis_rotated_beam.py"  # analysis
+    "analysis_default_regression.py --path diags/diag1000000"  # checksum
     OFF  # dependency
 )
