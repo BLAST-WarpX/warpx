@@ -84,6 +84,7 @@ beam1.focal_distance = focal_distance
 beam1.npart = nmacropart
 beam1.q_tot = -charge
 beam1.do_gaussian_beam_rotation = 1
+beam1.do_gaussian_beam_rotation_momenta = 1
 beam1.gaussian_beam_rotation_angle = rotation_angle
 beam1.gaussian_beam_rotation_axis = 0 1 0
 beam1.momentum_distribution_type = gaussian

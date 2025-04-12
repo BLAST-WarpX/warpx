@@ -115,6 +115,7 @@ public:
     bool do_focusing = false;
     amrex::Real focal_distance;
     bool do_rotation = false;
+    bool do_rotation_momenta = false;
     amrex::Real rotation_angle;
     amrex::Vector<amrex::Real> rotation_axis;
 
