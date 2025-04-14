@@ -233,7 +233,7 @@ WarpX::Evolve (int numsteps)
         // Resample particles
         // +1 is necessary here because value of step seen by user (first step is 1) is different than
         // value of step in code (first step is 0)
-        mypc->doResampling(istep[0]+1, verbose);
+        mypc->doResampling(Geom(), istep[0]+1, verbose);
 
         if (evolve_scheme == EvolveScheme::Explicit) {
             applyMirrors(cur_time);
@@ -1139,18 +1139,20 @@ WarpX::doQEDEvents ()
 #endif
 
 void
-WarpX::PushParticlesandDeposit (amrex::Real cur_time, bool skip_current, PushType push_type)
+WarpX::PushParticlesandDeposit (amrex::Real cur_time, bool skip_current,
+                                bool deposit_mass_matrices, PushType push_type)
 {
     // Evolve particles to p^{n+1/2} and x^{n+1}
     // Deposit current, j^{n+1/2}
     for (int lev = 0; lev <= finest_level; ++lev) {
-        PushParticlesandDeposit(lev, cur_time, DtType::Full, skip_current, push_type);
+        PushParticlesandDeposit(lev, cur_time, DtType::Full, skip_current,
+                                deposit_mass_matrices, push_type);
     }
 }
 
 void
 WarpX::PushParticlesandDeposit (int lev, amrex::Real cur_time, DtType a_dt_type, bool skip_current,
-                               PushType push_type)
+                               bool deposit_mass_matrices, PushType push_type)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -1178,6 +1180,7 @@ WarpX::PushParticlesandDeposit (int lev, amrex::Real cur_time, DtType a_dt_type,
         dt[lev],
         a_dt_type,
         skip_current,
+        deposit_mass_matrices,
         push_type
     );
     if (! skip_current) {

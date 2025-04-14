@@ -1,0 +1,1091 @@
+/* Copyright 2019 Axel Huebl, David Grote, Maxence Thevenet
+ * Remi Lehe, Weiqun Zhang, Michael Rowan
+ *
+ * This file is part of WarpX.
+ *
+ * License: BSD-3-Clause-LBNL
+ */
+#ifndef WARPX_MASS_MATRICES_DEPOSITION_H_
+#define WARPX_MASS_MATRICES_DEPOSITION_H_
+
+#include "Particles/Deposition/SharedDepositionUtils.H"
+#include "ablastr/parallelization/KernelTimer.H"
+#include "Particles/Pusher/GetAndSetPosition.H"
+#include "Particles/Gather/FieldGather.H"
+#include "Particles/ShapeFactors.H"
+#include "Utils/TextMsg.H"
+#include "Utils/WarpXAlgorithmSelection.H"
+#include "Utils/WarpXConst.H"
+#ifdef WARPX_DIM_RZ
+#   include "Utils/WarpX_Complex.H"
+#endif
+
+#include <AMReX.H>
+#include <AMReX_Arena.H>
+#include <AMReX_Array4.H>
+#include <AMReX_Dim3.H>
+#include <AMReX_REAL.H>
+
+/**
+ * \brief Set the mass matrices kernels for thread thread_num
+ * \param qs              Species charge
+ * \param ms              Species mass
+ * \param dt              Simulation time step
+ * \param inv_c2          1/c^2
+ * \param rhop            qs*wp*invvol*2.0/(gamma_n + gamma_np1)
+ * \param uxp,uyp,uzp     Proper velocity of particle (time-centered)
+ * \param Bxp,Byp,Bzp     Magnetic field vector components on particle
+ * \param fpxx,fpxy,fpxz  Mass matrices kernels corresponding to dJx
+ * \param fpyx,fpyy,fpyz  Mass matrices kernels corresponding to dJy
+ * \param fpzx,fpzy,fpzz  Mass matrices kernels corresponding to dJz
+ */
+AMREX_GPU_HOST_DEVICE AMREX_INLINE
+void setMassMatricesKernels ( const amrex::ParticleReal qs,
+                              const amrex::ParticleReal ms,
+                              const amrex::ParticleReal dt,
+                              const amrex::ParticleReal inv_c2,
+                              const amrex::ParticleReal rhop,
+                              const amrex::ParticleReal uxp,
+                              const amrex::ParticleReal uyp,
+                              const amrex::ParticleReal uzp,
+                              const amrex::ParticleReal Bxp,
+                              const amrex::ParticleReal Byp,
+                              const amrex::ParticleReal Bzp,
+                              amrex::ParticleReal& fpxx,
+                              amrex::ParticleReal& fpxy,
+                              amrex::ParticleReal& fpxz,
+                              amrex::ParticleReal& fpyx,
+                              amrex::ParticleReal& fpyy,
+                              amrex::ParticleReal& fpyz,
+                              amrex::ParticleReal& fpzx,
+                              amrex::ParticleReal& fpzy,
+                              amrex::ParticleReal& fpzz )
+{
+    using namespace amrex::literals;
+
+    // Convert B on particle to normalized cyclotron units with dt/2.0
+    const amrex::ParticleReal gamma_bar = std::sqrt(1._prt + (uxp*uxp + uyp*uyp + uzp*uzp)*inv_c2);
+    const amrex::ParticleReal alpha = qs/ms*0.5_prt*dt/gamma_bar;
+    const amrex::ParticleReal bxp = alpha*Bxp;
+    const amrex::ParticleReal byp = alpha*Byp;
+    const amrex::ParticleReal bzp = alpha*Bzp;
+
+    // Compute Mass Matrix kernels (non-relativistic for now)
+    amrex::ParticleReal bpsq = bxp*bxp + byp*byp + bzp*bzp;
+    amrex::ParticleReal arogp = alpha*rhop/(1.0_prt + bpsq);
+
+    fpxx = arogp*(bxp*bxp + 1.0_rt);
+    fpxy = arogp*(bxp*byp + bzp);
+    fpxz = arogp*(bxp*bzp - byp);
+
+    fpyx = arogp*(byp*bxp - bzp);
+    fpyy = arogp*(byp*byp + 1.0_rt);
+    fpyz = arogp*(byp*bzp + Bxp);
+
+    fpzx = arogp*(bzp*bxp + byp);
+    fpzy = arogp*(bzp*byp - bxp);
+    fpzz = arogp*(bzp*bzp + 1.0_rt);
+
+}
+
+/**
+ * \brief Kernel for the direct deposition of J and S (mass matrices) for thread thread_num
+ * \tparam depos_order deposition order
+ * \param xp, yp, zp               The particle positions.
+ * \param wqx,wqy,wqz              The particle velocity multiplied by the charge / volume
+ * \param fpxx,fpyy,fpzz           The diagonal mass matrix kernels
+ * \param jx_arr,jy_arr,jz_arr     Array4 of current density, either full array or tile.
+ * \param Sx_arr,Sy_arr,Sz_arr     Array4 of mass matrices, either full array or tile.
+ * \param jx_type,jy_type,jz_type  The j (and S) grid types along each direction, either NODE or CELL
+ * \param dinv                     3D cell size inverse
+ * \param xyzmin                   The lower bounds of the domain
+ * \param lo                       Index lower bounds of domain.
+ */
+template <int depos_order>
+AMREX_GPU_HOST_DEVICE AMREX_INLINE
+void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleReal xp,
+                                         [[maybe_unused]] const amrex::ParticleReal yp,
+                                         [[maybe_unused]] const amrex::ParticleReal zp,
+                                         const amrex::ParticleReal wqx,
+                                         const amrex::ParticleReal wqy,
+                                         const amrex::ParticleReal wqz,
+                                         const amrex::ParticleReal fpxx,
+                                         const amrex::ParticleReal fpyy,
+                                         const amrex::ParticleReal fpzz,
+                                         amrex::Array4<amrex::Real> const& jx_arr,
+                                         amrex::Array4<amrex::Real> const& jy_arr,
+                                         amrex::Array4<amrex::Real> const& jz_arr,
+                                         amrex::Array4<amrex::Real> const& Sx_arr,
+                                         amrex::Array4<amrex::Real> const& Sy_arr,
+                                         amrex::Array4<amrex::Real> const& Sz_arr,
+                                         const amrex::IntVect& jx_type,
+                                         const amrex::IntVect& jy_type,
+                                         const amrex::IntVect& jz_type,
+                                         const amrex::XDim3& dinv,
+                                         const amrex::XDim3& xyzmin,
+                                         const amrex::Dim3 lo )
+{
+    using namespace amrex::literals;
+
+    constexpr int NODE = amrex::IndexType::NODE;
+    constexpr int CELL = amrex::IndexType::CELL;
+
+    // --- Compute shape factors
+    Compute_shape_factor< depos_order > const compute_shape_factor;
+#if (AMREX_SPACEDIM >= 2)
+    // x direction
+    // Get particle position after 1/2 push back in position
+    // Keep these double to avoid bug in single precision
+    const double xmid = (xp - xyzmin.x)*dinv.x;
+
+    // j_j[xyz] leftmost grid point in x that the particle touches for the centering of each current
+    // sx_j[xyz] shape factor along x for the centering of each current
+    // There are only two possible centerings, node or cell centered, so at most only two shape factor
+    // arrays will be needed.
+    // Keep these double to avoid bug in single precision
+    double sx_node[depos_order + 1] = {0.};
+    double sx_cell[depos_order + 1] = {0.};
+    int j_node = 0;
+    int j_cell = 0;
+    if (jx_type[0] == NODE || jy_type[0] == NODE || jz_type[0] == NODE) {
+        j_node = compute_shape_factor(sx_node, xmid);
+    }
+    if (jx_type[0] == CELL || jy_type[0] == CELL || jz_type[0] == CELL) {
+        j_cell = compute_shape_factor(sx_cell, xmid - 0.5);
+    }
+
+    amrex::Real sx_jx[depos_order + 1] = {0._rt};
+    amrex::Real sx_jy[depos_order + 1] = {0._rt};
+    amrex::Real sx_jz[depos_order + 1] = {0._rt};
+    for (int ix=0; ix<=depos_order; ix++)
+    {
+        sx_jx[ix] = ((jx_type[0] == NODE) ? amrex::Real(sx_node[ix]) : amrex::Real(sx_cell[ix]));
+        sx_jy[ix] = ((jy_type[0] == NODE) ? amrex::Real(sx_node[ix]) : amrex::Real(sx_cell[ix]));
+        sx_jz[ix] = ((jz_type[0] == NODE) ? amrex::Real(sx_node[ix]) : amrex::Real(sx_cell[ix]));
+    }
+
+    int const j_jx = ((jx_type[0] == NODE) ? j_node : j_cell);
+    int const j_jy = ((jy_type[0] == NODE) ? j_node : j_cell);
+    int const j_jz = ((jz_type[0] == NODE) ? j_node : j_cell);
+#endif //AMREX_SPACEDIM >= 2
+
+#if defined(WARPX_DIM_3D)
+    // y direction
+    // Keep these double to avoid bug in single precision
+    const double ymid = (yp - xyzmin.y)*dinv.y;
+    double sy_node[depos_order + 1] = {0.};
+    double sy_cell[depos_order + 1] = {0.};
+    int k_node = 0;
+    int k_cell = 0;
+    if (jx_type[1] == NODE || jy_type[1] == NODE || jz_type[1] == NODE) {
+        k_node = compute_shape_factor(sy_node, ymid);
+    }
+    if (jx_type[1] == CELL || jy_type[1] == CELL || jz_type[1] == CELL) {
+        k_cell = compute_shape_factor(sy_cell, ymid - 0.5);
+    }
+    amrex::Real sy_jx[depos_order + 1] = {0._rt};
+    amrex::Real sy_jy[depos_order + 1] = {0._rt};
+    amrex::Real sy_jz[depos_order + 1] = {0._rt};
+    for (int iy=0; iy<=depos_order; iy++)
+    {
+        sy_jx[iy] = ((jx_type[1] == NODE) ? amrex::Real(sy_node[iy]) : amrex::Real(sy_cell[iy]));
+        sy_jy[iy] = ((jy_type[1] == NODE) ? amrex::Real(sy_node[iy]) : amrex::Real(sy_cell[iy]));
+        sy_jz[iy] = ((jz_type[1] == NODE) ? amrex::Real(sy_node[iy]) : amrex::Real(sy_cell[iy]));
+    }
+    int const k_jx = ((jx_type[1] == NODE) ? k_node : k_cell);
+    int const k_jy = ((jy_type[1] == NODE) ? k_node : k_cell);
+    int const k_jz = ((jz_type[1] == NODE) ? k_node : k_cell);
+#endif
+
+    // z direction
+    // Keep these double to avoid bug in single precision
+    constexpr int zdir = WARPX_ZINDEX;
+    const double zmid = (zp - xyzmin.z)*dinv.z;
+    double sz_node[depos_order + 1] = {0.};
+    double sz_cell[depos_order + 1] = {0.};
+    int l_node = 0;
+    int l_cell = 0;
+    if (jx_type[zdir] == NODE || jy_type[zdir] == NODE || jz_type[zdir] == NODE) {
+        l_node = compute_shape_factor(sz_node, zmid);
+    }
+    if (jx_type[zdir] == CELL || jy_type[zdir] == CELL || jz_type[zdir] == CELL) {
+        l_cell = compute_shape_factor(sz_cell, zmid - 0.5);
+    }
+    amrex::Real sz_jx[depos_order + 1] = {0._rt};
+    amrex::Real sz_jy[depos_order + 1] = {0._rt};
+    amrex::Real sz_jz[depos_order + 1] = {0._rt};
+    for (int iz=0; iz<=depos_order; iz++)
+    {
+        sz_jx[iz] = ((jx_type[zdir] == NODE) ? amrex::Real(sz_node[iz]) : amrex::Real(sz_cell[iz]));
+        sz_jy[iz] = ((jy_type[zdir] == NODE) ? amrex::Real(sz_node[iz]) : amrex::Real(sz_cell[iz]));
+        sz_jz[iz] = ((jz_type[zdir] == NODE) ? amrex::Real(sz_node[iz]) : amrex::Real(sz_cell[iz]));
+    }
+    int const l_jx = ((jx_type[zdir] == NODE) ? l_node : l_cell);
+    int const l_jy = ((jy_type[zdir] == NODE) ? l_node : l_cell);
+    int const l_jz = ((jz_type[zdir] == NODE) ? l_node : l_cell);
+
+    // Deposit mass matrix kernels into Sx_arr, Sy_arr and Sz_arr
+#if defined(WARPX_DIM_1D_Z)
+    for (int iz=0; iz<=depos_order; iz++){
+        amrex::Gpu::Atomic::AddNoRet(
+            &jx_arr(lo.x+l_jx+iz, 0, 0, 0),
+            sz_jx[iz]*wqx);
+        amrex::Gpu::Atomic::AddNoRet(
+            &jy_arr(lo.x+l_jy+iz, 0, 0, 0),
+            sz_jy[iz]*wqy);
+        amrex::Gpu::Atomic::AddNoRet(
+            &jz_arr(lo.x+l_jz+iz, 0, 0, 0),
+            sz_jz[iz]*wqz);
+        //
+        amrex::Gpu::Atomic::AddNoRet(
+            &Sx_arr(lo.x+l_jx+iz, 0, 0, 0),
+            sz_jx[iz]*sz_jx[iz]*fpxx);
+        amrex::Gpu::Atomic::AddNoRet(
+            &Sy_arr(lo.x+l_jy+iz, 0, 0, 0),
+            sz_jy[iz]*sz_jy[iz]*fpyy);
+        amrex::Gpu::Atomic::AddNoRet(
+            &Sz_arr(lo.x+l_jz+iz, 0, 0, 0),
+            sz_jz[iz]*sz_jz[iz]*fpzz);
+    }
+#endif
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+    for (int iz=0; iz<=depos_order; iz++){
+        for (int ix=0; ix<=depos_order; ix++){
+            amrex::Gpu::Atomic::AddNoRet(
+                &jx_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, 0),
+                sx_jx[ix]*sz_jx[iz]*wqx);
+            amrex::Gpu::Atomic::AddNoRet(
+                &jy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 0),
+                sx_jy[ix]*sz_jy[iz]*wqy);
+            amrex::Gpu::Atomic::AddNoRet(
+                &jz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, 0),
+                sx_jz[ix]*sz_jz[iz]*wqz);
+            //
+            amrex::Gpu::Atomic::AddNoRet(
+                &Sx_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, 0),
+                sx_jx[ix]*sx_jx[ix]*sz_jx[iz]*sz_jx[iz]*fpxx);
+            amrex::Gpu::Atomic::AddNoRet(
+                &Sy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 0),
+                sx_jy[ix]*sx_jy[ix]*sz_jy[iz]*sz_jy[iz]*fpyy);
+            amrex::Gpu::Atomic::AddNoRet(
+                &Sz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, 0),
+                sx_jz[ix]*sx_jz[ix]*sz_jz[iz]*sz_jz[iz]*fpzz);
+        }
+    }
+#elif defined(WARPX_DIM_3D)
+    for (int iz=0; iz<=depos_order; iz++){
+        for (int iy=0; iy<=depos_order; iy++){
+            for (int ix=0; ix<=depos_order; ix++){
+                amrex::Gpu::Atomic::AddNoRet(
+                    &jx_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz),
+                    sx_jx[ix]*sy_jx[iy]*sz_jx[iz]*wqx);
+                amrex::Gpu::Atomic::AddNoRet(
+                    &jy_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz),
+                    sx_jy[ix]*sy_jy[iy]*sz_jy[iz]*wqy);
+                amrex::Gpu::Atomic::AddNoRet(
+                    &jz_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz),
+                    sx_jz[ix]*sy_jz[iy]*sz_jz[iz]*wqz);
+                //
+                amrex::Gpu::Atomic::AddNoRet(
+                    &Sx_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz),
+                    sx_jx[ix]*sx_jx[ix]*sy_jx[iy]*sy_jx[iy]*sz_jx[iz]*sz_jx[iz]*fpxx);
+                amrex::Gpu::Atomic::AddNoRet(
+                    &Sy_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz),
+                    sx_jy[ix]*sx_jy[ix]*sy_jy[iy]*sy_jy[iy]*sz_jy[iz]*sz_jy[iz]*fpyy);
+                amrex::Gpu::Atomic::AddNoRet(
+                    &Sz_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz),
+                    sx_jz[ix]*sx_jz[ix]*sy_jz[iy]*sy_jz[iy]*sz_jz[iz]*sz_jz[iz]*fpzz);
+            }
+        }
+    }
+#endif
+}
+
+/**
+ * \brief direct deposition of J and mass matrices for thread thread_num
+ * \tparam depos_order deposition order
+ * \param GetPosition              A functor for returning the particle position.
+ * \param wp                       Pointer to array of particle weights.
+ * \param uxp_n,uyp_n,uzp_n        Pointer to arrays of particle momentum at time n.
+ * \param uxp,uyp,uzp              Pointer to arrays of particle momentum at time n+1/2.
+ * \param jx_fab,jy_fab,jz_fab     FArrayBox of current density, either full array or tile.
+ * \param Sx_arr,Sy_arr,Sz_arr     Array4 of the mass matrices, either full array or tile.
+ * \param Bx_arr,By_arr,Bz_arr     Array4 of the magnetic field, either full array or tile.
+ * \param Bx_type,By_type,Bz_type  IndexType of the magnetic field
+ * \param np_to_deposit            Number of particles for which current is deposited.
+ * \param dt                       Time step for particle.
+ * \param dinv                     3D cell size inverse.
+ * \param xyzmin                   Physical lower bounds of domain.
+ * \param lo                       Index lower bounds of domain.
+ * \param qs                       Species charge.
+ * \param ms                       Species mass.
+ */
+template <int depos_order>
+void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
+                                   const amrex::ParticleReal* wp,
+                                   const amrex::ParticleReal* uxp_n,
+                                   const amrex::ParticleReal* uyp_n,
+                                   const amrex::ParticleReal* uzp_n,
+                                   const amrex::ParticleReal* uxp,
+                                   const amrex::ParticleReal* uyp,
+                                   const amrex::ParticleReal* uzp,
+                                   amrex::FArrayBox& jx_fab,
+                                   amrex::FArrayBox& jy_fab,
+                                   amrex::FArrayBox& jz_fab,
+                                   amrex::Array4<amrex::Real> const& Sx_arr,
+                                   amrex::Array4<amrex::Real> const& Sy_arr,
+                                   amrex::Array4<amrex::Real> const& Sz_arr,
+                                   const amrex::Array4<amrex::Real const>& Bx_arr,
+                                   const amrex::Array4<amrex::Real const>& By_arr,
+                                   const amrex::Array4<amrex::Real const>& Bz_arr,
+                                   const amrex::IndexType Bx_type,
+                                   const amrex::IndexType By_type,
+                                   const amrex::IndexType Bz_type,
+                                   const long np_to_deposit,
+                                   const amrex::Real dt,
+                                   const amrex::XDim3& dinv,
+                                   const amrex::XDim3& xyzmin,
+                                   const amrex::Dim3 lo,
+                                   const amrex::Real qs,
+                                   const amrex::Real ms )
+{
+    using namespace amrex::literals;
+
+    const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
+
+    amrex::Array4<amrex::Real> const& jx_arr = jx_fab.array();
+    amrex::Array4<amrex::Real> const& jy_arr = jy_fab.array();
+    amrex::Array4<amrex::Real> const& jz_arr = jz_fab.array();
+    amrex::IntVect const jx_type = jx_fab.box().type();
+    amrex::IntVect const jy_type = jy_fab.box().type();
+    amrex::IntVect const jz_type = jz_fab.box().type();
+
+    // Loop over particles and deposit into jx_fab, jy_fab and jz_fab
+    amrex::ParallelFor(
+            np_to_deposit,
+            [=] AMREX_GPU_DEVICE (long ip) {
+            amrex::ParticleReal xp_nph, yp_nph, zp_nph;
+            GetPosition(ip, xp_nph, yp_nph, zp_nph);
+
+            // Compute magnetic field on particle
+            amrex::ParticleReal Bxp = 0.0;
+            amrex::ParticleReal Byp = 0.0;
+            amrex::ParticleReal Bzp = 0.0;
+            const int depos_order_perp = 1;
+            const int depos_order_para = 1;
+            const int n_rz_azimuthal_modes = 0;
+            doDirectGatherVectorField<depos_order_perp,depos_order_para>(
+                                    xp_nph, yp_nph, zp_nph,
+                                    Bxp, Byp, Bzp,
+                                    Bx_arr, By_arr, Bz_arr,
+                                    Bx_type, By_type, Bz_type,
+                                    dinv, xyzmin, lo, n_rz_azimuthal_modes );
+
+            constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
+
+            // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
+            // The uxp,uyp,uzp are the velocities at time level n+1/2
+            const amrex::ParticleReal uxp_np1 = 2._prt*uxp[ip] - uxp_n[ip];
+            const amrex::ParticleReal uyp_np1 = 2._prt*uyp[ip] - uyp_n[ip];
+            const amrex::ParticleReal uzp_np1 = 2._prt*uzp[ip] - uzp_n[ip];
+            const amrex::ParticleReal gamma_n = std::sqrt(1._prt + (uxp_n[ip]*uxp_n[ip] + uyp_n[ip]*uyp_n[ip] + uzp_n[ip]*uzp_n[ip])*inv_c2);
+            const amrex::ParticleReal gamma_np1 = std::sqrt(1._prt + (uxp_np1*uxp_np1 + uyp_np1*uyp_np1 + uzp_np1*uzp_np1)*inv_c2);
+            const amrex::ParticleReal gaminv = 2.0_prt/(gamma_n + gamma_np1);
+
+            // Compute current density kernels to deposit
+            const amrex::Real rhop = qs*wp[ip]*invvol*gaminv;
+            amrex::Real wqx  = rhop*uxp[ip];
+            amrex::Real wqy  = rhop*uyp[ip];
+            amrex::Real wqz  = rhop*uzp[ip];
+
+            // Set the Mass Matrices kernels
+            amrex::ParticleReal fpxx, fpxy, fpxz;
+            amrex::ParticleReal fpyx, fpyy, fpyz;
+            amrex::ParticleReal fpzx, fpzy, fpzz;
+            setMassMatricesKernels( qs, ms, dt, inv_c2, rhop,
+                                    uxp[ip], uyp[ip], uzp[ip],
+                                    Bxp, Byp, Bzp,
+                                    fpxx, fpxy, fpxz,
+                                    fpyx, fpyy, fpyz,
+                                    fpzx, fpzy, fpzz );
+            amrex::ignore_unused(fpxy,fpxz);
+            amrex::ignore_unused(fpyx,fpyz);
+            amrex::ignore_unused(fpzx,fpzy);
+
+            doDirectJandSigmaDepositionKernel<depos_order>( xp_nph, yp_nph, zp_nph,
+                                                            wqx, wqy, wqz,
+                                                            fpxx, fpyy, fpzz,
+                                                            jx_arr, jy_arr, jz_arr,
+                                                            Sx_arr, Sy_arr, Sz_arr,
+                                                            jx_type, jy_type, jz_type,
+                                                            dinv, xyzmin, lo );
+
+        }
+    );
+}
+
+/**
+ * \brief Kernel for the Villasenor deposition of J and S (mass matrices) for thread thread_num
+ * \param depos_order  deposition order
+ * \param xp_old,yp_old,zp_old     Old particle positions (nominally at start of step)
+ * \param xp_new,yp_new,zp_new     New particle positions (nominally at end of step)
+ * \param wp_invvol                Particle charge / volume
+ * \param uxp_mid,uyp_mid,uzp_mid  Particle momentum at middle of step
+ * \param gaminv                   One over gamma for particle at middle of step
+ * \param fpxx,fpyy,fpzz           The diagonal mass matrix kernels
+ * \param Jx_arr,Jy_arr,Jz_arr     Array4 of current density, either full array or tile
+ * \param Sx_arr,Sy_arr,Sz_arr     Array4 of mass matrices, either full array or tile
+ * \param dt                       Time step for particle level
+ * \param dinv                     3D cell size inverse
+ * \param xyzmin                   Physical lower bounds of domain
+ * \param lo                       Index lower bounds of domain
+ */
+template <int depos_order>
+AMREX_GPU_HOST_DEVICE AMREX_INLINE
+void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleReal xp_old,
+                                             [[maybe_unused]] const amrex::ParticleReal yp_old,
+                                             [[maybe_unused]] const amrex::ParticleReal zp_old,
+                                             [[maybe_unused]] const amrex::ParticleReal xp_new,
+                                             [[maybe_unused]] const amrex::ParticleReal yp_new,
+                                             [[maybe_unused]] const amrex::ParticleReal zp_new,
+                                             const amrex::ParticleReal wq_invvol,
+                                             [[maybe_unused]] const amrex::ParticleReal uxp_mid,
+                                             [[maybe_unused]] const amrex::ParticleReal uyp_mid,
+                                             [[maybe_unused]] const amrex::ParticleReal uzp_mid,
+                                             [[maybe_unused]] const amrex::ParticleReal gaminv,
+                                             const amrex::ParticleReal fpxx,
+                                             const amrex::ParticleReal fpyy,
+                                             const amrex::ParticleReal fpzz,
+                                             amrex::Array4<amrex::Real> const& Jx_arr,
+                                             amrex::Array4<amrex::Real> const& Jy_arr,
+                                             amrex::Array4<amrex::Real> const& Jz_arr,
+                                             amrex::Array4<amrex::Real> const& Sx_arr,
+                                             amrex::Array4<amrex::Real> const& Sy_arr,
+                                             amrex::Array4<amrex::Real> const& Sz_arr,
+                                             const amrex::Real dt,
+                                             const amrex::XDim3& dinv,
+                                             const amrex::XDim3& xyzmin,
+                                             const amrex::Dim3 lo )
+{
+
+    using namespace amrex::literals;
+
+#if (AMREX_SPACEDIM > 1)
+    amrex::Real constexpr one_third = 1.0_rt / 3.0_rt;
+    amrex::Real constexpr one_sixth = 1.0_rt / 6.0_rt;
+#endif
+
+    // computes current and old position in grid units
+#if defined(WARPX_DIM_RZ)
+    amrex::Real const xp_mid = (xp_new + xp_old)*0.5_rt;
+    amrex::Real const yp_mid = (yp_new + yp_old)*0.5_rt;
+    amrex::Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new);
+    amrex::Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old);
+    amrex::Real const rp_mid = (rp_new + rp_old)/2._rt;
+    amrex::Real const costheta_mid = (rp_mid > 0._rt ? xp_mid/rp_mid : 1._rt);
+    amrex::Real const sintheta_mid = (rp_mid > 0._rt ? yp_mid/rp_mid : 0._rt);
+
+    // Keep these double to avoid bug in single precision
+    double const x_new = (rp_new - xyzmin.x)*dinv.x;
+    double const x_old = (rp_old - xyzmin.x)*dinv.x;
+    amrex::Real const vx = (rp_new - rp_old)/dt;
+    amrex::Real const vy = (-uxp_mid*sintheta_mid + uyp_mid*costheta_mid)*gaminv;
+#elif defined(WARPX_DIM_XZ)
+    // Keep these double to avoid bug in single precision
+    double const x_new = (xp_new - xyzmin.x)*dinv.x;
+    double const x_old = (xp_old - xyzmin.x)*dinv.x;
+    amrex::Real const vx = (xp_new - xp_old)/dt;
+    amrex::Real const vy = uyp_mid*gaminv;
+#elif defined(WARPX_DIM_1D_Z)
+    amrex::Real const vx = uxp_mid*gaminv;
+    amrex::Real const vy = uyp_mid*gaminv;
+#elif defined(WARPX_DIM_3D)
+    // Keep these double to avoid bug in single precision
+    double const x_new = (xp_new - xyzmin.x)*dinv.x;
+    double const x_old = (xp_old - xyzmin.x)*dinv.x;
+    double const y_new = (yp_new - xyzmin.y)*dinv.y;
+    double const y_old = (yp_old - xyzmin.y)*dinv.y;
+    amrex::Real const vx = (xp_new - xp_old)/dt;
+    amrex::Real const vy = (yp_new - yp_old)/dt;
+#endif
+
+    // Keep these double to avoid bug in single precision
+    double const z_new = (zp_new - xyzmin.z)*dinv.z;
+    double const z_old = (zp_old - xyzmin.z)*dinv.z;
+    amrex::Real const vz = (zp_new - zp_old)/dt;
+
+    // Define velocity kernels to deposit
+    amrex::Real const wqx = wq_invvol*vx;
+    amrex::Real const wqy = wq_invvol*vy;
+    amrex::Real const wqz = wq_invvol*vz;
+
+    // 1) Determine the number of segments.
+    // 2) Loop over segments and deposit current.
+
+    // cell crossings are defined at cell edges if depos_order is odd
+    // cell crossings are defined at cell centers if depos_order is even
+
+    int num_segments = 1;
+    double shift = 0.0;
+    if ( (depos_order % 2) == 0 ) { shift = 0.5; }
+
+#if defined(WARPX_DIM_3D)
+
+    // compute cell crossings in X-direction
+    const auto i_old = static_cast<int>(x_old-shift);
+    const auto i_new = static_cast<int>(x_new-shift);
+    const int cell_crossings_x = std::abs(i_new-i_old);
+    num_segments += cell_crossings_x;
+
+    // compute cell crossings in Y-direction
+    const auto j_old = static_cast<int>(y_old-shift);
+    const auto j_new = static_cast<int>(y_new-shift);
+    const int cell_crossings_y = std::abs(j_new-j_old);
+    num_segments += cell_crossings_y;
+
+    // compute cell crossings in Z-direction
+    const auto k_old = static_cast<int>(z_old-shift);
+    const auto k_new = static_cast<int>(z_new-shift);
+    const int cell_crossings_z = std::abs(k_new-k_old);
+    num_segments += cell_crossings_z;
+
+    // need to assert that the number of cell crossings in each direction
+    // is within the range permitted by the number of guard cells
+    // e.g., if (num_segments > 7) ...
+
+    // compute total change in particle position and the initial cell
+    // locations in each direction used to find the position at cell crossings.
+    const double dxp = x_new - x_old;
+    const double dyp = y_new - y_old;
+    const double dzp = z_new - z_old;
+    const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
+    const auto dirY_sign = static_cast<double>(dyp < 0. ? -1. : 1.);
+    const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
+    double Xcell = 0., Ycell = 0., Zcell = 0.;
+    if (num_segments > 1) {
+        Xcell = static_cast<double>(i_old) + shift + 0.5*(1.-dirX_sign);
+        Ycell = static_cast<double>(j_old) + shift + 0.5*(1.-dirY_sign);
+        Zcell = static_cast<double>(k_old) + shift + 0.5*(1.-dirZ_sign);
+    }
+
+    // loop over the number of segments and deposit
+    const Compute_shape_factor< depos_order-1 > compute_shape_factor_cell;
+    const Compute_shape_factor_pair< depos_order > compute_shape_factors_node;
+    double dxp_seg, dyp_seg, dzp_seg;
+    double x0_new, y0_new, z0_new;
+    double x0_old = x_old;
+    double y0_old = y_old;
+    double z0_old = z_old;
+
+    for (int ns=0; ns<num_segments; ns++) {
+
+        if (ns == num_segments-1) { // final segment
+
+            x0_new = x_new;
+            y0_new = y_new;
+            z0_new = z_new;
+            dxp_seg = x0_new - x0_old;
+            dyp_seg = y0_new - y0_old;
+            dzp_seg = z0_new - z0_old;
+
+        }
+        else {
+
+            x0_new = Xcell + dirX_sign;
+            y0_new = Ycell + dirY_sign;
+            z0_new = Zcell + dirZ_sign;
+            dxp_seg = x0_new - x0_old;
+            dyp_seg = y0_new - y0_old;
+            dzp_seg = z0_new - z0_old;
+
+            if ( (dyp == 0. || std::abs(dxp_seg) < std::abs(dxp/dyp*dyp_seg))
+              && (dzp == 0. || std::abs(dxp_seg) < std::abs(dxp/dzp*dzp_seg)) ) {
+                Xcell = x0_new;
+                dyp_seg = dyp/dxp*dxp_seg;
+                dzp_seg = dzp/dxp*dxp_seg;
+                y0_new = y0_old + dyp_seg;
+                z0_new = z0_old + dzp_seg;
+            }
+            else if (dzp == 0. || std::abs(dyp_seg) < std::abs(dyp/dzp*dzp_seg)) {
+                Ycell = y0_new;
+                dxp_seg = dxp/dyp*dyp_seg;
+                dzp_seg = dzp/dyp*dyp_seg;
+                x0_new = x0_old + dxp_seg;
+                z0_new = z0_old + dzp_seg;
+            }
+            else {
+                Zcell = z0_new;
+                dxp_seg = dxp/dzp*dzp_seg;
+                dyp_seg = dyp/dzp*dzp_seg;
+                x0_new = x0_old + dxp_seg;
+                y0_new = y0_old + dyp_seg;
+            }
+
+        }
+
+        // compute the segment factors (each equal to dt_seg/dt for nonzero dxp, dyp, or dzp)
+        const auto seg_factor_x = static_cast<double>(dxp == 0. ? 1. : dxp_seg/dxp);
+        const auto seg_factor_y = static_cast<double>(dyp == 0. ? 1. : dyp_seg/dyp);
+        const auto seg_factor_z = static_cast<double>(dzp == 0. ? 1. : dzp_seg/dzp);
+
+        // compute cell-based weights using the average segment position
+        double sx_cell[depos_order] = {0.};
+        double sy_cell[depos_order] = {0.};
+        double sz_cell[depos_order] = {0.};
+        double const x0_bar = (x0_new + x0_old)/2.0;
+        double const y0_bar = (y0_new + y0_old)/2.0;
+        double const z0_bar = (z0_new + z0_old)/2.0;
+        const int i0_cell = compute_shape_factor_cell( sx_cell, x0_bar-0.5 );
+        const int j0_cell = compute_shape_factor_cell( sy_cell, y0_bar-0.5 );
+        const int k0_cell = compute_shape_factor_cell( sz_cell, z0_bar-0.5 );
+
+        if constexpr (depos_order >= 3) { // higher-order correction to the cell-based weights
+            const Compute_shape_factor_pair<depos_order-1> compute_shape_factors_cell;
+            double sx_old_cell[depos_order] = {0.};
+            double sx_new_cell[depos_order] = {0.};
+            double sy_old_cell[depos_order] = {0.};
+            double sy_new_cell[depos_order] = {0.};
+            double sz_old_cell[depos_order] = {0.};
+            double sz_new_cell[depos_order] = {0.};
+            const int i0_cell_2 = compute_shape_factors_cell( sx_old_cell, sx_new_cell, x0_old-0.5, x0_new-0.5 );
+            const int j0_cell_2 = compute_shape_factors_cell( sy_old_cell, sy_new_cell, y0_old-0.5, y0_new-0.5 );
+            const int k0_cell_2 = compute_shape_factors_cell( sz_old_cell, sz_new_cell, z0_old-0.5, z0_new-0.5 );
+            amrex::ignore_unused(i0_cell_2, j0_cell_2, k0_cell_2);
+            for (int m=0; m<depos_order; m++) {
+                sx_cell[m] = (4.0*sx_cell[m] + sx_old_cell[m] + sx_new_cell[m])/6.0;
+                sy_cell[m] = (4.0*sy_cell[m] + sy_old_cell[m] + sy_new_cell[m])/6.0;
+                sz_cell[m] = (4.0*sz_cell[m] + sz_old_cell[m] + sz_new_cell[m])/6.0;
+            }
+        }
+
+        // compute node-based weights using the old and new segment positions
+        double sx_old_node[depos_order+1] = {0.};
+        double sx_new_node[depos_order+1] = {0.};
+        double sy_old_node[depos_order+1] = {0.};
+        double sy_new_node[depos_order+1] = {0.};
+        double sz_old_node[depos_order+1] = {0.};
+        double sz_new_node[depos_order+1] = {0.};
+        const int i0_node = compute_shape_factors_node( sx_old_node, sx_new_node, x0_old, x0_new );
+        const int j0_node = compute_shape_factors_node( sy_old_node, sy_new_node, y0_old, y0_new );
+        const int k0_node = compute_shape_factors_node( sz_old_node, sz_new_node, z0_old, z0_new );
+
+        // deposit Jx and Sx for this segment
+        amrex::Real weight;
+        for (int i=0; i<=depos_order-1; i++) {
+            for (int j=0; j<=depos_order; j++) {
+                for (int k=0; k<=depos_order; k++) {
+                    weight = sx_cell[i]*( sy_old_node[j]*sz_old_node[k]*one_third
+                                        + sy_old_node[j]*sz_new_node[k]*one_sixth
+                                        + sy_new_node[j]*sz_old_node[k]*one_sixth
+                                        + sy_new_node[j]*sz_new_node[k]*one_third )*seg_factor_x;
+                    amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i0_cell+i, lo.y+j0_node+j, lo.z+k0_node+k), wqx*weight);
+                    amrex::Gpu::Atomic::AddNoRet( &Sx_arr(lo.x+i0_cell+i, lo.y+j0_node+j, lo.z+k0_node+k), fpxx*weight*weight);
+                }
+            }
+        }
+
+        // deposit Jy and Sy or this segment
+        for (int i=0; i<=depos_order; i++) {
+            for (int j=0; j<=depos_order-1; j++) {
+                for (int k=0; k<=depos_order; k++) {
+                    weight = sy_cell[j]*( sx_old_node[i]*sz_old_node[k]*one_third
+                                        + sx_old_node[i]*sz_new_node[k]*one_sixth
+                                        + sx_new_node[i]*sz_old_node[k]*one_sixth
+                                        + sx_new_node[i]*sz_new_node[k]*one_third )*seg_factor_y;
+                    amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i0_node+i, lo.y+j0_cell+j, lo.z+k0_node+k), wqy*weight);
+                    amrex::Gpu::Atomic::AddNoRet( &Sy_arr(lo.x+i0_node+i, lo.y+j0_cell+j, lo.z+k0_node+k), fpyy*weight*weight);
+                }
+            }
+        }
+
+        // deposit Jz and Sz for this segment
+        for (int i=0; i<=depos_order; i++) {
+            for (int j=0; j<=depos_order; j++) {
+                for (int k=0; k<=depos_order-1; k++) {
+                    weight = sz_cell[k]*( sx_old_node[i]*sy_old_node[j]*one_third
+                                        + sx_old_node[i]*sy_new_node[j]*one_sixth
+                                        + sx_new_node[i]*sy_old_node[j]*one_sixth
+                                        + sx_new_node[i]*sy_new_node[j]*one_third )*seg_factor_z;
+                    amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node+i, lo.y+j0_node+j, lo.z+k0_cell+k), wqz*weight);
+                    amrex::Gpu::Atomic::AddNoRet( &Sz_arr(lo.x+i0_node+i, lo.y+j0_node+j, lo.z+k0_cell+k), fpzz*weight*weight);
+                }
+            }
+        }
+
+        // update old segment values
+        if (ns < num_segments-1) {
+            x0_old = x0_new;
+            y0_old = y0_new;
+            z0_old = z0_new;
+        }
+
+    } // end loop over segments
+
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+
+    // compute cell crossings in X-direction
+    const auto i_old = static_cast<int>(x_old-shift);
+    const auto i_new = static_cast<int>(x_new-shift);
+    const int cell_crossings_x = std::abs(i_new-i_old);
+    num_segments += cell_crossings_x;
+
+    // compute cell crossings in Z-direction
+    const auto k_old = static_cast<int>(z_old-shift);
+    const auto k_new = static_cast<int>(z_new-shift);
+    const int cell_crossings_z = std::abs(k_new-k_old);
+    num_segments += cell_crossings_z;
+
+    // need to assert that the number of cell crossings in each direction
+    // is within the range permitted by the number of guard cells
+    // e.g., if (num_segments > 5) ...
+
+    // compute total change in particle position and the initial cell
+    // locations in each direction used to find the position at cell crossings.
+    const double dxp = x_new - x_old;
+    const double dzp = z_new - z_old;
+    const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
+    const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
+    double Xcell = 0., Zcell = 0.;
+    if (num_segments > 1) {
+        Xcell = static_cast<double>(i_old) + shift + 0.5*(1.-dirX_sign);
+        Zcell = static_cast<double>(k_old) + shift + 0.5*(1.-dirZ_sign);
+    }
+
+    // loop over the number of segments and deposit
+    const Compute_shape_factor< depos_order-1 > compute_shape_factor_cell;
+    const Compute_shape_factor_pair< depos_order > compute_shape_factors_node;
+    double dxp_seg, dzp_seg;
+    double x0_new, z0_new;
+    double x0_old = x_old;
+    double z0_old = z_old;
+
+    for (int ns=0; ns<num_segments; ns++) {
+
+        if (ns == num_segments-1) { // final segment
+
+            x0_new = x_new;
+            z0_new = z_new;
+            dxp_seg = x0_new - x0_old;
+            dzp_seg = z0_new - z0_old;
+
+        }
+        else {
+
+            x0_new = Xcell + dirX_sign;
+            z0_new = Zcell + dirZ_sign;
+            dxp_seg = x0_new - x0_old;
+            dzp_seg = z0_new - z0_old;
+
+            if (dzp == 0. || std::abs(dxp_seg) < std::abs(dxp/dzp*dzp_seg)) {
+                Xcell = x0_new;
+                dzp_seg = dzp/dxp*dxp_seg;
+                z0_new = z0_old + dzp_seg;
+            }
+            else {
+                Zcell = z0_new;
+                dxp_seg = dxp/dzp*dzp_seg;
+                x0_new = x0_old + dxp_seg;
+            }
+
+        }
+
+        // compute the segment factors (each equal to dt_seg/dt for nonzero dxp, or dzp)
+        const auto seg_factor_x = static_cast<double>(dxp == 0. ? 1. : dxp_seg/dxp);
+        const auto seg_factor_z = static_cast<double>(dzp == 0. ? 1. : dzp_seg/dzp);
+
+        // compute cell-based weights using the average segment position
+        double sx_cell[depos_order] = {0.};
+        double sz_cell[depos_order] = {0.};
+        double const x0_bar = (x0_new + x0_old)/2.0;
+        double const z0_bar = (z0_new + z0_old)/2.0;
+        const int i0_cell = compute_shape_factor_cell( sx_cell, x0_bar-0.5 );
+        const int k0_cell = compute_shape_factor_cell( sz_cell, z0_bar-0.5 );
+
+        if constexpr (depos_order >= 3) { // higher-order correction to the cell-based weights
+            const Compute_shape_factor_pair<depos_order-1> compute_shape_factors_cell;
+            double sx_old_cell[depos_order] = {0.};
+            double sx_new_cell[depos_order] = {0.};
+            double sz_old_cell[depos_order] = {0.};
+            double sz_new_cell[depos_order] = {0.};
+            const int i0_cell_2 = compute_shape_factors_cell( sx_old_cell, sx_new_cell, x0_old-0.5, x0_new-0.5 );
+            const int k0_cell_2 = compute_shape_factors_cell( sz_old_cell, sz_new_cell, z0_old-0.5, z0_new-0.5 );
+            amrex::ignore_unused(i0_cell_2, k0_cell_2);
+            for (int m=0; m<depos_order; m++) {
+                sx_cell[m] = (4.0*sx_cell[m] + sx_old_cell[m] + sx_new_cell[m])/6.0;
+                sz_cell[m] = (4.0*sz_cell[m] + sz_old_cell[m] + sz_new_cell[m])/6.0;
+            }
+        }
+
+        // compute node-based weights using the old and new segment positions
+        double sx_old_node[depos_order+1] = {0.};
+        double sx_new_node[depos_order+1] = {0.};
+        double sz_old_node[depos_order+1] = {0.};
+        double sz_new_node[depos_order+1] = {0.};
+        const int i0_node = compute_shape_factors_node( sx_old_node, sx_new_node, x0_old, x0_new );
+        const int k0_node = compute_shape_factors_node( sz_old_node, sz_new_node, z0_old, z0_new );
+
+        // deposit Jx and Sx for this segment
+        amrex::Real weight;
+        for (int i=0; i<=depos_order-1; i++) {
+            for (int k=0; k<=depos_order; k++) {
+                weight = sx_cell[i]*(sz_old_node[k] + sz_new_node[k])/2.0_rt*seg_factor_x;
+                amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i0_cell+i, lo.y+k0_node+k, 0, 0), wqx*weight);
+                amrex::Gpu::Atomic::AddNoRet( &Sx_arr(lo.x+i0_cell+i, lo.y+k0_node+k, 0, 0), fpxx*weight*weight);
+            }
+        }
+
+        // deposit out-of-plane Jy and Sy for this segment
+        const auto seg_factor_y = std::min(seg_factor_x,seg_factor_z);
+        for (int i=0; i<=depos_order; i++) {
+            for (int k=0; k<=depos_order; k++) {
+                weight = ( sx_old_node[i]*sz_old_node[k]*one_third
+                       +   sx_old_node[i]*sz_new_node[k]*one_sixth
+                       +   sx_new_node[i]*sz_old_node[k]*one_sixth
+                       +   sx_new_node[i]*sz_new_node[k]*one_third )*seg_factor_y;
+                amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i0_node+i, lo.y+k0_node+k, 0, 0), wqy*weight);
+                amrex::Gpu::Atomic::AddNoRet( &Sy_arr(lo.x+i0_node+i, lo.y+k0_node+k, 0, 0), fpyy*weight*weight);
+            }
+        }
+
+        // deposit Jz and Sz for this segment
+        for (int i=0; i<=depos_order; i++) {
+            for (int k=0; k<=depos_order-1; k++) {
+                weight = sz_cell[k]*(sx_old_node[i] + sx_new_node[i])/2.0_rt*seg_factor_z;
+                amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node+i, lo.y+k0_cell+k, 0, 0), wqz*weight);
+                amrex::Gpu::Atomic::AddNoRet( &Sz_arr(lo.x+i0_node+i, lo.y+k0_cell+k, 0, 0), fpzz*weight*weight);
+            }
+        }
+
+        // update old segment values
+        if (ns < num_segments-1) {
+            x0_old = x0_new;
+            z0_old = z0_new;
+        }
+
+    } // end loop over segments
+
+#elif defined(WARPX_DIM_1D_Z)
+
+    // compute cell crossings in Z-direction
+    const auto k_old = static_cast<int>(z_old-shift);
+    const auto k_new = static_cast<int>(z_new-shift);
+    const int cell_crossings_z = std::abs(k_new-k_old);
+    num_segments += cell_crossings_z;
+
+    // need to assert that the number of cell crossings in each direction
+    // is within the range permitted by the number of guard cells
+    // e.g., if (num_segments > 3) ...
+
+    // compute dzp and the initial cell location used to find the cell crossings.
+    double const dzp = z_new - z_old;
+    const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
+    double Zcell = static_cast<double>(k_old) + shift + 0.5*(1.-dirZ_sign);
+
+    // loop over the number of segments and deposit
+    const Compute_shape_factor< depos_order-1 > compute_shape_factor_cell;
+    const Compute_shape_factor_pair< depos_order > compute_shape_factors_node;
+    double dzp_seg;
+    double z0_new;
+    double z0_old = z_old;
+
+    for (int ns=0; ns<num_segments; ns++) {
+
+        if (ns == num_segments-1) { // final segment
+            z0_new = z_new;
+            dzp_seg = z0_new - z0_old;
+        }
+        else {
+            Zcell = Zcell + dirZ_sign;
+            z0_new = Zcell;
+            dzp_seg = z0_new - z0_old;
+        }
+
+        // compute the segment factor (equal to dt_seg/dt for nonzero dzp)
+        const auto seg_factor = static_cast<double>(dzp == 0. ? 1. : dzp_seg/dzp);
+
+        // compute cell-based weights using the average segment position
+        double sz_cell[depos_order] = {0.};
+        double const z0_bar = (z0_new + z0_old)/2.0;
+        const int k0_cell = compute_shape_factor_cell( sz_cell, z0_bar-0.5 );
+
+        if constexpr (depos_order >= 3) { // higher-order correction to the cell-based weights
+            const Compute_shape_factor_pair<depos_order-1> compute_shape_factors_cell;
+            double sz_old_cell[depos_order] = {0.};
+            double sz_new_cell[depos_order] = {0.};
+            const int k0_cell_2 = compute_shape_factors_cell( sz_old_cell, sz_new_cell, z0_old-0.5, z0_new-0.5 );
+            amrex::ignore_unused(k0_cell_2);
+            for (int m=0; m<depos_order; m++) {
+                sz_cell[m] = (4.0*sz_cell[m] + sz_old_cell[m] + sz_new_cell[m])/6.0;
+            }
+        }
+
+        // compute node-based weights using the old and new segment positions
+        double sz_old_node[depos_order+1] = {0.};
+        double sz_new_node[depos_order+1] = {0.};
+        const int k0_node = compute_shape_factors_node( sz_old_node, sz_new_node, z0_old, z0_new );
+
+        // deposit out-of-plane Jx, Jy, Sx, and Sy for this segment
+        for (int k=0; k<=depos_order; k++) {
+            const amrex::Real weight = 0.5_rt*(sz_old_node[k] + sz_new_node[k])*seg_factor;
+            amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+k0_node+k, 0, 0), wqx*weight);
+            amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+k0_node+k, 0, 0), wqy*weight);
+            //
+            amrex::Gpu::Atomic::AddNoRet( &Sx_arr(lo.x+k0_node+k, 0, 0), fpxx*weight*weight);
+            amrex::Gpu::Atomic::AddNoRet( &Sy_arr(lo.x+k0_node+k, 0, 0), fpyy*weight*weight);
+        }
+
+        // deposit Jz and Sz for this segment
+        for (int k=0; k<=depos_order-1; k++) {
+            const amrex::Real weight = sz_cell[k]*seg_factor;
+            amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+k0_cell+k, 0, 0), wqz*weight);
+            //
+            amrex::Gpu::Atomic::AddNoRet( &Sz_arr(lo.x+k0_cell+k, 0, 0), fpzz*weight*weight);
+        }
+
+        // update old segment values
+        if (ns < num_segments-1) {
+            z0_old = z0_new;
+        }
+
+    }
+
+#endif
+}
+
+/**
+ * \brief Villasenor and Buneman deposition of J and mass matrices for thread thread_num
+ * \param depos_order  deposition order
+ * \param xp_n,yp_n,zp_n           Pointer to arrays of particle position at time level n.
+ * \param GetPosition              A functor for returning the particle position.
+ * \param wp                       Pointer to array of particle weights.
+ * \param uxp_n,uyp_n,uzp_n        Pointer to arrays of particle momentum at time level n.
+ * \param uxp_nph,uyp_nph,uzp_nph  Pointer to arrays of particle momentum at time level n + 1/2.
+ * \param Jx_arr,Jy_arr,Jz_arr     Array4 of the current density, either full array or tile.
+ * \param Sx_arr,Sy_arr,Sz_arr     Array4 of the mass matrices, either full array or tile.
+ * \param Bx_arr,By_arr,Bz_arr     Array4 of the magnetic field, either full array or tile.
+ * \param Bx_type,By_type,Bz_type  IndexType of the magnetic field
+ * \param np_to_deposit            Number of particles for which current is deposited.
+ * \param dt                       Time step for particle level
+ * \param dinv                     3D cell size inverse
+ * \param xyzmin                   Physical lower bounds of domain.
+ * \param lo                       Index lower bounds of domain.
+ * \param qs                       Species charge.
+ * \param ms                       Species mass.
+ */
+template <int depos_order>
+void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleReal* xp_n_data,
+                                       [[maybe_unused]] const amrex::ParticleReal* yp_n_data,
+                                       [[maybe_unused]] const amrex::ParticleReal* zp_n_data,
+                                       const GetParticlePosition<PIdx>& GetPosition,
+                                       const amrex::ParticleReal* wp,
+                                       const amrex::ParticleReal* uxp_n,
+                                       const amrex::ParticleReal* uyp_n,
+                                       const amrex::ParticleReal* uzp_n,
+                                       const amrex::ParticleReal* uxp,
+                                       const amrex::ParticleReal* uyp,
+                                       const amrex::ParticleReal* uzp,
+                                       amrex::Array4<amrex::Real> const& Jx_arr,
+                                       amrex::Array4<amrex::Real> const& Jy_arr,
+                                       amrex::Array4<amrex::Real> const& Jz_arr,
+                                       amrex::Array4<amrex::Real> const& Sx_arr,
+                                       amrex::Array4<amrex::Real> const& Sy_arr,
+                                       amrex::Array4<amrex::Real> const& Sz_arr,
+                                       const amrex::Array4<amrex::Real const>& Bx_arr,
+                                       const amrex::Array4<amrex::Real const>& By_arr,
+                                       const amrex::Array4<amrex::Real const>& Bz_arr,
+                                       const amrex::IndexType Bx_type,
+                                       const amrex::IndexType By_type,
+                                       const amrex::IndexType Bz_type,
+                                       const long np_to_deposit,
+                                       const amrex::Real dt,
+                                       const amrex::XDim3& dinv,
+                                       const amrex::XDim3& xyzmin,
+                                       const amrex::Dim3 lo,
+                                       const amrex::Real qs,
+                                       const amrex::Real ms )
+{
+    using namespace amrex::literals;
+
+    const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
+
+    // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
+    amrex::ParallelFor(
+        np_to_deposit,
+        [=] AMREX_GPU_DEVICE (long const ip) {
+            amrex::ParticleReal xp_nph, yp_nph, zp_nph;
+            GetPosition(ip, xp_nph, yp_nph, zp_nph);
+
+            // Compute magnetic field on particle
+            amrex::ParticleReal Bxp = 0.0;
+            amrex::ParticleReal Byp = 0.0;
+            amrex::ParticleReal Bzp = 0.0;
+            const int depos_order_perp = 1;
+            const int depos_order_para = 1;
+            const int n_rz_azimuthal_modes = 0;
+            doDirectGatherVectorField<depos_order_perp,depos_order_para>(
+                                    xp_nph, yp_nph, zp_nph,
+                                    Bxp, Byp, Bzp,
+                                    Bx_arr, By_arr, Bz_arr,
+                                    Bx_type, By_type, Bz_type,
+                                    dinv, xyzmin, lo, n_rz_azimuthal_modes );
+
+            constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
+
+            // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
+            // The uxp,uyp,uzp are the velocities at time level n+1/2
+            const amrex::ParticleReal uxp_np1 = 2._prt*uxp[ip] - uxp_n[ip];
+            const amrex::ParticleReal uyp_np1 = 2._prt*uyp[ip] - uyp_n[ip];
+            const amrex::ParticleReal uzp_np1 = 2._prt*uzp[ip] - uzp_n[ip];
+            const amrex::ParticleReal gamma_n = std::sqrt(1._prt + (uxp_n[ip]*uxp_n[ip] + uyp_n[ip]*uyp_n[ip] + uzp_n[ip]*uzp_n[ip])*inv_c2);
+            const amrex::ParticleReal gamma_np1 = std::sqrt(1._prt + (uxp_np1*uxp_np1 + uyp_np1*uyp_np1 + uzp_np1*uzp_np1)*inv_c2);
+            const amrex::ParticleReal gaminv = 2.0_prt/(gamma_n + gamma_np1);
+
+            // Compute current density kernels to deposit
+            const amrex::Real wq_invvol = qs*wp[ip]*invvol;
+            const amrex::Real rhop = wq_invvol*gaminv;
+
+            // Set the Mass Matrices kernels
+            amrex::ParticleReal fpxx, fpxy, fpxz;
+            amrex::ParticleReal fpyx, fpyy, fpyz;
+            amrex::ParticleReal fpzx, fpzy, fpzz;
+            setMassMatricesKernels( qs, ms, dt, inv_c2, rhop,
+                                    uxp[ip], uyp[ip], uzp[ip],
+                                    Bxp, Byp, Bzp,
+                                    fpxx, fpxy, fpxz,
+                                    fpyx, fpyy, fpyz,
+                                    fpzx, fpzy, fpzz );
+            amrex::ignore_unused(fpxy,fpxz);
+            amrex::ignore_unused(fpyx,fpyz);
+            amrex::ignore_unused(fpzx,fpzy);
+
+#if (AMREX_SPACEDIM >= 2)
+            amrex::ParticleReal const xp_n = xp_n_data[ip];
+#else
+            amrex::ParticleReal const xp_n = 0._prt;
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+            amrex::ParticleReal const yp_n = yp_n_data[ip];
+#else
+            amrex::ParticleReal const yp_n = 0._prt;
+#endif
+            amrex::ParticleReal const zp_n = zp_n_data[ip];
+
+            // Compute position at time n + 1
+            amrex::ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n;
+            amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n;
+            amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n;
+
+            doVillasenorJandSigmaDepositionKernel<depos_order>( xp_n, yp_n, zp_n,
+                                                                xp_np1, yp_np1, zp_np1,
+                                                                wq_invvol,
+                                                                uxp[ip], uyp[ip], uzp[ip],
+                                                                gaminv,
+                                                                fpxx, fpyy, fpzz,
+                                                                Jx_arr, Jy_arr, Jz_arr,
+                                                                Sx_arr, Sy_arr, Sz_arr,
+                                                                dt, dinv, xyzmin, lo );
+
+    });
+}
+
+#endif // WARPX_MASSMATRICESDEPOSITION_H_

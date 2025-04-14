@@ -194,8 +194,8 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
             ParticleTileType& ptile_1 = species_1.ParticlesAt(lev, mfi);
             ParticleTileType& ptile_2 = species_2.ParticlesAt(lev, mfi);
 
-            ParticleBins bins_1 = ParticleUtils::findParticlesInEachCell( lev, mfi, ptile_1 );
-            ParticleBins bins_2 = ParticleUtils::findParticlesInEachCell( lev, mfi, ptile_2 );
+            ParticleBins bins_1 = ParticleUtils::findParticlesInEachCell( warpx.Geom(lev), mfi, ptile_1 );
+            ParticleBins bins_2 = ParticleUtils::findParticlesInEachCell( warpx.Geom(lev), mfi, ptile_2 );
 
             // species 1
             const auto soa_1 = ptile_1.getParticleTileData();

@@ -280,9 +280,7 @@ void WarpX::MakeWarpX ()
     ConvertLabParamsToBoost();
     ReadBCParams();
 
-#ifdef WARPX_DIM_RZ
     CheckGriddingForRZSpectral();
-#endif
 
     m_instance = new WarpX();
 }
