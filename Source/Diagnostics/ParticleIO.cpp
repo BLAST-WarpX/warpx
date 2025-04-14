@@ -436,7 +436,7 @@ storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
                 amrex::ignore_unused(Ex_grid, Ey_grid, Ez_grid,
                     Bx_grid, By_grid, Bz_grid, ex_type, ey_type, ez_type,
                     bx_type, by_type, bz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
-                
+
                 if constexpr ((ex_control == doEx || ey_control == doEy || ez_control == doEy) && (bx_control == doBx || by_control == doBy || bz_control == doBz))
                 {
                     // if E and B are both requested, doGatherShapeN is faster than two calls to doDirectGatherVectorField
