@@ -219,7 +219,7 @@ Here's how to do so:
 
    .. figure:: https://gist.github.com/user-attachments/assets/06c1fe27-2c13-4bd3-b6b8-8b8941b37889
 
-#. Save the raw log as a text file on your computer.
+#. Save the raw log as a text file on your computer (e.g., with the ``curl`` command, ``curl https://dev.azure.com/ECP-WarpX/... > raw_log.txt``).
 
 #. Go to the directory `Tools/DevUtils <https://github.com/BLAST-WarpX/warpx/tree/development/Tools/DevUtils>`__ and run the Python script `update_benchmarks_from_azure_output.py <https://github.com/BLAST-WarpX/warpx/blob/development/Tools/DevUtils/update_benchmarks_from_azure_output.py>`__ passing the path of the raw log text file as a command line argument:
 

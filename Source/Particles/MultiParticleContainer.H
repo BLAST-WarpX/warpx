@@ -31,6 +31,7 @@
 #include <AMReX_BLassert.H>
 #include <AMReX_Box.H>
 #include <AMReX_Config.H>
+#include <AMReX_Geometry.H>
 #include <AMReX_GpuControl.H>
 #include <AMReX_INT.H>
 #include <AMReX_MFIter.H>
@@ -173,6 +174,8 @@ public:
 
     std::unique_ptr<amrex::MultiFab> GetChargeDensity(int lev, bool local = false);
 
+    void GenerateGlobalDebyeLength ();
+
     void doFieldIonization (int lev,
                             const amrex::MultiFab& Ex, const amrex::MultiFab& Ey, const amrex::MultiFab& Ez,
                             const amrex::MultiFab& Bx, const amrex::MultiFab& By, const amrex::MultiFab& Bz);
@@ -182,9 +185,11 @@ public:
     /**
     * \brief This function loops over all species and performs resampling if appropriate.
     *
+    * @param[in] geom the geometry of all refinement levels
     * @param[in] timestep the current timestep.
+    * @param[in] verbose flag to control if information on the resampling process is printed out.
     */
-    void doResampling (int timestep, bool verbose);
+    void doResampling (const amrex::Vector<amrex::Geometry>& geom, int timestep, bool verbose);
 
 #ifdef WARPX_QED
     /** If Schwinger process is activated, this function is called at every

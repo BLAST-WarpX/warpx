@@ -28,6 +28,7 @@
 
 #include <AMReX_Array.H>
 #include <AMReX_FArrayBox.H>
+#include <AMReX_Geometry.H>
 #include <AMReX_GpuAllocators.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_INT.H>
@@ -323,6 +324,14 @@ public:
                                 amrex::Real relative_time,
                                 PushType push_type);
 
+    void DepositTemperature (amrex::MultiFab* temperature, const int lev);
+    std::unique_ptr<amrex::MultiFab> GetTemperature (int lev);
+
+    void DepositNumberDensity (amrex::MultiFab* number_density, const int lev);
+    std::unique_ptr<amrex::MultiFab> GetNumberDensity (int lev);
+
+    std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);
+
     // If particles start outside of the domain, ContinuousInjection
     // makes sure that they are initialized when they enter the domain, and
     // NOT before. Virtual function, overriden by derived classes.
@@ -477,7 +486,7 @@ public:
      * override the method for every derived class. Note that in practice this function is never
      * called because resample() is only called for PhysicalParticleContainers.
      */
-    virtual void resample (const int /*timestep*/, bool /*verbose*/) {}
+    virtual void resample (const amrex::Vector<amrex::Geometry>& /*geom*/, const int /*timestep*/, bool /*verbose*/) {}
 
     /**
      * When using runtime components, AMReX requires to touch all tiles

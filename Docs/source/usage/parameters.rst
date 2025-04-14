@@ -2088,6 +2088,13 @@ Details about the collision models can be found in the :ref:`theory section <mul
     a Coulomb logarithm will be computed automatically according to the algorithm in
     :cite:t:`param-PerezPOP2012`.
 
+* ``<collision_name>.use_global_debye_length`` (`bool`) optional
+    Only for ``pairwisecoulomb``. When set, the Debye length used in the Coulomb log
+    is calculated including all species in the simulation. The lengths are combined
+    using the square root of one over the sum of one over the squares of the Debye lengths
+    of each species. By default, this is turned off. Note that if ``<collision_name>.CoulombLog``
+    is specified, this Debye length is not used.
+
 * ``<collision_name>.fusion_multiplier`` (`float`) optional.
     Only for ``nuclearfusion``.
     Increasing ``fusion_multiplier`` creates more macroparticles of fusion

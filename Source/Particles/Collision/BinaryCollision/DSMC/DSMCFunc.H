@@ -98,6 +98,7 @@ public:
             GetParticlePosition<PIdx> /*get_position_1*/, GetParticlePosition<PIdx> /*get_position_2*/,
             amrex::ParticleReal const /*n1*/, amrex::ParticleReal const /*n2*/,
             amrex::ParticleReal const /*T1*/, amrex::ParticleReal const /*T2*/,
+            amrex::Real const /*global_lamdb*/,
             amrex::ParticleReal const  /*q1*/, amrex::ParticleReal const  /*q2*/,
             amrex::ParticleReal const  m1, amrex::ParticleReal const  m2,
             amrex::Real const  dt, amrex::Real const dV, index_type coll_idx,
@@ -207,6 +208,8 @@ public:
     };
 
     [[nodiscard]] Executor const& executor () const { return m_exe; }
+
+    bool use_global_debye_length() { return false; }
 
 private:
     amrex::Vector<ScatteringProcess> m_scattering_processes;
