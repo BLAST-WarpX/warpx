@@ -436,8 +436,22 @@ storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
                 amrex::ignore_unused(Ex_grid, Ey_grid, Ez_grid,
                     Bx_grid, By_grid, Bz_grid, ex_type, ey_type, ez_type,
                     bx_type, by_type, bz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
-
-                if constexpr (ex_control == doEx || ey_control == doEy || ez_control == doEz)
+                
+                if constexpr ((ex_control == doEx || ey_control == doEy || ez_control == doEy) && (bx_control == doBx || by_control == doBy || bz_control == doBz))
+                {
+                    // if E and B are both requested, doGatherShapeN is faster than two calls to doDirectGatherVectorField
+                    doGatherShapeN(
+                        xp, yp, zp,
+                        Ex_particle, Ey_particle, Ez_particle,
+                        Bx_particle, By_particle, Bz_particle,
+                        Ex_grid, Ey_grid, Ez_grid,
+                        Bx_grid, By_grid, Bz_grid,
+                        ex_type, ey_type, ez_type,
+                        bx_type, by_type, bz_type,
+                        dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, galerkin_interpolation
+                    );
+                }
+                else if constexpr (ex_control == doEx || ey_control == doEy || ez_control == doEz)
                 {
                     doDirectGatherVectorField<depos_order, depos_order - galerkin_interpolation>(
                         xp, yp, zp,
@@ -447,8 +461,7 @@ storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
                         dinv, xyzmin, lo, n_rz_azimuthal_modes
                     );
                 }
-
-                if constexpr (bx_control == doBx || by_control == doBy || bz_control == doBz)
+                else if constexpr (bx_control == doBx || by_control == doBy || bz_control == doBz)
                 {
                     doDirectGatherVectorField<depos_order - galerkin_interpolation, depos_order>(
                         xp, yp, zp,
