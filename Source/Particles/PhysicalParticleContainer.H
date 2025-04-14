@@ -400,6 +400,11 @@ protected:
     // A flag to enable saving of the previous timestep positions
     bool m_save_previous_position = false;
 
+    // flags for work computation
+    bool m_do_compute_wx = false;
+    bool m_do_compute_wy = false;
+    bool m_do_compute_wz = false;
+
 #ifdef WARPX_QED
     // A flag to enable quantum_synchrotron process for leptons
     bool m_do_qed_quantum_sync = false;

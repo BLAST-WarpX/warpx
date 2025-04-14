@@ -386,6 +386,20 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
         AddRealComp(m_user_real_attribs.at(i));
     }
 
+    // Work compute
+    pp_species_name.query("do_compute_wx", m_do_compute_wx);
+    pp_species_name.query("do_compute_wy", m_do_compute_wy);
+    pp_species_name.query("do_compute_wz", m_do_compute_wz);
+    if (m_do_compute_wx) {
+        AddRealComp("wx");
+    }
+    if (m_do_compute_wy) {
+        AddRealComp("wy");
+    }
+    if (m_do_compute_wz) {
+        AddRealComp("wz");
+    }
+
     // If old particle positions should be saved add the needed components
     pp_species_name.query("save_previous_position", m_save_previous_position);
     if (m_save_previous_position) {
