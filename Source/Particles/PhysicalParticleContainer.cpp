@@ -2430,14 +2430,18 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
             const int compute_wy_runtime_flag = m_do_compute_wy ? do_wy : no_wy;
             const int compute_wz_runtime_flag = m_do_compute_wz ? do_wz : no_wz;
 
+            ParticleReal* wx = nullptr;
+            ParticleReal* wy = nullptr;
+            ParticleReal* wz = nullptr;
+
             if (m_do_compute_wx) {
-                ParticleReal* const AMREX_RESTRICT wx = attribs[PIdx::wx].dataPtr();                
+                wx = pti.GetAttribs("wx").dataPtr();               
             }
             if (m_do_compute_wy) {
-                ParticleReal* const AMREX_RESTRICT wy = attribs[PIdx::wy].dataPtr();                
+                wy = pti.GetAttribs("wy").dataPtr();              
             }
             if (m_do_compute_wz) {
-                ParticleReal* const AMREX_RESTRICT wz = attribs[PIdx::wz].dataPtr();                
+                wz = pti.GetAttribs("wz").dataPtr();                             
             }
 
             int* AMREX_RESTRICT ion_lev = nullptr;
@@ -2514,6 +2518,10 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
                 } else {
                     amrex::Abort("Unknown particle pusher");
                 }
+
+                [[maybe_unused]] wx_tmp = wx;
+                [[maybe_unused]] wy_tmp = wy;
+                [[maybe_unused]] wz_tmp = wz;
 
                 if constexpr (compute_wx_control == do_wx) {
                     wx[ip] += dt * ux[ip] * q * Ex_external_particle;
