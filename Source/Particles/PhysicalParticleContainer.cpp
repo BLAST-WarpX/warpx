@@ -2423,6 +2423,23 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
             ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
             ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
+            enum wx_flags : int { no_wx, do_wx };
+            enum wy_flags : int { no_wy, do_wy };
+            enum wz_flags : int { no_wz, do_wz };
+            const int compute_wx_runtime_flag = m_do_compute_wx ? do_wx : no_wx;
+            const int compute_wy_runtime_flag = m_do_compute_wy ? do_wy : no_wy;
+            const int compute_wz_runtime_flag = m_do_compute_wz ? do_wz : no_wz;
+
+            if (m_do_compute_wx) {
+                ParticleReal* const AMREX_RESTRICT wx = attribs[PIdx::wx].dataPtr();                
+            }
+            if (m_do_compute_wy) {
+                ParticleReal* const AMREX_RESTRICT wy = attribs[PIdx::wy].dataPtr();                
+            }
+            if (m_do_compute_wz) {
+                ParticleReal* const AMREX_RESTRICT wz = attribs[PIdx::wz].dataPtr();                
+            }
+
             int* AMREX_RESTRICT ion_lev = nullptr;
             if (do_field_ionization) {
                 ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
@@ -2441,9 +2458,9 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
 
             const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
 
-            amrex::ParallelFor(TypeList<CompileTimeOptions<no_exteb,has_exteb>>{},
-                               {exteb_runtime_flag},
-                               np, [=] AMREX_GPU_DEVICE (long ip, auto exteb_control)
+            amrex::ParallelFor(TypeList<CompileTimeOptions<no_exteb,has_exteb>, CompileTimeOptions<no_wx, do_wx>, CompileTimeOptions<no_wy, do_wy>, CompileTimeOptions<no_wz, do_wz>>{},
+                               {exteb_runtime_flag, compute_wx_runtime_flag, compute_wy_runtime_flag, compute_wz_runtime_flag},
+                               np, [=] AMREX_GPU_DEVICE (long ip, auto exteb_control, auto compute_wx_control, auto compute_wy_control, auto compute_wz_control)
             {
                 amrex::ParticleReal xp, yp, zp;
                 getPosition(ip, xp, yp, zp);
@@ -2496,6 +2513,16 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
                                                Byp, Bzp, qp, m, dt);
                 } else {
                     amrex::Abort("Unknown particle pusher");
+                }
+
+                if constexpr (compute_wx_control == do_wx) {
+                    wx[ip] += dt * ux[ip] * q * Ex_external_particle;
+                }
+                if constexpr (compute_wy_control == do_wy) {
+                    wy[ip] += dt * uy[ip] * q * Ey_external_particle;
+                }
+                if constexpr (compute_wz_control == do_wz) {
+                    wz[ip] += dt * uz[ip] * q * Ez_external_particle;
                 }
             });
         }
