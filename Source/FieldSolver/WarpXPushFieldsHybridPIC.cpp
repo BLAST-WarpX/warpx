@@ -68,8 +68,8 @@ void WarpX::HybridPICEvolveFields ()
         dt[0], -0.5_rt * dt[0]);
 
     // TODO: Perhaps add flag here for when using temperature accumulation in Hybrid
-    // Perform Temperature Deposition at time t_{n+1/2}
-    mypc->DepositTemperatures(m_fields, dt[0], 0.0_rt);
+    // Perform Temperature Deposition at time t_{n+1}
+    mypc->DepositTemperatures(m_fields, 0.0_rt);
 
     // Deposit cold-relativistic fluid charge and current
     if (do_fluid_species) {

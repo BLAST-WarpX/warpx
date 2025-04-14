@@ -591,7 +591,7 @@ MultiParticleContainer::DepositCharge (
 void
 MultiParticleContainer::DepositTemperatures (
     ablastr::fields::MultiFabRegister & fields,
-    const amrex::Real dt, const amrex::Real relative_time)
+    const amrex::Real relative_time)
 {
     using ablastr::fields::Direction;
 
@@ -614,7 +614,7 @@ MultiParticleContainer::DepositTemperatures (
         }
 
         // Accumulate velocities for this species
-        pc->AccumulateVelocitiesAndComputeTemperature(T_vf, dt, relative_time);
+        pc->AccumulateVelocitiesAndComputeTemperature(T_vf, relative_time);
     }
 }
 

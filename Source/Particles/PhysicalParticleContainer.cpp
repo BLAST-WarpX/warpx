@@ -3366,7 +3366,7 @@ PhysicalParticleContainer::DepositTemperature (
     amrex::MultiFab * const Tx, amrex::MultiFab * const Ty, amrex::MultiFab * const Tz,
     long const offset, long const np_to_deposit,
     int const thread_num, const int lev, int const depos_lev,
-    amrex::Real const dt, amrex::Real const relative_time, PushType push_type)
+    amrex::Real const relative_time, PushType push_type)
 {
     using ablastr::fields::Direction;
 
@@ -3465,7 +3465,7 @@ PhysicalParticleContainer::DepositTemperature (
     // Note that this includes guard cells since it is after tilebox.ngrow
     const Dim3 lo = lbound(tilebox);
     // Take into account Galilean shift
-    const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, depos_lev, -relative_time);
+    const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, depos_lev, 0.0_rt);
 
     //WARPX_PROFILE_VAR_START(blp_deposit);
     if        (WarpX::nox == 1){
@@ -3507,7 +3507,7 @@ PhysicalParticleContainer::DepositTemperature (
 void
 PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
     ablastr::fields::MultiLevelVectorField const & T_vf,
-    const amrex::Real dt, const amrex::Real relative_time)
+    const amrex::Real relative_time)
 {
     using ablastr::fields::Direction;
 
@@ -3542,7 +3542,7 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
 
             DepositTemperature(pti, wp, uxp, uyp, uzp, ion_lev,
                             T_vf[lev][0], T_vf[lev][1], T_vf[lev][2],
-                            0, np, thread_num, lev, lev, dt, relative_time, PushType::Explicit);
+                            0, np, thread_num, lev, lev, relative_time, PushType::Explicit);
         }
 #ifdef AMREX_USE_OMP
         }

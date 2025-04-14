@@ -179,8 +179,7 @@ public:
      *                          the time of the deposition.
      */
     void
-    DepositTemperatures (ablastr::fields::MultiFabRegister & fields,
-                    amrex::Real dt, amrex::Real relative_time);
+    DepositTemperatures (ablastr::fields::MultiFabRegister & fields, amrex::Real relative_time);
 
     ///
     /// This deposits the particle charge onto a node-centered MultiFab and returns a unique ptr

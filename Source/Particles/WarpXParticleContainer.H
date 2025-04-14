@@ -337,7 +337,6 @@ public:
      */
     virtual void AccumulateVelocitiesAndComputeTemperature (
         [[maybe_unused]]ablastr::fields::MultiLevelVectorField const & T_vf,
-        [[maybe_unused]]amrex::Real dt,
         [[maybe_unused]]amrex::Real relative_time)
     {}
 
@@ -356,7 +355,6 @@ public:
         [[maybe_unused]]int const thread_num,
         [[maybe_unused]]const int lev,
         [[maybe_unused]]int const depos_lev,
-        [[maybe_unused]]amrex::Real const dt,
         [[maybe_unused]]amrex::Real const relative_time,
         [[maybe_unused]]PushType push_type)
     {}

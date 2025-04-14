@@ -362,7 +362,6 @@ public:
 
     virtual void AccumulateVelocitiesAndComputeTemperature (
         ablastr::fields::MultiLevelVectorField const & T_vf,
-        amrex::Real dt,
         amrex::Real relative_time) override;
 
     virtual void DepositTemperature (
@@ -373,7 +372,7 @@ public:
         amrex::MultiFab * const Tx, amrex::MultiFab * const Ty, amrex::MultiFab * const Tz,
         long const offset, long const np_to_deposit,
         int const thread_num, const int lev, int const depos_lev,
-        amrex::Real const dt, amrex::Real const relative_time, PushType push_type) override;
+        amrex::Real const relative_time, PushType push_type) override;
 
 protected:
 
