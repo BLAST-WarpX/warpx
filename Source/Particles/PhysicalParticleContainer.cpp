@@ -2519,9 +2519,9 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
                     amrex::Abort("Unknown particle pusher");
                 }
 
-                [[maybe_unused]] wx_tmp = wx;
-                [[maybe_unused]] wy_tmp = wy;
-                [[maybe_unused]] wz_tmp = wz;
+                [[maybe_unused]] const auto& wx_tmp = wx;
+                [[maybe_unused]] const auto& wy_tmp = wy;
+                [[maybe_unused]] const auto& wz_tmp = wz;
 
                 if constexpr (compute_wx_control == do_wx) {
                     wx[ip] += dt * ux[ip] * q * Ex_external_particle;
