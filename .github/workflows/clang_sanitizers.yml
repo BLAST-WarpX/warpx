@@ -32,7 +32,7 @@ jobs:
     name: Clang UB sanitizer
     runs-on: ubuntu-24.04
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false }}
     env:
       CC: clang
       CXX: clang++
@@ -40,11 +40,14 @@ jobs:
       #CMAKE_GENERATOR: Ninja
     steps:
     - name: Checkout code
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       uses: actions/checkout@v4
     - name: Install dependencies
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       run: |
         .github/workflows/dependencies/clang.sh 17
     - name: CCache Cache
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
@@ -52,6 +55,7 @@ jobs:
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: Build WarpX
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -75,6 +79,7 @@ jobs:
         ccache -s
         du -hs ~/.cache/ccache
     - name: Run with UB sanitizer
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       run: |
         export OMP_NUM_THREADS=2
         #MPI implementations often leak memory
@@ -89,7 +94,7 @@ jobs:
     name: Clang thread sanitizer
     runs-on: ubuntu-24.04
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false }}
     env:
       CC: clang
       CXX: clang++
@@ -97,11 +102,14 @@ jobs:
       #CMAKE_GENERATOR: Ninja
     steps:
     - name: Checkout code
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       uses: actions/checkout@v4
     - name: Install dependencies
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       run: |
         .github/workflows/dependencies/clang.sh 17
     - name: CCache Cache
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
@@ -109,6 +117,7 @@ jobs:
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: Build WarpX
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -132,6 +141,7 @@ jobs:
         ccache -s
         du -hs ~/.cache/ccache
     - name: Run with thread sanitizer
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       run: |
         # Disabling the gds/shmem component by using gds/hash instead
         # is required to avoid issues with shared memory.

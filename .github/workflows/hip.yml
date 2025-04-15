@@ -34,14 +34,17 @@ jobs:
       CXXFLAGS: "-Werror -Wno-deprecated-declarations -Wno-error=pass-failed"
       CMAKE_GENERATOR: Ninja
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false }}
     steps:
     - name: Checkout code
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       uses: actions/checkout@v4
     - name: Install dependencies
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       shell: bash
       run: .github/workflows/dependencies/hip.sh 6.3.2
     - name: CCache Cache
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
@@ -49,6 +52,7 @@ jobs:
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: Build WarpX
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       shell: bash
       run: |
         export CCACHE_COMPRESS=1
@@ -86,14 +90,17 @@ jobs:
       CXXFLAGS: "-Werror -Wno-deprecated-declarations -Wno-error=pass-failed"
       CMAKE_GENERATOR: Ninja
     needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: ${{ github.event.pull_request.draft == false }}
     steps:
     - name: Checkout code
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       uses: actions/checkout@v4
     - name: Install dependencies
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       shell: bash
       run: .github/workflows/dependencies/hip.sh 6.3.2
     - name: CCache Cache
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
@@ -101,6 +108,7 @@ jobs:
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: Build WarpX
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       shell: bash
       run: |
         export CCACHE_COMPRESS=1

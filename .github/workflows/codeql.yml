@@ -13,27 +13,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  skip_checks:
-    name: Analyze PR
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Skip checks?
-        run: |
-          .github/workflows/scripts/check_diff.sh     \
-            ${{ github.event.pull_request.head.ref }} \
-            ${{ github.event.pull_request.base.ref }} \
-            ${{ github.event.pull_request.head.repo.clone_url }}
-    outputs:
-      skip: ${{ env.SKIP_CHECKS }}
   analyze:
-    name: Query code
+    name: Analyze
     runs-on: ubuntu-24.04
-    needs: skip_checks
-    if: ${{ github.event.pull_request.draft == false && needs.skip_checks.outputs.skip == 'false' }}
+    if: github.event.pull_request.draft == false
     permissions:
       actions: read
       contents: read
@@ -50,7 +33,7 @@ jobs:
         with:
           python-version: '3.x'
       - name: Install Packages (C++)
-        if: ${{ matrix.language == 'cpp' }}
+        if: matrix.language == 'cpp'
         run: |
           sudo apt-get update
           sudo apt-get install --yes cmake openmpi-bin libopenmpi-dev libhdf5-openmpi-dev libadios-openmpi-dev ccache
@@ -60,7 +43,7 @@ jobs:
           python -m pip install --upgrade cmake
           python -m pipx install cmake
       - name: Set Up Cache
-        if: ${{ matrix.language == 'cpp' }}
+        if: matrix.language == 'cpp'
         uses: actions/cache@v4
         with:
           path: ~/.cache/ccache
@@ -68,7 +51,7 @@ jobs:
           restore-keys: |
                ccache-${{ github.workflow }}-${{ github.job }}-git-
       - name: Configure (C++)
-        if: ${{ matrix.language == 'cpp' }}
+        if: matrix.language == 'cpp'
         run: |
           cmake -S . -B build -DWarpX_OPENPMD=ON
       - name: Initialize CodeQL
@@ -78,10 +61,10 @@ jobs:
           languages: ${{ matrix.language }}
           queries: +security-and-quality
       - name: Build (py)
-        if: ${{ matrix.language == 'python' }}
+        if: matrix.language == 'python'
         uses: github/codeql-action/autobuild@v3
       - name: Build (C++)
-        if: ${{ matrix.language == 'cpp' }}
+        if: matrix.language == 'cpp'
         run: |
           export CCACHE_COMPRESS=1
           export CCACHE_COMPRESSLEVEL=10

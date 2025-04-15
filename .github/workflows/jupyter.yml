@@ -5,31 +5,50 @@ on:
     branches:
       - "development"
   pull_request:
-    paths-ignore:
-      - "Docs/**"
-      - "**.rst"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-jupyter
   cancel-in-progress: true
 
 jobs:
+  skip_checks:
+    name: Analyze PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Skip checks?
+        run: |
+          .github/workflows/scripts/check_diff.sh     \
+            ${{ github.event.pull_request.head.ref }} \
+            ${{ github.event.pull_request.base.ref }} \
+            ${{ github.event.pull_request.head.repo.clone_url }}
+    outputs:
+      skip: ${{ env.SKIP_CHECKS }}
   jupyter_notebooks:
     name: Notebooks
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
+    needs: skip_checks
+    if: ${{ github.event.pull_request.draft == false }}
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
+      uses: actions/checkout@v4
     - name: Set up Python
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       uses: actions/setup-python@v5
       with:
         python-version: "3.x"
     - name: Install Dependencies
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       run: |
         python -m pip install --upgrade pip
         pip install nbconvert nbformat jupyter
         pip install sympy
     - name: Run Notebooks
+      if: ${{ needs.skip_checks.outputs.skip == 'false' }}
       run: |
         cd Tools/Algorithms
         jupyter nbconvert --to notebook --execute psatd.ipynb
