@@ -2747,16 +2747,18 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 
             UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], dt);
             setPosition(ip, xp, yp, zp);
-
+            
             [[maybe_unused]] const auto& wx_tmp = wx;
             [[maybe_unused]] const auto& wy_tmp = wy;
             [[maybe_unused]] const auto& wz_tmp = wz;
 
             if constexpr (compute_wx_control == do_wx) {
                 wx[ip] += dt * ux[ip] * q * Exp;
+                amrex::Print() << "wx[ip] = " << wx[ip] << "\nexp = " << Exp << "\nux[ip] = " << ux[ip] << "\n";
             }
             if constexpr (compute_wy_control == do_wy) {
                 wy[ip] += dt * uy[ip] * q * Eyp;
+                amrex::Print() << "wy[ip] = " << wy[ip] << "\neyp = " << Eyp << "\nuy[ip] = " << uy[ip] << "\n";
             }
             if constexpr (compute_wz_control == do_wz) {
                 wz[ip] += dt * uz[ip] * q * Ezp;
