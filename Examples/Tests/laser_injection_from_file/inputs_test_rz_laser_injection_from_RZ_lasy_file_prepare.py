@@ -36,9 +36,9 @@ t_c = 20.0 * fs
 profile = CombinedLongitudinalTransverseProfile(
     wavelength,
     pol,
-    laser_energy,
     GaussianLongitudinalProfile(wavelength, tt, t_peak=0),
-    LaguerreGaussianTransverseProfile(w0, p=0, m=1),
+    LaguerreGaussianTransverseProfile(w0, p=0, m=1, wavelength=wavelength),
+    laser_energy,
 )
 dim = "rt"
 lo = (0e-6, -20e-15)
