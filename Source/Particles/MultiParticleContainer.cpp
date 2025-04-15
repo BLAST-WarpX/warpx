@@ -461,7 +461,7 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                 int lev,
                                 std::string const& current_fp_string,
                                 Real t, Real dt, DtType a_dt_type, bool skip_deposition,
-                                PushType push_type)
+                                bool deposit_mass_matrices, PushType push_type)
 {
     if (! skip_deposition) {
         using ablastr::fields::Direction;
@@ -474,9 +474,14 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         if (fields.has(FieldType::current_buf, Direction{2}, lev)) { fields.get(FieldType::current_buf, Direction{2}, lev)->setVal(0.0); }
         if (fields.has(FieldType::rho_fp, lev)) { fields.get(FieldType::rho_fp, lev)->setVal(0.0); }
         if (fields.has(FieldType::rho_buf, lev)) { fields.get(FieldType::rho_buf, lev)->setVal(0.0); }
+        if (deposit_mass_matrices) {
+            fields.get(FieldType::MassMatrices, Direction{0}, lev)->setVal(0.0);
+            fields.get(FieldType::MassMatrices, Direction{1}, lev)->setVal(0.0);
+            fields.get(FieldType::MassMatrices, Direction{2}, lev)->setVal(0.0);
+        }
     }
     for (auto& pc : allcontainers) {
-        pc->Evolve(fields, lev, current_fp_string, t, dt, a_dt_type, skip_deposition, push_type);
+        pc->Evolve(fields, lev, current_fp_string, t, dt, a_dt_type, skip_deposition, deposit_mass_matrices, push_type);
     }
 }
 

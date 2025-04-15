@@ -255,7 +255,7 @@ RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& field
                                         int lev,
                                         const std::string& current_fp_string,
                                         Real t, Real dt, DtType a_dt_type, bool skip_deposition,
-                                        PushType push_type)
+                                        bool /*deposit_mass_matrices*/, PushType push_type)
 {
 
     // Update location of injection plane in the boosted frame
@@ -280,7 +280,7 @@ RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& field
     PhysicalParticleContainer::Evolve (fields,
                                        lev,
                                        current_fp_string,
-                                       t, dt, a_dt_type, skip_deposition, push_type);
+                                       t, dt, a_dt_type, skip_deposition, false, push_type);
 }
 
 void
