@@ -69,9 +69,9 @@ void varianceDepositionSubKernel(
     amrex::Gpu::Atomic::AddNoRet(
         &wz_arr(izv[0], izv[1], izv[2], 0), wqz_var);
 
-    const amrex::Real wxsum = wx_arr(ixv[0], ixv[1], ixv[2], 0);
-    const amrex::Real wysum = wy_arr(iyv[0], iyv[1], iyv[2], 0);
-    const amrex::Real wzsum = wz_arr(izv[0], izv[1], izv[2], 0);
+    const amrex::Real wxsum = wx_old + wqx_var;
+    const amrex::Real wysum = wy_old + wqy_var;
+    const amrex::Real wzsum = wz_old + wqz_var;
 
     // Update w2_sum
     amrex::Gpu::Atomic::AddNoRet(
