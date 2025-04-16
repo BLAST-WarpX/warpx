@@ -324,10 +324,7 @@ public:
                                 amrex::Real relative_time,
                                 PushType push_type);
 
-    void DepositTemperature (amrex::MultiFab & temperature, const int lev);
     void CalculateTemperature (int lev);
-
-    void CalculateNumberDensity (int lev);
     void CalculateAverageVelocity (int lev);
     void CalculateNuei(amrex::MultiFab & species_nuei,
                        WarpXParticleContainer const & electron_species, int lev);
