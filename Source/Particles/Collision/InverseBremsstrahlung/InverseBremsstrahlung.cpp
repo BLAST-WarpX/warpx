@@ -26,8 +26,8 @@ InverseBremsstrahlung::InverseBremsstrahlung (std::string const& collision_name,
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_species_names.size() == 2,
                                      "Inverse Bremsstrahlung must have exactly two species.");
 
-    auto& species1 = mypc->GetParticleContainerFromName(m_species_names[0]);
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(species1.AmIA<PhysicalSpecies::photon>(),
+    auto& species_1 = mypc->GetParticleContainerFromName(m_species_names[0]);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(species_1.AmIA<PhysicalSpecies::photon>(),
                                      "InverseBremsstrahlung: The first species must be photons");
 }
 
@@ -37,17 +37,17 @@ InverseBremsstrahlung::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, M
     WARPX_PROFILE("InverseBremsstrahlung::doCollisions()");
     using namespace amrex::literals;
 
-    auto& species1 = mypc->GetParticleContainerFromName(m_species_names[0]);
-    auto& species2 = mypc->GetParticleContainerFromName(m_species_names[1]);
+    auto& species_1 = mypc->GetParticleContainerFromName(m_species_names[0]);
+    auto& species_2 = mypc->GetParticleContainerFromName(m_species_names[1]);
 
     mypc->CalculateNuei(m_species_names[0]);
 
     // Enable tiling
     amrex::MFItInfo info;
-    if (amrex::Gpu::notInLaunchRegion()) { info.EnableTiling(species1.tile_size); }
+    if (amrex::Gpu::notInLaunchRegion()) { info.EnableTiling(species_1.tile_size); }
 
     // Loop over refinement levels
-    auto const flvl = species1.finestLevel();
+    auto const flvl = species_1.finestLevel();
     for (int lev = 0; lev <= flvl; ++lev) {
 
         auto *cost = WarpX::getCosts(lev);
@@ -57,14 +57,14 @@ InverseBremsstrahlung::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, M
         info.SetDynamic(true);
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-        for (amrex::MFIter mfi = species1.MakeMFIter(lev, info); mfi.isValid(); ++mfi){
+        for (amrex::MFIter mfi = species_1.MakeMFIter(lev, info); mfi.isValid(); ++mfi){
             if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
             {
                 amrex::Gpu::synchronize();
             }
             auto wt = static_cast<amrex::Real>(amrex::second());
 
-            doInverseBremsstrahlungWithinTile(dt, lev, mfi, species1, species2);
+            doInverseBremsstrahlungWithinTile(dt, lev, mfi, species_1, species_2);
 
             if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
             {
@@ -137,7 +137,7 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile(
     amrex::ParallelFor(n_cells,
         [=] AMREX_GPU_DEVICE (int i_cell) noexcept
         {
-            // The particles from species1 that are in the cell `i_cell` are
+            // The particles from species_1 that are in the cell `i_cell` are
             // given by the `indices_1[cell_start_1:cell_stop_1]`
             index_type const cell_start_1 = cell_offsets_1[i_cell];
             index_type const cell_stop_1 = cell_offsets_1[i_cell+1];
