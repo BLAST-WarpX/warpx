@@ -182,6 +182,7 @@ void JacobianFunctionMF<T,Ops>::define ( const T& a_U,
                                          Ops* a_ops,
                                          const PreconditionerType& a_pc_type )
 {
+    BL_PROFILE("JacobianFunctionMF::::define()");
     m_Z.Define(a_U);
     m_Y0.Define(a_U);
     m_R0.Define(a_U);
@@ -211,6 +212,7 @@ void JacobianFunctionMF<T,Ops>::define ( const T& a_U,
 template <class T, class Ops>
 auto JacobianFunctionMF<T,Ops>::makeVecRHS () const -> T
 {
+    BL_PROFILE("JacobianFunctionMF::::makeVecRHS()");
     T Vec;
     Vec.Define(m_R);
     return Vec;
@@ -219,6 +221,7 @@ auto JacobianFunctionMF<T,Ops>::makeVecRHS () const -> T
 template <class T, class Ops>
 auto JacobianFunctionMF<T,Ops>::makeVecLHS () const -> T
 {
+    BL_PROFILE("JacobianFunctionMF::::makeVecLHS()");
     T Vec;
     Vec.Define(m_R);
     return Vec;
