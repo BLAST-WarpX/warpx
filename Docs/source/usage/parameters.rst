@@ -2061,6 +2061,8 @@ Details about the collision models can be found in the :ref:`theory section <mul
     - ``background_stopping`` for slowing of ions due to collisions with electrons or ions.
       This implements the approximate formulae as derived in Introduction to Plasma Physics,
       from Goldston and Rutherford, section 14.2.
+    - ``inverse_bremsstrahlung`` for inverse bremstrahlung absorption of photons from the collisions
+      of electrons and ions.
 
 * ``<collision_name>.species`` (`strings`)
     If using ``dsmc``, ``pairwisecoulomb`` or ``nuclearfusion``, this should be the name(s) of the species,
@@ -2068,6 +2070,8 @@ Details about the collision models can be found in the :ref:`theory section <mul
     If using ``background_mcc`` or ``background_stopping`` type this should be the name of the
     species for which collisions with a background will be included.
     In this case, only one species name should be given.
+    if using ``inverse_bremsstrahlung``, this should be the photon species being absorbed and the electron
+    species colliding with, in that order.
 
 * ``<collision_name>.product_species`` (`strings`)
     Only for ``dsmc`` and ``nuclearfusion``. The name(s) of the species in which to add
