@@ -76,9 +76,7 @@ FieldPoyntingFlux::FieldPoyntingFlux (const std::string& rd_name)
             std::vector<std::string> space_coords = {"z"};
 #elif defined(WARPX_DIM_RZ)
             std::vector<std::string> space_coords = {"r", "z"};
-#elif defined(WARPX_DIM_RCYLINDER)
-            std::vector<std::string> space_coords = {"r"};
-#elif defined(WARPX_DIM_RSPHERE)
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             std::vector<std::string> space_coords = {"r"};
 #endif
 
