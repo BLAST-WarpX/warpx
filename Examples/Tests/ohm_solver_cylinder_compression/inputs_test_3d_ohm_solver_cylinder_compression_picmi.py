@@ -255,6 +255,7 @@ class PlasmaCylinderCompression(object):
         simulation.particle_shape = 1
         simulation.use_filter = True
         simulation.verbose = self.verbose
+        simulation.grid_type = "collocated"
 
         #######################################################################
         # Field solver and external field                                     #

@@ -35,6 +35,8 @@
 #include <AMReX_SPACE.H>
 #include <AMReX_Vector.H>
 
+#include <ablastr/utils/Enums.H>
+
 #include "Fields.H"
 #include "Utils/Parser/ParserUtils.H"
 
@@ -65,6 +67,7 @@ protected:
     amrex::Real m_atol;
 
     std::string m_field_name;
+    ablastr::utils::enums::GridType m_grid_type;
 
 public:
     amrex::Vector< std::unique_ptr<amrex::MultiFab> > m_solution;
