@@ -17,7 +17,7 @@ Before you start, you will need a copy of the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
    cd $HOME/src/warpx
 
 WarpX depends on popular third party software.
@@ -121,6 +121,7 @@ CMake Option                  Default & Values                               Des
 ============================= ============================================== ===========================================================
 ``BUILD_SHARED_LIBS``         ON/**OFF**                                     `Build shared libraries for dependencies <https://cmake.org/cmake/help/latest/variable/BUILD_SHARED_LIBS.html>`__
 ``WarpX_CCACHE``              **ON**/OFF                                     Search and use CCache to speed up rebuilds.
+``WarpX_UNITY_BUILD``         ON/**OFF**                                     WarpX library as unity build (single TU)
 ``AMReX_CUDA_PTX_VERBOSE``    ON/**OFF**                                     Print CUDA code generation statistics from ``ptxas``.
 ``WarpX_amrex_src``           *None*                                         Path to AMReX source directory (preferred if set)
 ``WarpX_amrex_repo``          ``https://github.com/AMReX-Codes/amrex.git``   Repository URI to pull and build AMReX from
@@ -128,7 +129,7 @@ CMake Option                  Default & Values                               Des
 ``WarpX_amrex_internal``      **ON**/OFF                                     Needs a pre-installed AMReX library if set to ``OFF``
 ``WarpX_openpmd_src``         *None*                                         Path to openPMD-api source directory (preferred if set)
 ``WarpX_openpmd_repo``        ``https://github.com/openPMD/openPMD-api.git`` Repository URI to pull and build openPMD-api from
-``WarpX_openpmd_branch``      ``0.15.2``                                     Repository branch for ``WarpX_openpmd_repo``
+``WarpX_openpmd_branch``      ``0.16.1``                                     Repository branch for ``WarpX_openpmd_repo``
 ``WarpX_openpmd_internal``    **ON**/OFF                                     Needs a pre-installed openPMD-api library if set to ``OFF``
 ``WarpX_picsar_src``          *None*                                         Path to PICSAR source directory (preferred if set)
 ``WarpX_picsar_repo``         ``https://github.com/ECP-WarpX/picsar.git``    Repository URI to pull and build PICSAR from
@@ -143,6 +144,10 @@ CMake Option                  Default & Values                               Des
 ``WarpX_pybind11_repo``       ``https://github.com/pybind/pybind11.git``     Repository URI to pull and build pybind11 from
 ``WarpX_pybind11_branch``     *we set and maintain a compatible commit*      Repository branch for ``WarpX_pybind11_repo``
 ``WarpX_pybind11_internal``   **ON**/OFF                                     Needs a pre-installed pybind11 library if set to ``OFF``
+``WarpX_TEST_CLEANUP``        ON/**OFF**                                     Clean up automated test directories
+``WarpX_TEST_DEBUGGER``       ON/**OFF**                                     Run automated tests without AMReX signal handling (to attach debuggers)
+``WarpX_TEST_FPETRAP``        ON/**OFF**                                     Run automated tests with FPE-trapping runtime parameters
+``WarpX_BACKTRACE_INFO``      ON/**OFF**                                     Compile with -g1 for minimal debug symbols (currently used in CI tests)
 ============================= ============================================== ===========================================================
 
 For example, one can also build against a local AMReX copy.
@@ -218,7 +223,7 @@ PICMI Python Bindings
    .. code-block:: bash
 
       python3 -m pip install -U pip
-      python3 -m pip install -U build packaging setuptools wheel
+      python3 -m pip install -U build packaging setuptools[core] wheel
       python3 -m pip install -U cmake
       python3 -m pip install -r requirements.txt
 

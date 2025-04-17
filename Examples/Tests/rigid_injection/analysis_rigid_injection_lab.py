@@ -92,9 +92,9 @@ assert error_rel < tolerance_rel
 filename_start = filename[:-5] + "00000"
 ds_start = yt.load(filename_start)
 ad_start = ds_start.all_data()
-x = ad_start["beam", "particle_position_x"]
-z = ad_start["beam", "particle_position_y"]
-orig_z = ad_start["beam", "particle_orig_z"]
-center = ad_start["beam", "particle_center"]
+x = ad_start["beam", "particle_position_x"].value
+z = ad_start["beam", "particle_position_y"].value
+orig_z = ad_start["beam", "particle_orig_z"].value
+center = ad_start["beam", "particle_center"].value
 assert np.array_equal(z, orig_z)
 assert np.array_equal(1 * (np.abs(x) < 5.0e-7), center)

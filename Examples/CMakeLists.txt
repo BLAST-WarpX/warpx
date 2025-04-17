@@ -159,6 +159,9 @@ function(add_warpx_test
                 "amrex.fpe_trap_zero = 1"
             )
         endif()
+        if(WarpX_TEST_DEBUGGER)
+            set(runtime_params_fpetrap "amrex.signal_handling = 0")
+        endif()
         add_test(
             NAME ${name}.run
             COMMAND

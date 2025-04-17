@@ -40,9 +40,14 @@ class LibWarpX:
             # Once loaded, it gets added to the dictionary so this code won't be called again.
             self.load_library()
             return self.__dict__[attribute]
+        elif attribute == "warpx":
+            # A `warpx` attribute has not yet been assigned, so `initialize_warpx` has not been called.
+            raise AttributeError(
+                "Trying to access libwarpx.warpx before initialize_warpx has been called!"
+            )
         else:
             # For any other attribute, call the built-in routine - this should always
-            # return an AttributeException.
+            # return an AttributeError.
             return self.__getattribute__(attribute)
 
     def _get_package_root(self):
@@ -142,8 +147,6 @@ class LibWarpX:
         self.warpx.initialize_data()
         self.libwarpx_so.execute_python_callback("afterinit")
         self.libwarpx_so.execute_python_callback("particleloader")
-
-        # self.libwarpx_so.warpx_init()
 
         self.initialized = True
 
