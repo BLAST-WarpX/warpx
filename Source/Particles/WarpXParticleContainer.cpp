@@ -1729,16 +1729,16 @@ WarpXParticleContainer::CalculateNuei(amrex::MultiFab & species_nuei,
         "The nuei can not be calculated for a massless or neutral species.");
 
     WarpX & warpx = WarpX::GetInstance();
-    amrex::MultiFab const & vxi = *warpx.m_fields.get("v_" + species_name, Direction{0}, lev);
-    amrex::MultiFab const & vyi = *warpx.m_fields.get("v_" + species_name, Direction{1}, lev);
-    amrex::MultiFab const & vzi = *warpx.m_fields.get("v_" + species_name, Direction{2}, lev);
-    amrex::MultiFab const & vxe = *warpx.m_fields.get("v_" + electron_species.species_name, Direction{0}, lev);
-    amrex::MultiFab const & vye = *warpx.m_fields.get("v_" + electron_species.species_name, Direction{1}, lev);
-    amrex::MultiFab const & vze = *warpx.m_fields.get("v_" + electron_species.species_name, Direction{2}, lev);
-    amrex::MultiFab const & Ti = *warpx.m_fields.get("T_" + species_name, lev);
-    amrex::MultiFab const & Te = *warpx.m_fields.get("T_" + electron_species.species_name, lev);
-    amrex::MultiFab const & Ni = *warpx.m_fields.get("N_" + species_name, lev);
-    amrex::MultiFab const & Ne = *warpx.m_fields.get("N_" + electron_species.species_name, lev);
+    amrex::MultiFab const & vxi_mf = *warpx.m_fields.get("v_" + species_name, Direction{0}, lev);
+    amrex::MultiFab const & vyi_mf = *warpx.m_fields.get("v_" + species_name, Direction{1}, lev);
+    amrex::MultiFab const & vzi_mf = *warpx.m_fields.get("v_" + species_name, Direction{2}, lev);
+    amrex::MultiFab const & vxe_mf = *warpx.m_fields.get("v_" + electron_species.species_name, Direction{0}, lev);
+    amrex::MultiFab const & vye_mf = *warpx.m_fields.get("v_" + electron_species.species_name, Direction{1}, lev);
+    amrex::MultiFab const & vze_mf = *warpx.m_fields.get("v_" + electron_species.species_name, Direction{2}, lev);
+    amrex::MultiFab const & Ti_mf = *warpx.m_fields.get("T_" + species_name, lev);
+    amrex::MultiFab const & Te_mf = *warpx.m_fields.get("T_" + electron_species.species_name, lev);
+    amrex::MultiFab const & Ni_mf = *warpx.m_fields.get("N_" + species_name, lev);
+    amrex::MultiFab const & Ne_mf = *warpx.m_fields.get("N_" + electron_species.species_name, lev);
     amrex::MultiFab const & global_debye_length = *warpx.m_fields.get(warpx::fields::FieldType::global_debye_length, lev);
 
     amrex::Real const rimass = static_cast<amrex::Real>(mass);
@@ -1760,16 +1760,16 @@ WarpXParticleContainer::CalculateNuei(amrex::MultiFab & species_nuei,
         amrex::Real const dr = Geom(lev).CellSize(0);
 #endif
 
-        amrex::Array4<const amrex::Real> const & vxi_array = vxi.array(mfi);
-        amrex::Array4<const amrex::Real> const & vyi_array = vyi.array(mfi);
-        amrex::Array4<const amrex::Real> const & vzi_array = vzi.array(mfi);
-        amrex::Array4<const amrex::Real> const & vxe_array = vxe.array(mfi);
-        amrex::Array4<const amrex::Real> const & vye_array = vye.array(mfi);
-        amrex::Array4<const amrex::Real> const & vze_array = vze.array(mfi);
-        amrex::Array4<const amrex::Real> const & Ti_array = Ti.array(mfi);
-        amrex::Array4<const amrex::Real> const & Te_array = Te.array(mfi);
-        amrex::Array4<const amrex::Real> const & Ni_array = Ni.array(mfi);
-        amrex::Array4<const amrex::Real> const & Ne_array = Ne.array(mfi);
+        amrex::Array4<const amrex::Real> const & vxi_array = vxi_mf.array(mfi);
+        amrex::Array4<const amrex::Real> const & vyi_array = vyi_mf.array(mfi);
+        amrex::Array4<const amrex::Real> const & vzi_array = vzi_mf.array(mfi);
+        amrex::Array4<const amrex::Real> const & vxe_array = vxe_mf.array(mfi);
+        amrex::Array4<const amrex::Real> const & vye_array = vye_mf.array(mfi);
+        amrex::Array4<const amrex::Real> const & vze_array = vze_mf.array(mfi);
+        amrex::Array4<const amrex::Real> const & Ti_array = Ti_mf.array(mfi);
+        amrex::Array4<const amrex::Real> const & Te_array = Te_mf.array(mfi);
+        amrex::Array4<const amrex::Real> const & Ni_array = Ni_mf.array(mfi);
+        amrex::Array4<const amrex::Real> const & Ne_array = Ne_mf.array(mfi);
         amrex::Array4<const amrex::Real> const & debye_array = global_debye_length.array(mfi);
         amrex::Array4<amrex::Real> const & nuei_array = species_nuei.array(mfi);
 
