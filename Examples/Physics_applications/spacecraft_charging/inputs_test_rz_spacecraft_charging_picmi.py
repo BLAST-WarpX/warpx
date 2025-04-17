@@ -54,11 +54,11 @@ class SpaceChargeFieldCorrector(object):
 
         # Correct fields so as to recover the actual charge
         Er = warpx.multifab("Efield_fp", dir=self.dir_r, level=0)
-        Er.saxpy(Er, (q - q_v), self.normalized_Er, 0, 0, 1, 0)
+        Er.saxpy(q - q_v, self.normalized_Er, 0, 0, 1, 0)
         Ez = warpx.multifab("Efield_fp", dir=self.dir_z, level=0)
-        Ez.saxpy(Ez, (q - q_v), self.normalized_Ez, 0, 0, 1, 0)
+        Ez.saxpy(q - q_v, self.normalized_Ez, 0, 0, 1, 0)
         phi = warpx.multifab("phi_fp", level=0)
-        phi.saxpy(phi, (q - q_v), self.normalized_phi, 0, 0, 1, 0)
+        phi.saxpy(q - q_v, self.normalized_phi, 0, 0, 1, 0)
 
         self.spacecraft_potential += (q - q_v) * self.spacecraft_capacitance
         warpx.set_potential_on_eb("%f" % self.spacecraft_potential)
