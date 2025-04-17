@@ -939,7 +939,9 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
 
 #if   defined(WARPX_DIM_1D_Z)
     const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(WarpX::noz/2));
-#elif   defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(WarpX::nox/2));
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(WarpX::nox/2),
                                                        static_cast<int>(WarpX::noz/2));
 #elif defined(WARPX_DIM_3D)
@@ -1082,7 +1084,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
 
     // Not doing shared memory deposition, call normal kernels
     if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
         auto& xp_n = pti.GetAttribs("x_n");
         const ParticleReal* xp_n_data = xp_n.dataPtr() + offset;
 #else
@@ -1094,8 +1096,12 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
 #else
         const ParticleReal* yp_n_data = nullptr;
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
         auto& zp_n = pti.GetAttribs("z_n");
         const ParticleReal* zp_n_data = zp_n.dataPtr() + offset;
+#else
+        const ParticleReal* zp_n_data = nullptr;
+#endif
         if (WarpX::nox == 1){
             doVillasenorJandSigmaDeposition<1>(
                 xp_n_data, yp_n_data, zp_n_data,
