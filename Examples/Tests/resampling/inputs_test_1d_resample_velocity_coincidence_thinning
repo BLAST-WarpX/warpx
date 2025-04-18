@@ -17,8 +17,8 @@ algo.particle_shape = 1
 algo.maxwell_solver = none
 
 particles.species_names = hydrogen
-hydrogen.mass = 1.67262192369e-27
-hydrogen.charge = 1.602176634e-19
+hydrogen.mass = m_p
+hydrogen.charge = q_e
 hydrogen.injection_style = nrandompercell
 hydrogen.initialize_self_fields = 0
 hydrogen.do_not_push = 1

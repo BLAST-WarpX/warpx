@@ -13,6 +13,7 @@
 #include "Particles/Collision/BinaryCollision/DSMC/DSMCFunc.H"
 #include "Particles/Collision/BinaryCollision/DSMC/SplitAndScatterFunc.H"
 #include "Particles/Collision/BinaryCollision/NuclearFusion/NuclearFusionFunc.H"
+#include "Particles/Collision/BinaryCollision/PhotonPhoton/PhotonPhotonCollisionFunc.H"
 #include "Particles/Collision/BinaryCollision/ParticleCreationFunc.H"
 #include "Utils/TextMsg.H"
 
@@ -70,6 +71,12 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
                std::make_unique<BinaryCollision<NuclearFusionFunc, ParticleCreationFunc>>(
                     collision_names[i], mypc
                 );
+        }
+        else if (type == "photonphoton") {
+            allcollisions[i] =
+               std::make_unique<BinaryCollision<PhotonPhotonCollisionFunc, ParticleCreationFunc>>(
+                    collision_names[i], mypc
+               );
         }
         else{
             WARPX_ABORT_WITH_MESSAGE("Unknown collision type.");
