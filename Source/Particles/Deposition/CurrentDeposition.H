@@ -1223,10 +1223,10 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
             amrex::Real const zp_old = zp_n[ip];
             amrex::Real const rpxy_new = std::sqrt(xp_new*xp_new + yp_new*yp_new);
             amrex::Real const rpxy_old = std::sqrt(xp_old*xp_old + yp_old*yp_old);
-            amrex::Real const rpxy_mid = (rpxy_new + rpxy_old)/2._rt;
+            amrex::Real const rpxy_mid = (rpxy_new + rpxy_old)*0.5_rt;
             amrex::Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new + zp_new*zp_new);
             amrex::Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old + zp_old*zp_old);
-            amrex::Real const rp_mid = (rp_new + rp_old)/2._rt;
+            amrex::Real const rp_mid = (rp_new + rp_old)*0.5_rt;
 
             amrex::Real const costheta_mid = (rpxy_mid > 0. ? xp_mid/rpxy_mid : 1._rt);
             amrex::Real const sintheta_mid = (rpxy_mid > 0. ? yp_mid/rpxy_mid : 0._rt);
@@ -1443,8 +1443,8 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
                 amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i_new-1+i, 0, 0, 0), sdyj);
             }
             for (int i=dil; i<=depos_order+2-diu; i++) {
-                amrex::Real const sdzi = wq*vz*invvol*0.5_rt*(sx_old[i] + sx_new[i]);
-                amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i_new-1+i, 0, 0, 0), sdzi);
+                amrex::Real const sdzk = wq*vz*invvol*0.5_rt*(sx_old[i] + sx_new[i]);
+                amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i_new-1+i, 0, 0, 0), sdzk);
             }
 #endif
         }

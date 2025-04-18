@@ -653,7 +653,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                 }
 
             } else if (push_type == PushType::Implicit) {
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
                 auto& xp_n = pti.GetAttribs("x_n");
                 const ParticleReal* xp_n_data = xp_n.dataPtr() + offset;
 #else
