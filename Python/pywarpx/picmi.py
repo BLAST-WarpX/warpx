@@ -1528,15 +1528,6 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
         "CL2", "LL4", etc.
         By default, the string is empty and the JRhom algorithm is not used.
 
-    warpx_psatd_J_in_time: {'constant', 'linear'}, default='constant'
-        This determines whether the current density is assumed to be constant
-        or linear in time, within the time step over which the electromagnetic
-        fields are evolved.
-
-    warpx_psatd_rho_in_time: {'linear'}, default='linear'
-        This determines whether the charge density is assumed to be linear
-        in time, within the time step over which the electromagnetic fields are evolved.
-
     warpx_do_pml_in_domain: bool, default=False
         Whether to do the PML boundaries within the domain (versus
         in the guard cells)
@@ -1566,8 +1557,6 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
             self.psatd_update_with_rho = kw.pop("warpx_psatd_update_with_rho", None)
             self.psatd_do_time_averaging = kw.pop("warpx_psatd_do_time_averaging", None)
             self.psatd_JRhom = kw.pop("warpx_psatd_JRhom", None)
-            self.psatd_J_in_time = kw.pop("warpx_psatd_J_in_time", None)
-            self.psatd_rho_in_time = kw.pop("warpx_psatd_rho_in_time", None)
 
         self.do_pml_in_domain = kw.pop("warpx_do_pml_in_domain", None)
         self.pml_has_particles = kw.pop("warpx_pml_has_particles", None)
@@ -1584,8 +1573,6 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
             pywarpx.psatd.update_with_rho = self.psatd_update_with_rho
             pywarpx.psatd.do_time_averaging = self.psatd_do_time_averaging
             pywarpx.psatd.JRhom = self.psatd_JRhom
-            pywarpx.psatd.J_in_time = self.psatd_J_in_time
-            pywarpx.psatd.rho_in_time = self.psatd_rho_in_time
 
             if self.grid.guard_cells is not None:
                 pywarpx.psatd.nx_guard = self.grid.guard_cells[0]
