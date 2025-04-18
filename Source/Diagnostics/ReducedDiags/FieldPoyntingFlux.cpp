@@ -231,7 +231,7 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
             amrex::Box const boundary_matched = amrex::convert(boundary, box.ixType());
             box &= boundary_matched;
 
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             // Lower corner of box physical domain
             amrex::XDim3 const xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
             amrex::Dim3 const lo = amrex::lbound(box);
@@ -242,14 +242,18 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
 
             auto area_factor = [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                 amrex::ignore_unused(i,j,k);
-#if defined WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 amrex::Real r;
                 if (normal_dir == 0) {
                     r = rmin + (i - irmin)*dr;
                 } else {
                     r = rmin + (i + 0.5_rt - irmin)*dr;
                 }
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 return 2._rt*MathConst::pi*r;
+#elif defined(WARPX_DIM_RSPHERE)
+                return 4._rt*MathConst::pi*r*r;
+#endif
 #else
                 return 1._rt;
 #endif
