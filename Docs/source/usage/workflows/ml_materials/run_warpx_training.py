@@ -213,17 +213,13 @@ if psatd_algo == "galilean":
     galilean_velocity = [0.0, 0.0] if dim == "3" else [0.0]
     galilean_velocity += [-c * beta_boost]
     n_pass_z = 1
-    do_psatd_JRhom = None
-    do_psatd_JRhom_n_depositions = None
-    J_in_time = None
+    psatd_JRhom = None
     current_correction = True
     divE_cleaning = False
 elif psatd_algo == "psatd_JRhom":
     n_pass_z = 4
     galilean_velocity = None
-    do_psatd_JRhom = True
-    do_psatd_JRhom_n_depositions = 2
-    J_in_time = "linear"
+    psatd_JRhom = "LL2"
     current_correction = False
     divE_cleaning = True
 else:
@@ -249,9 +245,9 @@ solver = picmi.ElectromagneticSolver(
     stencil_order=stencil_order,
     galilean_velocity=galilean_velocity,
     warpx_psatd_update_with_rho=True,
+    warpx_psatd_JRhom=psatd_JRhom,
     warpx_current_correction=current_correction,
     divE_cleaning=divE_cleaning,
-    warpx_psatd_J_in_time=J_in_time,
 )
 
 # Diagnostics
@@ -328,8 +324,6 @@ sim = picmi.Simulation(
     warpx_particle_pusher_algo="vay",
     warpx_amrex_the_arena_is_managed=False,
     warpx_amrex_use_gpu_aware_mpi=True,
-    warpx_do_psatd_JRhom=do_psatd_JRhom,
-    warpx_do_psatd_JRhom_n_depositions=do_psatd_JRhom_n_depositions,
     warpx_grid_type=grid_type,
     # default: 2 for staggered grids, 8 for hybrid grids
     warpx_field_centering_order=[16, 16, 16],
