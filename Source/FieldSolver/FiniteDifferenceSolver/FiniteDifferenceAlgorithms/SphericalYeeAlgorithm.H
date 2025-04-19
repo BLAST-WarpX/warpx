@@ -77,7 +77,7 @@ struct SphericalYeeAlgorithm {
     /** Applies the differential operator, the gradient, `1/r**2 * d(r**2F)/dr`,
      * where `F` is on a *cell-centered* grid in `r`
      * and the differential operator is evaluated on a *nodal* grid.
-     * The input parameter `r` is given at the cell-centered position */
+     * The input parameter `r` is given at the node-centered position */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real DownwardDrr2_over_r2 (
         amrex::Array4<amrex::Real const> const& F,
@@ -97,7 +97,7 @@ struct SphericalYeeAlgorithm {
     /** Applies the differential operator `1/r * d(rF)/dr`,
      * where `F` is on a *cell-centered* grid in `r`
      * and the differential operator is evaluated on a *nodal* grid.
-     * The input parameter `r` is given at the cell-centered position */
+     * The input parameter `r` is given at the node-centered position */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real DownwardDrr_over_r (
         amrex::Array4<amrex::Real const> const& F,

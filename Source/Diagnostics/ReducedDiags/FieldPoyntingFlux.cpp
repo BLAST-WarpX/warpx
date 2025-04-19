@@ -202,7 +202,7 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
         // For 1D : it is always 2
         int const normal_dir = 2;
 #else
-        // For 3D : it is the same as the face direction
+        // For 3D, RCYLINDER, and RSPHERE : it is the same as the face direction
         int const normal_dir = face_dir;
 #endif
 

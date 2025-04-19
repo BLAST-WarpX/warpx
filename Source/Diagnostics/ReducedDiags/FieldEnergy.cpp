@@ -198,12 +198,11 @@ FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, [[maybe_unused]]int lev)
             return MathConst::pi*v_factor*theta_integral;
 #elif defined(WARPX_DIM_RSPHERE)
             amrex::Real const r = rmin + (i - tb_lo[0])*dr;
-            // Volume is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)
-            amrex::Real const r1 = (i == tb_lo[0] && is_nodal[0] ? r : r - dr/2.0_rt);
-            amrex::Real const r2 = (i == tb_hi[0] && is_nodal[0] ? r : r + dr/2.0_rt);
-            amrex::Real const v_factor = 4.0_rt/3.0_rt*MathConst::pi*(r2*r2*r2 - r1*r1*r1);
-            // Note that dr is already included in dV above so divide it out here.
-            return v_factor/dr;
+            amrex::Real v_factor = 4.0_rt*MathConst::pi*r*r;
+            if (r == 0._rt) { v_factor = 4.0_rt*MathConst::pi/3._rt*(dr*dr/4._rt); }
+            if (i == tb_lo[0] && is_nodal[0]) { v_factor *= 0.5_rt; }
+            if (i == tb_hi[0] && is_nodal[0]) { v_factor *= 0.5_rt; }
+            return v_factor;
 #else
             amrex::Real v_factor = 1._rt;
             AMREX_D_TERM(
