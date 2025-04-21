@@ -4,7 +4,7 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#include "PsatdJRhomAlgorithmSecondOrder.H"
+#include "PsatdAlgorithmJRhomSecondOrder.H"
 
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -29,7 +29,7 @@
 
 using namespace amrex::literals;
 
-PsatdJRhomAlgorithmSecondOrder::PsatdJRhomAlgorithmSecondOrder(
+PsatdAlgorithmJRhomSecondOrder::PsatdAlgorithmJRhomSecondOrder(
     const SpectralKSpace& spectral_kspace,
     const amrex::DistributionMapping& dm,
     const SpectralFieldIndex& spectral_index,
@@ -82,7 +82,7 @@ PsatdJRhomAlgorithmSecondOrder::PsatdJRhomAlgorithmSecondOrder(
 }
 
 void
-PsatdJRhomAlgorithmSecondOrder::pushSpectralFields (SpectralFieldData& f) const
+PsatdAlgorithmJRhomSecondOrder::pushSpectralFields (SpectralFieldData& f) const
 {
     const amrex::Real dt = m_dt;
     const bool update_with_rho = m_update_with_rho;
@@ -347,7 +347,7 @@ PsatdJRhomAlgorithmSecondOrder::pushSpectralFields (SpectralFieldData& f) const
     }
 }
 
-void PsatdJRhomAlgorithmSecondOrder::InitializeSpectralCoefficients (
+void PsatdAlgorithmJRhomSecondOrder::InitializeSpectralCoefficients (
     const SpectralKSpace& spectral_kspace,
     const amrex::DistributionMapping& dm,
     amrex::Real dt)
@@ -461,7 +461,7 @@ void PsatdJRhomAlgorithmSecondOrder::InitializeSpectralCoefficients (
     }
 }
 
-void PsatdJRhomAlgorithmSecondOrder::InitializeSpectralCoefficientsAveraging (
+void PsatdAlgorithmJRhomSecondOrder::InitializeSpectralCoefficientsAveraging (
     const SpectralKSpace& spectral_kspace,
     const amrex::DistributionMapping& dm,
     amrex::Real dt)
@@ -541,10 +541,10 @@ void PsatdJRhomAlgorithmSecondOrder::InitializeSpectralCoefficientsAveraging (
     }
 }
 
-void PsatdJRhomAlgorithmSecondOrder::CurrentCorrection (SpectralFieldData& field_data)
+void PsatdAlgorithmJRhomSecondOrder::CurrentCorrection (SpectralFieldData& field_data)
 {
     // Profiling
-    BL_PROFILE("PsatdJRhomAlgorithmSecondOrder::CurrentCorrection");
+    BL_PROFILE("PsatdAlgorithmJRhomSecondOrder::CurrentCorrection");
 
     const bool J_constant = (m_time_dependency_J   == TimeDependencyJ::Constant);
     const bool rho_linear = (m_time_dependency_rho == TimeDependencyRho::Linear);
@@ -610,10 +610,10 @@ void PsatdJRhomAlgorithmSecondOrder::CurrentCorrection (SpectralFieldData& field
 }
 
 void
-PsatdJRhomAlgorithmSecondOrder::VayDeposition (SpectralFieldData& field_data)
+PsatdAlgorithmJRhomSecondOrder::VayDeposition (SpectralFieldData& field_data)
 {
     // Profiling
-    BL_PROFILE("PsatdJRhomAlgorithmSecondOrder::VayDeposition()");
+    BL_PROFILE("PsatdAlgorithmJRhomSecondOrder::VayDeposition()");
 
     const bool J_constant = (m_time_dependency_J   == TimeDependencyJ::Constant);
     const bool rho_linear = (m_time_dependency_rho == TimeDependencyRho::Linear);

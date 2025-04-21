@@ -3,8 +3,8 @@ foreach(D IN LISTS WarpX_DIMS)
     target_sources(lib_${SD}
       PRIVATE
         SpectralBaseAlgorithm.cpp
-        PsatdJRhomAlgorithmFirstOrder.cpp
-        PsatdJRhomAlgorithmSecondOrder.cpp
+        PsatdAlgorithmJRhomFirstOrder.cpp
+        PsatdAlgorithmJRhomSecondOrder.cpp
         PsatdAlgorithmGalilean.cpp
         PsatdAlgorithmComoving.cpp
         PsatdAlgorithmPml.cpp

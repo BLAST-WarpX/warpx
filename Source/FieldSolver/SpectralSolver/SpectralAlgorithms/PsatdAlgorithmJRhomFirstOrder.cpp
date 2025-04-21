@@ -4,7 +4,7 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#include "PsatdJRhomAlgorithmFirstOrder.H"
+#include "PsatdAlgorithmJRhomFirstOrder.H"
 
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -28,7 +28,7 @@
 
 using namespace amrex::literals;
 
-PsatdJRhomAlgorithmFirstOrder::PsatdJRhomAlgorithmFirstOrder (
+PsatdAlgorithmJRhomFirstOrder::PsatdAlgorithmJRhomFirstOrder (
     const SpectralKSpace& spectral_kspace,
     const amrex::DistributionMapping& dm,
     const SpectralFieldIndex& spectral_index,
@@ -50,7 +50,7 @@ PsatdJRhomAlgorithmFirstOrder::PsatdJRhomAlgorithmFirstOrder (
 {}
 
 void
-PsatdJRhomAlgorithmFirstOrder::pushSpectralFields (SpectralFieldData& f) const
+PsatdAlgorithmJRhomFirstOrder::pushSpectralFields (SpectralFieldData& f) const
 {
     const bool div_cleaning = m_div_cleaning;
 
@@ -351,10 +351,10 @@ PsatdJRhomAlgorithmFirstOrder::pushSpectralFields (SpectralFieldData& f) const
     }
 }
 
-void PsatdJRhomAlgorithmFirstOrder::CurrentCorrection (SpectralFieldData& field_data)
+void PsatdAlgorithmJRhomFirstOrder::CurrentCorrection (SpectralFieldData& field_data)
 {
     // Profiling
-    BL_PROFILE("PsatdJRhomAlgorithmFirstOrder::CurrentCorrection");
+    BL_PROFILE("PsatdAlgorithmJRhomFirstOrder::CurrentCorrection");
 
     amrex::ignore_unused(field_data);
     WARPX_ABORT_WITH_MESSAGE(
@@ -362,10 +362,10 @@ void PsatdJRhomAlgorithmFirstOrder::CurrentCorrection (SpectralFieldData& field_
 }
 
 void
-PsatdJRhomAlgorithmFirstOrder::VayDeposition (SpectralFieldData& field_data)
+PsatdAlgorithmJRhomFirstOrder::VayDeposition (SpectralFieldData& field_data)
 {
     // Profiling
-    BL_PROFILE("PsatdJRhomAlgorithmFirstOrder::VayDeposition()");
+    BL_PROFILE("PsatdAlgorithmJRhomFirstOrder::VayDeposition()");
 
     amrex::ignore_unused(field_data);
     WARPX_ABORT_WITH_MESSAGE(

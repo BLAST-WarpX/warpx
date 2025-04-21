@@ -1,6 +1,6 @@
 CEXE_sources += SpectralBaseAlgorithm.cpp
-CEXE_sources += PsatdJRhomAlgorithmFirstOrder.cpp
-CEXE_sources += PsatdJRhomAlgorithmSecondOrder.cpp
+CEXE_sources += PsatdAlgorithmJRhomFirstOrder.cpp
+CEXE_sources += PsatdAlgorithmJRhomSecondOrder.cpp
 CEXE_sources += PsatdAlgorithmGalilean.cpp
 CEXE_sources += PsatdAlgorithmComoving.cpp
 CEXE_sources += PsatdAlgorithmPml.cpp

@@ -4,8 +4,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef WARPX_PSATD_JRHOM_ALGORITHM_SECOND_ORDER_H_
-#define WARPX_PSATD_JRHOM_ALGORITHM_SECOND_ORDER_H_
+#ifndef WARPX_PSATD_ALGORITHM_JRHOM_SECOND_ORDER_H_
+#define WARPX_PSATD_ALGORITHM_JRHOM_SECOND_ORDER_H_
 
 #include "FieldSolver/SpectralSolver/SpectralFieldData.H"
 #include "FieldSolver/SpectralSolver/SpectralKSpace.H"
@@ -29,12 +29,12 @@
  *        linear in time and two currents, deposited at the beginning and the end of the time step,
  *        are used for the PSATD update equations, instead of only one current deposited at half time.
  */
-class PsatdJRhomAlgorithmSecondOrder : public SpectralBaseAlgorithm
+class PsatdAlgorithmJRhomSecondOrder : public SpectralBaseAlgorithm
 {
     public:
 
         /**
-         * \brief Constructor of the class PsatdJRhomAlgorithmSecondOrder
+         * \brief Constructor of the class PsatdAlgorithmJRhomSecondOrder
          *
          * \param[in] spectral_kspace spectral space
          * \param[in] dm distribution mapping
@@ -51,7 +51,7 @@ class PsatdJRhomAlgorithmSecondOrder : public SpectralBaseAlgorithm
          * \param[in] time_dependency_J time dependency of J within one time step
          * \param[in] time_dependency_rho time dependency of rho within one time step
          */
-        PsatdJRhomAlgorithmSecondOrder (
+        PsatdAlgorithmJRhomSecondOrder (
             const SpectralKSpace& spectral_kspace,
             const amrex::DistributionMapping& dm,
             const SpectralFieldIndex& spectral_index,
@@ -138,4 +138,4 @@ class PsatdJRhomAlgorithmSecondOrder : public SpectralBaseAlgorithm
         TimeDependencyRho m_time_dependency_rho;
 };
 #endif // WARPX_USE_FFT
-#endif // WARPX_PSATD_JRHOM_ALGORITHM_SECOND_ORDER_H_
+#endif // WARPX_PSATD_ALGORITHM_JRHOM_SECOND_ORDER_H_

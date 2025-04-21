@@ -1110,7 +1110,7 @@ private:
     /**
      * \brief Perform one PIC iteration, with the multiple J deposition per time step
      */
-    void OneStep_psatd_JRhom (amrex::Real cur_time);
+    void OneStep_JRhom (amrex::Real cur_time);
 
     void RestrictCurrentFromFineToCoarsePatch (
         const ablastr::fields::MultiLevelVectorField& J_fp,

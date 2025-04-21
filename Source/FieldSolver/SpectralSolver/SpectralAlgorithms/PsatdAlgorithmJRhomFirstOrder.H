@@ -4,8 +4,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef WARPX_PSATD_JRHOM_ALGORITHM_FIRST_ORDER_H_
-#define WARPX_PSATD_JRHOM_ALGORITHM_FIRST_ORDER_H_
+#ifndef WARPX_PSATD_ALGORITHM_JRHOM_FIRST_ORDER_H_
+#define WARPX_PSATD_ALGORITHM_JRHOM_FIRST_ORDER_H_
 
 #include "FieldSolver/SpectralSolver/SpectralFieldData.H"
 #include "FieldSolver/SpectralSolver/SpectralKSpace.H"
@@ -26,12 +26,12 @@
 /*
  * \brief Class that updates the fields in spectral space according to the first-order PSATD equations.
  */
-class PsatdJRhomAlgorithmFirstOrder : public SpectralBaseAlgorithm
+class PsatdAlgorithmJRhomFirstOrder : public SpectralBaseAlgorithm
 {
     public:
 
         /**
-         * \brief Constructor of the class PsatdJRhomAlgorithmFirstOrder
+         * \brief Constructor of the class PsatdAlgorithmJRhomFirstOrder
          *
          * \param[in] spectral_kspace spectral space
          * \param[in] dm distribution mapping
@@ -45,7 +45,7 @@ class PsatdJRhomAlgorithmFirstOrder : public SpectralBaseAlgorithm
          * \param[in] time_dependency_J time dependency of J (currently supported: constant, linear)
          * \param[in] time_dependency_rho time dependency of rho (currently supported: constant, linear)
          */
-        PsatdJRhomAlgorithmFirstOrder (
+        PsatdAlgorithmJRhomFirstOrder (
             const SpectralKSpace& spectral_kspace,
             const amrex::DistributionMapping& dm,
             const SpectralFieldIndex& spectral_index,
@@ -97,4 +97,4 @@ class PsatdJRhomAlgorithmFirstOrder : public SpectralBaseAlgorithm
         TimeDependencyRho m_time_dependency_rho;
 };
 #endif // WARPX_USE_FFT
-#endif // WARPX_PSATD_JRHOM_ALGORITHM_FIRST_ORDER_H_
+#endif // WARPX_PSATD_ALGORITHM_JRHOM_FIRST_ORDER_H_

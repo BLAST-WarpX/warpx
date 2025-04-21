@@ -8,9 +8,9 @@
 #include "FieldSolver/SpectralSolver/SpectralFieldData.H"
 #include "SpectralAlgorithms/PsatdAlgorithmComoving.H"
 #include "SpectralAlgorithms/PsatdAlgorithmPml.H"
-#include "SpectralAlgorithms/PsatdJRhomAlgorithmFirstOrder.H"
 #include "SpectralAlgorithms/PsatdAlgorithmGalilean.H"
-#include "SpectralAlgorithms/PsatdJRhomAlgorithmSecondOrder.H"
+#include "SpectralAlgorithms/PsatdAlgorithmJRhomFirstOrder.H"
+#include "SpectralAlgorithms/PsatdAlgorithmJRhomSecondOrder.H"
 #include "SpectralKSpace.H"
 #include "SpectralSolver.H"
 #include "Utils/TextMsg.H"
@@ -93,13 +93,17 @@ SpectralSolver::SpectralSolver (
 
             const bool div_cleaning = (dive_cleaning && divb_cleaning);
 
-            algorithm = std::make_unique<PsatdJRhomAlgorithmFirstOrder>(
+            // First-order PSATD equations with variable time dependency of J and rho
+            // (valid also for standard PSATD, where J is constant and rho is linear)
+            algorithm = std::make_unique<PsatdAlgorithmJRhomFirstOrder>(
                 k_space, dm, m_spectral_index, norder_x, norder_y, norder_z, grid_type,
                 dt, div_cleaning, time_dependency_J, time_dependency_rho);
         }
         else if (psatd_solution_type == PSATDSolutionType::SecondOrder)
         {
-            algorithm = std::make_unique<PsatdJRhomAlgorithmSecondOrder>(
+            // Second-order PSATD equations with variable time dependency of J and rho
+            // (valid also for standard PSATD, where J is constant and rho is linear)
+            algorithm = std::make_unique<PsatdAlgorithmJRhomSecondOrder>(
               k_space, dm, m_spectral_index, norder_x, norder_y, norder_z, grid_type,
               dt, update_with_rho, fft_do_time_averaging, dive_cleaning, divb_cleaning, time_dependency_J, time_dependency_rho);
         }

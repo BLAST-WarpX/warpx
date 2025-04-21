@@ -205,10 +205,10 @@ WarpX::Evolve (int numsteps)
             const bool skip_deposition = true;
             PushParticlesandDeposit(cur_time, skip_deposition);
         }
-        // Electromagnetic case: PSATD-JRhom algorithm
+        // Electromagnetic case: JRhom algorithm
         else if (m_JRhom)
         {
-            OneStep_psatd_JRhom(cur_time);
+            OneStep_JRhom(cur_time);
         }
         // Electromagnetic case: no subcycling or no mesh refinement
         else if ( !m_do_subcycling || (finest_level == 0))
@@ -683,13 +683,13 @@ void WarpX::SyncCurrentAndRho ()
 }
 
 void
-WarpX::OneStep_psatd_JRhom (const amrex::Real cur_time)
+WarpX::OneStep_JRhom (const amrex::Real cur_time)
 {
 #ifdef WARPX_USE_FFT
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD,
-        "PSATD-JRhom algorithm not implemented for FDTD"
+        "JRhom algorithm not implemented with the FDTD solver"
     );
 
     using warpx::fields::FieldType;
@@ -882,7 +882,7 @@ WarpX::OneStep_psatd_JRhom (const amrex::Real cur_time)
 #else
     amrex::ignore_unused(cur_time);
     WARPX_ABORT_WITH_MESSAGE(
-        "PSATD-JRhom algorithm not implemented for FDTD");
+        "JRhom algorithm not implemented with the FDTD solver");
 #endif // WARPX_USE_FFT
 }
 
