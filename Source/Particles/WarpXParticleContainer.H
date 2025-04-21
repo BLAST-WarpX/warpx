@@ -90,10 +90,10 @@ struct PIdx
                                    "uy",
                                    "uz",
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                                   "theta",
+                                   "theta",  // azimuthal angle
 #endif
 #if defined(WARPX_DIM_RSPHERE)
-                                   "phi",
+                                   "phi", // polar angle, relative to the z-axis
 #endif
     };
 

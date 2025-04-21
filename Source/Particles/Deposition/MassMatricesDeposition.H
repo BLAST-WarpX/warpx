@@ -1192,17 +1192,9 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
             amrex::ignore_unused(fpyx,fpyz);
             amrex::ignore_unused(fpzx,fpzy);
 
-#if (AMREX_SPACEDIM >= 2)
-            amrex::ParticleReal const xp_n = xp_n_data[ip];
-#else
-            amrex::ParticleReal const xp_n = 0._prt;
-#endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-            amrex::ParticleReal const yp_n = yp_n_data[ip];
-#else
-            amrex::ParticleReal const yp_n = 0._prt;
-#endif
-            amrex::ParticleReal const zp_n = zp_n_data[ip];
+            amrex::ParticleReal const xp_n = (xp_n_data ? xp_n_data[ip] : 0._prt);
+            amrex::ParticleReal const yp_n = (yp_n_data ? yp_n_data[ip] : 0._prt);
+            amrex::ParticleReal const zp_n = (zp_n_data ? zp_n_data[ip] : 0._prt);
 
             // Compute position at time n + 1
             amrex::ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n;
