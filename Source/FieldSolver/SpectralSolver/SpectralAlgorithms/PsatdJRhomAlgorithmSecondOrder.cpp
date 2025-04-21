@@ -298,10 +298,10 @@ PsatdJRhomAlgorithmSecondOrder::pushSpectralFields (SpectralFieldData& f) const
                 const amrex::Real Y7 = Y7_arr(i,j,k);
                 const amrex::Real Y8 = Y8_arr(i,j,k);
 
-                // TODO: Here the code is *accumulating* the average,
-                // because it is meant to be used with sub-cycling
-                // maybe this should be made more generic
-                // To be changed
+                // TODO
+                // Here the code is *accumulating* the average,
+                // because it is meant to be used with sub-cycling.
+                // Maybe this should be made more generic?
                 fields(i,j,k,Idx.Ex_avg) += S_ck * Ex_old
                     + I * c2 * ep0 * Y4 * (ky * Bz_old - kz * By_old)
                     - I * c2 * kx * (Y6 * a_rho + Y7 * b_rho + Y8 * c_rho)
