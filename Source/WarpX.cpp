@@ -1966,6 +1966,28 @@ WarpX::BackwardCompatibility ()
         "Please use the new syntax for back-transformed diagnostics, see documentation."
     );
 
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !pp_warpx.query("do_multi_J", backward_bool),
+        "warpx.do_multi_J is no longer used. Please use psatd.JRhom instead."
+    );
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !pp_warpx.query("do_multi_J_n_depositions", backward_int),
+        "warpx.do_multi_J_n_depositions is no longer used. Please use psatd.JRhom instead."
+    );
+
+    const ParmParse pp_psatd("psatd");
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !pp_psatd.query("J_in_time", backward_str),
+        "psatd.J_in_time is no longer used. Please use psatd.JRhom instead."
+    );
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !pp_psatd.query("rho_in_time", backward_str),
+        "psatd.rho_in_time is no longer used. Please use psatd.JRhom instead."
+    );
+
     const ParmParse pp_slice("slice");
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
