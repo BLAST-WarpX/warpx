@@ -9,6 +9,7 @@
 
 #include "ExternalVectorPotential.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
+#include "Initialization/DivCleaner/ProjectionDivCleaner.H"
 #include "Fields.H"
 #include "WarpX.H"
 
@@ -209,6 +210,14 @@ ExternalVectorPotential::InitData ()
         }
 
         amrex::Gpu::streamSynchronize();
+
+        if (m_do_clean_divA && warpx.grid_type == GridType::Collocated) {
+            warpx::initialization::ProjectionDivCleaner dc(Aext_field);
+            dc.setSourceFromBfield();
+            dc.solve();
+            dc.correctBfield();
+            amrex::Print() << Utils::TextMsg::Info( "Finished Projection A-Field divergence cleaner.");
+        }
 
         CalculateExternalCurlA(m_field_names[i]);
 
