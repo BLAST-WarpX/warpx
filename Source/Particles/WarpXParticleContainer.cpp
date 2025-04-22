@@ -1618,7 +1618,7 @@ WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
         );
     }
 
-#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER)
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     if (apply_boundary_and_scale_volume)
     {
         // Reflect density over PEC boundaries, if needed.
@@ -1817,7 +1817,7 @@ WarpXParticleContainer::DepositNumberDensity (amrex::MultiFab* number_density, c
     {
         const amrex::Box& box = mfi.tilebox();
 
-#if defined WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         int const box_lo_r = box.smallEnd(0);
         amrex::XDim3 const xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
         amrex::Real const rmin = xyzmin.x;
@@ -1827,11 +1827,17 @@ WarpXParticleContainer::DepositNumberDensity (amrex::MultiFab* number_density, c
         amrex::Array4<amrex::Real> const& num_array = number_density->array(mfi);
         amrex::ParallelFor(box,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-#if defined WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 // Return the radial factor for the volume element, dV
                 amrex::Real const r = rmin + (i - box_lo_r)*dr;
                 // This is (pi*(r+dr)**2 - pi*r**2)/dr
                 amrex::Real const volume_factor = MathConst::pi*(2.0_rt*r + dr);
+#elif defined(WARPX_DIM_RSPHERE)
+                // Return the radial factor for the volume element, dV
+                amrex::Real const r = rmin + (i - box_lo_r)*dr;
+                // This is (4/3*pi*(r+dr)**3 - 4/3*pi*r**3)/dr, leaving out the
+                // highest order term
+                amrex::Real const volume_factor = 4.0_rt*MathConst::pi*(r + 0.5_rt*dr)*(r + 0.5_rt*dr);
 #else
                 // No factor is needed for Cartesian
                 amrex::Real constexpr volume_factor = 1._rt;

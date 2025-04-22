@@ -1373,8 +1373,6 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
     // See Verboncoeur JCP 174, 421-427 (2001) for the modified volume factor
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
-#elif defined(WARPX_DIM_RSPHERE)
-    const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1._rt/4._rt : 1._rt/8._rt);
 #endif
 
     for ( MFIter mfi(*Jx, TilingIfNotGPU()); mfi.isValid(); ++mfi )
@@ -1405,8 +1403,6 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
         int const ishift_t = (rmint > rmin ? 1 : 0);
         int const ishift_z = (rminz > rmin ? 1 : 0);
 
-        const int nmodes = n_rz_azimuthal_modes;
-
         // Grow the tileboxes to include the guard cells, except for the
         // guard cells at negative radius.
         if (rmin > 0._rt) {
@@ -1421,6 +1417,8 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
         tbr.grow(1, ngJ[1]);
         tbt.grow(1, ngJ[1]);
         tbz.grow(1, ngJ[1]);
+
+        const int nmodes = n_rz_azimuthal_modes;
 #endif
 
         // Rescale current in r-z mode since the inverse volume factor was not
@@ -1444,11 +1442,13 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 Jr_arr(i,j,0,0) /= (2._rt*MathConst::pi*r);
 #elif defined(WARPX_DIM_RSPHERE)
-                // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr
-                Jr_arr(i,j,0,0) /= (4._rt/3._rt*MathConst::pi*(3._rt*r*r + dr*dr/4._rt));
+                // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr,
+                // leaving out the highest order term
+                Jr_arr(i,j,0,0) /= 4._rt*MathConst::pi*r*r;
 #endif
             }
 
+#if defined(WARPX_DIM_RZ)
             for (int imode=1 ; imode < nmodes ; imode++) {
                 // Wrap the current density deposited in the guard cells around
                 // to the cells above the axis.
@@ -1466,6 +1466,7 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
                     Jr_arr(i,j,0,2*imode) /= (2._rt*MathConst::pi*r);
                 }
             }
+#endif
         },
         [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
         {
@@ -1486,11 +1487,13 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 Jt_arr(i,j,0,0) /= (2._rt*MathConst::pi*r);
 #elif defined(WARPX_DIM_RSPHERE)
-                // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr
-                Jt_arr(i,j,0,0) /= (4._rt/3._rt*MathConst::pi*(3._rt*r*r + dr*dr/4._rt));
+                // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr,
+                // leaving out the highest order term
+                Jt_arr(i,j,0,0) /= 4._rt*MathConst::pi*r*r;
 #endif
             }
 
+#if defined(WARPX_DIM_RZ)
             for (int imode=1 ; imode < nmodes ; imode++) {
                 // Wrap the current density deposited in the guard cells around
                 // to the cells above the axis.
@@ -1509,6 +1512,7 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
                     Jt_arr(i,j,0,2*imode) /= (2._rt*MathConst::pi*r);
                 }
             }
+#endif
         },
         [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
         {
@@ -1532,11 +1536,13 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 Jz_arr(i,j,0,0) /= (2._rt*MathConst::pi*r);
 #elif defined(WARPX_DIM_RSPHERE)
-                // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr
-                Jz_arr(i,j,0,0) /= (4._rt/3._rt*MathConst::pi*(3._rt*r*r + dr*dr/4._rt));
+                // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr,
+                // leaving out the highest order term
+                Jz_arr(i,j,0,0) /= 4._rt*MathConst::pi*r*r;
 #endif
             }
 
+#if defined(WARPX_DIM_RZ)
             for (int imode=1 ; imode < nmodes ; imode++) {
                 // Wrap the current density deposited in the guard cells around
                 // to the cells above the axis.
@@ -1554,7 +1560,7 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
                     Jz_arr(i,j,0,2*imode) /= (2._rt*MathConst::pi*r);
                 }
             }
-
+#endif
         });
     }
 }
@@ -1636,15 +1642,16 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev) const
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 Rho_arr(i,j,0,icomp) /= (MathConst::pi*dr*axis_volume_factor);
 #elif defined(WARPX_DIM_RSPHERE)
-                Rho_arr(i,j,0,icomp) /= (4._rt/3._rt*MathConst::pi*dr*dr*axis_volume_factor);
+                Rho_arr(i,j,0,icomp) /= 4._rt/3._rt*MathConst::pi*dr*dr*axis_volume_factor;
 #endif
             } else {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 // Scale factor is pi*((r + dr/2)**2 - (r - dr/2)**2)/dr
                 Rho_arr(i,j,0,icomp) /= (2._rt*MathConst::pi*r);
 #elif defined(WARPX_DIM_RSPHERE)
-                // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr
-                Rho_arr(i,j,0,icomp) /= (4._rt/3._rt*MathConst::pi*(3._rt*r*r + dr*dr/4._rt));
+                // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr,
+                // leaving out the highest order term
+                Rho_arr(i,j,0,icomp) /= 4._rt*MathConst::pi*r*r;
 #endif
             }
         });

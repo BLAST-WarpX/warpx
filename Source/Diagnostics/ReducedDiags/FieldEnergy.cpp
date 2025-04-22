@@ -199,9 +199,9 @@ FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, [[maybe_unused]]int lev)
 #elif defined(WARPX_DIM_RSPHERE)
             amrex::Real const r = rmin + (i - tb_lo[0])*dr;
             amrex::Real v_factor = 4.0_rt*MathConst::pi*r*r;
-            if (r == 0._rt) { v_factor = 4.0_rt*MathConst::pi/3._rt*(dr*dr/4._rt); }
-            if (i == tb_lo[0] && is_nodal[0]) { v_factor *= 0.5_rt; }
-            if (i == tb_hi[0] && is_nodal[0]) { v_factor *= 0.5_rt; }
+            if (r == 0._rt) { v_factor = 4.0_rt*MathConst::pi/3._rt*(dr*dr/8._rt); }
+            else if (i == tb_lo[0] && is_nodal[0]) { v_factor *= 0.5_rt; }
+            else if (i == tb_hi[0] && is_nodal[0]) { v_factor *= 0.5_rt; }
             return v_factor;
 #else
             amrex::Real v_factor = 1._rt;

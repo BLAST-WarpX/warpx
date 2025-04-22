@@ -930,7 +930,7 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
                 amrex::Real Vij = 0.0_rt;
 
                 // Volume element
-#elif defined(WARPX_DIM_RCYLINDER)
+#if defined(WARPX_DIM_RCYLINDER)
                 if (i == domain.smallEnd(0)) {
                     Vij = 2.0_rt*MathConst::pi*(dr/2.0_rt)*(dr/4.0_rt);
                 } else if (i == domain.bigEnd(0)+1) {
@@ -949,7 +949,7 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
 #endif
 
                 // Radial Surfaces
-#elif defined(WARPX_DIM_RCYLINDER)
+#if defined(WARPX_DIM_RCYLINDER)
                 amrex::Real S_Ar_plus = 2.0_rt*MathConst::pi*(r + dr/2.0_rt);
                 amrex::Real S_Ar_minus = 2.0_rt*MathConst::pi*(r - dr/2.0_rt);
                 if (i == domain.smallEnd(0)) {
