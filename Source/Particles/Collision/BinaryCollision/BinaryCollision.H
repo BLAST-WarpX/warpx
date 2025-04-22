@@ -324,16 +324,19 @@ public:
             return MathConst::pi*(2.0_prt*ri + 1.0_prt)*dr;
 #elif defined WARPX_DIM_RCYLINDER
             int const ri = i_cell;
-            return MathConst::pi*(2.0_prt*ri + 1.0_prt)*dr;
+            // rr is radius at the cell center
+            amrex::ParticleReal const rr = (ri + 0.5_prt)*dr;
+            return 2.0_prt*MathConst::pi*rr;
 #elif defined WARPX_DIM_RSPHERE
             // This needs double checking
             int const ri = i_cell;
-            int const rr = 2.0_prt*ri + 1.0_prt;
-            return 4._prt/3._prt*MathConst::pi*rr*rr*dr*dr;
+            // rr is radius at the cell center
+            amrex::ParticleReal const rr = (ri + 0.5_prt)*dr;
+            return 4.0_prt*MathConst::pi*rr*rr;
 #else
             // No factor is needed for Cartesian
             amrex::ignore_unused(i_cell);
-            return 1._prt;
+            return 1.0_prt;
 #endif
         };
 

@@ -930,6 +930,7 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
                 amrex::Real Vij = 0.0_rt;
 
                 // Volume element
+#elif defined(WARPX_DIM_RCYLINDER)
                 if (i == domain.smallEnd(0)) {
                     Vij = 2.0_rt*MathConst::pi*(dr/2.0_rt)*(dr/4.0_rt);
                 } else if (i == domain.bigEnd(0)+1) {
@@ -937,8 +938,18 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
                 }  else {
                     Vij = 2.0_rt*MathConst::pi*r*dr;
                 }
+#elif defined(WARPX_DIM_RSPHERE)
+                if (i == domain.smallEnd(0)) {
+                    Vij = 4.0_rt/3.0_rt*MathConst::pi*(dr/2.0_rt)*(dr/2.0_rt)*(dr/2.0_rt);
+                } else if (i == domain.bigEnd(0)+1) {
+                    Vij = 2.0_rt*MathConst::pi*r*r*dr;
+                }  else {
+                    Vij = 4.0_rt*MathConst::pi*r*r*dr;
+                }
+#endif
 
                 // Radial Surfaces
+#elif defined(WARPX_DIM_RCYLINDER)
                 amrex::Real S_Ar_plus = 2.0_rt*MathConst::pi*(r + dr/2.0_rt);
                 amrex::Real S_Ar_minus = 2.0_rt*MathConst::pi*(r - dr/2.0_rt);
                 if (i == domain.smallEnd(0)) {
@@ -947,6 +958,16 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
                 if (i == domain.bigEnd(0)+1) {
                     S_Ar_plus = 2.0_rt*MathConst::pi*(r);
                 }
+#elif defined(WARPX_DIM_RSPHERE)
+                amrex::Real S_Ar_plus = 4.0_rt*MathConst::pi*(r + dr/2.0_rt)*(r + dr/2.0_rt);
+                amrex::Real S_Ar_minus = 4.0_rt*MathConst::pi*(r - dr/2.0_rt)*(r - dr/2.0_rt);
+                if (i == domain.smallEnd(0)) {
+                    S_Ar_minus = 0.0_rt;
+                }
+                if (i == domain.bigEnd(0)+1) {
+                    S_Ar_plus = 4.0_rt*MathConst::pi*(r*r);
+                }
+#endif
 
                 // Impose "none" boundaries
                 // Condition: Vx(r) = 0 at boundaries
