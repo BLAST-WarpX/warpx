@@ -104,7 +104,7 @@ void
 ProjectionDivCleaner::ReadParameters ()
 {
     // Initialize tolerance based on field precision
-    if constexpr (std::is_same<Real, float>::value) {
+    if constexpr (std::is_same_v<Real, float>) {
         m_rtol = 5e-5;
         m_atol = 0.0;
     }
@@ -141,7 +141,7 @@ ProjectionDivCleaner::solve ()
 
     std::map<FieldBoundaryType, LinOpBCType> bcmap{
         {FieldBoundaryType::PEC, LinOpBCType::Dirichlet},
-        {FieldBoundaryType::Neumann, LinOpBCType::Neumann},
+        {FieldBoundaryType::Neumann, LinOpBCType::Neumann}, // Note that PMC is the same as Neumann
         {FieldBoundaryType::Periodic, LinOpBCType::Periodic},
         {FieldBoundaryType::None, LinOpBCType::Neumann}
     };
@@ -151,7 +151,7 @@ ProjectionDivCleaner::solve ()
         auto ithi = bcmap.find(WarpX::field_boundary_hi[idim]);
         if (itlo == bcmap.end() || ithi == bcmap.end()) {
             WARPX_ABORT_WITH_MESSAGE(
-                "Field boundary conditions have to be either periodic, PEC or neumann "
+                "Field boundary conditions have to be either periodic, PEC, PMC, or neumann "
                 "when using the MLMG projection based divergence cleaner solver."
             );
         }
@@ -337,7 +337,7 @@ WarpX::ProjectionCleanDivB() {
                 && WarpX::poisson_solver_id == PoissonSolverAlgo::Multigrid)) {
         amrex::Print() << Utils::TextMsg::Info( "Starting Projection B-Field divergence cleaner.");
 
-        if constexpr (!std::is_same<Real, double>::value) {
+        if constexpr (!std::is_same_v<Real, double>) {
             ablastr::warn_manager::WMRecordWarning("Projection Div Cleaner",
                 "WarpX is running with a field precision of SINGLE."
                 "Convergence of projection based div cleaner is not optimal and may fail.",

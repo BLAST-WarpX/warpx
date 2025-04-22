@@ -30,6 +30,7 @@
  * @param[in] q1,q2 charge of species 1/2
  * @param[in] m1,m2 mass of species 1/2
  * @param[in] dt is the time step length between two collision calls.
+ * @param[in] global_lamdb is the global Debye length and will be used if greater than zero
  * @param[in] L is the Coulomb log and will be used if greater than zero,
  *            otherwise will be computed.
  * @param[in] dV is the volume of the corresponding cell.
@@ -50,7 +51,7 @@ void ElasticCollisionPerez (
     T_PR const  T1, T_PR const  T2,
     T_PR const  q1, T_PR const  q2,
     T_PR const  m1, T_PR const  m2,
-    T_R const  dt, T_PR const  L, T_R const  dV,
+    T_R const  dt, T_R const global_lamdb, T_PR const  L, T_R const  dV,
     amrex::RandomEngine const& engine,
     bool const isSameSpecies, T_index coll_idx)
 {
@@ -72,8 +73,12 @@ void ElasticCollisionPerez (
     // compute Debye length lmdD (if not using a fixed L = Coulomb log)
     T_PR lmdD = T_PR(-1.0);
     if ( L <= T_PR(0.0) ) {
-        lmdD = T_PR(1.0)/std::sqrt( n1*q1*q1/(T1*PhysConst::ep0) +
-                                    n2*q2*q2/(T2*PhysConst::ep0) );
+        if (global_lamdb <= T_PR(0.0)) {
+            lmdD = T_PR(1.0)/std::sqrt( n1*q1*q1/(T1*PhysConst::ep0) +
+                                        n2*q2*q2/(T2*PhysConst::ep0) );
+        } else {
+            lmdD = global_lamdb;
+        }
     }
 
     // compute atomic spacing
@@ -116,11 +121,12 @@ void ElasticCollisionPerez (
 #endif
 
           // Compute the effective density n12 used to compute the normalized
-          // scattering path s12 in UpdateMomentumPerezElastic().
+          // transport mean free path (s12) in UpdateMomentumPerezElastic().
           // s12 is defined such that the expected value of the change in particle
-          // velocity is equal to that from the full NxN pairing method, as described
-          // here https://arxiv.org/abs/2407.19151. This method is a direct extension
-          // of the original method by Takizuka and Abe JCP 25 (1977) to weighted particles.
+          // velocity is equal to that from the full NxN pairing method for each particle, as described in
+          // Justin Ray Angus, Yichen Fu, Vasily Geyko, Dave Grote, David Larson, JCP 531, 113927 (2025).
+          // This method is a direct extension of the original binary-pairing method for equally weighted
+          // particles by Takizuka and Abe JCP 25 (1977).
           T_PR n12;
           const T_PR wpmax = amrex::max(w1[ I1[i1] ],w2[ I2[i2] ]);
           if (isSameSpecies) { n12 = wpmax*static_cast<T_PR>(min_N+max_N-1)/dV; }

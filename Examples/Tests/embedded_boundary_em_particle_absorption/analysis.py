@@ -39,7 +39,7 @@ elif dim == "2dcartesian":
 elif dim == "thetaMode":
     # In RZ: there are issues with divE on axis
     # Set the few cells around the axis to 0 for this test
-    divE_avg[13:19] = 0
+    divE_avg[:, 13:19] = 0
     tolerance = 4e-12
 
 

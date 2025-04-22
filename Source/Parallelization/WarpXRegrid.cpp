@@ -127,6 +127,10 @@ WarpX::LoadBalance ()
         ParallelDescriptor::Bcast(&doLoadBalance, 1,
                                   ParallelDescriptor::IOProcessorNumber());
 
+        amrex::Print() << Utils::TextMsg::Info("current LB efficiency = " + std::to_string(currentEfficiency)
+                          + " proposed LB efficiency = " + std::to_string(proposedEfficiency)
+                          + " LoadBalance is set to : " + std::to_string(doLoadBalance) );
+
         if (doLoadBalance)
         {
             Vector<int> pmap;
@@ -194,6 +198,7 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
         for (int idim=0; idim < 3; ++idim)
         {
             if (eb_enabled) {
+                RemakeMultiFab( m_eb_reduce_particle_shape[lev] );
                 if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
                     RemakeMultiFab( m_eb_update_E[lev][idim] );
                     RemakeMultiFab( m_eb_update_B[lev][idim] );
@@ -295,7 +300,7 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
         }
 
         // Re-initialize the lattice element finder with the new ba and dm.
-        m_accelerator_lattice[lev]->InitElementFinder(lev, gamma_boost, ba, dm);
+        m_accelerator_lattice[lev]->InitElementFinder(lev, gamma_boost, gett_new(), ba, dm);
 
         if (costs[lev] != nullptr)
         {

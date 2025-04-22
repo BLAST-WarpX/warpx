@@ -6,6 +6,7 @@
  */
 #include "Fields.H"
 #include "ThetaImplicitEM.H"
+#include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "WarpX.H"
 
 using warpx::fields::FieldType;
@@ -13,6 +14,8 @@ using namespace amrex::literals;
 
 void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
 {
+    BL_PROFILE("ThetaImplicitEM::Define()");
+
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !m_is_defined,
         "ThetaImplicitEM object is already defined!");
@@ -48,6 +51,9 @@ void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
     // Parse nonlinear solver parameters
     parseNonlinearSolverParams( pp );
 
+    // Initialize the mass matrices for plasma response
+    if (m_use_mass_matrices) { InitializeMassMatrices(); }
+
     // Define the nonlinear solver
     m_nlsolver->Define(m_E, this);
     m_is_defined = true;
@@ -56,6 +62,8 @@ void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
 
 void ThetaImplicitEM::PrintParameters () const
 {
+    BL_PROFILE("ThetaImplicitEM::PrintParameters()");
+
     if (!m_WarpX->Verbose()) { return; }
     amrex::Print() << "\n";
     amrex::Print() << "-----------------------------------------------------------\n";
@@ -69,6 +77,7 @@ void ThetaImplicitEM::PrintParameters () const
     }
     else if (m_nlsolver_type==NonlinearSolverType::Newton) {
         amrex::Print() << "Nonlinear solver type:      Newton\n";
+        amrex::Print() << "use mass matrices:          " << (m_use_mass_matrices ? "true":"false") << "\n";
     }
     m_nlsolver->PrintParams();
     amrex::Print() << "-----------------------------------------------------------\n\n";
@@ -78,6 +87,8 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  start_time,
                                 const amrex::Real  a_dt,
                                 const int          a_step )
 {
+    BL_PROFILE("ThetaImplicitEM::OneStep()");
+
     amrex::ignore_unused(a_step);
 
     // Fields have Eg^{n} and Bg^{n}
@@ -105,10 +116,11 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  start_time,
     // Solve nonlinear system for Eg at t_{n+theta}
     // Particles will be advanced to t_{n+1/2}
     m_E.Copy(m_Eold); // initial guess for Eg^{n+theta}
-    m_nlsolver->Solve( m_E, m_Eold, start_time, m_theta*m_dt );
+    m_nlsolver->Solve( m_E, m_Eold, start_time, m_dt, a_step );
 
     // Update WarpX owned Efield_fp and Bfield_fp to t_{n+theta}
     UpdateWarpXFields( m_E, start_time );
+    m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
     // Advance particles from time n+1/2 to time n+1
     m_WarpX->FinishImplicitParticleUpdate();
@@ -125,6 +137,8 @@ void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
                                    int              a_nl_iter,
                                    bool             a_from_jacobian )
 {
+    BL_PROFILE("ThetaImplicitEM::ComputeRHS()");
+
     // Update WarpX-owned Efield_fp and Bfield_fp using current state of
     // Eg from the nonlinear solver at time n+theta
     UpdateWarpXFields( a_E, start_time );
@@ -132,7 +146,7 @@ void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
     // Update particle positions and velocities using the current state
     // of Eg and Bg. Deposit current density at time n+1/2
     const amrex::Real theta_time = start_time + m_theta*m_dt;
-    m_WarpX->ImplicitPreRHSOp( theta_time, m_dt, a_nl_iter, a_from_jacobian );
+    m_WarpX->ImplicitPreRHSOp( theta_time, m_theta, m_dt, a_nl_iter, a_from_jacobian, m_use_mass_matrices );
 
     // RHS = cvac^2*m_theta*dt*( curl(Bg^{n+theta}) - mu0*Jg^{n+1/2} )
     m_WarpX->ImplicitComputeRHSE( m_theta*m_dt, a_RHS);
@@ -141,6 +155,7 @@ void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
 void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
                                           amrex::Real start_time )
 {
+    BL_PROFILE("ThetaImplicitEM::UpdateWarpXFields()");
 
     // Update Efield_fp owned by WarpX
     const amrex::Real theta_time = start_time + m_theta*m_dt;
@@ -154,6 +169,7 @@ void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
 
 void ThetaImplicitEM::FinishFieldUpdate ( amrex::Real end_time )
 {
+    BL_PROFILE("ThetaImplicitEM::FinishFieldUpdate()");
 
     // Eg^{n+1} = (1/theta)*Eg^{n+theta} + (1-1/theta)*Eg^n
     // Bg^{n+1} = (1/theta)*Bg^{n+theta} + (1-1/theta)*Bg^n

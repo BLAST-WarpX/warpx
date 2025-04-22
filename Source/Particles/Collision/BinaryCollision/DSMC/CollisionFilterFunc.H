@@ -65,7 +65,6 @@ void CollisionPairFilter (const amrex::ParticleReal u1x, const amrex::ParticleRe
 
     // Evaluate the cross-section for each scattering process to determine
     // the total collision probability.
-
     // The size of the arrays below is a compile-time constant (template parameter)
     // for performance reasons: it avoids dynamic memory allocation on the GPU.
     int coll_type[max_process_count] = {0};

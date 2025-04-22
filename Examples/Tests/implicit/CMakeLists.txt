@@ -2,6 +2,16 @@
 #
 
 add_warpx_test(
+    test_1d_planar_pinch_withPC  # name
+    1  # dims
+    2  # nprocs
+    inputs_test_1d_planar_pinch_withPC  # inputs
+    "analysis_1d_pinch.py"  # analysis
+    "analysis_default_regression.py --path diags/diag1000020"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_1d_semi_implicit_picard  # name
     1  # dims
     2  # nprocs

@@ -21,6 +21,7 @@ enum class ScatteringProcessType {
     CHARGE_EXCHANGE,
     EXCITATION,
     IONIZATION,
+    FORWARD,
 };
 
 class ScatteringProcess

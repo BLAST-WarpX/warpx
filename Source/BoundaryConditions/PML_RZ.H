@@ -53,8 +53,8 @@ public:
 
 private:
 
-    const int m_ncell;
-    const int m_do_pml_in_domain;
+    int m_ncell;
+    int m_do_pml_in_domain;
     const amrex::Geometry* m_geom;
 
     // The MultiFabs pml_E_fp and pml_B_fp are setup using the registry.

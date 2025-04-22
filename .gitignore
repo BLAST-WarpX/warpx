@@ -29,6 +29,7 @@ Python/dist/
 Python/pywarpx.egg-info/
 _tmppythonbuild/
 pywarpx.egg-info/
+*.ipynb_checkpoints/
 
 ##########
 # Sphinx #
