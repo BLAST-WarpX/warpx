@@ -1974,9 +1974,9 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
  * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry.
  */
 template <int depos_order>
-void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::ParticleReal * const xp_n,
-                                           [[maybe_unused]]const amrex::ParticleReal * const yp_n,
-                                           [[maybe_unused]]const amrex::ParticleReal * const zp_n,
+void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::ParticleReal * const xp_n_data,
+                                           [[maybe_unused]]const amrex::ParticleReal * const yp_n_data,
+                                           [[maybe_unused]]const amrex::ParticleReal * const zp_n_data,
                                            const GetParticlePosition<PIdx>& GetPosition,
                                            const amrex::ParticleReal * const wp,
                                            [[maybe_unused]]const amrex::ParticleReal * const uxp_n,
@@ -2034,11 +2034,23 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             amrex::ParticleReal xp_nph, yp_nph, zp_nph;
             GetPosition(ip, xp_nph, yp_nph, zp_nph);
 
-            amrex::ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n[ip];
-            amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n[ip];
-            amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n[ip];
+#if (AMREX_SPACEDIM >= 2)
+            amrex::ParticleReal const xp_n = xp_n_data[ip];
+#else
+            amrex::ParticleReal const xp_n = 0._prt;
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+            amrex::ParticleReal const yp_n = yp_n_data[ip];
+#else
+            amrex::ParticleReal const yp_n = 0._prt;
+#endif
+            amrex::ParticleReal const zp_n = zp_n_data[ip];
 
-            VillasenorDepositionShapeNKernel<depos_order>(xp_n[ip], yp_n[ip], zp_n[ip], xp_np1, yp_np1, zp_np1, wq,
+            amrex::ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n;
+            amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n;
+            amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n;
+
+            VillasenorDepositionShapeNKernel<depos_order>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq,
                                                           uxp_nph[ip], uyp_nph[ip], uzp_nph[ip], gaminv,
                                                           Jx_arr, Jy_arr, Jz_arr,
                                                           dt, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);

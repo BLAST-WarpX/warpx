@@ -13,7 +13,6 @@
 #include "Fluids/MultiFluidContainer.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/WarpXProfilerWrapper.H"
-#include "WarpX.H"
 
 #include <AMReX_Array.H>
 
