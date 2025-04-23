@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef PHOTON_PHOTON_COLLISION_FUNC_H_
-#define PHOTON_PHOTON_COLLISION_FUNC_H_
+#ifndef LINEAR_BREIT_WHEELER_COLLISION_FUNC_H_
+#define LINEAR_BREIT_WHEELER_COLLISION_FUNC_H_
 
 #include "SingleLinearBreitWheelerCollisionEvent.H"
 
@@ -268,4 +268,4 @@ private:
     Executor m_exe;
 };
 
-#endif // PHOTON_PHOTON_COLLISION_FUNC_H_
+#endif // LINEAR_BREIT_WHEELER_COLLISION_FUNC_H_

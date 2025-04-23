@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef SINGLE_PHOTON_PHOTON_COLLISION_EVENT_H_
-#define SINGLE_PHOTON_PHOTON_COLLISION_EVENT_H_
+#ifndef SINGLE_LINEAR_BREIT_WHEELER_COLLISION_EVENT_H_
+#define SINGLE_LINEAR_BREIT_WHEELER_COLLISION_EVENT_H_
 
 #include "LinearBreitWheelerCrossSection.H"
 
@@ -173,4 +173,4 @@ void SingleLinearBreitWheelerCollisionEvent (const amrex::ParticleReal& u1x, con
     }
 }
 
-#endif // SINGLE_PHOTON_PHOTON_COLLISION_EVENT_H_
+#endif // SINGLE_LINEAR_BREIT_WHEELER_COLLISION_EVENT_H_
