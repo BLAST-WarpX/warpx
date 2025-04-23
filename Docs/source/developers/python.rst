@@ -129,7 +129,7 @@ specified ``x``. The data will be scattered appropriately to the underlying FABs
    Jy = fields.JyFPWrapper()
    Jy[5,6:20,8:30] = 7.
 
-In this example, seven is added to all of the values along ``x``, including both valid and ghost cells (specified by using the empty tuple, ``()``), the first ghost cell at the lower boundary in ``y``, and the last valid cell and first upper guard cell in ``z``.
+In this example, seven is added to all of the values along ``x``, including both valid and ghost cells (specified by using the empty tuple, ``()``), the first ghost cell at the lower boundary in ``y``, and the last valid cell and first upper ghost cell in ``z``.
 Note that the ``+=`` will be a global operation.
 
 .. code-block:: python
@@ -138,10 +138,14 @@ Note that the ``+=`` will be a global operation.
    Jx = fields.JxFPWrapper()
    Jx[(),-1j,-1:2j] += 7.
 
+The fetch the data from all of the valid cells of all dimensions, the ellipsis can be used, ``Jx[...]``.
+Similarly, to fetch all of the data including valid cells and ghost cells, use an empty tuple, ``Jx[()]``.
 The code does error checking to ensure that the specified indices are within the bounds of the global domain.
 
 Under the covers, the wrapper object is using the Python wrapper of a MultiFab, relying on its global array indexing capability.
 The wrappers are always up to date since whenever an access is done (either a get or a set), the wrapper fetches the underlying MultiFab object.
+
+Through the wrapper, all of the operations available on the underlying MultiFab can be done. For example, to find the max value, use ``Jx.max()``, and to multiply the data by a factor, ``Jx.mult(2.)``.
 
 Particles
 ~~~~~~~~~
