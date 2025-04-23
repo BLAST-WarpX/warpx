@@ -90,7 +90,9 @@ namespace BinaryCollisionUtils{
         // Total energy in the lab frame
         // Note the use of `double` for energy since this calculation is
         // prone to error with single precision.
-        const double E_lab = (m1_dbl*g1 + m2_dbl*g2) * c_sq;
+        const double E1_lab = std::sqrt( m1_sq * c_sq + p1x_dbl*p1x_dbl + p1y_dbl*p1y_dbl + p1z_dbl*p1z_dbl ) * PhysConst::c;
+        const double E2_lab = std::sqrt( m2_sq * c_sq + p2x_dbl*p2x_dbl + p2y_dbl*p2y_dbl + p2z_dbl*p2z_dbl ) * PhysConst::c;
+        const double E_lab = E1_lab + E2_lab;
         // Total energy squared in the center of mass frame, calculated using the Lorentz invariance
         // of the four-momentum norm
         const double E_star_sq = E_lab*E_lab - c_sq*p_total_sq;
@@ -118,7 +120,7 @@ namespace BinaryCollisionUtils{
 
         // Cross sections and relative velocity are computed in the center of mass frame.
         // On the other hand, the particle densities (weight over volume) in the lab frame are used.
-        // To take this disrepancy into account, it is needed to multiply the
+        // To take this discrepancy into account, it is needed to multiply the
         // collision probability by the ratio between the Lorentz factors in the
         // COM frame and the Lorentz factors in the lab frame (see
         // Perez et al., Phys.Plasmas.19.083104 (2012)). The correction factor
