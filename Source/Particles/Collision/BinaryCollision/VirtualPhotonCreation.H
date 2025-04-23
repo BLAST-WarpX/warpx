@@ -31,7 +31,6 @@ using SoaData_type = typename WarpXParticleContainer::ParticleTileType::Particle
 
 void GenerateVirtualPhotons (MultiParticleContainer* mypc){
 
-
     WARPX_PROFILE("collision::binarycollision::virtualphotons::GenerateVirtualPhotons()");
 
     // loop through the species
@@ -44,17 +43,19 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
             continue;
         }
 
-
-        amrex::Print(0) << primary.has_virtual_photons() << std::endl;
-
         int vphotons_index = primary.getVirtualPhotonSpeciesIndex();
         auto& vphotons = mypc->GetParticleContainer(vphotons_index);
 
-        amrex::Print(0) << mypc->GetSpeciesNames()[vphotons_index] << std::endl;
+
+
+        //amrex::Print(0) << "XXXXXX   " <<  << std::endl;
+
+
+        //vphotons.resizeData(); //RemoveParticlesAtLevel(0);
 
         const amrex::ParmParse pp_species_name(mypc->GetSpeciesNames()[vphotons_index]);
         amrex::Real vphoton_min_energy;
-        utils::parser::getWithParser(pp_species_name, "min_energy", vphoton_min_energy);
+        utils::parser::getWithParser(pp_species_name, "virtual_photons_min_energy", vphoton_min_energy);
 
         amrex::Real sampling_factor;
         utils::parser::getWithParser(pp_species_name, "sampling_factor", sampling_factor);
@@ -137,7 +138,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                     amrex::ParticleReal lny = std::log( y_min );
 
                     // number of virtual photons per primary particle
-                    amrex::Real r_photons = alpha_pi * (lny * lny - coeff * lny) * sampling_factor;
+                    amrex::Real r_photons = alpha_pi * (lny * lny - coeff * lny) * sampling_factor; // CHECK THAT THIS IS POSITIVE?
                     amrex::Real i_photons; // integer part
                     amrex::Real f_photons = std::modf(r_photons, &i_photons); // fractional part
                     amrex::Long n_photons = (amrex::Long)i_photons;
@@ -182,6 +183,13 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                     amrex::ParticleReal ux_primary = soa.m_rdata[PIdx::ux][i];
                     amrex::ParticleReal uy_primary = soa.m_rdata[PIdx::uy][i];
                     amrex::ParticleReal uz_primary = soa.m_rdata[PIdx::uz][i];
+
+                    amrex::ParticleReal u_primary = std::sqrt(ux_primary*ux_primary + uy_primary*uy_primary + uz_primary*uz_primary);
+                    amrex::ParticleReal nx = ux_primary / u_primary; // normalized ux
+                    amrex::ParticleReal ny = uy_primary / u_primary; // normalized ux
+                    amrex::ParticleReal nz = uz_primary / u_primary; // normalized ux
+
+
                     amrex::ParticleReal gamma_primary = std::sqrt( 1.0_rt + (ux_primary*ux_primary + uy_primary*uy_primary + uz_primary*uz_primary)*inv_c2 );
                     // minimum fractional (wrt primary particle) photon energy
                     amrex::Real y_min = vphoton_min_energy / (mass * gamma_primary * PhysConst::c * PhysConst::c);
@@ -205,11 +213,13 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                         amrex::ParticleReal rnd = (umax - umin) * amrex::Random(engine) + umin ;
                         // fractional energy of the photon, often denoted as y (or x)
                         amrex::ParticleReal frac_energy = std::exp( 0.5_rt * coeff - std::sqrt(rnd));
+                        amrex::ParticleReal vphoton_energy = frac_energy * gamma_primary * PhysConst::c;
+
                         // photon index for the current primary
                         amrex::Long ip = offset_vp_data[i] + j;
-                        pa_vp[PIdx::ux][ip] = 0._rt;
-                        pa_vp[PIdx::uy][ip] = 0._rt;
-                        pa_vp[PIdx::uz][ip] = frac_energy * gamma_primary * PhysConst::c; // this will be multiplied by m_e before dumping the outputs
+                        pa_vp[PIdx::ux][ip] = vphoton_energy * nx;
+                        pa_vp[PIdx::uy][ip] = vphoton_energy * ny;
+                        pa_vp[PIdx::uz][ip] = vphoton_energy * nz; // this will be multiplied by m_e before dumping the outputs
                         pa_vp[PIdx::x][ip] = x;
                         pa_vp[PIdx::y][ip] = y;
                         pa_vp[PIdx::z][ip] = z;
