@@ -49,9 +49,9 @@ namespace BinaryCollisionUtils{
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void get_collision_parameters (
-        const amrex::ParticleReal& u1x, const amrex::ParticleReal& u1y,
-        const amrex::ParticleReal& u1z, const amrex::ParticleReal& u2x,
-        const amrex::ParticleReal& u2y, const amrex::ParticleReal& u2z,
+        const amrex::ParticleReal& p1x, const amrex::ParticleReal& p1y,
+        const amrex::ParticleReal& p1z, const amrex::ParticleReal& p2x,
+        const amrex::ParticleReal& p2y, const amrex::ParticleReal& p2z,
         const amrex::ParticleReal& m1, const amrex::ParticleReal& m2,
         amrex::ParticleReal& E_kin_COM, amrex::ParticleReal& v_rel_COM,
         amrex::ParticleReal& lab_to_COM_lorentz_factor )
@@ -70,30 +70,22 @@ namespace BinaryCollisionUtils{
         // This is needed to avoid errors when using single-precision particles
         const auto m1_dbl = static_cast<double>(m1);
         const auto m2_dbl = static_cast<double>(m2);
-        const auto u1x_dbl = static_cast<double>(u1x);
-        const auto u1y_dbl = static_cast<double>(u1y);
-        const auto u1z_dbl = static_cast<double>(u1z);
-        const auto u2x_dbl = static_cast<double>(u2x);
-        const auto u2y_dbl = static_cast<double>(u2y);
-        const auto u2z_dbl = static_cast<double>(u2z);
+        const auto p1x_dbl = static_cast<double>(p1x);
+        const auto p1y_dbl = static_cast<double>(p1y);
+        const auto p1z_dbl = static_cast<double>(p1z);
+        const auto p2x_dbl = static_cast<double>(p2x);
+        const auto p2y_dbl = static_cast<double>(p2y);
+        const auto p2z_dbl = static_cast<double>(p2z);
 
         const double m1_sq = m1_dbl*m1_dbl;
         const double m2_sq = m2_dbl*m2_dbl;
 
         // Compute Lorentz factor gamma in the lab frame
-        const double g1 = std::sqrt( 1.0 + (u1x_dbl*u1x_dbl + u1y_dbl*u1y_dbl + u1z_dbl*u1z_dbl)*inv_csq );
-        const double g2 = std::sqrt( 1.0 + (u2x_dbl*u2x_dbl + u2y_dbl*u2y_dbl + u2z_dbl*u2z_dbl)*inv_csq );
-
-        // Compute momenta
-        const double p1x = u1x_dbl * m1_dbl;
-        const double p1y = u1y_dbl * m1_dbl;
-        const double p1z = u1z_dbl * m1_dbl;
-        const double p2x = u2x_dbl * m2_dbl;
-        const double p2y = u2y_dbl * m2_dbl;
-        const double p2z = u2z_dbl * m2_dbl;
+        const double g1 = std::sqrt( 1.0 + (p1x_dbl*p1x_dbl + p1y_dbl*p1y_dbl + p1z_dbl*p1z_dbl)*inv_csq/m1_sq );
+        const double g2 = std::sqrt( 1.0 + (p2x_dbl*p2x_dbl + p2y_dbl*p2y_dbl + p2z_dbl*p2z_dbl)*inv_csq/m2_sq );
 
         // Square norm of the total (sum between the two particles) momenta in the lab frame
-        const double p_total_sq = powi<2>(p1x + p2x) + powi<2>(p1y + p2y) + powi<2>(p1z + p2z);
+        const double p_total_sq = powi<2>(p1x_dbl + p2x_dbl) + powi<2>(p1y_dbl + p2y_dbl) + powi<2>(p1z_dbl + p2z_dbl);
 
         // Total energy in the lab frame
         // Note the use of `double` for energy since this calculation is
