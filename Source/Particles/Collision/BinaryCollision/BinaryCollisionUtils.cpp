@@ -49,7 +49,7 @@ namespace BinaryCollisionUtils{
                 ||
                 (product_species1.AmIA<PhysicalSpecies::positron>() && product_species2.AmIA<PhysicalSpecies::electron>()),
                 "Product species of photon-photon collisions must be of type electron and positron");
-            return CollisionType::PhotonPhotonToElectronPositron;
+            return CollisionType::LinearBreitWheeler;
         }
         return CollisionType::Undefined;
     }
