@@ -69,7 +69,7 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
                     collision_names[i], mypc
                 );
         }
-        else if (type == "photonphoton") {
+        else if (type == "linear_breit_wheeler") {
             allcollisions[i] =
                std::make_unique<BinaryCollision<PhotonPhotonCollisionFunc, ParticleCreationFunc>>(
                     collision_names[i], mypc

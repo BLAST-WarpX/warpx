@@ -2065,7 +2065,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     - ``background_stopping`` for slowing of ions due to collisions with electrons or ions.
       This implements the approximate formulae as derived in Introduction to Plasma Physics,
       from Goldston and Rutherford, section 14.2.
-    - ``photonphoton`` for two-photon collisions according to the linear Breit-Wheeler mechanism
+    - ``linear_breit_wheeler`` for two-photon collisions according to the linear Breit-Wheeler mechanism
       (see for example `Gould et al. (Phys. Rev. 155, 1404, 1967) <https://doi.org/10.1103/PhysRev.155.1404>`__).
       This implements the generation of electron-positron pairs based on the analytical cross-section, e.g.
       equation (1) in Gould. The angular distribution of the emitted pairs is isotropic for now
@@ -2078,12 +2078,12 @@ Details about the collision models can be found in the :ref:`theory section <mul
     If using ``background_mcc`` or ``background_stopping`` type this should be the name of the
     species for which collisions with a background will be included.
     In this case, only one species name should be given.
-    If using ``photonphoton`` these should be two photon species.
+    If using ``linear_breit_wheeler`` these should be two photon species.
 
 * ``<collision_name>.product_species`` (`strings`)
     Only for ``dsmc`` and ``nuclearfusion``. The name(s) of the species in which to add
     the new macroparticles created by the reaction.
-    If using ``photonphoton`` these should be two species: one of electrons and one of positrons.
+    If using ``linear_breit_wheeler`` these should be two species: one of electrons and one of positrons.
 
 * ``<collision_name>.ndt`` (`int`) optional
     Execute collision every # time steps. The default value is 1.
@@ -2135,15 +2135,15 @@ Details about the collision models can be found in the :ref:`theory section <mul
     that collisions such that the fusion probability approches ``fusion_probability_target_value``.
 
 * ``<collision_name>.event_multiplier`` (`float`) optional.
-    Only for ``photonphoton``.
+    Only for ``linear_breit_wheeler``.
     Works in the same way as ``<collision_name>.fusion_probability_target_value`` for fusion reactions.
 
 * ``<collision_name>.probability_threshold`` (`float`) optional.
-    Only for ``photonphoton``.
+    Only for ``linear_breit_wheeler``.
     Works in the same way as ``<collision_name>.fusion_probability_threshold`` for fusion reactions.
 
 * ``<collision_name>.probability_target_value`` (`float`) optional.
-    Only for ``photonphoton``.
+    Only for ``linear_breit_wheeler``.
     Works in the same way as ``<collision_name>.fusion_probability_target_value`` for fusion reactions.
 
 * ``<collision_name>.background_density`` (`float`)

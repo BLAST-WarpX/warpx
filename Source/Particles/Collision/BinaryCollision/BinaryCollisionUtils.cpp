@@ -36,7 +36,7 @@ namespace BinaryCollisionUtils{
         else if (type == "dsmc") {
             return CollisionType::DSMC;
         }
-        else if (type == "photonphoton") {
+        else if (type == "linear_breit_wheeler") {
             amrex::Vector<std::string> product_species_name;
             pp_collision_name.getarr("product_species", product_species_name);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
