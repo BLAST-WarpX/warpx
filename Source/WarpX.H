@@ -80,6 +80,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <variant>
 #include <vector>
 
 class WARPX_EXPORT WarpX
@@ -839,7 +840,7 @@ public:
      * on the staggered yee-grid or cell-centered grid, in the interior cells
      * and guard cells.
      *
-     * \param[in] field FieldType to grab from register to write into
+     * \param[in] field FieldType or string containing field name to grab from register to write into
      * \param[in] fx_parser parser function to initialize x-field
      * \param[in] fy_parser parser function to initialize y-field
      * \param[in] fz_parser parser function to initialize z-field
@@ -849,59 +850,13 @@ public:
      * \param[in] use_eb_flags (default:true) flag indicating if eb points should be excluded or not
      */
     void ComputeExternalFieldOnGridUsingParser (
-        warpx::fields::FieldType field,
+        const std::variant<warpx::fields::FieldType, std::string>& field,
         amrex::ParserExecutor<4> const& fx_parser,
         amrex::ParserExecutor<4> const& fy_parser,
         amrex::ParserExecutor<4> const& fz_parser,
         int lev, PatchType patch_type,
         amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field,
-        bool use_eb_flags);
-
-    void ComputeExternalFieldOnGridUsingParser (
-        warpx::fields::FieldType field,
-        amrex::ParserExecutor<4> const& fx_parser,
-        amrex::ParserExecutor<4> const& fy_parser,
-        amrex::ParserExecutor<4> const& fz_parser,
-        int lev, PatchType patch_type,
-        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field);
-
-     /**
-     * \brief
-     * This function computes the E, B, and J fields on each level
-     * using the parser and the user-defined function for the external fields.
-     * The subroutine will parse the x_/y_z_external_grid_function and
-     * then, the field multifab is initialized based on the (x,y,z) position
-     * on the staggered yee-grid or cell-centered grid, in the interior cells
-     * and guard cells.
-     *
-     * \param[in] field string containing field name to grab from register
-     * \param[in] fx_parser parser function to initialize x-field
-     * \param[in] fy_parser parser function to initialize y-field
-     * \param[in] fz_parser parser function to initialize z-field
-     * \param[in] edge_lengths edge lengths information
-     * \param[in] face_areas face areas information
-     * \param[in] topology flag indicating if field is edge-based or face-based
-     * \param[in] lev level of the Multifabs that is initialized
-     * \param[in] patch_type PatchType on which the field is initialized (fine or coarse)
-     * \param[in] eb_update_field flag indicating which gridpoints should be modified by this functions
-     * \param[in] use_eb_flags (default:true) flag indicating if eb points should be excluded or not
-     */
-    void ComputeExternalFieldOnGridUsingParser (
-        std::string const& field,
-        amrex::ParserExecutor<4> const& fx_parser,
-        amrex::ParserExecutor<4> const& fy_parser,
-        amrex::ParserExecutor<4> const& fz_parser,
-        int lev, PatchType patch_type,
-        amrex::Vector< std::array< std::unique_ptr<amrex::iMultiFab>,3> > const& eb_update_field,
-        bool use_eb_flags);
-
-    void ComputeExternalFieldOnGridUsingParser (
-        std::string const& field,
-        amrex::ParserExecutor<4> const& fx_parser,
-        amrex::ParserExecutor<4> const& fy_parser,
-        amrex::ParserExecutor<4> const& fz_parser,
-        int lev, PatchType patch_type,
-        amrex::Vector< std::array< std::unique_ptr<amrex::iMultiFab>,3> > const& eb_update_field);
+        bool use_eb_flags = true);
 
     /**
      * \brief Load field values from a user-specified openPMD file,
