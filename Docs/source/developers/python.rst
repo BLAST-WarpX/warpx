@@ -110,7 +110,7 @@ For instance, the function ``ExWrapper`` returns a wrapper around the ``x`` comp
 
 The wrapper provides access to the data via global indexing.
 Using standard array indexing with square brackets, the data can be accessed using indices that are relative to the full domain (across the MultiFab and across processors).
-For indices within the domain, values from valid cells are always returned. The ghost cells at the exterior of the domain are accessed using imagninary numbers, with negative values accessing the lower ghost cells, and positive the upper ghost cells.
+For indices within the domain, values from valid cells are always returned. The ghost cells at the exterior of the domain are accessed using imaginary numbers, with negative values accessing the lower ghost cells, and positive the upper ghost cells.
 With multiple processors, when the data is fetched, the result is broadcast to all processors (and is a global operation).
 This example will return the ``Bz`` field at all valid interior points along ``x`` at the specified ``y`` and ``z`` indices.
 
@@ -129,7 +129,7 @@ specified ``x``. The data will be scattered appropriately to the underlying FABs
    Jy = fields.JyFPWrapper()
    Jy[5,6:20,8:30] = 7.
 
-In this example, seven is added to all of the values along ``x``, including both valid and ghost cells (specified by using the empty tuple), the first ghost cell at the lower boundary in ``y``, and the last valid cell and first upper guard cell in ``z``.
+In this example, seven is added to all of the values along ``x``, including both valid and ghost cells (specified by using the empty tuple, ``()``), the first ghost cell at the lower boundary in ``y``, and the last valid cell and first upper guard cell in ``z``.
 Note that the ``+=`` will be a global operation.
 
 .. code-block:: python
