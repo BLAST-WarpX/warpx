@@ -12,7 +12,7 @@
 
 #include "Particles/Collision/BinaryCollision/NuclearFusion/TwoProductFusionInitializeMomentum.H"
 #include "Particles/Collision/BinaryCollision/NuclearFusion/ProtonBoronFusionInitializeMomentum.H"
-#include "Particles/Collision/BinaryCollision/PhotonPhoton/TwoProductInitializeMomentum.H"
+#include "Particles/Collision/BinaryCollision/LinearBreitWheeler/TwoProductInitializeMomentum.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"

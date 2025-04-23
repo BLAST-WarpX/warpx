@@ -8,7 +8,7 @@
 #ifndef PHOTON_PHOTON_COLLISION_FUNC_H_
 #define PHOTON_PHOTON_COLLISION_FUNC_H_
 
-#include "SinglePhotonPhotonCollisionEvent.H"
+#include "SingleLinearBreitWheelerCollisionEvent.H"
 
 #include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
@@ -33,7 +33,7 @@
  *  creation functor.
  *  This functor also reads and stores the event multiplier.
  */
-class PhotonPhotonCollisionFunc
+class LinearBreitWheelerCollisionFunc
 {
     // Define shortcuts for frequently-used type names
     using ParticleType = WarpXParticleContainer::ParticleType;
@@ -45,17 +45,17 @@ class PhotonPhotonCollisionFunc
 
 public:
     /**
-     * \brief Default constructor of the PhotonPhotonCollisionFunc class.
+     * \brief Default constructor of the LinearBreitWheelerCollisionFunc class.
      */
-    PhotonPhotonCollisionFunc () = default;
+    LinearBreitWheelerCollisionFunc () = default;
 
     /**
-     * \brief Constructor of the PhotonPhotonCollisionFunc class
+     * \brief Constructor of the LinearBreitWheelerCollisionFunc class
      *
      * @param[in] collision_name the name of the collision
      * @param[in] isSameSpecies whether the two colliding species are the same
      */
-    PhotonPhotonCollisionFunc (
+    LinearBreitWheelerCollisionFunc (
             const std::string collision_name,
             MultiParticleContainer const * const /*mypc*/,
             const bool isSameSpecies) :
@@ -94,7 +94,7 @@ public:
 
     struct Executor {
         /**
-         * \brief Executor of the PhotonPhotonCollisionFunc class.
+         * \brief Executor of the LinearBreitWheelerCollisionFunc class.
          * Performs two-photon collisions at the cell level using the algorithm described in
          * Higginson et al., Journal of Computational Physics 388, 439-453 (2019).
          * Note that this function does not yet create the product particles, but
@@ -208,7 +208,7 @@ public:
                     u1x[I1[i1]] = u1xbuf*std::cos(theta) - u1y[I1[i1]]*std::sin(theta);
                     u1y[I1[i1]] = u1xbuf*std::sin(theta) + u1y[I1[i1]]*std::cos(theta);
 #endif
-                    SinglePhotonPhotonCollisionEvent(
+                    SingleLinearBreitWheelerCollisionEvent(
                         u1x[ I1[i1] ], u1y[ I1[i1] ], u1z[ I1[i1] ],
                         u2x[ I2[i2] ], u2y[ I2[i2] ], u2z[ I2[i2] ],
                         w1[ I1[i1] ], w2[ I2[i2] ],

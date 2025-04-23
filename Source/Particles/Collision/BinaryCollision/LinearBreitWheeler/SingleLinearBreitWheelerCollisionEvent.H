@@ -53,7 +53,7 @@
  */
 template <typename index_type>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
-void SinglePhotonPhotonCollisionEvent (const amrex::ParticleReal& u1x, const amrex::ParticleReal& u1y,
+void SingleLinearBreitWheelerCollisionEvent (const amrex::ParticleReal& u1x, const amrex::ParticleReal& u1y,
                                        const amrex::ParticleReal& u1z, const amrex::ParticleReal& u2x,
                                        const amrex::ParticleReal& u2y, const amrex::ParticleReal& u2z,
                                        amrex::ParticleReal w1, amrex::ParticleReal w2,
