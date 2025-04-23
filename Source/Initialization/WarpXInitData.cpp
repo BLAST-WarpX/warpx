@@ -1073,7 +1073,7 @@ WarpX::InitLevelData (int lev, Real /*time*/)
 
 template<typename T>
 void ComputeExternalFieldOnGridUsingParser_template (
-    T field,
+    const T& field,
     amrex::ParserExecutor<4> const& fx_parser,
     amrex::ParserExecutor<4> const& fy_parser,
     amrex::ParserExecutor<4> const& fz_parser,
@@ -1210,7 +1210,7 @@ void ComputeExternalFieldOnGridUsingParser_template (
 }
 
 void WarpX::ComputeExternalFieldOnGridUsingParser (
-    warpx::fields::FieldType field,
+    const std::variant<warpx::fields::FieldType, std::string>& field,
     amrex::ParserExecutor<4> const& fx_parser,
     amrex::ParserExecutor<4> const& fy_parser,
     amrex::ParserExecutor<4> const& fz_parser,
@@ -1218,57 +1218,20 @@ void WarpX::ComputeExternalFieldOnGridUsingParser (
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field,
     bool use_eb_flags)
 {
-    ComputeExternalFieldOnGridUsingParser_template<warpx::fields::FieldType> (
-        field,
-        fx_parser, fy_parser, fz_parser,
-        lev, patch_type, eb_update_field,
-        use_eb_flags);
-}
-
-void WarpX::ComputeExternalFieldOnGridUsingParser (
-    std::string const& field,
-    amrex::ParserExecutor<4> const& fx_parser,
-    amrex::ParserExecutor<4> const& fy_parser,
-    amrex::ParserExecutor<4> const& fz_parser,
-    int lev, PatchType patch_type,
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field,
-    bool use_eb_flags)
-{
-    ComputeExternalFieldOnGridUsingParser_template<std::string const&> (
-        field,
-        fx_parser, fy_parser, fz_parser,
-        lev, patch_type, eb_update_field,
-        use_eb_flags);
-}
-
-void WarpX::ComputeExternalFieldOnGridUsingParser (
-    warpx::fields::FieldType field,
-    amrex::ParserExecutor<4> const& fx_parser,
-    amrex::ParserExecutor<4> const& fy_parser,
-    amrex::ParserExecutor<4> const& fz_parser,
-    int lev, PatchType patch_type,
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field)
-{
-    ComputeExternalFieldOnGridUsingParser_template<warpx::fields::FieldType> (
-        field,
-        fx_parser, fy_parser, fz_parser,
-        lev, patch_type, eb_update_field,
-        true);
-}
-
-void WarpX::ComputeExternalFieldOnGridUsingParser (
-    std::string const& field,
-    amrex::ParserExecutor<4> const& fx_parser,
-    amrex::ParserExecutor<4> const& fy_parser,
-    amrex::ParserExecutor<4> const& fz_parser,
-    int lev, PatchType patch_type,
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field)
-{
-    ComputeExternalFieldOnGridUsingParser_template<std::string const&> (
-        field,
-        fx_parser, fy_parser, fz_parser,
-        lev, patch_type, eb_update_field,
-        true);
+    if (std::holds_alternative<warpx::fields::FieldType>(field)){
+        ComputeExternalFieldOnGridUsingParser_template<warpx::fields::FieldType> (
+            std::get<warpx::fields::FieldType>(field),
+            fx_parser, fy_parser, fz_parser,
+            lev, patch_type, eb_update_field,
+            use_eb_flags);
+    }
+    else{
+        ComputeExternalFieldOnGridUsingParser_template<std::string> (
+            std::get<std::string>(field),
+            fx_parser, fy_parser, fz_parser,
+            lev, patch_type, eb_update_field,
+            use_eb_flags);
+    }
 }
 
 void WarpX::CheckGuardCells()

@@ -30,7 +30,6 @@ amr.max_grid_size = 4
 #################################
 ###### BOUNDARY CONDITIONS ######
 #################################
-geometry.is_periodic = 1 1 1
 boundary.field_hi = periodic periodic periodic
 boundary.field_lo = periodic periodic periodic
 boundary.particle_hi = periodic periodic periodic
