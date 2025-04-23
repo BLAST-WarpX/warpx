@@ -1505,7 +1505,7 @@ WarpX::ReadParameters ()
         if (!JRhom_input.empty()) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 JRhom_input.length() >= 3,
-                "psatd.JRhom input string is too short to parse"
+                "psatd.JRhom = '" + JRhom_input + "' input string is too short to parse."
             );
             m_JRhom = true;
             // parse time dependency of J from first character
@@ -1520,7 +1520,8 @@ WarpX::ReadParameters ()
             }
             else {
                 WARPX_ABORT_WITH_MESSAGE(
-                    "Time dependency of J set by psatd.JRhom not implemented"
+                    "Time dependency '" + std::string(1, JRhom_input[0]) + "' of J set by psatd.JRhom = '" + JRhom_input + "' not valid."
+                    " Valid options are 'C' (constant), 'L' (linear), 'Q' (quadratic)."
                 );
             }
             // parse time dependency of rho from second character
@@ -1535,14 +1536,15 @@ WarpX::ReadParameters ()
             }
             else {
                 WARPX_ABORT_WITH_MESSAGE(
-                    "Time dependency of rho set by psatd.JRhom not implemented"
+                    "Time dependency '" + std::string(1, JRhom_input[1]) + "' of rho set by psatd.JRhom = '" + JRhom_input + "' not valid."
+                    " Valid options are 'C' (constant), 'L' (linear), 'Q' (quadratic)."
                 );
             }
             // parse number of subintervals from last digit
             for (const char m : JRhom_input.substr(2)) {
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                     std::isdigit(m),
-                    "psatd.JRhom input string does not include integer 'm'"
+                    "psatd.JRhom = '" + JRhom_input + "' input string must include integer 'm' after the first two characters (e.g., 'CL1')."
                 );
             }
             m_JRhom_subintervals = std::stoi(JRhom_input.substr(2));
