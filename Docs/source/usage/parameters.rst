@@ -2065,12 +2065,12 @@ Details about the collision models can be found in the :ref:`theory section <mul
     - ``background_stopping`` for slowing of ions due to collisions with electrons or ions.
       This implements the approximate formulae as derived in Introduction to Plasma Physics,
       from Goldston and Rutherford, section 14.2.
-    - ``linear_breit_wheeler`` for two-photon collisions according to the linear Breit-Wheeler mechanism
+    - ``linear_breit_wheeler`` for electron-positron pair creation from the annihilation of two photons, according to the linear Breit-Wheeler mechanism
       (see for example `Gould et al. (Phys. Rev. 155, 1404, 1967) <https://doi.org/10.1103/PhysRev.155.1404>`__).
       This implements the generation of electron-positron pairs based on the analytical cross-section, e.g.
       equation (1) in Gould. The angular distribution of the emitted pairs is isotropic for now
       (instead of following the correct distribution, see e.g. `Ribeyre et al. (Plasma Phys. Control. Fusion 60 104001, 2018) <https://doi.org/10.1088/1361-6587/aad6da>`__).
-      The implementation follows the same rationale as that of fusion reactions (see. `Higginson et al. (JCP 388, 439-453, 2019) <https://doi.org/10.1016/j.jcp.2019.03.020>`__).
+      The implementation follows the same numerical algorithm as that of fusion reactions (see. `Higginson et al. (JCP 388, 439-453, 2019) <https://doi.org/10.1016/j.jcp.2019.03.020>`__).
 
 * ``<collision_name>.species`` (`strings`)
     If using ``dsmc``, ``pairwisecoulomb`` or ``nuclearfusion``, this should be the name(s) of the species,
