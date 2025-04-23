@@ -64,7 +64,7 @@ public:
         using namespace amrex::literals;
 
 #ifdef AMREX_SINGLE_PRECISION_PARTICLES
-        WARPX_ABORT_WITH_MESSAGE("Photon-photon collision module does not currently work with single precision");
+        WARPX_ABORT_WITH_MESSAGE("Linear Breit-Wheeler collision module does not currently work with single precision");
 #endif
 
         amrex::ParmParse pp_collision_name(collision_name);
