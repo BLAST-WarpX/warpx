@@ -40,7 +40,7 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
             AMREX_ALWAYS_ASSERT_WITH_MESSAGE( colliding_species[1]==target_species, "The target species is not the second colliding species.");
 
             // check if the non-target species is in ``product_species``
-            auto it = std::find(product_species.begin(), product_species.end(), target_species);
+            auto it = std::find(product_species.begin(), product_species.end(), colliding_species[0]);
 
             if (it != product_species.end()) {
                 m_num_product_species = 3;
