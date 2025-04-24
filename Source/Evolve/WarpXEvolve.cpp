@@ -76,6 +76,37 @@ namespace
         // Print the warning list right after the first step.
         amrex::Print() << ablastr::warn_manager::GetWMInstance().PrintGlobalWarnings("FIRST STEP");
     }
+
+    void StoreCurrent (int lev, ablastr::fields::MultiFabRegister& fields)
+    {
+        using ablastr::fields::Direction;
+        using warpx::fields::FieldType;
+
+        for (int idim = 0; idim < 3; ++idim) {
+            const auto dir = Direction{idim};
+            if (fields.has(FieldType::current_store, dir,lev)) {
+                MultiFab::Copy(*fields.get(FieldType::current_store, dir, lev),
+                               *fields.get(FieldType::current_fp, dir, lev),
+                               0, 0, 1, fields.get(FieldType::current_store, dir, lev)->nGrowVect());
+            }
+        }
+    }
+
+    void RestoreCurrent (int lev, ablastr::fields::MultiFabRegister& fields)
+    {
+        using ablastr::fields::Direction;
+        using warpx::fields::FieldType;
+
+        for (int idim = 0; idim < 3; ++idim) {
+            const auto dir = Direction{idim};
+            if (fields.has(FieldType::current_store, dir, lev)) {
+                std::swap(
+                    *fields.get(FieldType::current_fp, dir, lev),
+                    *fields.get(FieldType::current_store, dir, lev)
+                );
+            }
+        }
+    }
 }
 
 void
@@ -966,7 +997,7 @@ WarpX::OneStep_sub1 (Real cur_time)
     // Push the fields on the coarse patch and mother grid
     // by only half a coarse step (first half)
     PushParticlesandDeposit(coarse_lev, cur_time, DtType::Full);
-    StoreCurrent(coarse_lev);
+    ::StoreCurrent(coarse_lev, m_fields);
     AddCurrentFromFineLevelandSumBoundary(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch),
@@ -1049,7 +1080,7 @@ WarpX::OneStep_sub1 (Real cur_time)
 
     // v) Push the fields on the coarse patch and mother grid
     // by only half a coarse step (second half)
-    RestoreCurrent(coarse_lev);
+    ::RestoreCurrent(coarse_lev, m_fields);
     AddCurrentFromFineLevelandSumBoundary(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch),

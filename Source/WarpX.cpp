@@ -3281,35 +3281,6 @@ WarpX::GatherBufferMasks (int lev)
     return GetInstance().getGatherBufferMasks(lev);
 }
 
-void
-WarpX::StoreCurrent (int lev)
-{
-    using ablastr::fields::Direction;
-    for (int idim = 0; idim < 3; ++idim) {
-        if (m_fields.has(FieldType::current_store, Direction{idim},lev)) {
-            MultiFab::Copy(*m_fields.get(FieldType::current_store, Direction{idim}, lev),
-                           *m_fields.get(FieldType::current_fp, Direction{idim}, lev),
-                           0, 0, 1, m_fields.get(FieldType::current_store, Direction{idim}, lev)->nGrowVect());
-        }
-    }
-}
-
-void
-WarpX::RestoreCurrent (int lev)
-{
-    using ablastr::fields::Direction;
-    using warpx::fields::FieldType;
-
-    for (int idim = 0; idim < 3; ++idim) {
-        if (m_fields.has(FieldType::current_store, Direction{idim}, lev)) {
-            std::swap(
-                *m_fields.get(FieldType::current_fp, Direction{idim}, lev),
-                *m_fields.get(FieldType::current_store, Direction{idim}, lev)
-            );
-        }
-    }
-}
-
 bool
 WarpX::isAnyParticleBoundaryThermal ()
 {

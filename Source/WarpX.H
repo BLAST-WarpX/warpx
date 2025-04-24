@@ -1073,8 +1073,6 @@ private:
         const ablastr::fields::MultiLevelVectorField& J_cp,
         const ablastr::fields::MultiLevelVectorField& J_buffer,
         int lev);
-    void StoreCurrent (int lev);
-    void RestoreCurrent (int lev);
     void ApplyFilterMF (
         const ablastr::fields::MultiLevelVectorField& mfvec,
         int lev,
