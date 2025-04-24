@@ -242,8 +242,8 @@ public:
 
     //! Integers that correspond to the time dependency of J (constant, linear)
     //! and rho (linear, quadratic) for the PSATD algorithm
-    static inline auto J_in_time = JInTime::Default;
-    static inline auto rho_in_time = RhoInTime::Default;
+    static inline auto time_dependency_J = TimeDependencyJ::Default;
+    static inline auto time_dependency_rho = TimeDependencyRho::Default;
 
     //! If true, the current is deposited on a nodal grid and then centered onto a staggered grid
     //! using finite centering of order given by #current_centering_nox, #current_centering_noy,
@@ -351,8 +351,10 @@ public:
     static utils::parser::IntervalsParser sort_intervals;
     static amrex::IntVect sort_bin_size;
 
-    static bool do_multi_J;
-    static int do_multi_J_n_depositions;
+    //! If true, particles will be sorted in the order x -> y -> z -> ppc for faster deposition
+    static bool sort_particles_for_deposition;
+    //! Specifies the type of grid used for the above sorting, i.e. cell-centered, nodal, or mixed
+    static amrex::IntVect sort_idx_type;
 
     //! With mesh refinement, particles located inside a refinement patch, but within
     //! #n_field_gather_buffer cells of the edge of the patch, will gather the fields
@@ -1063,7 +1065,7 @@ private:
     /**
      * \brief Perform one PIC iteration, with the multiple J deposition per time step
      */
-    void OneStep_multiJ (amrex::Real cur_time);
+    void OneStep_JRhom (amrex::Real cur_time);
 
     void RestrictCurrentFromFineToCoarsePatch (
         const ablastr::fields::MultiLevelVectorField& J_fp,
@@ -1561,6 +1563,16 @@ private:
     void PSATDMoveJNewToJOld ();
 
     /**
+     * \brief Copy rho_new to rho_mid in spectral space (when rho is quadratic in time)
+     */
+    void PSATDMoveRhoNewToRhoMid ();
+
+    /**
+     * \brief Copy J_new to J_mid in spectral space (when J is quadratic in time)
+     */
+    void PSATDMoveJNewToJMid ();
+
+    /**
      * \brief Forward FFT of F on all mesh refinement levels
      */
     void PSATDForwardTransformF ();
@@ -1612,6 +1624,10 @@ private:
 
     // implicit solver object
     std::unique_ptr<ImplicitSolver> m_implicit_solver;
+
+    //! PSATD JRhom algorithm
+    bool m_JRhom = false;
+    int m_JRhom_subintervals;
 
 };
 

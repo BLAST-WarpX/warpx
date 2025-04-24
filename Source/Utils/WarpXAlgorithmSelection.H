@@ -99,14 +99,16 @@ AMREX_ENUM(PSATDSolutionType,
            SecondOrder,
            Default = SecondOrder);
 
-AMREX_ENUM(JInTime,
+AMREX_ENUM(TimeDependencyJ,
            Constant,
            Linear,
+           Quadratic,
            Default = Constant);
 
-AMREX_ENUM(RhoInTime,
+AMREX_ENUM(TimeDependencyRho,
            Constant,
            Linear,
+           Quadratic,
            Default = Linear);
 
 /** Strategy to compute weights for use in load balance.
