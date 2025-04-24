@@ -65,7 +65,6 @@ namespace BinaryCollisionUtils{
 
         constexpr double c = PhysConst::c;
         constexpr double c_sq = PhysConst::c * PhysConst::c;
-        constexpr double inv_csq = 1.0 / c_sq;
 
         // Cast input parameters to double before computing collision properties
         // This is needed to avoid errors when using single-precision particles
