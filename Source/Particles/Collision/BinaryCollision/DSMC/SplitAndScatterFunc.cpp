@@ -46,7 +46,7 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
                 m_num_product_species = 3;
                 m_num_products_host.push_back(2); // the non-target species: one particle for the product ; one particle for the fact that the incident particle loses energy
                 m_num_products_host.push_back(0); // the target species
-                m_num_products_host.push_back(1); // corresponds to whichever ionization product species1 is not (ion or electron)
+                m_num_products_host.push_back(1); // the other product of the reaction
             } else {
                 m_num_product_species = 4;
                 m_num_products_host.push_back(1); // the non-target species
