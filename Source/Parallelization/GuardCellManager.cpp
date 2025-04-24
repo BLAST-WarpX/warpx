@@ -47,7 +47,7 @@ guardCellManager::Init (
     const amrex::Vector<amrex::Real>& v_galilean,
     const amrex::Vector<amrex::Real>& v_comoving,
     const bool safe_guard_cells,
-    const int do_multi_J,
+    const int do_psatd_JRhom,
     const bool fft_do_time_averaging,
     const bool do_pml,
     const int do_pml_in_domain,
@@ -145,13 +145,13 @@ guardCellManager::Init (
         {
             amrex::Real dt_Rho = dt;
             amrex::Real dt_J = 0.5_rt*dt;
-            if (do_multi_J) {
-                // With multi_J + time averaging, particles can move during 2*dt per PIC cycle.
+            if (do_psatd_JRhom) {
+                // With PSATD-JRhom + time averaging, particles can move during 2*dt per PIC cycle.
                 if (fft_do_time_averaging){
                     dt_Rho = 2._rt*dt;
                     dt_J = 2._rt*dt;
                 }
-                // With multi_J but without time averaging, particles can move during dt per PIC
+                // With PSATD-JRhom but without time averaging, particles can move during dt per PIC
                 // cycle for the current deposition as well.
                 else {
                     dt_J = dt;

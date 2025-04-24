@@ -1,7 +1,7 @@
 # -*- mode: yaml -*-
 
 pool:
-  vmImage: 'ubuntu-20.04'
+  vmImage: 'ubuntu-24.04'
 
 trigger:
   branches:
@@ -52,9 +52,12 @@ jobs:
   timeoutInMinutes: 240
 
   steps:
-  # set up caches:
+  # Ccache caching:
   # - once stored under a key, they become immutable (even if cache content changes)
   # - for a refresh the key has to change, e.g., hash of a tracked file in the key
+  - bash: |
+      mkdir -p /home/vsts/.ccache
+    displayName: 'Create Ccache Directory'
   - task: Cache@2
     continueOnError: true
     inputs:
@@ -64,7 +67,7 @@ jobs:
          Ccache | "$(System.JobName)" | .azure-pipelines.yml
       path: /home/vsts/.ccache
       cacheHitVar: CCACHE_CACHE_RESTORED
-    displayName: Cache Ccache Objects
+    displayName: 'Cache Ccache Objects'
 
   - bash: |
       set -o nounset errexit pipefail
@@ -111,12 +114,16 @@ jobs:
           -DCMAKE_CXX_STANDARD=17                         \
           -Duse_cmake_find_lapack=ON -Dbuild_tests=OFF -DCMAKE_VERBOSE_MAKEFILE=ON
       fi
+      # Remove system copy of Matplotlib to avoid conflict
+      # with version set in the requirements file - see, e.g.,
+      # https://github.com/matplotlib/matplotlib/issues/28768.
+      sudo apt remove python3-matplotlib
       # Python modules required for test analysis
       python3 -m pip install --upgrade -r Regression/requirements.txt
       python3 -m pip cache purge
       # external repositories required for test analysis
       cd ..
-      git clone --depth 1 https://github.com/ECP-WarpX/warpx-data.git
+      git clone --depth 1 https://github.com/BLAST-WarpX/warpx-data.git
       # TODO select only specific datasets?
       git clone --depth 1 https://github.com/openPMD/openPMD-example-datasets.git
       cd -

@@ -43,7 +43,7 @@ Use the following commands to download the WarpX source code:
    #
    # myproject -a YOUR_PROJECT_NAME
    #
-   git clone https://github.com/ECP-WarpX/WarpX.git $SHAREDHOMEDIR/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $SHAREDHOMEDIR/src/warpx
 
 We use system software modules, add environment hints and further dependencies via the file ``$SHAREDHOMEDIR/adastra_warpx.profile``.
 Create it now:

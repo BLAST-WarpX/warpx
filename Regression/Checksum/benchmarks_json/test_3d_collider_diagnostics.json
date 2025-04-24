@@ -13,21 +13,21 @@
     "rho_beam_e": 9.613059803999999e-19,
     "rho_beam_p": 9.613059803999999e-19
   },
-  "beam_e": {
-    "particle_momentum_x": 1.638554718442694e-22,
-    "particle_momentum_y": 2.184739624590259e-22,
-    "particle_momentum_z": 2.8401615119673365e-21,
-    "particle_opticalDepthQSR": 9.767741201839083e+00,
+  "beam_p": {
+    "particle_momentum_x": 1.63855472067315e-22,
+    "particle_momentum_y": 2.1847396275642e-22,
+    "particle_momentum_z": 2.8401615158334595e-21,
+    "particle_opticalDepthQSR": 8.773870620305825,
     "particle_position_x": 8.5,
     "particle_position_y": 8.5,
     "particle_position_z": 7.5,
     "particle_weight": 6.0
   },
-  "beam_p": {
-    "particle_momentum_x": 1.638554718442694e-22,
-    "particle_momentum_y": 2.184739624590259e-22,
-    "particle_momentum_z": 2.8401615119673365e-21,
-    "particle_opticalDepthQSR": 8.773870620305825e+00,
+  "beam_e": {
+    "particle_momentum_x": 1.63855472067315e-22,
+    "particle_momentum_y": 2.1847396275642e-22,
+    "particle_momentum_z": 2.8401615158334595e-21,
+    "particle_opticalDepthQSR": 9.767741201839083,
     "particle_position_x": 8.5,
     "particle_position_y": 8.5,
     "particle_position_z": 7.5,

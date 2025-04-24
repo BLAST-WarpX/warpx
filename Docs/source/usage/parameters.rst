@@ -126,6 +126,10 @@ Overall simulation parameters
     , this sets the relative tolerance for the iterative method used to obtain a self-consistent update of the particles at
     each iteration in the JFNK process.
 
+* ``implicit_evolve.use_mass_matrices`` (`bool`, default: false)
+    When `algo.evolve_scheme` is either `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton` and a preconditioner is being used
+    , the diagonal components of the diagonal mass matrices are used to capture the plasma response in the preconditioner.
+
 * ``picard.verbose`` (`bool`, default: 1)
     When `implicit_evolve.nonlinear_solver = picard`, this sets the verbosity of the Picard solver. If true, then information
     on the nonlinear error are printed to screen at each nonlinear iteration.
@@ -2061,6 +2065,12 @@ Details about the collision models can be found in the :ref:`theory section <mul
     - ``background_stopping`` for slowing of ions due to collisions with electrons or ions.
       This implements the approximate formulae as derived in Introduction to Plasma Physics,
       from Goldston and Rutherford, section 14.2.
+    - ``linear_breit_wheeler`` for electron-positron pair creation from the annihilation of two photons, according to the linear Breit-Wheeler mechanism
+      (see for example `Gould et al. (Phys. Rev. 155, 1404, 1967) <https://doi.org/10.1103/PhysRev.155.1404>`__).
+      This implements the generation of electron-positron pairs based on the analytical cross-section, e.g.
+      equation (1) in Gould. The angular distribution of the emitted pairs is isotropic for now
+      (instead of following the correct distribution, see e.g. `Ribeyre et al. (Plasma Phys. Control. Fusion 60 104001, 2018) <https://doi.org/10.1088/1361-6587/aad6da>`__).
+      The implementation follows the same numerical algorithm as that of fusion reactions (see. `Higginson et al. (JCP 388, 439-453, 2019) <https://doi.org/10.1016/j.jcp.2019.03.020>`__).
 
 * ``<collision_name>.species`` (`strings`)
     If using ``dsmc``, ``pairwisecoulomb`` or ``nuclearfusion``, this should be the name(s) of the species,
@@ -2068,10 +2078,12 @@ Details about the collision models can be found in the :ref:`theory section <mul
     If using ``background_mcc`` or ``background_stopping`` type this should be the name of the
     species for which collisions with a background will be included.
     In this case, only one species name should be given.
+    If using ``linear_breit_wheeler`` these should be two photon species.
 
 * ``<collision_name>.product_species`` (`strings`)
     Only for ``dsmc`` and ``nuclearfusion``. The name(s) of the species in which to add
     the new macroparticles created by the reaction.
+    If using ``linear_breit_wheeler`` these should be two species: one of electrons and one of positrons.
 
 * ``<collision_name>.ndt`` (`int`) optional
     Execute collision every # time steps. The default value is 1.
@@ -2087,6 +2099,13 @@ Details about the collision models can be found in the :ref:`theory section <mul
     If this is not provided, or if a non-positive value is provided,
     a Coulomb logarithm will be computed automatically according to the algorithm in
     :cite:t:`param-PerezPOP2012`.
+
+* ``<collision_name>.use_global_debye_length`` (`bool`) optional
+    Only for ``pairwisecoulomb``. When set, the Debye length used in the Coulomb log
+    is calculated including all species in the simulation. The lengths are combined
+    using the square root of one over the sum of one over the squares of the Debye lengths
+    of each species. By default, this is turned off. Note that if ``<collision_name>.CoulombLog``
+    is specified, this Debye length is not used.
 
 * ``<collision_name>.fusion_multiplier`` (`float`) optional.
     Only for ``nuclearfusion``.
@@ -2114,6 +2133,18 @@ Details about the collision models can be found in the :ref:`theory section <mul
     When the probability of fusion for a given collision exceeds
     ``fusion_probability_threshold``, WarpX reduces the fusion multiplier for
     that collisions such that the fusion probability approches ``fusion_probability_target_value``.
+
+* ``<collision_name>.event_multiplier`` (`float`) optional.
+    Only for ``linear_breit_wheeler``.
+    Works in the same way as ``<collision_name>.fusion_probability_target_value`` for fusion reactions.
+
+* ``<collision_name>.probability_threshold`` (`float`) optional.
+    Only for ``linear_breit_wheeler``.
+    Works in the same way as ``<collision_name>.fusion_probability_threshold`` for fusion reactions.
+
+* ``<collision_name>.probability_target_value`` (`float`) optional.
+    Only for ``linear_breit_wheeler``.
+    Works in the same way as ``<collision_name>.fusion_probability_target_value`` for fusion reactions.
 
 * ``<collision_name>.background_density`` (`float`)
     Only for ``background_mcc`` and ``background_stopping``. The density of the background in :math:`m^{-3}`.
@@ -2243,7 +2274,7 @@ Filtering
 
     .. warning::
 
-       Known bug: filter currently not working with FDTD solver in RZ geometry (see https://github.com/ECP-WarpX/WarpX/issues/1943).
+       Known bug: filter currently not working with FDTD solver in RZ geometry (see https://github.com/BLAST-WarpX/warpx/issues/1943).
 
 * ``warpx.filter_npass_each_dir`` (`3 int`) optional (default `1 1 1`)
     Number of passes along each direction for the bilinear filter.
@@ -2389,7 +2420,7 @@ Maxwell solver: PSATD method
 
     where :math:`\theta=\exp(i\,\boldsymbol{k}\cdot\boldsymbol{v}_G\,\Delta{t}/2)`.
 
-    This option is currently implemented only for the standard PSATD, Galilean PSATD, and averaged Galilean PSATD schemes, while it is not yet available for the multi-J algorithm.
+    This option is currently implemented only for the standard PSATD, Galilean PSATD, and averaged Galilean PSATD schemes, while it is not yet available for the PSATD JRhom algorithm.
 
 * ``psatd.update_with_rho`` (`0` or `1`)
     If true, the update equation for the electric field is expressed in terms of both the current density and the charge density, namely :math:`\widehat{\boldsymbol{J}}^{\,n+1/2}`, :math:`\widehat\rho^{n}`, and :math:`\widehat\rho^{n+1}`.
@@ -2458,15 +2489,9 @@ Maxwell solver: PSATD method
 
     The default value for ``psatd.update_with_rho`` is ``1`` if ``psatd.v_galilean`` is non-zero and ``0`` otherwise.
     The option ``psatd.update_with_rho=0`` is not implemented with the following algorithms:
-    comoving PSATD (``psatd.v_comoving``), time averaging (``psatd.do_time_averaging=1``), div(E) cleaning (``warpx.do_dive_cleaning=1``), and multi-J (``warpx.do_multi_J=1``).
+    comoving PSATD (``psatd.v_comoving``), time averaging (``psatd.do_time_averaging=1``), div(E) cleaning (``warpx.do_dive_cleaning=1``), and PSATD JRhom (``psatd.JRhom``).
 
     Note that the update with and without rho is also supported in RZ geometry.
-
-* ``psatd.J_in_time`` (``constant`` or ``linear``; default ``constant``)
-    This determines whether the current density is assumed to be constant or linear in time, within the time step over which the electromagnetic fields are evolved.
-
-* ``psatd.rho_in_time`` (``linear``; default ``linear``)
-    This determines whether the charge density is assumed to be linear in time, within the time step over which the electromagnetic fields are evolved.
 
 * ``psatd.v_galilean`` (`3 floats`, in units of the speed of light; default ``0. 0. 0.``)
     Defines the Galilean velocity.
@@ -2485,12 +2510,16 @@ Maxwell solver: PSATD method
 * ``psatd.do_time_averaging`` (`0` or `1`; default: 0)
     Whether to use an averaged Galilean PSATD algorithm or standard Galilean PSATD.
 
-* ``warpx.do_multi_J`` (`0` or `1`; default: `0`)
-    Whether to use the multi-J algorithm, where current deposition and field update are performed multiple times within each time step. The number of sub-steps is determined by the input parameter ``warpx.do_multi_J_n_depositions``. Unlike sub-cycling, field gathering is performed only once per time step, as in regular PIC cycles. When ``warpx.do_multi_J = 1``, we perform linear interpolation of two distinct currents deposited at the beginning and the end of the time step, instead of using one single current deposited at half time. For simulations with strong numerical Cherenkov instability (NCI), it is recommended to use the multi-J algorithm in combination with ``psatd.do_time_averaging = 1``.
+* ``psatd.JRhom`` (``string``)
+    This determines whether the PSATD JRhom algorithm is used, where current deposition and field update are performed multiple times within one time step, while field gathering is performed only once.
+    For simulations with strong numerical Cherenkov instability (NCI), the PSATD JRhom algorithm is recommended in combination with ``psatd.do_time_averaging = 1``.
+    The input parameter is a string composed by two characters and one digit.
+    The first character represents the time dependency of J within the time step over which the electromagnetic fields are evolved, e.g., "C" for constant in time, "L" for linear in time, "Q" for quadratic in time.
+    The second character represents the time dependency of rho within the time step over which the electromagnetic fields are evolved, following the same naming convention as for J.
+    The last digit is an integer that represents the number of subintervals used in the JRhom algorithm.
+    Examples: "CL1" (equivalent to the standard PSATD PIC algorithm), "CL2", "LL4", etc.
+    By default, the string is empty and the PSATD JRhom algorithm is not used.
 
-* ``warpx.do_multi_J_n_depositions`` (integer)
-    Number of sub-steps to use with the multi-J algorithm, when ``warpx.do_multi_J = 1``.
-    Note that this input parameter is not optional and must always be set in all input files where ``warpx.do_multi_J = 1``. No default value is provided automatically.
 
 Maxwell solver: macroscopic media
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

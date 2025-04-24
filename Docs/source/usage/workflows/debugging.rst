@@ -65,7 +65,7 @@ Typical Error Messages
 By default, the code is run in *Release* mode (see :ref:`compilation options <building-cmake-options>`).
 That means, code errors will likely show up as symptoms of earlier errors in the code instead of directly showing the underlying line that caused the error.
 
-For instance, we have `these <https://github.com/ECP-WarpX/WarpX/blob/23fa23209879cbdf5ef829530def162c2b343c72/Source/ablastr/particles/DepositCharge.H#L139>`__ `checks <https://github.com/ECP-WarpX/WarpX/blob/23fa23209879cbdf5ef829530def162c2b343c72/Source/Particles/WarpXParticleContainer.cpp#L364>`__ in release mode
+For instance, we have `these <https://github.com/BLAST-WarpX/warpx/blob/23fa23209879cbdf5ef829530def162c2b343c72/Source/ablastr/particles/DepositCharge.H#L139>`__ `checks <https://github.com/BLAST-WarpX/warpx/blob/23fa23209879cbdf5ef829530def162c2b343c72/Source/Particles/WarpXParticleContainer.cpp#L364>`__ in release mode
 
 .. code-block::
 
