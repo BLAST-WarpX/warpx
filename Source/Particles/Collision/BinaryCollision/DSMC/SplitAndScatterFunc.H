@@ -469,9 +469,9 @@ public:
                     const amrex::ParticleReal sin_phi = std::sin(phi);
 
                     // calculate the velocity components for each particle
-                    // ux1 = C * n_0 / m1 * cos_theta * cos_phi;
-                    // uy1 = C * n_0 / m1 * cos_theta * sin_phi;
-                    // uz1 = -C * n_0 / m1 * sin_theta;
+                    ux1 = C * n_0 / m1 * cos_theta * cos_phi;
+                    uy1 = C * n_0 / m1 * cos_theta * sin_phi;
+                    uz1 = -C * n_0 / m1 * sin_theta;
 
                     ux_p1 = C * n_1 / m_ioniz_product1 * (-cos_alpha * cos_theta * cos_phi - sin_alpha * sin_phi);
                     uy_p1 = C * n_1 / m_ioniz_product1 * (-cos_alpha * cos_theta * sin_phi + sin_alpha * cos_phi);
@@ -486,9 +486,9 @@ public:
                     amrex::Abort("Unknown scattering process.");
                 }
                 // transform back to labframe
-                // ux1 += uCOM_x;
-                // uy1 += uCOM_y;
-                // uz1 += uCOM_z;
+                ux1 += uCOM_x;
+                uy1 += uCOM_y;
+                uz1 += uCOM_z;
                 ux_p1 += uCOM_x;
                 uy_p1 += uCOM_y;
                 uz_p1 += uCOM_z;
