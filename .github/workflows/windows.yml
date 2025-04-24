@@ -52,7 +52,7 @@ jobs:
 
         python3 -m pip install --upgrade pip
         if(!$?) { Exit $LASTEXITCODE }
-        python3 -m pip install --upgrade build packaging setuptools wheel
+        python3 -m pip install --upgrade build packaging setuptools[core] wheel
         if(!$?) { Exit $LASTEXITCODE }
         cmake --build build --config Debug --target install
         if(!$?) { Exit $LASTEXITCODE }
@@ -113,7 +113,7 @@ jobs:
 
         python3 -m pip install --upgrade pip
         if errorlevel 1 exit 1
-        python3 -m pip install --upgrade build packaging setuptools wheel
+        python3 -m pip install --upgrade build packaging setuptools[core] wheel
         if errorlevel 1 exit 1
         python3 -m pip install --upgrade -r requirements.txt
         if errorlevel 1 exit 1

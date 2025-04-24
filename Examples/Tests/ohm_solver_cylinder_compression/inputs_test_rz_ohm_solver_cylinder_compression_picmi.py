@@ -93,8 +93,8 @@ class PlasmaCylinderCompression(object):
             Ar_data = np.zeros_like(RM)
             Az_data = np.zeros_like(RM)
 
-            # Zero padded outside of domain
-            At_data = 0.5 * RM * self.dB
+            # Only include half of the compression field here
+            At_data = 0.25 * RM * self.dB
 
             # Write vector potential to file to exercise field loading via
             series = io.Series("Afield.h5", io.Access.create)
@@ -255,11 +255,17 @@ class PlasmaCylinderCompression(object):
         #######################################################################
         # External Field definition. Sigmoid starting around 2.5 us
         A_ext = {
-            "uniform": {
+            "uniform_file": {
                 "read_from_file": True,
                 "path": "Afield.h5",
                 "A_time_external_function": "1/(1+exp(5*(1-(t-t0_ramp)*sqrt(2)/tau_ramp)))",
-            }
+            },
+            "uniform_analytical": {
+                "Ax_external_function": f"-0.25*y*{self.dB}",
+                "Ay_external_function": f"0.25*x*{self.dB}",
+                "Az_external_function": "0",
+                "A_time_external_function": "1/(1+exp(5*(1-(t-t0_ramp)*sqrt(2)/tau_ramp)))",
+            },
         }
 
         self.solver = picmi.HybridPICSolver(

@@ -15,6 +15,8 @@
 #include "Utils/ParticleUtils.H"
 
 #include <AMReX_Algorithm.H>
+#include <AMReX_Geometry.H>
+
 
 /**
  * \brief This class implements a particle merging scheme wherein particles
@@ -45,11 +47,14 @@ public:
     /**
      * \brief A method that performs merging for the considered species.
      *
+     * @param[in] geom_lev the geometry of the current refinement level
      * @param[in] pti WarpX particle iterator of the particles to resample.
      * @param[in] lev the index of the refinement level.
      * @param[in] pc a pointer to the particle container.
      */
-    void operator() (WarpXParIter& pti, int lev, WarpXParticleContainer* pc) const final;
+    void operator() (
+        const amrex::Geometry& geom_lev, WarpXParIter& pti,
+        int lev, WarpXParticleContainer* pc) const final;
 
     /**
      * \brief This merging routine requires functionality to sort a GPU vector

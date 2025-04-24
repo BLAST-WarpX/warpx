@@ -126,8 +126,11 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
     }
 #endif
 
-    auto copyAttribs = CopyParticleAttribs(pti, tmp_particle_data, offset);
     const int do_copy = (m_do_back_transformed_particles && (a_dt_type!=DtType::SecondHalf) );
+    CopyParticleAttribs copyAttribs;
+    if (do_copy) {
+        copyAttribs = CopyParticleAttribs(*this, pti, offset);
+    }
 
     const auto GetPosition = GetParticlePosition<PIdx>(pti, offset);
     auto SetPosition = SetParticlePosition<PIdx>(pti, offset);
@@ -233,13 +236,13 @@ PhotonParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                  int lev,
                                  const std::string& current_fp_string,
                                  Real t, Real dt, DtType a_dt_type, bool skip_deposition,
-                                 PushType push_type)
+                                 bool /*deposit_mass_matrices*/, PushType push_type)
 {
     // This does gather, push and deposit.
     // Push and deposit have been re-written for photons
     PhysicalParticleContainer::Evolve (fields,
                                        lev,
                                        current_fp_string,
-                                       t, dt, a_dt_type, skip_deposition, push_type);
+                                       t, dt, a_dt_type, skip_deposition, false, push_type);
 
 }

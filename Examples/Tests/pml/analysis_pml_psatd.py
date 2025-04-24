@@ -25,9 +25,9 @@ filename_init = os.path.join(cwd, "diags/diag1000050")
 galilean = True if re.search("galilean", cwd) else False
 # Initial laser energy (at iteration 50)
 if galilean:
-    energy_start = 4.439376199524034e-08
+    energy_start = 4.439376202529614e-08
 else:
-    energy_start = 7.282940107273505e-08
+    energy_start = 7.282940112203595e-08
 
 # Check consistency of field energy diagnostics with initial energy above
 ds = yt.load(filename_init)

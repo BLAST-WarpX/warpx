@@ -47,7 +47,7 @@ In order to create a GitHub release, you need to:
 
  2. **Local Commit** (Optional): at the moment, ``@ax3l`` is managing releases and signs tags (naming: ``YY.MM``) locally with his GPG key before uploading them to GitHub.
 
-    **Publish**: On the `GitHub Release page <https://github.com/ECP-WarpX/WarpX/releases>`__, create a new release via ``Draft a new release``.
+    **Publish**: On the `GitHub Release page <https://github.com/BLAST-WarpX/warpx/releases>`__, create a new release via ``Draft a new release``.
     Either select the locally created tag or create one online (naming: ``YY.MM``) on the merged commit of the PR from step 1.
 
     In the *release description*, please specify the compatible versions of dependencies (see previous releases), and provide info on the content of the release.
