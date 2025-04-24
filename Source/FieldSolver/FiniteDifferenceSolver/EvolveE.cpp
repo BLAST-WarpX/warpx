@@ -509,7 +509,7 @@ void FiniteDifferenceSolver::EvolveESpherical (
         amrex::ParallelFor(ter, tet, tep,
 
             [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
-                Er(i, 0, 0, 0) +=  c2 * dt*(
+                Er(i, 0, 0, 0) += c2 * dt*(
                     - PhysConst::mu0 * jr(i, 0, 0, 0) );
             },
 
