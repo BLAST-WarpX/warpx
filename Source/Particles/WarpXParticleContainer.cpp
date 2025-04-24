@@ -1837,7 +1837,8 @@ WarpXParticleContainer::DepositNumberDensity (amrex::MultiFab* number_density, c
                 amrex::Real const r = rmin + (i - box_lo_r)*dr;
                 // This is (4/3*pi*(r+dr)**3 - 4/3*pi*r**3)/dr, leaving out the
                 // highest order term
-                amrex::Real const volume_factor = 4.0_rt*MathConst::pi*(r + 0.5_rt*dr)*(r + 0.5_rt*dr);
+                amrex::Real const r_cell = r + 0.5_rt*dr;
+                amrex::Real const volume_factor = 4.0_rt*MathConst::pi*r_cell*r_cell;
 #else
                 // No factor is needed for Cartesian
                 amrex::Real constexpr volume_factor = 1._rt;
