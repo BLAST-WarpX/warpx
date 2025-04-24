@@ -388,7 +388,7 @@ WarpXOpenPMDPlot::WarpXOpenPMDPlot (
       m_fieldPMLdirections{fieldPMLdirections},
       m_authors{authors}
 {
-    m_OpenPMDoptions = detail::getSeriesOptions(operator_type, operator_parameters,
+    m_OpenPMDoptions = ::detail::getSeriesOptions(operator_type, operator_parameters,
                                                 engine_type, engine_parameters);
 }
 
@@ -638,7 +638,7 @@ for (const auto & particle_diag : particle_diags) {
 
     for (size_t i = PIdx::nattribs; i < rn.size(); ++i)
     {
-        real_names[i] = detail::snakeToCamel(rn[i]);
+        real_names[i] = ::detail::snakeToCamel(rn[i]);
     }
 
     amrex::Vector<int> real_flags = particle_diag.m_plot_flags;
@@ -652,7 +652,7 @@ for (const auto & particle_diag : particle_diags) {
     amrex::Vector<int> int_flags(tmp.NumIntComps());
     for (size_t i = 0; i < in.size(); ++i)
     {
-        int_names[i] = detail::snakeToCamel(in[i]);
+        int_names[i] = ::detail::snakeToCamel(in[i]);
         int_flags[i] = tmp.h_redistribute_int_comp[i];
     }
 
@@ -739,7 +739,7 @@ WarpXOpenPMDPlot::DumpToFile (ParticleContainer* pc,
         doParticleSetup = is_first_flush_with_particles || is_last_flush_and_never_particles;
     }
 
-    auto const positionComponents = detail::getParticlePositionComponentLabels(write_real_comp, real_comp_names);
+    auto const positionComponents = ::detail::getParticlePositionComponentLabels(write_real_comp, real_comp_names);
 
     // this setup stage also implicitly calls "makeEmpty" if needed (i.e., is_last_flush_and_never_particles)
     //   for BTD, we call this multiple times as we may resize in subsequent dumps if number of particles in the buffer > 0
@@ -856,7 +856,7 @@ WarpXOpenPMDPlot::SetupRealProperties (ParticleContainer const * pc,
     //
     auto const getComponentRecord = [&currSpecies](std::string const& comp_name) {
         // handle scalar and non-scalar records by name
-        const auto [record_name, component_name] = detail::name2openPMD(comp_name);
+        const auto [record_name, component_name] = ::detail::name2openPMD(comp_name);
         return currSpecies[record_name][component_name];
     };
     auto const real_counter = std::min(write_real_comp.size(), real_comp_names.size());
@@ -876,13 +876,13 @@ WarpXOpenPMDPlot::SetupRealProperties (ParticleContainer const * pc,
     for (auto idx=0; idx<pc->NumRealComps(); idx++) {
         if (write_real_comp[idx]) {
             // handle scalar and non-scalar records by name
-            const auto [record_name, component_name] = detail::name2openPMD(real_comp_names[idx]);
+            const auto [record_name, component_name] = ::detail::name2openPMD(real_comp_names[idx]);
             auto currRecord = currSpecies[record_name];
 
             // meta data for ED-PIC extension
             [[maybe_unused]] const auto [_, newRecord] = addedRecords.insert(record_name);
             if( newRecord ) {
-                currRecord.setUnitDimension( detail::getUnitDimension(record_name) );
+                currRecord.setUnitDimension( ::detail::getUnitDimension(record_name) );
                 if( record_name == "weighting" ) {
                     currRecord.setAttribute( "macroWeighted", 1u );
                 } else {
@@ -899,13 +899,13 @@ WarpXOpenPMDPlot::SetupRealProperties (ParticleContainer const * pc,
     for (auto idx=0; idx<int_counter; idx++) {
         if (write_int_comp[idx]) {
             // handle scalar and non-scalar records by name
-            const auto [record_name, component_name] = detail::name2openPMD(int_comp_names[idx]);
+            const auto [record_name, component_name] = ::detail::name2openPMD(int_comp_names[idx]);
             auto currRecord = currSpecies[record_name];
 
             // meta data for ED-PIC extension
             [[maybe_unused]] const auto [_, newRecord] = addedRecords.insert(record_name);
             if( newRecord ) {
-                currRecord.setUnitDimension( detail::getUnitDimension(record_name) );
+                currRecord.setUnitDimension( ::detail::getUnitDimension(record_name) );
                 currRecord.setAttribute( "macroWeighted", 0u );
                 if( record_name == "momentum" || record_name == "weighting" ) {
                     currRecord.setAttribute( "weightingPower", 1.0 );
@@ -933,7 +933,7 @@ WarpXOpenPMDPlot::SaveRealProperty (ParticleIter& pti,
 
     auto const getComponentRecord = [&currSpecies](std::string const& comp_name) {
         // handle scalar and non-scalar records by name
-        const auto [record_name, component_name] = detail::name2openPMD(comp_name);
+        const auto [record_name, component_name] = ::detail::name2openPMD(comp_name);
         return currSpecies[record_name][component_name];
     };
 
@@ -1081,11 +1081,11 @@ WarpXOpenPMDPlot::SetConstParticleRecordsEDPIC (
 
     // meta data
     if (!positionComponents.empty()) {
-        currSpecies["position"].setUnitDimension( detail::getUnitDimension("position") );
-        currSpecies["positionOffset"].setUnitDimension( detail::getUnitDimension("positionOffset") );
+        currSpecies["position"].setUnitDimension( ::detail::getUnitDimension("position") );
+        currSpecies["positionOffset"].setUnitDimension( ::detail::getUnitDimension("positionOffset") );
     }
-    currSpecies["charge"].setUnitDimension( detail::getUnitDimension("charge") );
-    currSpecies["mass"].setUnitDimension( detail::getUnitDimension("mass") );
+    currSpecies["charge"].setUnitDimension( ::detail::getUnitDimension("charge") );
+    currSpecies["mass"].setUnitDimension( ::detail::getUnitDimension("mass") );
 
     // meta data for ED-PIC extension
     if (!positionComponents.empty()) {
@@ -1264,7 +1264,7 @@ WarpXOpenPMDPlot::SetupMeshComp (openPMD::Mesh& mesh,
     }
 #endif
     // - AxisLabels
-    const std::vector<std::string> axis_labels = detail::getFieldAxisLabels(var_in_theta_mode);
+    const std::vector<std::string> axis_labels = ::detail::getFieldAxisLabels(var_in_theta_mode);
 
     // Prepare the type of dataset that will be written
     openPMD::Datatype const datatype = openPMD::determineDatatype<amrex::Real>();
@@ -1280,7 +1280,7 @@ WarpXOpenPMDPlot::SetupMeshComp (openPMD::Mesh& mesh,
     mesh.setAttribute("fieldSmoothing", "none");
     mesh_comp.resetDataset(dataset);
 
-    detail::setOpenPMDUnit( mesh, field_name );
+    ::detail::setOpenPMDUnit( mesh, field_name );
     auto relative_cell_pos = utils::getRelativeCellPosition(mf);     // AMReX Fortran index order
     std::reverse( relative_cell_pos.begin(), relative_cell_pos.end() ); // now in C order
     mesh_comp.setPosition( relative_cell_pos );
@@ -1299,7 +1299,7 @@ WarpXOpenPMDPlot::GetMeshCompNames (int meshLevel,
 
         // Check if this field is a vector. If so, then extract the field name
         std::vector< std::string > const vector_fields = {"E", "B", "j"};
-        std::vector< std::string > const field_components = detail::getFieldComponentLabels(var_in_theta_mode);
+        std::vector< std::string > const field_components = ::detail::getFieldComponentLabels(var_in_theta_mode);
         for( std::string const& vector_field : vector_fields ) {
             for( std::string const& component : field_components ) {
                 if( vector_field == varname_1st &&

@@ -1268,6 +1268,23 @@ WarpX::SyncCurrent (const std::string& current_fp_string)
 }
 
 void
+WarpX::SyncMassMatrices ()
+{
+    WARPX_PROFILE("WarpX::SyncMassMatrices()");
+
+    ablastr::fields::MultiLevelVectorField const& Sigma_fp = m_fields.get_mr_levels_alldirs("MassMatrices_PC", finest_level);
+
+    for (int idim = 0; idim < 3; ++idim)
+    {
+        for (int lev = finest_level; lev >= 0; --lev)
+        {
+            auto const& period = Geom(lev).periodicity();
+            SumBoundaryJ(Sigma_fp, lev, idim, period);
+        }
+    }
+}
+
+void
 WarpX::SyncRho () {
     bool const skip_lev0_coarse_patch = true;
     const ablastr::fields::MultiLevelScalarField rho_fp = m_fields.has(FieldType::rho_fp, 0) ?
@@ -1463,19 +1480,20 @@ void WarpX::SumBoundaryJ (
     }
 }
 
-/* /brief Update the currents of `lev` by adding the currents from particles
-*         that are in the mesh refinement patches at `lev+1`
-*
-* More precisely, apply filter and sum boundaries for the current of:
-* - the fine patch of `lev`
-* - the coarse patch of `lev+1` (same resolution)
-* - the buffer regions of the coarse patch of `lev+1` (i.e. for particules
-* that are within the mesh refinement patch, but do not deposit on the
-* mesh refinement patch because they are too close to the boundary)
-*
-* Then update the fine patch of `lev` by adding the currents for the coarse
-* patch (and buffer region) of `lev+1`
-*/
+/**
+ * \brief Update the currents of `lev` by adding the currents from particles
+ *         that are in the mesh refinement patches at `lev+1`
+ *
+ * More precisely, apply filter and sum boundaries for the current of:
+ * - the fine patch of `lev`
+ * - the coarse patch of `lev+1` (same resolution)
+ * - the buffer regions of the coarse patch of `lev+1` (i.e. for particules
+ * that are within the mesh refinement patch, but do not deposit on the
+ * mesh refinement patch because they are too close to the boundary)
+ *
+ * Then update the fine patch of `lev` by adding the currents for the coarse
+ * patch (and buffer region) of `lev+1`
+ */
 void WarpX::AddCurrentFromFineLevelandSumBoundary (
     const ablastr::fields::MultiLevelVectorField& J_fp,
     const ablastr::fields::MultiLevelVectorField& J_cp,
@@ -1596,19 +1614,20 @@ void WarpX::ApplyFilterandSumBoundaryRho (int /*lev*/, int glev, amrex::MultiFab
     }
 }
 
-/* /brief Update the charge density of `lev` by adding the charge density from particles
-*         that are in the mesh refinement patches at `lev+1`
-*
-* More precisely, apply filter and sum boundaries for the charge density of:
-* - the fine patch of `lev`
-* - the coarse patch of `lev+1` (same resolution)
-* - the buffer regions of the coarse patch of `lev+1` (i.e. for particules
-* that are within the mesh refinement patch, but do not deposit on the
-* mesh refinement patch because they are too close to the boundary)
-*
-* Then update the fine patch of `lev` by adding the charge density for the coarse
-* patch (and buffer region) of `lev+1`
-*/
+/**
+ *  \brief Update the charge density of `lev` by adding the charge density from particles
+ *         that are in the mesh refinement patches at `lev+1`
+ *
+ * More precisely, apply filter and sum boundaries for the charge density of:
+ * - the fine patch of `lev`
+ * - the coarse patch of `lev+1` (same resolution)
+ * - the buffer regions of the coarse patch of `lev+1` (i.e. for particules
+ * that are within the mesh refinement patch, but do not deposit on the
+ * mesh refinement patch because they are too close to the boundary)
+ *
+ * Then update the fine patch of `lev` by adding the charge density for the coarse
+ * patch (and buffer region) of `lev+1`
+ */
 void WarpX::AddRhoFromFineLevelandSumBoundary (
     const ablastr::fields::MultiLevelScalarField& charge_fp,
     const ablastr::fields::MultiLevelScalarField& charge_cp,

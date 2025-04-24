@@ -1,0 +1,36 @@
+name: 📙 Jupyter
+
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    paths-ignore:
+      - "Docs/**"
+      - "**.rst"
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.head_ref }}-jupyter
+  cancel-in-progress: true
+
+jobs:
+  jupyter_notebooks:
+    name: Notebooks
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.x"
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install nbconvert nbformat jupyter
+        pip install sympy
+    - name: Run Notebooks
+      run: |
+        cd Tools/Algorithms
+        jupyter nbconvert --to notebook --execute psatd.ipynb
+        jupyter nbconvert --to notebook --execute psatd_pml.ipynb
