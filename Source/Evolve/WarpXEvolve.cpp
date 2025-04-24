@@ -205,10 +205,10 @@ WarpX::Evolve (int numsteps)
             const bool skip_deposition = true;
             PushParticlesandDeposit(cur_time, skip_deposition);
         }
-        // Electromagnetic case: multi-J algorithm
-        else if (do_multi_J)
+        // Electromagnetic case: JRhom algorithm
+        else if (m_JRhom)
         {
-            OneStep_multiJ(cur_time);
+            OneStep_JRhom(cur_time);
         }
         // Electromagnetic case: no subcycling or no mesh refinement
         else if ( !m_do_subcycling || (finest_level == 0))
@@ -683,13 +683,13 @@ void WarpX::SyncCurrentAndRho ()
 }
 
 void
-WarpX::OneStep_multiJ (const amrex::Real cur_time)
+WarpX::OneStep_JRhom (const amrex::Real cur_time)
 {
 #ifdef WARPX_USE_FFT
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD,
-        "multi-J algorithm not implemented for FDTD"
+        "JRhom algorithm not implemented with the FDTD solver"
     );
 
     using warpx::fields::FieldType;
@@ -704,7 +704,7 @@ WarpX::OneStep_multiJ (const amrex::Real cur_time)
     const bool skip_deposition = true;
     PushParticlesandDeposit(cur_time, skip_deposition);
 
-    // Initialize multi-J loop:
+    // Initialize PSATD-JRhom loop:
 
     // 1) Prepare E,B,F,G fields in spectral space
     PSATDForwardTransformEB();
@@ -716,7 +716,7 @@ WarpX::OneStep_multiJ (const amrex::Real cur_time)
 
     // 3) Deposit rho (in rho_new, since it will be moved during the loop)
     //    (after checking that pointer to rho_fp on MR level 0 is not null)
-    if (m_fields.has(FieldType::rho_fp, 0) && rho_in_time == RhoInTime::Linear)
+    if (m_fields.has(FieldType::rho_fp, 0) && time_dependency_rho != TimeDependencyRho::Constant)
     {
         ablastr::fields::MultiLevelScalarField const rho_fp = m_fields.get_mr_levels(FieldType::rho_fp, finest_level);
 
@@ -734,7 +734,7 @@ WarpX::OneStep_multiJ (const amrex::Real cur_time)
 
     // 4) Deposit J at relative time -dt with time step dt
     //    (dt[0] denotes the time step on mesh refinement level 0)
-    if (J_in_time == JInTime::Linear)
+    if (time_dependency_J != TimeDependencyJ::Constant)
     {
         std::string const current_string = (do_current_centering) ? "current_fp_nodal" : "current_fp";
         mypc->DepositCurrent( m_fields.get_mr_levels_alldirs(current_string, finest_level), dt[0], -dt[0]);
@@ -749,23 +749,23 @@ WarpX::OneStep_multiJ (const amrex::Real cur_time)
     }
 
     // Number of depositions for multi-J scheme
-    const int n_deposit = WarpX::do_multi_J_n_depositions;
+    const int n_deposit = WarpX::m_JRhom_subintervals;
     // Time sub-step for each multi-J deposition
     const amrex::Real sub_dt = dt[0] / static_cast<amrex::Real>(n_deposit);
-    // Whether to perform multi-J depositions on a time interval that spans
+    // Whether to perform PSATD-JRhom depositions on a time interval that spans
     // one or two full time steps (from n*dt to (n+1)*dt, or from n*dt to (n+2)*dt)
     const int n_loop = (WarpX::fft_do_time_averaging) ? 2*n_deposit : n_deposit;
 
-    // Loop over multi-J depositions
+    // Loop over PSATD-JRhom depositions
     for (int i_deposit = 0; i_deposit < n_loop; i_deposit++)
     {
-        // Move J from new to old if J is linear in time
-        if (J_in_time == JInTime::Linear) { PSATDMoveJNewToJOld(); }
+        // Move J from new to old if J is linear or quadratic in time
+        if (time_dependency_J != TimeDependencyJ::Constant) { PSATDMoveJNewToJOld(); }
 
-        const amrex::Real t_deposit_current = (J_in_time == JInTime::Linear) ?
+        const amrex::Real t_deposit_current = (time_dependency_J == TimeDependencyJ::Linear) ?
             (i_deposit-n_deposit+1)*sub_dt : (i_deposit-n_deposit+0.5_rt)*sub_dt;
 
-        const amrex::Real t_deposit_charge = (rho_in_time == RhoInTime::Linear) ?
+        const amrex::Real t_deposit_charge = (time_dependency_rho == TimeDependencyRho::Linear) ?
             (i_deposit-n_deposit+1)*sub_dt : (i_deposit-n_deposit+0.5_rt)*sub_dt;
 
         // Deposit new J at relative time t_deposit_current with time step dt
@@ -781,6 +781,14 @@ WarpX::OneStep_multiJ (const amrex::Real cur_time)
         // Forward FFT of J
         PSATDForwardTransformJ("current_fp", "current_cp");
 
+        if (time_dependency_J == TimeDependencyJ::Quadratic)
+        {
+            PSATDMoveJNewToJMid();
+            mypc->DepositCurrent( m_fields.get_mr_levels_alldirs(current_string, finest_level),  dt[0], t_deposit_current + 0.5_rt*sub_dt);
+            SyncCurrent("current_fp");
+            PSATDForwardTransformJ("current_fp", "current_cp");
+        }
+
         // Deposit new rho
         // (after checking that pointer to rho_fp on MR level 0 is not null)
         if (m_fields.has(FieldType::rho_fp, 0))
@@ -791,21 +799,29 @@ WarpX::OneStep_multiJ (const amrex::Real cur_time)
             std::string const rho_cp_string = "rho_cp";
 
             // Move rho from new to old if rho is linear in time
-            if (rho_in_time == RhoInTime::Linear) { PSATDMoveRhoNewToRhoOld(); }
+            if (time_dependency_rho != TimeDependencyRho::Constant) { PSATDMoveRhoNewToRhoOld(); }
 
             // Deposit rho at relative time t_deposit_charge
             mypc->DepositCharge(rho_fp, t_deposit_charge);
             // Filter, exchange boundary, and interpolate across levels
             SyncRho();
             // Forward FFT of rho
-            const int rho_idx = (rho_in_time == RhoInTime::Linear) ? rho_new : rho_mid;
+            const int rho_idx = (time_dependency_rho != TimeDependencyRho::Constant) ? rho_new : rho_mid;
             PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 0, rho_idx);
+
+            if (time_dependency_rho == TimeDependencyRho::Quadratic)
+            {
+                PSATDMoveRhoNewToRhoMid();
+                mypc->DepositCharge(rho_fp, t_deposit_charge + 0.5_rt*sub_dt);
+                SyncRho();
+                PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 0, rho_new);
+            }
         }
 
         if (WarpX::current_correction)
         {
             WARPX_ABORT_WITH_MESSAGE(
-                "Current correction not implemented for multi-J algorithm.");
+                "Current correction not implemented for PSATD-JRhom algorithm.");
         }
 
         // Advance E,B,F,G fields in time and update the average fields
@@ -866,7 +882,7 @@ WarpX::OneStep_multiJ (const amrex::Real cur_time)
 #else
     amrex::ignore_unused(cur_time);
     WARPX_ABORT_WITH_MESSAGE(
-        "multi-J algorithm not implemented for FDTD");
+        "JRhom algorithm not implemented with the FDTD solver");
 #endif // WARPX_USE_FFT
 }
 
