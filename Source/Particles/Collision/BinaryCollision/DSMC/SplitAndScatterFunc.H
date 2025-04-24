@@ -87,6 +87,7 @@ public:
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
         );
 
+        amrex::Print() << "m_num_product_species = " << m_num_product_species << std::endl;
         amrex::Vector<int> num_added_vec(m_num_product_species, 0);
         for (int i = 0; i < m_num_product_species; i++)
         {
@@ -95,6 +96,7 @@ public:
             // each species (the piece that breaks off to have equal weight)
             // particles.
             num_added_vec[i] = static_cast<int>(no_product_total);
+            amrex::Print() << "num_added_vec[" << i << "] = " << num_added_vec[i] << std::endl;
         }
 
         // The following is used to calculate the appropriate offsets for
@@ -112,27 +114,23 @@ public:
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { with_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
         );
+        amrex::Print() << "with_product_total = " << with_product_total << std::endl;
 
         for (int i = 0; i < m_num_product_species; i++)
         {
-            // Add the number of product producing events to the species involved
-            // in those processes. For the two colliding particles, if either is set to
-            // have just 1 copy in the products it indicates that that species is not a
-            // product of the product producing reaction (instead it is just tracked as
-            // an outgoing particle in non-product producing reactions), and therefore
-            // it does not count in the products.
+            // Add the number of product producing events to the species involved in those processes.
             int num_products = m_num_products_host[i];
-            if ((i < 2) & (num_products == 1)) {
-                num_products = 0;
-            }
             const index_type num_added = with_product_total * num_products;
             num_added_vec[i] += static_cast<int>(num_added);
+            amrex::Print() << "num_added_vec[" << i << "] = " << num_added_vec[i] << std::endl;
         }
 
         // resize the particle tiles to accomodate the new particles
         for (int i = 0; i < m_num_product_species; i++)
         {
+            amrex::Print() << "tile_products[" << i << "] = " << tile_products[i]->numParticles() << std::endl;
             tile_products[i]->resize(products_np[i] + num_added_vec[i]);
+            amrex::Print() << "tile_products[" << i << "] = " << tile_products[i]->numParticles() << std::endl;
         }
 
         const auto soa_1 = ptile1.getParticleTileData();
@@ -189,23 +187,30 @@ public:
             }
         } else if (num_product_species == 4) {
             if (pc_products[2]->getCharge() < 0.0) {
+                amrex::Print() << "pc_products[2]->getCharge() < 0.0" << std::endl;
                 ioniz_product1_list_index = 2;
                 ioniz_product2_list_index = 3;
                 ioniz_product1_offset = products_np[2];
                 ioniz_product2_offset = products_np[3];
             } else {
+                amrex::Print() << "pc_products[2]->getCharge() >= 0.0" << std::endl;
                 ioniz_product1_list_index = 3;
                 ioniz_product2_list_index = 2;
                 ioniz_product1_offset = products_np[3];
                 ioniz_product2_offset = products_np[2];
             }
         }
+
         // Grab the masses of ionization products
         amrex::ParticleReal m_ioniz_product1 = 0;
         amrex::ParticleReal m_ioniz_product2 = 0;
         if (num_product_species > 2) {
             m_ioniz_product1 = pc_products[ioniz_product1_list_index]->getMass();
+            amrex::Print() << "ioniz_product1_list_index = " << ioniz_product1_list_index << std::endl;
+            amrex::Print() << "m_ioniz_product1 = " << m_ioniz_product1 << std::endl;
             m_ioniz_product2 = pc_products[ioniz_product2_list_index]->getMass();
+            amrex::Print() << "ioniz_product2_list_index = " << ioniz_product2_list_index << std::endl;
+            amrex::Print() << "m_ioniz_product2 = " << m_ioniz_product2 << std::endl;
         }
 
         // First perform all non-product producing collisions
@@ -328,33 +333,46 @@ public:
             // Next perform all product producing collisions
             else if (mask[i] == int(ScatteringProcessType::IONIZATION))
             {
+                amrex::Print() << "IONIZATION: i = " << i << std::endl;
+
                 const auto species1_index = products_np_data[0] + no_product_total + with_product_p_offsets[i];
-                // Make a copy of the particle from species 1
+                // Make a copy of the particle from species 1 (non-ionized species, we split a particle that loses some energy)
                 copy_species1[0](soa_products_data[0], soa_1, static_cast<int>(p_pair_indices_1[i]),
-                                static_cast<int>(species1_index), engine);
+                               static_cast<int>(species1_index), engine);
                 // Set the weight of the new particles to p_pair_reaction_weight[i]
+                amrex::Print() << "species1_index = " << species1_index << std::endl;
                 soa_products_data[0].m_rdata[PIdx::w][species1_index] = p_pair_reaction_weight[i];
 
                 // create a copy of the first product species at the location of species 2
                 const auto product1_index = ioniz_product1_offset + with_product_p_offsets[i];
+                amrex::Print() << "product1_index = " << product1_index << std::endl;
                 copy_species1[ioniz_product1_list_index](soa_products_data[ioniz_product1_list_index], soa_2, static_cast<int>(p_pair_indices_2[i]),
                                 static_cast<int>(product1_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
+                amrex::Print() << "ioniz_product1_list_index = " << ioniz_product1_list_index << std::endl;
                 soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::w][product1_index] = p_pair_reaction_weight[i];
 
                 // create a copy of the other product species at the location of species 2
                 const auto product2_index = ioniz_product2_offset + with_product_p_offsets[i];
+                amrex::Print() << "product2_index = " << product2_index << std::endl;
                 copy_species1[ioniz_product2_list_index](soa_products_data[ioniz_product2_list_index], soa_2, static_cast<int>(p_pair_indices_2[i]),
                                 static_cast<int>(product2_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
+                amrex::Print() << "ioniz_product2_list_index = " << ioniz_product2_list_index << std::endl;
                 soa_products_data[ioniz_product2_list_index].m_rdata[PIdx::w][product2_index] = p_pair_reaction_weight[i];
 
                 // Grab the colliding particle velocities to calculate the COM
                 // Note that the two product particles currently have the same
                 // velocity as the "target" particle
+                amrex::Print() << "p_pair_indices_1[i] = " << p_pair_indices_1[i] << std::endl;
+                amrex::Print() << "p_pair_indices_2[i] = " << p_pair_indices_2[i] << std::endl;
+                amrex::Print() << "species1_index = " << species1_index << std::endl;
                 auto& ux1 = soa_products_data[0].m_rdata[PIdx::ux][species1_index];
                 auto& uy1 = soa_products_data[0].m_rdata[PIdx::uy][species1_index];
                 auto& uz1 = soa_products_data[0].m_rdata[PIdx::uz][species1_index];
+                amrex::Print() << "ux1 = " << ux1 << std::endl;
+                amrex::Print() << "uy1 = " << uy1 << std::endl;
+                amrex::Print() << "uz1 = " << uz1 << std::endl;
                 auto& ux_p1 = soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::ux][product1_index];
                 auto& uy_p1 = soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::uy][product1_index];
                 auto& uz_p1 = soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::uz][product1_index];
@@ -476,9 +494,9 @@ public:
                     const amrex::ParticleReal sin_phi = std::sin(phi);
 
                     // calculate the velocity components for each particle
-                    ux1 = C * n_0 / m1 * cos_theta * cos_phi;
-                    uy1 = C * n_0 / m1 * cos_theta * sin_phi;
-                    uz1 = -C * n_0 / m1 * sin_theta;
+                    // ux1 = C * n_0 / m1 * cos_theta * cos_phi;
+                    // uy1 = C * n_0 / m1 * cos_theta * sin_phi;
+                    // uz1 = -C * n_0 / m1 * sin_theta;
 
                     ux_p1 = C * n_1 / m_ioniz_product1 * (-cos_alpha * cos_theta * cos_phi - sin_alpha * sin_phi);
                     uy_p1 = C * n_1 / m_ioniz_product1 * (-cos_alpha * cos_theta * sin_phi + sin_alpha * cos_phi);
@@ -493,9 +511,9 @@ public:
                     amrex::Abort("Unknown scattering process.");
                 }
                 // transform back to labframe
-                ux1 += uCOM_x;
-                uy1 += uCOM_y;
-                uz1 += uCOM_z;
+                // ux1 += uCOM_x;
+                // uy1 += uCOM_y;
+                // uz1 += uCOM_z;
                 ux_p1 += uCOM_x;
                 uy_p1 += uCOM_y;
                 uz_p1 += uCOM_z;
@@ -517,6 +535,9 @@ public:
         {
             const int start_index = int(products_np[i]);
             const int stop_index  = int(products_np[i] + num_added_vec[i]);
+            amrex::Print() << "i = " << i << std::endl;
+            amrex::Print() << "start_index = " << start_index << std::endl;
+            amrex::Print() << "stop_index = " << stop_index << std::endl;
             ParticleCreation::DefaultInitializeRuntimeAttributes(*tile_products[i],
                                        0, 0,
                                        pc_products[i]->getUserRealAttribs(), pc_products[i]->getUserIntAttribs(),
