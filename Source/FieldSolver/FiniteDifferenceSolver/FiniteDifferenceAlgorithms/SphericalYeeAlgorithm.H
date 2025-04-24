@@ -29,7 +29,7 @@ struct SphericalYeeAlgorithm {
         std::array<amrex::Real,3>& cell_size,
         amrex::Vector<amrex::Real>& stencil_coefs_r) {
 
-        using namespace amrex;
+        using namespace amrex::literals;
         // Store the inverse cell size along each direction in the coefficients
         stencil_coefs_r.resize(1);
         stencil_coefs_r[0] = 1._rt/cell_size[0];  // 1./dr
@@ -67,10 +67,10 @@ struct SphericalYeeAlgorithm {
         amrex::Real const * const coefs_r, int const n_coefs_r,
         int const i, int const j, int const k, int const comp ) {
 
-        using namespace amrex;
-        ignore_unused(n_coefs_r);
+        using namespace amrex::literals;
+        amrex::ignore_unused(n_coefs_r);
 
-        Real const inv_dr = coefs_r[0];
+        amrex::Real const inv_dr = coefs_r[0];
         return 1._rt/r * inv_dr*( (r+0.5_rt*dr)*F(i+1,j,k,comp) - (r-0.5_rt*dr)*F(i,j,k,comp) );
     }
 
@@ -85,12 +85,12 @@ struct SphericalYeeAlgorithm {
         amrex::Real const * const coefs_r, int const n_coefs_r,
         int const i, int const j, int const k, int const comp ) {
 
-        using namespace amrex;
-        ignore_unused(n_coefs_r);
+        using namespace amrex::literals;
+        amrex::ignore_unused(n_coefs_r);
 
-        Real const inv_dr = coefs_r[0];
-        Real const rph = r + 0.5_rt*dr;
-        Real const rmh = r - 0.5_rt*dr;
+        amrex::Real const inv_dr = coefs_r[0];
+        amrex::Real const rph = r + 0.5_rt*dr;
+        amrex::Real const rmh = r - 0.5_rt*dr;
         return 1._rt/(r*r) * inv_dr*( rph*rph*F(i,j,k,comp) - rmh*rmh*F(i-1,j,k,comp) );
     }
 
@@ -105,10 +105,10 @@ struct SphericalYeeAlgorithm {
         amrex::Real const * const coefs_r, int const n_coefs_r,
         int const i, int const j, int const k, int const comp ) {
 
-        using namespace amrex;
-        ignore_unused(n_coefs_r);
+        using namespace amrex::literals;
+        amrex::ignore_unused(n_coefs_r);
 
-        Real const inv_dr = coefs_r[0];
+        amrex::Real const inv_dr = coefs_r[0];
         return 1._rt/r * inv_dr*( (r+0.5_rt*dr)*F(i,j,k,comp) - (r-0.5_rt*dr)*F(i-1,j,k,comp) );
     }
 
@@ -120,10 +120,9 @@ struct SphericalYeeAlgorithm {
         amrex::Real const * const coefs_r, int const n_coefs_r,
         int const i, int const j, int const k, int const comp ) {
 
-        using namespace amrex;
-        ignore_unused(n_coefs_r);
+        amrex::ignore_unused(n_coefs_r);
 
-        Real const inv_dr = coefs_r[0];
+        amrex::Real const inv_dr = coefs_r[0];
         return inv_dr*( F(i+1,j,k,comp) - F(i,j,k,comp) );
     }
 
@@ -135,10 +134,9 @@ struct SphericalYeeAlgorithm {
         amrex::Real const * const coefs_r, int const n_coefs_r,
         int const i, int const j, int const k, int const comp ) {
 
-        using namespace amrex;
-        ignore_unused(n_coefs_r);
+        amrex::ignore_unused(n_coefs_r);
 
-        Real const inv_dr = coefs_r[0];
+        amrex::Real const inv_dr = coefs_r[0];
         return inv_dr*( F(i,j,k,comp) - F(i-1,j,k,comp) );
     }
 
@@ -153,9 +151,9 @@ struct SphericalYeeAlgorithm {
         amrex::Real const * const coefs_r, int const /*n_coefs_r*/,
         int const i, int const j, int const k, int const comp ) {
 
-        using namespace amrex;
+        using namespace amrex::literals;
 
-        Real const inv_dr2 = coefs_r[0]*coefs_r[0];
+        amrex::Real const inv_dr2 = coefs_r[0]*coefs_r[0];
         return 1._rt/r * inv_dr2*( (r+0.5_rt*dr)*(F(i+1,j,k,comp) - F(i,j,k,comp))
                                  - (r-0.5_rt*dr)*(F(i,j,k,comp) - F(i-1,j,k,comp)) );
     }
