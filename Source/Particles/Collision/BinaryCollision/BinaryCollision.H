@@ -307,27 +307,29 @@ public:
 
         amrex::Geometry const& geom_lev = WarpX::GetInstance().Geom(lev);
         auto const dV = AMREX_D_TERM(geom_lev.CellSize(0), *geom_lev.CellSize(1), *geom_lev.CellSize(2));
-#if defined WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ)
         amrex::Box const& cbx = mfi.tilebox(amrex::IntVect::TheZeroVector()); //Cell-centered box
         auto const lo = lbound(cbx);
         auto const hi = ubound(cbx);
         int const nz = hi.y - lo.y + 1;
-        auto const dr = geom_lev.CellSize(0);
-#elif defined WARPX_DIM_RCYLINDER || defined WARPX_DIM_RSPHERE
+#endif
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         auto const dr = geom_lev.CellSize(0);
 #endif
 
         auto volume_factor = [=] AMREX_GPU_DEVICE(int i_cell) noexcept {
-#if defined WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ)
             // Return the radial factor for the volume element, dV
             int const ri = (i_cell - i_cell%nz)/nz;
-            return MathConst::pi*(2.0_prt*ri + 1.0_prt)*dr;
-#elif defined WARPX_DIM_RCYLINDER
+            // rr is radius at the cell center
+            amrex::ParticleReal const rr = (ri + 0.5_prt)*dr;
+            return 2.0_prt*MathConst::pi*rr;
+#elif defined(WARPX_DIM_RCYLINDER)
             int const ri = i_cell;
             // rr is radius at the cell center
             amrex::ParticleReal const rr = (ri + 0.5_prt)*dr;
             return 2.0_prt*MathConst::pi*rr;
-#elif defined WARPX_DIM_RSPHERE
+#elif defined(WARPX_DIM_RSPHERE)
             // This needs double checking
             int const ri = i_cell;
             // rr is radius at the cell center
