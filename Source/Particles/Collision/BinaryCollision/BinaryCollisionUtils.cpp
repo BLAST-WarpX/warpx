@@ -11,7 +11,6 @@
 #include "Particles/WarpXParticleContainer.H"
 
 #include <AMReX_ParmParse.H>
-#include <AMReX_Parser.H>
 #include <AMReX_Vector.H>
 
 #include <string>
