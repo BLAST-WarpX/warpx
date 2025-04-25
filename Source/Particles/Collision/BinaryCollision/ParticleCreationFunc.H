@@ -12,6 +12,7 @@
 
 #include "Particles/Collision/BinaryCollision/NuclearFusion/TwoProductFusionInitializeMomentum.H"
 #include "Particles/Collision/BinaryCollision/NuclearFusion/ProtonBoronFusionInitializeMomentum.H"
+#include "Particles/Collision/BinaryCollision/LinearBreitWheeler/TwoProductInitializeMomentum.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
@@ -223,6 +224,14 @@ public:
                         products_np_data[1] + 2*p_offsets[i]*p_num_products_device[1],
                         m1, m2, products_mass_data[0], products_mass_data[1], fusion_energy, engine);
                 }
+                else if(t_collision_type == CollisionType::LinearBreitWheeler){
+                    TwoProductInitializeMomentum(soa_1, soa_2,
+                        soa_products_data[0], soa_products_data[1],
+                        p_pair_indices_1[i], p_pair_indices_2[i],
+                        products_np_data[0] + 2*p_offsets[i]*p_num_products_device[0],
+                        products_np_data[1] + 2*p_offsets[i]*p_num_products_device[1],
+                        engine);
+                }
 
             }
         });
@@ -235,7 +244,7 @@ public:
             ParticleCreation::DefaultInitializeRuntimeAttributes(*tile_products[i],
                                        0, 0,
                                        pc_products[i]->getUserRealAttribs(), pc_products[i]->getUserIntAttribs(),
-                                       pc_products[i]->getParticleComps(), pc_products[i]->getParticleiComps(),
+                                       pc_products[i]->GetRealSoANames(), pc_products[i]->GetIntSoANames(),
                                        pc_products[i]->getUserRealAttribParser(),
                                        pc_products[i]->getUserIntAttribParser(),
 #ifdef WARPX_QED

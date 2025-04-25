@@ -19,6 +19,7 @@ Checks: '
         -cppcoreguidelines-avoid-non-const-global-variables,
         -cppcoreguidelines-init-variables,
         -cppcoreguidelines-macro-usage,
+        -cppcoreguidelines-missing-std-forward,
         -cppcoreguidelines-narrowing-conversions,
         -cppcoreguidelines-non-private-member-variables-in-classes,
         -cppcoreguidelines-owning-memory,
@@ -29,6 +30,7 @@ Checks: '
     misc-*,
         -misc-no-recursion,
         -misc-non-private-member-variables-in-classes,
+        -misc-include-cleaner,
     modernize-*,
         -modernize-avoid-c-arrays,
         -modernize-return-braced-init-list,
@@ -44,7 +46,6 @@ Checks: '
         -readability-implicit-bool-conversion,
         -readability-isolate-declaration,
         -readability-magic-numbers,
-        -readability-misleading-indentation,
         -readability-named-parameter,
         -readability-uppercase-literal-suffix
     '
@@ -58,6 +59,7 @@ CheckOptions:
   value:        "true"
 - key:          misc-use-anonymous-namespace.HeaderFileExtensions
   value:        "H,"
-
+- key:          performance-move-const-arg.CheckTriviallyCopyableMove
+  value:        "false"
 
 HeaderFilterRegex: 'Source[a-z_A-Z0-9\/]+\.H$'

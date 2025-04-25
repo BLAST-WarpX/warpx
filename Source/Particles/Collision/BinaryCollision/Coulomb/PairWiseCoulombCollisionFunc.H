@@ -53,15 +53,23 @@ public:
     {
         using namespace amrex::literals;
         const amrex::ParmParse pp_collision_name(collision_name);
+
+        utils::parser::queryWithParser(
+            pp_collision_name, "use_global_debye_length", m_use_global_debye_length);
+
         // default Coulomb log, if < 0, will be computed automatically
         amrex::ParticleReal CoulombLog = -1.0_prt;
         utils::parser::queryWithParser(
             pp_collision_name, "CoulombLog", CoulombLog);
         m_CoulombLog = CoulombLog;
-
         m_exe.m_CoulombLog = m_CoulombLog;
-        if (m_CoulombLog<0.0) { m_exe.m_computeSpeciesTemperatures = true; }
+
+        if (m_CoulombLog<0.0 && !m_use_global_debye_length) {
+            m_exe.m_computeSpeciesTemperatures = true;
+        }
+
         m_exe.m_isSameSpecies = m_isSameSpecies;
+
     }
 
     struct Executor {
@@ -92,6 +100,7 @@ public:
             GetParticlePosition<PIdx> /*get_position_1*/, GetParticlePosition<PIdx> /*get_position_2*/,
             amrex::ParticleReal const  n1, amrex::ParticleReal const  n2,
             amrex::ParticleReal const  T1, amrex::ParticleReal const  T2,
+            amrex::Real const global_lamdb,
             amrex::ParticleReal const  q1, amrex::ParticleReal const  q2,
             amrex::ParticleReal const  m1, amrex::ParticleReal const  m2,
             amrex::Real const  dt, amrex::Real const dV, index_type coll_idx,
@@ -106,7 +115,7 @@ public:
                     I1s, I1e, I2s, I2e, I1, I2,
                     soa_1, soa_2, n1, n2, T1, T2,
                     q1, q2, m1, m2,
-                    dt, m_CoulombLog, dV, engine, m_isSameSpecies, coll_idx);
+                    dt, global_lamdb, m_CoulombLog, dV, engine, m_isSameSpecies, coll_idx);
         }
 
         amrex::ParticleReal m_CoulombLog;
@@ -117,11 +126,16 @@ public:
 
     [[nodiscard]] Executor const& executor () const { return m_exe; }
 
+    bool use_global_debye_length() { return m_use_global_debye_length; }
+
 private:
     amrex::ParticleReal m_CoulombLog;
     bool m_isSameSpecies;
 
     Executor m_exe;
+
+    bool m_use_global_debye_length = false;
+
 };
 
 #endif // WARPX_PAIRWISE_COULOMB_COLLISION_FUNC_H_

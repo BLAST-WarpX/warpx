@@ -11,11 +11,8 @@
 #include <AMReX_IntVect.H>
 #include <AMReX_MFInterp_C.H>
 
-#include <ablastr/fields/Interpolate.H>
-
 #include <array>
 #include <optional>
-
 
 namespace ablastr::fields::details {
 

@@ -18,7 +18,7 @@
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "EmbeddedBoundary/Enabled.H"
 #ifdef AMREX_USE_EB
-#   include "EmbeddedBoundary/EmbeddedBoundary.H"
+#   include "EmbeddedBoundary/EmbeddedBoundaryInit.H"
 #endif
 #include "Fields.H"
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver.H"
@@ -29,7 +29,6 @@
 #include "Initialization/ExternalField.H"
 #include "Initialization/DivCleaner/ProjectionDivCleaner.H"
 #include "Particles/MultiParticleContainer.H"
-#include "Utils/Algorithms/LinearInterpolation.H"
 #include "Utils/Logo/GetLogo.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
@@ -40,6 +39,7 @@
 #include "Python/callbacks.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/math/LinearInterpolation.H>
 #include <ablastr/parallelization/MPIInitHelpers.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/utils/UsedInputsFile.H>
@@ -93,6 +93,27 @@ using namespace amrex;
 
 namespace
 {
+
+    /** Print dt and dx,dy,dz */
+    void PrintDtDxDyDz (
+        int max_level, const amrex::Vector<Geometry>& geom, const amrex::Vector<amrex::Real>& dt)
+    {
+        for (int lev=0; lev <= max_level; lev++) {
+            const amrex::Real* dx_lev = geom[lev].CellSize();
+            amrex::Print() << "Level " << lev << ": dt = " << dt[lev]
+    #if defined(WARPX_DIM_1D_Z)
+                           << " ; dz = " << dx_lev[0] << '\n';
+    #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                           << " ; dx = " << dx_lev[0]
+                           << " ; dz = " << dx_lev[1] << '\n';
+    #elif defined(WARPX_DIM_3D)
+                           << " ; dx = " << dx_lev[0]
+                           << " ; dy = " << dx_lev[1]
+                           << " ; dz = " << dx_lev[2] << '\n';
+    #endif
+        }
+    }
+
     /**
      * \brief Check that the number of guard cells is smaller than the number of valid cells,
      * for a given MultiFab, and abort otherwise.
@@ -184,6 +205,15 @@ namespace
         // TODO: check MPI-rank to GPU ratio (should be 1:1)
         // TODO: check memory per MPI rank, especially if GPUs are underutilized
         // TODO: CPU tiling hints with OpenMP
+    }
+
+    /** Write a file that record all inputs: inputs file + command line options */
+    void WriteUsedInputsFile ()
+    {
+        std::string filename = "warpx_used_inputs";
+        ParmParse pp_warpx("warpx");
+        pp_warpx.queryAdd("used_inputs_file", filename);
+        ablastr::utils::write_used_inputs_file(filename);
     }
 }
 
@@ -288,17 +318,17 @@ WarpX::PrintMainPICparameters ()
     else{
       amrex::Print() << "Operation mode:       | Electromagnetic" << "\n";
     }
-    if (em_solver_medium == MediumForEM::Vacuum ){
+    if (m_em_solver_medium == MediumForEM::Vacuum ){
       amrex::Print() << "                      | - vacuum" << "\n";
     }
-    else if (em_solver_medium == MediumForEM::Macroscopic ){
+    else if (m_em_solver_medium == MediumForEM::Macroscopic ){
       amrex::Print() << "                      | - macroscopic" << "\n";
     }
-    if ( (em_solver_medium == MediumForEM::Macroscopic) &&
+    if ( (m_em_solver_medium == MediumForEM::Macroscopic) &&
        (WarpX::macroscopic_solver_algo == MacroscopicSolverAlgo::LaxWendroff)){
       amrex::Print() << "                      |  - Lax-Wendroff algorithm\n";
     }
-    else if ((em_solver_medium == MediumForEM::Macroscopic) &&
+    else if ((m_em_solver_medium == MediumForEM::Macroscopic) &&
             (WarpX::macroscopic_solver_algo == MacroscopicSolverAlgo::BackwardEuler)){
       amrex::Print() << "                      |  - Backward Euler algorithm\n";
     }
@@ -389,21 +419,21 @@ WarpX::PrintMainPICparameters ()
     if (WarpX::do_divb_cleaning) {
       amrex::Print() << "                      | - div(B) cleaning is ON \n";
       }
-    if (do_multi_J){
-      amrex::Print() << "                      | - multi-J deposition is ON \n";
-      amrex::Print() << "                      |   - do_multi_J_n_depositions = "
-                                        << WarpX::do_multi_J_n_depositions << "\n";
-      if (J_in_time == JInTime::Linear){
-        amrex::Print() << "                      |   - J_in_time = linear \n";
+    if (m_JRhom == 1){
+      amrex::Print() << "                      | - PSATD-JRhom deposition is ON \n";
+      amrex::Print() << "                      |   - m_JRhom_subintervals = "
+                                        << WarpX::m_JRhom_subintervals << "\n";
+      if (time_dependency_J == TimeDependencyJ::Linear){
+        amrex::Print() << "                      |   - time_dependency_J = linear \n";
       }
-      if (J_in_time == JInTime::Constant){
-        amrex::Print() << "                      |   - J_in_time = constant \n";
+      if (time_dependency_J == TimeDependencyJ::Constant){
+        amrex::Print() << "                      |   - time_dependency_J = constant \n";
       }
-      if (rho_in_time == RhoInTime::Linear){
-        amrex::Print() << "                      |   - rho_in_time = linear \n";
+      if (time_dependency_rho == TimeDependencyRho::Linear){
+        amrex::Print() << "                      |   - time_dependency_rho = linear \n";
       }
-      if (rho_in_time == RhoInTime::Constant){
-        amrex::Print() << "                      |   - rho_in_time = constant \n";
+      if (time_dependency_rho == TimeDependencyRho::Constant){
+        amrex::Print() << "                      |   - time_dependency_rho = constant \n";
       }
     }
     if (fft_do_time_averaging){
@@ -424,19 +454,19 @@ WarpX::PrintMainPICparameters ()
       amrex::Print() << "                      |   - field_centering_nox = " << WarpX::field_centering_nox << "\n";
       amrex::Print() << "                      |   - field_centering_noy = " << WarpX::field_centering_noy << "\n";
       amrex::Print() << "                      |   - field_centering_noz = " << WarpX::field_centering_noz << "\n";
-      amrex::Print() << "                      |   - current_centering_nox = " << WarpX::current_centering_nox << "\n";
-      amrex::Print() << "                      |   - current_centering_noy = " << WarpX::current_centering_noy << "\n";
-      amrex::Print() << "                      |   - current_centering_noz = " << WarpX::current_centering_noz << "\n";
+      amrex::Print() << "                      |   - current_centering_nox = " << m_current_centering_nox << "\n";
+      amrex::Print() << "                      |   - current_centering_noy = " << m_current_centering_noy << "\n";
+      amrex::Print() << "                      |   - current_centering_noz = " << m_current_centering_noz << "\n";
     }
     else if (dims=="2"){
       amrex::Print() << "                      |   - field_centering_nox = " << WarpX::field_centering_nox << "\n";
       amrex::Print() << "                      |   - field_centering_noz = " << WarpX::field_centering_noz << "\n";
-      amrex::Print() << "                      |   - current_centering_nox = " << WarpX::current_centering_nox << "\n";
-      amrex::Print() << "                      |   - current_centering_noz = " << WarpX::current_centering_noz << "\n";
+      amrex::Print() << "                      |   - current_centering_nox = " << m_current_centering_nox << "\n";
+      amrex::Print() << "                      |   - current_centering_noz = " << m_current_centering_noz << "\n";
      }
     else if (dims=="1"){
       amrex::Print() << "                      |   - field_centering_noz = " << WarpX::field_centering_noz << "\n";
-      amrex::Print() << "                      |   - current_centering_noz = " << WarpX::current_centering_noz << "\n";
+      amrex::Print() << "                      |   - current_centering_noz = " << m_current_centering_noz << "\n";
      }
     }
     if (WarpX::use_hybrid_QED){
@@ -497,16 +527,6 @@ WarpX::PrintMainPICparameters ()
 }
 
 void
-WarpX::WriteUsedInputsFile () const
-{
-    std::string filename = "warpx_used_inputs";
-    ParmParse pp_warpx("warpx");
-    pp_warpx.queryAdd("used_inputs_file", filename);
-
-    ablastr::utils::write_used_inputs_file(filename);
-}
-
-void
 WarpX::InitData ()
 {
     WARPX_PROFILE("WarpX::InitData()");
@@ -539,14 +559,14 @@ WarpX::InitData ()
     if (restart_chkfile.empty())
     {
         ComputeDt();
-        WarpX::PrintDtDxDyDz();
+        ::PrintDtDxDyDz(max_level, geom, dt);
         InitFromScratch();
         InitDiagnostics();
     }
     else
     {
         InitFromCheckpoint();
-        WarpX::PrintDtDxDyDz();
+        ::PrintDtDxDyDz(max_level, geom, dt);
         PostRestart();
         reduced_diags->InitData();
     }
@@ -561,7 +581,7 @@ WarpX::InitData ()
 
     BuildBufferMasks();
 
-    if (WarpX::em_solver_medium == MediumForEM::Macroscopic) {
+    if (m_em_solver_medium == MediumForEM::Macroscopic) {
         const int lev_zero = 0;
         m_macroscopic_properties->InitData(
             Geom(lev_zero),
@@ -574,7 +594,7 @@ WarpX::InitData ()
     m_electrostatic_solver->InitData();
 
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
-        m_hybrid_pic_model->InitData();
+        m_hybrid_pic_model->InitData(m_fields);
     }
 
     if (ParallelDescriptor::IOProcessor()) {
@@ -590,7 +610,7 @@ WarpX::InitData ()
     if (m_implicit_solver) {
         m_implicit_solver->PrintParameters();
     }
-    WriteUsedInputsFile();
+    ::WriteUsedInputsFile();
 
     // Run div cleaner here on loaded external fields
     if (m_do_divb_cleaning_external) {
@@ -733,12 +753,13 @@ WarpX::InitPML ()
             pml_ncell, pml_delta, amrex::IntVect::TheZeroVector(),
             dt[0], nox_fft, noy_fft, noz_fft, grid_type,
             do_moving_window, pml_has_particles, do_pml_in_domain,
-            m_psatd_solution_type, J_in_time, rho_in_time,
+            m_psatd_solution_type, time_dependency_J, time_dependency_rho,
             do_pml_dive_cleaning, do_pml_divb_cleaning,
             amrex::IntVect(0), amrex::IntVect(0),
             eb_enabled,
             guard_cells.ng_FieldSolver.max(),
             v_particle_pml,
+            m_fields,
             do_pml_Lo[0], do_pml_Hi[0]);
 #endif
 
@@ -774,11 +795,12 @@ WarpX::InitPML ()
                 pml_ncell, pml_delta, refRatio(lev-1),
                 dt[lev], nox_fft, noy_fft, noz_fft, grid_type,
                 do_moving_window, pml_has_particles, do_pml_in_domain,
-                m_psatd_solution_type, J_in_time, rho_in_time, do_pml_dive_cleaning, do_pml_divb_cleaning,
+                m_psatd_solution_type, time_dependency_J, time_dependency_rho, do_pml_dive_cleaning, do_pml_divb_cleaning,
                 amrex::IntVect(0), amrex::IntVect(0),
                 eb_enabled,
                 guard_cells.ng_FieldSolver.max(),
                 v_particle_pml,
+                m_fields,
                 do_pml_Lo[lev], do_pml_Hi[lev]);
         }
     }
@@ -1048,20 +1070,25 @@ WarpX::InitLevelData (int lev, Real /*time*/)
     }
 }
 
-void WarpX::ComputeExternalFieldOnGridUsingParser (
-    warpx::fields::FieldType field,
+template<typename T>
+void ComputeExternalFieldOnGridUsingParser_template (
+    const T& field,
     amrex::ParserExecutor<4> const& fx_parser,
     amrex::ParserExecutor<4> const& fy_parser,
     amrex::ParserExecutor<4> const& fz_parser,
     int lev, PatchType patch_type,
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field)
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field,
+    bool use_eb_flags)
 {
-    auto t = gett_new(lev);
+    auto &warpx = WarpX::GetInstance();
+    auto const &geom = warpx.Geom(lev);
 
-    auto dx_lev = geom[lev].CellSizeArray();
-    const RealBox& real_box = geom[lev].ProbDomain();
+    auto t = warpx.gett_new(lev);
 
-    amrex::IntVect refratio = (lev > 0 ) ? RefRatio(lev-1) : amrex::IntVect(1);
+    auto dx_lev = geom.CellSizeArray();
+    const RealBox& real_box = geom.ProbDomain();
+
+    amrex::IntVect refratio = (lev > 0 ) ? WarpX::RefRatio(lev-1) : amrex::IntVect(1);
     if (patch_type == PatchType::coarse) {
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             dx_lev[idim] = dx_lev[idim] * refratio[idim];
@@ -1069,9 +1096,9 @@ void WarpX::ComputeExternalFieldOnGridUsingParser (
     }
 
     using ablastr::fields::Direction;
-    amrex::MultiFab* mfx = m_fields.get(field, Direction{0}, lev);
-    amrex::MultiFab* mfy = m_fields.get(field, Direction{1}, lev);
-    amrex::MultiFab* mfz = m_fields.get(field, Direction{2}, lev);
+    amrex::MultiFab* mfx = warpx.m_fields.get(field, Direction{0}, lev);
+    amrex::MultiFab* mfy = warpx.m_fields.get(field, Direction{1}, lev);
+    amrex::MultiFab* mfz = warpx.m_fields.get(field, Direction{2}, lev);
 
     const amrex::IntVect x_nodal_flag = mfx->ixType().toIntVect();
     const amrex::IntVect y_nodal_flag = mfy->ixType().toIntVect();
@@ -1087,7 +1114,7 @@ void WarpX::ComputeExternalFieldOnGridUsingParser (
         auto const& mfzfab = mfz->array(mfi);
 
         amrex::Array4<int> update_fx_arr, update_fy_arr, update_fz_arr;
-        if (EB::enabled()) {
+        if (use_eb_flags && EB::enabled()) {
             update_fx_arr = eb_update_field[lev][0]->array(mfi);
             update_fy_arr = eb_update_field[lev][1]->array(mfi);
             update_fz_arr = eb_update_field[lev][2]->array(mfi);
@@ -1181,6 +1208,31 @@ void WarpX::ComputeExternalFieldOnGridUsingParser (
     }
 }
 
+void WarpX::ComputeExternalFieldOnGridUsingParser (
+    const std::variant<warpx::fields::FieldType, std::string>& field,
+    amrex::ParserExecutor<4> const& fx_parser,
+    amrex::ParserExecutor<4> const& fy_parser,
+    amrex::ParserExecutor<4> const& fz_parser,
+    int lev, PatchType patch_type,
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field,
+    bool use_eb_flags)
+{
+    if (std::holds_alternative<warpx::fields::FieldType>(field)){
+        ComputeExternalFieldOnGridUsingParser_template<warpx::fields::FieldType> (
+            std::get<warpx::fields::FieldType>(field),
+            fx_parser, fy_parser, fz_parser,
+            lev, patch_type, eb_update_field,
+            use_eb_flags);
+    }
+    else{
+        ComputeExternalFieldOnGridUsingParser_template<std::string> (
+            std::get<std::string>(field),
+            fx_parser, fy_parser, fz_parser,
+            lev, patch_type, eb_update_field,
+            use_eb_flags);
+    }
+}
+
 void WarpX::CheckGuardCells()
 {
     for (int lev = 0; lev <= max_level; ++lev)
@@ -1247,22 +1299,27 @@ void WarpX::InitializeEBGridData (int lev)
                 warpx::embedded_boundary::ScaleAreas(face_areas_lev, CellSize(lev));
 
                 // Compute additional quantities required for the ECT solver
-                MarkExtensionCells();
+                const auto& area_mod = m_fields.get_alldirs(FieldType::area_mod, maxLevel());
+                warpx::embedded_boundary::MarkExtensionCells(
+                    CellSize(maxLevel()), m_flag_info_face[maxLevel()], m_flag_ext_face[maxLevel()],
+                    m_fields.get_alldirs(FieldType::Bfield_fp, maxLevel()),
+                    face_areas_lev,
+                    edge_lengths_lev, area_mod);
                 ComputeFaceExtensions();
 
                 // Mark on which grid points E should be updated
-                MarkUpdateECellsECT( m_eb_update_E[lev], edge_lengths_lev );
+                warpx::embedded_boundary::MarkUpdateECellsECT( m_eb_update_E[lev], edge_lengths_lev );
                 // Mark on which grid points B should be updated
-                MarkUpdateBCellsECT( m_eb_update_B[lev], face_areas_lev, edge_lengths_lev);
+                warpx::embedded_boundary::MarkUpdateBCellsECT( m_eb_update_B[lev], face_areas_lev, edge_lengths_lev);
 
             } else {
                 // Mark on which grid points E should be updated (stair-case approximation)
-                MarkUpdateCellsStairCase(
+                warpx::embedded_boundary::MarkUpdateCellsStairCase(
                     m_eb_update_E[lev],
                     m_fields.get_alldirs(FieldType::Efield_fp, lev),
                     eb_fact );
                 // Mark on which grid points B should be updated (stair-case approximation)
-                MarkUpdateCellsStairCase(
+                warpx::embedded_boundary::MarkUpdateCellsStairCase(
                     m_eb_update_B[lev],
                     m_fields.get_alldirs(FieldType::Bfield_fp, lev),
                     eb_fact );
@@ -1271,7 +1328,7 @@ void WarpX::InitializeEBGridData (int lev)
         }
 
         ComputeDistanceToEB();
-        MarkReducedShapeCells( m_eb_reduce_particle_shape[lev], eb_fact, WarpX::nox );
+        warpx::embedded_boundary::MarkReducedShapeCells( m_eb_reduce_particle_shape[lev], eb_fact, nox, Geom(0).periodicity());
 
     }
 #else
@@ -1462,8 +1519,7 @@ WarpX::ReadExternalFieldFromFile (
        const std::string& F_name, const std::string& F_component)
 {
     // Get WarpX domain info
-    auto& warpx = WarpX::GetInstance();
-    amrex::Geometry const& geom0 = warpx.Geom(0);
+    amrex::Geometry const& geom0 = Geom(0);
     const amrex::RealBox& real_box = geom0.ProbDomain();
     const auto dx = geom0.CellSizeArray();
     const amrex::IntVect nodal_flag = mf->ixType().toIntVect();
@@ -1605,7 +1661,7 @@ WarpX::ReadExternalFieldFromFile (
                     f01 = fc_array(0, iz  , ir+1),
                     f10 = fc_array(0, iz+1, ir  ),
                     f11 = fc_array(0, iz+1, ir+1);
-                mffab(i,j,k) = static_cast<amrex::Real>(utils::algorithms::bilinear_interp<double>
+                mffab(i,j,k) = static_cast<amrex::Real>(ablastr::math::bilinear_interp<double>
                     (xx0, xx0+file_dr, xx1, xx1+file_dz,
                      f00, f01, f10, f11,
                      x0, x1));
@@ -1620,7 +1676,7 @@ WarpX::ReadExternalFieldFromFile (
                     f101 = fc_array(iz+1, iy  , ix+1),
                     f110 = fc_array(iz  , iy+1, ix+1),
                     f111 = fc_array(iz+1, iy+1, ix+1);
-                mffab(i,j,k) = static_cast<amrex::Real>(utils::algorithms::trilinear_interp<double>
+                mffab(i,j,k) = static_cast<amrex::Real>(ablastr::math::trilinear_interp<double>
                     (xx0, xx0+file_dx, xx1, xx1+file_dy, xx2, xx2+file_dz,
                      f000, f001, f010, f011, f100, f101, f110, f111,
                      x0, x1, x2));

@@ -11,6 +11,7 @@
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_DenseBins.H>
+#include <AMReX_Geometry.H>
 #include <AMReX_Particles.H>
 
 #include <AMReX_BaseFwd.H>
@@ -28,34 +29,14 @@ namespace ParticleUtils {
      * particles of a given species present in each cell.
      * Note that this does *not* rearrange particle arrays.
      *
-     * @param[in] lev the index of the refinement level.
+     * @param[in] geom_lev the geometry of the current refinement level.
      * @param[in] mfi the MultiFAB iterator.
      * @param[in] ptile the particle tile.
      */
     amrex::DenseBins<ParticleTileDataType>
-    findParticlesInEachCell (int lev,
-                             const amrex::MFIter & mfi,
+    findParticlesInEachCell (amrex::Geometry const& geom_lev,
+                             amrex::MFIter const & mfi,
                              WarpXParticleContainer::ParticleTileType & ptile);
-
-    /**
-     * \brief Return (relativistic) particle energy given velocity and mass.
-     * Note the use of `double` since this calculation is prone to error with
-     * single precision.
-     *
-     * @param[in] u2 square of particle speed (i.e. u dot u where u = gamma*v)
-     * @param[in] mass particle mass
-     * @param[out] energy particle energy in eV
-     */
-    AMREX_GPU_HOST_DEVICE AMREX_INLINE
-    void getEnergy ( amrex::ParticleReal const u2, double const mass,
-                     double& energy )
-    {
-        using std::sqrt;
-        using namespace amrex::literals;
-
-        constexpr auto c2 = PhysConst::c * PhysConst::c;
-        energy = mass * u2 / (sqrt(1.0_rt + u2 / c2) + 1.0_rt) / PhysConst::q_e;
-    }
 
     /**
      * \brief Return (relativistic) collision energy assuming the target (with

@@ -29,7 +29,7 @@ Note that these commands and the shell scripts all assume the bash shell.
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git /usr/workspace/${USER}/dane/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git /usr/workspace/${USER}/dane/src/warpx
 
 We use system software modules, add environment hints and further dependencies via the file ``$HOME/dane_warpx.profile``.
 Create it now:

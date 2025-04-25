@@ -73,10 +73,10 @@ if [ -d ${SRC_DIR}/adios2 ]
 then
   cd ${SRC_DIR}/adios2
   git fetch --prune
-  git checkout v2.10.1
+  git checkout v2.10.2
   cd -
 else
-  git clone -b v2.10.1 https://github.com/ornladios/ADIOS2.git ${SRC_DIR}/adios2
+  git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git ${SRC_DIR}/adios2
 fi
 cmake \
     --fresh                      \
@@ -87,7 +87,7 @@ cmake \
     -DADIOS2_USE_Fortran=OFF     \
     -DADIOS2_USE_Python=OFF      \
     -DADIOS2_USE_ZeroMQ=OFF      \
-    -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.1
+    -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.2
 cmake \
     --build ${build_dir}/adios2-build \
     --target install                  \
@@ -158,7 +158,7 @@ python3 -m pip install --upgrade pip
 python3 -m pip install --upgrade build
 python3 -m pip install --upgrade packaging
 python3 -m pip install --upgrade wheel
-python3 -m pip install --upgrade setuptools
+python3 -m pip install --upgrade setuptools[core]
 python3 -m pip install --upgrade cython
 python3 -m pip install --upgrade numpy
 python3 -m pip install --upgrade pandas
