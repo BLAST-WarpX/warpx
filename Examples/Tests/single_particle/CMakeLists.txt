@@ -10,3 +10,13 @@ add_warpx_test(
     "analysis_default_regression.py --path diags/diag1000001"  # checksum
     OFF  # dependency
 )
+
+add_warpx_test(
+    test_1d_synchronize_velocity  # name
+    1  # dims
+    1  # nprocs
+    inputs_test_1d_synchronize_velocity  # inputs
+    "analysis_synchronize_velocity.py diags/diag1000005"  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)

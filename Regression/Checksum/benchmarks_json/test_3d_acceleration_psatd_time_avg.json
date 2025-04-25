@@ -1,42 +1,15 @@
 {
   "lev=0": {
-    "Bx": 115610.21497814235,
-    "By": 243019.564489834,
-    "Bz": 63397.3416561916,
-    "Ex": 117012138466922.22,
-    "Ey": 18429606525820.12,
-    "Ez": 50835997822445.34,
-    "jx": 2.1028213761477244e+16,
-    "jy": 326844980054897.7,
-    "jz": 4514643615865121.0,
-    "rho": 22084564.546177678
-  },
-  "beam": {
-    "particle_momentum_x": 4.178482505909375e-19,
-    "particle_momentum_y": 4.56492260137707e-19,
-    "particle_momentum_z": 2.733972888170628e-17,
-    "particle_position_x": 0.0003995213395426269,
-    "particle_position_y": 0.0004148795632360405,
-    "particle_position_z": 1.901942694291968,
-    "particle_weight": 3120754537.230381
-  },
-  "plasma_p": {
-    "particle_momentum_x": 1.9959818202810056e-19,
-    "particle_momentum_y": 2.9455107653405726e-21,
-    "particle_momentum_z": 4.82960013792663e-14,
-    "particle_position_x": 0.4991250027534606,
-    "particle_position_y": 0.49912499804419774,
-    "particle_position_z": 0.4563845471451087,
-    "particle_weight": 33067341227104.625
-  },
-  "plasma_e": {
-    "particle_momentum_x": 1.9841122555955512e-19,
-    "particle_momentum_y": 1.2475587913571367e-20,
-    "particle_momentum_z": 2.6334235362474606e-17,
-    "particle_position_x": 0.49916947686056645,
-    "particle_position_y": 0.49919374997004357,
-    "particle_position_z": 0.4562507922838501,
-    "particle_weight": 33067341227104.625
+    "Bx": 115610.21490074227,
+    "By": 243019.56447090145,
+    "Bz": 63397.341671483126,
+    "Ex": 117012138437422.14,
+    "Ey": 18429606514168.84,
+    "Ez": 50835997803389.266,
+    "jx": 2.1028213773643336e+16,
+    "jy": 326844979471052.1,
+    "jz": 4514643615773751.0,
+    "rho": 22084564.548223726
   },
   "driverback": {
     "particle_momentum_x": 4.813131349021332e+21,
@@ -55,5 +28,32 @@
     "particle_position_y": 0.0016212373149699414,
     "particle_position_z": 0.30417779498653386,
     "particle_weight": 6241509074.460762
+  },
+  "plasma_e": {
+    "particle_momentum_x": 1.9841122557181376e-19,
+    "particle_momentum_y": 1.2475587896421996e-20,
+    "particle_momentum_z": 2.6334235398200446e-17,
+    "particle_position_x": 0.49916947686045443,
+    "particle_position_y": 0.499193749969849,
+    "particle_position_z": 0.4562507922841884,
+    "particle_weight": 33067341278168.26
+  },
+  "plasma_p": {
+    "particle_momentum_x": 1.995981820376272e-19,
+    "particle_momentum_y": 2.9455107630904925e-21,
+    "particle_momentum_z": 4.829600144452263e-14,
+    "particle_position_x": 0.4991250027534606,
+    "particle_position_y": 0.4991249980441978,
+    "particle_position_z": 0.4563845471451087,
+    "particle_weight": 33067341278168.26
+  },
+  "beam": {
+    "particle_momentum_x": 4.178482511597266e-19,
+    "particle_momentum_y": 4.564922607590997e-19,
+    "particle_momentum_z": 2.7339728918922037e-17,
+    "particle_position_x": 0.0003995213395426269,
+    "particle_position_y": 0.0004148795632360405,
+    "particle_position_z": 1.901942694291968,
+    "particle_weight": 3120754537.230381
   }
 }

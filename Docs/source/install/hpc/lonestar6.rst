@@ -28,7 +28,7 @@ Use the following commands to download the WarpX source code and switch to the c
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $WORK/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $WORK/src/warpx
 
 We use system software modules, add environment hints and further dependencies via the file ``$HOME/lonestar6_warpx_a100.profile``.
 Create it now:

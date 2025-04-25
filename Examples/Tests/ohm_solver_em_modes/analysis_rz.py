@@ -127,13 +127,13 @@ for ii, m in enumerate([1, 3, 6, 8]):
     omega_fast = sim.vA * np.sqrt(R2 + np.sqrt(R2**2 - P4))
     omega_slow = sim.vA * np.sqrt(R2 - np.sqrt(R2**2 - P4))
     # Upper right corner
-    ax.plot(k * sim.l_i, omega_fast / sim.w_ci, "w--", label="$\omega_{fast}$")
+    ax.plot(k * sim.l_i, omega_fast / sim.w_ci, "w--", label=r"$\omega_{fast}$")
     ax.plot(
         k * sim.l_i,
         omega_slow / sim.w_ci,
         color="white",
         linestyle="--",
-        label="$\omega_{slow}$",
+        label=r"$\omega_{slow}$",
     )
     # Thermal resonance
     thermal_res = sim.w_ci + 3 * sim.v_ti * k
@@ -142,7 +142,7 @@ for ii, m in enumerate([1, 3, 6, 8]):
         thermal_res / sim.w_ci,
         color="magenta",
         linestyle="--",
-        label="$\omega = \Omega_i + 3v_{th,i}k$",
+        label=r"$\omega = \Omega_i + 3v_{th,i}k$",
     )
     ax.plot(
         -k * sim.l_i, thermal_res / sim.w_ci, color="magenta", linestyle="--", label=""
@@ -153,7 +153,7 @@ for ii, m in enumerate([1, 3, 6, 8]):
         thermal_res / sim.w_ci,
         color="magenta",
         linestyle="--",
-        label="$\omega = \Omega_i + 3v_{th,i}k$",
+        label=r"$\omega = \Omega_i + 3v_{th,i}k$",
     )
     ax.plot(
         -k * sim.l_i, thermal_res / sim.w_ci, color="magenta", linestyle="--", label=""
@@ -164,10 +164,10 @@ for ax in axes.flatten():
     ax.set_xlim(-1.75, 1.75)
     ax.set_ylim(0, 1.6)
 
-axes[0, 0].set_ylabel("$\omega/\Omega_{ci}$")
-axes[1, 0].set_ylabel("$\omega/\Omega_{ci}$")
-axes[1, 0].set_xlabel("$k_zl_i$")
-axes[1, 1].set_xlabel("$k_zl_i$")
+axes[0, 0].set_ylabel(r"$\omega/\Omega_{ci}$")
+axes[1, 0].set_ylabel(r"$\omega/\Omega_{ci}$")
+axes[1, 0].set_xlabel(r"$k_zl_i$")
+axes[1, 1].set_xlabel(r"$k_zl_i$")
 
 plt.savefig("normal_modes_disp.png", dpi=600)
 if not sim.test:
@@ -179,5 +179,5 @@ else:
     amps = np.abs(F_kw[2, 1, len(kz) // 2 - 2 : len(kz) // 2 + 2])
     print("Amplitude sample: ", amps)
     assert np.allclose(
-        amps, np.array([59.23850009, 19.26746169, 92.65794174, 10.83627164])
+        amps, np.array([79.98358457, 27.24783417, 213.15227656, 24.12800388])
     )

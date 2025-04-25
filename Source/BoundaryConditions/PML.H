@@ -146,12 +146,13 @@ public:
          ablastr::utils::enums::GridType grid_type,
          int do_moving_window, int pml_has_particles, int do_pml_in_domain,
          PSATDSolutionType psatd_solution_type,
-         JInTime J_in_time, RhoInTime rho_in_time,
+         TimeDependencyJ time_dependency_J, TimeDependencyRho time_dependency_rho,
          bool do_pml_dive_cleaning, bool do_pml_divb_cleaning,
          const amrex::IntVect& fill_guards_fields,
          const amrex::IntVect& fill_guards_current,
          bool eb_enabled,
          int max_guard_EB, amrex::Real v_sigma_sb,
+         ablastr::fields::MultiFabRegister& fields,
          amrex::IntVect do_pml_Lo = amrex::IntVect::TheUnitVector(),
          amrex::IntVect do_pml_Hi = amrex::IntVect::TheUnitVector());
 
@@ -220,11 +221,6 @@ private:
 
     // Factory for field data
     std::unique_ptr<amrex::FabFactory<amrex::FArrayBox> > pml_field_factory;
-
-    [[nodiscard]] amrex::FabFactory<amrex::FArrayBox> const& fieldFactory () const noexcept
-    {
-        return *pml_field_factory;
-    }
 
 #ifdef AMREX_USE_EB
     [[nodiscard]] amrex::EBFArrayBoxFactory const& fieldEBFactory () const noexcept {

@@ -46,6 +46,13 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
         encoding = openPMD::IterationEncoding::fileBased;
     }
 
+    // BP5 does not support groupBased (metadata explosion)
+    if ((openpmd_backend == "bp5" || openpmd_backend == "bp") &&
+        (encoding == openPMD::IterationEncoding::groupBased))
+    {
+        throw std::runtime_error("BeamMonitor: groupBased encoding not supported for BP5.");
+    }
+
     std::string diag_type_str;
     pp_diag_name.get("diag_type", diag_type_str);
     if (diag_type_str == "BackTransformed")

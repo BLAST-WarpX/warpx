@@ -18,7 +18,6 @@ my_constants.xmin = -0.53
 my_constants.zmin = -0.53
 my_constants.xmax = 0.53
 my_constants.zmax = 0.53
-my_constants.pi = 3.141592653589793
 my_constants.theta = pi/8
 
 warpx.eb_implicit_function = "xr=x*cos(-theta)+z*sin(-theta); zr=-x*sin(-theta)+z*cos(-theta); max(max(xr+xmin,-(xr+xmax)), max(zr+zmin,-(zr+zmax)))"
@@ -29,12 +28,11 @@ my_constants.Lx = 1.06
 my_constants.Lz = 1.06
 my_constants.x_cent = 0.
 my_constants.z_cent = 0.
-my_constants.mu_0 = 1.25663706212e-06
 
 warpx.B_ext_grid_init_style = parse_B_ext_grid_function
 
 warpx.Bx_external_grid_function(x,y,z) = 0
-warpx.By_external_grid_function(x,y,z) = "mu_0 *
+warpx.By_external_grid_function(x,y,z) = "mu0 *
                                           cos(m * pi / Lx * (x*cos(-theta)+z*sin(-theta) - Lx / 2 - x_cent)) *
                                           cos(p * pi / Lz * (-x*sin(-theta)+z*cos(-theta) - Lz / 2 - z_cent))"
 warpx.Bz_external_grid_function(x,y,z) = 0
