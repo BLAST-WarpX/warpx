@@ -15,7 +15,13 @@ curl -L -o amrex-doxygen-web.tag.xml \
 curl -L -o openpmd-api-doxygen-web.tag.xml \
   https://openpmd-api.readthedocs.io/en/latest/_static/doxyhtml/openpmd-api-doxygen-web.tag.xml
 
-# treat all warnings as errors
-echo "WARN_AS_ERROR = YES" >> Doxyfile
+# Treat all warnings as errors
+if ! grep -q "WARN_AS_ERROR = YES" Doxyfile; then
+    # Add line with the comment
+    echo "" >> Doxyfile
+    echo "# Overwrite value of WARN_AS_ERROR" >> Doxyfile
+    echo "WARN_AS_ERROR = YES" >> Doxyfile
+fi
 
+# Run doxygen
 doxygen
