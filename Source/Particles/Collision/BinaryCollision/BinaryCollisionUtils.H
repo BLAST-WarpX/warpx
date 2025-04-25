@@ -65,6 +65,7 @@ namespace BinaryCollisionUtils{
 
         constexpr double c = PhysConst::c;
         constexpr double c_sq = PhysConst::c * PhysConst::c;
+        constexpr double inv_c = 1./PhysConst::c;
 
         // Cast input parameters to double before computing collision properties
         // This is needed to avoid errors when using single-precision particles
@@ -98,15 +99,30 @@ namespace BinaryCollisionUtils{
         // Cast back to chosen precision for output
         E_kin_COM = static_cast<amrex::ParticleReal>(E_star - (m1_dbl + m2_dbl)*c_sq);
 
-        // Square of the norm of the momentum of one of the particles in the center of mass frame
-        // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle
-        // The expression below is specifically written in a form that avoids returning
-        // small negative numbers due to machine precision errors, for low-energy particles
-        const double E_ratio = E_star/((m1_dbl + m2_dbl)*c_sq);
-        const double p_star_sq = m1_dbl*m2_dbl*c_sq * ( powi<2>(E_ratio) - 1.0 )
-            + powi<2>(m1_dbl - m2_dbl)*c_sq/4.0 * powi<2>( E_ratio - 1.0/E_ratio);
+        // Find the norm of the momentum of each particles in the center of mass frame
+        // This is done by solving the following system (in the COM frame)
+        // E_1^2 = p^2 c^2 + m_1^2 c^4  (for the first particle)
+        // E_2^2 = p^2 c^2 + m_2^2 c^4  (for the second particle ; same p since we are in the COM frame)
+        // to find the expression of the p as a function of E = E_1 + E_2.
+        // Here is an abbreviation derivation:
+        // - By summing the above equations
+        // E^2 = E_1^2 + E_2^2 + 2 E_1 E_2 = 2 p^2 c^2 + (m_1^2 + m_2^2) c^4 + 2 E_1 E_2
+        // - Rearranging and squaring
+        // ( E^2 - 2 p^2 c^2 - (m_1^2 + m_2^2) c^4 )^2 = 4 E_1^2 E_2^2 = 4 (p^2 c^2 + m_1^2 c^4) (p^2 c^2 + m_2^2 c^4)
+        // - By rearranging, we get:
+        // p^2 = E^2/4c^2 - (m_1^2 + m_2^2)c^2/2 + (m_1^2-m_2^2)^2 c^6/4E^2
+        double p_star_sq;
+        if (m1_dbl + m2_dbl == 0) {
+            p_star_sq = 0.5 * E_star * inv_c;
+        } else {
+            // The expression below is specifically written in a form that avoids returning
+            // small negative numbers due to machine precision errors, for low-energy particles
+            const double E_ratio = E_star/((m1_dbl + m2_dbl)*c_sq);
+            p_star_sq = m1_dbl*m2_dbl*c_sq * ( powi<2>(E_ratio) - 1.0 )
+                + powi<2>(m1_dbl - m2_dbl)*c_sq/4.0 * powi<2>( E_ratio - 1.0/E_ratio);
+        }
 
-        // Lorentz factors in the center of mass frame
+        // Energy of each particle in the center of mass frame
         const double E1_star = std::sqrt(m1_sq*c_sq + p_star_sq) * c;
         const double E2_star = std::sqrt(m2_sq*c_sq + p_star_sq) * c;
 
@@ -117,9 +133,8 @@ namespace BinaryCollisionUtils{
         // On the other hand, the particle densities (weight over volume) in the lab frame are used.
         // To take this discrepancy into account, it is needed to multiply the
         // collision probability by the ratio between the Lorentz factors in the
-        // COM frame and the Lorentz factors in the lab frame (see
-        // Perez et al., Phys.Plasmas.19.083104 (2012)). The correction factor
-        // is calculated here.
+        // COM frame and the Lorentz factors in the lab frame (see Perez et al.,
+        // Phys.Plasmas.19.083104 (2012)). The correction factor is calculated here.
         lab_to_COM_lorentz_factor = static_cast<amrex::ParticleReal>(E1_star*E2_star/(E1_lab*E2_lab));
     }
 
