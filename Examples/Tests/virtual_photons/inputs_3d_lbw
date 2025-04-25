@@ -14,8 +14,8 @@ my_constants.muz = 4*sigmaz
 my_constants.nmacropart = 1e4
 
 # BOX
-my_constants.Lx = 16*sigmax
-my_constants.Ly = 32*sigmay
+my_constants.Lx = 32*sigmax
+my_constants.Ly = 64*sigmay
 my_constants.Lz = 16*sigmaz
 
 my_constants.nx = 128
@@ -152,26 +152,26 @@ pho2.do_qed_breit_wheeler = 0
 collisions.collision_names = ll bh1 bh2 lbw
 
 lbw.species = pho1 pho2
-lbw.type = photonphoton
+lbw.type = linear_breit_wheeler
 lbw.product_species = ele pos
-lbw.event_multiplier = 1e10
+lbw.event_multiplier = 1e30
 #lbw.probability_threshold = 0.5
 #lbw.probability_target_value = 0.02
 
 ll.species = virtual_photons1 virtual_photons2
-ll.type = photonphoton
+ll.type = linear_breit_wheeler
 ll.product_species = ele pos
-ll.event_multiplier = 1e10
+ll.event_multiplier = 1e30
 
 bh1.species = virtual_photons1 pho2
-bh1.type = photonphoton
+bh1.type = linear_breit_wheeler
 bh1.product_species = ele pos
-bh1.event_multiplier = 1e10
+bh1.event_multiplier = 1e30
 
 bh2.species = pho1 virtual_photons2
-bh2.type = photonphoton
+bh2.type = linear_breit_wheeler
 bh2.product_species = ele pos
-bh2.event_multiplier = 1e10
+bh2.event_multiplier = 1e30
 
 qed_qs.photon_creation_energy_threshold = 0.
 qed_qs.lookup_table_mode = builtin
