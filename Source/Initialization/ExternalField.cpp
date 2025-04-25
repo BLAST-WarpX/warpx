@@ -145,9 +145,9 @@ ExternalFieldParams::ExternalFieldParams(const amrex::ParmParse& pp_warpx)
     // provided in the input file.
     if (E_ext_grid_type == ExternalFieldType::parse_ext_grid_function) {
 
-#if defined(WARPX_DIM_RZ)
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(WarpX::n_rz_azimuthal_modes == 0,
-            "E parser for external fields does not work with cylindrical modes -- TO DO");
+#ifdef WARPX_DIM_RZ
+        WARPX_ABORT_WITH_MESSAGE(
+            "E parser for external fields does not work with RZ -- TO DO");
 #endif
 
         //! Strings storing parser function to initialize the components of the electric field on the grid
