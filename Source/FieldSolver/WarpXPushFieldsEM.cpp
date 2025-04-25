@@ -1528,7 +1528,11 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
             // If Jz is node centered, Jz[0] is located on the boundary.
             // If Jz is cell centered, Jz[0] is at 1/2 dr.
             if (rmin == 0._rt && 1-ishift_z <= i && i <= ngJ[0]-ishift_z) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 Jz_arr(i,j,0,0) += Jz_arr(-ishift_z-i,j,0,0);
+#elif defined(WARPX_DIM_RSPHERE)
+                Jz_arr(i,j,0,0) -= Jz_arr(-ishift_z-i,j,0,0);
+#endif
             }
 
             // Apply the inverse volume scaling
