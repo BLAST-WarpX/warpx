@@ -25,7 +25,7 @@ boundary.field_lo = periodic periodic periodic
 collisions.collision_names = dd_collision
 
 # dd_collision
-dd_collision.fusion_multiplier = 1e10
+dd_collision.event_multiplier = 1e10
 dd_collision.product_species = helium3 neutron
 dd_collision.species = deuterium deuterium
 dd_collision.type = nuclearfusion
