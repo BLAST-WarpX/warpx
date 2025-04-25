@@ -4,8 +4,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef WARPX_PSATD_ALGORITHM_J_LINEAR_IN_TIME_H_
-#define WARPX_PSATD_ALGORITHM_J_LINEAR_IN_TIME_H_
+#ifndef WARPX_PSATD_ALGORITHM_JRHOM_SECOND_ORDER_H_
+#define WARPX_PSATD_ALGORITHM_JRHOM_SECOND_ORDER_H_
 
 #include "FieldSolver/SpectralSolver/SpectralFieldData.H"
 #include "FieldSolver/SpectralSolver/SpectralKSpace.H"
@@ -24,17 +24,17 @@
 
 #if WARPX_USE_FFT
 /*
- * \brief Class that updates the fields in spectral space according to the multi-J algorithm
+ * \brief Class that updates the fields in spectral space according to the PSATD-JRhom algorithm
  *        and stores the coefficients of the corresponding update equations. J is assumed to be
  *        linear in time and two currents, deposited at the beginning and the end of the time step,
  *        are used for the PSATD update equations, instead of only one current deposited at half time.
  */
-class PsatdAlgorithmJLinearInTime : public SpectralBaseAlgorithm
+class PsatdAlgorithmJRhomSecondOrder : public SpectralBaseAlgorithm
 {
     public:
 
         /**
-         * \brief Constructor of the class PsatdAlgorithmJLinearInTime
+         * \brief Constructor of the class PsatdAlgorithmJRhomSecondOrder
          *
          * \param[in] spectral_kspace spectral space
          * \param[in] dm distribution mapping
@@ -44,11 +44,14 @@ class PsatdAlgorithmJLinearInTime : public SpectralBaseAlgorithm
          * \param[in] norder_z order of the spectral solver along z
          * \param[in] grid_type type of grid (collocated or not)
          * \param[in] dt time step of the simulation
+         * \param[in] update_with_rho whether the update equation for E uses rho or not
          * \param[in] time_averaging whether to use time averaging for large time steps
          * \param[in] dive_cleaning Update F as part of the field update, so that errors in divE=rho propagate away at the speed of light
          * \param[in] divb_cleaning Update G as part of the field update, so that errors in divB=0 propagate away at the speed of light
+         * \param[in] time_dependency_J time dependency of J within one time step
+         * \param[in] time_dependency_rho time dependency of rho within one time step
          */
-        PsatdAlgorithmJLinearInTime (
+        PsatdAlgorithmJRhomSecondOrder (
             const SpectralKSpace& spectral_kspace,
             const amrex::DistributionMapping& dm,
             const SpectralFieldIndex& spectral_index,
@@ -57,13 +60,16 @@ class PsatdAlgorithmJLinearInTime : public SpectralBaseAlgorithm
             int norder_z,
             ablastr::utils::enums::GridType grid_type,
             amrex::Real dt,
+            bool update_with_rho,
             bool time_averaging,
             bool dive_cleaning,
-            bool divb_cleaning
+            bool divb_cleaning,
+            TimeDependencyJ time_dependency_J,
+            TimeDependencyRho time_dependency_rho
         );
 
         /**
-         * \brief Updates the E and B fields in spectral space, according to the multi-J PSATD equations
+         * \brief Updates the E and B fields in spectral space, according to the PSATD-JRhom equations
          *
          * \param[in,out] f all the fields in spectral space
          */
@@ -120,13 +126,16 @@ class PsatdAlgorithmJLinearInTime : public SpectralBaseAlgorithm
 
         // These real and complex coefficients are always allocated
         SpectralRealCoefficients C_coef, S_ck_coef;
-        SpectralRealCoefficients X1_coef, X2_coef, X3_coef, X5_coef, X6_coef;
+        SpectralRealCoefficients Y1_coef, Y2_coef, Y3_coef, Y4_coef, Y5_coef, Y6_coef, Y7_coef, Y8_coef;
 
         // Other member variables
         amrex::Real m_dt;
+        bool m_update_with_rho;
         bool m_time_averaging;
         bool m_dive_cleaning;
         bool m_divb_cleaning;
+        TimeDependencyJ m_time_dependency_J;
+        TimeDependencyRho m_time_dependency_rho;
 };
 #endif // WARPX_USE_FFT
-#endif // WARPX_PSATD_ALGORITHM_J_LINEAR_IN_TIME_H_
+#endif // WARPX_PSATD_ALGORITHM_JRHOM_SECOND_ORDER_H_

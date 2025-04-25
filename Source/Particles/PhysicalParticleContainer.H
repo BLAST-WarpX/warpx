@@ -101,6 +101,7 @@ public:
                  amrex::Real dt,
                  DtType a_dt_type=DtType::Full,
                  bool skip_deposition=false,
+                 bool deposit_mass_matrices=false,
                  PushType push_type=PushType::Explicit) override;
 
     virtual void PushPX (WarpXParIter& pti,

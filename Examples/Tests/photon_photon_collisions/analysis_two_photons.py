@@ -22,7 +22,7 @@ def get_input_parameters():
 
 
 # check that the photons have been completely transformed into pairs:
-# because the fusion multiplier is 1, as soon as a linear Breit-Wheeler event occurs,
+# because the event multiplier is 1, as soon as a linear Breit-Wheeler event occurs,
 # the two photons must disappear and 2 electron-positron pairs must be generated
 def check_final_macroparticles():
     (w1, w2) = get_input_parameters()
