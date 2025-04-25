@@ -1438,12 +1438,10 @@ void doGatherPicnicShapeN (
     amrex::Real const xp_old = xp_n;
     amrex::Real const yp_old = yp_n;
     amrex::Real const zp_old = zp_n;
-    amrex::Real const rpxy_new = std::sqrt(xp_new*xp_new + yp_new*yp_new);
-    amrex::Real const rpxy_old = std::sqrt(xp_old*xp_old + yp_old*yp_old);
-    amrex::Real const rpxy_mid = (rpxy_new + rpxy_old)/2._rt;
+    amrex::Real const rpxy_mid = std::sqrt(xp_mid*xp_mid + yp_mid*yp_mid);
     amrex::Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new + zp_new*zp_new);
     amrex::Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old + zp_old*zp_old);
-    amrex::Real const rp_mid = (rp_new + rp_old)/2._rt;
+    amrex::Real const rp_mid = (rp_new + rp_old)*0.5_rt;
 
     amrex::Real const costheta_mid = (rpxy_mid > 0. ? xp_mid/rpxy_mid : 1._rt);
     amrex::Real const sintheta_mid = (rpxy_mid > 0. ? yp_mid/rpxy_mid : 0._rt);
