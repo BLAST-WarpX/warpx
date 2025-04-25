@@ -68,6 +68,8 @@ void SingleLinearBreitWheelerCollisionEvent (const amrex::ParticleReal& u1x, con
 {
     amrex::ParticleReal E_coll, v_coll, lab_to_COM_factor;
 
+    // By convention in WarpX, the momentum of photons is normalized by m_e
+    // i.e. `p = m_e u`.
     constexpr amrex::ParticleReal me = PhysConst::m_e;
     BinaryCollisionUtils::get_collision_parameters(
         me*u1x, me*u1y, me*u1z, me*u2x, me*u2y, me*u2z, 0, 0,
