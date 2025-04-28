@@ -91,12 +91,6 @@ public:
      * \param[in]     a_Fz_x_lo the parser for the tangential field at the boundary
      * \param[in]     a_Fy_x_hi the parser for the tangential field at the boundary
      * \param[in]     a_Fz_x_hi the parser for the tangential field at the boundary
-     * \param[in]     set_F_y_lo whether the tangential field at the boundary was specified
-     * \param[in]     set_F_y_hi whether the tangential field at the boundary was specified
-     * \param[in]     a_Fx_y_lo the parser for the tangential field at the boundary
-     * \param[in]     a_Fz_y_lo the parser for the tangential field at the boundary
-     * \param[in]     a_Fx_y_hi the parser for the tangential field at the boundary
-     * \param[in]     a_Fz_y_hi the parser for the tangential field at the boundary
      * \param[in]     set_F_z_lo whether the tangential field at the boundary was specified
      * \param[in]     set_F_z_hi whether the tangential field at the boundary was specified
      * \param[in]     a_Fx_z_lo the parser for the tangential field at the boundary

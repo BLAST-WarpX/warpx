@@ -18,12 +18,12 @@
  *  This class mainly contains a function that
  *  computes the total charge at the surface
  *  of the embedded boundary, by using the formula
- *  $Q_{tot} = \epsilon_0 \iint dS \cdot E$
+ *  \f$Q_{tot} = \epsilon_0 \int\int dS \cdot E\f$
  *  where the integral is performed over the
  *  surface of the embedded boundary.
  *
  *  If a weighting function is provided, this computes
- *  $Q_{tot} = \epsilon_0 \iint dS \cdot E \times weighting(x, y, z)
+ *  \f$Q_{tot} = \epsilon_0 \int\int dS \cdot E \times w(x, y, z)\f$
  */
 class ChargeOnEB : public ReducedDiags
 {
@@ -37,7 +37,7 @@ public:
 
     /**
      * This function computes the charge at the surface of the EB:
-     * $Q_{tot} = \epsilon_0 \iint dS \cdot E$
+     * \f$Q_{tot} = \epsilon_0 \int\int dS \cdot E\f$
      *  where the integral is performed over the EB surface
      *
      * @param[in] step current time step

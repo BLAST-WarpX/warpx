@@ -24,6 +24,7 @@ struct SelectParticles
     /**
      * \brief Constructor of SelectParticles functor.
      *
+     * @param[in] pc                 WarpX particle container
      * @param[in] a_pti              WarpX particle iterator
      * @param[in] current_z_boost    current z-position of the slice in boosted frame
      * @param[in] old_z_boost        previous z-position of the slice in boosted frame
@@ -78,6 +79,7 @@ struct LorentzTransformParticles
     /**
      * \brief Constructor of the LorentzTransformParticles functor.
      *
+     * @param[in] pc                 WarpX particle container
      * @param[in] a_pti              WarpX particle iterator
      * @param[in] t_boost            time in boosted frame
      * @param[in] dt                 timestep in boosted-frame

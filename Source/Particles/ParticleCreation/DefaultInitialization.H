@@ -94,7 +94,7 @@ namespace ParticleCreation {
      * first n_external_attr_real real attributes and the first n_external_attr_int integer
      * attributes, which have been in principle externally set elsewhere.
      *
-     * @tparam[in] The type of the particle tile to operate on (e.g. could use different allocators)
+     * @tparam PTile The type of the particle tile to operate on (e.g. could use different allocators)
      * @param[inout] ptile the tile in which attributes are initialized
      * @param[in] n_external_attr_real The number of real attributes that have been externally set.
      * These are NOT initialized by this function.

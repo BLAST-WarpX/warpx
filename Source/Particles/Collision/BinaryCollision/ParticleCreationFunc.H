@@ -69,6 +69,7 @@ public:
      *
      * @param[in] n_total_pairs how many binary collisions have been performed in this tile
      * @param[in, out] ptile1,ptile2 the particle tiles of the two colliding species
+     * @param[in, out] pc_products particle container of the product particles.
      * @param[out] tile_products array containing tile data of the product particles.
      * @param[in] m1 mass of the first colliding particle species
      * @param[in] m2 mass of the second colliding particle species

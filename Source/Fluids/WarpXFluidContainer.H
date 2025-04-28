@@ -59,6 +59,7 @@ public:
      *
      * \brief Advective term, cold-rel. fluids
      *
+     * \param m_fields reference to MultiFab register storing all fields
      * \param[in] lev refinement level
      */
     void AdvectivePush_Muscl (ablastr::fields::MultiFabRegister& m_fields, int lev);
@@ -70,6 +71,7 @@ public:
      *
      * \brief Apply non-periodic BC to fluids and communicate boundaries
      *
+     * \param m_fields reference to MultiFab register storing all fields
      * \param[in] lev refinement level
      */
     void ApplyBcFluidsAndComms (ablastr::fields::MultiFabRegister& m_fields, int lev);
@@ -81,6 +83,7 @@ public:
      *
      * \brief Centrifugal source term
      *
+     * \param m_fields reference to MultiFab register storing all fields
      * \param[in] lev refinement level
      */
     void centrifugal_source_rz (ablastr::fields::MultiFabRegister& m_fields, int lev);
@@ -92,7 +95,7 @@ public:
      *
      * \brief Lorentz Momentum Source
      *
-     * \param[in] lev refinement level
+     * \param[in,out] m_fields TODO
      * \param[in] Ex Yee electric field (x)
      * \param[in] Ey Yee electric field (y)
      * \param[in] Ez Yee electric field (z)
@@ -100,6 +103,7 @@ public:
      * \param[in] By Yee magnetic field (y)
      * \param[in] Bz Yee magnetic field (z)
      * \param[in] t Current time
+     * \param[in] lev refinement level
      */
     void GatherAndPush (ablastr::fields::MultiFabRegister& m_fields,
         const amrex::MultiFab& Ex, const amrex::MultiFab& Ey, const amrex::MultiFab& Ez,
@@ -112,10 +116,11 @@ public:
      *
      * \brief Deposit fluid current density.
      *
-     * \param[in] lev refinement level
+     * \param[in,out] m_fields TODO
      * \param[in,out] jx current density MultiFab x comp.
      * \param[in,out] jy current density MultiFab y comp.
      * \param[in,out] jz current density MultiFab z comp.
+     * \param[in] lev refinement level
      */
     void DepositCurrent (ablastr::fields::MultiFabRegister& m_fields,
         amrex::MultiFab& jx, amrex::MultiFab& jy, amrex::MultiFab& jz, int lev);
@@ -126,8 +131,10 @@ public:
      *
      * \brief Deposit fluid charge density.
      *
-     * \param[in] lev refinement level
+     * \param m_fields reference to MultiFab register storing all fields
      * \param[in,out] rho charge density MultiFab.
+     * \param[in] lev refinement level
+     * \param[in] icomp TODO
      */
     void DepositCharge (ablastr::fields::MultiFabRegister& m_fields, amrex::MultiFab &rho, int lev, int icomp = 0);
 

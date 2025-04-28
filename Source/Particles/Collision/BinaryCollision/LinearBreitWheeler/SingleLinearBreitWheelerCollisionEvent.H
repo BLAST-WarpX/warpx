@@ -27,7 +27,7 @@
  * If the electron-positron pair is produced, the mask is set to true for that given pair
  * of macrophotons and the weight of the produced particles is stored in p_pair_reaction_weight.
  *
- * Note that the word <<pair>> sometimes refers to the electron-positron products of the collision,
+ * Note that the word 'pair' sometimes refers to the electron-positron products of the collision,
  * sometimes to the macrophotons that are paired to collide in a cell according to the algorithm.
  * It should be clear from the context.
  *

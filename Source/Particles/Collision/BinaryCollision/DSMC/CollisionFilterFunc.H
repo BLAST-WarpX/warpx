@@ -31,7 +31,7 @@
  * @param[in] multiplier factor by which the collision probability is increased to
  *            account for all other possible binary collision partners.
  * @param[in] process_count number of scattering processes to consider.
- * @param[in] scattering processes an array of scattering processes included for consideration.
+ * @param[in] scattering_processes an array of scattering processes included for consideration.
  * @param[in] engine the random engine.
  */
 template <int max_process_count, typename index_type>

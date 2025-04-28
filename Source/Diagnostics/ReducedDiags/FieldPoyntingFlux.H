@@ -45,8 +45,6 @@ public:
      * \brief This function computes the electromagnetic Poynting flux,
      * obtained by integrating the electromagnetic Poynting flux density g = eps0 * (E x B)
      * on the surface of the domain.
-     *
-     * \param[in] step current time step
      */
     void ComputePoyntingFlux ();
 

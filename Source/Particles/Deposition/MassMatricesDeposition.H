@@ -426,10 +426,10 @@ void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
 
 /**
  * \brief Kernel for the Villasenor deposition of J and S (mass matrices) for thread thread_num
- * \param depos_order  deposition order
+ * \tparam depos_order  deposition order
  * \param xp_old,yp_old,zp_old     Old particle positions (nominally at start of step)
  * \param xp_new,yp_new,zp_new     New particle positions (nominally at end of step)
- * \param wp_invvol                Particle charge / volume
+ * \param wq_invvol                Particle charge / volume
  * \param uxp_mid,uyp_mid,uzp_mid  Particle momentum at middle of step
  * \param gaminv                   One over gamma for particle at middle of step
  * \param fpxx,fpyy,fpzz           The diagonal mass matrix kernels
@@ -954,12 +954,12 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
 
 /**
  * \brief Villasenor and Buneman deposition of J and mass matrices for thread thread_num
- * \param depos_order  deposition order
- * \param xp_n,yp_n,zp_n           Pointer to arrays of particle position at time level n.
+ * \tparam depos_order  deposition order
+ * \param xp_n_data,yp_n_data,zp_n_data  Pointer to arrays of particle position at time level n.
  * \param GetPosition              A functor for returning the particle position.
  * \param wp                       Pointer to array of particle weights.
  * \param uxp_n,uyp_n,uzp_n        Pointer to arrays of particle momentum at time level n.
- * \param uxp_nph,uyp_nph,uzp_nph  Pointer to arrays of particle momentum at time level n + 1/2.
+ * \param uxp,uyp,uzp              Pointer to arrays of particle momentum at time level n + 1/2.
  * \param Jx_arr,Jy_arr,Jz_arr     Array4 of the current density, either full array or tile.
  * \param Sx_arr,Sy_arr,Sz_arr     Array4 of the mass matrices, either full array or tile.
  * \param Bx_arr,By_arr,Bz_arr     Array4 of the magnetic field, either full array or tile.

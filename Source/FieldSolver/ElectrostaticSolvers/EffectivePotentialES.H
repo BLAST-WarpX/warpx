@@ -37,6 +37,11 @@ public:
 
     void ComputeSigma ( amrex::MultiFab& sigma ) const;
 
+    void computePhi (
+        ablastr::fields::MultiLevelScalarField const& rho,
+        ablastr::fields::MultiLevelScalarField const& phi
+    ) const;
+
     /**
      * Compute the potential `phi` by solving the semi-implicit Poisson equation using the Effective Potential method
      * with `rho` as the source.
@@ -44,18 +49,14 @@ public:
      *  \f[
      *      \vec{\nabla}\cdot(\sigma\vec{\nabla}) \phi = -\frac{\rho}{\epsilon_0}
      *  \f]
-     * \param[out] phi The potential to be computed by this function
      * \param[in] rho The total charge density
+     * \param[out] phi The potential to be computed by this function
      * \param[in] sigma Represents the modified dielectric
      * \param[in] required_precision The relative convergence threshold for the MLMG solver
      * \param[in] absolute_tolerance The absolute convergence threshold for the MLMG solver
      * \param[in] max_iters The maximum number of iterations allowed for the MLMG solver
      * \param[in] verbosity The verbosity setting for the MLMG solver
      */
-    void computePhi (
-        ablastr::fields::MultiLevelScalarField const& rho,
-        ablastr::fields::MultiLevelScalarField const& phi
-    ) const;
     void computePhi (
         ablastr::fields::MultiLevelScalarField const& rho,
         ablastr::fields::MultiLevelScalarField const& phi,

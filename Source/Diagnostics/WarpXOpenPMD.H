@@ -306,7 +306,6 @@ private:
    * @param[in] int_comp_names The int attribute names, from WarpX
    * @param[in] charge         Charge of the particles (note: fix for ions)
    * @param[in] mass           Mass of the particles
-   * @param[inout] ParticleFlushOffset previously flushed number of particles in BTD
    * @param[in] isBTD is this a backtransformed diagnostics (BTD) write?
    * @param[in] isLastBTDFlush is this the last time we will flush this BTD station?
    */
