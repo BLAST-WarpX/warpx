@@ -13,4 +13,3 @@ AMREX_ENUM (LinearSolverType,
 );
 
 #endif
-
