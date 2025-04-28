@@ -114,7 +114,7 @@ ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name) :
     amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
                           m_h_stencil_coefs_z.begin(), m_h_stencil_coefs_z.end(),
                           m_stencil_coefs_z.begin());
-    amrex::Gpu::synchronize();
+    amrex::Gpu::streamSynchronize();
 }
 
 void
@@ -256,9 +256,10 @@ ProjectionDivCleaner::setSourceFromBfield ()
     // This function will compute -divB and store it in the source multifab
     for (int ilev = 0; ilev < m_levels; ++ilev)
     {
-        const auto& Bx = warpx.m_fields.get(m_field_name, Direction{0}, ilev);
-        const auto& By = warpx.m_fields.get(m_field_name, Direction{1}, ilev);
-        const auto& Bz = warpx.m_fields.get(m_field_name, Direction{2}, ilev);
+        // Grab B-field multifabs at this level
+        amrex::MultiFab* Bx = warpx.m_fields.get(m_field_name, Direction{0}, ilev);
+        amrex::MultiFab* By = warpx.m_fields.get(m_field_name, Direction{1}, ilev);
+        amrex::MultiFab* Bz = warpx.m_fields.get(m_field_name, Direction{2}, ilev);
 
         // Synchronize the ghost cells, do halo exchange
         // This is done to ensure the boundaries ae filled prior to
@@ -284,9 +285,7 @@ ProjectionDivCleaner::setSourceFromBfield ()
         WarpX::ComputeDivB(
             *m_source[ilev],
             0,
-            {warpx.m_fields.get(m_field_name, Direction{0}, ilev),
-             warpx.m_fields.get(m_field_name, Direction{1}, ilev),
-             warpx.m_fields.get(m_field_name, Direction{2}, ilev)},
+            {Bx, By, Bz},
             WarpX::CellSize(0)
             );
 
