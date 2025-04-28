@@ -401,9 +401,7 @@ protected:
     bool m_save_previous_position = false;
 
     // flags for work computation
-    bool m_do_compute_wx = false;
-    bool m_do_compute_wy = false;
-    bool m_do_compute_wz = false;
+    bool m_do_compute_work = false;
 
 #ifdef WARPX_QED
     // A flag to enable quantum_synchrotron process for leptons

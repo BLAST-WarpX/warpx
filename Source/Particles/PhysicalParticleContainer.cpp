@@ -387,16 +387,10 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     }
 
     // Work compute
-    pp_species_name.query("do_compute_wx", m_do_compute_wx);
-    pp_species_name.query("do_compute_wy", m_do_compute_wy);
-    pp_species_name.query("do_compute_wz", m_do_compute_wz);
-    if (m_do_compute_wx) {
+    pp_species_name.query("do_compute_work", m_do_compute_work);
+    if (m_do_compute_work) {
         AddRealComp("wx");
-    }
-    if (m_do_compute_wy) {
         AddRealComp("wy");
-    }
-    if (m_do_compute_wz) {
         AddRealComp("wz");
     }
 
@@ -2639,16 +2633,12 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
         amrex::ignore_unused(x_old, y_old);
     }
 
-    enum wx_flags : int { no_wx, do_wx };
-    enum wy_flags : int { no_wy, do_wy };
-    enum wz_flags : int { no_wz, do_wz };
-    const int compute_wx_runtime_flag = m_do_compute_wx ? do_wx : no_wx;
-    const int compute_wy_runtime_flag = m_do_compute_wy ? do_wy : no_wy;
-    const int compute_wz_runtime_flag = m_do_compute_wz ? do_wz : no_wz;
+    enum work_flags : int { no_work, do_work };
+    const int compute_work_runtime_flag = m_do_compute_work ? do_work : no_work;
 
-    ParticleReal* wx = m_do_compute_wx ? pti.GetAttribs("wx").dataPtr() : nullptr;
-    ParticleReal* wy = m_do_compute_wy ? pti.GetAttribs("wy").dataPtr() : nullptr;
-    ParticleReal* wz = m_do_compute_wz ? pti.GetAttribs("wz").dataPtr() : nullptr;
+    ParticleReal* wx = m_do_compute_work ? pti.GetAttribs("wx").dataPtr() : nullptr;
+    ParticleReal* wy = m_do_compute_work ? pti.GetAttribs("wy").dataPtr() : nullptr;
+    ParticleReal* wz = m_do_compute_work ? pti.GetAttribs("wz").dataPtr() : nullptr;
 
     // Loop over the particles and update their momentum
     const amrex::ParticleReal q = this->charge;
@@ -2686,10 +2676,10 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     // improves performance when qed or external EB are not used by reducing
     // register pressure.
     amrex::ParallelFor(
-        TypeList<CompileTimeOptions<no_exteb,has_exteb>, CompileTimeOptions<no_qed  ,has_qed>, CompileTimeOptions<no_wx, do_wx>, CompileTimeOptions<no_wy, do_wy>, CompileTimeOptions<no_wz, do_wz>>{},
-        {exteb_runtime_flag, qed_runtime_flag, compute_wx_runtime_flag, compute_wy_runtime_flag, compute_wz_runtime_flag},
+        TypeList<CompileTimeOptions<no_exteb,has_exteb>, CompileTimeOptions<no_qed  ,has_qed>, CompileTimeOptions<no_work, do_work>>{},
+        {exteb_runtime_flag, qed_runtime_flag, compute_work_runtime_flag},
         np_to_push,
-        [=] AMREX_GPU_DEVICE (long ip, auto exteb_control, auto qed_control, auto compute_wx_control, auto compute_wy_control, auto compute_wz_control)
+        [=] AMREX_GPU_DEVICE (long ip, auto exteb_control, auto qed_control, auto compute_work_control)
     {
         amrex::ParticleReal xp, yp, zp;
         getPosition(ip, xp, yp, zp);
@@ -2752,13 +2742,9 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
             [[maybe_unused]] const auto& wy_tmp = wy;
             [[maybe_unused]] const auto& wz_tmp = wz;
 
-            if constexpr (compute_wx_control == do_wx) {
+            if constexpr (compute_work_control == do_work) {
                 wx[ip] += dt * ux[ip] * q * Exp;
-            }
-            if constexpr (compute_wy_control == do_wy) {
                 wy[ip] += dt * uy[ip] * q * Eyp;
-            }
-            if constexpr (compute_wz_control == do_wz) {
                 wz[ip] += dt * uz[ip] * q * Ezp;
             }
         }
