@@ -82,7 +82,7 @@ mass = {
     "helium4": 4.00260325413 * scc.m_u,
     "neutron": 1.0013784193052508 * scc.m_p,
 }
-m_reduced = np.product([mass[s] for s in reactant_species]) / np.sum(
+m_reduced = np.prod([mass[s] for s in reactant_species]) / np.sum(
     [mass[s] for s in reactant_species]
 )
 

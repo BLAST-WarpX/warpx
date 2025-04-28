@@ -23,7 +23,7 @@ import yt
 
 tolerance = 1.0e-8
 x0 = 0.12238072
-y0 = 0.00965394
+y0 = 0.00965395
 z0 = 4.31754477
 
 filename = sys.argv[1]

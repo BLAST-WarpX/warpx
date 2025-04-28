@@ -206,6 +206,15 @@ namespace
         // TODO: check memory per MPI rank, especially if GPUs are underutilized
         // TODO: CPU tiling hints with OpenMP
     }
+
+    /** Write a file that record all inputs: inputs file + command line options */
+    void WriteUsedInputsFile ()
+    {
+        std::string filename = "warpx_used_inputs";
+        ParmParse pp_warpx("warpx");
+        pp_warpx.queryAdd("used_inputs_file", filename);
+        ablastr::utils::write_used_inputs_file(filename);
+    }
 }
 
 void
@@ -410,21 +419,21 @@ WarpX::PrintMainPICparameters ()
     if (WarpX::do_divb_cleaning) {
       amrex::Print() << "                      | - div(B) cleaning is ON \n";
       }
-    if (do_multi_J){
-      amrex::Print() << "                      | - multi-J deposition is ON \n";
-      amrex::Print() << "                      |   - do_multi_J_n_depositions = "
-                                        << WarpX::do_multi_J_n_depositions << "\n";
-      if (J_in_time == JInTime::Linear){
-        amrex::Print() << "                      |   - J_in_time = linear \n";
+    if (m_JRhom == 1){
+      amrex::Print() << "                      | - PSATD-JRhom deposition is ON \n";
+      amrex::Print() << "                      |   - m_JRhom_subintervals = "
+                                        << WarpX::m_JRhom_subintervals << "\n";
+      if (time_dependency_J == TimeDependencyJ::Linear){
+        amrex::Print() << "                      |   - time_dependency_J = linear \n";
       }
-      if (J_in_time == JInTime::Constant){
-        amrex::Print() << "                      |   - J_in_time = constant \n";
+      if (time_dependency_J == TimeDependencyJ::Constant){
+        amrex::Print() << "                      |   - time_dependency_J = constant \n";
       }
-      if (rho_in_time == RhoInTime::Linear){
-        amrex::Print() << "                      |   - rho_in_time = linear \n";
+      if (time_dependency_rho == TimeDependencyRho::Linear){
+        amrex::Print() << "                      |   - time_dependency_rho = linear \n";
       }
-      if (rho_in_time == RhoInTime::Constant){
-        amrex::Print() << "                      |   - rho_in_time = constant \n";
+      if (time_dependency_rho == TimeDependencyRho::Constant){
+        amrex::Print() << "                      |   - time_dependency_rho = constant \n";
       }
     }
     if (fft_do_time_averaging){
@@ -518,16 +527,6 @@ WarpX::PrintMainPICparameters ()
 }
 
 void
-WarpX::WriteUsedInputsFile () const
-{
-    std::string filename = "warpx_used_inputs";
-    ParmParse pp_warpx("warpx");
-    pp_warpx.queryAdd("used_inputs_file", filename);
-
-    ablastr::utils::write_used_inputs_file(filename);
-}
-
-void
 WarpX::InitData ()
 {
     WARPX_PROFILE("WarpX::InitData()");
@@ -611,7 +610,7 @@ WarpX::InitData ()
     if (m_implicit_solver) {
         m_implicit_solver->PrintParameters();
     }
-    WriteUsedInputsFile();
+    ::WriteUsedInputsFile();
 
     // Run div cleaner here on loaded external fields
     if (m_do_divb_cleaning_external) {
@@ -754,7 +753,7 @@ WarpX::InitPML ()
             pml_ncell, pml_delta, amrex::IntVect::TheZeroVector(),
             dt[0], nox_fft, noy_fft, noz_fft, grid_type,
             do_moving_window, pml_has_particles, do_pml_in_domain,
-            m_psatd_solution_type, J_in_time, rho_in_time,
+            m_psatd_solution_type, time_dependency_J, time_dependency_rho,
             do_pml_dive_cleaning, do_pml_divb_cleaning,
             amrex::IntVect(0), amrex::IntVect(0),
             eb_enabled,
@@ -796,7 +795,7 @@ WarpX::InitPML ()
                 pml_ncell, pml_delta, refRatio(lev-1),
                 dt[lev], nox_fft, noy_fft, noz_fft, grid_type,
                 do_moving_window, pml_has_particles, do_pml_in_domain,
-                m_psatd_solution_type, J_in_time, rho_in_time, do_pml_dive_cleaning, do_pml_divb_cleaning,
+                m_psatd_solution_type, time_dependency_J, time_dependency_rho, do_pml_dive_cleaning, do_pml_divb_cleaning,
                 amrex::IntVect(0), amrex::IntVect(0),
                 eb_enabled,
                 guard_cells.ng_FieldSolver.max(),
@@ -1073,7 +1072,7 @@ WarpX::InitLevelData (int lev, Real /*time*/)
 
 template<typename T>
 void ComputeExternalFieldOnGridUsingParser_template (
-    T field,
+    const T& field,
     amrex::ParserExecutor<4> const& fx_parser,
     amrex::ParserExecutor<4> const& fy_parser,
     amrex::ParserExecutor<4> const& fz_parser,
@@ -1210,7 +1209,7 @@ void ComputeExternalFieldOnGridUsingParser_template (
 }
 
 void WarpX::ComputeExternalFieldOnGridUsingParser (
-    warpx::fields::FieldType field,
+    const std::variant<warpx::fields::FieldType, std::string>& field,
     amrex::ParserExecutor<4> const& fx_parser,
     amrex::ParserExecutor<4> const& fy_parser,
     amrex::ParserExecutor<4> const& fz_parser,
@@ -1218,57 +1217,20 @@ void WarpX::ComputeExternalFieldOnGridUsingParser (
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field,
     bool use_eb_flags)
 {
-    ComputeExternalFieldOnGridUsingParser_template<warpx::fields::FieldType> (
-        field,
-        fx_parser, fy_parser, fz_parser,
-        lev, patch_type, eb_update_field,
-        use_eb_flags);
-}
-
-void WarpX::ComputeExternalFieldOnGridUsingParser (
-    std::string const& field,
-    amrex::ParserExecutor<4> const& fx_parser,
-    amrex::ParserExecutor<4> const& fy_parser,
-    amrex::ParserExecutor<4> const& fz_parser,
-    int lev, PatchType patch_type,
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field,
-    bool use_eb_flags)
-{
-    ComputeExternalFieldOnGridUsingParser_template<std::string const&> (
-        field,
-        fx_parser, fy_parser, fz_parser,
-        lev, patch_type, eb_update_field,
-        use_eb_flags);
-}
-
-void WarpX::ComputeExternalFieldOnGridUsingParser (
-    warpx::fields::FieldType field,
-    amrex::ParserExecutor<4> const& fx_parser,
-    amrex::ParserExecutor<4> const& fy_parser,
-    amrex::ParserExecutor<4> const& fz_parser,
-    int lev, PatchType patch_type,
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field)
-{
-    ComputeExternalFieldOnGridUsingParser_template<warpx::fields::FieldType> (
-        field,
-        fx_parser, fy_parser, fz_parser,
-        lev, patch_type, eb_update_field,
-        true);
-}
-
-void WarpX::ComputeExternalFieldOnGridUsingParser (
-    std::string const& field,
-    amrex::ParserExecutor<4> const& fx_parser,
-    amrex::ParserExecutor<4> const& fy_parser,
-    amrex::ParserExecutor<4> const& fz_parser,
-    int lev, PatchType patch_type,
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field)
-{
-    ComputeExternalFieldOnGridUsingParser_template<std::string const&> (
-        field,
-        fx_parser, fy_parser, fz_parser,
-        lev, patch_type, eb_update_field,
-        true);
+    if (std::holds_alternative<warpx::fields::FieldType>(field)){
+        ComputeExternalFieldOnGridUsingParser_template<warpx::fields::FieldType> (
+            std::get<warpx::fields::FieldType>(field),
+            fx_parser, fy_parser, fz_parser,
+            lev, patch_type, eb_update_field,
+            use_eb_flags);
+    }
+    else{
+        ComputeExternalFieldOnGridUsingParser_template<std::string> (
+            std::get<std::string>(field),
+            fx_parser, fy_parser, fz_parser,
+            lev, patch_type, eb_update_field,
+            use_eb_flags);
+    }
 }
 
 void WarpX::CheckGuardCells()

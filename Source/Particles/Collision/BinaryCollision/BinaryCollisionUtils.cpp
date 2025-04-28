@@ -15,6 +15,8 @@
 
 #include <string>
 
+#include "Utils/TextMsg.H"
+
 namespace BinaryCollisionUtils{
 
     CollisionType get_collision_type (const std::string& collision_name,
@@ -33,6 +35,21 @@ namespace BinaryCollisionUtils{
         }
         else if (type == "dsmc") {
             return CollisionType::DSMC;
+        }
+        else if (type == "linear_breit_wheeler") {
+            amrex::Vector<std::string> product_species_name;
+            pp_collision_name.getarr("product_species", product_species_name);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                product_species_name.size() == 2u,
+                "Linear Breit-Wheeler collisions must contain exactly two product species");
+            auto& product_species1 = mypc->GetParticleContainerFromName(product_species_name[0]);
+            auto& product_species2 = mypc->GetParticleContainerFromName(product_species_name[1]);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                (product_species1.AmIA<PhysicalSpecies::electron>() && product_species2.AmIA<PhysicalSpecies::positron>())
+                ||
+                (product_species1.AmIA<PhysicalSpecies::positron>() && product_species2.AmIA<PhysicalSpecies::electron>()),
+                "Product species of linear Breit-Wheeler collisions must be of type electron and positron");
+            return CollisionType::LinearBreitWheeler;
         }
         return CollisionType::Undefined;
     }

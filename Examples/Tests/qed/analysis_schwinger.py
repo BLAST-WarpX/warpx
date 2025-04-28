@@ -17,13 +17,10 @@ import sys
 
 import numpy as np
 import yt
+from scipy.constants import c, e, hbar, m_e
 
 # define some parameters
 
-c = 299792458.0
-m_e = 9.1093837015e-31
-e = 1.602176634e-19
-hbar = 1.054571817e-34
 E_S = m_e**2 * c**3 / e / hbar  # Schwinger field
 
 dV = (1.0e-6) ** 3  # total simulation volume
