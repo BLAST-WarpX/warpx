@@ -207,6 +207,54 @@ namespace
         // TODO: CPU tiling hints with OpenMP
     }
 
+    /**
+     * \brief Checks for known numerical issues involving different electromagnetic solvers
+     */
+    void CheckKnownEMSolverIssues (
+        const ElectromagneticSolverAlgo em_solver_algo,
+        const CurrentDepositionAlgo current_deposition_algo,
+        const bool is_any_boundary_pml,
+        const bool external_particle_field_used)
+    {
+        if (em_solver_algo == ElectromagneticSolverAlgo::PSATD && is_any_boundary_pml)
+        {
+            ablastr::warn_manager::WMRecordWarning(
+                "PML",
+                "Using PSATD together with PML may lead to instabilities if the plasma touches the PML region. "
+                "It is recommended to leave enough empty space between the plasma boundary and the PML region.",
+                ablastr::warn_manager::WarnPriority::low);
+        }
+
+        if (em_solver_algo == ElectromagneticSolverAlgo::HybridPIC)
+        {
+            if (current_deposition_algo == CurrentDepositionAlgo::Esirkepov)
+            {
+                ablastr::warn_manager::WMRecordWarning(
+                    "Hybrid-PIC",
+                    "When using Esirkepov current deposition together with the hybrid-PIC "
+                    "algorithm, a segfault will occur if a particle moves over multiple cells "
+                    "in a single step, so be careful with your choice of time step.",
+                    ablastr::warn_manager::WarnPriority::low);
+            }
+
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !external_particle_field_used,
+                "The hybrid-PIC algorithm does not work with external fields "
+                "applied directly to particles."
+            );
+        }
+
+    #if defined(__CUDACC__) && (__CUDACC_VER_MAJOR__ == 11) && (__CUDACC_VER_MINOR__ == 6)
+        if (em_solver_algo == ElectromagneticSolverAlgo::Yee)
+        {
+            WARPX_ABORT_WITH_MESSAGE(
+                "CUDA 11.6 does not work with the Yee Maxwell "
+                "solver: https://github.com/AMReX-Codes/amrex/issues/2607"
+            );
+        }
+    #endif
+    }
+
     /** Write a file that record all inputs: inputs file + command line options */
     void WriteUsedInputsFile ()
     {
@@ -658,7 +706,16 @@ WarpX::InitData ()
 
     ::PerformanceHints(total_nboxes, nprocs);
 
-    CheckKnownIssues();
+    const bool external_particle_field_used = (
+        mypc->m_B_ext_particle_s != "none" || mypc->m_E_ext_particle_s != "none");
+
+    const bool is_any_boundary_pml =(
+        (std::find(do_pml_Lo[0].begin(), do_pml_Lo[0].end(), true ) != do_pml_Lo[0].end()) ||
+        (std::find(do_pml_Hi[0].begin(), do_pml_Hi[0].end(), true ) != do_pml_Hi[0].end()));
+
+    ::CheckKnownEMSolverIssues(
+        electromagnetic_solver_id, current_deposition_algo,
+        is_any_boundary_pml, external_particle_field_used);
 }
 
 void
@@ -1333,52 +1390,6 @@ void WarpX::InitializeEBGridData (int lev)
     }
 #else
     amrex::ignore_unused(lev);
-#endif
-}
-
-void WarpX::CheckKnownIssues()
-{
-    if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD &&
-        (std::any_of(do_pml_Lo[0].begin(),do_pml_Lo[0].end(),[](const auto& ee){return ee;}) ||
-        std::any_of(do_pml_Hi[0].begin(),do_pml_Hi[0].end(),[](const auto& ee){return ee;})) )
-    {
-        ablastr::warn_manager::WMRecordWarning(
-            "PML",
-            "Using PSATD together with PML may lead to instabilities if the plasma touches the PML region. "
-            "It is recommended to leave enough empty space between the plasma boundary and the PML region.",
-            ablastr::warn_manager::WarnPriority::low);
-    }
-
-    if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC)
-    {
-        if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov)
-        {
-            ablastr::warn_manager::WMRecordWarning(
-                "Hybrid-PIC",
-                "When using Esirkepov current deposition together with the hybrid-PIC "
-                "algorithm, a segfault will occur if a particle moves over multiple cells "
-                "in a single step, so be careful with your choice of time step.",
-                ablastr::warn_manager::WarnPriority::low);
-        }
-
-        const bool external_particle_field_used = (
-            mypc->m_B_ext_particle_s != "none" || mypc->m_E_ext_particle_s != "none"
-        );
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            !external_particle_field_used,
-            "The hybrid-PIC algorithm does not work with external fields "
-            "applied directly to particles."
-        );
-    }
-
-#if defined(__CUDACC__) && (__CUDACC_VER_MAJOR__ == 11) && (__CUDACC_VER_MINOR__ == 6)
-    if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee)
-    {
-        WARPX_ABORT_WITH_MESSAGE(
-            "CUDA 11.6 does not work with the Yee Maxwell "
-            "solver: https://github.com/AMReX-Codes/amrex/issues/2607"
-        );
-    }
 #endif
 }
 
