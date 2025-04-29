@@ -205,6 +205,12 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
 
     if (m_linear_solver_type == LinearSolverType::amrex_gmres) {
         m_linear_solver = std::make_unique<AMReXGMRES<Vec,JacobianFunctionMF<Vec,Ops>>>();
+    } else if (m_linear_solver_type == LinearSolverType::petsc_ksp) {
+#ifdef AMREX_USE_PETSC
+        m_linear_solver = std::make_unique<PETScKSP<Vec,JacobianFunctionMF<Vec,Ops>>>();
+#else
+        WARPX_ABORT_WITH_MESSAGE("NewtonSolver::Define(): must compile with PETSc to use petsc_ksp (AMREX_USE_PETSC must be defined)");
+#endif
     } else {
         WARPX_ABORT_WITH_MESSAGE("NewtonSolver::Define(): invalid linear solver type");
     }
