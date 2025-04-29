@@ -2746,7 +2746,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 
             UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], dt);
             setPosition(ip, xp, yp, zp);
-            
+
             [[maybe_unused]] const auto& wx_tmp = wx;
             [[maybe_unused]] const auto& wy_tmp = wy;
             [[maybe_unused]] const auto& wz_tmp = wz;
