@@ -212,7 +212,7 @@ namespace
      */
     void CheckKnownEMSolverIssues (
         const ElectromagneticSolverAlgo em_solver_algo,
-        const CurrentDepositionAlgo current_dep_algo,
+        const CurrentDepositionAlgo current_deposition_algo,
         const bool is_any_boundary_pml,
         const bool external_particle_field_used)
     {
@@ -227,7 +227,7 @@ namespace
 
         if (em_solver_algo == ElectromagneticSolverAlgo::HybridPIC)
         {
-            if (current_dep_algo == CurrentDepositionAlgo::Esirkepov)
+            if (current_deposition_algo == CurrentDepositionAlgo::Esirkepov)
             {
                 ablastr::warn_manager::WMRecordWarning(
                     "Hybrid-PIC",
