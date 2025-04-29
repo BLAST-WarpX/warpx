@@ -96,7 +96,7 @@ void WarnManager::RecordWarning(
         std::string abort_msg = "A warning with priority '"
             + abl_msg_logger::PriorityToString(abort_priority)
             + "' has been raised";
-        abort_msg += ((m_always_warn_immediately) ? "." : (" :\n[" + topic + "] " + text));
+        abort_msg += ((m_always_warn_immediately) ? "." : (":\n[" + topic + "] " + text));
 
         ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(
             msg_priority < abort_priority,
