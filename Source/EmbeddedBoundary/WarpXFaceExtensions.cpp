@@ -118,7 +118,7 @@ namespace
     * @param[out]     flag_info_face The info flag used by the ECT solver
     */
     template <int idim>
-    void ApplyBCKCorrection(
+    void ApplyBCKCorrection (
         const std::array<amrex::Real,3> &cell_size_max_lev,
         ablastr::fields::MultiFabRegister& all_fields,
         const int max_level,
