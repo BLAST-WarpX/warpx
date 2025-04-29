@@ -85,12 +85,12 @@ namespace
    [[nodiscard]] [[maybe_unused]]
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     amrex::Real
-    ComputeSStab(const int i, const int j, const int k,
-             const amrex::Array4<const amrex::Real> lx,
-             const amrex::Array4<const amrex::Real> ly,
-             const amrex::Array4<const amrex::Real> lz,
-             const amrex::Real dx, const amrex::Real dy, const amrex::Real dz,
-             const int dim)
+    ComputeSStab (const int i, const int j, const int k,
+                  const amrex::Array4<const amrex::Real> lx,
+                  const amrex::Array4<const amrex::Real> ly,
+                  const amrex::Array4<const amrex::Real> lz,
+                  const amrex::Real dx, const amrex::Real dy, const amrex::Real dz,
+                  const int dim)
     {
         if (dim == 0) {
             return ::ComputeSStab<0>(i,j,k,lx,ly,lz,dx,dy,dz);
