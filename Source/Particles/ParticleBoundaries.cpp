@@ -6,7 +6,6 @@
  */
 
 #include "ParticleBoundaries.H"
-#include "WarpX.H"
 
 #include "Utils/Parser/ParserUtils.H"
 

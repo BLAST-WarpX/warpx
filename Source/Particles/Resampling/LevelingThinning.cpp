@@ -64,8 +64,9 @@ void LevelingThinning::BackwardCompatibility (const std::string& species_name )
     );
 }
 
-void LevelingThinning::operator() (WarpXParIter& pti, const int lev,
-                                   WarpXParticleContainer * const pc) const
+void LevelingThinning::operator() (
+    const amrex::Geometry& geom_lev, WarpXParIter& pti,
+    const int lev, WarpXParticleContainer * const pc) const
 {
     using namespace amrex::literals;
 
@@ -79,7 +80,7 @@ void LevelingThinning::operator() (WarpXParIter& pti, const int lev,
     // efficient to directly loop over the particles. Nevertheless, this structure with a loop over
     // the cells is more general and can be readily used to implement almost any other resampling
     // algorithm.
-    auto bins = ParticleUtils::findParticlesInEachCell(lev, pti, ptile);
+    auto bins = ParticleUtils::findParticlesInEachCell(geom_lev, pti, ptile);
 
     const auto n_cells = static_cast<int>(bins.numBins());
     auto *const indices = bins.permutationPtr();
