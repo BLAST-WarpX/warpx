@@ -36,7 +36,7 @@ Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
 We use system software modules, add environment hints and further dependencies via the file ``$HOME/leonardo_gpu_warpx.profile``.
 Create it now:
@@ -65,7 +65,7 @@ Finally, since Leonardo does not yet provide software modules for some of our de
 
 .. code-block:: bash
 
-   bash $HOME/src/warpx/Tools/machines/leonardo_cineca/install_gpu_dependencies.sh
+   bash $HOME/src/warpx/Tools/machines/leonardo-cineca/install_gpu_dependencies.sh
    source $HOME/sw/venvs/warpx/bin/activate
 
 .. dropdown:: Script Details

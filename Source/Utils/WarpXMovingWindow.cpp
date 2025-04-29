@@ -14,6 +14,7 @@
 #endif
 #include "Initialization/ExternalField.H"
 #include "Particles/MultiParticleContainer.H"
+#include "Fields.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
 #include "Utils/TextMsg.H"
@@ -55,6 +56,199 @@
 #include <string>
 
 using namespace amrex;
+
+namespace
+{
+
+    /** This function shifts a MultiFab in a given direction
+    *
+    * \param[in,out] mf the MultiFab to be shifted
+    * \param[in] geom the Geometry object associated to the level of the MultiFab mf
+    * \param[in] num_shift magnitude of the shift (cell number)
+    * \param[in] dir direction of the shift
+    * \param[in] safe_guard_cells flag to enable "safe mode" data exchanges with more guard cells
+    * \param[in] do_single_precision_comms flag to enable single precision communications
+    * \param[in,out] cost the pointer to the data structure holding costs for timer-based load-balance
+    * \param[in] external_field the external field (used to initialize EM fields)
+    * \param[in] useparser flag to enable the use of a field parser to initialize EM fields
+    * \param[in] field_parser the field parser
+    * \param[in] PMLRZ_flag flag to enable a special treatment for PML in RZ simulations
+    */
+    void shiftMF (
+        amrex::MultiFab& mf, const amrex::Geometry& geom,
+        int num_shift, int dir,
+        bool safe_guard_cells, bool do_single_precision_comms,
+        amrex::LayoutData<amrex::Real>* cost,
+        amrex::Real external_field=0.0, bool useparser = false,
+        amrex::ParserExecutor<3> const& field_parser={},
+        const bool PMLRZ_flag = false)
+    {
+        using namespace amrex::literals;
+        WARPX_PROFILE("warpx::shiftMF()");
+        const amrex::BoxArray& ba = mf.boxArray();
+        const amrex::DistributionMapping& dm = mf.DistributionMap();
+        const int nc = mf.nComp();
+        const amrex::IntVect& ng = mf.nGrowVect();
+
+        AMREX_ALWAYS_ASSERT(ng[dir] >= std::abs(num_shift));
+
+        amrex::MultiFab tmpmf(ba, dm, nc, ng);
+        amrex::MultiFab::Copy(tmpmf, mf, 0, 0, nc, ng);
+
+        if ( safe_guard_cells ) {
+            // Fill guard cells.
+            ablastr::utils::communication::FillBoundary(tmpmf, do_single_precision_comms, geom.periodicity());
+        } else {
+            amrex::IntVect ng_mw = amrex::IntVect::TheUnitVector();
+            // Enough guard cells in the MW direction
+            ng_mw[dir] = std::abs(num_shift);
+            // Make sure we don't exceed number of guard cells allocated
+            ng_mw = ng_mw.min(ng);
+            // Fill guard cells.
+            ablastr::utils::communication::FillBoundary(tmpmf, ng_mw, do_single_precision_comms, geom.periodicity());
+        }
+
+        // Make a box that covers the region that the window moved into
+        const amrex::IndexType& typ = ba.ixType();
+        const amrex::Box& domainBox = geom.Domain();
+        amrex::Box adjBox;
+        if (num_shift > 0) {
+            adjBox = adjCellHi(domainBox, dir, ng[dir]);
+        } else {
+            adjBox = adjCellLo(domainBox, dir, ng[dir]);
+        }
+        adjBox = amrex::convert(adjBox, typ);
+
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            if (idim == dir and typ.nodeCentered(dir)) {
+                if (num_shift > 0) {
+                    adjBox.growLo(idim, -1);
+                } else {
+                    adjBox.growHi(idim, -1);
+                }
+            } else if (idim != dir) {
+                adjBox.growLo(idim, ng[idim]);
+                adjBox.growHi(idim, ng[idim]);
+            }
+        }
+
+        amrex::IntVect shiftiv(0);
+        shiftiv[dir] = num_shift;
+        const amrex::Dim3 shift = shiftiv.dim3();
+
+        const amrex::RealBox& real_box = geom.ProbDomain();
+        const auto dx = geom.CellSizeArray();
+
+#ifdef AMREX_USE_OMP
+    #pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(tmpmf, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+        {
+            if (cost)
+            {
+                amrex::Gpu::synchronize();
+            }
+            auto wt = static_cast<amrex::Real>(amrex::second());
+
+            auto const& dstfab = mf.array(mfi);
+            auto const& srcfab = tmpmf.array(mfi);
+
+            const amrex::Box& outbox = mfi.growntilebox() & adjBox;
+
+            if (outbox.ok()) {
+                if (!useparser) {
+                    AMREX_PARALLEL_FOR_4D ( outbox, nc, i, j, k, n,
+                    {
+                        srcfab(i,j,k,n) = external_field;
+                    })
+                } else {
+                    // index type of the src mf
+                    auto const& mf_IndexType = (tmpmf).ixType();
+                    amrex::IntVect mf_type(AMREX_D_DECL(0,0,0));
+                    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                        mf_type[idim] = mf_IndexType.nodeCentered(idim);
+                    }
+
+                    amrex::ParallelFor (outbox, nc,
+                        [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+                    {
+                        // Compute x,y,z co-ordinates based on index type of mf
+#if defined(WARPX_DIM_1D_Z)
+                        const amrex::Real x = 0.0_rt;
+                        const amrex::Real y = 0.0_rt;
+                        const amrex::Real fac_z = (1.0_rt - mf_type[0]) * dx[0]*0.5_rt;
+                        const amrex::Real z = i*dx[0] + real_box.lo(0) + fac_z;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                        const amrex::Real fac_x = (1.0_rt - mf_type[0]) * dx[0]*0.5_rt;
+                        const amrex::Real x = i*dx[0] + real_box.lo(0) + fac_x;
+                        const amrex::Real y = 0.0;
+                        const amrex::Real fac_z = (1.0_rt - mf_type[1]) * dx[1]*0.5_rt;
+                        const amrex::Real z = j*dx[1] + real_box.lo(1) + fac_z;
+#else
+                        const amrex::Real fac_x = (1.0_rt - mf_type[0]) * dx[0]*0.5_rt;
+                        const amrex::Real x = i*dx[0] + real_box.lo(0) + fac_x;
+                        const amrex::Real fac_y = (1.0_rt - mf_type[1]) * dx[1]*0.5_rt;
+                        const amrex::Real y = j*dx[1] + real_box.lo(1) + fac_y;
+                        const amrex::Real fac_z = (1.0_rt - mf_type[2]) * dx[2]*0.5_rt;
+                        const amrex::Real z = k*dx[2] + real_box.lo(2) + fac_z;
+#endif
+                        srcfab(i,j,k,n) = field_parser(x,y,z);
+                    });
+                }
+
+            }
+
+            amrex::Box dstBox = mf[mfi].box();
+            if (num_shift > 0) {
+                dstBox.growHi(dir, -num_shift);
+            } else {
+                dstBox.growLo(dir,  num_shift);
+            }
+            AMREX_PARALLEL_FOR_4D ( dstBox, nc, i, j, k, n,
+            {
+                dstfab(i,j,k,n) = srcfab(i+shift.x,j+shift.y,k+shift.z,n);
+            })
+
+            if (cost)
+            {
+                amrex::Gpu::synchronize();
+                wt = static_cast<amrex::Real>(amrex::second()) - wt;
+                amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
+            }
+        }
+
+#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+        if (PMLRZ_flag) {
+            // This does the exchange of data in the corner guard cells, the cells that are in the
+            // guard region both radially and longitudinally. These are the PML cells in the overlapping
+            // longitudinal region. FillBoundary normally does not update these cells.
+            // This update is needed so that the cells at the end of the FABs are updated appropriately
+            // with the data shifted from the neighboring FAB. Without this update, the RZ PML becomes
+            // unstable with the moving grid.
+            // This code creates a temporary MultiFab using a BoxList where the radial size of all of
+            // its boxes is increased so that the radial guard cells are included in the boxes valid domain.
+            // The temporary MultiFab is setup to refer to the data of the original Multifab (this can
+            // be done since the shape of the data is all the same, just the indexing is different).
+            amrex::BoxList bl;
+            const auto ba_size = static_cast<int>(ba.size());
+            for (int i = 0; i < ba_size; ++i) {
+                bl.push_back(amrex::grow(ba[i], 0, mf.nGrowVect()[0]));
+            }
+            const amrex::BoxArray rba(std::move(bl));
+            amrex::MultiFab rmf(rba, dm, mf.nComp(), IntVect(0,mf.nGrowVect()[1]), MFInfo().SetAlloc(false));
+
+            for (amrex::MFIter mfi(mf); mfi.isValid(); ++mfi) {
+                rmf.setFab(mfi, FArrayBox(mf[mfi], amrex::make_alias, 0, mf.nComp()));
+            }
+            rmf.FillBoundary(false);
+        }
+#else
+        amrex::ignore_unused(PMLRZ_flag);
+#endif
+
+    }
+
+}
 
 void
 WarpX::UpdateInjectionPosition (const amrex::Real a_dt)
@@ -139,6 +333,11 @@ WarpX::MoveWindow (const int step, bool move_j)
 {
     WARPX_PROFILE("WarpX::MoveWindow");
 
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    bool const skip_lev0_coarse_patch = true;
+
     if (step == start_moving_window_step) {
         amrex::Print() << Utils::TextMsg::Info("Starting moving window");
     }
@@ -202,9 +401,6 @@ WarpX::MoveWindow (const int step, bool move_j)
     int num_shift      = num_shift_base;
     int num_shift_crse = num_shift;
 
-    constexpr auto do_update_cost = true;
-    constexpr auto dont_update_cost = false; //We can't update cost for PML
-
     // Shift the mesh fields
     for (int lev = 0; lev <= finest_level; ++lev) {
 
@@ -212,6 +408,11 @@ WarpX::MoveWindow (const int step, bool move_j)
             num_shift_crse = num_shift;
             num_shift *= refRatio(lev-1)[dir];
         }
+
+        auto* cost_lev =
+            (WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers) ? getCosts(lev)  : nullptr;
+
+        amrex::LayoutData<amrex::Real>* no_cost = nullptr ; //We can't update cost for PML
 
         // Shift each component of vector fields (E, B, j)
         for (int dim = 0; dim < 3; ++dim) {
@@ -234,69 +435,74 @@ WarpX::MoveWindow (const int step, bool move_j)
                 if (dim == 1) { Efield_parser = m_p_ext_field_params->Eyfield_parser->compile<3>(); }
                 if (dim == 2) { Efield_parser = m_p_ext_field_params->Ezfield_parser->compile<3>(); }
             }
-            shiftMF(*Bfield_fp[lev][dim], geom[lev], num_shift, dir, lev, do_update_cost,
+            ::shiftMF(*m_fields.get(FieldType::Bfield_fp, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev,
                 m_p_ext_field_params->B_external_grid[dim], use_Bparser, Bfield_parser);
-            shiftMF(*Efield_fp[lev][dim], geom[lev], num_shift, dir, lev, do_update_cost,
+            ::shiftMF(*m_fields.get(FieldType::Efield_fp, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev,
                 m_p_ext_field_params->E_external_grid[dim], use_Eparser, Efield_parser);
             if (fft_do_time_averaging) {
-                shiftMF(*Bfield_avg_fp[lev][dim], geom[lev], num_shift, dir, lev, do_update_cost,
+                ablastr::fields::MultiLevelVectorField Efield_avg_fp = m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_fp, finest_level);
+                ablastr::fields::MultiLevelVectorField Bfield_avg_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_fp, finest_level);
+                ::shiftMF(*Bfield_avg_fp[lev][dim], geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev,
                     m_p_ext_field_params->B_external_grid[dim], use_Bparser, Bfield_parser);
-                shiftMF(*Efield_avg_fp[lev][dim], geom[lev], num_shift, dir, lev, do_update_cost,
+                ::shiftMF(*Efield_avg_fp[lev][dim], geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev,
                    m_p_ext_field_params-> E_external_grid[dim], use_Eparser, Efield_parser);
             }
             if (move_j) {
-                shiftMF(*current_fp[lev][dim], geom[lev], num_shift, dir, lev, do_update_cost);
+                ::shiftMF(*m_fields.get(FieldType::current_fp, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
             }
             if (pml[lev] && pml[lev]->ok()) {
-                const std::array<amrex::MultiFab*, 3>& pml_B = pml[lev]->GetB_fp();
-                const std::array<amrex::MultiFab*, 3>& pml_E = pml[lev]->GetE_fp();
-                shiftMF(*pml_B[dim], geom[lev], num_shift, dir, lev, dont_update_cost);
-                shiftMF(*pml_E[dim], geom[lev], num_shift, dir, lev, dont_update_cost);
+                amrex::MultiFab* pml_B = m_fields.get(FieldType::pml_B_fp, Direction{dim}, lev);
+                amrex::MultiFab* pml_E = m_fields.get(FieldType::pml_E_fp, Direction{dim}, lev);
+                ::shiftMF(*pml_B, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost);
+                ::shiftMF(*pml_E, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost);
             }
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+            const bool PMLRZ_flag = getPMLRZ();
             if (pml_rz[lev] && dim < 2) {
-                const std::array<amrex::MultiFab*, 2>& pml_rz_B = pml_rz[lev]->GetB_fp();
-                const std::array<amrex::MultiFab*, 2>& pml_rz_E = pml_rz[lev]->GetE_fp();
-                shiftMF(*pml_rz_B[dim], geom[lev], num_shift, dir, lev, dont_update_cost);
-                shiftMF(*pml_rz_E[dim], geom[lev], num_shift, dir, lev, dont_update_cost);
+                amrex::MultiFab* pml_rz_B = m_fields.get(FieldType::pml_B_fp, Direction{dim}, lev);
+                amrex::MultiFab* pml_rz_E = m_fields.get(FieldType::pml_E_fp, Direction{dim}, lev);
+                ::shiftMF(*pml_rz_B, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost, 0.0_rt, false, amrex::ParserExecutor<3>{}, PMLRZ_flag);
+                ::shiftMF(*pml_rz_E, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost, 0.0_rt, false, amrex::ParserExecutor<3>{}, PMLRZ_flag);
             }
 #endif
             if (lev > 0) {
                 // coarse grid
-                shiftMF(*Bfield_cp[lev][dim], geom[lev-1], num_shift_crse, dir, lev, do_update_cost,
+                ::shiftMF(*m_fields.get(FieldType::Bfield_cp, Direction{dim}, lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev,
                     m_p_ext_field_params->B_external_grid[dim], use_Bparser, Bfield_parser);
-                shiftMF(*Efield_cp[lev][dim], geom[lev-1], num_shift_crse, dir, lev, do_update_cost,
+                ::shiftMF(*m_fields.get(FieldType::Efield_cp, Direction{dim}, lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev,
                     m_p_ext_field_params->E_external_grid[dim], use_Eparser, Efield_parser);
-                shiftMF(*Bfield_aux[lev][dim], geom[lev], num_shift, dir, lev, do_update_cost);
-                shiftMF(*Efield_aux[lev][dim], geom[lev], num_shift, dir, lev, do_update_cost);
+                ::shiftMF(*m_fields.get(FieldType::Bfield_aux, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
+                ::shiftMF(*m_fields.get(FieldType::Efield_aux, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
                 if (fft_do_time_averaging) {
-                    shiftMF(*Bfield_avg_cp[lev][dim], geom[lev-1], num_shift_crse, dir, lev, do_update_cost,
+                    ablastr::fields::MultiLevelVectorField Efield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_cp, finest_level, skip_lev0_coarse_patch);
+                    ablastr::fields::MultiLevelVectorField Bfield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_cp, finest_level, skip_lev0_coarse_patch);
+                    ::shiftMF(*Bfield_avg_cp[lev][dim], geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev,
                         m_p_ext_field_params->B_external_grid[dim], use_Bparser, Bfield_parser);
-                    shiftMF(*Efield_avg_cp[lev][dim], geom[lev-1], num_shift_crse, dir, lev, do_update_cost,
+                    ::shiftMF(*Efield_avg_cp[lev][dim], geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev,
                         m_p_ext_field_params->E_external_grid[dim], use_Eparser, Efield_parser);
                 }
                 if (move_j) {
-                    shiftMF(*current_cp[lev][dim], geom[lev-1], num_shift_crse, dir, lev, do_update_cost);
+                    ::shiftMF(*m_fields.get(FieldType::current_cp, Direction{dim}, lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
                 }
                 if (do_pml && pml[lev]->ok()) {
-                    const std::array<amrex::MultiFab*, 3>& pml_B = pml[lev]->GetB_cp();
-                    const std::array<amrex::MultiFab*, 3>& pml_E = pml[lev]->GetE_cp();
-                    shiftMF(*pml_B[dim], geom[lev-1], num_shift_crse, dir, lev, dont_update_cost);
-                    shiftMF(*pml_E[dim], geom[lev-1], num_shift_crse, dir, lev, dont_update_cost);
+                    amrex::MultiFab* pml_B_cp = m_fields.get(FieldType::pml_B_cp, Direction{dim}, lev);
+                    amrex::MultiFab* pml_E_cp = m_fields.get(FieldType::pml_E_cp, Direction{dim}, lev);
+                    ::shiftMF(*pml_B_cp, geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, no_cost);
+                    ::shiftMF(*pml_E_cp, geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, no_cost);
                 }
             }
         }
 
         // Shift scalar field F with div(E) cleaning in valid domain
         // TODO: shift F from pml_rz for RZ geometry with PSATD, once implemented
-        if (F_fp[lev])
+        if (m_fields.has(FieldType::F_fp, lev))
         {
             // Fine grid
-            shiftMF(*F_fp[lev], geom[lev], num_shift, dir, lev, do_update_cost);
+            ::shiftMF(*m_fields.get(FieldType::F_fp, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
             if (lev > 0)
             {
                 // Coarse grid
-                shiftMF(*F_cp[lev], geom[lev-1], num_shift_crse, dir, lev, do_update_cost);
+                ::shiftMF(*m_fields.get(FieldType::F_cp, lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
             }
         }
 
@@ -306,30 +512,30 @@ WarpX::MoveWindow (const int step, bool move_j)
             // Fine grid
             if (do_pml && pml[lev]->ok())
             {
-                amrex::MultiFab* pml_F = pml[lev]->GetF_fp();
-                shiftMF(*pml_F, geom[lev], num_shift, dir, lev, dont_update_cost);
+                amrex::MultiFab* pml_F = m_fields.get(FieldType::pml_F_fp, lev);
+                ::shiftMF(*pml_F, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost);
             }
             if (lev > 0)
             {
                 // Coarse grid
                 if (do_pml && pml[lev]->ok())
                 {
-                    amrex::MultiFab* pml_F = pml[lev]->GetF_cp();
-                    shiftMF(*pml_F, geom[lev-1], num_shift_crse, dir, lev, dont_update_cost);
+                    amrex::MultiFab* pml_F = m_fields.get(FieldType::pml_F_cp, lev);
+                    ::shiftMF(*pml_F, geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, no_cost);
                 }
             }
         }
 
         // Shift scalar field G with div(B) cleaning in valid domain
         // TODO: shift G from pml_rz for RZ geometry with PSATD, once implemented
-        if (G_fp[lev])
+        if (m_fields.has(FieldType::G_fp, lev))
         {
             // Fine grid
-            shiftMF(*G_fp[lev], geom[lev], num_shift, dir, lev, do_update_cost);
+            ::shiftMF(*m_fields.get(FieldType::G_fp, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
             if (lev > 0)
             {
                 // Coarse grid
-                shiftMF(*G_cp[lev], geom[lev-1], num_shift_crse, dir, lev, do_update_cost);
+                ::shiftMF(*m_fields.get(FieldType::G_cp, lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
             }
         }
 
@@ -339,28 +545,28 @@ WarpX::MoveWindow (const int step, bool move_j)
             // Fine grid
             if (do_pml && pml[lev]->ok())
             {
-                amrex::MultiFab* pml_G = pml[lev]->GetG_fp();
-                shiftMF(*pml_G, geom[lev], num_shift, dir, lev, dont_update_cost);
+                amrex::MultiFab* pml_G = m_fields.get(FieldType::pml_G_fp, lev);
+                ::shiftMF(*pml_G, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost);
             }
             if (lev > 0)
             {
                 // Coarse grid
                 if (do_pml && pml[lev]->ok())
                 {
-                    amrex::MultiFab* pml_G = pml[lev]->GetG_cp();
-                    shiftMF(*pml_G, geom[lev-1], num_shift_crse, dir, lev, dont_update_cost);
+                    amrex::MultiFab* pml_G = m_fields.get(FieldType::pml_G_cp, lev);
+                    ::shiftMF(*pml_G, geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, no_cost);
                 }
             }
         }
 
         // Shift scalar component rho
         if (move_j) {
-            if (rho_fp[lev]){
+            if (m_fields.has(FieldType::rho_fp, lev)) {
                 // Fine grid
-                shiftMF(*rho_fp[lev],   geom[lev], num_shift, dir, lev, do_update_cost);
+                ::shiftMF(*m_fields.get(FieldType::rho_fp,lev),   geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
                 if (lev > 0){
                     // Coarse grid
-                    shiftMF(*rho_cp[lev], geom[lev-1], num_shift_crse, dir, lev, do_update_cost);
+                    ::shiftMF(*m_fields.get(FieldType::rho_cp,lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
                 }
             }
         }
@@ -369,11 +575,11 @@ WarpX::MoveWindow (const int step, bool move_j)
         if (do_fluid_species) {
             const int n_fluid_species = myfl->nSpecies();
             for (int i=0; i<n_fluid_species; i++) {
-                WarpXFluidContainer& fl = myfl->GetFluidContainer(i);
-                shiftMF( *fl.N[lev], geom[lev], num_shift, dir, lev, do_update_cost );
-                shiftMF( *fl.NU[lev][0], geom[lev], num_shift, dir, lev, do_update_cost );
-                shiftMF( *fl.NU[lev][1], geom[lev], num_shift, dir, lev, do_update_cost );
-                shiftMF( *fl.NU[lev][2], geom[lev], num_shift, dir, lev, do_update_cost );
+                WarpXFluidContainer const& fl = myfl->GetFluidContainer(i);
+                ::shiftMF( *m_fields.get(fl.name_mf_N, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev );
+                ::shiftMF( *m_fields.get(fl.name_mf_NU, Direction{0}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev );
+                ::shiftMF( *m_fields.get(fl.name_mf_NU, Direction{1}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev );
+                ::shiftMF( *m_fields.get(fl.name_mf_NU, Direction{2}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev );
             }
         }
     }
@@ -449,194 +655,22 @@ WarpX::MoveWindow (const int step, bool move_j)
         const amrex::Real cur_time = t_new[0];
         for (int i=0; i<n_fluid_species; i++) {
             WarpXFluidContainer& fl = myfl->GetFluidContainer(i);
-            fl.InitData( lev, injection_box, cur_time );
+            fl.InitData( m_fields, injection_box, cur_time, lev );
         }
     }
 
     // Recompute macroscopic properties of the medium
-    if (WarpX::em_solver_medium == MediumForEM::Macroscopic) {
+    if (m_em_solver_medium == MediumForEM::Macroscopic) {
         const int lev_zero = 0;
         m_macroscopic_properties->InitData(
             Geom(lev_zero),
-            getField(warpx::fields::FieldType::Efield_fp, lev_zero,0).ixType().toIntVect(),
-            getField(warpx::fields::FieldType::Efield_fp, lev_zero,1).ixType().toIntVect(),
-            getField(warpx::fields::FieldType::Efield_fp, lev_zero,2).ixType().toIntVect()
+            m_fields.get(FieldType::Efield_fp, Direction{0}, lev_zero)->ixType().toIntVect(),
+            m_fields.get(FieldType::Efield_fp, Direction{1}, lev_zero)->ixType().toIntVect(),
+            m_fields.get(FieldType::Efield_fp, Direction{2}, lev_zero)->ixType().toIntVect()
         );
     }
 
     return num_shift_base;
-}
-
-void
-WarpX::shiftMF (amrex::MultiFab& mf, const amrex::Geometry& geom,
-                int num_shift, int dir, const int lev, bool update_cost_flag,
-                amrex::Real external_field, bool useparser,
-                amrex::ParserExecutor<3> const& field_parser)
-{
-    using namespace amrex::literals;
-    WARPX_PROFILE("WarpX::shiftMF()");
-    const amrex::BoxArray& ba = mf.boxArray();
-    const amrex::DistributionMapping& dm = mf.DistributionMap();
-    const int nc = mf.nComp();
-    const amrex::IntVect& ng = mf.nGrowVect();
-
-    AMREX_ALWAYS_ASSERT(ng[dir] >= num_shift);
-
-    amrex::MultiFab tmpmf(ba, dm, nc, ng);
-    amrex::MultiFab::Copy(tmpmf, mf, 0, 0, nc, ng);
-
-    if ( WarpX::safe_guard_cells ) {
-        // Fill guard cells.
-        ablastr::utils::communication::FillBoundary(tmpmf, WarpX::do_single_precision_comms, geom.periodicity());
-    } else {
-        amrex::IntVect ng_mw = amrex::IntVect::TheUnitVector();
-        // Enough guard cells in the MW direction
-        ng_mw[dir] = num_shift;
-        // Make sure we don't exceed number of guard cells allocated
-        ng_mw = ng_mw.min(ng);
-        // Fill guard cells.
-        ablastr::utils::communication::FillBoundary(tmpmf, ng_mw, WarpX::do_single_precision_comms, geom.periodicity());
-    }
-
-    // Make a box that covers the region that the window moved into
-    const amrex::IndexType& typ = ba.ixType();
-    const amrex::Box& domainBox = geom.Domain();
-    amrex::Box adjBox;
-    if (num_shift > 0) {
-        adjBox = adjCellHi(domainBox, dir, ng[dir]);
-    } else {
-        adjBox = adjCellLo(domainBox, dir, ng[dir]);
-    }
-    adjBox = amrex::convert(adjBox, typ);
-
-    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-        if (idim == dir and typ.nodeCentered(dir)) {
-            if (num_shift > 0) {
-                adjBox.growLo(idim, -1);
-            } else {
-                adjBox.growHi(idim, -1);
-            }
-        } else if (idim != dir) {
-            adjBox.growLo(idim, ng[idim]);
-            adjBox.growHi(idim, ng[idim]);
-        }
-    }
-
-    amrex::IntVect shiftiv(0);
-    shiftiv[dir] = num_shift;
-    const amrex::Dim3 shift = shiftiv.dim3();
-
-    const amrex::RealBox& real_box = geom.ProbDomain();
-    const auto dx = geom.CellSizeArray();
-
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (Gpu::notInLaunchRegion())
-#endif
-
-    for (amrex::MFIter mfi(tmpmf, TilingIfNotGPU()); mfi.isValid(); ++mfi )
-    {
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-        }
-        auto wt = static_cast<amrex::Real>(amrex::second());
-
-        auto const& dstfab = mf.array(mfi);
-        auto const& srcfab = tmpmf.array(mfi);
-
-        const amrex::Box& outbox = mfi.growntilebox() & adjBox;
-
-        if (outbox.ok()) {
-            if (!useparser) {
-                AMREX_PARALLEL_FOR_4D ( outbox, nc, i, j, k, n,
-                {
-                    srcfab(i,j,k,n) = external_field;
-                })
-            } else {
-                // index type of the src mf
-                auto const& mf_IndexType = (tmpmf).ixType();
-                amrex::IntVect mf_type(AMREX_D_DECL(0,0,0));
-                for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-                    mf_type[idim] = mf_IndexType.nodeCentered(idim);
-                }
-
-                amrex::ParallelFor (outbox, nc,
-                      [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
-                {
-                      // Compute x,y,z co-ordinates based on index type of mf
-#if defined(WARPX_DIM_1D_Z)
-                      const amrex::Real x = 0.0_rt;
-                      const amrex::Real y = 0.0_rt;
-                      const amrex::Real fac_z = (1.0_rt - mf_type[0]) * dx[0]*0.5_rt;
-                      const amrex::Real z = i*dx[0] + real_box.lo(0) + fac_z;
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                      const amrex::Real fac_x = (1.0_rt - mf_type[0]) * dx[0]*0.5_rt;
-                      const amrex::Real x = i*dx[0] + real_box.lo(0) + fac_x;
-                      const amrex::Real y = 0.0;
-                      const amrex::Real fac_z = (1.0_rt - mf_type[1]) * dx[1]*0.5_rt;
-                      const amrex::Real z = j*dx[1] + real_box.lo(1) + fac_z;
-#else
-                      const amrex::Real fac_x = (1.0_rt - mf_type[0]) * dx[0]*0.5_rt;
-                      const amrex::Real x = i*dx[0] + real_box.lo(0) + fac_x;
-                      const amrex::Real fac_y = (1.0_rt - mf_type[1]) * dx[1]*0.5_rt;
-                      const amrex::Real y = j*dx[1] + real_box.lo(1) + fac_y;
-                      const amrex::Real fac_z = (1.0_rt - mf_type[2]) * dx[2]*0.5_rt;
-                      const amrex::Real z = k*dx[2] + real_box.lo(2) + fac_z;
-#endif
-                      srcfab(i,j,k,n) = field_parser(x,y,z);
-                });
-            }
-
-        }
-
-        amrex::Box dstBox = mf[mfi].box();
-        if (num_shift > 0) {
-            dstBox.growHi(dir, -num_shift);
-        } else {
-            dstBox.growLo(dir,  num_shift);
-        }
-        AMREX_PARALLEL_FOR_4D ( dstBox, nc, i, j, k, n,
-        {
-            dstfab(i,j,k,n) = srcfab(i+shift.x,j+shift.y,k+shift.z,n);
-        })
-
-        if (cost && update_cost_flag &&
-            WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-            wt = static_cast<amrex::Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
-    }
-
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
-    if (WarpX::GetInstance().getPMLRZ()) {
-        // This does the exchange of data in the corner guard cells, the cells that are in the
-        // guard region both radially and longitudinally. These are the PML cells in the overlapping
-        // longitudinal region. FillBoundary normally does not update these cells.
-        // This update is needed so that the cells at the end of the FABs are updated appropriately
-        // with the data shifted from the neighboring FAB. Without this update, the RZ PML becomes
-        // unstable with the moving grid.
-        // This code creates a temporary MultiFab using a BoxList where the radial size of all of
-        // its boxes is increased so that the radial guard cells are included in the boxes valid domain.
-        // The temporary MultiFab is setup to refer to the data of the original Multifab (this can
-        // be done since the shape of the data is all the same, just the indexing is different).
-        amrex::BoxList bl;
-        const auto ba_size = static_cast<int>(ba.size());
-        for (int i = 0; i < ba_size; ++i) {
-            bl.push_back(amrex::grow(ba[i], 0, mf.nGrowVect()[0]));
-        }
-        const amrex::BoxArray rba(std::move(bl));
-        amrex::MultiFab rmf(rba, dm, mf.nComp(), IntVect(0,mf.nGrowVect()[1]), MFInfo().SetAlloc(false));
-
-        for (amrex::MFIter mfi(mf); mfi.isValid(); ++mfi) {
-            rmf.setFab(mfi, FArrayBox(mf[mfi], amrex::make_alias, 0, mf.nComp()));
-        }
-        rmf.FillBoundary(false);
-    }
-#endif
-
 }
 
 void

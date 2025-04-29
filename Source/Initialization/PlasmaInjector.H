@@ -131,6 +131,8 @@ public:
     int flux_normal_axis;
     int flux_direction; // -1 for left, +1 for right
 
+    bool m_inject_from_eb = false; // whether to inject from the embedded boundary
+
     bool radially_weighted = true;
 
     std::string str_flux_function;

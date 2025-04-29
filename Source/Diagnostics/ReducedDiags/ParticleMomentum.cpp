@@ -107,7 +107,7 @@ ParticleMomentum::ParticleMomentum (const std::string& rd_name)
                 ofs << species_names[i] + "_mean_z(kg*m/s)";
             }
 
-            ofs << std::endl;
+            ofs << "\n";
             ofs.close();
         }
     }

@@ -28,12 +28,15 @@ m_rd_name{rd_name}
 {
     BackwardCompatibility();
 
+    const ParmParse pp_rd("reduced_diags");
     const ParmParse pp_rd_name(m_rd_name);
 
     // read path
+    pp_rd.query("path", m_path);
     pp_rd_name.query("path", m_path);
 
     // read extension
+    pp_rd.query("extension", m_extension);
     pp_rd_name.query("extension", m_extension);
 
     // check if it is a restart run
@@ -61,13 +64,16 @@ m_rd_name{rd_name}
 
     // read reduced diags intervals
     std::vector<std::string> intervals_string_vec = {"1"};
-    pp_rd_name.getarr("intervals", intervals_string_vec);
+    pp_rd.queryarr("intervals", intervals_string_vec);
+    pp_rd_name.queryarr("intervals", intervals_string_vec);
     m_intervals = utils::parser::IntervalsParser(intervals_string_vec);
 
     // read separator
+    pp_rd.query("separator", m_sep);
     pp_rd_name.query("separator", m_sep);
 
     // precision of data in the output file
+    utils::parser::queryWithParser(pp_rd, "precision", m_precision);
     utils::parser::queryWithParser(pp_rd_name, "precision", m_precision);
 }
 // end constructor
@@ -84,6 +90,27 @@ void ReducedDiags::LoadBalance ()
     // Defines an empty function LoadBalance() to be overwritten if needed.
     // Function used to redistribute parallel data of the diagnostics in
     // load balancing operations
+}
+
+void ReducedDiags::ComputeDiagsMidStep (int /*step*/)
+{
+    // Defines an empty function ComputeDiagsMidStep() to be overwritten if needed.
+    // Function used to calculate the diagnostic at the mid step time leve
+    // (instead of at the end of the step).
+}
+
+void ReducedDiags::WriteCheckpointData (std::string const & /*dir*/)
+{
+    // Defines an empty function WriteCheckpointData() to be overwritten if needed.
+    // Function used to write out and data needed by the diagnostic in
+    // the checkpoint.
+}
+
+void ReducedDiags::ReadCheckpointData (std::string const & /*dir*/)
+{
+    // Defines an empty function ReadCheckpointData() to be overwritten if needed.
+    // Function used to read in any data that was written out in the checkpoint
+    // when doing a restart.
 }
 
 void ReducedDiags::BackwardCompatibility () const
@@ -121,7 +148,7 @@ void ReducedDiags::WriteToFile (int step) const
     // end loop over data size
 
     // end line
-    ofs << std::endl;
+    ofs << "\n";
 
     // close file
     ofs.close();

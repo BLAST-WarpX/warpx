@@ -28,7 +28,9 @@ sudo apt-key add rocm.gpg.key
 
 source /etc/os-release # set UBUNTU_CODENAME: focal or jammy or ...
 
-echo "deb [arch=amd64] https://repo.radeon.com/rocm/apt/${1-latest} ${UBUNTU_CODENAME} main" \
+VERSION=${1-6.3.2}
+
+echo "deb [arch=amd64] https://repo.radeon.com/rocm/apt/${VERSION} ${UBUNTU_CODENAME} main" \
   | sudo tee /etc/apt/sources.list.d/rocm.list
 echo 'export PATH=/opt/rocm/llvm/bin:/opt/rocm/bin:/opt/rocm/profiler/bin:/opt/rocm/opencl/bin:$PATH' \
   | sudo tee -a /etc/profile.d/rocm.sh
@@ -50,11 +52,16 @@ sudo apt-get install -y --no-install-recommends \
     libzstd-dev     \
     ninja-build     \
     openmpi-bin     \
-    rocm-dev        \
-    rocfft-dev      \
-    rocprim-dev     \
-    rocrand-dev     \
-    hiprand-dev
+    rocm-dev${VERSION}        \
+    roctracer-dev${VERSION}   \
+    rocprofiler-dev${VERSION} \
+    rocrand-dev${VERSION}     \
+    rocfft-dev${VERSION}      \
+    rocprim-dev${VERSION}     \
+    rocsparse-dev${VERSION}
+
+# hiprand-dev is a new package that does not exist in old versions
+sudo apt-get install -y --no-install-recommends hiprand-dev${VERSION} || true
 
 # ccache
 $(dirname "$0")/ccache.sh
@@ -68,27 +75,9 @@ which clang++
 export CXX=$(which clang++)
 export CC=$(which clang)
 
-# "mpic++ --showme" forgets open-pal in Ubuntu 20.04 + OpenMPI 4.0.3
-#   https://bugs.launchpad.net/ubuntu/+source/openmpi/+bug/1941786
-#   https://github.com/open-mpi/ompi/issues/9317
-export LDFLAGS="-lopen-pal"
-
 # cmake-easyinstall
 #
 sudo curl -L -o /usr/local/bin/cmake-easyinstall https://raw.githubusercontent.com/ax3l/cmake-easyinstall/main/cmake-easyinstall
 sudo chmod a+x /usr/local/bin/cmake-easyinstall
 export CEI_SUDO="sudo"
 export CEI_TMP="/tmp/cei"
-
-# heFFTe
-#
-cmake-easyinstall --prefix=/usr/local                      \
-    git+https://github.com/icl-utk-edu/heffte.git@v2.4.0   \
-    -DCMAKE_CXX_COMPILER_LAUNCHER=$(which ccache)          \
-    -DCMAKE_CXX_STANDARD=17 -DHeffte_ENABLE_DOXYGEN=OFF    \
-    -DHeffte_ENABLE_FFTW=OFF -DHeffte_ENABLE_TESTING=OFF   \
-    -DHeffte_ENABLE_CUDA=OFF -DHeffte_ENABLE_ROCM=ON       \
-    -DHeffte_ENABLE_ONEAPI=OFF -DHeffte_ENABLE_MKL=OFF     \
-    -DHeffte_ENABLE_PYTHON=OFF -DHeffte_ENABLE_FORTRAN=OFF \
-    -DHeffte_ENABLE_MAGMA=OFF                              \
-    -DCMAKE_VERBOSE_MAKEFILE=ON

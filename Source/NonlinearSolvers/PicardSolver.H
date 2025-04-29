@@ -13,6 +13,8 @@
 #include "Utils/TextMsg.H"
 
 #include <vector>
+#include <istream>
+#include <filesystem>
 
 /**
  * \brief Picard fixed-point iteration method to solve nonlinear
@@ -26,9 +28,9 @@ class PicardSolver : public NonlinearSolver<Vec,Ops>
 {
 public:
 
-    PicardSolver<Vec,Ops>() = default;
+    PicardSolver() = default;
 
-    ~PicardSolver<Vec,Ops>() override = default;
+    ~PicardSolver() override = default;
 
     // Prohibit Move and Copy operations
     PicardSolver(const PicardSolver&) = delete;
@@ -42,7 +44,8 @@ public:
     void Solve ( Vec&   a_U,
            const Vec&   a_b,
            amrex::Real  a_time,
-           amrex::Real  a_dt ) const override;
+           amrex::Real  a_dt,
+           int          a_step) const override;
 
     void GetSolverParams ( amrex::Real&  a_rtol,
                            amrex::Real&  a_atol,
@@ -55,10 +58,10 @@ public:
 
     void PrintParams () const override
     {
-        amrex::Print() << "Picard max iterations:      " << m_maxits << std::endl;
-        amrex::Print() << "Picard relative tolerance:  " << m_rtol << std::endl;
-        amrex::Print() << "Picard absolute tolerance:  " << m_atol << std::endl;
-        amrex::Print() << "Picard require convergence: " << (m_require_convergence?"true":"false") << std::endl;
+        amrex::Print() << "Picard max iterations:      " << m_maxits << "\n";
+        amrex::Print() << "Picard relative tolerance:  " << m_rtol << "\n";
+        amrex::Print() << "Picard absolute tolerance:  " << m_atol << "\n";
+        amrex::Print() << "Picard require convergence: " << (m_require_convergence?"true":"false") << "\n";
     }
 
 private:
@@ -114,6 +117,33 @@ void PicardSolver<Vec,Ops>::Define ( const Vec&  a_U,
 
     this->m_is_defined = true;
 
+    // Create diagnostic file and write header
+    if (amrex::ParallelDescriptor::IOProcessor()
+        && !this->m_diagnostic_file.empty()
+        && !amrex::FileExists(this->m_diagnostic_file)) {
+
+        std::filesystem::path const diagnostic_path(this->m_diagnostic_file);
+        std::filesystem::path const diagnostic_dir = diagnostic_path.parent_path();
+        if (!diagnostic_dir.empty()) {
+            std::filesystem::create_directories(diagnostic_dir);
+        }
+
+        std::ofstream diagnostic_file{this->m_diagnostic_file, std::ofstream::out | std::ofstream::trunc};
+        int c = 0;
+        diagnostic_file << "#";
+        diagnostic_file << "[" << c++ << "]step()";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]time(s)";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]iters";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]norm_abs";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]norm_rel";
+        diagnostic_file << "\n";
+        diagnostic_file.close();
+    }
+
 }
 
 template <class Vec, class Ops>
@@ -125,14 +155,16 @@ void PicardSolver<Vec,Ops>::ParseParameters ()
     pp_picard.query("relative_tolerance",  m_rtol);
     pp_picard.query("max_iterations",      m_maxits);
     pp_picard.query("require_convergence", m_require_convergence);
-
+    pp_picard.query("diagnostic_file",     this->m_diagnostic_file);
+    pp_picard.query("diagnostic_interval", this->m_diagnostic_interval);
 }
 
 template <class Vec, class Ops>
 void PicardSolver<Vec,Ops>::Solve ( Vec&         a_U,
                               const Vec&         a_b,
                                     amrex::Real  a_time,
-                                    amrex::Real  a_dt ) const
+                                    amrex::Real  a_dt,
+                                    int          a_step) const
 {
     BL_PROFILE("PicardSolver::Solve()");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -156,7 +188,7 @@ void PicardSolver<Vec,Ops>::Solve ( Vec&         a_U,
         m_Usave.Copy(a_U);
 
         // Update the solver state (a_U = a_b + m_R)
-        m_ops->ComputeRHS( m_R, a_U, a_time, a_dt, iter, false );
+        m_ops->ComputeRHS( m_R, a_U, a_time, iter, false );
         a_U.Copy(a_b);
         a_U += m_R;
 
@@ -179,19 +211,19 @@ void PicardSolver<Vec,Ops>::Solve ( Vec&         a_U,
 
         if (norm_abs < m_atol) {
             amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
-                           << ". Satisfied absolute tolerance " << m_atol << std::endl;
+                           << ". Satisfied absolute tolerance " << m_atol << "\n";
             break;
         }
 
         if (norm_rel < m_rtol) {
             amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
-                           << ". Satisfied relative tolerance " << m_rtol << std::endl;
+                           << ". Satisfied relative tolerance " << m_rtol << "\n";
             break;
         }
 
         if (iter >= m_maxits) {
             amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
-                           << ". Maximum iteration reached: iter = " << m_maxits << std::endl;
+                           << ". Maximum iteration reached: iter = " << m_maxits << "\n";
             break;
         }
 
@@ -204,12 +236,29 @@ void PicardSolver<Vec,Ops>::Solve ( Vec&         a_U,
                          " and the relative tolerance is " << m_rtol <<
                          ". Absolute norm is " << norm_abs <<
                          " and the absolute tolerance is " << m_atol;
-       if (this->m_verbose) { amrex::Print() << convergenceMsg.str() << std::endl; }
+       if (this->m_verbose) { amrex::Print() << convergenceMsg.str() << "\n"; }
        if (m_require_convergence) {
            WARPX_ABORT_WITH_MESSAGE(convergenceMsg.str());
        } else {
            ablastr::warn_manager::WMRecordWarning("PicardSolver", convergenceMsg.str());
        }
+    }
+
+    if (!this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor() &&
+        (a_step%this->m_diagnostic_interval==0 || a_step==0)) {
+        std::ofstream diagnostic_file{this->m_diagnostic_file, std::ofstream::out | std::ofstream::app};
+        diagnostic_file << std::setprecision(14);
+        diagnostic_file << a_step+1;
+        diagnostic_file << " ";
+        diagnostic_file << a_time + a_dt;
+        diagnostic_file << " ";
+        diagnostic_file << iter;
+        diagnostic_file << " ";
+        diagnostic_file << norm_abs;
+        diagnostic_file << " ";
+        diagnostic_file << norm_rel;
+        diagnostic_file << "\n";
+        diagnostic_file.close();
     }
 
 }

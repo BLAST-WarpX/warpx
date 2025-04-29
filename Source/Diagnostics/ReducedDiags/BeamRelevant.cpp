@@ -109,7 +109,7 @@ BeamRelevant::BeamRelevant (const std::string& rd_name)
             ofs << "[" << c++ << "]alpha_y()";        ofs << m_sep;
             ofs << "[" << c++ << "]beta_x(m)";        ofs << m_sep;
             ofs << "[" << c++ << "]beta_y(m)";        ofs << m_sep;
-            ofs << "[" << c++ << "]charge(C)";        ofs << std::endl;
+            ofs << "[" << c++ << "]charge(C)";        ofs << "\n";
 #elif (defined WARPX_DIM_XZ)
             int c = 0;
             ofs << "#";
@@ -131,7 +131,7 @@ BeamRelevant::BeamRelevant (const std::string& rd_name)
             ofs << "[" << c++ << "]emittance_z(m)";   ofs << m_sep;
             ofs << "[" << c++ << "]alpha_x()";        ofs << m_sep;
             ofs << "[" << c++ << "]beta_x(m)";        ofs << m_sep;
-            ofs << "[" << c++ << "]charge(C)";        ofs << std::endl;
+            ofs << "[" << c++ << "]charge(C)";        ofs << "\n";
 #elif (defined WARPX_DIM_1D_Z)
             int c = 0;
             ofs << "#";
@@ -148,7 +148,7 @@ BeamRelevant::BeamRelevant (const std::string& rd_name)
             ofs << "[" << c++ << "]pz_rms(kg*m/s)";   ofs << m_sep;
             ofs << "[" << c++ << "]gamma_rms()";      ofs << m_sep;
             ofs << "[" << c++ << "]emittance_z(m)";   ofs << m_sep;
-            ofs << "[" << c++ << "]charge(C)";        ofs << std::endl;
+            ofs << "[" << c++ << "]charge(C)";        ofs << "\n";
 #endif
             // close file
             ofs.close();

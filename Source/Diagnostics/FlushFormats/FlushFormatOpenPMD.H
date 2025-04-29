@@ -36,11 +36,12 @@ public:
         std::string prefix, int file_min_digits,
         bool plot_raw_fields,
         bool plot_raw_fields_guards,
+        int verbose,
         bool use_pinned_pc = false,
         bool isBTD = false, int snapshotID = -1,
         int bufferID = 1, int numBuffers = 1,
         const amrex::Geometry& full_BTD_snapshot = amrex::Geometry(),
-        bool isLastBTDFlush = false ) const override;
+        bool isLastBTDFlush = false) const override;
 
     ~FlushFormatOpenPMD () override = default;
 

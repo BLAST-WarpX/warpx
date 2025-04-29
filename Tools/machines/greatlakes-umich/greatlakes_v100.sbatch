@@ -26,8 +26,7 @@ INPUTS=inputs
 #   per node are 2x 2.4 GHz Intel Xeon Gold 6148
 #   note: the system seems to only expose cores (20 per socket),
 #         not hyperthreads (40 per socket)
-export SRUN_CPUS_PER_TASK=20
-export OMP_NUM_THREADS=${SRUN_CPUS_PER_TASK}
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 
 # GPU-aware MPI optimizations
 GPU_AWARE_MPI="amrex.use_gpu_aware_mpi=1"

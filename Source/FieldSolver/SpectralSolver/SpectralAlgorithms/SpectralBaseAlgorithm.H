@@ -13,6 +13,7 @@
 #include "FieldSolver/SpectralSolver/SpectralFieldData_fwd.H"
 #include "FieldSolver/SpectralSolver/SpectralFieldData.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/utils/Enums.H>
 
 #include <AMReX_BaseFab.H>
@@ -74,7 +75,7 @@ class SpectralBaseAlgorithm
          */
         void ComputeSpectralDivE ( int lev,
                                    SpectralFieldData& field_data,
-                                   const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
+                                   ablastr::fields::VectorField const& Efield,
                                    amrex::MultiFab& divE );
 
     protected: // Meant to be used in the subclasses

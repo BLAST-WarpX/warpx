@@ -8,16 +8,11 @@
 
 import sys
 
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import os
-
 import numpy as np
 import yt
 
 yt.funcs.mylog.setLevel(50)
-import re
 
-import checksumAPI
 from scipy.constants import c
 
 # Name of the last plotfile
@@ -52,10 +47,3 @@ rel_error = np.amax(abs(x - y)) / np.amax(abs(y))
 tolerance = 1e-1
 
 assert rel_error < tolerance
-
-test_name = os.path.split(os.getcwd())[1]
-
-if re.search("single_precision", fn):
-    checksumAPI.evaluate_checksum(test_name, fn, rtol=1.0e-3)
-else:
-    checksumAPI.evaluate_checksum(test_name, fn)

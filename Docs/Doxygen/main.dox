@@ -17,7 +17,7 @@
   It supports many features including Perfectly-Matched Layers (PML),
   mesh refinement, and the boosted-frame technique.
   WarpX is freely available on Github at
-  <a href="https://github.com/ECP-WarpX/WarpX">ECP-WarpX/WarpX</a>
+  <a href="https://github.com/BLAST-WarpX/warpx">BLAST-WarpX/warpx</a>
 
   WarpX is developed at LBNL in DOE's Exascale Computing Project and
   receives essential contributions from many collaborators, especially
@@ -36,7 +36,7 @@
   \subsection development_of_warpx Development
 
   All of WarpX' development is done in the GitHub repository under the
-  <a href="https://github.com/ECP-WarpX/WarpX/tree/development">
+  <a href="https://github.com/BLAST-WarpX/warpx/tree/development">
   development branch</a>; anyone can see the latest updates. A monthly release is
   tagged at the beginning of each month.
 
@@ -48,13 +48,13 @@
   Any level of changes are welcome: documentation, bug fixes,
   new test problems, new solvers, etc.
   For more complex projects, consider opening an
-  <a href="https://github.com/ECP-WarpX/WarpX/issues">issue</a>
+  <a href="https://github.com/BLAST-WarpX/warpx/issues">issue</a>
   first to coordinate development and gather feedback.
 
   To obtain help, simply post a
-  <a href="https://github.com/ECP-WarpX/WarpX/discussions">discussion</a>
+  <a href="https://github.com/BLAST-WarpX/warpx/discussions">discussion</a>
   or an
-  <a href="https://github.com/ECP-WarpX/WarpX/issues">issue</a>
+  <a href="https://github.com/BLAST-WarpX/warpx/issues">issue</a>
   on the WarpX GitHub page.
 
 */

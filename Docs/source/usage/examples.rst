@@ -10,7 +10,7 @@ We provide two kinds of inputs:
 * PICMI python input files, `with parameters described here <https://picmi-standard.github.io>`__.
 * AMReX ``inputs`` files, :ref:`with parameters described here <running-cpp-parameters>`,
 
-For a complete list of all example input files, also have a look at our `Examples/ <https://github.com/ECP-WarpX/WarpX/tree/development/Examples>`__ directory.
+For a complete list of all example input files, also have a look at our `Examples/ <https://github.com/BLAST-WarpX/warpx/tree/development/Examples>`__ directory.
 It contains folders and subfolders with self-describing names that you can try.
 All these input files are automatically tested, so they should always be up-to-date.
 
@@ -44,7 +44,8 @@ Particle Accelerator & Beam Physics
 
    examples/gaussian_beam/README.rst
    examples/beam_beam_collision/README.rst
-
+   examples/free_electron_laser/README.rst
+   examples/thomson_parabola_spectrometer/README.rst
 
 High Energy Astrophysical Plasma Physics
 ----------------------------------------
@@ -62,14 +63,6 @@ Microelectronics
 
 * `ARTEMIS examples <https://github.com/AMReX-Microelectronics/artemis/tree/development/Examples>`__
 * `ARTEMIS manual <https://artemis-em.readthedocs.io>`__
-
-
-Nuclear Fusion
---------------
-
-.. note::
-
-   TODO
 
 
 Fundamental Plasma Physics
@@ -95,7 +88,7 @@ dominate (ion cyclotron waves, for instance). See the
 examples and benchmarks of this kinetic-fluid hybrid model are provided below.
 A few of the examples are replications of the verification tests described in
 :cite:t:`ex-MUNOZ2018`. The hybrid-PIC model was added to WarpX in
-`PR #3665 <https://github.com/ECP-WarpX/WarpX/pull/3665>`_ - the figures in the
+`PR #3665 <https://github.com/BLAST-WarpX/warpx/pull/3665>`_ - the figures in the
 examples below were generated at that time.
 
 .. toctree::
@@ -143,7 +136,7 @@ Many Further Examples, Demos and Tests
    examples/field_ionization/README.rst
 
 WarpX runs over 200 integration tests on a variety of modeling cases, which validate and demonstrate its functionality.
-Please see the `Examples/Tests/ <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests>`__ directory for many more examples.
+Please see the `Examples/Tests/ <https://github.com/BLAST-WarpX/warpx/tree/development/Examples/Tests>`__ directory for many more examples.
 
 
 Example References

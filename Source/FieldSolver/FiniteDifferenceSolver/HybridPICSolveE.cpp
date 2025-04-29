@@ -1,8 +1,9 @@
-/* Copyright 2023 The WarpX Community
+/* Copyright 2023-2024 The WarpX Community
  *
  * This file is part of WarpX.
  *
  * Authors: Roelof Groenewald (TAE Technologies)
+ *          S. Eric Clark (Helion Energy)
  *
  * License: BSD-3-Clause-LBNL
  */
@@ -22,11 +23,12 @@
 #include <ablastr/coarsen/sample.H>
 
 using namespace amrex;
+using warpx::fields::FieldType;
 
 void FiniteDifferenceSolver::CalculateCurrentAmpere (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3>& Jfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3> const& Bfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
+    ablastr::fields::VectorField & Jfield,
+    ablastr::fields::VectorField const& Bfield,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     int lev )
 {
     // Select algorithm (The choice of algorithm is a runtime option,
@@ -34,12 +36,12 @@ void FiniteDifferenceSolver::CalculateCurrentAmpere (
     if (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC) {
 #ifdef WARPX_DIM_RZ
         CalculateCurrentAmpereCylindrical <CylindricalYeeAlgorithm> (
-            Jfield, Bfield, edge_lengths, lev
+            Jfield, Bfield, eb_update_E, lev
         );
 
 #else
         CalculateCurrentAmpereCartesian <CartesianYeeAlgorithm> (
-            Jfield, Bfield, edge_lengths, lev
+            Jfield, Bfield, eb_update_E, lev
         );
 
 #endif
@@ -59,9 +61,9 @@ void FiniteDifferenceSolver::CalculateCurrentAmpere (
 #ifdef WARPX_DIM_RZ
 template<typename T_Algo>
 void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Jfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
+    ablastr::fields::VectorField& Jfield,
+    ablastr::fields::VectorField const& Bfield,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     int lev
 )
 {
@@ -92,12 +94,16 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
         Array4<Real> const& Bt = Bfield[1]->array(mfi);
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
 
-        amrex::Array4<amrex::Real> lr, lt, lz;
-
+        // Extract structures indicating where the fields
+        // should be updated, given the position of the embedded boundaries.
+        // The plasma current is stored at the same locations as the E-field,
+        // therefore the `eb_update_E` multifab also appropriately specifies
+        // where the plasma current should be calculated.
+        amrex::Array4<int> update_Jr_arr, update_Jt_arr, update_Jz_arr;
         if (EB::enabled()) {
-            lr = edge_lengths[0]->array(mfi);
-            lt = edge_lengths[1]->array(mfi);
-            lz = edge_lengths[2]->array(mfi);
+            update_Jr_arr = eb_update_E[0]->array(mfi);
+            update_Jt_arr = eb_update_E[1]->array(mfi);
+            update_Jz_arr = eb_update_E[2]->array(mfi);
         }
 
         // Extract stencil coefficients
@@ -124,8 +130,10 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
 
             // Jr calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                // Skip if this cell is fully covered by embedded boundaries
-                if (lr && lr(i, j, 0) <= 0) { return; }
+
+                // Skip field update in the embedded boundaries
+                if (update_Jr_arr && update_Jr_arr(i, j, 0) == 0) { return; }
+
                 // Mode m=0
                 Jr(i, j, 0, 0) = one_over_mu0 * (
                     - T_Algo::DownwardDz(Bt, coefs_z, n_coefs_z, i, j, 0, 0)
@@ -148,8 +156,9 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
 
             // Jt calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                // In RZ Jt is associated with a mesh node, so we need to check if the mesh node is covered
-                if (lr && (lr(i, j, 0)<=0 || lr(i-1, j, 0)<=0 || lz(i, j-1, 0)<=0 || lz(i, j, 0)<=0)) { return; }
+
+                // Skip field update in the embedded boundaries
+                if (update_Jt_arr && update_Jt_arr(i, j, 0) == 0) { return; }
 
                 // r on a nodal point (Jt is nodal in r)
                 Real const r = rmin + i*dr;
@@ -194,8 +203,10 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
 
             // Jz calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                // Skip if this cell is fully covered by embedded boundaries
-                if (lz && lz(i, j, 0) <= 0) { return; }
+
+                // Skip field update in the embedded boundaries
+                if (update_Jz_arr && update_Jz_arr(i, j, 0) == 0) { return; }
+
                 // r on a nodal point (Jz is nodal in r)
                 Real const r = rmin + i*dr;
                 // Off-axis, regular curl
@@ -242,9 +253,9 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Jfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
+    ablastr::fields::VectorField& Jfield,
+    ablastr::fields::VectorField const& Bfield,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     int lev
 )
 {
@@ -274,11 +285,16 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
         Array4<Real const> const &By = Bfield[1]->const_array(mfi);
         Array4<Real const> const &Bz = Bfield[2]->const_array(mfi);
 
-        amrex::Array4<amrex::Real> lx, ly, lz;
+        // Extract structures indicating where the fields
+        // should be updated, given the position of the embedded boundaries.
+        // The plasma current is stored at the same locations as the E-field,
+        // therefore the `eb_update_E` multifab also appropriately specifies
+        // where the plasma current should be calculated.
+        amrex::Array4<int> update_Jx_arr, update_Jy_arr, update_Jz_arr;
         if (EB::enabled()) {
-            lx = edge_lengths[0]->array(mfi);
-            ly = edge_lengths[1]->array(mfi);
-            lz = edge_lengths[2]->array(mfi);
+            update_Jx_arr = eb_update_E[0]->array(mfi);
+            update_Jy_arr = eb_update_E[1]->array(mfi);
+            update_Jz_arr = eb_update_E[2]->array(mfi);
         }
 
         // Extract stencil coefficients
@@ -302,8 +318,9 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
 
             // Jx calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                // Skip if this cell is fully covered by embedded boundaries
-                if (lx && lx(i, j, k) <= 0) { return; }
+
+                // Skip field update in the embedded boundaries
+                if (update_Jx_arr && update_Jx_arr(i, j, k) == 0) { return; }
 
                 Jx(i, j, k) = one_over_mu0 * (
                     - T_Algo::DownwardDz(By, coefs_z, n_coefs_z, i, j, k)
@@ -313,14 +330,10 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
 
             // Jy calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                // Skip if this cell is fully covered by embedded boundaries
-#ifdef WARPX_DIM_3D
-                if (ly && ly(i,j,k) <= 0) { return; }
-#elif defined(WARPX_DIM_XZ)
-                // In XZ Jy is associated with a mesh node, so we need to check if the mesh node is covered
-                amrex::ignore_unused(ly);
-                if (lx && (lx(i, j, k)<=0 || lx(i-1, j, k)<=0 || lz(i, j-1, k)<=0 || lz(i, j, k)<=0)) { return; }
-#endif
+
+                // Skip field update in the embedded boundaries
+                if (update_Jy_arr && update_Jy_arr(i, j, k) == 0) { return; }
+
                 Jy(i, j, k) = one_over_mu0 * (
                     - T_Algo::DownwardDx(Bz, coefs_x, n_coefs_x, i, j, k)
                     + T_Algo::DownwardDz(Bx, coefs_z, n_coefs_z, i, j, k)
@@ -329,8 +342,9 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
 
             // Jz calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                // Skip if this cell is fully covered by embedded boundaries
-                if (lz && lz(i,j,k) <= 0) { return; }
+
+                // Skip field update in the embedded boundaries
+                if (update_Jz_arr && update_Jz_arr(i, j, k) == 0) { return; }
 
                 Jz(i, j, k) = one_over_mu0 * (
                     - T_Algo::DownwardDy(Bx, coefs_y, n_coefs_y, i, j, k)
@@ -351,14 +365,13 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
 
 
 void FiniteDifferenceSolver::HybridPICSolveE (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Efield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Jfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jifield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jextfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
-    std::unique_ptr<amrex::MultiFab> const& rhofield,
-    std::unique_ptr<amrex::MultiFab> const& Pefield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
+    ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField& Jfield,
+    ablastr::fields::VectorField const& Jifield,
+    ablastr::fields::VectorField const& Bfield,
+    amrex::MultiFab const& rhofield,
+    amrex::MultiFab const& Pefield,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     int lev, HybridPICModel const* hybrid_model,
     const bool solve_for_Faraday)
 {
@@ -368,15 +381,15 @@ void FiniteDifferenceSolver::HybridPICSolveE (
 #ifdef WARPX_DIM_RZ
 
         HybridPICSolveECylindrical <CylindricalYeeAlgorithm> (
-            Efield, Jfield, Jifield, Jextfield, Bfield, rhofield, Pefield,
-            edge_lengths, lev, hybrid_model, solve_for_Faraday
+            Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
+            eb_update_E, lev, hybrid_model, solve_for_Faraday
         );
 
 #else
 
         HybridPICSolveECartesian <CartesianYeeAlgorithm> (
-            Efield, Jfield, Jifield, Jextfield, Bfield, rhofield, Pefield,
-            edge_lengths, lev, hybrid_model, solve_for_Faraday
+            Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
+            eb_update_E, lev, hybrid_model, solve_for_Faraday
         );
 
 #endif
@@ -389,14 +402,13 @@ void FiniteDifferenceSolver::HybridPICSolveE (
 #ifdef WARPX_DIM_RZ
 template<typename T_Algo>
 void FiniteDifferenceSolver::HybridPICSolveECylindrical (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Efield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jifield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jextfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
-    std::unique_ptr<amrex::MultiFab> const& rhofield,
-    std::unique_ptr<amrex::MultiFab> const& Pefield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
+    ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField const& Jfield,
+    ablastr::fields::VectorField const& Jifield,
+    ablastr::fields::VectorField const& Bfield,
+    amrex::MultiFab const& rhofield,
+    amrex::MultiFab const& Pefield,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     int lev, HybridPICModel const* hybrid_model,
     const bool solve_for_Faraday )
 {
@@ -416,8 +428,19 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     const auto eta_h = hybrid_model->m_eta_h;
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
     const auto resistivity_has_J_dependence = hybrid_model->m_resistivity_has_J_dependence;
+    const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
+    const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity_term;
 
-    const bool include_hyper_resistivity_term = (eta_h > 0.0) && solve_for_Faraday;
+    const bool include_external_fields = hybrid_model->m_add_external_fields;
+
+    const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
+
+    auto & warpx = WarpX::GetInstance();
+    ablastr::fields::VectorField Bfield_external, Efield_external;
+    if (include_external_fields) {
+        Bfield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_B_fp_external, 0); // lev=0
+        Efield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_E_fp_external, 0); // lev=0
+    }
 
     // Index type required for interpolating fields from their respective
     // staggering to the Ex, Ey, Ez locations
@@ -449,8 +472,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     // Also note that enE_nodal_mf does not need to have any guard cells since
     // these values will be interpolated to the Yee mesh which is contained
     // by the nodal mesh.
-    auto const& ba = convert(rhofield->boxArray(), IntVect::TheNodeVector());
-    MultiFab enE_nodal_mf(ba, rhofield->DistributionMap(), 3, IntVect::TheZeroVector());
+    auto const& ba = convert(rhofield.boxArray(), IntVect::TheNodeVector());
+    MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
 
     // Loop through the grids, and over the tiles within each grid for the
     // initial, nodal calculation of E
@@ -471,12 +494,16 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real const> const& Jir = Jifield[0]->const_array(mfi);
         Array4<Real const> const& Jit = Jifield[1]->const_array(mfi);
         Array4<Real const> const& Jiz = Jifield[2]->const_array(mfi);
-        Array4<Real const> const& Jextr = Jextfield[0]->const_array(mfi);
-        Array4<Real const> const& Jextt = Jextfield[1]->const_array(mfi);
-        Array4<Real const> const& Jextz = Jextfield[2]->const_array(mfi);
         Array4<Real const> const& Br = Bfield[0]->const_array(mfi);
         Array4<Real const> const& Bt = Bfield[1]->const_array(mfi);
         Array4<Real const> const& Bz = Bfield[2]->const_array(mfi);
+
+        Array4<Real> Br_ext, Bt_ext, Bz_ext;
+        if (include_external_fields) {
+            Br_ext = Bfield_external[0]->array(mfi);
+            Bt_ext = Bfield_external[1]->array(mfi);
+            Bz_ext = Bfield_external[2]->array(mfi);
+        }
 
         // Loop over the cells and update the nodal E field
         amrex::ParallelFor(mfi.tilebox(), [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
@@ -492,22 +519,28 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
             auto const jiz_interp = Interp(Jiz, Jz_stag, nodal, coarsen, i, j, 0, 0);
 
             // interpolate the B field to a nodal grid
-            auto const Br_interp = Interp(Br, Br_stag, nodal, coarsen, i, j, 0, 0);
-            auto const Bt_interp = Interp(Bt, Bt_stag, nodal, coarsen, i, j, 0, 0);
-            auto const Bz_interp = Interp(Bz, Bz_stag, nodal, coarsen, i, j, 0, 0);
+            auto Br_interp = Interp(Br, Br_stag, nodal, coarsen, i, j, 0, 0);
+            auto Bt_interp = Interp(Bt, Bt_stag, nodal, coarsen, i, j, 0, 0);
+            auto Bz_interp = Interp(Bz, Bz_stag, nodal, coarsen, i, j, 0, 0);
+
+            if (include_external_fields) {
+                Br_interp += Interp(Br_ext, Br_stag, nodal, coarsen, i, j, 0, 0);
+                Bt_interp += Interp(Bt_ext, Bt_stag, nodal, coarsen, i, j, 0, 0);
+                Bz_interp += Interp(Bz_ext, Bz_stag, nodal, coarsen, i, j, 0, 0);
+            }
 
             // calculate enE = (J - Ji) x B
             enE_nodal(i, j, 0, 0) = (
-                (jt_interp - jit_interp - Jextt(i, j, 0)) * Bz_interp
-                - (jz_interp - jiz_interp - Jextz(i, j, 0)) * Bt_interp
+                (jt_interp - jit_interp) * Bz_interp
+                - (jz_interp - jiz_interp) * Bt_interp
             );
             enE_nodal(i, j, 0, 1) = (
-                (jz_interp - jiz_interp - Jextz(i, j, 0)) * Br_interp
-                - (jr_interp - jir_interp - Jextr(i, j, 0)) * Bz_interp
+                (jz_interp - jiz_interp) * Br_interp
+                - (jr_interp - jir_interp) * Bz_interp
             );
             enE_nodal(i, j, 0, 2) = (
-                (jr_interp - jir_interp - Jextr(i, j, 0)) * Bt_interp
-                - (jt_interp - jit_interp - Jextt(i, j, 0)) * Br_interp
+                (jr_interp - jir_interp) * Bt_interp
+                - (jt_interp - jit_interp) * Br_interp
             );
         });
 
@@ -539,14 +572,26 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real const> const& Jt = Jfield[1]->const_array(mfi);
         Array4<Real const> const& Jz = Jfield[2]->const_array(mfi);
         Array4<Real const> const& enE = enE_nodal_mf.const_array(mfi);
-        Array4<Real const> const& rho = rhofield->const_array(mfi);
-        Array4<Real> const& Pe = Pefield->array(mfi);
+        Array4<Real const> const& rho = rhofield.const_array(mfi);
+        Array4<Real const> const& Pe = Pefield.const_array(mfi);
+        Array4<Real> const& Br = Bfield[0]->array(mfi);
+        Array4<Real> const& Bt = Bfield[1]->array(mfi);
+        Array4<Real> const& Bz = Bfield[2]->array(mfi);
 
-        amrex::Array4<amrex::Real> lr, lz;
+        // Extract structures indicating where the fields
+        // should be updated, given the position of the embedded boundaries
+        amrex::Array4<int> update_Er_arr, update_Et_arr, update_Ez_arr;
         if (EB::enabled()) {
-            lr = edge_lengths[0]->array(mfi);
-            //   edge_lengths[1] is `lt` and is not needed
-            lz = edge_lengths[2]->array(mfi);
+            update_Er_arr = eb_update_E[0]->array(mfi);
+            update_Et_arr = eb_update_E[1]->array(mfi);
+            update_Ez_arr = eb_update_E[2]->array(mfi);
+        }
+
+        Array4<Real> Er_ext, Et_ext, Ez_ext;
+        if (include_external_fields) {
+            Er_ext = Efield_external[0]->array(mfi);
+            Et_ext = Efield_external[1]->array(mfi);
+            Ez_ext = Efield_external[2]->array(mfi);
         }
 
         // Extract stencil coefficients
@@ -568,50 +613,74 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
             // Er calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                // Skip if this cell is fully covered by embedded boundaries
-                if (lr && lr(i, j, 0) <= 0) { return; }
+
+                // Skip field update in the embedded boundaries
+                if (update_Er_arr && update_Er_arr(i, j, 0) == 0) { return; }
 
                 // Interpolate to get the appropriate charge density in space
-                Real rho_val = Interp(rho, nodal, Er_stag, coarsen, i, j, 0, 0);
+                const Real rho_val = Interp(rho, nodal, Er_stag, coarsen, i, j, 0, 0);
 
-                // Interpolate current to appropriate staggering to match E field
-                Real jtot_val = 0._rt;
-                if (solve_for_Faraday && resistivity_has_J_dependence) {
-                    const Real jr_val = Interp(Jr, Jr_stag, Er_stag, coarsen, i, j, 0, 0);
-                    const Real jt_val = Interp(Jt, Jt_stag, Er_stag, coarsen, i, j, 0, 0);
-                    const Real jz_val = Interp(Jz, Jz_stag, Er_stag, coarsen, i, j, 0, 0);
-                    jtot_val = std::sqrt(jr_val*jr_val + jt_val*jt_val + jz_val*jz_val);
+                if (rho_val < rho_floor && holmstrom_vacuum_region) {
+                    Er(i, j, 0) = 0._rt;
+                } else {
+                    // Get the gradient of the electron pressure if the longitudinal part of
+                    // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
+                    const Real grad_Pe = (!solve_for_Faraday) ?
+                        T_Algo::UpwardDr(Pe, coefs_r, n_coefs_r, i, j, 0, 0)
+                        : 0._rt;
+
+                    // interpolate the nodal neE values to the Yee grid
+                    const auto enE_r = Interp(enE, nodal, Er_stag, coarsen, i, j, 0, 0);
+
+                    // safety condition since we divide by rho
+                    const auto rho_val_limited = std::max(rho_val, rho_floor);
+
+                    Er(i, j, 0) = (enE_r - grad_Pe) / rho_val_limited;
                 }
 
-                // safety condition since we divide by rho_val later
-                if (rho_val < rho_floor) { rho_val = rho_floor; }
-
-                // Get the gradient of the electron pressure if the longitudinal part of
-                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                Real grad_Pe = 0._rt;
-                if (!solve_for_Faraday) { grad_Pe = T_Algo::UpwardDr(Pe, coefs_r, n_coefs_r, i, j, 0, 0); }
-
-                // interpolate the nodal neE values to the Yee grid
-                auto enE_r = Interp(enE, nodal, Er_stag, coarsen, i, j, 0, 0);
-
-                Er(i, j, 0) = (enE_r - grad_Pe) / rho_val;
-
                 // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) { Er(i, j, 0) += eta(rho_val, jtot_val) * Jr(i, j, 0); }
+                if (solve_for_Faraday) {
+                    Real jtot_val = 0._rt;
+                    if (resistivity_has_J_dependence) {
+                        // Interpolate current to appropriate staggering to match E field
+                        const Real jr_val = Jr(i, j, 0);
+                        const Real jt_val = Interp(Jt, Jt_stag, Er_stag, coarsen, i, j, 0, 0);
+                        const Real jz_val = Interp(Jz, Jz_stag, Er_stag, coarsen, i, j, 0, 0);
+                        jtot_val = std::sqrt(jr_val*jr_val + jt_val*jt_val + jz_val*jz_val);
+                    }
 
-                if (include_hyper_resistivity_term) {
-                    // r on cell-centered point (Jr is cell-centered in r)
-                    Real const r = rmin + (i + 0.5_rt)*dr;
+                    Er(i, j, 0) += eta(rho_val, jtot_val) * Jr(i, j, 0);
 
-                    auto nabla2Jr = T_Algo::Dr_rDr_over_r(Jr, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
-                    Er(i, j, 0) -= eta_h * nabla2Jr;
+                    if (include_hyper_resistivity_term) {
+
+                        // Interpolate B field to appropriate staggering to match E field
+                        Real btot_val = 0._rt;
+                        if (hyper_resistivity_has_B_dependence) {
+                            const Real br_val = Interp(Br, Br_stag, Er_stag, coarsen, i, j, 0, 0);
+                            const Real bt_val = Interp(Bt, Bt_stag, Er_stag, coarsen, i, j, 0, 0);
+                            const Real bz_val = Interp(Bz, Bz_stag, Er_stag, coarsen, i, j, 0, 0);
+                            btot_val = std::sqrt(br_val*br_val + bt_val*bt_val + bz_val*bz_val);
+                        }
+
+                        // r on cell-centered point (Jr is cell-centered in r)
+                        const Real r = rmin + (i + 0.5_rt)*dr;
+                        auto nabla2Jr = T_Algo::Dr_rDr_over_r(Jr, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
+                            + T_Algo::Dzz(Jr, coefs_z, n_coefs_z, i, j, 0, 0) - Jr(i, j, 0)/(r*r);
+
+                        Er(i, j, 0) -= eta_h(rho_val, btot_val) * nabla2Jr;
+                    }
+                }
+
+                if (include_external_fields && (rho_val >= rho_floor)) {
+                    Er(i, j, 0) -= Er_ext(i, j, 0);
                 }
             },
 
             // Et calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                // In RZ Et is associated with a mesh node, so we need to check if the mesh node is covered
-                if (lr && (lr(i, j, 0)<=0 || lr(i-1, j, 0)<=0 || lz(i, j-1, 0)<=0 || lz(i, j, 0)<=0)) { return; }
+
+                // Skip field update in the embedded boundaries
+                if (update_Et_arr && update_Et_arr(i, j, 0) == 0) { return; }
 
                 // r on a nodal grid (Et is nodal in r)
                 Real const r = rmin + i*dr;
@@ -622,71 +691,125 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 }
 
                 // Interpolate to get the appropriate charge density in space
-                Real rho_val = Interp(rho, nodal, Er_stag, coarsen, i, j, 0, 0);
+                const Real rho_val = Interp(rho, nodal, Et_stag, coarsen, i, j, 0, 0);
 
-                // Interpolate current to appropriate staggering to match E field
-                Real jtot_val = 0._rt;
-                if (solve_for_Faraday && resistivity_has_J_dependence) {
-                    const Real jr_val = Interp(Jr, Jr_stag, Et_stag, coarsen, i, j, 0, 0);
-                    const Real jt_val = Interp(Jt, Jt_stag, Et_stag, coarsen, i, j, 0, 0);
-                    const Real jz_val = Interp(Jz, Jz_stag, Et_stag, coarsen, i, j, 0, 0);
-                    jtot_val = std::sqrt(jr_val*jr_val + jt_val*jt_val + jz_val*jz_val);
+                if (rho_val < rho_floor && holmstrom_vacuum_region) {
+                    Et(i, j, 0) = 0._rt;
+                } else {
+                    // Get the gradient of the electron pressure
+                    // -> d/dt = 0 for m = 0
+                    const auto grad_Pe = 0.0_rt;
+
+                    // interpolate the nodal neE values to the Yee grid
+                    const auto enE_t = Interp(enE, nodal, Et_stag, coarsen, i, j, 0, 1);
+
+                    // safety condition since we divide by rho
+                    const auto rho_val_limited = std::max(rho_val, rho_floor);
+
+                    Et(i, j, 0) = (enE_t - grad_Pe) / rho_val_limited;
                 }
 
-                // safety condition since we divide by rho_val later
-                if (rho_val < rho_floor) { rho_val = rho_floor; }
-
-                // Get the gradient of the electron pressure
-                // -> d/dt = 0 for m = 0
-                auto grad_Pe = 0.0_rt;
-
-                // interpolate the nodal neE values to the Yee grid
-                auto enE_t = Interp(enE, nodal, Et_stag, coarsen, i, j, 0, 1);
-
-                Et(i, j, 0) = (enE_t - grad_Pe) / rho_val;
-
                 // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) { Et(i, j, 0) += eta(rho_val, jtot_val) * Jt(i, j, 0); }
+                if (solve_for_Faraday) {
+                    Real jtot_val = 0._rt;
+                    if(resistivity_has_J_dependence) {
+                        // Interpolate current to appropriate staggering to match E field
+                        const Real jr_val = Interp(Jr, Jr_stag, Et_stag, coarsen, i, j, 0, 0);
+                        const Real jt_val = Jt(i, j, 0);
+                        const Real jz_val = Interp(Jz, Jz_stag, Et_stag, coarsen, i, j, 0, 0);
+                        jtot_val = std::sqrt(jr_val*jr_val + jt_val*jt_val + jz_val*jz_val);
+                    }
 
-                // Note: Hyper-resisitivity should be revisited here when modal decomposition is implemented
+                    Et(i, j, 0) += eta(rho_val, jtot_val) * Jt(i, j, 0);
+
+                    if (include_hyper_resistivity_term) {
+
+                        // Interpolate B field to appropriate staggering to match E field
+                        Real btot_val = 0._rt;
+                        if (hyper_resistivity_has_B_dependence) {
+                            const Real br_val = Interp(Br, Br_stag, Et_stag, coarsen, i, j, 0, 0);
+                            const Real bt_val = Interp(Bt, Bt_stag, Et_stag, coarsen, i, j, 0, 0);
+                            const Real bz_val = Interp(Bz, Bz_stag, Et_stag, coarsen, i, j, 0, 0);
+                            btot_val = std::sqrt(br_val*br_val + bt_val*bt_val + bz_val*bz_val);
+                        }
+
+                        auto nabla2Jt = T_Algo::Dr_rDr_over_r(Jt, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
+                            + T_Algo::Dzz(Jt, coefs_z, n_coefs_z, i, j, 0, 0) - Jt(i, j, 0)/(r*r);
+
+                        Et(i, j, 0) -= eta_h(rho_val, btot_val) * nabla2Jt;
+                    }
+                }
+
+                if (include_external_fields && (rho_val >= rho_floor)) {
+                    Et(i, j, 0) -= Et_ext(i, j, 0);
+                }
             },
 
             // Ez calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                // Skip field solve if this cell is fully covered by embedded boundaries
-                if (lz && lz(i,j,0) <= 0) { return; }
+
+                // Skip field update in the embedded boundaries
+                if (update_Ez_arr && update_Ez_arr(i, j, 0) == 0) { return; }
 
                 // Interpolate to get the appropriate charge density in space
-                Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, 0, 0);
+                const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, 0, 0);
 
-                // Interpolate current to appropriate staggering to match E field
-                Real jtot_val = 0._rt;
-                if (solve_for_Faraday && resistivity_has_J_dependence) {
-                    const Real jr_val = Interp(Jr, Jr_stag, Ez_stag, coarsen, i, j, 0, 0);
-                    const Real jt_val = Interp(Jt, Jt_stag, Ez_stag, coarsen, i, j, 0, 0);
-                    const Real jz_val = Interp(Jz, Jz_stag, Ez_stag, coarsen, i, j, 0, 0);
-                    jtot_val = std::sqrt(jr_val*jr_val + jt_val*jt_val + jz_val*jz_val);
+                if (rho_val < rho_floor && holmstrom_vacuum_region) {
+                    Ez(i, j, 0) = 0._rt;
+                } else {
+                    // Get the gradient of the electron pressure if the longitudinal part of
+                    // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
+                    const Real grad_Pe = (!solve_for_Faraday) ?
+                        T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, 0, 0)
+                        : 0._rt;
+
+                    // interpolate the nodal neE values to the Yee grid
+                    const auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, 0, 2);
+
+                    // safety condition since we divide by rho
+                    const auto rho_val_limited = std::max(rho_val, rho_floor);
+
+                    Ez(i, j, 0) = (enE_z - grad_Pe) / rho_val_limited;
                 }
 
-                // safety condition since we divide by rho_val later
-                if (rho_val < rho_floor) { rho_val = rho_floor; }
-
-                // Get the gradient of the electron pressure if the longitudinal part of
-                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                Real grad_Pe = 0._rt;
-                if (!solve_for_Faraday) { grad_Pe = T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, 0, 0); }
-
-                // interpolate the nodal neE values to the Yee grid
-                auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, 0, 2);
-
-                Ez(i, j, 0) = (enE_z - grad_Pe) / rho_val;
-
                 // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) { Ez(i, j, 0) += eta(rho_val, jtot_val) * Jz(i, j, 0); }
+                if (solve_for_Faraday) {
+                    Real jtot_val = 0._rt;
+                    if (resistivity_has_J_dependence) {
+                        // Interpolate current to appropriate staggering to match E field
+                        const Real jr_val = Interp(Jr, Jr_stag, Ez_stag, coarsen, i, j, 0, 0);
+                        const Real jt_val = Interp(Jt, Jt_stag, Ez_stag, coarsen, i, j, 0, 0);
+                        const Real jz_val = Jz(i, j, 0);
+                        jtot_val = std::sqrt(jr_val*jr_val + jt_val*jt_val + jz_val*jz_val);
+                    }
 
-                if (include_hyper_resistivity_term) {
-                    auto nabla2Jz = T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, 0, 0);
-                    Ez(i, j, 0) -= eta_h * nabla2Jz;
+                    Ez(i, j, 0) += eta(rho_val, jtot_val) * Jz(i, j, 0);
+
+                    if (include_hyper_resistivity_term) {
+
+                        // Interpolate B field to appropriate staggering to match E field
+                        Real btot_val = 0._rt;
+                        if (hyper_resistivity_has_B_dependence) {
+                            const Real br_val = Interp(Br, Br_stag, Ez_stag, coarsen, i, j, 0, 0);
+                            const Real bt_val = Interp(Bt, Bt_stag, Ez_stag, coarsen, i, j, 0, 0);
+                            const Real bz_val = Interp(Bz, Bz_stag, Ez_stag, coarsen, i, j, 0, 0);
+                            btot_val = std::sqrt(br_val*br_val + bt_val*bt_val + bz_val*bz_val);
+                        }
+
+                        // r on nodal point (Jz is nodal in r)
+                        const Real r = rmin + i*dr;
+
+                        auto nabla2Jz = T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, 0, 0);
+                        if (r > 0.5_rt*dr) {
+                            nabla2Jz += T_Algo::Dr_rDr_over_r(Jz, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
+                        }
+
+                        Ez(i, j, 0) -= eta_h(rho_val, btot_val) * nabla2Jz;
+                    }
+                }
+
+                if (include_external_fields && (rho_val >= rho_floor)) {
+                    Ez(i, j, 0) -= Ez_ext(i, j, 0);
                 }
             }
         );
@@ -704,14 +827,13 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::HybridPICSolveECartesian (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Efield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jifield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jextfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
-    std::unique_ptr<amrex::MultiFab> const& rhofield,
-    std::unique_ptr<amrex::MultiFab> const& Pefield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
+    ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField const& Jfield,
+    ablastr::fields::VectorField const& Jifield,
+    ablastr::fields::VectorField const& Bfield,
+    amrex::MultiFab const& rhofield,
+    amrex::MultiFab const& Pefield,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     int lev, HybridPICModel const* hybrid_model,
     const bool solve_for_Faraday )
 {
@@ -725,8 +847,19 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const auto eta_h = hybrid_model->m_eta_h;
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
     const auto resistivity_has_J_dependence = hybrid_model->m_resistivity_has_J_dependence;
+    const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
+    const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity_term;
 
-    const bool include_hyper_resistivity_term = (eta_h > 0.) && solve_for_Faraday;
+    const bool include_external_fields = hybrid_model->m_add_external_fields;
+
+    const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
+
+    auto & warpx = WarpX::GetInstance();
+    ablastr::fields::VectorField Bfield_external, Efield_external;
+    if (include_external_fields) {
+        Bfield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_B_fp_external, 0); // lev=0
+        Efield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_E_fp_external, 0); // lev=0
+    }
 
     // Index type required for interpolating fields from their respective
     // staggering to the Ex, Ey, Ez locations
@@ -758,8 +891,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     // Also note that enE_nodal_mf does not need to have any guard cells since
     // these values will be interpolated to the Yee mesh which is contained
     // by the nodal mesh.
-    auto const& ba = convert(rhofield->boxArray(), IntVect::TheNodeVector());
-    MultiFab enE_nodal_mf(ba, rhofield->DistributionMap(), 3, IntVect::TheZeroVector());
+    auto const& ba = convert(rhofield.boxArray(), IntVect::TheNodeVector());
+    MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
 
     // Loop through the grids, and over the tiles within each grid for the
     // initial, nodal calculation of E
@@ -780,17 +913,21 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Array4<Real const> const& Jix = Jifield[0]->const_array(mfi);
         Array4<Real const> const& Jiy = Jifield[1]->const_array(mfi);
         Array4<Real const> const& Jiz = Jifield[2]->const_array(mfi);
-        Array4<Real const> const& Jextx = Jextfield[0]->const_array(mfi);
-        Array4<Real const> const& Jexty = Jextfield[1]->const_array(mfi);
-        Array4<Real const> const& Jextz = Jextfield[2]->const_array(mfi);
         Array4<Real const> const& Bx = Bfield[0]->const_array(mfi);
         Array4<Real const> const& By = Bfield[1]->const_array(mfi);
         Array4<Real const> const& Bz = Bfield[2]->const_array(mfi);
 
+        Array4<Real> Bx_ext, By_ext, Bz_ext;
+        if (include_external_fields) {
+            Bx_ext = Bfield_external[0]->array(mfi);
+            By_ext = Bfield_external[1]->array(mfi);
+            Bz_ext = Bfield_external[2]->array(mfi);
+        }
+
         // Loop over the cells and update the nodal E field
         amrex::ParallelFor(mfi.tilebox(), [=] AMREX_GPU_DEVICE (int i, int j, int k){
 
-            // interpolate the total current to a nodal grid
+            // interpolate the total plasma current to a nodal grid
             auto const jx_interp = Interp(Jx, Jx_stag, nodal, coarsen, i, j, k, 0);
             auto const jy_interp = Interp(Jy, Jy_stag, nodal, coarsen, i, j, k, 0);
             auto const jz_interp = Interp(Jz, Jz_stag, nodal, coarsen, i, j, k, 0);
@@ -801,22 +938,28 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             auto const jiz_interp = Interp(Jiz, Jz_stag, nodal, coarsen, i, j, k, 0);
 
             // interpolate the B field to a nodal grid
-            auto const Bx_interp = Interp(Bx, Bx_stag, nodal, coarsen, i, j, k, 0);
-            auto const By_interp = Interp(By, By_stag, nodal, coarsen, i, j, k, 0);
-            auto const Bz_interp = Interp(Bz, Bz_stag, nodal, coarsen, i, j, k, 0);
+            auto Bx_interp = Interp(Bx, Bx_stag, nodal, coarsen, i, j, k, 0);
+            auto By_interp = Interp(By, By_stag, nodal, coarsen, i, j, k, 0);
+            auto Bz_interp = Interp(Bz, Bz_stag, nodal, coarsen, i, j, k, 0);
+
+            if (include_external_fields) {
+                Bx_interp += Interp(Bx_ext, Bx_stag, nodal, coarsen, i, j, k, 0);
+                By_interp += Interp(By_ext, By_stag, nodal, coarsen, i, j, k, 0);
+                Bz_interp += Interp(Bz_ext, Bz_stag, nodal, coarsen, i, j, k, 0);
+            }
 
             // calculate enE = (J - Ji) x B
             enE_nodal(i, j, k, 0) = (
-                (jy_interp - jiy_interp - Jexty(i, j, k)) * Bz_interp
-                - (jz_interp - jiz_interp - Jextz(i, j, k)) * By_interp
+                (jy_interp - jiy_interp) * Bz_interp
+                - (jz_interp - jiz_interp) * By_interp
             );
             enE_nodal(i, j, k, 1) = (
-                (jz_interp - jiz_interp - Jextz(i, j, k)) * Bx_interp
-                - (jx_interp - jix_interp - Jextx(i, j, k)) * Bz_interp
+                (jz_interp - jiz_interp) * Bx_interp
+                - (jx_interp - jix_interp) * Bz_interp
             );
             enE_nodal(i, j, k, 2) = (
-                (jx_interp - jix_interp - Jextx(i, j, k)) * By_interp
-                - (jy_interp - jiy_interp - Jexty(i, j, k)) * Bx_interp
+                (jx_interp - jix_interp) * By_interp
+                - (jy_interp - jiy_interp) * Bx_interp
             );
         });
 
@@ -848,14 +991,26 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Array4<Real const> const& Jy = Jfield[1]->const_array(mfi);
         Array4<Real const> const& Jz = Jfield[2]->const_array(mfi);
         Array4<Real const> const& enE = enE_nodal_mf.const_array(mfi);
-        Array4<Real const> const& rho = rhofield->const_array(mfi);
-        Array4<Real> const& Pe = Pefield->array(mfi);
+        Array4<Real const> const& rho = rhofield.const_array(mfi);
+        Array4<Real const> const& Pe = Pefield.array(mfi);
+        Array4<Real> const& Bx = Bfield[0]->array(mfi);
+        Array4<Real> const& By = Bfield[1]->array(mfi);
+        Array4<Real> const& Bz = Bfield[2]->array(mfi);
 
-        amrex::Array4<amrex::Real> lx, ly, lz;
+        // Extract structures indicating where the fields
+        // should be updated, given the position of the embedded boundaries
+        amrex::Array4<int> update_Ex_arr, update_Ey_arr, update_Ez_arr;
         if (EB::enabled()) {
-            lx = edge_lengths[0]->array(mfi);
-            ly = edge_lengths[1]->array(mfi);
-            lz = edge_lengths[2]->array(mfi);
+            update_Ex_arr = eb_update_E[0]->array(mfi);
+            update_Ey_arr = eb_update_E[1]->array(mfi);
+            update_Ez_arr = eb_update_E[2]->array(mfi);
+        }
+
+        Array4<Real> Ex_ext, Ey_ext, Ez_ext;
+        if (include_external_fields) {
+            Ex_ext = Efield_external[0]->array(mfi);
+            Ey_ext = Efield_external[1]->array(mfi);
+            Ez_ext = Efield_external[2]->array(mfi);
         }
 
         // Extract stencil coefficients
@@ -875,124 +1030,193 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
             // Ex calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                // Skip if this cell is fully covered by embedded boundaries
-                if (lx && lx(i, j, k) <= 0) { return; }
+
+                // Skip field update in the embedded boundaries
+                if (update_Ex_arr && update_Ex_arr(i, j, k) == 0) { return; }
 
                 // Interpolate to get the appropriate charge density in space
-                Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, k, 0);
+                const Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, k, 0);
 
-                // Interpolate current to appropriate staggering to match E field
-                Real jtot_val = 0._rt;
-                if (solve_for_Faraday && resistivity_has_J_dependence) {
-                    const Real jx_val = Interp(Jx, Jx_stag, Ex_stag, coarsen, i, j, k, 0);
-                    const Real jy_val = Interp(Jy, Jy_stag, Ex_stag, coarsen, i, j, k, 0);
-                    const Real jz_val = Interp(Jz, Jz_stag, Ex_stag, coarsen, i, j, k, 0);
-                    jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
+                if (rho_val < rho_floor && holmstrom_vacuum_region) {
+                    Ex(i, j, k) = 0._rt;
+                } else {
+                    // Get the gradient of the electron pressure if the longitudinal part of
+                    // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
+                    const Real grad_Pe = (!solve_for_Faraday) ?
+                        T_Algo::UpwardDx(Pe, coefs_x, n_coefs_x, i, j, k)
+                        : 0._rt;
+
+                    // interpolate the nodal neE values to the Yee grid
+                    const auto enE_x = Interp(enE, nodal, Ex_stag, coarsen, i, j, k, 0);
+
+                    // safety condition since we divide by rho
+                    const auto rho_val_limited = std::max(rho_val, rho_floor);
+
+                    Ex(i, j, k) = (enE_x - grad_Pe) / rho_val_limited;
                 }
 
-                // safety condition since we divide by rho_val later
-                if (rho_val < rho_floor) { rho_val = rho_floor; }
-
-                // Get the gradient of the electron pressure if the longitudinal part of
-                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                Real grad_Pe = 0._rt;
-                if (!solve_for_Faraday) { grad_Pe = T_Algo::UpwardDx(Pe, coefs_x, n_coefs_x, i, j, k); }
-
-                // interpolate the nodal neE values to the Yee grid
-                auto enE_x = Interp(enE, nodal, Ex_stag, coarsen, i, j, k, 0);
-
-                Ex(i, j, k) = (enE_x - grad_Pe) / rho_val;
-
                 // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) { Ex(i, j, k) += eta(rho_val, jtot_val) * Jx(i, j, k); }
+                if (solve_for_Faraday) {
+                    Real jtot_val = 0._rt;
+                    if (resistivity_has_J_dependence) {
+                        // Interpolate current to appropriate staggering to match E field
+                        const Real jx_val = Jx(i, j, k);
+                        const Real jy_val = Interp(Jy, Jy_stag, Ex_stag, coarsen, i, j, k, 0);
+                        const Real jz_val = Interp(Jz, Jz_stag, Ex_stag, coarsen, i, j, k, 0);
+                        jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
+                    }
 
-                if (include_hyper_resistivity_term) {
-                    auto nabla2Jx = T_Algo::Dxx(Jx, coefs_x, n_coefs_x, i, j, k);
-                    Ex(i, j, k) -= eta_h * nabla2Jx;
+                    Ex(i, j, k) += eta(rho_val, jtot_val) * Jx(i, j, k);
+
+                    if (include_hyper_resistivity_term) {
+
+                        // Interpolate B field to appropriate staggering to match E field
+                        Real btot_val = 0._rt;
+                        if (hyper_resistivity_has_B_dependence) {
+                            const Real bx_val = Interp(Bx, Bx_stag, Ex_stag, coarsen, i, j, k, 0);
+                            const Real by_val = Interp(By, By_stag, Ex_stag, coarsen, i, j, k, 0);
+                            const Real bz_val = Interp(Bz, Bz_stag, Ex_stag, coarsen, i, j, k, 0);
+                            btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
+                        }
+
+                        auto nabla2Jx = T_Algo::Dxx(Jx, coefs_x, n_coefs_x, i, j, k)
+                            + T_Algo::Dyy(Jx, coefs_y, n_coefs_y, i, j, k)
+                            + T_Algo::Dzz(Jx, coefs_z, n_coefs_z, i, j, k);
+
+                        Ex(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jx;
+                    }
+                }
+
+                if (include_external_fields && (rho_val >= rho_floor)) {
+                    Ex(i, j, k) -= Ex_ext(i, j, k);
                 }
             },
 
             // Ey calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                // Skip field solve if this cell is fully covered by embedded boundaries
-#ifdef WARPX_DIM_3D
-                if (ly && ly(i,j,k) <= 0) { return; }
-#elif defined(WARPX_DIM_XZ)
-                //In XZ Ey is associated with a mesh node, so we need to check if the mesh node is covered
-                amrex::ignore_unused(ly);
-                if (lx && (lx(i, j, k)<=0 || lx(i-1, j, k)<=0 || lz(i, j-1, k)<=0 || lz(i, j, k)<=0)) { return; }
-#endif
-                // Interpolate to get the appropriate charge density in space
-                Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, k, 0);
 
-                // Interpolate current to appropriate staggering to match E field
-                Real jtot_val = 0._rt;
-                if (solve_for_Faraday && resistivity_has_J_dependence) {
-                    const Real jx_val = Interp(Jx, Jx_stag, Ey_stag, coarsen, i, j, k, 0);
-                    const Real jy_val = Interp(Jy, Jy_stag, Ey_stag, coarsen, i, j, k, 0);
-                    const Real jz_val = Interp(Jz, Jz_stag, Ey_stag, coarsen, i, j, k, 0);
-                    jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
+                // Skip field update in the embedded boundaries
+                if (update_Ey_arr && update_Ey_arr(i, j, k) == 0) { return; }
+
+                // Interpolate to get the appropriate charge density in space
+                const Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, k, 0);
+
+                if (rho_val < rho_floor && holmstrom_vacuum_region) {
+                    Ey(i, j, k) = 0._rt;
+                } else {
+                    // Get the gradient of the electron pressure if the longitudinal part of
+                    // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
+                    const Real grad_Pe = (!solve_for_Faraday) ?
+                        T_Algo::UpwardDy(Pe, coefs_y, n_coefs_y, i, j, k)
+                        : 0._rt;
+
+                    // interpolate the nodal neE values to the Yee grid
+                    const auto enE_y = Interp(enE, nodal, Ey_stag, coarsen, i, j, k, 1);
+
+                    // safety condition since we divide by rho
+                    const auto rho_val_limited = std::max(rho_val, rho_floor);
+
+                    Ey(i, j, k) = (enE_y - grad_Pe) / rho_val_limited;
                 }
 
-                // safety condition since we divide by rho_val later
-                if (rho_val < rho_floor) { rho_val = rho_floor; }
-
-                // Get the gradient of the electron pressure if the longitudinal part of
-                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                Real grad_Pe = 0._rt;
-                if (!solve_for_Faraday) { grad_Pe = T_Algo::UpwardDy(Pe, coefs_y, n_coefs_y, i, j, k); }
-
-                // interpolate the nodal neE values to the Yee grid
-                auto enE_y = Interp(enE, nodal, Ey_stag, coarsen, i, j, k, 1);
-
-                Ey(i, j, k) = (enE_y - grad_Pe) / rho_val;
-
                 // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) { Ey(i, j, k) += eta(rho_val, jtot_val) * Jy(i, j, k); }
+                if (solve_for_Faraday) {
+                    Real jtot_val = 0._rt;
+                    if (resistivity_has_J_dependence) {
+                        // Interpolate current to appropriate staggering to match E field
+                        const Real jx_val = Interp(Jx, Jx_stag, Ey_stag, coarsen, i, j, k, 0);
+                        const Real jy_val = Jy(i, j, k);
+                        const Real jz_val = Interp(Jz, Jz_stag, Ey_stag, coarsen, i, j, k, 0);
+                        jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
+                    }
 
-                if (include_hyper_resistivity_term) {
-                    auto nabla2Jy = T_Algo::Dyy(Jy, coefs_y, n_coefs_y, i, j, k);
-                    Ey(i, j, k) -= eta_h * nabla2Jy;
+                    Ey(i, j, k) += eta(rho_val, jtot_val) * Jy(i, j, k);
+
+                    if (include_hyper_resistivity_term) {
+
+                        // Interpolate B field to appropriate staggering to match E field
+                        Real btot_val = 0._rt;
+                        if (hyper_resistivity_has_B_dependence) {
+                            const Real bx_val = Interp(Bx, Bx_stag, Ey_stag, coarsen, i, j, k, 0);
+                            const Real by_val = Interp(By, By_stag, Ey_stag, coarsen, i, j, k, 0);
+                            const Real bz_val = Interp(Bz, Bz_stag, Ey_stag, coarsen, i, j, k, 0);
+                            btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
+                        }
+
+                        auto nabla2Jy = T_Algo::Dxx(Jy, coefs_x, n_coefs_x, i, j, k)
+                            + T_Algo::Dyy(Jy, coefs_y, n_coefs_y, i, j, k)
+                            + T_Algo::Dzz(Jy, coefs_z, n_coefs_z, i, j, k);
+
+                        Ey(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jy;
+                    }
+                }
+
+                if (include_external_fields && (rho_val >= rho_floor)) {
+                    Ey(i, j, k) -= Ey_ext(i, j, k);
                 }
             },
 
             // Ez calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-#ifdef AMREX_USE_EB
-                // Skip field solve if this cell is fully covered by embedded boundaries
-                if (lz && lz(i,j,k) <= 0) { return; }
-#endif
-                // Interpolate to get the appropriate charge density in space
-                Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
 
-                // Interpolate current to appropriate staggering to match E field
-                Real jtot_val = 0._rt;
-                if (solve_for_Faraday && resistivity_has_J_dependence) {
-                    const Real jx_val = Interp(Jx, Jx_stag, Ez_stag, coarsen, i, j, k, 0);
-                    const Real jy_val = Interp(Jy, Jy_stag, Ez_stag, coarsen, i, j, k, 0);
-                    const Real jz_val = Interp(Jz, Jz_stag, Ez_stag, coarsen, i, j, k, 0);
-                    jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
+                // Skip field update in the embedded boundaries
+                if (update_Ez_arr && update_Ez_arr(i, j, k) == 0) { return; }
+
+                // Interpolate to get the appropriate charge density in space
+                const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
+
+                if (rho_val < rho_floor && holmstrom_vacuum_region) {
+                    Ez(i, j, k) = 0._rt;
+                } else {
+                    // Get the gradient of the electron pressure if the longitudinal part of
+                    // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
+                    const Real grad_Pe = (!solve_for_Faraday) ?
+                        T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, k)
+                        : 0._rt;
+
+                    // interpolate the nodal neE values to the Yee grid
+                    const auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, k, 2);
+
+                    // safety condition since we divide by rho
+                    const auto rho_val_limited = std::max(rho_val, rho_floor);
+
+                    Ez(i, j, k) = (enE_z - grad_Pe) / rho_val_limited;
                 }
 
-                // safety condition since we divide by rho_val later
-                if (rho_val < rho_floor) { rho_val = rho_floor; }
-
-                // Get the gradient of the electron pressure if the longitudinal part of
-                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                Real grad_Pe = 0._rt;
-                if (!solve_for_Faraday) { grad_Pe = T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, k); }
-
-                // interpolate the nodal neE values to the Yee grid
-                auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, k, 2);
-
-                Ez(i, j, k) = (enE_z - grad_Pe) / rho_val;
-
                 // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) { Ez(i, j, k) += eta(rho_val, jtot_val) * Jz(i, j, k); }
+                if (solve_for_Faraday) {
+                    Real jtot_val = 0._rt;
+                    if (resistivity_has_J_dependence) {
+                        // Interpolate current to appropriate staggering to match E field
+                        const Real jx_val = Interp(Jx, Jx_stag, Ez_stag, coarsen, i, j, k, 0);
+                        const Real jy_val = Interp(Jy, Jy_stag, Ez_stag, coarsen, i, j, k, 0);
+                        const Real jz_val = Jz(i, j, k);
+                        jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
+                    }
 
-                if (include_hyper_resistivity_term) {
-                    auto nabla2Jz = T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, k);
-                    Ez(i, j, k) -= eta_h * nabla2Jz;
+                    Ez(i, j, k) += eta(rho_val, jtot_val) * Jz(i, j, k);
+
+                    if (include_hyper_resistivity_term) {
+
+                        // Interpolate B field to appropriate staggering to match E field
+                        Real btot_val = 0._rt;
+                        if (hyper_resistivity_has_B_dependence) {
+                            const Real bx_val = Interp(Bx, Bx_stag, Ez_stag, coarsen, i, j, k, 0);
+                            const Real by_val = Interp(By, By_stag, Ez_stag, coarsen, i, j, k, 0);
+                            const Real bz_val = Interp(Bz, Bz_stag, Ez_stag, coarsen, i, j, k, 0);
+                            btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
+                        }
+
+                        auto nabla2Jz = T_Algo::Dxx(Jz, coefs_x, n_coefs_x, i, j, k)
+                            + T_Algo::Dyy(Jz, coefs_y, n_coefs_y, i, j, k)
+                            + T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, k);
+
+                        Ez(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jz;
+                    }
+                }
+
+                if (include_external_fields && (rho_val >= rho_floor)) {
+                    Ez(i, j, k) -= Ez_ext(i, j, k);
                 }
             }
         );

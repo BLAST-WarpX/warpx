@@ -26,9 +26,6 @@ yt.funcs.mylog.setLevel(50)
 import numpy as np
 from scipy.constants import c, e, epsilon_0, m_e
 
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
-
 # test name
 test_name = os.path.split(os.getcwd())[1]
 
@@ -125,5 +122,3 @@ if current_correction or vay_deposition:
     print("error_rel = {}".format(error_rel))
     print("tolerance = {}".format(tolerance))
     assert error_rel < tolerance
-
-checksumAPI.evaluate_checksum(test_name, fn)

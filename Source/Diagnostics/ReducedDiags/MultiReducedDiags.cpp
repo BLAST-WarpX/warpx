@@ -10,10 +10,12 @@
 #include "ChargeOnEB.H"
 #include "ColliderRelevant.H"
 #include "DifferentialLuminosity.H"
+#include "DifferentialLuminosity2D.H"
 #include "FieldEnergy.H"
 #include "FieldMaximum.H"
-#include "FieldProbe.H"
 #include "FieldMomentum.H"
+#include "FieldPoyntingFlux.H"
+#include "FieldProbe.H"
 #include "FieldReduction.H"
 #include "LoadBalanceCosts.H"
 #include "LoadBalanceEfficiency.H"
@@ -24,6 +26,7 @@
 #include "ParticleMomentum.H"
 #include "ParticleNumber.H"
 #include "RhoMaximum.H"
+#include "Timestep.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXProfilerWrapper.H"
 
@@ -52,24 +55,27 @@ MultiReducedDiags::MultiReducedDiags ()
     using CS = const std::string& ;
     const auto reduced_diags_dictionary =
         std::map<std::string, std::function<std::unique_ptr<ReducedDiags>(CS)>>{
-            {"ParticleEnergy",        [](CS s){return std::make_unique<ParticleEnergy>(s);}},
-            {"ParticleMomentum",      [](CS s){return std::make_unique<ParticleMomentum>(s);}},
-            {"FieldEnergy",           [](CS s){return std::make_unique<FieldEnergy>(s);}},
-            {"FieldMomentum",         [](CS s){return std::make_unique<FieldMomentum>(s);}},
-            {"FieldMaximum",          [](CS s){return std::make_unique<FieldMaximum>(s);}},
-            {"FieldProbe",            [](CS s){return std::make_unique<FieldProbe>(s);}},
-            {"FieldReduction",        [](CS s){return std::make_unique<FieldReduction>(s);}},
-            {"RhoMaximum",            [](CS s){return std::make_unique<RhoMaximum>(s);}},
             {"BeamRelevant",          [](CS s){return std::make_unique<BeamRelevant>(s);}},
+            {"ChargeOnEB",            [](CS s){return std::make_unique<ChargeOnEB>(s);}},
             {"ColliderRelevant",      [](CS s){return std::make_unique<ColliderRelevant>(s);}},
             {"DifferentialLuminosity",[](CS s){return std::make_unique<DifferentialLuminosity>(s);}},
-            {"LoadBalanceCosts",      [](CS s){return std::make_unique<LoadBalanceCosts>(s);}},
-            {"LoadBalanceEfficiency", [](CS s){return std::make_unique<LoadBalanceEfficiency>(s);}},
+            {"DifferentialLuminosity2D",[](CS s){return std::make_unique<DifferentialLuminosity2D>(s);}},
+            {"ParticleEnergy",        [](CS s){return std::make_unique<ParticleEnergy>(s);}},
+            {"ParticleExtrema",       [](CS s){return std::make_unique<ParticleExtrema>(s);}},
             {"ParticleHistogram",     [](CS s){return std::make_unique<ParticleHistogram>(s);}},
             {"ParticleHistogram2D",   [](CS s){return std::make_unique<ParticleHistogram2D>(s);}},
+            {"ParticleMomentum",      [](CS s){return std::make_unique<ParticleMomentum>(s);}},
             {"ParticleNumber",        [](CS s){return std::make_unique<ParticleNumber>(s);}},
-            {"ParticleExtrema",       [](CS s){return std::make_unique<ParticleExtrema>(s);}},
-            {"ChargeOnEB",  [](CS s){return std::make_unique<ChargeOnEB>(s);}}
+            {"FieldEnergy",           [](CS s){return std::make_unique<FieldEnergy>(s);}},
+            {"FieldMaximum",          [](CS s){return std::make_unique<FieldMaximum>(s);}},
+            {"FieldMomentum",         [](CS s){return std::make_unique<FieldMomentum>(s);}},
+            {"FieldPoyntingFlux",     [](CS s){return std::make_unique<FieldPoyntingFlux>(s);}},
+            {"FieldProbe",            [](CS s){return std::make_unique<FieldProbe>(s);}},
+            {"FieldReduction",        [](CS s){return std::make_unique<FieldReduction>(s);}},
+            {"LoadBalanceCosts",      [](CS s){return std::make_unique<LoadBalanceCosts>(s);}},
+            {"LoadBalanceEfficiency", [](CS s){return std::make_unique<LoadBalanceEfficiency>(s);}},
+            {"RhoMaximum",            [](CS s){return std::make_unique<RhoMaximum>(s);}},
+            {"Timestep",              [](CS s){return std::make_unique<Timestep>(s);}}
     };
     // loop over all reduced diags and fill m_multi_rd with requested reduced diags
     std::transform(m_rd_names.begin(), m_rd_names.end(), std::back_inserter(m_multi_rd),
@@ -122,6 +128,20 @@ void MultiReducedDiags::ComputeDiags (int step)
 }
 // end void MultiReducedDiags::ComputeDiags
 
+// call functions to compute diags at the mid step time level
+void MultiReducedDiags::ComputeDiagsMidStep (int step)
+{
+    WARPX_PROFILE("MultiReducedDiags::ComputeDiagsMidStep()");
+
+    // loop over all reduced diags
+    for (int i_rd = 0; i_rd < static_cast<int>(m_rd_names.size()); ++i_rd)
+    {
+        m_multi_rd[i_rd] -> ComputeDiagsMidStep(step);
+    }
+    // end loop over all reduced diags
+}
+// end void MultiReducedDiags::ComputeDiagsMidStep
+
 // function to write data
 void MultiReducedDiags::WriteToFile (int step)
 {
@@ -140,3 +160,38 @@ void MultiReducedDiags::WriteToFile (int step)
     // end loop over all reduced diags
 }
 // end void MultiReducedDiags::WriteToFile
+
+// Check if any diagnostics will be done
+bool MultiReducedDiags::DoDiags(int step)
+{
+    bool result = false;
+    for (int i_rd = 0; i_rd < static_cast<int>(m_rd_names.size()); ++i_rd)
+    {
+        result = result || m_multi_rd[i_rd] -> DoDiags(step);
+    }
+    return result;
+}
+// end bool MultiReducedDiags::DoDiags
+
+void MultiReducedDiags::WriteCheckpointData (std::string const & dir)
+{
+    // Only the I/O rank does
+    if ( !ParallelDescriptor::IOProcessor() ) { return; }
+
+    // loop over all reduced diags
+    for (int i_rd = 0; i_rd < static_cast<int>(m_rd_names.size()); ++i_rd)
+    {
+        m_multi_rd[i_rd]->WriteCheckpointData(dir);
+    }
+    // end loop over all reduced diags
+}
+
+void MultiReducedDiags::ReadCheckpointData (std::string const & dir)
+{
+    // loop over all reduced diags
+    for (int i_rd = 0; i_rd < static_cast<int>(m_rd_names.size()); ++i_rd)
+    {
+        m_multi_rd[i_rd]->ReadCheckpointData(dir);
+    }
+    // end loop over all reduced diags
+}

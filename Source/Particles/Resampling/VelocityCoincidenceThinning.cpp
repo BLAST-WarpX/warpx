@@ -61,8 +61,9 @@ VelocityCoincidenceThinning::VelocityCoincidenceThinning (const std::string& spe
     }
 }
 
-void VelocityCoincidenceThinning::operator() (WarpXParIter& pti, const int lev,
-                                   WarpXParticleContainer * const pc) const
+void VelocityCoincidenceThinning::operator() (
+    const amrex::Geometry& geom_lev, WarpXParIter& pti,
+    const int lev, WarpXParticleContainer * const pc) const
 {
     using namespace amrex::literals;
 
@@ -85,7 +86,7 @@ void VelocityCoincidenceThinning::operator() (WarpXParIter& pti, const int lev,
     auto * const AMREX_RESTRICT idcpu = soa.GetIdCPUData().data();
 
     // Using this function means that we must loop over the cells in the ParallelFor.
-    auto bins = ParticleUtils::findParticlesInEachCell(lev, pti, ptile);
+    auto bins = ParticleUtils::findParticlesInEachCell(geom_lev, pti, ptile);
 
     const auto n_cells = static_cast<int>(bins.numBins());
     auto *const indices = bins.permutationPtr();

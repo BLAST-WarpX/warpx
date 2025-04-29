@@ -11,8 +11,6 @@
 #include <string>
 #include <vector>
 
-/** All types of diagnostics. */
-enum struct DiagTypes {Full, BackTransformed, BoundaryScraping};
 
 /**
  * \brief This class contains a vector of all diagnostics in the simulation.
@@ -25,6 +23,8 @@ public:
     void ReadParameters ();
     /** \brief Loop over diags in alldiags and call their InitDiags */
     void InitData ();
+    /** Check if any diagnostics will do compute and pack. */
+    bool DoComputeAndPack (int step, bool force_flush=false);
     /** \brief Called at each iteration. Compute diags and flush. */
     void FilterComputePackFlush (int step, bool force_flush=false, bool BackTransform=false);
     /** \brief Called only at the last iteration. Loop over each diag and if m_dump_last_timestep

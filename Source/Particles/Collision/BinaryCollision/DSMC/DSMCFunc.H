@@ -98,6 +98,7 @@ public:
             GetParticlePosition<PIdx> /*get_position_1*/, GetParticlePosition<PIdx> /*get_position_2*/,
             amrex::ParticleReal const /*n1*/, amrex::ParticleReal const /*n2*/,
             amrex::ParticleReal const /*T1*/, amrex::ParticleReal const /*T2*/,
+            amrex::Real const /*global_lamdb*/,
             amrex::ParticleReal const  /*q1*/, amrex::ParticleReal const  /*q2*/,
             amrex::ParticleReal const  m1, amrex::ParticleReal const  m2,
             amrex::Real const  dt, amrex::Real const dV, index_type coll_idx,
@@ -163,7 +164,11 @@ public:
                     u1y[I1[i1]] = u1xbuf*std::sin(theta) + u1y[I1[i1]]*std::cos(theta);
 #endif
 
-                    CollisionPairFilter(
+                    const int max_process_count = 4; // Pre-defined value, for performance reasons
+                    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        (m_process_count < max_process_count), "Too many scattering processes in DSMC routine (hardcoded to only allow 4). Update the max_process_count value in source code to allow more scattering processes."
+                    );
+                    CollisionPairFilter<max_process_count>(
                         u1x[ I1[i1] ], u1y[ I1[i1] ], u1z[ I1[i1] ],
                         u2x[ I2[i2] ], u2y[ I2[i2] ], u2z[ I2[i2] ],
                         m1, m2, w1[ I1[i1] ], w2[ I2[i2] ],
@@ -172,6 +177,7 @@ public:
                         m_process_count, m_scattering_processes_data, engine);
 
 #if (defined WARPX_DIM_RZ)
+                    /* Undo the earlier velocity rotation. */
                     amrex::ParticleReal const u1xbuf_new = u1x[I1[i1]];
                     u1x[I1[i1]] = u1xbuf_new*std::cos(-theta) - u1y[I1[i1]]*std::sin(-theta);
                     u1y[I1[i1]] = u1xbuf_new*std::sin(-theta) + u1y[I1[i1]]*std::cos(-theta);
@@ -203,9 +209,12 @@ public:
 
     [[nodiscard]] Executor const& executor () const { return m_exe; }
 
+    bool use_global_debye_length() { return false; }
+
 private:
     amrex::Vector<ScatteringProcess> m_scattering_processes;
     amrex::Gpu::DeviceVector<ScatteringProcess::Executor> m_scattering_processes_exe;
+
     bool m_isSameSpecies;
 
     Executor m_exe;

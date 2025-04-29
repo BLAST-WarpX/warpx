@@ -50,7 +50,7 @@ LoadBalanceEfficiency::LoadBalanceEfficiency (const std::string& rd_name)
                 ofs << m_sep;
                 ofs << "[" << c++ << "]lev" + std::to_string(lev);
             }
-            ofs << std::endl;
+            ofs << "\n";
 
             // close file
             ofs.close();

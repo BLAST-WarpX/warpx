@@ -134,9 +134,12 @@ This example accesses the :math:`E_x(x,y,z)` field at level 0 after every time s
        warpx = sim.extension.warpx
 
        # data access
-       E_x_mf = warpx.multifab(f"Efield_fp[x][level=0]")
+       #   vector field E, component x, on the fine patch of MR level 0
+       E_x_mf = warpx.multifab("Efield_fp", dir=0, level=0)
+       #   scalar field rho, on the fine patch of MR level 0
+       rho_mf = warpx.multifab("rho_fp", level=0)
 
-       # compute
+       # compute on E_x_mf
        # iterate over mesh-refinement levels
        for lev in range(warpx.finest_level + 1):
            # grow (aka guard/ghost/halo) regions

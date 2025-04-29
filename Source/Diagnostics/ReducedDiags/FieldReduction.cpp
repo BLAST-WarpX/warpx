@@ -77,7 +77,7 @@ FieldReduction::FieldReduction (const std::string& rd_name)
             ofs << m_sep;
             ofs << "[" << c++ << "]" + amrex::getEnumNameString(m_reduction_type) + " of " + parser_string + " (SI units)";
 
-            ofs << std::endl;
+            ofs << "\n";
             // close file
             ofs.close();
         }
