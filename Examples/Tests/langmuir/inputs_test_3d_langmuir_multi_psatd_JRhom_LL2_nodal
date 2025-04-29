@@ -4,10 +4,8 @@ FILE = inputs_base_3d
 # test input parameters
 algo.current_deposition = direct
 algo.maxwell_solver = psatd
-warpx.cfl = 0.5773502691896258
-warpx.do_multi_J = 1
-warpx.do_multi_J_n_depositions = 2
-psatd.J_in_time = linear
-psatd.solution_type = first-order
+psatd.JRhom = "LL2"
 psatd.update_with_rho = 1
 warpx.abort_on_warning_threshold = medium
+warpx.cfl = 0.5773502691896258
+warpx.grid_type = collocated
