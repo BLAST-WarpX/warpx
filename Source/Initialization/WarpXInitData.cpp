@@ -303,93 +303,140 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
         ba0 = BoxArray(std::move(bl));
     }
 
-    bool init_partition_species = false;
-    std::string density_function;
-    Real density_min=0;
-    Real efficiency_target = 0.7;
-    if (ParallelDescriptor::NProcs() > 1)
-    {
-        ParmParse pp_warpx("warpx");
-        std::string species;
-        pp_warpx.query("init_partition_species", species);
-        pp_warpx.query("init_partition_efficiency", efficiency_target);
-        if ( ! species.empty()) {
-            ParmParse pp(species);
-            std::string profile;
-            pp.query("profile", profile);
-            if (profile == "parse_density_function") {
-                utils::parser::Store_parserString(pp, "density_function(x,y,z)",
-                                                  density_function);
-                if (!density_function.empty() && pp.query("density_min", density_min))
-                {
-                    init_partition_species = true;
-                }
-            }
-        }
+    bool split_high_density_boxes = false;
+    Real split_high_density_boxes_threshold = 1.1;
+    int split_high_density_boxes_min_box_size = 8;
+    ParmParse pp0;
+    // If there is only one MPI process, we do not split high density boxes,
+    // because the purpose of splitting is to improve load balance potential
+    // among MPI processes.
+    if (ParallelDescriptor::NProcs() > 1) {
+        pp0.queryAdd("warpx.split_high_density_boxes"
+                     ,      split_high_density_boxes);
+        pp0.queryAdd("warpx.split_high_density_boxes_threshold"
+                     ,      split_high_density_boxes_threshold);
+        pp0.queryAdd("warpx.split_high_density_boxes_min_box_size",
+                            split_high_density_boxes_min_box_size);
     }
-    if (init_partition_species) {
-        auto density_parser = utils::parser::makeParser(density_function, {"x","y","z"});
-        auto density_exe = density_parser.compile<3>();
 
+    if (split_high_density_boxes) {
+        MultiFab rho;
         auto const dx = Geom(0).CellSizeArray();
         auto const problo = Geom(0).ProbLoArray();
 
-        MultiFab rho(ba0, DistributionMapping{ba0}, 1, 0);
-        auto const& rhoma = rho.arrays();
-        auto wtot = ParReduce(TypeList<ReduceOpSum>{}, TypeList<Real>{}, rho,
+        Real wtot = 0;
+
+        std::vector<std::string> species_names;
+        pp0.queryarr("particles.species_names", species_names);
+        for (auto const& species : species_names) {
+            Real density_min = std::numeric_limits<amrex::Real>::epsilon();
+            Real nppc = 0;
+            std::string profile, density_function;
+            ParmParse pp_spec(species);
+            pp_spec.query("profile", profile);
+            bool split_using_this_species = false;
+            if (profile == "parse_density_function" &&
+                pp_spec.queryline("density_function(x,y,z)", density_function))
+            {
+                split_using_this_species = true;
+                utils::parser::queryWithParser(pp_spec, "density_min", density_min);
+                std::vector<int> nppc_v(3,1);
+                utils::parser::getArrWithParser(pp_spec, "num_particles_per_cell_each_dim", nppc_v);
+                nppc = AMREX_D_TERM(Real(nppc_v[0]),*Real(nppc_v[1]),*Real(nppc_v[2]));
+            }
+
+            // If this species is not initialized by parse_density_function,
+            // we skip it.
+            if (!split_using_this_species) {
+                ablastr::warn_manager::WMRecordWarning("Domain Decomposition",
+                    species + " is ignored in splitting high density boxes because its profile is not parse_density_function\n");
+                break;
+            }
+
+            // Let's make sure MultiFab rho is defined.
+            if (rho.empty()) {
+                rho.define(ba0, DistributionMapping{ba0}, 1, 0);
+                rho.setVal(0);
+            }
+            auto const& rhoma = rho.arrays();
+
+            auto density_parser = utils::parser::makeParser(density_function, {"x","y","z"});
+            auto density_exe = density_parser.compile<3>();
+
+            // Predict how many particles of this species will be added.
+            auto w = ParReduce(TypeList<ReduceOpSum>{}, TypeList<Real>{}, rho,
                               [=] AMREX_GPU_DEVICE (int b, int i, int j, int k)
-        {
-            Real x = 0, y = 0, z = 0;
+            {
+                Real x = 0, y = 0, z = 0;
 #if defined(WARPX_DIM_1D_Z)
-            z = problo[0] + (i+Real(0.5))*dx[0];
+                z = problo[0] + (i+Real(0.5))*dx[0];
 #elif (defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ))
-            x = problo[0] + (i+Real(0.5))*dx[0];
-            z = problo[1] + (j+Real(0.5))*dx[1];
+                x = problo[0] + (i+Real(0.5))*dx[0];
+                z = problo[1] + (j+Real(0.5))*dx[1];
 #else
-            AMREX_D_TERM(x = problo[0] + (i+Real(0.5))*dx[0];,
-                         y = problo[1] + (j+Real(0.5))*dx[1];,
-                         z = problo[2] + (k+Real(0.5))*dx[2]);
+                AMREX_D_TERM(x = problo[0] + (i+Real(0.5))*dx[0];,
+                             y = problo[1] + (j+Real(0.5))*dx[1];,
+                             z = problo[2] + (k+Real(0.5))*dx[2]);
 #endif
-            Real v = density_exe(x,y,z);
-            Real r = (v >= density_min) ? Real(1) : Real(0);
-            rhoma[b](i,j,k) = r;
-            return r;
-        });
-        ParallelDescriptor::ReduceRealSum(wtot);
+                Real v = density_exe(x,y,z);
+                Real r = (v >= density_min) ? nppc : Real(0);
+                rhoma[b](i,j,k) += r;
+                return r;
+            });
+            wtot += w;
+        }
 
-        auto nprocs = Real(ParallelDescriptor::NProcs());
-        auto wtarget = wtot / nprocs * efficiency_target;
+        if (!rho.empty()) {
+            ParallelDescriptor::ReduceRealSum(wtot);
+        }
 
-        Vector<Box> new_boxes;
-        for (MFIter mfi(rho); mfi.isValid(); ++mfi) {
-            auto const& fab = rho[mfi];
-            Vector<Box> test_boxes{mfi.validbox()};
-            while ( ! test_boxes.empty()) {
-                auto bx = test_boxes.back();
-                test_boxes.pop_back();
-                auto w = fab.template sum<RunOn::Device>(bx,0);
-                if (w <= wtarget) {
-                    new_boxes.push_back(bx);
-                } else {
-                    int dir;
-                    int len = bx.longside(dir);
-                    if (len <= 8) { // Box is already very small.
+        if (!rho.empty() && wtot > 0) {
+            auto nprocs = Real(ParallelDescriptor::NProcs());
+            auto wtarget = wtot / nprocs * split_high_density_boxes_threshold;
+
+            Vector<Box> new_boxes; // We will use this build a BoxArray.
+            for (MFIter mfi(rho); mfi.isValid(); ++mfi) {
+                auto const& fab = rho[mfi];
+                Vector<Box> test_boxes{mfi.validbox()};
+                // test_boxes contains boxes to be processed.
+                while ( ! test_boxes.empty()) {
+                    auto bx = test_boxes.back();
+                    test_boxes.pop_back();
+                    auto w = fab.template sum<RunOn::Device>(bx,0);
+                    // w is the number of particles in Box bx.
+                    if (w < wtarget) {
+                        // If the number of particles is below threshold, we
+                        // keep this box by pushing it to new_boxes.
                         new_boxes.push_back(bx);
                     } else {
-                        int chop_pnt = bx.smallEnd(dir) + len/2;
-                        auto bx2 = bx.chop(dir, chop_pnt);
-                        test_boxes.push_back(bx);
-                        test_boxes.push_back(bx2);
+                        // If the number of particles is above the
+                        // threshold, we split this Box in its longest
+                        // direction.
+                        int dir;
+                        int len = bx.longside(dir); // longest side of the box
+                        if (len <= split_high_density_boxes_min_box_size) { // Box is already very small.
+                            new_boxes.push_back(bx);
+                        } else {
+                            int chop_pnt = bx.smallEnd(dir) + len/2;
+                            auto bx2 = bx.chop(dir, chop_pnt);
+                            // bx is now chopped into bx and bx2.
+                            test_boxes.push_back(bx);
+                            test_boxes.push_back(bx2);
+                            // For the two new boxes, we push them into
+                            // test_boxes for further processing.
+                        }
                     }
                 }
             }
-        }
 
-        amrex::AllGatherBoxes(new_boxes);
+            amrex::AllGatherBoxes(new_boxes);
 
-        AMREX_ALWAYS_ASSERT(new_boxes.size() >= ba0.size());
-        if (new_boxes.size() > ba0.size()) {
-            ba0 = BoxArray(new_boxes.data(), new_boxes.size());
+            AMREX_ALWAYS_ASSERT(new_boxes.size() >= ba0.size());
+            if (new_boxes.size() > ba0.size()) {
+                // If the size is the same as before, we don't need to build
+                // a new BoxArray.
+                ba0 = BoxArray(new_boxes.data(), new_boxes.size());
+            }
         }
     }
 }

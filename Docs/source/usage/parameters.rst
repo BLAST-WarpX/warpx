@@ -819,6 +819,19 @@ Distribution across MPI ranks and parallelization
     initialization by avoiding putting neighboring boxes on the same
     process.
 
+* ``warpx.split_high_density_boxes`` (`bool`) optional (default: false)
+    Whether to split high density boxes during initialization. This can
+    improve the potential for load balancing.
+
+* ``warpx.split_high_density_boxes_threshold`` (`float`) optional (default: 1.1)
+    Threshold used in splitting high density boxes. If a Box has more
+    particles than the average number of particles per MPI process
+    multiplied by this factor, we try to split this Box into smaller ones.
+
+* ``warpx.split_high_density_boxes_min_box_size`` (`integer`) optional (default: 8)
+    During splitting high density boxes, if a Box's longest side is already
+    less than or equal to this number, it will not be split.
+
 .. _running-cpp-parameters-parser:
 
 Math parser and user-defined constants
