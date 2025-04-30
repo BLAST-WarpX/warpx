@@ -16,6 +16,7 @@
 #include "FlushFormats/FlushFormat.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/Algorithms/IsIn.H"
+#include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "WarpX.H"
@@ -132,7 +133,6 @@ FullDiagnostics::ReadParameters ()
         const amrex::ParmParse pp_warpx("warpx");
         std::vector<std::string> dt_interval_vec = {"-1"};
         const bool timestep_may_vary = pp_warpx.queryarr("dt_update_interval", dt_interval_vec);
-        amrex::Print() << Utils::TextMsg::Warn("Time step varies?" + std::to_string(timestep_may_vary));
         if (timestep_may_vary) {
             WARPX_ABORT_WITH_MESSAGE(
                     "Time-averaged diagnostics (encountered in: "
@@ -155,9 +155,8 @@ FullDiagnostics::ReadParameters ()
         const bool averaging_period_steps_specified = pp_diag_name.query(
                 "average_period_steps", m_average_period_steps
         );
-        const bool averaging_period_time_specified = pp_diag_name.queryWithParser(
-                "average_period_time", m_average_period_time
-        );
+        const bool averaging_period_time_specified = utils::parser::queryWithParser
+            (pp_diag_name, "average_period_time", m_average_period_time);
 
         if (m_time_average_mode == TimeAverageType::Static) {
             // This fails if users do not specify a start.
@@ -565,12 +564,10 @@ FullDiagnostics::AddRZModesToDiags (int lev)
 
     // Check if divE is requested
     // If so, all components will be written out
-    bool divE_requested = false;
-    for (int comp = 0; comp < m_varnames.size(); comp++) {
-        if ( m_varnames[comp] == "divE" ) {
-            divE_requested = true;
-        }
-    }
+    const bool divE_requested = std::any_of(
+        std::begin(m_varnames),
+        std::end(m_varnames),
+        [](const auto& varname) { return varname == "divE"; });
 
     // If rho is requested, all components will be written out
     const bool rho_requested = utils::algorithms::is_in( m_varnames, "rho" );
@@ -875,7 +872,7 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
         } else if ( m_varnames[comp] == "divE" ){
             m_all_field_functors[lev][comp] = std::make_unique<DivEFunctor>(warpx.m_fields.get_alldirs(FieldType::Efield_aux, lev), lev, m_crse_ratio);
         } else {
-            std::cout << "Error on component " << m_varnames[comp] << std::endl;
+            std::cout << "Error on component " << m_varnames[comp] << "\n";
             WARPX_ABORT_WITH_MESSAGE(m_varnames[comp] + " is not a known field output type for this geometry");
         }
     }

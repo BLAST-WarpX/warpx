@@ -14,7 +14,12 @@ Plasma-Based Acceleration
 
 Scientific works in laser-plasma and beam-plasma acceleration.
 
-#. Shrock JE, Rockafellow E, Miao B, Le M, Hollinger RC, Wang S, Gonsalves AJ, Picksley A, Rocca JJ, and Milchberg HM
+#. Ma M, Zeng M, Wang J, Lu G, Yan W, Chen L, and Li D.
+   **Particle-in-cell simulation of laser wakefield accelerators with oblique lasers in quasicylindrical geometry**.
+   Phys. Rev. Accel. Beams **28**, 021301, 2025
+   `DOI:10.1103/PhysRevAccelBeams.28.021301 <https://doi.org/10.1103/PhysRevAccelBeams.28.021301>`__
+
+#. Shrock JE, Rockafellow E, Miao B, Le M, Hollinger RC, Wang S, Gonsalves AJ, Picksley A, Rocca JJ, and Milchberg HM.
    **Guided Mode Evolution and Ionization Injection in Meter-Scale Multi-GeV Laser Wakefield Accelerators**.
    Phys. Rev. Lett. **133**, 045002, 2024
    `DOI:10.1103/PhysRevLett.133.045002 <https://link.aps.org/doi/10.1103/PhysRevLett.133.045002>`__
@@ -149,10 +154,30 @@ Scientific works in particle and beam modeling.
    `DOI:10.18429/JACoW-IPAC2022-MOPOMS012 <https://doi.org/10.18429/JACoW-IPAC2022-MOPOMS012>`__
 
 
-High Energy Astrophysical Plasma Physics
-****************************************
+Astrophysical Plasma Physics
+****************************
 
 Scientific works in astrophysical plasma modeling.
+
+#. Wu Y, Shi C, Tao X, Zhao J
+   **Kinetic-hybrid Simulations of Counterpropagating Ion Cyclotron Waves and Proton Scattering in the Near-Sun Solar Wind**.
+   The Astrophysical Journal **983** 107, 2025.
+   `10.3847/1538-4357/adbc6a <https://doi.org/10.3847/1538-4357/adbc6a>`__
+
+#. Sam A, Kumar P, Fletcher AC, Crabtree C, Lee N, Elschot S.
+   **Nonlinear evolution, propagation, electron-trapping, and damping effects of ion-acoustic solitons using fully kinetic PIC simulations**.
+   Phys. Plasmas **32** 022103, 2025
+   `DOI:10.1063/5.0249525 <https://doi.org/10.1063/5.0249525>`__
+
+#. Jambunathan R, Jones H, Corrales L, Klion H, Roward ME, Myers A, Zhang W, Vay J-L.
+   **Application of mesh refinement to relativistic magnetic reconnection**.
+   Physics of Plasmas ***32*** 1, 2025
+   `DOI:10.1063/5.0233583 <https://doi.org/10.1063/5.0233583>`__
+
+#. Ghosh S, Bhat P.
+   **Magnetic Reconnection: An Alternative Explanation of Radio Emission in Galaxy Clusters**.
+   The Astrophysical Journal Letters **979** 1, 2025.
+   `DOI:10.3847/2041-8213/ad9f2d <https://doi.org/10.3847/2041-8213/ad9f2d>`__
 
 #. Klion H, Jambunathan R, Rowan ME, Yang E, Willcox D, Vay J-L, Lehe R, Myers A, Huebl A, Zhang W.
    **Particle-in-Cell simulations of relativistic magnetic reconnection with advanced Maxwell solver algorithms**.
@@ -198,6 +223,16 @@ Related works using WarpX:
 
 Nuclear Fusion and Plasma Confinement
 *************************************
+
+#. Tyushev M., Smolyakov A., Sabo A., Groenewald R., Necas A., and Yushmanov P.
+   **Drift-kinetic PIC simulations of plasma flow and energy transport in the magnetic mirror configuration**.
+   Physics of Plasmas **32**, 032514, 2025.
+   `DOI:10.1063/5.0227040 <https://doi.org/10.1063/5.0227040>`__
+
+#. Tyushev M., Papahn Zadeh M., Chopra N. S., Raitses Y., Romadanov I., Likhanskii A., Fubiani G., Garrigues L., Groenewald R. and Smolyakov A.
+   **Mode transitions and spoke structures in  E×B Penning discharge**.
+   Physics of Plasmas **32**, 013511, 2025.
+   `DOI:10.1063/5.0238577 <https://doi.org/10.1063/5.0238577>`__
 
 #. Scheffel J. and Jäderberg J. and Bendtz K. and Holmberg R. and Lindvall K.,
    **Axial Confinement in the Novatron Mirror Machine**.

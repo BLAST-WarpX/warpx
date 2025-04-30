@@ -88,7 +88,7 @@ Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src,
     ParticleCreation::DefaultInitializeRuntimeAttributes(dst,
                                        0, 0,
                                        pc.getUserRealAttribs(), pc.getUserIntAttribs(),
-                                       pc.getParticleComps(), pc.getParticleiComps(),
+                                       pc.GetRealSoANames(), pc.GetIntSoANames(),
                                        pc.getUserRealAttribParser(),
                                        pc.getUserIntAttribParser(),
 #ifdef WARPX_QED
@@ -258,7 +258,7 @@ Index filterCopyTransformParticles (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTi
     ParticleCreation::DefaultInitializeRuntimeAttributes(dst1,
                                        0, 0,
                                        pc1.getUserRealAttribs(), pc1.getUserIntAttribs(),
-                                       pc1.getParticleComps(), pc1.getParticleiComps(),
+                                       pc1.GetRealSoANames(), pc1.GetIntSoANames(),
                                        pc1.getUserRealAttribParser(),
                                        pc1.getUserIntAttribParser(),
 #ifdef WARPX_QED
@@ -272,7 +272,7 @@ Index filterCopyTransformParticles (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTi
     ParticleCreation::DefaultInitializeRuntimeAttributes(dst2,
                                        0, 0,
                                        pc2.getUserRealAttribs(), pc2.getUserIntAttribs(),
-                                       pc2.getParticleComps(), pc2.getParticleiComps(),
+                                       pc2.GetRealSoANames(), pc2.GetIntSoANames(),
                                        pc2.getUserRealAttribParser(),
                                        pc2.getUserIntAttribParser(),
 #ifdef WARPX_QED

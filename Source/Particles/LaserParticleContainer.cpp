@@ -560,7 +560,8 @@ void
 LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                 int lev,
                                 const std::string& current_fp_string,
-                                Real t, Real dt, DtType /*a_dt_type*/, bool skip_deposition, PushType push_type)
+                                Real t, Real dt, DtType /*a_dt_type*/, bool skip_deposition,
+                                bool /*deposit_mass_matrices*/, PushType push_type)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -873,18 +874,18 @@ LaserParticleContainer::update_laser_particle (WarpXParIter& pti,
 #if (AMREX_SPACEDIM >= 2)
     ParticleReal* x_n = nullptr;
     if (push_type == PushType::Implicit) {
-        x_n = pti.GetAttribs(particle_comps["x_n"]).dataPtr();
+        x_n = pti.GetAttribs("x_n").dataPtr();
     }
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
     ParticleReal* y_n = nullptr;
     if (push_type == PushType::Implicit) {
-        y_n = pti.GetAttribs(particle_comps["y_n"]).dataPtr();
+        y_n = pti.GetAttribs("y_n").dataPtr();
     }
 #endif
     ParticleReal* z_n = nullptr;
     if (push_type == PushType::Implicit) {
-        z_n = pti.GetAttribs(particle_comps["z_n"]).dataPtr();
+        z_n = pti.GetAttribs("z_n").dataPtr();
     }
 
     // Copy member variables to tmp copies for GPU runs.

@@ -59,7 +59,7 @@ computePhiIGF ( amrex::MultiFab const & rho,
     }
     if (!obc_solver || obc_solver->Domain() != domain) {
         amrex::FFT::Info info{};
-        if (is_igf_2d_slices) { info.setBatchMode(true); } // do 2D FFTs
+        if (is_igf_2d_slices) { info.setTwoDMode(true); } // do 2D FFTs
         info.setNumProcs(nprocs);
         obc_solver = std::make_unique<amrex::FFT::OpenBCSolver<amrex::Real>>(domain, info);
     }

@@ -47,11 +47,12 @@
 
 void
 WarpX::ImplicitPreRHSOp ( amrex::Real  a_cur_time,
+                          amrex::Real  a_theta,
                           amrex::Real  a_full_dt,
                           int          a_nl_iter,
-                          bool         a_from_jacobian )
+                          bool         a_from_jacobian,
+                          bool         a_use_mass_matrices )
 {
-    using namespace amrex::literals;
     using warpx::fields::FieldType;
     amrex::ignore_unused( a_full_dt, a_nl_iter, a_from_jacobian );
 
@@ -61,11 +62,69 @@ WarpX::ImplicitPreRHSOp ( amrex::Real  a_cur_time,
     // particle velocities by dt, then take average of old and new v,
     // deposit currents, giving J at n+1/2
     // This uses Efield_fp and Bfield_fp, the field at n+1/2 from the previous iteration.
-    const bool skip_current = false;
     const PushType push_type = PushType::Implicit;
-    PushParticlesandDeposit(a_cur_time, skip_current, push_type);
+    const bool skip_current = false;
+    bool deposit_mass_matrices = false;
+    if (a_use_mass_matrices && !a_from_jacobian) { deposit_mass_matrices = true; }
+    PushParticlesandDeposit(a_cur_time, skip_current, deposit_mass_matrices, push_type);
 
     SyncCurrentAndRho();
+    if (deposit_mass_matrices) {
+        SyncMassMatricesAndApplyBCs();
+        const amrex::Real theta_dt = a_theta*a_full_dt;
+        SetMassMatricesForPC( theta_dt );
+    }
+
+}
+
+void
+WarpX::SyncMassMatricesAndApplyBCs ()
+{
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    // Copy mass matrices elements used for the preconditioner
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        ablastr::fields::VectorField MM = m_fields.get_alldirs(FieldType::MassMatrices, lev);
+        ablastr::fields::VectorField MM_PC = m_fields.get_alldirs(FieldType::MassMatrices_PC, lev);
+        amrex::MultiFab::Copy(*MM_PC[0], *MM[0], 0, 0, MM[0]->nComp(), MM[0]->nGrowVect());
+        amrex::MultiFab::Copy(*MM_PC[1], *MM[1], 0, 0, MM[1]->nComp(), MM[1]->nGrowVect());
+        amrex::MultiFab::Copy(*MM_PC[2], *MM[2], 0, 0, MM[2]->nComp(), MM[2]->nGrowVect());
+    }
+
+    // Do addOp Exchange on MassMatrices_PC
+    SyncMassMatrices();
+
+    // Apply BCs to MassMatrices_PC
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        ApplyJfieldBoundary(lev,
+            m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev),
+            m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev),
+            m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev),
+            PatchType::fine);
+    }
+}
+
+void
+WarpX::SetMassMatricesForPC ( amrex::Real a_theta_dt )
+{
+
+    using namespace amrex::literals;
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    // Scale mass matrices used by preconditioner by c^2*mu0*theta*dt and add 1 to diagonal terms
+    // Note: This should be done after Sync/communication has been called
+
+    const amrex::Real pc_factor = PhysConst::c * PhysConst::c * PhysConst::mu0 * a_theta_dt;
+    const int diag_comp = 0;
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        for (int idir = 0 ; idir < 3 ; idir++) {
+            amrex::MultiFab* mass_matrix = m_fields.get(FieldType::MassMatrices_PC, Direction{idir}, lev);
+            mass_matrix->mult(pc_factor, 0, mass_matrix->nComp());
+            mass_matrix->plus(1.0_rt, diag_comp, 1, 0);
+        }
+    }
 
 }
 
@@ -169,7 +228,7 @@ WarpX::SaveParticlesAtImplicitStepStart ( )
 #endif
             {
 
-            auto particle_comps = pc->getParticleComps();
+            auto particle_comps = pc->GetRealSoANames();
 
             for (WarpXParIter pti(*pc, lev); pti.isValid(); ++pti) {
 
@@ -181,15 +240,15 @@ WarpX::SaveParticlesAtImplicitStepStart ( )
                 amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
 #if (AMREX_SPACEDIM >= 2)
-                amrex::ParticleReal* x_n = pti.GetAttribs(particle_comps["x_n"]).dataPtr();
+                amrex::ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr();
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-                amrex::ParticleReal* y_n = pti.GetAttribs(particle_comps["y_n"]).dataPtr();
+                amrex::ParticleReal* y_n = pti.GetAttribs("y_n").dataPtr();
 #endif
-                amrex::ParticleReal* z_n = pti.GetAttribs(particle_comps["z_n"]).dataPtr();
-                amrex::ParticleReal* ux_n = pti.GetAttribs(particle_comps["ux_n"]).dataPtr();
-                amrex::ParticleReal* uy_n = pti.GetAttribs(particle_comps["uy_n"]).dataPtr();
-                amrex::ParticleReal* uz_n = pti.GetAttribs(particle_comps["uz_n"]).dataPtr();
+                amrex::ParticleReal* z_n = pti.GetAttribs("z_n").dataPtr();
+                amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
+                amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
+                amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
 
                 const long np = pti.numParticles();
 
@@ -239,7 +298,7 @@ WarpX::FinishImplicitParticleUpdate ()
 #endif
             {
 
-            auto particle_comps = pc->getParticleComps();
+            auto particle_comps = pc->GetRealSoANames();
 
             for (WarpXParIter pti(*pc, lev); pti.isValid(); ++pti) {
 
@@ -252,15 +311,15 @@ WarpX::FinishImplicitParticleUpdate ()
                 amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
 #if (AMREX_SPACEDIM >= 2)
-                amrex::ParticleReal* x_n = pti.GetAttribs(particle_comps["x_n"]).dataPtr();
+                amrex::ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr();
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-                amrex::ParticleReal* y_n = pti.GetAttribs(particle_comps["y_n"]).dataPtr();
+                amrex::ParticleReal* y_n = pti.GetAttribs("y_n").dataPtr();
 #endif
-                amrex::ParticleReal* z_n = pti.GetAttribs(particle_comps["z_n"]).dataPtr();
-                amrex::ParticleReal* ux_n = pti.GetAttribs(particle_comps["ux_n"]).dataPtr();
-                amrex::ParticleReal* uy_n = pti.GetAttribs(particle_comps["uy_n"]).dataPtr();
-                amrex::ParticleReal* uz_n = pti.GetAttribs(particle_comps["uz_n"]).dataPtr();
+                amrex::ParticleReal* z_n = pti.GetAttribs("z_n").dataPtr();
+                amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
+                amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
+                amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
 
                 const long np = pti.numParticles();
 
@@ -385,12 +444,14 @@ WarpX::ImplicitComputeRHSE (int lev, PatchType patch_type, amrex::Real a_dt, War
                                         lev,
                                         patch_type,
                                         a_Erhs_vec.getArrayVec()[lev],
+                                        m_eb_update_E[lev],
                                         a_dt );
     } else {
         m_fdtd_solver_cp[lev]->EvolveE( m_fields,
                                         lev,
                                         patch_type,
                                         a_Erhs_vec.getArrayVec()[lev],
+                                        m_eb_update_E[lev],
                                         a_dt );
     }
 

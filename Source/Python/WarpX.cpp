@@ -69,7 +69,7 @@ void init_WarpX (py::module& m)
     py::class_<WarpX> warpx(m, "WarpX");
     warpx
         // WarpX is a Singleton Class with a private constructor
-        //   https://github.com/ECP-WarpX/WarpX/pull/4104
+        //   https://github.com/BLAST-WarpX/warpx/pull/4104
         //   https://pybind11.readthedocs.io/en/stable/advanced/classes.html?highlight=singleton#custom-constructors
         .def(py::init([]() {
             return &WarpX::GetInstance();
@@ -266,9 +266,13 @@ The physical fields in WarpX have the following naming:
             py::arg("potential"),
             "Sets the EB potential string and updates the function parser."
         )
-        .def_static("run_div_cleaner",
-            [] () { WarpX::ProjectionCleanDivB(); },
+        .def("run_div_cleaner",
+            [] (WarpX& wx) { wx.ProjectionCleanDivB(); },
             "Executes projection based divergence cleaner on loaded Bfield_fp_external."
+        )
+        .def_static("calculate_hybrid_external_curlA",
+            [] (WarpX& wx) { wx.CalculateExternalCurlA(); },
+            "Executes calculation of the curl of the external A in the hybrid solver."
         )
         .def("synchronize",
             [] (WarpX& wx) { wx.Synchronize(); },
