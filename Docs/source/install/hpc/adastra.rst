@@ -210,3 +210,12 @@ Known System Issues
    Reported to AMD and fixed for the next release of ROCm.
 
    Stay with the ROCm 5.2 module to avoid.
+
+.. warning::
+
+   April 30th, 2025:
+   We observed several unidentified issues which can cause WarpX simulations to hang or crash:
+   - Release ``25.03`` and current ``development`` branch lead to a segmentation fault error
+   - Release ``25.02`` will hang when writing particles diagnostics 
+
+   Releases ``25.04``, ``25.01`` and earlier are currently working. 
