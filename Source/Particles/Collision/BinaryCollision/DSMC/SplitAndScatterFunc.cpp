@@ -60,8 +60,8 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
 
         } else {
             m_num_product_species = 2;
-            m_num_products_host.push_back(1);
-            m_num_products_host.push_back(1);
+            m_num_products_host.push_back(0);
+            m_num_products_host.push_back(0);
         }
     }
     else
