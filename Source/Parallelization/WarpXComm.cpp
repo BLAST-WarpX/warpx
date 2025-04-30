@@ -1268,6 +1268,23 @@ WarpX::SyncCurrent (const std::string& current_fp_string)
 }
 
 void
+WarpX::SyncMassMatrices ()
+{
+    WARPX_PROFILE("WarpX::SyncMassMatrices()");
+
+    ablastr::fields::MultiLevelVectorField const& Sigma_fp = m_fields.get_mr_levels_alldirs("MassMatrices_PC", finest_level);
+
+    for (int idim = 0; idim < 3; ++idim)
+    {
+        for (int lev = finest_level; lev >= 0; --lev)
+        {
+            auto const& period = Geom(lev).periodicity();
+            SumBoundaryJ(Sigma_fp, lev, idim, period);
+        }
+    }
+}
+
+void
 WarpX::SyncRho () {
     bool const skip_lev0_coarse_patch = true;
     const ablastr::fields::MultiLevelScalarField rho_fp = m_fields.has(FieldType::rho_fp, 0) ?

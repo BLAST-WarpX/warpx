@@ -1,5 +1,5 @@
 # Iterations
-max_step = 25
+max_step = 1000
 
 # Domain
 amr.n_cell = 32 64
@@ -36,14 +36,12 @@ warpx.cfl = 1.
 
 warpx.do_dive_cleaning = 1
 warpx.do_divb_cleaning = 1
-warpx.do_multi_J = 1
-warpx.do_multi_J_n_depositions = 2
 psatd.do_time_averaging = 1
 
 # PSATD
 psatd.update_with_rho = 1
 #psatd.v_galilean = 0. 0. -0.9373391857121336
-psatd.J_in_time = linear
+psatd.JRhom = "LL2"
 
 # Particles
 
@@ -59,7 +57,7 @@ driver.z_rms = 20.1e-6
 driver.x_m = 0.
 driver.y_m = 0.
 driver.z_m = -80e-6
-driver.npart = 1000000
+driver.npart = 1000
 driver.q_tot = -1e-9
 driver.momentum_distribution_type = "gaussian"
 driver.ux_m = 0.
@@ -82,7 +80,7 @@ driver_back.z_rms = 20.1e-6
 driver_back.x_m = 0.
 driver_back.y_m = 0.
 driver_back.z_m = -80e-6
-driver_back.npart = 1000000
+driver_back.npart = 1000
 driver_back.q_tot = 1e-9
 driver_back.momentum_distribution_type = "at_rest"
 driver_back.initialize_self_fields = 0
