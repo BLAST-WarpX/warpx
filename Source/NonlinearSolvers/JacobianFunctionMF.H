@@ -214,18 +214,18 @@ template <class T, class Ops>
 auto JacobianFunctionMF<T,Ops>::makeVecRHS () const -> T
 {
     BL_PROFILE("JacobianFunctionMF::::makeVecRHS()");
-    T Vec;
-    Vec.Define(m_R);
-    return Vec;
+    T x;
+    x.Define(m_R);
+    return x;
 }
 
 template <class T, class Ops>
 auto JacobianFunctionMF<T,Ops>::makeVecLHS () const -> T
 {
     BL_PROFILE("JacobianFunctionMF::::makeVecLHS()");
-    T Vec;
-    Vec.Define(m_R);
-    return Vec;
+    T x;
+    x.Define(m_R);
+    return x;
 }
 
 template <class T, class Ops>
