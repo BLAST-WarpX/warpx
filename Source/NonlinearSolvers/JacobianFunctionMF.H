@@ -9,6 +9,7 @@
 
 #include "CurlCurlMLMGPC.H"
 #include "JacobiPC.H"
+#include "Utils/TextMsg.H"
 #include <string>
 
 /**
