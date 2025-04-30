@@ -324,11 +324,11 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
         auto const dx = Geom(0).CellSizeArray();
         auto const problo = Geom(0).ProbLoArray();
 
-        Real wtot = 0;
+        Real wtot = 0; // total number of particles
 
         std::vector<std::string> species_names;
         pp0.queryarr("particles.species_names", species_names);
-        for (auto const& species : species_names) {
+        for (auto const& species : species_names) { // loop over species
             Real density_min = std::numeric_limits<amrex::Real>::epsilon();
             Real nppc = 0;
             std::string profile, density_function;
@@ -349,7 +349,7 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
             // we skip it.
             if (!split_using_this_species) {
                 ablastr::warn_manager::WMRecordWarning("Domain Decomposition",
-                    species + " is ignored in splitting high density boxes because its profile is not parse_density_function\n");
+                    species + " is ignored when splitting high density boxes because its profile is not parse_density_function\n");
                 break;
             }
 
@@ -394,7 +394,7 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
             auto nprocs = Real(ParallelDescriptor::NProcs());
             auto wtarget = wtot / nprocs * split_high_density_boxes_threshold;
 
-            Vector<Box> new_boxes; // We will use this build a BoxArray.
+            Vector<Box> new_boxes; // We will use this to build a BoxArray.
             for (MFIter mfi(rho); mfi.isValid(); ++mfi) {
                 auto const& fab = rho[mfi];
                 Vector<Box> test_boxes{mfi.validbox()};
