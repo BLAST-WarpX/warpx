@@ -1,0 +1,135 @@
+/* Copyright 2025 Debojyoti Ghosh
+ *
+ * This file is part of WarpX.
+ *
+ * License: BSD-3-Clause-LBNL
+ */
+#ifdef AMREX_USE_PETSC
+
+#ifndef WARPX_PETSC_H_
+#define WARPX_PETSC_H_
+
+#include "LinearFunction.H"
+
+#include <petscsystypes.h>
+
+// forward declarations
+class WarpXSolverVec;
+class ImplicitSolver;
+// end of forward declarations
+
+namespace warpx_petsc {
+
+// forward declarations
+class KSPObj;
+class MatObj;
+class VecObj;
+// end of forward declarations
+
+using LinOpType = LinearFunction<WarpXSolverVec,ImplicitSolver>;
+using VecType = WarpXSolverVec;
+
+class KSP_impl
+{
+    public:
+
+        //! Constructor
+        KSP_impl (LinOpType&);
+
+        //! Destructor
+        ~KSP_impl ();
+
+        //! Create PETSc objects
+        void createObjects (const VecType&);
+
+        //! Set tolerances
+        void setTolerances(amrex::Real, amrex::Real, int);
+
+        //! Set max iters
+        void setMaxIters(int);
+
+        //! Solve
+        void solve(VecType&, const VecType&);
+
+        //! Set verbosity
+        void setVerbose(int);
+
+        //! Get number of iterations for recentmost solve
+        inline int getNumIters() const { return m_niters; }
+
+        //! Get status for recentmost solve
+        inline int getStatus() const { return m_status; }
+
+        //! Get relative norm for recentmost solve
+        inline amrex::Real getResidualNorm() const { return m_norm; }
+
+        //! Check if object is defined
+        [[nodiscard]] bool isDefined () const
+        {
+            return m_is_defined && (m_op != nullptr);
+        }
+
+        //! Apply matrix op on given vector
+        inline void applyOp( VecType& a_F, const VecType& a_U)
+        {
+            AMREX_ALWAYS_ASSERT(isDefined());
+            m_op->apply(a_F, a_U);
+        }
+
+        //! Work vector
+        VecType m_U;
+        //! Work vector
+        VecType m_F;
+
+    private:
+
+        //! MPI communicator
+        MPI_Comm m_comm = MPI_COMM_WORLD;
+        //! Number of MPI ranks
+        int m_num_procs = -1;
+        //! MPI rank of this process
+        int m_myid = -1;
+
+        //! Local number of DOFs
+        long m_ndofs_l = 0;
+        //! Global number of DOFs
+        long m_ndofs_g = 0;
+
+        //! absolute tolerance
+        amrex::Real m_atol;
+        //! relative tolerance
+        amrex::Real m_rtol;
+        //! maximum iterations
+        int m_maxits;
+        //! verbosity
+        int m_verbose;
+
+        //! number of iterations for recentmost solve
+        int m_niters;
+        //! status for recentmost solve
+        int m_status;
+        //! residual norm (relative) for recentmost solve
+        amrex::Real m_norm;
+
+        //! Linear operator object
+        LinOpType* m_op = nullptr;
+
+        // Note: unable to use std::unique_ptr<> due to
+        // incomplete-type compilation error.
+        //! Solver object
+        KSPObj* m_ksp = nullptr;
+        //! Matrix (lin operator) object
+        MatObj* m_A = nullptr;
+        //! solution vector
+        VecObj* m_x = nullptr;
+        //! right-hand-side vector
+        VecObj* m_b = nullptr;
+
+        //!PETSc objects created?
+        bool m_is_defined = false;
+};
+
+}
+
+#endif
+#endif

@@ -287,6 +287,13 @@ public:
     [[nodiscard]] std::string getVectorType () const { return m_vector_type_name; }
     [[nodiscard]] std::string getScalarType () const { return m_scalar_type_name; }
 
+    // vector sizes
+    [[nodiscard]] long nDOF_local  () const { return m_nDoFs_l; }
+    [[nodiscard]] long nDOF_global () const { return m_nDoFs_g; }
+
+    // copy to/from Real-type arrays
+    void copyFrom (const amrex::Real* const);
+    void copyTo   (amrex::Real* const) const;
 
 private:
 
@@ -294,6 +301,9 @@ private:
 
     ablastr::fields::MultiLevelVectorField m_array_vec;
     ablastr::fields::MultiLevelScalarField m_scalar_vec;
+
+    ablastr::fields::MultiLevelVectorField m_array_dofs_vec;
+    ablastr::fields::MultiLevelScalarField m_scalar_dofs_vec;
 
     warpx::fields::FieldType m_array_type = warpx::fields::FieldType::None;
     warpx::fields::FieldType m_scalar_type = warpx::fields::FieldType::None;
@@ -303,6 +313,9 @@ private:
 
     static constexpr int m_ncomp = 1;
     int m_num_amr_levels = 1;
+
+    long m_nDoFs_l = 0;
+    long m_nDoFs_g = 0;
 
     inline static bool m_warpx_ptr_defined = false;
     inline static WarpX* m_WarpX = nullptr;

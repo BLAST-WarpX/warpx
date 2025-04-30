@@ -10,6 +10,7 @@
 #define PETSC_KSP_WRAPPER_H_
 
 #include "LinearSolver.H"
+#include "WarpX_PETSc.H"
 
 #include <memory>
 
@@ -52,7 +53,7 @@ public:
     AMREX_FORCE_INLINE
     void define (Ops& a_linop)
     {
-        amrex::ignore_unused(a_linop);
+        m_solver = std::make_unique<warpx_petsc::KSP_impl>(a_linop);
     }
 
     /**
@@ -71,16 +72,16 @@ public:
                 RT a_tol_abs,
                 int a_its=-1)
     {
-        amrex::ignore_unused(a_sol);
-        amrex::ignore_unused(a_rhs);
-        amrex::ignore_unused(a_tol_rel);
-        amrex::ignore_unused(a_tol_abs);
-        amrex::ignore_unused(a_its);
+        if (!m_solver->isDefined()) {
+            m_solver->createObjects(a_sol);
+        }
+        m_solver->setTolerances(a_tol_rel, a_tol_abs, a_its);
+        m_solver->solve(a_sol, a_rhs);
     }
 
     //! Sets verbosity.
     AMREX_FORCE_INLINE
-    void setVerbose (int v) { amrex::ignore_unused(v); }
+    void setVerbose (int v) { m_solver->setVerbose(v); }
 
     //! Sets restart length. The default is 30.
     AMREX_FORCE_INLINE
@@ -88,21 +89,23 @@ public:
 
     //! Sets the max number of iterations
     AMREX_FORCE_INLINE
-    void setMaxIters (int niters) { amrex::ignore_unused(niters); }
+    void setMaxIters (int niters) { m_solver->setMaxIters(niters); }
 
     //! Gets the number of iterations.
     AMREX_FORCE_INLINE
-    int getNumIters () const { return -1; }
+    int getNumIters () const { return m_solver->getNumIters(); }
 
     //! Gets the solver status.
     AMREX_FORCE_INLINE
-    int getStatus () const { return -1; }
+    int getStatus () const { return m_solver->getStatus(); }
 
     //! Gets the 2-norm of the residual.
     AMREX_FORCE_INLINE
-    RT getResidualNorm () const { return 0.0; }
+    RT getResidualNorm () const { return m_solver->getResidualNorm(); }
 
 private:
+
+    std::unique_ptr<warpx_petsc::KSP_impl> m_solver = nullptr;
 };
 
 #endif
