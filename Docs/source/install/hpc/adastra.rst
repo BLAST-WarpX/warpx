@@ -216,6 +216,6 @@ Known System Issues
    April 30th, 2025:
    We observed several unidentified issues which can cause WarpX simulations to hang or crash:
    - Release ``25.03`` and current ``development`` branch lead to a segmentation fault error
-   - Release ``25.02`` will hang when writing particles diagnostics 
+   - Release ``25.02`` will hang when writing particles diagnostics
 
-   Releases ``25.04``, ``25.01`` and earlier are currently working. 
+   Releases ``25.04``, ``25.01`` and earlier are currently working.
