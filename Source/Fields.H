@@ -82,10 +82,11 @@ namespace warpx::fields
         Efield_avg_cp,
         Bfield_avg_cp,
         B_old, /**< Stores the value of B at the beginning of the timestep, for the implicit solver */
+        MassMatrices,    // Stores full mass matrix elements for the implicit solver
+        MassMatrices_PC, // Stores reduced mass matrix elements for the implicit solver preconditioner (PC)
         ECTRhofield,
         Venl,
-        global_debye_length,
-        sigmaPC
+        global_debye_length
     );
 
     /** these are vector fields */
@@ -126,9 +127,10 @@ namespace warpx::fields
         FieldType::Efield_avg_cp,
         FieldType::Bfield_avg_cp,
         FieldType::B_old,
+        FieldType::MassMatrices,
+        FieldType::MassMatrices_PC,
         FieldType::ECTRhofield,
-        FieldType::Venl,
-        FieldType::sigmaPC
+        FieldType::Venl
     };
 
     /** Returns true if a FieldType represents a vector field */

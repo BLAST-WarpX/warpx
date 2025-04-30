@@ -25,7 +25,7 @@ import sys
 import numpy as np
 import yt
 from openpmd_viewer import OpenPMDTimeSeries
-from scipy.constants import c
+from scipy.constants import c, e, epsilon_0, m_e
 from scipy.optimize import fsolve
 
 yt.funcs.mylog.setLevel(0)
@@ -41,10 +41,10 @@ emass_10 = True if re.search("emass_10", test_name) else False
 
 if emass_10:
     l2_tolerance = 0.096
-    m_e = 10
+    e_mass = 10
 else:
     l2_tolerance = 0.05
-    m_e = 9.10938356e-31  # Electron mass in kg
+    e_mass = m_e  # Electron mass in kg
 ndims = np.count_nonzero(ds.domain_dimensions > 1)
 
 if ndims == 2:
@@ -68,8 +68,7 @@ iy0 = round((0.0 - ymin) / dy)
 iz0 = round((0.0 - zmin) / dz)
 
 # Constants
-eps_0 = 8.8541878128e-12  # Vacuum Permittivity in C/(V*m)
-q_e = -1.60217662e-19  # Electron charge in C
+q_e = -e  # Electron charge in C
 pi = np.pi  # Circular constant of the universe
 r_0 = 0.1  # Initial radius of sphere
 q_tot = -1e-15  # Total charge of sphere in C
@@ -81,15 +80,15 @@ q_tot = -1e-15  # Total charge of sphere in C
 # v(r) and t(r) can be solved analytically.
 #
 # The solution r(t) solves the ODE: r''(t) = a/(r(t)**2) with initial conditions
-# r(0) = r_0, r'(0) = 0, and a = q_e*q_tot/(4*pi*eps_0*m_e)
+# r(0) = r_0, r'(0) = 0, and a = q_e*q_tot/(4*pi*epsilon_0*e_mass)
 #
 # The E was calculated at the end of the last time step
 def v_exact(r):
-    return np.sqrt(q_e * q_tot / (2 * pi * m_e * eps_0) * (1 / r_0 - 1 / r))
+    return np.sqrt(q_e * q_tot / (2 * pi * e_mass * epsilon_0) * (1 / r_0 - 1 / r))
 
 
 def t_exact(r):
-    return np.sqrt(r_0**3 * 2 * pi * m_e * eps_0 / (q_e * q_tot)) * (
+    return np.sqrt(r_0**3 * 2 * pi * e_mass * epsilon_0 / (q_e * q_tot)) * (
         np.sqrt(r / r_0 - 1) * np.sqrt(r / r_0)
         + np.log(np.sqrt(r / r_0 - 1) + np.sqrt(r / r_0))
     )
@@ -104,8 +103,8 @@ r_end = fsolve(func, r_0)[0]  # Numerically solve for r(t_max)
 
 def E_exact(r):
     return np.sign(r) * (
-        q_tot / (4 * pi * eps_0 * r**2) * (abs(r) >= r_end)
-        + q_tot * abs(r) / (4 * pi * eps_0 * r_end**3) * (abs(r) < r_end)
+        q_tot / (4 * pi * epsilon_0 * r**2) * (abs(r) >= r_end)
+        + q_tot * abs(r) / (4 * pi * epsilon_0 * r_end**3) * (abs(r) < r_end)
     )
 
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-This script is used to test the results of the multi-J PSATD
-first-order equations, with one J deposition. It compares the
+This script is used to test the results of the PSATD-JRhom
+first-order and second-order equations, with one J deposition. It compares the
 energy of the electric field with a given reference energy.
 
 The reference energy is computed by running the same test with J constant

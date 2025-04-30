@@ -39,12 +39,12 @@ class constants:
     # --- Put the constants in their own namespace
     # --- Values from WarpXConst.H
     c = 299792458.0
-    ep0 = 8.8541878128e-12
-    mu0 = 1.25663706212e-06
+    ep0 = 8.8541878188e-12
+    mu0 = 1.2566370612685e-06
     q_e = 1.602176634e-19
-    m_e = 9.1093837015e-31
-    m_p = 1.67262192369e-27
-    hbar = 1.054571817e-34
+    m_e = 9.1093837139e-31
+    m_p = 1.67262192595e-27
+    hbar = 1.0545718176461565e-34
     kb = 1.380649e-23
 
 
@@ -1512,14 +1512,21 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
     warpx_psatd_do_time_averaging: bool, optional
         Whether to do the time averaging for the spectral solver
 
-    warpx_psatd_J_in_time: {'constant', 'linear'}, default='constant'
-        This determines whether the current density is assumed to be constant
-        or linear in time, within the time step over which the electromagnetic
-        fields are evolved.
-
-    warpx_psatd_rho_in_time: {'linear'}, default='linear'
-        This determines whether the charge density is assumed to be linear
-        in time, within the time step over which the electromagnetic fields are evolved.
+    warpx_psatd_JRhom: str
+        This determines whether the PSATD JRhom algorithm is used.
+        The parameter is a string composed by two characters and one digit.
+        The first character represents the time dependency of J within the
+        time step over which the electromagnetic fields are evolved, e.g.,
+        "C" for constant in time, "L" for linear in time, "Q" for quadratic
+        in time.
+        The second character represents the time dependency of rho within the
+        time step over which the electromagnetic fields are evolved, following
+        the same naming convention as for J.
+        The last digit is an integer that represents the number of subintervals
+        used in the JRhom algorithm.
+        Examples: "CL1" (equivalent to the standard PSATD PIC algorithm),
+        "CL2", "LL4", etc.
+        By default, the string is empty and the JRhom algorithm is not used.
 
     warpx_do_pml_in_domain: bool, default=False
         Whether to do the PML boundaries within the domain (versus
@@ -1549,8 +1556,7 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
             self.psatd_current_correction = kw.pop("warpx_current_correction", None)
             self.psatd_update_with_rho = kw.pop("warpx_psatd_update_with_rho", None)
             self.psatd_do_time_averaging = kw.pop("warpx_psatd_do_time_averaging", None)
-            self.psatd_J_in_time = kw.pop("warpx_psatd_J_in_time", None)
-            self.psatd_rho_in_time = kw.pop("warpx_psatd_rho_in_time", None)
+            self.psatd_JRhom = kw.pop("warpx_psatd_JRhom", None)
 
         self.do_pml_in_domain = kw.pop("warpx_do_pml_in_domain", None)
         self.pml_has_particles = kw.pop("warpx_pml_has_particles", None)
@@ -1566,8 +1572,7 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
             pywarpx.psatd.current_correction = self.psatd_current_correction
             pywarpx.psatd.update_with_rho = self.psatd_update_with_rho
             pywarpx.psatd.do_time_averaging = self.psatd_do_time_averaging
-            pywarpx.psatd.J_in_time = self.psatd_J_in_time
-            pywarpx.psatd.rho_in_time = self.psatd_rho_in_time
+            pywarpx.psatd.JRhom = self.psatd_JRhom
 
             if self.grid.guard_cells is not None:
                 pywarpx.psatd.nx_guard = self.grid.guard_cells[0]
@@ -2799,15 +2804,6 @@ class Simulation(picmistandard.PICMI_Simulation):
     warpx_use_filter: bool, optional
         Whether to use filtering. The default depends on the conditions.
 
-    warpx_do_multi_J: bool, default=0
-        Whether to use the multi-J algorithm, where current deposition and
-        field update are performed multiple times within each time step.
-
-    warpx_do_multi_J_n_depositions: integer
-        Number of sub-steps to use with the multi-J algorithm, when ``warpx_do_multi_J=1``.
-        Note that this input parameter is not optional and must always be set in all
-        input files where ``warpx.do_multi_J=1``. No default value is provided automatically.
-
     warpx_grid_type: {'collocated', 'staggered', 'hybrid'}, default='staggered'
         Whether to use a collocated grid (all fields defined at the cell nodes),
         a staggered grid (fields defined on a Yee grid), or a hybrid grid
@@ -2975,8 +2971,6 @@ class Simulation(picmistandard.PICMI_Simulation):
         self.field_gathering_algo = kw.pop("warpx_field_gathering_algo", None)
         self.particle_pusher_algo = kw.pop("warpx_particle_pusher_algo", None)
         self.use_filter = kw.pop("warpx_use_filter", None)
-        self.do_multi_J = kw.pop("warpx_do_multi_J", None)
-        self.do_multi_J_n_depositions = kw.pop("warpx_do_multi_J_n_depositions", None)
         self.grid_type = kw.pop("warpx_grid_type", None)
         self.do_current_centering = kw.pop("warpx_do_current_centering", None)
         self.field_centering_order = kw.pop("warpx_field_centering_order", None)
@@ -3082,8 +3076,6 @@ class Simulation(picmistandard.PICMI_Simulation):
         pywarpx.warpx.grid_type = self.grid_type
         pywarpx.warpx.do_current_centering = self.do_current_centering
         pywarpx.warpx.use_filter = self.use_filter
-        pywarpx.warpx.do_multi_J = self.do_multi_J
-        pywarpx.warpx.do_multi_J_n_depositions = self.do_multi_J_n_depositions
         pywarpx.warpx.serialize_initial_conditions = self.serialize_initial_conditions
         pywarpx.warpx.random_seed = self.random_seed
         pywarpx.warpx.used_inputs_file = self.used_inputs_file
