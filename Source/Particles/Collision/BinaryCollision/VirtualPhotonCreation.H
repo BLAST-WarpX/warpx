@@ -150,6 +150,8 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                     }
 
                     num_vp_data[i] = n_photons;
+
+                    amrex::Print(0) << "n_photons: " << n_photons << std::endl;
                 });
 
                 // compute the offsets vector as the cumulative sum of the elements of num_vp excluding the current element,

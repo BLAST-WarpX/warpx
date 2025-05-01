@@ -6,15 +6,19 @@ my_constants.mc2_eV = m_e*clight*clight/q_e
 # BEAMS
 my_constants.beam_energy_eV = 125.e9
 my_constants.beam_gamma = beam_energy_eV/(mc2_eV)
-my_constants.beam_N = 1.2e10
-my_constants.sigmax = 500e-9
-my_constants.sigmay = 10e-9
+my_constants.beam_N = 2e10
+my_constants.sigmax = 516e-9
+my_constants.sigmay = 7.7e-9
 my_constants.sigmaz = 300e-6
 my_constants.muz = 4*sigmaz
-my_constants.nmacropart = 1e4
+my_constants.nmacropart = 1e5
+my_constants.emitx       = 0. #5*micro
+my_constants.emity       = 0. #35*nano
+my_constants.dux         = emitx / sigmax
+my_constants.duy         = emity / sigmay
 
 # BOX
-my_constants.Lx = 32*sigmax
+my_constants.Lx = 64*sigmax
 my_constants.Ly = 64*sigmay
 my_constants.Lz = 16*sigmaz
 
@@ -24,18 +28,16 @@ my_constants.nz = 32
 
 # TIME
 my_constants.T = 0.5*Lz/clight
-my_constants.dt = T / (nz-1)
+my_constants.dt = T / nz
 
 #################################
 ####### GENERAL PARAMETERS ######
 #################################
 stop_time = T
 amr.n_cell = nx ny nz
-amr.max_level = 0
 geometry.dims = 3
 geometry.prob_lo = -0.5*Lx -0.5*Ly -0.5*Lz
 geometry.prob_hi =  0.5*Lx  0.5*Ly  0.5*Lz
-#warpx.numprocs = 1 1 1
 
 #################################
 ######## BOUNDARY CONDITION #####
@@ -54,13 +56,16 @@ warpx.grid_type = collocated
 algo.particle_shape = 3
 algo.particle_pusher = vay
 warpx.poisson_solver = fft
-particles.do_tiling = 1
 warpx.use_2d_slices_fft_solver = 0
+amr.max_level = 0
+amr.ref_ratio_vect = 2 2 2
+warpx.fine_tag_hi = -3*sigmax -3*sigmay -3*sigmaz
+warpx.fine_tag_lo =  3*sigmax 3*sigmay 3*sigmaz
 
 #################################
 ########### PARTICLES ###########
 #################################
-particles.species_names = beam1 virtual_photons1 beam2 virtual_photons2 ele pos pho1 pho2
+particles.species_names = beam1 virtual_photons1 beam2 virtual_photons2 pho1 pho2 ele_bh pos_bh ele_ll pos_ll ele_bw pos_bw
 particles.photon_species = virtual_photons1 virtual_photons2 pho1 pho2
 
 # beam 1
@@ -70,8 +75,8 @@ beam1.momentum_distribution_type = gaussian
 beam1.uz_m = beam_gamma
 beam1.uy_m = 0.0
 beam1.ux_m = 0.0
-beam1.ux_th = 0.0
-beam1.uy_th = 0.0
+beam1.ux_th = dux
+beam1.uy_th = duy
 beam1.uz_th = 0
 beam1.do_not_push = 0
 beam1.species_type = electron
@@ -91,8 +96,8 @@ beam1.qed_quantum_sync_phot_product_species = pho1
 
 
 # Virtual photons 1
-virtual_photons1.virtual_photons_min_energy = 1e-3*m_e*clight*clight # has to be small enough
-virtual_photons1.sampling_factor = 100
+virtual_photons1.virtual_photons_min_energy = m_e*clight*clight # has to be small enough
+virtual_photons1.sampling_factor = 2
 virtual_photons1.species_type = photon
 virtual_photons1.injection_style = none
 virtual_photons1.do_not_push = 1
@@ -105,8 +110,8 @@ beam2.momentum_distribution_type = gaussian
 beam2.uz_m = -beam_gamma
 beam2.uy_m = 0.0
 beam2.ux_m = 0.0
-beam2.ux_th = 0.0
-beam2.uy_th = 0.0
+beam2.ux_th = dux
+beam2.uy_th = duy
 beam2.uz_th = 0
 beam2.do_not_push = 0
 beam2.species_type = positron
@@ -125,21 +130,41 @@ beam2.qed_quantum_sync_phot_product_species = pho2
 
 
 # Virtual photons 2
-virtual_photons2.virtual_photons_min_energy = 1e-3*m_e*clight*clight # has to be small enough
-virtual_photons2.sampling_factor = 100
+virtual_photons2.virtual_photons_min_energy = m_e*clight*clight # has to be small enough
+virtual_photons2.sampling_factor = 2
 virtual_photons2.species_type = photon
 virtual_photons2.injection_style = none
 virtual_photons2.do_not_push = 1
 
-ele.species_type = electron
-ele.injection_style = none
-ele.do_not_push = 0
-ele.do_not_deposit = 1
+ele_bh.species_type = electron
+ele_bh.injection_style = none
+ele_bh.do_not_push = 0
+ele_bh.do_not_deposit = 1
 
-pos.species_type = positron
-pos.injection_style = none
-pos.do_not_push = 0
-pos.do_not_deposit = 1
+pos_bh.species_type = positron
+pos_bh.injection_style = none
+pos_bh.do_not_push = 0
+pos_bh.do_not_deposit = 1
+
+ele_ll.species_type = electron
+ele_ll.injection_style = none
+ele_ll.do_not_push = 0
+ele_ll.do_not_deposit = 1
+
+pos_ll.species_type = positron
+pos_ll.injection_style = none
+pos_ll.do_not_push = 0
+pos_ll.do_not_deposit = 1
+
+ele_bw.species_type = electron
+ele_bw.injection_style = none
+ele_bw.do_not_push = 0
+ele_bw.do_not_deposit = 1
+
+pos_bw.species_type = positron
+pos_bw.injection_style = none
+pos_bw.do_not_push = 0
+pos_bw.do_not_deposit = 1
 
 pho1.species_type = photon
 pho1.injection_style = none
@@ -153,32 +178,38 @@ collisions.collision_names = ll bh1 bh2 lbw
 
 lbw.species = pho1 pho2
 lbw.type = linear_breit_wheeler
-lbw.product_species = ele pos
-lbw.event_multiplier = 1e30
+lbw.product_species = ele_bw pos_bw
+lbw.event_multiplier = 1e10
 #lbw.probability_threshold = 0.5
 #lbw.probability_target_value = 0.02
 
 ll.species = virtual_photons1 virtual_photons2
 ll.type = linear_breit_wheeler
-ll.product_species = ele pos
-ll.event_multiplier = 1e30
+ll.product_species = ele_ll pos_ll
+ll.event_multiplier = 1e10
+#ll.probability_threshold = 0.5
+#ll.probability_target_value = 0.02
 
 bh1.species = virtual_photons1 pho2
 bh1.type = linear_breit_wheeler
-bh1.product_species = ele pos
-bh1.event_multiplier = 1e30
+bh1.product_species = ele_bh pos_bh
+bh1.event_multiplier = 1e10
+#bh1.probability_threshold = 0.5
+#bh1.probability_target_value = 0.02
+
 
 bh2.species = pho1 virtual_photons2
 bh2.type = linear_breit_wheeler
-bh2.product_species = ele pos
-bh2.event_multiplier = 1e30
+bh2.product_species = ele_bh pos_bh
+bh2.event_multiplier = 1e10
+#bh2.probability_threshold = 0.5
+bh2.probability_target_value = 0.02
+
 
 qed_qs.photon_creation_energy_threshold = 0.
+
 qed_qs.lookup_table_mode = builtin
 qed_qs.chi_min = 1.e-7
-qed_bw.lookup_table_mode = builtin
-qed_bw.chi_min = 1.e-2
-
 
 
 #################################
@@ -191,7 +222,7 @@ diag1.intervals = 1
 diag1.diag_type = Full
 diag1.write_species = 1
 diag1.dump_last_timestep = 1
-diag1.species = beam1 virtual_photons1 beam2 virtual_photons2 ele pos pho1 pho2
+diag1.species = beam1 virtual_photons1 beam2 virtual_photons2 pho1 pho2 ele_bh pos_bh ele_ll pos_ll ele_bw pos_bw
 diag1.format = openpmd
 diag1.openpmd_backend = bp
 
@@ -199,7 +230,7 @@ bound.dump_last_timestep = 1
 bound.diag_type = BoundaryScraping
 bound.format = openpmd
 bound.openpmd_backend = bp
-bound.intervals = -1
+bound.intervals = 31
 
 beam1.save_particles_at_xlo = 1
 beam1.save_particles_at_ylo = 1
@@ -215,20 +246,46 @@ beam2.save_particles_at_xhi = 1
 beam2.save_particles_at_yhi = 1
 beam2.save_particles_at_zhi = 1
 
-ele.save_particles_at_xlo = 1
-ele.save_particles_at_ylo = 1
-ele.save_particles_at_zlo = 1
-ele.save_particles_at_xhi = 1
-ele.save_particles_at_yhi = 1
-ele.save_particles_at_zhi = 1
+ele_bh.save_particles_at_xlo = 1
+ele_bh.save_particles_at_ylo = 1
+ele_bh.save_particles_at_zlo = 1
+ele_bh.save_particles_at_xhi = 1
+ele_bh.save_particles_at_yhi = 1
+ele_bh.save_particles_at_zhi = 1
 
+pos_bh.save_particles_at_xlo = 1
+pos_bh.save_particles_at_ylo = 1
+pos_bh.save_particles_at_zlo = 1
+pos_bh.save_particles_at_xhi = 1
+pos_bh.save_particles_at_yhi = 1
+pos_bh.save_particles_at_zhi = 1
 
-pos.save_particles_at_xlo = 1
-pos.save_particles_at_ylo = 1
-pos.save_particles_at_zlo = 1
-pos.save_particles_at_xhi = 1
-pos.save_particles_at_yhi = 1
-pos.save_particles_at_zhi = 1
+ele_ll.save_particles_at_xlo = 1
+ele_ll.save_particles_at_ylo = 1
+ele_ll.save_particles_at_zlo = 1
+ele_ll.save_particles_at_xhi = 1
+ele_ll.save_particles_at_yhi = 1
+ele_ll.save_particles_at_zhi = 1
+pos_ll.save_particles_at_xlo = 1
+pos_ll.save_particles_at_ylo = 1
+pos_ll.save_particles_at_zlo = 1
+pos_ll.save_particles_at_xhi = 1
+pos_ll.save_particles_at_yhi = 1
+pos_ll.save_particles_at_zhi = 1
+
+ele_bw.save_particles_at_xlo = 1
+ele_bw.save_particles_at_ylo = 1
+ele_bw.save_particles_at_zlo = 1
+ele_bw.save_particles_at_xhi = 1
+ele_bw.save_particles_at_yhi = 1
+ele_bw.save_particles_at_zhi = 1
+pos_bw.save_particles_at_xlo = 1
+pos_bw.save_particles_at_ylo = 1
+pos_bw.save_particles_at_zlo = 1
+pos_bw.save_particles_at_xhi = 1
+pos_bw.save_particles_at_yhi = 1
+pos_bw.save_particles_at_zhi = 1
+
 
 pho1.save_particles_at_xlo = 1
 pho1.save_particles_at_ylo = 1
@@ -243,3 +300,7 @@ pho2.save_particles_at_zlo = 1
 pho2.save_particles_at_xhi = 1
 pho2.save_particles_at_yhi = 1
 pho2.save_particles_at_zhi = 1
+
+warpx.reduced_diags_names = PN
+PN.type = ParticleNumber
+PN.intervals = 1

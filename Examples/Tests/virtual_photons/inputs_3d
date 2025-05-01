@@ -16,6 +16,7 @@ my_constants.muz = 4*sigmaz
 my_constants.Lx = 8*sigmax
 my_constants.Ly = 8*sigmay
 my_constants.Lz = 16*sigmaz
+
 my_constants.nx = 32
 my_constants.ny = 32
 my_constants.nz = 32
@@ -34,7 +35,8 @@ amr.max_level = 0
 geometry.dims = 3
 geometry.prob_lo = -0.5*Lx -0.5*Ly -0.5*Lz
 geometry.prob_hi =  0.5*Lx  0.5*Ly  0.5*Lz
-warpx.numprocs = 1 1 1
+
+
 #################################
 ######## BOUNDARY CONDITION #####
 #################################
@@ -61,12 +63,12 @@ particles.species_names = beam virtual_photons
 particles.photon_species = virtual_photons
 
 
-my_constants.hwmin = 1e-12*m_e*clight*clight # has to be small enough
+my_constants.hwmin = 1e-3*m_e*clight*clight # has to be small enough
 beam.do_qed_virtual_photons = 1
 beam.qed_virtual_photon_species_name = virtual_photons
 
 
-virtual_photons.virtual_photons_min_energy = hwmin
+virtual_photons.min_energy = hwmin
 virtual_photons.sampling_factor = 10000000
 
 #beam.qed_virtual_photon_min_energy = hwmin
@@ -120,4 +122,4 @@ diag1.write_species = 1
 diag1.dump_last_timestep = 1
 diag1.species = beam virtual_photons
 diag1.format = openpmd
-diag1.openpmd_backend = bp
+diag1.openpmd_backend = h5
