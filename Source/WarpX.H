@@ -453,9 +453,6 @@ public:
     /** Print main PIC parameters to stdout */
     void PrintMainPICparameters ();
 
-    /** Write a file that record all inputs: inputs file + command line options */
-    void WriteUsedInputsFile () const;
-
     /**
      * \brief
      * Compute the last time step of the simulation
@@ -950,15 +947,6 @@ public:
     * \brief Do the eight-ways extension
     */
     void ComputeEightWaysExtensions();
-    /**
-    * \brief Whenever an unstable cell cannot be extended we increase its area to be the minimal for stability.
-    *        This is the method Benkler-Chavannes-Kuster method and it is less accurate than the regular ECT but it
-    *        still works better than staircasing. (see https://ieeexplore.ieee.org/document/1638381)
-    *
-    * @param idim Integer indicating the dimension (x->0, y->1, z->2) for which the BCK correction is done
-    *
-    */
-    void ApplyBCKCorrection(int idim);
 
 #ifdef WARPX_USE_FFT
     auto&  get_spectral_solver_fp (int lev) {return *spectral_solver_fp[lev];}
@@ -1076,8 +1064,6 @@ private:
         const ablastr::fields::MultiLevelVectorField& J_cp,
         const ablastr::fields::MultiLevelVectorField& J_buffer,
         int lev);
-    void StoreCurrent (int lev);
-    void RestoreCurrent (int lev);
     void ApplyFilterMF (
         const ablastr::fields::MultiLevelVectorField& mfvec,
         int lev,
@@ -1142,11 +1128,6 @@ private:
      * for all available MultiFabs, and abort otherwise.
      */
     void CheckGuardCells();
-
-    /**
-     * \brief Checks for known numerical issues involving different WarpX modules
-     */
-    void CheckKnownIssues();
 
     void BuildBufferMasks ();
 
