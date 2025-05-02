@@ -100,15 +100,25 @@ namespace {
     {
         amrex::ParmParse::SetParserPrefix("my_constants");
         amrex::ParmParse pp_constants("my_constants");
-        pp_constants.add("clight", PhysConst::c);
-        pp_constants.add("epsilon0", PhysConst::ep0);
-        pp_constants.add("mu0", PhysConst::mu0);
-        pp_constants.add("q_e", PhysConst::q_e);
-        pp_constants.add("m_e", PhysConst::m_e);
-        pp_constants.add("m_p", PhysConst::m_p);
-        pp_constants.add("m_u", PhysConst::m_u);
-        pp_constants.add("kb", PhysConst::kb);
-        pp_constants.add("pi", MathConst::pi);
+        // Add constants only if it's not defined already.
+        amrex::Real tmp = PhysConst::c;
+        pp_constants.queryAdd("clight", tmp);
+        tmp =       PhysConst::ep0;
+        pp_constants.queryAdd("epsilon0", tmp);
+        tmp =       PhysConst::mu0;
+        pp_constants.queryAdd("mu0", tmp);
+        tmp =       PhysConst::q_e;
+        pp_constants.queryAdd("q_e", tmp);
+        tmp =       PhysConst::m_e;
+        pp_constants.queryAdd("m_e", tmp);
+        tmp =       PhysConst::m_p;
+        pp_constants.queryAdd("m_p", tmp);
+        tmp =       PhysConst::m_u;
+        pp_constants.queryAdd("m_u", tmp);
+        tmp =       PhysConst::kb;
+        pp_constants.queryAdd("kb", tmp);
+        tmp =       MathConst::pi;
+        pp_constants.queryAdd("pi", tmp);
     }
 
     /** Overwrite defaults in AMReX Inputs
