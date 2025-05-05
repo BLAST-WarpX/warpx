@@ -39,7 +39,7 @@ namespace Algorithms{
         using namespace amrex;
 
         constexpr auto one = static_cast<T>(1.0);
-        constexpr auto inv_c2 = one/Math::powi<2>(static_cast<T>(PhysConst::variable_templates::c<T>));
+        constexpr auto inv_c2 = one/Math::powi<2>(static_cast<T>(PhysConst::const_templates::c<T>));
 
         // The expression used is derived by reducing the expression
         // (gamma - 1)*(gamma + 1)/(gamma + 1)
