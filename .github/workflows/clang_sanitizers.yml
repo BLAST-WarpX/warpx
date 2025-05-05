@@ -79,8 +79,7 @@ jobs:
   build_thread_sanitizer:
     name: Clang thread sanitizer
     runs-on: ubuntu-24.04
-    # TODO Fix data race conditions and re-enable job
-    if: 0 #github.event.pull_request.draft == false
+    if: github.event.pull_request.draft == false
     env:
       CC: clang
       CXX: clang++
@@ -118,33 +117,32 @@ jobs:
           -DWarpX_QED=ON                    \
           -DWarpX_QED_TABLE_GEN=ON          \
           -DWarpX_OPENPMD=ON                \
-          -DWarpX_EB=OFF                    \
           -DWarpX_PRECISION=DOUBLE          \
           -DWarpX_PARTICLE_PRECISION=DOUBLE
         cmake --build build -j 4
-
-        cmake -S . -B build_EB              \
-          -GNinja                           \
-          -DCMAKE_VERBOSE_MAKEFILE=ON       \
-          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-          -DWarpX_DIMS="2"                  \
-          -DWarpX_FFT=ON                    \
-          -DWarpX_QED=ON                    \
-          -DWarpX_QED_TABLE_GEN=ON          \
-          -DWarpX_OPENPMD=ON                \
-          -DWarpX_EB=ON                     \
-          -DWarpX_PRECISION=DOUBLE          \
-          -DWarpX_PARTICLE_PRECISION=DOUBLE
-        cmake --build build_EB -j 4
 
         ccache -s
         du -hs ~/.cache/ccache
 
     - name: run with thread sanitizer
       run: |
+        # Disabling the gds/shmem component by using gds/hash instead
+        # is required to avoid issues with shared memory.
         export PMIX_MCA_gds=hash
-        export TSAN_OPTIONS='ignore_noninstrumented_modules=1'
+
+        # Archer is a data race detector for OpenMP programs.
+        # It is required to avoid false positives with OpenMP and it is
+        # included in llvm. However with many Linux it is necessary
+        # to define this environment variable to make sure that the
+        # Archer library is actually used.
+        # When the Archer library is used and ARCHER_OPTIONS="verbose=1",
+        # the following message should be displayed:
+        # Archer detected OpenMP application with TSan, supplying OpenMP synchronization semantics
+        export OMP_TOOL_LIBRARIES=/usr/lib/llvm-17/lib/libarcher.so
         export ARCHER_OPTIONS="verbose=1"
+
+        # This option is required to avoid false positive reports from the OpenMP runtime
+        export TSAN_OPTIONS='ignore_noninstrumented_modules=1'
 
         export OMP_NUM_THREADS=2
 
@@ -158,4 +156,4 @@ jobs:
 
         ulimit -c unlimited
 
-        mpirun -n 2 ../../../build_EB/bin/warpx.2d inputs_test_2d_embedded_circle warpx.serialize_initial_conditions = 0
+        mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_embedded_circle warpx.serialize_initial_conditions = 0

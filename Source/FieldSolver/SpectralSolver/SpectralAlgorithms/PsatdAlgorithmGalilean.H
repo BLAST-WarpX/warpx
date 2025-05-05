@@ -4,8 +4,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef WARPX_PSATD_ALGORITHM_J_CONSTANT_IN_TIME_H_
-#define WARPX_PSATD_ALGORITHM_J_CONSTANT_IN_TIME_H_
+#ifndef WARPX_PSATD_ALGORITHM_GALILEAN_H_
+#define WARPX_PSATD_ALGORITHM_GALILEAN_H_
 
 #include "FieldSolver/SpectralSolver/SpectralFieldData.H"
 #include "FieldSolver/SpectralSolver/SpectralKSpace.H"
@@ -26,12 +26,12 @@
 /* \brief Class that updates the field in spectral space
  * and stores the coefficients of the corresponding update equation.
  */
-class PsatdAlgorithmJConstantInTime : public SpectralBaseAlgorithm
+class PsatdAlgorithmGalilean : public SpectralBaseAlgorithm
 {
     public:
 
         /**
-         * \brief Constructor of the class PsatdAlgorithmJConstantInTime
+         * \brief Constructor of the class PsatdAlgorithmGalilean
          *
          * \param[in] spectral_kspace spectral space
          * \param[in] dm distribution mapping
@@ -47,7 +47,7 @@ class PsatdAlgorithmJConstantInTime : public SpectralBaseAlgorithm
          * \param[in] dive_cleaning Update F as part of the field update, so that errors in divE=rho propagate away at the speed of light
          * \param[in] divb_cleaning Update G as part of the field update, so that errors in divB=0 propagate away at the speed of light
          */
-        PsatdAlgorithmJConstantInTime (
+        PsatdAlgorithmGalilean (
             const SpectralKSpace& spectral_kspace,
             const amrex::DistributionMapping& dm,
             const SpectralFieldIndex& spectral_index,
@@ -137,9 +137,6 @@ class PsatdAlgorithmJConstantInTime : public SpectralBaseAlgorithm
         amrex::Real m_dt;
         bool m_update_with_rho;
         bool m_time_averaging;
-        bool m_dive_cleaning;
-        bool m_divb_cleaning;
-        bool m_is_galilean;
 };
 #endif // WARPX_USE_FFT
-#endif // WARPX_PSATD_ALGORITHM_J_CONSTANT_IN_TIME_H_
+#endif // WARPX_PSATD_ALGORITHM_GALILEAN_H_
