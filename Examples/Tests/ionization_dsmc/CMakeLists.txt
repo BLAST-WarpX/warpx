@@ -2,11 +2,21 @@
 #
 
 add_warpx_test(
-    test_3d_ionization_dsmc  # name
+    test_3d_ionization_electron_dsmc  # name
     3  # dims
     2  # nprocs
-    inputs_test_3d_ionization_dsmc  # inputs
+    inputs_test_3d_ionization_electron_dsmc  # inputs
     "analysis_ionization_dsmc_3d.py"  # analysis
+    "analysis_default_regression.py --path diags/diag1000250"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_3d_ionization_ion_dsmc  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_ionization_ion_dsmc  # inputs
+    OFF # "analysis_ionization_dsmc_3d.py"  # analysis
     "analysis_default_regression.py --path diags/diag1000250"  # checksum
     OFF  # dependency
 )

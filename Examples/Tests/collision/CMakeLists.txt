@@ -22,6 +22,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_2d_collision_xz_global_debye  # name
+    2  # dims
+    1  # nprocs
+    inputs_test_2d_collision_xz_global_debye  # inputs
+    "analysis_collision_2d.py diags/diag1000150"  # analysis
+    "analysis_default_regression.py --path diags/diag1000150"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_2d_collision_xz_picmi  # name
     2  # dims
     1  # nprocs

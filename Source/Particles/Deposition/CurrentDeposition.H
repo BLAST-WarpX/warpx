@@ -19,8 +19,6 @@
 #   include "Utils/WarpX_Complex.H"
 #endif
 
-#include "WarpX.H" // todo: remove include and pass globals as args
-
 #include <AMReX.H>
 #include <AMReX_Arena.H>
 #include <AMReX_Array4.H>
@@ -449,6 +447,12 @@ void doDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPosition,
  * \param lo           Index lower bounds of domain.
  * \param q            species charge.
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
+ * \param a_bins             bins used for particle sorting
+ * \param box                the current box
+ * \param geom               the geometry of the current level
+ * \param a_tbox_max_size    the maximum size of a tilebox
+ * \param threads_per_block  number of threads to use per block in shared deposition
+ * \param bin_size           tileSize to use for shared current deposition operations
  */
 template <int depos_order>
 void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
@@ -470,7 +474,9 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                const amrex::DenseBins<WarpXParticleContainer::ParticleTileType::ParticleTileDataType>& a_bins,
                                const amrex::Box& box,
                                const amrex::Geometry& geom,
-                               const amrex::IntVect& a_tbox_max_size)
+                               const amrex::IntVect& a_tbox_max_size,
+                               const int threads_per_block,
+                               const amrex::IntVect bin_size)
 {
     using namespace amrex::literals;
 
@@ -505,11 +511,9 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
     const auto npts = amrex::max(sample_tbox_x.numPts(), sample_tbox_y.numPts(), sample_tbox_z.numPts());
 
     const int nblocks = a_bins.numBins();
-    const int threads_per_block = WarpX::shared_mem_current_tpb;
     const auto offsets_ptr = a_bins.offsetsPtr();
 
     const std::size_t shared_mem_bytes = npts*sizeof(amrex::Real);
-    const amrex::IntVect bin_size = WarpX::shared_tilesize;
     const std::size_t max_shared_mem_bytes = amrex::Gpu::Device::sharedMemPerBlock();
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(shared_mem_bytes <= max_shared_mem_bytes,
                                      "Tile size too big for GPU shared memory current deposition");
@@ -610,7 +614,11 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
     // Note, you should never reach this part of the code. This funcion cannot be called unless
     // using HIP/CUDA, and those things are checked prior
     //don't use any args
-    ignore_unused(GetPosition, wp, uxp, uyp, uzp, ion_lev, jx_fab, jy_fab, jz_fab, np_to_deposit, relative_time, dinv, xyzmin, lo, q, n_rz_azimuthal_modes, a_bins, box, geom, a_tbox_max_size);
+    ignore_unused(
+        GetPosition, wp, uxp, uyp, uzp, ion_lev, jx_fab, jy_fab, jz_fab,
+        np_to_deposit, relative_time, dinv, xyzmin, lo, q,
+        n_rz_azimuthal_modes, a_bins, box, geom, a_tbox_max_size,
+        threads_per_block, bin_size);
     WARPX_ABORT_WITH_MESSAGE("Shared memory only implemented for HIP/CUDA");
 #endif
 }
@@ -1974,9 +1982,9 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
  * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry.
  */
 template <int depos_order>
-void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::ParticleReal * const xp_n,
-                                           [[maybe_unused]]const amrex::ParticleReal * const yp_n,
-                                           [[maybe_unused]]const amrex::ParticleReal * const zp_n,
+void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::ParticleReal * const xp_n_data,
+                                           [[maybe_unused]]const amrex::ParticleReal * const yp_n_data,
+                                           [[maybe_unused]]const amrex::ParticleReal * const zp_n_data,
                                            const GetParticlePosition<PIdx>& GetPosition,
                                            const amrex::ParticleReal * const wp,
                                            [[maybe_unused]]const amrex::ParticleReal * const uxp_n,
@@ -2034,11 +2042,23 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             amrex::ParticleReal xp_nph, yp_nph, zp_nph;
             GetPosition(ip, xp_nph, yp_nph, zp_nph);
 
-            amrex::ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n[ip];
-            amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n[ip];
-            amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n[ip];
+#if (AMREX_SPACEDIM >= 2)
+            amrex::ParticleReal const xp_n = xp_n_data[ip];
+#else
+            amrex::ParticleReal const xp_n = 0._prt;
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+            amrex::ParticleReal const yp_n = yp_n_data[ip];
+#else
+            amrex::ParticleReal const yp_n = 0._prt;
+#endif
+            amrex::ParticleReal const zp_n = zp_n_data[ip];
 
-            VillasenorDepositionShapeNKernel<depos_order>(xp_n[ip], yp_n[ip], zp_n[ip], xp_np1, yp_np1, zp_np1, wq,
+            amrex::ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n;
+            amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n;
+            amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n;
+
+            VillasenorDepositionShapeNKernel<depos_order>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq,
                                                           uxp_nph[ip], uyp_nph[ip], uzp_nph[ip], gaminv,
                                                           Jx_arr, Jy_arr, Jz_arr,
                                                           dt, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);

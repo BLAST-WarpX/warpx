@@ -25,13 +25,15 @@ plasma_density = 1e14
 neutral_density = 1e20
 dt = 1e-9
 electron_temp = 10
-neutral_temp = 300
+neutral_temp = 0.01
 max_steps = 250
 max_time = max_steps * dt
 
 L = [0.1] * 3
 
-sigma_iz_file = "../../../../warpx-data/MCC_cross_sections/Xe/ionization.dat"
+sigma_iz_file = (
+    "../../../../warpx-data/MCC_cross_sections/H/electron_impact_ionization.dat"
+)
 iz_data = np.loadtxt(sigma_iz_file)
 
 energy_eV = iz_data[:, 0]
@@ -192,7 +194,7 @@ plt.tight_layout()
 plt.savefig("ionization_dsmc_density_Te.png", dpi=150)
 
 
-tolerances = [4e-2, 1e-6, 4e-2]
+tolerances = [2e-3, 1e-6, 6e-3]
 
 
 def check_tolerance(array, tolerance):
