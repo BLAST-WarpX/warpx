@@ -12,9 +12,9 @@
     "rho": 2.6092568008333786e-10
   },
   "electron": {
-    "particle_momentum_x": 6.943183193241947e-25,
-    "particle_momentum_y": 6.943183193241941e-25,
-    "particle_momentum_z": 6.943183193241939e-25,
+    "particle_momentum_x": 9.257577590989262e-25,
+    "particle_momentum_y": 9.257577590989256e-25,
+    "particle_momentum_z": 9.25757759098925e-25,
     "particle_position_x": 327.46875,
     "particle_position_y": 327.46875,
     "particle_position_z": 327.46875,

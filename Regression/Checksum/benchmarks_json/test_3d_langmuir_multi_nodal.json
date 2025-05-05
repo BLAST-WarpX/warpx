@@ -13,13 +13,13 @@
     "rho": 720713356.5083634
   },
   "positrons": {
-    "particle_momentum_z": 8.490569079610386e-20,
+    "particle_momentum_z": 9.320504975672502e-20,
     "particle_position_x": 2.6214400000000015,
     "particle_position_y": 2.621440000000001,
     "particle_position_z": 2.621440000000001
   },
   "electrons": {
-    "particle_momentum_x": 8.490569079610379e-20,
+    "particle_momentum_x": 9.320504975672496e-20,
     "particle_position_x": 2.6214400000000015,
     "particle_position_y": 2.621440000000001,
     "particle_position_z": 2.621440000000001,
