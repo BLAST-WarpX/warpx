@@ -121,11 +121,12 @@ void ElasticCollisionPerez (
 #endif
 
           // Compute the effective density n12 used to compute the normalized
-          // scattering path s12 in UpdateMomentumPerezElastic().
+          // transport mean free path (s12) in UpdateMomentumPerezElastic().
           // s12 is defined such that the expected value of the change in particle
-          // velocity is equal to that from the full NxN pairing method, as described
-          // here https://arxiv.org/abs/2407.19151. This method is a direct extension
-          // of the original method by Takizuka and Abe JCP 25 (1977) to weighted particles.
+          // velocity is equal to that from the full NxN pairing method for each particle, as described in
+          // Justin Ray Angus, Yichen Fu, Vasily Geyko, Dave Grote, David Larson, JCP 531, 113927 (2025).
+          // This method is a direct extension of the original binary-pairing method for equally weighted
+          // particles by Takizuka and Abe JCP 25 (1977).
           T_PR n12;
           const T_PR wpmax = amrex::max(w1[ I1[i1] ],w2[ I2[i2] ]);
           if (isSameSpecies) { n12 = wpmax*static_cast<T_PR>(min_N+max_N-1)/dV; }
