@@ -114,7 +114,7 @@ WarpX::SynchronizeVelocityWithPosition () {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    if (!is_synchronized) {
+    if (!m_is_synchronized) {
         // This assumes that the particle boundary conditions have been checked
         // so that the field gather in PushP will be correct.
         FillBoundaryE(guard_cells.ng_FieldGather);
@@ -138,7 +138,7 @@ WarpX::SynchronizeVelocityWithPosition () {
                 *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
             );
         }
-        is_synchronized = true;
+        m_is_synchronized = true;
     }
 }
 
@@ -284,8 +284,8 @@ WarpX::Evolve (int numsteps)
         }
         multi_diags->FilterComputePackFlush( step, false, true );
 
-        const bool move_j = is_synchronized;
-        // If is_synchronized we need to shift j too so that next step we can evolve E by dt/2.
+        const bool move_j = m_is_synchronized;
+        // If m_is_synchronized we need to shift j too so that next step we can evolve E by dt/2.
         // We might need to move j because we are going to make a plotfile.
         const int num_moved = MoveWindow(step+1, move_j);
 
@@ -528,9 +528,9 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
 
     // At the beginning, we have B^{n} and E^{n}.
     // Particles have p^{n} and x^{n}.
-    // is_synchronized is true.
+    // m_is_synchronized is true.
 
-    if (is_synchronized) {
+    if (m_is_synchronized) {
         // Not called at each iteration, so exchange all guard cells
         FillBoundaryE(guard_cells.ng_alloc_EB);
         FillBoundaryB(guard_cells.ng_alloc_EB);
@@ -551,7 +551,7 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
                 *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
             );
         }
-        is_synchronized = false;
+        m_is_synchronized = false;
 
     } else {
         // Beyond one step, we have E^{n} and B^{n}.
