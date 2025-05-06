@@ -550,3 +550,39 @@ void ElectrostaticSolver::computeB (
         }
     }
 }
+
+void ElectrostaticSolver::AddBoundaryField (ablastr::fields::MultiLevelVectorField& Efield_fp) const
+{
+    WARPX_PROFILE("RelativisticExplicitES::AddBoundaryField");
+
+    auto & warpx = WarpX::GetInstance();
+
+    // Allocate fields for charge and potential
+    Vector<std::unique_ptr<MultiFab>> rho(num_levels);
+    Vector<std::unique_ptr<MultiFab>> phi(num_levels);
+    // Use number of guard cells used for local deposition of rho
+    const amrex::IntVect ng = warpx.get_ng_depos_rho();
+    for (int lev = 0; lev < num_levels; lev++) {
+        BoxArray nba = warpx.boxArray(lev);
+        nba.surroundingNodes();
+        rho[lev] = std::make_unique<amrex::MultiFab>(nba, warpx.DistributionMap(lev), 1, ng);
+        rho[lev]->setVal(0.);
+        phi[lev] = std::make_unique<amrex::MultiFab>(nba, warpx.DistributionMap(lev), 1, 1);
+        phi[lev]->setVal(0.);
+    }
+
+    // Set the boundary potentials appropriately
+    setPhiBC( amrex::GetVecOfPtrs(phi), warpx.gett_new(0));
+
+    // beta is zero for boundaries
+    const std::array<Real, 3> beta = {0._rt};
+
+    // Compute the potential phi, by solving the Poisson equation
+    computePhi( amrex::GetVecOfPtrs(rho), amrex::GetVecOfPtrs(phi),
+                beta, self_fields_required_precision,
+                self_fields_absolute_tolerance, self_fields_max_iters,
+                self_fields_verbosity, is_igf_2d_slices );
+
+    // Compute the corresponding electric field, from the potential phi.
+    computeE( Efield_fp, amrex::GetVecOfPtrs(phi), beta );
+}

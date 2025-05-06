@@ -24,6 +24,7 @@
 #       include <FieldSolver/SpectralSolver/SpectralSolver.H>
 #   endif // RZ ifdef
 #endif // use PSATD ifdef
+#include <FieldSolver/ElectrostaticSolvers/RelativisticExplicitES.H>
 #include <FieldSolver/WarpX_FDTD.H>
 #include <Filter/NCIGodfreyFilter.H>
 #include <Initialization/ExternalField.H>
@@ -277,6 +278,13 @@ The physical fields in WarpX have the following naming:
         .def("synchronize",
             [] (WarpX& wx) { wx.Synchronize(); },
             "Synchronize particle velocities and positions."
+        )
+        .def("add_boundary_electrostatic_field",
+            [] (WarpX& wx) {
+                auto Efield_fp = wx.m_fields.get_mr_levels_alldirs("Efield_fp", wx.maxLevel());
+                wx.GetElectrostaticSolver().AddBoundaryField( Efield_fp );
+            },
+            "Compute the electric field due to the potential specified on the domain boundaries and embedded boundaries."
         )
     ;
 
