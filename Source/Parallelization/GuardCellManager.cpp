@@ -280,6 +280,10 @@ guardCellManager::Init (
             ng_FieldSolver  = CartesianCKCAlgorithm::GetMaxGuardCell();
             ng_FieldSolverF = CartesianCKCAlgorithm::GetMaxGuardCell();
             ng_FieldSolverG = CartesianCKCAlgorithm::GetMaxGuardCell();
+        } else if (electromagnetic_solver_id == ElectromagneticSolverAlgo::CustomCoef) {
+            ng_FieldSolver  = CartesianCustomCoefAlgorithm::GetMaxGuardCell();
+            ng_FieldSolverF = CartesianCustomCoefAlgorithm::GetMaxGuardCell();
+            ng_FieldSolverG = CartesianCustomCoefAlgorithm::GetMaxGuardCell();
         }
     }
 #endif

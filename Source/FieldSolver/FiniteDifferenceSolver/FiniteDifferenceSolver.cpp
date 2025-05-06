@@ -9,6 +9,7 @@
 #ifndef WARPX_DIM_RZ
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
+#   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianCustomCoefAlgorithm.H"
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
 #else
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
@@ -78,6 +79,11 @@ FiniteDifferenceSolver::FiniteDifferenceSolver (
     } else if (fdtd_algo == ElectromagneticSolverAlgo::CKC) {
 
         CartesianCKCAlgorithm::InitializeStencilCoefficients( cell_size,
+            m_h_stencil_coefs_x, m_h_stencil_coefs_y, m_h_stencil_coefs_z );
+
+    } else if (fdtd_algo == ElectromagneticSolverAlgo::CustomCoef) {
+        amrex::Print() << "Selecting this branch";
+        CartesianCustomCoefAlgorithm::InitializeStencilCoefficients( cell_size,
             m_h_stencil_coefs_x, m_h_stencil_coefs_y, m_h_stencil_coefs_z );
 
     } else {

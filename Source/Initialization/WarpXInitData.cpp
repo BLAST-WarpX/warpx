@@ -434,6 +434,9 @@ WarpX::PrintMainPICparameters ()
     else if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC){
       amrex::Print() << "Maxwell Solver:       | CKC \n";
     }
+    else if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::CustomCoef){
+      amrex::Print() << "Maxwell Solver:       | Custom coefficients \n";
+    }
     else if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT){
       amrex::Print() << "Maxwell Solver:       | ECT \n";
     }

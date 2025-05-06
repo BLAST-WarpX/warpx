@@ -7,6 +7,7 @@
 #include "WarpX.H"
 
 #ifndef WARPX_DIM_RZ
+#   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianCustomCoefAlgorithm.H"
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
@@ -85,6 +86,8 @@ WarpX::ComputeDt ()
             deltat = cfl * CartesianYeeAlgorithm::ComputeMaxDt(dx);
         } else if (electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC) {
             deltat = cfl * CartesianCKCAlgorithm::ComputeMaxDt(dx);
+        } else if (electromagnetic_solver_id == ElectromagneticSolverAlgo::CustomCoef) {
+            deltat = cfl * CartesianCustomCoefAlgorithm::ComputeMaxDt(dx);
 #endif
         } else {
             WARPX_ABORT_WITH_MESSAGE("ComputeDt: Unknown algorithm");

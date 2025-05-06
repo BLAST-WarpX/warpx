@@ -11,6 +11,7 @@
 #ifndef WARPX_DIM_RZ
 #   include "FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
 #   include "FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
+#   include "FiniteDifferenceAlgorithms/CartesianCustomCoefAlgorithm.H"
 #   include "FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
 #else
 #   include "FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
@@ -107,6 +108,11 @@ void FiniteDifferenceSolver::EvolveB (
     } else if (m_fdtd_algo == ElectromagneticSolverAlgo::CKC) {
 
         EvolveBCartesian <CartesianCKCAlgorithm> ( Bfield, Efield, Gfield, lev, dt );
+
+    } else if (m_fdtd_algo == ElectromagneticSolverAlgo::CustomCoef) {
+
+        EvolveBCartesian <CartesianCustomCoefAlgorithm> ( Bfield, Efield, Gfield, lev, dt );
+
     } else if (m_fdtd_algo == ElectromagneticSolverAlgo::ECT) {
         EvolveBCartesianECT(Bfield, face_areas, area_mod, ECTRhofield, Venl, flag_info_cell,
                             borrowing, lev, dt);
