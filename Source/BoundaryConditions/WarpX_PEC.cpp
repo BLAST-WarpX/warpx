@@ -361,6 +361,7 @@ namespace
      * \param[in] psign             Whether the field value should be flipped across the boundary
      * \param[in] is_reflective     Whether the given particle boundary is reflecting or field boundary is pec
      * \param[in] tangent_to_bndy   Whether a given direction is perpendicular to the boundary
+     * \param[in] is_nodal_r        Whether data is nodal along r
      * \param[in] fabbox            multifab box including ghost cells
      */
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -371,7 +372,7 @@ namespace
                                 amrex::GpuArray<GpuArray<amrex::Real, 2>, AMREX_SPACEDIM> const& psign,
                                 amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> const& is_reflective,
                                 amrex::GpuArray<bool, AMREX_SPACEDIM> const& tangent_to_bndy,
-                                int const is_nodal_r,
+                                [[maybe_unused]]int const is_nodal_r,
                                 amrex::Box const& fabbox)
     {
         // The boundary is handled in 2 steps:
