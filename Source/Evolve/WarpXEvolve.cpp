@@ -147,6 +147,8 @@ WarpX::Synchronize () {
 
 void
 WarpX::Evolve (int numsteps)
+// DocDiagram::[Level 1][WarpX main]
+// DocDiagram::[Level 1][WarpX main][Xn, Un-1/2, En, Bn]
 {
     WARPX_PROFILE_REGION("WarpX::Evolve()");
     WARPX_PROFILE("WarpX::Evolve()");
@@ -180,6 +182,7 @@ WarpX::Evolve (int numsteps)
         }
         ExecutePythonCallback("beforestep");
 
+        // DocDiagram::[Level 2][WarpX main][CheckLoadBalance]
         CheckLoadBalance(step);
 
         // Update timestep for electrostatic solver if a constant dt is not provided
@@ -195,12 +198,14 @@ WarpX::Evolve (int numsteps)
 
         // If position and velocity are synchronized, push velocity backward one half step
         if (evolve_scheme == EvolveScheme::Explicit)
+        // DocDiagram::[Level 3][WarpX main][if explicit:<br>ExplicitFillBoundaryEBUpdateAux]
         {
             ExplicitFillBoundaryEBUpdateAux();
         }
 
         // If needed, deposit the initial ion charge and current densities that
         // will be used to update the E-field in Ohm's law.
+        // DocDiagram::[Level 3][WarpX main][if hybrid:<br>HybridPICDepositInitialRhoAndJ]
         if (step == step_begin &&
             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC
         ) {
@@ -209,13 +214,16 @@ WarpX::Evolve (int numsteps)
 
         // Run multi-physics modules:
         // ionization, Coulomb collisions, QED
+        // DocDiagram::[Level 1][WarpX main][doFieldIonization]
         doFieldIonization();
 
         ExecutePythonCallback("beforecollisions");
+        // DocDiagram::[Level 1][WarpX main][doCollisions]
         mypc->doCollisions( cur_time, dt[0] );
         ExecutePythonCallback("aftercollisions");
 
 #ifdef WARPX_QED
+        // DocDiagram::[Level 1][WarpX main][doQEDEvents <br> doQEDSchwinger]
         doQEDEvents();
         mypc->doQEDSchwinger();
 #endif
@@ -223,20 +231,27 @@ WarpX::Evolve (int numsteps)
         // Main PIC operation:
         // gather fields, push particles, deposit sources, update fields
 
+        // DocDiagram::[Level 1][WarpX main][particleinjection]
         ExecutePythonCallback("particleinjection");
 
         if (m_implicit_solver) {
+            // DocDiagram::[Level 1][WarpX main](if implicit)
+            // DocDiagram::[Level 1][WarpX main](if implicit)[implicit_OneStep]
             m_implicit_solver->OneStep(cur_time, dt[0], step);
         }
         else if ( electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
              electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC )
         {
+            // DocDiagram::[Level 1][WarpX main](elif electrostatic/hybrid)
             // Electrostatic or hybrid-PIC case: only gather fields and push
             // particles, deposition and calculation of fields done further below
             const bool skip_deposition = true;
+            // DocDiagram::[Level 1][WarpX main](elif electrostatic/hybrid)[PushParticlesandDeposit]
             PushParticlesandDeposit(cur_time, skip_deposition);
         }
         // Electromagnetic case: JRhom algorithm
+        // DocDiagram::[Level 1][WarpX main](elif electromagnetic)
+        // DocDiagram::[Level 1][WarpX main](elif electromagnetic)[OneStep_nosub <br>or OneStep_JRhom <br>or OneStep_sub1]
         else if (m_JRhom)
         {
             OneStep_JRhom(cur_time);
@@ -264,8 +279,10 @@ WarpX::Evolve (int numsteps)
         // Resample particles
         // +1 is necessary here because value of step seen by user (first step is 1) is different than
         // value of step in code (first step is 0)
+        // DocDiagram::[Level 2][WarpX main][doResampling]
         mypc->doResampling(Geom(), istep[0]+1, verbose);
 
+        // DocDiagram::[Level 2][WarpX main][if explicit:<br>applyMirrors]
         if (evolve_scheme == EvolveScheme::Explicit) {
             applyMirrors(cur_time);
             // E : guard cells are NOT up-to-date
@@ -289,6 +306,7 @@ WarpX::Evolve (int numsteps)
 
         cur_time += dt[0];
 
+        // DocDiagram::[Level 2][WarpX main][ShiftGalileanBoundary]
         ShiftGalileanBoundary();
 
         // sync up time
@@ -296,23 +314,28 @@ WarpX::Evolve (int numsteps)
             t_old[i] = t_new[i];
             t_new[i] = cur_time;
         }
+        // DocDiagram::[Level 2][WarpX main][FilterComputePackFlush]
         multi_diags->FilterComputePackFlush( step, false, true );
 
         const bool move_j = is_synchronized;
         // If is_synchronized we need to shift j too so that next step we can evolve E by dt/2.
         // We might need to move j because we are going to make a plotfile.
+        // DocDiagram::[Level 2][WarpX main][MoveWindow]
         const int num_moved = MoveWindow(step+1, move_j);
 
         // Update the accelerator lattice element finder if the window has moved,
         // from either a moving window or a boosted frame
+        // DocDiagram::[Level 2][WarpX main][UpdateElementFinder]
         if (num_moved != 0 || gamma_boost > 1) {
             for (int lev = 0; lev <= finest_level; ++lev) {
                 m_accelerator_lattice[lev]->UpdateElementFinder(lev, gett_new());
             }
         }
 
+        // DocDiagram::[Level 1][WarpX main][HandleParticlesAtBoundaries]
         HandleParticlesAtBoundaries(step, cur_time, num_moved);
 
+        // DocDiagram::[Level 1][WarpX main][if ES/hybrid:Poisson solves]
         // Field solve step for electrostatic or hybrid-PIC solvers
         if( electrostatic_solver_id != ElectrostaticSolverAlgo::None ||
             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC )
@@ -364,6 +387,7 @@ WarpX::Evolve (int numsteps)
         ExecutePythonCallback("afterstep");
 
         /// reduced diags
+        // DocDiagram::[Level 2][WarpX main][ReducedDiags]
         if (reduced_diags->m_plot_rd != 0)
         {
             reduced_diags->LoadBalance();
@@ -376,6 +400,7 @@ WarpX::Evolve (int numsteps)
         ExecutePythonCallback("afterdiagnostics");
 
         // inputs: unused parameters (e.g. typos) check after step 1 has finished
+        // DocDiagram::[Level 3][WarpX main][checkEarlyUnusedParams]
         if (!early_params_checked) {
             ::checkEarlyUnusedParams();
             early_params_checked = true;
@@ -385,6 +410,7 @@ WarpX::Evolve (int numsteps)
         const auto evolve_time_end_step = static_cast<Real>(amrex::second());
         evolve_time += evolve_time_end_step - evolve_time_beg_step;
 
+        // DocDiagram::[Level 3][WarpX main][HandleSignals]
         HandleSignals();
 
         if (verbose) {
@@ -395,6 +421,7 @@ WarpX::Evolve (int numsteps)
                       << " s; Avg. per step = " << evolve_time/(step-step_begin+1) << " s\n\n";
         }
 
+        // DocDiagram::[Level 3][WarpX main][checkStopSimulation]
         if (checkStopSimulation(cur_time)) {
             break;
         }
@@ -413,6 +440,7 @@ WarpX::Evolve (int numsteps)
 
     amrex::Print() <<
         ablastr::warn_manager::GetWMInstance().PrintGlobalWarnings("THE END");
+// DocDiagram::[Level 1][WarpX main][Xn+1,Un+1/2,En+1,Bn+1]
 }
 
 /**
@@ -422,6 +450,7 @@ WarpX::Evolve (int numsteps)
  */
 void
 WarpX::OneStep_nosub (Real cur_time)
+// DocDiagram::[Level 1][OneStep_nosub]
 {
     WARPX_PROFILE("WarpX::OneStep_nosub()");
 
@@ -433,6 +462,7 @@ WarpX::OneStep_nosub (Real cur_time)
     ExecutePythonCallback("particlescraper");
     ExecutePythonCallback("beforedeposition");
 
+    // DocDiagram::[Level 1][OneStep_nosub][PushParticlesandDeposit]
     PushParticlesandDeposit(cur_time);
 
     ExecutePythonCallback("afterdeposition");
@@ -440,6 +470,7 @@ WarpX::OneStep_nosub (Real cur_time)
     // Synchronize J and rho:
     // filter (if used), exchange guard cells, interpolate across MR levels
     // and apply boundary conditions
+    // DocDiagram::[Level 1][OneStep_nosub][SyncCurrentAndRho]
     SyncCurrentAndRho();
 
     // At this point, J is up-to-date inside the domain, and E and B are
@@ -447,6 +478,7 @@ WarpX::OneStep_nosub (Real cur_time)
     // solve.
 
     // For extended PML: copy J from regular grid to PML, and damp J in PML
+    // DocDiagram::[Level 2][OneStep_nosub][CopyJPML<br>DampJPML]
     if (do_pml && pml_has_particles) { CopyJPML(); }
     if (do_pml && do_pml_j_damping) { DampJPML(); }
 
@@ -455,13 +487,16 @@ WarpX::OneStep_nosub (Real cur_time)
     // Push E and B from {n} to {n+1}
     // (And update guard cells immediately afterwards)
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
+        // DocDiagram::[Level 1][OneStep_nosub](if PSATD)
         if (use_hybrid_QED)
         {
             WarpX::Hybrid_QED_Push(dt);
             FillBoundaryE(guard_cells.ng_alloc_EB);
         }
+        // DocDiagram::[Level 1][OneStep_nosub](if PSATD)[PushPSATD]
         PushPSATD(cur_time);
 
+        // DocDiagram::[Level 1][OneStep_nosub](if PSATD)[DampPML]
         if (do_pml) {
             DampPML();
         }
@@ -483,28 +518,38 @@ WarpX::OneStep_nosub (Real cur_time)
             }
         }
     } else {
+        // DocDiagram::[Level 1][OneStep_nosub](elif FDTD)
         EvolveF(0.5_rt * dt[0], DtType::FirstHalf);
         EvolveG(0.5_rt * dt[0], DtType::FirstHalf);
         FillBoundaryF(guard_cells.ng_FieldSolverF);
         FillBoundaryG(guard_cells.ng_FieldSolverG);
 
+        // DocDiagram::[Level 1][OneStep_nosub](elif FDTD)[EvolveB 1/2dt]
         EvolveB(0.5_rt * dt[0], DtType::FirstHalf, cur_time); // We now have B^{n+1/2}
+        // DocDiagram::[Level 2][OneStep_nosub](elif FDTD)[FillBoundaryB]
         FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
         if (m_em_solver_medium == MediumForEM::Vacuum) {
+            // Doc2Diagram::[Level 1][OneStep_nosub](elif FDTD)(if Vacuum)
             // vacuum medium
+            // Doc2Diagram::[Level 1][OneStep_nosub](elif FDTD)(if Vacuum)[EvolveE]
             EvolveE(dt[0], cur_time); // We now have E^{n+1}
         } else if (m_em_solver_medium == MediumForEM::Macroscopic) {
+            // Doc2Diagram::[Level 1][OneStep_nosub](elif FDTD)(elif Medium)
             // macroscopic medium
+            // Doc2Diagram::[Level 1][OneStep_nosub](elif FDTD)[MacroscopicEvolveE]
             MacroscopicEvolveE(dt[0], cur_time); // We now have E^{n+1}
         } else {
             WARPX_ABORT_WITH_MESSAGE("Medium for EM is unknown");
         }
+        // DocDiagram::[Level 2][OneStep_nosub](elif FDTD)[FillBoundaryE]
         FillBoundaryE(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
         EvolveF(0.5_rt * dt[0], DtType::SecondHalf);
         EvolveG(0.5_rt * dt[0], DtType::SecondHalf);
         EvolveB(0.5_rt * dt[0], DtType::SecondHalf, cur_time + 0.5_rt * dt[0]); // We now have B^{n+1}
+        // DocDiagram::[Level 1][OneStep_nosub](elif FDTD)[EvolveB 1/2dt]
+
 
         if (do_pml) {
             DampPML();
@@ -513,15 +558,18 @@ WarpX::OneStep_nosub (Real cur_time)
             FillBoundaryF(guard_cells.ng_MovingWindow, WarpX::sync_nodal_points);
             FillBoundaryG(guard_cells.ng_MovingWindow, WarpX::sync_nodal_points);
         }
+        // DocDiagram::[Level 1][OneStep_nosub](elif FDTD)[DampPML]
 
         // E and B are up-to-date in the domain, but all guard cells are
         // outdated.
+        // DocDiagram::[Level 2][OneStep_nosub](elif FDTD)[FillBoundaryB]
         if (m_safe_guard_cells) {
             FillBoundaryB(guard_cells.ng_alloc_EB);
         }
     } // !PSATD
 
     ExecutePythonCallback("afterEsolve");
+// DocDiagram::[Level 1][OneStep_nosub][Return]
 }
 
 bool WarpX::checkStopSimulation (amrex::Real cur_time)
@@ -715,6 +763,7 @@ void WarpX::SyncCurrentAndRho ()
 
 void
 WarpX::OneStep_JRhom (const amrex::Real cur_time)
+// DocDiagram::[Level 1][OneStep_JRhom]
 {
 #ifdef WARPX_USE_FFT
 
@@ -733,16 +782,19 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
     // Push particle from x^{n} to x^{n+1}
     //               from p^{n-1/2} to p^{n+1/2}
     const bool skip_deposition = true;
+    // DocDiagram::[Level 1][OneStep_JRhom][skip_deposition = true<br>PushParticlesandDeposit]
     PushParticlesandDeposit(cur_time, skip_deposition);
 
     // Initialize PSATD-JRhom loop:
 
     // 1) Prepare E,B,F,G fields in spectral space
     PSATDForwardTransformEB();
+    // DocDiagram::[Level 2][OneStep_JRhom][PSATDForwardTransformEB]
     if (WarpX::do_dive_cleaning) { PSATDForwardTransformF(); }
     if (WarpX::do_divb_cleaning) { PSATDForwardTransformG(); }
 
     // 2) Set the averaged fields to zero
+    // DocDiagram::[Level 2][OneStep_JRhom][PSATDEraseAverageFields]
     if (WarpX::fft_do_time_averaging) { PSATDEraseAverageFields(); }
 
     // 3) Deposit rho (in rho_new, since it will be moved during the loop)
@@ -756,6 +808,7 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
 
         // Deposit rho at relative time -dt
         // (dt[0] denotes the time step on mesh refinement level 0)
+        // DocDiagram::[Level 1][OneStep_JRhom][DepositCharge at -dt]
         mypc->DepositCharge(rho_fp, -dt[0]);
         // Filter, exchange boundary, and interpolate across levels
         SyncRho();
@@ -768,6 +821,7 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
     if (time_dependency_J != TimeDependencyJ::Constant)
     {
         std::string const current_string = (do_current_centering) ? "current_fp_nodal" : "current_fp";
+        // DocDiagram::[Level 1][OneStep_JRhom][DepositCurrent at -dt]
         mypc->DepositCurrent( m_fields.get_mr_levels_alldirs(current_string, finest_level), dt[0], -dt[0]);
         // Synchronize J: filter, exchange boundary, and interpolate across levels.
         // With current centering, the nodal current is deposited in 'current',
@@ -788,6 +842,7 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
     const int n_loop = (WarpX::fft_do_time_averaging) ? 2*n_deposit : n_deposit;
 
     // Loop over PSATD-JRhom depositions
+    // DocDiagram::[Level 1][OneStep_JRhom](loop substeps)
     for (int i_deposit = 0; i_deposit < n_loop; i_deposit++)
     {
         // Move J from new to old if J is linear or quadratic in time
@@ -801,6 +856,7 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
 
         // Deposit new J at relative time t_deposit_current with time step dt
         // (dt[0] denotes the time step on mesh refinement level 0)
+        // DocDiagram::[Level 1][OneStep_JRhom](loop substeps)[DepositCurrent]
         std::string const current_string = (do_current_centering) ? "current_fp_nodal" : "current_fp";
         mypc->DepositCurrent( m_fields.get_mr_levels_alldirs(current_string, finest_level), dt[0], t_deposit_current);
         // Synchronize J: filter, exchange boundary, and interpolate across levels.
@@ -833,6 +889,7 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
             if (time_dependency_rho != TimeDependencyRho::Constant) { PSATDMoveRhoNewToRhoOld(); }
 
             // Deposit rho at relative time t_deposit_charge
+            // DocDiagram::[Level 1][OneStep_JRhom](loop substeps)[DepositCharge]
             mypc->DepositCharge(rho_fp, t_deposit_charge);
             // Filter, exchange boundary, and interpolate across levels
             SyncRho();
@@ -856,6 +913,7 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
         }
 
         // Advance E,B,F,G fields in time and update the average fields
+        // DocDiagram::[Level 1][OneStep_JRhom](loop substeps)[PSATDPushSpectralFields]
         PSATDPushSpectralFields();
 
         // Transform non-average fields E,B,F,G after n_deposit pushes
@@ -894,6 +952,7 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
         if (lev > 0) { ApplyBfieldBoundary(lev, PatchType::coarse, DtType::FirstHalf, cur_time + dt[0]); }
     }
 
+    // DocDiagram::[Level 1][OneStep_JRhom][DampPML]
     // Damp fields in PML before exchanging guard cells
     if (do_pml)
     {
@@ -915,6 +974,7 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
     WARPX_ABORT_WITH_MESSAGE(
         "JRhom algorithm not implemented with the FDTD solver");
 #endif // WARPX_USE_FFT
+// DocDiagram::[Level 1][OneStep_JRhom][Return]
 }
 
 /**
@@ -1200,6 +1260,7 @@ WarpX::PushParticlesandDeposit (amrex::Real cur_time, bool skip_current,
 void
 WarpX::PushParticlesandDeposit (int lev, amrex::Real cur_time, DtType a_dt_type, bool skip_current,
                                bool deposit_mass_matrices, PushType push_type)
+// DocDiagram::[Level 1][PushParticlesandDeposit]
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
