@@ -39,6 +39,7 @@ guardCellManager::Init (
     ablastr::utils::enums::GridType grid_type,
     const bool do_moving_window,
     const int moving_window_dir,
+    const int particle_max_grid_crossings,
     const int nox,
     const int nox_fft, const int noy_fft, const int noz_fft,
     const int nci_corr_stencil,
@@ -138,6 +139,9 @@ guardCellManager::Init (
     // both at the beginning and at the end of the PIC iteration).
     // For the hybrid-PIC solver, the same number of guard cells are used as for
     // the electrostatic solver.
+    // The min with particle_max_grid_crossings is taken since when using the implicit scheme,
+    // the speed of light Courant limit may be significantly violated, but the number of guard
+    // cells only need to be adjusted based on the particle motion.
     if (electromagnetic_solver_id != ElectromagneticSolverAlgo::None &&
         electromagnetic_solver_id != ElectromagneticSolverAlgo::HybridPIC)
     {
@@ -157,8 +161,10 @@ guardCellManager::Init (
                     dt_J = dt;
                 }
             }
-            ng_alloc_Rho[i] += static_cast<int>(std::ceil(PhysConst::c * dt_Rho / dx[i]));
-            ng_alloc_J[i]   += static_cast<int>(std::ceil(PhysConst::c * dt_J / dx[i]));
+            ng_alloc_Rho[i] += std::min(static_cast<int>(std::ceil(PhysConst::c * dt_Rho / dx[i])),
+                                        particle_max_grid_crossings);
+            ng_alloc_J[i]   += std::min(static_cast<int>(std::ceil(PhysConst::c * dt_J / dx[i])),
+                                        particle_max_grid_crossings);
         }
     }
 

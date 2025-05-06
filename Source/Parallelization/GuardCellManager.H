@@ -34,6 +34,7 @@ public:
      * \param grid_type integer, whether the grid is collocated or staggered
      * \param do_moving_window bool, whether to use moving window
      * \param moving_window_dir direction of moving window
+     * \param particle_max_grid_crossings maximum number of grid crossings for particles
      * \param nox order of current deposition
      * \param nox_fft order of PSATD in x direction
      * \param noy_fft order of PSATD in y direction
@@ -61,6 +62,7 @@ public:
         ablastr::utils::enums::GridType grid_type,
         bool do_moving_window,
         int moving_window_dir,
+        int particle_max_grid_crossings,
         int nox,
         int nox_fft, int noy_fft, int noz_fft,
         int nci_corr_stencil,
