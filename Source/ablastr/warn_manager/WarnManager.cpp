@@ -93,12 +93,14 @@ void WarnManager::RecordWarning(
         } else if(m_abort_on_warning_threshold == WarnPriority::medium) {
             abort_priority = abl_msg_logger::Priority::medium;
         }
+        std::string abort_msg = "A warning with priority '"
+            + abl_msg_logger::PriorityToString(abort_priority)
+            + "' has been raised";
+        abort_msg += ((m_always_warn_immediately) ? "." : (":\n[" + topic + "] " + text));
 
         ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(
             msg_priority < abort_priority,
-            "A warning with priority '"
-            + abl_msg_logger::PriorityToString(msg_priority)
-            + "' has been raised."
+            abort_msg
         );
     }
 }

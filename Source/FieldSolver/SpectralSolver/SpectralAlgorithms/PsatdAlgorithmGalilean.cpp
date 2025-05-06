@@ -4,7 +4,7 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#include "PsatdAlgorithmJConstantInTime.H"
+#include "PsatdAlgorithmGalilean.H"
 
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -29,7 +29,7 @@
 
 using namespace amrex;
 
-PsatdAlgorithmJConstantInTime::PsatdAlgorithmJConstantInTime(
+PsatdAlgorithmGalilean::PsatdAlgorithmGalilean(
     const SpectralKSpace& spectral_kspace,
     const DistributionMapping& dm,
     const SpectralFieldIndex& spectral_index,
@@ -58,11 +58,7 @@ PsatdAlgorithmJConstantInTime::PsatdAlgorithmJConstantInTime(
     m_v_galilean(v_galilean),
     m_dt(dt),
     m_update_with_rho(update_with_rho),
-    m_time_averaging(time_averaging),
-    m_dive_cleaning(dive_cleaning),
-    m_divb_cleaning(divb_cleaning),
-    m_is_galilean{
-        (v_galilean[0] != 0.) || (v_galilean[1] != 0.) || (v_galilean[2] != 0.)}
+    m_time_averaging(time_averaging)
 {
     const amrex::BoxArray& ba = spectral_kspace.spectralspace_ba;
 
@@ -72,13 +68,8 @@ PsatdAlgorithmJConstantInTime::PsatdAlgorithmJConstantInTime(
     X1_coef = SpectralComplexCoefficients(ba, dm, 1, 0);
     X2_coef = SpectralComplexCoefficients(ba, dm, 1, 0);
     X3_coef = SpectralComplexCoefficients(ba, dm, 1, 0);
-
-    // Allocate these coefficients only with Galilean PSATD
-    if (m_is_galilean)
-    {
-        X4_coef = SpectralComplexCoefficients(ba, dm, 1, 0);
-        T2_coef = SpectralComplexCoefficients(ba, dm, 1, 0);
-    }
+    X4_coef = SpectralComplexCoefficients(ba, dm, 1, 0);
+    T2_coef = SpectralComplexCoefficients(ba, dm, 1, 0);
 
     InitializeSpectralCoefficients(spectral_kspace, dm, dt);
 
@@ -95,29 +86,26 @@ PsatdAlgorithmJConstantInTime::PsatdAlgorithmJConstantInTime(
     }
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        !dive_cleaning || !m_is_galilean,
-        "warpx.do_dive_cleaning = 1 not implemented for Galilean PSATD algorithms"
+        !dive_cleaning,
+        "warpx.do_dive_cleaning=1 not implemented for Galilean PSATD algorithms"
     );
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        !divb_cleaning || !m_is_galilean,
-        "warpx.do_divb_cleaning = 1 not implemented for Galilean PSATD algorithms"
+        !divb_cleaning,
+        "warpx.do_divb_cleaning=1 not implemented for Galilean PSATD algorithms"
     );
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !time_averaging || update_with_rho,
-        "PSATD: psatd.time_averaging = 1 implemented only with psatd.update_with_rho = 1"
+        "PSATD: psatd.time_averaging=1 implemented only with psatd.update_with_rho=1"
     );
 }
 
 void
-PsatdAlgorithmJConstantInTime::pushSpectralFields (SpectralFieldData& f) const
+PsatdAlgorithmGalilean::pushSpectralFields (SpectralFieldData& f) const
 {
     const bool update_with_rho = m_update_with_rho;
     const bool time_averaging  = m_time_averaging;
-    const bool dive_cleaning   = m_dive_cleaning;
-    const bool divb_cleaning   = m_divb_cleaning;
-    const bool is_galilean     = m_is_galilean;
 
     const amrex::Real dt = m_dt;
 
@@ -137,14 +125,8 @@ PsatdAlgorithmJConstantInTime::pushSpectralFields (SpectralFieldData& f) const
         const amrex::Array4<const Complex> X1_arr = X1_coef[mfi].array();
         const amrex::Array4<const Complex> X2_arr = X2_coef[mfi].array();
         const amrex::Array4<const Complex> X3_arr = X3_coef[mfi].array();
-
-        amrex::Array4<const Complex> X4_arr;
-        amrex::Array4<const Complex> T2_arr;
-        if (is_galilean)
-        {
-            X4_arr = X4_coef[mfi].array();
-            T2_arr = T2_coef[mfi].array();
-        }
+        const amrex::Array4<const Complex> X4_arr = X4_coef[mfi].array();
+        const amrex::Array4<const Complex> T2_arr = T2_coef[mfi].array();
 
         // These coefficients are allocated only with averaged Galilean PSATD
         amrex::Array4<const Complex> Psi1_arr;
@@ -195,18 +177,6 @@ PsatdAlgorithmJConstantInTime::pushSpectralFields (SpectralFieldData& f) const
             const Complex Jy = fields(i,j,k,Idx.Jy_mid);
             const Complex Jz = fields(i,j,k,Idx.Jz_mid);
 
-            Complex F_old;
-            if (dive_cleaning)
-            {
-                F_old = fields(i,j,k,Idx.F);
-            }
-
-            Complex G_old;
-            if (divb_cleaning)
-            {
-                G_old = fields(i,j,k,Idx.G);
-            }
-
             // k vector values
             const amrex::Real kx = modified_kx_arr[i];
             const amrex::Real kx_c = modified_kx_arr_c[i];
@@ -224,7 +194,6 @@ PsatdAlgorithmJConstantInTime::pushSpectralFields (SpectralFieldData& f) const
             // Physical constants and imaginary unit
             constexpr Real c2 = PhysConst::c * PhysConst::c;
             constexpr Real ep0 = PhysConst::ep0;
-            constexpr Real inv_ep0 = 1._rt / PhysConst::ep0;
             constexpr Complex I = Complex{0._rt, 1._rt};
 
             // These coefficients are initialized in the function InitializeSpectralCoefficients
@@ -233,8 +202,8 @@ PsatdAlgorithmJConstantInTime::pushSpectralFields (SpectralFieldData& f) const
             const Complex X1 = X1_arr(i,j,k);
             const Complex X2 = X2_arr(i,j,k);
             const Complex X3 = X3_arr(i,j,k);
-            const Complex X4 = (is_galilean) ? X4_arr(i,j,k) : - S_ck / PhysConst::ep0;
-            const Complex T2 = (is_galilean) ? T2_arr(i,j,k) : 1.0_rt;
+            const Complex X4 = X4_arr(i,j,k);
+            const Complex T2 = T2_arr(i,j,k);
 
             // Shortcuts for the values of rho
             Complex rho_old, rho_new;
@@ -291,30 +260,6 @@ PsatdAlgorithmJConstantInTime::pushSpectralFields (SpectralFieldData& f) const
                                    - I * T2 * S_ck * (kx * Ey_old - ky * Ex_old)
                                    + I * X1 * (kx * Jy - ky * Jx);
 
-            if (dive_cleaning)
-            {
-                const Complex k_dot_J  = kx * Jx + ky * Jy + kz * Jz;
-                const Complex k_dot_E = kx * Ex_old + ky * Ey_old + kz * Ez_old;
-
-                fields(i,j,k,Idx.Ex) += I * c2 * S_ck * F_old * kx;
-                fields(i,j,k,Idx.Ey) += I * c2 * S_ck * F_old * ky;
-                fields(i,j,k,Idx.Ez) += I * c2 * S_ck * F_old * kz;
-
-                fields(i,j,k,Idx.F) = C * F_old + S_ck * (I * k_dot_E - rho_old * inv_ep0)
-                    - X1 * ((rho_new - rho_old) / dt + I * k_dot_J);
-            }
-
-            if (divb_cleaning)
-            {
-                const Complex k_dot_B = kx * Bx_old + ky * By_old + kz * Bz_old;
-
-                fields(i,j,k,Idx.Bx) += I * S_ck * G_old * kx;
-                fields(i,j,k,Idx.By) += I * S_ck * G_old * ky;
-                fields(i,j,k,Idx.Bz) += I * S_ck * G_old * kz;
-
-                fields(i,j,k,Idx.G) = C * G_old + I * c2 * S_ck * k_dot_B;
-            }
-
             // Additional update equations for averaged Galilean algorithm
             if (time_averaging)
             {
@@ -354,13 +299,11 @@ PsatdAlgorithmJConstantInTime::pushSpectralFields (SpectralFieldData& f) const
     }
 }
 
-void PsatdAlgorithmJConstantInTime::InitializeSpectralCoefficients (
+void PsatdAlgorithmGalilean::InitializeSpectralCoefficients (
     const SpectralKSpace& spectral_kspace,
     const amrex::DistributionMapping& dm,
     const amrex::Real dt)
 {
-    const bool is_galilean     = m_is_galilean;
-
     const amrex::BoxArray& ba = spectral_kspace.spectralspace_ba;
 
     // Loop over boxes and allocate the corresponding coefficients for each box
@@ -384,14 +327,8 @@ void PsatdAlgorithmJConstantInTime::InitializeSpectralCoefficients (
         const amrex::Array4<Complex> X1 = X1_coef[mfi].array();
         const amrex::Array4<Complex> X2 = X2_coef[mfi].array();
         const amrex::Array4<Complex> X3 = X3_coef[mfi].array();
-
-        amrex::Array4<Complex> X4;
-        amrex::Array4<Complex> T2;
-        if (is_galilean)
-        {
-            X4 = X4_coef[mfi].array();
-            T2 = T2_coef[mfi].array();
-        }
+        const amrex::Array4<Complex> X4 = X4_coef[mfi].array();
+        const amrex::Array4<Complex> T2 = T2_coef[mfi].array();
 
         // Extract Galilean velocity
         const amrex::Real vg_x = m_v_galilean[0];
@@ -456,10 +393,7 @@ void PsatdAlgorithmJConstantInTime::InitializeSpectralCoefficients (
                 ((1._rt - C(i,j,k)) / (ep0 * om2_s)):(0.5_rt * dt2 / ep0);
 
             // T2
-            if (is_galilean)
-            {
-                T2(i,j,k) = theta_c * theta_c;
-            }
+            T2(i,j,k) = theta_c * theta_c;
 
             // X1 (multiplies i*([k] \times J) in the update equation for update B)
             if ((om_s != 0.) || (w_c != 0.))
@@ -509,15 +443,12 @@ void PsatdAlgorithmJConstantInTime::InitializeSpectralCoefficients (
             }
 
             // X4 (multiplies J in the update equation for E)
-            if (is_galilean)
-            {
-                X4(i,j,k) = I * w_c * X1(i,j,k) - theta2_c * S_ck(i,j,k) / ep0;
-            }
+            X4(i,j,k) = I * w_c * X1(i,j,k) - theta2_c * S_ck(i,j,k) / ep0;
         });
     }
 }
 
-void PsatdAlgorithmJConstantInTime::InitializeSpectralCoefficientsAveraging (
+void PsatdAlgorithmGalilean::InitializeSpectralCoefficientsAveraging (
     const SpectralKSpace& spectral_kspace,
     const amrex::DistributionMapping& dm,
     const amrex::Real dt)
@@ -700,10 +631,10 @@ void PsatdAlgorithmJConstantInTime::InitializeSpectralCoefficientsAveraging (
     }
 }
 
-void PsatdAlgorithmJConstantInTime::CurrentCorrection (SpectralFieldData& field_data)
+void PsatdAlgorithmGalilean::CurrentCorrection (SpectralFieldData& field_data)
 {
     // Profiling
-    BL_PROFILE("PsatdAlgorithmJConstantInTime::CurrentCorrection");
+    BL_PROFILE("PsatdAlgorithmGalilean::CurrentCorrection");
 
     const SpectralFieldIndex& Idx = m_spectral_index;
 
@@ -800,10 +731,10 @@ void PsatdAlgorithmJConstantInTime::CurrentCorrection (SpectralFieldData& field_
 }
 
 void
-PsatdAlgorithmJConstantInTime::VayDeposition (SpectralFieldData& field_data)
+PsatdAlgorithmGalilean::VayDeposition (SpectralFieldData& field_data)
 {
     // Profiling
-    BL_PROFILE("PsatdAlgorithmJConstantInTime::VayDeposition()");
+    BL_PROFILE("PsatdAlgorithmGalilean::VayDeposition()");
 
     const SpectralFieldIndex& Idx = m_spectral_index;
 
