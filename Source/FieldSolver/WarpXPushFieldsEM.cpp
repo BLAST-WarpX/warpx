@@ -1368,10 +1368,6 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
     const std::array<Real,3>& dx = CellSize(lev);
     const Real dr = dx[0];
 
-    amrex::Box const domain_box = Geom(lev).Domain();
-    int const domain_lo_r = domain_box.smallEnd(0);
-    int const domain_hi_r = domain_box.bigEnd(0);
-
     constexpr int NODE = amrex::IndexType::NODE;
 
     // See Verboncoeur JCP 174, 421-427 (2001) for the modified volume factor
@@ -1430,7 +1426,6 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
         amrex::ParallelFor(tbr, tbt, tbz,
         [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
         {
-            amrex::Real const boundary_factor = (ishift_r == 0 && (i == domain_lo_r || i == domain_hi_r) ? 0.5_rt : 1.0_rt);
             // Wrap the current density deposited in the guard cells around
             // to the cells above the axis.
             // If Jr is node centered, Jr[0] is located on the boundary.
@@ -1445,11 +1440,11 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
                 Jr_arr(i,j,0,0) = 0.0_rt;
             } else {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                Jr_arr(i,j,0,0) /= 2.0_rt*MathConst::pi*r*boundary_factor;
+                Jr_arr(i,j,0,0) /= 2.0_rt*MathConst::pi*r;
 #elif defined(WARPX_DIM_RSPHERE)
                 // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr,
                 // leaving out the highest order term
-                Jr_arr(i,j,0,0) /= 4.0_rt*MathConst::pi*r*r*boundary_factor;
+                Jr_arr(i,j,0,0) /= 4.0_rt*MathConst::pi*r*r;
 #endif
             }
 
@@ -1467,15 +1462,14 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
                     Jr_arr(i,j,0,2*imode-1) = 0.0_rt;
                     Jr_arr(i,j,0,2*imode) = 0.0_rt;
                 } else {
-                    Jr_arr(i,j,0,2*imode-1) /= (2.0_rt*MathConst::pi*r)*boundary_factor;
-                    Jr_arr(i,j,0,2*imode) /= (2.0_rt*MathConst::pi*r)*boundary_factor;
+                    Jr_arr(i,j,0,2*imode-1) /= (2.0_rt*MathConst::pi*r);
+                    Jr_arr(i,j,0,2*imode) /= (2.0_rt*MathConst::pi*r);
                 }
             }
 #endif
         },
         [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
         {
-            amrex::Real const boundary_factor = (ishift_t == 0 && (i == domain_lo_r || i == domain_hi_r) ? 0.5_rt : 1.0_rt);
             // Wrap the current density deposited in the guard cells around
             // to the cells above the axis.
             // If Jt is node centered, Jt[0] is located on the boundary.
@@ -1491,11 +1485,11 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
                 Jt_arr(i,j,0,0) = 0.0_rt;
             } else {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                Jt_arr(i,j,0,0) /= (2.0_rt*MathConst::pi*r)*boundary_factor;
+                Jt_arr(i,j,0,0) /= (2.0_rt*MathConst::pi*r);
 #elif defined(WARPX_DIM_RSPHERE)
                 // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr,
                 // leaving out the highest order term
-                Jt_arr(i,j,0,0) /= 4.0_rt*MathConst::pi*r*r*boundary_factor;
+                Jt_arr(i,j,0,0) /= 4.0_rt*MathConst::pi*r*r;
 #endif
             }
 
@@ -1514,15 +1508,14 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
                     Jt_arr(i,j,0,2*imode-1) = 0.0_rt;
                     Jt_arr(i,j,0,2*imode) = 0.0_rt;
                 } else {
-                    Jt_arr(i,j,0,2*imode-1) /= (2.0_rt*MathConst::pi*r)*boundary_factor;
-                    Jt_arr(i,j,0,2*imode) /= (2.0_rt*MathConst::pi*r)*boundary_factor;
+                    Jt_arr(i,j,0,2*imode-1) /= (2.0_rt*MathConst::pi*r);
+                    Jt_arr(i,j,0,2*imode) /= (2.0_rt*MathConst::pi*r);
                 }
             }
 #endif
         },
         [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
         {
-            amrex::Real const boundary_factor = (ishift_z == 0 && (i == domain_lo_r || i == domain_hi_r) ? 0.5_rt : 1.0_rt);
             // Wrap the current density deposited in the guard cells around
             // to the cells above the axis.
             // If Jz is node centered, Jz[0] is located on the boundary.
@@ -1545,11 +1538,11 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
 #endif
             } else {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                Jz_arr(i,j,0,0) /= (2.0_rt*MathConst::pi*r)*boundary_factor;
+                Jz_arr(i,j,0,0) /= (2.0_rt*MathConst::pi*r);
 #elif defined(WARPX_DIM_RSPHERE)
                 // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr,
                 // leaving out the highest order term
-                Jz_arr(i,j,0,0) /= 4.0_rt*MathConst::pi*r*r*boundary_factor;
+                Jz_arr(i,j,0,0) /= 4.0_rt*MathConst::pi*r*r;
 #endif
             }
 
@@ -1567,8 +1560,8 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
                     Jz_arr(i,j,0,2*imode-1) /= (MathConst::pi*dr*axis_volume_factor);
                     Jz_arr(i,j,0,2*imode) /= (MathConst::pi*dr*axis_volume_factor);
                 } else {
-                    Jz_arr(i,j,0,2*imode-1) /= (2.0_rt*MathConst::pi*r)*boundary_factor;
-                    Jz_arr(i,j,0,2*imode) /= (2.0_rt*MathConst::pi*r)*boundary_factor;
+                    Jz_arr(i,j,0,2*imode-1) /= (2.0_rt*MathConst::pi*r);
+                    Jz_arr(i,j,0,2*imode) /= (2.0_rt*MathConst::pi*r);
                 }
             }
 #endif
@@ -1582,10 +1575,6 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev) const
     const amrex::IntVect ngRho = Rho->nGrowVect();
     const std::array<Real,3>& dx = WarpX::CellSize(lev);
     const Real dr = dx[0];
-
-    amrex::Box const domain_box = Geom(lev).Domain();
-    int const domain_lo_r = domain_box.smallEnd(0);
-    int const domain_hi_r = domain_box.bigEnd(0);
 
     constexpr int NODE = amrex::IndexType::NODE;
 
@@ -1634,7 +1623,6 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev) const
         amrex::ParallelFor(tb, ncomp,
         [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/, int icomp)
         {
-            amrex::Real const boundary_factor = (ishift == 0 && (i == domain_lo_r || i == domain_hi_r) ? 0.5_rt : 1.0_rt);
             // Wrap the charge density deposited in the guard cells around
             // to the cells above the axis.
             // Rho is located on the boundary
@@ -1663,11 +1651,11 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev) const
             } else {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 // Scale factor is pi*((r + dr/2)**2 - (r - dr/2)**2)/dr
-                Rho_arr(i,j,0,icomp) /= (2.0_rt*MathConst::pi*r)*boundary_factor;
+                Rho_arr(i,j,0,icomp) /= (2.0_rt*MathConst::pi*r);
 #elif defined(WARPX_DIM_RSPHERE)
                 // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr,
                 // leaving out the highest order term
-                Rho_arr(i,j,0,icomp) /= 4.0_rt*MathConst::pi*r*r*boundary_factor;
+                Rho_arr(i,j,0,icomp) /= 4.0_rt*MathConst::pi*r*r;
 #endif
             }
         });
