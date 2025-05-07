@@ -378,4 +378,9 @@ guardCellManager::Init (
             ng_MovingWindow[moving_window_dir] = 1;
         }
     }
+    for (int i = 0; i < AMREX_SPACEDIM; i++) {
+        ng_alloc_J[i] = nox;
+        ng_alloc_Rho[i] = nox;
+        ng_alloc_EB[i] = nox;
+    }
 }
