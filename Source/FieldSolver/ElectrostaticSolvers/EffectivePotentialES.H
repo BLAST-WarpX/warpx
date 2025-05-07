@@ -54,11 +54,13 @@ public:
      */
     void computePhi (
         ablastr::fields::MultiLevelScalarField const& rho,
-        ablastr::fields::MultiLevelScalarField const& phi
+        ablastr::fields::MultiLevelScalarField const& phi,
+        ablastr::fields::MultiLevelVectorField const& efield
     ) const;
     void computePhi (
         ablastr::fields::MultiLevelScalarField const& rho,
         ablastr::fields::MultiLevelScalarField const& phi,
+        ablastr::fields::MultiLevelVectorField const& efield,
         amrex::MultiFab const& sigma,
         amrex::Real required_precision,
         amrex::Real absolute_tolerance,

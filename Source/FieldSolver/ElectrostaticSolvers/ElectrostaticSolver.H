@@ -93,7 +93,8 @@ public:
         amrex::Real absolute_tolerance,
         int max_iters,
         int verbosity,
-        bool is_igf_2d_slices
+        bool is_igf_2d_slices,
+        std::optional<ablastr::fields::MultiLevelVectorField> efield = std::nullopt
     ) const;
 
     /**
