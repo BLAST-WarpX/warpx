@@ -174,8 +174,11 @@ ElectrostaticSolver::computePhi (
             );
         }
         post_phi_calculation = EBCalcEfromPhiPerLevel(e_field);
+    }
 
 #ifdef AMREX_USE_EB
+    if (EB::enabled())
+    {
         amrex::Vector<
             amrex::EBFArrayBoxFactory const *
         > factories;
@@ -183,8 +186,8 @@ ElectrostaticSolver::computePhi (
             factories.push_back(&warpx.fieldEBFactory(lev));
         }
         eb_farray_box_factory = factories;
-#endif
     }
+#endif
 
     bool const is_solver_igf_on_lev0 =
         WarpX::poisson_solver_id == PoissonSolverAlgo::IntegratedGreenFunction;
