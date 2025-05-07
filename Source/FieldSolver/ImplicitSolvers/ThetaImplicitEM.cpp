@@ -78,6 +78,7 @@ void ThetaImplicitEM::PrintParameters () const
     else if (m_nlsolver_type==NonlinearSolverType::Newton) {
         amrex::Print() << "Nonlinear solver type:      Newton\n";
         amrex::Print() << "use mass matrices:          " << (m_use_mass_matrices ? "true":"false") << "\n";
+        PrintMassMatricesParameters();
     }
     m_nlsolver->PrintParams();
     amrex::Print() << "-----------------------------------------------------------\n\n";

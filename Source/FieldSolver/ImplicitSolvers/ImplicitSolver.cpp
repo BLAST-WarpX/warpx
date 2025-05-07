@@ -2,6 +2,7 @@
 #include "Fields.H"
 #include "WarpX.H"
 #include "Particles/MultiParticleContainer.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 
 using namespace amrex;
 using namespace amrex::literals;
@@ -103,18 +104,99 @@ void ImplicitSolver::InitializeMassMatrices ()
 
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
+
+    const int shape = m_WarpX->nox;
+    const amrex::IntVect ngJ = m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, 0)->nGrowVect();
+    const amrex::IntVect ngE = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, 0)->nGrowVect();
+
+    // Compute the total number of components for each mass matrices container.
+    // This depends on the particle shape factor and the type of current deposition.
+    int Nc_tot_xx = 1, Nc_tot_xy = 1, Nc_tot_xz = 1;
+    int Nc_tot_yx = 1, Nc_tot_yy = 1, Nc_tot_yz = 1;
+    int Nc_tot_zx = 1, Nc_tot_zy = 1, Nc_tot_zz = 1;
+    if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Direct) {
+        amrex::Print() << "JRA: current algo is Direct\n";
+        amrex::Print() << "     shape = " << shape << "\n";
+        amrex::Print() << "     ngJ   = " << ngJ << "\n";
+        amrex::Print() << "     ngE   = " << ngE << "\n";
+        for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
+            AMREX_ASSERT(ngJ[dir]>=shape);
+            AMREX_ASSERT(ngE[dir]>=shape);
+            m_ncomp_xx[dir] = 1 + 2*shape;
+            m_ncomp_yy[dir] = 1 + 2*shape;
+            m_ncomp_zz[dir] = 1 + 2*shape;
+            if (dir==0) {
+                m_ncomp_xy[dir] = 2 + 2*shape;
+                m_ncomp_xz[dir] = 2 + 2*shape;
+                m_ncomp_yx[dir] = 2 + 2*shape;
+                m_ncomp_yz[dir] = 1 + 2*shape;
+                m_ncomp_zx[dir] = 2 + 2*shape;
+                m_ncomp_zy[dir] = 1 + 2*shape;
+            }
+            else if (dir==1) {
+                m_ncomp_xy[dir] = 2 + 2*shape;
+                m_ncomp_xz[dir] = 1 + 2*shape;
+                m_ncomp_yx[dir] = 2 + 2*shape;
+                m_ncomp_yz[dir] = 2 + 2*shape;
+                m_ncomp_zx[dir] = 1 + 2*shape;
+                m_ncomp_zy[dir] = 2 + 2*shape;
+            }
+            else if (dir==2) {
+                m_ncomp_xy[dir] = 1 + 2*shape;
+                m_ncomp_xz[dir] = 2 + 2*shape;
+                m_ncomp_yx[dir] = 1 + 2*shape;
+                m_ncomp_yz[dir] = 2 + 2*shape;
+                m_ncomp_zx[dir] = 2 + 2*shape;
+                m_ncomp_zy[dir] = 2 + 2*shape;
+            }
+            Nc_tot_xx *= m_ncomp_xx[dir];
+            Nc_tot_xy *= m_ncomp_xy[dir];
+            Nc_tot_xz *= m_ncomp_xz[dir];
+            Nc_tot_yx *= m_ncomp_yx[dir];
+            Nc_tot_yy *= m_ncomp_yy[dir];
+            Nc_tot_yz *= m_ncomp_yz[dir];
+            Nc_tot_zx *= m_ncomp_zx[dir];
+            Nc_tot_zy *= m_ncomp_zy[dir];
+            Nc_tot_zz *= m_ncomp_zz[dir];
+        }
+    }
+    else {
+        WARPX_ABORT_WITH_MESSAGE("Mass matrices can only be used with Direct deposition.");
+    }
+
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         const auto& ba_Jx = m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, lev)->boxArray();
         const auto& ba_Jy = m_WarpX->m_fields.get(FieldType::current_fp, Direction{1}, lev)->boxArray();
         const auto& ba_Jz = m_WarpX->m_fields.get(FieldType::current_fp, Direction{2}, lev)->boxArray();
         const auto& dm = m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, lev)->DistributionMap();
-        const amrex::IntVect ngb = m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, lev)->nGrowVect();
-        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices, Direction{0}, lev, ba_Jx, dm, 1, ngb, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices, Direction{1}, lev, ba_Jy, dm, 1, ngb, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices, Direction{2}, lev, ba_Jz, dm, 1, ngb, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{0}, lev, ba_Jx, dm, 1, ngb, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{1}, lev, ba_Jy, dm, 1, ngb, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{2}, lev, ba_Jz, dm, 1, ngb, 0.0_rt);
+        //
+        m_WarpX->m_fields.alloc_init(FieldType::Efield_fp_save, Direction{0}, lev, ba_Jx, dm, 1, ngE, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::Efield_fp_save, Direction{1}, lev, ba_Jy, dm, 1, ngE, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::Efield_fp_save, Direction{2}, lev, ba_Jz, dm, 1, ngE, 0.0_rt);
+        //
+        m_WarpX->m_fields.alloc_init(FieldType::current_fp_save, Direction{0}, lev, ba_Jx, dm, 1, ngJ, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::current_fp_save, Direction{1}, lev, ba_Jy, dm, 1, ngJ, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::current_fp_save, Direction{2}, lev, ba_Jz, dm, 1, ngJ, 0.0_rt);
+        //
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_X, Direction{0}, lev, ba_Jx, dm, Nc_tot_xx, ngJ, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_X, Direction{1}, lev, ba_Jx, dm, Nc_tot_xy, ngJ, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_X, Direction{2}, lev, ba_Jx, dm, Nc_tot_xz, ngJ, 0.0_rt);
+        //
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_Y, Direction{0}, lev, ba_Jy, dm, Nc_tot_yx, ngJ, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_Y, Direction{1}, lev, ba_Jy, dm, Nc_tot_yy, ngJ, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_Y, Direction{2}, lev, ba_Jy, dm, Nc_tot_yz, ngJ, 0.0_rt);
+        //
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_Z, Direction{0}, lev, ba_Jz, dm, Nc_tot_zx, ngJ, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_Z, Direction{1}, lev, ba_Jz, dm, Nc_tot_zy, ngJ, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_Z, Direction{2}, lev, ba_Jz, dm, Nc_tot_zz, ngJ, 0.0_rt);
+        //
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices, Direction{0}, lev, ba_Jx, dm, 1, ngJ, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices, Direction{1}, lev, ba_Jy, dm, 1, ngJ, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices, Direction{2}, lev, ba_Jz, dm, 1, ngJ, 0.0_rt);
+        //
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{0}, lev, ba_Jx, dm, 1, ngJ, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{1}, lev, ba_Jy, dm, 1, ngJ, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{2}, lev, ba_Jz, dm, 1, ngJ, 0.0_rt);
     }
 
     // Set the pointer to mass matrix MultiFab
@@ -202,4 +284,16 @@ void ImplicitSolver::SetMassMatricesForPC ( const amrex::Real a_theta_dt )
         }
     }
 
+void ImplicitSolver::PrintMassMatricesParameters () const
+{
+    if (!m_use_mass_matrices) { return; }
+    amrex::Print() << "    ncomp_xx:  " << m_ncomp_xx << "\n";
+    amrex::Print() << "    ncomp_xy:  " << m_ncomp_xy << "\n";
+    amrex::Print() << "    ncomp_xz:  " << m_ncomp_xz << "\n";
+    amrex::Print() << "    ncomp_yx:  " << m_ncomp_yx << "\n";
+    amrex::Print() << "    ncomp_yy:  " << m_ncomp_yy << "\n";
+    amrex::Print() << "    ncomp_yz:  " << m_ncomp_yz << "\n";
+    amrex::Print() << "    ncomp_zx:  " << m_ncomp_zx << "\n";
+    amrex::Print() << "    ncomp_zy:  " << m_ncomp_zy << "\n";
+    amrex::Print() << "    ncomp_zz:  " << m_ncomp_zz << "\n";
 }

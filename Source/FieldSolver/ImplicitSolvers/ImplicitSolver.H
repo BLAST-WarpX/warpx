@@ -154,6 +154,13 @@ protected:
     bool m_use_mass_matrices = false;
 
     /**
+     * \brief Tensor component specific number of mass matrices elements
+     */
+    amrex::IntVect m_ncomp_xx, m_ncomp_xy, m_ncomp_xz;
+    amrex::IntVect m_ncomp_yx, m_ncomp_yy, m_ncomp_yz;
+    amrex::IntVect m_ncomp_zx, m_ncomp_zy, m_ncomp_zz;
+
+    /**
      * \brief Array of multifab pointers to mass matrix preconditioner
      */
     amrex::Vector<amrex::Array<amrex::MultiFab*,3>> m_mmpc_mfarrvec;
@@ -191,6 +198,8 @@ protected:
      * \brief Initialize the Mass Matrices used for plasma response in nonlinear Newton solver
      */
     void InitializeMassMatrices ();
+
+    void PrintMassMatricesParameters () const;
 
     /**
      * \brief Perform operations needed before computing the Right Hand Side
