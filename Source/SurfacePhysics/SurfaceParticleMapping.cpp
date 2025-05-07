@@ -15,7 +15,7 @@
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/Pusher/UpdatePosition.H"
 #include "WarpX.H"
-
+#include <AMReX_ParallelDescriptor.H>
 #include <ablastr/particles/NodalFieldGather.H>
 
 #include <AMReX.H>
@@ -89,10 +89,9 @@ SurfacePhysicsBase::countParticlesFromEmbeddedBoundaries (
                 });
             }
         }
-//        amrex::Print() << " num_inparticles size " << num_in_particles[i].size() << "\n"; 
-        for (int j = 0; j < surf_ijk.size(); ++j) {
-            amrex::Print() << " num in for sp " << i << " is : " << num_in_particles[i][j] << " at element " << j << "\n";
-        }
+        //for (int j = 0; j < surf_ijk.size(); ++j) {
+        //    amrex::AllPrint() << amrex::ParallelDescriptor::MyProc() << " num in for sp " << i << " is : " << num_in_particles[i][j] << " at element " << j << "\n";
+        //}
     }
 }
 
