@@ -46,6 +46,82 @@
 #include <vector>
 
 void
+WarpX::SaveE0andJ0 ()
+{
+
+    // Copy Efield_fp and current_fp to Efield_fp_save and current_fp_save
+    // Do this after call to SyncCurrentAndRho() so that BCs are set for J
+
+    using warpx::fields::FieldType;
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        ablastr::fields::VectorField E = m_fields.get_alldirs(FieldType::Efield_fp, lev);
+        ablastr::fields::VectorField E0 = m_fields.get_alldirs(FieldType::Efield_fp_save, lev);
+        amrex::MultiFab::Copy(*E0[0], *E[0], 0, 0, 1, E[0]->nGrowVect());
+        amrex::MultiFab::Copy(*E0[1], *E[1], 0, 0, 1, E[1]->nGrowVect());
+        amrex::MultiFab::Copy(*E0[2], *E[2], 0, 0, 1, E[2]->nGrowVect());
+
+        ablastr::fields::VectorField J = m_fields.get_alldirs(FieldType::current_fp, lev);
+        ablastr::fields::VectorField J0 = m_fields.get_alldirs(FieldType::current_fp_save, lev);
+        amrex::MultiFab::Copy(*J0[0], *J[0], 0, 0, 1, J[0]->nGrowVect());
+        amrex::MultiFab::Copy(*J0[1], *J[1], 0, 0, 1, J[1]->nGrowVect());
+        amrex::MultiFab::Copy(*J0[2], *J[2], 0, 0, 1, J[2]->nGrowVect());
+    }
+
+}
+
+void
+WarpX::SyncMassMatricesAndApplyBCs ()
+{
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    // Copy mass matrices elements used for the preconditioner
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        ablastr::fields::VectorField MM = m_fields.get_alldirs(FieldType::MassMatrices, lev);
+        ablastr::fields::VectorField MM_PC = m_fields.get_alldirs(FieldType::MassMatrices_PC, lev);
+        amrex::MultiFab::Copy(*MM_PC[0], *MM[0], 0, 0, MM[0]->nComp(), MM[0]->nGrowVect());
+        amrex::MultiFab::Copy(*MM_PC[1], *MM[1], 0, 0, MM[1]->nComp(), MM[1]->nGrowVect());
+        amrex::MultiFab::Copy(*MM_PC[2], *MM[2], 0, 0, MM[2]->nComp(), MM[2]->nGrowVect());
+    }
+
+    // Do addOp Exchange on MassMatrices_PC
+    SyncMassMatrices();
+
+    // Apply BCs to MassMatrices_PC
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        ApplyJfieldBoundary(lev,
+            m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev),
+            m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev),
+            m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev),
+            PatchType::fine);
+    }
+}
+
+void
+WarpX::SetMassMatricesForPC ( amrex::Real a_theta_dt )
+{
+
+    using namespace amrex::literals;
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    // Scale mass matrices used by preconditioner by c^2*mu0*theta*dt and add 1 to diagonal terms
+    // Note: This should be done after Sync/communication has been called
+
+    const amrex::Real pc_factor = PhysConst::c * PhysConst::c * PhysConst::mu0 * a_theta_dt;
+    const int diag_comp = 0;
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        for (int idir = 0 ; idir < 3 ; idir++) {
+            amrex::MultiFab* mass_matrix = m_fields.get(FieldType::MassMatrices_PC, Direction{idir}, lev);
+            mass_matrix->mult(pc_factor, 0, mass_matrix->nComp());
+            mass_matrix->plus(1.0_rt, diag_comp, 1, 0);
+        }
+    }
+
+}
+
+void
+>>>>>>> ef35e5054 (E0 and J0 needed to compute J from MM are copied from Efield_fp and current_fp at each nonlinear iteration.)
 WarpX::SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time )
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
