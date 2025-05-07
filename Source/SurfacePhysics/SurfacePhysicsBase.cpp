@@ -13,6 +13,7 @@
 #include "WarpX.H"
 
 #include <AMReX.H>
+#include <AMReX_ParallelDescriptor.H>
 #include <AMReX_Print.H>
 
 SurfacePhysicsBase::SurfacePhysicsBase ()
@@ -29,8 +30,6 @@ SurfacePhysicsBase::InitData ()
     const auto & mpc = warpx.GetPartContainer();
     num_influx_species = mpc.nSpecies();
     std::vector<std::string> influx_species_names = mpc.GetSpeciesNames();
-    amrex::Print() << " num_influx species " << mpc.nSpecies() << "\n";
-    amrex::Print() << " influx_sp names " << influx_species_names[0] << " " << influx_species_names[1] << "\n";
     num_outflux_species = num_influx_species; //for now
     AllocAndInitInfluxBndVectors();
     AllocAndInitOutfluxBndVectors();
@@ -39,8 +38,6 @@ SurfacePhysicsBase::InitData ()
 void
 SurfacePhysicsBase::initializeMapping ()
 {
-    amrex::Print() << " init mapping \n";
-
     // get a reference to WarpX instance
     auto & warpx = WarpX::GetInstance();
 
@@ -63,11 +60,9 @@ SurfacePhysicsBase::initializeMapping ()
     for (amrex::MFIter mfi(eb_flag); mfi.isValid(); ++mfi)
     {
         amrex::Box const box = mfi.tilebox();
-        amrex::Print() << " eb box " << box << "\n";
         amrex::FabType const fab_type = eb_flag[mfi].getType(box);
         if (fab_type == amrex::FabType::regular) { continue;}
         else if (fab_type == amrex::FabType::covered) { continue;}
-        else {amrex::Print() << " fab types is neither regular nor convered \n";}
 
         // all cells in fab are open, i.e., outside EB
         if (fab_type == amrex::FabType::regular) {continue;}
@@ -89,11 +84,8 @@ SurfacePhysicsBase::initializeMapping ()
                 return;
             }
             else {
-                amrex::Print() << " cell" << i << " j " << j << " " << k << " is cut!! \n";
                 surf_ijk.push_back(iv);
-                amrex::Print() << " size : " << surf_ijk.size() << " intvect " << surf_ijk[surf_ijk.size()-1] << "\n";
                 ivect_arr(i,j,k) = surf_ijk.size() - 1;
-                amrex::Print() << " iMultiFab " << i << " " << j << " is : " << ivect_arr(i,j,k) << "\n";
 
                 surf_normal_x.push_back(eb_bnd_normal_arr(i,j,k,0));
 #if (defined WARPX_DIM_XZ)
@@ -132,7 +124,6 @@ SurfacePhysicsBase::AllocAndInitOutfluxBndVectors ()
     {
         num_out_particles[isp].resize(surf_ijk.size());
         bnd_outflux[isp].resize(surf_ijk.size());
-
         nullifyOutfluxParticleCounter(isp);
     }
 
@@ -170,7 +161,7 @@ SurfacePhysicsBase::nullifyOutfluxParticleCounter (int isp)
     for (int ibnd = 0; ibnd < surf_ijk.size(); ++ibnd)
     {
         num_out_particles[isp][ibnd] = 0;
-        bnd_outflux[isp][ibnd] = 0.;
+        bnd_outflux[isp][ibnd] = 5.e5;
     }
 }
 
