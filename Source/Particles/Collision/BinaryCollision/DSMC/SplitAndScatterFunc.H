@@ -416,10 +416,10 @@ public:
                     // p_product2 = - p_non_target_out * m_ioniz_product2 / m2
                     // (with m2 = m_ioniz_product1 + m_ioniz_product2, by conservation of mass)
 
-                    // Amplitude of the momentum of the non-target particle
+                    // Amplitude of the momentum of the non-target particle, obtained from conservation of energy
                     const amrex::ParticleReal p_non_target_out = std::sqrt( 2.0_prt * E_out / (1.0_prt / m1 + 1.0_prt / m2 ) );
 
-                    // Reduce the velocity of the non-target particle accordingly
+                    // Reduce the velocity of the non-target particle, to reflect the loss of energy due to ionization
                     const amrex::ParticleReal reduce_factor = p_non_target_out / p_non_target_in;
                     ux1 *= reduce_factor;
                     uy1 *= reduce_factor;
