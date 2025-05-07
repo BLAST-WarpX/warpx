@@ -75,7 +75,7 @@ SurfacePhysicsBase::countParticlesFromEmbeddedBoundaries (
                 auto ptile_data = ptile.getConstParticleTileData();
                 long const np = ptile.numParticles();
                 const auto getPosition = GetParticlePosition<PIdx>(pti);
-                
+
                 amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(int ip)
                 {
                     amrex::ParticleReal xp, yp, zp;

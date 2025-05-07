@@ -45,7 +45,7 @@ public:
     amrex::Vector< amrex::Vector< amrex::Real > > num_in_particles;
     amrex::Vector< amrex::Vector< amrex::Real > > num_out_particles;
 
-    
+
 
 };
 

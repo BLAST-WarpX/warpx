@@ -76,7 +76,7 @@ SurfacePhysicsBase::initializeMapping ()
         amrex::LoopOnCpu( box,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
 
-            amrex::IntVect const iv(AMREX_D_DECL(i,j,k));            
+            amrex::IntVect const iv(AMREX_D_DECL(i,j,k));
             if (eb_flag_arr(i,j,k).isRegular() ) {
                 return;
             }
@@ -97,7 +97,7 @@ SurfacePhysicsBase::initializeMapping ()
             }
         });
     }
-    
+
 }
 
 
@@ -157,7 +157,7 @@ SurfacePhysicsBase::nullifyOutfluxParticleCounter ()
 
 void
 SurfacePhysicsBase::nullifyOutfluxParticleCounter (int isp)
-{    
+{
     for (int ibnd = 0; ibnd < surf_ijk.size(); ++ibnd)
     {
         num_out_particles[isp][ibnd] = 0;
