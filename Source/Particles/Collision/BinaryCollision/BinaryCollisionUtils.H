@@ -113,7 +113,7 @@ namespace BinaryCollisionUtils{
         // p^2 = E^2/4c^2 - (m_1^2 + m_2^2)c^2/2 + (m_1^2-m_2^2)^2 c^6/4E^2
         double p_star_sq;
         if (m1_dbl + m2_dbl == 0) {
-            p_star_sq = 0.5 * E_star * inv_c;
+            p_star_sq = powi<2>( 0.5 * E_star * inv_c );
         } else {
             // The expression below is specifically written in a form that avoids returning
             // small negative numbers due to machine precision errors, for low-energy particles
