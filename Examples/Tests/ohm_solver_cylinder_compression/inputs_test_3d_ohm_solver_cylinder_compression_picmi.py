@@ -28,7 +28,7 @@ class PlasmaCylinderCompression(object):
     # B0 is chosen with all other quantities scaled by it
     n0 = 1e20
     T_i = 10  # eV
-    T_e = 0
+    T_e = 10
     p0 = n0 * constants.q_e * T_i
 
     B0 = np.sqrt(2 * constants.mu0 * p0)  # Initial magnetic field strength (T)
@@ -57,7 +57,7 @@ class PlasmaCylinderCompression(object):
     NZ = 128
 
     # Starting number of particles per cell
-    NPPC = 10
+    NPPC = 100
 
     # Number of substeps used to update B
     substeps = 20
@@ -255,6 +255,7 @@ class PlasmaCylinderCompression(object):
         simulation.particle_shape = 1
         simulation.use_filter = True
         simulation.verbose = self.verbose
+        simulation.grid_type = "collocated"
 
         #######################################################################
         # Field solver and external field                                     #
@@ -277,7 +278,7 @@ class PlasmaCylinderCompression(object):
         self.solver = picmi.HybridPICSolver(
             grid=self.grid,
             gamma=1.0,
-            Te=self.T_e,
+            Te=self.T_e * 11604.0,
             n0=self.n0,
             n_floor=0.05 * self.n0,
             plasma_resistivity="if(rho<=rho_floor,eta_v,eta_p)",
@@ -342,7 +343,7 @@ class PlasmaCylinderCompression(object):
         # Add diagnostics                                                     #
         #######################################################################
 
-        if self.test:
+        if self.test and False:
             particle_diag = picmi.ParticleDiagnostic(
                 name="diag1",
                 period=self.diag_steps,
@@ -358,7 +359,9 @@ class PlasmaCylinderCompression(object):
             period=self.diag_steps,
             data_list=["B", "E", "rho", "Tx_ions", "Ty_ions", "Tz_ions"],
             write_dir="diags",
-            warpx_format="plotfile",
+            warpx_format="openpmd",
+            warpx_openpmd_backend="h5",
+            warpx_file_prefix="field_diags",
         )
         simulation.add_diagnostic(field_diag)
 
