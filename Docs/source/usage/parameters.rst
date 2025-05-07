@@ -2125,7 +2125,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     that approaches 1 (for a given collision between two macroparticles), then
     there is a risk of underestimating the total yield. In these cases,
     WarpX reduces the event multiplier used in that given collision.
-    ``m_probability_threshold`` is the probability threshold above
+    ``probability_threshold`` is the probability threshold above
     which WarpX reduces the event multiplier.
 
 * ``<collision_name>.probability_target_value`` (`float`) optional.
