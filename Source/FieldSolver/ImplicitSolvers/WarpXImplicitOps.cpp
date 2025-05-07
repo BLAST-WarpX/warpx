@@ -50,7 +50,7 @@ WarpX::SaveE0andJ0 ()
 {
 
     // Copy Efield_fp and current_fp to Efield_fp_save and current_fp_save
-    // Do this after call to SyncCurrentAndRho() so that BCs are set for J
+    // Do this BEFORE call to SyncCurrentAndRho() so that BCs are set for J
 
     using warpx::fields::FieldType;
     for (int lev = 0; lev <= finest_level; ++lev) {
