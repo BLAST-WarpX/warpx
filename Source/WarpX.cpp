@@ -2070,6 +2070,19 @@ WarpX::BackwardCompatibility ()
             ablastr::warn_manager::WarnPriority::low);
     }
 
+    std::vector<std::string> backward_coll_names;
+    pp_collisions.queryarr("collision_names", backward_coll_names);
+    for(const std::string& coll_name : backward_coll_names){
+        const ParmParse pp_coll(coll_name);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !pp_coll.query("fusion_multiplier", backward_Real) &&
+            !pp_coll.query("fusion_probability_threshold", backward_Real) &&
+            !pp_coll.query("fusion_probability_target_value", backward_Real),
+            "Inputs fusion_multiplier, fusion_probability_threshold & fusion_probability_target_value "
+            "are deprecated. Please use event_multiplier, probability_threshold & probability_target_value."
+        );
+    }
+
     const ParmParse pp_lasers("lasers");
     int nlasers;
     if (pp_lasers.query("nlasers", nlasers)){

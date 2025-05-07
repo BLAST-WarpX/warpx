@@ -110,39 +110,36 @@ namespace
 }
 
 void
-WarpX::Synchronize () {
+WarpX::SynchronizeVelocityWithPosition () {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    // Note that this is potentially buggy since the PushP will do a field gather
-    // using particles that have been pushed but not yet checked at the boundaries.
-    // Also, this PushP may be inconsistent with the PushP backwards above since
-    // the fields may change between the two (mainly effecting the Python version when
-    // using electrostatics).
-    // When synchronize_velocity_for_diagnostics is true, the PushP at the end of the
-    // step is used so that the correct behavior is obtained.
-    FillBoundaryE(guard_cells.ng_FieldGather);
-    FillBoundaryB(guard_cells.ng_FieldGather);
-    if (fft_do_time_averaging)
-    {
-        FillBoundaryE_avg(guard_cells.ng_FieldGather);
-        FillBoundaryB_avg(guard_cells.ng_FieldGather);
+    if (!m_is_synchronized) {
+        // This assumes that the particle boundary conditions have been checked
+        // so that the field gather in PushP will be correct.
+        FillBoundaryE(guard_cells.ng_FieldGather);
+        FillBoundaryB(guard_cells.ng_FieldGather);
+        if (fft_do_time_averaging)
+        {
+            FillBoundaryE_avg(guard_cells.ng_FieldGather);
+            FillBoundaryB_avg(guard_cells.ng_FieldGather);
+        }
+        UpdateAuxilaryData();
+        FillBoundaryAux(guard_cells.ng_UpdateAux);
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            mypc->PushP(
+                lev,
+                0.5_rt*dt[lev],
+                *m_fields.get(FieldType::Efield_aux, Direction{0}, lev),
+                *m_fields.get(FieldType::Efield_aux, Direction{1}, lev),
+                *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
+                *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
+                *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
+                *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
+            );
+        }
+        m_is_synchronized = true;
     }
-    UpdateAuxilaryData();
-    FillBoundaryAux(guard_cells.ng_UpdateAux);
-    for (int lev = 0; lev <= finest_level; ++lev) {
-        mypc->PushP(
-            lev,
-            0.5_rt*dt[lev],
-            *m_fields.get(FieldType::Efield_aux, Direction{0}, lev),
-            *m_fields.get(FieldType::Efield_aux, Direction{1}, lev),
-            *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
-            *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
-            *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
-            *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
-        );
-    }
-    is_synchronized = true;
 }
 
 void
@@ -189,7 +186,7 @@ WarpX::Evolve (int numsteps)
             if (verbose) {
                 amrex::Print() << Utils::TextMsg::Info("updating timestep");
             }
-            Synchronize();
+            SynchronizeVelocityWithPosition();
             UpdateDtFromParticleSpeeds();
         }
 
@@ -272,17 +269,6 @@ WarpX::Evolve (int numsteps)
             // B : guard cells are NOT up-to-date
         }
 
-        // TODO: move out
-        bool const end_of_step_loop = (step == numsteps_max - 1) || (cur_time + dt[0] >= stop_time - 1.e-3*dt[0]);
-        if (evolve_scheme == EvolveScheme::Explicit) {
-            // At the end of step loop, push p by 0.5*dt to synchronize
-            // This synchronization is not at the correct place since it is done before the window is moved,
-            // before particles are scraped, and before the electrostatic field update
-            if (end_of_step_loop && !synchronize_velocity_for_diagnostics) {
-                Synchronize();
-            }
-        }
-
         for (int lev = 0; lev <= max_level; ++lev) {
             ++istep[lev];
         }
@@ -298,8 +284,8 @@ WarpX::Evolve (int numsteps)
         }
         multi_diags->FilterComputePackFlush( step, false, true );
 
-        const bool move_j = is_synchronized;
-        // If is_synchronized we need to shift j too so that next step we can evolve E by dt/2.
+        const bool move_j = m_is_synchronized;
+        // If m_is_synchronized we need to shift j too so that next step we can evolve E by dt/2.
         // We might need to move j because we are going to make a plotfile.
         const int num_moved = MoveWindow(step+1, move_j);
 
@@ -351,12 +337,13 @@ WarpX::Evolve (int numsteps)
         }
 
         bool const do_diagnostic = (multi_diags->DoComputeAndPack(step) || reduced_diags->DoDiags(step));
+        bool const end_of_step_loop = (step == numsteps_max - 1) || (cur_time + dt[0] >= stop_time - 1.e-3*dt[0]);
         if (synchronize_velocity_for_diagnostics &&
             (do_diagnostic || end_of_step_loop)) {
             // When the diagnostics require synchronization, push p by 0.5*dt to synchronize.
             // Note that this will be undone at the start of the next step by the half v-push
             // backwards.
-            Synchronize();
+            SynchronizeVelocityWithPosition();
         }
 
         // afterstep callback runs with the updated global time. It is included
@@ -541,9 +528,9 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
 
     // At the beginning, we have B^{n} and E^{n}.
     // Particles have p^{n} and x^{n}.
-    // is_synchronized is true.
+    // m_is_synchronized is true.
 
-    if (is_synchronized) {
+    if (m_is_synchronized) {
         // Not called at each iteration, so exchange all guard cells
         FillBoundaryE(guard_cells.ng_alloc_EB);
         FillBoundaryB(guard_cells.ng_alloc_EB);
@@ -564,7 +551,7 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
                 *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
             );
         }
-        is_synchronized = false;
+        m_is_synchronized = false;
 
     } else {
         // Beyond one step, we have E^{n} and B^{n}.
