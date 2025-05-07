@@ -115,10 +115,6 @@ void ImplicitSolver::InitializeMassMatrices ()
     int Nc_tot_yx = 1, Nc_tot_yy = 1, Nc_tot_yz = 1;
     int Nc_tot_zx = 1, Nc_tot_zy = 1, Nc_tot_zz = 1;
     if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Direct) {
-        amrex::Print() << "JRA: current algo is Direct\n";
-        amrex::Print() << "     shape = " << shape << "\n";
-        amrex::Print() << "     ngJ   = " << ngJ << "\n";
-        amrex::Print() << "     ngE   = " << ngE << "\n";
         for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
             AMREX_ASSERT(ngJ[dir]>=shape);
             AMREX_ASSERT(ngE[dir]>=shape);
