@@ -322,7 +322,7 @@ public:
             else if (mask[i] == int(ScatteringProcessType::IONIZATION))
             {
                 const auto species1_index = products_np_data[0] + no_product_total + with_product_p_offsets[i];
-                // Make a copy of the particle from species 1 (non-ionized species, we split a particle that loses some energy)
+                // Make a copy of the particle from species 1
                 copy_species1[0](soa_products_data[0], soa_1, static_cast<int>(p_pair_indices_1[i]),
                                static_cast<int>(species1_index), engine);
                 // Set the weight of the new particles to p_pair_reaction_weight[i]
