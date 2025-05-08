@@ -41,18 +41,21 @@ PhiFunctor::operator() (amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer
     }
     else
     {
+        const int num_levels = 1;
         // allocate fields for charge and potential
-        amrex::Vector<std::unique_ptr<amrex::MultiFab>> rho_vec(1);
-        amrex::Vector<std::unique_ptr<amrex::MultiFab>> phi_vec(1);
+        amrex::Vector<std::unique_ptr<amrex::MultiFab>> rho_vec(num_levels);
+        amrex::Vector<std::unique_ptr<amrex::MultiFab>> phi_vec(num_levels);
 
         // calculate the total charge density as the divergence of the E-field
-        const amrex::BoxArray& ba = warpx.boxArray(m_lev);
+        amrex::BoxArray ba = warpx.boxArray(m_lev);
+        ba.surroundingNodes();
         rho_vec[0] = std::make_unique<amrex::MultiFab>(ba, warpx.DistributionMap(m_lev), 1, 1);
         rho_vec[0]->setVal(0.);
         warpx.ComputeDivE(*rho_vec[0], m_lev);
         // multiply divE by epsilon0 to get charge density
         rho_vec[0]->mult(ablastr::constant::SI::ep0);
 
+        // Initialize MF to hold electrostatic potential
         phi_vec[0] = std::make_unique<amrex::MultiFab>(ba, warpx.DistributionMap(m_lev), 1, 1);
         phi_vec[0]->setVal(0.);
 

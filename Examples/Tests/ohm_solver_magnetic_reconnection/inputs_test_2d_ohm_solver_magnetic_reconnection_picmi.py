@@ -264,8 +264,8 @@ class ForceFreeSheetReconnection(object):
             simulation.add_diagnostic(field_diag)
 
             # set the solver convergence criteria low since phi is only
-            # calculated for diagnostic output
-            simulation.self_fields_required_precision = 1e-5
+            # calculated for diagnostic output testing
+            simulation.self_fields_required_precision = 1e-3
             simulation.self_fields_verbosity = 1
 
         # reduced diagnostics for reconnection rate calculation
