@@ -25,10 +25,9 @@ void RelativisticExplicitES::InitData () {
     }
     prepare_field_solve |= m_poisson_boundary_handler->m_boundary_potential_specified;
 
-    // if (prepare_field_solve) {
-    //     m_poisson_boundary_handler->DefinePhiBCs(warpx.Geom(0));
-    // }
-    m_poisson_boundary_handler->DefinePhiBCs(warpx.Geom(0));
+    if (prepare_field_solve) {
+        m_poisson_boundary_handler->DefinePhiBCs(warpx.Geom(0));
+    }
 }
 
 void RelativisticExplicitES::ComputeSpaceChargeField (

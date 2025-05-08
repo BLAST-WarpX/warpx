@@ -61,6 +61,8 @@ PhiFunctor::operator() (amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer
 
         // grab the WarpX instance's electrostatic solver
         auto& es_solver = warpx.GetElectrostaticSolver();
+        // define solver BCs in case they have not been defined yet
+        es_solver.m_poisson_boundary_handler->DefinePhiBCs(warpx.Geom(0));
         const std::array<amrex::Real, 3> beta = {0.0};
         es_solver.computePhi(
             amrex::GetVecOfPtrs(rho_vec), amrex::GetVecOfPtrs(phi_vec),
