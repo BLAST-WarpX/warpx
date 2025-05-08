@@ -194,6 +194,16 @@ protected:
 
     }
 
+    void PreRHSOp ( amrex::Real  a_cur_time,
+                    int          a_nl_iter,
+                    bool         a_from_jacobian );
+
+    void SaveEandJ();
+
+    void ComputeJfromMassMatrices();
+
+    void SetMassMatricesForPC ( amrex::Real a_theta_dt );
+
     /**
      * \brief Initialize the Mass Matrices used for plasma response in nonlinear Newton solver
      */
