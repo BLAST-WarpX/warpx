@@ -213,9 +213,9 @@ ExternalVectorPotential::InitData ()
 
         if (m_do_clean_divA && warpx.grid_type == GridType::Collocated) {
             warpx::initialization::ProjectionDivCleaner dc(Aext_field);
-            dc.setSourceFromBfield();
+            dc.setSourceFromField();
             dc.solve();
-            dc.correctBfield();
+            dc.correctField();
             amrex::Print() << Utils::TextMsg::Info( "Finished Projection A-Field divergence cleaner.");
         }
 

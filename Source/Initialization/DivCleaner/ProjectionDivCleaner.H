@@ -34,6 +34,7 @@
 #include <AMReX_REAL.H>
 #include <AMReX_SPACE.H>
 #include <AMReX_Vector.H>
+#include <AMReX_LO_BCTYPES.H>
 
 #include <ablastr/utils/Enums.H>
 
@@ -69,6 +70,35 @@ protected:
     std::string m_field_name;
     ablastr::utils::enums::GridType m_grid_type;
 
+private:
+    // Helper template for executing the MLMG solver with cell and node based solvers
+    template <typename T>
+    AMREX_FORCE_INLINE void runMLMG (
+        T &linop,
+        amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> const& lobc,
+        amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> const& hibc,
+        int lev
+    )
+    {
+        linop.setMaxOrder(m_linop_maxorder);
+        linop.setDomainBC(lobc, hibc);
+
+        if (lev > 0) {
+            linop.setCoarseFineBC(m_solution[lev-1].get(), m_ref_ratio);
+        }
+
+        linop.setLevelBC(lev, m_solution[lev].get());
+
+        amrex::MLMG mlmg(linop);
+        mlmg.setMaxIter(m_max_iter);
+        mlmg.setMaxFmgIter(m_max_fmg_iter);
+        mlmg.setBottomSolver(m_bottom_solver);
+        mlmg.setVerbose(m_verbose);
+        mlmg.setBottomVerbose(m_bottom_verbose);
+        mlmg.setAlwaysUseBNorm(false);
+        mlmg.solve({m_solution[lev].get()}, {m_source[lev].get()}, m_rtol, m_atol);
+    }
+
 public:
     amrex::Vector< std::unique_ptr<amrex::MultiFab> > m_solution;
     amrex::Vector< std::unique_ptr<amrex::MultiFab> > m_source;
@@ -91,8 +121,8 @@ public:
     void ReadParameters ();
 
     void solve ();
-    void setSourceFromBfield ();
-    void correctBfield ();
+    void setSourceFromField ();
+    void correctField ();
 
 };
 

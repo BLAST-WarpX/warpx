@@ -12,7 +12,6 @@
 #include <AMReX_MLPoisson.H>
 #include <AMReX_MLNodeLaplacian.H>
 #include <AMReX_MultiFabUtil.H>
-#include <AMReX_LO_BCTYPES.H>
 
 #include <WarpX.H>
 #if defined WARPX_DIM_RZ
@@ -196,44 +195,10 @@ ProjectionDivCleaner::solve ()
 #endif
 
             MLNodeLaplacian linop({geom[ilev]}, {ba[ilev]}, {dmap[ilev]}, info, eb_farray_box_factory, 1.0_rt);
-
-            linop.setMaxOrder(m_linop_maxorder);
-            linop.setDomainBC(lobc, hibc);
-
-            if (ilev > 0) {
-                linop.setCoarseFineBC(m_solution[ilev-1].get(), m_ref_ratio);
-            }
-
-            linop.setLevelBC(ilev, m_solution[ilev].get());
-
-            MLMG mlmg(linop);
-            mlmg.setMaxIter(m_max_iter);
-            mlmg.setMaxFmgIter(m_max_fmg_iter);
-            mlmg.setBottomSolver(m_bottom_solver);
-            mlmg.setVerbose(m_verbose);
-            mlmg.setBottomVerbose(m_bottom_verbose);
-            mlmg.setAlwaysUseBNorm(false);
-            mlmg.solve({m_solution[ilev].get()}, {m_source[ilev].get()}, m_rtol, m_atol);
+            runMLMG<MLNodeLaplacian>(linop, lobc, hibc, ilev);
         } else {
             MLPoisson linop({geom[ilev]}, {ba[ilev]}, {dmap[ilev]}, info);
-
-            linop.setMaxOrder(m_linop_maxorder);
-            linop.setDomainBC(lobc, hibc);
-
-            if (ilev > 0) {
-                linop.setCoarseFineBC(m_solution[ilev-1].get(), m_ref_ratio);
-            }
-
-            linop.setLevelBC(ilev, m_solution[ilev].get());
-
-            MLMG mlmg(linop);
-            mlmg.setMaxIter(m_max_iter);
-            mlmg.setMaxFmgIter(m_max_fmg_iter);
-            mlmg.setBottomSolver(m_bottom_solver);
-            mlmg.setVerbose(m_verbose);
-            mlmg.setBottomVerbose(m_bottom_verbose);
-            mlmg.setAlwaysUseBNorm(false);
-            mlmg.solve({m_solution[ilev].get()}, {m_source[ilev].get()}, m_rtol, m_atol);
+            runMLMG<MLPoisson>(linop, lobc, hibc, ilev);
         }
         // Synchronize the ghost cells, do halo exchange
         ablastr::utils::communication::FillBoundary(*m_solution[ilev],
@@ -245,7 +210,7 @@ ProjectionDivCleaner::solve ()
 }
 
 void
-ProjectionDivCleaner::setSourceFromBfield ()
+ProjectionDivCleaner::setSourceFromField ()
 {
     using ablastr::fields::Direction;
 
@@ -300,8 +265,37 @@ ProjectionDivCleaner::setSourceFromBfield ()
     }
 }
 
+template <typename T>
+AMREX_FORCE_INLINE
+void correctFieldCartesian_kernel (
+    const Box & tbx, const Box & tby, const Box & tbz,
+    Real const * const AMREX_RESTRICT coefs_x,
+    Real const * const AMREX_RESTRICT coefs_y,
+    Real const * const AMREX_RESTRICT coefs_z,
+    const int n_coefs_x, const int n_coefs_y, const int n_coefs_z,
+    amrex::Array4<Real> const& Bx_arr,
+    amrex::Array4<Real> const& By_arr,
+    amrex::Array4<Real> const& Bz_arr,
+    amrex::Array4<Real> const& sol_arr
+    )
+{
+    amrex::ParallelFor(tbx, tby, tbz,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            Bx_arr(i,j,k) += T::DownwardDx(sol_arr, coefs_x, n_coefs_x, i, j, k);
+        },
+        [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            By_arr(i,j,k) += T::DownwardDy(sol_arr, coefs_y, n_coefs_y, i, j, k);
+        },
+        [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            Bz_arr(i,j,k) += T::DownwardDz(sol_arr, coefs_z, n_coefs_z, i, j, k);
+        });
+}
+
 void
-ProjectionDivCleaner::correctBfield ()
+ProjectionDivCleaner::correctField ()
 {
     using ablastr::fields::Direction;
 
@@ -312,7 +306,7 @@ ProjectionDivCleaner::correctBfield ()
     // This function computes the gradient of the solution and subtracts out divB component from B
     for (int ilev = 0; ilev < m_levels; ++ilev)
     {
-        // Grab B-field multifabs at this level
+        // Grab field multifabs at this level
         amrex::MultiFab* Bx = warpx.m_fields.get(m_field_name, Direction{0}, ilev);
         amrex::MultiFab* By = warpx.m_fields.get(m_field_name, Direction{1}, ilev);
         amrex::MultiFab* Bz = warpx.m_fields.get(m_field_name, Direction{2}, ilev);
@@ -358,34 +352,13 @@ ProjectionDivCleaner::correctBfield ()
                 Bz_arr(i,j,0) += CylindricalYeeAlgorithm::DownwardDz(sol_arr, coefs_z, n_coefs_z, i, j, 0, 0);
             });
 #else
-            if (m_grid_type == GridType::Staggered) {
-                amrex::ParallelFor(tbx, tby, tbz,
-                [=] AMREX_GPU_DEVICE (int i, int j, int k)
-                {
-                    Bx_arr(i,j,k) += CartesianYeeAlgorithm::DownwardDx(sol_arr, coefs_x, n_coefs_x, i, j, k);
-                },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k)
-                {
-                    By_arr(i,j,k) += CartesianYeeAlgorithm::DownwardDy(sol_arr, coefs_y, n_coefs_y, i, j, k);
-                },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k)
-                {
-                    Bz_arr(i,j,k) += CartesianYeeAlgorithm::DownwardDz(sol_arr, coefs_z, n_coefs_z, i, j, k);
-                });
+            if (m_grid_type == GridType::Staggered)
+            {
+                correctFieldCartesian_kernel<CartesianYeeAlgorithm>(tbx, tby, tbz, coefs_x, coefs_y, coefs_z,
+                    n_coefs_x, n_coefs_y, n_coefs_z, Bx_arr, By_arr, Bz_arr, sol_arr);
             } else {
-                amrex::ParallelFor(tbx, tby, tbz,
-                [=] AMREX_GPU_DEVICE (int i, int j, int k)
-                {
-                    Bx_arr(i,j,k) += CartesianNodalAlgorithm::DownwardDx(sol_arr, coefs_x, n_coefs_x, i, j, k);
-                },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k)
-                {
-                    By_arr(i,j,k) += CartesianNodalAlgorithm::DownwardDy(sol_arr, coefs_y, n_coefs_y, i, j, k);
-                },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k)
-                {
-                    Bz_arr(i,j,k) += CartesianNodalAlgorithm::DownwardDz(sol_arr, coefs_z, n_coefs_z, i, j, k);
-                });
+                correctFieldCartesian_kernel<CartesianNodalAlgorithm>(tbx, tby, tbz, coefs_x, coefs_y, coefs_z,
+                    n_coefs_x, n_coefs_y, n_coefs_z, Bx_arr, By_arr, Bz_arr, sol_arr);
             }
 #endif
         }
@@ -432,9 +405,9 @@ WarpX::ProjectionCleanDivB() {
         warpx::initialization::ProjectionDivCleaner dc("Bfield_fp_external");
 
 
-        dc.setSourceFromBfield();
+        dc.setSourceFromField();
         dc.solve();
-        dc.correctBfield();
+        dc.correctField();
 
         amrex::Print() << Utils::TextMsg::Info( "Finished Projection B-Field divergence cleaner.");
     } else {
