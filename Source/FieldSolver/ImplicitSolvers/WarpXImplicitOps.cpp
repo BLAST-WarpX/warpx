@@ -70,6 +70,64 @@ WarpX::SaveE0andJ0 ()
 }
 
 void
+WarpX::ComputeJfromMassMatrices()
+{
+    using namespace amrex::literals;
+
+    using warpx::fields::FieldType;
+    using ablastr::fields::Direction;
+    for (int lev = 0; lev <= finest_level; ++lev) {
+
+        ablastr::fields::VectorField J = m_fields.get_alldirs(FieldType::current_fp, lev);
+        ablastr::fields::VectorField E = m_fields.get_alldirs(FieldType::Efield_fp, lev);
+        ablastr::fields::VectorField J0 = m_fields.get_alldirs(FieldType::current_fp_save, lev);
+        ablastr::fields::VectorField E0 = m_fields.get_alldirs(FieldType::Efield_fp_save, lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+       for ( amrex::MFIter mfi(*J[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi )
+        {
+
+            amrex::Array4<amrex::Real> const& Jx = J[0]->array(mfi);
+            amrex::Array4<amrex::Real> const& Jy = J[1]->array(mfi);
+            amrex::Array4<amrex::Real> const& Jz = J[2]->array(mfi);
+
+            amrex::Array4<const amrex::Real> const& Ex = E[0]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Ey = E[1]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Ez = E[2]->array(mfi);
+
+            amrex::Array4<const amrex::Real> const& Jx0 = J0[0]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Jy0 = J0[1]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Jz0 = J0[2]->array(mfi);
+
+            amrex::Array4<const amrex::Real> const& Ex0 = E0[0]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Ey0 = E0[1]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Ez0 = E0[2]->array(mfi);
+
+            amrex::Box const& tbx = mfi.tilebox(J[0]->ixType().toIntVect());
+            amrex::Box const& tby = mfi.tilebox(J[1]->ixType().toIntVect());
+            amrex::Box const& tbz = mfi.tilebox(J[2]->ixType().toIntVect());
+
+            amrex::ParallelFor(
+            tbx, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            {
+                Jx(i,j,k,n) = Jx(i,j,k,n) + 0.0*Jx0(i,j,k,n) + 0.0*(Ex(i,j,k,n) - Ex0(i,j,k,n));
+            },
+            tby, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            {
+                Jy(i,j,k,n) = Jy(i,j,k,n) + 0.0*Jy0(i,j,k,n) + 0.0*(Ey(i,j,k,n) - Ey0(i,j,k,n));
+            },
+            tbz, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            {
+                Jz(i,j,k,n) = Jz(i,j,k,n) + 0.0*Jz0(i,j,k,n) + 0.0*(Ez(i,j,k,n) - Ez0(i,j,k,n));
+            });
+        }
+
+    }
+}
+
+void
 WarpX::SyncMassMatricesAndApplyBCs ()
 {
     using ablastr::fields::Direction;
