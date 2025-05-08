@@ -130,9 +130,9 @@ public:
     void Evolve (int numsteps = -1);
 
     /** Push momentum one half step forward to synchronize with position.
-     *  Also sets is_synchronized to `true`.
+     *  Also sets m_is_synchronized to `true`.
      */
-    void Synchronize ();
+    void SynchronizeVelocityWithPosition ();
 
     //
     // Functions used by implicit solvers
@@ -727,7 +727,7 @@ public:
     [[nodiscard]] amrex::Real getdt (int lev) const {return dt.at(lev);}
     [[nodiscard]] int getdo_moving_window() const {return do_moving_window;}
     [[nodiscard]] amrex::Real getmoving_window_x() const {return moving_window_x;}
-    [[nodiscard]] bool getis_synchronized() const {return is_synchronized;}
+    [[nodiscard]] bool getis_synchronized() const {return m_is_synchronized;}
 
     [[nodiscard]] int maxStep () const {return max_step;}
     void updateMaxStep (const int new_max_step) {max_step = new_max_step;}
@@ -947,15 +947,6 @@ public:
     * \brief Do the eight-ways extension
     */
     void ComputeEightWaysExtensions();
-    /**
-    * \brief Whenever an unstable cell cannot be extended we increase its area to be the minimal for stability.
-    *        This is the method Benkler-Chavannes-Kuster method and it is less accurate than the regular ECT but it
-    *        still works better than staircasing. (see https://ieeexplore.ieee.org/document/1638381)
-    *
-    * @param idim Integer indicating the dimension (x->0, y->1, z->2) for which the BCK correction is done
-    *
-    */
-    void ApplyBCKCorrection(int idim);
 
 #ifdef WARPX_USE_FFT
     auto&  get_spectral_solver_fp (int lev) {return *spectral_solver_fp[lev];}
@@ -1137,11 +1128,6 @@ private:
      * for all available MultiFabs, and abort otherwise.
      */
     void CheckGuardCells();
-
-    /**
-     * \brief Checks for known numerical issues involving different WarpX modules
-     */
-    void CheckKnownIssues();
 
     void BuildBufferMasks ();
 
@@ -1389,7 +1375,7 @@ private:
     //! User-defined parser to define refinement patches
     std::unique_ptr<amrex::Parser> ref_patch_parser;
 
-    bool is_synchronized = true;
+    bool m_is_synchronized = true;
 
     // Synchronization of nodal points
     static constexpr bool sync_nodal_points = true;
