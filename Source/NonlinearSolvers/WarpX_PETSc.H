@@ -11,7 +11,6 @@
 
 #include "LinearFunction.H"
 
-#include <petscsystypes.h>
 
 // forward declarations
 class WarpXSolverVec;

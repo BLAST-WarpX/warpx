@@ -95,7 +95,7 @@ PetscErrorCode printKSPResidual(KSP a_ksp, PetscInt a_n, PetscReal a_rnorm, void
     amrex::ignore_unused(a_ksp);
     static amrex::Real norm0 = 0;
     if (a_n == 0) { norm0 = a_rnorm; }
-    amrex::Print() << "KSP: iter = " << a_n << ", residual = " << a_rnorm
+    amrex::Print() << "GMRES (PETSc KSP): iter = " << a_n << ", residual = " << a_rnorm
                    << ", " << a_rnorm / norm0 << " (rel.)\n";
     PetscFunctionReturn(PETSC_SUCCESS);
 }
