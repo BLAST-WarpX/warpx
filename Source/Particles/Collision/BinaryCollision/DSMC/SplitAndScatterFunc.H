@@ -88,7 +88,7 @@ public:
         );
 
         amrex::Vector<int> num_added_vec(m_num_product_species, 0);
-        for (int i = 0; i < m_num_product_species; i++)
+        for (int i = 0; i < 2; i++)
         {
             // Record the number of non product producing events lead to new
             // particles for species1 and 2. Only 1 particle is created for
