@@ -278,6 +278,33 @@ The physical fields in WarpX have the following naming:
             [] (WarpX& wx) { wx.SynchronizeVelocityWithPosition(); },
             "Synchronize particle velocities and positions."
         )
+        // Add some accessor bindings for the Hybrid Ohm's Law Solver
+        .def("set_hybrid_pic_substeps",
+            [](WarpX& wx, int substeps) {
+                wx.get_pointer_HybridPICModel()->m_substeps = substeps;
+            },
+            py::arg("substeps"),
+            "Sets the number of substeps to take in the hybrid solver."
+        )
+        .def("get_hybrid_pic_substeps",
+            [](WarpX& wx) {
+                return wx.get_pointer_HybridPICModel()->m_substeps;
+            },
+            "Gets the number of substeps taken in the hybrid solver."
+        )
+        .def("set_hybrid_pic_density_floor",
+            [](WarpX& wx, amrex::Real n_floor) {
+                wx.get_pointer_HybridPICModel()->m_n_floor = n_floor;
+            },
+            py::arg("n_floor"),
+            "Sets the density floor to use in the hybrid solver."
+        )
+        .def("get_hybrid_pic_density_floor",
+            [](WarpX& wx) {
+                return wx.get_pointer_HybridPICModel()->m_n_floor;
+            },
+            "Gets the number of substeps to take in the hybrid solver."
+        )
     ;
 
     py::class_<warpx::Config>(m, "Config")
