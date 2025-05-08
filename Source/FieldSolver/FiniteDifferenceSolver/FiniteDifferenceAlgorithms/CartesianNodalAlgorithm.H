@@ -104,7 +104,7 @@ struct CartesianNodalAlgorithm {
     }
 
     /**
-     * Perform second derivative along x on a nodal grid, from a nodal field `F`*/
+     * Perform second derivative along x on any grid, from the field `F`*/
     template< typename T_Field>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real Dxx (
@@ -157,7 +157,7 @@ struct CartesianNodalAlgorithm {
     }
 
     /**
-     * Perform derivative along y on a nodal grid, from a cell-centered field `F`*/
+     * Perform second derivative along y on any grid, from the field `F`*/
     template< typename T_Field>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real Dyy (
@@ -212,7 +212,7 @@ struct CartesianNodalAlgorithm {
 
 
     /**
-     * Perform second derivative along z on a cell-centered field `F`*/
+     * Perform second derivative along z on any grid, from the field `F`*/
     template< typename T_Field>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real Dzz (
