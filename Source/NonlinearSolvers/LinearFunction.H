@@ -105,6 +105,9 @@ class LinearFunction
         //! define the linear function object
         virtual void define( const T&, Ops*, const PreconditionerType& ) = 0;
 
+        //! returns the preconditioner type
+        virtual PreconditionerType pcType () const = 0;
+
     protected:
 
     private:

@@ -12,6 +12,7 @@
 
 #include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
+#include "Preconditioner.H"
 
 #include <AMReX_REAL.H>
 
@@ -85,7 +86,22 @@ PetscErrorCode applyMatOp(Mat a_A, Vec a_U, Vec a_F)
     context->applyOp( context->m_F, context->m_U );
     copyVec( a_F, context->m_F);
 
-    return 0;
+    PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+//! Apply native preconditioner
+PetscErrorCode applyNativePC( PC  a_pc, Vec a_X, Vec a_Y )
+{
+    BL_PROFILE("warpx_petsc::applyNativePC()");
+
+    KSP_impl *context;
+    PCShellGetContext(a_pc, &context);
+
+    copyVec( context->m_U, a_X );
+    context->applyPC( context->m_F, context->m_U );
+    copyVec( a_Y, context->m_F );
+
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 //! Print KSP residuals
@@ -127,6 +143,19 @@ KSP_impl::~KSP_impl()
     amrex::Print() << "KSP_impl: Finalized PETSc.\n";
 }
 
+void KSP_impl::applyOp( VecType& a_F, const VecType& a_U)
+{
+    AMREX_ALWAYS_ASSERT(isDefined());
+    m_op->apply(a_F, a_U);
+}
+
+void KSP_impl::applyPC( VecType& a_F, const VecType& a_U)
+{
+    AMREX_ALWAYS_ASSERT(isDefined());
+    a_F.zero();
+    m_op->precond(a_F, a_U);
+}
+
 void KSP_impl::createObjects(const VecType& a_vec)
 {
     BL_PROFILE("KSP_impl::createObjects()");
@@ -160,14 +189,20 @@ void KSP_impl::createObjects(const VecType& a_vec)
     KSPCreate( PETSC_COMM_WORLD, &m_ksp->obj );
     KSPSetOperators( m_ksp->obj, m_A->obj, m_A->obj );
     KSPSetTolerances( m_ksp->obj, m_rtol, m_atol, PETSC_CURRENT, m_maxits );
+    KSPSetNormType( m_ksp->obj, KSP_NORM_UNPRECONDITIONED );
     if (m_verbose > 0) {
         KSPMonitorSet( m_ksp->obj, printKSPResidual, NULL, NULL );
     }
 
-    // set PC to none
+    // set PC
     PC pc;
-    KSPGetPC( m_ksp->obj, &pc);
-    PCSetType(pc, PCNONE);
+    KSPGetPC(m_ksp->obj, &pc);
+    auto pc_type = m_op->pcType();
+    if (pc_type != PreconditionerType::pc_petsc) {
+        PCSetType(pc, PCSHELL);
+        PCShellSetApply(pc, applyNativePC);
+        PCShellSetContext(pc, this);
+    }
 
     // it is now defined
     m_is_defined = true;

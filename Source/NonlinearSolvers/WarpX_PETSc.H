@@ -11,6 +11,8 @@
 
 #include "LinearFunction.H"
 
+#include <AMReX_BLassert.H>
+#include <AMReX_REAL.H>
 
 // forward declarations
 class WarpXSolverVec;
@@ -69,11 +71,13 @@ class KSP_impl
         }
 
         //! Apply matrix op on given vector
-        inline void applyOp( VecType& a_F, const VecType& a_U)
-        {
-            AMREX_ALWAYS_ASSERT(isDefined());
-            m_op->apply(a_F, a_U);
-        }
+        void applyOp( VecType& a_F, const VecType& a_U);
+
+        //! Apply PC op on given vector
+        void applyPC( VecType& a_F, const VecType& a_U);
+
+        /* the following are not private to let them be accessible from
+         * non-member functions passed to PETSc */
 
         //! Work vector
         VecType m_U;
