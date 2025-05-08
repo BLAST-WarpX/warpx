@@ -130,6 +130,15 @@ WarpXParticleContainer::WarpXParticleContainer (AmrCore* amr_core, int ispecies)
     local_Sx.resize(num_threads);
     local_Sy.resize(num_threads);
     local_Sz.resize(num_threads);
+    local_Sxx.resize(num_threads);
+    local_Sxy.resize(num_threads);
+    local_Sxz.resize(num_threads);
+    local_Syx.resize(num_threads);
+    local_Syy.resize(num_threads);
+    local_Syz.resize(num_threads);
+    local_Szx.resize(num_threads);
+    local_Szy.resize(num_threads);
+    local_Szz.resize(num_threads);
 
     // The boundary conditions are read in in ReadBCParams but a child class
     // can allow these value to be overwritten if different boundary
@@ -926,6 +935,9 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                                         const RealVector& uxp, const RealVector& uyp, const RealVector& uzp,
                                         amrex::MultiFab* jx, amrex::MultiFab* jy, amrex::MultiFab* jz,
                                         amrex::MultiFab* Sx, amrex::MultiFab* Sy, amrex::MultiFab* Sz,
+                                        amrex::MultiFab* Sxx, amrex::MultiFab* Sxy, amrex::MultiFab* Sxz,
+                                        amrex::MultiFab* Syx, amrex::MultiFab* Syy, amrex::MultiFab* Syz,
+                                        amrex::MultiFab* Szx, amrex::MultiFab* Szy, amrex::MultiFab* Szz,
                                         const amrex::FArrayBox* Bx, const amrex::FArrayBox* By, const amrex::FArrayBox* Bz,
                                         long offset, long np_to_deposit, int thread_num, int lev, int depos_lev,
                                         amrex::Real dt )
@@ -1025,6 +1037,15 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     Array4<Real> const& Sx_arr = Sx->array(pti);
     Array4<Real> const& Sy_arr = Sy->array(pti);
     Array4<Real> const& Sz_arr = Sz->array(pti);
+    Array4<Real> const& Sxx_arr = Sxx->array(pti);
+    Array4<Real> const& Sxy_arr = Sxy->array(pti);
+    Array4<Real> const& Sxz_arr = Sxz->array(pti);
+    Array4<Real> const& Syx_arr = Syx->array(pti);
+    Array4<Real> const& Syy_arr = Syy->array(pti);
+    Array4<Real> const& Syz_arr = Syz->array(pti);
+    Array4<Real> const& Szx_arr = Szx->array(pti);
+    Array4<Real> const& Szy_arr = Szy->array(pti);
+    Array4<Real> const& Szz_arr = Szz->array(pti);
 #else
     tbx.grow(ng_J);
     tby.grow(ng_J);
@@ -1051,14 +1072,41 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     local_Sx[thread_num].resize(tbx, Sx->nComp());
     local_Sy[thread_num].resize(tby, Sy->nComp());
     local_Sz[thread_num].resize(tbz, Sz->nComp());
+    local_Sxx[thread_num].resize(tbx, Sxx->nComp());
+    local_Sxy[thread_num].resize(tby, Sxy->nComp());
+    local_Sxz[thread_num].resize(tbz, Sxz->nComp());
+    local_Syx[thread_num].resize(tbx, Syx->nComp());
+    local_Syy[thread_num].resize(tby, Syy->nComp());
+    local_Syz[thread_num].resize(tbz, Syz->nComp());
+    local_Szx[thread_num].resize(tbx, Szx->nComp());
+    local_Szy[thread_num].resize(tby, Szy->nComp());
+    local_Szz[thread_num].resize(tbz, Szz->nComp());
 
     // local_Sx[thread_num] is set to zero
     local_Sx[thread_num].setVal(0.0);
     local_Sy[thread_num].setVal(0.0);
     local_Sz[thread_num].setVal(0.0);
+    local_Sxx[thread_num].setVal(0.0);
+    local_Sxy[thread_num].setVal(0.0);
+    local_Sxz[thread_num].setVal(0.0);
+    local_Syx[thread_num].setVal(0.0);
+    local_Syy[thread_num].setVal(0.0);
+    local_Syz[thread_num].setVal(0.0);
+    local_Szx[thread_num].setVal(0.0);
+    local_Szy[thread_num].setVal(0.0);
+    local_Szz[thread_num].setVal(0.0);
     Array4<Real> const& Sx_arr = local_Sx[thread_num].array();
     Array4<Real> const& Sy_arr = local_Sy[thread_num].array();
     Array4<Real> const& Sz_arr = local_Sz[thread_num].array();
+    Array4<Real> const& Sxx_arr = local_Sxx[thread_num].array();
+    Array4<Real> const& Sxy_arr = local_Sxy[thread_num].array();
+    Array4<Real> const& Sxz_arr = local_Sxz[thread_num].array();
+    Array4<Real> const& Syx_arr = local_Syx[thread_num].array();
+    Array4<Real> const& Syy_arr = local_Syy[thread_num].array();
+    Array4<Real> const& Syz_arr = local_Syz[thread_num].array();
+    Array4<Real> const& Szx_arr = local_Szx[thread_num].array();
+    Array4<Real> const& Szy_arr = local_Szy[thread_num].array();
+    Array4<Real> const& Szz_arr = local_Szz[thread_num].array();
 #endif
 
     const auto GetPosition = GetParticlePosition<PIdx>(pti, offset);
@@ -1160,6 +1208,9 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                 jx_fab, jy_fab, jz_fab, Sx_arr, Sy_arr, Sz_arr,
+                Sxx_arr, Sxy_arr, Sxz_arr,
+                Syx_arr, Syy_arr, Syz_arr,
+                Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                 np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
         } else if (WarpX::nox == 2){
@@ -1168,6 +1219,9 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                 jx_fab, jy_fab, jz_fab, Sx_arr, Sy_arr, Sz_arr,
+                Sxx_arr, Sxy_arr, Sxz_arr,
+                Syx_arr, Syy_arr, Syz_arr,
+                Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                 np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
         } else if (WarpX::nox == 3){
@@ -1200,6 +1254,15 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     (*Sx)[pti].lockAdd(local_Sx[thread_num], tbx, tbx, 0, 0, Sx->nComp());
     (*Sy)[pti].lockAdd(local_Sy[thread_num], tby, tby, 0, 0, Sy->nComp());
     (*Sz)[pti].lockAdd(local_Sz[thread_num], tbz, tbz, 0, 0, Sz->nComp());
+    (*Sxx)[pti].lockAdd(local_Sxx[thread_num], tbx, tbx, 0, 0, Sxx->nComp());
+    (*Sxy)[pti].lockAdd(local_Sxy[thread_num], tby, tby, 0, 0, Sxy->nComp());
+    (*Sxz)[pti].lockAdd(local_Sxz[thread_num], tbz, tbz, 0, 0, Sxz->nComp());
+    (*Syx)[pti].lockAdd(local_Syx[thread_num], tbx, tbx, 0, 0, Syx->nComp());
+    (*Syy)[pti].lockAdd(local_Syy[thread_num], tby, tby, 0, 0, Syy->nComp());
+    (*Syz)[pti].lockAdd(local_Syz[thread_num], tbz, tbz, 0, 0, Syz->nComp());
+    (*Szx)[pti].lockAdd(local_Szx[thread_num], tbx, tbx, 0, 0, Szx->nComp());
+    (*Szy)[pti].lockAdd(local_Szy[thread_num], tby, tby, 0, 0, Szy->nComp());
+    (*Szz)[pti].lockAdd(local_Szz[thread_num], tbz, tbz, 0, 0, Szz->nComp());
     WARPX_PROFILE_VAR_STOP(blp_accumulate);
 #endif
 }

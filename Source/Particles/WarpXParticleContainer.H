@@ -390,6 +390,15 @@ public:
                                          amrex::MultiFab* Sx,
                                          amrex::MultiFab* Sy,
                                          amrex::MultiFab* Sz,
+                                         amrex::MultiFab* Sxx,
+                                         amrex::MultiFab* Sxy,
+                                         amrex::MultiFab* Sxz,
+                                         amrex::MultiFab* Syx,
+                                         amrex::MultiFab* Syy,
+                                         amrex::MultiFab* Syz,
+                                         amrex::MultiFab* Szx,
+                                         amrex::MultiFab* Szy,
+                                         amrex::MultiFab* Szz,
                                    const amrex::FArrayBox* bxfab,
                                    const amrex::FArrayBox* byfab,
                                    const amrex::FArrayBox* bzfab,
@@ -648,6 +657,15 @@ protected:
     amrex::Vector<amrex::FArrayBox> local_Sx;
     amrex::Vector<amrex::FArrayBox> local_Sy;
     amrex::Vector<amrex::FArrayBox> local_Sz;
+    amrex::Vector<amrex::FArrayBox> local_Sxx;
+    amrex::Vector<amrex::FArrayBox> local_Sxy;
+    amrex::Vector<amrex::FArrayBox> local_Sxz;
+    amrex::Vector<amrex::FArrayBox> local_Syx;
+    amrex::Vector<amrex::FArrayBox> local_Syy;
+    amrex::Vector<amrex::FArrayBox> local_Syz;
+    amrex::Vector<amrex::FArrayBox> local_Szx;
+    amrex::Vector<amrex::FArrayBox> local_Szy;
+    amrex::Vector<amrex::FArrayBox> local_Szz;
 
 public:
     using PairIndex = std::pair<int, int>;
