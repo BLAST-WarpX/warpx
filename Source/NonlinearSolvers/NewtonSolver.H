@@ -14,6 +14,7 @@
 #include "Utils/TextMsg.H"
 
 #include <AMReX_ParmParse.H>
+#include <AMReX_Config.H>
 
 #include <vector>
 #include <istream>

@@ -4,7 +4,6 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifdef AMREX_USE_PETSC
 
 #ifndef PETSC_KSP_WRAPPER_H_
 #define PETSC_KSP_WRAPPER_H_
@@ -12,7 +11,10 @@
 #include "LinearSolver.H"
 #include "WarpX_PETSc.H"
 
+#include <AMReX_Config.H>
 #include <memory>
+
+#ifdef AMREX_USE_PETSC
 
 /**
  * \brief Wrapper for PETSc's KSP solver

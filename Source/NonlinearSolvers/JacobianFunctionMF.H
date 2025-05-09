@@ -11,6 +11,7 @@
 #include "CurlCurlMLMGPC.H"
 #include "JacobiPC.H"
 #include "Utils/TextMsg.H"
+#include <AMReX_Config.H>
 #include <string>
 
 /**

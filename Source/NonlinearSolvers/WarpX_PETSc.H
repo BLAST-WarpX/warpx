@@ -4,7 +4,6 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifdef AMREX_USE_PETSC
 
 #ifndef WARPX_PETSC_H_
 #define WARPX_PETSC_H_
@@ -13,6 +12,9 @@
 
 #include <AMReX_BLassert.H>
 #include <AMReX_REAL.H>
+#include <AMReX_Config.H>
+
+#ifdef AMREX_USE_PETSC
 
 // forward declarations
 class WarpXSolverVec;

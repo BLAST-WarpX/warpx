@@ -4,18 +4,20 @@
  *
  * License: BSD-3-Clause-LBNL
  */
+
+#include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
+#include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
+#include "Preconditioner.H"
+
+#include <AMReX_Config.H>
+#include <AMReX_REAL.H>
+
 #ifdef AMREX_USE_PETSC
 
 #include <petscksp.h> // must include before WarpX_PETSc.H
 #include <petscmat.h> // must include before WarpX_PETSc.H
 #include <petscvec.h> // must include before WarpX_PETSc.H
 #include "WarpX_PETSc.H"
-
-#include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
-#include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
-#include "Preconditioner.H"
-
-#include <AMReX_REAL.H>
 
 namespace warpx_petsc {
 
@@ -271,3 +273,4 @@ void KSP_impl::setVerbose(int a_v)
 }
 
 #endif
+
