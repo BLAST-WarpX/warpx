@@ -380,6 +380,7 @@ guardCellManager::Init (
     }
     for (int i = 0; i < AMREX_SPACEDIM; i++) {
         ng_alloc_J[i] = nox+1;
+        ng_depos_J[i] = nox+1;
         ng_alloc_Rho[i] = nox+1;
         ng_alloc_EB[i] = nox+1;
     }

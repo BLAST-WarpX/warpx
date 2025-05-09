@@ -994,15 +994,15 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     const amrex::ParticleReal qs = this->charge;
     const amrex::ParticleReal ms = this->mass;
 
-    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::Sorting", blp_sort);
-    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::FindMaxTilesize",
+    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::Sorting", blp_sort);
+    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::FindMaxTilesize",
             blp_get_max_tilesize);
-    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::DirectCurrentDepKernel",
+    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::DirectCurrentDepKernel",
             direct_current_dep_kernel);
-    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::EsirkepovCurrentDepKernel",
+    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::EsirkepovCurrentDepKernel",
             esirkepov_current_dep_kernel);
-    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::CurrentDeposition", blp_deposit);
-    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::Accumulate", blp_accumulate);
+    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::CurrentDeposition", blp_deposit);
+    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::Accumulate", blp_accumulate);
 
     // Get tile box where current is deposited.
     // The tile box is different when depositing in the buffers (depos_lev<lev)
@@ -1073,13 +1073,13 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     local_Sy[thread_num].resize(tby, Sy->nComp());
     local_Sz[thread_num].resize(tbz, Sz->nComp());
     local_Sxx[thread_num].resize(tbx, Sxx->nComp());
-    local_Sxy[thread_num].resize(tby, Sxy->nComp());
-    local_Sxz[thread_num].resize(tbz, Sxz->nComp());
-    local_Syx[thread_num].resize(tbx, Syx->nComp());
+    local_Sxy[thread_num].resize(tbx, Sxy->nComp());
+    local_Sxz[thread_num].resize(tbx, Sxz->nComp());
+    local_Syx[thread_num].resize(tby, Syx->nComp());
     local_Syy[thread_num].resize(tby, Syy->nComp());
-    local_Syz[thread_num].resize(tbz, Syz->nComp());
-    local_Szx[thread_num].resize(tbx, Szx->nComp());
-    local_Szy[thread_num].resize(tby, Szy->nComp());
+    local_Syz[thread_num].resize(tby, Syz->nComp());
+    local_Szx[thread_num].resize(tbz, Szx->nComp());
+    local_Szy[thread_num].resize(tbz, Szy->nComp());
     local_Szz[thread_num].resize(tbz, Szz->nComp());
 
     // local_Sx[thread_num] is set to zero
@@ -1255,13 +1255,13 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     (*Sy)[pti].lockAdd(local_Sy[thread_num], tby, tby, 0, 0, Sy->nComp());
     (*Sz)[pti].lockAdd(local_Sz[thread_num], tbz, tbz, 0, 0, Sz->nComp());
     (*Sxx)[pti].lockAdd(local_Sxx[thread_num], tbx, tbx, 0, 0, Sxx->nComp());
-    (*Sxy)[pti].lockAdd(local_Sxy[thread_num], tby, tby, 0, 0, Sxy->nComp());
-    (*Sxz)[pti].lockAdd(local_Sxz[thread_num], tbz, tbz, 0, 0, Sxz->nComp());
-    (*Syx)[pti].lockAdd(local_Syx[thread_num], tbx, tbx, 0, 0, Syx->nComp());
+    (*Sxy)[pti].lockAdd(local_Sxy[thread_num], tbx, tbx, 0, 0, Sxy->nComp());
+    (*Sxz)[pti].lockAdd(local_Sxz[thread_num], tbx, tbx, 0, 0, Sxz->nComp());
+    (*Syx)[pti].lockAdd(local_Syx[thread_num], tby, tby, 0, 0, Syx->nComp());
     (*Syy)[pti].lockAdd(local_Syy[thread_num], tby, tby, 0, 0, Syy->nComp());
-    (*Syz)[pti].lockAdd(local_Syz[thread_num], tbz, tbz, 0, 0, Syz->nComp());
-    (*Szx)[pti].lockAdd(local_Szx[thread_num], tbx, tbx, 0, 0, Szx->nComp());
-    (*Szy)[pti].lockAdd(local_Szy[thread_num], tby, tby, 0, 0, Szy->nComp());
+    (*Syz)[pti].lockAdd(local_Syz[thread_num], tby, tby, 0, 0, Syz->nComp());
+    (*Szx)[pti].lockAdd(local_Szx[thread_num], tbz, tbz, 0, 0, Szx->nComp());
+    (*Szy)[pti].lockAdd(local_Szy[thread_num], tbz, tbz, 0, 0, Szy->nComp());
     (*Szz)[pti].lockAdd(local_Szz[thread_num], tbz, tbz, 0, 0, Szz->nComp());
     WARPX_PROFILE_VAR_STOP(blp_accumulate);
 #endif
