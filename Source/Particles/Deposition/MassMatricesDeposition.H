@@ -276,19 +276,19 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                 &Sxx_arr(lo.x+l_jx+iz, 0, 0, Nc),
                 sz_jx[iz]*sz_jx[aa]*fpxx);
 
-            Nc = depos_order + 1 - shift[0] + aa - iz;
+            Nc = depos_order + aa - iz;
             amrex::Gpu::Atomic::AddNoRet(
                 &Sxy_arr(lo.x+l_jx+iz, 0, 0, Nc),
                 sz_jx[iz]*sz_jy[aa]*fpxy);
 
-            Nc = depos_order + 1 - shift[0] + aa - iz;
+            Nc = depos_order + shift[0] + aa - iz;
             amrex::Gpu::Atomic::AddNoRet(
                 &Sxz_arr(lo.x+l_jx+iz, 0, 0, Nc),
                 sz_jx[iz]*sz_jz[aa]*fpxz);
             //
             //  Deposit mass matrices for Y-current
             //
-            Nc = depos_order + shift[0] + aa - iz;
+            Nc = depos_order + aa - iz;
             amrex::Gpu::Atomic::AddNoRet(
                 &Syx_arr(lo.x+l_jy+iz, 0, 0, Nc),
                 sz_jy[iz]*sz_jx[aa]*fpyx);
@@ -298,19 +298,19 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                 &Syy_arr(lo.x+l_jy+iz, 0, 0, Nc),
                 sz_jy[iz]*sz_jy[aa]*fpyy);
 
-            Nc = depos_order + aa - iz;
+            Nc = depos_order + shift[0] + aa - iz;
             amrex::Gpu::Atomic::AddNoRet(
                 &Syz_arr(lo.x+l_jy+iz, 0, 0, Nc),
                 sz_jy[iz]*sz_jz[aa]*fpyz);
             //
             //  Deposit mass matrices for Z-current
             //
-            Nc = depos_order + shift[0] + aa - iz;
+            Nc = depos_order + 1 - shift[0] + aa - iz;
             amrex::Gpu::Atomic::AddNoRet(
                 &Szx_arr(lo.x+l_jz+iz, 0, 0, Nc),
                 sz_jz[iz]*sz_jx[aa]*fpzx);
 
-            Nc = depos_order + aa - iz;
+            Nc = depos_order + 1 - shift[0] + aa - iz;
             amrex::Gpu::Atomic::AddNoRet(
                 &Szy_arr(lo.x+l_jz+iz, 0, 0, Nc),
                 sz_jz[iz]*sz_jy[aa]*fpzy);
