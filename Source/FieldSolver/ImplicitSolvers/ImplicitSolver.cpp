@@ -105,19 +105,24 @@ void ImplicitSolver::PreRHSOp ( amrex::Real  a_cur_time,
     // This uses Efield_fp and Bfield_fp, the field at n+1/2 from the previous iteration.
     const PushType push_type = PushType::Implicit;
     const bool skip_current = false;
-    bool deposit_mass_matrices = false;
-    if (m_use_mass_matrices && !a_from_jacobian) { deposit_mass_matrices = true; }
-    m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, deposit_mass_matrices, push_type);
 
-    if (deposit_mass_matrices) {
+    if (!m_use_mass_matrices) {  // Conventional particle-suppressed JFNK
+        bool deposit_mass_matrices = false;
+        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, deposit_mass_matrices, push_type);
+    }
+    else if (!a_from_jacobian) { // Called from non-linear stage of JFNK and using mass matrices
+        bool deposit_mass_matrices = true;
+        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, deposit_mass_matrices, push_type);
         SaveEandJ();
         m_WarpX->SyncMassMatricesAndApplyBCs();
         const amrex::Real theta_dt = m_theta*m_dt;
         SetMassMatricesForPC( theta_dt );
     }
-    else if (m_use_mass_matrices && a_from_jacobian) {
+    else {                       // Called from linear stage of JFNK and using mass matrices
         ComputeJfromMassMatrices();
     }
+
+    // Apply BCs to J and communicate
     m_WarpX->SyncCurrentAndRho();
 
 }
@@ -161,10 +166,42 @@ void ImplicitSolver::ComputeJfromMassMatrices()
         ablastr::fields::VectorField J0 = m_WarpX->m_fields.get_alldirs(FieldType::current_fp_save, lev);
         ablastr::fields::VectorField E0 = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp_save, lev);
 
+        ablastr::fields::VectorField SX = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_X, lev);
+        ablastr::fields::VectorField SY = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Y, lev);
+        ablastr::fields::VectorField SZ = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Z, lev);
+
+        // Compute the component offset in each direction (careful with staggering)
+        amrex::IntVect offset_xx, offset_xy, offset_xz;
+        amrex::IntVect offset_yx, offset_yy, offset_yz;
+        amrex::IntVect offset_zx, offset_zy, offset_zz;
+        for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
+            offset_xx[dir] = (m_ncomp_xx[dir]-1)/2;
+            offset_xy[dir] = (m_ncomp_xy[dir]-1)/2;
+            offset_xz[dir] = (m_ncomp_xz[dir]-1)/2;
+            offset_yx[dir] = (m_ncomp_yx[dir]-1)/2;
+            offset_yy[dir] = (m_ncomp_yy[dir]-1)/2;
+            offset_yz[dir] = (m_ncomp_yz[dir]-1)/2;
+            offset_zx[dir] = (m_ncomp_zx[dir]-1)/2;
+            offset_zy[dir] = (m_ncomp_zy[dir]-1)/2;
+            offset_zz[dir] = (m_ncomp_zz[dir]-1)/2;
+            if (dir==0) {
+                offset_xz[dir] = m_ncomp_xz[dir]/2;
+                offset_yz[dir] = m_ncomp_yz[dir]/2;
+            }
+            if (dir==1) {
+                offset_xy[dir] = m_ncomp_xy[dir]/2;
+                offset_zy[dir] = m_ncomp_zy[dir]/2;
+            }
+            if (dir==2) {
+                offset_xz[dir] = m_ncomp_xz[dir]/2;
+                offset_yz[dir] = m_ncomp_yz[dir]/2;
+            }
+        }
+
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-       for ( amrex::MFIter mfi(*J[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi )
+        for ( amrex::MFIter mfi(*J[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi )
         {
 
             amrex::Array4<amrex::Real> const& Jx = J[0]->array(mfi);
@@ -183,22 +220,113 @@ void ImplicitSolver::ComputeJfromMassMatrices()
             amrex::Array4<const amrex::Real> const& Ey0 = E0[1]->array(mfi);
             amrex::Array4<const amrex::Real> const& Ez0 = E0[2]->array(mfi);
 
-            amrex::Box const& tbx = mfi.tilebox(J[0]->ixType().toIntVect());
-            amrex::Box const& tby = mfi.tilebox(J[1]->ixType().toIntVect());
-            amrex::Box const& tbz = mfi.tilebox(J[2]->ixType().toIntVect());
+            amrex::Array4<const amrex::Real> const& Sxx = SX[0]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Sxy = SX[1]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Sxz = SX[2]->array(mfi);
+
+            amrex::Array4<const amrex::Real> const& Syx = SY[0]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Syy = SY[1]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Syz = SY[2]->array(mfi);
+
+            amrex::Array4<const amrex::Real> const& Szx = SZ[0]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Szy = SZ[1]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Szz = SZ[2]->array(mfi);
+
+            // Use grown boxes here
+            amrex::Box const& Ebx = mfi.growntilebox(E[0]->ixType().toIntVect());
+            amrex::Box const& Eby = mfi.growntilebox(E[0]->ixType().toIntVect());
+            amrex::Box const& Ebz = mfi.growntilebox(E[0]->ixType().toIntVect());
 
             amrex::ParallelFor(
-            tbx, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            Ebx, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
-                Jx(i,j,k,n) = Jx(i,j,k,n) + 0.0*Jx0(i,j,k,n) + 0.0*(Ex(i,j,k,n) - Ex0(i,j,k,n));
+                int ii_min = std::max(0,offset_xx[0]+Ebx.smallEnd(0)-i);
+                int ii_max = std::min(m_ncomp_xx[0]-1,offset_xx[0]+Ebx.bigEnd(0)-i);
+                amrex::Real SxxdEx = 0.0;
+                for (int ii = ii_min; ii <= ii_max; ++ii) {
+                    int Nc = ii;
+                    SxxdEx += Sxx(i,j,k,Nc)*(Ex(i+ii-offset_xx[0],j,k,n) - Ex0(i+ii-offset_xx[0],j,k,n));
+                }
+                ii_min = std::max(0,offset_xy[0]+Eby.smallEnd(0)-i);
+                ii_max = std::min(m_ncomp_xy[0]-1,offset_xy[0]+Eby.bigEnd(0)-i);
+                amrex::Real SxydEy = 0.0;
+                for (int ii = ii_min; ii <= ii_max; ++ii) {
+                    int Nc = ii;
+                    SxydEy += Sxy(i,j,k,Nc)*(Ey(i+ii-offset_xy[0],j,k,n) - Ey0(i+ii-offset_xy[0],j,k,n));
+                }
+                ii_min = std::max(0,offset_xz[0]+Ebz.smallEnd(0)-i);
+                ii_max = std::min(m_ncomp_xz[0]-1,offset_xz[0]+Ebz.bigEnd(0)-i);
+                amrex::Real SxzdEz = 0.0;
+                for (int ii = ii_min; ii <= ii_max; ++ii) {
+                    int Nc = ii;
+                    SxzdEz += Sxz(i,j,k,Nc)*(Ez(i+ii-offset_xz[0],j,k,n) - Ez0(i+ii-offset_xz[0],j,k,n));
+                }
+                amrex::Real Jx_MM = Jx0(i,j,k,n) + SxxdEx + SxydEy + SxzdEz;
+                Jx(i,j,k,n) = Jx_MM;
+                //Jx(i,j,k,n) = Jx(i,j,k,n);
+                //amrex::Real denom = std::max(1.0,std::abs(Jx(i,j,k,n)));
+                //amrex::Real diff = std::abs(Jx(i,j,k,n)-Jx_MM)/denom;
+                //amrex::AllPrint() << "Jx_MM = " << Jx_MM << "; Jx(i="<<i<<") = " << Jx(i,j,k,n) << "; diff = " << diff << std::endl;
             },
-            tby, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            Eby, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
-                Jy(i,j,k,n) = Jy(i,j,k,n) + 0.0*Jy0(i,j,k,n) + 0.0*(Ey(i,j,k,n) - Ey0(i,j,k,n));
+                int ii_min = std::max(0,offset_yx[0]+Ebx.smallEnd(0)-i);
+                int ii_max = std::min(m_ncomp_yx[0]-1,offset_yx[0]+Ebx.bigEnd(0)-i);
+                amrex::Real SyxdEx = 0.0;
+                for (int ii = ii_min; ii <= ii_max; ++ii) {
+                    int Nc = ii;
+                    SyxdEx += Syx(i,j,k,Nc)*(Ex(i+ii-offset_yx[0],j,k,n) - Ex0(i+ii-offset_yx[0],j,k,n));
+                }
+                ii_min = std::max(0,offset_yy[0]+Eby.smallEnd(0)-i);
+                ii_max = std::min(m_ncomp_yy[0]-1,offset_yy[0]+Eby.bigEnd(0)-i);
+                amrex::Real SyydEy = 0.0;
+                for (int ii = ii_min; ii <= ii_max; ++ii) {
+                    int Nc = ii;
+                    SyydEy += Syy(i,j,k,Nc)*(Ey(i+ii-offset_yy[0],j,k,n) - Ey0(i+ii-offset_yy[0],j,k,n));
+                }
+                ii_min = std::max(0,offset_yz[0]+Ebz.smallEnd(0)-i);
+                ii_max = std::min(m_ncomp_yz[0]-1,offset_yz[0]+Ebz.bigEnd(0)-i);
+                amrex::Real SyzdEz = 0.0;
+                for (int ii = ii_min; ii <= ii_max; ++ii) {
+                    int Nc = ii;
+                    SyzdEz += Syz(i,j,k,Nc)*(Ez(i+ii-offset_yz[0],j,k,n) - Ez0(i+ii-offset_yz[0],j,k,n));
+                }
+                amrex::Real Jy_MM = Jy0(i,j,k,n) + SyxdEx + SyydEy + SyzdEz;
+                Jy(i,j,k,n) = Jy_MM;
+                //Jy(i,j,k,n) = Jy(i,j,k,n);
+                //amrex::Real denom = std::max(1.0,std::abs(Jy(i,j,k,n)));
+                //amrex::Real diff = std::abs(Jy(i,j,k,n)-Jy_MM)/denom;
+                //amrex::AllPrint() << "Jy_MM = " << Jy_MM << "; Jy(i="<<i<<") = " << Jy(i,j,k,n) << "; diff = " << diff << std::endl;
             },
-            tbz, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            Ebz, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
-                Jz(i,j,k,n) = Jz(i,j,k,n) + 0.0*Jz0(i,j,k,n) + 0.0*(Ez(i,j,k,n) - Ez0(i,j,k,n));
+                int ii_min = std::max(0,offset_zx[0]+Ebx.smallEnd(0)-i);
+                int ii_max = std::min(m_ncomp_zx[0]-1,offset_zx[0]+Ebx.bigEnd(0)-i);
+                amrex::Real SzxdEx = 0.0;
+                for (int ii = ii_min; ii <= ii_max; ++ii) {
+                    int Nc = ii;
+                    SzxdEx += Szx(i,j,k,Nc)*(Ex(i+ii-offset_zx[0],j,k,n) - Ex0(i+ii-offset_zx[0],j,k,n));
+                }
+                ii_min = std::max(0,offset_zy[0]+Eby.smallEnd(0)-i);
+                ii_max = std::min(m_ncomp_zy[0]-1,offset_zy[0]+Eby.bigEnd(0)-i);
+                amrex::Real SzydEy = 0.0;
+                for (int ii = ii_min; ii <= ii_max; ++ii) {
+                    int Nc = ii;
+                    SzydEy += Szy(i,j,k,Nc)*(Ey(i+ii-offset_zy[0],j,k,n) - Ey0(i+ii-offset_zy[0],j,k,n));
+                }
+                ii_min = std::max(0,offset_zz[0]+Ebz.smallEnd(0)-i);
+                ii_max = std::min(m_ncomp_zz[0]-1,offset_zz[0]+Ebz.bigEnd(0)-i);
+                amrex::Real SzzdEz = 0.0;
+                for (int ii = ii_min; ii <= ii_max; ++ii) {
+                    int Nc = ii;
+                    SzzdEz += Szz(i,j,k,Nc)*(Ez(i+ii-offset_zz[0],j,k,n) - Ez0(i+ii-offset_zz[0],j,k,n));
+                }
+                amrex::Real Jz_MM = Jz0(i,j,k,n) + SzxdEx + SzydEy + SzzdEz;
+                Jz(i,j,k,n) = Jz_MM;
+                //Jz(i,j,k,n) = Jz(i,j,k,n);
+                //amrex::Real denom = std::max(1.0,std::abs(Jz(i,j,k,n)));
+                //amrex::Real diff = std::abs(Jz(i,j,k,n)-Jz_MM)/denom;
+                //amrex::AllPrint() << "Jz_MM = " << Jz_MM << "; Jz(i="<<i<<") = " << Jz(i,j,k,n) << "; diff = " << diff << std::endl;
             });
         }
 
@@ -260,12 +388,12 @@ void ImplicitSolver::InitializeMassMatrices ()
             m_ncomp_yy[dir] = 1 + 2*shape;
             m_ncomp_zz[dir] = 1 + 2*shape;
             if (dir==0) {
-                m_ncomp_xy[dir] = 2 + 2*shape;
+                m_ncomp_xy[dir] = 1 + 2*shape;
                 m_ncomp_xz[dir] = 2 + 2*shape;
-                m_ncomp_yx[dir] = 2 + 2*shape;
-                m_ncomp_yz[dir] = 1 + 2*shape;
+                m_ncomp_yx[dir] = 1 + 2*shape;
+                m_ncomp_yz[dir] = 2 + 2*shape;
                 m_ncomp_zx[dir] = 2 + 2*shape;
-                m_ncomp_zy[dir] = 1 + 2*shape;
+                m_ncomp_zy[dir] = 2 + 2*shape;
             }
             else if (dir==1) {
                 m_ncomp_xy[dir] = 2 + 2*shape;
