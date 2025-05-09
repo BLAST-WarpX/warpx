@@ -115,16 +115,8 @@ public:
 
         for (int i = 0; i < m_num_product_species; i++)
         {
-            // Add the number of product producing events to the species involved
-            // in those processes. For the two colliding particles, if either is set to
-            // have just 1 copy in the products it indicates that that species is not a
-            // product of the product producing reaction (instead it is just tracked as
-            // an outgoing particle in non-product producing reactions), and therefore
-            // it does not count in the products.
+            // Add the number of product producing events to the species involved in those processes.
             int num_products = m_num_products_host[i];
-            if ((i < 2) & (num_products == 1)) {
-                num_products = 0;
-            }
             const index_type num_added = with_product_total * num_products;
             num_added_vec[i] += static_cast<int>(num_added);
         }
@@ -200,6 +192,7 @@ public:
                 ioniz_product2_offset = products_np[2];
             }
         }
+
         // Grab the masses of ionization products
         amrex::ParticleReal m_ioniz_product1 = 0;
         amrex::ParticleReal m_ioniz_product2 = 0;
@@ -331,7 +324,7 @@ public:
                 const auto species1_index = products_np_data[0] + no_product_total + with_product_p_offsets[i];
                 // Make a copy of the particle from species 1
                 copy_species1[0](soa_products_data[0], soa_1, static_cast<int>(p_pair_indices_1[i]),
-                                static_cast<int>(species1_index), engine);
+                               static_cast<int>(species1_index), engine);
                 // Set the weight of the new particles to p_pair_reaction_weight[i]
                 soa_products_data[0].m_rdata[PIdx::w][species1_index] = p_pair_reaction_weight[i];
 
