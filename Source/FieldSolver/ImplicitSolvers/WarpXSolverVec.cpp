@@ -150,27 +150,33 @@ void WarpXSolverVec::copyFrom ( const amrex::Real* const a_arr)
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         if (m_array_type != FieldType::None) {
             for (int n = 0; n < 3; ++n) {
+                auto ncomp = m_array_vec[lev][n]->nComp();
                 for (amrex::MFIter mfi(*(m_dofs->m_array)[lev][n]); mfi.isValid(); ++mfi) {
                     auto bx = mfi.tilebox();
                     auto data_arr = m_array_vec[lev][n]->array(mfi);
                     auto dof_arr = m_dofs->m_array[lev][n]->const_array(mfi);
                     ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                     {
-                        int dof = (int) dof_arr(i,j,k,0);
-                        data_arr(i,j,k,0) = a_arr[dof];
+                        for (int v = 0; v < ncomp; v++) {
+                            int dof = (int) dof_arr(i,j,k,2*v); // local
+                            data_arr(i,j,k,v) = a_arr[dof];
+                        }
                     });
                 }
             }
         }
         if (m_scalar_type != FieldType::None) {
+            auto ncomp = m_scalar_vec[lev]->nComp();
             for (amrex::MFIter mfi(*(m_dofs->m_scalar)[lev]); mfi.isValid(); ++mfi) {
                 auto bx = mfi.tilebox();
                 auto data_arr = m_scalar_vec[lev]->array(mfi);
                 auto dof_arr = m_dofs->m_scalar[lev]->const_array(mfi);
                 ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
-                    int dof = (int) dof_arr(i,j,k,0);
-                    data_arr(i,j,k,0) = a_arr[dof];
+                    for (int v = 0; v < ncomp; v++) {
+                        int dof = (int) dof_arr(i,j,k,2*v); // local
+                        data_arr(i,j,k,v) = a_arr[dof];
+                    }
                 });
             }
         }
@@ -189,27 +195,33 @@ void WarpXSolverVec::copyTo ( amrex::Real* const a_arr) const
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         if (m_array_type != FieldType::None) {
             for (int n = 0; n < 3; ++n) {
+                auto ncomp = m_array_vec[lev][n]->nComp();
                 for (amrex::MFIter mfi(*(m_dofs->m_array)[lev][n]); mfi.isValid(); ++mfi) {
                     auto bx = mfi.tilebox();
                     auto data_arr = m_array_vec[lev][n]->const_array(mfi);
                     auto dof_arr = m_dofs->m_array[lev][n]->const_array(mfi);
                     ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                     {
-                        int dof = (int) dof_arr(i,j,k,0);
-                        a_arr[dof] = data_arr(i,j,k,0);
+                        for (int v = 0; v < ncomp; v++) {
+                            int dof = (int) dof_arr(i,j,k,2*v); // local
+                            a_arr[dof] = data_arr(i,j,k,v);
+                        }
                     });
                 }
             }
         }
         if (m_scalar_type != FieldType::None) {
+            auto ncomp = m_scalar_vec[lev]->nComp();
             for (amrex::MFIter mfi(*(m_dofs->m_scalar)[lev]); mfi.isValid(); ++mfi) {
                 auto bx = mfi.tilebox();
                 auto data_arr = m_scalar_vec[lev]->const_array(mfi);
                 auto dof_arr = m_dofs->m_scalar[lev]->const_array(mfi);
                 ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
-                    int dof = (int) dof_arr(i,j,k,0);
-                    a_arr[dof] = data_arr(i,j,k,0);
+                    for (int v = 0; v < ncomp; v++) {
+                        int dof = (int) dof_arr(i,j,k,2*v); // local
+                        a_arr[dof] = data_arr(i,j,k,v);
+                    }
                 });
             }
         }
