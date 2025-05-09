@@ -22,7 +22,7 @@ add_warpx_test(
 )
 
 add_warpx_test(
-    test_1d_neutral_ion_dsmc  # name
+    test_1d_ionization_neutral_dsmc  # name
     1  # dims
     2  # nprocs
     inputs_test_1d_ionization_neutral_dsmc  # inputs
