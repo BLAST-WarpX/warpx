@@ -7,20 +7,6 @@
 #
 # License: BSD-3-Clause-LBNL
 
-
-try:
-    import cupy as cp
-except ImportError:
-    cp = None
-
-try:
-    from mpi4py import MPI as mpi
-
-    comm_world = mpi.COMM_WORLD
-    npes = comm_world.Get_size()
-except ImportError:
-    npes = 1
-
 from ._libwarpx import libwarpx
 from .Bucket import Bucket
 
