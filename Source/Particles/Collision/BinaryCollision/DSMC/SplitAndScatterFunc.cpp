@@ -37,10 +37,13 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
             pp_collision_name.query("ionization_target_species", target_species);
             // find the index of the non-target species (the one that could
             // also be used as a product species)
-            AMREX_ALWAYS_ASSERT_WITH_MESSAGE( colliding_species[1]==target_species, "The target species is not the second colliding species.");
+            int non_target_idx = 0;
+            if (colliding_species[0] == target_species) {
+                non_target_idx = 1;
+            }
 
             // check if the non-target species is in ``product_species``
-            auto it = std::find(product_species.begin(), product_species.end(), colliding_species[0]);
+            auto it = std::find(product_species.begin(), product_species.end(), colliding_species[non_target_idx]);
 
             if (it != product_species.end()) {
                 m_num_product_species = 3;
