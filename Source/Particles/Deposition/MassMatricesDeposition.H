@@ -80,7 +80,7 @@ void setMassMatricesKernels ( const amrex::ParticleReal qs,
 
     fpyx = arogp*(byp*bxp - bzp);
     fpyy = arogp*(byp*byp + 1.0_rt);
-    fpyz = arogp*(byp*bzp + Bxp);
+    fpyz = arogp*(byp*bzp + bxp);
 
     fpzx = arogp*(bzp*bxp + byp);
     fpzy = arogp*(bzp*byp - bxp);
