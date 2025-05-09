@@ -82,6 +82,7 @@ public:
         auto const no_product_total = amrex::Scan::PrefixSum<index_type>(n_total_pairs,
             [=] AMREX_GPU_DEVICE (index_type i) -> index_type {
                 return ((mask[i] > 0) & (mask[i] != int(ScatteringProcessType::IONIZATION))) ? 1 : 0;
+                // TODO: add charge exchange as a product producing process
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { no_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -108,6 +109,7 @@ public:
         auto const with_product_total = amrex::Scan::PrefixSum<index_type>(n_total_pairs,
             [=] AMREX_GPU_DEVICE (index_type i) -> index_type {
                 return (mask[i] == int(ScatteringProcessType::IONIZATION)) ? 1 : 0;
+                // TODO: add charge exchange as a product producing process
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { with_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -157,6 +159,9 @@ public:
 
         const int num_product_species = m_num_product_species;
         const auto ionization_energy = m_ionization_energy;
+
+        // TODO: The code below does not apply for charge exchange
+        // and should probably be put inside an if statement
 
         // Store the list indices for ionization products, ensuring that
         // the first product species is always an electron (which is assumed
@@ -281,6 +286,7 @@ public:
                     ux2 *= -1.0_prt;
                     uy2 *= -1.0_prt;
                     uz2 *= -1.0_prt;
+                // TODO: remove this if condition, move this type of code to the product producing section
                 } else if (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE)) {
                     if (std::abs(m1 - m2) < 1e-28) {
                         auto const temp_ux = ux1;
@@ -319,6 +325,9 @@ public:
             }
 
             // Next perform all product producing collisions
+
+            // TODO: add an if condition for charge exchange
+
             else if (mask[i] == int(ScatteringProcessType::IONIZATION))
             {
                 const auto species1_index = products_np_data[0] + no_product_total + with_product_p_offsets[i];

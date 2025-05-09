@@ -68,6 +68,9 @@ DSMCFunc::DSMCFunc (
             // And add a check that the ionization species has the same mass
             // (and a positive charge), compared to the target species
         }
+
+        // TODO: check that charge exchange and ionization are not activated at the same time
+
         m_scattering_processes.push_back(std::move(process));
     }
 
