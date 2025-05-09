@@ -1,3 +1,10 @@
+# In this test, a beam of fast H neutral goes through a background gas of H2
+# Due to the ionization reaction H2 + Hneutral -> H2 + Hplus + electrons,
+# the beam of fast neutral is progressively converted into a beam of fast H+ ions,
+# with a rate that depends on the cross section and background gas density.
+# In the analysis script, we then check that the population of particles in the
+# beam is consistent with this rate.
+
 #############################
 # Define parameter of the
 my_constants.beam_energy_ev = 12e3 # [eV]
