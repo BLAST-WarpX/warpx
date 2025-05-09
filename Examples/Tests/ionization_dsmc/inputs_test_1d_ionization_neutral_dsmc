@@ -8,7 +8,7 @@ my_constants.gas_length = 0.2 # m
 
 #############################
 # Simulation time
-max_step = 150
+max_step = 100
 warpx.const_dt = gas_length/beam_beta/clight/32
 
 #############################
@@ -44,7 +44,7 @@ Hneutral.charge = 0
 Hneutral.surface_flux_pos = 0
 Hneutral.flux_normal_axis = z
 Hneutral.flux_direction = 1
-Hneutral.num_particles_per_cell = 400
+Hneutral.num_particles_per_cell = 800
 Hneutral.flux_profile = constant
 Hneutral.flux = beam_flux
 Hneutral.momentum_distribution_type = constant
@@ -57,7 +57,7 @@ Hplus.charge = 0
 H2.injection_style = NRandomPerCell
 H2.mass = 2*m_p
 H2.charge = 0
-H2.num_particles_per_cell = 800
+H2.num_particles_per_cell = 1600
 H2.profile = constant
 H2.density = gas_density
 H2.momentum_distribution_type = constant
@@ -74,8 +74,8 @@ electrons.charge = -q_e
 #############################
 # Add diagnostics
 diagnostics.diags_names = diag
-diag.intervals = 10
-diag.fields_to_plot = rho Ex Ey Ez
+diag.intervals = 50
+diag.fields_to_plot = rho
 diag.diag_type = Full
 diag.format = openpmd
 
