@@ -25,7 +25,7 @@ add_warpx_test(
     test_1d_neutral_ion_dsmc  # name
     1  # dims
     2  # nprocs
-    inputs_test_1d_neutral_ion_dsmc  # inputs
+    inputs_test_1d_ionization_neutral_dsmc  # inputs
     "analysis_ionization_dsmc_1d.py"  # analysis
     "analysis_default_regression.py --path diags/diag1000100"  # checksum
     OFF  # dependency
