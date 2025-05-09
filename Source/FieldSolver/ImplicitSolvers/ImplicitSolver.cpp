@@ -119,6 +119,8 @@ void ImplicitSolver::PreRHSOp ( amrex::Real  a_cur_time,
         SetMassMatricesForPC( theta_dt );
     }
     else {                       // Called from linear stage of JFNK and using mass matrices
+        //bool deposit_mass_matrices = false;
+        //m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, deposit_mass_matrices, push_type);
         ComputeJfromMassMatrices();
     }
 
@@ -170,6 +172,11 @@ void ImplicitSolver::ComputeJfromMassMatrices()
         ablastr::fields::VectorField SY = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Y, lev);
         ablastr::fields::VectorField SZ = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Z, lev);
 
+        // Should not need to do this!
+        //m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, lev)->setVal(0.0);
+        //m_WarpX->m_fields.get(FieldType::current_fp, Direction{1}, lev)->setVal(0.0);
+        //m_WarpX->m_fields.get(FieldType::current_fp, Direction{2}, lev)->setVal(0.0);
+
         // Compute the component offset in each direction (careful with staggering)
         amrex::IntVect offset_xx, offset_xy, offset_xz;
         amrex::IntVect offset_yx, offset_yy, offset_yz;
@@ -189,12 +196,12 @@ void ImplicitSolver::ComputeJfromMassMatrices()
                 offset_yz[dir] = m_ncomp_yz[dir]/2;
             }
             if (dir==1) {
-                offset_xy[dir] = m_ncomp_xy[dir]/2;
-                offset_zy[dir] = m_ncomp_zy[dir]/2;
+                //offset_xy[dir] = m_ncomp_xy[dir]/2;
+                //offset_zy[dir] = m_ncomp_zy[dir]/2;
             }
             if (dir==2) {
-                offset_xz[dir] = m_ncomp_xz[dir]/2;
-                offset_yz[dir] = m_ncomp_yz[dir]/2;
+                //offset_xz[dir] = m_ncomp_xz[dir]/2;
+                //offset_yz[dir] = m_ncomp_yz[dir]/2;
             }
         }
 
