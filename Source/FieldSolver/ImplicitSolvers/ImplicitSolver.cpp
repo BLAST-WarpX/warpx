@@ -232,13 +232,26 @@ void ImplicitSolver::ComputeJfromMassMatrices()
             amrex::Array4<const amrex::Real> const& Szy = SZ[1]->array(mfi);
             amrex::Array4<const amrex::Real> const& Szz = SZ[2]->array(mfi);
 
-            // Use grown boxes here
-            amrex::Box const& Ebx = mfi.growntilebox(E[0]->ixType().toIntVect());
-            amrex::Box const& Eby = mfi.growntilebox(E[0]->ixType().toIntVect());
-            amrex::Box const& Ebz = mfi.growntilebox(E[0]->ixType().toIntVect());
+            // Use grown boxes here with all guard cells
+            amrex::Box Jbx = mfi.tilebox(J[0]->ixType().toIntVect());
+            amrex::Box Jby = mfi.tilebox(J[1]->ixType().toIntVect());
+            amrex::Box Jbz = mfi.tilebox(J[2]->ixType().toIntVect());
+
+            amrex::Box Ebx = mfi.tilebox(E[0]->ixType().toIntVect());
+            amrex::Box Eby = mfi.tilebox(E[1]->ixType().toIntVect());
+            amrex::Box Ebz = mfi.tilebox(E[2]->ixType().toIntVect());
+
+            Jbx.grow(J[0]->nGrowVect());
+            Jby.grow(J[1]->nGrowVect());
+            Jbz.grow(J[2]->nGrowVect());
+            Ebx.grow(E[0]->nGrowVect());
+            Eby.grow(E[1]->nGrowVect());
+            Ebz.grow(E[2]->nGrowVect());
+            //amrex::Print() << "Jbx = " << Jbx << "; Jby = " << Jby << "; Jbz = " << Jbz << std::endl;
+            //amrex::Print() << "Ebx = " << Ebx << "; Eby = " << Eby << "; Ebz = " << Ebz << std::endl;
 
             amrex::ParallelFor(
-            Ebx, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            Jbx, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
                 int ii_min = std::max(0,offset_xx[0]+Ebx.smallEnd(0)-i);
                 int ii_max = std::min(m_ncomp_xx[0]-1,offset_xx[0]+Ebx.bigEnd(0)-i);
@@ -268,7 +281,7 @@ void ImplicitSolver::ComputeJfromMassMatrices()
                 //amrex::Real diff = std::abs(Jx(i,j,k,n)-Jx_MM)/denom;
                 //amrex::AllPrint() << "Jx_MM = " << Jx_MM << "; Jx(i="<<i<<") = " << Jx(i,j,k,n) << "; diff = " << diff << std::endl;
             },
-            Eby, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            Jby, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
                 int ii_min = std::max(0,offset_yx[0]+Ebx.smallEnd(0)-i);
                 int ii_max = std::min(m_ncomp_yx[0]-1,offset_yx[0]+Ebx.bigEnd(0)-i);
@@ -298,7 +311,7 @@ void ImplicitSolver::ComputeJfromMassMatrices()
                 //amrex::Real diff = std::abs(Jy(i,j,k,n)-Jy_MM)/denom;
                 //amrex::AllPrint() << "Jy_MM = " << Jy_MM << "; Jy(i="<<i<<") = " << Jy(i,j,k,n) << "; diff = " << diff << std::endl;
             },
-            Ebz, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            Jbz, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
                 int ii_min = std::max(0,offset_zx[0]+Ebx.smallEnd(0)-i);
                 int ii_max = std::min(m_ncomp_zx[0]-1,offset_zx[0]+Ebx.bigEnd(0)-i);
