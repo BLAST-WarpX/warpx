@@ -70,7 +70,7 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
     m_array_dofs_vec.resize(m_num_amr_levels);
     m_scalar_dofs_vec.resize(m_num_amr_levels);
 
-    long offset = 0;
+    amrex::Long offset = 0;
     m_nDoFs_l = 0;
 
     // Define the 3D vector field data container
@@ -94,7 +94,7 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
                 m_nDoFs_g += this_array[n]->boxArray().numPts();
 
                 m_array_dofs_vec[lev][n]->setVal(-1.0);
-                long offset_mf = 0;
+                amrex::Long offset_mf = 0;
                 for (amrex::MFIter mfi(*m_array_dofs_vec[lev][n]); mfi.isValid(); ++mfi) {
                     auto bx = mfi.tilebox();
                     auto dof_arr = m_array_dofs_vec[lev][n]->array(mfi);
@@ -133,7 +133,7 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
             m_nDoFs_g += this_mf->boxArray().numPts();
 
             m_scalar_dofs_vec[lev]->setVal(-1.0);
-            long offset_mf = 0;
+            amrex::Long offset_mf = 0;
             for (amrex::MFIter mfi(*m_scalar_dofs_vec[lev]); mfi.isValid(); ++mfi) {
                 auto bx = mfi.tilebox();
                 auto dof_arr = m_scalar_dofs_vec[lev]->array(mfi);

@@ -288,8 +288,8 @@ public:
     [[nodiscard]] std::string getScalarType () const { return m_scalar_type_name; }
 
     // vector sizes
-    [[nodiscard]] long nDOF_local  () const { return m_nDoFs_l; }
-    [[nodiscard]] long nDOF_global () const { return m_nDoFs_g; }
+    [[nodiscard]] amrex::Long nDOF_local  () const { return m_nDoFs_l; }
+    [[nodiscard]] amrex::Long nDOF_global () const { return m_nDoFs_g; }
 
     // copy to/from Real-type arrays
     void copyFrom (const amrex::Real* const);
@@ -314,8 +314,8 @@ private:
     static constexpr int m_ncomp = 1;
     int m_num_amr_levels = 1;
 
-    long m_nDoFs_l = 0;
-    long m_nDoFs_g = 0;
+    amrex::Long m_nDoFs_l = 0;
+    amrex::Long m_nDoFs_g = 0;
 
     inline static bool m_warpx_ptr_defined = false;
     inline static WarpX* m_WarpX = nullptr;
