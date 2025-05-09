@@ -8,6 +8,7 @@
 #include "WarpX.H"
 
 using warpx::fields::FieldType;
+std::unique_ptr<WarpXSolverDOF> WarpXSolverVec::m_dofs = nullptr;
 
 WarpXSolverVec::~WarpXSolverVec ()
 {
@@ -67,19 +68,11 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
     m_array_vec.resize(m_num_amr_levels);
     m_scalar_vec.resize(m_num_amr_levels);
 
-    m_array_dofs_vec.resize(m_num_amr_levels);
-    m_scalar_dofs_vec.resize(m_num_amr_levels);
-
-    amrex::Long offset = 0;
-    m_nDoFs_l = 0;
-
     // Define the 3D vector field data container
     if (m_array_type != FieldType::None) {
-
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             isFieldArray(m_array_type),
             "WarpXSolverVec::Define() called with array_type not an array field");
-
         for (int lev = 0; lev < m_num_amr_levels; ++lev) {
             const ablastr::fields::VectorField this_array = m_WarpX->m_fields.get_alldirs(m_vector_type_name, lev);
             for (int n = 0; n < 3; n++) {
@@ -87,106 +80,21 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
                                                            this_array[n]->DistributionMap(),
                                                            this_array[n]->nComp(),
                                                            amrex::IntVect::TheZeroVector() );
-                m_array_dofs_vec[lev][n] = new amrex::MultiFab( this_array[n]->boxArray(),
-                                                                this_array[n]->DistributionMap(),
-                                                                2, // {local, global}
-                                                                amrex::IntVect::TheUnitVector() );
-                m_nDoFs_g += this_array[n]->boxArray().numPts();
-
-                m_array_dofs_vec[lev][n]->setVal(-1.0);
-                amrex::Long offset_mf = 0;
-                for (amrex::MFIter mfi(*m_array_dofs_vec[lev][n]); mfi.isValid(); ++mfi) {
-                    auto bx = mfi.tilebox();
-                    auto dof_arr = m_array_dofs_vec[lev][n]->array(mfi);
-                    ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
-                    {
-                        dof_arr(i,j,k,0) = (amrex::Real) bx.index(amrex::IntVect(AMREX_D_DECL(i, j, k)))
-                                           + (amrex::Real) offset_mf
-                                           + (amrex::Real) offset;
-                    });
-                    offset_mf += bx.numPts();
-                }
-                offset += offset_mf;
-                m_nDoFs_l += offset_mf;
             }
         }
-
     }
 
     // Define the scalar data container
     if (m_scalar_type != FieldType::None) {
-
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             !isFieldArray(m_scalar_type),
             "WarpXSolverVec::Define() called with scalar_type not a scalar field ");
-
         for (int lev = 0; lev < m_num_amr_levels; ++lev) {
             const amrex::MultiFab* this_mf = m_WarpX->m_fields.get(m_scalar_type_name,lev);
             m_scalar_vec[lev] = new amrex::MultiFab( this_mf->boxArray(),
                                                      this_mf->DistributionMap(),
                                                      this_mf->nComp(),
                                                      amrex::IntVect::TheZeroVector() );
-            m_scalar_dofs_vec[lev] = new amrex::MultiFab( this_mf->boxArray(),
-                                                          this_mf->DistributionMap(),
-                                                          2, // {local, global}
-                                                          amrex::IntVect::TheUnitVector() );
-            m_nDoFs_g += this_mf->boxArray().numPts();
-
-            m_scalar_dofs_vec[lev]->setVal(-1.0);
-            amrex::Long offset_mf = 0;
-            for (amrex::MFIter mfi(*m_scalar_dofs_vec[lev]); mfi.isValid(); ++mfi) {
-                auto bx = mfi.tilebox();
-                auto dof_arr = m_scalar_dofs_vec[lev]->array(mfi);
-                ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
-                {
-                    dof_arr(i,j,k,0) = (amrex::Real) bx.index(amrex::IntVect(AMREX_D_DECL(i, j, k)))
-                                       + (amrex::Real) offset_mf
-                                       + (amrex::Real) offset;
-                });
-                offset_mf += bx.numPts();
-            }
-            offset += offset_mf;
-            m_nDoFs_l += offset_mf;
-        }
-
-    }
-
-    auto nDoFs_g = m_nDoFs_l;
-    amrex::ParallelDescriptor::ReduceLongSum(&nDoFs_g,1);
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        m_nDoFs_g == nDoFs_g,
-        "WarpXSolverVec::Define(): something has gone wrong in DoF counting");
-
-    auto num_procs = amrex::ParallelDescriptor::NProcs();
-    auto my_proc = amrex::ParallelDescriptor::MyProc();
-    amrex::Vector<int> dof_proc_arr(num_procs,0);
-    dof_proc_arr[my_proc] = m_nDoFs_l;
-    amrex::ParallelDescriptor::ReduceIntSum(dof_proc_arr.data(), num_procs);
-
-    int offset_global = 0;
-    for (int i = 0; i < my_proc; i++) { offset_global += dof_proc_arr[i]; }
-
-    if (m_array_type != FieldType::None) {
-
-        for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-            for (int n = 0; n < 3; n++) {
-                for (amrex::MFIter mfi(*m_array_dofs_vec[lev][n]); mfi.isValid(); ++mfi) {
-                    auto bx = mfi.tilebox();
-                    auto dof_arr = m_array_dofs_vec[lev][n]->array(mfi);
-                    ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
-                    { dof_arr(i,j,k,1) = dof_arr(i,j,k,0) + (amrex::Real) offset_global; });
-                }
-            }
-        }
-    }
-    if (m_scalar_type != FieldType::None) {
-        for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-            for (amrex::MFIter mfi(*m_scalar_dofs_vec[lev]); mfi.isValid(); ++mfi) {
-                auto bx = mfi.tilebox();
-                auto dof_arr = m_scalar_dofs_vec[lev]->array(mfi);
-                ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
-                { dof_arr(i,j,k,1) = dof_arr(i,j,k,0) + (amrex::Real) offset_global; });
-            }
         }
     }
 
@@ -194,6 +102,10 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
         m_array_type != FieldType::None ||
         m_scalar_type != FieldType::None,
         "WarpXSolverVec cannot be defined with both array and scalar vecs FieldType::None");
+    if (m_dofs == nullptr) {
+        m_dofs = std::make_unique<WarpXSolverDOF>();
+        m_dofs->Define(m_WarpX, m_num_amr_levels, m_vector_type_name, m_scalar_type_name);
+    }
 
     m_is_defined = true;
 }
@@ -228,16 +140,20 @@ void WarpXSolverVec::Copy ( FieldType  a_array_type,
 
 void WarpXSolverVec::copyFrom ( const amrex::Real* const a_arr)
 {
+    BL_PROFILE("WarpXSolverVec::copyFrom");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         IsDefined(),
         "WarpXSolverVec::CopyFrom() called on undefined WarpXSolverVec");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        (m_dofs != nullptr),
+        "WarpXSolverVec::CopyFrom() DOF object is a nullptr");
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         if (m_array_type != FieldType::None) {
             for (int n = 0; n < 3; ++n) {
-                for (amrex::MFIter mfi(*m_array_dofs_vec[lev][n]); mfi.isValid(); ++mfi) {
+                for (amrex::MFIter mfi(*(m_dofs->m_array)[lev][n]); mfi.isValid(); ++mfi) {
                     auto bx = mfi.tilebox();
                     auto data_arr = m_array_vec[lev][n]->array(mfi);
-                    auto dof_arr = m_array_dofs_vec[lev][n]->const_array(mfi);
+                    auto dof_arr = m_dofs->m_array[lev][n]->const_array(mfi);
                     ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                     {
                         int dof = (int) dof_arr(i,j,k,0);
@@ -247,10 +163,10 @@ void WarpXSolverVec::copyFrom ( const amrex::Real* const a_arr)
             }
         }
         if (m_scalar_type != FieldType::None) {
-            for (amrex::MFIter mfi(*m_scalar_dofs_vec[lev]); mfi.isValid(); ++mfi) {
+            for (amrex::MFIter mfi(*(m_dofs->m_scalar)[lev]); mfi.isValid(); ++mfi) {
                 auto bx = mfi.tilebox();
                 auto data_arr = m_scalar_vec[lev]->array(mfi);
-                auto dof_arr = m_scalar_dofs_vec[lev]->const_array(mfi);
+                auto dof_arr = m_dofs->m_scalar[lev]->const_array(mfi);
                 ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
                     int dof = (int) dof_arr(i,j,k,0);
@@ -263,16 +179,20 @@ void WarpXSolverVec::copyFrom ( const amrex::Real* const a_arr)
 
 void WarpXSolverVec::copyTo ( amrex::Real* const a_arr) const
 {
+    BL_PROFILE("WarpXSolverVec::copyTo");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         IsDefined(),
         "WarpXSolverVec::CopyTo() called on undefined WarpXSolverVec");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        (m_dofs != nullptr),
+        "WarpXSolverVec::CopyTo() DOF object is a nullptr");
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         if (m_array_type != FieldType::None) {
             for (int n = 0; n < 3; ++n) {
-                for (amrex::MFIter mfi(*m_array_dofs_vec[lev][n]); mfi.isValid(); ++mfi) {
+                for (amrex::MFIter mfi(*(m_dofs->m_array)[lev][n]); mfi.isValid(); ++mfi) {
                     auto bx = mfi.tilebox();
                     auto data_arr = m_array_vec[lev][n]->const_array(mfi);
-                    auto dof_arr = m_array_dofs_vec[lev][n]->const_array(mfi);
+                    auto dof_arr = m_dofs->m_array[lev][n]->const_array(mfi);
                     ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                     {
                         int dof = (int) dof_arr(i,j,k,0);
@@ -282,10 +202,10 @@ void WarpXSolverVec::copyTo ( amrex::Real* const a_arr) const
             }
         }
         if (m_scalar_type != FieldType::None) {
-            for (amrex::MFIter mfi(*m_scalar_dofs_vec[lev]); mfi.isValid(); ++mfi) {
+            for (amrex::MFIter mfi(*(m_dofs->m_scalar)[lev]); mfi.isValid(); ++mfi) {
                 auto bx = mfi.tilebox();
                 auto data_arr = m_scalar_vec[lev]->const_array(mfi);
-                auto dof_arr = m_scalar_dofs_vec[lev]->const_array(mfi);
+                auto dof_arr = m_dofs->m_scalar[lev]->const_array(mfi);
                 ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
                     int dof = (int) dof_arr(i,j,k,0);
