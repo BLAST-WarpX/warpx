@@ -8,8 +8,6 @@
 #ifndef SINGLE_LINEAR_COMPTON_COLLISION_EVENT_H_
 #define SINGLE_LINEAR_COMPTON_COLLISION_EVENT_H_
 
-#include "LinearComptonCrossSection.H"
-
 #include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
 #include "Utils/WarpXConst.H"
 
@@ -66,45 +64,55 @@ void SingleLinearComptonCollisionEvent (const amrex::ParticleReal& u1x, const am
                                        const amrex::ParticleReal& probability_target_value,
                                        const amrex::RandomEngine& engine)
 {
-    amrex::ParticleReal E_coll, v_coll, lab_to_COM_factor;
-
-    // By convention in WarpX, the momentum of photons is normalized by m_e
-    // i.e. `p = m_e u`.
-    constexpr amrex::ParticleReal me = PhysConst::m_e;
-    BinaryCollisionUtils::get_collision_parameters(
-        me*u1x, me*u1y, me*u1z, me*u2x, me*u2y, me*u2z, 0, 0,
-        E_coll, v_coll, lab_to_COM_factor);
-
     using namespace amrex::literals;
+    constexpr amrex::ParticleReal inv_c = 1._prt / PhysConst::c;
+    constexpr amrex::ParticleReal inv_c_sq = inv_c * inv_c;
 
     const amrex::ParticleReal w_min = amrex::min(w1, w2);
     const amrex::ParticleReal w_max = amrex::max(w1, w2);
 
-    // Compute linear Breit Wheeler cross section as a function of the kinetic energy
-    // in the center of momentum frame
-    auto lbw_cross_section = amrex::ParticleReal(0.);
-    lbw_cross_section = LinearComptonCrossSection(E_coll/2);
+    // When checking the user input, we ensure that the first particle is the photon
+    // and the second particle is the lepton (electron/positron).
+    // The cross-section is computed in the rest frame of the lepton.
 
-    // First estimate of probability to produce an electron-positron pair
+    // Lepton's Lorentz factor
+    const amrex::ParticleReal gamma_lepton = std::sqrt(1._prt + (u2x*u2x + u2y*u2y + u2z*u2z)*inv_c_sq);
+    // Photon's normalized momentum in the lab frame
+    amrex::ParticleReal const u1_norm = std::sqrt(u1x*u1x + u1y*u1y + u1z*u1z);
+    // Photon's normalized momentum in the rest frame of the lepton
+    // (obtained from the fact that the product of the photon and lepton's 4-momenta is invariant)
+    const amrex::ParticleReal u1_norm_rest = u1_norm * gamma_lepton - (u1x*u2x + u1y*u2y + u1z*u2z)*inv_c;
+    // Lorentz factor for labframe to rest frame transformation
+    const amrex::ParticleReal lab_to_rest_frame_factor = gamma_lepton;
+
+    // Calculate the Klein-Nishina cross-section (cross-section in the rest frame of the lepton)
+    const amrex::ParticleReal k = u1_norm_rest * inv_c;
+    // By convention, in WarpX, the photon momentum u is normalized by the electron mass m_e, so k corresponds to p/(m_e*c)
+    const amrex::ParticleReal f1 = 2 * ( 2 + k*(1+k)*(8+k) ) / ( k*k * (1 + 2*k)*(1 + 2*k) );
+    const amrex::ParticleReal f2 = ( 2 + k*(2-k) ) * std::log( 1 + 2*k ) / (k*k*k);
+    const amrex::ParticleReal klein_nishina_cross_section = MathConst::pi * PhysConst::r_e * PhysConst::r_e * ( f1 - f2 );
+
+    // First estimate of probability for scattering
+    // (Convert from rest frame to lab frame, using lab_to_rest_frame_factor)
     amrex::ParticleReal probability_estimate = multiplier_ratio * event_multiplier *
-                                lab_to_COM_factor * w_max * lbw_cross_section * v_coll * dt / dV;
+                                lab_to_rest_frame_factor * w_max * klein_nishina_cross_section * PhysConst::c * dt / dV;
 
     // Effective event multiplier
     amrex::ParticleReal event_multiplier_eff = event_multiplier;
 
-    // If the pair-production probability is too high and the event multiplier greater than one,
+    // If the scattering probability is too high and the event multiplier greater than one,
     // we risk to systematically underestimate the electron-positron yield. In this case,
     // we reduce the event multiplier to reduce the pair-production probability
     if (probability_estimate > probability_threshold)
     {
-        // We aim for a pair-production probability of probability_target_value but take into account
+        // We aim for a scattering probability of probability_target_value but take into account
         // the constraint that the event_multiplier cannot be smaller than one
         event_multiplier_eff  = amrex::max(event_multiplier *
                                          probability_target_value / probability_estimate , 1._prt);
         probability_estimate *= event_multiplier_eff/event_multiplier;
     }
 
-    // Compute actual pair-production probability that is always between zero and one
+    // Compute actual scattering probability that is always between zero and one
     // In principle this is obtained by computing 1 - exp(-probability_estimate)
     // However, the computation of this quantity can fail numerically when probability_estimate is
     // too small (e.g. exp(-probability_estimate) returns 1 and the computation returns 0).
@@ -114,7 +122,7 @@ void SingleLinearComptonCollisionEvent (const amrex::ParticleReal& u1x, const am
     // Get a random number
     const amrex::ParticleReal random_number = amrex::Random(engine);
 
-    // If we have a pair-production event, set the mask to true and fill the product weight array
+    // If we have a scattering event, set the mask to true and fill the product weight array
     if (random_number < probability)
     {
         p_mask[pair_index] = true;
