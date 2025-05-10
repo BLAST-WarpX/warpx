@@ -19,19 +19,14 @@
 
 
 /**
- * \brief This function computes whether the collision between two photons results in a
- * pair-producing (electron and positron) event, using the algorithm described in
- * Higginson et al., Journal of Computational Physics 388, 439-453 (2019).
- * If the electron-positron pair is produced, the mask is set to true for that given pair
- * of macrophotons and the weight of the produced particles is stored in p_pair_reaction_weight.
- *
- * Note that the word <<pair>> sometimes refers to the electron-positron products of the collision,
- * sometimes to the macrophotons that are paired to collide in a cell according to the algorithm.
- * It should be clear from the context.
+ * \brief This function computes whether the collision between a photon and lepton results in a
+ * scattering event, using the algorithm described in Higginson et al., Journal of Computational
+ * Physics 388, 439-453 (2019). If the scattering occurs, the mask is set to true for that given pair
+ * of colliding macroparticles and the weight of the produced particles is stored in p_pair_reaction_weight.
  *
  * @tparam index_type type of the index argument
- * @param[in] u1x,u1y,u1z momentum components of the first colliding particle
- * @param[in] u2x,u2y,u2z momentum components of the second colliding particle
+ * @param[in] u1x,u1y,u1z momentum components of the first colliding particle (photon)
+ * @param[in] u2x,u2y,u2z momentum components of the second colliding particle (lepton)
  * @param[in] w1,w2 effective weight of the colliding particles
  * @param[in] dt is the time step length between two collision calls.
  * @param[in] dV is the volume of the corresponding cell.
