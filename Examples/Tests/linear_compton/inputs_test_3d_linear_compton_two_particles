@@ -26,29 +26,35 @@ algo.particle_shape = 1
 #################################
 ############ PLASMA #############
 #################################
-particles.species_names = photon electron
-particles.photon_species = photon
+particles.species_names = photon1 electron1 photon2 electron2
+particles.photon_species = photon1 photon2
 
-photon.species_type = photon
-photon.injection_style = "SingleParticle"
-photon.single_particle_pos = 0 0 0
-photon.single_particle_u = 2.8 0 0
-photon.single_particle_weight = 1e14
-photon.do_not_push = 1
+photon1.species_type = photon
+photon1.injection_style = "SingleParticle"
+photon1.single_particle_pos = 0 0 0
+photon1.single_particle_u = 2.8 0 0
+photon1.single_particle_weight = 1e14
+photon1.do_not_push = 1
 
-electron.species_type = electron
-electron.injection_style = "SingleParticle"
-electron.single_particle_pos = 0 0 0
-electron.single_particle_u = -2.8 0 0
-electron.single_particle_weight = 1e14
-electron.do_not_push = 1
+electron1.species_type = electron
+electron1.injection_style = "SingleParticle"
+electron1.single_particle_pos = 0 0 0
+electron1.single_particle_u = -2.8 0 0
+electron1.single_particle_weight = 1e14
+electron1.do_not_push = 1
+
+electron2.species_type = electron
+electron2.injection_style = none
+
+photon2.species_type = photon
+photon2.injection_style = none
 
 #################################
 ############ COLLISION ##########
 #################################
 collisions.collision_names = lc # linear Compton
-lc.species = photon electron
-lc.product_species = photon electron
+lc.species = photon1 electron1
+lc.product_species = photon2 electron2
 lc.type = linear_compton
 lc.event_multiplier = 1.
 lc.probability_threshold = 0.5
@@ -58,13 +64,12 @@ lc.probability_target_value = 0.02
 diagnostics.diags_names = diag1
 diag1.intervals = 1
 diag1.diag_type = Full
-diag1.fields_to_plot = rho rho_electron
+diag1.fields_to_plot = rho
 diag1.write_species = 1
-diag1.species = photon electron
 
 my_constants.out_freq_red = 1
 # Reduced diagnostics
-warpx.reduced_diags_names = FieldEnergy FieldMomentum FieldMaximum ParticleExtrema_photon ParticleExtrema_electron ParticleEnergy ParticleMomentum RhoMaximum ParticleNumber
+warpx.reduced_diags_names = FieldEnergy FieldMomentum FieldMaximum ParticleExtrema_photon1 ParticleExtrema_photon2 ParticleExtrema_electron1 ParticleExtrema_electron2 ParticleEnergy ParticleMomentum RhoMaximum ParticleNumber
 
 FieldEnergy.type = FieldEnergy
 FieldEnergy.intervals = out_freq_red
@@ -75,21 +80,21 @@ FieldMomentum.intervals = out_freq_red
 FieldMaximum.type = FieldMaximum
 FieldMaximum.intervals = out_freq_red
 
-ParticleExtrema_photonA.type = ParticleExtrema
-ParticleExtrema_photonA.intervals = out_freq_red
-ParticleExtrema_photonA.species = photonA
+ParticleExtrema_photon1.type = ParticleExtrema
+ParticleExtrema_photon1.intervals = out_freq_red
+ParticleExtrema_photon1.species = photon1
 
-ParticleExtrema_photonB.type = ParticleExtrema
-ParticleExtrema_photonB.intervals = out_freq_red
-ParticleExtrema_photonB.species = photonB
+ParticleExtrema_photon2.type = ParticleExtrema
+ParticleExtrema_photon2.intervals = out_freq_red
+ParticleExtrema_photon2.species = photon2
 
-ParticleExtrema_electron.type = ParticleExtrema
-ParticleExtrema_electron.intervals = out_freq_red
-ParticleExtrema_electron.species = electron
+ParticleExtrema_electron1.type = ParticleExtrema
+ParticleExtrema_electron1.intervals = out_freq_red
+ParticleExtrema_electron1.species = electron1
 
-ParticleExtrema_positron.type = ParticleExtrema
-ParticleExtrema_positron.intervals = out_freq_red
-ParticleExtrema_positron.species = positron
+ParticleExtrema_electron2.type = ParticleExtrema
+ParticleExtrema_electron2.intervals = out_freq_red
+ParticleExtrema_electron2.species = electron2
 
 ParticleEnergy.type = ParticleEnergy
 ParticleEnergy.intervals = out_freq_red
