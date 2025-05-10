@@ -114,7 +114,7 @@ void ImplicitSolver::PreRHSOp ( amrex::Real  a_cur_time,
         bool deposit_mass_matrices = true;
         m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, deposit_mass_matrices, push_type);
         SaveEandJ();
-        m_WarpX->SyncMassMatricesAndApplyBCs();
+        SyncMassMatricesAndApplyBCs();
         const amrex::Real theta_dt = m_theta*m_dt;
         SetMassMatricesForPC( theta_dt );
     }
@@ -350,6 +350,34 @@ void ImplicitSolver::ComputeJfromMassMatrices()
             });
         }
 
+    }
+}
+
+void ImplicitSolver::SyncMassMatricesAndApplyBCs ()
+{
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    // Copy mass matrices elements used for the preconditioner
+    const int finest_level = 0;
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        ablastr::fields::VectorField MM = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices, lev);
+        ablastr::fields::VectorField MM_PC = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_PC, lev);
+        amrex::MultiFab::Copy(*MM_PC[0], *MM[0], 0, 0, MM[0]->nComp(), MM[0]->nGrowVect());
+        amrex::MultiFab::Copy(*MM_PC[1], *MM[1], 0, 0, MM[1]->nComp(), MM[1]->nGrowVect());
+        amrex::MultiFab::Copy(*MM_PC[2], *MM[2], 0, 0, MM[2]->nComp(), MM[2]->nGrowVect());
+    }
+
+    // Do addOp Exchange on MassMatrices_PC
+    m_WarpX->SyncMassMatrices();
+
+    // Apply BCs to MassMatrices_PC
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        m_WarpX->ApplyJfieldBoundary(lev,
+            m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev),
+            m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev),
+            m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev),
+            PatchType::fine);
     }
 }
 

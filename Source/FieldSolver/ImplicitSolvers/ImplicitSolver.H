@@ -202,6 +202,8 @@ protected:
 
     void ComputeJfromMassMatrices();
 
+    void SyncMassMatricesAndApplyBCs ();
+
     void SetMassMatricesForPC ( amrex::Real a_theta_dt );
 
     /**
