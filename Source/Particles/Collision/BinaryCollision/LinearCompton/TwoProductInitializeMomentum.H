@@ -149,8 +149,11 @@ namespace {
         amrex::ParticleReal const new_photon_uz_rest = cos_theta * new_photon_uZ_rest
                                                      - sin_theta * new_photon_uX_rest;
 
-        // TODO: Transform the momentum of the scattered photon back to the lab frame
+        // Transform the momentum of the scattered photon back to the lab frame
         // TODO: abstract the Lorentz transformation, or look for an existing WarpX function that does it
+        amrex::ParticleReal const new_photon_u_parallel_rest = - (new_photon_ux_rest*lepton_nx + new_photon_uy_rest*lepton_ny + new_photon_uz_rest*lepton_nz);
+        amrex::ParticleReal const new_photon_u = lepton_gamma * ( new_photon_u_rest - lepton_beta * new_photon_u_parallel_rest );
+        amrex::ParticleReal const new_photon_u_parallel = lepton_gamma * ( new_photon_u_parallel_rest - lepton_beta * new_photon_u_rest );
         amrex::ParticleReal const new_photon_ux = new_photon_ux_rest - lepton_nx * (new_photon_u_parallel - new_photon_u_parallel_rest);
         amrex::ParticleReal const new_photon_uy = new_photon_uy_rest - lepton_ny * (new_photon_u_parallel - new_photon_u_parallel_rest);
         amrex::ParticleReal const new_photon_uz = new_photon_uz_rest - lepton_nz * (new_photon_u_parallel - new_photon_u_parallel_rest);
