@@ -84,6 +84,7 @@ namespace {
 
         // Find cos and sin of the spherical angle that represent
         // the direction of the incoming photon in the rest frame
+        // TODO: Check if we could reuse code from the Coulomb scattering code.
         amrex::ParticleReal const cos_theta = photon_uz_rest / photon_u_rest;
         amrex::ParticleReal cos_phi = 0;
         amrex::ParticleReal sin_phi = 0;
