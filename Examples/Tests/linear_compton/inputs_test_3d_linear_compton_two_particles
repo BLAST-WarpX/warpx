@@ -45,9 +45,11 @@ electron1.do_not_push = 1
 
 electron2.species_type = electron
 electron2.injection_style = none
+electron2.do_not_push = 1
 
 photon2.species_type = photon
 photon2.injection_style = none
+photon2.do_not_push = 1
 
 #################################
 ############ COLLISION ##########
