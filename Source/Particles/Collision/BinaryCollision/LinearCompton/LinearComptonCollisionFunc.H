@@ -26,7 +26,7 @@
 #include <AMReX_Vector.H>
 
 /**
- * \brief This functor does two-photon binary collisions on a single cell.
+ * \brief This functor does perform linear Compton scattering on a single cell.
  *  Particles of the two colliding species are paired with each other and for each pair we compute
  *  if a pair-production event occurs. If so, we fill a mask (input parameter p_mask) with true so that
  *  product particles corresponding to a given pair can be effectively created in the particle
@@ -94,12 +94,11 @@ public:
 
     struct Executor {
         /**
-         * \brief Executor of the LinearBreitWheelerCollisionFunc class.
-         * Performs two-photon collisions at the cell level using the algorithm described in
+         * \brief Executor of the LinearComptonCollisionFunc class.
+         * Performs linear Compton scattering at the cell level using the algorithm described in
          * Higginson et al., Journal of Computational Physics 388, 439-453 (2019).
          * Note that this function does not yet create the product particles, but
-         * instead fills an array p_mask that stores which collisions result in a pair-producing event
-         * (electron and positron).
+         * instead fills an array p_mask that stores which collisions result in a scattering event
          *
          * Also note that there are three main differences between this implementation and the
          * algorithm described in Higginson's paper:
@@ -111,9 +110,6 @@ public:
          * documentation for more details.
          * - 3) Here, we divide the weight of a particle by the number of times it is paired with other
          * particles. This was not explicitly specified in Higginson's paper.
-         *
-         * In the following, the word <<pair>> refers to the pairs of colliding macrophotons in a
-         * given cell, not to the electron-positron products of each collision.
          *
          * @param[in] I1s,I2s is the start index for I1,I2 (inclusive).
          * @param[in] I1e,I2e is the stop index for I1,I2 (exclusive).
@@ -208,7 +204,7 @@ public:
                     u1x[I1[i1]] = u1xbuf*std::cos(theta) - u1y[I1[i1]]*std::sin(theta);
                     u1y[I1[i1]] = u1xbuf*std::sin(theta) + u1y[I1[i1]]*std::cos(theta);
 #endif
-                    SingleLinearBreitWheelerCollisionEvent(
+                    SingleLinearComptonCollisionEvent(
                         u1x[ I1[i1] ], u1y[ I1[i1] ], u1z[ I1[i1] ],
                         u2x[ I2[i2] ], u2y[ I2[i2] ], u2z[ I2[i2] ],
                         w1[ I1[i1] ], w2[ I2[i2] ],

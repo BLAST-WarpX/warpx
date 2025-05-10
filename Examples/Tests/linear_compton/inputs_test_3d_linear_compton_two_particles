@@ -66,6 +66,7 @@ diag1.intervals = 1
 diag1.diag_type = Full
 diag1.fields_to_plot = rho
 diag1.write_species = 1
+diag1.format = openpmd
 
 my_constants.out_freq_red = 1
 # Reduced diagnostics
