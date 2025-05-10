@@ -46,8 +46,8 @@ namespace {
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void LorentzTransformMomentum (
-        amrex::ParticleReal& p_out, amrex::ParticleReal& px_out, amrex::ParticleReal& py_out, amrex::ParticleReal& pz_out,
         amrex::ParticleReal const& p_in, amrex::ParticleReal const& px_in, amrex::ParticleReal const& py_in, amrex::ParticleReal const& pz_in,
+        amrex::ParticleReal& p_out, amrex::ParticleReal& px_out, amrex::ParticleReal& py_out, amrex::ParticleReal& pz_out,
         amrex::ParticleReal const& gamma, amrex::ParticleReal const& beta,
         amrex::ParticleReal const& nx, amrex::ParticleReal const& ny, amrex::ParticleReal const& nz )
     {
@@ -107,8 +107,8 @@ namespace {
         // - Perform the Lorentz transformation
         amrex::ParticleReal photon_u_rest, photon_ux_rest, photon_uy_rest, photon_uz_rest;
         LorentzTransformMomentum(
-            photon_u_rest, photon_ux_rest, photon_uy_rest, photon_uz_rest,
             photon_u, photon_ux, photon_uy, photon_uz,
+            photon_u_rest, photon_ux_rest, photon_uy_rest, photon_uz_rest,
             lepton_gamma, lepton_beta, lepton_nx, lepton_ny, lepton_nz);
 
         // Find cos and sin of the spherical angle that represent
@@ -183,8 +183,8 @@ namespace {
         // Transform the momentum of the scattered photon back to the lab frame
         amrex::ParticleReal new_photon_u, new_photon_ux, new_photon_uy, new_photon_uz;
         LorentzTransformMomentum(
-            new_photon_u, new_photon_ux, new_photon_uy, new_photon_uz,
             new_photon_u_rest, new_photon_ux_rest, new_photon_uy_rest, new_photon_uz_rest,
+            new_photon_u, new_photon_ux, new_photon_uy, new_photon_uz,
             lepton_gamma, lepton_beta, -lepton_nx, -lepton_ny, -lepton_nz);
 
         // Fill momentum of product species (note that we actually
