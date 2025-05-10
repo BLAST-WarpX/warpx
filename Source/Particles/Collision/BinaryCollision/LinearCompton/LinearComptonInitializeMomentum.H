@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef TWO_PRODUCT_INITIALIZE_MOMENTUM_H
-#define TWO_PRODUCT_INITIALIZE_MOMENTUM_H
+#ifndef LINEAR_COMPTON_INITIALIZE_MOMENTUM_H
+#define LINEAR_COMPTON_INITIALIZE_MOMENTUM_H
 
 #include "TwoProductUtil.H"
 #include "Particles/WarpXParticleContainer.H"
@@ -44,7 +44,7 @@ namespace {
      * @param[in] engine the random engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
-    void TwoProductInitializeMomentum (
+    void LinearComptonInitializeMomentum (
                             const SoaData_type& soa1_in, const SoaData_type& soa2_in,
                             SoaData_type& soa1_out, SoaData_type& soa2_out,
                             const index_type& idx1_in, const index_type& idx2_in,
@@ -159,6 +159,10 @@ namespace {
         amrex::ParticleReal const new_photon_uy = new_photon_uy_rest - lepton_ny * (new_photon_u_parallel - new_photon_u_parallel_rest);
         amrex::ParticleReal const new_photon_uz = new_photon_uz_rest - lepton_nz * (new_photon_u_parallel - new_photon_u_parallel_rest);
 
+        amrex::Print() << "new_photon_ux: " << new_photon_ux << std::endl;
+        amrex::Print() << "new_photon_uy: " << new_photon_uy << std::endl;
+        amrex::Print() << "new_photon_uz: " << new_photon_uz << std::endl;
+
         // Fill momentum of product species (note that we actually
         // create 4 products, 2 at the position of each incident particle)
         // - Scattered photon
@@ -178,4 +182,4 @@ namespace {
     }
 }
 
-#endif // TWO_PRODUCT_INITIALIZE_MOMENTUM_H
+#endif // LINEAR_COMPTON_INITIALIZE_MOMENTUM_H
