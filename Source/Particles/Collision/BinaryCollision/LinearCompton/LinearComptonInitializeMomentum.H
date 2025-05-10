@@ -29,6 +29,37 @@ namespace {
     using index_type = ParticleBins::index_type;
 
     /**
+     * \brief This function performs a Lorentz transform of the 4-momentum
+     * \param[out] p_out the 0-component of the 4-momentum after the Lorentz transform
+     * \param[out] px_out the x-component of the 4-momentum after the Lorentz transform
+     * \param[out] py_out the y-component of the 4-momentum after the Lorentz transform
+     * \param[out] pz_out the z-component of the 4-momentum after the Lorentz transform
+     * \param[in] p_in the 0-component of the 4-momentum before the Lorentz transform
+     * \param[in] px_in the x-component of the 4-momentum before the Lorentz transform
+     * \param[in] py_in the y-component of the 4-momentum before the Lorentz transform
+     * \param[in] pz_in the z-component of the 4-momentum before the Lorentz transform
+     * \param[in] gamma Lorentz factor of the Lorentz transform
+     * \param[in] beta beta of the Lorentz transform
+     * \param[in] nx x-component of the normalized vector that indicates the direction of the transform
+     * \param[in] ny y-component of the normalized vector that indicates the direction of the transform
+     * \param[in] nz z-component of the normalized vector that indicates the direction of the transform
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    void LorentzTransformMomentum (
+        amrex::ParticleReal& p_out, amrex::ParticleReal& px_out, amrex::ParticleReal& py_out, amrex::ParticleReal& pz_out,
+        amrex::ParticleReal const& p_in, amrex::ParticleReal const& px_in, amrex::ParticleReal const& py_in, amrex::ParticleReal const& pz_in,
+        amrex::ParticleReal const& gamma, amrex::ParticleReal const& beta,
+        amrex::ParticleReal const& nx, amrex::ParticleReal const& ny, amrex::ParticleReal const& nz )
+    {
+        amrex::ParticleReal const p_parallel_in = nx*px_in + ny*py_in + nz*pz_in;
+        amrex::ParticleReal const p_parallel_out = gamma * ( p_parallel_in - beta * p_in );
+        p_out = gamma * ( p_in - beta * p_parallel_in );
+        px_out = px_in + nx * ( p_parallel_out - p_parallel_in );
+        py_out = py_in + ny * ( p_parallel_out - p_parallel_in );
+        pz_out = pz_in + nz * ( p_parallel_out - p_parallel_in );
+    }
+
+    /**
      * \brief This function initializes the momentum of the product particles,
      * in a Compton scattering event.
      *
@@ -72,14 +103,13 @@ namespace {
         amrex::ParticleReal const lepton_nx = lepton_ux / lepton_u;
         amrex::ParticleReal const lepton_ny = lepton_uy / lepton_u;
         amrex::ParticleReal const lepton_nz = lepton_uz / lepton_u;
-        // - Perform the Lorentz transformation
         amrex::ParticleReal const photon_u = std::sqrt(photon_ux*photon_ux + photon_uy*photon_uy + photon_uz*photon_uz);
-        amrex::ParticleReal const photon_u_parallel = (photon_ux*lepton_nx + photon_uy*lepton_ny + photon_uz*lepton_nz);
-        amrex::ParticleReal const photon_u_rest = lepton_gamma * (photon_u - lepton_beta * photon_u_parallel);
-        amrex::ParticleReal const photon_u_parallel_rest = lepton_gamma * ( photon_u_parallel - lepton_beta * photon_u );
-        amrex::ParticleReal const photon_ux_rest = photon_ux + lepton_nx * (photon_u_parallel_rest - photon_u_parallel);
-        amrex::ParticleReal const photon_uy_rest = photon_uy + lepton_ny * (photon_u_parallel_rest - photon_u_parallel);
-        amrex::ParticleReal const photon_uz_rest = photon_uz + lepton_nz * (photon_u_parallel_rest - photon_u_parallel);
+        // - Perform the Lorentz transformation
+        amrex::ParticleReal photon_u_rest, photon_ux_rest, photon_uy_rest, photon_uz_rest;
+        LorentzTransformMomentum(
+            photon_u_rest, photon_ux_rest, photon_uy_rest, photon_uz_rest,
+            photon_u, photon_ux, photon_uy, photon_uz,
+            lepton_gamma, lepton_beta, lepton_nx, lepton_ny, lepton_nz);
 
         // Find cos and sin of the spherical angle that represent
         // the direction of the incoming photon in the rest frame
@@ -151,13 +181,11 @@ namespace {
                                                      - sin_theta * new_photon_uX_rest;
 
         // Transform the momentum of the scattered photon back to the lab frame
-        // TODO: abstract the Lorentz transformation, or look for an existing WarpX function that does it
-        amrex::ParticleReal const new_photon_u_parallel_rest = - (new_photon_ux_rest*lepton_nx + new_photon_uy_rest*lepton_ny + new_photon_uz_rest*lepton_nz);
-        amrex::ParticleReal const new_photon_u = lepton_gamma * ( new_photon_u_rest - lepton_beta * new_photon_u_parallel_rest );
-        amrex::ParticleReal const new_photon_u_parallel = lepton_gamma * ( new_photon_u_parallel_rest - lepton_beta * new_photon_u );
-        amrex::ParticleReal const new_photon_ux = new_photon_ux_rest - lepton_nx * (new_photon_u_parallel - new_photon_u_parallel_rest);
-        amrex::ParticleReal const new_photon_uy = new_photon_uy_rest - lepton_ny * (new_photon_u_parallel - new_photon_u_parallel_rest);
-        amrex::ParticleReal const new_photon_uz = new_photon_uz_rest - lepton_nz * (new_photon_u_parallel - new_photon_u_parallel_rest);
+        amrex::ParticleReal new_photon_u, new_photon_ux, new_photon_uy, new_photon_uz;
+        LorentzTransformMomentum(
+            new_photon_u, new_photon_ux, new_photon_uy, new_photon_uz,
+            new_photon_u_rest, new_photon_ux_rest, new_photon_uy_rest, new_photon_uz_rest,
+            lepton_gamma, lepton_beta, -lepton_nx, -lepton_ny, -lepton_nz);
 
         // Fill momentum of product species (note that we actually
         // create 4 products, 2 at the position of each incident particle)
