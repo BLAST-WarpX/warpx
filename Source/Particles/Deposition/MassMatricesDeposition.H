@@ -269,7 +269,7 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                     &Sxx_arr(lo.x+l_jx+iz, 0, 0, 0),
                     sz_jx[iz]*sz_jx[aa]*fpxx);
             }
-            else {
+            else if (Sxx_nComp>1) {
                 int Nc = depos_order + aa - iz;
                 amrex::Gpu::Atomic::AddNoRet(
                     &Sxx_arr(lo.x+l_jx+iz, 0, 0, Nc),
@@ -292,7 +292,7 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                     &Syy_arr(lo.x+l_jy+iz, 0, 0, 0),
                     sz_jy[iz]*sz_jy[aa]*fpyy);
             }
-            else {
+            else if (Syy_nComp>1) {
                 int Nc = depos_order + aa - iz;
                 amrex::Gpu::Atomic::AddNoRet(
                     &Syx_arr(lo.x+l_jy+iz, 0, 0, Nc),
@@ -315,7 +315,7 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                     &Szz_arr(lo.x+l_jz+iz, 0, 0, 0),
                     sz_jz[iz]*sz_jz[aa]*fpzz);
             }
-            else {
+            else if(Szz_nComp>1) {
                 int Nc = depos_order + 1 - shift[0] + aa - iz;
                 amrex::Gpu::Atomic::AddNoRet(
                     &Szx_arr(lo.x+l_jz+iz, 0, 0, Nc),
