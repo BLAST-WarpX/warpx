@@ -106,22 +106,22 @@ void ImplicitSolver::PreRHSOp ( amrex::Real  a_cur_time,
     const PushType push_type = PushType::Implicit;
     const bool skip_current = false;
 
-    if (!m_use_mass_matrices) {  // Conventional particle-suppressed JFNK
-        bool deposit_mass_matrices = false;
-        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, deposit_mass_matrices, push_type);
-    }
-    else if (!a_from_jacobian) { // Called from non-linear stage of JFNK and using mass matrices
+    if (m_use_mass_matrices && !a_from_jacobian) { // Called from non-linear stage of JFNK and using mass matrices
         bool deposit_mass_matrices = true;
         m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, deposit_mass_matrices, push_type);
-        SaveEandJ();
-        SyncMassMatricesAndApplyBCs();
-        const amrex::Real theta_dt = m_theta*m_dt;
-        SetMassMatricesForPC( theta_dt );
+        if (m_use_mass_matrices_jacobian) { SaveEandJ(); }
+        if (m_use_mass_matrices_pc) {
+           SyncMassMatricesPCAndApplyBCs();
+           const amrex::Real theta_dt = m_theta*m_dt;
+           SetMassMatricesForPC( theta_dt );
+        }
     }
-    else {                       // Called from linear stage of JFNK and using mass matrices
-        //bool deposit_mass_matrices = false;
-        //m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, deposit_mass_matrices, push_type);
+    else if (m_use_mass_matrices_jacobian) { // Called from linear stage of JFNK and using mass matrices
         ComputeJfromMassMatrices();
+    }
+    else {  // Conventional particle-suppressed JFNK
+        bool deposit_mass_matrices = false;
+        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, deposit_mass_matrices, push_type);
     }
 
     // Apply BCs to J and communicate
@@ -353,7 +353,8 @@ void ImplicitSolver::ComputeJfromMassMatrices()
     }
 }
 
-void ImplicitSolver::SyncMassMatricesAndApplyBCs ()
+
+void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -374,7 +375,7 @@ void ImplicitSolver::SyncMassMatricesAndApplyBCs ()
     }
 
     // Do addOp Exchange on MassMatrices_PC
-    m_WarpX->SyncMassMatrices();
+    m_WarpX->SyncMassMatricesPC();
 
     // Apply BCs to MassMatrices_PC
     for (int lev = 0; lev <= finest_level; ++lev) {
@@ -421,6 +422,13 @@ void ImplicitSolver::InitializeMassMatrices ()
     // dJy = MassMatrices_yx*dEx + MassMatrices_yy*dEy + MassMatrices_yz*dEz
     // dJz = MassMatrices_zx*dEx + MassMatrices_zy*dEy + MassMatrices_zz*dEz
 
+    // check that PC is being used by nonlinear solver
+    if (m_use_mass_matrices_pc) {
+        if (!m_nlsolver->UsePreconditioner()) {
+            m_use_mass_matrices_pc = false;
+        }
+    }
+
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
@@ -433,50 +441,65 @@ void ImplicitSolver::InitializeMassMatrices ()
     int Nc_tot_xx = 1, Nc_tot_xy = 1, Nc_tot_xz = 1;
     int Nc_tot_yx = 1, Nc_tot_yy = 1, Nc_tot_yz = 1;
     int Nc_tot_zx = 1, Nc_tot_zy = 1, Nc_tot_zz = 1;
-    if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Direct) {
-        for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
-            AMREX_ASSERT(ngJ[dir]>=shape);
-            AMREX_ASSERT(ngE[dir]>=shape);
-            m_ncomp_xx[dir] = 1 + 2*shape;
-            m_ncomp_yy[dir] = 1 + 2*shape;
-            m_ncomp_zz[dir] = 1 + 2*shape;
-            if (dir==0) {
-                m_ncomp_xy[dir] = 1 + 2*shape;
-                m_ncomp_xz[dir] = 2 + 2*shape;
-                m_ncomp_yx[dir] = 1 + 2*shape;
-                m_ncomp_yz[dir] = 2 + 2*shape;
-                m_ncomp_zx[dir] = 2 + 2*shape;
-                m_ncomp_zy[dir] = 2 + 2*shape;
+    if (m_use_mass_matrices_jacobian) { // else only for PC
+        if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Direct) {
+            for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
+                AMREX_ASSERT(ngJ[dir]>=shape);
+                AMREX_ASSERT(ngE[dir]>=shape);
+                m_ncomp_xx[dir] = 1 + 2*shape;
+                m_ncomp_yy[dir] = 1 + 2*shape;
+                m_ncomp_zz[dir] = 1 + 2*shape;
+                if (dir==0) {
+                    m_ncomp_xy[dir] = 1 + 2*shape;
+                    m_ncomp_xz[dir] = 2 + 2*shape;
+                    m_ncomp_yx[dir] = 1 + 2*shape;
+                    m_ncomp_yz[dir] = 2 + 2*shape;
+                    m_ncomp_zx[dir] = 2 + 2*shape;
+                    m_ncomp_zy[dir] = 2 + 2*shape;
+                }
+                else if (dir==1) {
+                    m_ncomp_xy[dir] = 2 + 2*shape;
+                    m_ncomp_xz[dir] = 1 + 2*shape;
+                    m_ncomp_yx[dir] = 2 + 2*shape;
+                    m_ncomp_yz[dir] = 2 + 2*shape;
+                    m_ncomp_zx[dir] = 1 + 2*shape;
+                    m_ncomp_zy[dir] = 2 + 2*shape;
+                }
+                else if (dir==2) {
+                    m_ncomp_xy[dir] = 1 + 2*shape;
+                    m_ncomp_xz[dir] = 2 + 2*shape;
+                    m_ncomp_yx[dir] = 1 + 2*shape;
+                    m_ncomp_yz[dir] = 2 + 2*shape;
+                    m_ncomp_zx[dir] = 2 + 2*shape;
+                    m_ncomp_zy[dir] = 2 + 2*shape;
+                }
+                Nc_tot_xx *= m_ncomp_xx[dir];
+                Nc_tot_xy *= m_ncomp_xy[dir];
+                Nc_tot_xz *= m_ncomp_xz[dir];
+                Nc_tot_yx *= m_ncomp_yx[dir];
+                Nc_tot_yy *= m_ncomp_yy[dir];
+                Nc_tot_yz *= m_ncomp_yz[dir];
+                Nc_tot_zx *= m_ncomp_zx[dir];
+                Nc_tot_zy *= m_ncomp_zy[dir];
+                Nc_tot_zz *= m_ncomp_zz[dir];
             }
-            else if (dir==1) {
-                m_ncomp_xy[dir] = 2 + 2*shape;
-                m_ncomp_xz[dir] = 1 + 2*shape;
-                m_ncomp_yx[dir] = 2 + 2*shape;
-                m_ncomp_yz[dir] = 2 + 2*shape;
-                m_ncomp_zx[dir] = 1 + 2*shape;
-                m_ncomp_zy[dir] = 2 + 2*shape;
-            }
-            else if (dir==2) {
-                m_ncomp_xy[dir] = 1 + 2*shape;
-                m_ncomp_xz[dir] = 2 + 2*shape;
-                m_ncomp_yx[dir] = 1 + 2*shape;
-                m_ncomp_yz[dir] = 2 + 2*shape;
-                m_ncomp_zx[dir] = 2 + 2*shape;
-                m_ncomp_zy[dir] = 2 + 2*shape;
-            }
-            Nc_tot_xx *= m_ncomp_xx[dir];
-            Nc_tot_xy *= m_ncomp_xy[dir];
-            Nc_tot_xz *= m_ncomp_xz[dir];
-            Nc_tot_yx *= m_ncomp_yx[dir];
-            Nc_tot_yy *= m_ncomp_yy[dir];
-            Nc_tot_yz *= m_ncomp_yz[dir];
-            Nc_tot_zx *= m_ncomp_zx[dir];
-            Nc_tot_zy *= m_ncomp_zy[dir];
-            Nc_tot_zz *= m_ncomp_zz[dir];
+        }
+        else {
+            WARPX_ABORT_WITH_MESSAGE("Mass matrices can only be used with Direct deposition.");
         }
     }
-    else {
-        WARPX_ABORT_WITH_MESSAGE("Mass matrices can only be used with Direct deposition.");
+    else { // Mass matrices used for PC only
+        for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
+            m_ncomp_xx[dir] = 1;
+            m_ncomp_xy[dir] = 1;
+            m_ncomp_xz[dir] = 1;
+            m_ncomp_yx[dir] = 1;
+            m_ncomp_yy[dir] = 1;
+            m_ncomp_yz[dir] = 1;
+            m_ncomp_zx[dir] = 1;
+            m_ncomp_zy[dir] = 1;
+            m_ncomp_zz[dir] = 1;
+        }
     }
 
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
@@ -485,14 +508,15 @@ void ImplicitSolver::InitializeMassMatrices ()
         const auto& ba_Jz = m_WarpX->m_fields.get(FieldType::current_fp, Direction{2}, lev)->boxArray();
         const auto& dm = m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, lev)->DistributionMap();
         //
-        m_WarpX->m_fields.alloc_init(FieldType::Efield_fp_save, Direction{0}, lev, ba_Jx, dm, 1, ngE, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::Efield_fp_save, Direction{1}, lev, ba_Jy, dm, 1, ngE, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::Efield_fp_save, Direction{2}, lev, ba_Jz, dm, 1, ngE, 0.0_rt);
-        //
-        m_WarpX->m_fields.alloc_init(FieldType::current_fp_save, Direction{0}, lev, ba_Jx, dm, 1, ngJ, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::current_fp_save, Direction{1}, lev, ba_Jy, dm, 1, ngJ, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::current_fp_save, Direction{2}, lev, ba_Jz, dm, 1, ngJ, 0.0_rt);
-        //
+        if (m_use_mass_matrices_jacobian) {
+            m_WarpX->m_fields.alloc_init(FieldType::Efield_fp_save, Direction{0}, lev, ba_Jx, dm, 1, ngE, 0.0_rt);
+            m_WarpX->m_fields.alloc_init(FieldType::Efield_fp_save, Direction{1}, lev, ba_Jy, dm, 1, ngE, 0.0_rt);
+            m_WarpX->m_fields.alloc_init(FieldType::Efield_fp_save, Direction{2}, lev, ba_Jz, dm, 1, ngE, 0.0_rt);
+            //
+            m_WarpX->m_fields.alloc_init(FieldType::current_fp_save, Direction{0}, lev, ba_Jx, dm, 1, ngJ, 0.0_rt);
+            m_WarpX->m_fields.alloc_init(FieldType::current_fp_save, Direction{1}, lev, ba_Jy, dm, 1, ngJ, 0.0_rt);
+            m_WarpX->m_fields.alloc_init(FieldType::current_fp_save, Direction{2}, lev, ba_Jz, dm, 1, ngJ, 0.0_rt);
+        }
         m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_X, Direction{0}, lev, ba_Jx, dm, Nc_tot_xx, ngJ, 0.0_rt);
         m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_X, Direction{1}, lev, ba_Jx, dm, Nc_tot_xy, ngJ, 0.0_rt);
         m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_X, Direction{2}, lev, ba_Jx, dm, Nc_tot_xz, ngJ, 0.0_rt);
@@ -505,14 +529,18 @@ void ImplicitSolver::InitializeMassMatrices ()
         m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_Z, Direction{1}, lev, ba_Jz, dm, Nc_tot_zy, ngJ, 0.0_rt);
         m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_Z, Direction{2}, lev, ba_Jz, dm, Nc_tot_zz, ngJ, 0.0_rt);
         //
-        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{0}, lev, ba_Jx, dm, 1, ngJ, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{1}, lev, ba_Jy, dm, 1, ngJ, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{2}, lev, ba_Jz, dm, 1, ngJ, 0.0_rt);
+        if (m_use_mass_matrices_pc) {
+            m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{0}, lev, ba_Jx, dm, 1, ngJ, 0.0_rt);
+            m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{1}, lev, ba_Jy, dm, 1, ngJ, 0.0_rt);
+            m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{2}, lev, ba_Jz, dm, 1, ngJ, 0.0_rt);
+        }
     }
 
     // Set the pointer to mass matrix MultiFab
-    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        m_mmpc_mfarrvec.push_back(m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_PC, 0));
+    if (m_use_mass_matrices_pc) {
+        for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+            m_mmpc_mfarrvec.push_back(m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_PC, 0));
+        }
     }
 
 }
@@ -598,6 +626,8 @@ void ImplicitSolver::SetMassMatricesForPC ( const amrex::Real a_theta_dt )
 void ImplicitSolver::PrintMassMatricesParameters () const
 {
     if (!m_use_mass_matrices) { return; }
+    amrex::Print() << "    for jacobian calc:  " << (m_use_mass_matrices_jacobian ? "true":"false") << "\n";
+    amrex::Print() << "    for preconditioner: " << (m_use_mass_matrices_pc ? "true":"false") << "\n";
     amrex::Print() << "    ncomp_xx:  " << m_ncomp_xx << "\n";
     amrex::Print() << "    ncomp_xy:  " << m_ncomp_xy << "\n";
     amrex::Print() << "    ncomp_xz:  " << m_ncomp_xz << "\n";

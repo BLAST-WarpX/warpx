@@ -100,7 +100,7 @@ public:
      * \brief Return pointer to MultiFab array for mass matrix
      */
     [[nodiscard]] const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetMassMatricesCoeff() const {
-        if (m_use_mass_matrices) { return &m_mmpc_mfarrvec; }
+        if (m_use_mass_matrices_pc) { return &m_mmpc_mfarrvec; }
         else { return nullptr; }
     }
 
@@ -154,6 +154,16 @@ protected:
     bool m_use_mass_matrices = false;
 
     /**
+     * \brief Whether to use mass matrices to compute J during linear stage of JFNK
+     */
+    bool m_use_mass_matrices_jacobian = false;
+
+    /**
+     * \brief Whether to use mass matrices in the preconditioner
+     */
+    bool m_use_mass_matrices_pc = false;
+
+    /**
      * \brief Tensor component specific number of mass matrices elements
      */
     amrex::IntVect m_ncomp_xx, m_ncomp_xy, m_ncomp_xz;
@@ -186,6 +196,15 @@ protected:
             pp.query("max_particle_iterations", m_max_particle_iterations);
             pp.query("particle_tolerance", m_particle_tolerance);
             pp.query("use_mass_matrices", m_use_mass_matrices);
+            if (m_use_mass_matrices) {
+                m_use_mass_matrices_jacobian = true;
+                m_use_mass_matrices_pc = true;
+                pp.query("use_mass_matrices_jacobian", m_use_mass_matrices_jacobian);
+                pp.query("use_mass_matrices_pc", m_use_mass_matrices_pc);
+                if (!m_use_mass_matrices_jacobian && !m_use_mass_matrices_pc) {
+                    m_use_mass_matrices = false;
+                }
+            }
         }
         else {
             WARPX_ABORT_WITH_MESSAGE(
@@ -202,7 +221,7 @@ protected:
 
     void ComputeJfromMassMatrices();
 
-    void SyncMassMatricesAndApplyBCs ();
+    void SyncMassMatricesPCAndApplyBCs ();
 
     void SetMassMatricesForPC ( amrex::Real a_theta_dt );
 

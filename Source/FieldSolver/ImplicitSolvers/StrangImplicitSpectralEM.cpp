@@ -30,11 +30,12 @@ void StrangImplicitSpectralEM::Define ( WarpX* const a_WarpX )
     const amrex::ParmParse pp_implicit_evolve("implicit_evolve");
     parseNonlinearSolverParams( pp_implicit_evolve );
 
+    // Define the nonlinear solver
+    m_nlsolver->Define(m_E, this);
+
     // Initialize the mass matrices for plasma response
     if (m_use_mass_matrices) { InitializeMassMatrices(); }
 
-    // Define the nonlinear solver
-    m_nlsolver->Define(m_E, this);
     m_is_defined = true;
 
 }
