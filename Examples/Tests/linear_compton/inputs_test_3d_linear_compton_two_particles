@@ -1,0 +1,104 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 100
+amr.n_cell = 16 16 16
+amr.max_grid_size = 16
+amr.blocking_factor = 4
+amr.max_level = 0
+geometry.dims = 3
+geometry.prob_lo = -1e-6 -1e-6 -1e-6
+geometry.prob_hi = 1e-6 1e-6 1e-6
+
+#################################
+##### BOUNDARY CONDITIONS #######
+#################################
+boundary.field_lo = periodic periodic periodic
+boundary.field_hi = periodic periodic periodic
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.verbose = 1
+warpx.cfl = 1.0
+algo.particle_shape = 1
+
+#################################
+############ PLASMA #############
+#################################
+particles.species_names = photon electron
+particles.photon_species = photon
+
+photon.species_type = photon
+photon.injection_style = "SingleParticle"
+photon.single_particle_pos = 0 0 0
+photon.single_particle_u = 2.8 0 0
+photon.single_particle_weight = 1e14
+photon.do_not_push = 1
+
+electron.species_type = electron
+electron.injection_style = "SingleParticle"
+electron.single_particle_pos = 0 0 0
+electron.single_particle_u = -2.8 0 0
+electron.single_particle_weight = 1e14
+electron.do_not_push = 1
+
+#################################
+############ COLLISION ##########
+#################################
+collisions.collision_names = lc # linear Compton
+lc.species = photon electron
+lc.product_species = photon electron
+lc.type = linear_compton
+lc.event_multiplier = 1.
+lc.probability_threshold = 0.5
+lc.probability_target_value = 0.02
+
+# Full diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.fields_to_plot = rho rho_electron
+diag1.write_species = 1
+diag1.species = photon electron
+
+my_constants.out_freq_red = 1
+# Reduced diagnostics
+warpx.reduced_diags_names = FieldEnergy FieldMomentum FieldMaximum ParticleExtrema_photon ParticleExtrema_electron ParticleEnergy ParticleMomentum RhoMaximum ParticleNumber
+
+FieldEnergy.type = FieldEnergy
+FieldEnergy.intervals = out_freq_red
+
+FieldMomentum.type = FieldMomentum
+FieldMomentum.intervals = out_freq_red
+
+FieldMaximum.type = FieldMaximum
+FieldMaximum.intervals = out_freq_red
+
+ParticleExtrema_photonA.type = ParticleExtrema
+ParticleExtrema_photonA.intervals = out_freq_red
+ParticleExtrema_photonA.species = photonA
+
+ParticleExtrema_photonB.type = ParticleExtrema
+ParticleExtrema_photonB.intervals = out_freq_red
+ParticleExtrema_photonB.species = photonB
+
+ParticleExtrema_electron.type = ParticleExtrema
+ParticleExtrema_electron.intervals = out_freq_red
+ParticleExtrema_electron.species = electron
+
+ParticleExtrema_positron.type = ParticleExtrema
+ParticleExtrema_positron.intervals = out_freq_red
+ParticleExtrema_positron.species = positron
+
+ParticleEnergy.type = ParticleEnergy
+ParticleEnergy.intervals = out_freq_red
+
+ParticleMomentum.type = ParticleMomentum
+ParticleMomentum.intervals = out_freq_red
+
+RhoMaximum.type = RhoMaximum
+RhoMaximum.intervals = out_freq_red
+
+ParticleNumber.type = ParticleNumber
+ParticleNumber.intervals = out_freq_red
