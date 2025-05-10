@@ -80,6 +80,8 @@ void SingleLinearComptonCollisionEvent (const amrex::ParticleReal& u1x, const am
     // Factor that converts collision rate from rest frame to lab frame: ration of products of energies
     // (See L. D. Landau and E. M. Lifshitz. The classical theory of fields, Eq. 12.5, 12.6)
     const amrex::ParticleReal lab_to_rest_frame_factor = u1_norm_rest * 1._prt / (u1_norm * gamma_lepton);
+    const amrex::ParticleReal v_rel =  PhysConst::c; // sqrt( | v1 - v2 |^2  - | v1 x v2 |^2/c^2 ) evaluated in the rest frame
+
 
     // Calculate the Klein-Nishina cross-section (cross-section in the rest frame of the lepton)
     const amrex::ParticleReal k = u1_norm_rest * inv_c;
@@ -91,7 +93,7 @@ void SingleLinearComptonCollisionEvent (const amrex::ParticleReal& u1x, const am
     // First estimate of probability for scattering
     // (Convert from rest frame to lab frame, using lab_to_rest_frame_factor)
     amrex::ParticleReal probability_estimate = multiplier_ratio * event_multiplier *
-                                lab_to_rest_frame_factor * w_max * klein_nishina_cross_section * PhysConst::c * dt / dV;
+                                lab_to_rest_frame_factor * w_max * klein_nishina_cross_section * v_rel * dt / dV;
 
     // Effective event multiplier
     amrex::ParticleReal event_multiplier_eff = event_multiplier;
