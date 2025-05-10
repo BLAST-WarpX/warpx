@@ -87,7 +87,6 @@ namespace warpx::fields
         MassMatrices_X,  // Stores full mass matrix elements for Jx used by the implicit solvers
         MassMatrices_Y,  // Stores full mass matrix elements for Jy used by the implicit solvers
         MassMatrices_Z,  // Stores full mass matrix elements for Jz used by the implicit solvers
-        MassMatrices,    // Stores full mass matrix elements for the implicit solver
         MassMatrices_PC, // Stores reduced mass matrix elements for the implicit solver preconditioner (PC)
         ECTRhofield,
         Venl,
@@ -137,7 +136,6 @@ namespace warpx::fields
         FieldType::MassMatrices_X,
         FieldType::MassMatrices_Y,
         FieldType::MassMatrices_Z,
-        FieldType::MassMatrices,
         FieldType::MassMatrices_PC,
         FieldType::ECTRhofield,
         FieldType::Venl

@@ -2173,9 +2173,6 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                     amrex::MultiFab * jy = fields.get(current_fp_string, Direction{1}, lev);
                     amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
                     if (push_type == PushType::Implicit && deposit_mass_matrices) {
-                        amrex::MultiFab * Sx = fields.get(FieldType::MassMatrices, Direction{0}, lev);
-                        amrex::MultiFab * Sy = fields.get(FieldType::MassMatrices, Direction{1}, lev);
-                        amrex::MultiFab * Sz = fields.get(FieldType::MassMatrices, Direction{2}, lev);
                         amrex::MultiFab * Sxx = fields.get(FieldType::MassMatrices_X, Direction{0}, lev);
                         amrex::MultiFab * Sxy = fields.get(FieldType::MassMatrices_X, Direction{1}, lev);
                         amrex::MultiFab * Sxz = fields.get(FieldType::MassMatrices_X, Direction{2}, lev);
@@ -2186,7 +2183,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * Szy = fields.get(FieldType::MassMatrices_Z, Direction{1}, lev);
                         amrex::MultiFab * Szz = fields.get(FieldType::MassMatrices_Z, Direction{2}, lev);
                         DepositCurrentAndMassMatrices(pti, wp, uxp, uyp, uzp, jx, jy, jz,
-                                       Sx, Sy, Sz, Sxx, Sxy, Sxz, Syx, Syy, Syz, Szx, Szy, Szz,
+                                       Sxx, Sxy, Sxz, Syx, Syy, Syz, Szx, Szy, Szz,
                                        bxfab, byfab, bzfab, 0, np_current, thread_num, lev, lev, dt);
                     }
                     else {

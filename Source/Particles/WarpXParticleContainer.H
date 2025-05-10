@@ -387,9 +387,6 @@ public:
                                          amrex::MultiFab* jx,
                                          amrex::MultiFab* jy,
                                          amrex::MultiFab* jz,
-                                         amrex::MultiFab* Sx,
-                                         amrex::MultiFab* Sy,
-                                         amrex::MultiFab* Sz,
                                          amrex::MultiFab* Sxx,
                                          amrex::MultiFab* Sxy,
                                          amrex::MultiFab* Sxz,
@@ -654,9 +651,6 @@ protected:
     amrex::Vector<amrex::FArrayBox> local_jz;
 
     // local containers for mass matrix deposit used by implicit solvers
-    amrex::Vector<amrex::FArrayBox> local_Sx;
-    amrex::Vector<amrex::FArrayBox> local_Sy;
-    amrex::Vector<amrex::FArrayBox> local_Sz;
     amrex::Vector<amrex::FArrayBox> local_Sxx;
     amrex::Vector<amrex::FArrayBox> local_Sxy;
     amrex::Vector<amrex::FArrayBox> local_Sxz;

@@ -478,9 +478,6 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
             fields.get(FieldType::MassMatrices_Z, Direction{0}, lev)->setVal(0.0);
             fields.get(FieldType::MassMatrices_Z, Direction{1}, lev)->setVal(0.0);
             fields.get(FieldType::MassMatrices_Z, Direction{2}, lev)->setVal(0.0);
-            fields.get(FieldType::MassMatrices, Direction{0}, lev)->setVal(0.0);
-            fields.get(FieldType::MassMatrices, Direction{1}, lev)->setVal(0.0);
-            fields.get(FieldType::MassMatrices, Direction{2}, lev)->setVal(0.0);
         }
     }
     for (auto& pc : allcontainers) {
