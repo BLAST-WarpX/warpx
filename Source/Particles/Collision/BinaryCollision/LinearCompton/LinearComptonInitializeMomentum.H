@@ -8,7 +8,6 @@
 #ifndef LINEAR_COMPTON_INITIALIZE_MOMENTUM_H
 #define LINEAR_COMPTON_INITIALIZE_MOMENTUM_H
 
-#include "TwoProductUtil.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/ParticleUtils.H"
 #include "Utils/WarpXConst.H"
@@ -113,10 +112,11 @@ namespace {
         amrex::ParticleReal const a = 2._prt*b - 1._prt;
         // Use rejection method to draw x
         bool reject = true;
+        amrex::ParticleReal x = 0;
         while (reject) {
             // - Draw x with an approximate probability distribution
             amrex::ParticleReal const r1 = amrex::Random(engine);
-            amrex::ParticleReal const x = b - (b + 1._prt)*std::pow(0.5_prt*c0, r1);
+            x = b - (b + 1._prt)*std::pow(0.5_prt*c0, r1);
             // - Calculate approximate probability distribution h
             amrex::ParticleReal const h = a/(b-x);
             // - Calculate expected (exact) probability distribution f
@@ -134,7 +134,7 @@ namespace {
         // - First in a system of axes aligned with the incoming photon
         amrex::ParticleReal const cos_theta_s = x;
         amrex::ParticleReal const sin_theta_s = std::sqrt( 1._prt - x*x );
-        amrex::ParticleReal const phi_s = 2._prt*amrex::Math::pi*amrex::Random(engine);
+        amrex::ParticleReal const phi_s = 2._prt*MathConst::pi*amrex::Random(engine);
         amrex::ParticleReal const cos_phi_s = std::cos( phi_s );
         amrex::ParticleReal const sin_phi_s = std::sin( phi_s );
         amrex::ParticleReal const new_photon_uX_rest = new_photon_u_rest * sin_theta_s*cos_phi_s;
@@ -154,14 +154,10 @@ namespace {
         // TODO: abstract the Lorentz transformation, or look for an existing WarpX function that does it
         amrex::ParticleReal const new_photon_u_parallel_rest = - (new_photon_ux_rest*lepton_nx + new_photon_uy_rest*lepton_ny + new_photon_uz_rest*lepton_nz);
         amrex::ParticleReal const new_photon_u = lepton_gamma * ( new_photon_u_rest - lepton_beta * new_photon_u_parallel_rest );
-        amrex::ParticleReal const new_photon_u_parallel = lepton_gamma * ( new_photon_u_parallel_rest - lepton_beta * new_photon_u_rest );
+        amrex::ParticleReal const new_photon_u_parallel = lepton_gamma * ( new_photon_u_parallel_rest - lepton_beta * new_photon_u );
         amrex::ParticleReal const new_photon_ux = new_photon_ux_rest - lepton_nx * (new_photon_u_parallel - new_photon_u_parallel_rest);
         amrex::ParticleReal const new_photon_uy = new_photon_uy_rest - lepton_ny * (new_photon_u_parallel - new_photon_u_parallel_rest);
         amrex::ParticleReal const new_photon_uz = new_photon_uz_rest - lepton_nz * (new_photon_u_parallel - new_photon_u_parallel_rest);
-
-        amrex::Print() << "new_photon_ux: " << new_photon_ux << std::endl;
-        amrex::Print() << "new_photon_uy: " << new_photon_uy << std::endl;
-        amrex::Print() << "new_photon_uz: " << new_photon_uz << std::endl;
 
         // Fill momentum of product species (note that we actually
         // create 4 products, 2 at the position of each incident particle)
