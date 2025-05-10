@@ -170,6 +170,82 @@ namespace ParticleUtils {
                           && (xlo[2] <= point.z) && (point.z <= xhi[2]));
     }
 
+
+    /* \brief method to add/subtract a small percent of energy from a
+     *        pair of particles such that momentum is not disturbed
+     *
+     * This is done by treating it as an inelastic scattering event
+     * with potential U = a_deltaE and zero scattering angle
+     * a_deltaE > 0 ==> need to take energy away
+     * a_deltaE < 0 ==> need to add energy
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    void ModifyEnergyPairwise( amrex::ParticleReal& ux1, amrex::ParticleReal& uy1, amrex::ParticleReal& uz1,
+                               amrex::ParticleReal& ux2, amrex::ParticleReal& uy2, amrex::ParticleReal& uz2,
+                               amrex::ParticleReal const a_wpmp1,
+                               amrex::ParticleReal const a_wpmp2,
+                               amrex::ParticleReal const a_Erel_frac,
+                               amrex::ParticleReal & a_Erel_cumm,
+                               amrex::ParticleReal & a_deltaE )
+    {
+
+        using namespace amrex::literals;
+        constexpr auto c2 = PhysConst::c * PhysConst::c;
+
+        int const sign = (a_deltaE < 0.0 ? -1 : 1);
+
+        const amrex::ParticleReal ux = ux1 - ux2;
+        const amrex::ParticleReal uy = uy1 - uy2;
+        const amrex::ParticleReal uz = uz1 - uz2;
+        const long double usq = (ux*ux + uy*uy + uz*uz)/c2;
+        const long double gbsq1 = (ux1*ux1 + uy1*uy1 + uz1*uz1)/c2;
+        const long double gbsq2 = (ux2*ux2 + uy2*uy2 + uz2*uz2)/c2;
+        const long double gamma1 = std::sqrt(1.0_prt + gbsq1);
+        const long double gamma2 = std::sqrt(1.0_prt + gbsq2);
+        const long double E1 = a_wpmp1*gamma1;
+        const long double E2 = a_wpmp2*gamma2;
+        const long double Etot = E1 + E2;
+        const long double pxtot = a_wpmp1*ux1 + a_wpmp2*ux2;
+        const long double pytot = a_wpmp1*uy1 + a_wpmp2*uy2;
+        const long double pztot = a_wpmp1*uz1 + a_wpmp2*uz2;
+        const long double Ecm = std::sqrt(Etot*Etot - (pxtot*pxtot + pytot*pytot + pztot*pztot)/c2);
+        const long double Erel = Ecm - a_wpmp1 - a_wpmp2;
+        if (Erel <= 0.0) { return; }
+
+        long double deltaE = sign*a_Erel_frac*Erel;
+        if (std::abs(deltaE) > std::abs(a_deltaE)) {
+            deltaE = a_deltaE;
+            a_deltaE = 0.0_prt;
+        } else {
+            a_deltaE -= deltaE;
+        }
+        a_Erel_cumm += Erel - deltaE;
+
+        const long double A = Etot - deltaE;
+        const long double D = A*A + E2*E2 - E1*E1;
+        const long double p2dotu = a_wpmp2*(ux2*ux + uy2*uy + uz2*uz)/c2;
+        const long double ptdotu = (pxtot*ux + pytot*uy + pztot*uz)/c2;
+
+        // compute coefficients for quadratic equation for alpha
+        const long double a = A*A*usq - ptdotu*ptdotu;
+        const long double b = D*ptdotu - 2.0_prt*A*A*p2dotu;
+        const long double c = A*A*E2*E2 - D*D/4.0_prt;
+
+        const long double root = b*b - 4.0_prt*a*c;
+        if (root < 0.0 || a == 0.0) { return; }
+        const long double alpha = (-b + std::sqrt(root))/(2.0_prt*a);
+
+        // update particle velocities
+        const long double ratio1 = alpha/a_wpmp1;
+        const long double ratio2 = alpha/a_wpmp2;
+        ux1 += ratio1*ux;
+        uy1 += ratio1*uy;
+        uz1 += ratio1*uz;
+        ux2 -= ratio2*ux;
+        uy2 -= ratio2*uy;
+        uz2 -= ratio2*uz;
+
+    }
 }
 
 #endif // WARPX_PARTICLE_UTILS_H_
