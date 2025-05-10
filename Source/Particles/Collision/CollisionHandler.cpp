@@ -76,6 +76,12 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
                     collision_names[i], mypc
                );
         }
+        else if (type == "linear_compton") {
+            allcollisions[i] =
+               std::make_unique<BinaryCollision<LinearComptonCollisionFunc, ParticleCreationFunc>>(
+                    collision_names[i], mypc
+               );
+        }
         else{
             WARPX_ABORT_WITH_MESSAGE("Unknown collision type.");
         }
