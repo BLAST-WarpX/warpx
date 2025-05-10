@@ -77,8 +77,9 @@ void SingleLinearComptonCollisionEvent (const amrex::ParticleReal& u1x, const am
     // Photon's normalized momentum in the rest frame of the lepton
     // (obtained from the fact that the product of the photon and lepton's 4-momenta is invariant)
     const amrex::ParticleReal u1_norm_rest = u1_norm * gamma_lepton - (u1x*u2x + u1y*u2y + u1z*u2z)*inv_c;
-    // Lorentz factor for labframe to rest frame transformation
-    const amrex::ParticleReal lab_to_rest_frame_factor = gamma_lepton;
+    // Factor that converts collision rate from rest frame to lab frame: ration of products of energies
+    // (See L. D. Landau and E. M. Lifshitz. The classical theory of fields, Eq. 12.5, 12.6)
+    const amrex::ParticleReal lab_to_rest_frame_factor = u1_norm_rest * 1._prt / (u1_norm * gamma_lepton);
 
     // Calculate the Klein-Nishina cross-section (cross-section in the rest frame of the lepton)
     const amrex::ParticleReal k = u1_norm_rest * inv_c;
