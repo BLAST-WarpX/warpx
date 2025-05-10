@@ -203,6 +203,7 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
 
     m_linear_function = std::make_unique<JacobianFunctionMF<Vec,Ops>>();
     m_linear_function->define(m_F, m_ops, m_pc_type);
+    this->m_usePC = m_linear_function->usePreconditioner();
 
     if (m_linear_solver_type == LinearSolverType::amrex_gmres) {
         m_linear_solver = std::make_unique<AMReXGMRES<Vec,JacobianFunctionMF<Vec,Ops>>>();
