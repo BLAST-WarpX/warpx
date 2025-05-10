@@ -31,19 +31,16 @@ namespace {
 
     /**
      * \brief This function initializes the momentum of the product particles,
-     * in a pair-production event. Here only two products are produced.
-     * (In this case, conservation of energy and momentum determines
-     * the amplitude of the momentum of the particles exactly.)
-     * We assume that the emission of the product is isotropic in the center-of-momentum frame.
+     * in a Compton scattering event.
      *
-     * @param[in] soa1_in struct of array data of the first colliding photon species
-     * @param[in] soa2_in struct of array data of the second colliding photon species
-     * @param[out] soa1_out struct of array data of the first product species
-     * @param[out] soa2_out struct of array data of the first product species
-     * @param[in] idx1_in index of first colliding macrophoton
-     * @param[in] idx2_in index of second colliding macrophoton
-     * @param[in] idx1_out_start index of first macrophoton
-     * @param[in] idx2_out_start index of second macrophoton
+     * @param[in] soa1_in struct of array data of the first colliding species (photon)
+     * @param[in] soa2_in struct of array data of the second colliding species (lepton)
+     * @param[out] soa1_out struct of array data of the first product species (photon)
+     * @param[out] soa2_out struct of array data of the second product species (lepton)
+     * @param[in] idx1_in index of first colliding macroparticle (photon)
+     * @param[in] idx2_in index of second colliding macroparticle (lepton)
+     * @param[in] idx1_out_start index of first product macroparticle (photon)
+     * @param[in] idx2_out_start index of second product macroparticle (lepton)
      * @param[in] engine the random engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -59,25 +56,18 @@ namespace {
         amrex::ParticleReal ux1_out = 0.0_prt, uy1_out = 0.0_prt, uz1_out = 0.0_prt;
         amrex::ParticleReal ux2_out = 0.0_prt, uy2_out = 0.0_prt, uz2_out = 0.0_prt;
 
-        TwoProductComputeProductMomenta(
-            soa1_in.m_rdata[PIdx::ux][idx1_in],
-            soa1_in.m_rdata[PIdx::uy][idx1_in],
-            soa1_in.m_rdata[PIdx::uz][idx1_in],
-            soa2_in.m_rdata[PIdx::ux][idx2_in],
-            soa2_in.m_rdata[PIdx::uy][idx2_in],
-            soa2_in.m_rdata[PIdx::uz][idx2_in],
-            ux1_out, uy1_out, uz1_out,
-            ux2_out, uy2_out, uz2_out,
-            engine);
+        // TODO: Implement angle-dependent Compton scattering (Klein-Nishina cross-section)
 
         // Fill momentum of product species (note that we actually
         // create 4 products, 2 at the position of each incident particle)
+        // - Photon
         soa1_out.m_rdata[PIdx::ux][idx1_out_start] = ux1_out;
         soa1_out.m_rdata[PIdx::uy][idx1_out_start] = uy1_out;
         soa1_out.m_rdata[PIdx::uz][idx1_out_start] = uz1_out;
         soa1_out.m_rdata[PIdx::ux][idx1_out_start + 1] = ux1_out;
         soa1_out.m_rdata[PIdx::uy][idx1_out_start + 1] = uy1_out;
         soa1_out.m_rdata[PIdx::uz][idx1_out_start + 1] = uz1_out;
+        // - Electron
         soa2_out.m_rdata[PIdx::ux][idx2_out_start] = ux2_out;
         soa2_out.m_rdata[PIdx::uy][idx2_out_start] = uy2_out;
         soa2_out.m_rdata[PIdx::uz][idx2_out_start] = uz2_out;
