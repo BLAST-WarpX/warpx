@@ -656,6 +656,7 @@ WarpX::ReadParameters ()
 
         utils::parser::queryWithParser(pp_warpx, "cfl", cfl);
         pp_warpx.query("verbose", verbose);
+        pp_warpx.query("limit_verbose_step", m_limit_verbose_step);
         utils::parser::queryWithParser(pp_warpx, "regrid_int", regrid_int);
         pp_warpx.query("do_subcycling", m_do_subcycling);
         pp_warpx.query("use_hybrid_QED", use_hybrid_QED);
