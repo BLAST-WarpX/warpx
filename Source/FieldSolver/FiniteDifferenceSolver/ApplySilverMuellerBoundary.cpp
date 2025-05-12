@@ -79,7 +79,7 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
     // Extract cylindrical specific parameters
     Real const dr = m_dr;
     Real const rmin = m_rmin;
-#if !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_RZ)
     int const nmodes = m_nmodes;
 #endif
 
@@ -168,6 +168,7 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
                     // Mode 0
                     Bt(i,j,0,0) = coef1_r*Bt(i,j,0,0) - coef2_r*Ez(i,j,0,0)
                         + coef3_r*CylindricalYeeAlgorithm::UpwardDz(Er, coefs_z, n_coefs_z, i, j, 0, 0);
+#if defined(WARPX_DIM_RZ)
                     for (int m=1; m<nmodes; m++) { // Higher-order modes
                         // Real part
                         Bt(i,j,0,2*m-1) = coef1_r*Bt(i,j,0,2*m-1) - coef2_r*Ez(i,j,0,2*m-1)
@@ -176,6 +177,7 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
                         Bt(i,j,0,2*m) = coef1_r*Bt(i,j,0,2*m) - coef2_r*Ez(i,j,0,2*m)
                             + coef3_r*CylindricalYeeAlgorithm::UpwardDz(Er, coefs_z, n_coefs_z, i, j, 0, 2*m);
                     }
+#endif
                 }
 #endif
 
@@ -195,6 +197,7 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
                     Real const r = rmin + (i + 0.5_rt)*dr; // r on nodal point (Bz is cell-centered in r)
                     // Mode 0
                     Bz(i,j,0,0) = coef1_r*Bz(i,j,0,0) + coef2_r*Et(i,j,0,0) - coef3_r*Et(i,j,0,0)/r;
+#if defined(WARPX_DIM_RZ)
                     for (int m=1; m<nmodes; m++) { // Higher-order modes
                         // Real part
                         Bz(i,j,0,2*m-1) = coef1_r*Bz(i,j,0,2*m-1) + coef2_r*Et(i,j,0,2*m-1)
@@ -203,6 +206,7 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
                         Bz(i,j,0,2*m) = coef1_r*Bz(i,j,0,2*m) + coef2_r*Et(i,j,0,2*m)
                             - coef3_r/r*(Et(i,j,0,2*m) + m*Er(i,j,0,2*m-1));
                     }
+#endif
                 }
 #endif
 

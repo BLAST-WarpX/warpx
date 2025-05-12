@@ -277,9 +277,8 @@ void FiniteDifferenceSolver::ComputeCurlASpherical (
                 // Skip field update in the embedded boundaries
                 if (update_Bt_arr && update_Bt_arr(i, j, 0) == 0) { return; }
 
-                Bt(i, j, 0, 0) = - (
-                    T_Algo::UpwardDr(Ap, coefs_r, n_coefs_r, i, j, 0, 0));
-            },
+                Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bt is cell-centered in r)
+                Bt(i, j, 0, 0) =  -T_Algo::UpwardDrr_over_r(Ap, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
 
             // Bp calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
