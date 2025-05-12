@@ -46,16 +46,6 @@
 #include <vector>
 
 void
-WarpX::ImplicitPreRHSOp ()
-{
-    // ApplyFilterMF() is protected and can't be called using m_WarpX-> from ImplicitSolver::PreRHSOp()
-    if (use_filter) {
-        using warpx::fields::FieldType;
-        ApplyFilterMF(m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level), 0);
-    }
-}
-
-void
 WarpX::SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time )
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(

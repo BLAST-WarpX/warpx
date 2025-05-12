@@ -129,7 +129,10 @@ void ImplicitSolver::PreRHSOp ( amrex::Real  a_cur_time,
     using warpx::fields::FieldType;
     amrex::ignore_unused( a_nl_iter );
 
-    m_WarpX->ImplicitPreRHSOp();
+    if (m_WarpX->use_filter) {
+        int finest_level = 0;
+        m_WarpX->ApplyFilterMF(m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level), 0);
+    }
 
     // Advance the particle positions by 1/2 dt,
     // particle velocities by dt, then take average of old and new v,
