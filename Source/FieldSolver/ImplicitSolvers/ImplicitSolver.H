@@ -106,6 +106,8 @@ public:
 
     [[nodiscard]] amrex::Real  GetTheta () const { return m_theta; }
 
+    void ComputeJfromMassMatrices();
+
 protected:
 
     /**
@@ -218,8 +220,6 @@ protected:
                     bool         a_from_jacobian );
 
     void SaveEandJ();
-
-    void ComputeJfromMassMatrices();
 
     void SyncMassMatricesPCAndApplyBCs ();
 
