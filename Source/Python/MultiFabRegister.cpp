@@ -32,6 +32,7 @@ void init_MultiFabRegister (py::module & m)
                  bool,
                  bool
              >(&MultiFabRegister::alloc_init<std::string>),
+             py::return_value_policy::reference_internal,
              py::arg("name"),
              py::arg("level"),
              py::arg("ba"),
@@ -56,6 +57,7 @@ void init_MultiFabRegister (py::module & m)
                  bool,
                  bool
              >(&MultiFabRegister::alloc_init<std::string>),
+             py::return_value_policy::reference_internal,
              py::arg("name"),
              py::arg("dir"),
              py::arg("level"),
