@@ -27,7 +27,6 @@ import numpy as np
 from scipy.constants import c, e, epsilon_0, m_e
 
 sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
 
 # this will be the name of the plot file
 fn = sys.argv[1]
