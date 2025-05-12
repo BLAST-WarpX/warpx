@@ -130,7 +130,6 @@ namespace
 
                         field_value = ( (iside == -1) ? field_lo[idim] : field_hi[idim] );
                         set_field = ( (iside == -1) ? set_field_lo[idim]==1 : set_field_hi[idim]==1 );
-
                     }
                 } // is pec_insulator boundary
             } // loop over iside
