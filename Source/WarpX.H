@@ -130,9 +130,9 @@ public:
     void Evolve (int numsteps = -1);
 
     /** Push momentum one half step forward to synchronize with position.
-     *  Also sets is_synchronized to `true`.
+     *  Also sets m_is_synchronized to `true`.
      */
-    void Synchronize ();
+    void SynchronizeVelocityWithPosition ();
 
     //
     // Functions used by implicit solvers
@@ -727,7 +727,7 @@ public:
     [[nodiscard]] amrex::Real getdt (int lev) const {return dt.at(lev);}
     [[nodiscard]] int getdo_moving_window() const {return do_moving_window;}
     [[nodiscard]] amrex::Real getmoving_window_x() const {return moving_window_x;}
-    [[nodiscard]] bool getis_synchronized() const {return is_synchronized;}
+    [[nodiscard]] bool getis_synchronized() const {return m_is_synchronized;}
 
     [[nodiscard]] int maxStep () const {return max_step;}
     void updateMaxStep (const int new_max_step) {max_step = new_max_step;}
@@ -1375,7 +1375,7 @@ private:
     //! User-defined parser to define refinement patches
     std::unique_ptr<amrex::Parser> ref_patch_parser;
 
-    bool is_synchronized = true;
+    bool m_is_synchronized = true;
 
     // Synchronization of nodal points
     static constexpr bool sync_nodal_points = true;

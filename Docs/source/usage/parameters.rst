@@ -2107,44 +2107,32 @@ Details about the collision models can be found in the :ref:`theory section <mul
     of each species. By default, this is turned off. Note that if ``<collision_name>.CoulombLog``
     is specified, this Debye length is not used.
 
-* ``<collision_name>.fusion_multiplier`` (`float`) optional.
-    Only for ``nuclearfusion``.
-    Increasing ``fusion_multiplier`` creates more macroparticles of fusion
-    products, but with lower weight (in such a way that the corresponding
-    total number of physical particle remains the same). This can improve
-    the statistics of the simulation, in the case where fusion reactions are very rare.
-    More specifically, in a fusion reaction between two macroparticles with weight ``w_1`` and ``w_2``,
-    the weight of the product macroparticles will be ``min(w_1,w_2)/fusion_multiplier``.
-    (And the weights of the reactant macroparticles are reduced correspondingly after the reaction.)
-    See :cite:t:`param-HigginsonJCP2019` for more details.
-    The default value of ``fusion_multiplier`` is 1.
-
-* ``<collision_name>.fusion_probability_threshold`` (`float`) optional.
-    Only for ``nuclearfusion``.
-    If the fusion multiplier is too high and results in a fusion probability
-    that approaches 1 (for a given collision between two macroparticles), then
-    there is a risk of underestimating the total fusion yield. In these cases,
-    WarpX reduces the fusion multiplier used in that given collision.
-    ``m_probability_threshold`` is the fusion probability threshold above
-    which WarpX reduces the fusion multiplier.
-
-* ``<collision_name>.fusion_probability_target_value`` (`float`) optional.
-    Only for ``nuclearfusion``.
-    When the probability of fusion for a given collision exceeds
-    ``fusion_probability_threshold``, WarpX reduces the fusion multiplier for
-    that collisions such that the fusion probability approches ``fusion_probability_target_value``.
-
 * ``<collision_name>.event_multiplier`` (`float`) optional.
-    Only for ``linear_breit_wheeler``.
-    Works in the same way as ``<collision_name>.fusion_probability_target_value`` for fusion reactions.
+    Only for ``nuclearfusion`` and ``linear_breit_wheeler`` (LBW).
+    Increasing ``event_multiplier`` creates more macroparticles products,
+    but with lower weight (in such a way that the corresponding
+    total number of physical particle remains the same). This can improve
+    the statistics of the simulation, in the case where the collision events are very rare.
+    More specifically, in a collision between two macroparticles with weight ``w_1`` and ``w_2``,
+    the weight of the product macroparticles will be ``min(w_1,w_2)/event_multiplier``.
+    (And the weights of the reactant macroparticles are reduced correspondingly after the collision.)
+    See :cite:t:`param-HigginsonJCP2019` for more details.
+    The default value of ``event_multiplier`` is 1.
 
 * ``<collision_name>.probability_threshold`` (`float`) optional.
-    Only for ``linear_breit_wheeler``.
-    Works in the same way as ``<collision_name>.fusion_probability_threshold`` for fusion reactions.
+    Only for ``nuclearfusion`` and ``linear_breit_wheeler``.
+    If the event multiplier is too high and results in a probability
+    that approaches 1 (for a given collision between two macroparticles), then
+    there is a risk of underestimating the total yield. In these cases,
+    WarpX reduces the event multiplier used in that given collision.
+    ``probability_threshold`` is the probability threshold above
+    which WarpX reduces the event multiplier.
 
 * ``<collision_name>.probability_target_value`` (`float`) optional.
-    Only for ``linear_breit_wheeler``.
-    Works in the same way as ``<collision_name>.fusion_probability_target_value`` for fusion reactions.
+    Only for ``nuclearfusion`` and ``linear_breit_wheeler``.
+    When the probability of fusion or linear Breit-Wheeler for a given collision exceeds
+    ``probability_threshold``, WarpX reduces the event multiplier for
+    that collisions such that the probability approches ``probability_target_value``.
 
 * ``<collision_name>.background_density`` (`float`)
     Only for ``background_mcc`` and ``background_stopping``. The density of the background in :math:`m^{-3}`.

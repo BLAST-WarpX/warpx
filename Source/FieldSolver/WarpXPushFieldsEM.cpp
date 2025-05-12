@@ -903,7 +903,8 @@ WarpX::PushPSATD (amrex::Real start_time)
     PSATDForwardTransformEB();
 
 #ifdef WARPX_DIM_RZ
-    if (pml_rz[0]) { pml_rz[0]->PushPSATD(0); }
+    constexpr auto lev0 = 0;
+    if (pml_rz[lev0]) { pml_rz[lev0]->PushPSATD(lev0, m_fields, get_spectral_solver_fp(lev0)); }
 #endif
 
     // FFT of F and G
