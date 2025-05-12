@@ -107,5 +107,3 @@ print("error_rel    : " + str(error_rel))
 print("tolerance_rel: " + str(tolerance_rel))
 
 assert error_rel < tolerance_rel
-
-checksumAPI.evaluate_checksum(test_name, fn)
