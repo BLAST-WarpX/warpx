@@ -71,7 +71,7 @@ class SpaceChargeFieldCorrector(object):
         self,
     ):
         warpx = sim.extension.warpx
-
+        amrex = sim.externsion.amrex
         # Compute the charge that WarpX thinks there is on the spacecraft
         # from phi and rho after the Poisson solver
         q_v = compute_virtual_charge_on_spacecraft()
