@@ -334,14 +334,18 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
         }
 
         if (norm_abs < m_rtol) {
-            amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
-                           << ". Satisfied absolute tolerance " << m_atol << "\n";
+            if (this->m_verbose) {
+                amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
+                               << ". Satisfied absolute tolerance " << m_atol << "\n";
+            }
             break;
         }
 
         if (norm_rel < m_rtol) {
-            amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
-                           << ". Satisfied relative tolerance " << m_rtol << "\n";
+            if (this->m_verbose) {
+                amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
+                               << ". Satisfied relative tolerance " << m_rtol << "\n";
+            }
             break;
         }
 
@@ -365,8 +369,10 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
 
         iter++;
         if (iter >= m_maxits) {
-            amrex::Print() << "Newton: exiting at iter = " << std::setw(3) << iter
-                           << ". Maximum iteration reached: iter = " << m_maxits << "\n";
+            if (this->m_verbose) {
+                amrex::Print() << "Newton: exiting at iter = " << std::setw(3) << iter
+                               << ". Maximum iteration reached: iter = " << m_maxits << "\n";
+            }
             break;
         }
 
