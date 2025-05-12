@@ -77,6 +77,19 @@ class SpaceChargeFieldCorrector(object):
         q_v = compute_virtual_charge_on_spacecraft()
         self.spacecraft_capacitance = 1.0 / q_v  # the potential was set to 1V
 
+        reg = warpx.multifab_register()
+        reg.alloc_init(
+            "test_mf",
+            0,
+            warpx.boxArray(0),
+            warpx.DistributionMap(0),
+            1,
+            amrex.IntVect(0, 0),
+            0.0,
+            True,
+            True,
+        )
+
         # Record fields
         self.normalized_Er = warpx.multifab("Efield_fp", dir=self.dir_r, level=0).copy()
         self.normalized_Er.mult(1 / q_v, 0)
