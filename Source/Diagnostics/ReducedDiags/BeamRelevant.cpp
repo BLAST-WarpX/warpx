@@ -52,18 +52,30 @@ BeamRelevant::BeamRelevant (const std::string& rd_name)
     //    19,20: beta-function x,y
     //       21: charge
     m_data.resize(22, 0.0_rt);
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RCYLINDER)
-    //     0, 1: mean x,z, or mean x,y
+#elif defined(WARPX_DIM_XZ)
+    //     0, 1: mean x,z
     //  2, 3, 4: mean px,py,pz
     //        5: gamma
-    //     6, 7: rms x,z, or rms x,y
+    //     6, 7: rms x,z
     //  8, 9,10: rms px,py,pz
     //       11: rms gamma
-    //    12,13: emittance x,z, or emittance x,y
+    //    12,13: emittance x,z
     //       14: Twiss-alpha x
     //       15: beta-function x
     //       16: charge
     m_data.resize(17, 0.0_rt);
+#elif defined(WARPX_DIM_RCYLINDER)
+    //        0: mean x
+    //  1, 2, 3: mean px,py,pz
+    //        4: gamma
+    //        5: rms x
+    //  6, 7, 8: rms px,py,pz
+    //        9: rms gamma
+    //       10: emittance x
+    //       11: Twiss-alpha x
+    //       12: beta-function x
+    //       13: charge
+    m_data.resize(14, 0.0_rt);
 #elif (defined WARPX_DIM_1D_Z)
     //       0 : mean z
     //   1,2,3 : mean px,py,pz
@@ -110,30 +122,44 @@ BeamRelevant::BeamRelevant (const std::string& rd_name)
             ofs << "[" << c++ << "]beta_x(m)";        ofs << m_sep;
             ofs << "[" << c++ << "]beta_y(m)";        ofs << m_sep;
             ofs << "[" << c++ << "]charge(C)";        ofs << "\n";
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RCYLINDER)
-#if defined(WARPX_DIM_XZ)
-            std::string const dim2 = "z";
-#elif defined(WARPX_DIM_RCYLINDER)
-            std::string const dim2 = "y";
-#endif
+#elif defined(WARPX_DIM_XZ)
             int c = 0;
             ofs << "#";
             ofs << "[" << c++ << "]step()";           ofs << m_sep;
             ofs << "[" << c++ << "]time(s)";          ofs << m_sep;
             ofs << "[" << c++ << "]x_mean(m)";        ofs << m_sep;
-            ofs << "[" << c++ << "]"+dim2+"_mean(m)"; ofs << m_sep;
+            ofs << "[" << c++ << "]z_mean(m)"; ofs << m_sep;
             ofs << "[" << c++ << "]px_mean(kg*m/s)";  ofs << m_sep;
             ofs << "[" << c++ << "]py_mean(kg*m/s)";  ofs << m_sep;
             ofs << "[" << c++ << "]pz_mean(kg*m/s)";  ofs << m_sep;
             ofs << "[" << c++ << "]gamma_mean()";     ofs << m_sep;
             ofs << "[" << c++ << "]x_rms(m)";         ofs << m_sep;
-            ofs << "[" << c++ << "]"+dim2+"_rms(m)";  ofs << m_sep;
+            ofs << "[" << c++ << "]z_rms(m)";  ofs << m_sep;
             ofs << "[" << c++ << "]px_rms(kg*m/s)";   ofs << m_sep;
             ofs << "[" << c++ << "]py_rms(kg*m/s)";   ofs << m_sep;
             ofs << "[" << c++ << "]pz_rms(kg*m/s)";   ofs << m_sep;
             ofs << "[" << c++ << "]gamma_rms()";      ofs << m_sep;
             ofs << "[" << c++ << "]emittance_x(m)";   ofs << m_sep;
-            ofs << "[" << c++ << "]emittance_"+dim2+"(m)"; ofs << m_sep;
+            ofs << "[" << c++ << "]emittance_z(m)"; ofs << m_sep;
+            ofs << "[" << c++ << "]alpha_x()";        ofs << m_sep;
+            ofs << "[" << c++ << "]beta_x(m)";        ofs << m_sep;
+            ofs << "[" << c++ << "]charge(C)";        ofs << "\n";
+#elif defined(WARPX_DIM_RCYLINDER)
+            int c = 0;
+            ofs << "#";
+            ofs << "[" << c++ << "]step()";           ofs << m_sep;
+            ofs << "[" << c++ << "]time(s)";          ofs << m_sep;
+            ofs << "[" << c++ << "]x_mean(m)";        ofs << m_sep;
+            ofs << "[" << c++ << "]px_mean(kg*m/s)";  ofs << m_sep;
+            ofs << "[" << c++ << "]py_mean(kg*m/s)";  ofs << m_sep;
+            ofs << "[" << c++ << "]pz_mean(kg*m/s)";  ofs << m_sep;
+            ofs << "[" << c++ << "]gamma_mean()";     ofs << m_sep;
+            ofs << "[" << c++ << "]x_rms(m)";         ofs << m_sep;
+            ofs << "[" << c++ << "]px_rms(kg*m/s)";   ofs << m_sep;
+            ofs << "[" << c++ << "]py_rms(kg*m/s)";   ofs << m_sep;
+            ofs << "[" << c++ << "]pz_rms(kg*m/s)";   ofs << m_sep;
+            ofs << "[" << c++ << "]gamma_rms()";      ofs << m_sep;
+            ofs << "[" << c++ << "]emittance_x(m)";   ofs << m_sep;
             ofs << "[" << c++ << "]alpha_x()";        ofs << m_sep;
             ofs << "[" << c++ << "]beta_x(m)";        ofs << m_sep;
             ofs << "[" << c++ << "]charge(C)";        ofs << "\n";
@@ -376,23 +402,20 @@ void BeamRelevant::ComputeDiags (int step)
         amrex::ignore_unused(y_mean, y_ms, yuy);
 #elif defined(WARPX_DIM_RCYLINDER)
         m_data[0]  = x_mean;
-        m_data[1]  = y_mean;
-        m_data[2]  = ux_mean * m;
-        m_data[3]  = uy_mean * m;
-        m_data[4]  = uz_mean * m;
-        m_data[5]  = gm_mean;
-        m_data[6]  = std::sqrt(x_ms);
-        m_data[7]  = std::sqrt(y_ms);
-        m_data[8]  = std::sqrt(ux_ms) * m;
-        m_data[9]  = std::sqrt(uy_ms) * m;
-        m_data[10] = std::sqrt(uz_ms) * m;
-        m_data[11] = std::sqrt(gm_ms);
-        m_data[12] = std::sqrt(x_ms*ux_ms-xux*xux) / PhysConst::c;
-        m_data[13] = std::sqrt(y_ms*uz_ms-yuy*yuy) / PhysConst::c;
-        m_data[14] = - (PhysConst::c * xux) / std::sqrt(x_ms*ux_ms-xux*xux);
-        m_data[15] = (PhysConst::c * x_ms) / std::sqrt(x_ms*ux_ms-xux*xux);
-        m_data[16] = charge;
-        amrex::ignore_unused(z_mean, z_ms, zuz);
+        m_data[1]  = ux_mean * m;
+        m_data[2]  = uy_mean * m;
+        m_data[3]  = uz_mean * m;
+        m_data[4]  = gm_mean;
+        m_data[5]  = std::sqrt(x_ms);
+        m_data[6]  = std::sqrt(ux_ms) * m;
+        m_data[7]  = std::sqrt(uy_ms) * m;
+        m_data[8]  = std::sqrt(uz_ms) * m;
+        m_data[9]  = std::sqrt(gm_ms);
+        m_data[10] = std::sqrt(x_ms*ux_ms-xux*xux) / PhysConst::c;
+        m_data[11] = - (PhysConst::c * xux) / std::sqrt(x_ms*ux_ms-xux*xux);
+        m_data[12] = (PhysConst::c * x_ms) / std::sqrt(x_ms*ux_ms-xux*xux);
+        m_data[13] = charge;
+        amrex::ignore_unused(y_ms, yuy, z_mean, z_ms, zuz);
 #elif (defined WARPX_DIM_1D_Z)
         m_data[0]  = z_mean;
         m_data[1]  = ux_mean * m;
