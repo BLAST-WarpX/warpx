@@ -2993,6 +2993,8 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
     const RealVect dx_vect(dx[0], dx[2]);
 #elif defined(WARPX_DIM_1D_Z)
     const RealVect dx_vect(dx[2]);
+#elif (defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE))
+    const RealVect dx_vect(dx[0]);
 #endif
 
     amrex::Real solver_dt = dt[lev];
