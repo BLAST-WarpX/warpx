@@ -151,7 +151,7 @@ namespace {
 
         // Subtraction of cumulative sum for Vay deposition
         // implemented only in 2D and 3D Cartesian geometry
-    #if !defined (WARPX_DIM_1D_Z) && !defined (WARPX_DIM_RZ)
+    #if !defined (WARPX_DIM_1D_Z) && !defined (WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 
         // TODO Implementation with coarse patches
         // TODO Implementation with current centering
