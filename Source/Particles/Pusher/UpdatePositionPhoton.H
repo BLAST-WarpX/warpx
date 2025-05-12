@@ -38,7 +38,7 @@ void UpdatePositionPhoton(
     amrex::ignore_unused(x);
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    // cylinderical and spherical push particles in 3D
+    // cylindrical and spherical push particles in 3D
     y += uy * c_over_umod * dt;
 #else
     amrex::ignore_unused(y);

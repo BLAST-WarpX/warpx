@@ -8,7 +8,7 @@
 #
 # This is a script that analyses the simulation results from
 # the script `inputs_test_rcylinder_langmuir_multi` and `inputs_test_rspherical_langmuir_multi`.
-# This simulates a 1d plasma wave using either cylinderical or spherical coordinates.
+# This simulates a 1d plasma wave using either cylindrical or spherical coordinates.
 # The electric field in the simulation is given (in theory) by:
 # $$ E_r = -\partial_r \phi = \epsilon \,\frac{mc^2}{e}\frac{2\,r}{w_0^2} \exp\left(-\frac{r^2}{w_0^2}\right) \sin(\omega_p t)
 # Unrelated to the Langmuir waves, we also test the plotfile particle filter function in this
