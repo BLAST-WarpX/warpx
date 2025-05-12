@@ -16,7 +16,7 @@ Scientific works in laser-plasma and beam-plasma acceleration.
 
 #. Chu M., Luan S., Yang H., Feng K., Tian Y., Yang X., and Wang W.
    **Controlled Betatron radiation from high-charge electron beams in multiple plasma channels**.
-   Optics Express **33**, 21070, 2025.
+   Optics Express **33**, 10, 2025.
    `DOI:10.1364/OE.557855 <https://doi.org/10.1364/OE.557855>`__
 
 #. Ma M, Zeng M, Wang J, Lu G, Yan W, Chen L, and Li D.
