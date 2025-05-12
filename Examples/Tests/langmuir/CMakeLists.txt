@@ -427,8 +427,8 @@ add_warpx_test(
     RCYLINDER  # dims
     2  # nprocs
     inputs_test_rcylinder_langmuir_multi  # inputs
-    analysis_r1d.py  # analysis
-    diags/diag1000080  # output
+    "analysis_r1d.py diags/diag1000080" # analysis
+    "analysis_default_regression.py --path diags/diag1000080"  # checksum
     OFF  # dependency
 )
 
@@ -437,7 +437,7 @@ add_warpx_test(
     RSPHERE  # dims
     2  # nprocs
     inputs_test_rsphere_langmuir_multi  # inputs
-    analysis_r1d.py  # analysis
-    diags/diag1000080  # output
+    "analysis_r1d.py diags/diag1000080"  # analysis
+    "analysis_default_regression.py --path diags/diag1000080"  # checksum
     OFF  # dependency
 )
