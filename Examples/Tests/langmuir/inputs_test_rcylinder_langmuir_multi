@@ -43,9 +43,7 @@ warpx.use_filter = 0
 algo.particle_shape = 1
 
 # CFL
-# The cfl value was chosen to give better adhoc agreement with theory for the cell
-# nearest the axis where the largest error occurs
-warpx.cfl = 0.8
+warpx.cfl = 1
 
 # Having this turned on makes for a more sensitive test
 warpx.do_dive_cleaning = 1

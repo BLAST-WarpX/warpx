@@ -61,10 +61,7 @@ struct CylindricalYeeAlgorithm {
 #elif defined(WARPX_DIM_RCYLINDER)
         // A slightly higher value of alpha is needed compared to RZ
         amrex::ignore_unused(n_rz_azimuthal_modes);
-        const amrex::Real alpha = 0.22_rt;
-        const amrex::Real delta_t = 1._rt / ( std::sqrt(
-                                     (1._rt + alpha) / (dx[0]*dx[0])
-                              ) * PhysConst::c );
+        const amrex::Real delta_t = 0.8_rt * dx[0] / PhysConst::c;
 #endif
         return delta_t;
     }
