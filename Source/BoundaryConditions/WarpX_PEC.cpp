@@ -169,16 +169,6 @@ namespace
                         GuardCell = true;
                         // tangential components are inverted across PEC boundary
                         if (is_tangent_to_PEC) { sign *= -1._rt; }
-#if (defined WARPX_DIM_RZ)
-                        if (icomp == 0 && idim == 0 && iside == 1) {
-                            // Add radial scale so that drEr/dr = 0.
-                            // This only works for the first guard cell and with
-                            // Er cell centered in r.
-                            const amrex::Real rguard = ijk_vec[idim] + 0.5_rt*(1._rt - is_nodal[idim]);
-                            const amrex::Real rmirror = ijk_mirror[idim] + 0.5_rt*(1._rt - is_nodal[idim]);
-                            sign *= rmirror/rguard;
-                        }
-#endif
                     }
                 } // is PEC boundary
             } // loop over iside
@@ -308,14 +298,6 @@ namespace
                         GuardCell = true;
                         // Sign of the normal component in guard cell is inverted
                         if (is_normal_to_PEC) { sign *= -1._rt; }
-#if (defined WARPX_DIM_RZ)
-                        if (icomp == 0 && idim == 0 && iside == 1) {
-                            // Add radial scale so that drBr/dr = 0.
-                            const amrex::Real rguard = ijk_vec[idim] + 0.5_rt*(1._rt - is_nodal[idim]);
-                            const amrex::Real rmirror = ijk_mirror[idim] + 0.5_rt*(1._rt - is_nodal[idim]);
-                            sign *= rmirror/rguard;
-                        }
-#endif
                     }
                 } // if PEC Boundary
             } // loop over sides
@@ -351,6 +333,7 @@ namespace
      * \param[in] psign             Whether the field value should be flipped across the boundary
      * \param[in] is_reflective     Whether the given particle boundary is reflecting or field boundary is pec
      * \param[in] tangent_to_bndy   Whether a given direction is perpendicular to the boundary
+     * \param[in] is_nodal_r        Whether data is nodal along r
      * \param[in] fabbox            multifab box including ghost cells
      */
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -361,6 +344,7 @@ namespace
                                 amrex::GpuArray<GpuArray<amrex::Real, 2>, AMREX_SPACEDIM> const& psign,
                                 amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> const& is_reflective,
                                 amrex::GpuArray<bool, AMREX_SPACEDIM> const& tangent_to_bndy,
+                                [[maybe_unused]]int const is_nodal_r,
                                 amrex::Box const& fabbox)
     {
         // The boundary is handled in 2 steps:
@@ -381,7 +365,17 @@ namespace
                     field(ijk_vec,n) = 0._rt;
                 } else if (fabbox.contains(iv_mirror)) {
                     // Note that this includes the cells on the boundary for PMC
-                    field(ijk_vec,n) += psign[idim][iside] * field(iv_mirror,n);
+                    amrex::Real rscale = 1._rt;
+#if (defined WARPX_DIM_RZ)
+                    if (idim == 0 && iside == 1) {
+                        // Account for different dV at different radii
+                        amrex::Real const rshift = (is_nodal_r ? 0.0_rt : 0.5_rt);
+                        const amrex::Real rvalid = ijk_vec[idim] + rshift;
+                        const amrex::Real rmirror = iv_mirror[idim] + rshift;
+                        rscale = rmirror/rvalid;
+                    }
+#endif
+                    field(ijk_vec,n) += rscale*psign[idim][iside] * field(iv_mirror,n);
                 }
             }
         }
@@ -397,10 +391,20 @@ namespace
                 iv_mirror[idim] = mirrorfac[idim][iside] - ijk_vec[idim];
                 if (ijk_vec != iv_mirror && fabbox.contains(iv_mirror))
                 {
+                    amrex::Real rscale = 1._rt;
+#if (defined WARPX_DIM_RZ)
+                    if (idim == 0 && iside == 1) {
+                        // Account for different dV at different radii
+                        amrex::Real const rshift = (is_nodal_r ? 0.0_rt : 0.5_rt);
+                        amrex::Real const rvalid = ijk_vec[idim] + rshift;
+                        amrex::Real const rmirror = iv_mirror[idim] + rshift;
+                        rscale = rvalid/rmirror;
+                    }
+#endif
                     if (tangent_to_bndy[idim]) {
-                        field(iv_mirror, n) = -field(ijk_vec, n);
+                        field(iv_mirror, n) = -rscale*field(ijk_vec, n);
                     } else {
-                        field(iv_mirror, n) = field(ijk_vec, n);
+                        field(iv_mirror, n) = rscale*field(ijk_vec, n);
                     }
                 }
             }
@@ -715,7 +719,7 @@ PEC::ApplyReflectiveBoundarytoRhofield (
 
             ::SetRhoOrJfieldFromPEC(
                 n, iv, rho_array, mirrorfac, psign, is_reflective,
-                is_tangent_to_bndy, fabbox
+                is_tangent_to_bndy, rho_nodal[0], fabbox
             );
         });
     }
@@ -851,7 +855,7 @@ PEC::ApplyReflectiveBoundarytoJfield(
 
             ::SetRhoOrJfieldFromPEC(
                 n, iv, Jx_array, mirrorfac[0], psign[0], is_reflective,
-                is_tangent_to_bndy[0], fabbox
+                is_tangent_to_bndy[0], Jx_nodal[0], fabbox
             );
         });
     }
@@ -882,7 +886,7 @@ PEC::ApplyReflectiveBoundarytoJfield(
 
             ::SetRhoOrJfieldFromPEC(
                 n, iv, Jy_array, mirrorfac[1], psign[1], is_reflective,
-                is_tangent_to_bndy[1], fabbox
+                is_tangent_to_bndy[1], Jy_nodal[0], fabbox
             );
         });
     }
@@ -913,7 +917,7 @@ PEC::ApplyReflectiveBoundarytoJfield(
 
             ::SetRhoOrJfieldFromPEC(
                 n, iv, Jz_array, mirrorfac[2], psign[2], is_reflective,
-                is_tangent_to_bndy[2], fabbox
+                is_tangent_to_bndy[2], Jz_nodal[0], fabbox
             );
         });
     }
