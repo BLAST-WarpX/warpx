@@ -74,7 +74,7 @@ collisions.collision_names = DDNHeF1
 DDNHeF1.species = deuterium_1 hydrogen2_1
 DDNHeF1.product_species = helium3_1 neutron_1
 DDNHeF1.type = nuclearfusion
-DDNHeF1.fusion_multiplier = 1.e50
+DDNHeF1.event_multiplier = 1.e50
 
 # Diagnostics
 diagnostics.diags_names = diag1

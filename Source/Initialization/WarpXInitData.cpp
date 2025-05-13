@@ -206,6 +206,63 @@ namespace
         // TODO: check memory per MPI rank, especially if GPUs are underutilized
         // TODO: CPU tiling hints with OpenMP
     }
+
+    /**
+     * \brief Checks for known numerical issues involving different electromagnetic solvers
+     */
+    void CheckKnownEMSolverIssues (
+        const ElectromagneticSolverAlgo em_solver_algo,
+        const CurrentDepositionAlgo current_deposition_algo,
+        const bool is_any_boundary_pml,
+        const bool external_particle_field_used)
+    {
+        if (em_solver_algo == ElectromagneticSolverAlgo::PSATD && is_any_boundary_pml)
+        {
+            ablastr::warn_manager::WMRecordWarning(
+                "PML",
+                "Using PSATD together with PML may lead to instabilities if the plasma touches the PML region. "
+                "It is recommended to leave enough empty space between the plasma boundary and the PML region.",
+                ablastr::warn_manager::WarnPriority::low);
+        }
+
+        if (em_solver_algo == ElectromagneticSolverAlgo::HybridPIC)
+        {
+            if (current_deposition_algo == CurrentDepositionAlgo::Esirkepov)
+            {
+                ablastr::warn_manager::WMRecordWarning(
+                    "Hybrid-PIC",
+                    "When using Esirkepov current deposition together with the hybrid-PIC "
+                    "algorithm, a segfault will occur if a particle moves over multiple cells "
+                    "in a single step, so be careful with your choice of time step.",
+                    ablastr::warn_manager::WarnPriority::low);
+            }
+
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !external_particle_field_used,
+                "The hybrid-PIC algorithm does not work with external fields "
+                "applied directly to particles."
+            );
+        }
+
+    #if defined(__CUDACC__) && (__CUDACC_VER_MAJOR__ == 11) && (__CUDACC_VER_MINOR__ == 6)
+        if (em_solver_algo == ElectromagneticSolverAlgo::Yee)
+        {
+            WARPX_ABORT_WITH_MESSAGE(
+                "CUDA 11.6 does not work with the Yee Maxwell "
+                "solver: https://github.com/AMReX-Codes/amrex/issues/2607"
+            );
+        }
+    #endif
+    }
+
+    /** Write a file that record all inputs: inputs file + command line options */
+    void WriteUsedInputsFile ()
+    {
+        std::string filename = "warpx_used_inputs";
+        ParmParse pp_warpx("warpx");
+        pp_warpx.queryAdd("used_inputs_file", filename);
+        ablastr::utils::write_used_inputs_file(filename);
+    }
 }
 
 void
@@ -410,21 +467,21 @@ WarpX::PrintMainPICparameters ()
     if (WarpX::do_divb_cleaning) {
       amrex::Print() << "                      | - div(B) cleaning is ON \n";
       }
-    if (do_multi_J){
-      amrex::Print() << "                      | - multi-J deposition is ON \n";
-      amrex::Print() << "                      |   - do_multi_J_n_depositions = "
-                                        << WarpX::do_multi_J_n_depositions << "\n";
-      if (J_in_time == JInTime::Linear){
-        amrex::Print() << "                      |   - J_in_time = linear \n";
+    if (m_JRhom == 1){
+      amrex::Print() << "                      | - PSATD-JRhom deposition is ON \n";
+      amrex::Print() << "                      |   - m_JRhom_subintervals = "
+                                        << WarpX::m_JRhom_subintervals << "\n";
+      if (time_dependency_J == TimeDependencyJ::Linear){
+        amrex::Print() << "                      |   - time_dependency_J = linear \n";
       }
-      if (J_in_time == JInTime::Constant){
-        amrex::Print() << "                      |   - J_in_time = constant \n";
+      if (time_dependency_J == TimeDependencyJ::Constant){
+        amrex::Print() << "                      |   - time_dependency_J = constant \n";
       }
-      if (rho_in_time == RhoInTime::Linear){
-        amrex::Print() << "                      |   - rho_in_time = linear \n";
+      if (time_dependency_rho == TimeDependencyRho::Linear){
+        amrex::Print() << "                      |   - time_dependency_rho = linear \n";
       }
-      if (rho_in_time == RhoInTime::Constant){
-        amrex::Print() << "                      |   - rho_in_time = constant \n";
+      if (time_dependency_rho == TimeDependencyRho::Constant){
+        amrex::Print() << "                      |   - time_dependency_rho = constant \n";
       }
     }
     if (fft_do_time_averaging){
@@ -518,16 +575,6 @@ WarpX::PrintMainPICparameters ()
 }
 
 void
-WarpX::WriteUsedInputsFile () const
-{
-    std::string filename = "warpx_used_inputs";
-    ParmParse pp_warpx("warpx");
-    pp_warpx.queryAdd("used_inputs_file", filename);
-
-    ablastr::utils::write_used_inputs_file(filename);
-}
-
-void
 WarpX::InitData ()
 {
     WARPX_PROFILE("WarpX::InitData()");
@@ -611,7 +658,7 @@ WarpX::InitData ()
     if (m_implicit_solver) {
         m_implicit_solver->PrintParameters();
     }
-    WriteUsedInputsFile();
+    ::WriteUsedInputsFile();
 
     // Run div cleaner here on loaded external fields
     if (m_do_divb_cleaning_external) {
@@ -659,7 +706,16 @@ WarpX::InitData ()
 
     ::PerformanceHints(total_nboxes, nprocs);
 
-    CheckKnownIssues();
+    const bool external_particle_field_used = (
+        mypc->m_B_ext_particle_s != "none" || mypc->m_E_ext_particle_s != "none");
+
+    const bool is_any_boundary_pml =(
+        (std::find(do_pml_Lo[0].begin(), do_pml_Lo[0].end(), true ) != do_pml_Lo[0].end()) ||
+        (std::find(do_pml_Hi[0].begin(), do_pml_Hi[0].end(), true ) != do_pml_Hi[0].end()));
+
+    ::CheckKnownEMSolverIssues(
+        electromagnetic_solver_id, current_deposition_algo,
+        is_any_boundary_pml, external_particle_field_used);
 }
 
 void
@@ -744,7 +800,7 @@ WarpX::InitPML ()
         bool const eb_enabled = EB::enabled();
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
         do_pml_Lo[0][0] = 0; // no PML at r=0, in cylindrical geometry
-        pml_rz[0] = std::make_unique<PML_RZ>(0, boxArray(0), DistributionMap(0), &Geom(0), pml_ncell, do_pml_in_domain);
+        pml_rz[0] = std::make_unique<PML_RZ>(0, boxArray(0), DistributionMap(0), &Geom(0), m_fields, pml_ncell, do_pml_in_domain);
 #else
         // Note: fill_guards_fields and fill_guards_current are both set to
         // zero (amrex::IntVect(0)) (what we do with damping BCs does not apply
@@ -754,7 +810,7 @@ WarpX::InitPML ()
             pml_ncell, pml_delta, amrex::IntVect::TheZeroVector(),
             dt[0], nox_fft, noy_fft, noz_fft, grid_type,
             do_moving_window, pml_has_particles, do_pml_in_domain,
-            m_psatd_solution_type, J_in_time, rho_in_time,
+            m_psatd_solution_type, time_dependency_J, time_dependency_rho,
             do_pml_dive_cleaning, do_pml_divb_cleaning,
             amrex::IntVect(0), amrex::IntVect(0),
             eb_enabled,
@@ -796,7 +852,7 @@ WarpX::InitPML ()
                 pml_ncell, pml_delta, refRatio(lev-1),
                 dt[lev], nox_fft, noy_fft, noz_fft, grid_type,
                 do_moving_window, pml_has_particles, do_pml_in_domain,
-                m_psatd_solution_type, J_in_time, rho_in_time, do_pml_dive_cleaning, do_pml_divb_cleaning,
+                m_psatd_solution_type, time_dependency_J, time_dependency_rho, do_pml_dive_cleaning, do_pml_divb_cleaning,
                 amrex::IntVect(0), amrex::IntVect(0),
                 eb_enabled,
                 guard_cells.ng_FieldSolver.max(),
@@ -1073,7 +1129,7 @@ WarpX::InitLevelData (int lev, Real /*time*/)
 
 template<typename T>
 void ComputeExternalFieldOnGridUsingParser_template (
-    T field,
+    const T& field,
     amrex::ParserExecutor<4> const& fx_parser,
     amrex::ParserExecutor<4> const& fy_parser,
     amrex::ParserExecutor<4> const& fz_parser,
@@ -1210,7 +1266,7 @@ void ComputeExternalFieldOnGridUsingParser_template (
 }
 
 void WarpX::ComputeExternalFieldOnGridUsingParser (
-    warpx::fields::FieldType field,
+    const std::variant<warpx::fields::FieldType, std::string>& field,
     amrex::ParserExecutor<4> const& fx_parser,
     amrex::ParserExecutor<4> const& fy_parser,
     amrex::ParserExecutor<4> const& fz_parser,
@@ -1218,57 +1274,20 @@ void WarpX::ComputeExternalFieldOnGridUsingParser (
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field,
     bool use_eb_flags)
 {
-    ComputeExternalFieldOnGridUsingParser_template<warpx::fields::FieldType> (
-        field,
-        fx_parser, fy_parser, fz_parser,
-        lev, patch_type, eb_update_field,
-        use_eb_flags);
-}
-
-void WarpX::ComputeExternalFieldOnGridUsingParser (
-    std::string const& field,
-    amrex::ParserExecutor<4> const& fx_parser,
-    amrex::ParserExecutor<4> const& fy_parser,
-    amrex::ParserExecutor<4> const& fz_parser,
-    int lev, PatchType patch_type,
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field,
-    bool use_eb_flags)
-{
-    ComputeExternalFieldOnGridUsingParser_template<std::string const&> (
-        field,
-        fx_parser, fy_parser, fz_parser,
-        lev, patch_type, eb_update_field,
-        use_eb_flags);
-}
-
-void WarpX::ComputeExternalFieldOnGridUsingParser (
-    warpx::fields::FieldType field,
-    amrex::ParserExecutor<4> const& fx_parser,
-    amrex::ParserExecutor<4> const& fy_parser,
-    amrex::ParserExecutor<4> const& fz_parser,
-    int lev, PatchType patch_type,
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field)
-{
-    ComputeExternalFieldOnGridUsingParser_template<warpx::fields::FieldType> (
-        field,
-        fx_parser, fy_parser, fz_parser,
-        lev, patch_type, eb_update_field,
-        true);
-}
-
-void WarpX::ComputeExternalFieldOnGridUsingParser (
-    std::string const& field,
-    amrex::ParserExecutor<4> const& fx_parser,
-    amrex::ParserExecutor<4> const& fy_parser,
-    amrex::ParserExecutor<4> const& fz_parser,
-    int lev, PatchType patch_type,
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field)
-{
-    ComputeExternalFieldOnGridUsingParser_template<std::string const&> (
-        field,
-        fx_parser, fy_parser, fz_parser,
-        lev, patch_type, eb_update_field,
-        true);
+    if (std::holds_alternative<warpx::fields::FieldType>(field)){
+        ComputeExternalFieldOnGridUsingParser_template<warpx::fields::FieldType> (
+            std::get<warpx::fields::FieldType>(field),
+            fx_parser, fy_parser, fz_parser,
+            lev, patch_type, eb_update_field,
+            use_eb_flags);
+    }
+    else{
+        ComputeExternalFieldOnGridUsingParser_template<std::string> (
+            std::get<std::string>(field),
+            fx_parser, fy_parser, fz_parser,
+            lev, patch_type, eb_update_field,
+            use_eb_flags);
+    }
 }
 
 void WarpX::CheckGuardCells()
@@ -1371,52 +1390,6 @@ void WarpX::InitializeEBGridData (int lev)
     }
 #else
     amrex::ignore_unused(lev);
-#endif
-}
-
-void WarpX::CheckKnownIssues()
-{
-    if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD &&
-        (std::any_of(do_pml_Lo[0].begin(),do_pml_Lo[0].end(),[](const auto& ee){return ee;}) ||
-        std::any_of(do_pml_Hi[0].begin(),do_pml_Hi[0].end(),[](const auto& ee){return ee;})) )
-    {
-        ablastr::warn_manager::WMRecordWarning(
-            "PML",
-            "Using PSATD together with PML may lead to instabilities if the plasma touches the PML region. "
-            "It is recommended to leave enough empty space between the plasma boundary and the PML region.",
-            ablastr::warn_manager::WarnPriority::low);
-    }
-
-    if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC)
-    {
-        if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov)
-        {
-            ablastr::warn_manager::WMRecordWarning(
-                "Hybrid-PIC",
-                "When using Esirkepov current deposition together with the hybrid-PIC "
-                "algorithm, a segfault will occur if a particle moves over multiple cells "
-                "in a single step, so be careful with your choice of time step.",
-                ablastr::warn_manager::WarnPriority::low);
-        }
-
-        const bool external_particle_field_used = (
-            mypc->m_B_ext_particle_s != "none" || mypc->m_E_ext_particle_s != "none"
-        );
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            !external_particle_field_used,
-            "The hybrid-PIC algorithm does not work with external fields "
-            "applied directly to particles."
-        );
-    }
-
-#if defined(__CUDACC__) && (__CUDACC_VER_MAJOR__ == 11) && (__CUDACC_VER_MINOR__ == 6)
-    if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee)
-    {
-        WARPX_ABORT_WITH_MESSAGE(
-            "CUDA 11.6 does not work with the Yee Maxwell "
-            "solver: https://github.com/AMReX-Codes/amrex/issues/2607"
-        );
-    }
 #endif
 }
 
