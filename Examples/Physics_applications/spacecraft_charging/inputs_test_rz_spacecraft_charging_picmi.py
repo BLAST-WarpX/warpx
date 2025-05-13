@@ -87,6 +87,10 @@ class SpaceChargeFieldCorrector(object):
         reg.alloc_init("normalized_Ez",0,warpx.boxArray(0).convert(amrex.IntVect(1,0)),warpx.DistributionMap(0),1,self.Ez.n_grow_vect,0.0,True,True)
         reg.alloc_init("normalized_phi",0,warpx.boxArray(0).convert(amrex.IntVect(1,1)),warpx.DistributionMap(0),1,self.phi.n_grow_vect,0.0,True,True)
 
+        self.normalized_Er = reg.get("normalized_Er",self.dir_r,0)
+        self.normalized_Ez = reg.get("normalized_Ez",self.dir_z,0)
+        self.normalized_phi = reg.get("normalized_phi",0)
+
         # Record fields
         self.normalized_Er.copymf(self.Er,0,0,1,self.Er.n_grow_vect)
         self.normalized_Er.mult(1 / q_v, 0)
