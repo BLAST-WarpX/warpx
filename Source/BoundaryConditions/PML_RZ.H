@@ -33,14 +33,15 @@ class PML_RZ
 {
 public:
     PML_RZ (int lev, amrex::BoxArray const& grid_ba, amrex::DistributionMapping const& grid_dm,
-            amrex::Geometry const* geom, int ncell, int do_pml_in_domain);
+            amrex::Geometry const* geom, ablastr::fields::MultiFabRegister& fields,
+            int ncell, int do_pml_in_domain);
 
     void ApplyDamping(amrex::MultiFab* Et_fp, amrex::MultiFab* Ez_fp,
                       amrex::MultiFab* Bt_fp, amrex::MultiFab* Bz_fp,
                       amrex::Real dt, ablastr::fields::MultiFabRegister& fields);
 
 #ifdef WARPX_USE_FFT
-    void PushPSATD (int lev);
+    void PushPSATD (int lev, ablastr::fields::MultiFabRegister& fields, SpectralSolverRZ& spec_solver);
 #endif
 
     void FillBoundaryE (ablastr::fields::MultiFabRegister& fields,
@@ -56,16 +57,6 @@ private:
     int m_ncell;
     int m_do_pml_in_domain;
     const amrex::Geometry* m_geom;
-
-    // The MultiFabs pml_E_fp and pml_B_fp are setup using the registry.
-    // They hold Er, Et, and Br, Bt.
-
-#ifdef WARPX_USE_FFT
-    void PushPMLPSATDSinglePatchRZ (int lev,
-                SpectralSolverRZ& solver,
-                ablastr::fields::MultiFabRegister& fields);
-#endif
-
 };
 
 #endif

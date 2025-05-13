@@ -101,6 +101,7 @@ public:
                  amrex::Real dt,
                  DtType a_dt_type=DtType::Full,
                  bool skip_deposition=false,
+                 bool deposit_mass_matrices=false,
                  PushType push_type=PushType::Explicit) override;
 
     virtual void PushPX (WarpXParIter& pti,
@@ -145,6 +146,8 @@ public:
                         long np,
                         WarpXParIter& pti,
                         int lev,
+                        int n_field_gather_buffer,
+                        int n_current_deposition_buffer,
                         amrex::iMultiFab const* current_masks,
                         amrex::iMultiFab const* gather_masks );
 
