@@ -12,6 +12,8 @@ import yt
 
 yt.funcs.mylog.setLevel(50)
 import numpy as np
+
+sys.path.insert(1, "../../../Regression/Checksum/")
 from checksum import Checksum
 
 # this will be the name of the first plot file
