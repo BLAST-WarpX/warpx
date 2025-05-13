@@ -117,9 +117,9 @@ class SpaceChargeFieldCorrector(object):
             True,
         )
 
-        self.normalized_Er = reg.get("normalized_Er",0)
-        self.normalized_Ez = reg.get("normalized_Ez",0)
-        self.normalized_phi = reg.get("normalized_phi",0)
+        self.normalized_Er = reg.get("normalized_Er", 0)
+        self.normalized_Ez = reg.get("normalized_Ez", 0)
+        self.normalized_phi = reg.get("normalized_phi", 0)
 
         # Record fields
         self.normalized_Er.copymf(self.Er, 0, 0, 1, self.Er.n_grow_vect)
