@@ -42,6 +42,12 @@ class KSP_impl
         //! Destructor
         ~KSP_impl ();
 
+        // Prohibit Move and Copy operations
+        KSP_impl(const KSP_impl&) = delete;
+        KSP_impl& operator=(const KSP_impl&) = delete;
+        KSP_impl(KSP_impl&&) noexcept = delete;
+        KSP_impl& operator=(KSP_impl&&) noexcept = delete;
+
         //! Create PETSc objects
         void createObjects (const VecType&);
 
