@@ -581,7 +581,11 @@ amrex::XDim3 PlasmaInjector::getMomentum (amrex::Real x,
                                           amrex::Real y,
                                           amrex::Real z) const noexcept
 {
+#ifdef AMREX_USE_GPU
+    return h_inj_mom->getMomentum(x, y, z, amrex::RandomEngine{nullptr}); // gamma*beta
+#else
     return h_inj_mom->getMomentum(x, y, z, amrex::RandomEngine{}); // gamma*beta
+#endif
 }
 
 bool PlasmaInjector::insideBounds (amrex::Real x, amrex::Real y, amrex::Real z) const noexcept

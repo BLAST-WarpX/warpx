@@ -133,7 +133,9 @@ void EffectivePotentialES::ComputeSigma (MultiFab& sigma) const
     // Loop over each species to calculate the Poisson equation dressing
     for (auto const& pc : mypc) {
         // grab the charge density for this species
-        auto rho = pc->GetChargeDensity(lev, false);
+        // Note: local deposition is done since the guard cells values are added
+        // to the valid cells after filtering in `ApplyFilterandSumBoundaryRho` below
+        auto rho = pc->GetChargeDensity(lev, true);
 
         // Handle the parallel transfer of guard cells and apply filtering
         warpx.ApplyFilterandSumBoundaryRho(lev, lev, *rho, 0, rho->nComp());
@@ -159,7 +161,6 @@ void EffectivePotentialES::ComputeSigma (MultiFab& sigma) const
                 // C_SI * w_p^2 * dt^2 / 4 = C_SI / 4 * q*rho/(m*eps0) * dt^2
                 sigma_arr(i, j, k, 0) += mult_factor_pc * rho_cc;
             });
-
         }
     }
 }
