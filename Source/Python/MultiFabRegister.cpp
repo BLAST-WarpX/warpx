@@ -123,6 +123,7 @@ void init_MultiFabRegister (py::module & m)
                  std::string,
                  int
              >(&MultiFabRegister::get<std::string>),
+             py::return_value_policy::reference_internal,
              py::arg("name"),
              py::arg("level")
         )
@@ -133,6 +134,7 @@ void init_MultiFabRegister (py::module & m)
                  ablastr::fields::Direction,
                  int
              >(&MultiFabRegister::get<std::string>),
+             py::return_value_policy::reference_internal,
              py::arg("name"),
              py::arg("dir"),
              py::arg("level")
