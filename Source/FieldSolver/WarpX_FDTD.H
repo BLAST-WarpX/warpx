@@ -42,7 +42,7 @@ void warpx_computedivb(
         amrex::ignore_unused(j, Bx, dxinv);
         amrex::ignore_unused(k, By, dyinv);
 #elif defined WARPX_DIM_RZ
-        WARPX_ABORT_WITH_MESSAGE("Collocated RZ not a supported mode.")
+        WARPX_ABORT_WITH_MESSAGE("Collocated RZ not a supported mode.");
 #endif
     } else {
 #if defined WARPX_DIM_3D
