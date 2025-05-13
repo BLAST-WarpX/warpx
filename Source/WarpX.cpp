@@ -1074,6 +1074,9 @@ WarpX::ReadParameters ()
         if (!do_divb_cleaning
             && m_p_ext_field_params->B_ext_grid_type != ExternalFieldType::default_zero
             && m_p_ext_field_params->B_ext_grid_type != ExternalFieldType::constant
+#if defined(WARPX_DIM_RZ)
+            && WarpX::grid_type == GridType::Staggered
+#endif
             && (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee
             ||  WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC
             ||  ( (WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrame

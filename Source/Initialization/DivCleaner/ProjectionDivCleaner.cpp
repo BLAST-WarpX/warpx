@@ -390,11 +390,16 @@ void
 WarpX::ProjectionCleanDivB() {
     WARPX_PROFILE("WarpX::ProjectionDivCleanB()");
 
-        if ( WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee
+    if ( (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee
             ||  WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC
             ||  ( (WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrame
                 || WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic)
-                && WarpX::poisson_solver_id == PoissonSolverAlgo::Multigrid)) {
+                && WarpX::poisson_solver_id == PoissonSolverAlgo::Multigrid))
+#if defined(WARPX_DIM_RZ)
+                && WarpX::grid_type == GridType::Staggered
+#endif
+            )
+    {
         amrex::Print() << Utils::TextMsg::Info( "Starting Projection B-Field divergence cleaner.");
 
         if constexpr (!std::is_same_v<Real, double>) {
