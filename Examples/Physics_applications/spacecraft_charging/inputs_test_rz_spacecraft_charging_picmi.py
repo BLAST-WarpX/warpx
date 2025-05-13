@@ -79,24 +79,54 @@ class SpaceChargeFieldCorrector(object):
         amrex = sim.extension.amrex
         reg = warpx.multifab_register()
 
-        self.phi = warpx.multifab("phi_fp",0)
-        self.Er = warpx.multifab("Efield_fp",dir=self.dir_r,level=0)
-        self.Ez = warpx.multifab("Efield_fp",dir=self.dir_z,level=0)
+        self.phi = warpx.multifab("phi_fp", 0)
+        self.Er = warpx.multifab("Efield_fp", dir=self.dir_r, level=0)
+        self.Ez = warpx.multifab("Efield_fp", dir=self.dir_z, level=0)
         # allocate and initialize normalized fields
-        reg.alloc_init("normalized_Er",0,warpx.boxArray(0).convert(amrex.IntVect(0,1)),warpx.DistributionMap(0),1,self.Er.n_grow_vect,0.0,True,True)
-        reg.alloc_init("normalized_Ez",0,warpx.boxArray(0).convert(amrex.IntVect(1,0)),warpx.DistributionMap(0),1,self.Ez.n_grow_vect,0.0,True,True)
-        reg.alloc_init("normalized_phi",0,warpx.boxArray(0).convert(amrex.IntVect(1,1)),warpx.DistributionMap(0),1,self.phi.n_grow_vect,0.0,True,True)
+        reg.alloc_init(
+            "normalized_Er",
+            0,
+            warpx.boxArray(0).convert(amrex.IntVect(0, 1)),
+            warpx.DistributionMap(0),
+            1,
+            self.Er.n_grow_vect,
+            0.0,
+            True,
+            True,
+        )
+        reg.alloc_init(
+            "normalized_Ez",
+            0,
+            warpx.boxArray(0).convert(amrex.IntVect(1, 0)),
+            warpx.DistributionMap(0),
+            1,
+            self.Ez.n_grow_vect,
+            0.0,
+            True,
+            True,
+        )
+        reg.alloc_init(
+            "normalized_phi",
+            0,
+            warpx.boxArray(0).convert(amrex.IntVect(1, 1)),
+            warpx.DistributionMap(0),
+            1,
+            self.phi.n_grow_vect,
+            0.0,
+            True,
+            True,
+        )
 
         self.normalized_Er = reg.get("normalized_Er",self.dir_r,0)
         self.normalized_Ez = reg.get("normalized_Ez",self.dir_z,0)
         self.normalized_phi = reg.get("normalized_phi",0)
 
         # Record fields
-        self.normalized_Er.copymf(self.Er,0,0,1,self.Er.n_grow_vect)
+        self.normalized_Er.copymf(self.Er, 0, 0, 1, self.Er.n_grow_vect)
         self.normalized_Er.mult(1 / q_v, 0)
-        self.normalized_Ez.copymf(self.Ez,0,0,1,self.Ez.n_grow_vect)
+        self.normalized_Ez.copymf(self.Ez, 0, 0, 1, self.Ez.n_grow_vect)
         self.normalized_Ez.mult(1 / q_v, 0)
-        self.normalized_phi.copymf(self.phi,0,0,1,self.phi.n_grow_vect)
+        self.normalized_phi.copymf(self.phi, 0, 0, 1, self.phi.n_grow_vect)
         self.normalized_phi.mult(1 / q_v, 0)
 
         self.saved_first_iteration_fields = True
