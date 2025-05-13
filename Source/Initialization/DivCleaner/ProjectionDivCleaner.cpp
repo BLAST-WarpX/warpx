@@ -31,8 +31,8 @@ using namespace amrex;
 
 namespace warpx::initialization {
 
-ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name) :
-    m_field_name(a_field_name)
+ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name, bool a_vector_potential=false) :
+    m_field_name(a_field_name), m_vector_potential(a_vector_potential)
 {
     using ablastr::fields::Direction;
     ReadParameters();
@@ -54,8 +54,10 @@ ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name) :
     const int ncomps = WarpX::ncomps;
     auto const& ng = warpx.m_fields.get(m_field_name, Direction{0}, 0)->nGrowVect();
 
+    m_nodal_operator = m_grid_type == GridType::Collocated || m_vector_potential;
+
     IntVect nodal_flag{};
-    if (m_grid_type == GridType::Collocated) {
+    if (m_nodal_operator) {
         nodal_flag = IntVect::TheNodeVector();
     } else {
         nodal_flag = IntVect::TheCellVector();
@@ -87,7 +89,7 @@ ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name) :
     CylindricalYeeAlgorithm::InitializeStencilCoefficients( cell_size,
         m_h_stencil_coefs_x, m_h_stencil_coefs_z );
 #else
-    if (warpx.grid_type == GridType::Collocated) {
+    if (m_nodal_operator) {
         CartesianNodalAlgorithm::InitializeStencilCoefficients( cell_size,
             m_h_stencil_coefs_x, m_h_stencil_coefs_y, m_h_stencil_coefs_z );
     } else {
@@ -187,11 +189,11 @@ ProjectionDivCleaner::solve ()
 
     for (int ilev = 0; ilev < m_levels; ++ilev)
     {
-        if (m_grid_type == GridType::Collocated) {
+        if (m_nodal_operator) {
 #if defined(AMREX_USE_EB)
             const amrex::Vector<amrex::EBFArrayBoxFactory const *> eb_farray_box_factory{};
 #else
-            const amrex::Vector<amrex::FArrayBoxFactory const *> eb_farray_box_factory{};
+            const amrex::Vector<amrex::FabFactory<amrex::FArrayBox> const*> eb_farray_box_factory{};
 #endif
 
             MLNodeLaplacian linop({geom[ilev]}, {ba[ilev]}, {dmap[ilev]}, info, eb_farray_box_factory, 1.0_rt);

@@ -211,8 +211,8 @@ ExternalVectorPotential::InitData ()
 
         amrex::Gpu::streamSynchronize();
 
-        if (m_do_clean_divA && warpx.grid_type == GridType::Collocated) {
-            warpx::initialization::ProjectionDivCleaner dc(Aext_field);
+        if (m_do_clean_divA) {
+            warpx::initialization::ProjectionDivCleaner dc(Aext_field, true);
             dc.setSourceFromField();
             dc.solve();
             dc.correctField();
@@ -228,14 +228,6 @@ ExternalVectorPotential::InitData ()
 
         const std::set<std::string> A_time_ext_symbols = m_A_external_time_parser[i]->symbols();
         A_time_dep_count += static_cast<int>(A_time_ext_symbols.count("t"));
-    }
-
-    if (A_time_dep_count > 0) {
-        ablastr::warn_manager::WMRecordWarning(
-            "HybridPIC ExternalVectorPotential",
-            "Coulomb Gauge is Expected, please be sure to have a divergence free A. Divergence cleaning of A to be implemented soon.",
-            ablastr::warn_manager::WarnPriority::low
-        );
     }
 
     UpdateHybridExternalFields(warpx.gett_new(0), warpx.getdt(0));

@@ -255,7 +255,6 @@ class PlasmaCylinderCompression(object):
         simulation.particle_shape = 1
         simulation.use_filter = True
         simulation.verbose = self.verbose
-        simulation.grid_type = "collocated"
 
         #######################################################################
         # Field solver and external field                                     #
@@ -356,7 +355,7 @@ class PlasmaCylinderCompression(object):
             name="diag1",
             grid=self.grid,
             period=self.diag_steps,
-            data_list=["B", "E", "rho"],
+            data_list=["B", "E", "rho", "divB"],
             write_dir="diags",
             warpx_format="plotfile",
         )

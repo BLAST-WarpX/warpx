@@ -70,6 +70,9 @@ protected:
     std::string m_field_name;
     ablastr::utils::enums::GridType m_grid_type;
 
+    bool m_vector_potential;
+    bool m_nodal_operator;
+
 private:
     // Helper template for executing the MLMG solver with cell and node based solvers
     template <typename T>
@@ -116,7 +119,7 @@ public:
     amrex::Gpu::DeviceVector<amrex::Real> m_stencil_coefs_z;
 
     // Default Constructor
-    ProjectionDivCleaner (std::string const& a_field_name);
+    ProjectionDivCleaner (std::string const& a_field_name, bool a_vector_potential);
 
     void ReadParameters ();
 
