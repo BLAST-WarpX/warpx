@@ -167,7 +167,7 @@ void JacobiPC<T,Ops>::Define ( const T& a_U,
     amrex::ignore_unused(a_U);
     m_ops = a_ops;
     m_num_amr_levels = m_ops->numAMRLevels();
-    m_bcoefs = m_ops->GetSigmaCoeff();
+    m_bcoefs = m_ops->GetMassMatricesCoeff();
 
     // read preconditioner parameters
     readParameters();

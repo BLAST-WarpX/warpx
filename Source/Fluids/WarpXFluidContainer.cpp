@@ -163,7 +163,9 @@ void WarpXFluidContainer::AllocateLevelMFs(ablastr::fields::MultiFabRegister& fi
 
 }
 
-void WarpXFluidContainer::InitData(ablastr::fields::MultiFabRegister& fields, amrex::Box init_box, amrex::Real cur_time, int lev)
+void WarpXFluidContainer::InitData(
+    ablastr::fields::MultiFabRegister& fields, amrex::Box init_box, amrex::Real cur_time, int lev,
+    const amrex::Geometry& geom_lev, const amrex::Real gamma_boost, const amrex::Real beta_boost)
 {
     using ablastr::fields::Direction;
     WARPX_PROFILE("WarpXFluidContainer::InitData");
@@ -176,13 +178,9 @@ void WarpXFluidContainer::InitData(ablastr::fields::MultiFabRegister& fields, am
     InjectorMomentum* inj_mom = d_inj_mom;
 
     // Extract grid geometry properties
-    WarpX &warpx = WarpX::GetInstance();
-    const amrex::Geometry &geom = warpx.Geom(lev);
-    const auto dx = geom.CellSizeArray();
-    const auto problo = geom.ProbLoArray();
+    const auto dx = geom_lev.CellSizeArray();
+    const auto problo = geom_lev.ProbLoArray();
     const amrex::Real clight = PhysConst::c;
-    const amrex::Real gamma_boost = WarpX::gamma_boost;
-    const amrex::Real beta_boost = WarpX::beta_boost;
 
     // Loop through cells and initialize their value
 #ifdef AMREX_USE_OMP
