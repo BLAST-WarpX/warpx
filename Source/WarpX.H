@@ -137,15 +137,7 @@ public:
     //
     // Functions used by implicit solvers
     //
-    void ImplicitPreRHSOp ( amrex::Real cur_time,
-                            amrex::Real a_theta,
-                            amrex::Real a_full_dt,
-                            int         a_nl_iter,
-                            bool        a_from_jacobian,
-                            bool        a_use_mass_matrices );
-    void SyncMassMatricesAndApplyBCs ();
-    void SyncMassMatrices ();
-    void SetMassMatricesForPC ( amrex::Real a_theta_dt );
+    void SyncMassMatricesPC ();
     void SaveParticlesAtImplicitStepStart ();
     void FinishImplicitParticleUpdate ();
     void SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time );
@@ -890,6 +882,15 @@ public:
 
     void ApplyFilterandSumBoundaryRho (int lev, int glev, amrex::MultiFab& rho, int icomp, int ncomp);
 
+    void ApplyFilterMF (
+        const ablastr::fields::MultiLevelVectorField& mfvec,
+        int lev,
+        int idim);
+
+    void ApplyFilterMF (
+        const ablastr::fields::MultiLevelVectorField& mfvec,
+        int lev);
+
     // Device vectors of stencil coefficients used for finite-order centering of fields
     amrex::Gpu::DeviceVector<amrex::Real> device_field_centering_stencil_coeffs_x;
     amrex::Gpu::DeviceVector<amrex::Real> device_field_centering_stencil_coeffs_y;
@@ -1059,13 +1060,6 @@ private:
         const ablastr::fields::MultiLevelVectorField& J_fp,
         const ablastr::fields::MultiLevelVectorField& J_cp,
         const ablastr::fields::MultiLevelVectorField& J_buffer,
-        int lev);
-    void ApplyFilterMF (
-        const ablastr::fields::MultiLevelVectorField& mfvec,
-        int lev,
-        int idim);
-    void ApplyFilterMF (
-        const ablastr::fields::MultiLevelVectorField& mfvec,
         int lev);
     void SumBoundaryJ (
         const ablastr::fields::MultiLevelVectorField& current,

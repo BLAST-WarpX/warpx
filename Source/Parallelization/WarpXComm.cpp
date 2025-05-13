@@ -1268,9 +1268,9 @@ WarpX::SyncCurrent (const std::string& current_fp_string)
 }
 
 void
-WarpX::SyncMassMatrices ()
+WarpX::SyncMassMatricesPC ()
 {
-    WARPX_PROFILE("WarpX::SyncMassMatrices()");
+    WARPX_PROFILE("WarpX::SyncMassMatricesPC()");
 
     ablastr::fields::MultiLevelVectorField const& Sigma_fp = m_fields.get_mr_levels_alldirs("MassMatrices_PC", finest_level);
 
