@@ -297,7 +297,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
         species_name + "'."
     );
 
-    utils::parser::queryWithParser(pp_species_name, "do_temperature_deposition", do_temperature_deposition);
+    utils::parser::queryWithParser(pp_species_name, "do_temperature_deposition", m_do_temperature_deposition);
 
     pp_species_name.query("boost_adjust_transverse_positions", boost_adjust_transverse_positions);
     pp_species_name.query("do_backward_propagation", do_backward_propagation);
@@ -435,7 +435,7 @@ PhysicalParticleContainer::AllocData ()
     // Call Base class Data allocation
     WarpXParticleContainer::AllocData();
 
-    if (do_temperature_deposition) {
+    if (m_do_temperature_deposition) {
         using ablastr::fields::Direction;
 
         auto& warpx = WarpX::GetInstance();
@@ -3354,15 +3354,15 @@ PhysicalParticleContainer::getPairGenerationFilterFunc ()
                       required to have the charge of each macroparticle
                       since q is a scalar. For non-ionizable species,
                       ion_lev is a null pointer.
- * \param Tx Ty Tz    Full array of current density
- * \param offset      Index of first particle for which current is deposited
- * \param np_to_deposit Number of particles for which current is deposited.
-                        Particles [offset,offset+np_to_deposit] deposit current
+ * \param Tx Ty Tz    Full array of temperature components
+ * \param offset      Index of first particle for which temperature is deposited
+ * \param np_to_deposit Number of particles for which temperature is deposited.
+                        Particles [offset,offset+np_to_deposit] deposit temperature
  * \param thread_num  Thread number (if tiling)
  * \param lev         Level of box that contains particles
  * \param depos_lev   Level on which particles deposit (if buffers are used)
  * \param dt          Time step for particle level
- * \param relative_time  Time at which to deposit J, relative to the time of the
+ * \param relative_time  Time at which to deposit T, relative to the time of the
  *                       current positions of the particles. When different than 0,
  *                       the particle position will be temporarily modified to match
  *                       the time of the deposition.
@@ -3380,8 +3380,10 @@ PhysicalParticleContainer::DepositTemperature (
 {
     using ablastr::fields::Direction;
 
+    WARPX_PROFILE("PhysicalParticleContainer::DepositTemperature()");
+
     // Return if we are not depositing temperature.
-    if (!do_temperature_deposition) { return; }
+    if (!m_do_temperature_deposition) { return; }
 
     if (WarpX::current_deposition_algo != CurrentDepositionAlgo::Direct
         || push_type != PushType::Explicit
@@ -3477,7 +3479,6 @@ PhysicalParticleContainer::DepositTemperature (
     // Take into account Galilean shift
     const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, depos_lev, 0.0_rt);
 
-    //WARPX_PROFILE_VAR_START(blp_deposit);
     if        (WarpX::nox == 1){
         warpx::particles::deposition::doVarianceDepositionShapeN<1>(
             GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
@@ -3511,7 +3512,6 @@ PhysicalParticleContainer::DepositTemperature (
             np_to_deposit, relative_time, dinv,
             xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
     }
-    //WARPX_PROFILE_VAR_STOP(blp_deposit);
 }
 
 void

@@ -170,14 +170,14 @@ public:
                     amrex::Real dt, amrex::Real relative_time);
 
     /**
-     * \brief Deposit temperatures to species MFs. This is done for each
+     * \brief Deposit temperature to species MFs. This is done for each
      *        species and can be used in the future for a single pass update of rho, J, and T.
      *
-     * \param[in,out] fields Multifab field register to grab Temeprature MFs
+     * \param[in,out] fields Multifab field register to grab Temperature MFs
      * \param[in] dt Time step for particle level
-     * \param[in] relative_time Time at which to deposit velocities, rel
-     *                          current positions of the partic
-     *                          the particle position will be at
+     * \param[in] relative_time Time at which to deposit velocities, relative to the time of the
+     *                          current positions of the particles. When different than 0,
+     *                          the particle position will be temporarily modified to match
      *                          the time of the deposition.
      */
     void

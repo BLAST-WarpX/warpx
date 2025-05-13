@@ -360,7 +360,7 @@ public:
         [[maybe_unused]]PushType push_type)
     {}
 
-    void DepositIsotropicNGPTemperature (amrex::MultiFab* temperature, const int lev);
+    void DepositTotalNGPTemperature (amrex::MultiFab* temperature, const int lev);
     std::unique_ptr<amrex::MultiFab> GetIsotropicNGPTemperature (int lev);
 
     void DepositNumberDensity (amrex::MultiFab* number_density, const int lev);
