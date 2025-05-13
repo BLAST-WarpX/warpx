@@ -68,7 +68,7 @@ namespace ablastr
     */
     template <typename RealType>
     constexpr RealType heaviside_lorentz_reference_energy =
-        ablastr::constant::SI::variable_templates::MeV<RealType>;
+        ablastr::constant::SI::constant_templates::MeV<RealType>;
 
     /**
     * Physical quantities
@@ -100,21 +100,21 @@ namespace ablastr
 
         template <typename T>
         constexpr auto fact<quantity::mass, T> = static_cast<T>(
-            amrex::Math::powi<2>(ablastr::constant::SI::variable_templates::c<double>)/
+            amrex::Math::powi<2>(ablastr::constant::SI::constant_templates::c<double>)/
             heaviside_lorentz_reference_energy<double>);
 
         template <typename T>
         constexpr auto fact<quantity::charge, T>  = static_cast<T>(
-            ablastr::constant::SI::variable_templates::sqrt_4_pi_fine_structure<double>/
-            ablastr::constant::SI::variable_templates::q_e<double>);
+            ablastr::constant::SI::constant_templates::sqrt_4_pi_fine_structure<double>/
+            ablastr::constant::SI::constant_templates::q_e<double>);
 
         template <typename T>
         constexpr auto fact<quantity::velocity, T>  = static_cast<T>(
-            1.0/ablastr::constant::SI::variable_templates::c<double>);
+            1.0/ablastr::constant::SI::constant_templates::c<double>);
 
         template <typename T>
         constexpr auto fact<quantity::momentum, T>  = static_cast<T>(
-            ablastr::constant::SI::variable_templates::c<double>/
+            ablastr::constant::SI::constant_templates::c<double>/
             heaviside_lorentz_reference_energy<double>);
 
         template <typename T>
@@ -124,7 +124,7 @@ namespace ablastr
         template <typename T>
         constexpr auto fact<quantity::length, T>  = static_cast<T>(
             heaviside_lorentz_reference_energy<double>/
-            (ablastr::constant::SI::variable_templates::hbar<double>*ablastr::constant::SI::variable_templates::c<double>));
+            (ablastr::constant::SI::constant_templates::hbar<double>*ablastr::constant::SI::constant_templates::c<double>));
 
         template <typename T>
         constexpr auto fact<quantity::area, T>  = static_cast<T>(
@@ -137,7 +137,7 @@ namespace ablastr
         template <typename T>
         constexpr auto fact<quantity::time, T>  = static_cast<T>(
             heaviside_lorentz_reference_energy<double>/
-            ablastr::constant::SI::variable_templates::hbar<double>);
+            ablastr::constant::SI::constant_templates::hbar<double>);
 
         template <typename T>
         constexpr auto fact<quantity::rate, T>  = static_cast<T>(
@@ -146,16 +146,16 @@ namespace ablastr
         template <typename T>
         constexpr auto fact<quantity::E, T>  = static_cast<T>(
             (
-                ablastr::constant::SI::variable_templates::q_e<double>*
-                ablastr::constant::SI::variable_templates::hbar<double>*
-                ablastr::constant::SI::variable_templates::c<double>
+                ablastr::constant::SI::constant_templates::q_e<double>*
+                ablastr::constant::SI::constant_templates::hbar<double>*
+                ablastr::constant::SI::constant_templates::c<double>
             )/
             (amrex::Math::powi<2>(heaviside_lorentz_reference_energy<double>))/
-            (ablastr::constant::SI::variable_templates::sqrt_4_pi_fine_structure<double>));
+            (ablastr::constant::SI::constant_templates::sqrt_4_pi_fine_structure<double>));
 
         template <typename T>
         constexpr auto fact<quantity::B, T>  = static_cast<T>(
-            fact<quantity::E, double>*ablastr::constant::SI::variable_templates::c<double>);
+            fact<quantity::E, double>*ablastr::constant::SI::constant_templates::c<double>);
     }
 
     /**
@@ -199,7 +199,7 @@ namespace ablastr
         }
         else
         {
-            ABLASTR_ABORT_WITH_MESSAGE ("Unit conversion not yet iimplemented");
+            ABLASTR_ABORT_WITH_MESSAGE ("Unit conversion not yet implemented");
         }
     }
 }
