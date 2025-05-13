@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-petsc-cpu:
+  test-petsc-gcc:
     name: GCC w/PETSc
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
@@ -32,10 +32,10 @@ jobs:
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: Build PETSc
+    - name: Install Dependencies
       run: |
         sudo apt-get install -y --no-install-recommends libblas-dev liblapack-dev
-    - name: build WarpX
+    - name: build WarpX w/PETSc
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -63,6 +63,61 @@ jobs:
           -DPETSC_ARCH=${PETSC_ARCH}   \
           -DWarpX_EB=OFF               \
           -DWarpX_MPI=OFF              \
+          -DWarpX_QED=OFF
+        cmake --build build -j 4
+
+        ccache -s
+        du -hs ~/.cache/ccache
+
+  test-petsc-mpich:
+    name: MPICH w/PETSc
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    env:
+      CXXFLAGS: "-Werror"
+    steps:
+    - uses: actions/checkout@v4
+    - name: Dependencies
+      run: |
+        .github/workflows/dependencies/gcc.sh
+    - name: CCache Cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ccache
+        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
+        restore-keys: |
+             ccache-${{ github.workflow }}-${{ github.job }}-git-
+    - name: Install Dependencies
+      run: |
+        sudo apt-get install -y --no-install-recommends libblas-dev liblapack-dev mpich libmpich-dev
+    - name: build WarpX w/PETSc
+      run: |
+        export CCACHE_COMPRESS=1
+        export CCACHE_COMPRESSLEVEL=10
+        export CCACHE_MAXSIZE=100M
+        ccache -z
+
+        export warpx_dir=${PWD}
+        echo "warpx_dir is ${warpx_dir}"
+        export PETSC_DIR=${warpx_dir}/petsc
+        echo "PETSC_DIR is ${PETSC_DIR}"
+        export PETSC_ARCH=arch-opt
+
+        cd ${warpx_dir}
+        git clone -b release https://gitlab.com/petsc/petsc.git petsc
+        cd ${PETSC_DIR}
+        ./configure --with-fortran-bindings=no --with-x=no --with-cc=mpicc --with-fc=mpif90 --with-cxx=mpicxx
+        make -j 4
+
+        cd ${warpx_dir}
+        cmake -S . -B build            \
+          -DCMAKE_VERBOSE_MAKEFILE=ON  \
+          -DWarpX_DIMS="1;2;RZ;3"      \
+          -DAMReX_PETSC=YES            \
+          -DPETSC_DIR=${PETSC_DIR}     \
+          -DPETSC_ARCH=${PETSC_ARCH}   \
+          -DWarpX_EB=OFF               \
+          -DWarpX_MPI=ON               \
           -DWarpX_QED=OFF
         cmake --build build -j 4
 
