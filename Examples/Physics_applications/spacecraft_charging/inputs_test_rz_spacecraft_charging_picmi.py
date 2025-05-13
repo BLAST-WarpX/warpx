@@ -76,7 +76,7 @@ class SpaceChargeFieldCorrector(object):
         self.spacecraft_capacitance = 1.0 / q_v  # the potential was set to 1V
 
         warpx = sim.extension.warpx
-        amrex = sim.extension.amrex
+        amrex = sim.extension.amr
         reg = warpx.multifab_register()
 
         self.phi = warpx.multifab("phi_fp", 0)
