@@ -141,8 +141,6 @@ ExternalVectorPotential::InitData ()
     using ablastr::fields::Direction;
     auto& warpx = WarpX::GetInstance();
 
-    int A_time_dep_count = 0;
-
     for (int i = 0; i < m_nFields; ++i) {
 
         const std::string Aext_field = m_field_names[i] + std::string{"_Aext"};
@@ -225,9 +223,6 @@ ExternalVectorPotential::InitData ()
         m_A_external_time_parser[i] = std::make_unique<amrex::Parser>(
             utils::parser::makeParser(m_A_ext_time_function[i],{"t",}));
         m_A_time_scale[i] = m_A_external_time_parser[i]->compile<1>();
-
-        const std::set<std::string> A_time_ext_symbols = m_A_external_time_parser[i]->symbols();
-        A_time_dep_count += static_cast<int>(A_time_ext_symbols.count("t"));
     }
 
     UpdateHybridExternalFields(warpx.gett_new(0), warpx.getdt(0));
