@@ -365,6 +365,12 @@ WarpX::WarpX ()
         myfl = std::make_unique<MultiFluidContainer>();
     }
 
+#ifdef WARPX_SURFACE_PHYSICS
+    if (do_surface_physics) {
+        m_surface_physics = std::make_unique<SurfacePhysicsBase>();
+    }
+#endif
+
     Efield_dotMask.resize(nlevs_max);
     Bfield_dotMask.resize(nlevs_max);
     Afield_dotMask.resize(nlevs_max);
@@ -729,6 +735,14 @@ WarpX::ReadParameters ()
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             !eb_enabled,
             "Embedded boundaries are requested via warpx.eb_enabled but were not compiled!"
+        );
+#endif
+
+       pp_warpx.query("do_surface_physics", do_surface_physics);
+#if !defined(WARPX_SURFACE_PHYSICS)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !do_surface_physics,
+            "Surface Physics is requested via warpx.do_surface_physics but were not compiled!"
         );
 #endif
 

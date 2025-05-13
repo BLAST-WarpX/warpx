@@ -50,6 +50,10 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/export.H"
 
+#ifdef WARPX_SURFACE_PHYSICS
+    #include "SurfacePhysics/SurfacePhysicsBase.H"
+#endif
+
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/utils/Enums.H>
 
@@ -170,6 +174,10 @@ public:
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag() { return m_eb_update_E; }
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateBFlag() { return m_eb_update_B; }
     amrex::Vector< std::unique_ptr<amrex::iMultiFab> > const & GetEBReduceParticleShapeFlag() const { return m_eb_reduce_particle_shape; }
+
+#ifdef WARPX_SURFACE_PHYSICS
+    SurfacePhysicsBase& GetSurfacePhysicsModel () {return *m_surface_physics;}
+#endif
 
     /**
      * \brief
@@ -411,6 +419,10 @@ public:
 
     [[nodiscard]] bool DoPML () const {return do_pml;}
     [[nodiscard]] bool DoFluidSpecies () const {return do_fluid_species;}
+
+#ifdef WARPX_SURFACE_PHYSICS
+    [[nodiscard]] bool DoSurfacePhysics () const {return do_surface_physics;}
+#endif
 
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
     const PML_RZ* getPMLRZ() {return pml_rz[0].get();}
@@ -1188,6 +1200,10 @@ private:
 
     //! Integer that corresponds to electromagnetic Maxwell solver (vacuum - 0, macroscopic - 1)
     MediumForEM m_em_solver_medium = MediumForEM::Default;
+    bool do_surface_physics = false;
+#ifdef WARPX_SURFACE_PHYSICS
+    std::unique_ptr<SurfacePhysicsBase> m_surface_physics;
+#endif
 
     //
     // Fields: First array for level, second for direction

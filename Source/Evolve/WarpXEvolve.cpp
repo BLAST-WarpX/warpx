@@ -617,6 +617,10 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         mypc->ScrapeParticlesAtEB(m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level));
         m_particle_boundary_buffer->gatherParticlesFromEmbeddedBoundaries(
             *mypc, m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level));
+#ifdef WARPX_SURFACE_PHYSICS
+        if (do_surface_physics) m_surface_physics->countParticlesFromEmbeddedBoundaries(
+            *mypc, m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level));
+#endif
         mypc->deleteInvalidParticles();
     }
 
