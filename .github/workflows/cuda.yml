@@ -13,6 +13,7 @@ concurrency:
 jobs:
 
   check_changes:
+    name: Analyze
     uses: ./.github/workflows/check_changes.yml
 
   build_nvcc:

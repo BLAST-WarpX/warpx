@@ -10,6 +10,7 @@ on:
 
 jobs:
   check:
+    name: Check changes
     runs-on: ubuntu-latest
     outputs:
       has_non_docs_changes: ${{ steps.set-output.outputs.has_non_docs_changes }}
