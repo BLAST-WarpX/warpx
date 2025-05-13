@@ -923,10 +923,6 @@ public:
     */
     void ComputeDistanceToEB ();
     /**
-    * \brief Auxiliary function to count the amount of faces which still need to be extended
-    */
-    amrex::Array1D<int, 0, 2> CountExtFaces();
-    /**
     * \brief Main function computing the cell extension. Where possible it computes one-way
     *       extensions and, when this is not possible, it does eight-ways extensions.
     */
