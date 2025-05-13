@@ -70,32 +70,29 @@ class SpaceChargeFieldCorrector(object):
     def save_normalized_vacuum_Efields(
         self,
     ):
-        warpx = sim.extension.warpx
-        amrex = sim.externsion.amrex
         # Compute the charge that WarpX thinks there is on the spacecraft
         # from phi and rho after the Poisson solver
         q_v = compute_virtual_charge_on_spacecraft()
         self.spacecraft_capacitance = 1.0 / q_v  # the potential was set to 1V
 
+        warpx = sim.extension.warpx
+        amrex = sim.extension.amrex
         reg = warpx.multifab_register()
-        reg.alloc_init(
-            "test_mf",
-            0,
-            warpx.boxArray(0),
-            warpx.DistributionMap(0),
-            1,
-            amrex.IntVect(0, 0),
-            0.0,
-            True,
-            True,
-        )
+
+        self.phi = warpx.multifab("phi_fp",0)
+        self.Er = warpx.multifab("Efield_fp",dir=self.dir_r,level=0)
+        self.Ez = warpx.multifab("Efield_fp",dir=self.dir_z,level=0)
+        # allocate and initialize normalized fields
+        reg.alloc_init("normalized_Er",0,warpx.boxArray(0).convert(amrex.IntVect(0,1)),warpx.DistributionMap(0),1,self.Er.n_grow_vect,0.0,True,True)
+        reg.alloc_init("normalized_Ez",0,warpx.boxArray(0).convert(amrex.IntVect(1,0)),warpx.DistributionMap(0),1,self.Ez.n_grow_vect,0.0,True,True)
+        reg.alloc_init("normalized_phi",0,warpx.boxArray(0).convert(amrex.IntVect(1,1)),warpx.DistributionMap(0),1,self.phi.n_grow_vect,0.0,True,True)
 
         # Record fields
-        self.normalized_Er = warpx.multifab("Efield_fp", dir=self.dir_r, level=0).copy()
+        self.normalized_Er.copymf(self.Er,0,0,1,self.Er.n_grow_vect)
         self.normalized_Er.mult(1 / q_v, 0)
-        self.normalized_Ez = warpx.multifab("Efield_fp", dir=self.dir_z, level=0).copy()
+        self.normalized_Ez.copymf(self.Ez,0,0,1,self.Ez.n_grow_vect)
         self.normalized_Ez.mult(1 / q_v, 0)
-        self.normalized_phi = warpx.multifab("phi_fp", level=0).copy()
+        self.normalized_phi.copymf(self.phi,0,0,1,self.phi.n_grow_vect)
         self.normalized_phi.mult(1 / q_v, 0)
 
         self.saved_first_iteration_fields = True
