@@ -192,6 +192,7 @@ template <class T, class Ops>
 void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
                                      Ops* const a_ops )
 {
+    BL_PROFILE("CurlCurlMLMGPC::Define()");
     using namespace amrex;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -256,7 +257,7 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
         m_gmres_solver->setVerbose(static_cast<int>(m_verbose));
     }
 
-    m_bcoefs = m_ops->GetSigmaCoeff();
+    m_bcoefs = m_ops->GetMassMatricesCoeff();
     if (m_bcoefs != nullptr) { m_beta_scalar = false; }
 
     m_is_defined = true;
@@ -265,6 +266,7 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
 template <class T, class Ops>
 void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
 {
+    BL_PROFILE("CurlCurlMLMGPC::Update()");
     using namespace amrex;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -274,7 +276,7 @@ void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
     // a_U is not needed for a linear operator
     amrex::ignore_unused(a_U);
 
-    // set the alpha for curl-curl op
+    // set the alpha coefficient for the curl-curl op
     const RT thetaDt = m_ops->GetTheta()*this->m_dt;
     const RT alpha = (thetaDt*PhysConst::c) * (thetaDt*PhysConst::c);
     m_curl_curl->setScalars(alpha, RT(1.0));
@@ -316,6 +318,7 @@ void CurlCurlMLMGPC<T,Ops>::Apply (T& a_x, const T& a_b)
     //  operator:
     //      A x = curl (alpha * curl (x) ) + beta * x
 
+    BL_PROFILE("CurlCurlMLMGPC::Apply()");
     using namespace amrex;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(

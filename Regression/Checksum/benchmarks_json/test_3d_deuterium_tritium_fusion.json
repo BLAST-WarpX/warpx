@@ -2,14 +2,23 @@
   "lev=0": {
     "rho": 0.0
   },
+  "helium4_1": {
+    "particle_momentum_x": 1.7311199180516124e-15,
+    "particle_momentum_y": 1.7338147503562452e-15,
+    "particle_momentum_z": 1.748593891253606e-15,
+    "particle_position_x": 152328.87386637297,
+    "particle_position_y": 152201.05998549453,
+    "particle_position_z": 322519.25118115084,
+    "particle_weight": 4.361993850442553e-28
+  },
   "neutron_2": {
-    "particle_momentum_x": 1.5428541105411113e-15,
-    "particle_momentum_y": 1.5521530475782452e-15,
-    "particle_momentum_z": 1.5581061911002605e-15,
-    "particle_position_x": 139420.85239440785,
-    "particle_position_y": 137544.4080412421,
-    "particle_position_z": 292987.6112145397,
-    "particle_weight": 6.353652226479104e+18
+    "particle_momentum_x": 1.5325069007452443e-15,
+    "particle_momentum_y": 1.5287487791429885e-15,
+    "particle_momentum_z": 1.5571223918371296e-15,
+    "particle_position_x": 136886.78874254596,
+    "particle_position_y": 135706.09380675093,
+    "particle_position_z": 288468.65527695697,
+    "particle_weight": 6.393220448450249e+18
   },
   "tritium_2": {
     "particle_momentum_x": 0.0,
@@ -18,60 +27,51 @@
     "particle_position_x": 409665.266470154,
     "particle_position_y": 409535.84596852644,
     "particle_position_z": 819126.8984535293,
-    "particle_weight": 1.0239999999364636e+29
+    "particle_weight": 1.0239999999360678e+29
   },
-  "helium4_2": {
-    "particle_momentum_x": 1.5428541105411113e-15,
-    "particle_momentum_y": 1.5521530475782452e-15,
-    "particle_momentum_z": 1.7807114780425105e-15,
-    "particle_position_x": 139420.85239440785,
-    "particle_position_y": 137544.4080412421,
-    "particle_position_z": 292987.6112145397,
-    "particle_weight": 6.353652226479104e+18
-  },
-  "neutron_1": {
-    "particle_momentum_x": 1.7286463849660049e-15,
-    "particle_momentum_y": 1.7253692489143775e-15,
-    "particle_momentum_z": 1.7397872072929338e-15,
-    "particle_position_x": 151971.91531558792,
-    "particle_position_y": 150436.3752328273,
-    "particle_position_z": 320653.7895132215,
-    "particle_weight": 4.360021412453755e-28
+  "deuterium_2": {
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 3.356220764978016e-14,
+    "particle_position_x": 4096177.559084946,
+    "particle_position_y": 4096353.028787281,
+    "particle_position_z": 8192362.405430989,
+    "particle_weight": 1.024000113771385e+30
   },
   "deuterium_1": {
     "particle_momentum_x": 0.0,
     "particle_momentum_y": 0.0,
-    "particle_momentum_z": 2.8875978729147693e-13,
+    "particle_momentum_z": 2.887597874931959e-13,
     "particle_position_x": 40958427.509923086,
     "particle_position_y": 40959476.344507605,
     "particle_position_z": 81921930.27522033,
     "particle_weight": 1024.000000000021
   },
+  "helium4_2": {
+    "particle_momentum_x": 1.5325069007452443e-15,
+    "particle_momentum_y": 1.5287487791429885e-15,
+    "particle_momentum_z": 1.7644166342166164e-15,
+    "particle_position_x": 136886.78874254596,
+    "particle_position_y": 135706.09380675093,
+    "particle_position_z": 288468.65527695697,
+    "particle_weight": 6.393220448450249e+18
+  },
+  "neutron_1": {
+    "particle_momentum_x": 1.7311199180516124e-15,
+    "particle_momentum_y": 1.7338147503562452e-15,
+    "particle_momentum_z": 1.748593891253606e-15,
+    "particle_position_x": 152328.87386637297,
+    "particle_position_y": 152201.05998549453,
+    "particle_position_z": 322519.25118115084,
+    "particle_weight": 4.361993850442553e-28
+  },
   "tritium_1": {
     "particle_momentum_x": 0.0,
     "particle_momentum_y": 0.0,
-    "particle_momentum_z": 2.8875978729147693e-13,
+    "particle_momentum_z": 2.887597874931959e-13,
     "particle_position_x": 40959200.1108159,
     "particle_position_y": 40960650.40789148,
     "particle_position_z": 81920772.79861207,
     "particle_weight": 1024.000000000021
-  },
-  "deuterium_2": {
-    "particle_momentum_x": 0.0,
-    "particle_momentum_y": 0.0,
-    "particle_momentum_z": 3.356220762633467e-14,
-    "particle_position_x": 4096177.559084946,
-    "particle_position_y": 4096353.028787281,
-    "particle_position_z": 8192362.405430989,
-    "particle_weight": 1.024000113771424e+30
-  },
-  "helium4_1": {
-    "particle_momentum_x": 1.7286463849660049e-15,
-    "particle_momentum_y": 1.7253692489143775e-15,
-    "particle_momentum_z": 1.7397872072929338e-15,
-    "particle_position_x": 151971.91531558792,
-    "particle_position_y": 150436.3752328273,
-    "particle_position_z": 320653.7895132215,
-    "particle_weight": 4.360021412453755e-28
   }
 }

@@ -180,6 +180,7 @@ template <class Vec, class Ops>
 void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
                                      Ops*        a_ops )
 {
+    BL_PROFILE("NewtonSolver::Define()");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !this->m_is_defined,
         "Newton nonlinear solver object is already defined!");
@@ -306,14 +307,18 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
         }
 
         if (norm_abs < m_rtol) {
-            amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
-                           << ". Satisfied absolute tolerance " << m_atol << "\n";
+            if (this->m_verbose) {
+                amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
+                               << ". Satisfied absolute tolerance " << m_atol << "\n";
+            }
             break;
         }
 
         if (norm_rel < m_rtol) {
-            amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
-                           << ". Satisfied relative tolerance " << m_rtol << "\n";
+            if (this->m_verbose) {
+                amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
+                               << ". Satisfied relative tolerance " << m_rtol << "\n";
+            }
             break;
         }
 
@@ -337,8 +342,10 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
 
         iter++;
         if (iter >= m_maxits) {
-            amrex::Print() << "Newton: exiting at iter = " << std::setw(3) << iter
-                           << ". Maximum iteration reached: iter = " << m_maxits << "\n";
+            if (this->m_verbose) {
+                amrex::Print() << "Newton: exiting at iter = " << std::setw(3) << iter
+                               << ". Maximum iteration reached: iter = " << m_maxits << "\n";
+            }
             break;
         }
 
@@ -389,7 +396,7 @@ void NewtonSolver<Vec,Ops>::EvalResidual ( Vec&         a_F,
                                            amrex::Real  a_time,
                                            int          a_iter ) const
 {
-
+    BL_PROFILE("NewtonSolver::EvalResidual()");
     m_ops->ComputeRHS( m_R, a_U, a_time, a_iter, false );
 
     // set base U and R(U) for matrix-free Jacobian action calculation

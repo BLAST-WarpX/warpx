@@ -560,7 +560,8 @@ void
 LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                 int lev,
                                 const std::string& current_fp_string,
-                                Real t, Real dt, DtType /*a_dt_type*/, bool skip_deposition, PushType push_type)
+                                Real t, Real dt, DtType /*a_dt_type*/, bool skip_deposition,
+                                bool /*deposit_mass_matrices*/, PushType push_type)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
