@@ -17,7 +17,7 @@ namespace ablastr::constant
     /** Mathematical constants */
     namespace math
     {
-        namespace const_templates
+        namespace constant_templates
         {
             //! ratio of a circle's circumference to its diameter (variable template)
             template<typename T>
@@ -27,13 +27,13 @@ namespace ablastr::constant
             template<typename T>
             constexpr auto tau = static_cast<T>(2.0 * pi<double>);
 
-        } // namespace const_templates
+        } // namespace constant_templates
 
         //! ratio of a circle's circumference to its diameter
-        constexpr auto pi = const_templates::pi<amrex::Real>;
+        constexpr auto pi = constant_templates::pi<amrex::Real>;
 
         //! https://tauday.com/tau-manifesto
-        constexpr auto tau = const_templates::tau<amrex::Real>;
+        constexpr auto tau = constant_templates::tau<amrex::Real>;
 
     } // namespace math
 
@@ -49,7 +49,7 @@ namespace ablastr::constant
      */
     namespace SI
     {
-        namespace const_templates
+        namespace constant_templates
         {
             //! vacuum speed of light [m/s] (variable template)
             template<typename T>
@@ -136,68 +136,68 @@ namespace ablastr::constant
             template<typename T>
             constexpr auto sqrt_4_pi_fine_structure = static_cast<T>(0.3028221207690299);
 
-        } // namespace const_templates
+        } // namespace constant_templates
 
         //! vacuum speed of light [m/s]
-        constexpr auto c = const_templates::c<amrex::Real>;
+        constexpr auto c = constant_templates::c<amrex::Real>;
 
         //! vacuum permittivity: dielectric permittivity of vacuum [F/m]
-        constexpr auto ep0 = const_templates::ep0<amrex::Real>;
+        constexpr auto ep0 = constant_templates::ep0<amrex::Real>;
 
         //! vacuum permeability: magnetic permeability of vacuum = 4.0e-7 * pi [H/m]
-        constexpr auto mu0 = const_templates::mu0<amrex::Real>;
+        constexpr auto mu0 = constant_templates::mu0<amrex::Real>;
 
         //! elementary charge [C]
-        constexpr auto q_e = const_templates::q_e<amrex::Real>;
+        constexpr auto q_e = constant_templates::q_e<amrex::Real>;
 
         //! electron mass [kg]
-        constexpr auto m_e = const_templates::m_e<amrex::Real>;
+        constexpr auto m_e = constant_templates::m_e<amrex::Real>;
 
         //! proton mass [kg]
-        constexpr auto m_p = const_templates::m_p<amrex::Real>;
+        constexpr auto m_p = constant_templates::m_p<amrex::Real>;
 
         //! dalton: unified atomic mass unit [kg]
-        constexpr auto m_u = const_templates::m_u<amrex::Real>;
+        constexpr auto m_u = constant_templates::m_u<amrex::Real>;
 
         //! reduced Planck Constant = h / tau [J*s]
-        constexpr auto hbar = const_templates::hbar<amrex::Real>;
+        constexpr auto hbar = constant_templates::hbar<amrex::Real>;
 
         //! fine-structure constant = mu0/(4*pi)*q_e*q_e*c/hbar [dimensionless]
-        constexpr auto alpha = const_templates::alpha<amrex::Real>;
+        constexpr auto alpha = constant_templates::alpha<amrex::Real>;
 
         //! classical electron radius = 1./(4*pi*ep0) * q_e*q_e/(m_e*c*c) [m]
-        constexpr auto r_e = const_templates::r_e<amrex::Real>;
+        constexpr auto r_e = constant_templates::r_e<amrex::Real>;
 
         //! xi: nonlinearity parameter of Heisenberg-Euler effective theory = (2.*alpha*alpha*ep0*ep0*hbar*hbar*hbar)/(45.*m_e*m_e*m_e*m_e*c*c*c*c*c)
         constexpr double xi = 1.3050122383827227e-52;
 
         //! xi times c2 = xi*c*c. This should be usable for single precision instead of xi; very close to smallest float32 number possible (1.2e-38)
-        constexpr auto xi_c2 = const_templates::xi_c2<amrex::Real>;
+        constexpr auto xi_c2 = constant_templates::xi_c2<amrex::Real>;
 
         //! Schwinger field [V/m] (variable template)
         template<typename T>
-        constexpr auto schwinger_field = const_templates::schwinger_field<amrex::Real>;
+        constexpr auto schwinger_field = constant_templates::schwinger_field<amrex::Real>;
 
         //! Boltzmann constant (exact) [J/K]
-        constexpr auto kb = const_templates::kb<amrex::Real>;
+        constexpr auto kb = constant_templates::kb<amrex::Real>;
 
         //! 1 eV in [J]
-        constexpr auto eV = const_templates::eV<amrex::Real>;
+        constexpr auto eV = constant_templates::eV<amrex::Real>;
 
         //! 1 MeV in [J]
-        constexpr auto MeV = const_templates::MeV<amrex::Real>;
+        constexpr auto MeV = constant_templates::MeV<amrex::Real>;
 
         //! 1 eV/c in [kg*m/s]
-        constexpr auto eV_invc = const_templates::eV_invc<amrex::Real>;
+        constexpr auto eV_invc = constant_templates::eV_invc<amrex::Real>;
 
         //! 1 MeV/c in [kg*m/s]
-        constexpr auto MeV_invc = const_templates::MeV_invc<amrex::Real>;
+        constexpr auto MeV_invc = constant_templates::MeV_invc<amrex::Real>;
 
         //! 1 eV/c^2 in [kg]
-        constexpr auto eV_invc2 = const_templates::eV_invc2<amrex::Real>;
+        constexpr auto eV_invc2 = constant_templates::eV_invc2<amrex::Real>;
 
         //! 1 MeV/c^2 in [kg]
-        constexpr auto MeV_invc2 = const_templates::MeV_invc2<amrex::Real>;
+        constexpr auto MeV_invc2 = constant_templates::MeV_invc2<amrex::Real>;
 
     } // namespace SI
 
