@@ -364,7 +364,7 @@ public:
     }
 
     // By default this returns false, can be overridden in PysicalParticleContainer
-    virtual bool getTemperatureDepositionFlag () const noexcept override {return do_temperature_deposition;}
+    virtual bool getTemperatureDepositionFlag () const noexcept override {return m_do_temperature_deposition;}
 
     virtual void AccumulateVelocitiesAndComputeTemperature (
         ablastr::fields::MultiLevelVectorField const & T_vf,
@@ -421,7 +421,7 @@ protected:
     bool m_save_previous_position = false;
 
     // Flag controlling whether or not variance and then temperatures are computed per species
-    bool do_temperature_deposition = false;
+    bool m_do_temperature_deposition = false;
 
     std::unique_ptr<warpx::particles::deposition::VarianceAccumulationBuffer> local_temperature_arrays;
 
