@@ -122,9 +122,9 @@ void ImplicitSolver::InitializeMassMatrices ()
 
 }
 
-void ImplicitSolver::PreRHSOp ( amrex::Real  a_cur_time,
-                                int          a_nl_iter,
-                                bool         a_from_jacobian )
+void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
+                                const int          a_nl_iter,
+                                const bool         a_from_jacobian )
 {
     using warpx::fields::FieldType;
     amrex::ignore_unused( a_nl_iter );
@@ -180,7 +180,7 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
     }
 }
 
-void ImplicitSolver::SetMassMatricesForPC ( amrex::Real a_theta_dt )
+void ImplicitSolver::SetMassMatricesForPC ( const amrex::Real a_theta_dt )
 {
 
     using namespace amrex::literals;

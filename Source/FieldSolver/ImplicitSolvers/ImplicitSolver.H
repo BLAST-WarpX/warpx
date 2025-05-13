@@ -195,9 +195,9 @@ protected:
     /**
      * \brief Perform operations needed before computing the Right Hand Side
      */
-    void PreRHSOp ( amrex::Real  a_cur_time,
-                    int          a_nl_iter,
-                    bool         a_from_jacobian );
+    void PreRHSOp ( const amrex::Real  a_cur_time,
+                    const int          a_nl_iter,
+                    const bool         a_from_jacobian );
 
     /**
      * \brief Communicate Mass Matrices used for PC and apply boundary conditions
@@ -207,7 +207,7 @@ protected:
     /**
      * \brief Scale mass matrices used for PC by c^2*mu0*theta*dt and add 1 to diagonal terms
      */
-    void SetMassMatricesForPC ( amrex::Real a_theta_dt );
+    void SetMassMatricesForPC ( const amrex::Real a_theta_dt );
 
     /**
      * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType
