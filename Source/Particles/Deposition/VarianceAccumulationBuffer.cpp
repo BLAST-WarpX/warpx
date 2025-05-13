@@ -144,8 +144,6 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
 #endif
             for ( amrex::MFIter mfi(variancemf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
                 // Extract Tileboxes for wmf and bbf
-                const amrex::IntVect& ngv = variancemf.nGrowVect();
-
                 auto const& tb = mfi.tilebox();
 
                 const auto& w_old_arr = wmf_old.const_array(mfi);
