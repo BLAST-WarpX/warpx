@@ -16,7 +16,7 @@
 /**
  * \brief Wrapper for AMReX's GMRES solver
  *
- *    This class is a wrapper for AMReX's GMRES algorithm that inheritis from
+ *    This class is a wrapper for AMReX's GMRES algorithm that inherits from
  *    WarpX's LinearSolver base class. See the documentation of AMReX's GMRES
  *    solver for more details. This class is templated on a vector class Vec,
  *    and an operator class Ops.
