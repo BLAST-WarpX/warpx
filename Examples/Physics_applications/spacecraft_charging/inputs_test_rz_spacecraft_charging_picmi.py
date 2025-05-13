@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
-#
+##!/usr/bin/env python3
+##
 # --- Input file for spacecraft charging testing in RZ.
 # --- This input defines a conducting sphere (spacecraft) immersed in a thermal
 # --- plasma with the same given initial conditions as in the article:
