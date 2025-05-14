@@ -517,7 +517,7 @@ void FiniteDifferenceSolver::EvolveESpherical (
                 Real const r = rmin + i*dr; // r on a nodal grid (Et is nodal in r)
                 if (r != 0) { // Off-axis, regular Maxwell equations
                     Et(i, 0, 0, 0) += c2 * dt*(
-                        + T_Algo::DownwardDrr_over_r(Bphi, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0)
+                        - T_Algo::DownwardDrr_over_r(Bphi, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0)
                         - PhysConst::mu0 * jt(i, 0, 0, 0 ) );
                 } else { // r==0: on-axis corrections
                     // Ensure that Et remains 0 on axis
@@ -529,7 +529,7 @@ void FiniteDifferenceSolver::EvolveESpherical (
                 Real const r = rmin + i*dr; // r on a nodal grid (Ephi is nodal in r)
                 if (r != 0) { // Off-axis, regular Maxwell equations
                     Ephi(i, 0, 0, 0) += c2 * dt*(
-                        - T_Algo::DownwardDrr_over_r(Bt, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0)
+                        + T_Algo::DownwardDrr_over_r(Bt, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0)
                         - PhysConst::mu0 * jphi(i, 0, 0, 0  ) );
                 } else { // r==0: on-axis corrections
                     // Ensure that Ephi remains 0 on axis
