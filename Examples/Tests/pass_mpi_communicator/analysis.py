@@ -13,8 +13,8 @@ import yt
 yt.funcs.mylog.setLevel(50)
 import numpy as np
 
-sys.path.insert(1, "../../../Regression/Checksum/")
-from checksum import Checksum
+sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
+import checksum
 
 # this will be the name of the first plot file
 fn1 = "Python_pass_mpi_comm_plt1_000010"
@@ -24,8 +24,10 @@ fn2 = "Python_pass_mpi_comm_plt2_000010"
 test_name1 = fn1[:-10]
 test_name2 = fn2[:-10]
 
-checksum1 = Checksum(test_name1, fn1, do_fields=True, do_particles=True)
-checksum2 = Checksum(test_name2, fn2, do_fields=True, do_particles=True)
+
+checksum1 = checksum.Checksum(test_name1, fn1, do_fields=True, do_particles=True)
+
+checksum2 = checksum.Checksum(test_name2, fn2, do_fields=True, do_particles=True)
 
 rtol = 1.0e-9
 atol = 1.0e-40
