@@ -301,13 +301,13 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereSpherical (
         // Extract tileboxes for which to loop
         Box const& tjr  = mfi.tilebox(Jfield[0]->ixType().toIntVect());
         Box const& tjtheta  = mfi.tilebox(Jfield[1]->ixType().toIntVect());
-        Box const& tjp  = mfi.tilebox(Jfield[2]->ixType().toIntVect());
+        Box const& tjphi  = mfi.tilebox(Jfield[2]->ixType().toIntVect());
 
         Real const one_over_mu0 = 1._rt / PhysConst::mu0;
 
         // Calculate the total current, using Ampere's law, on the same grid
         // as the E-field
-        amrex::ParallelFor(tjr, tjtheta, tjp,
+        amrex::ParallelFor(tjr, tjtheta, tjphi,
 
             // Jr calculation
             [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
