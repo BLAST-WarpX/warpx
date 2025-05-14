@@ -14,6 +14,8 @@
 #include <AMReX_REAL.H>
 #include <AMReX_Config.H>
 
+#include  <cfloat>
+
 #ifdef AMREX_USE_PETSC
 
 // forward declarations
@@ -105,20 +107,20 @@ class KSP_impl
         long m_ndofs_g = 0;
 
         //! absolute tolerance
-        amrex::Real m_atol;
+        amrex::Real m_atol = 1e-12;
         //! relative tolerance
-        amrex::Real m_rtol;
+        amrex::Real m_rtol = 1e-8;
         //! maximum iterations
-        int m_maxits;
+        int m_maxits= 100;
         //! verbosity
-        int m_verbose;
+        int m_verbose = 1;
 
         //! number of iterations for recentmost solve
-        int m_niters;
+        int m_niters = -1;
         //! status for recentmost solve
-        int m_status;
+        int m_status = -1;
         //! residual norm (relative) for recentmost solve
-        amrex::Real m_norm;
+        amrex::Real m_norm = DBL_MAX;
 
         //! Linear operator object
         LinOpType* m_op = nullptr;
