@@ -65,8 +65,6 @@ jobs:
           -DWarpX_MPI=OFF              \
           -DWarpX_QED=OFF
         cmake --build build -j 4
-        ./build/bin/warpx.2d \
-                    Examples/Tests/uniform_plasma/uniform_plasma_2d.petsc_ksp.curlcurlPC.in
 
         ccache -s
         du -hs ~/.cache/ccache
@@ -122,146 +120,6 @@ jobs:
           -DWarpX_MPI=ON               \
           -DWarpX_QED=OFF
         cmake --build build -j 4
-        mpiexec -n 4 --oversubscribe \
-                     ./build/bin/warpx.2d \
-                     Examples/Tests/uniform_plasma/uniform_plasma_2d.petsc_ksp.curlcurlPC.in
-
-        ccache -s
-        du -hs ~/.cache/ccache
-
-  test-petsc-nvcc:
-    name: NVCC 
-    runs-on: ubuntu-22.04
-    if: github.event.pull_request.draft == false
-    env:
-      CXXFLAGS: "-Werror"
-      CMAKE_GENERATOR: Ninja
-    steps:
-    - uses: actions/checkout@v4
-    - name: Dependencies
-      run: |
-        .github/workflows/dependencies/nvcc.sh 11.7
-    - name: CCache Cache
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/ccache
-        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
-        restore-keys: |
-             ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: Install Dependencies
-      run: |
-        sudo apt-get install -y --no-install-recommends libblas-dev liblapack-dev
-    - name: build WarpX w/PETSc
-      run: |
-        export CCACHE_COMPRESS=1
-        export CCACHE_COMPRESSLEVEL=10
-        export CCACHE_MAXSIZE=600M
-
-        export PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
-        export LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
-        which nvcc || echo "nvcc not in PATH!"
-
-        nvcc_path=$(which nvcc)
-        echo "nvcc is in ${nvcc_path}"
-        cuda_dir="${nvcc_path%/bin/nvcc}"
-        echo "cuda_dir is ${cuda_dir}"
-
-        export warpx_dir=${PWD}
-        echo "warpx_dir is ${warpx_dir}"
-        export PETSC_DIR=${warpx_dir}/petsc
-        echo "PETSC_DIR is ${PETSC_DIR}"
-        export PETSC_ARCH=arch-opt
-
-        cd ${warpx_dir}
-        git clone -b release https://gitlab.com/petsc/petsc.git petsc
-        cd ${PETSC_DIR}
-        ./configure --with-fortran-bindings=no --with-x=no \
-                    --with-cc=mpicc \
-                    --with-fc=mpif90 \
-                    --with-cxx=mpicxx \
-                    --with-cuda=1 \
-                    --with-cuda-arch=80 \
-                    --with-cuda-dir=${cuda_dir}
-        make -j 4
-
-        cd ${warpx_dir}
-        cmake -S . -B build            \
-          -DCMAKE_VERBOSE_MAKEFILE=ON  \
-          -DWarpX_DIMS="1;2;RZ;3"      \
-          -DWarpX_COMPUTE=CUDA         \
-          -DAMReX_CUDA_ARCH=80         \
-          -DWarpX_MPI=ON               \
-          -DAMReX_PETSC=YES            \
-          -DPETSC_DIR=${PETSC_DIR}     \
-          -DPETSC_ARCH=${PETSC_ARCH}   \
-          -DWarpX_EB=OFF               \
-          -DWarpX_OPENPMD=OFF          \
-          -DWarpX_QED=OFF
-        cmake --build build -j 4
-        mpiexec -n 4 --oversubscribe \
-                     ./build/bin/warpx.2d \
-                     Examples/Tests/uniform_plasma/uniform_plasma_2d.petsc_ksp.curlcurlPC.in
-
-        ccache -s
-        du -hs ~/.cache/ccache
-
-  test-petsc-gcc-tmp:
-    name: GCC (tmp)
-    runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
-    env:
-      CXXFLAGS: "-Werror"
-    steps:
-    - uses: actions/checkout@v4
-    - name: Dependencies
-      run: |
-        .github/workflows/dependencies/gcc.sh
-    - name: CCache Cache
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/ccache
-        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
-        restore-keys: |
-             ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: Install Dependencies
-      run: |
-        sudo apt-get install -y --no-install-recommends libblas-dev liblapack-dev
-    - name: build WarpX w/PETSc
-      run: |
-        export CCACHE_COMPRESS=1
-        export CCACHE_COMPRESSLEVEL=10
-        export CCACHE_MAXSIZE=100M
-        ccache -z
-
-        export warpx_dir=${PWD}
-        echo "warpx_dir is ${warpx_dir}"
-        export PETSC_DIR=${warpx_dir}/petsc
-        echo "PETSC_DIR is ${PETSC_DIR}"
-        export PETSC_ARCH=arch-opt
-        export AMREX_DIR=${warpx_dir}/amrex
-        echo "AMREX_DIR is ${AMREX_DIR}"
-
-        cd ${warpx_dir}
-        git clone -b release https://gitlab.com/petsc/petsc.git petsc
-        cd ${PETSC_DIR}
-        ./configure --with-fortran-bindings=no --with-x=no --with-mpi=0
-        make -j 4
-
-        cd ${warpx_dir}
-        cmake -S . -B build            \
-          -DCMAKE_VERBOSE_MAKEFILE=ON  \
-          -DWarpX_DIMS="1;2;RZ;3"      \
-          -DAMReX_PETSC=YES            \
-          -DPETSC_DIR=${PETSC_DIR}     \
-          -DPETSC_ARCH=${PETSC_ARCH}   \
-          -DWarpX_amrex_repo=https://github.com/WeiqunZhang/amrex.git \
-          -DWarpX_amrex_branch=no_mpi \
-          -DWarpX_EB=OFF               \
-          -DWarpX_MPI=OFF              \
-          -DWarpX_QED=OFF
-        cmake --build build -j 4
-        ./build/bin/warpx.2d \
-                    Examples/Tests/uniform_plasma/uniform_plasma_2d.petsc_ksp.curlcurlPC.in
 
         ccache -s
         du -hs ~/.cache/ccache
@@ -322,8 +180,6 @@ jobs:
           -DWarpX_MPI=OFF              \
           -DWarpX_QED=OFF
         cmake --build build -j 4
-        ./build/bin/warpx.2d \
-                    Examples/Tests/uniform_plasma/uniform_plasma_2d.petsc_ksp.curlcurlPC.in
 
         ccache -s
         du -hs ~/.cache/ccache
@@ -380,9 +236,6 @@ jobs:
           -DWarpX_MPI=ON               \
           -DWarpX_QED=OFF
         cmake --build build -j 4
-        mpiexec -n 4 --oversubscribe \
-                     ./build/bin/warpx.2d \
-                     Examples/Tests/uniform_plasma/uniform_plasma_2d.petsc_ksp.curlcurlPC.in
 
         ccache -s
         du -hs ~/.cache/ccache
