@@ -6,5 +6,7 @@ foreach(D IN LISTS WarpX_DIMS)
         Drift.cpp
         HardEdgedQuadrupole.cpp
         HardEdgedPlasmaLens.cpp
+        Solenoid.cpp
+        SolenoidRF.cpp
     )
 endforeach()

@@ -2,5 +2,7 @@ CEXE_sources += LatticeElementBase.cpp
 CEXE_sources += Drift.cpp
 CEXE_sources += HardEdgedQuadrupole.cpp
 CEXE_sources += HardEdgedPlasmaLens.cpp
+CEXE_sources += Solenoid.cpp
+CEXE_sources += SolenoidRF.cpp
 
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/AcceleratorLattice/LatticeElements
