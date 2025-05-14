@@ -59,7 +59,7 @@ struct CylindricalYeeAlgorithm {
                                     + 1._rt / (dx[1]*dx[1])
                               ) * PhysConst::c );
 #elif defined(WARPX_DIM_RCYLINDER)
-        // A slightly higher value of alpha is needed compared to RZ
+        // The numerical value of the max Dt below was determined empirically (for one case)
         amrex::ignore_unused(n_rz_azimuthal_modes);
         const amrex::Real delta_t = 0.8_rt * dx[0] / PhysConst::c;
 #endif
