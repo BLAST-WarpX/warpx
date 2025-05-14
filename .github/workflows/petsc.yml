@@ -1,4 +1,4 @@
-name: PETSc
+name: w/PETSc
 
 on:
   push:
@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   test-petsc-gcc:
-    name: GCC w/PETSc
+    name: GCC 
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
     env:
@@ -72,7 +72,7 @@ jobs:
         du -hs ~/.cache/ccache
 
   test-petsc-mpich:
-    name: GCC-12 + MPICH w/PETSc
+    name: GCC-12 + MPICH 
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
     env:
@@ -130,7 +130,7 @@ jobs:
         du -hs ~/.cache/ccache
 
   test-petsc-nvcc:
-    name: NVCC w/PETSc
+    name: NVCC 
     runs-on: ubuntu-22.04
     if: github.event.pull_request.draft == false
     env:
@@ -206,7 +206,7 @@ jobs:
         du -hs ~/.cache/ccache
 
   test-petsc-gcc-tmp:
-    name: GCC w/PETSc (tmp)
+    name: GCC (tmp)
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
     env:
