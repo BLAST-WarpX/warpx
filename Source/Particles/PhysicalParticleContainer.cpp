@@ -1205,12 +1205,12 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
                 // Replace the x, y, and z, setting angles theta and phi.
                 // These x, y, and z are used to get the momentum and density
                 const Real theta = MathConst::pi*(2._rt*amrex::Random(engine) - 1._rt);
-                const Real cos_phi = 2._rt*amrex::Random(engine) - 1._rt;
-                const Real sin_phi = std::sqrt(1._rt - cos_phi*cos_phi);
+                const Real sin_phi = 2._rt*amrex::Random(engine) - 1._rt;
+                const Real cos_phi = std::sqrt(1._rt - sin_phi*sin_phi);
                 const Real phi = std::atan2(sin_phi, cos_phi);
-                pos.x = xb*sin_phi*std::cos(theta);
-                pos.y = xb*sin_phi*std::sin(theta);
-                pos.z = xb*cos_phi;
+                pos.x = xb*cos_phi*std::cos(theta);
+                pos.y = xb*cos_phi*std::sin(theta);
+                pos.z = xb*sin_phi;
 #endif
 
                 Real dens;
@@ -1764,14 +1764,14 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 // These x, y, and z are used to get the momentum and flux
                 amrex::Real const radial_position = ppos.x;
                 amrex::Real const theta = MathConst::pi*(2._rt*amrex::Random(engine) - 1._rt);
-                amrex::Real const cos_phi = 2._rt*amrex::Random(engine) - 1._rt;
-                amrex::Real const sin_phi = std::sqrt(1._rt - cos_phi*cos_phi);
+                amrex::Real const sin_phi = 2._rt*amrex::Random(engine) - 1._rt;
+                amrex::Real const cos_phi = std::sqrt(1._rt - sin_phi*sin_phi);
                 amrex::Real const phi = std::atan2(sin_phi, cos_phi);
                 amrex::Real const cos_theta = std::cos(theta);
                 amrex::Real const sin_theta = std::sin(theta);
-                pos.x = radial_position*sin_phi*std::cos(theta);
-                pos.y = radial_position*sin_phi*std::sin(theta);
-                pos.z = radial_position*cos_phi;
+                pos.x = radial_position*cos_phi*std::cos(theta);
+                pos.y = radial_position*cos_phi*std::sin(theta);
+                pos.z = radial_position*sin_phi;
                 // Rotate the momentum
                 // This because, when the flux direction is e.g. "r"
                 // the `inj_mom` objects generates a v*Gaussian distribution
@@ -1780,9 +1780,9 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 amrex::Real const ur = pu.x;
                 amrex::Real const ut = pu.y;
                 amrex::Real const up = pu.z;
-                pu.x = sin_phi*cos_theta*ur - sin_theta*ut + cos_phi*cos_theta*up;
-                pu.y = sin_phi*sin_theta*ur + cos_theta*ut + cos_phi*sin_theta*up;
-                pu.z = cos_phi*ur - sin_phi*up;;
+                pu.x = cos_phi*cos_theta*ur - sin_theta*ut - sin_phi*cos_theta*up;
+                pu.y = cos_phi*sin_theta*ur + cos_theta*ut - sin_phi*sin_theta*up;
+                pu.z = sin_phi*ur + cos_phi*up;;
 #endif
                 const Real flux = inj_flux->getFlux(ppos.x, ppos.y, ppos.z, t);
                 // Remove particle if flux is negative or 0

@@ -528,15 +528,15 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     amrex::Real const rp_mid = (rp_new + rp_old)*0.5_rt;
     amrex::Real const costheta_mid = (rpxy_mid > 0._rt ? xp_mid/rpxy_mid : 1._rt);
     amrex::Real const sintheta_mid = (rpxy_mid > 0._rt ? yp_mid/rpxy_mid : 0._rt);
-    amrex::Real const cosphi_mid = (rp_mid > 0._rt ? zp_mid/rp_mid : 1._rt);
-    amrex::Real const sinphi_mid = (rp_mid > 0._rt ? rpxy_mid/rp_mid : 0._rt);
+    amrex::Real const cosphi_mid = (rp_mid > 0._rt ? rpxy_mid/rp_mid : 1._rt);
+    amrex::Real const sinphi_mid = (rp_mid > 0._rt ? zp_mid/rp_mid : 0._rt);
 
     // Keep these double to avoid bug in single precision
     double const x_new = (rp_new - xyzmin.x)*dinv.x;
     double const x_old = (rp_old - xyzmin.x)*dinv.x;
     amrex::Real const vx = (rp_new - rp_old)/dt;
     amrex::Real const vy = (-uxp_mid*sintheta_mid + uyp_mid*costheta_mid)*gaminv;
-    amrex::Real const vz = (+uxp_mid*costheta_mid*cosphi_mid + uyp_mid*sintheta_mid*cosphi_mid - uzp_mid*sinphi_mid)*gaminv;
+    amrex::Real const vz = (-uxp_mid*costheta_mid*cosphi_mid - uyp_mid*sintheta_mid*cosphi_mid + uzp_mid*sinphi_mid)*gaminv;
 #elif defined(WARPX_DIM_XZ)
     // Keep these double to avoid bug in single precision
     double const x_new = (xp_new - xyzmin.x)*dinv.x;

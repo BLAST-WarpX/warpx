@@ -176,19 +176,21 @@ namespace ApplyParticleBoundaries {
         }
         if (change_sign_uz) { uz = -uz; }
 #elif defined(WARPX_DIM_RSPHERE)
+        // "y" is theta
+        // "z" is phi
         const amrex::Real costheta = std::cos(y);
         const amrex::Real sintheta = std::sin(y);
         const amrex::Real cosphi = std::cos(z);
         const amrex::Real sinphi = std::sin(z);
         amrex::Real ur = +ux*costheta*sinphi + uy*sintheta*sinphi + uz*cosphi;
         amrex::Real ut = -ux*sintheta + uy*costheta;
-        amrex::Real up = +ux*costheta*cosphi + uy*sintheta*cosphi - uz*sinphi;
+        amrex::Real up = -ux*costheta*cosphi - uy*sintheta*cosphi + uz*sinphi;
         if (change_sign_ux) { ur = -ur; }
         if (change_sign_uy) { ut = -ut; }
         if (change_sign_uz) { up = -up; }
-        ux = sinphi*costheta*ur - sintheta*ut + cosphi*costheta*up;
-        uy = sinphi*sintheta*ur + costheta*ut + cosphi*sintheta*up;
-        uz = cosphi*ur - sinphi*up;;
+        ux = sinphi*costheta*ur - sintheta*ut - cosphi*costheta*up;
+        uy = sinphi*sintheta*ur + costheta*ut - cosphi*sintheta*up;
+        uz = cosphi*ur + sinphi*up;;
 #else
         if (change_sign_ux) { ux = -ux; }
         if (change_sign_uy) { uy = -uy; }

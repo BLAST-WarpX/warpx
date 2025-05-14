@@ -93,7 +93,7 @@ struct PIdx
                                    "theta",  // azimuthal angle
 #endif
 #if defined(WARPX_DIM_RSPHERE)
-                                   "phi", // polar angle, relative to the z-axis
+                                   "phi", // polar angle, relative to the x-y plane
 #endif
     };
 

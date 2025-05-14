@@ -47,9 +47,9 @@ void get_particle_position (const WarpXParticleContainer::SuperParticleType& p,
     amrex::ParticleReal const theta = p.rdata(T_PIdx::theta);
     amrex::ParticleReal const phi = p.rdata(T_PIdx::phi);
     amrex::ParticleReal const r = p.pos(T_PIdx::x);
-    x = r*std::cos(theta)*std::sin(phi);
-    y = r*std::sin(theta)*std::sin(phi);
-    z = r*std::cos(phi);
+    x = r*std::cos(theta)*std::cos(phi);
+    y = r*std::sin(theta)*std::cos(phi);
+    z = r*std::sin(phi);
 #elif defined(WARPX_DIM_3D)
     x = p.pos(PIdx::x);
     y = p.pos(PIdx::y);
@@ -144,9 +144,9 @@ struct GetParticlePosition
         z = m_z_default;
 #elif defined(WARPX_DIM_RSPHERE)
         RType const r = m_x[i];
-        x = r*std::cos(m_theta[i])*std::sin(m_phi[i]);
-        y = r*std::sin(m_theta[i])*std::sin(m_phi[i]);
-        z = r*std::cos(m_phi[i]);
+        x = r*std::cos(m_theta[i])*std::cos(m_phi[i]);
+        y = r*std::sin(m_theta[i])*std::cos(m_phi[i]);
+        z = r*std::sin(m_phi[i]);
 #elif defined(WARPX_DIM_3D)
         x = m_x[i];
         y = m_y[i];
@@ -274,7 +274,7 @@ struct SetParticlePosition
         RType const r = std::sqrt(x*x + y*y + z*z);
         m_x[i] = r;
         m_theta[i] = std::atan2(y, x);
-        m_phi[i] = std::atan2(rxy, z);
+        m_phi[i] = std::atan2(z, rxy);
 #elif defined(WARPX_DIM_3D)
         m_x[i] = x;
         m_y[i] = y;

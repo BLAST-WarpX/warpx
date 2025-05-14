@@ -94,12 +94,12 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
     const amrex::Real rpmid = std::sqrt(xpmid*xpmid + ypmid*ypmid + zpmid*zpmid);
     const amrex::Real costheta = (rpxymid > 0._rt ? xpmid/rpxymid : 1._rt);
     const amrex::Real sintheta = (rpxymid > 0._rt ? ypmid/rpxymid : 0._rt);
-    const amrex::Real cosphi = (rpmid > 0._rt ? zpmid/rpmid : 1._rt);
-    const amrex::Real sinphi = (rpmid > 0._rt ? rpxymid/rpmid : 0._rt);
+    const amrex::Real cosphi = (rpmid > 0._rt ? rpxymid/rpmid : 1._rt);
+    const amrex::Real sinphi = (rpmid > 0._rt ? zpmid/rpmid : 0._rt);
     // convert from Cartesian to spherical
-    const amrex::Real wqx = wq*invvol*(+vx*costheta*sinphi + vy*sintheta*sinphi + vz*cosphi);
+    const amrex::Real wqx = wq*invvol*(+vx*costheta*cosphi + vy*sintheta*cosphi + vz*sinphi);
     const amrex::Real wqy = wq*invvol*(-vx*sintheta + vy*costheta);
-    const amrex::Real wqz = wq*invvol*(+vx*costheta*cosphi + vy*sintheta*cosphi - vz*sinphi);
+    const amrex::Real wqz = wq*invvol*(-vx*costheta*sinphi - vy*sintheta*sinphi + vz*cosphi);
 #else
     const amrex::Real wqx = wq*invvol*vx;
     const amrex::Real wqy = wq*invvol*vy;
@@ -785,8 +785,8 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
             amrex::Real const costheta_mid = (rpxy_mid > 0. ? xp_mid/rpxy_mid : 1._rt);
             amrex::Real const sintheta_mid = (rpxy_mid > 0. ? yp_mid/rpxy_mid : 0._rt);
-            amrex::Real const cosphi_mid = (rp_mid > 0. ? zp_mid/rp_mid : 1._rt);
-            amrex::Real const sinphi_mid = (rp_mid > 0. ? rpxy_mid/rp_mid : 0._rt);
+            amrex::Real const cosphi_mid = (rp_mid > 0. ? rpxy_mid/rp_mid : 1._rt);
+            amrex::Real const sinphi_mid = (rp_mid > 0. ? zp_mid/rp_mid : 0._rt);
 
             // Keep these double to avoid bug in single precision
             double const x_new = (rp_new - xyzmin.x)*dinv.x;
@@ -866,7 +866,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 #elif defined(WARPX_DIM_RSPHERE)
             // convert from Cartesian to spherical
             Real const vy = (-uxp[ip]*sintheta_mid + uyp[ip]*costheta_mid)*gaminv;
-            Real const vz = (+uxp[ip]*costheta_mid*cosphi_mid + uyp[ip]*sintheta_mid*cosphi_mid - uzp[ip]*sinphi_mid)*gaminv;
+            Real const vz = (-uxp[ip]*costheta_mid*sinphi_mid - uyp[ip]*sintheta_mid*sinphi_mid + uzp[ip]*cosphi_mid)*gaminv;
 #endif
 
             // --- Compute shape factors
@@ -1237,8 +1237,8 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
 
             amrex::Real const costheta_mid = (rpxy_mid > 0. ? xp_mid/rpxy_mid : 1._rt);
             amrex::Real const sintheta_mid = (rpxy_mid > 0. ? yp_mid/rpxy_mid : 0._rt);
-            amrex::Real const cosphi_mid = (rp_mid > 0. ? zp_mid/rp_mid : 1._rt);
-            amrex::Real const sinphi_mid = (rp_mid > 0. ? rpxy_mid/rp_mid : 0._rt);
+            amrex::Real const cosphi_mid = (rp_mid > 0. ? rpxy_mid/rp_mid : 1._rt);
+            amrex::Real const sinphi_mid = (rp_mid > 0. ? zp_mid/rp_mid : 0._rt);
 
             // Keep these double to avoid bug in single precision
             double const x_new = (rp_new - xyzmin.x)*dinv.x;
@@ -1274,7 +1274,7 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
 #elif defined(WARPX_DIM_RSPHERE)
             // convert from Cartesian to spherical
             amrex::Real const vy = (-uxp_nph[ip]*sintheta_mid + uyp_nph[ip]*costheta_mid)*gaminv;
-            amrex::Real const vz = (+uxp_nph[ip]*costheta_mid*cosphi_mid + uyp_nph[ip]*sintheta_mid*cosphi_mid - uzp_nph[ip]*sinphi_mid)*gaminv;
+            amrex::Real const vz = (-uxp_nph[ip]*costheta_mid*sinphi_mid - uyp_nph[ip]*sintheta_mid*sinphi_mid + uzp_nph[ip]*cosphi_mid)*gaminv;
 #endif
 
             // --- Compute shape factors
@@ -1543,8 +1543,8 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
 
     amrex::Real const costheta_mid = (rpxy_mid > 0. ? xp_mid/rpxy_mid : 1._rt);
     amrex::Real const sintheta_mid = (rpxy_mid > 0. ? yp_mid/rpxy_mid : 0._rt);
-    amrex::Real const cosphi_mid = (rp_mid > 0. ? zp_mid/rp_mid : 1._rt);
-    amrex::Real const sinphi_mid = (rp_mid > 0. ? rpxy_mid/rp_mid : 0._rt);
+    amrex::Real const cosphi_mid = (rp_mid > 0. ? rpxy_mid/rp_mid : 1._rt);
+    amrex::Real const sinphi_mid = (rp_mid > 0. ? zp_mid/rp_mid : 0._rt);
 
     // Keep these double to avoid bug in single precision
     double const x_new = (rp_new - xyzmin.x)*dinv.x;
@@ -1552,7 +1552,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     amrex::Real const vx = (rp_new - rp_old)/dt;
     // convert from Cartesian to spherical
     amrex::Real const vy = (-uxp_mid*sintheta_mid + uyp_mid*costheta_mid)*gaminv;
-    amrex::Real const vz = (+uxp_mid*costheta_mid*cosphi_mid + uyp_mid*sintheta_mid*cosphi_mid - uzp_mid*sinphi_mid)*gaminv;
+    amrex::Real const vz = (-uxp_mid*costheta_mid*sinphi_mid - uyp_mid*sintheta_mid*sinphi_mid + uzp_mid*cosphi_mid)*gaminv;
 #elif defined(WARPX_DIM_XZ)
     // Keep these double to avoid bug in single precision
     double const x_new = (xp_new - xyzmin.x)*dinv.x;

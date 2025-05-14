@@ -555,12 +555,12 @@ void FiniteDifferenceSolver::EvolveBSpherical (
 
             [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
                 Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bp is cell-centered in r)
-                Bt(i, 0, 0, 0) += dt*( + T_Algo::UpwardDrr_over_r(Ep, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0));
+                Bt(i, 0, 0, 0) += dt*( - T_Algo::UpwardDrr_over_r(Ep, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0));
             },
 
             [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
                 Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bt is cell-centered in r)
-                Bp(i, 0, 0, 0) += dt*( - T_Algo::UpwardDrr_over_r(Et, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0));
+                Bp(i, 0, 0, 0) += dt*( + T_Algo::UpwardDrr_over_r(Et, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0));
             }
 
         );

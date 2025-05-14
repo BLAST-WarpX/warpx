@@ -311,15 +311,15 @@ void doDirectGatherVectorField (
 #elif defined(WARPX_DIM_RSPHERE)
 
     amrex::Real const rpxy = std::sqrt(xp*xp + yp*yp);
-    amrex::Real const costheta = (rpxy > 0. ? xp/rpxy : 1.);;
-    amrex::Real const sintheta = (rpxy > 0. ? yp/rpxy : 0.);;
-    amrex::Real const cosphi = (rp > 0. ? zp/rp : 1.);;
-    amrex::Real const sinphi = (rp > 0. ? rpxy/rp : 0.);;
+    amrex::Real const costheta = (rpxy > 0. ? xp/rpxy : 1.);
+    amrex::Real const sintheta = (rpxy > 0. ? yp/rpxy : 0.);
+    amrex::Real const cosphi = (rp > 0. ? rpxy/rp : 1.);
+    amrex::Real const sinphi = (rp > 0. ? zp/rp : 0.);
 
     // Convert Frp, Fthetap, and Fphi to Fx, Fy, and Fz
-    Fxp += costheta*sinphi*Frp + costheta*cosphi*F3p - sintheta*Fthetap;
-    Fyp += sintheta*sinphi*Frp + sintheta*cosphi*F3p + costheta*Fthetap;
-    Fzp += cosphi*Frp - sinphi*F3p;
+    Fxp += costheta*cosphi*Frp - sintheta*Fthetap - costheta*sinphi*F3p;
+    Fyp += sintheta*cosphi*Frp + costheta*Fthetap - sintheta*sinphi*F3p;
+    Fzp += sinphi*Frp + cosphi*F3p;
 
 #endif
 #endif
@@ -711,8 +711,8 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
         Bthetap += sx_by[ix]*by_arr(lo.x+j_by+ix, 0, 0, 0);
     }
 
-    amrex::Real const costheta = (rp > 0. ? xp/rp : 1.);;
-    amrex::Real const sintheta = (rp > 0. ? yp/rp : 0.);;
+    amrex::Real const costheta = (rp > 0. ? xp/rp : 1.);
+    amrex::Real const sintheta = (rp > 0. ? yp/rp : 0.);
 
     // Convert Erp and Ethetap to Ex and Ey
     Exp += costheta*Erp - sintheta*Ethetap;
@@ -751,18 +751,18 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     }
 
     const amrex::Real rpxy = std::sqrt(xp*xp + yp*yp);
-    amrex::Real const costheta = (rpxy > 0. ? xp/rpxy : 1.);;
-    amrex::Real const sintheta = (rpxy > 0. ? yp/rpxy : 0.);;
-    amrex::Real const cosphi = (rp > 0. ? zp/rp : 1.);;
-    amrex::Real const sinphi = (rp > 0. ? rpxy/rp : 0.);;
+    amrex::Real const costheta = (rpxy > 0. ? xp/rpxy : 1.);
+    amrex::Real const sintheta = (rpxy > 0. ? yp/rpxy : 0.);
+    amrex::Real const cosphi = (rp > 0. ? rpxy/rp : 1.);
+    amrex::Real const sinphi = (rp > 0. ? zp/rp : 0.);
 
     // Convert Erp, Ethetap, and Ephi to Ex, Ey, and Ez
-    Exp += costheta*sinphi*Erp + costheta*cosphi*Ephip - sintheta*Ethetap;
-    Eyp += sintheta*sinphi*Erp + sintheta*cosphi*Ephip + costheta*Ethetap;
-    Ezp += cosphi*Erp - sinphi*Ephip;
-    Bxp += costheta*sinphi*Brp + costheta*cosphi*Bphip - sintheta*Bthetap;
-    Byp += sintheta*sinphi*Brp + sintheta*cosphi*Bphip + costheta*Bthetap;
-    Bzp += cosphi*Brp - sinphi*Bphip;
+    Exp += costheta*cosphi*Erp - sintheta*Ethetap - costheta*sinphi*Ephip;
+    Eyp += sintheta*cosphi*Erp + costheta*Ethetap - sintheta*sinphi*Ephip;
+    Ezp += sinphi*Erp + cosphi*Ephip;
+    Bxp += costheta*cosphi*Brp - sintheta*Bthetap - costheta*sinphi*Bphip;
+    Byp += sintheta*cosphi*Brp + costheta*Bthetap - sintheta*sinphi*Bphip;
+    Bzp += sinphi*Brp + cosphi*Bphip;
 
 #else // defined(WARPX_DIM_3D)
     // Gather field on particle Exp from field on grid ex_arr
@@ -1299,8 +1299,8 @@ void doGatherShapeNEsirkepovStencilImplicit (
     amrex::Real const rp_mid = (rp_new + rp_old)*0.5_rt;
     amrex::Real const costheta_mid = (rpxy_mid > 0. ? xp_mid/rpxy_mid : 1._rt);
     amrex::Real const sintheta_mid = (rpxy_mid > 0. ? yp_mid/rpxy_mid : 0._rt);
-    amrex::Real const cosphi_mid = (rp_mid > 0. ? zp_mid/rp_mid : 1._rt);
-    amrex::Real const sinphi_mid = (rp_mid > 0. ? rpxy_mid/rp_mid : 0._rt);
+    amrex::Real const cosphi_mid = (rp_mid > 0. ? rpxy_mid/rp_mid : 1._rt);
+    amrex::Real const sinphi_mid = (rp_mid > 0. ? zp_mid/rp_mid : 0._rt);
 
     amrex::ParticleReal Erp = 0.;
     amrex::ParticleReal Ethetap = 0.;
@@ -1325,12 +1325,12 @@ void doGatherShapeNEsirkepovStencilImplicit (
     }
 
     // Convert Erp, Ethetap, and Ephi to Ex, Ey, and Ez
-    Exp += costheta_mid*sinphi_mid*Erp + costheta_mid*cosphi_mid*Ephip - sintheta_mid*Ethetap;
-    Eyp += sintheta_mid*sinphi_mid*Erp + sintheta_mid*cosphi_mid*Ephip + costheta_mid*Ethetap;
-    Ezp += cosphi_mid*Erp - sinphi_mid*Ephip;
-    Bxp += costheta_mid*sinphi_mid*Brp + costheta_mid*cosphi_mid*Bphip - sintheta_mid*Bthetap;
-    Byp += sintheta_mid*sinphi_mid*Brp + sintheta_mid*cosphi_mid*Bphip + costheta_mid*Bthetap;
-    Bzp += cosphi_mid*Brp - sinphi_mid*Bphip;
+    Exp += costheta_mid*cosphi_mid*Erp - sintheta_mid*Ethetap - costheta_mid*sinphi_mid*Ephip;
+    Eyp += sintheta_mid*cosphi_mid*Erp + costheta_mid*Ethetap - sintheta_mid*sinphi_mid*Ephip;
+    Ezp += sinphi_mid*Erp + cosphi_mid*Ephip;
+    Bxp += costheta_mid*cosphi_mid*Brp - sintheta_mid*Bthetap - costheta_mid*sinphi_mid*Bphip;
+    Byp += sintheta_mid*cosphi_mid*Brp + costheta_mid*Bthetap - sintheta_mid*sinphi_mid*Bphip;
+    Bzp += sinphi_mid*Brp + cosphi_mid*Bphip;
 
 #endif
 }
@@ -1443,8 +1443,8 @@ void doGatherPicnicShapeN (
 
     amrex::Real const costheta_mid = (rpxy_mid > 0. ? xp_mid/rpxy_mid : 1._rt);
     amrex::Real const sintheta_mid = (rpxy_mid > 0. ? yp_mid/rpxy_mid : 0._rt);
-    amrex::Real const cosphi_mid = (rp_mid > 0. ? zp_mid/rp_mid : 1._rt);
-    amrex::Real const sinphi_mid = (rp_mid > 0. ? rpxy_mid/rp_mid : 0._rt);
+    amrex::Real const cosphi_mid = (rp_mid > 0. ? rpxy_mid/rp_mid : 1._rt);
+    amrex::Real const sinphi_mid = (rp_mid > 0. ? zp_mid/rp_mid : 0._rt);
 
     // Keep these double to avoid bug in single precision
     double const x_new = (rp_new - xyzmin.x)*dinv.x;
@@ -2016,9 +2016,9 @@ void doGatherPicnicShapeN (
 #elif defined(WARPX_DIM_RSPHERE)
 
     // Convert Erp, Ethetap, and Ephi to Ex, Ey, and Ez
-    Exp += costheta_mid*sinphi_mid*Erp + costheta_mid*cosphi_mid*E3p - sintheta_mid*Ethetap;
-    Eyp += sintheta_mid*sinphi_mid*Erp + sintheta_mid*cosphi_mid*E3p + costheta_mid*Ethetap;
-    Ezp += cosphi_mid*Erp - sinphi_mid*E3p;
+    Exp += costheta_mid*cosphi_mid*Erp - sintheta_mid*Ethetap - costheta_mid*sinphi_mid*E3p;
+    Eyp += sintheta_mid*cosphi_mid*Erp + costheta_mid*Ethetap - sintheta_mid*sinphi_mid*E3p;
+    Ezp += sinphi_mid*Erp + cosphi_mid*E3p;
 
 #endif
 #endif
