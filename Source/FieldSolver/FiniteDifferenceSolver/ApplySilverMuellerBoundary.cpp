@@ -98,12 +98,12 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
 #if !defined(WARPX_DIM_RSPHERE)
         Array4<Real> const& Er = Efield[Direction{0}]->array(mfi);
 #endif
-        Array4<Real> const& Et = Efield[Direction{1}]->array(mfi);
+        Array4<Real> const& Etheta = Efield[Direction{1}]->array(mfi);
         Array4<Real> const& Ez = Efield[Direction{2}]->array(mfi);
 #if defined(WARPX_DIM_RZ)
         Array4<Real> const& Br = Bfield[Direction{0}]->array(mfi);
 #endif
-        Array4<Real> const& Bt = Bfield[Direction{1}]->array(mfi);
+        Array4<Real> const& Btheta = Bfield[Direction{1}]->array(mfi);
         Array4<Real> const& Bz = Bfield[Direction{2}]->array(mfi);
 
         // Extract tileboxes for which to loop
@@ -126,13 +126,13 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
                 // At the +z boundary (innermost guard cell)
                 if ( apply_hi_z && (j==domain_box.bigEnd(1)+1) ){
                     for (int m=0; m<2*nmodes-1; m++) {
-                        Br(i,j,0,m) = coef1_z*Br(i,j,0,m) - coef2_z*Et(i,j,0,m);
+                        Br(i,j,0,m) = coef1_z*Br(i,j,0,m) - coef2_z*Etheta(i,j,0,m);
                     }
                 }
                 // At the -z boundary (innermost guard cell)
                 if ( apply_lo_z && (j==domain_box.smallEnd(1)-1) ){
                     for (int m=0; m<2*nmodes-1; m++) {
-                        Br(i,j,0,m) = coef1_z*Br(i,j,0,m) + coef2_z*Et(i,j+1,0,m);
+                        Br(i,j,0,m) = coef1_z*Br(i,j,0,m) + coef2_z*Etheta(i,j+1,0,m);
                     }
                 }
 #else
@@ -146,13 +146,13 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
                 // At the +z boundary (innermost guard cell)
                 if ( apply_hi_z && (j==domain_box.bigEnd(1)+1) ){
                     for (int m=0; m<2*nmodes-1; m++) {
-                        Bt(i,j,0,m) = coef1_z*Bt(i,j,0,m) + coef2_z*Er(i,j,0,m);
+                        Btheta(i,j,0,m) = coef1_z*Btheta(i,j,0,m) + coef2_z*Er(i,j,0,m);
                     }
                 }
                 // At the -z boundary (innermost guard cell)
                 if ( apply_lo_z && (j==domain_box.smallEnd(1)-1) ){
                     for (int m=0; m<2*nmodes-1; m++) {
-                        Bt(i,j,0,m) = coef1_z*Bt(i,j,0,m) - coef2_z*Er(i,j+1,0,m);
+                        Btheta(i,j,0,m) = coef1_z*Btheta(i,j,0,m) - coef2_z*Er(i,j+1,0,m);
                     }
                 }
 #endif
@@ -160,21 +160,21 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
                 // At the +r boundary (innermost guard cell)
                 if ( apply_hi_r && (i==domain_box.bigEnd(0)+1) ){
                     // Mode 0
-                    Bt(i,j,0,0) = coef1_r*Bt(i,j,0,0) - coef2_r*Ez(i,j,0,0);
+                    Btheta(i,j,0,0) = coef1_r*Btheta(i,j,0,0) - coef2_r*Ez(i,j,0,0);
                 }
 #else
                 // At the +r boundary (innermost guard cell)
                 if ( apply_hi_r && (i==domain_box.bigEnd(0)+1) ){
                     // Mode 0
-                    Bt(i,j,0,0) = coef1_r*Bt(i,j,0,0) - coef2_r*Ez(i,j,0,0)
+                    Btheta(i,j,0,0) = coef1_r*Btheta(i,j,0,0) - coef2_r*Ez(i,j,0,0)
                         + coef3_r*CylindricalYeeAlgorithm::UpwardDz(Er, coefs_z, n_coefs_z, i, j, 0, 0);
 #if defined(WARPX_DIM_RZ)
                     for (int m=1; m<nmodes; m++) { // Higher-order modes
                         // Real part
-                        Bt(i,j,0,2*m-1) = coef1_r*Bt(i,j,0,2*m-1) - coef2_r*Ez(i,j,0,2*m-1)
+                        Btheta(i,j,0,2*m-1) = coef1_r*Btheta(i,j,0,2*m-1) - coef2_r*Ez(i,j,0,2*m-1)
                             + coef3_r*CylindricalYeeAlgorithm::UpwardDz(Er, coefs_z, n_coefs_z, i, j, 0, 2*m-1);
                         // Imaginary part
-                        Bt(i,j,0,2*m) = coef1_r*Bt(i,j,0,2*m) - coef2_r*Ez(i,j,0,2*m)
+                        Btheta(i,j,0,2*m) = coef1_r*Btheta(i,j,0,2*m) - coef2_r*Ez(i,j,0,2*m)
                             + coef3_r*CylindricalYeeAlgorithm::UpwardDz(Er, coefs_z, n_coefs_z, i, j, 0, 2*m);
                     }
 #endif
@@ -189,22 +189,22 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
                 if ( apply_hi_r && (i==domain_box.bigEnd(0)+1) ){
                     Real const r = rmin + (i + 0.5_rt)*dr; // r on nodal point (Bz is cell-centered in r)
                     // Mode 0
-                    Bz(i,j,0,0) = coef1_r*Bz(i,j,0,0) + coef2_r*Et(i,j,0,0) - coef3_r*Et(i,j,0,0)/r;
+                    Bz(i,j,0,0) = coef1_r*Bz(i,j,0,0) + coef2_r*Etheta(i,j,0,0) - coef3_r*Etheta(i,j,0,0)/r;
                 }
 #else
                 // At the +r boundary (innermost guard cell)
                 if ( apply_hi_r && (i==domain_box.bigEnd(0)+1) ){
                     Real const r = rmin + (i + 0.5_rt)*dr; // r on nodal point (Bz is cell-centered in r)
                     // Mode 0
-                    Bz(i,j,0,0) = coef1_r*Bz(i,j,0,0) + coef2_r*Et(i,j,0,0) - coef3_r*Et(i,j,0,0)/r;
+                    Bz(i,j,0,0) = coef1_r*Bz(i,j,0,0) + coef2_r*Etheta(i,j,0,0) - coef3_r*Etheta(i,j,0,0)/r;
 #if defined(WARPX_DIM_RZ)
                     for (int m=1; m<nmodes; m++) { // Higher-order modes
                         // Real part
-                        Bz(i,j,0,2*m-1) = coef1_r*Bz(i,j,0,2*m-1) + coef2_r*Et(i,j,0,2*m-1)
-                            - coef3_r/r*(Et(i,j,0,2*m-1) - m*Er(i,j,0,2*m));
+                        Bz(i,j,0,2*m-1) = coef1_r*Bz(i,j,0,2*m-1) + coef2_r*Etheta(i,j,0,2*m-1)
+                            - coef3_r/r*(Etheta(i,j,0,2*m-1) - m*Er(i,j,0,2*m));
                         // Imaginary part
-                        Bz(i,j,0,2*m) = coef1_r*Bz(i,j,0,2*m) + coef2_r*Et(i,j,0,2*m)
-                            - coef3_r/r*(Et(i,j,0,2*m) + m*Er(i,j,0,2*m-1));
+                        Bz(i,j,0,2*m) = coef1_r*Bz(i,j,0,2*m) + coef2_r*Etheta(i,j,0,2*m)
+                            - coef3_r/r*(Etheta(i,j,0,2*m) + m*Er(i,j,0,2*m-1));
                     }
 #endif
                 }

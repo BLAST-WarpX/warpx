@@ -94,15 +94,15 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
         Array4<const Real> const& At = Afield[1]->const_array(mfi);
         Array4<const Real> const& Az = Afield[2]->const_array(mfi);
         Array4<Real> const& Br = Bfield[0]->array(mfi);
-        Array4<Real> const& Bt = Bfield[1]->array(mfi);
+        Array4<Real> const& Btheta = Bfield[1]->array(mfi);
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
 
         // Extract structures indicating where the fields
         // should be updated, given the position of the embedded boundaries.
-        amrex::Array4<int> update_Br_arr, update_Bt_arr, update_Bz_arr;
+        amrex::Array4<int> update_Br_arr, update_Btheta_arr, update_Bz_arr;
         if (EB::enabled()) {
             update_Br_arr = eb_update_B[0]->array(mfi);
-            update_Bt_arr = eb_update_B[1]->array(mfi);
+            update_Btheta_arr = eb_update_B[1]->array(mfi);
             update_Bz_arr = eb_update_B[2]->array(mfi);
         }
 
@@ -162,19 +162,19 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
                 }
             },
 
-            // Bt calculation
+            // Btheta calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
                 // Skip field update in the embedded boundaries
-                if (update_Bt_arr && update_Bt_arr(i, j, 0) == 0) { return; }
+                if (update_Btheta_arr && update_Btheta_arr(i, j, 0) == 0) { return; }
 
-                Bt(i, j, 0, 0) = - (
+                Btheta(i, j, 0, 0) = - (
                     T_Algo::UpwardDr(Az, coefs_r, n_coefs_r, i, j, 0, 0)
                     - T_Algo::UpwardDz(Ar, coefs_z, n_coefs_z, i, j, 0, 0)); // Mode m=0
                 for (int m=1 ; m<nmodes ; m++) { // Higher-order modes
-                    Bt(i, j, 0, 2*m-1) = - (
+                    Btheta(i, j, 0, 2*m-1) = - (
                         T_Algo::UpwardDr(Az, coefs_r, n_coefs_r, i, j, 0, 2*m-1)
                         - T_Algo::UpwardDz(Ar, coefs_z, n_coefs_z, i, j, 0, 2*m-1)); // Real part
-                    Bt(i, j, 0, 2*m  ) = - (
+                    Btheta(i, j, 0, 2*m  ) = - (
                         T_Algo::UpwardDr(Az, coefs_r, n_coefs_r, i, j, 0, 2*m  )
                         - T_Algo::UpwardDz(Ar, coefs_z, n_coefs_z, i, j, 0, 2*m  )); // Imaginary part
                 }
@@ -237,15 +237,15 @@ void FiniteDifferenceSolver::ComputeCurlASpherical (
         Array4<const Real> const& At = Afield[1]->const_array(mfi);
         Array4<const Real> const& Ap = Afield[2]->const_array(mfi);
         Array4<Real> const& Br = Bfield[0]->array(mfi);
-        Array4<Real> const& Bt = Bfield[1]->array(mfi);
+        Array4<Real> const& Btheta = Bfield[1]->array(mfi);
         Array4<Real> const& Bphi = Bfield[2]->array(mfi);
 
         // Extract structures indicating where the fields
         // should be updated, given the position of the embedded boundaries.
-        amrex::Array4<int> update_Br_arr, update_Bt_arr, update_Bphi_arr;
+        amrex::Array4<int> update_Br_arr, update_Btheta_arr, update_Bphi_arr;
         if (EB::enabled()) {
             update_Br_arr = eb_update_B[0]->array(mfi);
-            update_Bt_arr = eb_update_B[1]->array(mfi);
+            update_Btheta_arr = eb_update_B[1]->array(mfi);
             update_Bphi_arr = eb_update_B[2]->array(mfi);
         }
 
@@ -272,13 +272,13 @@ void FiniteDifferenceSolver::ComputeCurlASpherical (
                 Br(i, j, 0, 0) = 0._rt;
             },
 
-            // Bt calculation
+            // Btheta calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
                 // Skip field update in the embedded boundaries
-                if (update_Bt_arr && update_Bt_arr(i, j, 0) == 0) { return; }
+                if (update_Btheta_arr && update_Btheta_arr(i, j, 0) == 0) { return; }
 
-                Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bt is cell-centered in r)
-                Bt(i, j, 0, 0) =  -T_Algo::UpwardDrr_over_r(Ap, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
+                Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Btheta is cell-centered in r)
+                Btheta(i, j, 0, 0) =  -T_Algo::UpwardDrr_over_r(Ap, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
             },
 
             // Bphi calculation

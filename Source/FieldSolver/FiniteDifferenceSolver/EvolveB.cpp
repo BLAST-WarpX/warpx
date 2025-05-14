@@ -411,10 +411,10 @@ void FiniteDifferenceSolver::EvolveBCylindrical (
 
         // Extract field data for this grid/tile
         Array4<Real> const& Br = Bfield[0]->array(mfi);
-        Array4<Real> const& Bt = Bfield[1]->array(mfi);
+        Array4<Real> const& Btheta = Bfield[1]->array(mfi);
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
         Array4<Real> const& Er = Efield[0]->array(mfi);
-        Array4<Real> const& Et = Efield[1]->array(mfi);
+        Array4<Real> const& Etheta = Efield[1]->array(mfi);
         Array4<Real> const& Ez = Efield[2]->array(mfi);
 
         // Extract stencil coefficients
@@ -439,13 +439,13 @@ void FiniteDifferenceSolver::EvolveBCylindrical (
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
                 Real const r = rmin + i*dr; // r on nodal point (Br is nodal in r)
                 if (r != 0) { // Off-axis, regular Maxwell equations
-                    Br(i, j, 0, 0) += dt * T_Algo::UpwardDz(Et, coefs_z, n_coefs_z, i, j, 0, 0); // Mode m=0
+                    Br(i, j, 0, 0) += dt * T_Algo::UpwardDz(Etheta, coefs_z, n_coefs_z, i, j, 0, 0); // Mode m=0
                     for (int m=1; m<nmodes; m++) { // Higher-order modes
                         Br(i, j, 0, 2*m-1) += dt*(
-                            T_Algo::UpwardDz(Et, coefs_z, n_coefs_z, i, j, 0, 2*m-1)
+                            T_Algo::UpwardDz(Etheta, coefs_z, n_coefs_z, i, j, 0, 2*m-1)
                             - m * Ez(i, j, 0, 2*m  )/r );  // Real part
                         Br(i, j, 0, 2*m  ) += dt*(
-                            T_Algo::UpwardDz(Et, coefs_z, n_coefs_z, i, j, 0, 2*m  )
+                            T_Algo::UpwardDz(Etheta, coefs_z, n_coefs_z, i, j, 0, 2*m  )
                             + m * Ez(i, j, 0, 2*m-1)/r ); // Imaginary part
                     }
                 } else { // r==0: On-axis corrections
@@ -456,10 +456,10 @@ void FiniteDifferenceSolver::EvolveBCylindrical (
                             // For m==1, Ez is linear in r, for small r
                             // Therefore, the formula below regularizes the singularity
                             Br(i, j, 0, 2*m-1) += dt*(
-                                T_Algo::UpwardDz(Et, coefs_z, n_coefs_z, i, j, 0, 2*m-1)
+                                T_Algo::UpwardDz(Etheta, coefs_z, n_coefs_z, i, j, 0, 2*m-1)
                                 - m * Ez(i+1, j, 0, 2*m  )/dr );  // Real part
                             Br(i, j, 0, 2*m  ) += dt*(
-                                T_Algo::UpwardDz(Et, coefs_z, n_coefs_z, i, j, 0, 2*m  )
+                                T_Algo::UpwardDz(Etheta, coefs_z, n_coefs_z, i, j, 0, 2*m  )
                                 + m * Ez(i+1, j, 0, 2*m-1)/dr ); // Imaginary part
                         } else {
                             Br(i, j, 0, 2*m-1) = 0.;
@@ -470,14 +470,14 @@ void FiniteDifferenceSolver::EvolveBCylindrical (
             },
 
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                Bt(i, j, 0, 0) += dt*(
+                Btheta(i, j, 0, 0) += dt*(
                     T_Algo::UpwardDr(Ez, coefs_r, n_coefs_r, i, j, 0, 0)
                     - T_Algo::UpwardDz(Er, coefs_z, n_coefs_z, i, j, 0, 0)); // Mode m=0
                 for (int m=1 ; m<nmodes ; m++) { // Higher-order modes
-                    Bt(i, j, 0, 2*m-1) += dt*(
+                    Btheta(i, j, 0, 2*m-1) += dt*(
                         T_Algo::UpwardDr(Ez, coefs_r, n_coefs_r, i, j, 0, 2*m-1)
                         - T_Algo::UpwardDz(Er, coefs_z, n_coefs_z, i, j, 0, 2*m-1)); // Real part
-                    Bt(i, j, 0, 2*m  ) += dt*(
+                    Btheta(i, j, 0, 2*m  ) += dt*(
                         T_Algo::UpwardDr(Ez, coefs_r, n_coefs_r, i, j, 0, 2*m  )
                         - T_Algo::UpwardDz(Er, coefs_z, n_coefs_z, i, j, 0, 2*m  )); // Imaginary part
                 }
@@ -485,12 +485,12 @@ void FiniteDifferenceSolver::EvolveBCylindrical (
 
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
                 Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bz is cell-centered in r)
-                Bz(i, j, 0, 0) += dt*( - T_Algo::UpwardDrr_over_r(Et, r, dr, coefs_r, n_coefs_r, i, j, 0, 0));
+                Bz(i, j, 0, 0) += dt*( - T_Algo::UpwardDrr_over_r(Etheta, r, dr, coefs_r, n_coefs_r, i, j, 0, 0));
                 for (int m=1 ; m<nmodes ; m++) { // Higher-order modes
                     Bz(i, j, 0, 2*m-1) += dt*( m * Er(i, j, 0, 2*m  )/r
-                        - T_Algo::UpwardDrr_over_r(Et, r, dr, coefs_r, n_coefs_r, i, j, 0, 2*m-1)); // Real part
+                        - T_Algo::UpwardDrr_over_r(Etheta, r, dr, coefs_r, n_coefs_r, i, j, 0, 2*m-1)); // Real part
                     Bz(i, j, 0, 2*m  ) += dt*(-m * Er(i, j, 0, 2*m-1)/r
-                        - T_Algo::UpwardDrr_over_r(Et, r, dr, coefs_r, n_coefs_r, i, j, 0, 2*m  )); // Imaginary part
+                        - T_Algo::UpwardDrr_over_r(Etheta, r, dr, coefs_r, n_coefs_r, i, j, 0, 2*m  )); // Imaginary part
                 }
             }
 
@@ -528,9 +528,9 @@ void FiniteDifferenceSolver::EvolveBSpherical (
 
         // Extract field data for this grid/tile
         Array4<Real> const& Br = Bfield[0]->array(mfi);
-        Array4<Real> const& Bt = Bfield[1]->array(mfi);
+        Array4<Real> const& Btheta = Bfield[1]->array(mfi);
         Array4<Real> const& Bphi = Bfield[2]->array(mfi);
-        Array4<Real> const& Et = Efield[1]->array(mfi);
+        Array4<Real> const& Etheta = Efield[1]->array(mfi);
         Array4<Real> const& Ephi = Efield[2]->array(mfi);
 
         // Extract stencil coefficients
@@ -555,12 +555,12 @@ void FiniteDifferenceSolver::EvolveBSpherical (
 
             [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
                 Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bphi is cell-centered in r)
-                Bt(i, 0, 0, 0) += dt*( + T_Algo::UpwardDrr_over_r(Ephi, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0));
+                Btheta(i, 0, 0, 0) += dt*( + T_Algo::UpwardDrr_over_r(Ephi, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0));
             },
 
             [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
-                Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bt is cell-centered in r)
-                Bphi(i, 0, 0, 0) += dt*( - T_Algo::UpwardDrr_over_r(Et, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0));
+                Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Btheta is cell-centered in r)
+                Bphi(i, 0, 0, 0) += dt*( - T_Algo::UpwardDrr_over_r(Etheta, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0));
             }
 
         );
