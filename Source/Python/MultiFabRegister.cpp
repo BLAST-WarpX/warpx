@@ -77,6 +77,7 @@ void init_MultiFabRegister (py::module & m)
                  int,
                  std::optional<const amrex::Real>
              >(&MultiFabRegister::alias_init<std::string, std::string>),
+             py::return_value_policy::reference_internal,
              py::arg("new_name"),
              py::arg("alias_name"),
              py::arg("level"),
@@ -91,6 +92,7 @@ void init_MultiFabRegister (py::module & m)
                  int,
                  std::optional<const amrex::Real>
              >(&MultiFabRegister::alias_init<std::string, std::string>),
+             py::return_value_policy::reference_internal,
              py::arg("new_name"),
              py::arg("alias_name"),
              py::arg("dir"),
