@@ -70,7 +70,7 @@ jobs:
         du -hs ~/.cache/ccache
 
   test-petsc-mpich:
-    name: MPICH w/PETSc
+    name: GCC-12 + MPICH w/PETSc
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
     env:
