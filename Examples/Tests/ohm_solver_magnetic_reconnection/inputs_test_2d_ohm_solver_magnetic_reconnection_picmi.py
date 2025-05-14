@@ -301,7 +301,7 @@ class ForceFreeSheetReconnection(object):
         if not (step == 1 or step % self.diag_steps == 0):
             return
 
-        rho = fields.RhoFPWrapper()[:, :]
+        rho = fields.RhoFPWrapper()[...]
         Jiy = fields.JyFPWrapper()[...] / self.J0
         Jy = fields.JyFPPlasmaWrapper()[...] / self.J0
         Bx = fields.BxFPWrapper()[...] / self.B0
