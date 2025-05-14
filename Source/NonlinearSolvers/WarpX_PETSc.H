@@ -94,8 +94,6 @@ class KSP_impl
 
     private:
 
-        //! MPI communicator
-        MPI_Comm m_comm = MPI_COMM_WORLD;
         //! Number of MPI ranks
         int m_num_procs = -1;
         //! MPI rank of this process

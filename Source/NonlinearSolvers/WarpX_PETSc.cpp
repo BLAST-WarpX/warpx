@@ -11,6 +11,7 @@
 
 #include <AMReX_Config.H>
 #include <AMReX_REAL.H>
+#include <AMReX_ParallelContext.H>
 
 #ifdef AMREX_USE_PETSC
 
@@ -122,7 +123,7 @@ PetscErrorCode printKSPResidual(KSP a_ksp, PetscInt a_n, PetscReal a_rnorm, void
 KSP_impl::KSP_impl(LinOpType& a_op)
 {
     m_op = &a_op;
-    PETSC_COMM_WORLD = m_comm;
+    PETSC_COMM_WORLD = amrex::ParallelContext::CommunicatorSub();
     PetscInitialize(nullptr, nullptr, nullptr, nullptr);
     MPI_Comm_size(PETSC_COMM_WORLD, &m_num_procs);
     MPI_Comm_rank(PETSC_COMM_WORLD, &m_myid);
