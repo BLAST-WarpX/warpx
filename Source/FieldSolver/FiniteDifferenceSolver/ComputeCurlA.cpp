@@ -238,15 +238,15 @@ void FiniteDifferenceSolver::ComputeCurlASpherical (
         Array4<const Real> const& Ap = Afield[2]->const_array(mfi);
         Array4<Real> const& Br = Bfield[0]->array(mfi);
         Array4<Real> const& Bt = Bfield[1]->array(mfi);
-        Array4<Real> const& Bp = Bfield[2]->array(mfi);
+        Array4<Real> const& Bphi = Bfield[2]->array(mfi);
 
         // Extract structures indicating where the fields
         // should be updated, given the position of the embedded boundaries.
-        amrex::Array4<int> update_Br_arr, update_Bt_arr, update_Bp_arr;
+        amrex::Array4<int> update_Br_arr, update_Bt_arr, update_Bphi_arr;
         if (EB::enabled()) {
             update_Br_arr = eb_update_B[0]->array(mfi);
             update_Bt_arr = eb_update_B[1]->array(mfi);
-            update_Bp_arr = eb_update_B[2]->array(mfi);
+            update_Bphi_arr = eb_update_B[2]->array(mfi);
         }
 
         // Extract stencil coefficients
@@ -281,13 +281,13 @@ void FiniteDifferenceSolver::ComputeCurlASpherical (
                 Bt(i, j, 0, 0) =  -T_Algo::UpwardDrr_over_r(Ap, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
             },
 
-            // Bp calculation
+            // Bphi calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
                 // Skip field update in the embedded boundaries
-                if (update_Bp_arr && update_Bp_arr(i, j, 0) == 0) { return; }
+                if (update_Bphi_arr && update_Bphi_arr(i, j, 0) == 0) { return; }
 
-                Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bp is cell-centered in r)
-                Bp(i, j, 0, 0) =  T_Algo::UpwardDrr_over_r(At, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
+                Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bphi is cell-centered in r)
+                Bphi(i, j, 0, 0) =  T_Algo::UpwardDrr_over_r(At, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
             }
         );
 

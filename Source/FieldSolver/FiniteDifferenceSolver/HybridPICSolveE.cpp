@@ -286,9 +286,9 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereSpherical (
         // Extract field data for this grid/tile
         Array4<Real> const& Jr = Jfield[0]->array(mfi);
         Array4<Real> const& Jt = Jfield[1]->array(mfi);
-        Array4<Real> const& Jp = Jfield[2]->array(mfi);
+        Array4<Real> const& Jphi = Jfield[2]->array(mfi);
         Array4<Real> const& Bt = Bfield[1]->array(mfi);
-        Array4<Real> const& Bp = Bfield[2]->array(mfi);
+        Array4<Real> const& Bphi = Bfield[2]->array(mfi);
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
@@ -322,27 +322,27 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereSpherical (
                 if (r > 0.5_rt*dr) {
                     // Mode m=0
                     Jt(i, 0, 0, 0) = one_over_mu0 * (
-                        - T_Algo::DownwardDrr_over_r(Bp, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0));
+                        - T_Algo::DownwardDrr_over_r(Bphi, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0));
                 } else { // r==0: on-axis corrections
                     // Ensure that Jt remains 0 on axis
                     Jt(i, 0, 0, 0) = 0.;
                 }
             },
 
-            // Jp calculation
+            // Jphi calculation
             [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
-                // r on a nodal point (Jp is nodal in r)
+                // r on a nodal point (Jphi is nodal in r)
                 Real const r = rmin + i*dr;
                 // Off-axis, regular curl
                 if (r > 0.5_rt*dr) {
-                    Jp(i, 0, 0, 0) = one_over_mu0 * (
+                    Jphi(i, 0, 0, 0) = one_over_mu0 * (
                        T_Algo::DownwardDrr_over_r(Bt, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0)
                     );
                 // r==0: on-axis corrections
                 } else {
                     // Bt is linear in r, for small r
                     // Therefore, the formula below regularizes the singularity
-                    Jp(i, 0, 0, 0) = one_over_mu0 * 4 * Bt(i, 0, 0, 0) / dr;
+                    Jphi(i, 0, 0, 0) = one_over_mu0 * 4 * Bt(i, 0, 0, 0) / dr;
                 }
             }
         );
