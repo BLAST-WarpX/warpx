@@ -2070,6 +2070,19 @@ WarpX::BackwardCompatibility ()
             ablastr::warn_manager::WarnPriority::low);
     }
 
+    std::vector<std::string> backward_coll_names;
+    pp_collisions.queryarr("collision_names", backward_coll_names);
+    for(const std::string& coll_name : backward_coll_names){
+        const ParmParse pp_coll(coll_name);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !pp_coll.query("fusion_multiplier", backward_Real) &&
+            !pp_coll.query("fusion_probability_threshold", backward_Real) &&
+            !pp_coll.query("fusion_probability_target_value", backward_Real),
+            "Inputs fusion_multiplier, fusion_probability_threshold & fusion_probability_target_value "
+            "are deprecated. Please use event_multiplier, probability_threshold & probability_target_value."
+        );
+    }
+
     const ParmParse pp_lasers("lasers");
     int nlasers;
     if (pp_lasers.query("nlasers", nlasers)){
@@ -2365,7 +2378,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         myfl->AllocateLevelMFs(m_fields, ba, dm, lev);
         auto & warpx = GetInstance();
         const amrex::Real cur_time = warpx.gett_new(lev);
-        myfl->InitData(m_fields, geom[lev].Domain(), cur_time, lev);
+        myfl->InitData(m_fields, geom[lev].Domain(), cur_time, lev, geom[lev], gamma_boost, beta_boost);
     }
 
     // Allocate extra multifabs for macroscopic properties of the medium
@@ -3279,35 +3292,6 @@ const iMultiFab*
 WarpX::GatherBufferMasks (int lev)
 {
     return GetInstance().getGatherBufferMasks(lev);
-}
-
-void
-WarpX::StoreCurrent (int lev)
-{
-    using ablastr::fields::Direction;
-    for (int idim = 0; idim < 3; ++idim) {
-        if (m_fields.has(FieldType::current_store, Direction{idim},lev)) {
-            MultiFab::Copy(*m_fields.get(FieldType::current_store, Direction{idim}, lev),
-                           *m_fields.get(FieldType::current_fp, Direction{idim}, lev),
-                           0, 0, 1, m_fields.get(FieldType::current_store, Direction{idim}, lev)->nGrowVect());
-        }
-    }
-}
-
-void
-WarpX::RestoreCurrent (int lev)
-{
-    using ablastr::fields::Direction;
-    using warpx::fields::FieldType;
-
-    for (int idim = 0; idim < 3; ++idim) {
-        if (m_fields.has(FieldType::current_store, Direction{idim}, lev)) {
-            std::swap(
-                *m_fields.get(FieldType::current_fp, Direction{idim}, lev),
-                *m_fields.get(FieldType::current_store, Direction{idim}, lev)
-            );
-        }
-    }
 }
 
 bool
