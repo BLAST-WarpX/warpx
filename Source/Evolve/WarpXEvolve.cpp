@@ -179,8 +179,7 @@ WarpX::Evolve (int numsteps)
             else if (step<100) { verbose_step_interval = 10; }
             else { verbose_step_interval = 100; }
 
-            if ((step+1)%verbose_step_interval==0) { verbose_step = true; }
-            else { verbose_step = false; }
+            verbose_step = !((step+1)%verbose_step_interval);
 
         }
 
