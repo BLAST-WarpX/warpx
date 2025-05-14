@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   test-petsc-gcc:
-    name: GCC 
+    name: GCC
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
     env:
@@ -70,7 +70,7 @@ jobs:
         du -hs ~/.cache/ccache
 
   test-petsc-mpich:
-    name: GCC-12 + MPICH 
+    name: GCC-12 + MPICH
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
     env:
@@ -174,8 +174,6 @@ jobs:
           -DCMAKE_BUILD_TYPE=Debug     \
           -DPETSC_DIR=${PETSC_DIR}     \
           -DPETSC_ARCH=${PETSC_ARCH}   \
-          -DWarpX_amrex_repo=https://github.com/WeiqunZhang/amrex.git \
-          -DWarpX_amrex_branch=no_mpi \
           -DWarpX_EB=OFF               \
           -DWarpX_MPI=OFF              \
           -DWarpX_QED=OFF
