@@ -607,10 +607,11 @@ Domain Boundary Conditions
     For a reflecting boundary condition, this flags whether the sign of only the normal velocity is changed or all velocities.
 
 * ``boundary.verboncoeur_axis_correction`` (`bool`) optional (default `true`)
-    Whether to apply the Verboncoeur correction on the charge and current density on axis when using RZ.
-    For nodal values (rho and Jz), the cell volume for values on axis is calculated as :math:`\pi*\Delta r^2/4`.
-    In :cite:t:`param-VerboncoeurJCP2001`, it is shown that using
-    :math:`\pi*\Delta r^2/3` instead will give a uniform density if the particle density is uniform.
+    Whether to apply the Verboncoeur correction on the charge and current density on axis when using RZ, RCYLINDER, or RSPHERE.
+    For nodal values (rho and Jz), the cell volume for values on axis is :math:`\pi*\Delta dr^2/4` RZ and RCYLINDER, and :math:`\pi*\Delta dr^3/8` for RSPHERE.
+    In :cite:t:`param-VerboncoeurJCP2001`, it is shown that for cylindrical coordinates, using
+    :math:`\pi*\Delta dr^2/3` instead will give a uniform density if the particle density is uniform.
+    For spherical coordinates, using :math:`\pi*\Delta dr^3/4` similarly gives a uniform density.
 
 Additional PML parameters
 -------------------------
@@ -1072,11 +1073,12 @@ Particle initialization
 
     * ``none``: Do not inject macro-particles (for example, in a simulation that starts with neutral, ionizable atoms, one may want to create the electrons species -- where ionized electrons can be stored later on -- without injecting electron macro-particles).
 
-* ``<species_name>.num_particles_per_cell_each_dim`` (`3 integers in 3D and RZ, 2 integers in 2D`)
+* ``<species_name>.num_particles_per_cell_each_dim`` (`3 integers in 3D, RZ, RSPHERE, 2 integers in 2D and RCYLNDER`)
     With the NUniformPerCell injection style, this specifies the number of particles along each axis
-    within a cell. Note that for RZ, the three axis are radius, theta, and z and that the recommended
+    within a cell. For RZ, the three axis are radius, theta, and z and that the recommended
     number of particles per theta is at least two times the number of azimuthal modes requested.
     (It is recommended to do a convergence scan of the number of particles per theta)
+    For RSPHERE, the three axis are radius, theta, and phi, and for RCYLINDER, the two axis are radius and theta.
 
 * ``<species_name>.random_theta`` (`bool`) optional (default `1`)
     When using RZ geometry, whether to randomize the azimuthal position of particles.

@@ -52,7 +52,8 @@ struct InjectorPositionRandomPlane
         if (dir == 1) { return amrex::XDim3{amrex::Random(engine), amrex::Random(engine), 0._rt}; }
         else          { return amrex::XDim3{amrex::Random(engine), 0._rt, 0._rt }; }
 #elif (defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE))
-        // In 1D, the first components of the `XDim3` vector below correspond to the first dimension
+        // In 1D, the first components of the `XDim3` vector below correspond to the first dimension,
+        // z for 1D Cartesian, and r for 1D cylindrical and spherical.
         if (dir == 0) { return amrex::XDim3{amrex::Random(engine), 0._rt, 0._rt}; }
         if (dir == 1) { return amrex::XDim3{amrex::Random(engine), 0._rt, 0._rt}; }
         else          { return amrex::XDim3{0._rt, 0._rt, 0._rt}; }

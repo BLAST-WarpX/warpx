@@ -104,8 +104,11 @@ namespace
     #if defined(WARPX_DIM_1D_Z)
                            << " ; dz = " << dx_lev[0] << '\n';
     #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                           << " ; dx = " << dx_lev[0] << '\n';
-    #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                           << " ; dr = " << dx_lev[0] << '\n';
+    #elif defined(WARPX_DIM_RZ)
+                           << " ; dr = " << dx_lev[0]
+                           << " ; dz = " << dx_lev[1] << '\n';
+    #elif defined(WARPX_DIM_XZ)
                            << " ; dx = " << dx_lev[0]
                            << " ; dz = " << dx_lev[1] << '\n';
     #elif defined(WARPX_DIM_3D)
