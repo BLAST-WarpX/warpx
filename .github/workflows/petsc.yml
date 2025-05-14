@@ -65,6 +65,8 @@ jobs:
           -DWarpX_MPI=OFF              \
           -DWarpX_QED=OFF
         cmake --build build -j 4
+        ./build/bin/warpx.2d \
+                    Examples/Tests/uniform_plasma/uniform_plasma_2d.petsc_ksp.curlcurlPC.in
 
         ccache -s
         du -hs ~/.cache/ccache
@@ -120,6 +122,9 @@ jobs:
           -DWarpX_MPI=ON               \
           -DWarpX_QED=OFF
         cmake --build build -j 4
+        mpiexec -n 4 --oversubscribe \
+                     ./build/bin/warpx.2d \
+                     Examples/Tests/uniform_plasma/uniform_plasma_2d.petsc_ksp.curlcurlPC.in
 
         ccache -s
         du -hs ~/.cache/ccache
@@ -193,6 +198,9 @@ jobs:
           -DWarpX_OPENPMD=OFF          \
           -DWarpX_QED=OFF
         cmake --build build -j 4
+        mpiexec -n 4 --oversubscribe \
+                     ./build/bin/warpx.2d \
+                     Examples/Tests/uniform_plasma/uniform_plasma_2d.petsc_ksp.curlcurlPC.in
 
         ccache -s
         du -hs ~/.cache/ccache
@@ -252,6 +260,8 @@ jobs:
           -DWarpX_MPI=OFF              \
           -DWarpX_QED=OFF
         cmake --build build -j 4
+        ./build/bin/warpx.2d \
+                    Examples/Tests/uniform_plasma/uniform_plasma_2d.petsc_ksp.curlcurlPC.in
 
         ccache -s
         du -hs ~/.cache/ccache
