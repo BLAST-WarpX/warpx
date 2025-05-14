@@ -2981,7 +2981,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
 
 * ``<diag_name>.<species_name>.variables`` (list of `strings` separated by spaces, optional)
     List of particle quantities to write to output.
-    Choices are ``x``, ``y``, ``z`` for the particle positions (3D, RZ, RSPERE), ``x`` and ``z`` in 2D, ``z`` in 1D, ``x`` and ``y`` for RCYLINDER,
+    Choices are ``x``, ``y``, ``z`` for the particle positions (3D, RZ, RSPHERE), ``x`` and ``z`` in 2D, ``z`` in 1D, ``x`` and ``y`` for RCYLINDER,
     ``w`` for the particle weight and ``ux``, ``uy``, ``uz`` for the particle momenta.
     When using the lab-frame electrostatic solver, ``phi`` (electrostatic potential, on the macroparticles) is also available.
     By default, all particle quantities (except ``phi``) are written.
