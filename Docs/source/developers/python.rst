@@ -138,7 +138,7 @@ Note that the ``+=`` will be a global operation.
    Jx = fields.JxFPWrapper()
    Jx[(),-1j,-1:2j] += 7.
 
-The fetch the data from all of the valid cells of all dimensions, the ellipsis can be used, ``Jx[...]``.
+To fetch the data from all of the valid cells of all dimensions, the ellipsis can be used, ``Jx[...]``.
 Similarly, to fetch all of the data including valid cells and ghost cells, use an empty tuple, ``Jx[()]``.
 The code does error checking to ensure that the specified indices are within the bounds of the global domain.
 
