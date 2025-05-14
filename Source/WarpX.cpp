@@ -1631,6 +1631,11 @@ WarpX::ReadParameters ()
         const amrex::ParmParse pp_warpx("warpx");
         const bool boosted_frame = pp_warpx.query("gamma_boost", gamma_boost);
 
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!boosted_frame,
+            "The boosted frame is not supported with 1D cylindrical and spherical geometry");
+#endif
+
         // Check whether the default Galilean velocity should be used
         bool use_default_v_galilean = false;
         pp_psatd.query("use_default_v_galilean", use_default_v_galilean);
@@ -3081,7 +3086,7 @@ WarpX::LowerCorner(const Box& bx, const int lev, const amrex::Real time_shift_de
     return { grid_min[0] + galilean_shift[0], std::numeric_limits<Real>::lowest(), grid_min[1] + galilean_shift[2] };
 
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    return { grid_min[0] + galilean_shift[0], std::numeric_limits<Real>::lowest(), std::numeric_limits<Real>::lowest() };
+    return { grid_min[0], std::numeric_limits<Real>::lowest(), std::numeric_limits<Real>::lowest() };
 
 #elif defined(WARPX_DIM_1D_Z)
     return { std::numeric_limits<Real>::lowest(), std::numeric_limits<Real>::lowest(), grid_min[0] + galilean_shift[2] };
@@ -3109,7 +3114,7 @@ WarpX::UpperCorner(const Box& bx, const int lev, const amrex::Real time_shift_de
     return { grid_max[0] + galilean_shift[0], std::numeric_limits<Real>::max(), grid_max[1] + galilean_shift[1] };
 
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    return { grid_max[0] + galilean_shift[0], std::numeric_limits<Real>::max(), std::numeric_limits<Real>::max() };
+    return { grid_max[0], std::numeric_limits<Real>::max(), std::numeric_limits<Real>::max() };
 
 #elif defined(WARPX_DIM_1D_Z)
     return { std::numeric_limits<Real>::max(), std::numeric_limits<Real>::max(), grid_max[0] + galilean_shift[0] };
