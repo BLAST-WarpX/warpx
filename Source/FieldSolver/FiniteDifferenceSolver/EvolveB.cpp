@@ -529,9 +529,9 @@ void FiniteDifferenceSolver::EvolveBSpherical (
         // Extract field data for this grid/tile
         Array4<Real> const& Br = Bfield[0]->array(mfi);
         Array4<Real> const& Bt = Bfield[1]->array(mfi);
-        Array4<Real> const& Bp = Bfield[2]->array(mfi);
+        Array4<Real> const& Bphi = Bfield[2]->array(mfi);
         Array4<Real> const& Et = Efield[1]->array(mfi);
-        Array4<Real> const& Ep = Efield[2]->array(mfi);
+        Array4<Real> const& Ephi = Efield[2]->array(mfi);
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
@@ -554,13 +554,13 @@ void FiniteDifferenceSolver::EvolveBSpherical (
             },
 
             [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
-                Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bp is cell-centered in r)
-                Bt(i, 0, 0, 0) += dt*( - T_Algo::UpwardDrr_over_r(Ep, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0));
+                Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bphi is cell-centered in r)
+                Bt(i, 0, 0, 0) += dt*( - T_Algo::UpwardDrr_over_r(Ephi, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0));
             },
 
             [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
                 Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bt is cell-centered in r)
-                Bp(i, 0, 0, 0) += dt*( + T_Algo::UpwardDrr_over_r(Et, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0));
+                Bphi(i, 0, 0, 0) += dt*( + T_Algo::UpwardDrr_over_r(Et, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0));
             }
 
         );

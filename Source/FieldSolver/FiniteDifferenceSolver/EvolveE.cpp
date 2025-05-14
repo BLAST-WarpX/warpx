@@ -483,12 +483,12 @@ void FiniteDifferenceSolver::EvolveESpherical (
         // Extract field data for this grid/tile
         Array4<Real> const& Er = Efield[0]->array(mfi);
         Array4<Real> const& Et = Efield[1]->array(mfi);
-        Array4<Real> const& Ep = Efield[2]->array(mfi);
+        Array4<Real> const& Ephi = Efield[2]->array(mfi);
         Array4<Real> const& Bt = Bfield[1]->array(mfi);
-        Array4<Real> const& Bp = Bfield[2]->array(mfi);
+        Array4<Real> const& Bphi = Bfield[2]->array(mfi);
         Array4<Real> const& jr = Jfield[0]->array(mfi);
         Array4<Real> const& jt = Jfield[1]->array(mfi);
-        Array4<Real> const& jp = Jfield[2]->array(mfi);
+        Array4<Real> const& jphi = Jfield[2]->array(mfi);
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
@@ -517,7 +517,7 @@ void FiniteDifferenceSolver::EvolveESpherical (
                 Real const r = rmin + i*dr; // r on a nodal grid (Et is nodal in r)
                 if (r != 0) { // Off-axis, regular Maxwell equations
                     Et(i, 0, 0, 0) += c2 * dt*(
-                        + T_Algo::DownwardDrr_over_r(Bp, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0)
+                        + T_Algo::DownwardDrr_over_r(Bphi, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0)
                         - PhysConst::mu0 * jt(i, 0, 0, 0 ) );
                 } else { // r==0: on-axis corrections
                     // Ensure that Et remains 0 on axis
@@ -526,14 +526,14 @@ void FiniteDifferenceSolver::EvolveESpherical (
             },
 
             [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
-                Real const r = rmin + i*dr; // r on a nodal grid (Ep is nodal in r)
+                Real const r = rmin + i*dr; // r on a nodal grid (Ephi is nodal in r)
                 if (r != 0) { // Off-axis, regular Maxwell equations
-                    Ep(i, 0, 0, 0) += c2 * dt*(
+                    Ephi(i, 0, 0, 0) += c2 * dt*(
                         - T_Algo::DownwardDrr_over_r(Bt, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0)
-                        - PhysConst::mu0 * jp(i, 0, 0, 0  ) );
+                        - PhysConst::mu0 * jphi(i, 0, 0, 0  ) );
                 } else { // r==0: on-axis corrections
-                    // Ensure that Ep remains 0 on axis
-                    Ep(i, 0, 0, 0) = 0.;
+                    // Ensure that Ephi remains 0 on axis
+                    Ephi(i, 0, 0, 0) = 0.;
                 }
             }
 
