@@ -347,12 +347,7 @@ void PlasmaInjector::setupNFluxPerCell (amrex::ParmParse const& pp_species)
             flux_normal_axis = 1;
         }
 #endif
-#if defined(WARPX_DIM_RSPHERE)
-        // "p" for phi
-        if (flux_normal_axis_string == "p" || flux_normal_axis_string == "P") {
-            flux_normal_axis = 2;
-        }
-#else
+#if !defined(WARPX_DIM_RSPHERE) && !defined(WARPX_DIM_RCYLINDER)
         if (flux_normal_axis_string == "z" || flux_normal_axis_string == "Z") {
             flux_normal_axis = 2;
         }
