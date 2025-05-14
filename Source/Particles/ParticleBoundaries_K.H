@@ -190,7 +190,7 @@ namespace ApplyParticleBoundaries {
         if (change_sign_uz) { up = -up; }
         ux = sinphi*costheta*ur - sintheta*ut - cosphi*costheta*up;
         uy = sinphi*sintheta*ur + costheta*ut - cosphi*sintheta*up;
-        uz = cosphi*ur + sinphi*up;;
+        uz = cosphi*ur + sinphi*up;
 #else
         if (change_sign_ux) { ux = -ux; }
         if (change_sign_uy) { uy = -uy; }

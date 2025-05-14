@@ -1782,7 +1782,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 amrex::Real const up = pu.z;
                 pu.x = cos_phi*cos_theta*ur - sin_theta*ut - sin_phi*cos_theta*up;
                 pu.y = cos_phi*sin_theta*ur + cos_theta*ut - sin_phi*sin_theta*up;
-                pu.z = sin_phi*ur + cos_phi*up;;
+                pu.z = sin_phi*ur + cos_phi*up;
 #endif
                 const Real flux = inj_flux->getFlux(ppos.x, ppos.y, ppos.z, t);
                 // Remove particle if flux is negative or 0
