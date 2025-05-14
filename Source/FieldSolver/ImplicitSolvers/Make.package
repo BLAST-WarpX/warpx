@@ -1,5 +1,7 @@
+CEXE_sources += ImplicitSolver.cpp
 CEXE_sources += SemiImplicitEM.cpp
 CEXE_sources += ThetaImplicitEM.cpp
+CEXE_sources += StrangImplicitSpectralEM.cpp
 CEXE_sources += WarpXImplicitOps.cpp
 CEXE_sources += WarpXSolverVec.cpp
 

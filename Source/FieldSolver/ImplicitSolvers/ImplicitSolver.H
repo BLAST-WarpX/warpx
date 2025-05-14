@@ -1,4 +1,4 @@
-/* Copyright 2024 Justin Angus
+/* Copyright 2024 Justin Angus, Debojyoti Ghosh
  *
  * This file is part of WarpX.
  *
@@ -9,9 +9,11 @@
 
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "NonlinearSolvers/NonlinearSolverLibrary.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 
 #include <AMReX_Array.H>
 #include <AMReX_REAL.H>
+#include <AMReX_LO_BCTYPES.H>
 
 /**
  * \brief Base class for implicit time solvers. The base functions are those
@@ -55,6 +57,8 @@ public:
         a_particle_tol = m_particle_tolerance;
     }
 
+    void CreateParticleAttributes () const;
+
     /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
      */
@@ -81,9 +85,26 @@ public:
     virtual void ComputeRHS ( WarpXSolverVec&  a_RHS,
                         const WarpXSolverVec&  a_E,
                               amrex::Real      a_time,
-                              amrex::Real      a_dt,
                               int              a_nl_iter,
                               bool             a_from_jacobian ) = 0;
+
+    [[nodiscard]] int numAMRLevels () const { return m_num_amr_levels; }
+
+    [[nodiscard]] const amrex::Geometry& GetGeometry (int) const;
+    [[nodiscard]] const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& GetFieldBoundaryLo () const;
+    [[nodiscard]] const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& GetFieldBoundaryHi () const;
+    [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> GetLinOpBCLo () const;
+    [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> GetLinOpBCHi () const;
+
+    /**
+     * \brief Return pointer to MultiFab array for mass matrix
+     */
+    [[nodiscard]] const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetMassMatricesCoeff() const {
+        if (m_use_mass_matrices) { return &m_mmpc_mfarrvec; }
+        else { return nullptr; }
+    }
+
+    [[nodiscard]] amrex::Real  GetTheta () const { return m_theta; }
 
 protected:
 
@@ -93,6 +114,21 @@ protected:
     WarpX* m_WarpX;
 
     bool m_is_defined = false;
+
+    /**
+     * \brief Number of AMR levels
+     */
+    int m_num_amr_levels = 1;
+
+    /**
+     * \brief Time step
+     */
+    mutable amrex::Real m_dt = 0.0;
+
+    /**
+     * \brief Time-biasing parameter for fields used on RHS to advance system.
+     */
+    amrex::Real m_theta = 0.5;
 
     /**
      * \brief Nonlinear solver type and object
@@ -111,6 +147,16 @@ protected:
      *  update of the particle positions and velocities for given E and B on the grid
      */
     int m_max_particle_iterations = 21;
+
+    /**
+     * \brief Whether to use mass matrices for the implicit solver
+     */
+    bool m_use_mass_matrices = false;
+
+    /**
+     * \brief Array of multifab pointers to mass matrix preconditioner
+     */
+    amrex::Vector<amrex::Array<amrex::MultiFab*,3>> m_mmpc_mfarrvec;
 
     /**
      * \brief parse nonlinear solver parameters (if one is used)
@@ -132,6 +178,7 @@ protected:
             m_nlsolver = std::make_unique<NewtonSolver<WarpXSolverVec,ImplicitSolver>>();
             pp.query("max_particle_iterations", m_max_particle_iterations);
             pp.query("particle_tolerance", m_particle_tolerance);
+            pp.query("use_mass_matrices", m_use_mass_matrices);
         }
         else {
             WARPX_ABORT_WITH_MESSAGE(
@@ -139,6 +186,33 @@ protected:
         }
 
     }
+
+    /**
+     * \brief Initialize the Mass Matrices used for plasma response in nonlinear Newton solver
+     */
+    void InitializeMassMatrices ();
+
+    /**
+     * \brief Perform operations needed before computing the Right Hand Side
+     */
+    void PreRHSOp ( const amrex::Real  a_cur_time,
+                    const int          a_nl_iter,
+                    const bool         a_from_jacobian );
+
+    /**
+     * \brief Communicate Mass Matrices used for PC and apply boundary conditions
+     */
+    void SyncMassMatricesPCAndApplyBCs ();
+
+    /**
+     * \brief Scale mass matrices used for PC by c^2*mu0*theta*dt and add 1 to diagonal terms
+     */
+    void SetMassMatricesForPC ( const amrex::Real a_theta_dt );
+
+    /**
+     * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType
+     */
+    [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> convertFieldBCToLinOpBC ( const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& ) const;
 
 };
 

@@ -17,16 +17,10 @@ import sys
 
 import numpy as np
 import yt
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
+from scipy.constants import c, e, hbar, m_e
 
 # define some parameters
 
-c = 299792458.0
-m_e = 9.1093837015e-31
-e = 1.602176634e-19
-hbar = 1.054571817e-34
 E_S = m_e**2 * c**3 / e / hbar  # Schwinger field
 
 dV = (1.0e-6) ** 3  # total simulation volume
@@ -160,9 +154,3 @@ def do_analysis(Ex, Ey, Ez, Bx, By, Bz):
 
 
 do_analysis(Ex_test, Ey_test, Ez_test, Bx_test, By_test, Bz_test)
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

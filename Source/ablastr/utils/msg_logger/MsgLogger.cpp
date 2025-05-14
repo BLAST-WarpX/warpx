@@ -147,9 +147,10 @@ Msg Msg::deserialize (std::vector<char>::const_iterator& it)
     return msg;
 }
 
-Msg Msg::deserialize (std::vector<char>::const_iterator&& it)
+Msg Msg::deserialize (std::vector<char>::const_iterator&& rit)
 {
-    return Msg::deserialize(it);
+    auto lit = std::vector<char>::const_iterator{std::move(rit)};
+    return Msg::deserialize(lit);
 }
 
 std::vector<char> MsgWithCounter::serialize() const
@@ -174,9 +175,10 @@ MsgWithCounter MsgWithCounter::deserialize (std::vector<char>::const_iterator& i
     return msg_with_counter;
 }
 
-MsgWithCounter MsgWithCounter::deserialize (std::vector<char>::const_iterator&& it)
+MsgWithCounter MsgWithCounter::deserialize (std::vector<char>::const_iterator&& rit)
 {
-    return MsgWithCounter::deserialize(it);
+    auto lit = std::vector<char>::const_iterator{std::move(rit)};
+    return MsgWithCounter::deserialize(lit);
 }
 
 std::vector<char> MsgWithCounterAndRanks::serialize() const
@@ -205,9 +207,10 @@ MsgWithCounterAndRanks::deserialize (std::vector<char>::const_iterator& it)
 }
 
 MsgWithCounterAndRanks
-MsgWithCounterAndRanks::deserialize (std::vector<char>::const_iterator&& it)
+MsgWithCounterAndRanks::deserialize (std::vector<char>::const_iterator&& rit)
 {
-    return MsgWithCounterAndRanks::deserialize(it);
+    auto lit = std::vector<char>::const_iterator{std::move(rit)};
+    return MsgWithCounterAndRanks::deserialize(lit);
 }
 
 Logger::Logger() :

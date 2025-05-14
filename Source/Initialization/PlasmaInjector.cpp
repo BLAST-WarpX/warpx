@@ -306,6 +306,9 @@ void PlasmaInjector::setupNFluxPerCell (amrex::ParmParse const& pp_species)
     }
 #endif
 
+    utils::parser::queryWithParser(pp_species, source_name, "flux_tmin", flux_tmin);
+    utils::parser::queryWithParser(pp_species, source_name, "flux_tmax", flux_tmax);
+
     // Check whether injection from the embedded boundary is requested
     utils::parser::queryWithParser(pp_species, source_name, "inject_from_embedded_boundary", m_inject_from_eb);
     if (m_inject_from_eb) {
@@ -319,8 +322,6 @@ void PlasmaInjector::setupNFluxPerCell (amrex::ParmParse const& pp_species)
         // Parse the parameters of the plane (position, normal direction, etc.)
 
         utils::parser::getWithParser(pp_species, source_name, "surface_flux_pos", surface_flux_pos);
-        utils::parser::queryWithParser(pp_species, source_name, "flux_tmin", flux_tmin);
-        utils::parser::queryWithParser(pp_species, source_name, "flux_tmax", flux_tmax);
         std::string flux_normal_axis_string;
         utils::parser::get(pp_species, source_name, "flux_normal_axis", flux_normal_axis_string);
         flux_normal_axis = -1;
@@ -581,7 +582,11 @@ amrex::XDim3 PlasmaInjector::getMomentum (amrex::Real x,
                                           amrex::Real y,
                                           amrex::Real z) const noexcept
 {
+#ifdef AMREX_USE_GPU
+    return h_inj_mom->getMomentum(x, y, z, amrex::RandomEngine{nullptr}); // gamma*beta
+#else
     return h_inj_mom->getMomentum(x, y, z, amrex::RandomEngine{}); // gamma*beta
+#endif
 }
 
 bool PlasmaInjector::insideBounds (amrex::Real x, amrex::Real y, amrex::Real z) const noexcept

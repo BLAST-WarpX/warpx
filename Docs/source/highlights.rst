@@ -14,7 +14,17 @@ Plasma-Based Acceleration
 
 Scientific works in laser-plasma and beam-plasma acceleration.
 
-#. Shrock JE, Rockafellow E, Miao B, Le M, Hollinger RC, Wang S, Gonsalves AJ, Picksley A, Rocca JJ, and Milchberg HM
+#. Chu M., Luan S., Yang H., Feng K., Tian Y., Yang X., and Wang W.
+   **Controlled Betatron radiation from high-charge electron beams in multiple plasma channels**.
+   Optics Express **33**, 10, 2025.
+   `DOI:10.1364/OE.557855 <https://doi.org/10.1364/OE.557855>`__
+
+#. Ma M, Zeng M, Wang J, Lu G, Yan W, Chen L, and Li D.
+   **Particle-in-cell simulation of laser wakefield accelerators with oblique lasers in quasicylindrical geometry**.
+   Phys. Rev. Accel. Beams **28**, 021301, 2025
+   `DOI:10.1103/PhysRevAccelBeams.28.021301 <https://doi.org/10.1103/PhysRevAccelBeams.28.021301>`__
+
+#. Shrock JE, Rockafellow E, Miao B, Le M, Hollinger RC, Wang S, Gonsalves AJ, Picksley A, Rocca JJ, and Milchberg HM.
    **Guided Mode Evolution and Ionization Injection in Meter-Scale Multi-GeV Laser Wakefield Accelerators**.
    Phys. Rev. Lett. **133**, 045002, 2024
    `DOI:10.1103/PhysRevLett.133.045002 <https://link.aps.org/doi/10.1103/PhysRevLett.133.045002>`__
@@ -149,10 +159,30 @@ Scientific works in particle and beam modeling.
    `DOI:10.18429/JACoW-IPAC2022-MOPOMS012 <https://doi.org/10.18429/JACoW-IPAC2022-MOPOMS012>`__
 
 
-High Energy Astrophysical Plasma Physics
-****************************************
+Astrophysical Plasma Physics
+****************************
 
 Scientific works in astrophysical plasma modeling.
+
+#. Wu Y, Shi C, Tao X, Zhao J
+   **Kinetic-hybrid Simulations of Counterpropagating Ion Cyclotron Waves and Proton Scattering in the Near-Sun Solar Wind**.
+   The Astrophysical Journal **983** 107, 2025.
+   `10.3847/1538-4357/adbc6a <https://doi.org/10.3847/1538-4357/adbc6a>`__
+
+#. Sam A, Kumar P, Fletcher AC, Crabtree C, Lee N, Elschot S.
+   **Nonlinear evolution, propagation, electron-trapping, and damping effects of ion-acoustic solitons using fully kinetic PIC simulations**.
+   Phys. Plasmas **32** 022103, 2025
+   `DOI:10.1063/5.0249525 <https://doi.org/10.1063/5.0249525>`__
+
+#. Jambunathan R, Jones H, Corrales L, Klion H, Roward ME, Myers A, Zhang W, Vay J-L.
+   **Application of mesh refinement to relativistic magnetic reconnection**.
+   Physics of Plasmas ***32*** 1, 2025
+   `DOI:10.1063/5.0233583 <https://doi.org/10.1063/5.0233583>`__
+
+#. Ghosh S, Bhat P.
+   **Magnetic Reconnection: An Alternative Explanation of Radio Emission in Galaxy Clusters**.
+   The Astrophysical Journal Letters **979** 1, 2025.
+   `DOI:10.3847/2041-8213/ad9f2d <https://doi.org/10.3847/2041-8213/ad9f2d>`__
 
 #. Klion H, Jambunathan R, Rowan ME, Yang E, Willcox D, Vay J-L, Lehe R, Myers A, Huebl A, Zhang W.
    **Particle-in-Cell simulations of relativistic magnetic reconnection with advanced Maxwell solver algorithms**.
@@ -188,8 +218,31 @@ Scientific works in High-Performance Computing, applied mathematics and numerics
 
 Please see :ref:`this section <acknowledge_warpx_all_refs>`.
 
+Related works using WarpX:
+
+#. Yan Y., Du F., Tang J., Yu D and Zhao Y.,
+   **Numerical study on wave attenuation via 1D fully kinetic electromagnetic particle-in-cell simulations**.
+   Plasma Sources Sci. Technol. **33** 115013, 2024
+   `DOI:10.1088/1361-6595/ad8c7c <https://doi.org/10.1088/1361-6595/ad8c7c>`__
+
+
 Nuclear Fusion and Plasma Confinement
 *************************************
+
+#. Tyushev M., Smolyakov A., Sabo A., Groenewald R., Necas A., and Yushmanov P.
+   **Drift-kinetic PIC simulations of plasma flow and energy transport in the magnetic mirror configuration**.
+   Physics of Plasmas **32**, 032514, 2025.
+   `DOI:10.1063/5.0227040 <https://doi.org/10.1063/5.0227040>`__
+
+#. Tyushev M., Papahn Zadeh M., Chopra N. S., Raitses Y., Romadanov I., Likhanskii A., Fubiani G., Garrigues L., Groenewald R. and Smolyakov A.
+   **Mode transitions and spoke structures in  E×B Penning discharge**.
+   Physics of Plasmas **32**, 013511, 2025.
+   `DOI:10.1063/5.0238577 <https://doi.org/10.1063/5.0238577>`__
+
+#. Scheffel J. and Jäderberg J. and Bendtz K. and Holmberg R. and Lindvall K.,
+   **Axial Confinement in the Novatron Mirror Machine**.
+   arXiv 2410.20134
+   `DOI:10.48550/arXiv.2410.20134 <https://doi.org/10.48550/arXiv.2410.20134>`__
 
 #. Affolter M., Thompson R., Hepner S., Hayes E. C., Podolsky V., Borghei M., Carlsson J., Gargone A., Merthe D., McKee E., Langtry R.,
    **The Orbitron: A crossed-field device for co-confinement of high energy ions and electrons**.
@@ -208,6 +261,11 @@ Nuclear Fusion and Plasma Confinement
 
 Plasma Thrusters and Electric Propulsion
 ****************************************
+
+#. Marks T. A. and Gorodetsky A. A.,
+   **GPU-accelerated kinetic Hall thruster simulations in WarpX**.
+   Journal of Electric Propulsion (2025) 4:34.
+   `DOI:10.1007/s44205-025-00133-1 <https://doi.org/10.1007/s44205-025-00133-1>`__
 
 #. Xie L., Luo X., Zhou Z. and Zhao Y.,
    **Effect of plasma initialization on 3D PIC simulation of Hall thruster azimuthal instability**.

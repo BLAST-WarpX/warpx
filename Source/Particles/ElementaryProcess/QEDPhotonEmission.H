@@ -47,7 +47,7 @@ public:
     /**
     * \brief Constructor of the PhotonEmissionFilterFunc functor.
     *
-    * @param[in] opt_depth_runtime_comp Index of the optical depth component
+    * @param[in] opt_depth_runtime_comp Index of the optical depth component in the runtime real data
     */
     PhotonEmissionFilterFunc(int const opt_depth_runtime_comp)
         : m_opt_depth_runtime_comp(opt_depth_runtime_comp)
@@ -73,7 +73,7 @@ public:
     }
 
 private:
-    int m_opt_depth_runtime_comp; /*!< Index of the optical depth component of the source species*/
+    int m_opt_depth_runtime_comp; /*!< Index of the optical depth runtime component of the source species */
 };
 
 /**
@@ -178,12 +178,12 @@ public:
     }
 
 private:
-    const QuantumSynchrotronGetOpticalDepth
+    QuantumSynchrotronGetOpticalDepth
         m_opt_depth_functor;  /*!< A copy of the functor to initialize the optical depth of the source species. */
 
-    const int m_opt_depth_runtime_comp = 0;  /*!< Index of the optical depth component of source species*/
+    int m_opt_depth_runtime_comp = 0;  /*!< Index of the optical depth component of source species*/
 
-    const QuantumSynchrotronPhotonEmission
+    QuantumSynchrotronPhotonEmission
         m_emission_functor;  /*!< A copy of the functor to generate photons. It contains only pointers to the lookup tables.*/
 
     GetParticlePosition<PIdx> m_get_position;

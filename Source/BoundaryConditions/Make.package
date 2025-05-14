@@ -1,3 +1,4 @@
+CEXE_sources += PEC_Insulator.cpp
 CEXE_sources += PML.cpp WarpXEvolvePML.cpp
 CEXE_sources += WarpXFieldBoundaries.cpp WarpX_PEC.cpp
 

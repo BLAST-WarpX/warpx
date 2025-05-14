@@ -23,12 +23,12 @@
 #    include "ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper_fwd.H"
 #endif
 #include "MultiParticleContainer_fwd.H"
-#include "NamedComponentParticleContainer.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 
 #include <AMReX_Array.H>
 #include <AMReX_FArrayBox.H>
+#include <AMReX_Geometry.H>
 #include <AMReX_GpuAllocators.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_INT.H>
@@ -49,6 +49,55 @@
 #include <string>
 #include <utility>
 
+/** Real Particle Attributes stored in amrex::ParticleContainer's struct of array
+ */
+struct PIdx
+{
+    enum {
+#if !defined (WARPX_DIM_1D_Z)
+        x,
+#endif
+#if defined (WARPX_DIM_3D)
+        y,
+#endif
+        z,
+        w,      ///< weight
+        ux, uy, uz,
+#ifdef WARPX_DIM_RZ
+        theta,      ///< RZ needs all three position components
+#endif
+        nattribs    ///< number of compile-time attributes
+    };
+
+    //! component names
+    static constexpr auto names = {
+#if !defined (WARPX_DIM_1D_Z)
+                                   "x",
+#endif
+#if defined (WARPX_DIM_3D)
+                                   "y",
+#endif
+                                   "z",
+                                   "w",
+                                   "ux",
+                                   "uy",
+                                   "uz",
+#ifdef WARPX_DIM_RZ
+                                   "theta"
+#endif
+    };
+
+    static_assert(names.size() == nattribs);
+};
+
+struct IntIdx {
+    enum
+        {
+            nattribs ///< the number of attributes above (always last)
+        };
+
+    static constexpr std::initializer_list<char const *> names = {};
+};
 
 class WarpXParIter
     : public amrex::ParIterSoA<PIdx::nattribs, 0>
@@ -80,9 +129,34 @@ public:
         return GetStructOfArrays().GetRealData(comp);
     }
 
+    [[nodiscard]] const IntVector& GetiAttribs (int comp) const
+    {
+        return GetStructOfArrays().GetIntData(comp);
+    }
+
     [[nodiscard]] IntVector& GetiAttribs (int comp)
     {
         return GetStructOfArrays().GetIntData(comp);
+    }
+
+    [[nodiscard]] const RealVector& GetAttribs (const std::string& name) const
+    {
+        return GetStructOfArrays().GetRealData(name);
+    }
+
+    [[nodiscard]] RealVector& GetAttribs (const std::string& name)
+    {
+        return GetStructOfArrays().GetRealData(name);
+    }
+
+    [[nodiscard]] const IntVector& GetiAttribs (const std::string& name) const
+    {
+        return GetStructOfArrays().GetIntData(name);
+    }
+
+    [[nodiscard]] IntVector& GetiAttribs (const std::string& name)
+    {
+        return GetStructOfArrays().GetIntData(name);
     }
 };
 
@@ -109,7 +183,7 @@ public:
  * derived classes, e.g., Evolve) or actual functions (e.g. CurrentDeposition).
  */
 class WarpXParticleContainer
-    : public NamedComponentParticleContainer<amrex::DefaultAllocator>
+    : public amrex::ParticleContainerPureSoA<PIdx::nattribs, 0, amrex::DefaultAllocator>
 {
 public:
     friend MultiParticleContainer;
@@ -151,7 +225,7 @@ public:
                          int lev,
                          const std::string& current_fp_string,
                          amrex::Real t, amrex::Real dt, DtType a_dt_type=DtType::Full, bool skip_deposition=false,
-                         PushType push_type=PushType::Explicit) = 0;
+                         bool deposit_mass_matrices=false, PushType push_type=PushType::Explicit) = 0;
 
     virtual void PostRestart () = 0;
 
@@ -249,6 +323,36 @@ public:
                                 amrex::Real dt,
                                 amrex::Real relative_time,
                                 PushType push_type);
+
+    void DepositTemperature (amrex::MultiFab* temperature, const int lev);
+    std::unique_ptr<amrex::MultiFab> GetTemperature (int lev);
+
+    void DepositNumberDensity (amrex::MultiFab* number_density, const int lev);
+    std::unique_ptr<amrex::MultiFab> GetNumberDensity (int lev);
+
+    std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);
+
+    virtual
+    void DepositCurrentAndMassMatrices ( WarpXParIter& pti,
+                                   const RealVector& wp,
+                                   const RealVector& uxp,
+                                   const RealVector& uyp,
+                                   const RealVector& uzp,
+                                         amrex::MultiFab* jx,
+                                         amrex::MultiFab* jy,
+                                         amrex::MultiFab* jz,
+                                         amrex::MultiFab* Sx,
+                                         amrex::MultiFab* Sy,
+                                         amrex::MultiFab* Sz,
+                                   const amrex::FArrayBox* bxfab,
+                                   const amrex::FArrayBox* byfab,
+                                   const amrex::FArrayBox* bzfab,
+                                         long offset,
+                                         long np_to_deposit,
+                                         int thread_num,
+                                         int lev,
+                                         int depos_lev,
+                                         amrex::Real dt );
 
     // If particles start outside of the domain, ContinuousInjection
     // makes sure that they are initialized when they enter the domain, and
@@ -360,8 +464,12 @@ public:
      *
      * \param[in] do_back_transformed_particles The parameter to set if back-transformed particles are set to true/false
      */
-    void SetDoBackTransformedParticles(const bool do_back_transformed_particles) {
+    void SetDoBackTransformedParticles (const bool do_back_transformed_particles) {
         m_do_back_transformed_particles = do_back_transformed_particles;
+    }
+
+    bool GetDoBackTransformedParticles () const {
+        return m_do_back_transformed_particles;
     }
 
     //amrex::Real getCharge () {return charge;}
@@ -400,7 +508,7 @@ public:
      * override the method for every derived class. Note that in practice this function is never
      * called because resample() is only called for PhysicalParticleContainers.
      */
-    virtual void resample (const int /*timestep*/, bool /*verbose*/) {}
+    virtual void resample (const amrex::Vector<amrex::Geometry>& /*geom*/, const int /*timestep*/, bool /*verbose*/) {}
 
     /**
      * When using runtime components, AMReX requires to touch all tiles
@@ -490,18 +598,15 @@ protected:
     amrex::Vector<amrex::FArrayBox> local_jy;
     amrex::Vector<amrex::FArrayBox> local_jz;
 
+    // local containers for mass matrix deposit used by implicit solvers
+    amrex::Vector<amrex::FArrayBox> local_Sx;
+    amrex::Vector<amrex::FArrayBox> local_Sy;
+    amrex::Vector<amrex::FArrayBox> local_Sz;
+
 public:
     using PairIndex = std::pair<int, int>;
-    using TmpParticleTile = std::array<amrex::Gpu::DeviceVector<amrex::ParticleReal>,
-                                       TmpIdx::nattribs>;
-    using TmpParticles = amrex::Vector<std::map<PairIndex, TmpParticleTile> >;
-
-    TmpParticles getTmpParticleData () const noexcept {return tmp_particle_data;}
 
     int getIonizationInitialLevel () const noexcept {return ionization_initial_level;}
-
-protected:
-    TmpParticles tmp_particle_data;
 
 private:
     void particlePostLocate(ParticleType& p, const amrex::ParticleLocData& pld, int lev) override;

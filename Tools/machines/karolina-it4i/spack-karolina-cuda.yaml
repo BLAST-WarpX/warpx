@@ -20,7 +20,7 @@ spack:
   - py-cython
   - py-mpi4py
   - py-numpy@1.24.2
-  - openpmd-api@0.15.2 +python
+  - openpmd-api@0.16.1 +python
   - py-periodictable@1.5.0
   - py-h5py
 # optional

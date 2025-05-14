@@ -65,7 +65,8 @@ WarpX::ComputeMagnetostaticField()
     // Fields have been reset in Electrostatic solver for this time step, these fields
     // are added into the B fields after electrostatic solve
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(this->max_level == 0, "Magnetostatic solver not implemented with mesh refinement.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(this->max_level == 0,
+        "Magnetostatic solver not implemented with mesh refinement.");
 
     AddMagnetostaticFieldLabFrame();
 }
@@ -127,16 +128,21 @@ WarpX::AddMagnetostaticFieldLabFrame()
 
     // const amrex::Real magnetostatic_absolute_tolerance = self_fields_absolute_tolerance*PhysConst::c;
     // temporary fix!!!
-    const amrex::Real magnetostatic_absolute_tolerance = 0.0;
-    const amrex::Real self_fields_required_precision = 1e-12;
-    const int self_fields_max_iters = 200;
-    const int self_fields_verbosity = 2;
+    const amrex::Real absolute_tolerance = 0.0;
+    amrex::Real required_precision;
+    if constexpr (std::is_same_v<Real, float>) {
+        required_precision = 1e-5;
+    }
+    else {
+        required_precision = 1e-11;
+    }
 
     computeVectorPotential(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::vector_potential_fp_nodal, finest_level),
-        self_fields_required_precision, magnetostatic_absolute_tolerance, self_fields_max_iters,
-        self_fields_verbosity);
+        required_precision, absolute_tolerance, magnetostatic_solver_max_iters,
+        magnetostatic_solver_verbosity
+    );
 }
 
 /* Compute the vector potential `A` by solving the Poisson equation with `J` as
@@ -187,11 +193,16 @@ WarpX::computeVectorPotential (ablastr::fields::MultiLevelVectorField const& cur
     });
 
 #if defined(AMREX_USE_EB)
-    amrex::Vector<amrex::EBFArrayBoxFactory const *> factories;
-    for (int lev = 0; lev <= finest_level; ++lev) {
-        factories.push_back(&WarpX::fieldEBFactory(lev));
+    std::optional<amrex::Vector<amrex::EBFArrayBoxFactory const *> > eb_farray_box_factory;
+    auto &warpx = WarpX::GetInstance();
+
+    if (EB::enabled()) {
+        amrex::Vector<amrex::EBFArrayBoxFactory const *> factories;
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            factories.push_back(&warpx.fieldEBFactory(lev));
+        }
+        eb_farray_box_factory = factories;
     }
-    const std::optional<amrex::Vector<amrex::EBFArrayBoxFactory const *> > eb_farray_box_factory({factories});
 #else
     const std::optional<amrex::Vector<amrex::FArrayBoxFactory const *> > eb_farray_box_factory;
 #endif

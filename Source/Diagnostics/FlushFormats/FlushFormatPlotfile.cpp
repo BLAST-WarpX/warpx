@@ -49,12 +49,19 @@
 #include <utility>
 #include <vector>
 
+#ifndef WARPX_UNITY_ID
+#define WARPX_UNITY_ID
+#endif
+
 using namespace amrex;
 using warpx::fields::FieldType;
 
 namespace
 {
+namespace WARPX_UNITY_ID
+{
     const std::string default_level_prefix {"Level_"};
+}
 }
 
 void
@@ -66,6 +73,7 @@ FlushFormatPlotfile::WriteToFile (
     const amrex::Vector<ParticleDiag>& particle_diags, int nlev,
     const std::string prefix, int file_min_digits, bool plot_raw_fields,
     bool plot_raw_fields_guards,
+    int verbose,
     const bool /*use_pinned_pc*/,
     bool isBTD, int snapshotID,  int bufferID, int numBuffers,
     const amrex::Geometry& /*full_BTD_snapshot*/,
@@ -74,17 +82,19 @@ FlushFormatPlotfile::WriteToFile (
     WARPX_PROFILE("FlushFormatPlotfile::WriteToFile()");
     auto & warpx = WarpX::GetInstance();
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
-    if (!isBTD)
-    {
-      amrex::Print() << Utils::TextMsg::Info("Writing plotfile " + filename);
-    } else
-    {
-      amrex::Print() << Utils::TextMsg::Info("Writing buffer " + std::to_string(bufferID+1) + " of " + std::to_string(numBuffers)
-                        + " to snapshot " + std::to_string(snapshotID) +  " in plotfile BTD " + prefix );
-      if (isLastBTDFlush)
-      {
-        amrex::Print() << Utils::TextMsg::Info("Finished writing snapshot " + std::to_string(snapshotID) + " in plotfile BTD " + filename);
-      }
+    if (verbose > 0) {
+        if (!isBTD)
+        {
+            amrex::Print() << Utils::TextMsg::Info("Writing plotfile " + filename);
+        } else
+        {
+            amrex::Print() << Utils::TextMsg::Info("Writing buffer " + std::to_string(bufferID+1) + " of " + std::to_string(numBuffers)
+                                + " to snapshot " + std::to_string(snapshotID) +  " in plotfile BTD " + prefix );
+            if (isLastBTDFlush)
+            {
+                amrex::Print() << Utils::TextMsg::Info("Finished writing snapshot " + std::to_string(snapshotID) + " in plotfile BTD " + filename);
+            }
+        }
     }
 
     Vector<std::string> rfs;
@@ -359,7 +369,15 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
         Vector<int> int_flags;
         Vector<int> real_flags;
 
-        // note: positions skipped here, since we reconstruct a plotfile SoA from them
+#if !defined (WARPX_DIM_1D_Z)
+        real_names.push_back("position_x");
+#endif
+#if defined (WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+        real_names.push_back("position_y");
+#endif
+#if !defined(WARPX_DIM_RZ)
+        real_names.push_back("position_z");
+#endif
         real_names.push_back("weight");
         real_names.push_back("momentum_x");
         real_names.push_back("momentum_y");
@@ -369,29 +387,30 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
         real_names.push_back("theta");
 #endif
 
-        // get the names of the real comps
+        // get the names of the extra real comps
+        real_names.resize(tmp.NumRealComps());
+        real_flags = part_diag.m_plot_flags;
+        real_flags.resize(tmp.NumRealComps());
 
-        //   note: skips the mandatory AMREX_SPACEDIM positions for pure SoA
-        real_names.resize(tmp.NumRealComps() - AMREX_SPACEDIM);
-        auto runtime_rnames = tmp.getParticleRuntimeComps();
-        for (auto const& x : runtime_rnames) {
-            real_names[x.second + PIdx::nattribs - AMREX_SPACEDIM] = x.first;
+        // note, skip the required component names here
+        auto rnames = tmp.GetRealSoANames();
+        for (std::size_t index = PIdx::nattribs; index < rnames.size(); ++index) {
+            real_names[index] = rnames[index];
+            real_flags[index] = tmp.h_redistribute_real_comp[index];
         }
 
-        // plot any "extra" fields by default
-        real_flags = part_diag.m_plot_flags;
-        real_flags.resize(tmp.NumRealComps(), 1);
-
         //   note: skip the mandatory AMREX_SPACEDIM positions for pure SoA
+        real_names.erase(real_names.begin(), real_names.begin() + AMREX_SPACEDIM);
         real_flags.erase(real_flags.begin(), real_flags.begin() + AMREX_SPACEDIM);
 
-        // and the names
+        // and the int comps
         int_names.resize(tmp.NumIntComps());
-        auto runtime_inames = tmp.getParticleRuntimeiComps();
-        for (auto const& x : runtime_inames) { int_names[x.second+0] = x.first; }
-
-        // plot by default
-        int_flags.resize(tmp.NumIntComps(), 1);
+        int_flags.resize(tmp.NumIntComps());
+        auto inames = tmp.GetIntSoANames();
+        for (std::size_t index = 0; index < inames.size(); ++index) {
+            int_names[index] = inames[index];
+            int_flags[index] = tmp.h_redistribute_int_comp[index];
+        }
 
         const auto mass = pc->AmIA<PhysicalSpecies::photon>() ? PhysConst::m_e : pc->getMass();
         RandomFilter const random_filter(part_diag.m_do_random_filter,
@@ -423,6 +442,7 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
             tmp.copyParticles(*pinned_pc, true);
             particlesConvertUnits(ConvertDirection::WarpX_to_SI, &tmp, mass);
         }
+
         // real_names contains a list of all particle attributes.
         // real_flags & int_flags are 1 or 0, whether quantity is dumped or not.
         tmp.WritePlotFile(
@@ -557,6 +577,7 @@ FlushFormatPlotfile::WriteAllRawFields(
     const bool plot_raw_fields_guards) const
 {
     using ablastr::fields::Direction;
+    using WARPX_UNITY_ID::default_level_prefix;
 
     if (!plot_raw_fields) { return; }
     auto & warpx = WarpX::GetInstance();

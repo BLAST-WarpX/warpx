@@ -5,6 +5,7 @@
 #   include "BoundaryConditions/PML_RZ.H"
 #endif
 #include "Diagnostics/ParticleDiag/ParticleDiag.H"
+#include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "Fields.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/TextMsg.H"
@@ -21,12 +22,19 @@
 #include <AMReX_Utility.H>
 #include <AMReX_VisMF.H>
 
+#ifndef WARPX_UNITY_ID
+#define WARPX_UNITY_ID
+#endif
+
 using namespace amrex;
 using warpx::fields::FieldType;
 
 namespace
 {
+namespace WARPX_UNITY_ID
+{
     const std::string default_level_prefix {"Level_"};
+}
 }
 
 void
@@ -39,6 +47,7 @@ FlushFormatCheckpoint::WriteToFile (
         const std::string prefix, int file_min_digits,
         bool /*plot_raw_fields*/,
         bool /*plot_raw_fields_guards*/,
+        int verbose,
         const bool /*use_pinned_pc*/,
         bool /*isBTD*/, int /*snapshotID*/,
         int /*bufferID*/, int /*numBuffers*/,
@@ -46,6 +55,7 @@ FlushFormatCheckpoint::WriteToFile (
         bool /*isLastBTDFlush*/) const
 {
     using ablastr::fields::Direction;
+    using WARPX_UNITY_ID::default_level_prefix;
 
     WARPX_PROFILE("FlushFormatCheckpoint::WriteToFile()");
 
@@ -56,8 +66,10 @@ FlushFormatCheckpoint::WriteToFile (
 
     const std::string& checkpointname = amrex::Concatenate(prefix, iteration[0], file_min_digits);
 
-    amrex::Print() << Utils::TextMsg::Info(
-        "Writing checkpoint " + checkpointname);
+    if (verbose > 0) {
+        amrex::Print() << Utils::TextMsg::Info(
+            "Writing checkpoint " + checkpointname);
+    }
 
     // const int nlevels = finestLevel()+1;
     amrex::PreBuildDirectorHierarchy(checkpointname, default_level_prefix, nlev, true);
@@ -171,6 +183,8 @@ FlushFormatCheckpoint::WriteToFile (
 
     WriteDMaps(checkpointname, nlev);
 
+    WriteReducedDiagsData(checkpointname);
+
     VisMF::SetHeaderVersion(current_version);
 
 }
@@ -185,31 +199,47 @@ FlushFormatCheckpoint::CheckpointParticles (
 
         Vector<std::string> real_names;
         Vector<std::string> int_names;
+        Vector<int> write_real_comps;
+        Vector<int> write_int_comps;
 
         // note: positions skipped here, since we reconstruct a plotfile SoA from them
-        real_names.push_back("weight");
-        real_names.push_back("momentum_x");
-        real_names.push_back("momentum_y");
-        real_names.push_back("momentum_z");
-
+        std::vector<std::string> const fixed_names = {"weight",
+                                                      "momentum_x",
+                                                      "momentum_y",
+                                                      "momentum_z"
 #ifdef WARPX_DIM_RZ
-        real_names.push_back("theta");
+                                                      ,"theta"
 #endif
+                                                      };
 
-        // get the names of the real comps
-        //   note: skips the mandatory AMREX_SPACEDIM positions for pure SoA
+        for (auto const& name : fixed_names) {
+            real_names.push_back(name);
+            write_real_comps.push_back(1);
+        }
+
+        // get the names of the extra real comps
         real_names.resize(pc->NumRealComps() - AMREX_SPACEDIM);
-        auto runtime_rnames = pc->getParticleRuntimeComps();
-        for (auto const& x : runtime_rnames) {
-            real_names[x.second + PIdx::nattribs - AMREX_SPACEDIM] = x.first;
+        write_real_comps.resize(pc->NumRealComps() - AMREX_SPACEDIM);
+
+        // note, skip the required component names here
+        auto rnames = pc->GetRealSoANames();
+        for (std::size_t index = PIdx::nattribs; index < rnames.size(); ++index) {
+            std::size_t const i = index - AMREX_SPACEDIM;
+            real_names[i] = rnames[index];
+            write_real_comps[i] = pc->h_redistribute_real_comp[index];
         }
 
         // and the int comps
         int_names.resize(pc->NumIntComps());
-        auto runtime_inames = pc->getParticleRuntimeiComps();
-        for (auto const& x : runtime_inames) { int_names[x.second+0] = x.first; }
+        write_int_comps.resize(pc->NumIntComps());
+        auto inames = pc->GetIntSoANames();
+        for (std::size_t index = 0; index < inames.size(); ++index) {
+            int_names[index] = inames[index];
+            write_int_comps[index] = pc->h_redistribute_int_comp[index];
+        }
 
-        pc->Checkpoint(dir, part_diag.getSpeciesName(), true,
+        pc->Checkpoint(dir, part_diag.getSpeciesName(),
+                       write_real_comps, write_int_comps,
                        real_names, int_names);
     }
 }
@@ -240,5 +270,14 @@ FlushFormatCheckpoint::WriteDMaps (const std::string& dir, int nlev) const
                 "FlushFormatCheckpoint::WriteDMaps: problem writing DMFile"
             );
         }
+    }
+}
+
+void
+FlushFormatCheckpoint::WriteReducedDiagsData (std::string const & dir) const
+{
+    if (ParallelDescriptor::IOProcessor()) {
+        auto & warpx = WarpX::GetInstance();
+        warpx.reduced_diags->WriteCheckpointData(dir);
     }
 }

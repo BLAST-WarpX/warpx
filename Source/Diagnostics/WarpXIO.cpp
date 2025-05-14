@@ -19,6 +19,7 @@
 #include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 #include "Diagnostics/MultiDiagnostics.H"
+#include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 
 #include <ablastr/utils/Communication.H>
 #include <ablastr/utils/text/StreamUtils.H>
@@ -172,7 +173,7 @@ WarpX::InitFromCheckpoint ()
         is >> moving_window_x_checkpoint;
         ablastr::utils::text::goto_next_line(is);
 
-        is >> is_synchronized;
+        is >> m_is_synchronized;
         ablastr::utils::text::goto_next_line(is);
 
         amrex::Vector<amrex::Real> prob_lo( AMREX_SPACEDIM );
@@ -330,7 +331,7 @@ WarpX::InitFromCheckpoint ()
                         amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, "Bz_avg_fp"));
         }
 
-        if (is_synchronized) {
+        if (m_is_synchronized) {
             VisMF::Read(*m_fields.get(FieldType::current_fp, Direction{0}, lev),
                         amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, "jx_fp"));
             VisMF::Read(*m_fields.get(FieldType::current_fp, Direction{1}, lev),
@@ -372,7 +373,7 @@ WarpX::InitFromCheckpoint ()
                             amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, "Bz_avg_cp"));
             }
 
-            if (is_synchronized) {
+            if (m_is_synchronized) {
                 VisMF::Read(*m_fields.get(FieldType::current_cp, Direction{0}, lev),
                             amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, "jx_cp"));
                 VisMF::Read(*m_fields.get(FieldType::current_cp, Direction{1}, lev),
@@ -400,8 +401,18 @@ WarpX::InitFromCheckpoint ()
 
     if (EB::enabled()) { InitializeEBGridData(maxLevel()); }
 
+    reduced_diags->ReadCheckpointData(restart_chkfile);
+
     // Initialize particles
     mypc->AllocData();
     mypc->Restart(restart_chkfile);
+
+    if (m_implicit_solver) {
+
+        m_implicit_solver->Define(this);
+        m_implicit_solver->GetParticleSolverParams( max_particle_its_in_implicit_scheme,
+                                                    particle_tol_in_implicit_scheme );
+        m_implicit_solver->CreateParticleAttributes();
+    }
 
 }

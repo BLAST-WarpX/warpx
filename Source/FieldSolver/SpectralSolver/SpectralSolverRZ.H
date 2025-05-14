@@ -42,8 +42,8 @@ class SpectralSolverRZ
                           bool with_pml,
                           bool update_with_rho,
                           bool fft_do_time_averaging,
-                          JInTime J_in_time,
-                          RhoInTime rho_in_time,
+                          TimeDependencyJ time_dependency_J,
+                          TimeDependencyRho time_dependency_rho,
                           bool dive_cleaning,
                           bool divb_cleaning);
 
@@ -151,6 +151,9 @@ class SpectralSolverRZ
         }
 
         SpectralFieldIndex m_spectral_index;
+
+        // Solve time step size
+        amrex::Real m_dt;
 
     private:
 

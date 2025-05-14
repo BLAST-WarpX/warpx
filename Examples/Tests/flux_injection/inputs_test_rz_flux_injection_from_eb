@@ -1,7 +1,7 @@
 FILE = inputs_base_from_eb
 
 # number of grid points
-amr.n_cell = 8 16
+amr.n_cell = 16 32
 
 # Geometry
 geometry.dims = RZ
