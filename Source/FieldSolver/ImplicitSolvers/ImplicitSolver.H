@@ -215,16 +215,6 @@ protected:
 
     }
 
-    void PreRHSOp ( amrex::Real  a_cur_time,
-                    int          a_nl_iter,
-                    bool         a_from_jacobian );
-
-    void SaveEandJ();
-
-    void SyncMassMatricesPCAndApplyBCs ();
-
-    void SetMassMatricesForPC ( amrex::Real a_theta_dt );
-
     /**
      * \brief Initialize the Mass Matrices used for plasma response in nonlinear Newton solver
      */
@@ -248,6 +238,11 @@ protected:
      * \brief Scale mass matrices used for PC by c^2*mu0*theta*dt and add 1 to diagonal terms
      */
     void SetMassMatricesForPC ( const amrex::Real a_theta_dt );
+
+    /**
+     * \brief Save E and J at start of each Newton step
+     */
+    void SaveEandJ();
 
     /**
      * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType
