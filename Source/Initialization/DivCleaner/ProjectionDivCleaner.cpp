@@ -33,7 +33,7 @@ using namespace amrex;
 
 namespace warpx::initialization {
 
-ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name, bool a_vector_potential=false) :
+ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name, bool a_vector_potential) :
     m_field_name(a_field_name), m_vector_potential(a_vector_potential)
 {
     using ablastr::fields::Direction;
@@ -56,10 +56,8 @@ ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name, bool
     const int ncomps = WarpX::ncomps;
     auto const& ng = warpx.m_fields.get(m_field_name, Direction{0}, 0)->nGrowVect();
 
-    m_nodal_operator = m_grid_type == GridType::Collocated || m_vector_potential;
-
     IntVect nodal_flag{};
-    if (m_nodal_operator) {
+    if (m_grid_type == GridType::Collocated || m_vector_potential) {
         nodal_flag = IntVect::TheNodeVector();
     } else {
         nodal_flag = IntVect::TheCellVector();
@@ -94,7 +92,7 @@ ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name, bool
     SphericalYeeAlgorithm::InitializeStencilCoefficients( cell_size,
         m_h_stencil_coefs_x );
 #else
-    if (m_nodal_operator) {
+    if (m_grid_type == GridType::Collocated) {
         CartesianNodalAlgorithm::InitializeStencilCoefficients( cell_size,
             m_h_stencil_coefs_x, m_h_stencil_coefs_y, m_h_stencil_coefs_z );
     } else {
@@ -195,7 +193,7 @@ ProjectionDivCleaner::solve ()
 
     for (int ilev = 0; ilev < m_levels; ++ilev)
     {
-        if (m_nodal_operator) {
+        if (m_grid_type == GridType::Collocated || m_vector_potential) {
 #if defined(AMREX_USE_EB)
             const amrex::Vector<amrex::EBFArrayBoxFactory const *> eb_farray_box_factory{};
 #else
@@ -363,12 +361,12 @@ ProjectionDivCleaner::correctField ()
                 Bx_arr(i,0,0) += SphericalYeeAlgorithm::DownwardDr(sol_arr, coefs_x, n_coefs_x, i, 0, 0, 0);
             });
 #else
-            if (m_grid_type == GridType::Staggered)
+            if (m_grid_type == GridType::Collocated)
             {
-                correctFieldCartesian_kernel<CartesianYeeAlgorithm>(tbx, tby, tbz, coefs_x, coefs_y, coefs_z,
+                correctFieldCartesian_kernel<CartesianNodalAlgorithm>(tbx, tby, tbz, coefs_x, coefs_y, coefs_z,
                     n_coefs_x, n_coefs_y, n_coefs_z, Bx_arr, By_arr, Bz_arr, sol_arr);
             } else {
-                correctFieldCartesian_kernel<CartesianNodalAlgorithm>(tbx, tby, tbz, coefs_x, coefs_y, coefs_z,
+                correctFieldCartesian_kernel<CartesianYeeAlgorithm>(tbx, tby, tbz, coefs_x, coefs_y, coefs_z,
                     n_coefs_x, n_coefs_y, n_coefs_z, Bx_arr, By_arr, Bz_arr, sol_arr);
             }
 #endif

@@ -3167,7 +3167,7 @@ WarpX::ComputeDivB (amrex::MultiFab& divB, int const dcomp,
         ParallelFor(bx,
         [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
         {
-            warpx_computedivb(i, j, k, dcomp, divBfab, Bxfab, Byfab, Bzfab, dxinv, dyinv, dzinv
+            warpx_computedivb(i, j, k, dcomp, divBfab, Bxfab, Byfab, Bzfab, dxinv, dyinv, dzinv,
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                               rmin,
 #endif
