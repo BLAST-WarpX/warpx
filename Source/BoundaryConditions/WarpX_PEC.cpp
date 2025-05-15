@@ -745,7 +745,7 @@ PEC::ApplyBoundarytoRhofield (
 
             ::SetRhoOrJfieldFromPEC(
                 n, iv, rho_array, mirrorfac, psign, is_pec_pmc_bndy,
-                is_tangent_to_bndy, fabbox
+                is_tangent_to_bndy, rho_nodal[0], fabbox
             );
         });
     }
@@ -879,7 +879,7 @@ PEC::ApplyBoundarytoJfield(
 
             ::SetRhoOrJfieldFromPEC(
                 n, iv, Jx_array, mirrorfac[0], psign[0], is_pec_pmc_bndy,
-                is_tangent_to_bndy[0], fabbox
+                is_tangent_to_bndy[0], Jx_nodal[0], fabbox
             );
         });
     }
@@ -910,7 +910,7 @@ PEC::ApplyBoundarytoJfield(
 
             ::SetRhoOrJfieldFromPEC(
                 n, iv, Jy_array, mirrorfac[1], psign[1], is_pec_pmc_bndy,
-                is_tangent_to_bndy[1], fabbox
+                is_tangent_to_bndy[1], Jy_nodal[0], fabbox
             );
         });
     }
@@ -941,7 +941,7 @@ PEC::ApplyBoundarytoJfield(
 
             ::SetRhoOrJfieldFromPEC(
                 n, iv, Jz_array, mirrorfac[2], psign[2], is_pec_pmc_bndy,
-                is_tangent_to_bndy[2], fabbox
+                is_tangent_to_bndy[2], Jz_nodal[0], fabbox
             );
         });
     }
