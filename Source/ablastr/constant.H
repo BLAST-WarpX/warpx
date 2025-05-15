@@ -136,6 +136,18 @@ namespace ablastr::constant
             template<typename T>
             constexpr auto sqrt_4_pi_fine_structure = static_cast<T>(0.3028221207690299);
 
+            //! square of the vacuum speed of light [m^2/s^2] (variable template)
+            template<typename T>
+            constexpr auto c2 = static_cast<T>(c<double>*c<double>);
+
+            //! inverse of the vacuum speed of light [s/m] (variable template)
+            template<typename T>
+            constexpr auto invc = static_cast<T>(1.0/c<double>);
+
+            //! inverse of the square of the vacuum speed of light [s^2/m^2] (variable template)
+            template<typename T>
+            constexpr auto invc2 = static_cast<T>(1.0/c2<double>);
+
         } // namespace constant_templates
 
         //! vacuum speed of light [m/s]
@@ -198,6 +210,15 @@ namespace ablastr::constant
 
         //! 1 MeV/c^2 in [kg]
         constexpr auto MeV_invc2 = constant_templates::MeV_invc2<amrex::Real>;
+
+        //! square of the vacuum speed of light [m^2/s^2]
+        constexpr auto c2 = constant_templates::c2<amrex::Real>;
+
+        //! inverse of the vacuum speed of light [s/m] (variable template)
+        constexpr auto invc = constant_templates::invc<amrex::Real>;
+
+        //! inverse of the square of the vacuum speed of light [s^2/m^2] (variable template)
+        constexpr auto invc2 = constant_templates::invc2<amrex::Real>;
 
     } // namespace SI
 
