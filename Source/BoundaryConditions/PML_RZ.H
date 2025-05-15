@@ -10,8 +10,6 @@
 
 #include "PML_RZ_fwd.H"
 
-#include "Utils/WarpXAlgorithmSelection.H"
-
 #ifdef WARPX_USE_FFT
 #   include "FieldSolver/SpectralSolver/SpectralSolverRZ.H"
 #endif
@@ -21,12 +19,9 @@
 #include <AMReX_MultiFab.H>
 #include <AMReX_BoxArray.H>
 #include <AMReX_Config.H>
-#include <AMReX_REAL.H>
 
 #include <AMReX_BaseFwd.H>
 
-#include <array>
-#include <optional>
 #include <string>
 
 class PML_RZ
