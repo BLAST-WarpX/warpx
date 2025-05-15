@@ -88,5 +88,5 @@ collisions.collision_names = neutral_to_ion
 neutral_to_ion.type = dsmc
 neutral_to_ion.scattering_processes = charge_exchange
 neutral_to_ion.species = Hplus H2
-#neutral_to_ion.product_species = H H2plus
+neutral_to_ion.product_species = H H2plus
 neutral_to_ion.charge_exchange_cross_section = ../../../../warpx-data/MCC_cross_sections/H/H_on_H2_ionization.dat

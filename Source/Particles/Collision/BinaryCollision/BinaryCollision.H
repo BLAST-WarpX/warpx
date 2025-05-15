@@ -142,10 +142,6 @@ public:
         }
         m_have_product_species = !m_product_species.empty();
 
-        // TODO: for charge exchange, make sure that the first product species matches the first incoming species
-        // and the second product species matches the second incoming species (same mass up to one electron mass ;
-        // charge differs by one electron mass)
-
         if ((std::is_same_v<CopyTransformFunctor, NoParticleCreationFunc>) && (m_have_product_species)) {
             WARPX_ABORT_WITH_MESSAGE( "Binary collision " + collision_name +
                 " does not produce species. Thus, `product_species` should not be specified in the input script." );
