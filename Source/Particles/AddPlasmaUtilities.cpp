@@ -61,6 +61,8 @@ bool find_overlap_flux (const amrex::RealBox& tile_realbox, const amrex::RealBox
             // - flux_normal_axis=2 (emission along z) and dir=1
 #elif defined(WARPX_DIM_1D_Z)
         if ( (dir==0) && (plasma_injector.flux_normal_axis==2) ) {
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        if ( (dir==0) && (plasma_injector.flux_normal_axis==0) ) {
 #endif
             if (plasma_injector.flux_direction > 0) {
                 if (plasma_injector.surface_flux_pos <  tile_realbox.lo(dir) ||

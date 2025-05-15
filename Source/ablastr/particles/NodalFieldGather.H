@@ -91,7 +91,31 @@ void compute_weights (const amrex::ParticleReal xp,
     W[1][0] = 1.0_rt - W[1][1];
 
     k = 0;
-#else
+
+#elif defined(WARPX_DIM_RCYLINDER)
+
+    amrex::ignore_unused(zp);
+    const amrex::Real r = (std::sqrt(xp*xp+yp*yp) - plo[0]) * dxi[0] - half_if_cell_centered;
+    i = static_cast<int>(amrex::Math::floor(r));
+    W[0][1] = r - i;
+
+    W[0][0] = 1.0_rt - W[0][1];
+
+    j = 0;
+    k = 0;
+
+#elif defined(WARPX_DIM_RSPHERE)
+
+    const amrex::Real r = (std::sqrt(xp*xp+yp*yp+zp*zp) - plo[0]) * dxi[0] - half_if_cell_centered;
+    i = static_cast<int>(amrex::Math::floor(r));
+    W[0][1] = r - i;
+
+    W[0][0] = 1.0_rt - W[0][1];
+
+    j = 0;
+    k = 0;
+
+#elif (defined WARPX_DIM_1D_Z)
     const amrex::Real z = (zp - plo[0]) * dxi[0] - half_if_cell_centered;
     amrex::ignore_unused(xp, yp);
     i = static_cast<int>(amrex::Math::floor(z));

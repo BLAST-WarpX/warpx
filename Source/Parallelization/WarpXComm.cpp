@@ -1446,6 +1446,8 @@ void WarpX::SumBoundaryJ (
     {
 #if   defined(WARPX_DIM_1D_Z)
         ng_depos_J[0] += m_current_centering_noz / 2;
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        ng_depos_J[0] += m_current_centering_nox / 2;
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         ng_depos_J[0] += m_current_centering_nox / 2;
         ng_depos_J[1] += m_current_centering_noz / 2;

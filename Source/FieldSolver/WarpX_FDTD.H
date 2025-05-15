@@ -1,4 +1,5 @@
-/* Copyright 2019 Axel Huebl, David Grote
+/* Copyright 2019-2025 The WarpX Community
+ * Axel Huebl, David Grote, Eric Clark
  *
  * This file is part of WarpX.
  *
@@ -20,15 +21,21 @@ void warpx_computedivb(
     amrex::Real dxinv,
     amrex::Real dyinv,
     amrex::Real dzinv,
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     amrex::Real const rmin,
 #endif
     bool collocated = false)
 {
-
+    // TODO: Update to use the templated operators in the FiniteDifference object 
     using namespace amrex;
-
+ 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    const amrex::Real ru = 1._rt + 0.5_rt/(rmin*dxinv + i + 0.5_rt);
+    const amrex::Real rd = 1._rt - 0.5_rt/(rmin*dxinv + i + 0.5_rt);
+#endif
+  
     if (collocated) {
+        //Stencil is across 2 cells.
 #if defined WARPX_DIM_3D
         divB(i,j,k,dcomp) = 0.5_rt*(Bx(i+1,j  ,k  ) - Bx(i-1,j,k))*dxinv
                 +        0.5_rt*(By(i  ,j+1,k  ) - By(i,j-1,k))*dyinv
@@ -41,8 +48,8 @@ void warpx_computedivb(
         divB(i,0,0,dcomp) = 0.5*(Bz(i+1,0  ,0) - Bz(i-1,0,0))*dzinv;
         amrex::ignore_unused(j, Bx, dxinv);
         amrex::ignore_unused(k, By, dyinv);
-#elif defined WARPX_DIM_RZ
-        WARPX_ABORT_WITH_MESSAGE("Collocated RZ not a supported mode.");
+#elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        WARPX_ABORT_WITH_MESSAGE("Collocated non-Cartesian grids are not a currently supported mode for computing div B.");
 #endif
     } else {
 #if defined WARPX_DIM_3D
@@ -57,11 +64,17 @@ void warpx_computedivb(
         divB(i,0,0,dcomp) = (Bz(i+1,0  ,0) - Bz(i,0,0))*dzinv;
         amrex::ignore_unused(j, Bx, dxinv);
         amrex::ignore_unused(k, By, dyinv);
+#elif defined(WARPX_DIM_RCYLINDER)
+        divB(i,0,0,dcomp) = (ru*Bx(i+1,0  ,0) - rd*Bx(i,0,0))*dxinv;
+        amrex::ignore_unused(j, By, dyinv);
+        amrex::ignore_unused(k, Bz, dzinv);
+#elif defined(WARPX_DIM_RSPHERE)
+        divB(i,0,0,dcomp) = (ru*ru*Bx(i+1,0  ,0) - rd*rd*Bx(i,0,0))*dxinv;
+        amrex::ignore_unused(j, By, dyinv);
+        amrex::ignore_unused(k, Bz, dzinv);
 #elif defined WARPX_DIM_RZ
-        const amrex::Real ru = 1._rt + 0.5_rt/(rmin*dxinv + i + 0.5_rt);
-        const amrex::Real rd = 1._rt - 0.5_rt/(rmin*dxinv + i + 0.5_rt);
         divB(i,j,0,dcomp) = (ru*Bx(i+1,j,0) - rd*Bx(i,j,0))*dxinv
-                        + (Bz(i,j+1,0) - Bz(i,j,0))*dzinv;
+                           + (Bz(i,j+1,0) - Bz(i,j,0))*dzinv;
         amrex::ignore_unused(k, By, dyinv);
 #endif
     }

@@ -78,7 +78,7 @@ public:
      */
     void ApplyBcFluidsAndComms (ablastr::fields::MultiFabRegister& m_fields, int lev);
 
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     /**
      * centrifugal_source_rz adds contributions due to curvature acceleration for a
      * single timestep using an SSP-RK3 timestep for RZ specifically

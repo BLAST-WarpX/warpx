@@ -20,6 +20,8 @@
 AcceleratorLattice::AcceleratorLattice ()
 {
 
+#if defined(WARPX_ZINDEX)
+
     using namespace amrex::literals;
 
     /* Get the inputs for and initialize all of the lattice element types */
@@ -28,6 +30,9 @@ AcceleratorLattice::AcceleratorLattice ()
 
     h_quad.WriteToDevice();
     h_plasmalens.WriteToDevice();
+
+#endif
+
 }
 
 void
