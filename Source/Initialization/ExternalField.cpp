@@ -108,9 +108,9 @@ ExternalFieldParams::ExternalFieldParams(const amrex::ParmParse& pp_warpx)
         std::string str_By_ext_grid_function;
         std::string str_Bz_ext_grid_function;
 
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ)
         std::stringstream warnMsg;
-        warnMsg << "Parser for external B (r and theta) fields does not work with RZ\n"
+        warnMsg << "Parser for external B (r and theta) fields does not work with cylindrical and spherical\n"
             << "The initial Br and Bt fields are currently hardcoded to 0.\n"
             << "The initial Bz field should only be a function of z.\n";
         ablastr::warn_manager::WMRecordWarning(

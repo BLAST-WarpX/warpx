@@ -142,6 +142,8 @@ macro(find_amrex)
         # RZ is AMReX 2D
         set(WarpX_amrex_dim ${WarpX_DIMS})
         list(TRANSFORM WarpX_amrex_dim REPLACE RZ 2)
+        list(TRANSFORM WarpX_amrex_dim REPLACE RCYLINDER 1)
+        list(TRANSFORM WarpX_amrex_dim REPLACE RSPHERE 1)
         list(REMOVE_DUPLICATES WarpX_amrex_dim)
         set(AMReX_SPACEDIM ${WarpX_amrex_dim} CACHE INTERNAL "")
 
@@ -294,7 +296,7 @@ set(WarpX_amrex_src ""
 set(WarpX_amrex_repo "https://github.com/AMReX-Codes/amrex.git"
     CACHE STRING
     "Repository URI to pull and build AMReX from if(WarpX_amrex_internal)")
-set(WarpX_amrex_branch "25.05"
+set(WarpX_amrex_branch "7911bc643bffed673c92a89db33303855ece05ea"
     CACHE STRING
     "Repository branch for WarpX_amrex_repo if(WarpX_amrex_internal)")
 

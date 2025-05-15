@@ -365,7 +365,7 @@ FullDiagnostics::DoComputeAndPack (int step, bool force_flush)
 void
 FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
 {
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     using ablastr::fields::Direction;
 
     auto & warpx = WarpX::GetInstance();
@@ -408,7 +408,11 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
     // diagnostic output
     bool deposit_current = !m_solver_deposits_current;
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     std::vector<std::string> field_names = {"r", "t", "z"};
+#elif defined(WARPX_DIM_RSPHERE)
+    std::vector<std::string> field_names = {"r", "t", "p"};
+#endif
 
     // Fill vector of functors for all components except individual cylindrical modes.
     const auto m_varname_fields_size = static_cast<int>(m_varnames_fields.size());
@@ -643,7 +647,7 @@ FullDiagnostics::AddRZModesToDiags (int lev)
 
 void
 FullDiagnostics::AddRZModesToOutputNames (const std::string& field, int ncomp){
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ)
     // In cylindrical geometry, real and imag part of each mode are also
     // dumped to file separately, so they need to be added to m_varnames
     m_varnames.push_back( field + "_0_real" );
@@ -791,7 +795,7 @@ FullDiagnostics::InitializeBufferData (int i_buffer, int lev, bool restart ) {
 void
 FullDiagnostics::InitializeFieldFunctors (int lev)
 {
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     // For RZ, with openPMD, we need a special initialization instead
     if (m_format == "openpmd") {
         InitializeFieldFunctorsRZopenPMD(lev);
@@ -820,8 +824,10 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
 
     using ablastr::fields::Direction;
 
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     std::vector<std::string> field_names = {"r", "t", "z"};
+#elif defined(WARPX_DIM_RSPHERE)
+    std::vector<std::string> field_names = {"r", "t", "p"};
 #else
     std::vector<std::string> field_names = {"x", "y", "z"};
 #endif
@@ -946,6 +952,12 @@ FullDiagnostics::MovingWindowAndGalileanDomainShift (int step)
     {
         new_lo[0] = current_lo[0] + warpx.m_galilean_shift[2];
         new_hi[0] = current_hi[0] + warpx.m_galilean_shift[2];
+    }
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    {
+        // No shift is applied
+        new_lo[0] = current_lo[0];
+        new_hi[0] = current_hi[0];
     }
 #endif
     // Update RealBox of geometry with galilean-shifted boundary.

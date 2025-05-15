@@ -61,6 +61,10 @@ RigidInjectedParticleContainer::RigidInjectedParticleContainer (AmrCore* amr_cor
     : PhysicalParticleContainer(amr_core, ispecies, name)
 {
 
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    WARPX_ABORT_WITH_MESSAGE("Rigid injection not supported with 1D cylindrical and spherical");
+#endif
+
     const ParmParse pp_species_name(species_name);
 
     utils::parser::getWithParser(
@@ -265,8 +269,13 @@ RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& field
     // particles have crossed the inject plane.
     const Real* plo = Geom(lev).ProbLo();
     const Real* phi = Geom(lev).ProbHi();
-    done_injecting_lev = ((zinject_plane_levels[lev] < plo[WARPX_ZINDEX] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c >= 0.) ||
-                           (zinject_plane_levels[lev] > phi[WARPX_ZINDEX] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c <= 0.));
+#if defined(WARPX_ZINDEX)
+    const int zindex = WARPX_ZINDEX;
+#else
+    const int zindex = 0;
+#endif
+    done_injecting_lev = ((zinject_plane_levels[lev] < plo[zindex] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c >= 0.) ||
+                           (zinject_plane_levels[lev] > phi[zindex] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c <= 0.));
 
     PhysicalParticleContainer::Evolve (fields,
                                        lev,
