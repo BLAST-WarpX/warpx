@@ -67,9 +67,10 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
 
             // For charge exchange:
             if (std::find(scattering_processes.begin(), scattering_processes.end(), "charge_exchange") != scattering_processes.end()) {
-                // grab the colliding species
-                amrex::Vector<std::string> colliding_species;
-                pp_collision_name.getarr("species", colliding_species);
+                m_num_products_host.push_back(0); // the colliding species are consumed in the reaction
+                m_num_products_host.push_back(0); // the colliding species are consumed in the reaction
+                m_num_products_host.push_back(1); // first product species
+                m_num_products_host.push_back(1); // second product species
             }
 
         } else {
