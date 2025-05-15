@@ -5,15 +5,13 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#include "PML_RZ.H"
-
 #include "BoundaryConditions/PML_RZ.H"
+
 #include "Fields.H"
 #ifdef WARPX_USE_FFT
 #   include "FieldSolver/SpectralSolver/SpectralFieldDataRZ.H"
 #endif
 #include "Utils/WarpXConst.H"
-#include "WarpX.H"
 
 #include <ablastr/utils/Communication.H>
 
@@ -128,38 +126,6 @@ PML_RZ::ApplyDamping (amrex::MultiFab* Et_fp, amrex::MultiFab* Ez_fp,
                 Bz_arr(i,j,k,icomp) *= damp_factor;
                 Ez_arr(i,j,k,icomp) *= damp_factor;
             });
-    }
-}
-
-void
-PML_RZ::FillBoundaryE (ablastr::fields::MultiFabRegister& fields, PatchType patch_type, std::optional<bool> nodal_sync)
-{
-    using ablastr::fields::Direction;
-
-    amrex::MultiFab * pml_Er = fields.get(FieldType::pml_E_fp, Direction{0}, 0);
-    amrex::MultiFab * pml_Et = fields.get(FieldType::pml_E_fp, Direction{1}, 0);
-
-    if (patch_type == PatchType::fine && pml_Er->nGrowVect().max() > 0)
-    {
-        amrex::Periodicity const& period = m_geom->periodicity();
-        const amrex::Vector<amrex::MultiFab*> mf = {pml_Er, pml_Et};
-        ablastr::utils::communication::FillBoundary(mf, WarpX::do_single_precision_comms, period, nodal_sync);
-    }
-}
-
-void
-PML_RZ::FillBoundaryB (ablastr::fields::MultiFabRegister& fields, PatchType patch_type, std::optional<bool> nodal_sync)
-{
-    if (patch_type == PatchType::fine)
-    {
-        using ablastr::fields::Direction;
-
-        amrex::MultiFab * pml_Br = fields.get(FieldType::pml_B_fp, Direction{0}, 0);
-        amrex::MultiFab * pml_Bt = fields.get(FieldType::pml_B_fp, Direction{1}, 0);
-
-        amrex::Periodicity const& period = m_geom->periodicity();
-        const amrex::Vector<amrex::MultiFab*> mf = {pml_Br, pml_Bt};
-        ablastr::utils::communication::FillBoundary(mf, WarpX::do_single_precision_comms, period, nodal_sync);
     }
 }
 
