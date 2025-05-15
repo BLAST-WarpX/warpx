@@ -171,8 +171,20 @@ WarpX::Evolve (int numsteps)
 
         multi_diags->NewIteration();
 
+        bool verbose_step = (bool)verbose;
+        if (verbose && m_limit_verbose_step) {
+
+            int verbose_step_interval = 1;
+            if (step<10) { verbose_step_interval = 1; }
+            else if (step<100) { verbose_step_interval = 10; }
+            else { verbose_step_interval = 100; }
+
+            verbose_step = !((step+1)%verbose_step_interval);
+
+        }
+
         // Start loop on time steps
-        if (verbose) {
+        if (verbose_step) {
             amrex::Print() << "STEP " << step+1 << " starts ...\n";
         }
         ExecutePythonCallback("beforestep");
@@ -183,7 +195,7 @@ WarpX::Evolve (int numsteps)
         // This first synchronizes the position and velocity before setting the new timestep
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None &&
             !m_const_dt.has_value() && m_dt_update_interval.contains(step+1)) {
-            if (verbose) {
+            if (verbose_step) {
                 amrex::Print() << Utils::TextMsg::Info("updating timestep");
             }
             SynchronizeVelocityWithPosition();
@@ -261,7 +273,7 @@ WarpX::Evolve (int numsteps)
         // Resample particles
         // +1 is necessary here because value of step seen by user (first step is 1) is different than
         // value of step in code (first step is 0)
-        mypc->doResampling(Geom(), istep[0]+1, verbose);
+        mypc->doResampling(Geom(), istep[0]+1, verbose_step);
 
         if (evolve_scheme == EvolveScheme::Explicit) {
             applyMirrors(cur_time);
@@ -374,7 +386,7 @@ WarpX::Evolve (int numsteps)
 
         HandleSignals();
 
-        if (verbose) {
+        if (verbose_step) {
             amrex::Print()<< "STEP " << step+1 << " ends." << " TIME = " << cur_time
                         << " DT = " << dt[0] << "\n";
             amrex::Print()<< "Evolve time = " << evolve_time

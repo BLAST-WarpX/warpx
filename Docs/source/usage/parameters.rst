@@ -3955,6 +3955,11 @@ When developing, testing and :ref:`debugging WarpX <debugging_warpx>`, the follo
 * ``warpx.verbose`` (``0`` or ``1``; default is ``1`` for true)
     Controls how much information is printed to the terminal, when running WarpX.
 
+* ``warpx.limit_verbose_step`` (`bool`, default: false)
+    If set to true, the information normally printed to the terminal at every time step
+    is limited: it prints every step for the first 10 steps, every 10 steps for steps between 10 and 100,
+    and once every 100 steps for steps greater than 100.
+
 * ``warpx.always_warn_immediately`` (``0`` or ``1``; default is ``0`` for false)
     If set to ``1``, WarpX immediately prints every warning message as soon as
     it is generated. It is mainly intended for debug purposes, in case a simulation

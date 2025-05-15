@@ -1329,6 +1329,7 @@ private:
 
     // Other runtime parameters
     int verbose = 1;
+    bool m_limit_verbose_step = false;
 
     bool use_hybrid_QED = false;
 
