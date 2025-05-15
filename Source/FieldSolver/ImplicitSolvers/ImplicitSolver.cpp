@@ -98,8 +98,7 @@ void ImplicitSolver::SaveEandJ ()
     // Do this BEFORE call to SyncCurrentAndRho() so that BCs are set for J
 
     using warpx::fields::FieldType;
-    const int finest_level = 0;
-    for (int lev = 0; lev <= finest_level; ++lev) {
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         ablastr::fields::VectorField E = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
         ablastr::fields::VectorField E0 = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp_save, lev);
         amrex::MultiFab::Copy(*E0[0], *E[0], 0, 0, 1, E[0]->nGrowVect());
@@ -121,9 +120,8 @@ void ImplicitSolver::ComputeJfromMassMatrices()
 
     using warpx::fields::FieldType;
     using ablastr::fields::Direction;
-    const int finest_level = 0;
     const int ncomps = 1;
-    for (int lev = 0; lev <= finest_level; ++lev) {
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
 
         ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
         ablastr::fields::VectorField E = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
@@ -508,11 +506,10 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
     using warpx::fields::FieldType;
 
     // Copy mass matrices elements used for the preconditioner
-    const int finest_level = 0;
     const int diag_comp_xx = (m_ncomp_xx[0]-1)/2;
     const int diag_comp_yy = (m_ncomp_yy[0]-1)/2;
     const int diag_comp_zz = (m_ncomp_zz[0]-1)/2;
-    for (int lev = 0; lev <= finest_level; ++lev) {
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         amrex::MultiFab* MM_xx = m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{0}, lev);
         amrex::MultiFab* MM_yy = m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{1}, lev);
         amrex::MultiFab* MM_zz = m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{2}, lev);
@@ -526,7 +523,7 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
     m_WarpX->SyncMassMatricesPC();
 
     // Apply BCs to MassMatrices_PC
-    for (int lev = 0; lev <= finest_level; ++lev) {
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         m_WarpX->ApplyJfieldBoundary(lev,
             m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev),
             m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev),
