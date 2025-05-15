@@ -32,7 +32,7 @@ DSMCFunc::DSMCFunc (
 
     // create a vector of ScatteringProcess objects from each scattering
     // process name
-    bool ionization_flag = false;
+    bool reaction_produces_new_species = false;
     for (const auto& scattering_process : scattering_process_names) {
         const std::string kw_cross_section = scattering_process + "_cross_section";
         std::string cross_section_file;
@@ -56,20 +56,16 @@ DSMCFunc::DSMCFunc (
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::INVALID,
                                         "Cannot add an unknown scattering process type");
 
-        // Only one ionization process is currently supported as part of a given
-        // collision set.
-        if (process.type() == ScatteringProcessType::IONIZATION) {
+        // Only one reaction that produces a new species is currently supported as part of a given collision set.
+        if (process.type() == ScatteringProcessType::IONIZATION || process.type() == ScatteringProcessType::CHARGE_EXCHANGE) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                !ionization_flag,
-                "DSMC only supports a single ionization process"
+                !reaction_produces_new_species,
+                "DSMC only supports a single reaction that produces a new species"
             );
-            ionization_flag = true;
+            reaction_produces_new_species = true;
 
-            // And add a check that the ionization species has the same mass
-            // (and a positive charge), compared to the target species
+            // And add a check that the mass and charge of the products is consistent with the charge and mass of the incident particle
         }
-
-        // TODO: check that charge exchange and ionization are not activated at the same time
 
         m_scattering_processes.push_back(std::move(process));
     }
