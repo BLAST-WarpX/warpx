@@ -145,7 +145,7 @@ A new test can be added by calling the function ``add_warpx_test`` in ``CMakeLis
      function(add_warpx_test
          name        # unique test name:
                      # test_1d_example, test_2d_example_picmi, etc.
-         dims        # dimensionality: 1, 2, 3, RZ
+         dims        # dimensionality: 1, 2, 3, RZ, RCYLINDER, RSPHERE
          nprocs      # number of processes: 1, 2
          inputs      # inputs file or PICMI script:
                      # inputs_test_1d_example, inputs_test_2d_example_picmi.py, "inputs_test_2d_example_picmi.py arg1 arg2", etc.

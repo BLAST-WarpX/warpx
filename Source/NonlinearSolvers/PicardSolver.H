@@ -210,20 +210,26 @@ void PicardSolver<Vec,Ops>::Solve ( Vec&         a_U,
         }
 
         if (norm_abs < m_atol) {
-            amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
-                           << ". Satisfied absolute tolerance " << m_atol << "\n";
+            if (this->m_verbose) {
+                amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
+                               << ". Satisfied absolute tolerance " << m_atol << "\n";
+            }
             break;
         }
 
         if (norm_rel < m_rtol) {
-            amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
-                           << ". Satisfied relative tolerance " << m_rtol << "\n";
+            if (this->m_verbose) {
+                amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
+                               << ". Satisfied relative tolerance " << m_rtol << "\n";
+            }
             break;
         }
 
         if (iter >= m_maxits) {
-            amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
-                           << ". Maximum iteration reached: iter = " << m_maxits << "\n";
+            if (this->m_verbose) {
+                amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
+                               << ". Maximum iteration reached: iter = " << m_maxits << "\n";
+            }
             break;
         }
 

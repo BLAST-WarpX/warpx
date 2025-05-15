@@ -118,7 +118,7 @@ void EffectivePotentialES::ComputeSigma (MultiFab& sigma) const
     amrex::GpuArray<int, 3> const nodal = {1, 1, 1};
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     amrex::GpuArray<int, 3> const nodal = {1, 1, 0};
-#elif defined(WARPX_DIM_1D_Z)
+#elif defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     amrex::GpuArray<int, 3> const nodal = {1, 0, 0};
 #endif
 
@@ -211,6 +211,10 @@ void EffectivePotentialES::computePhi (
 #if defined(WARPX_DIM_1D_Z)
                 amrex::Array<amrex::MultiFab*, 1>{
                     efield[lev][2]
+                }
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                amrex::Array<amrex::MultiFab*, 1>{
+                    warpx.m_fields.get(FieldType::Efield_fp, Direction{0}, lev)
                 }
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                 amrex::Array<amrex::MultiFab*, 2>{

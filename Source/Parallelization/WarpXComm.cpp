@@ -1268,9 +1268,9 @@ WarpX::SyncCurrent (const std::string& current_fp_string)
 }
 
 void
-WarpX::SyncMassMatrices ()
+WarpX::SyncMassMatricesPC ()
 {
-    WARPX_PROFILE("WarpX::SyncMassMatrices()");
+    WARPX_PROFILE("WarpX::SyncMassMatricesPC()");
 
     ablastr::fields::MultiLevelVectorField const& Sigma_fp = m_fields.get_mr_levels_alldirs("MassMatrices_PC", finest_level);
 
@@ -1446,6 +1446,8 @@ void WarpX::SumBoundaryJ (
     {
 #if   defined(WARPX_DIM_1D_Z)
         ng_depos_J[0] += m_current_centering_noz / 2;
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        ng_depos_J[0] += m_current_centering_nox / 2;
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         ng_depos_J[0] += m_current_centering_nox / 2;
         ng_depos_J[1] += m_current_centering_noz / 2;

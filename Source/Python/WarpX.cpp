@@ -211,7 +211,7 @@ The physical fields in WarpX have the following naming:
         .def("sync_rho",
             [](WarpX& wx){ wx.SyncRho(); }
         )
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         .def("apply_inverse_volume_scaling_to_charge_density",
             [](WarpX& wx, amrex::MultiFab* rho, int const lev) {
                 wx.ApplyInverseVolumeScalingToChargeDensity(rho, lev);
@@ -274,9 +274,36 @@ The physical fields in WarpX have the following naming:
             [] (WarpX& wx) { wx.CalculateExternalCurlA(); },
             "Executes calculation of the curl of the external A in the hybrid solver."
         )
-        .def("synchronize",
-            [] (WarpX& wx) { wx.Synchronize(); },
+        .def("synchronize_velocity_with_position",
+            [] (WarpX& wx) { wx.SynchronizeVelocityWithPosition(); },
             "Synchronize particle velocities and positions."
+        )
+        // Add some accessor bindings for the Hybrid Ohm's Law Solver
+        .def("set_hybrid_pic_substeps",
+            [](WarpX& wx, int substeps) {
+                wx.get_pointer_HybridPICModel()->m_substeps = substeps;
+            },
+            py::arg("substeps"),
+            "Sets the number of substeps to take in the hybrid solver."
+        )
+        .def("get_hybrid_pic_substeps",
+            [](WarpX& wx) {
+                return wx.get_pointer_HybridPICModel()->m_substeps;
+            },
+            "Gets the number of substeps taken in the hybrid solver."
+        )
+        .def("set_hybrid_pic_density_floor",
+            [](WarpX& wx, amrex::Real n_floor) {
+                wx.get_pointer_HybridPICModel()->m_n_floor = n_floor;
+            },
+            py::arg("n_floor"),
+            "Sets the density floor to use in the hybrid solver."
+        )
+        .def("get_hybrid_pic_density_floor",
+            [](WarpX& wx) {
+                return wx.get_pointer_HybridPICModel()->m_n_floor;
+            },
+            "Gets the number of substeps to take in the hybrid solver."
         )
     ;
 
