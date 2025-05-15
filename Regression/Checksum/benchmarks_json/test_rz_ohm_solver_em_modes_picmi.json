@@ -1,9 +1,9 @@
 {
   "lev=0": {},
   "ions": {
-    "particle_momentum_x": 5.045848832411279e-17,
-    "particle_momentum_y": 5.03955262360032e-17,
-    "particle_momentum_z": 5.051320303573478e-17,
+    "particle_momentum_x": 5.046097751966259e-17,
+    "particle_momentum_y": 5.039635981650863e-17,
+    "particle_momentum_z": 5.051320399073014e-17,
     "particle_position_x": 143159.4669993523,
     "particle_position_y": 143164.10186326457,
     "particle_theta": 2574363.0814531804,
