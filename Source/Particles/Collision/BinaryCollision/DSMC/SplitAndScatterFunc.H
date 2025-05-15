@@ -204,7 +204,7 @@ public:
         amrex::ParallelForRNG(n_total_pairs,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
         {
-            if ((mask[i] > 0) & (mask[i] != int(ScatteringProcessType::IONIZATION)))
+            if ((mask[i] > 0) & (mask[i] != int(ScatteringProcessType::IONIZATION)) & (mask[i] != int(ScatteringProcessType::CHARGE_EXCHANGE)))
             {
                 const auto product1_index = products_np_data[0] + no_product_p_offsets[i];
                 // Make a copy of the particle from species 1
