@@ -30,7 +30,7 @@ struct WarpXSolverDOF
     warpx::fields::FieldType m_scalar_type = warpx::fields::FieldType::None;
 
     amrex::Long m_nDoFs_l = 0; /*!< Local nDOF */
-    amrex::Long m_nDoFs_g = 0; /*!< Gloval nDOF */
+    amrex::Long m_nDoFs_g = 0; /*!< Global nDOF */
 
     void Define ( WarpX* const, int, const std::string&, const std::string&);
 };
