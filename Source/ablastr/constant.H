@@ -214,10 +214,10 @@ namespace ablastr::constant
         //! square of the vacuum speed of light [m^2/s^2]
         constexpr auto c2 = constant_templates::c2<amrex::Real>;
 
-        //! inverse of the vacuum speed of light [s/m] (variable template)
+        //! inverse of the vacuum speed of light [s/m]
         constexpr auto invc = constant_templates::invc<amrex::Real>;
 
-        //! inverse of the square of the vacuum speed of light [s^2/m^2] (variable template)
+        //! inverse of the square of the vacuum speed of light [s^2/m^2]
         constexpr auto invc2 = constant_templates::invc2<amrex::Real>;
 
     } // namespace SI
