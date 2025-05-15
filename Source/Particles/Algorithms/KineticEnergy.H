@@ -37,15 +37,15 @@ namespace Algorithms{
         const amrex::ParticleReal ux, const amrex::ParticleReal uy, const amrex::ParticleReal uz, const amrex::ParticleReal mass)
     {
         using namespace amrex;
+        using PC_ct = PhysConst::constant_templates;
 
         constexpr auto one = static_cast<T>(1.0);
-        constexpr auto inv_c2 = one/Math::powi<2>(static_cast<T>(PhysConst::constant_templates::c<T>));
 
         // The expression used is derived by reducing the expression
         // (gamma - 1)*(gamma + 1)/(gamma + 1)
 
         const auto u2 = static_cast<T>(ux*ux + uy*uy + uz*uz);
-        const auto gamma = std::sqrt(one + u2*inv_c2);
+        const auto gamma = std::sqrt(one + u2*PC_ct::invc2<T>);
         return one/(one + gamma)*static_cast<T>(mass)*u2;
     }
 
