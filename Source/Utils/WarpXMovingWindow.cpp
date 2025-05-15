@@ -184,6 +184,11 @@ namespace
                         const amrex::Real y = 0.0;
                         const amrex::Real fac_z = (1.0_rt - mf_type[1]) * dx[1]*0.5_rt;
                         const amrex::Real z = j*dx[1] + real_box.lo(1) + fac_z;
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                        const amrex::Real fac_x = (1.0_rt - mf_type[0]) * dx[0]*0.5_rt;
+                        const amrex::Real x = i*dx[0] + real_box.lo(0) + fac_x;
+                        const amrex::Real y = 0.0_rt;
+                        const amrex::Real z = 0.0_rt;
 #else
                         const amrex::Real fac_x = (1.0_rt - mf_type[0]) * dx[0]*0.5_rt;
                         const amrex::Real x = i*dx[0] + real_box.lo(0) + fac_x;
@@ -271,6 +276,8 @@ WarpX::UpdateInjectionPosition (const amrex::Real a_dt)
             amrex::Vector<amrex::Real> current_injection_position = {0._rt, 0._rt, 0._rt};
 #if defined(WARPX_DIM_1D_Z)
             current_injection_position[2] = pc.m_current_injection_position;
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            current_injection_position[0] = pc.m_current_injection_position;
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             current_injection_position[dir*2] = pc.m_current_injection_position;
 #else // 3D
@@ -289,6 +296,8 @@ WarpX::UpdateInjectionPosition (const amrex::Real a_dt)
                     current_injection_position[2]);
 #if defined(WARPX_DIM_1D_Z)
                 amrex::Vector<amrex::Real> u_bulk_vec = {u_bulk.z};
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                amrex::Vector<amrex::Real> u_bulk_vec = {u_bulk.x};
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                 amrex::Vector<amrex::Real> u_bulk_vec = {u_bulk.x, u_bulk.z};
 #else // 3D
@@ -318,6 +327,12 @@ WarpX::UpdateInjectionPosition (const amrex::Real a_dt)
                 // This needs to be converted to access boost_direction,
                 // which has always 3 components.
                 v_shift *= WarpX::boost_direction[2];
+                amrex::ignore_unused(dir);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                // In 1D radial, dir=0 corresponds to x.
+                // This needs to be converted to access boost_direction,
+                // which has always 3 components.
+                v_shift *= WarpX::boost_direction[0];
                 amrex::ignore_unused(dir);
 #endif
             }
@@ -717,6 +732,12 @@ WarpX::ShiftGalileanBoundary ()
     {
         new_lo[0] = current_lo[0] + m_galilean_shift[2];
         new_hi[0] = current_hi[0] + m_galilean_shift[2];
+    }
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    amrex::ignore_unused(time_shift);
+    {
+        new_lo[0] = current_lo[0];
+        new_hi[0] = current_hi[0];
     }
 #endif
     time_of_last_gal_shift = cur_time;

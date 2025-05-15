@@ -57,6 +57,9 @@ WarpX::ErrorEst (int lev, TagBoxArray& tags, Real /*time*/, int /*ngrow*/)
 #elif defined (WARPX_DIM_1D_Z)
                 const auto unused = 0.0_rt;
                 tag_val = (ref_parser(unused, unused, pos[0]) == 1);
+#elif defined (WARPX_DIM_RCYLINDER) || defined (WARPX_DIM_RSPHERE)
+                const auto unused = 0.0_rt;
+                tag_val = (ref_parser(pos[0], unused, unused) == 1);
 #endif
             } else {
                 tag_val = (pos > ftlo && pos < fthi);

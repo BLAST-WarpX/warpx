@@ -211,7 +211,7 @@ The physical fields in WarpX have the following naming:
         .def("sync_rho",
             [](WarpX& wx){ wx.SyncRho(); }
         )
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         .def("apply_inverse_volume_scaling_to_charge_density",
             [](WarpX& wx, amrex::MultiFab* rho, int const lev) {
                 wx.ApplyInverseVolumeScalingToChargeDensity(rho, lev);

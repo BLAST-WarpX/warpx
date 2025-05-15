@@ -349,6 +349,8 @@ LaserParticleContainer::UpdateAntennaPosition (const amrex::Real dt)
         m_updated_position[2] -= WarpX::beta_boost *
             WarpX::boost_direction[2] * PhysConst::c * dt;
         amrex::ignore_unused(dir);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        amrex::ignore_unused(dir, dt);
 #endif
     }
 }
@@ -831,7 +833,7 @@ LaserParticleContainer::calculate_laser_plane_coordinates (const WarpXParIter& p
                 tmp_u_X_0 * (x - tmp_position_0) +
                 tmp_u_X_2 * (z - tmp_position_2);
             pplane_Yp[i] = 0.;
-#elif defined(WARPX_DIM_1D_Z)
+#elif AMREX_SPACEDIM == 1
             pplane_Xp[i] = 0.;
             pplane_Yp[i] = 0.;
 #endif
@@ -871,7 +873,7 @@ LaserParticleContainer::update_laser_particle (WarpXParIter& pti,
     // When using the implicit solver, this function is called multiple times per timestep
     // (within the linear and nonlinear solver). Thus, the position of the particles needs to be reset
     // to the initial position (at the beginning of the timestep), before updating the particle position
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
     ParticleReal* x_n = nullptr;
     if (push_type == PushType::Implicit) {
         x_n = pti.GetAttribs("x_n").dataPtr();
