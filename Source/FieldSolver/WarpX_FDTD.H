@@ -26,14 +26,14 @@ void warpx_computedivb(
 #endif
     bool collocated = false)
 {
-    // TODO: Update to use the templated operators in the FiniteDifference object 
+    // TODO: Update to use the templated operators in the FiniteDifference object
     using namespace amrex;
- 
+
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     const amrex::Real ru = 1._rt + 0.5_rt/(rmin*dxinv + i + 0.5_rt);
     const amrex::Real rd = 1._rt - 0.5_rt/(rmin*dxinv + i + 0.5_rt);
 #endif
-  
+
     if (collocated) {
         //Stencil is across 2 cells.
 #if defined WARPX_DIM_3D
