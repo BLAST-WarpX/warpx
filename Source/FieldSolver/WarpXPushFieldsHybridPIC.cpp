@@ -259,6 +259,13 @@ void WarpX::HybridPICEvolveFields ()
 
 void WarpX::HybridPICDepositInitialRhoAndJ ()
 {
+    // The Ohm's law solver requires two timesteps' values for the charge
+    // density and current density. This function is called at the start of
+    // the PIC loop (before particles have been pushed for the first time,
+    // but after their positions and velocities have been de-synchronized).
+    // The charge density and current density are now deposited to get
+    // rho^{0} and J^{-dt/2}.
+
     using warpx::fields::FieldType;
 
     bool const skip_lev0_coarse_patch = true;
@@ -266,17 +273,10 @@ void WarpX::HybridPICDepositInitialRhoAndJ ()
     ablastr::fields::MultiLevelScalarField rho_fp_temp = m_fields.get_mr_levels(FieldType::hybrid_rho_fp_temp, finest_level);
     ablastr::fields::MultiLevelVectorField current_fp_temp = m_fields.get_mr_levels_alldirs(FieldType::hybrid_current_fp_temp, finest_level);
     mypc->DepositCharge(rho_fp_temp, 0._rt);
-    mypc->DepositCurrent(current_fp_temp, dt[0], 0._rt);
+    mypc->DepositCurrent(current_fp_temp, dt[0], -0.5_rt * dt[0]);
     SyncRho(rho_fp_temp, m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_lev0_coarse_patch), m_fields.get_mr_levels(FieldType::rho_buf, finest_level, skip_lev0_coarse_patch));
     SyncCurrent("hybrid_current_fp_temp");
     for (int lev=0; lev <= finest_level; ++lev) {
-        // SyncCurrent does not include a call to FillBoundary, but it is needed
-        // for the hybrid-PIC solver since current values are interpolated to
-        // a nodal grid
-        current_fp_temp[lev][0]->FillBoundary(Geom(lev).periodicity());
-        current_fp_temp[lev][1]->FillBoundary(Geom(lev).periodicity());
-        current_fp_temp[lev][2]->FillBoundary(Geom(lev).periodicity());
-
         ApplyRhofieldBoundary(lev, rho_fp_temp[lev], PatchType::fine);
         // Set current density at PEC boundaries, if needed.
         ApplyJfieldBoundary(
@@ -285,6 +285,13 @@ void WarpX::HybridPICDepositInitialRhoAndJ ()
             current_fp_temp[lev][2],
             PatchType::fine
         );
+
+        // SyncCurrent does not include a call to FillBoundary, but it is needed
+        // for the hybrid-PIC solver since current values are interpolated to
+        // a nodal grid
+        current_fp_temp[lev][0]->FillBoundary(Geom(lev).periodicity());
+        current_fp_temp[lev][1]->FillBoundary(Geom(lev).periodicity());
+        current_fp_temp[lev][2]->FillBoundary(Geom(lev).periodicity());
     }
 }
 
