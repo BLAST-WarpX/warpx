@@ -171,33 +171,40 @@ public:
         // is present). If species1 is also a product, this would start the
         // indexing for product particles after the particles created from
         // fragmentation.
-        int product1_list_index = 0, product2_list_index = 0;
-        index_type product1_offset = 0, product2_offset = 0;
+        int ioniz_product1_list_index = 0, ioniz_product2_list_index = 0;
+        index_type ioniz_product1_offset = 0, ioniz_product2_offset = 0;
         if (num_product_species == 3) {
             if (pc_products[0]->getCharge() < 0.0) {
-                product1_list_index = 0;
-                product2_list_index = 2;
-                product1_offset = products_np[0] + no_product_total + with_product_total;
-                product2_offset = products_np[2];
+                ioniz_product1_list_index = 0;
+                ioniz_product2_list_index = 2;
+                ioniz_product1_offset = products_np[0] + no_product_total + with_product_total;
+                ioniz_product2_offset = products_np[2];
             } else {
-                product1_list_index = 2;
-                product2_list_index = 0;
-                product1_offset = products_np[2];
-                product2_offset = products_np[0] + no_product_total + with_product_total;
+                ioniz_product1_list_index = 2;
+                ioniz_product2_list_index = 0;
+                ioniz_product1_offset = products_np[2];
+                ioniz_product2_offset = products_np[0] + no_product_total + with_product_total;
             }
         } else if (num_product_species == 4) {
-            product1_list_index = 2;
-            product2_list_index = 3;
-            product1_offset = products_np[2];
-            product2_offset = products_np[3];
+            if (pc_products[2]->getCharge() < 0.0) {
+                ioniz_product1_list_index = 2;
+                ioniz_product2_list_index = 3;
+                ioniz_product1_offset = products_np[2];
+                ioniz_product2_offset = products_np[3];
+            } else {
+                ioniz_product1_list_index = 3;
+                ioniz_product2_list_index = 2;
+                ioniz_product1_offset = products_np[3];
+                ioniz_product2_offset = products_np[2];
+            }
         }
 
         // Grab the masses of ionization products
-        amrex::ParticleReal m_product1 = 0;
-        amrex::ParticleReal m_product2 = 0;
+        amrex::ParticleReal m_ioniz_product1 = 0;
+        amrex::ParticleReal m_ioniz_product2 = 0;
         if (num_product_species > 2) {
-            m_product1 = pc_products[product1_list_index]->getMass();
-            m_product2 = pc_products[product2_list_index]->getMass();
+            m_ioniz_product1 = pc_products[ioniz_product1_list_index]->getMass();
+            m_ioniz_product2 = pc_products[ioniz_product2_list_index]->getMass();
         }
 
         // First perform all non-product producing collisions
@@ -306,18 +313,18 @@ public:
             else if (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE))
             {
                 // create a copy of the first product species at the location of species 1
-                const auto product1_index = product1_offset + with_product_p_offsets[i];
-                copy_species1[product1_list_index](soa_products_data[product1_list_index], soa_1, static_cast<int>(p_pair_indices_1[i]),
+                const auto product1_index = ioniz_product1_offset + with_product_p_offsets[i];
+                copy_species1[ioniz_product1_list_index](soa_products_data[ioniz_product1_list_index], soa_1, static_cast<int>(p_pair_indices_1[i]),
                                 static_cast<int>(product1_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
-                soa_products_data[product1_list_index].m_rdata[PIdx::w][product1_index] = p_pair_reaction_weight[i];
+                soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::w][product1_index] = p_pair_reaction_weight[i];
 
                 // create a copy of the other product species at the location of species 2
-                const auto product2_index = product2_offset + with_product_p_offsets[i];
-                copy_species1[product2_list_index](soa_products_data[product2_list_index], soa_2, static_cast<int>(p_pair_indices_2[i]),
+                const auto product2_index = ioniz_product2_offset + with_product_p_offsets[i];
+                copy_species1[ioniz_product2_list_index](soa_products_data[ioniz_product2_list_index], soa_2, static_cast<int>(p_pair_indices_2[i]),
                                 static_cast<int>(product2_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
-                soa_products_data[product2_list_index].m_rdata[PIdx::w][product2_index] = p_pair_reaction_weight[i];
+                soa_products_data[ioniz_product2_list_index].m_rdata[PIdx::w][product2_index] = p_pair_reaction_weight[i];
             }
             else if (mask[i] == int(ScatteringProcessType::IONIZATION))
             {
@@ -329,18 +336,18 @@ public:
                 soa_products_data[0].m_rdata[PIdx::w][species1_index] = p_pair_reaction_weight[i];
 
                 // create a copy of the first product species at the location of species 2
-                const auto product1_index = product1_offset + with_product_p_offsets[i];
-                copy_species1[product1_list_index](soa_products_data[product1_list_index], soa_2, static_cast<int>(p_pair_indices_2[i]),
+                const auto product1_index = ioniz_product1_offset + with_product_p_offsets[i];
+                copy_species1[ioniz_product1_list_index](soa_products_data[ioniz_product1_list_index], soa_2, static_cast<int>(p_pair_indices_2[i]),
                                 static_cast<int>(product1_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
-                soa_products_data[product1_list_index].m_rdata[PIdx::w][product1_index] = p_pair_reaction_weight[i];
+                soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::w][product1_index] = p_pair_reaction_weight[i];
 
                 // create a copy of the other product species at the location of species 2
-                const auto product2_index = product2_offset + with_product_p_offsets[i];
-                copy_species1[product2_list_index](soa_products_data[product2_list_index], soa_2, static_cast<int>(p_pair_indices_2[i]),
+                const auto product2_index = ioniz_product2_offset + with_product_p_offsets[i];
+                copy_species1[ioniz_product2_list_index](soa_products_data[ioniz_product2_list_index], soa_2, static_cast<int>(p_pair_indices_2[i]),
                                 static_cast<int>(product2_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
-                soa_products_data[product2_list_index].m_rdata[PIdx::w][product2_index] = p_pair_reaction_weight[i];
+                soa_products_data[ioniz_product2_list_index].m_rdata[PIdx::w][product2_index] = p_pair_reaction_weight[i];
 
                 // Grab the colliding particle velocities to calculate the COM
                 // Note that the two product particles currently have the same
@@ -348,12 +355,12 @@ public:
                 auto& ux1 = soa_products_data[0].m_rdata[PIdx::ux][species1_index];
                 auto& uy1 = soa_products_data[0].m_rdata[PIdx::uy][species1_index];
                 auto& uz1 = soa_products_data[0].m_rdata[PIdx::uz][species1_index];
-                auto& ux_p1 = soa_products_data[product1_list_index].m_rdata[PIdx::ux][product1_index];
-                auto& uy_p1 = soa_products_data[product1_list_index].m_rdata[PIdx::uy][product1_index];
-                auto& uz_p1 = soa_products_data[product1_list_index].m_rdata[PIdx::uz][product1_index];
-                auto& ux_p2 = soa_products_data[product2_list_index].m_rdata[PIdx::ux][product2_index];
-                auto& uy_p2 = soa_products_data[product2_list_index].m_rdata[PIdx::uy][product2_index];
-                auto& uz_p2 = soa_products_data[product2_list_index].m_rdata[PIdx::uz][product2_index];
+                auto& ux_p1 = soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::ux][product1_index];
+                auto& uy_p1 = soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::uy][product1_index];
+                auto& uz_p1 = soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::uz][product1_index];
+                auto& ux_p2 = soa_products_data[ioniz_product2_list_index].m_rdata[PIdx::ux][product2_index];
+                auto& uy_p2 = soa_products_data[ioniz_product2_list_index].m_rdata[PIdx::uy][product2_index];
+                auto& uz_p2 = soa_products_data[ioniz_product2_list_index].m_rdata[PIdx::uz][product2_index];
 
 #if (defined WARPX_DIM_RZ)
                 /* In RZ geometry, macroparticles can collide with other macroparticles
@@ -366,7 +373,7 @@ public:
                 * there is a corresponding assert statement at initialization.)
                 */
                 amrex::ParticleReal const theta = (
-                    soa_products_data[product1_list_index].m_rdata[PIdx::theta][product1_index]
+                    soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::theta][product1_index]
                     - soa_products_data[0].m_rdata[PIdx::theta][species1_index]
                 );
                 amrex::ParticleReal const ux1buf = ux1;
@@ -446,7 +453,7 @@ public:
 
                     // calculate the value of C
                     const amrex::ParticleReal C = std::sqrt(E_out / (
-                        n_0*n_0 / (2.0_prt * m1) + n_1*n_1 / (2.0_prt * m_product1) + n_2*n_2 / (2.0_prt * m_product2)
+                        n_0*n_0 / (2.0_prt * m1) + n_1*n_1 / (2.0_prt * m_ioniz_product1) + n_2*n_2 / (2.0_prt * m_ioniz_product2)
                     ));
 
                     // Now that appropriate momenta are set for each outgoing species
@@ -473,13 +480,13 @@ public:
                     uy1 = C * n_0 / m1 * cos_theta * sin_phi;
                     uz1 = -C * n_0 / m1 * sin_theta;
 
-                    ux_p1 = C * n_1 / m_product1 * (-cos_alpha * cos_theta * cos_phi - sin_alpha * sin_phi);
-                    uy_p1 = C * n_1 / m_product1 * (-cos_alpha * cos_theta * sin_phi + sin_alpha * cos_phi);
-                    uz_p1 = C * n_1 / m_product1 * (cos_alpha * sin_theta);
+                    ux_p1 = C * n_1 / m_ioniz_product1 * (-cos_alpha * cos_theta * cos_phi - sin_alpha * sin_phi);
+                    uy_p1 = C * n_1 / m_ioniz_product1 * (-cos_alpha * cos_theta * sin_phi + sin_alpha * cos_phi);
+                    uz_p1 = C * n_1 / m_ioniz_product1 * (cos_alpha * sin_theta);
 
-                    ux_p2 = C * n_2 / m_product2 * (-cos_gamma * cos_theta * cos_phi + sin_gamma * sin_phi);
-                    uy_p2 = C * n_2 / m_product2 * (-cos_gamma * cos_theta * sin_phi - sin_gamma * cos_phi);
-                    uz_p2 = C * n_2 / m_product2 * (cos_gamma * sin_theta);
+                    ux_p2 = C * n_2 / m_ioniz_product2 * (-cos_gamma * cos_theta * cos_phi + sin_gamma * sin_phi);
+                    uy_p2 = C * n_2 / m_ioniz_product2 * (-cos_gamma * cos_theta * sin_phi - sin_gamma * cos_phi);
+                    uz_p2 = C * n_2 / m_ioniz_product2 * (cos_gamma * sin_theta);
 
                 }
                 else {

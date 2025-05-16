@@ -67,7 +67,6 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
 
             // For charge exchange:
             if (std::find(scattering_processes.begin(), scattering_processes.end(), "charge_exchange") != scattering_processes.end()) {
-                m_num_product_species = 4;
                 m_num_products_host.push_back(0); // the colliding species are consumed in the reaction
                 m_num_products_host.push_back(0); // the colliding species are consumed in the reaction
                 m_num_products_host.push_back(1); // first product species
