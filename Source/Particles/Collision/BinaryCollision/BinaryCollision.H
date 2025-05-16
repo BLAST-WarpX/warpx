@@ -108,22 +108,6 @@ public:
         // If DSMC the colliding species are also product species.
         // Therefore, we insert the colliding species at the beginning of `m_product_species`.
         if (collision_type == CollisionType::DSMC) {
-            // If the scattering process is ionization ensure that the
-            // explicitly specified "target" species, i.e., the species that
-            // undergoes ionization, is second in the species list for this
-            // collision set. The reason for this is that during the collision
-            // operation, an outgoing particle of the first species type will
-            // be created.
-            std::string target_species;
-            pp_collision_name.query("ionization_target_species", target_species);
-            if (!target_species.empty()) {
-                if (m_species_names[0] == target_species) {
-                    std::swap(m_species_names[0], m_species_names[1]);
-                } else if (m_species_names[1] != target_species) {
-                    WARPX_ABORT_WITH_MESSAGE("DSMC: Ionization target species, " + target_species + " must be one of the colliding species.");
-                }
-            }
-
             m_product_species.insert( m_product_species.begin(), m_species_names.begin(), m_species_names.end() );
 
             // During an ionization event, the non-ionizing target species could

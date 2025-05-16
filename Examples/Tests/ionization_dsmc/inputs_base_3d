@@ -89,7 +89,6 @@ collisions.collision_names = ioniz
 
 ioniz.ionization_energy = 13.59844
 ioniz.product_species = ions electrons
-ioniz.ionization_target_species = neutrals
 ioniz.ndt = 1
 ioniz.scattering_processes = ionization
 ioniz.type = dsmc

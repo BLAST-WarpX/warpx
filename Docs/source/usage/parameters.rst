@@ -2080,6 +2080,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
 * ``<collision_name>.species`` (`strings`)
     If using ``dsmc``, ``pairwisecoulomb`` or ``nuclearfusion``, this should be the name(s) of the species,
     between which the collision will be considered. (Provide only one name for intra-species collisions.)
+    When using ``dsmc`` with impact ionization, the second species is the one that gets ionized.
     If using ``background_mcc`` or ``background_stopping`` type this should be the name of the
     species for which collisions with a background will be included.
     In this case, only one species name should be given.
@@ -2216,10 +2217,6 @@ Details about the collision models can be found in the :ref:`theory section <mul
     Only for ``background_mcc``. If the scattering process is ``ionization`` the
     produced species must also be given. For example if argon properties is used
     for the background gas, a species of argon ions should be specified here.
-
-* ``<collision_name>.ionization_target_species`` (`string`)
-    Only for ``dsmc`` with impact ionization. This specifies which one of the
-    colliding particles is ionized.
 
 .. _running-cpp-parameters-numerics:
 

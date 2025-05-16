@@ -31,19 +31,8 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
             // grab the colliding species
             amrex::Vector<std::string> colliding_species;
             pp_collision_name.getarr("species", colliding_species);
-            // grab the target species (i.e., the species that looses an
-            // electron during the collision)
-            std::string target_species;
-            pp_collision_name.query("ionization_target_species", target_species);
-            // find the index of the non-target species (the one that could
-            // also be used as a product species)
-            int non_target_idx = 0;
-            if (colliding_species[0] == target_species) {
-                non_target_idx = 1;
-            }
-
-            // check if the non-target species is in ``product_species``
-            auto it = std::find(product_species.begin(), product_species.end(), colliding_species[non_target_idx]);
+            // check if the non-target species (which is always the first species) is in ``product_species``
+            auto it = std::find(product_species.begin(), product_species.end(), colliding_species[0]);
 
             if (it != product_species.end()) {
                 m_num_product_species = 3;
