@@ -7,7 +7,6 @@ foreach(D IN LISTS WarpX_DIMS)
         SpeciesUtils.cpp
         RelativeCellPosition.cpp
         WarpXMovingWindow.cpp
-        WarpXTagging.cpp
         WarpXUtil.cpp
         WarpXVersion.cpp
     )
