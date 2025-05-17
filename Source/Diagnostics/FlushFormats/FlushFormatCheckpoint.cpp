@@ -177,6 +177,7 @@ FlushFormatCheckpoint::WriteToFile (
             }
 #endif
         }
+        ParallelDescriptor::Barrier();
     }
 
     CheckpointParticles(checkpointname, particle_diags);
