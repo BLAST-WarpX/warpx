@@ -263,35 +263,55 @@ void WarpX::HybridPICDepositInitialRhoAndJ ()
     // density and current density. This function is called at the start of
     // the PIC loop (before particles have been pushed for the first time,
     // but after their positions and velocities have been de-synchronized).
-    // The charge density and current density are now deposited to get
-    // rho^{0} and J^{-dt/2}.
 
     using warpx::fields::FieldType;
-
-    bool const skip_lev0_coarse_patch = true;
-
+    using ablastr::fields::Direction;
     ablastr::fields::MultiLevelScalarField rho_fp_temp = m_fields.get_mr_levels(FieldType::hybrid_rho_fp_temp, finest_level);
     ablastr::fields::MultiLevelVectorField current_fp_temp = m_fields.get_mr_levels_alldirs(FieldType::hybrid_current_fp_temp, finest_level);
-    mypc->DepositCharge(rho_fp_temp, 0._rt);
-    mypc->DepositCurrent(current_fp_temp, dt[0], -0.5_rt * dt[0]);
-    SyncRho(rho_fp_temp, m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_lev0_coarse_patch), m_fields.get_mr_levels(FieldType::rho_buf, finest_level, skip_lev0_coarse_patch));
-    SyncCurrent("hybrid_current_fp_temp");
-    for (int lev=0; lev <= finest_level; ++lev) {
-        ApplyRhofieldBoundary(lev, rho_fp_temp[lev], PatchType::fine);
-        // Set current density at PEC boundaries, if needed.
-        ApplyJfieldBoundary(
-            lev, current_fp_temp[lev][0],
-            current_fp_temp[lev][1],
-            current_fp_temp[lev][2],
-            PatchType::fine
-        );
 
-        // SyncCurrent does not include a call to FillBoundary, but it is needed
-        // for the hybrid-PIC solver since current values are interpolated to
-        // a nodal grid
-        current_fp_temp[lev][0]->FillBoundary(Geom(lev).periodicity());
-        current_fp_temp[lev][1]->FillBoundary(Geom(lev).periodicity());
-        current_fp_temp[lev][2]->FillBoundary(Geom(lev).periodicity());
+    if (restart_chkfile.empty()) {
+        // This is not a restart.
+        // The charge density and current density are now deposited directly
+        // in the "temp" mulrifabs to get rho^{0} and J^{-dt/2}.
+
+        bool const skip_lev0_coarse_patch = true;
+        mypc->DepositCharge(rho_fp_temp, 0._rt);
+        mypc->DepositCurrent(current_fp_temp, dt[0], -0.5_rt * dt[0]);
+        SyncRho(rho_fp_temp, m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_lev0_coarse_patch), m_fields.get_mr_levels(FieldType::rho_buf, finest_level, skip_lev0_coarse_patch));
+        SyncCurrent("hybrid_current_fp_temp");
+        for (int lev=0; lev <= finest_level; ++lev) {
+            ApplyRhofieldBoundary(lev, rho_fp_temp[lev], PatchType::fine);
+            // Set current density at PEC boundaries, if needed.
+            ApplyJfieldBoundary(
+                lev, current_fp_temp[lev][0],
+                current_fp_temp[lev][1],
+                current_fp_temp[lev][2],
+                PatchType::fine
+            );
+
+            // SyncCurrent does not include a call to FillBoundary, but it is needed
+            // for the hybrid-PIC solver since current values are interpolated to
+            // a nodal grid
+            current_fp_temp[lev][0]->FillBoundary(Geom(lev).periodicity());
+            current_fp_temp[lev][1]->FillBoundary(Geom(lev).periodicity());
+            current_fp_temp[lev][2]->FillBoundary(Geom(lev).periodicity());
+        }
+    }
+    else {
+        // This is a restart.
+        // Copy the rho^{n} values to rho_fp_temp and the J_i^{n-1/2} values to
+        // current_fp_temp, from the rho_fp and current_fp multifabs, with
+        // values from the previous timestep, as they were loaded during the restart.
+        for (int lev = 0; lev <= finest_level; ++lev)
+        {
+            // copy 1 component value starting at index 0 to index 0
+            MultiFab::Copy(*rho_fp_temp[lev], *m_fields.get(FieldType::rho_fp, lev),
+                            0, 0, 1, rho_fp_temp[lev]->nGrowVect());
+            for (int idim = 0; idim < 3; ++idim) {
+                MultiFab::Copy(*current_fp_temp[lev][idim], *m_fields.get(FieldType::current_fp, Direction{idim}, lev),
+                            0, 0, 1, current_fp_temp[lev][idim]->nGrowVect());
+            }
+        }
     }
 }
 
