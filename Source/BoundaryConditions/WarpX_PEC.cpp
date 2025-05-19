@@ -402,10 +402,11 @@ namespace
                         const amrex::Real rvalid = ijk_vec[idim] + rshift;
                         const amrex::Real rmirror = iv_mirror[idim] + rshift;
                         rscale = rmirror/rvalid;
+                        inv_rscale = rvalid/rmirror;
 #if defined(WARPX_DIM_RSPHERE)
                         rscale *= rmirror/rvalid;
+                        inv_rscale = *rvalid/rmirror;
 #endif
-                        inv_rscale = rvalid/rmirror;
                     }
 #endif
                     // 1) Update valid cells to account for J/rho deposited to guards
