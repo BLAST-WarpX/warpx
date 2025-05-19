@@ -6,7 +6,7 @@ export MY_PROFILE=$(cd $(dirname $BASH_SOURCE) && pwd)"/"$(basename $BASH_SOURCE
 if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your $MY_PROFILE file! Please edit its line 2 to continue!"; return; fi
 
 # required dependencies
-module load cmake/3.27.9
+module load cmake/3.30.5
 module load craype-accel-amd-gfx90a
 module load rocm/6.2.4
 module load cray-mpich/8.1.31
