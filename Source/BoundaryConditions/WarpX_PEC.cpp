@@ -405,7 +405,7 @@ namespace
                         inv_rscale = rvalid/rmirror;
 #if defined(WARPX_DIM_RSPHERE)
                         rscale *= rmirror/rvalid;
-                        inv_rscale = *rvalid/rmirror;
+                        inv_rscale *= rvalid/rmirror;
 #endif
                     }
 #endif
