@@ -404,7 +404,6 @@ namespace
 #endif
                     }
 #endif
-                    // 1) Update valid cells to account for J/rho deposited to guards
                     field(ijk_vec,n) += rscale * psign[idim][iside] * field(iv_mirror,n);
                 }
             }
