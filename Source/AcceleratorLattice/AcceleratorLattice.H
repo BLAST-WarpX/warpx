@@ -11,6 +11,7 @@
 #include "LatticeElements/Drift.H"
 #include "LatticeElements/HardEdgedQuadrupole.H"
 #include "LatticeElements/HardEdgedPlasmaLens.H"
+#include "Utils/LowerCornerFunctor.H"
 
 #include <memory>
 #include <string>
@@ -52,7 +53,9 @@ public:
         amrex::Real gamma_boost,
         const amrex::Vector<amrex::Real>& time,
         amrex::BoxArray const & ba,
-        amrex::DistributionMapping const & dm);
+        amrex::DistributionMapping const & dm,
+        LowerCornerFunctor lower_corner_functor
+    );
 
     /**
      * \brief Update the element finder, needed when the simulation frame has moved relative to the lab frame
@@ -60,7 +63,7 @@ public:
      * @param[in] lev the level of refinement
      * @param[in] time the current time at all refinement levels
      */
-    void UpdateElementFinder (int lev, const amrex::Vector<amrex::Real>& time);
+    void UpdateElementFinder (int lev, const amrex::Vector<amrex::Real>& time, LowerCornerFunctor lower_corner_functor);
 
     /* The lattice element finder handles the lookup that finds the elements at the particle locations.
      * It should follow the same grid layout as the main grids.

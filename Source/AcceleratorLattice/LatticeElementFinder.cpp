@@ -4,10 +4,10 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#include "WarpX.H"
 #include "LatticeElementFinder.H"
 #include "LatticeElements/HardEdgedQuadrupole.H"
 #include "LatticeElements/HardEdgedPlasmaLens.H"
+#include "WarpX.H"
 
 #include <AMReX_ParmParse.H>
 #include <AMReX_REAL.H>
@@ -18,7 +18,8 @@ void
 LatticeElementFinder::InitElementFinder (int const lev, const amrex::Real gamma_boost,
                                          const amrex::Vector<amrex::Real>& time,
                                          amrex::MFIter const& a_mfi,
-                                         AcceleratorLattice const& accelerator_lattice)
+                                         AcceleratorLattice const& accelerator_lattice,
+                                         LowerCornerFunctor lower_corner_functor)
 {
 
     // The lattice is assumed to extend in the z-direction
@@ -38,7 +39,7 @@ LatticeElementFinder::InitElementFinder (int const lev, const amrex::Real gamma_
 
     AllocateIndices(accelerator_lattice);
 
-    UpdateIndices(lev, a_mfi, accelerator_lattice, time);
+    UpdateIndices(lev, a_mfi, accelerator_lattice, time, lower_corner_functor);
 
 }
 
@@ -60,13 +61,14 @@ LatticeElementFinder::AllocateIndices (AcceleratorLattice const& accelerator_lat
 void
 LatticeElementFinder::UpdateIndices (int const lev, amrex::MFIter const& a_mfi,
                                      AcceleratorLattice const& accelerator_lattice,
-                                     const amrex::Vector<amrex::Real>& time)
+                                     const amrex::Vector<amrex::Real>& time,
+                                     LowerCornerFunctor lower_corner_functor)
 {
     // Update the location of the index grid.
     // Note that the current box is used since the box may have been updated since
     // the initialization in InitElementFinder.
     const amrex::Box box = a_mfi.tilebox();
-    m_zmin = WarpX::LowerCorner(box, lev, 0._rt).z;
+    m_zmin = lower_corner_functor(box, lev, 0._rt).z;
     m_time = time[lev];
 
     if (accelerator_lattice.h_quad.nelements > 0) {

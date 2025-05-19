@@ -11,6 +11,7 @@
 #include "LatticeElements/HardEdgedPlasmaLens.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Utils/LowerCornerFunctor.H"
 
 #include <AMReX_REAL.H>
 #include <AMReX_GpuContainers.H>
@@ -38,7 +39,8 @@ struct LatticeElementFinder
     void InitElementFinder (int lev, amrex::Real gamma_boost,
                             const amrex::Vector<amrex::Real>& time,
                             amrex::MFIter const& a_mfi,
-                            AcceleratorLattice const& accelerator_lattice);
+                            AcceleratorLattice const& accelerator_lattice,
+                            LowerCornerFunctor lower_corner_functor);
 
     /**
      * \brief Allocate the index lookup tables for each element type
@@ -57,7 +59,8 @@ struct LatticeElementFinder
      */
     void UpdateIndices (int lev, amrex::MFIter const& a_mfi,
                         AcceleratorLattice const& accelerator_lattice,
-                        const amrex::Vector<amrex::Real>& time);
+                        const amrex::Vector<amrex::Real>& time,
+                        LowerCornerFunctor lower_corner_functor);
 
     /* Define the location and size of the index lookup table */
     /* Use the type Real to be consistent with the way the main grid is defined */

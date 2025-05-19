@@ -46,6 +46,7 @@
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "Filter/BilinearFilter.H"
 #include "Parallelization/GuardCellManager.H"
+#include "Utils/LowerCornerFunctor.H"
 #include "Utils/Parser/IntervalsParser.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/export.H"
@@ -739,6 +740,9 @@ public:
      * \return An array of the position coordinates
      */
     static amrex::XDim3 LowerCorner (const amrex::Box& bx, int lev, amrex::Real time_shift_delta);
+
+    LowerCornerFunctor GetLowerCornerFunctor ();
+
     /**
      * \brief Return the upper corner of the box in real units.
      * \param bx The box

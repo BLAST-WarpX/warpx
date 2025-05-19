@@ -300,7 +300,8 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
         }
 
         // Re-initialize the lattice element finder with the new ba and dm.
-        m_accelerator_lattice[lev]->InitElementFinder(lev, gamma_boost, gett_new(), ba, dm);
+        const auto lower_corner_functor = GetLowerCornerFunctor();
+        m_accelerator_lattice[lev]->InitElementFinder(lev, gamma_boost, gett_new(), ba, dm, lower_corner_functor);
 
         if (costs[lev] != nullptr)
         {

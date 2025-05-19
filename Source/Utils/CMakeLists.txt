@@ -3,6 +3,7 @@ foreach(D IN LISTS WarpX_DIMS)
     target_sources(lib_${SD}
       PRIVATE
         Interpolate.cpp
+        LowerCornerFunctor.cpp
         ParticleUtils.cpp
         SpeciesUtils.cpp
         RelativeCellPosition.cpp

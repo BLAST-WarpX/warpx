@@ -2235,7 +2235,9 @@ WarpX::AllocLevelData (int lev, const BoxArray& ba, const DistributionMapping& d
                   guard_cells.ng_alloc_Rho, guard_cells.ng_alloc_F, guard_cells.ng_alloc_G, aux_is_nodal);
 
     m_accelerator_lattice[lev] = std::make_unique<AcceleratorLattice>();
-    m_accelerator_lattice[lev]->InitElementFinder(lev, gamma_boost, gett_new(), ba, dm);
+
+    const auto lower_corner_functor = GetLowerCornerFunctor();
+    m_accelerator_lattice[lev]->InitElementFinder(lev, gamma_boost, gett_new(), ba, dm, lower_corner_functor);
 
 }
 
@@ -3093,6 +3095,14 @@ WarpX::LowerCorner(const Box& bx, const int lev, const amrex::Real time_shift_de
 #elif defined(WARPX_DIM_1D_Z)
     return { std::numeric_limits<Real>::lowest(), std::numeric_limits<Real>::lowest(), grid_min[0] + galilean_shift[2] };
 #endif
+}
+
+LowerCornerFunctor
+WarpX::GetLowerCornerFunctor ()
+{
+    return LowerCornerFunctor{
+        t_new, time_of_last_gal_shift,
+        m_v_galilean, geom};
 }
 
 amrex::XDim3
