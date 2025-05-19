@@ -376,8 +376,6 @@ namespace
         // The boundary is handled in 2 steps:
         // 1) The cells internal to the domain are updated using the
         //    current deposited in the guard cells
-        // 2) The guard cells are updated with the appropriate image
-        //    charge/current in the valid cells
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim)
         {
             for (int iside = 0; iside < 2; ++iside)
@@ -394,7 +392,6 @@ namespace
                 } else if (fabbox.contains(iv_mirror)) {
                     // Note that this includes the cells on the boundary for PMC
                     amrex::Real rscale = 1._rt;
-                    amrex::Real inv_rscale = 1._rt;
 #if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                     if (idim == 0 && iside == 1) {
                         // Account for different dV at different radii
@@ -402,18 +399,42 @@ namespace
                         const amrex::Real rvalid = ijk_vec[idim] + rshift;
                         const amrex::Real rmirror = iv_mirror[idim] + rshift;
                         rscale = rmirror/rvalid;
-                        inv_rscale = rvalid/rmirror;
 #if defined(WARPX_DIM_RSPHERE)
                         rscale *= rmirror/rvalid;
-                        inv_rscale *= rvalid/rmirror;
 #endif
                     }
 #endif
                     // 1) Update valid cells to account for J/rho deposited to guards
                     field(ijk_vec,n) += rscale * psign[idim][iside] * field(iv_mirror,n);
+                }
+            }
+        }
+        // 2) The guard cells are updated with the appropriate image
+        //    charge based on the charge/current in the valid cells
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim)
+        {
+            for (int iside = 0; iside < 2; ++iside)
+            {
+                if (!is_reflective[idim][iside]) { continue; }
 
-                    // 2) Updated guard cells with the appropriate image J/rho
-                    field(iv_mirror,n) = inv_rscale * psign[idim][iside] * field(ijk_vec,n);
+                amrex::IntVect iv_mirror = ijk_vec;
+                iv_mirror[idim] = mirrorfac[idim][iside] - ijk_vec[idim];
+                if (ijk_vec != iv_mirror && fabbox.contains(iv_mirror))
+                {
+                    amrex::Real rscale = 1._rt;
+#if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                    if (idim == 0 && iside == 1) {
+                        // Account for different dV at different radii
+                        amrex::Real const rshift = (is_nodal_r ? 0.0_rt : 0.5_rt);
+                        amrex::Real const rvalid = ijk_vec[idim] + rshift;
+                        amrex::Real const rmirror = iv_mirror[idim] + rshift;
+                        rscale = rvalid/rmirror;
+#if defined(WARPX_DIM_RSPHERE)
+                        rscale *= rvalid/rmirror;
+#endif
+                    }
+#endif
+                    field(iv_mirror, n) = rscale * psign[idim][iside] * field(ijk_vec, n);
                 }
             }
         }
