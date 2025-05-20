@@ -760,7 +760,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const amrex::Real costheta_mid = (rp_mid > 0._rt ? xp_mid/rp_mid : 1._rt);
             const amrex::Real sintheta_mid = (rp_mid > 0._rt ? yp_mid/rp_mid : 0._rt);
             // Keep these double to avoid bug in single precision
-            double const x_new = (rp_new - xyzmin.x)*dinv.x;
+            double x_new = (rp_new - xyzmin.x)*dinv.x;
             double const x_old = (rp_old - xyzmin.x)*dinv.x;
 #if defined(WARPX_DIM_RZ)
             const amrex::Real costheta_new = (rp_new > 0._rt ? xp_new/rp_new : 1._rt);
@@ -843,6 +843,11 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             double const len_before = (z_new - z_old);
             ParticleUtils::crop_at_boundary(z_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
             double const len_after  = (z_new - z_old);
+            double const len_ratio = (len_after > 0. ? len_before/len_after : 1.);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            double const len_before = (x_new - x_old);
+            ParticleUtils::crop_at_boundary(x_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
+            double const len_after  = (x_new - x_old);
             double const len_ratio = (len_after > 0. ? len_before/len_after : 1.);
 #endif
 
@@ -1114,7 +1119,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
             amrex::Real sdri = 0._rt;
             for (int i=dil; i<=depos_order+1-diu; i++) {
-                sdri += wq*invdtd.x*(sx_old[i] - sx_new[i]);
+                sdri += wq*invdtd.x*len_ratio*(sx_old[i] - sx_new[i]);
                 amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i_new-1+i, 0, 0, 0), sdri);
             }
             for (int i=dil; i<=depos_order+2-diu; i++) {
@@ -1248,7 +1253,7 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
             const amrex::Real costheta_mid = (rp_mid > 0._rt ? xp_mid/rp_mid : 1._rt);
             const amrex::Real sintheta_mid = (rp_mid > 0._rt ? yp_mid/rp_mid : 0._rt);
             // Keep these double to avoid bug in single precision
-            double const x_new = (rp_new - xyzmin.x)*dinv.x;
+            double x_new = (rp_new - xyzmin.x)*dinv.x;
             double const x_old = (rp_old - xyzmin.x)*dinv.x;
 #if defined(WARPX_DIM_RZ)
             const amrex::Real costheta_new = (rp_new > 0._rt ? xp_new/rp_new : 1._rt);
@@ -1347,6 +1352,11 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
             double const len_before = (z_new - z_old);
             ParticleUtils::crop_at_boundary(z_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
             double const len_after  = (z_new - z_old);
+            double const len_ratio = (len_after > 0. ? len_before/len_after : 1.);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            double const len_before = (x_new - x_old);
+            ParticleUtils::crop_at_boundary(x_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
+            double const len_after  = (x_new - x_old);
             double const len_ratio = (len_after > 0. ? len_before/len_after : 1.);
 #endif
 
@@ -1516,7 +1526,7 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
 
             amrex::Real sdri = 0._rt;
             for (int i=dil; i<=depos_order+1-diu; i++) {
-                sdri += wq*invdtd.x*(sx_old[i] - sx_new[i]);
+                sdri += wq*invdtd.x*len_ratio*(sx_old[i] - sx_new[i]);
                 amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i_new-1+i, 0, 0, 0), sdri);
             }
             for (int i=dil; i<=depos_order+2-diu; i++) {
@@ -1622,7 +1632,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     amrex::Real const sinphi_mid = (rp_mid > 0. ? zp_mid/rp_mid : 0._rt);
 
     // Keep these double to avoid bug in single precision
-    double const x_new = (rp_new - xyzmin.x)*dinv.x;
+    double x_new = (rp_new - xyzmin.x)*dinv.x;
     double const x_old = (rp_old - xyzmin.x)*dinv.x;
     amrex::Real const vx = (rp_new - rp_old)/dt;
     // convert from Cartesian to spherical
@@ -1662,7 +1672,9 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
 #if defined(WARPX_DIM_3D)
     const double dyp = y_new - y_old;
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     const double dzp = z_new - z_old;
+#endif
 
 #if defined(WARPX_DIM_3D)
     ParticleUtils::crop_at_boundary(x_old, y_old, z_old, x_new, y_new, z_new,
@@ -1678,6 +1690,8 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
                                     domain.smallEnd(1) - lo.y, domain.bigEnd(1) - lo.y, is_absorbing[1]);
 #elif defined(WARPX_DIM_1D_Z)
     ParticleUtils::crop_at_boundary(z_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    ParticleUtils::crop_at_boundary(x_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
 #endif
 
     // Define velocity kernals to deposit
@@ -1719,6 +1733,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     // is within the range permitted by the number of guard cells
     // e.g., if (num_segments > 7) ...
 
+    // compute the initial cell location used to find the cell crossings.
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
     const auto dirY_sign = static_cast<double>(dyp < 0. ? -1. : 1.);
     const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
@@ -1899,6 +1914,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     // is within the range permitted by the number of guard cells
     // e.g., if (num_segments > 5) ...
 
+    // compute the initial cell location used to find the cell crossings.
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
     const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
     double Xcell = 0., Zcell = 0.;
@@ -2062,6 +2078,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     // is within the range permitted by the number of guard cells
     // e.g., if (num_segments > 3) ...
 
+    // compute the initial cell location used to find the cell crossings.
     const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
     double Zcell = static_cast<double>(k_old) + shift + 0.5*(1.-dirZ_sign);
 
@@ -2140,8 +2157,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     // is within the range permitted by the number of guard cells
     // e.g., if (num_segments > 3) ...
 
-    // compute dxp and the initial cell location used to find the cell crossings.
-    double const dxp = x_new - x_old;
+    // compute the initial cell location used to find the cell crossings.
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
     double Xcell = static_cast<double>(i_old) + shift + 0.5*(1.-dirX_sign);
 

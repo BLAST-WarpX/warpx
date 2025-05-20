@@ -917,7 +917,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
     amrex::Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old + zp_old*zp_old);
 
     // Keep these double to avoid bug in single precision
-    double const x_new = (rp_new - xyzmin.x)*dinv.x;
+    double x_new = (rp_new - xyzmin.x)*dinv.x;
     double const x_old = (rp_old - xyzmin.x)*dinv.x;
 #else
 #if !defined(WARPX_DIM_1D_Z)
@@ -968,6 +968,11 @@ void doGatherShapeNEsirkepovStencilImplicit (
     double const len_before = (z_new - z_old);
     ParticleUtils::crop_at_boundary(z_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
     double const len_after  = (z_new - z_old);
+    double const len_ratio = (len_before > 0. ? len_after/len_before : 1.);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    double const len_before = (x_new - x_old);
+    ParticleUtils::crop_at_boundary(x_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
+    double const len_after  = (x_new - x_old);
     double const len_ratio = (len_before > 0. ? len_after/len_before : 1.);
 #endif
 
@@ -1315,7 +1320,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
     amrex::Real sdxi = 0._rt;
     for (int i=dil_E; i<=depos_order+1-diu_E; i++) {
         sdxi += (sx_E_old[i] - sx_E_new[i]);
-        auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi/(x_new - x_old));
+        auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi*len_ratio/(x_new - x_old));
         Erp += Ex_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxiov;
         Bthetap += By_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxiov;
         Bzp += Bz_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxiov;
@@ -1355,7 +1360,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
     amrex::Real sdxi = 0._rt;
     for (int i=dil_E; i<=depos_order+1-diu_E; i++) {
         sdxi += (sx_E_old[i] - sx_E_new[i]);
-        auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi/(x_new - x_old));
+        auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi*len_ratio/(x_new - x_old));
         Erp += Ex_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxiov;
         Bthetap += By_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxiov;
         Bphip += Bz_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxiov;
@@ -1512,7 +1517,9 @@ void doGatherPicnicShapeN (
 #if defined(WARPX_DIM_3D)
     const double dyp = y_new - y_old;
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     const double dzp = z_new - z_old;
+#endif
 
 #if defined(WARPX_DIM_3D)
     ParticleUtils::crop_at_boundary(x_old, y_old, z_old, x_new, y_new, z_new,
@@ -1526,6 +1533,8 @@ void doGatherPicnicShapeN (
     ParticleUtils::crop_at_boundary(z_old, x_old, z_new, x_new, domain.smallEnd(1) - lo.y, domain.bigEnd(1) - lo.y, is_absorbing[1]);
 #elif defined(WARPX_DIM_1D_Z)
     ParticleUtils::crop_at_boundary(z_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    ParticleUtils::crop_at_boundary(x_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
 #endif
 
     // 1) Determine the number of segments.
@@ -1563,8 +1572,7 @@ void doGatherPicnicShapeN (
     // is within the range permitted by the number of guard cells
     // e.g., if (num_segments > 7) ...
 
-    // compute total change in particle position and the initial cell
-    // locations in each direction used to find the position at cell crossings.
+    // compute the initial cell location used to find the cell crossings.
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
     const auto dirY_sign = static_cast<double>(dyp < 0. ? -1. : 1.);
     const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
@@ -1743,8 +1751,7 @@ void doGatherPicnicShapeN (
     // is within the range permitted by the number of guard cells
     // e.g., if (num_segments > 5) ...
 
-    // compute total change in particle position and the initial cell
-    // locations in each direction used to find the position at cell crossings.
+    // compute the initial cell location used to find the cell crossings.
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
     const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
     double Xcell = 0., Zcell = 0.;
@@ -1912,7 +1919,7 @@ void doGatherPicnicShapeN (
     // is within the range permitted by the number of guard cells
     // e.g., if (num_segments > 3) ...
 
-    // compute dzp and the initial cell location used to find the cell crossings.
+    // compute the initial cell location used to find the cell crossings.
     const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
     double Zcell = static_cast<double>(k_old) + shift + 0.5*(1.-dirZ_sign);
 
@@ -1996,8 +2003,7 @@ void doGatherPicnicShapeN (
     // is within the range permitted by the number of guard cells
     // e.g., if (num_segments > 3) ...
 
-    // compute dxp and the initial cell location used to find the cell crossings.
-    double const dxp = x_new - x_old;
+    // compute the initial cell location used to find the cell crossings.
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
     double Xcell = static_cast<double>(i_old) + shift + 0.5*(1.-dirX_sign);
 
