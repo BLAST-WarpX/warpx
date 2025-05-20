@@ -85,7 +85,7 @@ PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
 #       endif
     }
 
-#   ifndef WARPX_DIM_1D_Z
+#   if AMREX_SPACEDIM > 1
     if( geom.isPeriodic(1) ) {
 #       ifndef WARPX_DIM_3D
         zmin = geom.ProbLo(1);
@@ -258,6 +258,10 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( y_rms > 0._rt,
         "Error: Gaussian beam y_rms must be strictly greater than 0 in 1D "
         "(it is used when computing the particles' weights from the total beam charge)");
+#elif defined(WARPX_DIM_RCYLINDER)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE( z_rms > 0._rt,
+        "Error: Gaussian beam z_rms must be strictly greater than 0 with RCYLINDER "
+        "(it is used when computing the particles' weights from the total beam charge)");
 #endif
 }
 
@@ -324,7 +328,7 @@ void PlasmaInjector::setupNFluxPerCell (amrex::ParmParse const& pp_species)
         std::string flux_normal_axis_string;
         utils::parser::get(pp_species, source_name, "flux_normal_axis", flux_normal_axis_string);
         flux_normal_axis = -1;
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         if      (flux_normal_axis_string == "r" || flux_normal_axis_string == "R") {
             flux_normal_axis = 0;
         }
@@ -343,20 +347,22 @@ void PlasmaInjector::setupNFluxPerCell (amrex::ParmParse const& pp_species)
             flux_normal_axis = 1;
         }
 #endif
+#if !defined(WARPX_DIM_RSPHERE) && !defined(WARPX_DIM_RCYLINDER)
         if (flux_normal_axis_string == "z" || flux_normal_axis_string == "Z") {
             flux_normal_axis = 2;
         }
-#ifdef WARPX_DIM_3D
+#endif
+#if defined(WARPX_DIM_3D)
         const std::string flux_normal_axis_help = "'x', 'y', or 'z'.";
-#else
-#    ifdef WARPX_DIM_RZ
+#elif defined(WARPX_DIM_RZ)
         const std::string flux_normal_axis_help = "'r' or 'z'.";
-#    elif WARPX_DIM_XZ
+#elif defined(WARPX_DIM_XZ)
         const std::string flux_normal_axis_help = "'x' or 'z'.";
-#    else
+#elif defined(WARPX_DIM_1D_Z)
         const std::string flux_normal_axis_help = "'z'.";
-#    endif
-    #endif
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        const std::string flux_normal_axis_help = "'r'.";
+#endif
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(flux_normal_axis >= 0,
             "Error: Invalid value for flux_normal_axis. It must be " + flux_normal_axis_help);
         utils::parser::getWithParser(pp_species, source_name, "flux_direction", flux_direction);
@@ -388,24 +394,23 @@ void PlasmaInjector::setupNFluxPerCell (amrex::ParmParse const& pp_species)
 void PlasmaInjector::setupNuniformPerCell (amrex::ParmParse const& pp_species)
 {
     // Note that for RZ, three numbers are expected, r, theta, and z.
+    // For RCYLINDER, two numbers are expected, r, theta.
+    // For RSPHERE, three numbers are expected, r, theta, and phi
     // For 2D, only two are expected. The third is overwritten with 1.
     // For 1D, only one is expected. The second and third are overwritten with 1.
 #if defined(WARPX_DIM_1D_Z)
     constexpr int num_required_ppc_each_dim = 1;
-#elif defined(WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RCYLINDER)
     constexpr int num_required_ppc_each_dim = 2;
 #else
     constexpr int num_required_ppc_each_dim = 3;
 #endif
     utils::parser::getArrWithParser(pp_species, source_name, "num_particles_per_cell_each_dim", num_particles_per_cell_each_dim,
                         0, num_required_ppc_each_dim);
-#if WARPX_DIM_XZ
-    num_particles_per_cell_each_dim.push_back(1);
-#endif
-#if WARPX_DIM_1D_Z
-    num_particles_per_cell_each_dim.push_back(1); // overwrite 2nd number with 1
-    num_particles_per_cell_each_dim.push_back(1); // overwrite 3rd number with 1
-#endif
+    // overwrite extra dimensions with 1
+    for (int i=num_required_ppc_each_dim ; i < 3 ; i++) {
+        num_particles_per_cell_each_dim.push_back(1);
+    }
 #if WARPX_DIM_RZ
     if (WarpX::n_rz_azimuthal_modes > 1) {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(

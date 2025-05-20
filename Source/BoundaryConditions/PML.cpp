@@ -664,6 +664,8 @@ PML::PML (const int lev, const BoxArray& grid_ba,
         auto ngFFT = IntVect(ngFFt_x, ngFFt_z);
 #elif defined(WARPX_DIM_1D_Z)
         auto ngFFT = IntVect(ngFFt_z);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        auto ngFFT = IntVect(ngFFt_x);
 #endif
 
         // Set the number of guard cells to the maximum of each field

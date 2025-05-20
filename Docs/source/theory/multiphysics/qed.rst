@@ -43,4 +43,4 @@ the total number of physical pairs created.
 
 So far the Schwinger module requires using ``warpx.grid_type = collocated`` or
 ``algo.field_gathering = momentum-conserving`` (so that the auxiliary fields are calculated on the nodes)
-and is not compatible with either mesh refinement, RZ coordinates or single precision.
+and is not compatible with either mesh refinement, RZ, RCYLINDER, and RSPHERE coordinates or single precision.

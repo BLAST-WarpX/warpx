@@ -90,6 +90,8 @@ int compute_area_weights (const amrex::IntVect& iv, const int normal_axis) {
     else if (normal_axis == 2) { r /= iv[1]; }
 #elif defined(WARPX_DIM_1D_Z)
     if (normal_axis == 2) { r /= iv[0]; }
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    if (normal_axis == 0) { r /= iv[0]; }
 #endif
     return r;
 }
@@ -226,6 +228,8 @@ amrex::Real compute_scale_fac_area_plane (const amrex::GpuArray<amrex::Real, AMR
     // the emitting surface is a rectangle, within the plane of the simulation
 #elif defined(WARPX_DIM_1D_Z)
     if (flux_normal_axis == 2) { scale_fac /= dx[0]; }
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    if (flux_normal_axis == 0) { scale_fac /= dx[0]; }
 #endif
     return scale_fac;
 }
