@@ -60,8 +60,7 @@ void WarpX::HybridPICEvolveFields ()
     }
 
     // The particles have now been pushed to their t_{n+1} positions.
-    // Perform charge deposition in component 0 of rho_fp at t_{n+1} and
-    // current deposition at t_{n+1/2}.
+    // Perform charge deposition at t_{n+1} and current deposition at t_{n+1/2}.
     HybridPICDepositRhoAndJ();
 
     // Get the external current
@@ -286,7 +285,7 @@ void WarpX::HybridPICDepositInitialRhoAndJ ()
     // Copy the rho_fp values to rho_fp_temp and the current_fp values to
     // current_fp_temp, since the "temp" multifabs are meant to store the
     // particle and current densities from the previous step during the field
-    // solve routine and are therefore needed when the first field solve is
+    // solve routine and are needed when the first field solve is
     // performed after pushing the particles.
     ablastr::fields::MultiLevelScalarField rho_fp_temp = m_fields.get_mr_levels(FieldType::hybrid_rho_fp_temp, finest_level);
     ablastr::fields::MultiLevelVectorField current_fp_temp = m_fields.get_mr_levels_alldirs(FieldType::hybrid_current_fp_temp, finest_level);
