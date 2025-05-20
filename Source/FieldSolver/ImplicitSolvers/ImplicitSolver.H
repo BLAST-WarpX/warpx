@@ -9,7 +9,6 @@
 
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "NonlinearSolvers/NonlinearSolverLibrary.H"
-#include "Utils/WarpXAlgorithmSelection.H"
 
 #include <AMReX_Array.H>
 #include <AMReX_REAL.H>
@@ -22,6 +21,7 @@
  */
 
 class WarpX;
+enum class FieldBoundaryType;
 class ImplicitSolver
 {
 public:

@@ -9,6 +9,7 @@
 
 #include "Fields.H"
 #include "Utils/WarpXConst.H"
+#include "Utils/TextMsg.H"
 #include "Preconditioner.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
