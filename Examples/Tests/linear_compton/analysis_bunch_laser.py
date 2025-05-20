@@ -95,14 +95,14 @@ print(f"Relative error  : {abs(simulated_frac - expected_frac) / expected_frac:.
 # %%
 # Bin the photons on a grid in frequency and angle
 
-# freq_min = 0.5
-# freq_max = 1.2
+freq_min = 0.5
+freq_max = 1.2
 N_freq = 500
-# gammatheta_min = 0.
-# gammatheta_max = 1.
+gammatheta_min = 0.0
+gammatheta_max = 1.0
 N_gammatheta = 100
-# hist_range = [[freq_min, freq_max], [gammatheta_min, gammatheta_max]]
-# extent = [freq_min, freq_max, gammatheta_min, gammatheta_max]
+hist_range = [[freq_min, freq_max], [gammatheta_min, gammatheta_max]]
+extent = [freq_min, freq_max, gammatheta_min, gammatheta_max]
 fundamental_frequency = 4 * gamma_bunch_mean**2 * c / laser_wavelength
 
 # Compton-scattered photons (in lab frame)
@@ -112,11 +112,15 @@ px, py, pz, w = series.get_particle(
 p_perp = np.sqrt(px**2 + py**2)
 p_norm = np.sqrt(px**2 + py**2 + pz**2)
 photon_scaled_freq = p_norm * c / (h * fundamental_frequency)
-gamma_theta = gamma_bunch_mean * np.arctan2(p_perp, pz)
+gamma_theta = gamma_bunch_mean * np.arctan2(p_perp, -pz)
 
 # Compute histogram
 grid, freq_bins, gammatheta_bins = np.histogram2d(
-    photon_scaled_freq, gamma_theta, weights=w, bins=[N_freq, N_gammatheta]
+    photon_scaled_freq,
+    gamma_theta,
+    weights=w,
+    range=hist_range,
+    bins=[N_freq, N_gammatheta],
 )
 
 extent = [freq_bins[0], freq_bins[-1], gammatheta_bins[0], gammatheta_bins[-1]]
@@ -131,7 +135,7 @@ if do_plots:
     grid /= dw * domega[np.newaxis, 1:] * np.sum(w)
     grid = np.where(grid == 0, np.nan, grid)
     plt.imshow(
-        np.flip(grid.T, 0),
+        grid.T,
         origin="lower",
         extent=extent,
         cmap="gist_earth",
