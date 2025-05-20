@@ -5,19 +5,22 @@ on:
     branches:
       - "development"
   pull_request:
-    paths-ignore:
-      - "Docs/**"
-      - "**.rst"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-petsc
   cancel-in-progress: true
 
 jobs:
+
+  check_changes:
+    name: Analyze
+    uses: ./.github/workflows/check_changes.yml
+
   test-petsc-gcc:
     name: GCC
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
       CXXFLAGS: "-Werror"
     steps:
@@ -72,7 +75,8 @@ jobs:
   test-petsc-mpich:
     name: GCC-12 + MPICH
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
       CXXFLAGS: "-Werror"
     steps:
@@ -127,7 +131,8 @@ jobs:
   test-petsc-gcc-debug:
     name: GCC [Debug]
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
       CXXFLAGS: "-Werror"
     steps:
@@ -185,7 +190,8 @@ jobs:
   test-petsc-mpich-debug:
     name: GCC-12 + MPICH [Debug]
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
       CXXFLAGS: "-Werror"
     steps:

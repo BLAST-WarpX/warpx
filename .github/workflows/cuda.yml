@@ -5,19 +5,22 @@ on:
     branches:
       - "development"
   pull_request:
-    paths-ignore:
-      - "Docs/**"
-      - "**.rst"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-cuda
   cancel-in-progress: true
 
 jobs:
+
+  check_changes:
+    name: Analyze
+    uses: ./.github/workflows/check_changes.yml
+
   build_nvcc:
     name: NVCC SP
     runs-on: ubuntu-22.04
-    if: github.event.pull_request.draft == false
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
       CXXFLAGS: "-Werror"
       CMAKE_GENERATOR: Ninja
@@ -98,7 +101,8 @@ jobs:
   build_nvcc_gnumake:
     name: NVCC GNU Make
     runs-on: ubuntu-22.04
-    if: github.event.pull_request.draft == false
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies
@@ -132,7 +136,8 @@ jobs:
   build_nvhpc:
     name: NVHPC
     runs-on: ubuntu-24.04
-    if: github.event.pull_request.draft == false
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     #env:
     #  # For NVHPC, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja
