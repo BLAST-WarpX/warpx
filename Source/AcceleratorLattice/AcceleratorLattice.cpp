@@ -20,6 +20,8 @@
 AcceleratorLattice::AcceleratorLattice ()
 {
 
+#if defined(WARPX_ZINDEX)
+
     using namespace amrex::literals;
 
     /* Get the inputs for and initialize all of the lattice element types */
@@ -28,6 +30,9 @@ AcceleratorLattice::AcceleratorLattice ()
 
     h_quad.WriteToDevice();
     h_plasmalens.WriteToDevice();
+
+#endif
+
 }
 
 void
@@ -92,7 +97,7 @@ AcceleratorLattice::InitElementFinder (
 
 void
 AcceleratorLattice::UpdateElementFinder (int const lev, const amrex::Vector<amrex::Real>& time) // NOLINT(readability-make-member-function-const)
-{                                                       // Techniquely clang-tidy is correct because
+{                                                       // Technically clang-tidy is correct because
                                                         // m_element_finder is unique_ptr, not const*.
     if (m_lattice_defined) {
         for (amrex::MFIter mfi(*m_element_finder); mfi.isValid(); ++mfi)

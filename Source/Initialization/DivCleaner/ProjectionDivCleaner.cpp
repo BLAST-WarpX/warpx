@@ -14,10 +14,12 @@
 #include <AMReX_LO_BCTYPES.H>
 
 #include <WarpX.H>
-#if defined WARPX_DIM_RZ
-#include <FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H>
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+    #include <FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H>
+#elif defined(WARPX_DIM_RSPHERE)
+    #include <FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/SphericalYeeAlgorithm.H>
 #else
-#include <FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H>
+    #include <FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H>
 #endif
 #include "Fields.H"
 #include <Initialization/ExternalField.H>
@@ -72,31 +74,36 @@ ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name) :
     }
 
     auto cell_size = WarpX::CellSize(0);
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     CylindricalYeeAlgorithm::InitializeStencilCoefficients( cell_size,
             m_h_stencil_coefs_x, m_h_stencil_coefs_z );
+#elif defined(WARPX_DIM_RSPHERE)
+    SphericalYeeAlgorithm::InitializeStencilCoefficients( cell_size,
+            m_h_stencil_coefs_x );
 #else
     CartesianYeeAlgorithm::InitializeStencilCoefficients( cell_size,
             m_h_stencil_coefs_x, m_h_stencil_coefs_y, m_h_stencil_coefs_z );
 #endif
 
-    m_stencil_coefs_x.resize(m_h_stencil_coefs_x.size());
-#if !defined(WARPX_DIM_RZ)
-    m_stencil_coefs_y.resize(m_h_stencil_coefs_y.size());
-#endif
-    m_stencil_coefs_z.resize(m_h_stencil_coefs_z.size());
 
-    amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
-                          m_h_stencil_coefs_x.begin(), m_h_stencil_coefs_x.end(),
-                          m_stencil_coefs_x.begin());
-#if !defined(WARPX_DIM_RZ)
-    amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
-                          m_h_stencil_coefs_y.begin(), m_h_stencil_coefs_y.end(),
-                          m_stencil_coefs_y.begin());
-#endif
-    amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
-                          m_h_stencil_coefs_z.begin(), m_h_stencil_coefs_z.end(),
-                          m_stencil_coefs_z.begin());
+    if (!m_h_stencil_coefs_x.empty()) {
+        m_stencil_coefs_x.resize(m_h_stencil_coefs_x.size());
+        amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
+                              m_h_stencil_coefs_x.begin(), m_h_stencil_coefs_x.end(),
+                              m_stencil_coefs_x.begin());
+    }
+    if (!m_h_stencil_coefs_y.empty()) {
+        m_stencil_coefs_y.resize(m_h_stencil_coefs_y.size());
+        amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
+                              m_h_stencil_coefs_y.begin(), m_h_stencil_coefs_y.end(),
+                              m_stencil_coefs_y.begin());
+    }
+    if (!m_h_stencil_coefs_z.empty()) {
+        m_stencil_coefs_z.resize(m_h_stencil_coefs_z.size());
+        amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
+                              m_h_stencil_coefs_z.begin(), m_h_stencil_coefs_z.end(),
+                              m_stencil_coefs_z.begin());
+    }
     amrex::Gpu::synchronize();
 }
 
@@ -164,7 +171,7 @@ ProjectionDivCleaner::solve ()
     info.setAgglomeration(m_agglomeration);
     info.setConsolidation(m_consolidation);
     info.setMaxCoarseningLevel(m_max_coarsening_level);
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     info.setMetricTerm(true);
 #endif
 
@@ -254,30 +261,27 @@ ProjectionDivCleaner::correctBfield ()
         {
             // Grab references to B field arrays for this grid/tile
             amrex::Array4<Real> const& Bx_arr = Bx->array(mfi);
-#if !defined(WARPX_DIM_RZ)
-            amrex::Array4<Real> const& By_arr = By->array(mfi);
-#endif
-            amrex::Array4<Real> const& Bz_arr = Bz->array(mfi);
-
-            // Extract stencil coefficients
             Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
             auto const n_coefs_x = static_cast<int>(m_stencil_coefs_x.size());
-#if !defined(WARPX_DIM_RZ)
+            const Box& tbx = mfi.tilebox(Bx->ixType().toIntVect());
+
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+            amrex::Array4<Real> const& By_arr = By->array(mfi);
             Real const * const AMREX_RESTRICT coefs_y = m_stencil_coefs_y.dataPtr();
             auto const n_coefs_y = static_cast<int>(m_stencil_coefs_y.size());
-#endif
-            Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
-            auto const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
-
-            const Box& tbx = mfi.tilebox(Bx->ixType().toIntVect());
-#if !defined(WARPX_DIM_RZ)
             const Box& tby = mfi.tilebox(By->ixType().toIntVect());
 #endif
+
+#if !defined(WARPX_DIM_RSPHERE)
+            amrex::Array4<Real> const& Bz_arr = Bz->array(mfi);
+            Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
+            auto const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
             const Box& tbz = mfi.tilebox(Bz->ixType().toIntVect());
+#endif
 
             amrex::Array4<Real> const& sol_arr = m_solution[ilev]->array(mfi);
 
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
             amrex::ParallelFor(tbx, tbz,
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
             {
@@ -286,6 +290,12 @@ ProjectionDivCleaner::correctBfield ()
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
             {
                 Bz_arr(i,j,0) += CylindricalYeeAlgorithm::DownwardDz(sol_arr, coefs_z, n_coefs_z, i, j, 0, 0);
+            });
+#elif defined(WARPX_DIM_RSPHERE)
+            amrex::ParallelFor(tbx,
+            [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/)
+            {
+                Bx_arr(i,0,0) += SphericalYeeAlgorithm::DownwardDr(sol_arr, coefs_x, n_coefs_x, i, 0, 0, 0);
             });
 #else
             amrex::ParallelFor(tbx, tby, tbz,

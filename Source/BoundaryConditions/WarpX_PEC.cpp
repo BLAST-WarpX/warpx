@@ -101,10 +101,24 @@ namespace
      *            where, r-boundary is along the line z at r=rmin and r=rmax
      *                   z-boundary is along the line r at z=zmin and z=zmax
      *
+     *        For RCYLINDER : WarpX uses R as the one dimension
+     *            theta_component is tangential to the r-boundary
+     *            z component is tangential to the r-boundary
+     *            r component is normal to the r-boundary
+     *            theta_component is not normal to any boundary (only r dimension)
+     *            where, r-boundary is at r=rmin and r=rmax
+     *
+     *        For RSPHERE : WarpX uses R as the one dimension
+     *            theta_component is tangential to the r-boundary
+     *            phi component is tangential to the r-boundary
+     *            r component is normal to the r-boundary
+     *            theta_component is not normal to any boundary (only r dimension)
+     *            phi_component is not normal to any boundary (only r dimension)
+     *            where, r-boundary is at r=rmin and r=rmax
      *
      * \param[in] icomp        component of the Efield being updated
      *                         (0=x, 1=y, 2=z in Cartesian)
-     *                         (0=r, 1=theta, 2=z in RZ)
+     *                         (0=r, 1=theta, 2=z in RZ and RCYLINDER)
      * \param[in] dom_lo       index value of the lower domain boundary (cell-centered)
      * \param[in] dom_hi       index value of the higher domain boundary (cell-centered)
      * \param[in] ijk_vec      indices along the x(i), y(j), z(k) of Efield Array4
@@ -230,10 +244,24 @@ namespace
      *            where, r-boundary is along the line z at r=rmin and r=rmax
      *                   z-boundary is along the line r at z=zmin and z=zmax
      *
+     *        For RCYLINDER : WarpX uses R as the one dimension
+     *            theta_component is tangential to the r-boundary
+     *            z component is tangential to the r-boundary
+     *            r component is normal to the r-boundary
+     *            theta_component is not normal to any boundary (only r dimension)
+     *            where, r-boundary is at r=rmin and r=rmax
+     *
+     *        For RSPHERE : WarpX uses R as the one dimension
+     *            theta_component is tangential to the r-boundary
+     *            phi component is tangential to the r-boundary
+     *            r component is normal to the r-boundary
+     *            theta_component is not normal to any boundary (only r dimension)
+     *            phi_component is not normal to any boundary (only r dimension)
+     *            where, r-boundary is at r=rmin and r=rmax
      *
      * \param[in] icomp        component of the Bfield being updated
      *                         (0=x, 1=y, 2=z in Cartesian)
-     *                         (0=r, 1=theta, 2=z in RZ)
+     *                         (0=r, 1=theta, 2=z in RZ and RCYLINDER)
      * \param[in] dom_lo       index value of the lower domain boundary (cell-centered)
      * \param[in] dom_hi       index value of the higher domain boundary (cell-centered)
      * \param[in] ijk_vec      indices along the x(i), y(j), z(k) of Efield Array4
@@ -366,13 +394,16 @@ namespace
                 } else if (fabbox.contains(iv_mirror)) {
                     // Note that this includes the cells on the boundary for PMC
                     amrex::Real rscale = 1._rt;
-#if (defined WARPX_DIM_RZ)
+#if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                     if (idim == 0 && iside == 1) {
                         // Account for different dV at different radii
                         amrex::Real const rshift = (is_nodal_r ? 0.0_rt : 0.5_rt);
                         const amrex::Real rvalid = ijk_vec[idim] + rshift;
                         const amrex::Real rmirror = iv_mirror[idim] + rshift;
                         rscale = rmirror/rvalid;
+#if defined(WARPX_DIM_RSPHERE)
+                        rscale *= rmirror/rvalid;
+#endif
                     }
 #endif
                     field(ijk_vec,n) += rscale*psign[idim][iside] * field(iv_mirror,n);
@@ -392,13 +423,16 @@ namespace
                 if (ijk_vec != iv_mirror && fabbox.contains(iv_mirror))
                 {
                     amrex::Real rscale = 1._rt;
-#if (defined WARPX_DIM_RZ)
+#if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                     if (idim == 0 && iside == 1) {
                         // Account for different dV at different radii
                         amrex::Real const rshift = (is_nodal_r ? 0.0_rt : 0.5_rt);
                         amrex::Real const rvalid = ijk_vec[idim] + rshift;
                         amrex::Real const rmirror = iv_mirror[idim] + rshift;
                         rscale = rvalid/rmirror;
+#if defined(WARPX_DIM_RSPHERE)
+                        rscale *= rvalid/rmirror;
+#endif
                     }
 #endif
                     if (tangent_to_bndy[idim]) {
