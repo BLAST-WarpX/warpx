@@ -1463,7 +1463,7 @@ void doGatherPicnicShapeN (
 #endif
 
     // Keep these double to avoid bug in single precision
-    double const x_new = (rp_new - xyzmin.x)*dinv.x;
+    double x_new = (rp_new - xyzmin.x)*dinv.x;
     double const x_old = (rp_old - xyzmin.x)*dinv.x;
 #elif defined(WARPX_DIM_RSPHERE)
     amrex::Real const xp_new = xp_np1;
