@@ -60,35 +60,9 @@ void WarpX::HybridPICEvolveFields ()
     }
 
     // The particles have now been pushed to their t_{n+1} positions.
-    // Perform charge deposition in component 0 of rho_fp at t_{n+1}.
-    mypc->DepositCharge(m_fields.get_mr_levels(FieldType::rho_fp, finest_level), 0._rt);
-    // Perform current deposition at t_{n+1/2}.
-    mypc->DepositCurrent(m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), dt[0], -0.5_rt * dt[0]);
-
-    // Deposit cold-relativistic fluid charge and current
-    if (do_fluid_species) {
-        int const lev = 0;
-        myfl->DepositCharge(m_fields, *m_fields.get(FieldType::rho_fp, lev), lev);
-        myfl->DepositCurrent(m_fields,
-            *m_fields.get(FieldType::current_fp, Direction{0}, lev),
-            *m_fields.get(FieldType::current_fp, Direction{1}, lev),
-            *m_fields.get(FieldType::current_fp, Direction{2}, lev),
-            lev);
-    }
-
-    // Synchronize J and rho:
-    // filter (if used), exchange guard cells, interpolate across MR levels
-    // and apply boundary conditions
-    SyncCurrentAndRho();
-
-    // SyncCurrent does not include a call to FillBoundary, but it is needed
-    // for the hybrid-PIC solver since current values are interpolated to
-    // a nodal grid
-    for (int lev = 0; lev <= finest_level; ++lev) {
-        for (int idim = 0; idim < 3; ++idim) {
-            m_fields.get(FieldType::current_fp, Direction{idim}, lev)->FillBoundary(Geom(lev).periodicity());
-        }
-    }
+    // Perform charge deposition in component 0 of rho_fp at t_{n+1} and
+    // current deposition at t_{n+1/2}.
+    HybridPICDepositRhoAndJ();
 
     // Get the external current
     m_hybrid_pic_model->GetCurrentExternal();
@@ -257,6 +231,42 @@ void WarpX::HybridPICEvolveFields ()
     }
 }
 
+void WarpX::HybridPICDepositRhoAndJ ()
+{
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    // Perform charge deposition in component 0 of rho_fp at current time.
+    mypc->DepositCharge(m_fields.get_mr_levels(FieldType::rho_fp, finest_level), 0._rt);
+    // Perform current deposition at t_{n-1/2}.
+    mypc->DepositCurrent(m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), dt[0], -0.5_rt * dt[0]);
+
+    // Deposit cold-relativistic fluid charge and current
+    if (do_fluid_species) {
+        int const lev = 0;
+        myfl->DepositCharge(m_fields, *m_fields.get(FieldType::rho_fp, lev), lev);
+        myfl->DepositCurrent(m_fields,
+            *m_fields.get(FieldType::current_fp, Direction{0}, lev),
+            *m_fields.get(FieldType::current_fp, Direction{1}, lev),
+            *m_fields.get(FieldType::current_fp, Direction{2}, lev),
+            lev);
+    }
+
+    // Synchronize J and rho:
+    // filter (if used), exchange guard cells, interpolate across MR levels
+    // and apply boundary conditions
+    SyncCurrentAndRho();
+
+    // SyncCurrent does not include a call to FillBoundary, but it is needed
+    // for the hybrid-PIC solver since current values are interpolated to
+    // a nodal grid
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        for (int idim = 0; idim < 3; ++idim) {
+            m_fields.get(FieldType::current_fp, Direction{idim}, lev)->FillBoundary(Geom(lev).periodicity());
+        }
+    }
+}
+
 void WarpX::HybridPICDepositInitialRhoAndJ ()
 {
     // The Ohm's law solver requires two timesteps' values for the charge
@@ -270,35 +280,7 @@ void WarpX::HybridPICDepositInitialRhoAndJ ()
     if (restart_chkfile.empty()) {
         // This is not a restart, so the rho_fp and current_fp multifabs are
         // still empty.
-        // Perform charge deposition in component 0 of rho_fp at t_{0}.
-        mypc->DepositCharge(m_fields.get_mr_levels(FieldType::rho_fp, finest_level), 0._rt);
-        // Perform current deposition at t_{-1/2}.
-        mypc->DepositCurrent(m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), dt[0], -0.5_rt * dt[0]);
-
-        // Deposit cold-relativistic fluid charge and current
-        if (do_fluid_species) {
-            int const lev = 0;
-            myfl->DepositCharge(m_fields, *m_fields.get(FieldType::rho_fp, lev), lev);
-            myfl->DepositCurrent(m_fields,
-                *m_fields.get(FieldType::current_fp, Direction{0}, lev),
-                *m_fields.get(FieldType::current_fp, Direction{1}, lev),
-                *m_fields.get(FieldType::current_fp, Direction{2}, lev),
-                lev);
-        }
-
-        // Synchronize J and rho:
-        // filter (if used), exchange guard cells, interpolate across MR levels
-        // and apply boundary conditions
-        SyncCurrentAndRho();
-
-        // SyncCurrent does not include a call to FillBoundary, but it is needed
-        // for the hybrid-PIC solver since current values are interpolated to
-        // a nodal grid
-        for (int lev = 0; lev <= finest_level; ++lev) {
-            for (int idim = 0; idim < 3; ++idim) {
-                m_fields.get(FieldType::current_fp, Direction{idim}, lev)->FillBoundary(Geom(lev).periodicity());
-            }
-        }
+        HybridPICDepositRhoAndJ();
     }
 
     // Copy the rho_fp values to rho_fp_temp and the current_fp values to
