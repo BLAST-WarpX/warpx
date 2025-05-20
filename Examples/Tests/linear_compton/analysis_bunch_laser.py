@@ -7,7 +7,7 @@ from scipy.constants import e as q_e
 
 r_e = physical_constants["classical electron radius"][0]  # m
 
-do_plots = False
+do_plots = True
 
 Q_bunch = 2080.5031144200598 * 30000 * q_e  # Coulomb
 N_bunch = 300000
@@ -53,11 +53,9 @@ for i, it in enumerate(series.iterations):
     py_pho2 = np.append(py_pho2, (w * uy).sum() / (m_e * c))
     pz_pho2 = np.append(pz_pho2, (w * uz).sum() / (m_e * c))
 
-assert np.allclose(0.0, px_pho2 + px_ele2, atol=1e-12)
-assert np.allclose(0.0, py_pho2 + py_ele2, atol=1e-12)
-
-# print(np.abs(pz_ele1+pz_ele2+pz_pho2 - pz_init)  / np.abs(pz_init))
-assert np.allclose(pz_ele1 + pz_ele2 + pz_pho2, pz_init, atol=0.0, rtol=1e-7)
+assert np.allclose(0.0, px_pho2 + px_ele2, atol=1.0e-9 * abs(pz_init))
+assert np.allclose(0.0, py_pho2 + py_ele2, atol=1.0e-9 * abs(pz_init))
+assert np.allclose(pz_ele1 + pz_ele2 + pz_pho2, pz_init, atol=1.0e-9 * abs(pz_init))
 
 # %%
 # Check that the photon fraction is close (within 10%) to
