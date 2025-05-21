@@ -207,6 +207,12 @@ public:
             m_ioniz_product2 = pc_products[ioniz_product2_list_index]->getMass();
         }
 
+        // Store indices for charge exchange products
+        // TODO: Update for the case where the products are also colliding particles
+        // and where there is also non-product producing collisions
+        index_type cx_product1_offset = products_np[2];
+        index_type cx_product2_offset = products_np[3];
+
         // First perform all non-product producing collisions
         amrex::ParallelForRNG(n_total_pairs,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
@@ -313,18 +319,18 @@ public:
             else if (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE))
             {
                 // create a copy of the first product species at the location of species 1
-                const auto product1_index = ioniz_product1_offset + with_product_p_offsets[i];
-                copy_species1[ioniz_product1_list_index](soa_products_data[ioniz_product1_list_index], soa_1, static_cast<int>(p_pair_indices_1[i]),
+                const auto product1_index = cx_product1_offset + with_product_p_offsets[i];
+                copy_species1[2](soa_products_data[2], soa_1, static_cast<int>(p_pair_indices_1[i]),
                                 static_cast<int>(product1_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
-                soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::w][product1_index] = p_pair_reaction_weight[i];
+                soa_products_data[2].m_rdata[PIdx::w][product1_index] = p_pair_reaction_weight[i];
 
                 // create a copy of the other product species at the location of species 2
-                const auto product2_index = ioniz_product2_offset + with_product_p_offsets[i];
-                copy_species1[ioniz_product2_list_index](soa_products_data[ioniz_product2_list_index], soa_2, static_cast<int>(p_pair_indices_2[i]),
+                const auto product2_index = cx_product2_offset + with_product_p_offsets[i];
+                copy_species1[3](soa_products_data[3], soa_2, static_cast<int>(p_pair_indices_2[i]),
                                 static_cast<int>(product2_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
-                soa_products_data[ioniz_product2_list_index].m_rdata[PIdx::w][product2_index] = p_pair_reaction_weight[i];
+                soa_products_data[3].m_rdata[PIdx::w][product2_index] = p_pair_reaction_weight[i];
             }
             else if (mask[i] == int(ScatteringProcessType::IONIZATION))
             {
