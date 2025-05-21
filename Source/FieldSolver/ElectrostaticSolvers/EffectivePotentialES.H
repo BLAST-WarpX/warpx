@@ -44,8 +44,9 @@ public:
      *  \f[
      *      \vec{\nabla}\cdot(\sigma\vec{\nabla}) \phi = -\frac{\rho}{\epsilon_0}
      *  \f]
-     * \param[out] phi The potential to be computed by this function
      * \param[in] rho The total charge density
+     * \param[out] phi The potential to be computed by this function
+     * \param[out] efield The electric field corresponding to the calculated phi (only used with embedded boundaries)
      * \param[in] sigma Represents the modified dielectric
      * \param[in] required_precision The relative convergence threshold for the MLMG solver
      * \param[in] absolute_tolerance The absolute convergence threshold for the MLMG solver
