@@ -214,7 +214,7 @@ void EffectivePotentialES::computePhi (
                 }
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 amrex::Array<amrex::MultiFab*, 1>{
-                    warpx.m_fields.get(FieldType::Efield_fp, Direction{0}, lev)
+                    efield[lev][0]
                 }
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                 amrex::Array<amrex::MultiFab*, 2>{
