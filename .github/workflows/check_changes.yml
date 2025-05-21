@@ -22,6 +22,7 @@ jobs:
               - '!Docs/**'
               - '!**.md'
               - '!**.rst'
+              - '!.github/**'  # FIXME
           predicate-quantifier: 'every'
       - id: set-output
         run: |
