@@ -757,16 +757,17 @@ PEC::ApplyReflectiveBoundarytoRhofield (
 
                 if (!is_reflective[idim][iside]) { continue; }
 
-                // Get Rho box, continue if it does not touch this boundary,
-                // else collapse box to valid boundary region in idim direction
+                // Get node/Rho boxes, continue if node_box does not touch this boundary,
+                // else collapse Rho box to valid boundary region in idim direction
+                const amrex::Box node_box = mfi.tilebox(IntVect::TheNodeVector());
                 amrex::Box rho_box = mfi.tilebox(rho_nodal);
                 if (iside==0) {
-                    if (rho_box.smallEnd()[idim] != domain_lo[idim]) { continue; }
+                    if (node_box.smallEnd()[idim] != domain_lo[idim]) { continue; }
                     rho_box.setSmall(idim,domain_lo[idim]);
                     rho_box.setBig(idim,domain_lo[idim]+Ng[idim]);
                 }
                 else if (iside==1) {
-                    if (rho_box.bigEnd()[idim] != domain_hi[idim]) { continue; }
+                    if (node_box.bigEnd()[idim] != domain_hi[idim]) { continue; }
                     rho_box.setSmall(idim,domain_hi[idim]-Ng[idim]);
                     rho_box.setBig(idim,domain_hi[idim]);
                 }
@@ -809,16 +810,17 @@ PEC::ApplyReflectiveBoundarytoRhofield (
 
                 if (!is_reflective[idim][iside]) { continue; }
 
-                // Get Rho box, continue if it does not touch this boundary,
-                // else collapse box to valid boundary region in idim direction
+                // Get node/Rho boxes, continue if node_box does not touch this boundary,
+                // else collapse Rho box to valid boundary region in idim direction
+                const amrex::Box node_box = mfi.tilebox(IntVect::TheNodeVector());
                 amrex::Box rho_box = mfi.tilebox(rho_nodal);
                 if (iside==0) {
-                    if (rho_box.smallEnd()[idim] != domain_lo[idim]) { continue; }
+                    if (node_box.smallEnd()[idim] != domain_lo[idim]) { continue; }
                     rho_box.setSmall(idim,domain_lo[idim]);
                     rho_box.setBig(idim,domain_lo[idim]+Ng[idim]);
                 }
                 else if (iside==1) {
-                    if (rho_box.bigEnd()[idim] != domain_hi[idim]) { continue; }
+                    if (node_box.bigEnd()[idim] != domain_hi[idim]) { continue; }
                     rho_box.setSmall(idim,domain_hi[idim]-Ng[idim]);
                     rho_box.setBig(idim,domain_hi[idim]);
                 }
@@ -1011,7 +1013,7 @@ PEC::ApplyReflectiveBoundarytoJfield (
 
                 // Get node/J boxes, continue if node_box does not touch this boundary,
                 // else collapse J boxes to valid boundary region in idim direction
-                amrex::Box node_box = mfi.tilebox(IntVect::TheNodeVector());
+                const amrex::Box node_box = mfi.tilebox(IntVect::TheNodeVector());
                 amrex::Box Jx_box = mfi.tilebox(Jx_nodal);
                 amrex::Box Jy_box = mfi.tilebox(Jy_nodal);
                 amrex::Box Jz_box = mfi.tilebox(Jz_nodal);
@@ -1098,7 +1100,7 @@ PEC::ApplyReflectiveBoundarytoJfield (
 
                 // Get node/J boxes, continue if node_box does not touch this boundary,
                 // else collapse J boxes to valid boundary region in idim direction
-                amrex::Box node_box = mfi.tilebox(IntVect::TheNodeVector());
+                const amrex::Box node_box = mfi.tilebox(IntVect::TheNodeVector());
                 amrex::Box Jx_box = mfi.tilebox(Jx_nodal);
                 amrex::Box Jy_box = mfi.tilebox(Jy_nodal);
                 amrex::Box Jz_box = mfi.tilebox(Jz_nodal);
