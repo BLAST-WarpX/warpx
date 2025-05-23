@@ -723,7 +723,7 @@ PEC::ApplyReflectiveBoundarytoRhofield (
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-    for (amrex::MFIter mfi(*rho); mfi.isValid(); ++mfi) {
+    for (amrex::MFIter mfi(*rho, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
 
         // Get the multifab box including ghost cells
         Box const& fabbox = mfi.fabbox();
@@ -912,7 +912,7 @@ PEC::ApplyReflectiveBoundarytoJfield (
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-    for (amrex::MFIter mfi(*Jx); mfi.isValid(); ++mfi) {
+    for (amrex::MFIter mfi(*Jx, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
 
 <<<<<<< HEAD
     amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> is_reflective;
