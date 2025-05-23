@@ -675,14 +675,20 @@ PEC::ApplyPECtoBfield (
 
 
 /**
- * \brief Sets the rho field value in cells close to and inside a PEC boundary.
- *        The charge density deposited in the guard cells are either reflected
- *        back into the simulation domain (if a reflecting particle
- *        boundary is used), or the opposite charge density is deposited
- *        back in the domain to capture the effect of an image charge.
- *        The charge density on the PEC boundary is set to 0 while values
- *        in the guard cells are set equal and opposite to their mirror
- *        location inside the domain - representing image charges.
+ * \brief Step 1: Reflect the Rho field value deposited to the guard cells back to
+ *                their mirror location inside the domain at PEC and PMC boundaries.
+ *        Step 2: Set the Rho field value in the guard cells consistent with the
+ *                assumed symmetries associated with PEC and PMC boundaries.
+ *
+ *        PEC: This is an anti-symmetry boundary. Rho deposited to guard cells is
+ *             subtracted from its mirror location inside the domain, which is
+ *             equivalent to depositing Rho associated with the image charge of the
+ *             opposite sign on the other side of the PEC boundary.
+ *        PMC: This is a symmetry boundary. Rho deposited to guard cells is
+ *             Added to its mirror location inside the domain, which is
+ *             equivalent to depositing Rho associated with the image charge of the
+ *             same sign on the other side of the PMC boundary.
+ *
  **/
 void
 PEC::ApplyReflectiveBoundarytoRhofield (
@@ -854,6 +860,22 @@ PEC::ApplyReflectiveBoundarytoRhofield (
 
 }
 
+/**
+ * \brief Step 1: Reflect the J field value deposited to the guard cells back to
+ *                their mirror location inside the domain at PEC and PMC boundaries.
+ *        Step 2: Set the J field value in the guard cells consistent with the
+ *                assumed symmetries associated with PEC and PMC boundaries.
+ *
+ *        PEC: This is an anti-symmetry boundary. Jparallel/Jperp to a boundary deposited
+ *             to guard cells is subtracted/added from/to its mirror location inside the
+ *             domain, which is equivalent to depositing J associated with the image
+ *             charge of the opposite sign on the other side of the PEC boundary.
+ *        PMC: This is a symmetry boundary. Jparallel/Jperp to a boundary deposited
+ *             to guard cells is added/subtracted to/from its mirror location inside the
+ *             domain, which is equivalent to depositing J associated with the image
+ *             charge of the opposite sign on the other side of the PEC boundary.
+ *
+ **/
 void
 PEC::ApplyReflectiveBoundarytoJfield (
     amrex::MultiFab* Jx, amrex::MultiFab* Jy, amrex::MultiFab* Jz,
