@@ -359,9 +359,11 @@ namespace
      * \param[in] n                 index of the MultiFab component being updated
      * \param[in] ijk_vec           indices along the x(i), y(j), z(k) of the Rho/J Array4
      * \param[in out] field         field data to be updated
-     * \param[in] mirrorfac         mirror cell is given by mirrorfac - ijk_vec
-     * \param[in] psign             Whether the field value should be flipped across the boundary
-     * \param[in] is_nodal_r        Whether data is nodal along r
+     * \param[in] ijk_mirror        mirror indices
+     * \param[in] psign             whether the field value should be flipped across the boundary
+     * \param[in] idim              boundary direction
+     * \param[in] iside             boundary side
+     * \param[in] is_nodal_r        whether data is nodal along r
      * \param[in] fabbox            multifab box including ghost cells
      */
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -421,9 +423,11 @@ namespace
      * \param[in] n                 index of the MultiFab component being updated
      * \param[in] ijk_vec           indices along the x(i), y(j), z(k) of the Rho/J Array4
      * \param[in out] field         field data to be updated
-     * \param[in] mirrorfac         mirror cell is given by mirrorfac - ijk_vec
-     * \param[in] psign             Whether the field value should be flipped across the boundary
-     * \param[in] is_nodal_r        Whether data is nodal along r
+     * \param[in] ijk_mirror        mirror indices
+     * \param[in] psign             whether the field value should be flipped across the boundary
+     * \param[in] idim              boundary direction
+     * \param[in] iside             boundary side
+     * \param[in] is_nodal_r        whether data is nodal along r
      * \param[in] fabbox            multifab box including ghost cells
      */
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
