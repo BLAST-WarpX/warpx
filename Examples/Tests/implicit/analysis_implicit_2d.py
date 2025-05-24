@@ -17,8 +17,8 @@ import numpy as np
 import yt
 from scipy.constants import e, epsilon_0
 
-field_energy = np.loadtxt("diags/reducedfiles/field_energy.txt", skiprows=1)
-particle_energy = np.loadtxt("diags/reducedfiles/particle_energy.txt", skiprows=1)
+field_energy = np.loadtxt("diags/reduced_files/field_energy.txt", skiprows=1)
+particle_energy = np.loadtxt("diags/reduced_files/particle_energy.txt", skiprows=1)
 
 total_energy = field_energy[:, 2] + particle_energy[:, 2]
 
