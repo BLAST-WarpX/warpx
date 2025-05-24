@@ -912,8 +912,6 @@ PEC::ApplyReflectiveBoundarytoJfield (
     amrex::GpuArray<GpuArray<GpuArray<int,2>,3>,AMREX_SPACEDIM> mirrorfac;
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
 
-        if (geom.isPeriodic()[idim] == 1) { continue; }
-
         // Check if boundary is reflective on lo side
         is_reflective[idim][0] = ( (particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
                                ||  (particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
