@@ -1,12 +1,12 @@
 {
   "lev=0": {},
   "ions": {
-    "particle_momentum_x": 5.0460869033231105e-17,
-    "particle_momentum_y": 5.039655653859276e-17,
-    "particle_momentum_z": 5.0513200523181714e-17,
-    "particle_position_x": 143159.44615591134,
-    "particle_position_y": 143164.1018301089,
-    "particle_theta": 2574363.0280683013,
-    "particle_weight": 8.128652114374367e+18
+    "particle_momentum_x": 5.046086956729646e-17,
+    "particle_momentum_y": 5.0398109473108016e-17,
+    "particle_momentum_z": 5.051326371881093e-17,
+    "particle_position_x": 143159.1174573574,
+    "particle_position_y": 143164.10443445836,
+    "particle_theta": 2574363.2114661173,
+    "particle_weight": 8.128652114374374e+18
   }
 }
