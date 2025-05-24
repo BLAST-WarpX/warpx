@@ -7,9 +7,10 @@
 #
 # License: BSD-3-Clause-LBNL
 #
-# This is a script that analyses the simulation results from the script `inputs_vandb_2d`.
-# This simulates a 2D periodic plasma using the implicit solver
-# with the Villasenor deposition using shape factor 2.
+# This is a script that analyses the results from a simulation of
+# a uniform thermal plasma in a 2D box with four symmetry boundaries
+# using the exactly energy conserving EM implicit solver using the
+# exactly charge conserving villasenor deposition with shape = 2.
 import sys
 
 import numpy as np
