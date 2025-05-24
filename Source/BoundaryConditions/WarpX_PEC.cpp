@@ -760,6 +760,8 @@ PEC::ApplyReflectiveBoundarytoRhofield (
         // Get the multifab box including ghost cells
         const amrex::Box& rho_fabbox = mfi.fabbox();
 
+        auto const& rho_array = rho->array(mfi);
+
         // Get nodal box that does not include ghost cells
         const amrex::Box& node_box = mfi.tilebox(IntVect::TheNodeVector());
 
@@ -793,8 +795,6 @@ PEC::ApplyReflectiveBoundarytoRhofield (
                     if (jdim==idim) { continue; }
                     rho_box.grow(jdim,Ng[jdim]);
                 }
-
-                auto const& rho_array = rho->array(mfi);
 
                 // Loop over cells and reflect Rho
                 amrex::ParallelFor(
@@ -841,8 +841,6 @@ PEC::ApplyReflectiveBoundarytoRhofield (
                     if (jdim==idim) { continue; }
                     rho_box.grow(jdim,Ng[jdim]);
                 }
-
-                auto const& rho_array = rho->array(mfi);
 
                 // Loop over cells and set Rho in guard cells
                 amrex::ParallelFor(
@@ -1032,6 +1030,10 @@ PEC::ApplyReflectiveBoundarytoJfield (
         const amrex::Box Jy_fabbox = mfi.fabbox().convert(Jy_nodal);
         const amrex::Box Jz_fabbox = mfi.fabbox().convert(Jz_nodal);
 
+        auto const& Jx_array = Jx->array(mfi);
+        auto const& Jy_array = Jy->array(mfi);
+        auto const& Jz_array = Jz->array(mfi);
+
         // Get nodal box that does not include ghost cells
         const amrex::Box node_box = mfi.tilebox(IntVect::TheNodeVector());
 
@@ -1077,10 +1079,6 @@ PEC::ApplyReflectiveBoundarytoJfield (
                     Jy_box.grow(jdim,Ng[jdim]);
                     Jz_box.grow(jdim,Ng[jdim]);
                 }
-
-                auto const& Jx_array = Jx->array(mfi);
-                auto const& Jy_array = Jy->array(mfi);
-                auto const& Jz_array = Jz->array(mfi);
 
                 // Loop over cells and reflect J
                 amrex::ParallelFor(
@@ -1159,10 +1157,6 @@ PEC::ApplyReflectiveBoundarytoJfield (
                     Jy_box.grow(jdim,Ng[jdim]);
                     Jz_box.grow(jdim,Ng[jdim]);
                 }
-
-                auto const& Jx_array = Jx->array(mfi);
-                auto const& Jy_array = Jy->array(mfi);
-                auto const& Jz_array = Jz->array(mfi);
 
                 // Loop over cells and set J in guard cells
                 amrex::ParallelFor(
