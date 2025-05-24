@@ -1026,16 +1026,16 @@ PEC::ApplyReflectiveBoundarytoJfield (
                                         ? -1._rt : 1._rt;
 =======
         // Get the multifab box including ghost cells
-        const amrex::Box Jx_fabbox = mfi.fabbox().convert(Jx_nodal);
-        const amrex::Box Jy_fabbox = mfi.fabbox().convert(Jy_nodal);
-        const amrex::Box Jz_fabbox = mfi.fabbox().convert(Jz_nodal);
+        const amrex::Box& Jx_fabbox = mfi.fabbox().convert(Jx_nodal);
+        const amrex::Box& Jy_fabbox = mfi.fabbox().convert(Jy_nodal);
+        const amrex::Box& Jz_fabbox = mfi.fabbox().convert(Jz_nodal);
 
         auto const& Jx_array = Jx->array(mfi);
         auto const& Jy_array = Jy->array(mfi);
         auto const& Jz_array = Jz->array(mfi);
 
         // Get nodal box that does not include ghost cells
-        const amrex::Box node_box = mfi.tilebox(IntVect::TheNodeVector());
+        const amrex::Box& node_box = mfi.tilebox(IntVect::TheNodeVector());
 
         //
         // Step 1: Reflect J deposited to guard cells back into the domain
