@@ -758,7 +758,10 @@ PEC::ApplyReflectiveBoundarytoRhofield (
     for (amrex::MFIter mfi(*rho, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
 
         // Get the multifab box including ghost cells
-        Box const& fabbox = mfi.fabbox();
+        const amrex::Box& rho_fabbox = mfi.fabbox();
+
+        // Get nodal box that does not include ghost cells
+        const amrex::Box& node_box = mfi.tilebox(IntVect::TheNodeVector());
 
         //
         // Step 1: Reflect Rho deposited to guard cells back into the domain
@@ -771,7 +774,6 @@ PEC::ApplyReflectiveBoundarytoRhofield (
 
                 // Get node/Rho boxes, continue if node_box does not touch this boundary,
                 // else collapse Rho box to valid boundary region in idim direction
-                const amrex::Box node_box = mfi.tilebox(IntVect::TheNodeVector());
                 amrex::Box rho_box = mfi.tilebox(rho_nodal);
                 if (iside==0) {
                     if (node_box.smallEnd()[idim] != domain_lo[idim]) { continue; }
@@ -784,7 +786,7 @@ PEC::ApplyReflectiveBoundarytoRhofield (
                     rho_box.setBig(idim,domain_hi[idim]);
                 }
 
-                // Grow Rho box to include ghost cells in transverse direction
+                // Grow Rho box to include guard cells in dir transverse to boundary
                 // !Required to get rho correct at domain corners touching multiple
                 // PEC/PMC boundaries!
                 for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
@@ -804,7 +806,7 @@ PEC::ApplyReflectiveBoundarytoRhofield (
                     iv_mirror[idim] = mirrorfac[idim][iside] - iv[idim];
                     ::ReflectJorRho( n, iv, rho_array, iv_mirror,
                                      psign[idim][iside], idim, iside,
-                                     rho_nodal[0], fabbox );
+                                     rho_nodal[0], rho_fabbox );
                 });
 
             }
@@ -820,9 +822,8 @@ PEC::ApplyReflectiveBoundarytoRhofield (
 
                 if (!is_reflective[idim][iside]) { continue; }
 
-                // Get node/Rho boxes, continue if node_box does not touch this boundary,
+                // Get Rho box, continue if node_box does not touch this boundary,
                 // else collapse Rho box to valid boundary region in idim direction
-                const amrex::Box node_box = mfi.tilebox(IntVect::TheNodeVector());
                 amrex::Box rho_box = mfi.tilebox(rho_nodal);
                 if (iside==0) {
                     if (node_box.smallEnd()[idim] != domain_lo[idim]) { continue; }
@@ -835,7 +836,7 @@ PEC::ApplyReflectiveBoundarytoRhofield (
                     rho_box.setBig(idim,domain_hi[idim]);
                 }
 
-                // Grow Rho box to include ghost cells in transverse direction
+                // Grow Rho box to include guard cells in dir transverse to boundary
                 for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
                     if (jdim==idim) { continue; }
                     rho_box.grow(jdim,Ng[jdim]);
@@ -853,7 +854,7 @@ PEC::ApplyReflectiveBoundarytoRhofield (
                     iv_mirror[idim] = mirrorfac[idim][iside] - iv[idim];
                     ::SetJorRho( n, iv, rho_array, iv_mirror,
                                  psign[idim][iside], idim, iside,
-                                 rho_nodal[0], fabbox );
+                                 rho_nodal[0], rho_fabbox );
                 });
 
             }
@@ -1031,6 +1032,9 @@ PEC::ApplyReflectiveBoundarytoJfield (
         const amrex::Box Jy_fabbox = mfi.fabbox().convert(Jy_nodal);
         const amrex::Box Jz_fabbox = mfi.fabbox().convert(Jz_nodal);
 
+        // Get nodal box that does not include ghost cells
+        const amrex::Box node_box = mfi.tilebox(IntVect::TheNodeVector());
+
         //
         // Step 1: Reflect J deposited to guard cells back into the domain
         //
@@ -1040,9 +1044,8 @@ PEC::ApplyReflectiveBoundarytoJfield (
 
                 if (!is_reflective[idim][iside]) { continue; }
 
-                // Get node/J boxes, continue if node_box does not touch this boundary,
+                // Get J boxes, continue if node_box does not touch this boundary,
                 // else collapse J boxes to valid boundary region in idim direction
-                const amrex::Box node_box = mfi.tilebox(IntVect::TheNodeVector());
                 amrex::Box Jx_box = mfi.tilebox(Jx_nodal);
                 amrex::Box Jy_box = mfi.tilebox(Jy_nodal);
                 amrex::Box Jz_box = mfi.tilebox(Jz_nodal);
@@ -1065,7 +1068,7 @@ PEC::ApplyReflectiveBoundarytoJfield (
                     Jz_box.setBig(idim,domain_hi[idim] + Jz_nodal[idim] - 1);
                 }
 
-                // Grow J boxes to include ghost cells in transverse direction
+                // Grow J boxes to include guard cells in dir transverse to boundary
                 // !Required to get J correct at domain corners touching multiple
                 // PEC/PMC boundaries!
                 for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
@@ -1125,9 +1128,8 @@ PEC::ApplyReflectiveBoundarytoJfield (
 
                 if (!is_reflective[idim][iside]) { continue; }
 
-                // Get node/J boxes, continue if node_box does not touch this boundary,
+                // Get J boxes, continue if node_box does not touch this boundary,
                 // else collapse J boxes to valid boundary region in idim direction
-                const amrex::Box node_box = mfi.tilebox(IntVect::TheNodeVector());
                 amrex::Box Jx_box = mfi.tilebox(Jx_nodal);
                 amrex::Box Jy_box = mfi.tilebox(Jy_nodal);
                 amrex::Box Jz_box = mfi.tilebox(Jz_nodal);
@@ -1150,7 +1152,7 @@ PEC::ApplyReflectiveBoundarytoJfield (
                     Jz_box.setBig(idim,domain_hi[idim] + Jz_nodal[idim] - 1);
                 }
 
-                // Grow J boxes to include ghost cells in transverse direction
+                // Grow J boxes to include guard cells in dir transverse to boundary
                 for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
                     if (jdim==idim) { continue; }
                     Jx_box.grow(jdim,Ng[jdim]);
