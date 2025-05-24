@@ -166,7 +166,7 @@ public:
 
         // Ensure that the first product species is always an electron (which is assumed
         // during the scattering operation).
-        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(pc_products[0]->getCharge() < 0.0,
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(pc_products[2]->getCharge() < 0.0,
             "The first product species must be an electron.");
         // Grab the masses of ionization products
         amrex::ParticleReal m_ioniz_product1 = 0;
