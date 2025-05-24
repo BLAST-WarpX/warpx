@@ -323,12 +323,12 @@ public:
                 auto& ux1 = soa_products_data[0].m_rdata[PIdx::ux][species1_index];
                 auto& uy1 = soa_products_data[0].m_rdata[PIdx::uy][species1_index];
                 auto& uz1 = soa_products_data[0].m_rdata[PIdx::uz][species1_index];
-                auto& ux_p1 = soa_products_data[0].m_rdata[PIdx::ux][product1_index];
-                auto& uy_p1 = soa_products_data[0].m_rdata[PIdx::uy][product1_index];
-                auto& uz_p1 = soa_products_data[0].m_rdata[PIdx::uz][product1_index];
-                auto& ux_p2 = soa_products_data[1].m_rdata[PIdx::ux][product2_index];
-                auto& uy_p2 = soa_products_data[1].m_rdata[PIdx::uy][product2_index];
-                auto& uz_p2 = soa_products_data[1].m_rdata[PIdx::uz][product2_index];
+                auto& ux_p1 = soa_products_data[2].m_rdata[PIdx::ux][product1_index];
+                auto& uy_p1 = soa_products_data[2].m_rdata[PIdx::uy][product1_index];
+                auto& uz_p1 = soa_products_data[2].m_rdata[PIdx::uz][product1_index];
+                auto& ux_p2 = soa_products_data[3].m_rdata[PIdx::ux][product2_index];
+                auto& uy_p2 = soa_products_data[3].m_rdata[PIdx::uy][product2_index];
+                auto& uz_p2 = soa_products_data[3].m_rdata[PIdx::uz][product2_index];
 
 #if (defined WARPX_DIM_RZ)
                 /* In RZ geometry, macroparticles can collide with other macroparticles
