@@ -14,7 +14,8 @@ import sys
 
 import numpy as np
 import yt
-from scipy.constants import e, epsilon_0
+from scipy.constants import e
+
 ep0_warpx = 8.8541878188e-12
 
 field_energy = np.loadtxt("diags/reducedfiles/field_energy.txt", skiprows=1)
@@ -47,8 +48,8 @@ rho = data["boxlib", "rho"].value
 num = data["boxlib", "num_electrons"].value
 dLx = ds.domain_right_edge[0] - ds.domain_left_edge[0]
 dLz = ds.domain_right_edge[1] - ds.domain_left_edge[1]
-dV = dLx.value*dLz.value
-ne0 = num.sum()/dV
+dV = dLx.value * dLz.value
+ne0 = num.sum() / dV
 
 # compute local error in Gauss's law
 drho = (rho - ep0_warpx * divE) / e / ne0

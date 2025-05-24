@@ -6,7 +6,7 @@ my_constants.ne0 = 4.e26     # m^-3
 my_constants.Ti = 2000.      # eV
 my_constants.Te = 2000.      # eV
 my_constants.A = 12.
-my_constants.Z = 6 
+my_constants.Z = 6
 my_constants.mi = A*m_u - Z*m_e
 my_constants.qi = Z*q_e
 
