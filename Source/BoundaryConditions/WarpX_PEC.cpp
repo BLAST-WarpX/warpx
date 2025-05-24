@@ -716,9 +716,41 @@ PEC::ApplyReflectiveBoundarytoRhofield (
     amrex::IntVect rho_nodal = rho->ixType().toIntVect();
     amrex::IntVect Ng = rho->nGrowVect();
 
+    // Declare and assign GpuArrays before ifdef AMREX_USE_OMP
     amrex::GpuArray<GpuArray<int,2>,AMREX_SPACEDIM> is_reflective;
     amrex::GpuArray<GpuArray<Real,2>,AMREX_SPACEDIM> psign;
     amrex::GpuArray<GpuArray<int,2>,AMREX_SPACEDIM> mirrorfac;
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+
+        // Check if boundary is reflective on lo side
+        is_reflective[idim][0] = ( (particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
+                               ||  (particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
+                               ||  (field_boundary_lo[idim] == FieldBoundaryType::PMC)
+                               ||  (field_boundary_lo[idim] == FieldBoundaryType::PEC) );
+
+        // Check if boundary is reflective on hi side
+        is_reflective[idim][1] = ( (particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
+                               ||  (particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
+                               ||  (field_boundary_hi[idim] == FieldBoundaryType::PMC)
+                               ||  (field_boundary_hi[idim] == FieldBoundaryType::PEC) );
+
+        // Set psign on lo side
+        psign[idim][0] = ( (particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
+                       ||  (particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
+                       ||  (field_boundary_lo[idim] == FieldBoundaryType::PMC) )
+                           ? 1._rt : -1._rt;
+
+        // Set psign on hi side
+        psign[idim][1] = ( (particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
+                       ||  (particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
+                       ||  (field_boundary_hi[idim] == FieldBoundaryType::PMC) )
+                           ? 1._rt : -1._rt;
+
+        // Set the mirror index offset on lo and hi sides
+        mirrorfac[idim][0] = 2*domain_lo[idim] - (1 - rho_nodal[idim]);
+        mirrorfac[idim][1] = 2*domain_hi[idim] - (1 - rho_nodal[idim]);
+
+    }
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -732,36 +764,6 @@ PEC::ApplyReflectiveBoundarytoRhofield (
         // Step 1: Reflect Rho deposited to guard cells back into the domain
         //
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-
-            if (geom.isPeriodic()[idim] == 1) { continue; }
-
-            // Check if boundary is reflective on lo side
-            is_reflective[idim][0] = ( (particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
-                                   ||  (particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
-                                   ||  (field_boundary_lo[idim] == FieldBoundaryType::PMC)
-                                   ||  (field_boundary_lo[idim] == FieldBoundaryType::PEC) );
-
-            // Check if boundary is reflective on hi side
-            is_reflective[idim][1] = ( (particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
-                                   ||  (particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
-                                   ||  (field_boundary_hi[idim] == FieldBoundaryType::PMC)
-                                   ||  (field_boundary_hi[idim] == FieldBoundaryType::PEC) );
-
-            // Set psign on lo side
-            psign[idim][0] = ( (particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
-                           ||  (particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
-                           ||  (field_boundary_lo[idim] == FieldBoundaryType::PMC) )
-                               ? 1._rt : -1._rt;
-
-            // Set psign on hi side
-            psign[idim][1] = ( (particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
-                           ||  (particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
-                           ||  (field_boundary_hi[idim] == FieldBoundaryType::PMC) )
-                               ? 1._rt : -1._rt;
-
-            // Set the mirror index offset
-            mirrorfac[idim][0] = 2*domain_lo[idim] - (1 - rho_nodal[idim]);
-            mirrorfac[idim][1] = 2*domain_hi[idim] - (1 - rho_nodal[idim]);
 
             for (int iside = 0; iside < 2; ++iside) {
 
@@ -813,8 +815,6 @@ PEC::ApplyReflectiveBoundarytoRhofield (
         // Step 2: Set Rho in the guard cells
         //
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-
-            if (geom.isPeriodic()[idim] == 1) { continue; }
 
             for (int iside = 0; iside < 2; ++iside) {
 
@@ -904,10 +904,67 @@ PEC::ApplyReflectiveBoundarytoJfield (
     amrex::IntVect Jz_nodal = Jz->ixType().toIntVect();
     amrex::IntVect Ng = Jx->nGrowVect();
 
+    // Declare and assign GpuArrays before ifdef AMREX_USE_OMP
     bool is_tangent_to_bndy;
     amrex::GpuArray<GpuArray<int,2>,AMREX_SPACEDIM> is_reflective;
     amrex::GpuArray<GpuArray<GpuArray<Real,2>,3>,AMREX_SPACEDIM> psign;
     amrex::GpuArray<GpuArray<GpuArray<int,2>,3>,AMREX_SPACEDIM> mirrorfac;
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+
+        if (geom.isPeriodic()[idim] == 1) { continue; }
+
+        // Check if boundary is reflective on lo side
+        is_reflective[idim][0] = ( (particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
+                               ||  (particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
+                               ||  (field_boundary_lo[idim] == FieldBoundaryType::PMC)
+                               ||  (field_boundary_lo[idim] == FieldBoundaryType::PEC) );
+
+        // Check if boundary is reflective on hi side
+        is_reflective[idim][1] = ( (particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
+                               ||  (particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
+                               ||  (field_boundary_hi[idim] == FieldBoundaryType::PMC)
+                               ||  (field_boundary_hi[idim] == FieldBoundaryType::PEC) );
+
+        for (int icomp = 0; icomp < 3; ++icomp) {
+            // Set the psign value for each component of J for each direction
+#if (defined WARPX_DIM_1D_Z)
+            // For 1D : icomp=0 and icomp=1 (Jx and Jy are tangential to the z boundary)
+            //          The logic below ensures that the flags are set right for 1D
+            is_tangent_to_bndy = (icomp != (idim+2));
+#elif (defined WARPX_DIM_XZ) || (defined WARPX_DIM_RZ)
+            // For 2D : for icomp==1, (Jy in XZ, Jtheta in RZ),
+            //          icomp=1 is tangential to both x and z boundaries
+            //          The logic below ensures that the flags are set right for 2D
+            is_tangent_to_bndy = (icomp != AMREX_SPACEDIM*idim);
+#else
+            is_tangent_to_bndy = (icomp != idim);
+#endif
+
+            amrex::Real pmc_sign = 1._rt;
+            if (!is_tangent_to_bndy) { pmc_sign = -1._rt; }
+
+            // Set psign on lo side
+            psign[idim][icomp][0] = ( (particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
+                                  ||  (particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
+                                  ||  (field_boundary_lo[idim] == FieldBoundaryType::PMC) )
+                                      ? pmc_sign : -pmc_sign;
+
+            // Set psign on hi side
+            psign[idim][icomp][1] = ( (particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
+                                  ||  (particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
+                                  ||  (field_boundary_hi[idim] == FieldBoundaryType::PMC) )
+                                      ? pmc_sign : -pmc_sign;
+        }
+
+        // Set the mirror index offset on lo and hi sides
+        mirrorfac[idim][0][0] = 2*domain_lo[idim] - (1 - Jx_nodal[idim]);
+        mirrorfac[idim][0][1] = 2*domain_hi[idim] - (1 - Jx_nodal[idim]);
+        mirrorfac[idim][1][0] = 2*domain_lo[idim] - (1 - Jy_nodal[idim]);
+        mirrorfac[idim][1][1] = 2*domain_hi[idim] - (1 - Jy_nodal[idim]);
+        mirrorfac[idim][2][0] = 2*domain_lo[idim] - (1 - Jz_nodal[idim]);
+        mirrorfac[idim][2][1] = 2*domain_hi[idim] - (1 - Jz_nodal[idim]);
+
+    }
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -978,60 +1035,6 @@ PEC::ApplyReflectiveBoundarytoJfield (
         // Step 1: Reflect J deposited to guard cells back into the domain
         //
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-
-            if (geom.isPeriodic()[idim] == 1) { continue; }
-
-            // Check if boundary is reflective on lo side
-            is_reflective[idim][0] = ( (particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
-                                   ||  (particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
-                                   ||  (field_boundary_lo[idim] == FieldBoundaryType::PMC)
-                                   ||  (field_boundary_lo[idim] == FieldBoundaryType::PEC) );
-
-            // Check if boundary is reflective on hi side
-            is_reflective[idim][1] = ( (particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
-                                   ||  (particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
-                                   ||  (field_boundary_hi[idim] == FieldBoundaryType::PMC)
-                                   ||  (field_boundary_hi[idim] == FieldBoundaryType::PEC) );
-
-            for (int icomp=0; icomp < 3; ++icomp) {
-                // Set the psign value correctly for each current component for each
-                // simulation direction
-#if (defined WARPX_DIM_1D_Z)
-                // For 1D : icomp=0 and icomp=1 (Ex and Ey are tangential to the z boundary)
-                //          The logic below ensures that the flags are set right for 1D
-                is_tangent_to_bndy = (icomp != (idim+2));
-#elif (defined WARPX_DIM_XZ) || (defined WARPX_DIM_RZ)
-                // For 2D : for icomp==1, (Ey in XZ, Etheta in RZ),
-                //          icomp=1 is tangential to both x and z boundaries
-                //          The logic below ensures that the flags are set right for 2D
-                is_tangent_to_bndy = (icomp != AMREX_SPACEDIM*idim);
-#else
-                is_tangent_to_bndy = (icomp != idim);
-#endif
-
-                amrex::Real pmc_sign = 1._rt;
-                if (!is_tangent_to_bndy) { pmc_sign = -1._rt; }
-
-                // Set psign on lo side
-                psign[idim][icomp][0] = ( (particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
-                                      ||  (particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
-                                      ||  (field_boundary_lo[idim] == FieldBoundaryType::PMC) )
-                                          ? pmc_sign : -pmc_sign;
-
-                // Set psign on hi side
-                psign[idim][icomp][1] = ( (particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
-                                      ||  (particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
-                                      ||  (field_boundary_hi[idim] == FieldBoundaryType::PMC) )
-                                          ? pmc_sign : -pmc_sign;
-            }
-
-            // Set the mirror index offset
-            mirrorfac[idim][0][0] = 2*domain_lo[idim] - (1 - Jx_nodal[idim]);
-            mirrorfac[idim][0][1] = 2*domain_hi[idim] - (1 - Jx_nodal[idim]);
-            mirrorfac[idim][1][0] = 2*domain_lo[idim] - (1 - Jy_nodal[idim]);
-            mirrorfac[idim][1][1] = 2*domain_hi[idim] - (1 - Jy_nodal[idim]);
-            mirrorfac[idim][2][0] = 2*domain_lo[idim] - (1 - Jz_nodal[idim]);
-            mirrorfac[idim][2][1] = 2*domain_hi[idim] - (1 - Jz_nodal[idim]);
 
             for (int iside = 0; iside < 2; ++iside) {
 
@@ -1117,8 +1120,6 @@ PEC::ApplyReflectiveBoundarytoJfield (
         // Step 2: Set J in the guard cells
         //
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-
-            if (geom.isPeriodic()[idim] == 1) { continue; }
 
             for (int iside = 0; iside < 2; ++iside) {
 
