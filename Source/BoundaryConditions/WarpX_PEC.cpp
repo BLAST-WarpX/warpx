@@ -710,11 +710,11 @@ PEC::ApplyReflectiveBoundarytoRhofield (
     }
     domain_box.convert(rho->ixType());
 
-    amrex::IntVect domain_lo = domain_box.smallEnd();
-    amrex::IntVect domain_hi = domain_box.bigEnd();
+    const amrex::IntVect domain_lo = domain_box.smallEnd();
+    const amrex::IntVect domain_hi = domain_box.bigEnd();
 
-    amrex::IntVect rho_nodal = rho->ixType().toIntVect();
-    amrex::IntVect Ng = rho->nGrowVect();
+    const amrex::IntVect rho_nodal = rho->ixType().toIntVect();
+    const amrex::IntVect Ng = rho->nGrowVect();
 
     // Declare and assign GpuArrays before ifdef AMREX_USE_OMP
     amrex::GpuArray<GpuArray<int,2>,AMREX_SPACEDIM> is_reflective;
@@ -758,7 +758,7 @@ PEC::ApplyReflectiveBoundarytoRhofield (
     for (amrex::MFIter mfi(*rho, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
 
         // Get the multifab box including ghost cells
-        const amrex::Box rho_fabbox = mfi.fabbox();
+        const amrex::Box& rho_fabbox = mfi.fabbox();
 
         // Get nodal box that does not include ghost cells
         const amrex::Box& node_box = mfi.tilebox(IntVect::TheNodeVector());
@@ -897,13 +897,13 @@ PEC::ApplyReflectiveBoundarytoJfield (
     }
     domain_box.convert(IntVect::TheNodeVector());
 
-    amrex::IntVect domain_lo = domain_box.smallEnd();
-    amrex::IntVect domain_hi = domain_box.bigEnd();
+    const amrex::IntVect domain_lo = domain_box.smallEnd();
+    const amrex::IntVect domain_hi = domain_box.bigEnd();
 
-    amrex::IntVect Jx_nodal = Jx->ixType().toIntVect();
-    amrex::IntVect Jy_nodal = Jy->ixType().toIntVect();
-    amrex::IntVect Jz_nodal = Jz->ixType().toIntVect();
-    amrex::IntVect Ng = Jx->nGrowVect();
+    const amrex::IntVect Jx_nodal = Jx->ixType().toIntVect();
+    const amrex::IntVect Jy_nodal = Jy->ixType().toIntVect();
+    const amrex::IntVect Jz_nodal = Jz->ixType().toIntVect();
+    const amrex::IntVect Ng = Jx->nGrowVect();
 
     // Declare and assign GpuArrays before ifdef AMREX_USE_OMP
     bool is_tangent_to_bndy;
