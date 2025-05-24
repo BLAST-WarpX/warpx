@@ -14,9 +14,7 @@ import sys
 
 import numpy as np
 import yt
-from scipy.constants import e
-
-ep0_warpx = 8.8541878188e-12
+from scipy.constants import e, epsilon_0
 
 field_energy = np.loadtxt("diags/reducedfiles/field_energy.txt", skiprows=1)
 particle_energy = np.loadtxt("diags/reducedfiles/particle_energy.txt", skiprows=1)
@@ -52,7 +50,7 @@ dV = dLx.value * dLz.value
 ne0 = num.sum() / dV
 
 # compute local error in Gauss's law
-drho = (rho - ep0_warpx * divE) / e / ne0
+drho = (rho - epsilon_0 * divE) / e / ne0
 
 # compute RMS on in error on the grid
 nX = drho.shape[0]
