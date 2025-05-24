@@ -25,6 +25,11 @@ theory_flux = {"H": [], "Hplus": []}
 
 # Compute the simulation flux
 # Loop over species
+dz_bin = 0.006250881155571423
+z_min = 0.0
+z_max = 0.2
+# Define bin edges from z_min to z_max with specified bin width
+bins = np.arange(z_min, z_max + dz_bin, dz_bin)
 for species in ["H", "Hplus"]:
     z, w, uz = ts.get_particle(
         ["z", "w", "uz"],
@@ -32,7 +37,7 @@ for species in ["H", "Hplus"]:
         iteration=iteration,
         select={"uz": [1e-3, None]},
     )
-    w_binned, bins = np.histogram(z, bins=25, weights=w * uz)
+    w_binned, bins = np.histogram(z, bins=bins, weights=w * uz)
     # Convert from number of particles per bin to beam current
     dz_bin = bins[1] - bins[0]
     sim_flux[species] = w_binned / dz_bin * c
@@ -40,9 +45,8 @@ for species in ["H", "Hplus"]:
 # Compute the theoretical flux
 n = 1e21
 flux = 1e20
-zmax = 0.2
 z_th = bins[:-1]
-theory_flux["Hplus"] = flux * np.exp(-z_th * n * cross_section)  # remaining H+ flux
+theory_flux["Hplus"] = flux * np.exp(-z_th * n * cross_section)  # remaining Hplus flux
 theory_flux["H"] = flux * (
     1 - np.exp(-z_th * n * cross_section)
 )  # H flux, which underwent the charge exchange
