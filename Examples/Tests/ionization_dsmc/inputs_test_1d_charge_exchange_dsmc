@@ -1,9 +1,3 @@
-# In this test, a beam of fast H neutral goes through a background gas of H2
-# Due to the ionization reaction H2 + Hneutral -> H2 + Hplus + electrons,
-# the beam of fast neutral is progressively converted into a beam of fast H+ ions,
-# with a rate that depends on the cross section and background gas density.
-# In the analysis script, we then check that the population of particles in the
-# beam is consistent with this rate.
 
 #############################
 # Define parameter of the
@@ -42,24 +36,24 @@ boundary.field_hi = pec
 
 #############################
 # Create species
-particles.species_names = Hplus Hneutral electrons H2
+particles.species_names = H Hplus H2 H2plus
 
-Hneutral.do_continuous_injection = 1
-Hneutral.injection_style = NFluxPerCell
-Hneutral.mass = m_p
-Hneutral.charge = 0
-Hneutral.surface_flux_pos = 0
-Hneutral.flux_normal_axis = z
-Hneutral.flux_direction = 1
-Hneutral.num_particles_per_cell = 800
-Hneutral.flux_profile = constant
-Hneutral.flux = beam_flux
-Hneutral.momentum_distribution_type = constant
-Hneutral.uz = beam_beta
-
-Hplus.injection_style = none
+Hplus.do_continuous_injection = 1
+Hplus.injection_style = NFluxPerCell
 Hplus.mass = m_p
-Hplus.charge = 0
+Hplus.charge = q_e
+Hplus.surface_flux_pos = 0
+Hplus.flux_normal_axis = z
+Hplus.flux_direction = 1
+Hplus.num_particles_per_cell = 800
+Hplus.flux_profile = constant
+Hplus.flux = beam_flux
+Hplus.momentum_distribution_type = constant
+Hplus.uz = beam_beta
+
+H.injection_style = none
+H.mass = m_p
+H.charge = 0
 
 H2.injection_style = NRandomPerCell
 H2.mass = 2*m_p
@@ -74,9 +68,9 @@ H2.uz = 0
 H2.zmin = 0
 H2.zmax = gas_length
 
-electrons.injection_style = none
-electrons.mass = m_e
-electrons.charge = -q_e
+H2plus.injection_style = none
+H2plus.mass = 2*m_p
+H2plus.charge = q_e
 
 #############################
 # Add diagnostics
@@ -92,9 +86,7 @@ diag.format = openpmd
 collisions.collision_names = neutral_to_ion
 
 neutral_to_ion.type = dsmc
-neutral_to_ion.scattering_processes = ionization
-neutral_to_ion.species = H2 Hneutral
-neutral_to_ion.ionization_target_species = Hneutral
-neutral_to_ion.product_species = electrons Hplus
-neutral_to_ion.ionization_cross_section = ../../../../warpx-data/MCC_cross_sections/H/H_on_H2_ionization.dat
-neutral_to_ion.ionization_energy = 13.6 # eV
+neutral_to_ion.scattering_processes = charge_exchange
+neutral_to_ion.species = Hplus H2
+neutral_to_ion.product_species = H H2plus
+neutral_to_ion.charge_exchange_cross_section = ../../../../warpx-data/MCC_cross_sections/H/Hion_on_H2_charge_exchange.dat

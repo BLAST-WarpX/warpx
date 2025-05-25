@@ -5,19 +5,22 @@ on:
     branches:
       - "development"
   pull_request:
-    paths-ignore:
-      - "Docs/**"
-      - "**.rst"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-cuda
   cancel-in-progress: true
 
 jobs:
+
+  check_changes:
+    name: Analyze
+    uses: ./.github/workflows/check_changes.yml
+
   build_nvcc:
     name: NVCC SP
     runs-on: ubuntu-22.04
-    if: github.event.pull_request.draft == false
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
       CXXFLAGS: "-Werror"
       CMAKE_GENERATOR: Ninja
@@ -98,7 +101,8 @@ jobs:
   build_nvcc_gnumake:
     name: NVCC GNU Make
     runs-on: ubuntu-22.04
-    if: github.event.pull_request.draft == false
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies
@@ -123,7 +127,7 @@ jobs:
         which nvcc || echo "nvcc not in PATH!"
 
         git clone https://github.com/AMReX-Codes/amrex.git ../amrex
-        cd ../amrex && git checkout --detach 1fbc66798140479a59ecd16796079984cc0370c0 && cd -
+        cd ../amrex && git checkout --detach d3798de0bd81b76ed148af042b4656bd271ed2c7 && cd -
         make COMP=gcc QED=FALSE USE_MPI=TRUE USE_GPU=TRUE USE_OMP=FALSE USE_FFT=TRUE USE_CCACHE=TRUE -j 4
 
         ccache -s
@@ -132,7 +136,8 @@ jobs:
   build_nvhpc:
     name: NVHPC
     runs-on: ubuntu-24.04
-    if: github.event.pull_request.draft == false
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     #env:
     #  # For NVHPC, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja

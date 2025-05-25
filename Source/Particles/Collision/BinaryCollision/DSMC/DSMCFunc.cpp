@@ -32,7 +32,7 @@ DSMCFunc::DSMCFunc (
 
     // create a vector of ScatteringProcess objects from each scattering
     // process name
-    bool ionization_flag = false;
+    bool reaction_produces_new_species = false;
     for (const auto& scattering_process : scattering_process_names) {
         const std::string kw_cross_section = scattering_process + "_cross_section";
         std::string cross_section_file;
@@ -56,18 +56,32 @@ DSMCFunc::DSMCFunc (
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::INVALID,
                                         "Cannot add an unknown scattering process type");
 
-        // Only one ionization process is currently supported as part of a given
-        // collision set.
-        if (process.type() == ScatteringProcessType::IONIZATION) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                !ionization_flag,
-                "DSMC only supports a single ionization process"
-            );
-            ionization_flag = true;
+        if (process.type() == ScatteringProcessType::IONIZATION || process.type() == ScatteringProcessType::CHARGE_EXCHANGE) {
+            // Only one ionization process is currently supported as part of a given
+            // collision set.
+            if (reaction_produces_new_species) {
+                amrex::Abort("Multiple reactions that produce new species were specified in " + collision_name +
+                ".scattering_processes, but DSMC only supports a single reaction that produces new species.");
+            }
+            reaction_produces_new_species = true;
+        }
 
-            // And add a check that the ionization species has the same mass
+        if (process.type() == ScatteringProcessType::IONIZATION) {
+            // Ensure that the first product species is always an electron (which is assumed
+            // during the scattering operation).
+            amrex::Vector<std::string> product_species_names;
+            pp_collision_name.getarr("product_species", product_species_names);
+            // Check that the charge and mass of the species is consistent with an electron species
+            auto& species1 = mypc->GetParticleContainerFromName(product_species_names[0]);
+            if( std::abs(  species1.getCharge() + PhysConst::q_e ) > 1e-6*PhysConst::q_e   ||
+                std::abs( species1.getMass() - PhysConst::m_e ) > 1e-6*PhysConst::m_e ) {
+                amrex::Abort("The first species in " + collision_name + ".product_species must be an electron.");
+            }
+
+            // TODO: add a check that the ionization species has the same mass
             // (and a positive charge), compared to the target species
         }
+
         m_scattering_processes.push_back(std::move(process));
     }
 
