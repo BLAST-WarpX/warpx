@@ -74,9 +74,8 @@ H2.uz = 0
 H2.zmin = 0
 H2.zmax = gas_length
 
+electrons.species_type = electron
 electrons.injection_style = none
-electrons.mass = m_e
-electrons.charge = -q_e
 
 #############################
 # Add diagnostics
@@ -95,6 +94,6 @@ neutral_to_ion.type = dsmc
 neutral_to_ion.scattering_processes = ionization
 neutral_to_ion.species = H2 Hneutral
 neutral_to_ion.ionization_target_species = Hneutral
-neutral_to_ion.product_species = Hplus electrons
+neutral_to_ion.product_species = electrons Hplus
 neutral_to_ion.ionization_cross_section = ../../../../warpx-data/MCC_cross_sections/H/H_on_H2_ionization.dat
 neutral_to_ion.ionization_energy = 13.6 # eV

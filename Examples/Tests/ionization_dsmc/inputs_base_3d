@@ -40,11 +40,10 @@ boundary.particle_lo = periodic periodic periodic
 #################################
 particles.species_names = electrons ions neutrals
 
-electrons.charge = -q_e
+electrons.species_type = electron
 electrons.density = 1e+14
 electrons.initialize_self_fields = 0
 electrons.injection_style = nuniformpercell
-electrons.mass = m_e
 electrons.momentum_distribution_type = gaussian
 electrons.num_particles_per_cell_each_dim = 5 5 5
 electrons.profile = constant
@@ -88,7 +87,7 @@ neutrals.uz_th = sqrt(q_e * Tn / m_p) / clight
 collisions.collision_names = ioniz
 
 ioniz.ionization_energy = 13.59844
-ioniz.product_species = ions electrons
+ioniz.product_species = electrons ions
 ioniz.ionization_target_species = neutrals
 ioniz.ndt = 1
 ioniz.scattering_processes = ionization

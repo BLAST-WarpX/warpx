@@ -209,10 +209,14 @@ void WarpXFluidContainer::InitData(
                 const amrex::Real x = problo[0] + i * dx[0];
                 const amrex::Real y = 0.0_rt;
                 amrex::Real z = problo[1] + j * dx[1];
-#else
+#elif defined(WARPX_DIM_1D_Z)
                 const amrex::Real x = 0.0_rt;
                 const amrex::Real y = 0.0_rt;
                 amrex::Real z = problo[0] + i * dx[0];
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                const amrex::Real x = problo[0] + i * dx[0];
+                const amrex::Real y = 0.0_rt;
+                amrex::Real z = 0.0_rt;
 #endif
 
                 // Lorentz transform z (from boosted to lab frame)
@@ -283,7 +287,7 @@ void WarpXFluidContainer::Evolve(
 
     // Cylindrical centrifugal term
     if(!do_not_push){
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         centrifugal_source_rz(fields, lev);
 #endif
 
@@ -384,7 +388,7 @@ void WarpXFluidContainer::ApplyBcFluidsAndComms (ablastr::fields::MultiFabRegist
 
                 }
 
-#elif ( defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_3D) )
+#else
 
                 // Upper end (index 0)
                 if ( (periodic_directions[0] != 1) && (i==domain.bigEnd(0)+1) ){
@@ -400,8 +404,6 @@ void WarpXFluidContainer::ApplyBcFluidsAndComms (ablastr::fields::MultiFabRegist
                     NUy_arr(i,j,k) = NUy_arr(i+2,j,k);
                     NUz_arr(i,j,k) = NUz_arr(i+2,j,k);
                 }
-
-#else
 
 #endif
             }
@@ -444,9 +446,13 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
     const amrex::Real dt_over_dx_half = 0.5_rt*(dt/dx[0]);
     const amrex::Real dt_over_dz_half = 0.5_rt*(dt/dx[1]);
     const amrex::Box& domain = geom.Domain();
-#else
+#elif defined(WARPX_DIM_1D_Z)
     const amrex::Real dt_over_dz = (dt/dx[0]);
     const amrex::Real dt_over_dz_half = 0.5_rt*(dt/dx[0]);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    const auto problo = geom.ProbLoArray();
+    const amrex::Real dt_over_dx_half = 0.5_rt*(dt/dx[0]);
+    const amrex::Box& domain = geom.Domain();
 #endif
 
     const amrex::BoxArray ba = fields.get(name_mf_N, lev)->boxArray();
@@ -464,9 +470,12 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
     amrex::MultiFab tmp_U_plus_x( amrex::convert(ba, IntVect(0,1)), fields.get(name_mf_N, lev)->DistributionMap(), 4, 1);
     amrex::MultiFab tmp_U_minus_z( amrex::convert(ba, IntVect(1,0)), fields.get(name_mf_N, lev)->DistributionMap(), 4, 1);
     amrex::MultiFab tmp_U_plus_z( amrex::convert(ba, IntVect(1,0)), fields.get(name_mf_N, lev)->DistributionMap(), 4, 1);
-#else
+#elif defined(WARPX_DIM_1D_Z)
     amrex::MultiFab tmp_U_minus_z( amrex::convert(ba, IntVect(0)), fields.get(name_mf_N, lev)->DistributionMap(), 4, 1);
     amrex::MultiFab tmp_U_plus_z( amrex::convert(ba, IntVect(0)), fields.get(name_mf_N, lev)->DistributionMap(), 4, 1);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    amrex::MultiFab tmp_U_minus_x( amrex::convert(ba, IntVect(0)), fields.get(name_mf_N, lev)->DistributionMap(), 4, 1);
+    amrex::MultiFab tmp_U_plus_x( amrex::convert(ba, IntVect(0)), fields.get(name_mf_N, lev)->DistributionMap(), 4, 1);
 #endif
 
     // Fill edge values of N and U at the half timestep for MUSCL
@@ -481,7 +490,7 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
         // the flux calculation loop
         const amrex::Box tile_box = [&](){
             auto tt = mfi.growntilebox(1);
-#if defined (WARPX_DIM_RZ)
+#if defined (WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             // Limit the grown box for RZ at r = 0, r_max
             const int idir = 0;
             const int n_cell = -1;
@@ -507,8 +516,10 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         amrex::Box const box_x = amrex::convert( box, tmp_U_minus_x.ixType() );
         amrex::Box const box_z = amrex::convert( box, tmp_U_minus_z.ixType() );
-#else
+#elif defined(WARPX_DIM_1D_Z)
         amrex::Box const box_z = amrex::convert( box, tmp_U_minus_z.ixType() );
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        amrex::Box const box_x = amrex::convert( box, tmp_U_minus_x.ixType() );
 #endif
 
         //N and NU are always defined at the nodes, the tmp_Q_* are defined
@@ -528,9 +539,12 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
         const amrex::Array4<amrex::Real> U_plus_x = tmp_U_plus_x.array(mfi);
         const amrex::Array4<amrex::Real> U_minus_z = tmp_U_minus_z.array(mfi);
         const amrex::Array4<amrex::Real> U_plus_z = tmp_U_plus_z.array(mfi);
-#else
+#elif defined(WARPX_DIM_1D_Z)
         const amrex::Array4<amrex::Real> U_minus_z = tmp_U_minus_z.array(mfi);
         const amrex::Array4<amrex::Real> U_plus_z = tmp_U_plus_z.array(mfi);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        const amrex::Array4<amrex::Real> U_minus_x = tmp_U_minus_x.array(mfi);
+        const amrex::Array4<amrex::Real> U_plus_x = tmp_U_plus_x.array(mfi);
 #endif
 
         amrex::ParallelFor(tile_box,
@@ -554,7 +568,7 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
                     // J represents are 4x4 matrices that show up in the advection
                     // equations written as a function of U = {N, Ux, Uy, Uz}:
                     // \partial_t U + Jx \partial_x U + Jy \partial_y U + Jz \partial_z U = 0
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
+#if !defined(WARPX_DIM_1D_Z)
                     const amrex::Real Vx = Ux/gamma;
                     // Compute the non-zero element of Jx
                     const amrex::Real J00x = Vx;
@@ -593,6 +607,8 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
                     const amrex::Real dU3y = ave( DownDy_U(N_arr,NUz_arr,Uz,i,j,k), UpDy_U(N_arr,NUz_arr,Uz,i,j,k) );
 
 #endif
+
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
                     const amrex::Real Vz = Uz/gamma;
                     // Compute the non-zero element of Jz
                     const amrex::Real J00z = Vz;
@@ -608,6 +624,7 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
                     const amrex::Real dU1z = ave( DownDz_U(N_arr,NUx_arr,Ux,i,j,k), UpDz_U(N_arr,NUx_arr,Ux,i,j,k) );
                     const amrex::Real dU2z = ave( DownDz_U(N_arr,NUy_arr,Uy,i,j,k), UpDz_U(N_arr,NUy_arr,Uy,i,j,k) );
                     const amrex::Real dU3z = ave( DownDz_U(N_arr,NUz_arr,Uz,i,j,k), UpDz_U(N_arr,NUz_arr,Uz,i,j,k) );
+#endif
 
 
                     // Select the specific implementation depending on dimensionality
@@ -653,9 +670,9 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
                     // then set the slope (dU) to to zero in that cell/direction
                     positivity_limiter (U_plus_z, U_minus_z,  N_arr, i, j, k, box_z, Ux, Uy, Uz, 2);
 
-#elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
 
-#if defined(WARPX_DIM_RZ)
+    #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                     const amrex::Real dr = dx[0];
                     const amrex::Real r = problo[0] + i * dr;
                     // Impose "none" boundaries
@@ -682,11 +699,12 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
                     // RZ sources:
                     const amrex::Real N_source =
                         (i != domain.smallEnd(0)) ? N_arr(i,j,k)*Vx/r : 0.0_rt;
-#else
+    #else
                     // Have no RZ-inertial source for primitive vars if in XZ
                     const amrex::Real N_source = 0.0;
-#endif
+    #endif
 
+    #if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                     // Compute U ([ N, U]) at the halfsteps (U_tilde) using the slopes (dU)
                     const amrex::Real  JdU0x = J00x*dU0x + J01x*dU1x + J02x*dU2x + J03x*dU3x;
                     const amrex::Real  JdU1x = J11x*dU1x;
@@ -715,7 +733,26 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
                     // then set the slope (dU) to to zero in that cell/direction
                     positivity_limiter (U_plus_z, U_minus_z,  N_arr, i, j, k, box_z, Ux, Uy, Uz, 2);
 
-#else
+    #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                    // Compute U ([ N, U]) at the halfsteps (U_tilde) using the slopes (dU)
+                    const amrex::Real  JdU0x = J00x*dU0x + J01x*dU1x + J02x*dU2x + J03x*dU3x;
+                    const amrex::Real  JdU1x = J11x*dU1x;
+                    const amrex::Real  JdU2x = J22x*dU2x;
+                    const amrex::Real  JdU3x = J33x*dU3x;
+                    const amrex::Real  U_tilde0 = N_arr(i,j,k)   - dt_over_dx_half*JdU0x - (dt/2.0_rt)*N_source;
+                    const amrex::Real  U_tilde1 = Ux - dt_over_dx_half*JdU1x;
+                    const amrex::Real  U_tilde2 = Uy - dt_over_dx_half*JdU2x;
+                    const amrex::Real  U_tilde3 = Uz - dt_over_dx_half*JdU3x;
+
+                    // Predict U at the cell edges (x)
+                    compute_U_edges(U_minus_x, U_plus_x, i, j, k, box_x, U_tilde0, U_tilde1, U_tilde2, U_tilde3, dU0x, dU1x, dU2x, dU3x,0);
+
+                    // Positivity Limiter for density N, if N_edge < 0,
+                    // then set the slope (dU) to to zero in that cell/direction
+                    positivity_limiter (U_plus_x, U_minus_x,  N_arr, i, j, k, box_x, Ux, Uy, Uz, 0);
+    #endif
+
+#elif defined(WARPX_DIM_1D_Z)
 
                     // Compute U ([ N, U]) at the halfsteps (U_tilde) using the slopes (dU)
                     const amrex::Real  JdU0z = J00z*dU0z + J01z*dU1z + J02z*dU2z + J03z*dU3z;
@@ -744,8 +781,10 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
 #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
                     set_U_edges_to_zero(U_minus_x, U_plus_x, i, j, k, box_x, 0);
                     set_U_edges_to_zero(U_minus_z, U_plus_z, i, j, k, box_z, 2);
-#else
+#elif defined(WARPX_DIM_1D_Z)
                     set_U_edges_to_zero(U_minus_z, U_plus_z, i, j, k, box_z, 2);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                    set_U_edges_to_zero(U_minus_x, U_plus_x, i, j, k, box_x, 2);
 #endif
                 }
             }
@@ -776,9 +815,12 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
         amrex::Array4<amrex::Real> const &U_plus_x = tmp_U_plus_x.array(mfi);
         amrex::Array4<amrex::Real> const &U_minus_z = tmp_U_minus_z.array(mfi);
         amrex::Array4<amrex::Real> const &U_plus_z = tmp_U_plus_z.array(mfi);
-#else
+#elif defined(WARPX_DIM_1D_Z)
         amrex::Array4<amrex::Real> const &U_minus_z = tmp_U_minus_z.array(mfi);
         amrex::Array4<amrex::Real> const &U_plus_z = tmp_U_plus_z.array(mfi);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        amrex::Array4<amrex::Real> const &U_minus_x = tmp_U_minus_x.array(mfi);
+        amrex::Array4<amrex::Real> const &U_plus_x = tmp_U_plus_x.array(mfi);
 #endif
 
         amrex::ParallelFor(tile_box,
@@ -877,7 +919,86 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
                 NUy_arr(i,j,k) = NUy_arr(i,j,k) - (dt/Vij)*(F2_plusx - F2_minusx + dF(U_minus_z,U_plus_z,i,j,k,clight,2,2)*S_Az);
                 NUz_arr(i,j,k) = NUz_arr(i,j,k) - (dt/Vij)*(F3_plusx - F3_minusx + dF(U_minus_z,U_plus_z,i,j,k,clight,3,2)*S_Az);
 
-#else
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+
+                // Compute the flux areas for RZ
+                // Cell-centered radius
+                const amrex::Real dr = dx[0];
+                const amrex::Real r = problo[0] + i * dr;
+                amrex::Real Vij = 0.0_rt;
+
+                // Volume element
+#if defined(WARPX_DIM_RCYLINDER)
+                if (i == domain.smallEnd(0)) {
+                    Vij = 2.0_rt*MathConst::pi*(dr/2.0_rt)*(dr/4.0_rt);
+                } else if (i == domain.bigEnd(0)+1) {
+                    Vij = 2.0_rt*MathConst::pi*(r - dr/4.0_rt)*(dr/2.0_rt);
+                }  else {
+                    Vij = 2.0_rt*MathConst::pi*r*dr;
+                }
+#elif defined(WARPX_DIM_RSPHERE)
+                if (i == domain.smallEnd(0)) {
+                    Vij = 4.0_rt/3.0_rt*MathConst::pi*(dr/2.0_rt)*(dr/2.0_rt)*(dr/2.0_rt);
+                } else if (i == domain.bigEnd(0)+1) {
+                    Vij = 2.0_rt*MathConst::pi*r*r*dr;
+                }  else {
+                    Vij = 4.0_rt*MathConst::pi*r*r*dr;
+                }
+#endif
+
+                // Radial Surfaces
+#if defined(WARPX_DIM_RCYLINDER)
+                amrex::Real S_Ar_plus = 2.0_rt*MathConst::pi*(r + dr/2.0_rt);
+                amrex::Real S_Ar_minus = 2.0_rt*MathConst::pi*(r - dr/2.0_rt);
+                if (i == domain.smallEnd(0)) {
+                    S_Ar_minus = 0.0_rt;
+                }
+                if (i == domain.bigEnd(0)+1) {
+                    S_Ar_plus = 2.0_rt*MathConst::pi*(r);
+                }
+#elif defined(WARPX_DIM_RSPHERE)
+                amrex::Real S_Ar_plus = 4.0_rt*MathConst::pi*(r + dr/2.0_rt)*(r + dr/2.0_rt);
+                amrex::Real S_Ar_minus = 4.0_rt*MathConst::pi*(r - dr/2.0_rt)*(r - dr/2.0_rt);
+                if (i == domain.smallEnd(0)) {
+                    S_Ar_minus = 0.0_rt;
+                }
+                if (i == domain.bigEnd(0)+1) {
+                    S_Ar_plus = 4.0_rt*MathConst::pi*(r*r);
+                }
+#endif
+
+                // Impose "none" boundaries
+                // Condition: Vx(r) = 0 at boundaries
+                const amrex::Real Vx_I_minus = V_calc(U_minus_x,i,j,k,0,clight);
+                const amrex::Real Vx_L_plus = V_calc(U_plus_x,i-1,j,k,0,clight);
+
+                // compute the fluxes:
+                // (note that _plus is shifted due to grid location)
+                amrex::Real Vx_L_minus = 0.0_rt, Vx_I_plus = 0.0_rt;
+                amrex::Real F0_minusx = 0.0_rt, F1_minusx = 0.0_rt, F2_minusx = 0.0_rt, F3_minusx = 0.0_rt;
+                amrex::Real F0_plusx = 0.0_rt, F1_plusx = 0.0_rt, F2_plusx = 0.0_rt, F3_plusx = 0.0_rt;
+                if (i != domain.smallEnd(0)) {
+                    Vx_L_minus = V_calc(U_minus_x,i-1,j,k,0,clight);
+                    F0_minusx = flux_N(  U_minus_x, U_plus_x, i-1, j, k, Vx_L_minus, Vx_L_plus)*S_Ar_minus;
+                    F1_minusx = flux_NUx(U_minus_x, U_plus_x, i-1, j, k, Vx_L_minus, Vx_L_plus)*S_Ar_minus;
+                    F2_minusx = flux_NUy(U_minus_x, U_plus_x, i-1, j, k, Vx_L_minus, Vx_L_plus)*S_Ar_minus;
+                    F3_minusx = flux_NUz(U_minus_x, U_plus_x, i-1, j, k, Vx_L_minus, Vx_L_plus)*S_Ar_minus;
+                }
+                if (i < domain.bigEnd(0)) {
+                    Vx_I_plus = V_calc(U_plus_x,i,j,k,0,clight);
+                    F0_plusx  = flux_N(  U_minus_x, U_plus_x, i  , j, k, Vx_I_minus, Vx_I_plus)*S_Ar_plus;
+                    F1_plusx  = flux_NUx(U_minus_x, U_plus_x, i  , j, k, Vx_I_minus, Vx_I_plus)*S_Ar_plus;
+                    F2_plusx  = flux_NUy(U_minus_x, U_plus_x, i  , j, k, Vx_I_minus, Vx_I_plus)*S_Ar_plus;
+                    F3_plusx  = flux_NUz(U_minus_x, U_plus_x, i  , j, k, Vx_I_minus, Vx_I_plus)*S_Ar_plus;
+                }
+
+                // Update the conserved variables from tn -> tn + dt
+                N_arr(i,j,k) = N_arr(i,j,k)     - (dt/Vij)*(F0_plusx - F0_minusx);
+                NUx_arr(i,j,k) = NUx_arr(i,j,k) - (dt/Vij)*(F1_plusx - F1_minusx);
+                NUy_arr(i,j,k) = NUy_arr(i,j,k) - (dt/Vij)*(F2_plusx - F2_minusx);
+                NUz_arr(i,j,k) = NUz_arr(i,j,k) - (dt/Vij)*(F3_plusx - F3_minusx);
+
+#elif defined(WARPX_DIM_1D_Z)
 
                 // Update the conserved variables Q = [N, NU] from tn -> tn + dt
                 N_arr(i,j,k) = N_arr(i,j,k) - dt_over_dz*dF(U_minus_z,U_plus_z,i,j,k,clight,0,2);
@@ -892,7 +1013,7 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
 
 
 // Momentum source due to curvature
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
 void WarpXFluidContainer::centrifugal_source_rz (ablastr::fields::MultiFabRegister& fields, int lev)
 {
     using ablastr::fields::Direction;
@@ -1111,10 +1232,14 @@ void WarpXFluidContainer::GatherAndPush (
                             const amrex::Real x = problo[0] + i * dx[0];
                             const amrex::Real y = 0.0_rt;
                             const amrex::Real z = problo[1] + j * dx[1];
-#else
+#elif defined(WARPX_DIM_1D_Z)
                             const amrex::Real x = 0.0_rt;
                             const amrex::Real y = 0.0_rt;
                             const amrex::Real z = problo[0] + i * dx[0];
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                            const amrex::Real x = problo[0] + i * dx[0];
+                            const amrex::Real y = 0.0_rt;
+                            const amrex::Real z = 0.0_rt;
 #endif
 
                             // Get the lab frame E and B
@@ -1172,10 +1297,14 @@ void WarpXFluidContainer::GatherAndPush (
                             const amrex::Real x = problo[0] + i * dx[0];
                             const amrex::Real y = 0.0_rt;
                             const amrex::Real z = problo[1] + j * dx[1];
-#else
+#elif defined(WARPX_DIM_1D_Z)
                             const amrex::Real x = 0.0_rt;
                             const amrex::Real y = 0.0_rt;
                             const amrex::Real z = problo[0] + i * dx[0];
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                            const amrex::Real x = problo[0] + i * dx[0];
+                            const amrex::Real y = 0.0_rt;
+                            const amrex::Real z = 0.0_rt;
 #endif
 
                             Ex_Nodal += Exfield_parser(x, y, z, t);
@@ -1193,10 +1322,14 @@ void WarpXFluidContainer::GatherAndPush (
                             const amrex::Real x = problo[0] + i * dx[0];
                             const amrex::Real y = 0.0_rt;
                             const amrex::Real z = problo[1] + j * dx[1];
-#else
+#elif defined(WARPX_DIM_1D_Z)
                             const amrex::Real x = 0.0_rt;
                             const amrex::Real y = 0.0_rt;
                             const amrex::Real z = problo[0] + i * dx[0];
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                            const amrex::Real x = problo[0] + i * dx[0];
+                            const amrex::Real y = 0.0_rt;
+                            const amrex::Real z = 0.0_rt;
 #endif
 
                             Bx_Nodal += Bxfield_parser(x, y, z, t);
@@ -1211,7 +1344,7 @@ void WarpXFluidContainer::GatherAndPush (
                     amrex::Real tmp_Uz = (NUz_arr(i, j, k) / N_arr(i,j,k));
 
                     // Enforce RZ boundary conditions
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                     if  ( i == 0 ){
                         Ex_Nodal = 0.0;
                         Ey_Nodal = 0.0;

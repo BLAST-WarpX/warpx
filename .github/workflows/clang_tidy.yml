@@ -5,15 +5,17 @@ on:
     branches:
       - "development"
   pull_request:
-    paths-ignore:
-      - "Docs/**"
-      - "**.rst"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-clangtidy
   cancel-in-progress: true
 
 jobs:
+
+  check_changes:
+    name: Analyze
+    uses: ./.github/workflows/check_changes.yml
+
   run_clang_tidy:
     strategy:
       matrix:
@@ -21,7 +23,8 @@ jobs:
     name: clang-tidy-${{ matrix.dim }}D
     runs-on: ubuntu-24.04
     timeout-minutes: 250
-    if: github.event.pull_request.draft == false
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies

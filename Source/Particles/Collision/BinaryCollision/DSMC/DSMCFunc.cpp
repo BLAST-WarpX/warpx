@@ -56,15 +56,29 @@ DSMCFunc::DSMCFunc (
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::INVALID,
                                         "Cannot add an unknown scattering process type");
 
-        // Only one reaction that produces a new species is currently supported as part of a given collision set.
         if (process.type() == ScatteringProcessType::IONIZATION || process.type() == ScatteringProcessType::CHARGE_EXCHANGE) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                !reaction_produces_new_species,
-                "DSMC only supports a single reaction that produces a new species"
-            );
+            // Only one ionization process is currently supported as part of a given
+            // collision set.
+            if (reaction_produces_new_species) {
+                amrex::Abort("Multiple reactions that produce new species were specified in " + collision_name +
+                ".scattering_processes, but DSMC only supports a single reaction that produces new species.");
+            }
             reaction_produces_new_species = true;
+        }
 
-            // And add a check that the mass and charge of the products is consistent with the charge and mass of the incident particle
+        if (process.type() == ScatteringProcessType::IONIZATION) {
+            // Ensure that the first product species is always an electron (which is assumed
+            // during the scattering operation).
+            amrex::Vector<std::string> product_species_names;
+            pp_collision_name.getarr("product_species", product_species_names);
+            auto& species1 = mypc->GetParticleContainerFromName(product_species_names[0]);
+            if(species1.AmIA<PhysicalSpecies::electron>() == false) {
+                amrex::Abort("The first species in " + collision_name + ".product_species must be an electron, " +
+                "and must be marked as such with species_type=electron.");
+            }
+
+            // TODO: add a check that the ionization species has the same mass
+            // (and a positive charge), compared to the target species
         }
 
         m_scattering_processes.push_back(std::move(process));
