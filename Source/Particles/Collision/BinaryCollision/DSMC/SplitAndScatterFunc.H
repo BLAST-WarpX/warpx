@@ -289,7 +289,7 @@ public:
 
                 // create a copy of the other product species at the location of species 2
                 const auto product2_index = products_np_data[3] + with_product_p_offsets[i];
-                copy_species1[3](soa_products_data[3], soa_2, static_cast<int>(p_pair_indices_2[i]),
+                copy_species2[3](soa_products_data[3], soa_2, static_cast<int>(p_pair_indices_2[i]),
                                 static_cast<int>(product2_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
                 soa_products_data[3].m_rdata[PIdx::w][product2_index] = p_pair_reaction_weight[i];
