@@ -7,10 +7,9 @@
 #
 # License: BSD-3-Clause-LBNL
 #
-# This is a script that analyses the results from a simulation of
-# a uniform thermal plasma in a 2D box with four symmetry boundaries
-# using the exactly energy conserving EM implicit solver using the
-# exactly charge conserving villasenor deposition with shape = 2.
+# This script analyses conservation of energy and charge from simulations of
+# a uniform thermal plasma using the exactly energy-conserving EM implicit method
+# in 1D, 2D, or 3D with any combination of periodic and symmetry boundaries.
 import sys
 
 import numpy as np
@@ -45,9 +44,10 @@ data = ds.covering_grid(
 divE = data["boxlib", "divE"].value
 rho = data["boxlib", "rho"].value
 num = data["boxlib", "num_electrons"].value
-dLx = ds.domain_right_edge[0] - ds.domain_left_edge[0]
-dLz = ds.domain_right_edge[1] - ds.domain_left_edge[1]
-dV = dLx.value * dLz.value
+Lx = ds.domain_right_edge[0] - ds.domain_left_edge[0]
+Ly = ds.domain_right_edge[1] - ds.domain_left_edge[1]
+Lz = ds.domain_right_edge[2] - ds.domain_left_edge[2]
+dV = Lx.value * Ly.value * Lz.value
 ne0 = num.sum() / dV
 
 # compute local error in Gauss's law
@@ -55,8 +55,9 @@ drho = (rho - epsilon_0 * divE) / e / ne0
 
 # compute RMS on in error on the grid
 nX = drho.shape[0]
-nZ = drho.shape[1]
-drho2_avg = (drho**2).sum() / (nX * nZ)
+nY = drho.shape[1]
+nZ = drho.shape[2]
+drho2_avg = (drho**2).sum() / (nX * nY * nZ)
 drho_rms = np.sqrt(drho2_avg)
 
 print(f"rms error in charge conservation: {drho_rms}")
