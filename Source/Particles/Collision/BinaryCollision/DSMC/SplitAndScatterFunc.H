@@ -121,13 +121,13 @@ public:
             num_added_vec[i] += static_cast<int>(num_added);
         }
 
-        // resize the particle tiles to accomodate the new particles, for the colliding species
-        for (int i = 0; i < 2; i++)
-        {
-            tile_products[i]->resize(products_np[i] + num_added_vec[i]);
-        }
-        // resize the particle tiles to accomodate the new particles, for the product species
-        for (int i = 2; i < m_num_product_species; i++)
+        // resize the particle tiles to accomodate the new particles
+        // The code works correctly, even if the same species appears
+        // several times in the product species list.
+        // (e.g., for e- + H -> 2 e- + H+, the product species list is [e-, H, e-, H+])
+        // In that case, the species that appears multiple times is resized several times ;
+        // `products_np` keeps track of array positions at which it has been resized.
+        for (int i = 0; i < m_num_product_species; i++)
         {
             products_np[i] = tile_products[i]->numParticles();
             tile_products[i]->resize(products_np[i] + num_added_vec[i]);
