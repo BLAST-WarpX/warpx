@@ -170,10 +170,6 @@ public:
         if (num_product_species > 2) {
             m_ioniz_product1 = pc_products[2]->getMass();
             m_ioniz_product2 = pc_products[3]->getMass();
-            // Ensure that the first product species is always an electron (which is assumed
-            // during the scattering operation).
-            AMREX_ALWAYS_ASSERT_WITH_MESSAGE(pc_products[2]->getCharge() < 0.0,
-                "The first product species must be an electron.");
         }
 
         // First perform all non-product producing collisions

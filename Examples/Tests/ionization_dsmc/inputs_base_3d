@@ -40,11 +40,10 @@ boundary.particle_lo = periodic periodic periodic
 #################################
 particles.species_names = electrons ions neutrals
 
-electrons.charge = -q_e
+electrons.species_type = electron
 electrons.density = 1e+14
 electrons.initialize_self_fields = 0
 electrons.injection_style = nuniformpercell
-electrons.mass = m_e
 electrons.momentum_distribution_type = gaussian
 electrons.num_particles_per_cell_each_dim = 5 5 5
 electrons.profile = constant

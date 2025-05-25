@@ -127,6 +127,7 @@ public:
             m_product_species.insert( m_product_species.begin(), m_species_names.begin(), m_species_names.end() );
             // Note that, if a species is both a colliding species and a product species
             // (e.g., e- in e- + H -> 2 e- + H+) then it will be listed twice in `m_product_species`.
+            // (e.g., m_product_species = [e-, H, e-, H+])
             // The code for ionization in `SplitAndScatterFunc` handles this case correctly.
         }
         m_have_product_species = !m_product_species.empty();

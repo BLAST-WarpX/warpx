@@ -74,9 +74,8 @@ H2.uz = 0
 H2.zmin = 0
 H2.zmax = gas_length
 
+electrons.species_type = electron
 electrons.injection_style = none
-electrons.mass = m_e
-electrons.charge = -q_e
 
 #############################
 # Add diagnostics
