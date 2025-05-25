@@ -281,14 +281,14 @@ public:
             else if (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE))
             {
                 // create a copy of the first product species at the location of species 1
-                const auto product1_index = products_np[2] + with_product_p_offsets[i];
+                const auto product1_index = products_np_data[2] + with_product_p_offsets[i];
                 copy_species1[2](soa_products_data[2], soa_1, static_cast<int>(p_pair_indices_1[i]),
                                 static_cast<int>(product1_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
                 soa_products_data[2].m_rdata[PIdx::w][product1_index] = p_pair_reaction_weight[i];
 
                 // create a copy of the other product species at the location of species 2
-                const auto product2_index = products_np[3] + with_product_p_offsets[i];
+                const auto product2_index = products_np_data[3] + with_product_p_offsets[i];
                 copy_species1[3](soa_products_data[3], soa_2, static_cast<int>(p_pair_indices_2[i]),
                                 static_cast<int>(product2_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
