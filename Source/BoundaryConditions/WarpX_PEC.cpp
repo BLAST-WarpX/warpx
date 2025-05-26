@@ -342,7 +342,7 @@ namespace
     }
 
     /**
-     * \brief Reflect the J or Rho field value deposited to the guard cells back to their
+     * \brief Reflect the J or Rho field values deposited to the guard cells to their
      *        mirror location inside the domain at PEC or PMC boundaries.
      *
      *        PMC: -Rho/J_parallel deposited to guard region is added to its mirror location.
@@ -412,7 +412,7 @@ namespace
     }
 
     /**
-     * \brief Set the J or Rho field value in the guard cells consistent with the
+     * \brief Set the J or Rho field values in the guard cells consistent with the
      *        assumed symmetries associated with PEC or PMC boundaries.
      *
      *        PMC: -Rho/J_parallel in guard region is equal to Rho/J_parallel at
