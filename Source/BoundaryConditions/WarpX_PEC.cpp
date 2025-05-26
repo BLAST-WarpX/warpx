@@ -777,13 +777,11 @@ PEC::ApplyReflectiveBoundarytoRhofield (
                 amrex::Box rho_box = amrex::convert(mfi.validbox(),rho_nodal);
                 if (iside==0) {
                     if (node_box.smallEnd()[idim] != domain_lo[idim]) { continue; }
-                    rho_box.setSmall(idim,domain_lo[idim]);
                     rho_box.setBig(idim,domain_lo[idim]+Ng[idim]);
                 }
                 else if (iside==1) {
                     if (node_box.bigEnd()[idim] != domain_hi[idim]) { continue; }
                     rho_box.setSmall(idim,domain_hi[idim]-Ng[idim]);
-                    rho_box.setBig(idim,domain_hi[idim]);
                 }
 
                 // Grow Rho box to include guard cells in dir transverse to boundary
@@ -827,13 +825,11 @@ PEC::ApplyReflectiveBoundarytoRhofield (
                 amrex::Box rho_box = amrex::convert(mfi.validbox(),rho_nodal);
                 if (iside==0) {
                     if (node_box.smallEnd()[idim] != domain_lo[idim]) { continue; }
-                    rho_box.setSmall(idim,domain_lo[idim]);
                     rho_box.setBig(idim,domain_lo[idim]+Ng[idim]);
                 }
                 else if (iside==1) {
                     if (node_box.bigEnd()[idim] != domain_hi[idim]) { continue; }
                     rho_box.setSmall(idim,domain_hi[idim]-Ng[idim]);
-                    rho_box.setBig(idim,domain_hi[idim]);
                 }
 
                 // Grow Rho box to include guard cells in dir transverse to boundary
@@ -1049,9 +1045,6 @@ PEC::ApplyReflectiveBoundarytoJfield (
                 amrex::Box Jz_box = amrex::convert(mfi.validbox(),Jz_nodal);
                 if (iside==0) {
                     if (node_box.smallEnd()[idim] != domain_lo[idim]) { continue; }
-                    Jx_box.setSmall(idim,domain_lo[idim]);
-                    Jy_box.setSmall(idim,domain_lo[idim]);
-                    Jz_box.setSmall(idim,domain_lo[idim]);
                     Jx_box.setBig(idim,domain_lo[idim] + Ng[idim] + Jx_nodal[idim] - 1);
                     Jy_box.setBig(idim,domain_lo[idim] + Ng[idim] + Jy_nodal[idim] - 1);
                     Jz_box.setBig(idim,domain_lo[idim] + Ng[idim] + Jz_nodal[idim] - 1);
@@ -1061,9 +1054,6 @@ PEC::ApplyReflectiveBoundarytoJfield (
                     Jx_box.setSmall(idim,domain_hi[idim] - Ng[idim]);
                     Jy_box.setSmall(idim,domain_hi[idim] - Ng[idim]);
                     Jz_box.setSmall(idim,domain_hi[idim] - Ng[idim]);
-                    Jx_box.setBig(idim,domain_hi[idim] + Jx_nodal[idim] - 1);
-                    Jy_box.setBig(idim,domain_hi[idim] + Jy_nodal[idim] - 1);
-                    Jz_box.setBig(idim,domain_hi[idim] + Jz_nodal[idim] - 1);
                 }
 
                 // Grow J boxes to include guard cells in dir transverse to boundary
@@ -1133,9 +1123,6 @@ PEC::ApplyReflectiveBoundarytoJfield (
                 amrex::Box Jz_box = amrex::convert(mfi.validbox(),Jz_nodal);
                 if (iside==0) {
                     if (node_box.smallEnd()[idim] != domain_lo[idim]) { continue; }
-                    Jx_box.setSmall(idim,domain_lo[idim]);
-                    Jy_box.setSmall(idim,domain_lo[idim]);
-                    Jz_box.setSmall(idim,domain_lo[idim]);
                     Jx_box.setBig(idim,domain_lo[idim] + Ng[idim] + Jx_nodal[idim] - 1);
                     Jy_box.setBig(idim,domain_lo[idim] + Ng[idim] + Jy_nodal[idim] - 1);
                     Jz_box.setBig(idim,domain_lo[idim] + Ng[idim] + Jz_nodal[idim] - 1);
@@ -1145,9 +1132,6 @@ PEC::ApplyReflectiveBoundarytoJfield (
                     Jx_box.setSmall(idim,domain_hi[idim] - Ng[idim]);
                     Jy_box.setSmall(idim,domain_hi[idim] - Ng[idim]);
                     Jz_box.setSmall(idim,domain_hi[idim] - Ng[idim]);
-                    Jx_box.setBig(idim,domain_hi[idim] + Jx_nodal[idim] - 1);
-                    Jy_box.setBig(idim,domain_hi[idim] + Jy_nodal[idim] - 1);
-                    Jz_box.setBig(idim,domain_hi[idim] + Jz_nodal[idim] - 1);
                 }
 
                 // Grow J boxes to include guard cells in dir transverse to boundary
