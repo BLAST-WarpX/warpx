@@ -368,36 +368,44 @@ namespace
      */
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     void ReflectJorRho (const int n,
-                  const amrex::IntVect & ijk_vec,
-                        amrex::Array4<amrex::Real> const& field,
-                  const amrex::IntVect & ijk_mirror,
-                  const int psign,
-                  [[maybe_unused]]int const idim,
-                  [[maybe_unused]]int const iside,
-                  [[maybe_unused]]int const is_nodal_r,
-                        amrex::Box const& fabbox)
+                        const amrex::IntVect & ijk_vec,
+                              amrex::Array4<amrex::Real> const& field,
+                        const amrex::GpuArray<int,2> & mirrorfac,
+                        const amrex::GpuArray<int,2> & is_reflective,
+                        const amrex::GpuArray<amrex::Real,2> & psign,
+                        [[maybe_unused]]int const idim,
+                        [[maybe_unused]]int const is_nodal_r,
+                              amrex::Box const& fabbox)
     {
 
-        // Update the cell if the mirror guard cell exists
-        if (ijk_vec == ijk_mirror && psign == -1) {
-            field(ijk_vec,n) = 0._rt;
-        } else if (fabbox.contains(ijk_mirror)) {
-            // Note that this includes the cells on the boundary for PMC
-            amrex::Real rscale = 1._rt;
+        for (int iside = 0; iside < 2; ++iside) {
+
+            if (!is_reflective[iside]) { continue; }
+
+            amrex::IntVect ijk_mirror = ijk_vec;
+            ijk_mirror[idim] = mirrorfac[iside] - ijk_vec[idim];
+
+            // Update the cell if the mirror guard cell exists
+            if (ijk_vec == ijk_mirror && psign[iside] == -1) {
+                field(ijk_vec,n) = 0._rt;
+            } else if (fabbox.contains(ijk_mirror)) {
+                // Note that this includes the cells on the boundary for PMC
+                amrex::Real rscale = 1._rt;
 #if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            if (idim == 0 && iside == 1) {
-                // Account for different dV at different radii
-                amrex::Real const rshift = (is_nodal_r ? 0.0_rt : 0.5_rt);
-                const amrex::Real rvalid = ijk_vec[idim] + rshift;
-                const amrex::Real rmirror = ijk_mirror[idim] + rshift;
-                rscale = rmirror/rvalid;
+                if (idim == 0 && iside == 1) {
+                    // Account for different dV at different radii
+                    amrex::Real const rshift = (is_nodal_r ? 0.0_rt : 0.5_rt);
+                    const amrex::Real rvalid = ijk_vec[idim] + rshift;
+                    const amrex::Real rmirror = ijk_mirror[idim] + rshift;
+                    rscale = rmirror/rvalid;
 #if defined(WARPX_DIM_RSPHERE)
-                rscale *= rmirror/rvalid;
+                    rscale *= rmirror/rvalid;
 #endif
+                }
+#endif
+                // Reflected J/rho deposited to guard cell to mirror valid cell
+                field(ijk_vec,n) += rscale * psign[iside] * field(ijk_mirror,n);
             }
-#endif
-            // Reflected J/rho deposited to guard cell to mirror valid cell
-            field(ijk_vec,n) += rscale * psign * field(ijk_mirror,n);
         }
     }
 
@@ -434,33 +442,41 @@ namespace
     void SetJorRho (const int n,
                     const amrex::IntVect & ijk_vec,
                           amrex::Array4<amrex::Real> const& field,
-                    const amrex::IntVect & ijk_mirror,
-                    const int psign,
+                    const amrex::GpuArray<int,2> & mirrorfac,
+                    const amrex::GpuArray<int,2> & is_reflective,
+                    const amrex::GpuArray<amrex::Real,2> & psign,
                     [[maybe_unused]]int const idim,
-                    [[maybe_unused]]int const iside,
                     [[maybe_unused]]int const is_nodal_r,
                           amrex::Box const& fabbox)
     {
 
-        // Update the cell if the mirror guard cell exists
-        if ( (ijk_vec == ijk_mirror) && (psign == -1) ) {
-            field(ijk_mirror,n) = 0.0;
-        }
-        else if ( (ijk_vec != ijk_mirror) && (fabbox.contains(ijk_mirror)) ) {
-            amrex::Real inv_rscale = 1._rt;
-#if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            if (idim == 0 && iside == 1) {
-                // Account for different dV at different radii
-                amrex::Real const rshift = (is_nodal_r ? 0.0_rt : 0.5_rt);
-                const amrex::Real rvalid = ijk_vec[idim] + rshift;
-                const amrex::Real rmirror = ijk_mirror[idim] + rshift;
-                inv_rscale = rvalid/rmirror;
-#if defined(WARPX_DIM_RSPHERE)
-                inv_rscale *= rvalid/rmirror;
-#endif
+        for (int iside = 0; iside < 2; ++iside) {
+
+            if (!is_reflective[iside]) { continue; }
+
+            amrex::IntVect ijk_mirror = ijk_vec;
+            ijk_mirror[idim] = mirrorfac[iside] - ijk_vec[idim];
+
+            // Update the cell if the mirror guard cell exists
+            if ( (ijk_vec == ijk_mirror) && (psign[iside] == -1) ) {
+                field(ijk_mirror,n) = 0.0;
             }
+            else if ( (ijk_vec != ijk_mirror) && (fabbox.contains(ijk_mirror)) ) {
+                amrex::Real inv_rscale = 1._rt;
+#if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                if (idim == 0 && iside == 1) {
+                    // Account for different dV at different radii
+                    amrex::Real const rshift = (is_nodal_r ? 0.0_rt : 0.5_rt);
+                    const amrex::Real rvalid = ijk_vec[idim] + rshift;
+                    const amrex::Real rmirror = ijk_mirror[idim] + rshift;
+                    inv_rscale = rvalid/rmirror;
+#if defined(WARPX_DIM_RSPHERE)
+                    inv_rscale *= rvalid/rmirror;
 #endif
-            field(ijk_mirror,n) = inv_rscale * psign * field(ijk_vec,n);
+                }
+#endif
+                field(ijk_mirror,n) = inv_rscale * psign[iside] * field(ijk_vec,n);
+            }
         }
     }
 
@@ -768,46 +784,32 @@ PEC::ApplyReflectiveBoundarytoRhofield (
         //
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
 
-            for (int iside = 0; iside < 2; ++iside) {
+            if ( !is_reflective[idim][0] && !is_reflective[idim][1] ) { continue; }
 
-                if (!is_reflective[idim][iside]) { continue; }
+            if ( (node_box.smallEnd()[idim] != domain_lo[idim]) &&
+                 (node_box.bigEnd()[idim] != domain_hi[idim]) ) { continue; }
 
-                // Get node/Rho boxes, continue if node_box does not touch this boundary,
-                // else collapse Rho box to valid boundary region in idim direction
-                amrex::Box rho_box = amrex::convert(mfi.validbox(),rho_nodal);
-                if (iside==0) {
-                    if (node_box.smallEnd()[idim] != domain_lo[idim]) { continue; }
-                    rho_box.setBig(idim,domain_lo[idim]+Ng[idim]);
-                }
-                else if (iside==1) {
-                    if (node_box.bigEnd()[idim] != domain_hi[idim]) { continue; }
-                    rho_box.setSmall(idim,domain_hi[idim]-Ng[idim]);
-                }
-
-                // Grow Rho box to include guard cells in dir transverse to boundary
-                // !Required to get rho correct at domain corners touching multiple
-                // PEC/PMC boundaries!
-                for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
-                    if (jdim==idim) { continue; }
-                    rho_box.grow(jdim,Ng[jdim]);
-                }
-
-                auto const& rho_array = rho->array(mfi);
-
-                // Loop over cells and reflect Rho
-                amrex::ParallelFor(
-                rho_box, rho->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
-                {
-                    amrex::ignore_unused(j,k);
-                    const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
-                    amrex::IntVect iv_mirror = iv;
-                    iv_mirror[idim] = mirrorfac[idim][iside] - iv[idim];
-                    ::ReflectJorRho( n, iv, rho_array, iv_mirror,
-                                     psign[idim][iside], idim, iside,
-                                     rho_nodal[0], rho_fabbox );
-                });
-
+            // Get Rho box and grow to include guard cells in dir transverse to boundary
+            // Required to correctly reflect Rho at domain corners touching multiple
+            // PEC/PMC boundaries
+            amrex::Box rho_box = amrex::convert(mfi.validbox(),rho_nodal);
+            for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
+                if (jdim==idim) { continue; }
+                rho_box.grow(jdim,Ng[jdim]);
             }
+
+            auto const& rho_array = rho->array(mfi);
+
+            // Loop over cells and reflect Rho
+            amrex::ParallelFor(
+            rho_box, rho->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            {
+                amrex::ignore_unused(j,k);
+                const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
+                ::ReflectJorRho( n, iv, rho_array, mirrorfac[idim],
+                                 is_reflective[idim], psign[idim], idim,
+                                 rho_nodal[0], rho_fabbox );
+            });
 
         }
 
@@ -816,44 +818,30 @@ PEC::ApplyReflectiveBoundarytoRhofield (
         //
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
 
-            for (int iside = 0; iside < 2; ++iside) {
+            if ( !is_reflective[idim][0] && !is_reflective[idim][1] ) { continue; }
 
-                if (!is_reflective[idim][iside]) { continue; }
+            if ( (node_box.smallEnd()[idim] != domain_lo[idim]) &&
+                 (node_box.bigEnd()[idim] != domain_hi[idim]) ) { continue; }
 
-                // Get Rho box, continue if node_box does not touch this boundary,
-                // else collapse Rho box to valid boundary region in idim direction
-                amrex::Box rho_box = amrex::convert(mfi.validbox(),rho_nodal);
-                if (iside==0) {
-                    if (node_box.smallEnd()[idim] != domain_lo[idim]) { continue; }
-                    rho_box.setBig(idim,domain_lo[idim]+Ng[idim]);
-                }
-                else if (iside==1) {
-                    if (node_box.bigEnd()[idim] != domain_hi[idim]) { continue; }
-                    rho_box.setSmall(idim,domain_hi[idim]-Ng[idim]);
-                }
-
-                // Grow Rho box to include guard cells in dir transverse to boundary
-                for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
-                    if (jdim==idim) { continue; }
-                    rho_box.grow(jdim,Ng[jdim]);
-                }
-
-                auto const& rho_array = rho->array(mfi);
-
-                // Loop over cells and set Rho in guard cells
-                amrex::ParallelFor(
-                rho_box, rho->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
-                {
-                    amrex::ignore_unused(j,k);
-                    const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
-                    amrex::IntVect iv_mirror = iv;
-                    iv_mirror[idim] = mirrorfac[idim][iside] - iv[idim];
-                    ::SetJorRho( n, iv, rho_array, iv_mirror,
-                                 psign[idim][iside], idim, iside,
-                                 rho_nodal[0], rho_fabbox );
-                });
-
+            // Get Rho box and grow to include guard cells in dir transverse to boundary
+            amrex::Box rho_box = amrex::convert(mfi.validbox(),rho_nodal);
+            for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
+                if (jdim==idim) { continue; }
+                rho_box.grow(jdim,Ng[jdim]);
             }
+
+            auto const& rho_array = rho->array(mfi);
+
+            // Loop over cells and set Rho in guard cells
+            amrex::ParallelFor(
+            rho_box, rho->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            {
+                amrex::ignore_unused(j,k);
+                const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
+                ::SetJorRho( n, iv, rho_array, mirrorfac[idim],
+                             is_reflective[idim], psign[idim], idim,
+                             rho_nodal[0], rho_fabbox );
+            });
 
         }
 
@@ -1034,76 +1022,54 @@ PEC::ApplyReflectiveBoundarytoJfield (
         //
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
 
-            for (int iside = 0; iside < 2; ++iside) {
+            if ( !is_reflective[idim][0] && !is_reflective[idim][1] ) { continue; }
 
-                if (!is_reflective[idim][iside]) { continue; }
+            if ( (node_box.smallEnd()[idim] != domain_lo[idim]) &&
+                 (node_box.bigEnd()[idim] != domain_hi[idim]) ) { continue; }
 
-                // Get J boxes, continue if node_box does not touch this boundary,
-                // else collapse J boxes to valid boundary region in idim direction
-                amrex::Box Jx_box = amrex::convert(mfi.validbox(),Jx_nodal);
-                amrex::Box Jy_box = amrex::convert(mfi.validbox(),Jy_nodal);
-                amrex::Box Jz_box = amrex::convert(mfi.validbox(),Jz_nodal);
-                if (iside==0) {
-                    if (node_box.smallEnd()[idim] != domain_lo[idim]) { continue; }
-                    Jx_box.setBig(idim,domain_lo[idim] + Ng[idim] + Jx_nodal[idim] - 1);
-                    Jy_box.setBig(idim,domain_lo[idim] + Ng[idim] + Jy_nodal[idim] - 1);
-                    Jz_box.setBig(idim,domain_lo[idim] + Ng[idim] + Jz_nodal[idim] - 1);
-                }
-                else if (iside==1) {
-                    if (node_box.bigEnd()[idim] != domain_hi[idim]) { continue; }
-                    Jx_box.setSmall(idim,domain_hi[idim] - Ng[idim]);
-                    Jy_box.setSmall(idim,domain_hi[idim] - Ng[idim]);
-                    Jz_box.setSmall(idim,domain_hi[idim] - Ng[idim]);
-                }
-
-                // Grow J boxes to include guard cells in dir transverse to boundary
-                // !Required to get J correct at domain corners touching multiple
-                // PEC/PMC boundaries!
-                for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
-                    if (jdim==idim) { continue; }
-                    Jx_box.grow(jdim,Ng[jdim]);
-                    Jy_box.grow(jdim,Ng[jdim]);
-                    Jz_box.grow(jdim,Ng[jdim]);
-                }
-
-                auto const& Jx_array = Jx->array(mfi);
-                auto const& Jy_array = Jy->array(mfi);
-                auto const& Jz_array = Jz->array(mfi);
-
-                // Loop over cells and reflect J
-                amrex::ParallelFor(
-                Jx_box, Jx->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
-                {
-                    amrex::ignore_unused(j,k);
-                    const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
-                    amrex::IntVect iv_mirror = iv;
-                    iv_mirror[idim] = mirrorfac[idim][0][iside] - iv[idim];
-                    ::ReflectJorRho( n, iv, Jx_array, iv_mirror,
-                                     psign[idim][0][iside], idim, iside,
-                                     Jx_nodal[0], Jx_fabbox );
-                },
-                Jy_box, Jy->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
-                {
-                    amrex::ignore_unused(j,k);
-                    const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
-                    amrex::IntVect iv_mirror = iv;
-                    iv_mirror[idim] = mirrorfac[idim][1][iside] - iv[idim];
-                    ::ReflectJorRho( n, iv, Jy_array, iv_mirror,
-                                     psign[idim][1][iside], idim, iside,
-                                     Jy_nodal[0], Jy_fabbox );
-                },
-                Jz_box, Jz->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
-                {
-                    amrex::ignore_unused(j,k);
-                    const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
-                    amrex::IntVect iv_mirror = iv;
-                    iv_mirror[idim] = mirrorfac[idim][2][iside] - iv[idim];
-                    ::ReflectJorRho( n, iv, Jz_array, iv_mirror,
-                                     psign[idim][2][iside], idim, iside,
-                                     Jz_nodal[0], Jz_fabbox );
-                });
-
+            // Get J boxes and grow to include guard cells in dir transverse to boundary
+            // Required to properly reflect J at domain corners touching multiple
+            // PEC/PMC boundaries
+            amrex::Box Jx_box = amrex::convert(mfi.validbox(),Jx_nodal);
+            amrex::Box Jy_box = amrex::convert(mfi.validbox(),Jy_nodal);
+            amrex::Box Jz_box = amrex::convert(mfi.validbox(),Jz_nodal);
+            for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
+                if (jdim==idim) { continue; }
+                Jx_box.grow(jdim,Ng[jdim]);
+                Jy_box.grow(jdim,Ng[jdim]);
+                Jz_box.grow(jdim,Ng[jdim]);
             }
+
+            auto const& Jx_array = Jx->array(mfi);
+            auto const& Jy_array = Jy->array(mfi);
+            auto const& Jz_array = Jz->array(mfi);
+
+            // Loop over cells and reflect J
+            amrex::ParallelFor(
+            Jx_box, Jx->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            {
+                amrex::ignore_unused(j,k);
+                const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
+                ::ReflectJorRho( n, iv, Jx_array, mirrorfac[idim][0],
+                                 is_reflective[idim], psign[idim][0], idim,
+                                 Jx_nodal[0], Jx_fabbox );
+            },
+            Jy_box, Jy->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            {
+                amrex::ignore_unused(j,k);
+                const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
+                ::ReflectJorRho( n, iv, Jy_array, mirrorfac[idim][1],
+                                 is_reflective[idim], psign[idim][1], idim,
+                                 Jy_nodal[0], Jy_fabbox );
+            },
+            Jz_box, Jz->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            {
+                amrex::ignore_unused(j,k);
+                const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
+                ::ReflectJorRho( n, iv, Jz_array, mirrorfac[idim][2],
+                                 is_reflective[idim], psign[idim][2], idim,
+                                 Jz_nodal[0], Jz_fabbox );
+            });
 
         }
 
@@ -1112,74 +1078,54 @@ PEC::ApplyReflectiveBoundarytoJfield (
         //
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
 
-            for (int iside = 0; iside < 2; ++iside) {
+            if ( !is_reflective[idim][0] && !is_reflective[idim][1] ) { continue; }
 
-                if (!is_reflective[idim][iside]) { continue; }
+            if ( (node_box.smallEnd()[idim] != domain_lo[idim]) &&
+                 (node_box.bigEnd()[idim] != domain_hi[idim]) ) { continue; }
 
-                // Get J boxes, continue if node_box does not touch this boundary,
-                // else collapse J boxes to valid boundary region in idim direction
-                amrex::Box Jx_box = amrex::convert(mfi.validbox(),Jx_nodal);
-                amrex::Box Jy_box = amrex::convert(mfi.validbox(),Jy_nodal);
-                amrex::Box Jz_box = amrex::convert(mfi.validbox(),Jz_nodal);
-                if (iside==0) {
-                    if (node_box.smallEnd()[idim] != domain_lo[idim]) { continue; }
-                    Jx_box.setBig(idim,domain_lo[idim] + Ng[idim] + Jx_nodal[idim] - 1);
-                    Jy_box.setBig(idim,domain_lo[idim] + Ng[idim] + Jy_nodal[idim] - 1);
-                    Jz_box.setBig(idim,domain_lo[idim] + Ng[idim] + Jz_nodal[idim] - 1);
-                }
-                else if (iside==1) {
-                    if (node_box.bigEnd()[idim] != domain_hi[idim]) { continue; }
-                    Jx_box.setSmall(idim,domain_hi[idim] - Ng[idim]);
-                    Jy_box.setSmall(idim,domain_hi[idim] - Ng[idim]);
-                    Jz_box.setSmall(idim,domain_hi[idim] - Ng[idim]);
-                }
-
-                // Grow J boxes to include guard cells in dir transverse to boundary
-                for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
-                    if (jdim==idim) { continue; }
-                    Jx_box.grow(jdim,Ng[jdim]);
-                    Jy_box.grow(jdim,Ng[jdim]);
-                    Jz_box.grow(jdim,Ng[jdim]);
-                }
-
-                auto const& Jx_array = Jx->array(mfi);
-                auto const& Jy_array = Jy->array(mfi);
-                auto const& Jz_array = Jz->array(mfi);
-
-                // Loop over cells and set J in guard cells
-                amrex::ParallelFor(
-                Jx_box, Jx->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
-                {
-                    amrex::ignore_unused(j,k);
-                    const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
-                    amrex::IntVect iv_mirror = iv;
-                    iv_mirror[idim] = mirrorfac[idim][0][iside] - iv[idim];
-                    ::SetJorRho( n, iv, Jx_array, iv_mirror,
-                                 psign[idim][0][iside], idim, iside,
-                                 Jx_nodal[0], Jx_fabbox );
-                },
-                Jy_box, Jy->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
-                {
-                    amrex::ignore_unused(j,k);
-                    const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
-                    amrex::IntVect iv_mirror = iv;
-                    iv_mirror[idim] = mirrorfac[idim][1][iside] - iv[idim];
-                    ::SetJorRho( n, iv, Jy_array, iv_mirror,
-                                 psign[idim][1][iside], idim, iside,
-                                 Jy_nodal[0], Jy_fabbox );
-                },
-                Jz_box, Jz->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
-                {
-                    amrex::ignore_unused(j,k);
-                    const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
-                    amrex::IntVect iv_mirror = iv;
-                    iv_mirror[idim] = mirrorfac[idim][2][iside] - iv[idim];
-                    ::SetJorRho( n, iv, Jz_array, iv_mirror,
-                                 psign[idim][2][iside], idim, iside,
-                                 Jz_nodal[0], Jz_fabbox );
-                });
-
+            // Get J boxes and grow to include guard cells in dir transverse to boundary
+            // Required to properly reflect J at domain corners touching multiple
+            // PEC/PMC boundaries
+            amrex::Box Jx_box = amrex::convert(mfi.validbox(),Jx_nodal);
+            amrex::Box Jy_box = amrex::convert(mfi.validbox(),Jy_nodal);
+            amrex::Box Jz_box = amrex::convert(mfi.validbox(),Jz_nodal);
+            for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
+                if (jdim==idim) { continue; }
+                Jx_box.grow(jdim,Ng[jdim]);
+                Jy_box.grow(jdim,Ng[jdim]);
+                Jz_box.grow(jdim,Ng[jdim]);
             }
+
+            auto const& Jx_array = Jx->array(mfi);
+            auto const& Jy_array = Jy->array(mfi);
+            auto const& Jz_array = Jz->array(mfi);
+
+            // Loop over cells and set J in guard cells
+            amrex::ParallelFor(
+            Jx_box, Jx->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            {
+                amrex::ignore_unused(j,k);
+                const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
+                ::SetJorRho( n, iv, Jx_array, mirrorfac[idim][0],
+                             is_reflective[idim], psign[idim][0], idim,
+                             Jx_nodal[0], Jx_fabbox );
+            },
+            Jy_box, Jy->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            {
+                amrex::ignore_unused(j,k);
+                const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
+                ::SetJorRho( n, iv, Jy_array, mirrorfac[idim][1],
+                             is_reflective[idim], psign[idim][1], idim,
+                             Jy_nodal[0], Jy_fabbox );
+            },
+            Jz_box, Jz->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            {
+                amrex::ignore_unused(j,k);
+                const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
+                ::SetJorRho( n, iv, Jz_array, mirrorfac[idim][2],
+                             is_reflective[idim], psign[idim][2], idim,
+                             Jz_nodal[0], Jz_fabbox );
+            });
 
         }
 
