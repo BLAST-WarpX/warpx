@@ -359,10 +359,10 @@ namespace
      * \param[in] n                 index of the MultiFab component being updated
      * \param[in] ijk_vec           indices along the x(i), y(j), z(k) of the Rho/J Array4
      * \param[in out] field         field data to be updated
-     * \param[in] ijk_mirror        mirror indices
-     * \param[in] psign             whether the field value should be flipped across the boundary
+     * \param[in] mirrorfac         mirror cell indices given by mirrorfac - ijk_vec
+     * \param[in] is_reflective     whether the given boundary is reflective
+     * \param[in] psign             sign for reflecting the field value across the boundary
      * \param[in] idim              boundary direction
-     * \param[in] iside             boundary side
      * \param[in] is_nodal_r        whether data is nodal along r
      * \param[in] fabbox            multifab box including ghost cells
      */
@@ -382,13 +382,15 @@ namespace
 
             if (!is_reflective[iside]) { continue; }
 
+            // Get the mirror guard cell index
             amrex::IntVect ijk_mirror = ijk_vec;
             ijk_mirror[idim] = mirrorfac[iside] - ijk_vec[idim];
 
             // Update the cell if the mirror guard cell exists
             if (ijk_vec == ijk_mirror && psign[iside] == -1) {
                 field(ijk_vec,n) = 0._rt;
-            } else if (fabbox.contains(ijk_mirror)) {
+            }
+            else if (fabbox.contains(ijk_mirror)) {
                 // Note that this includes the cells on the boundary for PMC
                 amrex::Real rscale = 1._rt;
 #if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
@@ -431,10 +433,10 @@ namespace
      * \param[in] n                 index of the MultiFab component being updated
      * \param[in] ijk_vec           indices along the x(i), y(j), z(k) of the Rho/J Array4
      * \param[in out] field         field data to be updated
-     * \param[in] ijk_mirror        mirror indices
-     * \param[in] psign             whether the field value should be flipped across the boundary
+     * \param[in] mirrorfac         mirror cell indices given by mirrorfac - ijk_vec
+     * \param[in] is_reflective     whether the given boundary is reflective
+     * \param[in] psign             sign for reflecting the field value across the boundary
      * \param[in] idim              boundary direction
-     * \param[in] iside             boundary side
      * \param[in] is_nodal_r        whether data is nodal along r
      * \param[in] fabbox            multifab box including ghost cells
      */
@@ -454,11 +456,12 @@ namespace
 
             if (!is_reflective[iside]) { continue; }
 
+            // Get the mirror guard cell index
             amrex::IntVect ijk_mirror = ijk_vec;
             ijk_mirror[idim] = mirrorfac[iside] - ijk_vec[idim];
 
             // Update the cell if the mirror guard cell exists
-            if ( (ijk_vec == ijk_mirror) && (psign[iside] == -1) ) {
+            if (ijk_vec == ijk_mirror && psign[iside] == -1) {
                 field(ijk_mirror,n) = 0.0;
             }
             else if ( (ijk_vec != ijk_mirror) && (fabbox.contains(ijk_mirror)) ) {
@@ -695,9 +698,9 @@ PEC::ApplyPECtoBfield (
 
 
 /**
- * \brief Step 1: Reflect the Rho field value deposited to the guard cells back to
- *                their mirror location inside the domain at PEC and PMC boundaries.
- *        Step 2: Set the Rho field value in the guard cells consistent with the
+ * \brief Step 1: Reflect the Rho field values deposited to the guard cells to
+ *                their mirror locations inside the domain at PEC and PMC boundaries.
+ *        Step 2: Set the Rho field values in the guard cells consistent with the
  *                assumed symmetries associated with PEC and PMC boundaries.
  *
  *        PEC: This is an anti-symmetry boundary. Rho deposited to guard cells is
@@ -789,9 +792,9 @@ PEC::ApplyReflectiveBoundarytoRhofield (
             if ( (node_box.smallEnd()[idim] != domain_lo[idim]) &&
                  (node_box.bigEnd()[idim] != domain_hi[idim]) ) { continue; }
 
-            // Get Rho box and grow to include guard cells in dir transverse to boundary
-            // Required to correctly reflect Rho at domain corners touching multiple
-            // PEC/PMC boundaries
+            // Get Rho box and grow to include guard cells in directions transverse
+            // to this boundary. This is required to correctly reflect Rho at domain
+            // corners that touch multiple PEC/PMC boundaries.
             amrex::Box rho_box = amrex::convert(mfi.validbox(),rho_nodal);
             for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
                 if (jdim==idim) { continue; }
@@ -823,7 +826,7 @@ PEC::ApplyReflectiveBoundarytoRhofield (
             if ( (node_box.smallEnd()[idim] != domain_lo[idim]) &&
                  (node_box.bigEnd()[idim] != domain_hi[idim]) ) { continue; }
 
-            // Get Rho box and grow to include guard cells in dir transverse to boundary
+            // Get Rho box and grow to include guard cells in transverse dirs
             amrex::Box rho_box = amrex::convert(mfi.validbox(),rho_nodal);
             for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
                 if (jdim==idim) { continue; }
@@ -850,9 +853,9 @@ PEC::ApplyReflectiveBoundarytoRhofield (
 }
 
 /**
- * \brief Step 1: Reflect the J field value deposited to the guard cells back to
- *                their mirror location inside the domain at PEC and PMC boundaries.
- *        Step 2: Set the J field value in the guard cells consistent with the
+ * \brief Step 1: Reflect the J field values deposited to the guard cells to
+ *                their mirror locations inside the domain at PEC and PMC boundaries.
+ *        Step 2: Set the J field values in the guard cells consistent with the
  *                assumed symmetries associated with PEC and PMC boundaries.
  *
  *        PEC: This is an anti-symmetry boundary. Jparallel/Jperp to a boundary deposited
@@ -1027,9 +1030,9 @@ PEC::ApplyReflectiveBoundarytoJfield (
             if ( (node_box.smallEnd()[idim] != domain_lo[idim]) &&
                  (node_box.bigEnd()[idim] != domain_hi[idim]) ) { continue; }
 
-            // Get J boxes and grow to include guard cells in dir transverse to boundary
-            // Required to properly reflect J at domain corners touching multiple
-            // PEC/PMC boundaries
+            // Get J boxes and grow to include guard cells in directions transverse
+            // to this boundary. This is required to correctly reflect J at domain
+            // corners that touch multiple PEC/PMC boundaries.
             amrex::Box Jx_box = amrex::convert(mfi.validbox(),Jx_nodal);
             amrex::Box Jy_box = amrex::convert(mfi.validbox(),Jy_nodal);
             amrex::Box Jz_box = amrex::convert(mfi.validbox(),Jz_nodal);
@@ -1083,9 +1086,7 @@ PEC::ApplyReflectiveBoundarytoJfield (
             if ( (node_box.smallEnd()[idim] != domain_lo[idim]) &&
                  (node_box.bigEnd()[idim] != domain_hi[idim]) ) { continue; }
 
-            // Get J boxes and grow to include guard cells in dir transverse to boundary
-            // Required to properly reflect J at domain corners touching multiple
-            // PEC/PMC boundaries
+            // Get J boxes and grow to include guard cells in transverse dirs
             amrex::Box Jx_box = amrex::convert(mfi.validbox(),Jx_nodal);
             amrex::Box Jy_box = amrex::convert(mfi.validbox(),Jy_nodal);
             amrex::Box Jz_box = amrex::convert(mfi.validbox(),Jz_nodal);
