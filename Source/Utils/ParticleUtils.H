@@ -178,6 +178,14 @@ namespace ParticleUtils {
      * with potential U = a_deltaE and zero scattering angle
      * a_deltaE > 0 ==> need to take energy away
      * a_deltaE < 0 ==> need to add energy
+     *
+     * \param[in/out] ux1, uy1, uz1 momenta of first particle
+     * \param[in/out] ux2, uy2, uz2 momenta of second particle
+     * \param[in] a_wpmp1 mass time weight of the first particle
+     * \param[in] a_wpmp2 mass time weight of the second particle
+     * \param[in] a_Erel_frac fraction of the particles COM energy to distribute
+     * \param[in] a_Erel_cumm relative energy distribute so far
+     * \param[in/out] a_deltaE remaining amount of energy to be distributed in this species
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void ModifyEnergyPairwise( amrex::ParticleReal& ux1, amrex::ParticleReal& uy1, amrex::ParticleReal& uz1,

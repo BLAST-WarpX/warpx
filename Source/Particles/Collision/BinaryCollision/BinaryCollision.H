@@ -701,6 +701,10 @@ public:
                     index_type const cell_start_2 = cell_offsets_2[i_cell];
                     index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
 
+                    // Do not collide if one species is missing in the cell
+                    if ( cell_stop_1 - cell_start_1 < 1 ||
+                         cell_stop_2 - cell_start_2 < 1 ) { return; }
+
                     // ux from species1 can be accessed like this:
                     // ux_1[ indices_1[i] ], where i is between
                     // cell_start_1 (inclusive) and cell_start_2 (exclusive)
@@ -740,6 +744,10 @@ public:
                     }
 
                     // compute local energy and momentum
+                    px_in_each_cell[i_cell] = 0.0_prt;
+                    py_in_each_cell[i_cell] = 0.0_prt;
+                    pz_in_each_cell[i_cell] = 0.0_prt;
+                    KE_in_each_cell[i_cell] = 0.0_prt;
                     for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
                         px_in_each_cell[i_cell] += w1[ indices_1[i1] ]*u1x[ indices_1[i1] ]*m1;
                         py_in_each_cell[i_cell] += w1[ indices_1[i1] ]*u1y[ indices_1[i1] ]*m1;
@@ -756,10 +764,6 @@ public:
                                                                                                  u2y[ indices_2[i2] ],
                                                                                                  u2z[ indices_2[i2] ], m2);
                     }
-
-                    // Do not collide if one species is missing in the cell
-                    if ( cell_stop_1 - cell_start_1 < 1 ||
-                         cell_stop_2 - cell_start_2 < 1 ) { return; }
 
                     // shuffle
                     ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine);
@@ -865,6 +869,10 @@ public:
                     index_type const cell_start_2 = cell_offsets_2[i_cell];
                     index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
 
+                    // Do not do the rebalance if one species is missing in the cell
+                    if ( cell_stop_1 - cell_start_1 < 1 ||
+                         cell_stop_2 - cell_start_2 < 1 ) { return; }
+
                     // ux from species1 can be accessed like this:
                     // ux_1[ indices_1[i] ], where i is between
                     // cell_start_1 (inclusive) and cell_start_2 (exclusive)
@@ -880,9 +888,9 @@ public:
                     amrex::ParticleReal * const AMREX_RESTRICT u2y = soa_2.m_rdata[PIdx::uy];
                     amrex::ParticleReal * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];
 
-                    amrex::ParticleReal w1_sum = 0._prt;
-                    amrex::ParticleReal w2_sum = 0._prt;
-                    amrex::ParticleReal ww_weighted_sum = 0._prt;
+                    amrex::ParticleReal w1_sum = 0.0_prt;
+                    amrex::ParticleReal w2_sum = 0.0_prt;
+                    amrex::ParticleReal ww_weighted_sum = 0.0_prt;
 
                     // subract momentum from the initial values
                     // whatever is left over, will be distributed among the particles
@@ -953,6 +961,10 @@ public:
                         amrex::ParticleReal const energy_fraction_max = 0.5_prt;  // will be user input
 
                         // adjust species 1 particles to absorb deltaEp1
+                        // This loops over the species 1 particles, two at a time, distributing
+                        // the energy until all of it has been distributed.
+                        // The loop is setup to switch between even first and odd first pairs
+                        // each loop over the particles.
                         int loop_count = 0;
                         amrex::ParticleReal Erel_cumm = 0.0_prt;
                         amrex::ParticleReal fmult_fact = 1.0_prt;
