@@ -52,7 +52,7 @@ jobs:
         cd ${warpx_dir}
         git clone -b release https://gitlab.com/petsc/petsc.git petsc
         cd ${PETSC_DIR}
-        ./configure --with-fortran-bindings=no --with-x=no --with-mpi=0
+        ./configure --with-fortran-bindings=no --with-x=no --with-mpi=0 --with-debugging=1
         make -j 4
         # configure WarpX
         cd ${warpx_dir}
@@ -106,7 +106,7 @@ jobs:
         cd ${warpx_dir}
         git clone -b release https://gitlab.com/petsc/petsc.git petsc
         cd ${PETSC_DIR}
-        ./configure --with-fortran-bindings=no --with-x=no --with-cc=mpicc --with-fc=mpif90 --with-cxx=mpicxx
+        ./configure --with-fortran-bindings=no --with-x=no --with-cc=mpicc --with-fc=mpif90 --with-cxx=mpicxx --with-debugging=1
         make -j 4
         # configure WarpX
         cd ${warpx_dir}
