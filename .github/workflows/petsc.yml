@@ -1,4 +1,4 @@
-name: PETSc
+name: 🐧 PETSc
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
 
   test_petsc_gcc:
     name: GCC
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: check_changes
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
@@ -72,7 +72,7 @@ jobs:
 
   test_petsc_mpich:
     name: GCC + MPICH
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: check_changes
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
