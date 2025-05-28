@@ -829,7 +829,7 @@ PEC::ApplyReflectiveBoundarytoRhofield (
 
             // Get Rho box and grow to include guard cells in dims < idim
             amrex::Box rho_box = amrex::convert(mfi.validbox(),rho_nodal);
-            for (int jdim = idim; jdim < idim; ++jdim) {
+            for (int jdim = 0; jdim < idim; ++jdim) {
                 rho_box.grow(jdim,Ng[jdim]);
             }
 
