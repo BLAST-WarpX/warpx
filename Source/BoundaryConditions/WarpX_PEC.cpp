@@ -388,6 +388,7 @@ namespace
 
             // Update the cell if the mirror guard cell exists
             if (ijk_vec == ijk_mirror && psign[iside] == -1) {
+                // enforce zero since value is subtracted from itself
                 field(ijk_vec,n) = 0._rt;
             }
             else if (fabbox.contains(ijk_mirror)) {
