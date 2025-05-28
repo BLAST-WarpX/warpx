@@ -826,10 +826,9 @@ PEC::ApplyReflectiveBoundarytoRhofield (
             if ( (node_box.smallEnd()[idim] != domain_lo[idim]) &&
                  (node_box.bigEnd()[idim] != domain_hi[idim]) ) { continue; }
 
-            // Get Rho box and grow to include guard cells in transverse dirs
+            // Get Rho box and grow to include guard cells in transverse dirs < idim
             amrex::Box rho_box = amrex::convert(mfi.validbox(),rho_nodal);
-            for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
-                if (jdim==idim) { continue; }
+            for (int jdim = idim; jdim < idim; ++jdim) {
                 rho_box.grow(jdim,Ng[jdim]);
             }
 
@@ -1086,12 +1085,11 @@ PEC::ApplyReflectiveBoundarytoJfield (
             if ( (node_box.smallEnd()[idim] != domain_lo[idim]) &&
                  (node_box.bigEnd()[idim] != domain_hi[idim]) ) { continue; }
 
-            // Get J boxes and grow to include guard cells in transverse dirs
+            // Get J boxes and grow to include guard cells in transverse dirs < idim
             amrex::Box Jx_box = amrex::convert(mfi.validbox(),Jx_nodal);
             amrex::Box Jy_box = amrex::convert(mfi.validbox(),Jy_nodal);
             amrex::Box Jz_box = amrex::convert(mfi.validbox(),Jz_nodal);
-            for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
-                if (jdim==idim) { continue; }
+            for (int jdim = 0; jdim < idim; ++jdim) {
                 Jx_box.grow(jdim,Ng[jdim]);
                 Jy_box.grow(jdim,Ng[jdim]);
                 Jz_box.grow(jdim,Ng[jdim]);
