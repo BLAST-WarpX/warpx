@@ -387,12 +387,8 @@ namespace
             ijk_mirror[idim] = mirrorfac[iside] - ijk_vec[idim];
 
             // Update the cell if the mirror guard cell exists
-            if (ijk_vec == ijk_mirror && psign[iside] == -1) {
-                // enforce zero since value is subtracted from itself
-                field(ijk_vec,n) = 0._rt;
-            }
-            else if (fabbox.contains(ijk_mirror)) {
-                // Note that this includes the cells on the boundary for PMC
+            if (fabbox.contains(ijk_mirror)) {
+                // Note that this includes the cells on the boundary
                 amrex::Real rscale = 1._rt;
 #if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 if (idim == 0 && iside == 1) {
