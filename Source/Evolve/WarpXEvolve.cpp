@@ -76,42 +76,70 @@ namespace
         // Print the warning list right after the first step.
         amrex::Print() << ablastr::warn_manager::GetWMInstance().PrintGlobalWarnings("FIRST STEP");
     }
+
+    void StoreCurrent (int lev, ablastr::fields::MultiFabRegister& fields)
+    {
+        using ablastr::fields::Direction;
+        using warpx::fields::FieldType;
+
+        for (int idim = 0; idim < 3; ++idim) {
+            const auto dir = Direction{idim};
+            if (fields.has(FieldType::current_store, dir,lev)) {
+                MultiFab::Copy(*fields.get(FieldType::current_store, dir, lev),
+                               *fields.get(FieldType::current_fp, dir, lev),
+                               0, 0, 1, fields.get(FieldType::current_store, dir, lev)->nGrowVect());
+            }
+        }
+    }
+
+    void RestoreCurrent (int lev, ablastr::fields::MultiFabRegister& fields)
+    {
+        using ablastr::fields::Direction;
+        using warpx::fields::FieldType;
+
+        for (int idim = 0; idim < 3; ++idim) {
+            const auto dir = Direction{idim};
+            if (fields.has(FieldType::current_store, dir, lev)) {
+                std::swap(
+                    *fields.get(FieldType::current_fp, dir, lev),
+                    *fields.get(FieldType::current_store, dir, lev)
+                );
+            }
+        }
+    }
 }
 
 void
-WarpX::Synchronize () {
+WarpX::SynchronizeVelocityWithPosition () {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    // Note that this is potentially buggy since the PushP will do a field gather
-    // using particles that have been pushed but not yet checked at the boundaries.
-    // Also, this PushP may be inconsistent with the PushP backwards above since
-    // the fields may change between the two (mainly effecting the Python version when
-    // using electrostatics).
-    // When synchronize_velocity_for_diagnostics is true, the PushP at the end of the
-    // step is used so that the correct behavior is obtained.
-    FillBoundaryE(guard_cells.ng_FieldGather);
-    FillBoundaryB(guard_cells.ng_FieldGather);
-    if (fft_do_time_averaging)
-    {
-        FillBoundaryE_avg(guard_cells.ng_FieldGather);
-        FillBoundaryB_avg(guard_cells.ng_FieldGather);
+    if (!m_is_synchronized) {
+        // This assumes that the particle boundary conditions have been checked
+        // so that the field gather in PushP will be correct.
+        FillBoundaryE(guard_cells.ng_FieldGather);
+        FillBoundaryB(guard_cells.ng_FieldGather);
+        if (fft_do_time_averaging)
+        {
+            FillBoundaryE_avg(guard_cells.ng_FieldGather);
+            FillBoundaryB_avg(guard_cells.ng_FieldGather);
+        }
+        UpdateAuxilaryData();
+        FillBoundaryAux(guard_cells.ng_UpdateAux);
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            mypc->PushP(
+                lev,
+                0.5_rt*dt[lev],
+                *m_fields.get(FieldType::Efield_aux, Direction{0}, lev),
+                *m_fields.get(FieldType::Efield_aux, Direction{1}, lev),
+                *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
+                *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
+                *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
+                *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
+            );
+        }
+        m_is_synchronized = true;
     }
-    UpdateAuxilaryData();
-    FillBoundaryAux(guard_cells.ng_UpdateAux);
-    for (int lev = 0; lev <= finest_level; ++lev) {
-        mypc->PushP(
-            lev,
-            0.5_rt*dt[lev],
-            *m_fields.get(FieldType::Efield_aux, Direction{0}, lev),
-            *m_fields.get(FieldType::Efield_aux, Direction{1}, lev),
-            *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
-            *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
-            *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
-            *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
-        );
-    }
-    is_synchronized = true;
 }
 
 void
@@ -143,8 +171,20 @@ WarpX::Evolve (int numsteps)
 
         multi_diags->NewIteration();
 
+        bool verbose_step = (bool)verbose;
+        if (verbose && m_limit_verbose_step) {
+
+            int verbose_step_interval = 1;
+            if (step<10) { verbose_step_interval = 1; }
+            else if (step<100) { verbose_step_interval = 10; }
+            else { verbose_step_interval = 100; }
+
+            verbose_step = !((step+1)%verbose_step_interval);
+
+        }
+
         // Start loop on time steps
-        if (verbose) {
+        if (verbose_step) {
             amrex::Print() << "STEP " << step+1 << " starts ...\n";
         }
         ExecutePythonCallback("beforestep");
@@ -155,10 +195,10 @@ WarpX::Evolve (int numsteps)
         // This first synchronizes the position and velocity before setting the new timestep
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None &&
             !m_const_dt.has_value() && m_dt_update_interval.contains(step+1)) {
-            if (verbose) {
+            if (verbose_step) {
                 amrex::Print() << Utils::TextMsg::Info("updating timestep");
             }
-            Synchronize();
+            SynchronizeVelocityWithPosition();
             UpdateDtFromParticleSpeeds();
         }
 
@@ -233,23 +273,12 @@ WarpX::Evolve (int numsteps)
         // Resample particles
         // +1 is necessary here because value of step seen by user (first step is 1) is different than
         // value of step in code (first step is 0)
-        mypc->doResampling(Geom(), istep[0]+1, verbose);
+        mypc->doResampling(Geom(), istep[0]+1, verbose_step);
 
         if (evolve_scheme == EvolveScheme::Explicit) {
             applyMirrors(cur_time);
             // E : guard cells are NOT up-to-date
             // B : guard cells are NOT up-to-date
-        }
-
-        // TODO: move out
-        bool const end_of_step_loop = (step == numsteps_max - 1) || (cur_time + dt[0] >= stop_time - 1.e-3*dt[0]);
-        if (evolve_scheme == EvolveScheme::Explicit) {
-            // At the end of step loop, push p by 0.5*dt to synchronize
-            // This synchronization is not at the correct place since it is done before the window is moved,
-            // before particles are scraped, and before the electrostatic field update
-            if (end_of_step_loop && !synchronize_velocity_for_diagnostics) {
-                Synchronize();
-            }
         }
 
         for (int lev = 0; lev <= max_level; ++lev) {
@@ -267,8 +296,8 @@ WarpX::Evolve (int numsteps)
         }
         multi_diags->FilterComputePackFlush( step, false, true );
 
-        const bool move_j = is_synchronized;
-        // If is_synchronized we need to shift j too so that next step we can evolve E by dt/2.
+        const bool move_j = m_is_synchronized;
+        // If m_is_synchronized we need to shift j too so that next step we can evolve E by dt/2.
         // We might need to move j because we are going to make a plotfile.
         const int num_moved = MoveWindow(step+1, move_j);
 
@@ -320,12 +349,13 @@ WarpX::Evolve (int numsteps)
         }
 
         bool const do_diagnostic = (multi_diags->DoComputeAndPack(step) || reduced_diags->DoDiags(step));
+        bool const end_of_step_loop = (step == numsteps_max - 1) || (cur_time + dt[0] >= stop_time - 1.e-3*dt[0]);
         if (synchronize_velocity_for_diagnostics &&
             (do_diagnostic || end_of_step_loop)) {
             // When the diagnostics require synchronization, push p by 0.5*dt to synchronize.
             // Note that this will be undone at the start of the next step by the half v-push
             // backwards.
-            Synchronize();
+            SynchronizeVelocityWithPosition();
         }
 
         // afterstep callback runs with the updated global time. It is included
@@ -356,7 +386,7 @@ WarpX::Evolve (int numsteps)
 
         HandleSignals();
 
-        if (verbose) {
+        if (verbose_step) {
             amrex::Print()<< "STEP " << step+1 << " ends." << " TIME = " << cur_time
                         << " DT = " << dt[0] << "\n";
             amrex::Print()<< "Evolve time = " << evolve_time
@@ -510,9 +540,9 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
 
     // At the beginning, we have B^{n} and E^{n}.
     // Particles have p^{n} and x^{n}.
-    // is_synchronized is true.
+    // m_is_synchronized is true.
 
-    if (is_synchronized) {
+    if (m_is_synchronized) {
         // Not called at each iteration, so exchange all guard cells
         FillBoundaryE(guard_cells.ng_alloc_EB);
         FillBoundaryB(guard_cells.ng_alloc_EB);
@@ -533,7 +563,7 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
                 *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
             );
         }
-        is_synchronized = false;
+        m_is_synchronized = false;
 
     } else {
         // Beyond one step, we have E^{n} and B^{n}.
@@ -966,7 +996,7 @@ WarpX::OneStep_sub1 (Real cur_time)
     // Push the fields on the coarse patch and mother grid
     // by only half a coarse step (first half)
     PushParticlesandDeposit(coarse_lev, cur_time, DtType::Full);
-    StoreCurrent(coarse_lev);
+    ::StoreCurrent(coarse_lev, m_fields);
     AddCurrentFromFineLevelandSumBoundary(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch),
@@ -1049,7 +1079,7 @@ WarpX::OneStep_sub1 (Real cur_time)
 
     // v) Push the fields on the coarse patch and mother grid
     // by only half a coarse step (second half)
-    RestoreCurrent(coarse_lev);
+    ::RestoreCurrent(coarse_lev, m_fields);
     AddCurrentFromFineLevelandSumBoundary(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch),
@@ -1200,7 +1230,7 @@ WarpX::PushParticlesandDeposit (int lev, amrex::Real cur_time, DtType a_dt_type,
         push_type
     );
     if (! skip_current) {
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         // This is called after all particles have deposited their current and charge.
         ApplyInverseVolumeScalingToCurrentDensity(
             m_fields.get(FieldType::current_fp, Direction{0}, lev),

@@ -168,7 +168,7 @@ FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, [[maybe_unused]]int lev)
         amrex::IntVect const tb_lo = tb.smallEnd();
         amrex::IntVect const tb_hi = tb.bigEnd();
 
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         // Lower corner of tile box physical domain
         auto const & warpx = WarpX::GetInstance();
         amrex::Geometry const & geom = warpx.Geom(lev);
@@ -185,15 +185,25 @@ FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, [[maybe_unused]]int lev)
 
         auto volume_factor = [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
             amrex::ignore_unused(i,j,k,n);
-#if defined WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
             amrex::Real const r = rmin + (i - tb_lo[0])*dr;
-            amrex::Real v_factor = 2._rt*r;
-            if (i == tb_lo[0] && is_nodal[0]) { v_factor = r + dr/4._rt; }
-            if (i == tb_hi[0] && is_nodal[0]) { v_factor = r - dr/4._rt; }
+            amrex::Real v_factor = 2._rt*MathConst::pi*r;
+            if (r == 0._rt) { v_factor = MathConst::pi*dr/4._rt; }
+            else if (i == tb_lo[0] && is_nodal[0]) { v_factor *= 0.5_rt; }
+            if (i == tb_hi[0] && is_nodal[0]) { v_factor *= 0.5_rt; }
+#if defined(WARPX_DIM_RZ)
             if (j == tb_lo[1] && is_nodal[1]) { v_factor *= 0.5_rt; }
             if (j == tb_hi[1] && is_nodal[1]) { v_factor *= 0.5_rt; }
+#endif
             amrex::Real const theta_integral = (n == 0 ? 1._rt : 0.5_rt);
-            return MathConst::pi*v_factor*theta_integral;
+            return v_factor*theta_integral;
+#elif defined(WARPX_DIM_RSPHERE)
+            amrex::Real const r = rmin + (i - tb_lo[0])*dr;
+            amrex::Real v_factor = 4.0_rt*MathConst::pi*r*r;
+            if (r == 0._rt) { v_factor = 4.0_rt/3.0_rt*MathConst::pi*(dr*dr/8._rt); }
+            else if (i == tb_lo[0] && is_nodal[0]) { v_factor *= 0.5_rt; }
+            if (i == tb_hi[0] && is_nodal[0]) { v_factor *= 0.5_rt; }
+            return v_factor;
 #else
             amrex::Real v_factor = 1._rt;
             AMREX_D_TERM(

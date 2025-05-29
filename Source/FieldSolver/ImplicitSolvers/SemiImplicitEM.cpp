@@ -125,7 +125,7 @@ void SemiImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
 
     // Update particle positions and velocities using the current state
     // of Eg and Bg. Deposit current density at time n+1/2
-    m_WarpX->ImplicitPreRHSOp( half_time, m_theta, m_dt, a_nl_iter, a_from_jacobian, m_use_mass_matrices );
+    PreRHSOp( half_time, a_nl_iter, a_from_jacobian );
 
     // RHS = cvac^2*0.5*dt*( curl(Bg^{n+1/2}) - mu0*Jg^{n+1/2} )
     m_WarpX->ImplicitComputeRHSE(0.5_rt*m_dt, a_RHS);

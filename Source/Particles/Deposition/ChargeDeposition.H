@@ -75,7 +75,7 @@ void doChargeDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
             // --- Compute shape factors
             Compute_shape_factor< depos_order > const compute_shape_factor;
-#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_3D)
+#if !defined(WARPX_DIM_1D_Z)
             // x direction
             // Get particle position in grid coordinates
 #if defined(WARPX_DIM_RZ)
@@ -83,6 +83,12 @@ void doChargeDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const amrex::Real costheta = (rp > 0._rt ? xp/rp : 1._rt);
             const amrex::Real sintheta = (rp > 0._rt ? yp/rp : 0._rt);
             const Complex xy0 = Complex{costheta, sintheta};
+            const amrex::Real x = (rp - xyzmin.x)*dinv.x;
+#elif defined(WARPX_DIM_RCYLINDER)
+            const amrex::Real rp = std::sqrt(xp*xp + yp*yp);
+            const amrex::Real x = (rp - xyzmin.x)*dinv.x;
+#elif defined(WARPX_DIM_RSPHERE)
+            const amrex::Real rp = std::sqrt(xp*xp + yp*yp + zp*zp);
             const amrex::Real x = (rp - xyzmin.x)*dinv.x;
 #else
             const amrex::Real x = (xp - xyzmin.x)*dinv.x;
@@ -97,7 +103,7 @@ void doChargeDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             } else if (rho_type[0] == CELL) {
                 i = compute_shape_factor(sx, x - 0.5_rt);
             }
-#endif //defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_3D)
+#endif // !defined(WARPX_DIM_1D_Z)
 #if defined(WARPX_DIM_3D)
             // y direction
             const amrex::Real y = (yp - xyzmin.y)*dinv.y;
@@ -109,6 +115,7 @@ void doChargeDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                 j = compute_shape_factor(sy, y - 0.5_rt);
             }
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
             // z direction
             const amrex::Real z = (zp - xyzmin.z)*dinv.z;
             amrex::Real sz[depos_order + 1] = {0._rt};
@@ -118,6 +125,7 @@ void doChargeDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             } else if (rho_type[WARPX_ZINDEX] == CELL) {
                 k = compute_shape_factor(sz, z - 0.5_rt);
             }
+#endif
 
             // Deposit charge into rho_arr
 #if defined(WARPX_DIM_1D_Z)
@@ -125,6 +133,12 @@ void doChargeDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                 amrex::Gpu::Atomic::AddNoRet(
                     &rho_arr(lo.x+k+iz, 0, 0, 0),
                     sz[iz]*wq);
+            }
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            for (int ix=0; ix<=depos_order; ix++){
+                amrex::Gpu::Atomic::AddNoRet(
+                    &rho_arr(lo.x+i+ix, 0, 0, 0),
+                    sx[ix]*wq);
             }
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             for (int iz=0; iz<=depos_order; iz++){
@@ -275,6 +289,8 @@ void doChargeDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPositio
                                int(amrex::Math::floor((zp-plo[1])*dinv.z)));
 #elif defined(WARPX_DIM_1D_Z)
           IntVect iv = IntVect(int(amrex::Math::floor((zp-plo[0])*dinv.z)));
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+          IntVect iv = IntVect(int(amrex::Math::floor((xp-plo[0])*dinv.x)));
 #endif
           iv += domain.smallEnd();
           getTileIndex(iv, box, true, bin_size, buffer_box);
@@ -316,7 +332,7 @@ void doChargeDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPositio
 
             // --- Compute shape factors
             Compute_shape_factor< depos_order > const compute_shape_factor;
-#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_3D)
+#if !defined(WARPX_DIM_1D_Z)
             // x direction
             // Get particle position in grid coordinates
 #if defined(WARPX_DIM_RZ)
@@ -331,6 +347,12 @@ void doChargeDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPositio
                 sintheta = 0._rt;
             }
             const Complex xy0 = Complex{costheta, sintheta};
+            const amrex::Real x = (rp - xyzmin.x)*dinv.x;
+#elif defined(WARPX_DIM_RCYLINDER)
+            const amrex::Real rp = std::sqrt(xp*xp + yp*yp);
+            const amrex::Real x = (rp - xyzmin.x)*dinv.x;
+#elif defined(WARPX_DIM_RSPHERE)
+            const amrex::Real rp = std::sqrt(xp*xp + yp*yp + zp*zp);
             const amrex::Real x = (rp - xyzmin.x)*dinv.x;
 #else
             const amrex::Real x = (xp - xyzmin.x)*dinv.x;
@@ -357,6 +379,7 @@ void doChargeDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPositio
                 j = compute_shape_factor(sy, y - 0.5_rt);
             }
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
             // z direction
             const amrex::Real z = (zp - xyzmin.z)*dinv.z;
             amrex::Real sz[depos_order + 1] = {0._rt};
@@ -366,6 +389,7 @@ void doChargeDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPositio
             } else if (rho_type[WARPX_ZINDEX] == CELL) {
                 k = compute_shape_factor(sz, z - 0.5_rt);
             }
+#endif
 
             // Deposit charge into buf
 #if defined(WARPX_DIM_1D_Z)
@@ -373,6 +397,12 @@ void doChargeDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPositio
                 amrex::Gpu::Atomic::AddNoRet(
                     &buf(lo.x+k+iz, 0, 0, 0),
                     sz[iz]*wq);
+            }
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            for (int ix=0; ix<=depos_order; ix++){
+                amrex::Gpu::Atomic::AddNoRet(
+                    &buf(lo.x+i+ix, 0, 0, 0),
+                    sx[ix]*wq);
             }
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             for (int iz=0; iz<=depos_order; iz++){
