@@ -168,7 +168,7 @@ void ImplicitSolver::ComputeJfromMassMatrices()
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-        for ( amrex::MFIter mfi(*J[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi )
+        for ( amrex::MFIter mfi(*J[0], false); mfi.isValid(); ++mfi )
         {
 
             amrex::Array4<amrex::Real> const& Jx = J[0]->array(mfi);
@@ -200,13 +200,12 @@ void ImplicitSolver::ComputeJfromMassMatrices()
             amrex::Array4<const amrex::Real> const& Szz = SZ[2]->array(mfi);
 
             // Use grown boxes here with all guard cells
-            amrex::Box Jbx = mfi.tilebox(J[0]->ixType().toIntVect());
-            amrex::Box Jby = mfi.tilebox(J[1]->ixType().toIntVect());
-            amrex::Box Jbz = mfi.tilebox(J[2]->ixType().toIntVect());
-
-            amrex::Box Ebx = mfi.tilebox(E[0]->ixType().toIntVect());
-            amrex::Box Eby = mfi.tilebox(E[1]->ixType().toIntVect());
-            amrex::Box Ebz = mfi.tilebox(E[2]->ixType().toIntVect());
+            amrex::Box Jbx = amrex::convert(mfi.validbox(),J[0]->ixType().toIntVect());
+            amrex::Box Jby = amrex::convert(mfi.validbox(),J[1]->ixType().toIntVect());
+            amrex::Box Jbz = amrex::convert(mfi.validbox(),J[2]->ixType().toIntVect());
+            amrex::Box Ebx = amrex::convert(mfi.validbox(),E[0]->ixType().toIntVect());
+            amrex::Box Eby = amrex::convert(mfi.validbox(),E[1]->ixType().toIntVect());
+            amrex::Box Ebz = amrex::convert(mfi.validbox(),E[2]->ixType().toIntVect());
 
             Jbx.grow(J[0]->nGrowVect());
             Jby.grow(J[1]->nGrowVect());
