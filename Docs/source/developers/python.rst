@@ -98,7 +98,7 @@ There are two python modules that provide convenient access to the fields and th
 Fields
 ~~~~~~
 
-The ``fields`` module provides wrappers around most of the MultiFabs that are defined in the WarpX class.
+The ``fields`` module provides wrappers aroundthe MultiFabs that are defined in the WarpX class, those that are added to the MultiFab registry.
 For a list of all of the available wrappers, see the file ``Python/pywarpx/fields.py``.
 For each MultiFab, there is a function that will return a wrapper around the data.
 For instance, the function ``ExWrapper`` returns a wrapper around the ``x`` component of the MultiFab vector ``Efield_aux`` at level 0.
@@ -110,8 +110,8 @@ For instance, the function ``ExWrapper`` returns a wrapper around the ``x`` comp
 
 The wrapper provides access to the data via global indexing.
 Using standard array indexing with square brackets, the data can be accessed using indices that are relative to the full domain (across the MultiFab and across processors).
-For indices within the domain, values from valid cells are always returned. The ghost cells at the exterior of the domain are accessed using imaginary numbers, with negative values accessing the lower ghost cells, and positive the upper ghost cells.
 With multiple processors, when the data is fetched, the result is broadcast to all processors (and is a global operation).
+For indices within the domain, values from valid cells are always returned. The ghost cells at the exterior of the domain are accessed using imaginary numbers, with negative values accessing the lower ghost cells, and positive the upper ghost cells.
 This example will return the ``Bz`` field at all valid interior points along ``x`` at the specified ``y`` and ``z`` indices.
 
 .. code-block:: python
@@ -144,8 +144,19 @@ The code does error checking to ensure that the specified indices are within the
 
 Under the covers, the wrapper object is using the Python wrapper of a MultiFab, relying on its global array indexing capability.
 The wrappers are always up to date since whenever an access is done (either a get or a set), the wrapper fetches the underlying MultiFab object.
+This allows the wrapper to be used in cases when load balancing is done, since it will always return the updated MultiFab.
 
 Through the wrapper, all of the operations available on the underlying MultiFab can be done. For example, to find the max value, use ``Jx.max()``, and to multiply the data by a factor, ``Jx.mult(2.)``.
+
+The wrapper allows new MultiFabs to be created at the Python level and added to the registry.
+In this example, a new MultiFab is added with the same properties as `Er`.
+
+-- code-block:: python
+   normalized_Er = fields.MultiFabWrapper(create_new=True,
+                                          mf_name="normalized_Er",
+                                          idir=0,
+                                          ba=Er.box_array(),
+                                          ngrow=Er.n_grow_vect)
 
 Particles
 ~~~~~~~~~
