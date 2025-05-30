@@ -417,6 +417,11 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                     }
                     else if (Syy_nComp>1) {
                         int offset = base_offset;
+                        int Nc =  depos_order + aa - ix
+                               + (depos_order + bb - iz)*offset;
+                        amrex::Gpu::Atomic::AddNoRet(
+                            &Syy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, Nc),
+                            sx_jy[ix]*sz_jy[iz]*sx_jy[aa]*sz_jy[bb]*fpyy);
                     }
                     if (Szz_nComp==1 && aa==ix && bb==iz) {
                         amrex::Gpu::Atomic::AddNoRet(
@@ -425,6 +430,11 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                     }
                     else if (Szz_nComp>1) {
                         int offset = base_offset;
+                        int Nc =  depos_order + aa - ix
+                               + (depos_order + bb - iz)*offset;
+                        amrex::Gpu::Atomic::AddNoRet(
+                            &Szz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, Nc),
+                            sx_jz[ix]*sz_jz[iz]*sx_jz[aa]*sz_jz[bb]*fpzz);
                     }
                 }
             }
