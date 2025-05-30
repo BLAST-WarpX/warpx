@@ -455,8 +455,8 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                             &Szz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, Nc),
                             weight_Jz*weight_Ez*fpzz);
                         offset = base_offset + offset_xz[0];
-                        Nc =  depos_order + shift[0]*offset_xy[0] + aa - ix
-                           + (depos_order + 1 - shift[1]*offset_xy[1] + bb - iz)*offset;
+                        Nc =  depos_order + shift[0]*offset_xz[0] + aa - ix
+                           + (depos_order + 1 - shift[1]*offset_xz[1] + bb - iz)*offset;
                         amrex::Gpu::Atomic::AddNoRet(
                             &Szx_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, Nc),
                             weight_Jz*weight_Ex*fpzx);
