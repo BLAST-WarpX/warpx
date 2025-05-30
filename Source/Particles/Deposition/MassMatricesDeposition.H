@@ -150,6 +150,9 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
     constexpr int NODE = amrex::IndexType::NODE;
     constexpr int CELL = amrex::IndexType::CELL;
 
+    // MassMatrices index shift parameter
+    int shift[AMREX_SPACEDIM] = {0};
+
     // --- Compute shape factors
     Compute_shape_factor< depos_order > const compute_shape_factor;
 #if !defined(WARPX_DIM_1D_Z)
@@ -173,6 +176,9 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
     if (jx_type[0] == CELL || jy_type[0] == CELL || jz_type[0] == CELL) {
         j_cell = compute_shape_factor(sx_cell, xmid - 0.5);
     }
+
+    // Set the index shift parameter
+    if (j_node==j_cell) { shift[0] = 1; }
 
     amrex::Real sx_jx[depos_order + 1] = {0._rt};
     amrex::Real sx_jy[depos_order + 1] = {0._rt};
@@ -203,6 +209,10 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
     if (jx_type[1] == CELL || jy_type[1] == CELL || jz_type[1] == CELL) {
         k_cell = compute_shape_factor(sy_cell, ymid - 0.5);
     }
+
+    // Set the index shift parameter
+    if (k_node==k_cell) { shift[1] = 1; }
+
     amrex::Real sy_jx[depos_order + 1] = {0._rt};
     amrex::Real sy_jy[depos_order + 1] = {0._rt};
     amrex::Real sy_jz[depos_order + 1] = {0._rt};
@@ -244,10 +254,23 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
     int const l_jx = ((jx_type[zdir] == NODE) ? l_node : l_cell);
     int const l_jy = ((jy_type[zdir] == NODE) ? l_node : l_cell);
     int const l_jz = ((jz_type[zdir] == NODE) ? l_node : l_cell);
+
+    // Set the index shift parameter
+    if (l_node==l_cell) { shift[zdir] = 1; }
+
+#if !defined(WARPX_DIM_1D_Z)
+    const int base_offset = 1 + 2*depos_order;
 #endif
 
-    int shift[AMREX_SPACEDIM] = {0};
-    if (l_node==l_cell) { shift[0] = 1; }
+#endif
+
+    // Compute index offset needed when x and y comps have different location on grid
+    amrex::IntVect offset_xy, offset_xz, offset_yz;
+    for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
+        offset_xy[dir] = (jx_type[dir] + jy_type[dir]) % 2;
+        offset_xz[dir] = (jx_type[dir] + jz_type[dir]) % 2;
+        offset_yz[dir] = (jy_type[dir] + jz_type[dir]) % 2;
+    }
 
     // Deposit J and mass matrices
 #if defined(WARPX_DIM_1D_Z)
@@ -273,11 +296,11 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                 amrex::Gpu::Atomic::AddNoRet(
                     &Sxx_arr(lo.x+l_jx+iz, 0, 0, Nc),
                     sz_jx[iz]*sz_jx[aa]*fpxx);
-                Nc = depos_order + aa - iz;
+                Nc = depos_order + shift[0]*offset_xy[0] + aa - iz;
                 amrex::Gpu::Atomic::AddNoRet(
                     &Sxy_arr(lo.x+l_jx+iz, 0, 0, Nc),
                     sz_jx[iz]*sz_jy[aa]*fpxy);
-                Nc = depos_order + shift[0] + aa - iz;
+                Nc = depos_order + shift[0]*offset_xz[0] + aa - iz;
                 amrex::Gpu::Atomic::AddNoRet(
                     &Sxz_arr(lo.x+l_jx+iz, 0, 0, Nc),
                     sz_jx[iz]*sz_jz[aa]*fpxz);
@@ -289,7 +312,7 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                     sz_jy[iz]*sz_jy[aa]*fpyy);
             }
             else if (Syy_nComp>1) {
-                int Nc = depos_order + aa - iz;
+                int Nc = depos_order + shift[0]*offset_xy[0] + aa - iz;
                 amrex::Gpu::Atomic::AddNoRet(
                     &Syx_arr(lo.x+l_jy+iz, 0, 0, Nc),
                     sz_jy[iz]*sz_jx[aa]*fpyx);
@@ -297,7 +320,7 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                 amrex::Gpu::Atomic::AddNoRet(
                     &Syy_arr(lo.x+l_jy+iz, 0, 0, Nc),
                     sz_jy[iz]*sz_jy[aa]*fpyy);
-                Nc = depos_order + shift[0] + aa - iz;
+                Nc = depos_order + shift[0]*offset_yz[0] + aa - iz;
                 amrex::Gpu::Atomic::AddNoRet(
                     &Syz_arr(lo.x+l_jy+iz, 0, 0, Nc),
                     sz_jy[iz]*sz_jz[aa]*fpyz);
@@ -309,11 +332,11 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                     sz_jz[iz]*sz_jz[aa]*fpzz);
             }
             else if(Szz_nComp>1) {
-                int Nc = depos_order + 1 - shift[0] + aa - iz;
+                int Nc = depos_order + 1 - shift[0]*offset_xz[0] + aa - iz;
                 amrex::Gpu::Atomic::AddNoRet(
                     &Szx_arr(lo.x+l_jz+iz, 0, 0, Nc),
                     sz_jz[iz]*sz_jx[aa]*fpzx);
-                Nc = depos_order + 1 - shift[0] + aa - iz;
+                Nc = depos_order + 1 - shift[0]*offset_yz[0] + aa - iz;
                 amrex::Gpu::Atomic::AddNoRet(
                     &Szy_arr(lo.x+l_jz+iz, 0, 0, Nc),
                     sz_jz[iz]*sz_jy[aa]*fpzy);
@@ -347,9 +370,6 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
             sx_jz[ix]*sx_jz[ix]*fpzz);
     }
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-    const int diag_comp_xx = (Sxx_nComp - 1)/2;
-    const int diag_comp_yy = (Syy_nComp - 1)/2;
-    const int diag_comp_zz = (Szz_nComp - 1)/2;
     for (int iz=0; iz<=depos_order; iz++){
         for (int ix=0; ix<=depos_order; ix++){
             amrex::Gpu::Atomic::AddNoRet(
@@ -361,15 +381,42 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
             amrex::Gpu::Atomic::AddNoRet(
                 &jz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, 0),
                 sx_jz[ix]*sz_jz[iz]*wqz);
-            //
+            for (int bb=0; bb<=depos_order; bb++){
+                for (int aa=0; aa<=depos_order; aa++){
+                    //  Deposit mass matrices for X-current
+                    if (Sxx_nComp==1 && aa==ix && bb==iz) {
+                        amrex::Gpu::Atomic::AddNoRet(
+                            &Sxx_arr(lo.x+l_jx+ix, lo.y+l_jx+iz, 0, 0),
+                            sx_jx[ix]*sz_jx[iz]*sx_jx[aa]*sz_jx[bb]*fpxx);
+                    }
+                    else if (Sxx_nComp>1) {
+                        int offset = base_offset;
+                        int Nc =  depos_order + aa - ix
+                               + (depos_order + bb - iz)*offset;
+                        amrex::Gpu::Atomic::AddNoRet(
+                            &Sxx_arr(lo.x+l_jx+ix, lo.y+l_jx+iz, 0, Nc),
+                            sx_jx[ix]*sz_jx[iz]*sx_jx[aa]*sz_jx[bb]*fpxx);
+                        offset = base_offset + offset_xy[0];
+                        Nc =  depos_order + 1 - shift[0]*offset_xy[0] + aa - ix
+                           + (depos_order + shift[1]*offset_xy[1] + bb - iz)*offset;
+                        amrex::Gpu::Atomic::AddNoRet(
+                            &Sxy_arr(lo.x+l_jx+ix, lo.y+l_jx+iz, 0, Nc),
+                            sx_jx[ix]*sz_jx[iz]*sx_jy[aa]*sz_jy[bb]*fpxy);
+                        Nc = depos_order + shift[0] + aa - iz;
+                        offset = base_offset + offset_xz[0];
+                        Nc =  depos_order + 1 - shift[0]*offset_xz[0] + aa - ix
+                           + (depos_order + shift[1]*offset_xz[1] + bb - iz)*offset;
+                        amrex::Gpu::Atomic::AddNoRet(
+                            &Sxz_arr(lo.x+l_jx+ix, lo.y+l_jx+iz, 0, Nc),
+                            sx_jx[ix]*sz_jx[iz]*sx_jz[aa]*sz_jz[bb]*fpxz);
+                    }
+                }
+            }
             amrex::Gpu::Atomic::AddNoRet(
-                &Sxx_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, diag_comp_xx),
-                sx_jx[ix]*sx_jx[ix]*sz_jx[iz]*sz_jx[iz]*fpxx);
-            amrex::Gpu::Atomic::AddNoRet(
-                &Syy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, diag_comp_yy),
+                &Syy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 0),
                 sx_jy[ix]*sx_jy[ix]*sz_jy[iz]*sz_jy[iz]*fpyy);
             amrex::Gpu::Atomic::AddNoRet(
-                &Szz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, diag_comp_zz),
+                &Szz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, 0),
                 sx_jz[ix]*sx_jz[ix]*sz_jz[iz]*sz_jz[iz]*fpzz);
         }
     }
