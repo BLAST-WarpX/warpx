@@ -25,8 +25,6 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
 
         const bool ionization_flag = (!product_species.empty());
 
-        // if ionization is one of the processes, check if one of the colliding
-        // species is also used as a product species
         if (ionization_flag) {
             m_num_product_species = 4;
             m_num_products_host.push_back(1); // the non-target species
