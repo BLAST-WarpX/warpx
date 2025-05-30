@@ -115,7 +115,7 @@ This object is the Python equivalent to the C++ ``WarpX`` simulation class.
 The :py:class:`WarpX` also provides read and write access to field ``MultiFab`` and ``ParticleContainer`` data, shown in the following examples.
 
 Fields
-------
+^^^^^^
 
 This example accesses the :math:`E_x(x,y,z)` field at level 0 after every time step and calculate the largest value in it.
 
@@ -174,7 +174,7 @@ For further details on how to `access GPU data <https://pyamrex.readthedocs.io/e
 A warning is that it is recommended that the reference to the MultiFab returned by multifab_register.get should not be saved across time steps. If there is load balancing, the MultiFabs will be regenerated and that reference will become invalid.
 
 High-Level Field Wrapper
-------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 The ``fields`` module provides wrappers around the MultiFabs that are defined in the WarpX class, those that are added to the MultiFab registry.
 For a list of all of the available wrappers, see the file ``Python/pywarpx/fields.py``.
@@ -223,14 +223,17 @@ Similarly, to fetch all of the data including valid cells and ghost cells, use a
 The code does error checking to ensure that the specified indices are within the bounds of the global domain.
 
 The wrapper allows new MultiFabs to be created at the Python level and added to the registry.
-In this example, a new MultiFab is added with the same properties as `Er`.
+In this example, a new MultiFab is added with the same properties as `Ex`.
 
--- code-block:: python
-   normalized_Er = fields.MultiFabWrapper(create_new=True,
-                                          mf_name="normalized_Er",
+.. code-block:: python
+
+   from pywarpx import fields
+   Ex = fields.ExWrapper()
+   normalized_Ex = fields.MultiFabWrapper(create_new=True,
+                                          mf_name="normalized_Ex",
                                           idir=0,
-                                          ba=Er.box_array(),
-                                          ngrow=Er.n_grow_vect)
+                                          ba=Ex.box_array(),
+                                          ngrow=Ex.n_grow_vect)
 
 Under the covers, the wrapper object is using the Python wrapper of a MultiFab, relying on its global array indexing capability.
 The wrappers are always up to date since whenever an access is done (either a get or a set), the wrapper fetches the underlying MultiFab object.
@@ -294,7 +297,7 @@ For further details on how to `access GPU data <https://pyamrex.readthedocs.io/e
 
 
 High-Level Particle Wrapper
-"""""""""""""""""""""""""""
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. note::
 
