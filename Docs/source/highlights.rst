@@ -259,7 +259,7 @@ Nuclear Fusion and Plasma Confinement
    Physics of Plasmas **30**, 122508, 2023.
    `DOI:10.1063/5.0178288 <https://doi.org/10.1063/5.0178288>`__
 
-Plasma Thrusters and spacecraft physics
+Plasma Thrusters and Spacecraft Physics
 ***************************************
 
 #. Sam A., Elschot S.,
