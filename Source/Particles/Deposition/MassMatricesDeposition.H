@@ -394,30 +394,40 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                         int Nc =  depos_order + aa - ix
                                + (depos_order + bb - iz)*offset;
                         amrex::Gpu::Atomic::AddNoRet(
-                            &Sxx_arr(lo.x+l_jx+ix, lo.y+l_jx+iz, 0, Nc),
+                            &Sxx_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, Nc),
                             sx_jx[ix]*sz_jx[iz]*sx_jx[aa]*sz_jx[bb]*fpxx);
                         offset = base_offset + offset_xy[0];
                         Nc =  depos_order + 1 - shift[0]*offset_xy[0] + aa - ix
                            + (depos_order + shift[1]*offset_xy[1] + bb - iz)*offset;
                         amrex::Gpu::Atomic::AddNoRet(
-                            &Sxy_arr(lo.x+l_jx+ix, lo.y+l_jx+iz, 0, Nc),
+                            &Sxy_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, Nc),
                             sx_jx[ix]*sz_jx[iz]*sx_jy[aa]*sz_jy[bb]*fpxy);
                         Nc = depos_order + shift[0] + aa - iz;
                         offset = base_offset + offset_xz[0];
                         Nc =  depos_order + 1 - shift[0]*offset_xz[0] + aa - ix
                            + (depos_order + shift[1]*offset_xz[1] + bb - iz)*offset;
                         amrex::Gpu::Atomic::AddNoRet(
-                            &Sxz_arr(lo.x+l_jx+ix, lo.y+l_jx+iz, 0, Nc),
+                            &Sxz_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, Nc),
                             sx_jx[ix]*sz_jx[iz]*sx_jz[aa]*sz_jz[bb]*fpxz);
+                    }
+                    if (Syy_nComp==1 && aa==ix && bb==iz) {
+                        amrex::Gpu::Atomic::AddNoRet(
+                            &Syy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 0),
+                            sx_jy[ix]*sz_jy[iz]*sx_jy[aa]*sz_jy[bb]*fpyy);
+                    }
+                    else if (Syy_nComp>1) {
+                        int offset = base_offset;
+                    }
+                    if (Szz_nComp==1 && aa==ix && bb==iz) {
+                        amrex::Gpu::Atomic::AddNoRet(
+                            &Szz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, 0),
+                            sx_jz[ix]*sz_jz[iz]*sx_jz[aa]*sz_jz[bb]*fpzz);
+                    }
+                    else if (Szz_nComp>1) {
+                        int offset = base_offset;
                     }
                 }
             }
-            amrex::Gpu::Atomic::AddNoRet(
-                &Syy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 0),
-                sx_jy[ix]*sx_jy[ix]*sz_jy[iz]*sz_jy[iz]*fpyy);
-            amrex::Gpu::Atomic::AddNoRet(
-                &Szz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, 0),
-                sx_jz[ix]*sx_jz[ix]*sz_jz[iz]*sz_jz[iz]*fpzz);
         }
     }
 #elif defined(WARPX_DIM_3D)
