@@ -392,14 +392,24 @@ void ImplicitSolver::InitializeMassMatrices ()
     else { // Mass matrices used for PC only
         for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
             m_ncomp_xx[dir] = 1;
-            m_ncomp_xy[dir] = 1;
-            m_ncomp_xz[dir] = 1;
-            m_ncomp_yx[dir] = 1;
+            m_ncomp_xy[dir] = 0;
+            m_ncomp_xz[dir] = 0;
+            m_ncomp_yx[dir] = 0;
             m_ncomp_yy[dir] = 1;
-            m_ncomp_yz[dir] = 1;
-            m_ncomp_zx[dir] = 1;
-            m_ncomp_zy[dir] = 1;
+            m_ncomp_yz[dir] = 0;
+            m_ncomp_zx[dir] = 0;
+            m_ncomp_zy[dir] = 0;
             m_ncomp_zz[dir] = 1;
+            //
+            Nc_tot_xx *= m_ncomp_xx[dir];
+            Nc_tot_xy *= m_ncomp_xy[dir];
+            Nc_tot_xz *= m_ncomp_xz[dir];
+            Nc_tot_yx *= m_ncomp_yx[dir];
+            Nc_tot_yy *= m_ncomp_yy[dir];
+            Nc_tot_yz *= m_ncomp_yz[dir];
+            Nc_tot_zx *= m_ncomp_zx[dir];
+            Nc_tot_zy *= m_ncomp_zy[dir];
+            Nc_tot_zz *= m_ncomp_zz[dir];
         }
     }
 
