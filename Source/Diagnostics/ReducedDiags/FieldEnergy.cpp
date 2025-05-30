@@ -164,9 +164,10 @@ FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, [[maybe_unused]]int lev)
         amrex::Array4<const amrex::Real> const& field_arr = field.array(mfi);
 
         amrex::Box const tilebox = mfi.tilebox();
+        amrex::Box const validbox = mfi.validbox();
         amrex::Box const tb = convert(tilebox, is_nodal);
-        amrex::IntVect const tb_lo = tb.smallEnd();
-        amrex::IntVect const tb_hi = tb.bigEnd();
+        amrex::IntVect const tb_lo = validbox.smallEnd();
+        amrex::IntVect const tb_hi = validbox.bigEnd();
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         // Lower corner of tile box physical domain
