@@ -348,6 +348,12 @@ void ImplicitSolver::InitializeMassMatrices ()
     const amrex::IntVect ngJ = m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, 0)->nGrowVect();
     const amrex::IntVect ngE = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, 0)->nGrowVect();
 
+    // Get nodal flags for each component of J
+    const ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, 0);
+    const amrex::IntVect Jx_nodal = J[0]->ixType().toIntVect();
+    const amrex::IntVect Jy_nodal = J[1]->ixType().toIntVect();
+    const amrex::IntVect Jz_nodal = J[2]->ixType().toIntVect();
+
     // Compute the total number of components for each mass matrices container.
     // This depends on the particle shape factor and the type of current deposition.
     int Nc_tot_xx = 1, Nc_tot_xy = 1, Nc_tot_xz = 1;
@@ -359,32 +365,15 @@ void ImplicitSolver::InitializeMassMatrices ()
                 AMREX_ASSERT(ngJ[dir]>=shape);
                 AMREX_ASSERT(ngE[dir]>=shape);
                 m_ncomp_xx[dir] = 1 + 2*shape;
+                m_ncomp_xy[dir] = 1 + 2*shape + ( (Jx_nodal[dir] + Jy_nodal[dir]) % 2 );
+                m_ncomp_xz[dir] = 1 + 2*shape + ( (Jx_nodal[dir] + Jz_nodal[dir]) % 2 );
                 m_ncomp_yy[dir] = 1 + 2*shape;
+                m_ncomp_yx[dir] = 1 + 2*shape + ( (Jy_nodal[dir] + Jx_nodal[dir]) % 2 );
+                m_ncomp_yz[dir] = 1 + 2*shape + ( (Jy_nodal[dir] + Jz_nodal[dir]) % 2 );
                 m_ncomp_zz[dir] = 1 + 2*shape;
-                if (dir==0) {
-                    m_ncomp_xy[dir] = 1 + 2*shape;
-                    m_ncomp_xz[dir] = 2 + 2*shape;
-                    m_ncomp_yx[dir] = 1 + 2*shape;
-                    m_ncomp_yz[dir] = 2 + 2*shape;
-                    m_ncomp_zx[dir] = 2 + 2*shape;
-                    m_ncomp_zy[dir] = 2 + 2*shape;
-                }
-                else if (dir==1) {
-                    m_ncomp_xy[dir] = 2 + 2*shape;
-                    m_ncomp_xz[dir] = 1 + 2*shape;
-                    m_ncomp_yx[dir] = 2 + 2*shape;
-                    m_ncomp_yz[dir] = 2 + 2*shape;
-                    m_ncomp_zx[dir] = 1 + 2*shape;
-                    m_ncomp_zy[dir] = 2 + 2*shape;
-                }
-                else if (dir==2) {
-                    m_ncomp_xy[dir] = 1 + 2*shape;
-                    m_ncomp_xz[dir] = 2 + 2*shape;
-                    m_ncomp_yx[dir] = 1 + 2*shape;
-                    m_ncomp_yz[dir] = 2 + 2*shape;
-                    m_ncomp_zx[dir] = 2 + 2*shape;
-                    m_ncomp_zy[dir] = 2 + 2*shape;
-                }
+                m_ncomp_zx[dir] = 1 + 2*shape + ( (Jz_nodal[dir] + Jx_nodal[dir]) % 2 );
+                m_ncomp_zy[dir] = 1 + 2*shape + ( (Jz_nodal[dir] + Jy_nodal[dir]) % 2 );
+                //
                 Nc_tot_xx *= m_ncomp_xx[dir];
                 Nc_tot_xy *= m_ncomp_xy[dir];
                 Nc_tot_xz *= m_ncomp_xz[dir];
@@ -397,7 +386,7 @@ void ImplicitSolver::InitializeMassMatrices ()
             }
         }
         else {
-            WARPX_ABORT_WITH_MESSAGE("Mass matrices can only be used with Direct deposition.");
+            WARPX_ABORT_WITH_MESSAGE("Mass matrices can only be used with Direct deposition (for now).");
         }
     }
     else { // Mass matrices used for PC only
