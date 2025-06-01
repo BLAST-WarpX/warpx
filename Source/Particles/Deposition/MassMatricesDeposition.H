@@ -151,7 +151,7 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
     constexpr int CELL = amrex::IndexType::CELL;
 
     // MassMatrices index shift parameter
-    int shift[AMREX_SPACEDIM] = {0};
+    amrex::IntVect shift = amrex::IntVect::TheZeroVector();
 
     // --- Compute shape factors
     Compute_shape_factor< depos_order > const compute_shape_factor;
