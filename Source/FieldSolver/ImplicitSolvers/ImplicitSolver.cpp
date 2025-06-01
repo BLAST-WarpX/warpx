@@ -152,16 +152,21 @@ void ImplicitSolver::ComputeJfromMassMatrices()
             offset_zy[dir] = (m_ncomp_zy[dir]-1)/2;
             offset_zz[dir] = (m_ncomp_zz[dir]-1)/2;
             if (dir==0) {
+#if AMREX_SPACEDIM == 1
                 offset_xz[dir] = m_ncomp_xz[dir]/2;
                 offset_yz[dir] = m_ncomp_yz[dir]/2;
+#elif AMREX_SPACEDIM == 2
+                offset_yx[dir] = m_ncomp_yx[dir]/2;
+                offset_zx[dir] = m_ncomp_zx[dir]/2;
+#endif
             }
             if (dir==1) {
-                //offset_xy[dir] = m_ncomp_xy[dir]/2;
-                //offset_zy[dir] = m_ncomp_zy[dir]/2;
+                offset_xy[dir] = m_ncomp_xy[dir]/2;
+                offset_zy[dir] = m_ncomp_zy[dir]/2;
             }
             if (dir==2) {
-                //offset_xz[dir] = m_ncomp_xz[dir]/2;
-                //offset_yz[dir] = m_ncomp_yz[dir]/2;
+                offset_xz[dir] = m_ncomp_xz[dir]/2;
+                offset_yz[dir] = m_ncomp_yz[dir]/2;
             }
         }
 
@@ -231,24 +236,65 @@ void ImplicitSolver::ComputeJfromMassMatrices()
             {
                 int ii_min = std::max(0,offset_xx[0]+Ebx.smallEnd(0)-i);
                 int ii_max = std::min(ncomp_xx[0]-1,offset_xx[0]+Ebx.bigEnd(0)-i);
+                int jj_min = 0, jj_max = 0;
+                int kk_min = 0, kk_max = 0;
+#if AMREX_SPACEDIM > 1
+                jj_min = std::max(0,offset_xx[1]+Ebx.smallEnd(1)-j);
+                jj_max = std::min(ncomp_xx[1]-1,offset_xx[1]+Ebx.bigEnd(1)-j);
+#endif
+#if AMREX_SPACEDIM == 3
+                kk_min = std::max(0,offset_xx[2]+Ebx.smallEnd(2)-k);
+                kk_max = std::min(ncomp_xx[2]-1,offset_xx[2]+Ebx.bigEnd(2)-k);
+#endif
                 amrex::Real SxxdEx = 0.0;
                 for (int ii = ii_min; ii <= ii_max; ++ii) {
-                    int Nc = ii;
-                    SxxdEx += Sxx(i,j,k,Nc)*(Ex(i+ii-offset_xx[0],j,k,n) - Ex0(i+ii-offset_xx[0],j,k,n));
+                    for (int jj = jj_min; jj <= jj_max; ++jj) {
+                        for (int kk = kk_min; kk <= kk_max; ++kk) {
+                            int Nc = AMREX_D_TERM(ii, + ncomp_xx[0]*jj, + ncomp_xx[0]*ncomp_xx[1]*kk);
+                            SxxdEx += Sxx(i,j,k,Nc)*( Ex(i+ii-offset_xx[0],j+jj-offset_xx[1],k+kk-offset_xx[2],n)
+                                                  -  Ex0(i+ii-offset_xx[0],j+jj-offset_xx[1],k+kk-offset_xx[2],n) );
+                        }
+                    }
                 }
                 ii_min = std::max(0,offset_xy[0]+Eby.smallEnd(0)-i);
                 ii_max = std::min(ncomp_xy[0]-1,offset_xy[0]+Eby.bigEnd(0)-i);
+#if AMREX_SPACEDIM > 1
+                jj_min = std::max(0,offset_xy[1]+Eby.smallEnd(1)-j);
+                jj_max = std::min(ncomp_xy[1]-1,offset_xy[1]+Eby.bigEnd(1)-j);
+#endif
+#if AMREX_SPACEDIM == 3
+                kk_min = std::max(0,offset_xy[2]+Eby.smallEnd(2)-k);
+                kk_max = std::min(ncomp_xy[2]-1,offset_xy[2]+Eby.bigEnd(2)-k);
+#endif
                 amrex::Real SxydEy = 0.0;
                 for (int ii = ii_min; ii <= ii_max; ++ii) {
-                    int Nc = ii;
-                    SxydEy += Sxy(i,j,k,Nc)*(Ey(i+ii-offset_xy[0],j,k,n) - Ey0(i+ii-offset_xy[0],j,k,n));
+                    for (int jj = jj_min; jj <= jj_max; ++jj) {
+                        for (int kk = kk_min; kk <= kk_max; ++kk) {
+                            int Nc = AMREX_D_TERM(ii, + ncomp_xy[0]*jj, + ncomp_xy[0]*ncomp_xy[1]*kk);
+                            SxydEy += Sxy(i,j,k,Nc)*( Ey(i+ii-offset_xy[0],j+jj-offset_xy[1],k+kk-offset_xy[2],n)
+                                                   - Ey0(i+ii-offset_xy[0],j+jj-offset_xy[1],k+kk-offset_xy[2],n) );
+                        }
+                    }
                 }
                 ii_min = std::max(0,offset_xz[0]+Ebz.smallEnd(0)-i);
                 ii_max = std::min(ncomp_xz[0]-1,offset_xz[0]+Ebz.bigEnd(0)-i);
+#if AMREX_SPACEDIM > 1
+                jj_min = std::max(0,offset_xz[1]+Ebz.smallEnd(1)-j);
+                jj_max = std::min(ncomp_xz[1]-1,offset_xz[1]+Ebz.bigEnd(1)-j);
+#endif
+#if AMREX_SPACEDIM == 3
+                kk_min = std::max(0,offset_xz[2]+Ebz.smallEnd(2)-k);
+                kk_max = std::min(ncomp_xz[2]-1,offset_xz[2]+Ebz.bigEnd(2)-k);
+#endif
                 amrex::Real SxzdEz = 0.0;
                 for (int ii = ii_min; ii <= ii_max; ++ii) {
-                    int Nc = ii;
-                    SxzdEz += Sxz(i,j,k,Nc)*(Ez(i+ii-offset_xz[0],j,k,n) - Ez0(i+ii-offset_xz[0],j,k,n));
+                    for (int jj = jj_min; jj <= jj_max; ++jj) {
+                        for (int kk = kk_min; kk <= kk_max; ++kk) {
+                            int Nc = AMREX_D_TERM(ii, + ncomp_xz[0]*jj, + ncomp_xz[0]*ncomp_xz[1]*kk);
+                            SxzdEz += Sxz(i,j,k,Nc)*( Ez(i+ii-offset_xz[0],j+jj-offset_xz[1],k+kk-offset_xz[2],n)
+                                                   - Ez0(i+ii-offset_xz[0],j+jj-offset_xz[1],k+kk-offset_xz[2],n) );
+                        }
+                    }
                 }
                 amrex::Real Jx_MM = Jx0(i,j,k,n) + SxxdEx + SxydEy + SxzdEz;
                 Jx(i,j,k,n) = Jx_MM;
@@ -261,24 +307,65 @@ void ImplicitSolver::ComputeJfromMassMatrices()
             {
                 int ii_min = std::max(0,offset_yx[0]+Ebx.smallEnd(0)-i);
                 int ii_max = std::min(ncomp_yx[0]-1,offset_yx[0]+Ebx.bigEnd(0)-i);
+                int jj_min = 0, jj_max = 0;
+                int kk_min = 0, kk_max = 0;
+#if AMREX_SPACEDIM > 1
+                jj_min = std::max(0,offset_yx[1]+Ebx.smallEnd(1)-j);
+                jj_max = std::min(ncomp_yx[1]-1,offset_yx[1]+Ebx.bigEnd(1)-j);
+#endif
+#if AMREX_SPACEDIM == 3
+                kk_min = std::max(0,offset_yx[2]+Ebx.smallEnd(2)-k);
+                kk_max = std::min(ncomp_yx[2]-1,offset_yx[2]+Ebx.bigEnd(2)-k);
+#endif
                 amrex::Real SyxdEx = 0.0;
                 for (int ii = ii_min; ii <= ii_max; ++ii) {
-                    int Nc = ii;
-                    SyxdEx += Syx(i,j,k,Nc)*(Ex(i+ii-offset_yx[0],j,k,n) - Ex0(i+ii-offset_yx[0],j,k,n));
+                    for (int jj = jj_min; jj <= jj_max; ++jj) {
+                        for (int kk = kk_min; kk <= kk_max; ++kk) {
+                            int Nc = AMREX_D_TERM(ii, + ncomp_yx[0]*jj, + ncomp_yx[0]*ncomp_yx[1]*kk);
+                            SyxdEx += Syx(i,j,k,Nc)*( Ex(i+ii-offset_yx[0],j+jj-offset_yx[1],k+kk-offset_yx[2],n)
+                                                  -  Ex0(i+ii-offset_yx[0],j+jj-offset_yx[1],k+kk-offset_yx[2],n) );
+                        }
+                    }
                 }
                 ii_min = std::max(0,offset_yy[0]+Eby.smallEnd(0)-i);
                 ii_max = std::min(ncomp_yy[0]-1,offset_yy[0]+Eby.bigEnd(0)-i);
+#if AMREX_SPACEDIM > 1
+                jj_min = std::max(0,offset_yy[1]+Eby.smallEnd(1)-j);
+                jj_max = std::min(ncomp_yy[1]-1,offset_yy[1]+Eby.bigEnd(1)-j);
+#endif
+#if AMREX_SPACEDIM == 3
+                kk_min = std::max(0,offset_yy[2]+Eby.smallEnd(2)-k);
+                kk_max = std::min(ncomp_yy[2]-1,offset_yy[2]+Eby.bigEnd(2)-k);
+#endif
                 amrex::Real SyydEy = 0.0;
                 for (int ii = ii_min; ii <= ii_max; ++ii) {
-                    int Nc = ii;
-                    SyydEy += Syy(i,j,k,Nc)*(Ey(i+ii-offset_yy[0],j,k,n) - Ey0(i+ii-offset_yy[0],j,k,n));
+                    for (int jj = jj_min; jj <= jj_max; ++jj) {
+                        for (int kk = kk_min; kk <= kk_max; ++kk) {
+                            int Nc = AMREX_D_TERM(ii, + ncomp_yy[0]*jj, + ncomp_yy[0]*ncomp_yy[1]*kk);
+                            SyydEy += Syy(i,j,k,Nc)*( Ey(i+ii-offset_yy[0],j+jj-offset_yy[1],k+kk-offset_yy[2],n)
+                                                  -  Ey0(i+ii-offset_yy[0],j+jj-offset_yy[1],k+kk-offset_yy[2],n) );
+                        }
+                    }
                 }
                 ii_min = std::max(0,offset_yz[0]+Ebz.smallEnd(0)-i);
                 ii_max = std::min(ncomp_yz[0]-1,offset_yz[0]+Ebz.bigEnd(0)-i);
+#if AMREX_SPACEDIM > 1
+                jj_min = std::max(0,offset_yz[1]+Ebz.smallEnd(1)-j);
+                jj_max = std::min(ncomp_yz[1]-1,offset_yz[1]+Ebz.bigEnd(1)-j);
+#endif
+#if AMREX_SPACEDIM == 3
+                kk_min = std::max(0,offset_yz[2]+Ebz.smallEnd(2)-k);
+                kk_max = std::min(ncomp_yz[2]-1,offset_yz[2]+Ebz.bigEnd(2)-k);
+#endif
                 amrex::Real SyzdEz = 0.0;
                 for (int ii = ii_min; ii <= ii_max; ++ii) {
-                    int Nc = ii;
-                    SyzdEz += Syz(i,j,k,Nc)*(Ez(i+ii-offset_yz[0],j,k,n) - Ez0(i+ii-offset_yz[0],j,k,n));
+                    for (int jj = jj_min; jj <= jj_max; ++jj) {
+                        for (int kk = kk_min; kk <= kk_max; ++kk) {
+                            int Nc = AMREX_D_TERM(ii, + ncomp_yz[0]*jj, + ncomp_yz[0]*ncomp_yz[1]*kk);
+                            SyzdEz += Syz(i,j,k,Nc)*( Ez(i+ii-offset_yz[0],j+jj-offset_yz[1],k+kk-offset_yz[2],n)
+                                                  -  Ez0(i+ii-offset_yz[0],j+jj-offset_yz[1],k+kk-offset_yz[2],n) );
+                        }
+                    }
                 }
                 amrex::Real Jy_MM = Jy0(i,j,k,n) + SyxdEx + SyydEy + SyzdEz;
                 Jy(i,j,k,n) = Jy_MM;
@@ -291,24 +378,65 @@ void ImplicitSolver::ComputeJfromMassMatrices()
             {
                 int ii_min = std::max(0,offset_zx[0]+Ebx.smallEnd(0)-i);
                 int ii_max = std::min(ncomp_zx[0]-1,offset_zx[0]+Ebx.bigEnd(0)-i);
+                int jj_min = 0, jj_max = 0;
+                int kk_min = 0, kk_max = 0;
+#if AMREX_SPACEDIM > 1
+                jj_min = std::max(0,offset_zx[1]+Ebx.smallEnd(1)-j);
+                jj_max = std::min(ncomp_zx[1]-1,offset_zx[1]+Ebx.bigEnd(1)-j);
+#endif
+#if AMREX_SPACEDIM == 3
+                kk_min = std::max(0,offset_zx[2]+Ebx.smallEnd(2)-k);
+                kk_max = std::min(ncomp_zx[2]-1,offset_zx[2]+Ebx.bigEnd(2)-k);
+#endif
                 amrex::Real SzxdEx = 0.0;
                 for (int ii = ii_min; ii <= ii_max; ++ii) {
-                    int Nc = ii;
-                    SzxdEx += Szx(i,j,k,Nc)*(Ex(i+ii-offset_zx[0],j,k,n) - Ex0(i+ii-offset_zx[0],j,k,n));
+                    for (int jj = jj_min; jj <= jj_max; ++jj) {
+                        for (int kk = kk_min; kk <= kk_max; ++kk) {
+                            int Nc = AMREX_D_TERM(ii, + ncomp_zx[0]*jj, + ncomp_zx[0]*ncomp_zx[1]*kk);
+                            SzxdEx += Szx(i,j,k,Nc)*( Ex(i+ii-offset_zx[0],j+jj-offset_zx[1],k+kk-offset_zx[2],n)
+                                                  -  Ex0(i+ii-offset_zx[0],j+jj-offset_zx[1],k+kk-offset_zx[2],n) );
+                        }
+                    }
                 }
                 ii_min = std::max(0,offset_zy[0]+Eby.smallEnd(0)-i);
                 ii_max = std::min(ncomp_zy[0]-1,offset_zy[0]+Eby.bigEnd(0)-i);
+#if AMREX_SPACEDIM > 1
+                jj_min = std::max(0,offset_zy[1]+Eby.smallEnd(1)-j);
+                jj_max = std::min(ncomp_zy[1]-1,offset_zy[1]+Eby.bigEnd(1)-j);
+#endif
+#if AMREX_SPACEDIM == 3
+                kk_min = std::max(0,offset_zy[2]+Eby.smallEnd(2)-k);
+                kk_max = std::min(ncomp_zy[2]-1,offset_zy[2]+Eby.bigEnd(2)-k);
+#endif
                 amrex::Real SzydEy = 0.0;
                 for (int ii = ii_min; ii <= ii_max; ++ii) {
-                    int Nc = ii;
-                    SzydEy += Szy(i,j,k,Nc)*(Ey(i+ii-offset_zy[0],j,k,n) - Ey0(i+ii-offset_zy[0],j,k,n));
+                    for (int jj = jj_min; jj <= jj_max; ++jj) {
+                        for (int kk = kk_min; kk <= kk_max; ++kk) {
+                            int Nc = AMREX_D_TERM(ii, + ncomp_zy[0]*jj, + ncomp_zy[0]*ncomp_zy[1]*kk);
+                            SzydEy += Szy(i,j,k,Nc)*( Ey(i+ii-offset_zy[0],j+jj-offset_zy[1],k+kk-offset_zy[2],n)
+                                                  -  Ey0(i+ii-offset_zy[0],j+jj-offset_zy[1],k+kk-offset_zy[2],n) );
+                        }
+                    }
                 }
                 ii_min = std::max(0,offset_zz[0]+Ebz.smallEnd(0)-i);
                 ii_max = std::min(ncomp_zz[0]-1,offset_zz[0]+Ebz.bigEnd(0)-i);
+#if AMREX_SPACEDIM > 1
+                jj_min = std::max(0,offset_zz[1]+Ebz.smallEnd(1)-j);
+                jj_max = std::min(ncomp_zz[1]-1,offset_zz[1]+Ebz.bigEnd(1)-j);
+#endif
+#if AMREX_SPACEDIM == 3
+                kk_min = std::max(0,offset_zz[2]+Ebz.smallEnd(2)-k);
+                kk_max = std::min(ncomp_zz[2]-1,offset_zz[2]+Ebz.bigEnd(2)-k);
+#endif
                 amrex::Real SzzdEz = 0.0;
                 for (int ii = ii_min; ii <= ii_max; ++ii) {
-                    int Nc = ii;
-                    SzzdEz += Szz(i,j,k,Nc)*(Ez(i+ii-offset_zz[0],j,k,n) - Ez0(i+ii-offset_zz[0],j,k,n));
+                    for (int jj = jj_min; jj <= jj_max; ++jj) {
+                        for (int kk = kk_min; kk <= kk_max; ++kk) {
+                            int Nc = AMREX_D_TERM(ii, + ncomp_zz[0]*jj, + ncomp_zz[0]*ncomp_zz[1]*kk);
+                            SzzdEz += Szz(i,j,k,Nc)*( Ez(i+ii-offset_zz[0],j+jj-offset_zz[1],k+kk-offset_zz[2],n)
+                                                  -  Ez0(i+ii-offset_zz[0],j+jj-offset_zz[1],k+kk-offset_zz[2],n) );
+                        }
+                    }
                 }
                 amrex::Real Jz_MM = Jz0(i,j,k,n) + SzxdEx + SzydEy + SzzdEz;
                 Jz(i,j,k,n) = Jz_MM;
