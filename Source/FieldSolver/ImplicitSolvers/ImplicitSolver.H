@@ -207,6 +207,16 @@ protected:
                     m_use_mass_matrices = false;
                 }
             }
+#if defined(WARPX_DIM_RCYLINDER)
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !m_use_mass_matrices,
+                "Using mass matrices is not setup for DIM = RCYLINDER!");
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !m_use_mass_matrices,
+                "Using mass matrices is not setup for DIM = RSHERE!");
+#endif
         }
         else {
             WARPX_ABORT_WITH_MESSAGE(
