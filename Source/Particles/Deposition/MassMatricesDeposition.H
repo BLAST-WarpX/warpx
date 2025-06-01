@@ -392,7 +392,7 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                     //  Deposit mass matrices for X-current
                     if (Sxx_nComp==1 && aa==ix && bb==iz) {
                         amrex::Gpu::Atomic::AddNoRet(
-                            &Sxx_arr(lo.x+l_jx+ix, lo.y+l_jx+iz, 0, 0),
+                            &Sxx_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, 0),
                             weight_Jx*weight_Ex*fpxx);
                     }
                     else if (Sxx_nComp>1) {
