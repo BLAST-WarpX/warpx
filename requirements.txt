@@ -1,14 +1,21 @@
-# basic dependencies
+# 从 requirements.txt 文件中获取软件包要求
+# basic dependencies  基本依赖项
+# 数组
 numpy>=1.15
+# 元素周期表
 periodictable~=1.5
 
 # PICMI
 # note: don't forget to update the version in Docs/requirements.txt, too
+# PICMI 
+# 注意：别忘了更新 Docs/requirements.txt 中的版本
 picmistandard==0.33.0
 #   for development against an unreleased PICMI version, use:
 #picmistandard @ git+https://github.com/picmi-standard/picmi.git#subdirectory=PICMI_Python
+# 如需针对未发布的 PICMI 版本进行开发，请使用： picmistandard @ git+https://github.com/picmi-standard/picmi.git#subdirectory=PICMI_Python
 
 # optional, some used for testing:
+# 可选，有些用于测试：
 # yt
 # openpmd-api
 # openpmd-viewer

@@ -1,3 +1,7 @@
+# setup.py 文件是 Python 生态中用于构建、安装和分发 Python 模块的标准脚本。
+# 它使用 setuptools 库来定义项目的元数据（如名称、版本、作者等）以及项目的依赖关系和包结构。
+# 通过 setup.py，开发者可以轻松地安装、打包和发布他们的 Python 项目。
+
 import os
 import platform
 import re
@@ -17,6 +21,8 @@ class CopyPreBuild(build):
         # clashes with directories many developers have in their source trees;
         # this can create confusing results with "pip install .", which clones
         # the whole source tree by default
+        # 我们之所以覆盖它，是因为默认的 “build”（和 “build/lib”）与许多开发者在源代码树中的目录有冲突；
+        # 这可能会与 “pip install . ”产生混乱的结果，后者默认克隆整个源代码树
         self.build_base = os.path.join("_tmppythonbuild", "warpx")
 
     def run(self):
@@ -24,10 +30,16 @@ class CopyPreBuild(build):
         #   by default, this stays around. we want to make sure generated
         #   files like libwarpx.(1d|2d|rz|3d).(so|pyd) are always only the
         #   ones we want to package and not ones from an earlier wheel's stage
+        #  默认情况下会移除现有的build目录，但该目录会保留。
+        # 我们希望确保生成的文件（如 libwarpx.(1d|2d|rz|3d).(so|pyd)）始终只是我们要打包的文件，
+        # 而不是来自早期轮子阶段的文件
         if os.path.exists(self.build_base):
             shutil.rmtree(self.build_base)
 
         # call superclass
+        # 在Python中，调用父类（superclass）的方法是使用super()函数。这允许你在子类中调用父类的方法。
+        # build.run(self) 在 Python 中表示调用一个名为 build 的 ​对象/模块/类​ 中的 run 方法，
+        # 并将当前实例 self 作为参数传递。
         build.run(self)
 
         # matches: warpx_pybind_(1d|2d|rz|3d). ... .(so|pyd)
@@ -44,6 +56,7 @@ class CopyPreBuild(build):
             )
 
         # copy external libs into collection of files in a temporary build dir
+        # 将外部库复制到临时构建目录下的文件集中
         dst_path = os.path.join(self.build_lib, "pywarpx")
         for lib_path in libs_found:
             shutil.copy(lib_path, dst_path)
@@ -78,6 +91,7 @@ class CMakeBuild(build_ext):
     def build_extension(self, ext):
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
         # required for auto-detection of auxiliary "native" libs
+        # 自动检测辅助 “本地 native”库所需
         if not extdir.endswith(os.path.sep):
             extdir += os.path.sep
 
@@ -87,6 +101,7 @@ class CMakeBuild(build_ext):
         pyv = sys.version_info
         cmake_args = [
             # Python: use the calling interpreter in CMake
+            # Python：在 CMake 中使用调用的解释器
             # https://cmake.org/cmake/help/latest/module/FindPython.html#hints
             # https://cmake.org/cmake/help/latest/command/find_package.html#config-mode-version-selection
             f"-DPython_ROOT_DIR={sys.prefix}",
@@ -97,7 +112,7 @@ class CMakeBuild(build_ext):
             "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=" + extdir,
             "-DWarpX_DIMS=" + dims,
             "-DWarpX_APP:BOOL=OFF",
-            ## variants
+            ## variants  变量
             "-DWarpX_COMPUTE=" + WARPX_COMPUTE,
             "-DWarpX_MPI:BOOL=" + WARPX_MPI,
             "-DWarpX_EB:BOOL=" + WARPX_EB,
@@ -109,20 +124,22 @@ class CMakeBuild(build_ext):
             "-DWarpX_PYTHON_IPO:BOOL=" + WARPX_PYTHON_IPO,
             "-DWarpX_QED:BOOL=" + WARPX_QED,
             "-DWarpX_QED_TABLE_GEN:BOOL=" + WARPX_QED_TABLE_GEN,
-            ## dependency control (developers & package managers)
+            ## dependency control (developers & package managers)  依赖性控制（开发人员和软件包管理器）
             "-DWarpX_amrex_internal=" + WARPX_AMREX_INTERNAL,
-            # PEP-440 conformant version from package
+            # PEP-440 conformant version from package  软件包中符合 PEP-440 标准的版本
             "-DpyWarpX_VERSION_INFO=" + self.distribution.get_version(),
-            #        see PICSAR and openPMD below
-            ## static/shared libs
+            #        see PICSAR and openPMD below  见下文 PICSAR 和 openPMD
+            ## static/shared libs  静态/共享程序库
             "-DBUILD_SHARED_LIBS:BOOL=" + BUILD_SHARED_LIBS,
             ## Unix: rpath to current dir when packaged
             ##       needed for shared (here non-default) builds and ADIOS1
             ##       wrapper libraries
+            ## Unix：共享（此处为非默认）构建和 ADIOS1 封装库打包时需要 rpath 到当前目录
             "-DCMAKE_BUILD_WITH_INSTALL_RPATH:BOOL=ON",
             "-DCMAKE_INSTALL_RPATH_USE_LINK_PATH:BOOL=OFF",
             # Windows: has no RPath concept, all `.dll`s must be in %PATH%
             #          or same dir as calling executable
+            # Windows：没有 RPath 概念，所有`.dll`必须位于 %PATH% 或与调用可执行文件相同的目录中
         ]
         if WARPX_QED.upper() in ["1", "ON", "TRUE", "YES"]:
             cmake_args.append("-DWarpX_picsar_internal=" + WARPX_PICSAR_INTERNAL)
@@ -133,6 +150,7 @@ class CMakeBuild(build_ext):
                 "-DWarpX_openpmd_internal=" + WARPX_OPENPMD_INTERNAL,
             ]
         # further dependency control (developers & package managers)
+        # 进一步的依赖性控制（开发人员和软件包管理器）
         if WARPX_AMREX_SRC:
             cmake_args.append("-DWarpX_amrex_src=" + WARPX_AMREX_SRC)
         if WARPX_AMREX_REPO:
@@ -159,6 +177,7 @@ class CMakeBuild(build_ext):
         else:
             # values: linux*, aix, freebsd, ...
             #   just as well win32 & cygwin (although Windows has no RPaths)
+            # values：Linux*、AIX、Freebsd......以及 Win32 和 cygwin（尽管 Windows 没有 RPaths）。
             cmake_args.append("-DCMAKE_INSTALL_RPATH=$ORIGIN")
 
         cfg = "Debug" if self.debug else "Release"
@@ -183,6 +202,7 @@ class CMakeBuild(build_ext):
         subprocess.check_call(["cmake", "--build", "."] + build_args, cwd=build_dir)
         # note that this does not call install;
         # we pick up artifacts directly from the build output dirs
+        # 请注意，这不会调用安装install；我们会直接从build输出目录中提取工件
 
 
 with open("./README.md", encoding="utf-8") as f:
@@ -191,6 +211,7 @@ with open("./README.md", encoding="utf-8") as f:
 # Allow to control options via environment vars.
 #   Work-around for https://github.com/pypa/setuptools/issues/1712
 # Pick up existing WarpX libraries or...
+# 允许通过环境变量控制选项。https://github.com/pypa/setuptools/issues/1712 的变通办法。拾取现有的 WarpX 库或...
 PYWARPX_LIB_DIR = os.environ.get("PYWARPX_LIB_DIR")
 
 WARPX_PYTHON_IPO = os.environ.get("WARPX_PYTHON_IPO", "ON")
@@ -200,6 +221,9 @@ env = os.environ.copy()
 #   note: changed default for SHARED, MPI, TESTING and EXAMPLES
 #   note: we use all-uppercase variable names for environment control to be
 #         consistent across platforms (especially Windows)
+# 使用 CMake 构建 WarpX 库。
+# 注：更改了 SHARED、MPI、TESTING 和 EXAMPLES 的默认值 
+# 注：我们使用全大写变量名进行环境控制，以便在不同平台（尤其是 Windows）上保持一致
 WARPX_COMPUTE = env.pop("WARPX_COMPUTE", "OMP")
 WARPX_MPI = env.pop("WARPX_MPI", "OFF")
 WARPX_EB = env.pop("WARPX_EB", "ON")
@@ -216,10 +240,11 @@ BUILD_SHARED_LIBS = env.pop("WARPX_BUILD_SHARED_LIBS", "OFF")
 #                               'OFF')
 # BUILD_EXAMPLES = env.pop('WARPX_BUILD_EXAMPLES',
 #                                'OFF')
-# openPMD-api sub-control
+# openPMD-api sub-control openPMD-api 子控件
 HDF5_USE_STATIC_LIBRARIES = env.pop("HDF5_USE_STATIC_LIBRARIES", "OFF")
 ADIOS_USE_STATIC_LIBS = env.pop("ADIOS_USE_STATIC_LIBS", "OFF")
-# CMake dependency control (developers & package managers)
+# CMake dependency control (developers & package managers)  
+# CMake 依赖性控制（开发人员和软件包管理器）
 WARPX_AMREX_SRC = env.pop("WARPX_AMREX_SRC", "")
 WARPX_AMREX_REPO = env.pop("WARPX_AMREX_REPO", "")
 WARPX_AMREX_BRANCH = env.pop("WARPX_AMREX_BRANCH", "")
@@ -242,26 +267,29 @@ for key in env.keys():
 
 
 # https://cmake.org/cmake/help/v3.0/command/if.html
+# MPI并行计算
 if WARPX_MPI.upper() in ["1", "ON", "TRUE", "YES"]:
     WARPX_MPI = "ON"
 else:
     WARPX_MPI = "OFF"
 
-# Include embedded boundary functionality
+# Include embedded boundary functionality  包括嵌入式边界功能
 if WARPX_EB.upper() in ["1", "ON", "TRUE", "YES"]:
     WARPX_EB = "ON"
 else:
     WARPX_EB = "OFF"
 
 
-# for CMake
-cxx_modules = []  # values: warpx_1d, warpx_2d, warpx_rz, warpx_3d
-cmdclass = {}  # build extensions
+# for CMake  对于Cmake
+cxx_modules = []  # values: warpx_1d, warpx_2d, warpx_rz, warpx_3d  取值：warpx_1d, warpx_2d, warpx_rz, warpx_3d 
+cmdclass = {}  # build extensions  build扩展
 
 # externally pre-built: pick up pre-built WarpX libraries
+# 外部pre-built：拾取pre-built的 WarpX 库
 if PYWARPX_LIB_DIR:
     cmdclass = dict(build=CopyPreBuild)
 # CMake: build WarpX libraries ourselves
+# CMake: 自行构建WarpX库
 else:
     cmdclass = dict(build_ext=CMakeBuild)
     for dim in [x.lower() for x in WARPX_DIMS.split(";")]:
@@ -269,6 +297,7 @@ else:
         cxx_modules.append(CMakeExtension("warpx_" + name))
 
 # Get the package requirements from the requirements.txt file
+# 从 requirements.txt 文件中获取软件包要求
 install_requires = []
 with open("./requirements.txt") as f:
     install_requires = [line.strip("\n") for line in f.readlines()]
