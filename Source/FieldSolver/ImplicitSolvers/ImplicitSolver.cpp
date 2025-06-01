@@ -155,14 +155,19 @@ void ImplicitSolver::ComputeJfromMassMatrices()
 #if AMREX_SPACEDIM == 1
                 offset_xz[dir] = m_ncomp_xz[dir]/2;
                 offset_yz[dir] = m_ncomp_yz[dir]/2;
-#elif AMREX_SPACEDIM == 2
+#elif AMREX_SPACEDIM >= 2
                 offset_yx[dir] = m_ncomp_yx[dir]/2;
                 offset_zx[dir] = m_ncomp_zx[dir]/2;
 #endif
             }
             if (dir==1) {
+#if AMREX_SPACEDIM == 2
+                offset_xz[dir] = m_ncomp_xz[dir]/2;
+                offset_yz[dir] = m_ncomp_yz[dir]/2;
+#elif AMREX_SPACEDIM == 3
                 offset_xy[dir] = m_ncomp_xy[dir]/2;
                 offset_zy[dir] = m_ncomp_zy[dir]/2;
+#endif
             }
             if (dir==2) {
                 offset_xz[dir] = m_ncomp_xz[dir]/2;
