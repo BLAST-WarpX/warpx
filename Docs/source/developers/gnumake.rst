@@ -58,6 +58,8 @@ options are:
     * ``DEBUG=FALSE`` or ``TRUE``: Compiling in ``DEBUG`` mode can help tremendously during code development.
     * ``USE_FFT=FALSE`` or ``TRUE``: Compile the Pseudo-Spectral Analytical Time Domain Maxwell solver. Requires an FFT library.
     * ``USE_RZ=FALSE`` or ``TRUE``: Compile for 2D axisymmetric geometry.
+    * ``USE_RCYLINDER=FALSE`` or ``TRUE``: Compile for 1D cylindrical geometry.
+    * ``USE_RSPHERE=FALSE`` or ``TRUE``: Compile for 1D spherical geometry.
     * ``COMP=gcc`` or ``intel``: Compiler.
     * ``USE_MPI=TRUE`` or ``FALSE``: Whether to compile with MPI support.
     * ``USE_OMP=TRUE`` or ``FALSE``: Whether to compile with OpenMP support.

@@ -140,7 +140,7 @@ WarpXParticleContainer::WarpXParticleContainer (AmrCore* amr_core, int ispecies)
     m_boundary_conditions.SetBoundsZ(WarpX::particle_boundary_lo[2], WarpX::particle_boundary_hi[2]);
 #elif WARPX_DIM_XZ || WARPX_DIM_RZ
     m_boundary_conditions.SetBoundsZ(WarpX::particle_boundary_lo[1], WarpX::particle_boundary_hi[1]);
-#else
+#elif defined(WARPX_DIM_1D_Z)
     m_boundary_conditions.SetBoundsZ(WarpX::particle_boundary_lo[0], WarpX::particle_boundary_hi[0]);
 #endif
     m_boundary_conditions.BuildReflectionModelParsers();
@@ -215,9 +215,13 @@ WarpXParticleContainer::AddNParticles (int /*lev*/, long n,
 
     const std::size_t np = iend-ibegin;
 
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     amrex::Vector<amrex::ParticleReal> r(np);
     amrex::Vector<amrex::ParticleReal> theta(np);
+#elif defined(WARPX_DIM_RSPHERE)
+    amrex::Vector<amrex::ParticleReal> r(np);
+    amrex::Vector<amrex::ParticleReal> theta(np);
+    amrex::Vector<amrex::ParticleReal> phi(np);
 #endif
 
     for (auto i = ibegin; i < iend; ++i)
@@ -230,9 +234,14 @@ WarpXParticleContainer::AddNParticles (int /*lev*/, long n,
         }
         idcpu_data.push_back(amrex::SetParticleIDandCPU(current_id, ParallelDescriptor::MyProc()));
 
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
         r[i-ibegin] = std::sqrt(x[i]*x[i] + y[i]*y[i]);
         theta[i-ibegin] = std::atan2(y[i], x[i]);
+#elif defined(WARPX_DIM_RSPHERE)
+        r[i-ibegin] = std::sqrt(x[i]*x[i] + y[i]*y[i] + z[i]*z[i]);
+        theta[i-ibegin] = std::atan2(y[i], x[i]);
+        const amrex::ParticleReal rxy = std::sqrt(x[i]*x[i] + y[i]*y[i]);
+        phi[i-ibegin] = std::atan2(rxy, r[i-ibegin]);
 #endif
     }
 
@@ -250,9 +259,12 @@ WarpXParticleContainer::AddNParticles (int /*lev*/, long n,
         pinned_tile.push_back_real(PIdx::x, x.data() + ibegin, x.data() + iend);
 #endif
         pinned_tile.push_back_real(PIdx::z, z.data() + ibegin, z.data() + iend);
-#else //AMREX_SPACEDIM == 1
+#elif defined(WARPX_DIM_1D_Z)
         amrex::ignore_unused(x,y);
         pinned_tile.push_back_real(PIdx::z, z.data() + ibegin, z.data() + iend);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        pinned_tile.push_back_real(PIdx::x, x.data() + ibegin, x.data() + iend);
+        amrex::ignore_unused(y,z);
 #endif
 
         pinned_tile.push_back_real(PIdx::w, attr_real[0].data() + ibegin, attr_real[0].data() + iend);
@@ -266,10 +278,15 @@ WarpXParticleContainer::AddNParticles (int /*lev*/, long n,
 
         for (int comp = PIdx::uz+1; comp < PIdx::nattribs; ++comp)
         {
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             if (comp == PIdx::theta) {
                 pinned_tile.push_back_real(comp, theta.data(), theta.data() + np);
             }
+#if defined(WARPX_DIM_RSPHERE)
+            else if (comp == PIdx::phi) {
+                pinned_tile.push_back_real(comp, phi.data(), phi.data() + np);
+            }
+#endif
             else {
                 pinned_tile.push_back_real(comp, np, 0.0_prt);
             }
@@ -390,6 +407,8 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
 
 #if   defined(WARPX_DIM_1D_Z)
     const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(WarpX::noz/2));
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(WarpX::nox/2));
 #elif   defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(WarpX::nox/2),
                                                        static_cast<int>(WarpX::noz/2));
@@ -637,20 +656,24 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                 }
 
             } else if (push_type == PushType::Implicit) {
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
                 auto& xp_n = pti.GetAttribs("x_n");
                 const ParticleReal* xp_n_data = xp_n.dataPtr() + offset;
 #else
                 const ParticleReal* xp_n_data = nullptr;
 #endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 auto& yp_n = pti.GetAttribs("y_n");
                 const ParticleReal* yp_n_data = yp_n.dataPtr() + offset;
 #else
                 const ParticleReal* yp_n_data = nullptr;
 #endif
+#if !defined(WARPX_DIM_RCYLINDER)
                 auto& zp_n = pti.GetAttribs("z_n");
                 const ParticleReal* zp_n_data = zp_n.dataPtr() + offset;
+#else
+                const ParticleReal* zp_n_data = nullptr;
+#endif
                 auto& uxp_n = pti.GetAttribs("ux_n");
                 auto& uyp_n = pti.GetAttribs("uy_n");
                 auto& uzp_n = pti.GetAttribs("uz_n");
@@ -690,20 +713,24 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
             }
         } else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
             if (push_type == PushType::Implicit) {
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
                 auto& xp_n = pti.GetAttribs("x_n");
                 const ParticleReal* xp_n_data = xp_n.dataPtr() + offset;
 #else
                 const ParticleReal* xp_n_data = nullptr;
 #endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 auto& yp_n = pti.GetAttribs("y_n");
                 const ParticleReal* yp_n_data = yp_n.dataPtr() + offset;
 #else
                 const ParticleReal* yp_n_data = nullptr;
 #endif
+#if !defined(WARPX_DIM_RCYLINDER)
                 auto& zp_n = pti.GetAttribs("z_n");
                 const ParticleReal* zp_n_data = zp_n.dataPtr() + offset;
+#else
+                const ParticleReal* zp_n_data = nullptr;
+#endif
                 auto& uxp_n = pti.GetAttribs("ux_n");
                 auto& uyp_n = pti.GetAttribs("uy_n");
                 auto& uzp_n = pti.GetAttribs("uz_n");
@@ -923,7 +950,9 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
 
 #if   defined(WARPX_DIM_1D_Z)
     const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(WarpX::noz/2));
-#elif   defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(WarpX::nox/2));
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(WarpX::nox/2),
                                                        static_cast<int>(WarpX::noz/2));
 #elif defined(WARPX_DIM_3D)
@@ -1066,20 +1095,24 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
 
     // Not doing shared memory deposition, call normal kernels
     if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
         auto& xp_n = pti.GetAttribs("x_n");
         const ParticleReal* xp_n_data = xp_n.dataPtr() + offset;
 #else
         const ParticleReal* xp_n_data = nullptr;
 #endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         auto& yp_n = pti.GetAttribs("y_n");
         const ParticleReal* yp_n_data = yp_n.dataPtr() + offset;
 #else
         const ParticleReal* yp_n_data = nullptr;
 #endif
+#if !defined(WARPX_DIM_RCYLINDER)
         auto& zp_n = pti.GetAttribs("z_n");
         const ParticleReal* zp_n_data = zp_n.dataPtr() + offset;
+#else
+        const ParticleReal* zp_n_data = nullptr;
+#endif
         if (WarpX::nox == 1){
             doVillasenorJandSigmaDeposition<1>(
                 xp_n_data, yp_n_data, zp_n_data,
@@ -1230,6 +1263,8 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
 
 #if   defined(WARPX_DIM_1D_Z)
         const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(WarpX::noz/2));
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(WarpX::nox/2));
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(WarpX::nox/2+1),
                                                            static_cast<int>(WarpX::noz/2+1));
@@ -1568,7 +1603,7 @@ WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
     }
 #endif
 
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     if (apply_boundary_and_scale_volume)
     {
         WarpX::GetInstance().ApplyInverseVolumeScalingToChargeDensity(rho, lev);
@@ -1586,7 +1621,7 @@ WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
         );
     }
 
-#ifndef WARPX_DIM_RZ
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     if (apply_boundary_and_scale_volume)
     {
         // Reflect density over PEC boundaries, if needed.
@@ -1785,7 +1820,7 @@ WarpXParticleContainer::DepositNumberDensity (amrex::MultiFab* number_density, c
     {
         const amrex::Box& box = mfi.tilebox();
 
-#if defined WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         int const box_lo_r = box.smallEnd(0);
         amrex::XDim3 const xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
         amrex::Real const rmin = xyzmin.x;
@@ -1795,11 +1830,18 @@ WarpXParticleContainer::DepositNumberDensity (amrex::MultiFab* number_density, c
         amrex::Array4<amrex::Real> const& num_array = number_density->array(mfi);
         amrex::ParallelFor(box,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-#if defined WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 // Return the radial factor for the volume element, dV
                 amrex::Real const r = rmin + (i - box_lo_r)*dr;
                 // This is (pi*(r+dr)**2 - pi*r**2)/dr
                 amrex::Real const volume_factor = MathConst::pi*(2.0_rt*r + dr);
+#elif defined(WARPX_DIM_RSPHERE)
+                // Return the radial factor for the volume element, dV
+                amrex::Real const r = rmin + (i - box_lo_r)*dr;
+                // This is (4/3*pi*(r+dr)**3 - 4/3*pi*r**3)/dr, leaving out the
+                // highest order term
+                amrex::Real const r_cell = r + 0.5_rt*dr;
+                amrex::Real const volume_factor = 4.0_rt*MathConst::pi*r_cell*r_cell;
 #else
                 // No factor is needed for Cartesian
                 amrex::Real constexpr volume_factor = 1._rt;
@@ -2166,8 +2208,10 @@ WarpXParticleContainer::ApplyBoundaryConditions (){
             gridmin.y = Geom(lev).ProbLo(1);
             gridmax.y = Geom(lev).ProbHi(1);
 #endif
+#if defined(WARPX_ZINDEX)
             gridmin.z = Geom(lev).ProbLo(WARPX_ZINDEX);
             gridmax.z = Geom(lev).ProbHi(WARPX_ZINDEX);
+#endif
 
             ParticleTileType& ptile = ParticlesAt(lev, pti);
 
@@ -2187,7 +2231,8 @@ WarpXParticleContainer::ApplyBoundaryConditions (){
 
                     ParticleReal x, y, z;
                     GetPosition.AsStored(i, x, y, z);
-                    // Note that for RZ, (x, y, z) is actually (r, theta, z).
+                    // Note that for RZ and RCYLINDER, (x, y, z) is actually (r, theta, z),
+                    // and for RSPHERE (r, theta, phi).
 
                     bool particle_lost = false;
                     ApplyParticleBoundaries::apply_boundaries(x, y, z, gridmin, gridmax,

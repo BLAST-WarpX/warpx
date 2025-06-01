@@ -30,12 +30,18 @@ struct FieldProbePIdx
 #if defined (WARPX_DIM_3D)
         y,
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) || !defined(WARPX_DIM_RSPHERE)
         z,
+#endif
         Ex, Ey, Ez,
         Bx, By, Bz,
         S, //!< the Poynting vector
-#ifdef WARPX_DIM_RZ
-        theta,      ///< RZ needs all three position components
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        theta,      ///< Cylindrical and spherical needs the angle
+
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+        phi,      ///< 1D Sphere needs all three position components
 #endif
         nattribs
     };

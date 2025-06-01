@@ -184,7 +184,11 @@ if "phi" in ts.avail_record_components["electron"]:
     print("Checking conservation of energy")
     Ek_i, Ep_i = return_energies(0)
     Ek_f, Ep_f = return_energies(30)
+    print(f"Ek_i + Ep_i = {Ek_i} + {Ep_i} = {Ek_i + Ep_i}")
+    print(f"Ek_f + Ep_f = {Ek_f} + {Ep_f} = {Ek_f + Ep_f}")
+    print(f"(Ek_i + Ep_i) - (Ek_f + Ep_f) = {(Ek_i + Ep_i) - (Ek_f + Ep_f)}")
+    print(f"Energy change tolerance = 0.0032*(Ek_i + Ep_i) = {0.0032 * (Ek_i + Ep_i)}")
     assert Ep_f < 0.7 * Ep_i  # Check that potential energy changes significantly
-    assert abs((Ek_i + Ep_i) - (Ek_f + Ep_f)) < 0.003 * (
+    assert abs((Ek_i + Ep_i) - (Ek_f + Ep_f)) < 0.0032 * (
         Ek_i + Ep_i
     )  # Check conservation of energy

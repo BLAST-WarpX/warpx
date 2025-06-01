@@ -1,11 +1,11 @@
 {
   "lev=0": {
-    "Bz": 9.524453830443424e-24
+    "Bz": 9.524453830432052e-24
   },
   "electron": {
-    "particle_momentum_x": 7.146168295484027e-18,
-    "particle_momentum_y": 7.07310844133659e-18,
-    "particle_momentum_z": 9.282175462811119e-42,
+    "particle_momentum_x": 7.144363399312765e-18,
+    "particle_momentum_y": 7.076043485040536e-18,
+    "particle_momentum_z": 9.183344458930543e-42,
     "particle_position_x": 6978.158002864324,
     "particle_position_y": 2044.6981840260364,
     "particle_theta": 6298.956889003178,
