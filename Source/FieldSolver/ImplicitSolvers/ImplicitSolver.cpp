@@ -299,9 +299,9 @@ void ImplicitSolver::ComputeJfromMassMatrices()
                 for (int ii = ii_min; ii <= ii_max; ++ii) {
                     for (int jj = jj_min; jj <= jj_max; ++jj) {
                         for (int kk = kk_min; kk <= kk_max; ++kk) {
-                            int Nc = AMREX_D_TERM( ii+offset_zy[0],
-                                   + ncomp_zy[0]*( jj+offset_zy[1] ),
-                                   + ncomp_zy[0]*ncomp_zy[1]*( kk+offset_zy[2] ) );
+                            int Nc = AMREX_D_TERM( ii+offset_xz[0],
+                                   + ncomp_xz[0]*( jj+offset_xz[1] ),
+                                   + ncomp_xz[0]*ncomp_xz[1]*( kk+offset_xz[2] ) );
                             SxzdEz += Sxz(i,j,k,Nc)*( Ez(i+ii,j+jj,k+kk,n)
                                                    - Ez0(i+ii,j+jj,k+kk,n) );
                         }
