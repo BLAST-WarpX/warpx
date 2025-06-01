@@ -1162,7 +1162,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                 jx_arr, jy_arr, jz_arr,
                 Sxx_nComp, Syy_nComp, Szz_nComp,
-                Sxx_arr, Sxy_arr, Sxz_arr,
+                Sxx_arr, Syy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                 np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
         } else if (WarpX::nox == 2){
