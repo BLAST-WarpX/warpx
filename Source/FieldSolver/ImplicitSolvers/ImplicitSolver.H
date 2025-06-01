@@ -217,6 +217,11 @@ protected:
                 !m_use_mass_matrices,
                 "Using mass matrices is not setup for DIM = RSHERE!");
 #endif
+#if AMREX_SPACEDIM == 3
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !m_use_mass_matrices_jacobian,
+                "Using mass matrices for jacobian can not be used for DIM = 3");
+#endif
         }
         else {
             WARPX_ABORT_WITH_MESSAGE(
