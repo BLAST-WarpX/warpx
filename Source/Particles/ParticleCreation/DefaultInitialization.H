@@ -60,7 +60,7 @@ enum struct InitializationPolicy {Zero=0, One, RandomExp};
 
 /**
  * \brief This map sets the initialization policy for each particle component
- * used in WarpX.  
+ * used in WarpX.
  * 该映射为 WarpX 中使用的每个粒子组件设置初始化策略。
  */
 static std::map<std::string, InitializationPolicy> initialization_policies = {

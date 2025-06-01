@@ -222,7 +222,7 @@ env = os.environ.copy()
 #   note: we use all-uppercase variable names for environment control to be
 #         consistent across platforms (especially Windows)
 # 使用 CMake 构建 WarpX 库。
-# 注：更改了 SHARED、MPI、TESTING 和 EXAMPLES 的默认值 
+# 注：更改了 SHARED、MPI、TESTING 和 EXAMPLES 的默认值
 # 注：我们使用全大写变量名进行环境控制，以便在不同平台（尤其是 Windows）上保持一致
 WARPX_COMPUTE = env.pop("WARPX_COMPUTE", "OMP")
 WARPX_MPI = env.pop("WARPX_MPI", "OFF")
@@ -243,7 +243,7 @@ BUILD_SHARED_LIBS = env.pop("WARPX_BUILD_SHARED_LIBS", "OFF")
 # openPMD-api sub-control openPMD-api 子控件
 HDF5_USE_STATIC_LIBRARIES = env.pop("HDF5_USE_STATIC_LIBRARIES", "OFF")
 ADIOS_USE_STATIC_LIBS = env.pop("ADIOS_USE_STATIC_LIBS", "OFF")
-# CMake dependency control (developers & package managers)  
+# CMake dependency control (developers & package managers)
 # CMake 依赖性控制（开发人员和软件包管理器）
 WARPX_AMREX_SRC = env.pop("WARPX_AMREX_SRC", "")
 WARPX_AMREX_REPO = env.pop("WARPX_AMREX_REPO", "")
@@ -281,7 +281,7 @@ else:
 
 
 # for CMake  对于Cmake
-cxx_modules = []  # values: warpx_1d, warpx_2d, warpx_rz, warpx_3d  取值：warpx_1d, warpx_2d, warpx_rz, warpx_3d 
+cxx_modules = []  # values: warpx_1d, warpx_2d, warpx_rz, warpx_3d  取值：warpx_1d, warpx_2d, warpx_rz, warpx_3d
 cmdclass = {}  # build extensions  build扩展
 
 # externally pre-built: pick up pre-built WarpX libraries
