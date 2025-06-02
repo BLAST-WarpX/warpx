@@ -27,4 +27,4 @@ algo.field_gathering = momentum-conserving
 diagnostics.diags_names = diag1
 diag1.intervals = 1
 diag1.diag_type = Full
-diag1.fields_to_plot = Er phi
+diag1.fields_to_plot = Er phi eb_covered

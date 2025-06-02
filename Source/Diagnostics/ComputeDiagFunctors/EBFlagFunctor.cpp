@@ -14,7 +14,6 @@ EBFlagFunctor::EBFlagFunctor (
 )
     : ComputeDiagFunctor(ncomp, crse_ratio), m_lev(lev)
 {
-    // TODO: add runtime check that EB are enabled + ifdef to ensure compilation
     // Write only in one output component.
     AMREX_ALWAYS_ASSERT(ncomp == 1);
 }
@@ -22,14 +21,10 @@ EBFlagFunctor::EBFlagFunctor (
 void
 EBFlagFunctor::operator()(amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer*/) const
 {
-
-    // TODO: add documentation of parameter
-    // TODO: change name to eb covered
-    // TODO: handle RZ case
-
     // Extract structures for embedded boundaries
+    // TODO: add runtime check that EB are enabled + ifdef to ensure compilation
     auto& warpx = WarpX::GetInstance();
     amrex::EBFArrayBoxFactory const& eb_fact = warpx.fieldEBFactory(m_lev);
-
     ablastr::coarsen::sample::Coarsen(mf_dst, eb_fact.getVolFrac(), dcomp, 0, nComp(), 0, m_crse_ratio);
+    // TODO: Otherwise: fill with 0
 }
