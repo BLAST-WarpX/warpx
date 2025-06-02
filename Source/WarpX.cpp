@@ -1386,7 +1386,9 @@ WarpX::ReadParameters ()
                     "We recommend setting algo.particle_shape = 1 in order to avoid this issue");
             }
 
-            pp_particles.query("max_grid_crossings", particle_max_grid_crossings);
+            if (evolve_scheme != EvolveScheme::Explicit) {
+                pp_particles.query("max_grid_crossings", particle_max_grid_crossings);
+            }
 
             // default sort interval for particles if species or lasers vector is not empty
 #ifdef AMREX_USE_GPU
