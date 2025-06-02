@@ -239,22 +239,19 @@ void ImplicitSolver::ComputeJfromMassMatrices()
             amrex::ParallelFor(
             Jbx, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
-                int ii_min = std::max(-offset_xx[0],Ebx.smallEnd(0)-i);
-                int ii_max = std::min(ncomp_xx[0]-1-offset_xx[0],Ebx.bigEnd(0)-i);
-                int jj_min = 0, jj_max = 0;
-                int kk_min = 0, kk_max = 0;
-#if AMREX_SPACEDIM > 1
-                jj_min = std::max(-offset_xx[1],Ebx.smallEnd(1)-j);
-                jj_max = std::min(ncomp_xx[1]-1-offset_xx[1],Ebx.bigEnd(1)-j);
-#endif
-#if AMREX_SPACEDIM == 3
-                kk_min = std::max(-offset_xx[2],Ebx.smallEnd(2)-k);
-                kk_max = std::min(ncomp_xx[2]-1-offset_xx[2],Ebx.bigEnd(2)-k);
-#endif
+                const int idx[3] = {i, j, k};
+                amrex::GpuArray<int, 3> index_min = {0, 0, 0};
+                amrex::GpuArray<int, 3> index_max = {0, 0, 0};
+
+                // Compute Sxx*dEx
+                for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
+                    index_min[dim] = std::max(-offset_xx[dim],Ebx.smallEnd(dim)-idx[dim]);
+                    index_max[dim] = std::min(ncomp_xx[dim]-1-offset_xx[dim],Ebx.bigEnd(dim)-idx[dim]);
+                }
                 amrex::Real SxxdEx = 0.0;
-                for (int ii = ii_min; ii <= ii_max; ++ii) {
-                    for (int jj = jj_min; jj <= jj_max; ++jj) {
-                        for (int kk = kk_min; kk <= kk_max; ++kk) {
+                for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
+                    for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
+                        for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
                             int Nc = AMREX_D_TERM( ii+offset_xx[0],
                                    + ncomp_xx[0]*( jj+offset_xx[1] ),
                                    + ncomp_xx[0]*ncomp_xx[1]*( kk+offset_xx[2] ) );
@@ -263,20 +260,16 @@ void ImplicitSolver::ComputeJfromMassMatrices()
                         }
                     }
                 }
-                ii_min = std::max(-offset_xy[0],Eby.smallEnd(0)-i);
-                ii_max = std::min(ncomp_xy[0]-1-offset_xy[0],Eby.bigEnd(0)-i);
-#if AMREX_SPACEDIM > 1
-                jj_min = std::max(-offset_xy[1],Eby.smallEnd(1)-j);
-                jj_max = std::min(ncomp_xy[1]-1-offset_xy[1],Eby.bigEnd(1)-j);
-#endif
-#if AMREX_SPACEDIM == 3
-                kk_min = std::max(-offset_xy[2],Eby.smallEnd(2)-k);
-                kk_max = std::min(ncomp_xy[2]-1-offset_xy[2],Eby.bigEnd(2)-k);
-#endif
+
+                // Compute Sxy*dEy
+                for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
+                    index_min[dim] = std::max(-offset_xy[dim],Eby.smallEnd(dim)-idx[dim]);
+                    index_max[dim] = std::min(ncomp_xy[dim]-1-offset_xy[dim],Eby.bigEnd(dim)-idx[dim]);
+                }
                 amrex::Real SxydEy = 0.0;
-                for (int ii = ii_min; ii <= ii_max; ++ii) {
-                    for (int jj = jj_min; jj <= jj_max; ++jj) {
-                        for (int kk = kk_min; kk <= kk_max; ++kk) {
+                for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
+                    for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
+                        for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
                             int Nc = AMREX_D_TERM( ii+offset_xy[0],
                                    + ncomp_xy[0]*( jj+offset_xy[1] ),
                                    + ncomp_xy[0]*ncomp_xy[1]*( kk+offset_xy[2] ) );
@@ -285,20 +278,16 @@ void ImplicitSolver::ComputeJfromMassMatrices()
                         }
                     }
                 }
-                ii_min = std::max(-offset_xz[0],Ebz.smallEnd(0)-i);
-                ii_max = std::min(ncomp_xz[0]-1-offset_xz[0],Ebz.bigEnd(0)-i);
-#if AMREX_SPACEDIM > 1
-                jj_min = std::max(-offset_xz[1],Ebz.smallEnd(1)-j);
-                jj_max = std::min(ncomp_xz[1]-1-offset_xz[1],Ebz.bigEnd(1)-j);
-#endif
-#if AMREX_SPACEDIM == 3
-                kk_min = std::max(-offset_xz[2],Ebz.smallEnd(2)-k);
-                kk_max = std::min(ncomp_xz[2]-1-offset_xz[2],Ebz.bigEnd(2)-k);
-#endif
+
+                // Compute Sxz*dEz
+                for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
+                    index_min[dim] = std::max(-offset_xz[dim],Ebz.smallEnd(dim)-idx[dim]);
+                    index_max[dim] = std::min(ncomp_xz[dim]-1-offset_xz[dim],Ebz.bigEnd(dim)-idx[dim]);
+                }
                 amrex::Real SxzdEz = 0.0;
-                for (int ii = ii_min; ii <= ii_max; ++ii) {
-                    for (int jj = jj_min; jj <= jj_max; ++jj) {
-                        for (int kk = kk_min; kk <= kk_max; ++kk) {
+                for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
+                    for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
+                        for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
                             int Nc = AMREX_D_TERM( ii+offset_xz[0],
                                    + ncomp_xz[0]*( jj+offset_xz[1] ),
                                    + ncomp_xz[0]*ncomp_xz[1]*( kk+offset_xz[2] ) );
@@ -307,6 +296,7 @@ void ImplicitSolver::ComputeJfromMassMatrices()
                         }
                     }
                 }
+
                 amrex::Real Jx_MM = Jx0(i,j,k,n) + SxxdEx + SxydEy + SxzdEz;
                 Jx(i,j,k,n) = Jx_MM;
                 //Jx(i,j,k,n) = Jx(i,j,k,n);
@@ -316,22 +306,19 @@ void ImplicitSolver::ComputeJfromMassMatrices()
             },
             Jby, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
-                int ii_min = std::max(-offset_yx[0],Ebx.smallEnd(0)-i);
-                int ii_max = std::min(ncomp_yx[0]-1-offset_yx[0],Ebx.bigEnd(0)-i);
-                int jj_min = 0, jj_max = 0;
-                int kk_min = 0, kk_max = 0;
-#if AMREX_SPACEDIM > 1
-                jj_min = std::max(-offset_yx[1],Ebx.smallEnd(1)-j);
-                jj_max = std::min(ncomp_yx[1]-1-offset_yx[1],Ebx.bigEnd(1)-j);
-#endif
-#if AMREX_SPACEDIM == 3
-                kk_min = std::max(-offset_yx[2],Ebx.smallEnd(2)-k);
-                kk_max = std::min(ncomp_yx[2]-1-offset_yx[2],Ebx.bigEnd(2)-k);
-#endif
+                const int idx[3] = {i, j, k};
+                amrex::GpuArray<int, 3> index_min = {0, 0, 0};
+                amrex::GpuArray<int, 3> index_max = {0, 0, 0};
+
+                // Compute Syx*dEx
+                for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
+                    index_min[dim] = std::max(-offset_yx[dim],Ebx.smallEnd(dim)-idx[dim]);
+                    index_max[dim] = std::min(ncomp_yx[dim]-1-offset_yx[dim],Ebx.bigEnd(dim)-idx[dim]);
+                }
                 amrex::Real SyxdEx = 0.0;
-                for (int ii = ii_min; ii <= ii_max; ++ii) {
-                    for (int jj = jj_min; jj <= jj_max; ++jj) {
-                        for (int kk = kk_min; kk <= kk_max; ++kk) {
+                for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
+                    for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
+                        for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
                             int Nc = AMREX_D_TERM( ii+offset_yx[0],
                                    + ncomp_yx[0]*( jj+offset_yx[1] ),
                                    + ncomp_yx[0]*ncomp_yx[1]*( kk+offset_yx[2] ) );
@@ -340,20 +327,16 @@ void ImplicitSolver::ComputeJfromMassMatrices()
                         }
                     }
                 }
-                ii_min = std::max(-offset_yy[0],Eby.smallEnd(0)-i);
-                ii_max = std::min(ncomp_yy[0]-1-offset_yy[0],Eby.bigEnd(0)-i);
-#if AMREX_SPACEDIM > 1
-                jj_min = std::max(-offset_yy[1],Eby.smallEnd(1)-j);
-                jj_max = std::min(ncomp_yy[1]-1-offset_yy[1],Eby.bigEnd(1)-j);
-#endif
-#if AMREX_SPACEDIM == 3
-                kk_min = std::max(-offset_yy[2],Eby.smallEnd(2)-k);
-                kk_max = std::min(ncomp_yy[2]-1-offset_yy[2],Eby.bigEnd(2)-k);
-#endif
+
+                // Compute Syy*dEy
+                for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
+                    index_min[dim] = std::max(-offset_yy[dim],Eby.smallEnd(dim)-idx[dim]);
+                    index_max[dim] = std::min(ncomp_yy[dim]-1-offset_yy[dim],Eby.bigEnd(dim)-idx[dim]);
+                }
                 amrex::Real SyydEy = 0.0;
-                for (int ii = ii_min; ii <= ii_max; ++ii) {
-                    for (int jj = jj_min; jj <= jj_max; ++jj) {
-                        for (int kk = kk_min; kk <= kk_max; ++kk) {
+                for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
+                    for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
+                        for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
                             int Nc = AMREX_D_TERM( ii+offset_yy[0],
                                    + ncomp_yy[0]*( jj+offset_yy[1] ),
                                    + ncomp_yy[0]*ncomp_yy[1]*( kk+offset_yy[2] ) );
@@ -362,20 +345,16 @@ void ImplicitSolver::ComputeJfromMassMatrices()
                         }
                     }
                 }
-                ii_min = std::max(-offset_yz[0],Ebz.smallEnd(0)-i);
-                ii_max = std::min(ncomp_yz[0]-1-offset_yz[0],Ebz.bigEnd(0)-i);
-#if AMREX_SPACEDIM > 1
-                jj_min = std::max(-offset_yz[1],Ebz.smallEnd(1)-j);
-                jj_max = std::min(ncomp_yz[1]-1-offset_yz[1],Ebz.bigEnd(1)-j);
-#endif
-#if AMREX_SPACEDIM == 3
-                kk_min = std::max(-offset_yz[2],Ebz.smallEnd(2)-k);
-                kk_max = std::min(ncomp_yz[2]-1-offset_yz[2],Ebz.bigEnd(2)-k);
-#endif
+
+                // Compute Syz*dEz
+                for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
+                    index_min[dim] = std::max(-offset_yz[dim],Ebz.smallEnd(dim)-idx[dim]);
+                    index_max[dim] = std::min(ncomp_yz[dim]-1-offset_yz[dim],Ebz.bigEnd(dim)-idx[dim]);
+                }
                 amrex::Real SyzdEz = 0.0;
-                for (int ii = ii_min; ii <= ii_max; ++ii) {
-                    for (int jj = jj_min; jj <= jj_max; ++jj) {
-                        for (int kk = kk_min; kk <= kk_max; ++kk) {
+                for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
+                    for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
+                        for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
                             int Nc = AMREX_D_TERM( ii+offset_yz[0],
                                    + ncomp_yz[0]*( jj+offset_yz[1] ),
                                    + ncomp_yz[0]*ncomp_yz[1]*( kk+offset_yz[2] ) );
@@ -384,6 +363,7 @@ void ImplicitSolver::ComputeJfromMassMatrices()
                         }
                     }
                 }
+
                 amrex::Real Jy_MM = Jy0(i,j,k,n) + SyxdEx + SyydEy + SyzdEz;
                 Jy(i,j,k,n) = Jy_MM;
                 //Jy(i,j,k,n) = Jy(i,j,k,n);
@@ -393,22 +373,19 @@ void ImplicitSolver::ComputeJfromMassMatrices()
             },
             Jbz, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
-                int ii_min = std::max(-offset_zx[0],Ebx.smallEnd(0)-i);
-                int ii_max = std::min(ncomp_zx[0]-1-offset_zx[0],Ebx.bigEnd(0)-i);
-                int jj_min = 0, jj_max = 0;
-                int kk_min = 0, kk_max = 0;
-#if AMREX_SPACEDIM > 1
-                jj_min = std::max(-offset_zx[1],Ebx.smallEnd(1)-j);
-                jj_max = std::min(ncomp_zx[1]-1-offset_zx[1],Ebx.bigEnd(1)-j);
-#endif
-#if AMREX_SPACEDIM == 3
-                kk_min = std::max(-offset_zx[2],Ebx.smallEnd(2)-k);
-                kk_max = std::min(ncomp_zx[2]-1-offset_zx[2],Ebx.bigEnd(2)-k);
-#endif
+                const int idx[3] = {i, j, k};
+                amrex::GpuArray<int, 3> index_min = {0, 0, 0};
+                amrex::GpuArray<int, 3> index_max = {0, 0, 0};
+
+                // Compute Szx*dEx
+                for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
+                    index_min[dim] = std::max(-offset_zx[dim],Ebx.smallEnd(dim)-idx[dim]);
+                    index_max[dim] = std::min(ncomp_zx[dim]-1-offset_zx[dim],Ebx.bigEnd(dim)-idx[dim]);
+                }
                 amrex::Real SzxdEx = 0.0;
-                for (int ii = ii_min; ii <= ii_max; ++ii) {
-                    for (int jj = jj_min; jj <= jj_max; ++jj) {
-                        for (int kk = kk_min; kk <= kk_max; ++kk) {
+                for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
+                    for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
+                        for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
                             int Nc = AMREX_D_TERM( ii+offset_zx[0],
                                    + ncomp_zx[0]*( jj+offset_zx[1] ),
                                    + ncomp_zx[0]*ncomp_zx[1]*( kk+offset_zx[2] ) );
@@ -417,20 +394,16 @@ void ImplicitSolver::ComputeJfromMassMatrices()
                         }
                     }
                 }
-                ii_min = std::max(-offset_zy[0],Eby.smallEnd(0)-i);
-                ii_max = std::min(ncomp_zy[0]-1-offset_zy[0],Eby.bigEnd(0)-i);
-#if AMREX_SPACEDIM > 1
-                jj_min = std::max(-offset_zy[1],Eby.smallEnd(1)-j);
-                jj_max = std::min(ncomp_zy[1]-1-offset_zy[1],Eby.bigEnd(1)-j);
-#endif
-#if AMREX_SPACEDIM == 3
-                kk_min = std::max(-offset_zy[2],Eby.smallEnd(2)-k);
-                kk_max = std::min(ncomp_zy[2]-1-offset_zy[2],Eby.bigEnd(2)-k);
-#endif
+
+                // Compute Szy*dEy
+                for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
+                    index_min[dim] = std::max(-offset_zy[dim],Eby.smallEnd(dim)-idx[dim]);
+                    index_max[dim] = std::min(ncomp_zy[dim]-1-offset_zy[dim],Eby.bigEnd(dim)-idx[dim]);
+                }
                 amrex::Real SzydEy = 0.0;
-                for (int ii = ii_min; ii <= ii_max; ++ii) {
-                    for (int jj = jj_min; jj <= jj_max; ++jj) {
-                        for (int kk = kk_min; kk <= kk_max; ++kk) {
+                for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
+                    for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
+                        for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
                             int Nc = AMREX_D_TERM( ii+offset_zy[0],
                                    + ncomp_zy[0]*( jj+offset_zy[1] ),
                                    + ncomp_zy[0]*ncomp_zy[1]*( kk+offset_zy[2] ) );
@@ -439,20 +412,16 @@ void ImplicitSolver::ComputeJfromMassMatrices()
                         }
                     }
                 }
-                ii_min = std::max(-offset_zz[0],Ebz.smallEnd(0)-i);
-                ii_max = std::min(ncomp_zz[0]-1-offset_zz[0],Ebz.bigEnd(0)-i);
-#if AMREX_SPACEDIM > 1
-                jj_min = std::max(-offset_zz[1],Ebz.smallEnd(1)-j);
-                jj_max = std::min(ncomp_zz[1]-1-offset_zz[1],Ebz.bigEnd(1)-j);
-#endif
-#if AMREX_SPACEDIM == 3
-                kk_min = std::max(-offset_zz[2],Ebz.smallEnd(2)-k);
-                kk_max = std::min(ncomp_zz[2]-1-offset_zz[2],Ebz.bigEnd(2)-k);
-#endif
+
+                // Compute Szz*dEz
+                for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
+                    index_min[dim] = std::max(-offset_zz[dim],Ebz.smallEnd(dim)-idx[dim]);
+                    index_max[dim] = std::min(ncomp_zz[dim]-1-offset_zz[dim],Ebz.bigEnd(dim)-idx[dim]);
+                }
                 amrex::Real SzzdEz = 0.0;
-                for (int ii = ii_min; ii <= ii_max; ++ii) {
-                    for (int jj = jj_min; jj <= jj_max; ++jj) {
-                        for (int kk = kk_min; kk <= kk_max; ++kk) {
+                for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
+                    for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
+                        for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
                             int Nc = AMREX_D_TERM( ii+offset_zz[0],
                                    + ncomp_zz[0]*( jj+offset_zz[1] ),
                                    + ncomp_zz[0]*ncomp_zz[1]*( kk+offset_zz[2] ) );
@@ -461,6 +430,7 @@ void ImplicitSolver::ComputeJfromMassMatrices()
                         }
                     }
                 }
+
                 amrex::Real Jz_MM = Jz0(i,j,k,n) + SzxdEx + SzydEy + SzzdEz;
                 Jz(i,j,k,n) = Jz_MM;
                 //Jz(i,j,k,n) = Jz(i,j,k,n);
