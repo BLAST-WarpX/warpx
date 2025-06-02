@@ -632,7 +632,6 @@ FullDiagnostics::AddRZModesToDiags (int lev)
             lev, m_crse_ratio, false, ncomp_multimodefab));
         AddRZModesToOutputNames(std::string("divE"), ncomp_multimodefab);
     }
-    // eb_covered
     // rho
     if (rho_requested) {
         m_all_field_functors[lev].push_back(std::make_unique<RhoFunctor>(
