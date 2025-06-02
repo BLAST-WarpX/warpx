@@ -36,6 +36,8 @@ EBCoveredFunctor::operator()(amrex::MultiFab& mf_dst, int dcomp, const int /*i_b
         mf_dst.plus(1.0, dcomp, nComp(), 0);
 #endif
     } else {
-        mf_dst.setVal(0.0, dcomp, 1, 0);
+        // If EB are disabled, set the fraction to 0
+        amrex::ignore_unused(m_lev);
+        mf_dst.setVal(0.0, dcomp, nComp(), 0);
     }
 }
