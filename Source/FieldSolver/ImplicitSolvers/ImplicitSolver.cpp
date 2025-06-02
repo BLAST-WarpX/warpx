@@ -147,20 +147,20 @@ void ImplicitSolver::ComputeJfromMassMatrices()
         amrex::IntVect offset_zx, offset_zy, offset_zz;
         for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
             offset_xx[dir] = (m_ncomp_xx[dir]-1)/2;
-            offset_xy[dir] = (m_ncomp_xy[dir]-1)/2;
-            offset_xz[dir] = (m_ncomp_xz[dir]-1)/2;
-            offset_yx[dir] = (m_ncomp_yx[dir]-1)/2;
+            offset_xy[dir] = (Jx_nodal[dir] > Jy_nodal[dir]) ?  (m_ncomp_xy[dir]/2)
+                                                             : ((m_ncomp_xy[dir]-1)/2);
+            offset_xz[dir] = (Jx_nodal[dir] > Jz_nodal[dir]) ?  (m_ncomp_xz[dir]/2)
+                                                             : ((m_ncomp_xz[dir]-1)/2);
+            offset_yx[dir] = (Jy_nodal[dir] > Jx_nodal[dir]) ?  (m_ncomp_yx[dir]/2)
+                                                             : ((m_ncomp_yx[dir]-1)/2);
             offset_yy[dir] = (m_ncomp_yy[dir]-1)/2;
-            offset_yz[dir] = (m_ncomp_yz[dir]-1)/2;
-            offset_zx[dir] = (m_ncomp_zx[dir]-1)/2;
-            offset_zy[dir] = (m_ncomp_zy[dir]-1)/2;
+            offset_yz[dir] = (Jy_nodal[dir] > Jz_nodal[dir]) ?  (m_ncomp_yz[dir]/2)
+                                                             : ((m_ncomp_yz[dir]-1)/2);
+            offset_zx[dir] = (Jz_nodal[dir] > Jx_nodal[dir]) ?  (m_ncomp_zx[dir]/2)
+                                                             : ((m_ncomp_zx[dir]-1)/2);
+            offset_zy[dir] = (Jz_nodal[dir] > Jy_nodal[dir]) ?  (m_ncomp_zy[dir]/2)
+                                                             : ((m_ncomp_zy[dir]-1)/2);
             offset_zz[dir] = (m_ncomp_zz[dir]-1)/2;
-            if (Jx_nodal[dir] > Jz_nodal[dir]) { offset_xz[dir] = m_ncomp_xz[dir]/2; }
-            if (Jy_nodal[dir] > Jz_nodal[dir]) { offset_yz[dir] = m_ncomp_yz[dir]/2; }
-            if (Jy_nodal[dir] > Jx_nodal[dir]) { offset_yx[dir] = m_ncomp_yx[dir]/2; }
-            if (Jz_nodal[dir] > Jx_nodal[dir]) { offset_zx[dir] = m_ncomp_zx[dir]/2; }
-            if (Jx_nodal[dir] > Jy_nodal[dir]) { offset_xy[dir] = m_ncomp_xy[dir]/2; }
-            if (Jz_nodal[dir] > Jy_nodal[dir]) { offset_zy[dir] = m_ncomp_zy[dir]/2; }
         }
 
 #ifdef AMREX_USE_OMP
