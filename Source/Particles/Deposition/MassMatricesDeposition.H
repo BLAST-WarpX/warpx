@@ -115,28 +115,28 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                                          const amrex::ParticleReal wqy,
                                          const amrex::ParticleReal wqz,
                                          const amrex::ParticleReal fpxx,
-                                         const amrex::ParticleReal fpxy,
-                                         const amrex::ParticleReal fpxz,
-                                         const amrex::ParticleReal fpyx,
+                                         [[maybe_unused]] const amrex::ParticleReal fpxy,
+                                         [[maybe_unused]] const amrex::ParticleReal fpxz,
+                                         [[maybe_unused]] const amrex::ParticleReal fpyx,
                                          const amrex::ParticleReal fpyy,
-                                         const amrex::ParticleReal fpyz,
-                                         const amrex::ParticleReal fpzx,
-                                         const amrex::ParticleReal fpzy,
+                                         [[maybe_unused]] const amrex::ParticleReal fpyz,
+                                         [[maybe_unused]] const amrex::ParticleReal fpzx,
+                                         [[maybe_unused]] const amrex::ParticleReal fpzy,
                                          const amrex::ParticleReal fpzz,
                                          amrex::Array4<amrex::Real> const& jx_arr,
                                          amrex::Array4<amrex::Real> const& jy_arr,
                                          amrex::Array4<amrex::Real> const& jz_arr,
-                                         int Sxx_nComp,
-                                         int Syy_nComp,
-                                         int Szz_nComp,
+                                         [[maybe_unused]] int Sxx_nComp,
+                                         [[maybe_unused]] int Syy_nComp,
+                                         [[maybe_unused]] int Szz_nComp,
                                          amrex::Array4<amrex::Real> const& Sxx_arr,
-                                         amrex::Array4<amrex::Real> const& Sxy_arr,
-                                         amrex::Array4<amrex::Real> const& Sxz_arr,
-                                         amrex::Array4<amrex::Real> const& Syx_arr,
+                                         [[maybe_unused]] amrex::Array4<amrex::Real> const& Sxy_arr,
+                                         [[maybe_unused]] amrex::Array4<amrex::Real> const& Sxz_arr,
+                                         [[maybe_unused]] amrex::Array4<amrex::Real> const& Syx_arr,
                                          amrex::Array4<amrex::Real> const& Syy_arr,
-                                         amrex::Array4<amrex::Real> const& Syz_arr,
-                                         amrex::Array4<amrex::Real> const& Szx_arr,
-                                         amrex::Array4<amrex::Real> const& Szy_arr,
+                                         [[maybe_unused]] amrex::Array4<amrex::Real> const& Syz_arr,
+                                         [[maybe_unused]] amrex::Array4<amrex::Real> const& Szx_arr,
+                                         [[maybe_unused]] amrex::Array4<amrex::Real> const& Szy_arr,
                                          amrex::Array4<amrex::Real> const& Szz_arr,
                                          const amrex::IntVect& jx_type,
                                          const amrex::IntVect& jy_type,
@@ -258,10 +258,6 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
     // Set the index shift parameter
     if (l_node==l_cell) { shift[zdir] = 1; }
 
-#if !defined(WARPX_DIM_1D_Z)
-    const int base_offset = 1 + 2*depos_order;
-#endif
-
 #endif
 
     // Compute index offset needed when x and y comps have different location on grid
@@ -370,6 +366,7 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
             sx_jz[ix]*sx_jz[ix]*fpzz);
     }
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+    const int base_offset = 1 + 2*depos_order;
     for (int iz=0; iz<=depos_order; iz++){
         for (int ix=0; ix<=depos_order; ix++){
             const amrex::Real weight_Jx = sx_jx[ix]*sz_jx[iz];
@@ -490,7 +487,7 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                 //
                 amrex::Gpu::Atomic::AddNoRet(
                     &Sxx_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz, 0),
-                    weight_Jx*weightJx*fpxx);
+                    weight_Jx*weight_Jx*fpxx);
                 amrex::Gpu::Atomic::AddNoRet(
                     &Syy_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz, 0),
                     weight_Jy*weight_Jy*fpyy);
