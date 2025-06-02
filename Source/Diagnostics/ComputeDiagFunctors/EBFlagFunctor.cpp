@@ -10,18 +10,19 @@
 EBFlagFunctor::EBFlagFunctor (
     const int lev,
     const amrex::IntVect crse_ratio,
-    bool convertRZmodes2cartesian,
     const int ncomp
 )
-    : ComputeDiagFunctor(ncomp, crse_ratio), m_lev(lev),
-      m_convertRZmodes2cartesian(convertRZmodes2cartesian)
-{}
+    : ComputeDiagFunctor(ncomp, crse_ratio), m_lev(lev)
+{
+    // TODO: add runtime check that EB are enabled + ifdef to ensure compilation
+    // Write only in one output component.
+    AMREX_ALWAYS_ASSERT(ncomp == 1);
+}
 
 void
 EBFlagFunctor::operator()(amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer*/) const
 {
 
-    // TODO: add runtime check that EB are enabled + ifdef to ensure compilation
     // TODO: add documentation of parameter
     // TODO: change name to eb covered
     // TODO: handle RZ case
