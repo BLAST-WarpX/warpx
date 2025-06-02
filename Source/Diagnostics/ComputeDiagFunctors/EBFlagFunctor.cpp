@@ -20,6 +20,15 @@ EBFlagFunctor::EBFlagFunctor (
 void
 EBFlagFunctor::operator()(amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer*/) const
 {
-    // For now, this is an empty implementation as requested
-    // The actual implementation will be added later
+
+    // TODO: add runtime check that EB are enabled + ifdef to ensure compilation
+    // TODO: add documentation of parameter
+    // TODO: change name to eb covered
+    // TODO: handle RZ case
+
+    // Extract structures for embedded boundaries
+    auto& warpx = WarpX::GetInstance();
+    amrex::EBFArrayBoxFactory const& eb_fact = warpx.fieldEBFactory(m_lev);
+
+    ablastr::coarsen::sample::Coarsen(mf_dst, eb_fact.getVolFrac(), dcomp, 0, nComp(), 0, m_crse_ratio);
 }
