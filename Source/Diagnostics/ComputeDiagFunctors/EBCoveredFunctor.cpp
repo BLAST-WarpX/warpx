@@ -32,5 +32,7 @@ EBCoveredFunctor::operator()(amrex::MultiFab& mf_dst, int dcomp, const int /*i_b
         amrex::EBFArrayBoxFactory const& eb_fact = warpx.fieldEBFactory(m_lev);
         ablastr::coarsen::sample::Coarsen(mf_dst, eb_fact.getVolFrac(), dcomp, 0, nComp(), 0, m_crse_ratio);
 #endif
+    } else {
+        mf_dst.setVal(0.0, dcomp, 1, 0);
     }
 }
