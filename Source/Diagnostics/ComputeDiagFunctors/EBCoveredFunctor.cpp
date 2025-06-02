@@ -31,6 +31,9 @@ EBCoveredFunctor::operator()(amrex::MultiFab& mf_dst, int dcomp, const int /*i_b
         auto& warpx = WarpX::GetInstance();
         amrex::EBFArrayBoxFactory const& eb_fact = warpx.fieldEBFactory(m_lev);
         ablastr::coarsen::sample::Coarsen(mf_dst, eb_fact.getVolFrac(), dcomp, 0, nComp(), 0, m_crse_ratio);
+        // The fraction of the cell that is covered by the EB is 1 - the volume fraction
+        mf_dst.mult(-1.0, dcomp, nComp(), 0);
+        mf_dst.plus(1.0, dcomp, nComp(), 0);
 #endif
     } else {
         mf_dst.setVal(0.0, dcomp, 1, 0);

@@ -40,6 +40,6 @@ assert np.all(eb_covered >= 0)
 assert np.all(eb_covered <= 1)
 # Check that it is 1 everywhere inside the sphere
 R = 0.1
-np.all(eb_covered[r < R - info.dx] == 1)
+assert np.all(eb_covered[r < R - info.dx] == 1)
 # Check that it is 0 everywhere outside the sphere
-np.all(eb_covered[r > R + info.dx] == 0)
+assert np.all(eb_covered[r > R + info.dx] == 0)
