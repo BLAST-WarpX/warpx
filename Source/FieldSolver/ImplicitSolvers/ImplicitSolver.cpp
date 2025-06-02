@@ -132,6 +132,10 @@ void ImplicitSolver::ComputeJfromMassMatrices()
         ablastr::fields::VectorField SY = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Y, lev);
         ablastr::fields::VectorField SZ = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Z, lev);
 
+        const amrex::IntVect Jx_nodal = J[0]->ixType().toIntVect();
+        const amrex::IntVect Jy_nodal = J[1]->ixType().toIntVect();
+        const amrex::IntVect Jz_nodal = J[2]->ixType().toIntVect();
+
         // Should not need to do this!
         //m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, lev)->setVal(0.0);
         //m_WarpX->m_fields.get(FieldType::current_fp, Direction{1}, lev)->setVal(0.0);
@@ -151,28 +155,12 @@ void ImplicitSolver::ComputeJfromMassMatrices()
             offset_zx[dir] = (m_ncomp_zx[dir]-1)/2;
             offset_zy[dir] = (m_ncomp_zy[dir]-1)/2;
             offset_zz[dir] = (m_ncomp_zz[dir]-1)/2;
-            if (dir==0) {
-#if AMREX_SPACEDIM == 1
-                offset_xz[dir] = m_ncomp_xz[dir]/2; // Jz centered, Jx nodal
-                offset_yz[dir] = m_ncomp_yz[dir]/2; // Jz centered, Jy nodal
-#elif AMREX_SPACEDIM >= 2
-                offset_yx[dir] = m_ncomp_yx[dir]/2; // Jx centered, Jy nodal
-                offset_zx[dir] = m_ncomp_zx[dir]/2; // Jx centered, Jz nodal
-#endif
-            }
-            if (dir==1) {
-#if AMREX_SPACEDIM == 2
-                offset_xz[dir] = m_ncomp_xz[dir]/2; // Jz centered, Jx nodal
-                offset_yz[dir] = m_ncomp_yz[dir]/2; // Jz centered, Jy nodal
-#elif AMREX_SPACEDIM == 3
-                offset_xy[dir] = m_ncomp_xy[dir]/2; // Jy centered, Jx nodal
-                offset_zy[dir] = m_ncomp_zy[dir]/2; // Jy centered, Jz nodal
-#endif
-            }
-            if (dir==2) {
-                offset_xz[dir] = m_ncomp_xz[dir]/2; // Jz centered, Jx nodal
-                offset_yz[dir] = m_ncomp_yz[dir]/2; // Jz centered, Jy nodal
-            }
+            if (Jx_nodal[dir] > Jz_nodal[dir]) { offset_xz[dir] = m_ncomp_xz[dir]/2; }
+            if (Jy_nodal[dir] > Jz_nodal[dir]) { offset_yz[dir] = m_ncomp_yz[dir]/2; }
+            if (Jy_nodal[dir] > Jx_nodal[dir]) { offset_yx[dir] = m_ncomp_yx[dir]/2; }
+            if (Jz_nodal[dir] > Jx_nodal[dir]) { offset_zx[dir] = m_ncomp_zx[dir]/2; }
+            if (Jx_nodal[dir] > Jy_nodal[dir]) { offset_xy[dir] = m_ncomp_xy[dir]/2; }
+            if (Jz_nodal[dir] > Jy_nodal[dir]) { offset_zy[dir] = m_ncomp_zy[dir]/2; }
         }
 
 #ifdef AMREX_USE_OMP
