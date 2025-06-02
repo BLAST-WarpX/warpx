@@ -6,7 +6,7 @@
 #include <AMReX_BaseFwd.H>
 
 /**
- * \brief Functor to compute EB covered cells into mf_out.
+ * \brief Functor to indicate the fraction of the cell that is covered by the embedded boundary.
  */
 class EBCoveredFunctor final : public ComputeDiagFunctor
 {
@@ -23,7 +23,7 @@ public:
         int ncomp=1
     );
 
-    /** \brief Compute EB covered cells directly into mf_dst.
+    /** \brief Save the fraction of the cell that is covered by the embedded boundary.
      *
      * \param[out] mf_dst output MultiFab where the result is written
      * \param[in] dcomp first component of mf_dst in which cell-centered
@@ -31,7 +31,7 @@ public:
      */
     void operator()(amrex::MultiFab& mf_dst, int dcomp, int /*i_buffer=0*/) const override;
 private:
-    int m_lev; /**< level on which mf_src is defined (used in cylindrical) */
+    int m_lev; /**< level on which mf_src is defined */
 };
 
 #endif // WARPX_EBCOVEREDFUNCTOR_H_
