@@ -41,6 +41,7 @@ public:
      * \param noz_fft order of PSATD in z direction
      * \param nci_corr_stencil stencil of NCI corrector
      * \param electromagnetic_solver_id Integer corresponding to the type of Maxwell solver
+     * \param evolve_scheme The evolve scheme, whether it's explicit or implicit
      * \param max_level max level of the simulation
      * \param v_galilean Velocity used in the Galilean PSATD scheme
      * \param v_comoving Velocity used in the comoving PSATD scheme
@@ -67,6 +68,7 @@ public:
         int nox_fft, int noy_fft, int noz_fft,
         int nci_corr_stencil,
         ElectromagneticSolverAlgo electromagnetic_solver_id,
+        EvolveScheme evolve_scheme,
         int max_level,
         const amrex::Vector<amrex::Real>& v_galilean,
         const amrex::Vector<amrex::Real>& v_comoving,

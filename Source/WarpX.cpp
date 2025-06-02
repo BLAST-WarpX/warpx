@@ -2151,6 +2151,7 @@ WarpX::AllocLevelData (int lev, const BoxArray& ba, const DistributionMapping& d
         nox_fft, noy_fft, noz_fft,
         NCIGodfreyFilter::m_stencil_width,
         electromagnetic_solver_id,
+        evolve_scheme,
         maxLevel(),
         WarpX::m_v_galilean,
         WarpX::m_v_comoving,
