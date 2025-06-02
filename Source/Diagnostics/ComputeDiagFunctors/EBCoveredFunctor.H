@@ -1,14 +1,14 @@
-#ifndef WARPX_EBFLAGFUNCTOR_H_
-#define WARPX_EBFLAGFUNCTOR_H_
+#ifndef WARPX_EBCOVEREDFUNCTOR_H_
+#define WARPX_EBCOVEREDFUNCTOR_H_
 
 #include "ComputeDiagFunctor.H"
 
 #include <AMReX_BaseFwd.H>
 
 /**
- * \brief Functor to compute EB flags into mf_out.
+ * \brief Functor to compute EB covered cells into mf_out.
  */
-class EBFlagFunctor final : public ComputeDiagFunctor
+class EBCoveredFunctor final : public ComputeDiagFunctor
 {
 public:
     /** Constructor.
@@ -17,13 +17,13 @@ public:
      *                       from simulation MultiFabs to the output MultiFab mf_dst
      * \param[in] ncomp Number of component of mf_src to cell-center in dst multifab.
      */
-    EBFlagFunctor (
+    EBCoveredFunctor (
         int lev,
         amrex::IntVect crse_ratio,
         int ncomp=1
     );
 
-    /** \brief Compute EB flags directly into mf_dst.
+    /** \brief Compute EB covered cells directly into mf_dst.
      *
      * \param[out] mf_dst output MultiFab where the result is written
      * \param[in] dcomp first component of mf_dst in which cell-centered
@@ -34,4 +34,4 @@ private:
     int m_lev; /**< level on which mf_src is defined (used in cylindrical) */
 };
 
-#endif // WARPX_EBFLAGFUNCTOR_H_
+#endif // WARPX_EBCOVEREDFUNCTOR_H_

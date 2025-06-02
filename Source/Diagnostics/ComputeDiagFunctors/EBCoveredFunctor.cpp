@@ -1,4 +1,4 @@
-#include "EBFlagFunctor.H"
+#include "EBCoveredFunctor.H"
 
 #include "WarpX.H"
 
@@ -7,7 +7,7 @@
 #include <AMReX_IntVect.H>
 #include <AMReX_MultiFab.H>
 
-EBFlagFunctor::EBFlagFunctor (
+EBCoveredFunctor::EBCoveredFunctor (
     const int lev,
     const amrex::IntVect crse_ratio,
     const int ncomp
@@ -19,7 +19,7 @@ EBFlagFunctor::EBFlagFunctor (
 }
 
 void
-EBFlagFunctor::operator()(amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer*/) const
+EBCoveredFunctor::operator()(amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer*/) const
 {
     // Extract structures for embedded boundaries
     // TODO: add runtime check that EB are enabled + ifdef to ensure compilation

@@ -5,7 +5,7 @@ foreach(D IN LISTS WarpX_DIMS)
         CellCenterFunctor.cpp
         DivBFunctor.cpp
         DivEFunctor.cpp
-        EBFlagFunctor.cpp
+        EBCoveredFunctor.cpp
         JFunctor.cpp
         JdispFunctor.cpp
         RhoFunctor.cpp
