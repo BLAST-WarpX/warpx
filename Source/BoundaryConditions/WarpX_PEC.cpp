@@ -954,61 +954,6 @@ PEC::ApplyReflectiveBoundarytoJfield (
 #endif
     for (amrex::MFIter mfi(*Jx, false); mfi.isValid(); ++mfi) {
 
-<<<<<<< HEAD
-    amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> is_reflective;
-    bool is_tangent_to_bndy;
-    amrex::GpuArray<GpuArray<GpuArray<amrex::Real, 2>, AMREX_SPACEDIM>, 3> psign;
-    amrex::GpuArray<GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM>, 3> mirrorfac;
-    for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
-        is_reflective[idim][0] = ( particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
-                              || ( particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
-                              || ( field_boundary_lo[idim] == FieldBoundaryType::PEC)
-                              || ( field_boundary_lo[idim] == FieldBoundaryType::PMC);
-        if (field_boundary_lo[idim] == FieldBoundaryType::PMC) { is_reflective[idim][0] = 2; }
-        is_reflective[idim][1] = ( particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
-                              || ( particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
-                              || ( field_boundary_hi[idim] == FieldBoundaryType::PEC)
-                              || ( field_boundary_hi[idim] == FieldBoundaryType::PMC);
-        if (field_boundary_hi[idim] == FieldBoundaryType::PMC) { is_reflective[idim][1] = 2; }
-        if (!is_reflective[idim][0]) { grown_domain_box.growLo(idim, ng_fieldgather[idim]); }
-        if (!is_reflective[idim][1]) { grown_domain_box.growHi(idim, ng_fieldgather[idim]); }
-
-        for (int icomp=0; icomp < 3; ++icomp) {
-            // Set the psign value correctly for each current component for each
-            // simulation direction
-#if (defined WARPX_DIM_1D_Z)
-            // For 1D : icomp=0 and icomp=1 (Ex and Ey are tangential to the z boundary)
-            //          The logic below ensures that the flags are set right for 1D
-            is_tangent_to_bndy = (icomp != (idim+2));
-#elif (defined WARPX_DIM_XZ) || (defined WARPX_DIM_RZ)
-            // For 2D : for icomp==1, (Ey in XZ, Etheta in RZ),
-            //          icomp=1 is tangential to both x and z boundaries
-            //          The logic below ensures that the flags are set right for 2D
-            is_tangent_to_bndy = (icomp != AMREX_SPACEDIM*idim);
-#else
-            is_tangent_to_bndy = (icomp != idim);
-#endif
-
-            if (is_tangent_to_bndy){
-                psign[icomp][idim][0] = ( (particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
-                                        ||(particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
-                                        ||(field_boundary_lo[idim] == FieldBoundaryType::PMC))
-                                        ? 1._rt : -1._rt;
-                psign[icomp][idim][1] = ( (particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
-                                        ||(particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
-                                        ||(field_boundary_hi[idim] == FieldBoundaryType::PMC))
-                                        ? 1._rt : -1._rt;
-            }
-            else {
-                psign[icomp][idim][0] = ( (particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
-                                        ||(particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
-                                        ||(field_boundary_lo[idim] == FieldBoundaryType::PMC))
-                                        ? -1._rt : 1._rt;
-                psign[icomp][idim][1] = ( (particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
-                                        ||(particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
-                                        ||(field_boundary_hi[idim] == FieldBoundaryType::PMC))
-                                        ? -1._rt : 1._rt;
-=======
         // Get the multifab box including ghost cells
         const amrex::Box Jx_fabbox = mfi.fabbox().convert(Jx_nodal);
         const amrex::Box Jy_fabbox = mfi.fabbox().convert(Jy_nodal);
