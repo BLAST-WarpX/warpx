@@ -166,7 +166,7 @@ protected:
     bool m_use_mass_matrices_pc = false;
 
     /**
-     * \brief Tensor component specific number of mass matrices elements
+     * \brief Direction-dependent component number of mass matrices elements
      */
     amrex::IntVect m_ncomp_xx, m_ncomp_xy, m_ncomp_xz;
     amrex::IntVect m_ncomp_yx, m_ncomp_yy, m_ncomp_yz;

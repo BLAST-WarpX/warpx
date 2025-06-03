@@ -136,11 +136,6 @@ void ImplicitSolver::ComputeJfromMassMatrices()
         const amrex::IntVect Jy_nodal = J[1]->ixType().toIntVect();
         const amrex::IntVect Jz_nodal = J[2]->ixType().toIntVect();
 
-        // Should not need to do this!
-        //m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, lev)->setVal(0.0);
-        //m_WarpX->m_fields.get(FieldType::current_fp, Direction{1}, lev)->setVal(0.0);
-        //m_WarpX->m_fields.get(FieldType::current_fp, Direction{2}, lev)->setVal(0.0);
-
         // Compute the component offset in each direction (careful with staggering)
         amrex::IntVect offset_xx, offset_xy, offset_xz;
         amrex::IntVect offset_yx, offset_yy, offset_yz;
