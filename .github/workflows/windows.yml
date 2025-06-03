@@ -96,7 +96,7 @@ jobs:
     - name: Build & Install
       shell: cmd
       run: |
-        call "C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\vc\Auxiliary\build\vcvarsall.bat" x64
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
         cmake -S . -B build   ^
               -G "Ninja"      ^
               -DCMAKE_C_COMPILER=clang-cl   ^
@@ -128,8 +128,8 @@ jobs:
     - name: Test
       shell: cmd
       run: |
-        call "C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\vc\Auxiliary\build\vcvarsall.bat" x64
-        set "PATH=C:/Program Files (x86)/WarpX/bin/;%PATH%"
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
+        set "PATH=C:/Program Files/WarpX/bin/;%PATH%"
 
         python3 Examples/Tests/gaussian_beam/inputs_test_3d_gaussian_beam_picmi.py --diagformat=openpmd
         if errorlevel 1 exit 1
