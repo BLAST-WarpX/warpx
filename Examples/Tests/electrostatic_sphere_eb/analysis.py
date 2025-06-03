@@ -5,7 +5,6 @@
 # tests are otherwise the same.
 
 # Check reduced diagnostics for charge on EB
-import sys
 
 import numpy as np
 from openpmd_viewer import OpenPMDTimeSeries
@@ -27,8 +26,7 @@ q_sim_eighth = data_eighth[1, 2]
 assert abs((q_sim_eighth - q_th / 8) / (q_th / 8)) < 0.06
 
 # Check that the eb_covered field is correct
-fn = sys.argv[1]
-ts = OpenPMDTimeSeries(fn)
+ts = OpenPMDTimeSeries("diags/diag1")
 eb_covered, info = ts.get_field("eb_covered", iteration=0)
 r = np.sqrt(
     info.x[:, np.newaxis, np.newaxis] ** 2

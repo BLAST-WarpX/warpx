@@ -7,7 +7,7 @@ if(WarpX_EB)
         3  # dims
         2  # nprocs
         inputs_test_3d_electrostatic_sphere_eb  # inputs
-        "analysis.py diags/diag1/"  # analysis
+        "analysis.py"  # analysis
         "analysis_default_regression.py --path diags/diag1/"  # checksum
         OFF  # dependency
     )
