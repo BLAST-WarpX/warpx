@@ -3,6 +3,7 @@
 #include "ComputeDiagFunctors/CellCenterFunctor.H"
 #include "ComputeDiagFunctors/DivBFunctor.H"
 #include "ComputeDiagFunctors/DivEFunctor.H"
+#include "ComputeDiagFunctors/EBCoveredFunctor.H"
 #include "ComputeDiagFunctors/JFunctor.H"
 #include "ComputeDiagFunctors/JdispFunctor.H"
 #include "ComputeDiagFunctors/PartPerCellFunctor.H"
@@ -512,6 +513,11 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
             if (update_varnames) {
                 AddRZModesToOutputNames(std::string("divE"), ncomp);
             }
+        } else if ( m_varnames_fields[comp] == "eb_covered" ){
+            m_all_field_functors[lev][comp] = std::make_unique<EBCoveredFunctor>(lev, m_crse_ratio);
+            if (update_varnames) {
+                m_varnames.push_back(std::string("eb_covered"));
+            }
         }
         else {
             WARPX_ABORT_WITH_MESSAGE(
@@ -877,6 +883,8 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
             m_all_field_functors[lev][comp] = std::make_unique<DivBFunctor>(warpx.m_fields.get_alldirs(FieldType::Bfield_aux, lev), lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "divE" ){
             m_all_field_functors[lev][comp] = std::make_unique<DivEFunctor>(warpx.m_fields.get_alldirs(FieldType::Efield_aux, lev), lev, m_crse_ratio);
+        } else if ( m_varnames[comp] == "eb_covered" ){
+            m_all_field_functors[lev][comp] = std::make_unique<EBCoveredFunctor>(lev, m_crse_ratio);
         } else {
             std::cout << "Error on component " << m_varnames[comp] << "\n";
             WARPX_ABORT_WITH_MESSAGE(m_varnames[comp] + " is not a known field output type for this geometry");
