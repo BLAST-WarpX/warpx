@@ -1386,7 +1386,8 @@ WarpX::ReadParameters ()
                     "We recommend setting algo.particle_shape = 1 in order to avoid this issue");
             }
 
-            if (evolve_scheme != EvolveScheme::Explicit) {
+            if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
+                evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
                 pp_particles.query("max_grid_crossings", particle_max_grid_crossings);
             }
 

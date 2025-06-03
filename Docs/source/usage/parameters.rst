@@ -2356,7 +2356,7 @@ Particle push, charge and current deposition, field gathering
 
 * ``particles.max_grid_crossings`` (`integer`) optional (default `1`)
     Maximum number of grid crossings the particles can do per time step.
-    This is only used with the implicit schemes since they allow the particle Courant limit to be violated.
+    This is only used with the Strang and theta-implicit schemes since they allow the speed of light Courant limit to be violated.
 
 Maxwell solver
 ^^^^^^^^^^^^^^
