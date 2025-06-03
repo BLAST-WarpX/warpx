@@ -211,8 +211,6 @@ void ImplicitSolver::ComputeJfromMassMatrices()
             Ebx.grow(E[0]->nGrowVect());
             Eby.grow(E[1]->nGrowVect());
             Ebz.grow(E[2]->nGrowVect());
-            //amrex::Print() << "Jbx = " << Jbx << "; Jby = " << Jby << "; Jbz = " << Jbz << std::endl;
-            //amrex::Print() << "Ebx = " << Ebx << "; Eby = " << Eby << "; Ebz = " << Ebz << std::endl;
 
             const amrex::IntVect ncomp_xx = m_ncomp_xx;
             const amrex::IntVect ncomp_xy = m_ncomp_xy;
@@ -285,12 +283,7 @@ void ImplicitSolver::ComputeJfromMassMatrices()
                     }
                 }
 
-                amrex::Real Jx_MM = Jx0(i,j,k,n) + SxxdEx + SxydEy + SxzdEz;
-                Jx(i,j,k,n) = Jx_MM;
-                //Jx(i,j,k,n) = Jx(i,j,k,n);
-                //amrex::Real denom = std::max(1.0,std::abs(Jx(i,j,k,n)));
-                //amrex::Real diff = std::abs(Jx(i,j,k,n)-Jx_MM)/denom;
-                //amrex::AllPrint() << "Jx_MM = " << Jx_MM << "; Jx(i="<<i<<") = " << Jx(i,j,k,n) << "; diff = " << diff << std::endl;
+                Jx(i,j,k,n) = Jx0(i,j,k,n) + SxxdEx + SxydEy + SxzdEz;
             },
             Jby, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
@@ -352,12 +345,7 @@ void ImplicitSolver::ComputeJfromMassMatrices()
                     }
                 }
 
-                amrex::Real Jy_MM = Jy0(i,j,k,n) + SyxdEx + SyydEy + SyzdEz;
-                Jy(i,j,k,n) = Jy_MM;
-                //Jy(i,j,k,n) = Jy(i,j,k,n);
-                //amrex::Real denom = std::max(1.0,std::abs(Jy(i,j,k,n)));
-                //amrex::Real diff = std::abs(Jy(i,j,k,n)-Jy_MM)/denom;
-                //amrex::AllPrint() << "Jy_MM = " << Jy_MM << "; Jy(i="<<i<<") = " << Jy(i,j,k,n) << "; diff = " << diff << std::endl;
+                Jy(i,j,k,n) = Jy0(i,j,k,n) + SyxdEx + SyydEy + SyzdEz;
             },
             Jbz, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
@@ -419,12 +407,7 @@ void ImplicitSolver::ComputeJfromMassMatrices()
                     }
                 }
 
-                amrex::Real Jz_MM = Jz0(i,j,k,n) + SzxdEx + SzydEy + SzzdEz;
-                Jz(i,j,k,n) = Jz_MM;
-                //Jz(i,j,k,n) = Jz(i,j,k,n);
-                //amrex::Real denom = std::max(1.0,std::abs(Jz(i,j,k,n)));
-                //amrex::Real diff = std::abs(Jz(i,j,k,n)-Jz_MM)/denom;
-                //amrex::AllPrint() << "Jz_MM = " << Jz_MM << "; Jz(i="<<i<<") = " << Jz(i,j,k,n) << "; diff = " << diff << std::endl;
+                Jz(i,j,k,n) = Jz0(i,j,k,n) + SzxdEx + SzydEy + SzzdEz;
             });
         }
 
