@@ -175,84 +175,163 @@ namespace ParticleUtils {
      *        pair of particles such that momentum is not disturbed
      *
      * This is done by treating it as an inelastic scattering event
-     * with potential U = a_deltaE and zero scattering angle
-     * a_deltaE > 0 ==> need to take energy away
-     * a_deltaE < 0 ==> need to add energy
+     * with potential U = deltaE and zero scattering angle
+     * deltaE > 0 ==> need to take energy away
+     * deltaE < 0 ==> need to add energy
      *
-     * \param[in/out] ux1, uy1, uz1 momenta of first particle
-     * \param[in/out] ux2, uy2, uz2 momenta of second particle
-     * \param[in] a_wpmp1 mass time weight of the first particle
+     * \param[in/out] uxp, uyp, uzp momenta of the particles
+     * \param[in] indices indices of particles, listed in cell order
+     * \param[in] cell_start start index of particles in the cell
+     * \param[in] cell_stop start index of particles in the next cell
+     * \param[in] mass mass of the particles
      * \param[in] a_wpmp2 mass time weight of the second particle
-     * \param[in] a_Erel_frac fraction of the particles COM energy to distribute
-     * \param[in] a_Erel_cumm relative energy distribute so far
-     * \param[in/out] a_deltaE remaining amount of energy to be distributed in this species
+     * \param[in] energy_fraction fraction of pair's relative energy to change
+     * \param[in] energy_fraction_max max fracton of total relative energy that can be changed
+     * \param[in/out] deltaE amount of energy to be distributed in this species
      */
+    template <typename T_index>
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
-    void ModifyEnergyPairwise( amrex::ParticleReal& ux1, amrex::ParticleReal& uy1, amrex::ParticleReal& uz1,
-                               amrex::ParticleReal& ux2, amrex::ParticleReal& uy2, amrex::ParticleReal& uz2,
-                               amrex::ParticleReal const a_wpmp1,
-                               amrex::ParticleReal const a_wpmp2,
-                               amrex::ParticleReal const a_Erel_frac,
-                               amrex::ParticleReal & a_Erel_cumm,
-                               amrex::ParticleReal & a_deltaE )
+    bool ModifyEnergyPairwise (amrex::ParticleReal * const AMREX_RESTRICT uxp,
+                               amrex::ParticleReal * const AMREX_RESTRICT uyp,
+                               amrex::ParticleReal * const AMREX_RESTRICT uzp,
+                               amrex::ParticleReal * const AMREX_RESTRICT w,
+                               T_index const * const AMREX_RESTRICT indices,
+                               T_index const cell_start,
+                               T_index const cell_stop,
+                               amrex::ParticleReal const mass,
+                               amrex::ParticleReal const energy_fraction,
+                               amrex::ParticleReal const energy_fraction_max,
+                               amrex::ParticleReal & deltaE )
     {
-
         using namespace amrex::literals;
+
         constexpr auto c2 = PhysConst::c * PhysConst::c;
 
-        int const sign = (a_deltaE < 0.0 ? -1 : 1);
+        int const numCell = (cell_stop - cell_start);
+        bool correction_failed = false;
 
-        const amrex::ParticleReal ux = ux1 - ux2;
-        const amrex::ParticleReal uy = uy1 - uy2;
-        const amrex::ParticleReal uz = uz1 - uz2;
-        const long double dbetasq = (ux*ux + uy*uy + uz*uz)/c2;
-        const long double gbsq1 = (ux1*ux1 + uy1*uy1 + uz1*uz1)/c2;
-        const long double gbsq2 = (ux2*ux2 + uy2*uy2 + uz2*uz2)/c2;
-        const long double gamma1 = std::sqrt(1.0_prt + gbsq1);
-        const long double gamma2 = std::sqrt(1.0_prt + gbsq2);
-        const long double E1 = a_wpmp1*gamma1*c2;
-        const long double E2 = a_wpmp2*gamma2*c2;
-        const long double Etot = E1 + E2;
-        const long double pxtot = a_wpmp1*ux1 + a_wpmp2*ux2;
-        const long double pytot = a_wpmp1*uy1 + a_wpmp2*uy2;
-        const long double pztot = a_wpmp1*uz1 + a_wpmp2*uz2;
-        const long double Ecm = std::sqrt(Etot*Etot - (pxtot*pxtot + pytot*pytot + pztot*pztot)*c2);
-        const long double Erel = Ecm - a_wpmp1*c2 - a_wpmp2*c2;
-        if (Erel <= 0.0) { return; }
+        // adjust particle's momentum to absorb deltaEp
+        // This loops over the particles, two at a time, distributing
+        // the energy until all of it has been distributed.
+        // The loop is setup to switch between even first and odd first pairs
+        // each loop over the particles.
+        int loop_count = 0;
+        amrex::ParticleReal Erel_cumm = 0.0_prt;
+        amrex::ParticleReal fmult_fact = 1.0_prt;
+        amrex::ParticleReal energy_frac_eff = 0.0_prt;
+        T_index i1 = cell_start;
+        while (energy_frac_eff <= energy_fraction_max && loop_count <= 10) {
 
-        long double deltaE = sign*a_Erel_frac*Erel;
-        if (std::abs(deltaE) > std::abs(a_deltaE)) {
-            deltaE = a_deltaE;
-            a_deltaE = 0.0_prt;
-        } else {
-            a_deltaE -= deltaE;
+            if (deltaE == 0.0_prt) { break; }
+
+            T_index i2 = i1 + 1;
+            if (i2 == cell_stop) {
+                // If i1 is the last particle, set the other particle, i2, to be the first particle
+                i2 = cell_start;
+            }
+
+            int const sign = (deltaE < 0.0 ? -1 : 1);
+
+            const amrex::ParticleReal ux1 = uxp[ indices[i1] ];
+            const amrex::ParticleReal uy1 = uyp[ indices[i1] ];
+            const amrex::ParticleReal uz1 = uzp[ indices[i1] ];
+            const amrex::ParticleReal ux2 = uxp[ indices[i2] ];
+            const amrex::ParticleReal uy2 = uyp[ indices[i2] ];
+            const amrex::ParticleReal uz2 = uzp[ indices[i2] ];
+            const amrex::ParticleReal wpmp1 = mass*w[ indices[i1] ];
+            const amrex::ParticleReal wpmp2 = mass*w[ indices[i2] ];
+
+            const amrex::ParticleReal ux = ux1 - ux2;
+            const amrex::ParticleReal uy = uy1 - uy2;
+            const amrex::ParticleReal uz = uz1 - uz2;
+            const long double dbetasq = (ux*ux + uy*uy + uz*uz)/c2;
+            const long double gbsq1 = (ux1*ux1 + uy1*uy1 + uz1*uz1)/c2;
+            const long double gbsq2 = (ux2*ux2 + uy2*uy2 + uz2*uz2)/c2;
+            const long double gamma1 = std::sqrt(1.0_prt + gbsq1);
+            const long double gamma2 = std::sqrt(1.0_prt + gbsq2);
+            const long double E1 = wpmp1*gamma1*c2;
+            const long double E2 = wpmp2*gamma2*c2;
+            const long double Etot = E1 + E2;
+            const long double pxtot = wpmp1*ux1 + wpmp2*ux2;
+            const long double pytot = wpmp1*uy1 + wpmp2*uy2;
+            const long double pztot = wpmp1*uz1 + wpmp2*uz2;
+            const long double Ecm = std::sqrt(Etot*Etot - (pxtot*pxtot + pytot*pytot + pztot*pztot)*c2);
+            const long double Erel = Ecm - wpmp1*c2 - wpmp2*c2;
+            if (Erel <= 0.0) { continue; }
+
+            long double deltaEpair = sign*energy_fraction*fmult_fact*Erel;
+            if (std::abs(deltaEpair) > std::abs(deltaE)) {
+                deltaEpair = deltaE;
+                deltaE = 0.0_prt;
+            } else {
+                deltaE -= deltaEpair;
+            }
+            Erel_cumm += Erel - deltaEpair;
+
+            const long double A = Etot - deltaEpair;
+            const long double D = A*A + E2*E2 - E1*E1;
+            const long double p2dotu = wpmp2*(ux2*ux + uy2*uy + uz2*uz);
+            const long double ptdotu = (pxtot*ux + pytot*uy + pztot*uz);
+
+            // compute coefficients for quadratic equation for alpha
+            const long double a = A*A*dbetasq - ptdotu*ptdotu;
+            const long double b = D*ptdotu - 2.0_prt*A*A*p2dotu;
+            const long double c = A*A*E2*E2 - D*D/4.0_prt;
+
+            const long double root = b*b - 4.0_prt*a*c;
+            if (root < 0.0 || a == 0.0) { continue; }
+            const long double alpha = (-b + std::sqrt(root))/(2.0_prt*a);
+
+            // update particle velocities
+            const long double ratio1 = alpha/(wpmp1*c2);
+            const long double ratio2 = alpha/(wpmp2*c2);
+            uxp[ indices[i1] ] += ratio1*ux;
+            uyp[ indices[i1] ] += ratio1*uy;
+            uzp[ indices[i1] ] += ratio1*uz;
+            uxp[ indices[i2] ] -= ratio2*ux;
+            uyp[ indices[i2] ] -= ratio2*uy;
+            uzp[ indices[i2] ] -= ratio2*uz;
+
+            if (i1 < cell_stop - 2) {
+                // If not done with the loop, increment to the next pair of particles
+                i1 = i2 + 1;
+            } else {
+                loop_count++;
+                if (i1 == cell_stop - 2) {
+                    if ((numCell % 2) == 0) { i1 = cell_start + 1; }
+                    if ((numCell % 2) == 1) { i1 = cell_start; }
+                } else {
+                    if ((numCell % 2) == 0) { i1 = cell_start; }
+                    if ((numCell % 2) == 1) { i1 = cell_start + 1; }
+                }
+                // compute energy frac to correct energy with one more loop
+                energy_frac_eff = std::abs(deltaE)/Erel_cumm;
+                if (energy_frac_eff > energy_fraction_max || loop_count > 10) {
+#ifndef AMREX_USE_GPU
+                    if (numCell > 50) {
+                        amrex::Print() << "Notice: energy_frac_eff = " << energy_frac_eff << "\n";
+                        amrex::Print() << "        on loop_count = " << loop_count << "\n";
+                        amrex::Print() << "        is larger than energy_frac_max = " << energy_fraction_max << "\n";
+                        /* amrex::Print() << "        for species1 = " << m_species_names[0] << "\n"; */
+                        /* amrex::Print() << "        and species2 = " << m_species_names[1] << "\n"; */
+                        amrex::Print() << "        num_parts    = " << numCell << "\n";
+                        /* amrex::Print() << "        i_cell       = " << i_cell << "\n"; */
+                        /* amrex::Print() << "        Etot0        = " << KE_in_each_cell[i_cell] << "\n"; */
+                        /* amrex::Print() << "        Etot1        = " << KE_after << "\n"; */
+                        /* amrex::Print() << "        KE1_after       = " << KE1_after << "\n"; */
+                        amrex::Print() << "        deltaE     = " << deltaE << "\n";
+                    }
+#endif
+                    correction_failed = true;
+                    break;
+                } else if (energy_frac_eff > energy_fraction) {
+                    fmult_fact = energy_frac_eff/energy_fraction;
+                }
+            }
+
         }
-        a_Erel_cumm += Erel - deltaE;
 
-        const long double A = Etot - deltaE;
-        const long double D = A*A + E2*E2 - E1*E1;
-        const long double p2dotu = a_wpmp2*(ux2*ux + uy2*uy + uz2*uz);
-        const long double ptdotu = (pxtot*ux + pytot*uy + pztot*uz);
-
-        // compute coefficients for quadratic equation for alpha
-        const long double a = A*A*dbetasq - ptdotu*ptdotu;
-        const long double b = D*ptdotu - 2.0_prt*A*A*p2dotu;
-        const long double c = A*A*E2*E2 - D*D/4.0_prt;
-
-        const long double root = b*b - 4.0_prt*a*c;
-        if (root < 0.0 || a == 0.0) { return; }
-        const long double alpha = (-b + std::sqrt(root))/(2.0_prt*a);
-
-        // update particle velocities
-        const long double ratio1 = alpha/(a_wpmp1*c2);
-        const long double ratio2 = alpha/(a_wpmp2*c2);
-        ux1 += ratio1*ux;
-        uy1 += ratio1*uy;
-        uz1 += ratio1*uz;
-        ux2 -= ratio2*ux;
-        uy2 -= ratio2*uy;
-        uz2 -= ratio2*uz;
-
+        return correction_failed;
     }
 }
 

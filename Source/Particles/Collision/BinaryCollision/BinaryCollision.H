@@ -91,6 +91,7 @@ public:
     BinaryCollision (std::string collision_name, MultiParticleContainer const * const mypc)
         : CollisionBase(collision_name)
     {
+        using namespace amrex::literals;
         if(m_species_names.size() != 2) {
             WARPX_ABORT_WITH_MESSAGE("Binary collision " + collision_name + " must have exactly two species.");
         }
@@ -105,6 +106,26 @@ public:
 
         const amrex::ParmParse pp_collision_name(collision_name);
         pp_collision_name.queryarr("product_species", m_product_species);
+
+        const amrex::ParmParse pp_collisions("collisions");
+
+        // Default values
+        m_correct_energy_momentum = false;
+        m_beta_weight_exponent = 1;
+        m_energy_fraction = 0.5_prt;
+        m_energy_fraction_max = 0.5_prt;
+
+        // Input parameter set for all collisions
+        pp_collisions.query("correct_energy_momentum", m_correct_energy_momentum);
+        pp_collisions.query("beta_weight_exponent", m_beta_weight_exponent);
+        pp_collisions.query("energy_fraction", m_energy_fraction);
+        pp_collisions.query("energy_fraction_max", m_energy_fraction_max);
+
+        // Input parameter set for this collision
+        pp_collision_name.query("correct_energy_momentum", m_correct_energy_momentum);
+        pp_collision_name.query("beta_weight_exponent", m_beta_weight_exponent);
+        pp_collision_name.query("energy_fraction", m_energy_fraction);
+        pp_collision_name.query("energy_fraction_max", m_energy_fraction_max);
 
         // If DSMC the colliding species are also product species.
         // Therefore, we insert the colliding species at the beginning of `m_product_species`.
@@ -443,6 +464,27 @@ public:
             amrex::ParticleReal* AMREX_RESTRICT n1_in_each_cell = n1_vec.dataPtr();
             amrex::ParticleReal* AMREX_RESTRICT T1_in_each_cell = T1_vec.dataPtr();
 
+            // create vectors to store energy and momentum in each cell
+            // This is used to correct the energy and momentum in the
+            // cell after the collisions
+            amrex::Gpu::DeviceVector<amrex::ParticleReal> KE_vec;
+            amrex::Gpu::DeviceVector<amrex::ParticleReal> px_vec;
+            amrex::Gpu::DeviceVector<amrex::ParticleReal> py_vec;
+            amrex::Gpu::DeviceVector<amrex::ParticleReal> pz_vec;
+            if (m_correct_energy_momentum) {
+                KE_vec.resize(n_cells);
+                px_vec.resize(n_cells);
+                py_vec.resize(n_cells);
+                pz_vec.resize(n_cells);
+            }
+            amrex::ParticleReal* AMREX_RESTRICT KE_in_each_cell = KE_vec.dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT px_in_each_cell = px_vec.dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT py_in_each_cell = py_vec.dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT pz_in_each_cell = pz_vec.dataPtr();
+
+            bool const correct_energy_momentum = m_correct_energy_momentum;
+            int const beta_weight_exponent = m_beta_weight_exponent;
+
             // Loop over cells
             WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::computeDensityTemperatures", prof_computeDensityTemperatures);
             amrex::ParallelForRNG( n_cells,
@@ -456,10 +498,14 @@ public:
                     // Do not collide if there is only one particle in the cell
                     if ( cell_stop_1 - cell_start_1 <= 1 ) { return; }
 
+                    amrex::ParticleReal * const AMREX_RESTRICT u1x = soa_1.m_rdata[PIdx::ux];
+                    amrex::ParticleReal * const AMREX_RESTRICT u1y = soa_1.m_rdata[PIdx::uy];
+                    amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
+                    amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
+
                     // compute local density [1/m^3]
                     if (binary_collision_functor.m_computeSpeciesDensities) {
                         amrex::ParticleReal wtot1 = 0.0;
-                        amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
                         for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
                             wtot1 += w1[ indices_1[i1] ];
                         }
@@ -469,12 +515,24 @@ public:
 
                     // compute local temperature [Joules]
                     if (binary_collision_functor.m_computeSpeciesTemperatures) {
-                        amrex::ParticleReal * const AMREX_RESTRICT w1  = soa_1.m_rdata[PIdx::w];
-                        amrex::ParticleReal * const AMREX_RESTRICT u1x = soa_1.m_rdata[PIdx::ux];
-                        amrex::ParticleReal * const AMREX_RESTRICT u1y = soa_1.m_rdata[PIdx::uy];
-                        amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
                         T1_in_each_cell[i_cell] = ComputeTemperature( cell_start_1, cell_stop_1, indices_1,
                                                                       w1, u1x, u1y, u1z, m1 );
+                    }
+
+                    // compute local energy and momentum
+                    if (correct_energy_momentum) {
+                        px_in_each_cell[i_cell] = 0.0_prt;
+                        py_in_each_cell[i_cell] = 0.0_prt;
+                        pz_in_each_cell[i_cell] = 0.0_prt;
+                        KE_in_each_cell[i_cell] = 0.0_prt;
+                        for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
+                            px_in_each_cell[i_cell] += w1[ indices_1[i1] ]*u1x[ indices_1[i1] ]*m1;
+                            py_in_each_cell[i_cell] += w1[ indices_1[i1] ]*u1y[ indices_1[i1] ]*m1;
+                            pz_in_each_cell[i_cell] += w1[ indices_1[i1] ]*u1z[ indices_1[i1] ]*m1;
+                            KE_in_each_cell[i_cell] += w1[ indices_1[i1] ]*Algorithms::KineticEnergy(u1x[ indices_1[i1] ],
+                                                                                                     u1y[ indices_1[i1] ],
+                                                                                                     u1z[ indices_1[i1] ], m1);
+                        }
                     }
 
                     // shuffle
@@ -559,6 +617,80 @@ public:
             {
                 setNewParticleIDs(*(tile_products_data[i]), static_cast<int>(products_np[i]), num_added[i]);
             }
+
+            if (m_correct_energy_momentum) {
+                // Loop over cells and calculate the change in energy and momentum
+                amrex::ParticleReal const energy_fraction = m_energy_fraction;
+                amrex::ParticleReal const energy_fraction_max = m_energy_fraction_max;
+                WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::correctEnergyMomentum", prof_correctEnergyMomentum);
+                amrex::ParallelFor( n_cells,
+                    [=] AMREX_GPU_DEVICE (int i_cell) noexcept
+                    {
+                        // The particles from species1 that are in the cell `i_cell` are
+                        // given by the `indices_1[cell_start_1:cell_stop_1]`
+                        index_type const cell_start_1 = cell_offsets_1[i_cell];
+                        index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
+
+                        // Do not do the rebalance if one species is missing in the cell
+                        if (cell_stop_1 - cell_start_1 < 1) { return; }
+
+                        // ux from species1 can be accessed like this:
+                        // ux_1[ indices_1[i] ], where i is between
+                        // cell_start_1 (inclusive) and cell_start_2 (exclusive)
+
+                        amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
+                        amrex::ParticleReal * const AMREX_RESTRICT u1x = soa_1.m_rdata[PIdx::ux];
+                        amrex::ParticleReal * const AMREX_RESTRICT u1y = soa_1.m_rdata[PIdx::uy];
+                        amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
+
+                        amrex::ParticleReal ww_weighted_sum = 0.0_prt;
+
+                        // subract momentum from the initial values
+                        // whatever is left over, will be distributed among the particles
+                        for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
+                            ww_weighted_sum += std::pow(w1[ indices_1[i1] ], beta_weight_exponent);
+                            px_in_each_cell[i_cell] -= w1[ indices_1[i1] ]*u1x[ indices_1[i1] ]*m1;
+                            py_in_each_cell[i_cell] -= w1[ indices_1[i1] ]*u1y[ indices_1[i1] ]*m1;
+                            pz_in_each_cell[i_cell] -= w1[ indices_1[i1] ]*u1z[ indices_1[i1] ]*m1;
+                        }
+
+                        amrex::ParticleReal const psq = px_in_each_cell[i_cell]*px_in_each_cell[i_cell] +
+                                                        py_in_each_cell[i_cell]*py_in_each_cell[i_cell] +
+                                                        pz_in_each_cell[i_cell]*pz_in_each_cell[i_cell];
+                        if (psq > 0.) {
+                            amrex::ParticleReal KE1_after = 0._prt;
+                            amrex::ParticleReal const px_avg = px_in_each_cell[i_cell]/ww_weighted_sum;
+                            amrex::ParticleReal const py_avg = py_in_each_cell[i_cell]/ww_weighted_sum;
+                            amrex::ParticleReal const pz_avg = pz_in_each_cell[i_cell]/ww_weighted_sum;
+                            for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
+                                amrex::ParticleReal const w_factor = std::pow(w1[ indices_1[i1] ], beta_weight_exponent - 1)/m1;
+                                u1x[ indices_1[i1] ] += w_factor*px_avg;
+                                u1y[ indices_1[i1] ] += w_factor*py_avg;
+                                u1z[ indices_1[i1] ] += w_factor*pz_avg;
+                                KE1_after += w1[ indices_1[i1] ]*Algorithms::KineticEnergy(u1x[ indices_1[i1] ],
+                                                                                           u1y[ indices_1[i1] ],
+                                                                                           u1z[ indices_1[i1] ], m1);
+                            }
+
+                            const amrex::ParticleReal KE_after = KE1_after;
+                            const amrex::ParticleReal deltaE = KE_after - KE_in_each_cell[i_cell];
+                            amrex::ParticleReal deltaEp1 = deltaE;
+
+                            bool correction_failed = false;
+                            if (deltaEp1 != 0.) {
+                                // adjust species 1 particles to absorb deltaEp1
+                                correction_failed = correction_failed ||
+                                     ParticleUtils::ModifyEnergyPairwise(u1x, u1y, u1z, w1, indices_1,
+                                                                         cell_start_1, cell_stop_1, m1,
+                                                                         energy_fraction, energy_fraction_max, deltaEp1);
+                            }
+
+                        }
+                    }
+                );
+                WARPX_PROFILE_VAR_STOP(prof_correctEnergyMomentum);
+            }
+
         }
         else // species_1 != species_2
         {
@@ -692,15 +824,18 @@ public:
             amrex::Gpu::DeviceVector<amrex::ParticleReal> px_vec;
             amrex::Gpu::DeviceVector<amrex::ParticleReal> py_vec;
             amrex::Gpu::DeviceVector<amrex::ParticleReal> pz_vec;
-            KE_vec.resize(n_cells);
-            px_vec.resize(n_cells);
-            py_vec.resize(n_cells);
-            pz_vec.resize(n_cells);
+            if (m_correct_energy_momentum) {
+                KE_vec.resize(n_cells);
+                px_vec.resize(n_cells);
+                py_vec.resize(n_cells);
+                pz_vec.resize(n_cells);
+            }
             amrex::ParticleReal* AMREX_RESTRICT KE_in_each_cell = KE_vec.dataPtr();
             amrex::ParticleReal* AMREX_RESTRICT px_in_each_cell = px_vec.dataPtr();
             amrex::ParticleReal* AMREX_RESTRICT py_in_each_cell = py_vec.dataPtr();
             amrex::ParticleReal* AMREX_RESTRICT pz_in_each_cell = pz_vec.dataPtr();
 
+            bool const correct_energy_momentum = m_correct_energy_momentum;
             int const beta_weight_exponent = m_beta_weight_exponent;
 
             // Loop over cells
@@ -759,25 +894,27 @@ public:
                     }
 
                     // compute local energy and momentum
-                    px_in_each_cell[i_cell] = 0.0_prt;
-                    py_in_each_cell[i_cell] = 0.0_prt;
-                    pz_in_each_cell[i_cell] = 0.0_prt;
-                    KE_in_each_cell[i_cell] = 0.0_prt;
-                    for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
-                        px_in_each_cell[i_cell] += w1[ indices_1[i1] ]*u1x[ indices_1[i1] ]*m1;
-                        py_in_each_cell[i_cell] += w1[ indices_1[i1] ]*u1y[ indices_1[i1] ]*m1;
-                        pz_in_each_cell[i_cell] += w1[ indices_1[i1] ]*u1z[ indices_1[i1] ]*m1;
-                        KE_in_each_cell[i_cell] += w1[ indices_1[i1] ]*Algorithms::KineticEnergy(u1x[ indices_1[i1] ],
-                                                                                                 u1y[ indices_1[i1] ],
-                                                                                                 u1z[ indices_1[i1] ], m1);
-                    }
-                    for (index_type i2=cell_start_2; i2<cell_stop_2; ++i2) {
-                        px_in_each_cell[i_cell] += w2[ indices_2[i2] ]*u2x[ indices_2[i2] ]*m2;
-                        py_in_each_cell[i_cell] += w2[ indices_2[i2] ]*u2y[ indices_2[i2] ]*m2;
-                        pz_in_each_cell[i_cell] += w2[ indices_2[i2] ]*u2z[ indices_2[i2] ]*m2;
-                        KE_in_each_cell[i_cell] += w2[ indices_2[i2] ]*Algorithms::KineticEnergy(u2x[ indices_2[i2] ],
-                                                                                                 u2y[ indices_2[i2] ],
-                                                                                                 u2z[ indices_2[i2] ], m2);
+                    if (correct_energy_momentum) {
+                        px_in_each_cell[i_cell] = 0.0_prt;
+                        py_in_each_cell[i_cell] = 0.0_prt;
+                        pz_in_each_cell[i_cell] = 0.0_prt;
+                        KE_in_each_cell[i_cell] = 0.0_prt;
+                        for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
+                            px_in_each_cell[i_cell] += w1[ indices_1[i1] ]*u1x[ indices_1[i1] ]*m1;
+                            py_in_each_cell[i_cell] += w1[ indices_1[i1] ]*u1y[ indices_1[i1] ]*m1;
+                            pz_in_each_cell[i_cell] += w1[ indices_1[i1] ]*u1z[ indices_1[i1] ]*m1;
+                            KE_in_each_cell[i_cell] += w1[ indices_1[i1] ]*Algorithms::KineticEnergy(u1x[ indices_1[i1] ],
+                                                                                                     u1y[ indices_1[i1] ],
+                                                                                                     u1z[ indices_1[i1] ], m1);
+                        }
+                        for (index_type i2=cell_start_2; i2<cell_stop_2; ++i2) {
+                            px_in_each_cell[i_cell] += w2[ indices_2[i2] ]*u2x[ indices_2[i2] ]*m2;
+                            py_in_each_cell[i_cell] += w2[ indices_2[i2] ]*u2y[ indices_2[i2] ]*m2;
+                            pz_in_each_cell[i_cell] += w2[ indices_2[i2] ]*u2z[ indices_2[i2] ]*m2;
+                            KE_in_each_cell[i_cell] += w2[ indices_2[i2] ]*Algorithms::KineticEnergy(u2x[ indices_2[i2] ],
+                                                                                                     u2y[ indices_2[i2] ],
+                                                                                                     u2z[ indices_2[i2] ], m2);
+                        }
                     }
 
                     // shuffle
@@ -871,232 +1008,131 @@ public:
                 setNewParticleIDs(*(tile_products_data[i]), static_cast<int>(products_np[i]), num_added[i]);
             }
 
-            // Loop over cells and calculate the change in energy and momentum
-            WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::correctEnergyMomentum", prof_correctEnergyMomentum);
-            amrex::ParallelFor( n_cells,
-                [=] AMREX_GPU_DEVICE (int i_cell) noexcept
-                {
-                    // The particles from species1 that are in the cell `i_cell` are
-                    // given by the `indices_1[cell_start_1:cell_stop_1]`
-                    index_type const cell_start_1 = cell_offsets_1[i_cell];
-                    index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
-                    // Same for species 2
-                    index_type const cell_start_2 = cell_offsets_2[i_cell];
-                    index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
+            if (m_correct_energy_momentum) {
+                // Loop over cells and calculate the change in energy and momentum
+                amrex::ParticleReal const energy_fraction = m_energy_fraction;
+                amrex::ParticleReal const energy_fraction_max = m_energy_fraction_max;
+                WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::correctEnergyMomentum", prof_correctEnergyMomentum);
+                amrex::ParallelFor( n_cells,
+                    [=] AMREX_GPU_DEVICE (int i_cell) noexcept
+                    {
+                        // The particles from species1 that are in the cell `i_cell` are
+                        // given by the `indices_1[cell_start_1:cell_stop_1]`
+                        index_type const cell_start_1 = cell_offsets_1[i_cell];
+                        index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
+                        // Same for species 2
+                        index_type const cell_start_2 = cell_offsets_2[i_cell];
+                        index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
 
-                    // Do not do the rebalance if one species is missing in the cell
-                    if ( cell_stop_1 - cell_start_1 < 1 ||
-                         cell_stop_2 - cell_start_2 < 1 ) { return; }
+                        // Do not do the rebalance if one species is missing in the cell
+                        if ( cell_stop_1 - cell_start_1 < 1 ||
+                             cell_stop_2 - cell_start_2 < 1 ) { return; }
 
-                    // ux from species1 can be accessed like this:
-                    // ux_1[ indices_1[i] ], where i is between
-                    // cell_start_1 (inclusive) and cell_start_2 (exclusive)
+                        // ux from species1 can be accessed like this:
+                        // ux_1[ indices_1[i] ], where i is between
+                        // cell_start_1 (inclusive) and cell_start_2 (exclusive)
 
-                    amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
-                    amrex::ParticleReal * const AMREX_RESTRICT w2 = soa_2.m_rdata[PIdx::w];
+                        amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
+                        amrex::ParticleReal * const AMREX_RESTRICT w2 = soa_2.m_rdata[PIdx::w];
 
-                    amrex::ParticleReal * const AMREX_RESTRICT u1x = soa_1.m_rdata[PIdx::ux];
-                    amrex::ParticleReal * const AMREX_RESTRICT u1y = soa_1.m_rdata[PIdx::uy];
-                    amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
+                        amrex::ParticleReal * const AMREX_RESTRICT u1x = soa_1.m_rdata[PIdx::ux];
+                        amrex::ParticleReal * const AMREX_RESTRICT u1y = soa_1.m_rdata[PIdx::uy];
+                        amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
 
-                    amrex::ParticleReal * const AMREX_RESTRICT u2x = soa_2.m_rdata[PIdx::ux];
-                    amrex::ParticleReal * const AMREX_RESTRICT u2y = soa_2.m_rdata[PIdx::uy];
-                    amrex::ParticleReal * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];
+                        amrex::ParticleReal * const AMREX_RESTRICT u2x = soa_2.m_rdata[PIdx::ux];
+                        amrex::ParticleReal * const AMREX_RESTRICT u2y = soa_2.m_rdata[PIdx::uy];
+                        amrex::ParticleReal * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];
 
-                    amrex::ParticleReal w1_sum = 0.0_prt;
-                    amrex::ParticleReal w2_sum = 0.0_prt;
-                    amrex::ParticleReal ww_weighted_sum = 0.0_prt;
+                        amrex::ParticleReal w1_sum = 0.0_prt;
+                        amrex::ParticleReal w2_sum = 0.0_prt;
+                        amrex::ParticleReal ww_weighted_sum = 0.0_prt;
 
-                    // subract momentum from the initial values
-                    // whatever is left over, will be distributed among the particles
-                    for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
-                        w1_sum += w1[ indices_1[i1] ];
-                        ww_weighted_sum += std::pow(w1[ indices_1[i1] ], beta_weight_exponent);
-                        px_in_each_cell[i_cell] -= w1[ indices_1[i1] ]*u1x[ indices_1[i1] ]*m1;
-                        py_in_each_cell[i_cell] -= w1[ indices_1[i1] ]*u1y[ indices_1[i1] ]*m1;
-                        pz_in_each_cell[i_cell] -= w1[ indices_1[i1] ]*u1z[ indices_1[i1] ]*m1;
-                    }
-                    for (index_type i2=cell_start_2; i2<cell_stop_2; ++i2) {
-                        w2_sum += w2[ indices_2[i2] ];
-                        ww_weighted_sum += std::pow(w2[ indices_2[i2] ], beta_weight_exponent);
-                        px_in_each_cell[i_cell] -= w2[ indices_2[i2] ]*u2x[ indices_2[i2] ]*m2;
-                        py_in_each_cell[i_cell] -= w2[ indices_2[i2] ]*u2y[ indices_2[i2] ]*m2;
-                        pz_in_each_cell[i_cell] -= w2[ indices_2[i2] ]*u2z[ indices_2[i2] ]*m2;
-                    }
-
-                    amrex::ParticleReal const psq = px_in_each_cell[i_cell]*px_in_each_cell[i_cell] +
-                                                    py_in_each_cell[i_cell]*py_in_each_cell[i_cell] +
-                                                    pz_in_each_cell[i_cell]*pz_in_each_cell[i_cell];
-                    if (psq > 0.) {
-                        amrex::ParticleReal KE1_after = 0._prt;
-                        amrex::ParticleReal KE2_after = 0._prt;
-                        amrex::ParticleReal const px_avg = px_in_each_cell[i_cell]/ww_weighted_sum;
-                        amrex::ParticleReal const py_avg = py_in_each_cell[i_cell]/ww_weighted_sum;
-                        amrex::ParticleReal const pz_avg = pz_in_each_cell[i_cell]/ww_weighted_sum;
+                        // subract momentum from the initial values
+                        // whatever is left over, will be distributed among the particles
                         for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
-                            amrex::ParticleReal const w_factor = std::pow(w1[ indices_1[i1] ], beta_weight_exponent - 1)/m1;
-                            u1x[ indices_1[i1] ] += w_factor*px_avg;
-                            u1y[ indices_1[i1] ] += w_factor*py_avg;
-                            u1z[ indices_1[i1] ] += w_factor*pz_avg;
-                            KE1_after += w1[ indices_1[i1] ]*Algorithms::KineticEnergy(u1x[ indices_1[i1] ],
-                                                                                       u1y[ indices_1[i1] ],
-                                                                                       u1z[ indices_1[i1] ], m1);
+                            w1_sum += w1[ indices_1[i1] ];
+                            ww_weighted_sum += std::pow(w1[ indices_1[i1] ], beta_weight_exponent);
+                            px_in_each_cell[i_cell] -= w1[ indices_1[i1] ]*u1x[ indices_1[i1] ]*m1;
+                            py_in_each_cell[i_cell] -= w1[ indices_1[i1] ]*u1y[ indices_1[i1] ]*m1;
+                            pz_in_each_cell[i_cell] -= w1[ indices_1[i1] ]*u1z[ indices_1[i1] ]*m1;
                         }
                         for (index_type i2=cell_start_2; i2<cell_stop_2; ++i2) {
-                            amrex::ParticleReal const w_factor = std::pow(w2[ indices_2[i2] ], beta_weight_exponent - 1)/m2;
-                            u2x[ indices_2[i2] ] += w_factor*px_avg;
-                            u2y[ indices_2[i2] ] += w_factor*py_avg;
-                            u2z[ indices_2[i2] ] += w_factor*pz_avg;
-                            KE2_after += w2[ indices_2[i2] ]*Algorithms::KineticEnergy(u2x[ indices_2[i2] ],
-                                                                                       u2y[ indices_2[i2] ],
-                                                                                       u2z[ indices_2[i2] ], m2);
+                            w2_sum += w2[ indices_2[i2] ];
+                            ww_weighted_sum += std::pow(w2[ indices_2[i2] ], beta_weight_exponent);
+                            px_in_each_cell[i_cell] -= w2[ indices_2[i2] ]*u2x[ indices_2[i2] ]*m2;
+                            py_in_each_cell[i_cell] -= w2[ indices_2[i2] ]*u2y[ indices_2[i2] ]*m2;
+                            pz_in_each_cell[i_cell] -= w2[ indices_2[i2] ]*u2z[ indices_2[i2] ]*m2;
                         }
 
-                        const amrex::ParticleReal KE_after = KE1_after + KE2_after;
-                        const amrex::ParticleReal deltaE = KE_after - KE_in_each_cell[i_cell];
-                        amrex::ParticleReal deltaEp1, deltaEp2;
-                        int const numCell1 = (cell_stop_1 - cell_start_1);
-                        int const numCell2 = (cell_stop_2 - cell_start_2);
-                        if (numCell1 == 1) {
-                            deltaEp1 = 0.0;
-                            deltaEp2 = deltaE;
-                        } else if (numCell2 == 1) {
-                            deltaEp1 = deltaE;
-                            deltaEp2 = 0.0;
-                        } else {
-                            const amrex::ParticleReal Etotdenom = w1_sum*KE1_after/numCell1 + w2_sum*KE2_after/numCell2;
-                            deltaEp1 = w1_sum*KE1_after/Etotdenom*deltaE/numCell1;
-                            deltaEp2 = w2_sum*KE2_after/Etotdenom*deltaE/numCell2;
-                            //deltaEp1 = KE1_after/KE_after*deltaE;
-                            //deltaEp2 = KE2_after/KE_after*deltaE;
-                        }
-
-                        bool correction_failed = false;
-                        amrex::ParticleReal const energy_fraction = 0.5_prt;  // will be user input
-                        amrex::ParticleReal const energy_fraction_max = 0.5_prt;  // will be user input
-
-                        // adjust species 1 particles to absorb deltaEp1
-                        // This loops over the species 1 particles, two at a time, distributing
-                        // the energy until all of it has been distributed.
-                        // The loop is setup to switch between even first and odd first pairs
-                        // each loop over the particles.
-                        int loop_count = 0;
-                        amrex::ParticleReal Erel_cumm = 0.0_prt;
-                        amrex::ParticleReal fmult_fact = 1.0_prt;
-                        amrex::ParticleReal energy_frac_eff = 0.0_prt;
-                        index_type i1 = cell_start_1;
-                        while (energy_frac_eff <= energy_fraction_max && loop_count <= 10) {
-
-                            if (deltaEp1 == 0.0_prt) { break; }
-
-                            index_type i2 = i1 + 1;
-                            if (i2 == cell_stop_1) {
-                                i2 = cell_start_1;
+                        amrex::ParticleReal const psq = px_in_each_cell[i_cell]*px_in_each_cell[i_cell] +
+                                                        py_in_each_cell[i_cell]*py_in_each_cell[i_cell] +
+                                                        pz_in_each_cell[i_cell]*pz_in_each_cell[i_cell];
+                        if (psq > 0.) {
+                            amrex::ParticleReal KE1_after = 0._prt;
+                            amrex::ParticleReal KE2_after = 0._prt;
+                            amrex::ParticleReal const px_avg = px_in_each_cell[i_cell]/ww_weighted_sum;
+                            amrex::ParticleReal const py_avg = py_in_each_cell[i_cell]/ww_weighted_sum;
+                            amrex::ParticleReal const pz_avg = pz_in_each_cell[i_cell]/ww_weighted_sum;
+                            for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
+                                amrex::ParticleReal const w_factor = std::pow(w1[ indices_1[i1] ], beta_weight_exponent - 1)/m1;
+                                u1x[ indices_1[i1] ] += w_factor*px_avg;
+                                u1y[ indices_1[i1] ] += w_factor*py_avg;
+                                u1z[ indices_1[i1] ] += w_factor*pz_avg;
+                                KE1_after += w1[ indices_1[i1] ]*Algorithms::KineticEnergy(u1x[ indices_1[i1] ],
+                                                                                           u1y[ indices_1[i1] ],
+                                                                                           u1z[ indices_1[i1] ], m1);
+                            }
+                            for (index_type i2=cell_start_2; i2<cell_stop_2; ++i2) {
+                                amrex::ParticleReal const w_factor = std::pow(w2[ indices_2[i2] ], beta_weight_exponent - 1)/m2;
+                                u2x[ indices_2[i2] ] += w_factor*px_avg;
+                                u2y[ indices_2[i2] ] += w_factor*py_avg;
+                                u2z[ indices_2[i2] ] += w_factor*pz_avg;
+                                KE2_after += w2[ indices_2[i2] ]*Algorithms::KineticEnergy(u2x[ indices_2[i2] ],
+                                                                                           u2y[ indices_2[i2] ],
+                                                                                           u2z[ indices_2[i2] ], m2);
                             }
 
-                            // zero angle inelastic scatter
-                            ParticleUtils::ModifyEnergyPairwise(u1x[ indices_1[i1] ], u1y[ indices_1[i1] ], u1z[ indices_1[i1] ],
-                                                                u1x[ indices_1[i2] ], u1y[ indices_1[i2] ], u1z[ indices_1[i2] ],
-                                                                m1*w1[ indices_1[i1] ], m1*w1[ indices_1[i2] ],
-                                                                energy_fraction*fmult_fact, Erel_cumm, deltaEp1);
-
-                            if (i1 < cell_stop_1 - 2) {
-                                i1 = i2 + 1;
+                            const amrex::ParticleReal KE_after = KE1_after + KE2_after;
+                            const amrex::ParticleReal deltaE = KE_after - KE_in_each_cell[i_cell];
+                            amrex::ParticleReal deltaEp1, deltaEp2;
+                            int const numCell1 = (cell_stop_1 - cell_start_1);
+                            int const numCell2 = (cell_stop_2 - cell_start_2);
+                            if (numCell1 == 1) {
+                                deltaEp1 = 0.0;
+                                deltaEp2 = deltaE;
+                            } else if (numCell2 == 1) {
+                                deltaEp1 = deltaE;
+                                deltaEp2 = 0.0;
                             } else {
-                                loop_count++;
-                                if (i1 == cell_stop_1 - 2) {
-                                    if ((numCell1 % 2) == 0) { i1 = cell_start_1 + 1; }
-                                    if ((numCell1 % 2) == 1) { i1 = cell_start_1; }
-                                } else {
-                                    if ((numCell1 % 2) == 0) { i1 = cell_start_1; }
-                                    if ((numCell1 % 2) == 1) { i1 = cell_start_1 + 1; }
-                                }
-                                // compute energy frac to correct energy with one more loop
-                                energy_frac_eff = std::abs(deltaEp1)/Erel_cumm;
-                                if (energy_frac_eff > energy_fraction_max || loop_count > 10) {
-                                    if (numCell1 > 50) {
-                                        amrex::Print() << "Notice: energy_frac_eff = " << energy_frac_eff << "\n";
-                                        amrex::Print() << "        on loop_count = " << loop_count << "\n";
-                                        amrex::Print() << "        is larger than energy_frac_max = " << energy_fraction_max << "\n";
-                                        amrex::Print() << "        for species1 = " << m_species_names[0] << "\n";
-                                        amrex::Print() << "        and species2 = " << m_species_names[1] << "\n";
-                                        amrex::Print() << "        num_parts    = " << numCell1 << "\n";
-                                        /* amrex::Print() << "        ig           = " << ig << "\n"; */
-                                        amrex::Print() << "        Etot0        = " << KE_in_each_cell[i_cell] << "\n";
-                                        amrex::Print() << "        Etot1        = " << KE_after << "\n";
-                                        amrex::Print() << "        KE1_after       = " << KE1_after << "\n";
-                                        amrex::Print() << "        deltaEp1     = " << deltaEp1 << "\n";
-                                    }
-                                    correction_failed = true;
-                                    break;
-                                } else if (energy_frac_eff > energy_fraction) {
-                                    fmult_fact = energy_frac_eff/energy_fraction;
-                                }
+                                const amrex::ParticleReal Etotdenom = w1_sum*KE1_after/numCell1 + w2_sum*KE2_after/numCell2;
+                                deltaEp1 = w1_sum*KE1_after/Etotdenom*deltaE/numCell1;
+                                deltaEp2 = w2_sum*KE2_after/Etotdenom*deltaE/numCell2;
+                                //deltaEp1 = KE1_after/KE_after*deltaE
+                                //deltaEp2 = KE2_after/KE_after*deltaE
+                            }
+
+                            bool correction_failed = false;
+                            if (deltaEp1 != 0.) {
+                                // adjust species 1 particles to absorb deltaEp1
+                                correction_failed = correction_failed ||
+                                     ParticleUtils::ModifyEnergyPairwise(u1x, u1y, u1z, w1, indices_1,
+                                                                         cell_start_1, cell_stop_1, m1,
+                                                                         energy_fraction, energy_fraction_max, deltaEp1);
+                            }
+
+                            if (deltaEp2 != 0.) {
+                                // adjust species 2 particles to absorb deltaEp1
+                                correction_failed = correction_failed ||
+                                     ParticleUtils::ModifyEnergyPairwise(u2x, u2y, u2z, w2, indices_2,
+                                                                         cell_start_2, cell_stop_2, m2,
+                                                                         energy_fraction, energy_fraction_max, deltaEp2);
                             }
 
                         }
-
-                        // adjust species 2 particles to absorb deltaEp2
-                        loop_count = 0;
-                        Erel_cumm = 0.0_prt;
-                        fmult_fact = 1.0_prt;
-                        energy_frac_eff = 0.0_prt;
-                        i1 = cell_start_2;
-                        while (energy_frac_eff <= energy_fraction_max && loop_count <= 10) {
-
-                            if (deltaEp2 == 0.0_prt) { break; }
-
-                            index_type i2 = i1 + 1;
-                            if (i2 == cell_stop_2) {
-                                i2 = cell_start_2;
-                            }
-
-                            // zero angle inelastic scatter
-                            ParticleUtils::ModifyEnergyPairwise(u2x[ indices_2[i1] ], u2y[ indices_2[i1] ], u2z[ indices_2[i1] ],
-                                                                u2x[ indices_2[i2] ], u2y[ indices_2[i2] ], u2z[ indices_2[i2] ],
-                                                                m2*w2[ indices_2[i1] ], m2*w2[ indices_2[i2] ],
-                                                                energy_fraction*fmult_fact, Erel_cumm, deltaEp2);
-
-                            if (i1 < cell_stop_2 - 2) {
-                                i1 = i2 + 1;
-                            } else {
-                                loop_count++;
-                                if (i1 == cell_stop_2 - 2) {
-                                    if ((numCell2 % 2) == 0) { i1 = cell_start_2 + 1; }
-                                    if ((numCell2 % 2) == 1) { i1 = cell_start_2; }
-                                } else {
-                                    if ((numCell2 % 2) == 0) { i1 = cell_start_2; }
-                                    if ((numCell2 % 2) == 1) { i1 = cell_start_2 + 1; }
-                                }
-                                // compute energy frac to correct energy with one more loop
-                                energy_frac_eff = std::abs(deltaEp2)/Erel_cumm;
-                                if (energy_frac_eff > energy_fraction_max || loop_count > 10) {
-                                    if (numCell2 > 50) {
-                                        amrex::Print() << "Notice: energy_frac_eff = " << energy_frac_eff << "\n";
-                                        amrex::Print() << "        on loop_count = " << loop_count << "\n";
-                                        amrex::Print() << "        is larger than energy_frac_max = " << energy_fraction_max << "\n";
-                                        amrex::Print() << "        for species1 = " << m_species_names[0] << "\n";
-                                        amrex::Print() << "        and species2 = " << m_species_names[1] << "\n";
-                                        amrex::Print() << "        num_parts    = " << numCell2 << "\n";
-                                        /* amrex::Print() << "        ig           = " << ig << "\n"; */
-                                        amrex::Print() << "        Etot0        = " << KE_in_each_cell[i_cell] << "\n";
-                                        amrex::Print() << "        Etot1        = " << KE_after << "\n";
-                                        amrex::Print() << "        KE2_after       = " << KE2_after << "\n";
-                                        amrex::Print() << "        deltaEp2     = " << deltaEp2 << "\n";
-                                    }
-                                    correction_failed = true;
-                                    break;
-                                } else if (energy_frac_eff > energy_fraction) {
-                                    fmult_fact = energy_frac_eff/energy_fraction;
-                                }
-                            }
-
-                        }
-
                     }
-                }
-            );
-            WARPX_PROFILE_VAR_STOP(prof_correctEnergyMomentum);
+                );
+                WARPX_PROFILE_VAR_STOP(prof_correctEnergyMomentum);
+            }
 
         } // end if ( m_isSameSpecies)
 
@@ -1106,7 +1142,12 @@ private:
 
     bool m_isSameSpecies;
     bool m_have_product_species;
-    int m_beta_weight_exponent = 1;
+
+    bool m_correct_energy_momentum;
+    int m_beta_weight_exponent;
+    amrex::ParticleReal m_energy_fraction;
+    amrex::ParticleReal m_energy_fraction_max;
+
     amrex::Vector<std::string> m_product_species;
     // functor that performs collisions within a cell
     CollisionFunctor m_binary_collision_functor;
