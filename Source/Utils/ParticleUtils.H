@@ -217,11 +217,7 @@ namespace ParticleUtils {
         const long double pytot = a_wpmp1*uy1 + a_wpmp2*uy2;
         const long double pztot = a_wpmp1*uz1 + a_wpmp2*uz2;
         const long double Ecm = std::sqrt(Etot*Etot - (pxtot*pxtot + pytot*pytot + pztot*pztot)*c2);
-        const long double Enum = 4*c2*c2*a_wpmp1*a_wpmp1*a_wpmp2*a_wpmp2*(c2*ux1*ux1 - 2*c2*ux1*ux2 + c2*ux2*ux2 + c2*uy1*uy1 - 2*c2*uy1*uy2 + c2*uy2*uy2 + c2*uz1*uz1 - 2*c2*uz1*uz2 + c2*uz2*uz2 + ux1*ux1*uy2*uy2 + ux1*ux1*uz2*uz2 - 2*ux1*ux2*uy1*uy2 - 2*ux1*ux2*uz1*uz2 + ux2*ux2*uy1*uy1 + ux2*ux2*uz1*uz1 + uy1*uy1*uz2*uz2 - 2*uy1*uy2*uz1*uz2 + uy2*uy2*uz1*uz1);
-        const long double Eden1 = Ecm + a_wpmp1*c2 + a_wpmp2*c2;
-        const long double Eden2 = (2*c2*c2*a_wpmp1*a_wpmp2*std::sqrt(1 + ux1*ux1/c2 + uy1*uy1/c2 + uz1*uz1/c2)*std::sqrt(1 + ux2*ux2/c2 + uy2*uy2/c2 + uz2*uz2/c2) + 2*c2*c2*a_wpmp1*a_wpmp2 + 2*c2*ux1*ux2*a_wpmp1*a_wpmp2 + 2*c2*uy1*uy2*a_wpmp1*a_wpmp2 + 2*c2*uz1*uz2*a_wpmp1*a_wpmp2);
         const long double Erel = Ecm - a_wpmp1*c2 - a_wpmp2*c2;
-        amrex::Print() << "Erel " << " " << Ecm - a_wpmp1*c2 - a_wpmp2*c2 << " " << Enum/Eden1/Eden2 << "\n";
         if (Erel <= 0.0) { return; }
 
         long double deltaE = sign*a_Erel_frac*Erel;
