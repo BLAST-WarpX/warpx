@@ -205,19 +205,23 @@ namespace ParticleUtils {
         const amrex::ParticleReal ux = ux1 - ux2;
         const amrex::ParticleReal uy = uy1 - uy2;
         const amrex::ParticleReal uz = uz1 - uz2;
-        const long double usq = (ux*ux + uy*uy + uz*uz)/c2;
+        const long double dbetasq = (ux*ux + uy*uy + uz*uz)/c2;
         const long double gbsq1 = (ux1*ux1 + uy1*uy1 + uz1*uz1)/c2;
         const long double gbsq2 = (ux2*ux2 + uy2*uy2 + uz2*uz2)/c2;
         const long double gamma1 = std::sqrt(1.0_prt + gbsq1);
         const long double gamma2 = std::sqrt(1.0_prt + gbsq2);
-        const long double E1 = a_wpmp1*gamma1;
-        const long double E2 = a_wpmp2*gamma2;
+        const long double E1 = a_wpmp1*gamma1*c2;
+        const long double E2 = a_wpmp2*gamma2*c2;
         const long double Etot = E1 + E2;
         const long double pxtot = a_wpmp1*ux1 + a_wpmp2*ux2;
         const long double pytot = a_wpmp1*uy1 + a_wpmp2*uy2;
         const long double pztot = a_wpmp1*uz1 + a_wpmp2*uz2;
-        const long double Ecm = std::sqrt(Etot*Etot - (pxtot*pxtot + pytot*pytot + pztot*pztot)/c2);
-        const long double Erel = Ecm - a_wpmp1 - a_wpmp2;
+        const long double Ecm = std::sqrt(Etot*Etot - (pxtot*pxtot + pytot*pytot + pztot*pztot)*c2);
+        const long double Enum = 4*c2*c2*a_wpmp1*a_wpmp1*a_wpmp2*a_wpmp2*(c2*ux1*ux1 - 2*c2*ux1*ux2 + c2*ux2*ux2 + c2*uy1*uy1 - 2*c2*uy1*uy2 + c2*uy2*uy2 + c2*uz1*uz1 - 2*c2*uz1*uz2 + c2*uz2*uz2 + ux1*ux1*uy2*uy2 + ux1*ux1*uz2*uz2 - 2*ux1*ux2*uy1*uy2 - 2*ux1*ux2*uz1*uz2 + ux2*ux2*uy1*uy1 + ux2*ux2*uz1*uz1 + uy1*uy1*uz2*uz2 - 2*uy1*uy2*uz1*uz2 + uy2*uy2*uz1*uz1);
+        const long double Eden1 = Ecm + a_wpmp1*c2 + a_wpmp2*c2;
+        const long double Eden2 = (2*c2*c2*a_wpmp1*a_wpmp2*std::sqrt(1 + ux1*ux1/c2 + uy1*uy1/c2 + uz1*uz1/c2)*std::sqrt(1 + ux2*ux2/c2 + uy2*uy2/c2 + uz2*uz2/c2) + 2*c2*c2*a_wpmp1*a_wpmp2 + 2*c2*ux1*ux2*a_wpmp1*a_wpmp2 + 2*c2*uy1*uy2*a_wpmp1*a_wpmp2 + 2*c2*uz1*uz2*a_wpmp1*a_wpmp2);
+        const long double Erel = Ecm - a_wpmp1*c2 - a_wpmp2*c2;
+        amrex::Print() << "Erel " << " " << Ecm - a_wpmp1*c2 - a_wpmp2*c2 << " " << Enum/Eden1/Eden2 << "\n";
         if (Erel <= 0.0) { return; }
 
         long double deltaE = sign*a_Erel_frac*Erel;
@@ -231,11 +235,11 @@ namespace ParticleUtils {
 
         const long double A = Etot - deltaE;
         const long double D = A*A + E2*E2 - E1*E1;
-        const long double p2dotu = a_wpmp2*(ux2*ux + uy2*uy + uz2*uz)/c2;
-        const long double ptdotu = (pxtot*ux + pytot*uy + pztot*uz)/c2;
+        const long double p2dotu = a_wpmp2*(ux2*ux + uy2*uy + uz2*uz);
+        const long double ptdotu = (pxtot*ux + pytot*uy + pztot*uz);
 
         // compute coefficients for quadratic equation for alpha
-        const long double a = A*A*usq - ptdotu*ptdotu;
+        const long double a = A*A*dbetasq - ptdotu*ptdotu;
         const long double b = D*ptdotu - 2.0_prt*A*A*p2dotu;
         const long double c = A*A*E2*E2 - D*D/4.0_prt;
 
@@ -244,8 +248,8 @@ namespace ParticleUtils {
         const long double alpha = (-b + std::sqrt(root))/(2.0_prt*a);
 
         // update particle velocities
-        const long double ratio1 = alpha/a_wpmp1;
-        const long double ratio2 = alpha/a_wpmp2;
+        const long double ratio1 = alpha/(a_wpmp1*c2);
+        const long double ratio2 = alpha/(a_wpmp2*c2);
         ux1 += ratio1*ux;
         uy1 += ratio1*uy;
         uz1 += ratio1*uz;
