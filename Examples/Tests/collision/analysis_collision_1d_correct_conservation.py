@@ -26,8 +26,8 @@ first_fn = sys.argv[1]
 last_fn = sys.argv[2]
 
 # tolerance for the relative change in the momentum and energy
-p_tolerance = 1.e-14
-KE_tolerance = 1.e-13
+p_tolerance = 1.0e-14
+KE_tolerance = 1.0e-13
 
 ds0 = yt.load(first_fn)
 ds1 = yt.load(last_fn)
@@ -36,31 +36,31 @@ ad0 = ds0.all_data()
 ad1 = ds1.all_data()
 
 # carbon 12 ion (mass = 12*amu - 6*me)
-m_c12 = 12.*constants.m_u - 6.*constants.m_e
+m_c12 = 12.0 * constants.m_u - 6.0 * constants.m_e
 mA = m_c12
 mB = m_c12
 
 wwA0 = ad0["ionsA", "particle_weight"].value
 wwB0 = ad0["ionsB", "particle_weight"].value
 
-pxA0 = ad0["ionsA", "particle_momentum_x"].value*wwA0
-pyA0 = ad0["ionsA", "particle_momentum_y"].value*wwA0
-pzA0 = ad0["ionsA", "particle_momentum_z"].value*wwA0
+pxA0 = ad0["ionsA", "particle_momentum_x"].value * wwA0
+pyA0 = ad0["ionsA", "particle_momentum_y"].value * wwA0
+pzA0 = ad0["ionsA", "particle_momentum_z"].value * wwA0
 
-pxB0 = ad0["ionsB", "particle_momentum_x"].value*wwB0
-pyB0 = ad0["ionsB", "particle_momentum_y"].value*wwB0
-pzB0 = ad0["ionsB", "particle_momentum_z"].value*wwB0
+pxB0 = ad0["ionsB", "particle_momentum_x"].value * wwB0
+pyB0 = ad0["ionsB", "particle_momentum_y"].value * wwB0
+pzB0 = ad0["ionsB", "particle_momentum_z"].value * wwB0
 
 wwA1 = ad1["ionsA", "particle_weight"].value
 wwB1 = ad1["ionsB", "particle_weight"].value
 
-pxA1 = ad1["ionsA", "particle_momentum_x"].value*wwA1
-pyA1 = ad1["ionsA", "particle_momentum_y"].value*wwA1
-pzA1 = ad1["ionsA", "particle_momentum_z"].value*wwA1
+pxA1 = ad1["ionsA", "particle_momentum_x"].value * wwA1
+pyA1 = ad1["ionsA", "particle_momentum_y"].value * wwA1
+pzA1 = ad1["ionsA", "particle_momentum_z"].value * wwA1
 
-pxB1 = ad1["ionsB", "particle_momentum_x"].value*wwB1
-pyB1 = ad1["ionsB", "particle_momentum_y"].value*wwB1
-pzB1 = ad1["ionsB", "particle_momentum_z"].value*wwB1
+pxB1 = ad1["ionsB", "particle_momentum_x"].value * wwB1
+pyB1 = ad1["ionsB", "particle_momentum_y"].value * wwB1
+pzB1 = ad1["ionsB", "particle_momentum_z"].value * wwB1
 
 pxA0sum = pxA0.sum()
 pyA0sum = pyA0.sum()
@@ -84,27 +84,33 @@ print(f"B momenta {pxB0sum} {pyB0sum} {pzB0sum}")
 print("step 1")
 print(f"A momenta {pxA1sum} {pyA1sum} {pzA1sum}")
 print(f"B momenta {pxB1sum} {pyB1sum} {pzB1sum}")
-print(f"totals 0  {pxA0sum + pxB0sum:24.16e} {pyA0sum + pyB0sum:24.16e} {pzA0sum + pzB0sum:24.16e}")
-print(f"totals 1  {pxA1sum + pxB1sum:24.16e} {pyA1sum + pyB1sum:24.16e} {pzA1sum + pzB1sum:24.16e}")
+print(
+    f"totals 0  {pxA0sum + pxB0sum:24.16e} {pyA0sum + pyB0sum:24.16e} {pzA0sum + pzB0sum:24.16e}"
+)
+print(
+    f"totals 1  {pxA1sum + pxB1sum:24.16e} {pyA1sum + pyB1sum:24.16e} {pzA1sum + pzB1sum:24.16e}"
+)
 
-px_rel = (pxA1sum + pxB1sum - pxA0sum - pxB0sum)/(pxA0sum + pxB0sum)
-py_rel = (pyA1sum + pyB1sum - pyA0sum - pyB0sum)/(pyA0sum + pyB0sum)
-pz_rel = (pzA1sum + pzB1sum - pzA0sum - pzB0sum)/(pzA0sum + pzB0sum)
+px_rel = (pxA1sum + pxB1sum - pxA0sum - pxB0sum) / (pxA0sum + pxB0sum)
+py_rel = (pyA1sum + pyB1sum - pyA0sum - pyB0sum) / (pyA0sum + pyB0sum)
+pz_rel = (pzA1sum + pzB1sum - pzA0sum - pzB0sum) / (pzA0sum + pzB0sum)
 
 print(f"relative momentum change {px_rel} {py_rel} {pz_rel}, tolerance {p_tolerance}")
 
-def KE(ad, ss, mass):
-    ux = ad[ss, "particle_momentum_x"].value/mass
-    uy = ad[ss, "particle_momentum_y"].value/mass
-    uz = ad[ss, "particle_momentum_z"].value/mass
-    u2 = ux*ux + uy*uy + uz*uz
-    gamma = np.sqrt(1. + u2/constants.c**2)
-    return 1./(1. + gamma)*mass*u2
 
-KEA0 = KE(ad0, "ionsA", mA)*wwA0
-KEB0 = KE(ad0, "ionsB", mB)*wwB0
-KEA1 = KE(ad1, "ionsA", mA)*wwA1
-KEB1 = KE(ad1, "ionsB", mB)*wwB1
+def KE(ad, ss, mass):
+    ux = ad[ss, "particle_momentum_x"].value / mass
+    uy = ad[ss, "particle_momentum_y"].value / mass
+    uz = ad[ss, "particle_momentum_z"].value / mass
+    u2 = ux * ux + uy * uy + uz * uz
+    gamma = np.sqrt(1.0 + u2 / constants.c**2)
+    return 1.0 / (1.0 + gamma) * mass * u2
+
+
+KEA0 = KE(ad0, "ionsA", mA) * wwA0
+KEB0 = KE(ad0, "ionsB", mB) * wwB0
+KEA1 = KE(ad1, "ionsA", mA) * wwA1
+KEB1 = KE(ad1, "ionsB", mB) * wwB1
 
 KEA0sum = KEA0.sum()
 KEB0sum = KEB0.sum()
@@ -122,7 +128,7 @@ print(f"B KE {KEB1sum}")
 print(f"totals 0  {KEA0sum + KEB0sum:24.16e}")
 print(f"totals 1  {KEA1sum + KEB1sum:24.16e}")
 
-KE_rel = (KEA1sum + KEB1sum - KEA0sum - KEB0sum)/(KEA0sum + KEB0sum)
+KE_rel = (KEA1sum + KEB1sum - KEA0sum - KEB0sum) / (KEA0sum + KEB0sum)
 
 print(f"relative energy change {KE_rel}, tolerance {KE_tolerance}")
 
