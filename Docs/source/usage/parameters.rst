@@ -2221,6 +2221,36 @@ Details about the collision models can be found in the :ref:`theory section <mul
     Only for ``dsmc`` with impact ionization. This specifies which one of the
     colliding particles is ionized.
 
+* ``collisions.correct_energy_momentum`` (`bool`) optional (default 0)
+    For binary collisions, whether to correct the energy and momentum after the collisions so that they are conserved.
+    In binary collisions, if the weights of the colliding particles are not the same, the collision does not
+    conserve energy and momentum. When this option is on, after the collisions, small modifications are made to the
+    particle mometum so that the energy and momentum are exactly conserved in each cell.
+
+* ``collisions.energy_fraction`` (`float`) optional (default 0.5)
+    For binary collisions, when correcting the energy and momentum conservation, the energy correction is applied to pairs of particles in their center of momentum frame.
+    This parameter is the fraction of the relative energy in the COM frame that is used in the correction.
+
+* ``collisions.energy_fraction_max`` (`float`) optional (default 0.5)
+    For binary collisions, when correcting the energy and momentum conservation, the energy correction is applied to pairs of particles in their center of momentum frame.
+    This parameter is the fraction of the total relative energy in the COM frame of all pairs that is used in the correction.
+
+* ``collisions.beta_weight_exponent`` (`float`) optional (default 1.)
+    For binary collisions, when correcting the energy and momentum conservation, this parameter controls the exponent used on the particle weight when distributing the momentum correction.
+    With a value greater than 1, it will distribute more of the correction to particles with higher weights.
+
+* ``<collision_name>.correct_energy_momentum`` (`bool`) optional
+    For binary collisions, override the parameter ``collisions.correct_energy_momentum`` for the specific collision.
+
+* ``<collision_name>.energy_fraction`` (`float`) optional
+    For binary collisions, override the parameter ``collisions.energy_fraction`` for the specific collision.
+
+* ``<collision_name>.energy_fraction_max`` (`float`) optional
+    For binary collisions, override the parameter ``collisions.energy_fraction_ma`` for the specific collision.
+
+* ``<collision_name>.beta_weight_exponent`` (`float`) optional
+    For binary collisions, override the parameter ``collisions.beta_weight_exponent`` for the specific collision.
+
 .. _running-cpp-parameters-numerics:
 
 Numerics and algorithms
