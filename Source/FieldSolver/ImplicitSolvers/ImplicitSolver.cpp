@@ -116,6 +116,7 @@ void ImplicitSolver::SaveEandJ ()
 
 void ImplicitSolver::ComputeJfromMassMatrices()
 {
+    BL_PROFILE("ImplicitSolver::ComputeJfromMassMatrices()");
     using namespace amrex::literals;
 
     using warpx::fields::FieldType;
