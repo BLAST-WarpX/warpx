@@ -209,21 +209,23 @@ def secondary_emission():
         energy_ions = 0.5 * proton_mass * w * (ux**2 + uy**2 + uz**2)
         energy_ions_in_kEv = energy_ions / (e * 1000)
         sigma_nascap_ions = sigma_nascap(energy_ions_in_kEv, delta_H, E_HMax)
+
+        # Prepare arrays for secondary electrons
+        xe = np.array([])
+        ye = np.array([])
+        ze = np.array([])
+        we = np.array([])
+        delta_te = np.array([])
+        uxe = np.array([])
+        uye = np.array([])
+        uze = np.array([])
+
         # Loop over all ions that have been scraped in the last timestep
         for i in range(0, len(w)):
             sigma = sigma_nascap_ions[i]
             # Ne_sec is number of the secondary electrons to be emitted
             Ne_sec = int(sigma + np.random.uniform())
             for _ in range(Ne_sec):
-                xe = np.array([])
-                ye = np.array([])
-                ze = np.array([])
-                we = np.array([])
-                delta_te = np.array([])
-                uxe = np.array([])
-                uye = np.array([])
-                uze = np.array([])
-
                 # Random thermal momenta distribution
                 ux_th = np.random.normal(0, dist_th)
                 uy_th = np.random.normal(0, dist_th)
@@ -252,15 +254,16 @@ def secondary_emission():
                 we = np.append(we, w[i])
                 delta_te = np.append(delta_te, delta_t[i])
 
-                elect_pc.add_particles(
-                    x=xe + (dt - delta_te) * uxe,
-                    y=ye + (dt - delta_te) * uye,
-                    z=ze + (dt - delta_te) * uze,
-                    ux=uxe,
-                    uy=uye,
-                    uz=uze,
-                    w=we,
-                )
+        # Add secondary electrons to the general particle container
+        elect_pc.add_particles(
+            x=xe + (dt - delta_te) * uxe,
+            y=ye + (dt - delta_te) * uye,
+            z=ze + (dt - delta_te) * uze,
+            ux=uxe,
+            uy=uye,
+            uz=uze,
+            w=we,
+        )
 
 
 # using the new particle container modified at the last step
