@@ -925,9 +925,9 @@ public:
             amrex::Gpu::DeviceVector<amrex::ParticleReal> u2x_before;
             amrex::Gpu::DeviceVector<amrex::ParticleReal> u2y_before;
             amrex::Gpu::DeviceVector<amrex::ParticleReal> u2z_before;
-            amrex::ParticleReal* AMREX_RESTRICT u2x_before_ptr;
-            amrex::ParticleReal* AMREX_RESTRICT u2y_before_ptr;
-            amrex::ParticleReal* AMREX_RESTRICT u2z_before_ptr;
+            amrex::ParticleReal* AMREX_RESTRICT u2x_before_ptr = nullptr;
+            amrex::ParticleReal* AMREX_RESTRICT u2y_before_ptr = nullptr;
+            amrex::ParticleReal* AMREX_RESTRICT u2z_before_ptr = nullptr;
             if (m_correct_energy_momentum) {
                 int const np2 = ptile_2.numParticles();
                 // Check if ux_n was added.
