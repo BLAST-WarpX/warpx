@@ -59,6 +59,10 @@ BTDiagnostics::BTDiagnostics (int i, const std::string& name, DiagTypes diag_typ
     : Diagnostics{i, name, diag_type},
       m_cell_centered_data_name("BTD_cell_centered_data_" + name)
 {
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    WARPX_ABORT_WITH_MESSAGE("Back-transformed diagnostic not supported with 1D cylindrical and spherical");
+#endif
+
     ReadParameters();
 }
 
@@ -218,8 +222,10 @@ BTDiagnostics::ReadParameters ()
         "The moving window must not stop when using the boosted frame diagnostic.");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( WarpX::start_moving_window_step == 0,
         "The moving window must start at step zero for the boosted frame diagnostic.");
+#if defined(WARPX_ZINDEX)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( WarpX::moving_window_dir == WARPX_ZINDEX,
            "The boosted frame diagnostic currently only works if the moving window is in the z direction.");
+#endif
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_format == "plotfile" || m_format == "openpmd",
         "<diag>.format must be plotfile or openpmd for back transformed diagnostics");
@@ -934,7 +940,12 @@ BTDiagnostics::DefineFieldBufferMultiFab (const int i_buffer, const int lev)
     auto ref_ratio = amrex::IntVect(1);
     if (lev > 0 ) { ref_ratio = WarpX::RefRatio(lev-1); }
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-        const amrex::Real cellsize = (idim < WARPX_ZINDEX)?
+#if defined(WARPX_ZINDEX)
+        const int zindex = WARPX_ZINDEX;
+#else
+        const int zindex = 0;
+#endif
+        const amrex::Real cellsize = (idim < zindex)?
             warpx.Geom(lev).CellSize(idim):
             dz_lab(warpx.getdt(lev), ref_ratio[m_moving_window_dir]);
         const amrex::Real buffer_lo = m_snapshot_domain_lab[i_buffer].lo(idim)
