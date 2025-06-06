@@ -205,6 +205,16 @@ namespace ParticleUtils {
     {
         using namespace amrex::literals;
 
+        // long double is used when available for the calculations below since
+        // extra precision is required when updating the energy since it
+        // involves taking differences between similar numbers, which can lose
+        // precision.
+#ifndef AMREX_USE_GPU
+#define LONGDOUBLE double
+#else
+#define LONGDOUBLE long double
+#endif
+
         constexpr auto c2 = PhysConst::c * PhysConst::c;
 
         int const numCell = (cell_stop - cell_start);
@@ -249,19 +259,19 @@ namespace ParticleUtils {
             const amrex::ParticleReal ux = ux1 - ux2;
             const amrex::ParticleReal uy = uy1 - uy2;
             const amrex::ParticleReal uz = uz1 - uz2;
-            const long double dbetasq = (ux*ux + uy*uy + uz*uz)/c2;
-            const long double gbsq1 = (ux1*ux1 + uy1*uy1 + uz1*uz1)/c2;
-            const long double gbsq2 = (ux2*ux2 + uy2*uy2 + uz2*uz2)/c2;
-            const long double gamma1 = std::sqrt(1.0_prt + gbsq1);
-            const long double gamma2 = std::sqrt(1.0_prt + gbsq2);
-            const long double E1 = wpmp1*gamma1*c2;
-            const long double E2 = wpmp2*gamma2*c2;
-            const long double Etot = E1 + E2;
-            const long double pxtot = wpmp1*ux1 + wpmp2*ux2;
-            const long double pytot = wpmp1*uy1 + wpmp2*uy2;
-            const long double pztot = wpmp1*uz1 + wpmp2*uz2;
-            const long double Ecm = std::sqrt(Etot*Etot - (pxtot*pxtot + pytot*pytot + pztot*pztot)*c2);
-            const long double Erel = Ecm - wpmp1*c2 - wpmp2*c2;
+            const LONGDOUBLE dbetasq = (ux*ux + uy*uy + uz*uz)/c2;
+            const LONGDOUBLE gbsq1 = (ux1*ux1 + uy1*uy1 + uz1*uz1)/c2;
+            const LONGDOUBLE gbsq2 = (ux2*ux2 + uy2*uy2 + uz2*uz2)/c2;
+            const LONGDOUBLE gamma1 = std::sqrt(1.0_prt + gbsq1);
+            const LONGDOUBLE gamma2 = std::sqrt(1.0_prt + gbsq2);
+            const LONGDOUBLE E1 = wpmp1*gamma1*c2;
+            const LONGDOUBLE E2 = wpmp2*gamma2*c2;
+            const LONGDOUBLE Etot = E1 + E2;
+            const LONGDOUBLE pxtot = wpmp1*ux1 + wpmp2*ux2;
+            const LONGDOUBLE pytot = wpmp1*uy1 + wpmp2*uy2;
+            const LONGDOUBLE pztot = wpmp1*uz1 + wpmp2*uz2;
+            const LONGDOUBLE Ecm = std::sqrt(Etot*Etot - (pxtot*pxtot + pytot*pytot + pztot*pztot)*c2);
+            const LONGDOUBLE Erel = Ecm - wpmp1*c2 - wpmp2*c2;
             if (Erel <= 0.0) { continue; }
 
             // Set the amount of energy change for this pair based on the
@@ -269,7 +279,7 @@ namespace ParticleUtils {
             // If deltaE > 0, no more that Erel can be removed from this pair.
             // If deltaE < 0, limit the energy added by Erel at first, but
             // after the first loop, add whatever is left (using the adjusted fmult_fact).
-            long double deltaEpair = sign*energy_fraction*fmult_fact*Erel;
+            LONGDOUBLE deltaEpair = sign*energy_fraction*fmult_fact*Erel;
             if (std::abs(deltaEpair) > std::abs(deltaE)) {
                 deltaEpair = deltaE;
                 deltaE = 0.0_prt;
@@ -278,23 +288,23 @@ namespace ParticleUtils {
             }
             Erel_cumm += Erel - deltaEpair;
 
-            const long double A = Etot - deltaEpair;
-            const long double D = A*A + E2*E2 - E1*E1;
-            const long double p2dotu = wpmp2*(ux2*ux + uy2*uy + uz2*uz);
-            const long double ptdotu = (pxtot*ux + pytot*uy + pztot*uz);
+            const LONGDOUBLE A = Etot - deltaEpair;
+            const LONGDOUBLE D = A*A + E2*E2 - E1*E1;
+            const LONGDOUBLE p2dotu = wpmp2*(ux2*ux + uy2*uy + uz2*uz);
+            const LONGDOUBLE ptdotu = (pxtot*ux + pytot*uy + pztot*uz);
 
             // Compute coefficients for quadratic equation for alpha.
-            const long double a = A*A*dbetasq - ptdotu*ptdotu;
-            const long double b = D*ptdotu - 2.0_prt*A*A*p2dotu;
-            const long double c = A*A*E2*E2 - D*D/4.0_prt;
+            const LONGDOUBLE a = A*A*dbetasq - ptdotu*ptdotu;
+            const LONGDOUBLE b = D*ptdotu - 2.0_prt*A*A*p2dotu;
+            const LONGDOUBLE c = A*A*E2*E2 - D*D/4.0_prt;
 
-            const long double root = b*b - 4.0_prt*a*c;
+            const LONGDOUBLE root = b*b - 4.0_prt*a*c;
             if (root < 0.0 || a == 0.0) { continue; }
-            const long double alpha = (-b + std::sqrt(root))/(2.0_prt*a);
+            const LONGDOUBLE alpha = (-b + std::sqrt(root))/(2.0_prt*a);
 
             // Update particle velocities.
-            const long double ratio1 = alpha/(wpmp1*c2);
-            const long double ratio2 = alpha/(wpmp2*c2);
+            const LONGDOUBLE ratio1 = alpha/(wpmp1*c2);
+            const LONGDOUBLE ratio2 = alpha/(wpmp2*c2);
             uxp[ indices[i1] ] += ratio1*ux;
             uyp[ indices[i1] ] += ratio1*uy;
             uzp[ indices[i1] ] += ratio1*uz;
