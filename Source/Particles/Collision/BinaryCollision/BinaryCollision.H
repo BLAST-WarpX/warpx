@@ -107,25 +107,21 @@ public:
         const amrex::ParmParse pp_collision_name(collision_name);
         pp_collision_name.queryarr("product_species", m_product_species);
 
-        const amrex::ParmParse pp_collisions("collisions");
 
-        // Default values
-        m_correct_energy_momentum = false;
-        m_beta_weight_exponent = 1;
-        m_energy_fraction = 0.5_prt;
-        m_energy_fraction_max = 0.5_prt;
+        if (collision_type == CollisionType::PairwiseCoulomb) {
+            // Input parameter set for all pairwise Coulomb collisions
+            const amrex::ParmParse pp_collisions("collisions");
+            pp_collisions.query("correct_energy_momentum", m_correct_energy_momentum);
+            pp_collisions.query("beta_weight_exponent", m_beta_weight_exponent);
+            pp_collisions.query("energy_fraction", m_energy_fraction);
+            pp_collisions.query("energy_fraction_max", m_energy_fraction_max);
 
-        // Input parameter set for all collisions
-        pp_collisions.query("correct_energy_momentum", m_correct_energy_momentum);
-        pp_collisions.query("beta_weight_exponent", m_beta_weight_exponent);
-        pp_collisions.query("energy_fraction", m_energy_fraction);
-        pp_collisions.query("energy_fraction_max", m_energy_fraction_max);
-
-        // Input parameter set for this collision
-        pp_collision_name.query("correct_energy_momentum", m_correct_energy_momentum);
-        pp_collision_name.query("beta_weight_exponent", m_beta_weight_exponent);
-        pp_collision_name.query("energy_fraction", m_energy_fraction);
-        pp_collision_name.query("energy_fraction_max", m_energy_fraction_max);
+            // Input parameter set for this collision
+            pp_collision_name.query("correct_energy_momentum", m_correct_energy_momentum);
+            pp_collision_name.query("beta_weight_exponent", m_beta_weight_exponent);
+            pp_collision_name.query("energy_fraction", m_energy_fraction);
+            pp_collision_name.query("energy_fraction_max", m_energy_fraction_max);
+        }
 
         // If DSMC the colliding species are also product species.
         // Therefore, we insert the colliding species at the beginning of `m_product_species`.
@@ -1286,10 +1282,10 @@ private:
     bool m_isSameSpecies;
     bool m_have_product_species;
 
-    bool m_correct_energy_momentum;
-    int m_beta_weight_exponent;
-    amrex::ParticleReal m_energy_fraction;
-    amrex::ParticleReal m_energy_fraction_max;
+    bool m_correct_energy_momentum = false;
+    int m_beta_weight_exponent = 1.;
+    amrex::ParticleReal m_energy_fraction = 0.5;
+    amrex::ParticleReal m_energy_fraction_max = 0.5;
 
     amrex::Vector<std::string> m_product_species;
     // functor that performs collisions within a cell
