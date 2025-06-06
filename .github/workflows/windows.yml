@@ -132,4 +132,5 @@ jobs:
         set "PATH=C:/Program Files (x86)/WarpX/bin/;%PATH%"
 
         python3 Examples/Tests/gaussian_beam/inputs_test_3d_gaussian_beam_picmi.py --diagformat=openpmd
+        cat Backtrace.0.0
         if errorlevel 1 exit 1
