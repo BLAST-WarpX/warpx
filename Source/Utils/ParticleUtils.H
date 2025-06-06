@@ -171,8 +171,8 @@ namespace ParticleUtils {
     }
 
 
-    /* \brief method to add/subtract a small percent of energy from a
-     *        pair of particles such that momentum is not disturbed
+    /* \brief Add or subtract a small percent of energy from a
+     *        pair of particles such that momentum is not disturbed.
      *
      * This is done by treating it as an inelastic scattering event
      * with potential U = deltaE and zero scattering angle
@@ -180,11 +180,11 @@ namespace ParticleUtils {
      * deltaE < 0 ==> need to add energy
      *
      * \param[in/out] uxp, uyp, uzp momenta of the particles
+     * \param[in] w weight of the particles
      * \param[in] indices indices of particles, listed in cell order
      * \param[in] cell_start start index of particles in the cell
      * \param[in] cell_stop start index of particles in the next cell
      * \param[in] mass mass of the particles
-     * \param[in] a_wpmp2 mass time weight of the second particle
      * \param[in] energy_fraction fraction of pair's relative energy to change
      * \param[in] energy_fraction_max max fracton of total relative energy that can be changed
      * \param[in/out] deltaE amount of energy to be distributed in this species
@@ -208,19 +208,24 @@ namespace ParticleUtils {
         constexpr auto c2 = PhysConst::c * PhysConst::c;
 
         int const numCell = (cell_stop - cell_start);
-        bool correction_failed = false;
 
-        // adjust particle's momentum to absorb deltaEp
+        // Adjust particle's momentum to absorb deltaE.
         // This loops over the particles, two at a time, distributing
-        // the energy until all of it has been distributed.
+        // the energy until all of it has been distributed or failing if not.
+        // If deltaE < 0, it should never fail since energy can always be added
+        // to the particles.
+        // if deltaE > 0, it will sometimes fail because energy cannot always be
+        // removed from the particles without changing the momentum.
         // The loop is setup to switch between even first and odd first pairs
         // each loop over the particles.
         int loop_count = 0;
+        int const max_loop_count = 10;
         amrex::ParticleReal Erel_cumm = 0.0_prt;
         amrex::ParticleReal fmult_fact = 1.0_prt;
         amrex::ParticleReal energy_frac_eff = 0.0_prt;
         T_index i1 = cell_start;
-        while (energy_frac_eff <= energy_fraction_max && loop_count <= 10) {
+        bool correction_failed = false;
+        while (!correction_failed && loop_count <= max_loop_count) {
 
             if (deltaE == 0.0_prt) { break; }
 
@@ -259,6 +264,11 @@ namespace ParticleUtils {
             const long double Erel = Ecm - wpmp1*c2 - wpmp2*c2;
             if (Erel <= 0.0) { continue; }
 
+            // Set the amount of energy change for this pair based on the
+            // relative energy in the center of momentum.
+            // If deltaE > 0, no more that Erel can be removed from this pair.
+            // If deltaE < 0, limit the energy added by Erel at first, but
+            // after the first loop, add whatever is left (using the adjusted fmult_fact).
             long double deltaEpair = sign*energy_fraction*fmult_fact*Erel;
             if (std::abs(deltaEpair) > std::abs(deltaE)) {
                 deltaEpair = deltaE;
@@ -273,7 +283,7 @@ namespace ParticleUtils {
             const long double p2dotu = wpmp2*(ux2*ux + uy2*uy + uz2*uz);
             const long double ptdotu = (pxtot*ux + pytot*uy + pztot*uz);
 
-            // compute coefficients for quadratic equation for alpha
+            // Compute coefficients for quadratic equation for alpha.
             const long double a = A*A*dbetasq - ptdotu*ptdotu;
             const long double b = D*ptdotu - 2.0_prt*A*A*p2dotu;
             const long double c = A*A*E2*E2 - D*D/4.0_prt;
@@ -282,7 +292,7 @@ namespace ParticleUtils {
             if (root < 0.0 || a == 0.0) { continue; }
             const long double alpha = (-b + std::sqrt(root))/(2.0_prt*a);
 
-            // update particle velocities
+            // Update particle velocities.
             const long double ratio1 = alpha/(wpmp1*c2);
             const long double ratio2 = alpha/(wpmp2*c2);
             uxp[ indices[i1] ] += ratio1*ux;
@@ -297,6 +307,9 @@ namespace ParticleUtils {
                 i1 = i2 + 1;
             } else {
                 loop_count++;
+                // On next time through the loop, use a different set of pairs.
+                // What index to start with depends on whether the number of particles
+                // is even or odd.
                 if (i1 == cell_stop - 2) {
                     if ((numCell % 2) == 0) { i1 = cell_start + 1; }
                     if ((numCell % 2) == 1) { i1 = cell_start; }
@@ -304,27 +317,27 @@ namespace ParticleUtils {
                     if ((numCell % 2) == 0) { i1 = cell_start; }
                     if ((numCell % 2) == 1) { i1 = cell_start + 1; }
                 }
-                // compute energy frac to correct energy with one more loop
-                energy_frac_eff = std::abs(deltaE)/Erel_cumm;
-                if (energy_frac_eff > energy_fraction_max || loop_count > 10) {
+                // Compute the energy fraction to correct with one more loop.
+                // This is the remaining energy correction divided by the cummulated Erel,
+                // the amount of "free" energy available.
+                // If deltaE < 0, this check always passes since the amount of energy that
+                // can be added is unlimited.
+                energy_frac_eff = deltaE/Erel_cumm;
+                if (energy_frac_eff > energy_fraction_max || loop_count > max_loop_count) {
 #ifndef AMREX_USE_GPU
                     if (numCell > 50) {
                         amrex::Print() << "Notice: energy_frac_eff = " << energy_frac_eff << "\n";
                         amrex::Print() << "        on loop_count = " << loop_count << "\n";
                         amrex::Print() << "        is larger than energy_frac_max = " << energy_fraction_max << "\n";
-                        /* amrex::Print() << "        for species1 = " << m_species_names[0] << "\n"; */
-                        /* amrex::Print() << "        and species2 = " << m_species_names[1] << "\n"; */
                         amrex::Print() << "        num_parts    = " << numCell << "\n";
-                        /* amrex::Print() << "        i_cell       = " << i_cell << "\n"; */
-                        /* amrex::Print() << "        Etot0        = " << KE_in_each_cell[i_cell] << "\n"; */
-                        /* amrex::Print() << "        Etot1        = " << KE_after << "\n"; */
-                        /* amrex::Print() << "        KE1_after       = " << KE1_after << "\n"; */
                         amrex::Print() << "        deltaE     = " << deltaE << "\n";
                     }
 #endif
                     correction_failed = true;
                     break;
-                } else if (energy_frac_eff > energy_fraction) {
+                } else if (deltaE < 0.) {
+                    // If after the first time around, there is energy left to distribute,
+                    // increase the multiplier to distribute the rest faster.
                     fmult_fact = energy_frac_eff/energy_fraction;
                 }
             }
