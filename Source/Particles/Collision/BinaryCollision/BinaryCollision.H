@@ -485,9 +485,9 @@ public:
             amrex::Gpu::DeviceVector<amrex::ParticleReal> u1x_before;
             amrex::Gpu::DeviceVector<amrex::ParticleReal> u1y_before;
             amrex::Gpu::DeviceVector<amrex::ParticleReal> u1z_before;
-            amrex::ParticleReal* AMREX_RESTRICT u1x_before_ptr;
-            amrex::ParticleReal* AMREX_RESTRICT u1y_before_ptr;
-            amrex::ParticleReal* AMREX_RESTRICT u1z_before_ptr;
+            amrex::ParticleReal* AMREX_RESTRICT u1x_before_ptr = nullptr;
+            amrex::ParticleReal* AMREX_RESTRICT u1y_before_ptr = nullptr;
+            amrex::ParticleReal* AMREX_RESTRICT u1z_before_ptr = nullptr;
             if (m_correct_energy_momentum) {
                 int const np1 = ptile_1.numParticles();
                 // Check if ux_n was added.
@@ -887,9 +887,9 @@ public:
             amrex::Gpu::DeviceVector<amrex::ParticleReal> u1x_before;
             amrex::Gpu::DeviceVector<amrex::ParticleReal> u1y_before;
             amrex::Gpu::DeviceVector<amrex::ParticleReal> u1z_before;
-            amrex::ParticleReal* AMREX_RESTRICT u1x_before_ptr;
-            amrex::ParticleReal* AMREX_RESTRICT u1y_before_ptr;
-            amrex::ParticleReal* AMREX_RESTRICT u1z_before_ptr;
+            amrex::ParticleReal* AMREX_RESTRICT u1x_before_ptr = nullptr;
+            amrex::ParticleReal* AMREX_RESTRICT u1y_before_ptr = nullptr;
+            amrex::ParticleReal* AMREX_RESTRICT u1z_before_ptr = nullptr;
             if (m_correct_energy_momentum) {
                 int const np1 = ptile_1.numParticles();
                 // Check if ux_n was added.
