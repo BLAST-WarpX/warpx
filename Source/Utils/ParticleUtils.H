@@ -209,7 +209,7 @@ namespace ParticleUtils {
         // extra precision is required when updating the energy since it
         // involves taking differences between similar numbers, which can lose
         // precision.
-#ifndef AMREX_USE_GPU
+#ifdef AMREX_USE_GPU
 #define LONGDOUBLE double
 #else
 #define LONGDOUBLE long double
