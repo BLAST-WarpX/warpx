@@ -284,6 +284,9 @@ public:
     //! Order of the particle shape factors (splines) along z
     static int noz;
 
+    //! Maximum number of allowed grid crossings for particles
+    static int particle_max_grid_crossings;
+
     //! Order of finite centering of fields (from staggered grid to nodal grid), along x
     static int field_centering_nox;
     //! Order of finite centering of fields (from staggered grid to nodal grid), along y
