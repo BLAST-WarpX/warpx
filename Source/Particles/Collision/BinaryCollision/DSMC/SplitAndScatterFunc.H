@@ -393,12 +393,12 @@ public:
                 uz1 *= reduce_factor;
                 // Obtain the other velocity vectors by conservation of momentum
                 const amrex::ParticleReal mass_ratio = m1 / m2;
-                ux_p1 = mass_ratio * m_ioniz_product1 * ux1;
-                uy_p1 = mass_ratio * m_ioniz_product1 * uy1;
-                uz_p1 = mass_ratio * m_ioniz_product1 * uz1;
-                ux_p2 = mass_ratio * m_ioniz_product2 * ux1;
-                uy_p2 = mass_ratio * m_ioniz_product2 * uy1;
-                uz_p2 = mass_ratio * m_ioniz_product2 * uz1;
+                ux_p1 = -mass_ratio * ux1;
+                uy_p1 = -mass_ratio * uy1;
+                uz_p1 = -mass_ratio * uz1;
+                ux_p2 = -mass_ratio * ux1;
+                uy_p2 = -mass_ratio * uy1;
+                uz_p2 = -mass_ratio * uz1;
 
                 // transform back to labframe
                 ux1 += uCOM_x;
