@@ -279,7 +279,7 @@ namespace ParticleUtils {
             // If deltaE > 0, no more that Erel can be removed from this pair.
             // If deltaE < 0, limit the energy added by Erel at first, but
             // after the first loop, add whatever is left (using the adjusted fmult_fact).
-            LONGDOUBLE deltaEpair = sign*energy_fraction*fmult_fact*Erel;
+            LONGDOUBLE deltaEpair = static_cast<LONGDOUBLE>(sign*energy_fraction*fmult_fact)*Erel;
             if (std::abs(deltaEpair) > std::abs(deltaE)) {
                 deltaEpair = deltaE;
                 deltaE = 0.0_prt;
@@ -290,7 +290,7 @@ namespace ParticleUtils {
 
             const LONGDOUBLE A = Etot - deltaEpair;
             const LONGDOUBLE D = A*A + E2*E2 - E1*E1;
-            const LONGDOUBLE p2dotu = wpmp2*(ux2*ux + uy2*uy + uz2*uz);
+            const LONGDOUBLE p2dotu = static_cast<LONGDOUBLE>(wpmp2*(ux2*ux + uy2*uy + uz2*uz));
             const LONGDOUBLE ptdotu = (pxtot*ux + pytot*uy + pztot*uz);
 
             // Compute coefficients for quadratic equation for alpha.
@@ -322,10 +322,10 @@ namespace ParticleUtils {
                 // is even or odd.
                 if (i1 == cell_stop - 2) {
                     if ((numCell % 2) == 0) { i1 = cell_start + 1; }
-                    if ((numCell % 2) == 1) { i1 = cell_start; }
+                    if ((numCell % 2) != 0) { i1 = cell_start; }
                 } else {
                     if ((numCell % 2) == 0) { i1 = cell_start; }
-                    if ((numCell % 2) == 1) { i1 = cell_start + 1; }
+                    if ((numCell % 2) != 0) { i1 = cell_start + 1; }
                 }
                 // Compute the energy fraction to correct with one more loop.
                 // This is the remaining energy correction divided by the cummulated Erel,
