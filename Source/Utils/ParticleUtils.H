@@ -235,9 +235,8 @@ namespace ParticleUtils {
         amrex::ParticleReal energy_frac_eff = 0.0_prt;
         T_index i1 = cell_start;
         bool correction_failed = false;
-        while (!correction_failed && loop_count <= max_loop_count) {
-
-            if (deltaE == 0.0_prt) { break; }
+        bool deltaE_is_zero = false;
+        while (!deltaE_is_zero && !correction_failed && loop_count <= max_loop_count) {
 
             T_index i2 = i1 + 1;
             if (i2 == cell_stop) {
@@ -280,13 +279,13 @@ namespace ParticleUtils {
             // If deltaE < 0, limit the energy added by Erel at first, but
             // after the first loop, add whatever is left (using the adjusted fmult_fact).
             LONGDOUBLE deltaEpair = static_cast<LONGDOUBLE>(sign*energy_fraction*fmult_fact)*Erel;
-            if (std::abs(deltaEpair) > std::abs(deltaE)) {
+            if (std::abs(deltaEpair) >= std::abs(deltaE)) {
                 deltaEpair = deltaE;
                 deltaE = 0.0_prt;
+                deltaE_is_zero = true;
             } else {
                 deltaE -= deltaEpair;
             }
-            Erel_cumm += Erel - deltaEpair;
 
             const LONGDOUBLE A = Etot - deltaEpair;
             const LONGDOUBLE D = A*A + E2*E2 - E1*E1;
@@ -311,6 +310,8 @@ namespace ParticleUtils {
             uxp[ indices[i2] ] -= ratio2*ux;
             uyp[ indices[i2] ] -= ratio2*uy;
             uzp[ indices[i2] ] -= ratio2*uz;
+
+            Erel_cumm += Erel - deltaEpair;
 
             if (i1 < cell_stop - 2) {
                 // If not done with the loop, increment to the next pair of particles
