@@ -1,39 +1,12 @@
 #################################
 ########## MY CONSTANTS #########
 #################################
-my_constants.mc2 = m_e*clight*clight
 my_constants.nano = 1.0e-9
 my_constants.micro = 1.e-6
-my_constants.GeV = q_e*1.e9
-
-# BEAMS
-my_constants.energy = 125.*GeV
-my_constants.gamma = energy/mc2
-my_constants.npart = 2.e10
-my_constants.nmacropart = 1000000
-my_constants.charge = q_e * npart
 
 my_constants.sigmax = 516.0*nano
 my_constants.sigmay = 7.7*nano
 my_constants.sigmaz = 300.*micro
-
-my_constants.mux = 0.0
-my_constants.muy = 0.0
-my_constants.muz = 0.0
-
-my_constants.ux = 0.0
-my_constants.uy = 0.0
-my_constants.uz = gamma
-
-my_constants.emitx = 50*micro
-my_constants.emity = 20*nano
-my_constants.emitz = 0.
-
-my_constants.dux = emitx / sigmax
-my_constants.duy = emity / sigmay
-my_constants.duz = emitz / sigmaz
-
-my_constants.focal_distance = 4*sigmaz
 
 # BOX
 my_constants.Lx = 20*sigmax
