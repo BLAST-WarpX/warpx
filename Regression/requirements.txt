@@ -5,7 +5,6 @@ matplotlib
 mpi4py
 numpy
 openpmd-api
-openpmd-validator
 openpmd-viewer
 pandas
 periodictable
