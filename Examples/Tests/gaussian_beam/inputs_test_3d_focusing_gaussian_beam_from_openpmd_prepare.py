@@ -7,6 +7,8 @@ It generates a set of particles and saves in an openPMD file, to be read as inpu
 import numpy as np
 from scipy.constants import c, e, m_e
 
+np.random.seed(0)
+
 # Beam properties
 
 mc2 = m_e * c * c
@@ -16,7 +18,7 @@ GeV = e * 1.0e9
 energy = 125.0 * GeV
 gamma = energy / mc2
 npart = 2.0e10
-nmacropart = 1000000
+nmacropart = 2000000
 charge = e * npart
 sigmax = 516.0 * nano
 sigmay = 7.7 * nano
@@ -37,16 +39,15 @@ focal_distance = 4 * sigmaz
 # Generate Gaussian distribution (corresponds to the beam at focus)
 x = np.random.normal(0, sigmax, nmacropart)
 y = np.random.normal(0, sigmay, nmacropart)
-z = np.random.normal(focal_distance, sigmaz, nmacropart)
+z = np.random.normal(0, sigmaz, nmacropart)
 ux = np.random.normal(ux, dux, nmacropart)
 uy = np.random.normal(uy, duy, nmacropart)
 uz = np.random.normal(uz, duz, nmacropart)
 
-# Change beam beam positions, in way consistent with
-# the beam being focal_distance upstream of focus
-x = x - focal_distance * ux / gamma
-y = y - focal_distance * uy / gamma
-z = z - focal_distance * uz / gamma
+# Change transverse beam positions, in way consistent with
+# the beam being focused to focal_distance downstream
+x = x - (focal_distance - z) * ux / uz
+y = y - (focal_distance - z) * uy / uz
 
 # Write particles to file using openPMD API
 
