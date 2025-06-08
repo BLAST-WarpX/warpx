@@ -1,5 +1,5 @@
 """
-This script prepares the inputs for the test_3d_focusing_gaussian_beam_from_openpmd.py script.
+This script prepares the inputs for the test_3d_focusing_gaussian_beam_from_openpmd script.
 
 It generates a set of particles and saves in an openPMD file, to be read as input by the WarpX simulation.
 """
