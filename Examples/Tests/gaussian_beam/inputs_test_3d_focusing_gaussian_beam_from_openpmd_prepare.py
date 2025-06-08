@@ -102,11 +102,11 @@ electrons["momentum"]["z"].unit_SI = m_e * c  # Convert from unitless (gamma*bet
 # Write the particle offset
 # (required by the openPMD standard but set to 0 here)
 electrons["positionOffset"]["x"].reset_dataset(d)
-electrons["positionOffset"]["x"].make_constant(0)
+electrons["positionOffset"]["x"].make_constant(0.0)
 electrons["positionOffset"]["y"].reset_dataset(d)
-electrons["positionOffset"]["y"].make_constant(0)
+electrons["positionOffset"]["y"].make_constant(0.0)
 electrons["positionOffset"]["z"].reset_dataset(d)
-electrons["positionOffset"]["z"].make_constant(0)
+electrons["positionOffset"]["z"].make_constant(0.0)
 
 # at any point in time you may decide to dump already created output to
 # disk note that this will make some operations impossible (e.g. renaming

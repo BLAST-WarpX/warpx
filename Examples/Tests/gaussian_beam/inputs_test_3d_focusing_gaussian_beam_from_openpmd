@@ -16,8 +16,6 @@ my_constants.nx = 256
 my_constants.ny = 256
 my_constants.nz = 256
 
-
-
 #################################
 ####### GENERAL PARAMETERS ######
 #################################
@@ -48,25 +46,8 @@ algo.particle_shape = 3
 #################################
 particles.species_names = beam1
 
-beam1.species_type = electron
-beam1.injection_style = gaussian_beam
-beam1.x_rms = sigmax
-beam1.y_rms = sigmay
-beam1.z_rms = sigmaz
-beam1.x_m = muy
-beam1.y_m = mux
-beam1.z_m = muz
-beam1.focal_distance = focal_distance
-beam1.npart = nmacropart
-beam1.q_tot = -charge
-
-beam1.momentum_distribution_type = gaussian
-beam1.ux_m = ux
-beam1.uy_m = uy
-beam1.uz_m = uz
-beam1.ux_th = dux
-beam1.uy_th = duy
-beam1.uz_th = duz
+beam1.injection_style = external_file
+beam1.injection_file = openpmd_generated_particles.h5
 
 #################################
 ######### DIAGNOSTICS ###########
