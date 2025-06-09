@@ -38,7 +38,9 @@ zmax = 2
 delta_H = 0.4
 E_HMax = 250
 
-np.random.seed(10025015)
+# Reproducible, separate seeds for each MPI rank
+np.random.seed(COMM_WORLD.Get_rank() + 3)
+
 ##########################
 # numerics components
 ##########################
@@ -185,12 +187,8 @@ def secondary_emission():
     buffer = particle_containers.ParticleBoundaryBufferWrapper()  # boundary buffer
     lev = 0  # level 0 (no mesh refinement here)
 
-    # local=True: each MPI rank only gets the particles that are on its local domain
-    n = buffer.get_particle_boundary_buffer_size("ions", "eb", local=True)
+    # Each MPI rank extracts the particles that are on its local domain
     elect_pc = particle_containers.ParticleContainerWrapper("electrons")
-
-    print(f"mpi rank: {COMM_WORLD.Get_rank()}: n = {n}", flush=True)
-
     r = concat(buffer.get_particle_scraped_this_step("ions", "eb", "x", lev))
     theta = concat(buffer.get_particle_scraped_this_step("ions", "eb", "theta", lev))
     z = concat(buffer.get_particle_scraped_this_step("ions", "eb", "z", lev))
@@ -206,6 +204,8 @@ def secondary_emission():
     delta_t = concat(
         buffer.get_particle_scraped_this_step("ions", "eb", "deltaTimeScraped", lev)
     )
+
+    print(f"mpi rank: {COMM_WORLD.Get_rank()}: w.shape = {w.shape}", flush=True)
 
     energy_ions = 0.5 * proton_mass * w * (ux**2 + uy**2 + uz**2)
     energy_ions_in_kEv = energy_ions / (e * 1000)
@@ -228,6 +228,7 @@ def secondary_emission():
 
         # Generate Ne_sec secondary electrons with random thermal momenta
         # using numpy array operations
+        print(f"mpi rank: {COMM_WORLD.Get_rank()}: Ne_sec = {Ne_sec}", flush=True)
 
         ux_th = np.random.normal(0, dist_th, size=Ne_sec)
         uy_th = np.random.normal(0, dist_th, size=Ne_sec)
