@@ -38,4 +38,4 @@ for i in range(0, N_sec_e):
     r = np.sqrt(x[i] ** 2 + y[i] ** 2 + z[i] ** 2)
     print(f"Electron # {i}: r={r:5.5f}")
     assert r - radius > 0, "Electron is not outside the sphere"
-    assert r - radius < tolerance, "Electron is not on the surface of the sphere"
+    assert r - radius < tolerance, "Electron is not close to the surface of the sphere"
