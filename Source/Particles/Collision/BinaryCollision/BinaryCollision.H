@@ -125,20 +125,10 @@ public:
             }
 
             m_product_species.insert( m_product_species.begin(), m_species_names.begin(), m_species_names.end() );
-
-            // During an ionization event, the non-ionizing target species could
-            // also be a product (for example, electron impact ionization producing another
-            // electron). We check that if this is the case, the product species is
-            // only listed once. The number of product particles is appropriately
-            // handled in `SplitAndScatterFunc` in that case.
-            if (m_product_species.size() > 2) {
-                if (m_product_species[2] == m_product_species[0]) {
-                    m_product_species.erase(m_product_species.begin() + 2);
-                }
-                else if (m_product_species[3] == m_product_species[0]) {
-                    m_product_species.erase(m_product_species.begin() + 3);
-                }
-            }
+            // Note that, if a species is both a colliding species and a product species
+            // (e.g., e- in e- + H -> 2 e- + H+) then it will be listed twice in `m_product_species`.
+            // (e.g., m_product_species = [e-, H, e-, H+])
+            // The code for ionization in `SplitAndScatterFunc` handles this case correctly.
         }
         m_have_product_species = !m_product_species.empty();
 
