@@ -72,7 +72,7 @@ DSMCFunc::DSMCFunc (
             pp_collision_name.getarr("product_species", product_species_names);
             // Check that the charge is consistent with an electron species
             auto& species1 = mypc->GetParticleContainerFromName(product_species_names[0]);
-            if( species1.getCharge() < 0._prt ) {
+            if( species1.getCharge() >= 0._prt ) {
                 amrex::Abort("The first species in " + collision_name + ".product_species must be an electron.");
             }
 
