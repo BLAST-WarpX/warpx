@@ -2086,8 +2086,9 @@ Details about the collision models can be found in the :ref:`theory section <mul
     If using ``linear_breit_wheeler`` these should be two photon species.
 
 * ``<collision_name>.product_species`` (`strings`)
-    Only for ``dsmc`` and ``nuclearfusion``. The name(s) of the species in which to add
+    Only for ``dsmc``, ``linear_breit_wheeler``, and ``nuclearfusion``. The name(s) of the species in which to add
     the new macroparticles created by the reaction.
+    If using ``dsmc`` with ionization reactions, the first species in this list must be an electron.
     If using ``linear_breit_wheeler`` these should be two species: one of electrons and one of positrons.
 
 * ``<collision_name>.ndt`` (`int`) optional
@@ -2346,6 +2347,10 @@ Particle push, charge and current deposition, field gathering
     High-order shape factors are computationally more expensive, but may increase the overall accuracy of the results. For production runs it is generally safer to use high-order shape factors, such as cubic order.
 
     Note that this input parameter is not optional and must always be set in all input files provided that there is at least one particle species (set in input as ``particles.species_names``) or one laser species (set in input as ``lasers.names``) in the simulation. No default value is provided automatically.
+
+* ``particles.max_grid_crossings`` (`integer`) optional (default `1`)
+    Maximum number of grid crossings the particles can do per time step.
+    This is only used with the Strang and theta-implicit schemes since they allow the speed of light Courant limit to be violated.
 
 Maxwell solver
 ^^^^^^^^^^^^^^
