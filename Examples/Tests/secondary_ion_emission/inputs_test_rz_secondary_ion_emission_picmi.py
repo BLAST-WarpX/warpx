@@ -215,7 +215,6 @@ def secondary_emission():
         ye = np.array([])
         ze = np.array([])
         we = np.array([])
-        delta_te = np.array([])
         uxe = np.array([])
         uye = np.array([])
         uze = np.array([])
@@ -225,40 +224,44 @@ def secondary_emission():
             sigma = sigma_nascap_ions[i]
             # Ne_sec is number of the secondary electrons to be emitted
             Ne_sec = int(sigma + np.random.uniform())
-            for _ in range(Ne_sec):
-                # Random thermal momenta distribution
-                ux_th = np.random.normal(0, dist_th)
-                uy_th = np.random.normal(0, dist_th)
-                uz_th = np.random.normal(0, dist_th)
 
-                un_th = nx[i] * ux_th + ny[i] * uy_th + nz[i] * uz_th
+            # Generate Ne_sec secondary electrons with random thermal momenta
+            # using numpy array operations
 
-                if un_th < 0:
-                    ux_th_reflect = (
-                        -2 * un_th * nx[i] + ux_th
-                    )  # for a "mirror reflection" u(sym)=-2(u.n)n+u
-                    uy_th_reflect = -2 * un_th * ny[i] + uy_th
-                    uz_th_reflect = -2 * un_th * nz[i] + uz_th
+            ux_th = np.random.normal(0, dist_th, size=Ne_sec)
+            uy_th = np.random.normal(0, dist_th, size=Ne_sec)
+            uz_th = np.random.normal(0, dist_th, size=Ne_sec)
+            # The electrons should be emitted away from the boundary
+            # so if the normal component of their velocity points
+            # towards the boundary, we reflect it
+            un_th = nx[i] * ux_th + ny[i] * uy_th + nz[i] * uz_th
+            ux_new = np.where(un_th < 0, -2 * un_th * nx[i] + ux_th, ux_th)
+            uy_new = np.where(un_th < 0, -2 * un_th * ny[i] + uy_th, uy_th)
+            uz_new = np.where(un_th < 0, -2 * un_th * nz[i] + uz_th, uz_th)
+            # Generate these particles with a position consistent with propagating
+            # for dt-delta_t[i] with the velocity ux_new, uy_new, uz_new,
+            # after being emitted, i.e. starting from the position of the ion on the boundary
+            xe_new = x[i] + (dt - delta_t[i]) * ux_new
+            ye_new = y[i] + (dt - delta_t[i]) * uy_new
+            ze_new = z[i] + (dt - delta_t[i]) * uz_new
 
-                    uxe = np.append(uxe, ux_th_reflect)
-                    uye = np.append(uye, uy_th_reflect)
-                    uze = np.append(uze, uz_th_reflect)
-                else:
-                    uxe = np.append(uxe, ux_th)
-                    uye = np.append(uye, uy_th)
-                    uze = np.append(uze, uz_th)
+            # The weight is identical for all these secondary electrons
+            w_new = w[i] * np.ones(Ne_sec)
 
-                xe = np.append(xe, x[i])
-                ye = np.append(ye, y[i])
-                ze = np.append(ze, z[i])
-                we = np.append(we, w[i])
-                delta_te = np.append(delta_te, delta_t[i])
+            # Add particles to the array of particles
+            xe = np.concatenate([xe, xe_new])
+            ye = np.concatenate([ye, ye_new])
+            ze = np.concatenate([ze, ze_new])
+            we = np.concatenate([we, w_new])
+            uxe = np.concatenate([uxe, ux_new])
+            uye = np.concatenate([uye, uy_new])
+            uze = np.concatenate([uze, uz_new])
 
         # Add secondary electrons to the general particle container
         elect_pc.add_particles(
-            x=xe + (dt - delta_te) * uxe,
-            y=ye + (dt - delta_te) * uye,
-            z=ze + (dt - delta_te) * uze,
+            x=xe,
+            y=ye,
+            z=ze,
             ux=uxe,
             uy=uye,
             uz=uze,
