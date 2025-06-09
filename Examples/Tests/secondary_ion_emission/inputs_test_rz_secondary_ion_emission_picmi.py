@@ -205,8 +205,6 @@ def secondary_emission():
         buffer.get_particle_scraped_this_step("ions", "eb", "deltaTimeScraped", lev)
     )
 
-    print(f"mpi rank: {COMM_WORLD.Get_rank()}: w.shape = {w.shape}", flush=True)
-
     energy_ions = 0.5 * proton_mass * w * (ux**2 + uy**2 + uz**2)
     energy_ions_in_kEv = energy_ions / (e * 1000)
     sigma_nascap_ions = sigma_nascap(energy_ions_in_kEv, delta_H, E_HMax)
@@ -228,8 +226,6 @@ def secondary_emission():
 
         # Generate Ne_sec secondary electrons with random thermal momenta
         # using numpy array operations
-        print(f"mpi rank: {COMM_WORLD.Get_rank()}: Ne_sec = {Ne_sec}", flush=True)
-
         ux_th = np.random.normal(0, dist_th, size=Ne_sec)
         uy_th = np.random.normal(0, dist_th, size=Ne_sec)
         uz_th = np.random.normal(0, dist_th, size=Ne_sec)
