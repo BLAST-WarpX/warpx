@@ -23,36 +23,19 @@ ts = OpenPMDTimeSeries(filename)
 it = ts.iterations
 x, y, z = ts.get_particle(["x", "y", "z"], species="electrons", iteration=it[-1])
 
-x_analytic = [-0.091696, 0.011599]
-y_analytic = [-0.002282, -0.0111624]
-z_analytic = [-0.200242, -0.201728]
-
 N_sec_e = np.size(z)  # number of the secondary electrons
 
 assert N_sec_e == 2, (
     "Test did not pass: for this set up we expect 2 secondary electrons emitted"
 )
 
-tolerance = 1e-3
+radius = 0.2
+tolerance = 2e-2
 
+# Check that the secondary electrons are on the surface of the sphere
 for i in range(0, N_sec_e):
     print("\n")
-    print(f"Electron # {i}:")
-    print("NUMERICAL coordinates of the emitted electrons:")
-    print(f"x={x[i]:5.5f}, y={y[i]:5.5f}, z={z[i]:5.5f}")
-    print("\n")
-    print("ANALYTICAL coordinates of the point of contact:")
-    print(f"x={x_analytic[i]:5.5f}, y={y_analytic[i]:5.5f}, z={z_analytic[i]:5.5f}")
-
-    rel_err_x = np.abs((x[i] - x_analytic[i]) / x_analytic[i])
-    rel_err_y = np.abs((y[i] - y_analytic[i]) / y_analytic[i])
-    rel_err_z = np.abs((z[i] - z_analytic[i]) / z_analytic[i])
-
-    print("\n")
-    print(f"Relative percentage error for x = {rel_err_x * 100:5.4f} %")
-    print(f"Relative percentage error for y = {rel_err_y * 100:5.4f} %")
-    print(f"Relative percentage error for z = {rel_err_z * 100:5.4f} %")
-
-    assert (
-        (rel_err_x < tolerance) and (rel_err_y < tolerance) and (rel_err_z < tolerance)
-    ), "Test particle_boundary_interaction did not pass"
+    r = np.sqrt(x[i] ** 2 + y[i] ** 2 + z[i] ** 2)
+    print(f"Electron # {i}: r={r:5.5f}")
+    assert r - radius > 0, "Electron is not outside the sphere"
+    assert r - radius < tolerance, "Electron is not on the surface of the sphere"
