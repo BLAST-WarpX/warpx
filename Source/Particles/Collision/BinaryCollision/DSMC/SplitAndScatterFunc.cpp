@@ -25,38 +25,12 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
 
         const bool ionization_flag = (!product_species.empty());
 
-        // if ionization is one of the processes, check if one of the colliding
-        // species is also used as a product species
         if (ionization_flag) {
-            // grab the colliding species
-            amrex::Vector<std::string> colliding_species;
-            pp_collision_name.getarr("species", colliding_species);
-            // grab the target species (i.e., the species that looses an
-            // electron during the collision)
-            std::string target_species;
-            pp_collision_name.query("ionization_target_species", target_species);
-            // find the index of the non-target species (the one that could
-            // also be used as a product species)
-            int non_target_idx = 0;
-            if (colliding_species[0] == target_species) {
-                non_target_idx = 1;
-            }
-
-            // check if the non-target species is in ``product_species``
-            auto it = std::find(product_species.begin(), product_species.end(), colliding_species[non_target_idx]);
-
-            if (it != product_species.end()) {
-                m_num_product_species = 3;
-                m_num_products_host.push_back(2); // the non-target species: one particle for the product ; one particle for the fact that the incident particle loses energy
-                m_num_products_host.push_back(0); // the target species
-                m_num_products_host.push_back(1); // the other product of the reaction
-            } else {
-                m_num_product_species = 4;
-                m_num_products_host.push_back(1); // the non-target species
-                m_num_products_host.push_back(0); // the target species
-                m_num_products_host.push_back(1); // first product species
-                m_num_products_host.push_back(1); // second product species
-            }
+            m_num_product_species = 4;
+            m_num_products_host.push_back(1); // the non-target species
+            m_num_products_host.push_back(0); // the target species
+            m_num_products_host.push_back(1); // first product species
+            m_num_products_host.push_back(1); // second product species
 
             // get the ionization energy
             pp_collision_name.get("ionization_energy", m_ionization_energy);

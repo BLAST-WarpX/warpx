@@ -58,7 +58,7 @@ public:
         const amrex::ParticleReal m1, const amrex::ParticleReal m2,
         const amrex::Vector<amrex::ParticleReal>& /*products_mass*/,
         const index_type* AMREX_RESTRICT mask,
-        const amrex::Vector<index_type>& products_np,
+        amrex::Vector<index_type>& products_np,
         const SmartCopy* AMREX_RESTRICT copy_species1,
         const SmartCopy* AMREX_RESTRICT copy_species2,
         const index_type* AMREX_RESTRICT p_pair_indices_1,
@@ -122,8 +122,14 @@ public:
         }
 
         // resize the particle tiles to accomodate the new particles
+        // The code works correctly, even if the same species appears
+        // several times in the product species list.
+        // (e.g., for e- + H -> 2 e- + H+, the product species list is [e-, H, e-, H+])
+        // In that case, the species that appears multiple times is resized several times ;
+        // `products_np` keeps track of array positions at which it has been resized.
         for (int i = 0; i < m_num_product_species; i++)
         {
+            products_np[i] = tile_products[i]->numParticles();
             tile_products[i]->resize(products_np[i] + num_added_vec[i]);
         }
 
@@ -158,47 +164,12 @@ public:
         const int num_product_species = m_num_product_species;
         const auto ionization_energy = m_ionization_energy;
 
-        // Store the list indices for ionization products, ensuring that
-        // the first product species is always an electron (which is assumed
-        // during the scattering operation).
-        // Also, get the starting index for the first ionization product (if ionization
-        // is present). If species1 is also a product, this would start the
-        // indexing for product particles after the particles created from
-        // fragmentation.
-        int ioniz_product1_list_index = 0, ioniz_product2_list_index = 0;
-        index_type ioniz_product1_offset = 0, ioniz_product2_offset = 0;
-        if (num_product_species == 3) {
-            if (pc_products[0]->getCharge() < 0.0) {
-                ioniz_product1_list_index = 0;
-                ioniz_product2_list_index = 2;
-                ioniz_product1_offset = products_np[0] + no_product_total + with_product_total;
-                ioniz_product2_offset = products_np[2];
-            } else {
-                ioniz_product1_list_index = 2;
-                ioniz_product2_list_index = 0;
-                ioniz_product1_offset = products_np[2];
-                ioniz_product2_offset = products_np[0] + no_product_total + with_product_total;
-            }
-        } else if (num_product_species == 4) {
-            if (pc_products[2]->getCharge() < 0.0) {
-                ioniz_product1_list_index = 2;
-                ioniz_product2_list_index = 3;
-                ioniz_product1_offset = products_np[2];
-                ioniz_product2_offset = products_np[3];
-            } else {
-                ioniz_product1_list_index = 3;
-                ioniz_product2_list_index = 2;
-                ioniz_product1_offset = products_np[3];
-                ioniz_product2_offset = products_np[2];
-            }
-        }
-
         // Grab the masses of ionization products
         amrex::ParticleReal m_ioniz_product1 = 0;
         amrex::ParticleReal m_ioniz_product2 = 0;
         if (num_product_species > 2) {
-            m_ioniz_product1 = pc_products[ioniz_product1_list_index]->getMass();
-            m_ioniz_product2 = pc_products[ioniz_product2_list_index]->getMass();
+            m_ioniz_product1 = pc_products[2]->getMass();
+            m_ioniz_product2 = pc_products[3]->getMass();
         }
 
         // First perform all non-product producing collisions
@@ -329,18 +300,18 @@ public:
                 soa_products_data[0].m_rdata[PIdx::w][species1_index] = p_pair_reaction_weight[i];
 
                 // create a copy of the first product species at the location of species 2
-                const auto product1_index = ioniz_product1_offset + with_product_p_offsets[i];
-                copy_species1[ioniz_product1_list_index](soa_products_data[ioniz_product1_list_index], soa_2, static_cast<int>(p_pair_indices_2[i]),
+                const auto product1_index = products_np_data[2] + with_product_p_offsets[i];
+                copy_species1[2](soa_products_data[2], soa_2, static_cast<int>(p_pair_indices_2[i]),
                                 static_cast<int>(product1_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
-                soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::w][product1_index] = p_pair_reaction_weight[i];
+                soa_products_data[2].m_rdata[PIdx::w][product1_index] = p_pair_reaction_weight[i];
 
                 // create a copy of the other product species at the location of species 2
-                const auto product2_index = ioniz_product2_offset + with_product_p_offsets[i];
-                copy_species1[ioniz_product2_list_index](soa_products_data[ioniz_product2_list_index], soa_2, static_cast<int>(p_pair_indices_2[i]),
+                const auto product2_index = products_np_data[3] + with_product_p_offsets[i];
+                copy_species1[3](soa_products_data[3], soa_2, static_cast<int>(p_pair_indices_2[i]),
                                 static_cast<int>(product2_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
-                soa_products_data[ioniz_product2_list_index].m_rdata[PIdx::w][product2_index] = p_pair_reaction_weight[i];
+                soa_products_data[3].m_rdata[PIdx::w][product2_index] = p_pair_reaction_weight[i];
 
                 // Grab the colliding particle velocities to calculate the COM
                 // Note that the two product particles currently have the same
@@ -348,12 +319,12 @@ public:
                 auto& ux1 = soa_products_data[0].m_rdata[PIdx::ux][species1_index];
                 auto& uy1 = soa_products_data[0].m_rdata[PIdx::uy][species1_index];
                 auto& uz1 = soa_products_data[0].m_rdata[PIdx::uz][species1_index];
-                auto& ux_p1 = soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::ux][product1_index];
-                auto& uy_p1 = soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::uy][product1_index];
-                auto& uz_p1 = soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::uz][product1_index];
-                auto& ux_p2 = soa_products_data[ioniz_product2_list_index].m_rdata[PIdx::ux][product2_index];
-                auto& uy_p2 = soa_products_data[ioniz_product2_list_index].m_rdata[PIdx::uy][product2_index];
-                auto& uz_p2 = soa_products_data[ioniz_product2_list_index].m_rdata[PIdx::uz][product2_index];
+                auto& ux_p1 = soa_products_data[2].m_rdata[PIdx::ux][product1_index];
+                auto& uy_p1 = soa_products_data[2].m_rdata[PIdx::uy][product1_index];
+                auto& uz_p1 = soa_products_data[2].m_rdata[PIdx::uz][product1_index];
+                auto& ux_p2 = soa_products_data[3].m_rdata[PIdx::ux][product2_index];
+                auto& uy_p2 = soa_products_data[3].m_rdata[PIdx::uy][product2_index];
+                auto& uz_p2 = soa_products_data[3].m_rdata[PIdx::uz][product2_index];
 
 #if (defined WARPX_DIM_RZ)
                 /* In RZ geometry, macroparticles can collide with other macroparticles
@@ -366,7 +337,7 @@ public:
                 * there is a corresponding assert statement at initialization.)
                 */
                 amrex::ParticleReal const theta = (
-                    soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::theta][product1_index]
+                    soa_products_data[2].m_rdata[PIdx::theta][product1_index]
                     - soa_products_data[0].m_rdata[PIdx::theta][species1_index]
                 );
                 amrex::ParticleReal const ux1buf = ux1;
