@@ -70,10 +70,9 @@ DSMCFunc::DSMCFunc (
             // during the scattering operation).
             amrex::Vector<std::string> product_species_names;
             pp_collision_name.getarr("product_species", product_species_names);
-            // Check that the charge and mass of the species is consistent with an electron species
+            // Check that the charge is consistent with an electron species
             auto& species1 = mypc->GetParticleContainerFromName(product_species_names[0]);
-            if( std::abs(  species1.getCharge() + PhysConst::q_e ) > 1e-6*PhysConst::q_e   ||
-                std::abs( species1.getMass() - PhysConst::m_e ) > 1e-6*PhysConst::m_e ) {
+            if( species1.getCharge() < 0._prt ) {
                 amrex::Abort("The first species in " + collision_name + ".product_species must be an electron.");
             }
 
