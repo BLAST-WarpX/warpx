@@ -9,6 +9,7 @@
 # Simulation is initialized with four ions with i_dist distribution and spherical
 # embedded boundary given by implicit function.
 import numpy as np
+from mpi4py.MPI import COMM_WORLD
 from scipy.constants import e, elementary_charge, m_e, proton_mass
 
 from pywarpx import callbacks, particle_containers, picmi
@@ -182,91 +183,94 @@ def sigma_nascap(energy_kEv, delta_H, E_HMax):
 
 def secondary_emission():
     buffer = particle_containers.ParticleBoundaryBufferWrapper()  # boundary buffer
-    # STEP 1: extract the different parameters of the boundary buffer (normal, time, position)
     lev = 0  # level 0 (no mesh refinement here)
-    n = buffer.get_particle_boundary_buffer_size("ions", "eb")
+
+    # local=True: each MPI rank only gets the particles that are on its local domain
+    n = buffer.get_particle_boundary_buffer_size("ions", "eb", local=True)
     elect_pc = particle_containers.ParticleContainerWrapper("electrons")
 
-    if n != 0:
-        r = concat(buffer.get_particle_scraped_this_step("ions", "eb", "x", lev))
-        theta = concat(
-            buffer.get_particle_scraped_this_step("ions", "eb", "theta", lev)
-        )
-        z = concat(buffer.get_particle_scraped_this_step("ions", "eb", "z", lev))
-        x = r * np.cos(theta)  # from RZ coordinates to 3D coordinates
-        y = r * np.sin(theta)
-        ux = concat(buffer.get_particle_scraped_this_step("ions", "eb", "ux", lev))
-        uy = concat(buffer.get_particle_scraped_this_step("ions", "eb", "uy", lev))
-        uz = concat(buffer.get_particle_scraped_this_step("ions", "eb", "uz", lev))
-        w = concat(buffer.get_particle_scraped_this_step("ions", "eb", "w", lev))
-        nx = concat(buffer.get_particle_scraped_this_step("ions", "eb", "nx", lev))
-        ny = concat(buffer.get_particle_scraped_this_step("ions", "eb", "ny", lev))
-        nz = concat(buffer.get_particle_scraped_this_step("ions", "eb", "nz", lev))
-        delta_t = concat(
-            buffer.get_particle_scraped_this_step("ions", "eb", "deltaTimeScraped", lev)
-        )
+    print(f"mpi rank: {COMM_WORLD.Get_rank()}: n = {n}", flush=True)
 
-        energy_ions = 0.5 * proton_mass * w * (ux**2 + uy**2 + uz**2)
-        energy_ions_in_kEv = energy_ions / (e * 1000)
-        sigma_nascap_ions = sigma_nascap(energy_ions_in_kEv, delta_H, E_HMax)
+    r = concat(buffer.get_particle_scraped_this_step("ions", "eb", "x", lev))
+    theta = concat(buffer.get_particle_scraped_this_step("ions", "eb", "theta", lev))
+    z = concat(buffer.get_particle_scraped_this_step("ions", "eb", "z", lev))
+    x = r * np.cos(theta)  # from RZ coordinates to 3D coordinates
+    y = r * np.sin(theta)
+    ux = concat(buffer.get_particle_scraped_this_step("ions", "eb", "ux", lev))
+    uy = concat(buffer.get_particle_scraped_this_step("ions", "eb", "uy", lev))
+    uz = concat(buffer.get_particle_scraped_this_step("ions", "eb", "uz", lev))
+    w = concat(buffer.get_particle_scraped_this_step("ions", "eb", "w", lev))
+    nx = concat(buffer.get_particle_scraped_this_step("ions", "eb", "nx", lev))
+    ny = concat(buffer.get_particle_scraped_this_step("ions", "eb", "ny", lev))
+    nz = concat(buffer.get_particle_scraped_this_step("ions", "eb", "nz", lev))
+    delta_t = concat(
+        buffer.get_particle_scraped_this_step("ions", "eb", "deltaTimeScraped", lev)
+    )
 
-        # Prepare arrays for secondary electrons
-        xe = np.array([])
-        ye = np.array([])
-        ze = np.array([])
-        we = np.array([])
-        uxe = np.array([])
-        uye = np.array([])
-        uze = np.array([])
+    energy_ions = 0.5 * proton_mass * w * (ux**2 + uy**2 + uz**2)
+    energy_ions_in_kEv = energy_ions / (e * 1000)
+    sigma_nascap_ions = sigma_nascap(energy_ions_in_kEv, delta_H, E_HMax)
 
-        # Loop over all ions that have been scraped in the last timestep
-        for i in range(0, len(w)):
-            sigma = sigma_nascap_ions[i]
-            # Ne_sec is number of the secondary electrons to be emitted
-            Ne_sec = int(sigma + np.random.uniform())
+    # Prepare arrays for secondary electrons
+    xe = np.array([])
+    ye = np.array([])
+    ze = np.array([])
+    we = np.array([])
+    uxe = np.array([])
+    uye = np.array([])
+    uze = np.array([])
 
-            # Generate Ne_sec secondary electrons with random thermal momenta
-            # using numpy array operations
+    # Loop over all ions that have been scraped in the last timestep
+    for i in range(0, len(w)):
+        sigma = sigma_nascap_ions[i]
+        # Ne_sec is number of the secondary electrons to be emitted
+        Ne_sec = int(sigma + np.random.uniform())
 
-            ux_th = np.random.normal(0, dist_th, size=Ne_sec)
-            uy_th = np.random.normal(0, dist_th, size=Ne_sec)
-            uz_th = np.random.normal(0, dist_th, size=Ne_sec)
-            # The electrons should be emitted away from the boundary
-            # so if the normal component of their velocity points
-            # towards the boundary, we reflect it
-            un_th = nx[i] * ux_th + ny[i] * uy_th + nz[i] * uz_th
-            ux_new = np.where(un_th < 0, -2 * un_th * nx[i] + ux_th, ux_th)
-            uy_new = np.where(un_th < 0, -2 * un_th * ny[i] + uy_th, uy_th)
-            uz_new = np.where(un_th < 0, -2 * un_th * nz[i] + uz_th, uz_th)
-            # Generate these particles with a position consistent with propagating
-            # for dt-delta_t[i] with the velocity ux_new, uy_new, uz_new,
-            # after being emitted, i.e. starting from the position of the ion on the boundary
-            xe_new = x[i] + (dt - delta_t[i]) * ux_new
-            ye_new = y[i] + (dt - delta_t[i]) * uy_new
-            ze_new = z[i] + (dt - delta_t[i]) * uz_new
+        # Generate Ne_sec secondary electrons with random thermal momenta
+        # using numpy array operations
 
-            # The weight is identical for all these secondary electrons
-            w_new = w[i] * np.ones(Ne_sec)
+        ux_th = np.random.normal(0, dist_th, size=Ne_sec)
+        uy_th = np.random.normal(0, dist_th, size=Ne_sec)
+        uz_th = np.random.normal(0, dist_th, size=Ne_sec)
+        # The electrons should be emitted away from the boundary
+        # so if the normal component of their velocity points
+        # towards the boundary, we reflect it
+        un_th = nx[i] * ux_th + ny[i] * uy_th + nz[i] * uz_th
+        ux_new = np.where(un_th < 0, -2 * un_th * nx[i] + ux_th, ux_th)
+        uy_new = np.where(un_th < 0, -2 * un_th * ny[i] + uy_th, uy_th)
+        uz_new = np.where(un_th < 0, -2 * un_th * nz[i] + uz_th, uz_th)
+        # Generate these particles with a position consistent with propagating
+        # for dt-delta_t[i] with the velocity ux_new, uy_new, uz_new,
+        # after being emitted, i.e. starting from the position of the ion on the boundary
+        xe_new = x[i] + (dt - delta_t[i]) * ux_new
+        ye_new = y[i] + (dt - delta_t[i]) * uy_new
+        ze_new = z[i] + (dt - delta_t[i]) * uz_new
 
-            # Add particles to the array of particles
-            xe = np.concatenate([xe, xe_new])
-            ye = np.concatenate([ye, ye_new])
-            ze = np.concatenate([ze, ze_new])
-            we = np.concatenate([we, w_new])
-            uxe = np.concatenate([uxe, ux_new])
-            uye = np.concatenate([uye, uy_new])
-            uze = np.concatenate([uze, uz_new])
+        # The weight is identical for all these secondary electrons
+        w_new = w[i] * np.ones(Ne_sec)
 
-        # Add secondary electrons to the general particle container
-        elect_pc.add_particles(
-            x=xe,
-            y=ye,
-            z=ze,
-            ux=uxe,
-            uy=uye,
-            uz=uze,
-            w=we,
-        )
+        # Add particles to the array of particles
+        xe = np.concatenate([xe, xe_new])
+        ye = np.concatenate([ye, ye_new])
+        ze = np.concatenate([ze, ze_new])
+        we = np.concatenate([we, w_new])
+        uxe = np.concatenate([uxe, ux_new])
+        uye = np.concatenate([uye, uy_new])
+        uze = np.concatenate([uze, uz_new])
+
+    # Add secondary electrons to the particle container
+    elect_pc.add_particles(
+        x=xe,
+        y=ye,
+        z=ze,
+        ux=uxe,
+        uy=uye,
+        uz=uze,
+        w=we,
+        unique_particles=False,
+    )
+    # unique_particles=False: each MPI rank adds
+    # its own set of particles to the particle container
 
 
 # using the new particle container modified at the last step
