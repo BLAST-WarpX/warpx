@@ -221,6 +221,7 @@ def secondary_emission():
     # Loop over all ions that have been scraped in the last timestep
     for i in range(0, len(w)):
         sigma = sigma_nascap_ions[i]
+
         # Ne_sec is number of the secondary electrons to be emitted
         Ne_sec = int(sigma + np.random.uniform())
 
@@ -264,9 +265,9 @@ def secondary_emission():
         uy=uye,
         uz=uze,
         w=we,
-        unique_particles=False,
+        unique_particles=True,
     )
-    # unique_particles=False: each MPI rank adds
+    # unique_particles=True: each MPI rank adds
     # its own set of particles to the particle container
 
 
