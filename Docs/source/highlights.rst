@@ -259,8 +259,13 @@ Nuclear Fusion and Plasma Confinement
    Physics of Plasmas **30**, 122508, 2023.
    `DOI:10.1063/5.0178288 <https://doi.org/10.1063/5.0178288>`__
 
-Plasma Thrusters and Electric Propulsion
-****************************************
+Plasma Thrusters and Spacecraft Physics
+***************************************
+
+#. Sam A., Elschot S.,
+   **Self-consistent charging of complex objects in flowing plasma: Implementation and analysis in WarpX**.
+   Computer Physics Communications, **314**, 109680, 2025.
+   `DOI:10.1016/j.cpc.2025.109680 <https://doi.org/10.1016/j.cpc.2025.109680>`__
 
 #. Marks T. A. and Gorodetsky A. A.,
    **GPU-accelerated kinetic Hall thruster simulations in WarpX**.
