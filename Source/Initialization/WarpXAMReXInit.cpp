@@ -131,13 +131,13 @@ namespace {
     void
     overwrite_amrex_parser_defaults ()
     {
+        add_constants();
         override_default_abort_on_out_of_gpu_memory();
         override_default_the_arena_is_managed();
         override_default_omp_threads();
         apply_workaround_for_warpx_numprocs();
         set_device_synchronization();
         override_default_tiling_option_for_particles();
-        add_constants();
     }
 
     /** Parse prob_lo and hi
