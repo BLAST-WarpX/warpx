@@ -70,11 +70,11 @@ public:
 
         const amrex::ParmParse pp_collision_name(collision_name);
         utils::parser::queryWithParser(
-            pp_collision_name, "fusion_multiplier", m_fusion_multiplier);
+            pp_collision_name, "event_multiplier", m_fusion_multiplier);
         utils::parser::queryWithParser(
-            pp_collision_name, "fusion_probability_threshold", m_probability_threshold);
+            pp_collision_name, "probability_threshold", m_probability_threshold);
         utils::parser::queryWithParser(
-            pp_collision_name, "fusion_probability_target_value",
+            pp_collision_name, "probability_target_value",
             m_probability_target_value);
 
         m_exe.m_fusion_multiplier = m_fusion_multiplier;

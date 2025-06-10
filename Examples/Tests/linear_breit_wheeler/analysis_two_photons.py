@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+# This test checks that the linear Breit-Wheeler infrastructure is working ok.
+# It initializes two photons in the same cell with a certain energy (above threshold) and weight.
+# The two photons are not pushed, so that the keep colliding until they disappear
+# upon having been completely converted into electron-positron pairs.
+# It also checks charge, energy, and momentum conservation.
+
 import numpy as np
 from analysis_base import (
     check_charge_conservation,

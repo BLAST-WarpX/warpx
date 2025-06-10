@@ -7,12 +7,10 @@
 
 
 #include "FiniteDifferenceSolver.H"
-#ifndef WARPX_DIM_RZ
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
-#else
-#   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
 #endif
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -42,7 +40,7 @@ void FiniteDifferenceSolver::EvolveG (
     ablastr::fields::VectorField const& Bfield,
     amrex::Real const dt)
 {
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     // TODO Implement G update equation in RZ geometry
     amrex::ignore_unused(Gfield, Bfield, dt);
 #else
@@ -66,7 +64,7 @@ void FiniteDifferenceSolver::EvolveG (
 #endif
 }
 
-#ifndef WARPX_DIM_RZ
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::EvolveGCartesian (

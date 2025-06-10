@@ -58,7 +58,7 @@ public:
         const amrex::ParticleReal m1, const amrex::ParticleReal m2,
         const amrex::Vector<amrex::ParticleReal>& /*products_mass*/,
         const index_type* AMREX_RESTRICT mask,
-        const amrex::Vector<index_type>& products_np,
+        amrex::Vector<index_type>& products_np,
         const SmartCopy* AMREX_RESTRICT copy_species1,
         const SmartCopy* AMREX_RESTRICT copy_species2,
         const index_type* AMREX_RESTRICT p_pair_indices_1,
@@ -88,7 +88,7 @@ public:
         );
 
         amrex::Vector<int> num_added_vec(m_num_product_species, 0);
-        for (int i = 0; i < m_num_product_species; i++)
+        for (int i = 0; i < 2; i++)
         {
             // Record the number of non product producing events lead to new
             // particles for species1 and 2. Only 1 particle is created for
@@ -115,23 +115,21 @@ public:
 
         for (int i = 0; i < m_num_product_species; i++)
         {
-            // Add the number of product producing events to the species involved
-            // in those processes. For the two colliding particles, if either is set to
-            // have just 1 copy in the products it indicates that that species is not a
-            // product of the product producing reaction (instead it is just tracked as
-            // an outgoing particle in non-product producing reactions), and therefore
-            // it does not count in the products.
+            // Add the number of product producing events to the species involved in those processes.
             int num_products = m_num_products_host[i];
-            if ((i < 2) & (num_products == 1)) {
-                num_products = 0;
-            }
             const index_type num_added = with_product_total * num_products;
             num_added_vec[i] += static_cast<int>(num_added);
         }
 
         // resize the particle tiles to accomodate the new particles
+        // The code works correctly, even if the same species appears
+        // several times in the product species list.
+        // (e.g., for e- + H -> 2 e- + H+, the product species list is [e-, H, e-, H+])
+        // In that case, the species that appears multiple times is resized several times ;
+        // `products_np` keeps track of array positions at which it has been resized.
         for (int i = 0; i < m_num_product_species; i++)
         {
+            products_np[i] = tile_products[i]->numParticles();
             tile_products[i]->resize(products_np[i] + num_added_vec[i]);
         }
 
@@ -166,46 +164,12 @@ public:
         const int num_product_species = m_num_product_species;
         const auto ionization_energy = m_ionization_energy;
 
-        // Store the list indices for ionization products, ensuring that
-        // the first product species is always an electron (which is assumed
-        // during the scattering operation).
-        // Also, get the starting index for the first ionization product (if ionization
-        // is present). If species1 is also a product, this would start the
-        // indexing for product particles after the particles created from
-        // fragmentation.
-        int ioniz_product1_list_index = 0, ioniz_product2_list_index = 0;
-        index_type ioniz_product1_offset = 0, ioniz_product2_offset = 0;
-        if (num_product_species == 3) {
-            if (pc_products[0]->getCharge() < 0.0) {
-                ioniz_product1_list_index = 0;
-                ioniz_product2_list_index = 2;
-                ioniz_product1_offset = products_np[0] + no_product_total + with_product_total;
-                ioniz_product2_offset = products_np[2];
-            } else {
-                ioniz_product1_list_index = 2;
-                ioniz_product2_list_index = 0;
-                ioniz_product1_offset = products_np[2];
-                ioniz_product2_offset = products_np[0] + no_product_total + with_product_total;
-            }
-        } else if (num_product_species == 4) {
-            if (pc_products[2]->getCharge() < 0.0) {
-                ioniz_product1_list_index = 2;
-                ioniz_product2_list_index = 3;
-                ioniz_product1_offset = products_np[2];
-                ioniz_product2_offset = products_np[3];
-            } else {
-                ioniz_product1_list_index = 3;
-                ioniz_product2_list_index = 2;
-                ioniz_product1_offset = products_np[3];
-                ioniz_product2_offset = products_np[2];
-            }
-        }
         // Grab the masses of ionization products
         amrex::ParticleReal m_ioniz_product1 = 0;
         amrex::ParticleReal m_ioniz_product2 = 0;
         if (num_product_species > 2) {
-            m_ioniz_product1 = pc_products[ioniz_product1_list_index]->getMass();
-            m_ioniz_product2 = pc_products[ioniz_product2_list_index]->getMass();
+            m_ioniz_product1 = pc_products[2]->getMass();
+            m_ioniz_product2 = pc_products[3]->getMass();
         }
 
         // First perform all non-product producing collisions
@@ -331,23 +295,25 @@ public:
                 const auto species1_index = products_np_data[0] + no_product_total + with_product_p_offsets[i];
                 // Make a copy of the particle from species 1
                 copy_species1[0](soa_products_data[0], soa_1, static_cast<int>(p_pair_indices_1[i]),
-                                static_cast<int>(species1_index), engine);
+                               static_cast<int>(species1_index), engine);
                 // Set the weight of the new particles to p_pair_reaction_weight[i]
                 soa_products_data[0].m_rdata[PIdx::w][species1_index] = p_pair_reaction_weight[i];
 
                 // create a copy of the first product species at the location of species 2
-                const auto product1_index = ioniz_product1_offset + with_product_p_offsets[i];
-                copy_species1[ioniz_product1_list_index](soa_products_data[ioniz_product1_list_index], soa_2, static_cast<int>(p_pair_indices_2[i]),
+                // (species2 is the "target species", i.e. the species that is ionized)
+                const auto product1_index = products_np_data[2] + with_product_p_offsets[i];
+                copy_species2[2](soa_products_data[2], soa_2, static_cast<int>(p_pair_indices_2[i]),
                                 static_cast<int>(product1_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
-                soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::w][product1_index] = p_pair_reaction_weight[i];
+                soa_products_data[2].m_rdata[PIdx::w][product1_index] = p_pair_reaction_weight[i];
 
                 // create a copy of the other product species at the location of species 2
-                const auto product2_index = ioniz_product2_offset + with_product_p_offsets[i];
-                copy_species1[ioniz_product2_list_index](soa_products_data[ioniz_product2_list_index], soa_2, static_cast<int>(p_pair_indices_2[i]),
+                // (species2 is the "target species", i.e. the species that is ionized)
+                const auto product2_index = products_np_data[3] + with_product_p_offsets[i];
+                copy_species2[3](soa_products_data[3], soa_2, static_cast<int>(p_pair_indices_2[i]),
                                 static_cast<int>(product2_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
-                soa_products_data[ioniz_product2_list_index].m_rdata[PIdx::w][product2_index] = p_pair_reaction_weight[i];
+                soa_products_data[3].m_rdata[PIdx::w][product2_index] = p_pair_reaction_weight[i];
 
                 // Grab the colliding particle velocities to calculate the COM
                 // Note that the two product particles currently have the same
@@ -355,12 +321,12 @@ public:
                 auto& ux1 = soa_products_data[0].m_rdata[PIdx::ux][species1_index];
                 auto& uy1 = soa_products_data[0].m_rdata[PIdx::uy][species1_index];
                 auto& uz1 = soa_products_data[0].m_rdata[PIdx::uz][species1_index];
-                auto& ux_p1 = soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::ux][product1_index];
-                auto& uy_p1 = soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::uy][product1_index];
-                auto& uz_p1 = soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::uz][product1_index];
-                auto& ux_p2 = soa_products_data[ioniz_product2_list_index].m_rdata[PIdx::ux][product2_index];
-                auto& uy_p2 = soa_products_data[ioniz_product2_list_index].m_rdata[PIdx::uy][product2_index];
-                auto& uz_p2 = soa_products_data[ioniz_product2_list_index].m_rdata[PIdx::uz][product2_index];
+                auto& ux_p1 = soa_products_data[2].m_rdata[PIdx::ux][product1_index];
+                auto& uy_p1 = soa_products_data[2].m_rdata[PIdx::uy][product1_index];
+                auto& uz_p1 = soa_products_data[2].m_rdata[PIdx::uz][product1_index];
+                auto& ux_p2 = soa_products_data[3].m_rdata[PIdx::ux][product2_index];
+                auto& uy_p2 = soa_products_data[3].m_rdata[PIdx::uy][product2_index];
+                auto& uz_p2 = soa_products_data[3].m_rdata[PIdx::uz][product2_index];
 
 #if (defined WARPX_DIM_RZ)
                 /* In RZ geometry, macroparticles can collide with other macroparticles
@@ -373,7 +339,7 @@ public:
                 * there is a corresponding assert statement at initialization.)
                 */
                 amrex::ParticleReal const theta = (
-                    soa_products_data[ioniz_product1_list_index].m_rdata[PIdx::theta][product1_index]
+                    soa_products_data[2].m_rdata[PIdx::theta][product1_index]
                     - soa_products_data[0].m_rdata[PIdx::theta][species1_index]
                 );
                 amrex::ParticleReal const ux1buf = ux1;
@@ -399,99 +365,94 @@ public:
                 uy_p2 -= uCOM_y;
                 uz_p2 -= uCOM_z;
 
-                if (mask[i] == int(ScatteringProcessType::IONIZATION)) {
-                    // calculate kinetic energy of the collision (in eV)
-                    const amrex::ParticleReal E1 = (
-                        0.5_prt * m1 * (ux1*ux1 + uy1*uy1 + uz1*uz1) / PhysConst::q_e
-                    );
-                    const amrex::ParticleReal E2 = (
-                        0.5_prt * m2 * (ux_p2*ux_p2 + uy_p2*uy_p2 + uz_p2*uz_p2) / PhysConst::q_e
-                    );
-                    const amrex::ParticleReal E_coll = E1 + E2;
+                // calculate kinetic energy of the collision (in eV)
+                const amrex::ParticleReal E1 = (
+                    0.5_prt * m1 * (ux1*ux1 + uy1*uy1 + uz1*uz1) / PhysConst::q_e
+                );
+                const amrex::ParticleReal E2 = (
+                    0.5_prt * m2 * (ux_p2*ux_p2 + uy_p2*uy_p2 + uz_p2*uz_p2) / PhysConst::q_e
+                );
+                const amrex::ParticleReal E_coll = E1 + E2;
 
-                    // subtract the energy cost for ionization
-                    const amrex::ParticleReal E_out = (E_coll - ionization_energy) * PhysConst::q_e;
+                // subtract the energy cost for ionization
+                const amrex::ParticleReal E_out = (E_coll - ionization_energy) * PhysConst::q_e;
 
-                    // Momentum and energy division after the ionization event
-                    // is done as follows:
-                    // Three numbers are generated that satisfy the triangle
-                    // inequality. These numbers will be scaled to give the
-                    // momentum for each particle (satisfying the triangle
-                    // inequality ensures that the momentum vectors can be
-                    // arranged such that the net linear momentum is zero).
-                    // Product 2 is definitely an ion, so we first choose its
-                    // proportion to be n_2 = min(E2 / E_coll, 0.5 * R), where
-                    // R is a random number between 0 and 1.
-                    // The other two numbers (n_0 & n_1) are then found
-                    // by choosing a random point on the ellipse characterized
-                    // by the semi-major and semi-minor axes
-                    //    a = (1 - n_0) / 2.0
-                    //    b = 0.5 * sqrt(1 - 2 * n_0)
-                    // The numbers are found by randomly sampling an x value
-                    // between -a and a, and finding the corresponding y value
-                    // that falls on the ellipse: y^2 = b^2 - b^2/a^2 * x^2.
-                    // Then n_0 = sqrt(y^2 + (x - n_2/2)^2) and
-                    // n_1 = 1 - n_2 - n_0.
-                    // Next, we need to find the number C, such that if
-                    // p_i = C * n_i, we would have E_0 + E_1 + E_2 = E_out
-                    // where E_i = p_i^2 / (2 M_i), i.e.,
-                    // C^2 * \sum_i [n_i^2 / (2 M_i)] = E_out
-                    // After C is determined the momentum vectors are arranged
-                    // such that the net linear momentum is zero.
+                // Momentum and energy division after the ionization event
+                // is done as follows:
+                // Three numbers are generated that satisfy the triangle
+                // inequality. These numbers will be scaled to give the
+                // momentum for each particle (satisfying the triangle
+                // inequality ensures that the momentum vectors can be
+                // arranged such that the net linear momentum is zero).
+                // Product 2 is definitely an ion, so we first choose its
+                // proportion to be n_2 = min(E2 / E_coll, 0.5 * R), where
+                // R is a random number between 0 and 1.
+                // The other two numbers (n_0 & n_1) are then found
+                // by choosing a random point on the ellipse characterized
+                // by the semi-major and semi-minor axes
+                //    a = (1 - n_0) / 2.0
+                //    b = 0.5 * sqrt(1 - 2 * n_0)
+                // The numbers are found by randomly sampling an x value
+                // between -a and a, and finding the corresponding y value
+                // that falls on the ellipse: y^2 = b^2 - b^2/a^2 * x^2.
+                // Then n_0 = sqrt(y^2 + (x - n_2/2)^2) and
+                // n_1 = 1 - n_2 - n_0.
+                // Next, we need to find the number C, such that if
+                // p_i = C * n_i, we would have E_0 + E_1 + E_2 = E_out
+                // where E_i = p_i^2 / (2 M_i), i.e.,
+                // C^2 * \sum_i [n_i^2 / (2 M_i)] = E_out
+                // After C is determined the momentum vectors are arranged
+                // such that the net linear momentum is zero.
 
-                    const amrex::ParticleReal n_2 = std::min(E2 / E_coll, 0.5_prt * amrex::Random(engine));
+                const amrex::ParticleReal n_2 = std::min(E2 / E_coll, 0.5_prt * amrex::Random(engine));
 
-                    // find ellipse semi-major and minor axis
-                    const amrex::ParticleReal a = 0.5_prt * (1.0_prt - n_2);
-                    const amrex::ParticleReal b = 0.5_prt * std::sqrt(1.0_prt - 2.0_prt * n_2);
+                // find ellipse semi-major and minor axis
+                const amrex::ParticleReal a = 0.5_prt * (1.0_prt - n_2);
+                const amrex::ParticleReal b = 0.5_prt * std::sqrt(1.0_prt - 2.0_prt * n_2);
 
-                    // sample random x value and calculate y
-                    const amrex::ParticleReal x = (2._prt * amrex::Random(engine) - 1.0_prt) * a;
-                    const amrex::ParticleReal y2 = b*b - b*b/(a*a) * x*x;
-                    const amrex::ParticleReal n_0 = std::sqrt(y2 + x*x - x*n_2 + 0.25_prt*n_2*n_2);
-                    const amrex::ParticleReal n_1 = 1.0_prt - n_0 - n_2;
+                // sample random x value and calculate y
+                const amrex::ParticleReal x = (2._prt * amrex::Random(engine) - 1.0_prt) * a;
+                const amrex::ParticleReal y2 = b*b - b*b/(a*a) * x*x;
+                const amrex::ParticleReal n_0 = std::sqrt(y2 + x*x - x*n_2 + 0.25_prt*n_2*n_2);
+                const amrex::ParticleReal n_1 = 1.0_prt - n_0 - n_2;
 
-                    // calculate the value of C
-                    const amrex::ParticleReal C = std::sqrt(E_out / (
-                        n_0*n_0 / (2.0_prt * m1) + n_1*n_1 / (2.0_prt * m_ioniz_product1) + n_2*n_2 / (2.0_prt * m_ioniz_product2)
-                    ));
+                // calculate the value of C
+                const amrex::ParticleReal C = std::sqrt(E_out / (
+                    n_0*n_0 / (2.0_prt * m1) + n_1*n_1 / (2.0_prt * m_ioniz_product1) + n_2*n_2 / (2.0_prt * m_ioniz_product2)
+                ));
 
-                    // Now that appropriate momenta are set for each outgoing species
-                    // the directions for the velocity vectors must be chosen such
-                    // that the net linear momentum in the current frame is 0.
-                    // This is achieved by arranging the momentum vectors in
-                    // a triangle and finding the required angles between the vectors.
-                    const amrex::ParticleReal cos_alpha = (n_0*n_0 + n_1*n_1 - n_2*n_2) / (2.0_prt * n_0 * n_1);
-                    const amrex::ParticleReal sin_alpha = std::sqrt(1.0_prt - cos_alpha*cos_alpha);
-                    const amrex::ParticleReal cos_gamma = (n_0*n_0 + n_2*n_2 - n_1*n_1) / (2.0_prt * n_0 * n_2);
-                    const amrex::ParticleReal sin_gamma = std::sqrt(1.0_prt - cos_gamma*cos_gamma);
+                // Now that appropriate momenta are set for each outgoing species
+                // the directions for the velocity vectors must be chosen such
+                // that the net linear momentum in the current frame is 0.
+                // This is achieved by arranging the momentum vectors in
+                // a triangle and finding the required angles between the vectors.
+                const amrex::ParticleReal cos_alpha = (n_0*n_0 + n_1*n_1 - n_2*n_2) / (2.0_prt * n_0 * n_1);
+                const amrex::ParticleReal sin_alpha = std::sqrt(1.0_prt - cos_alpha*cos_alpha);
+                const amrex::ParticleReal cos_gamma = (n_0*n_0 + n_2*n_2 - n_1*n_1) / (2.0_prt * n_0 * n_2);
+                const amrex::ParticleReal sin_gamma = std::sqrt(1.0_prt - cos_gamma*cos_gamma);
 
-                    // choose random theta and phi values (orientation of the triangle)
-                    const amrex::ParticleReal Theta = amrex::Random(engine) * 2.0_prt * MathConst::pi;
-                    const amrex::ParticleReal phi = amrex::Random(engine) * MathConst::pi;
+                // choose random theta and phi values (orientation of the triangle)
+                const amrex::ParticleReal Theta = amrex::Random(engine) * 2.0_prt * MathConst::pi;
+                const amrex::ParticleReal phi = amrex::Random(engine) * MathConst::pi;
 
-                    const amrex::ParticleReal cos_theta = std::cos(Theta);
-                    const amrex::ParticleReal sin_theta = std::sin(Theta);
-                    const amrex::ParticleReal cos_phi = std::cos(phi);
-                    const amrex::ParticleReal sin_phi = std::sin(phi);
+                const amrex::ParticleReal cos_theta = std::cos(Theta);
+                const amrex::ParticleReal sin_theta = std::sin(Theta);
+                const amrex::ParticleReal cos_phi = std::cos(phi);
+                const amrex::ParticleReal sin_phi = std::sin(phi);
 
-                    // calculate the velocity components for each particle
-                    ux1 = C * n_0 / m1 * cos_theta * cos_phi;
-                    uy1 = C * n_0 / m1 * cos_theta * sin_phi;
-                    uz1 = -C * n_0 / m1 * sin_theta;
+                // calculate the velocity components for each particle
+                ux1 = C * n_0 / m1 * cos_theta * cos_phi;
+                uy1 = C * n_0 / m1 * cos_theta * sin_phi;
+                uz1 = -C * n_0 / m1 * sin_theta;
 
-                    ux_p1 = C * n_1 / m_ioniz_product1 * (-cos_alpha * cos_theta * cos_phi - sin_alpha * sin_phi);
-                    uy_p1 = C * n_1 / m_ioniz_product1 * (-cos_alpha * cos_theta * sin_phi + sin_alpha * cos_phi);
-                    uz_p1 = C * n_1 / m_ioniz_product1 * (cos_alpha * sin_theta);
+                ux_p1 = C * n_1 / m_ioniz_product1 * (-cos_alpha * cos_theta * cos_phi - sin_alpha * sin_phi);
+                uy_p1 = C * n_1 / m_ioniz_product1 * (-cos_alpha * cos_theta * sin_phi + sin_alpha * cos_phi);
+                uz_p1 = C * n_1 / m_ioniz_product1 * (cos_alpha * sin_theta);
 
-                    ux_p2 = C * n_2 / m_ioniz_product2 * (-cos_gamma * cos_theta * cos_phi + sin_gamma * sin_phi);
-                    uy_p2 = C * n_2 / m_ioniz_product2 * (-cos_gamma * cos_theta * sin_phi - sin_gamma * cos_phi);
-                    uz_p2 = C * n_2 / m_ioniz_product2 * (cos_gamma * sin_theta);
+                ux_p2 = C * n_2 / m_ioniz_product2 * (-cos_gamma * cos_theta * cos_phi + sin_gamma * sin_phi);
+                uy_p2 = C * n_2 / m_ioniz_product2 * (-cos_gamma * cos_theta * sin_phi - sin_gamma * cos_phi);
+                uz_p2 = C * n_2 / m_ioniz_product2 * (cos_gamma * sin_theta);
 
-                }
-                else {
-                    amrex::Abort("Unknown scattering process.");
-                }
                 // transform back to labframe
                 ux1 += uCOM_x;
                 uy1 += uCOM_y;

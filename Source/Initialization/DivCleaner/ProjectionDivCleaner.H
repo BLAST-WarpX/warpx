@@ -71,15 +71,11 @@ public:
     amrex::Vector< std::unique_ptr<amrex::MultiFab> > m_source;
 
     amrex::Vector<amrex::Real> m_h_stencil_coefs_x;
-#if !defined(WARPX_DIM_RZ)
     amrex::Vector<amrex::Real> m_h_stencil_coefs_y;
-#endif
     amrex::Vector<amrex::Real> m_h_stencil_coefs_z;
 
     amrex::Gpu::DeviceVector<amrex::Real> m_stencil_coefs_x;
-#if !defined(WARPX_DIM_RZ)
     amrex::Gpu::DeviceVector<amrex::Real> m_stencil_coefs_y;
-#endif
     amrex::Gpu::DeviceVector<amrex::Real> m_stencil_coefs_z;
 
     // Default Constructor

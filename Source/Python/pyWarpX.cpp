@@ -22,6 +22,10 @@
 #  define PYWARPX_MODULE_NAME CONCAT_NAME(warpx_pybind_, 2d)
 #elif defined(WARPX_DIM_RZ)
 #  define PYWARPX_MODULE_NAME CONCAT_NAME(warpx_pybind_, rz)
+#elif defined(WARPX_DIM_RCYLINDER)
+#  define PYWARPX_MODULE_NAME CONCAT_NAME(warpx_pybind_, rcylinder)
+#elif defined(WARPX_DIM_RSPHERE)
+#  define PYWARPX_MODULE_NAME CONCAT_NAME(warpx_pybind_, rsphere)
 #elif defined(WARPX_DIM_3D)
 #  define PYWARPX_MODULE_NAME CONCAT_NAME(warpx_pybind_, 3d)
 #endif
@@ -42,7 +46,7 @@ PYBIND11_MODULE(PYWARPX_MODULE_NAME, m) {
     // make sure AMReX types are known
 #if defined(WARPX_DIM_3D)
     auto amr = py::module::import("amrex.space3d");
-#elif defined(WARPX_DIM_1D_Z)
+#elif defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     auto amr = py::module::import("amrex.space1d");
 #else
     auto amr = py::module::import("amrex.space2d");
@@ -51,7 +55,7 @@ PYBIND11_MODULE(PYWARPX_MODULE_NAME, m) {
     m.doc() = R"pbdoc(
             warpx_pybind
             --------------
-            .. currentmodule:: warpx_pybind_(1d|2d|3d|rz)
+            .. currentmodule:: warpx_pybind_(1d|2d|3d|rz|rcylinder|rsphere)
 
             .. autosummary::
                :toctree: _generate
