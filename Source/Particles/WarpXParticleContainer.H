@@ -15,6 +15,7 @@
 #include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
 #include "Initialization/PlasmaInjector.H"
+#include "Particles/Algorithms/KineticEnergy.H"
 #include "Particles/ParticleBoundaries.H"
 #include "SpeciesPhysicalProperties.H"
 
@@ -393,6 +394,7 @@ public:
     ///
     amrex::ParticleReal sumParticleCharge(bool local = false);
     amrex::ParticleReal sumParticleWeight(bool local = false);
+    amrex::ParticleReal sumParticleEnergy(bool local = false);
 
     std::array<amrex::ParticleReal, 3> meanParticleVelocity(bool local = false);
 

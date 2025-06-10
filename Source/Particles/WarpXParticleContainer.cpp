@@ -1987,6 +1987,44 @@ amrex::ParticleReal WarpXParticleContainer::sumParticleCharge(bool local) {
     return this->sumParticleWeight(local) * this->charge;
 }
 
+amrex::ParticleReal WarpXParticleContainer::sumParticleEnergy(bool local) {
+
+    amrex::ParticleReal total_energy = 0.0;
+    ReduceOps<ReduceOpSum> reduce_op;
+    ReduceData<ParticleReal> reduce_data(reduce_op);
+
+    const int nLevels = finestLevel();
+
+    // get the species mass
+    const amrex::Real m = this->mass;
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (int lev = 0; lev <= nLevels; ++lev) {
+        for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
+        {
+            auto *const w  = pti.GetAttribs(PIdx::w).data();
+            auto *const ux = pti.GetAttribs(PIdx::ux).data();
+            auto *const uy = pti.GetAttribs(PIdx::uy).data();
+            auto *const uz = pti.GetAttribs(PIdx::uz).data();
+
+            reduce_op.eval(pti.numParticles(), reduce_data,
+                            [=] AMREX_GPU_DEVICE (int ip)
+                {
+                    if (m > 0) return w[ip]*Algorithms::KineticEnergy(ux[ip],uy[ip],uz[ip],m);
+                    else return w[ip]*Algorithms::KineticEnergyPhotons(ux[ip],uy[ip],uz[ip]);
+                }
+            );
+        }
+    }
+
+    total_energy = get<0>(reduce_data.value());
+
+    if (!local) { ParallelDescriptor::ReduceRealSum(total_energy); }
+    return total_energy;
+}
+
 std::array<ParticleReal, 3> WarpXParticleContainer::meanParticleVelocity(bool local) {
 
     amrex::ParticleReal vx_total = 0.0_prt;
