@@ -19,7 +19,7 @@ void
 LatticeElementBase::AddElementBase (amrex::ParmParse & pp_element, amrex::ParticleReal & z_location)
 {
     // Read in the length of the element and save the start and end, and update z_location
-    amrex::ParticleReal ds;
+    amrex::ParticleReal ds = 0; // Quiet GCC warning maybe-uninitialized
     utils::parser::getWithParser(pp_element, "ds", ds);
 
     h_zs.push_back(z_location);
