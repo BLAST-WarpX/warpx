@@ -47,7 +47,7 @@ algo.particle_shape = 3
 particles.species_names = beam1
 
 beam1.injection_style = external_file
-beam1.injection_file = openpmd_generated_particles.h5
+beam1.injection_file = ../test_3d_focusing_gaussian_beam_from_openpmd_prepare/openpmd_generated_particles.h5
 
 #################################
 ######### DIAGNOSTICS ###########
