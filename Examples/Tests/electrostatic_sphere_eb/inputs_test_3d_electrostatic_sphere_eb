@@ -27,7 +27,9 @@ algo.field_gathering = momentum-conserving
 diagnostics.diags_names = diag1
 diag1.intervals = 1
 diag1.diag_type = Full
-diag1.fields_to_plot = Ex Ey Ez rho phi
+diag1.fields_to_plot = Ex Ey Ez rho phi eb_covered
+diag1.format = openpmd
+diag1.openpmd_backend = h5
 
 warpx.reduced_diags_names = eb_charge eb_charge_one_eighth
 eb_charge.type = ChargeOnEB

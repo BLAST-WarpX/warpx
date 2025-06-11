@@ -56,16 +56,27 @@ DSMCFunc::DSMCFunc (
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::INVALID,
                                         "Cannot add an unknown scattering process type");
 
-        // Only one ionization process is currently supported as part of a given
-        // collision set.
         if (process.type() == ScatteringProcessType::IONIZATION) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                !ionization_flag,
-                "DSMC only supports a single ionization process"
-            );
+
+            // Only one ionization process is currently supported as part of a given
+            // collision set.
+            if (ionization_flag) {
+                amrex::Abort("Multiple ionization processes were specified in " + collision_name +
+                ".scattering_processes, but DSMC only supports a single ionization process.");
+            }
             ionization_flag = true;
 
-            // And add a check that the ionization species has the same mass
+            // Ensure that the first product species is always an electron (which is assumed
+            // during the scattering operation).
+            amrex::Vector<std::string> product_species_names;
+            pp_collision_name.getarr("product_species", product_species_names);
+            // Check that the charge is consistent with an electron species
+            auto& species1 = mypc->GetParticleContainerFromName(product_species_names[0]);
+            if( species1.getCharge() >= 0._prt ) {
+                amrex::Abort("The first species in " + collision_name + ".product_species must be an electron.");
+            }
+
+            // TODO: add a check that the ionization species has the same mass
             // (and a positive charge), compared to the target species
         }
         m_scattering_processes.push_back(std::move(process));

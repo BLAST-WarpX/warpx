@@ -11,18 +11,18 @@
     "jz": 8899048833947625.0
   },
   "ele_schwinger": {
-    "particle_momentum_x": 3.695301335661869e-12,
-    "particle_momentum_y": 1.0718987518810743e-26,
-    "particle_momentum_z": 2.8810249733308386e-12,
+    "particle_momentum_x": 2.267388519613851e-12,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 2.2673887860617666e-12,
     "particle_position_x": 0.00028800000000000006,
     "particle_position_y": 0.000216,
     "particle_position_z": 0.0002540000004700524,
     "particle_weight": 63968.698937700814
   },
   "pos_schwinger": {
-    "particle_momentum_x": 3.695301335661867e-12,
-    "particle_momentum_y": 1.0879388905772012e-26,
-    "particle_momentum_z": 2.881024973330826e-12,
+    "particle_momentum_x": 2.267388519613851e-12,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 2.2673887860617666e-12,
     "particle_position_x": 0.000288,
     "particle_position_y": 0.000216,
     "particle_position_z": 0.00023799999952994755,

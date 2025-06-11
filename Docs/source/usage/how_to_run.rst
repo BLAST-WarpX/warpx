@@ -36,7 +36,7 @@ Hitting the ``<TAB>`` key will suggest available WarpX executables as found in y
 
 .. note::
 
-   WarpX needs separate binaries to run in dimensionality of 1D, 2D, 3D, and RZ.
+   WarpX needs a separate binary to run in each dimensionality, 1D, 2D, 3D, RZ, RCYLINDER, and RSPHERE.
    We encode the supported dimensionality in the binary file name.
 
 If you :ref:`compiled the code yourself <install-developers>`, the WarpX executable is stored in the source folder under ``build/bin``.

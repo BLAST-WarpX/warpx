@@ -5,15 +5,17 @@ on:
     branches:
       - "development"
   pull_request:
-    paths-ignore:
-      - "Docs/**"
-      - "**.rst"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-intel
   cancel-in-progress: true
 
 jobs:
+
+  check_changes:
+    name: Analyze
+    uses: ./.github/workflows/check_changes.yml
+
   build_icpx:
     name: oneAPI ICX SP
     runs-on: ubuntu-24.04
@@ -24,7 +26,8 @@ jobs:
       CXXFLAGS: "-Werror -Wno-error=pass-failed -Wno-tautological-constant-compare"
     # For oneAPI, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja
-    if: github.event.pull_request.draft == false
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies
@@ -89,7 +92,8 @@ jobs:
       CXXFLAGS: "-Werror -Wno-tautological-constant-compare"
     # For oneAPI, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja
-    if: github.event.pull_request.draft == false
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies

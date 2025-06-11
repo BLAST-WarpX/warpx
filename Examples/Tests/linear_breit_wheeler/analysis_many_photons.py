@@ -1,5 +1,17 @@
 #!/usr/bin/env python3
 
+# This test checks
+# The box is filled with photons with same number density and opposite momenta.
+# The photons are not pushed and collide via linear Breit-Wheeler.
+# We estimate the electron-positron yield in time only from the input parameters.
+# The number of electrons and positrons in time is N_+(t) = N_-(t) and follows this law:
+# d^2 N_+ / (dt dV) = sigma * n_A * n_B * sqrt[ (v_A - v_B )^2 - ( v_A x v_B )^2 /c^2 ] = 2*c * sigma * n_A^2
+# where dV is the differential volume, dt the differential time,
+# n_A = n_B = N_A / V = N_B / V the photon (of species photonA and photonB) number density,
+# sigma the linear Breit-Wheeler cross section, c the speed of light.
+# Then we calculate dN_+/dt by integrating in space and compare with the simulation result.
+# It also checks charge, energy, and momentum conservation.
+
 import numpy as np
 from analysis_base import (
     check_charge_conservation,
