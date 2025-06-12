@@ -113,6 +113,8 @@ void init_WarpX (py::module& m)
             //py::overload_cast< int >(&WarpX::boxArray, py::const_),
             py::arg("lev")
         )
+        .def("multifab_register",&WarpX::GetMultiFabRegister,
+            py::return_value_policy::reference_internal)
         .def("multifab",
              [](WarpX & wx, std::string internal_name) {
                  if (wx.m_fields.internal_has(internal_name)) {
@@ -211,7 +213,7 @@ The physical fields in WarpX have the following naming:
         .def("sync_rho",
             [](WarpX& wx){ wx.SyncRho(); }
         )
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         .def("apply_inverse_volume_scaling_to_charge_density",
             [](WarpX& wx, amrex::MultiFab* rho, int const lev) {
                 wx.ApplyInverseVolumeScalingToChargeDensity(rho, lev);
