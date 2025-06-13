@@ -141,6 +141,8 @@ int WarpX::nox = 0;
 int WarpX::noy = 0;
 int WarpX::noz = 0;
 
+int WarpX::particle_max_grid_crossings = 1;
+
 // Order of finite-order centering of fields (staggered to nodal)
 int WarpX::field_centering_nox = 2;
 int WarpX::field_centering_noy = 2;
@@ -1403,6 +1405,11 @@ WarpX::ReadParameters ()
                     "We recommend setting algo.particle_shape = 1 in order to avoid this issue");
             }
 
+            if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
+                evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+                pp_particles.query("max_grid_crossings", particle_max_grid_crossings);
+            }
+
             // default sort interval for particles if species or lasers vector is not empty
 #ifdef AMREX_USE_GPU
             sort_intervals_string_vec = {"4"};
@@ -2184,10 +2191,12 @@ WarpX::AllocLevelData (int lev, const BoxArray& ba, const DistributionMapping& d
         grid_type,
         do_moving_window,
         moving_window_dir,
+        particle_max_grid_crossings,
         WarpX::nox,
         nox_fft, noy_fft, noz_fft,
         NCIGodfreyFilter::m_stencil_width,
         electromagnetic_solver_id,
+        evolve_scheme,
         maxLevel(),
         WarpX::m_v_galilean,
         WarpX::m_v_comoving,

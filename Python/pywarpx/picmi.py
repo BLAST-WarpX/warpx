@@ -3419,6 +3419,7 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                     "divB",
                     "proc_number",
                     "part_per_cell",
+                    "eb_covered",
                 ]:
                     fields_to_plot.add(dataname)
                 elif dataname in J_fields_list:
