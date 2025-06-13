@@ -1175,22 +1175,22 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
         double sx_new_node[depos_order+1] = {0.};
         const int i0_node = compute_shape_factors_node( sx_old_node, sx_new_node, x0_old, x0_new );
 
-        // deposit out-of-plane Jy, Jz, Sy, and Sz for this segment
+        // deposit out-of-plane Jy, Jz, Syy, and Szz for this segment
         for (int i=0; i<=depos_order; i++) {
             const amrex::Real weight = 0.5_rt*(sx_old_node[i] + sx_new_node[i])*seg_factor;
             amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i0_node+i, 0, 0), wqy*weight);
             amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node+i, 0, 0), wqz*weight);
             //
-            amrex::Gpu::Atomic::AddNoRet( &Sy_arr(lo.x+i0_node+i, 0, 0), fpyy*weight*weight);
-            amrex::Gpu::Atomic::AddNoRet( &Sz_arr(lo.x+i0_node+i, 0, 0), fpzz*weight*weight);
+            amrex::Gpu::Atomic::AddNoRet( &Syy_arr(lo.x+i0_node+i, 0, 0), fpyy*weight*weight);
+            amrex::Gpu::Atomic::AddNoRet( &Szz_arr(lo.x+i0_node+i, 0, 0), fpzz*weight*weight);
         }
 
-        // deposit Jx and Sx for this segment
+        // deposit Jx and Sxx for this segment
         for (int i=0; i<=depos_order-1; i++) {
             const amrex::Real weight = sx_cell[i]*seg_factor;
             amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i0_cell+i, 0, 0), wqx*weight);
             //
-            amrex::Gpu::Atomic::AddNoRet( &Sx_arr(lo.x+i0_cell+i, 0, 0), fpxx*weight*weight);
+            amrex::Gpu::Atomic::AddNoRet( &Sxx_arr(lo.x+i0_cell+i, 0, 0), fpxx*weight*weight);
         }
 
         // update old segment values
