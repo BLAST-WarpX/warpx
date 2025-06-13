@@ -85,7 +85,7 @@ pc_curl_curl_mlmg.relative_tolerance = 1e-4
 
 algo.particle_pusher = "boris"
 
-particle.max_grid_crossings = 2
+particles.max_grid_crossings = 2
 algo.particle_shape = 2
 algo.current_deposition = "villasenor"
 
