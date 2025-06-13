@@ -390,6 +390,14 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
         AddRealComp(m_user_real_attribs.at(i));
     }
 
+    // Work compute
+    pp_species_name.query("do_compute_work", m_do_compute_work);
+    if (m_do_compute_work) {
+        AddRealComp("wx");
+        AddRealComp("wy");
+        AddRealComp("wz");
+    }
+
     // If old particle positions should be saved add the needed components
     pp_species_name.query("save_previous_position", m_save_previous_position);
     if (m_save_previous_position) {
@@ -2773,6 +2781,13 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
         amrex::ignore_unused(x_old, y_old, z_old);
     }
 
+    enum work_flags : int { no_work, do_work };
+    const int compute_work_runtime_flag = m_do_compute_work ? do_work : no_work;
+
+    ParticleReal* wx = m_do_compute_work ? pti.GetAttribs("wx").dataPtr() : nullptr;
+    ParticleReal* wy = m_do_compute_work ? pti.GetAttribs("wy").dataPtr() : nullptr;
+    ParticleReal* wz = m_do_compute_work ? pti.GetAttribs("wz").dataPtr() : nullptr;
+
     // Loop over the particles and update their momentum
     const amrex::ParticleReal q = this->charge;
     const amrex::ParticleReal m = this-> mass;
@@ -2809,10 +2824,10 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     // improves performance when qed or external EB are not used by reducing
     // register pressure.
     amrex::ParallelFor(
-        TypeList<CompileTimeOptions<no_exteb,has_exteb>, CompileTimeOptions<no_qed  ,has_qed>>{},
-        {exteb_runtime_flag, qed_runtime_flag},
+        TypeList<CompileTimeOptions<no_exteb,has_exteb>, CompileTimeOptions<no_qed  ,has_qed>, CompileTimeOptions<no_work, do_work>>{},
+        {exteb_runtime_flag, qed_runtime_flag, compute_work_runtime_flag},
         np_to_push,
-        [=] AMREX_GPU_DEVICE (long ip, auto exteb_control, auto qed_control)
+        [=] AMREX_GPU_DEVICE (long ip, auto exteb_control, auto qed_control, auto compute_work_control)
     {
         amrex::ParticleReal xp, yp, zp;
         getPosition(ip, xp, yp, zp);
@@ -2872,6 +2887,16 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 
             UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], dt);
             setPosition(ip, xp, yp, zp);
+
+            [[maybe_unused]] const auto& wx_tmp = wx;
+            [[maybe_unused]] const auto& wy_tmp = wy;
+            [[maybe_unused]] const auto& wz_tmp = wz;
+
+            if constexpr (compute_work_control == do_work) {
+                wx[ip] += dt * ux[ip] * q * Exp;
+                wy[ip] += dt * uy[ip] * q * Eyp;
+                wz[ip] += dt * uz[ip] * q * Ezp;
+            }
         }
 #ifdef WARPX_QED
         else {
