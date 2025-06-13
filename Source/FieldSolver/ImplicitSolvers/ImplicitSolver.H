@@ -197,15 +197,10 @@ protected:
             m_nlsolver = std::make_unique<NewtonSolver<WarpXSolverVec,ImplicitSolver>>();
             pp.query("max_particle_iterations", m_max_particle_iterations);
             pp.query("particle_tolerance", m_particle_tolerance);
-            pp.query("use_mass_matrices", m_use_mass_matrices);
-            if (m_use_mass_matrices) {
-                m_use_mass_matrices_jacobian = true;
-                m_use_mass_matrices_pc = true;
-                pp.query("use_mass_matrices_jacobian", m_use_mass_matrices_jacobian);
-                pp.query("use_mass_matrices_pc", m_use_mass_matrices_pc);
-                if (!m_use_mass_matrices_jacobian && !m_use_mass_matrices_pc) {
-                    m_use_mass_matrices = false;
-                }
+            pp.query("use_mass_matrices_jacobian", m_use_mass_matrices_jacobian);
+            pp.query("use_mass_matrices_pc", m_use_mass_matrices_pc);
+            if (m_use_mass_matrices_jacobian || m_use_mass_matrices_pc) {
+                m_use_mass_matrices = true;
             }
 #if defined(WARPX_DIM_RCYLINDER)
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
