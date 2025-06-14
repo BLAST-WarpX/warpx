@@ -4,7 +4,6 @@ CEXE_sources += WarpXUtil.cpp
 CEXE_sources += WarpXVersion.cpp
 CEXE_sources += Interpolate.cpp
 CEXE_sources += IntervalsParser.cpp
-CEXE_sources += RelativeCellPosition.cpp
 CEXE_sources += ParticleUtils.cpp
 CEXE_sources += SpeciesUtils.cpp
 

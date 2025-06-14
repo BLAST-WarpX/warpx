@@ -38,7 +38,7 @@ With ``--user``, the default location will be in your home directory, ``~/.local
 
 In HPC environments, it is often recommended to install codes in scratch or work space which typically have faster disk access.
 
-The different dimensioned versions of WarpX, 3D, 2D, and RZ, can coexist in the Python installation.
+The different dimensioned versions of WarpX, 3D, 2D, RZ, RSPHERE, and RCYLINDER can coexist in the Python installation.
 The appropriate one will be imported depending on the input file.
 Note, however, other options will overwrite - compiling with ``DEBUG=TRUE`` will replace the version compiled with ``DEBUG=FALSE`` for example.
 

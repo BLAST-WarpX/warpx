@@ -207,8 +207,11 @@ FlushFormatCheckpoint::CheckpointParticles (
                                                       "momentum_x",
                                                       "momentum_y",
                                                       "momentum_z"
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                                                       ,"theta"
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+                                                      ,"phi"
 #endif
                                                       };
 

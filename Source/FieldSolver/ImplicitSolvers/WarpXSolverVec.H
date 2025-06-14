@@ -8,6 +8,7 @@
 #define WarpXSolverVec_H_
 
 #include "Utils/TextMsg.H"
+#include "FieldSolver/ImplicitSolvers/WarpXSolverDOF.H"
 #include "Fields.H"
 
 #include <ablastr/utils/SignalHandling.H>
@@ -287,6 +288,31 @@ public:
     [[nodiscard]] std::string getVectorType () const { return m_vector_type_name; }
     [[nodiscard]] std::string getScalarType () const { return m_scalar_type_name; }
 
+    // vector sizes
+    [[nodiscard]] amrex::Long nDOF_local  () const
+    {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            (m_dofs != nullptr),
+            "WarpXSolverVec::nDOF_local() DOF object is a nullptr");
+        return m_dofs->m_nDoFs_l;
+    }
+    [[nodiscard]] amrex::Long nDOF_global () const
+    {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            (m_dofs != nullptr),
+            "WarpXSolverVec::nDOF_global() DOF object is a nullptr");
+        return m_dofs->m_nDoFs_g;
+    }
+
+    // copy to/from Real-type arrays
+    void copyFrom (const amrex::Real* const);
+    void copyTo   (amrex::Real* const) const;
+
+    // return WarpX pointer
+    inline auto getWarpX () const { return m_WarpX; }
+
+    // return the number of AMR levels
+    inline auto numAMRLevels () const { return m_num_amr_levels; }
 
 private:
 
@@ -307,6 +333,7 @@ private:
     inline static bool m_warpx_ptr_defined = false;
     inline static WarpX* m_WarpX = nullptr;
 
+    static std::unique_ptr<WarpXSolverDOF> m_dofs;
 };
 
 #endif
