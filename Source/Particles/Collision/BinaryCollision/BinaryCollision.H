@@ -524,7 +524,7 @@ public:
             }
 
             bool const correct_energy_momentum = m_correct_energy_momentum;
-            int const beta_weight_exponent = m_beta_weight_exponent;
+            amrex::ParticleReal const beta_weight_exponent = m_beta_weight_exponent;
 
             // Loop over cells
             WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::computeDensityTemperatures", prof_computeDensityTemperatures);
@@ -540,7 +540,8 @@ public:
 
                     // Compute the local energy and momentum.
                     if (correct_energy_momentum) {
-                        amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], std::pow(w1[ indices_1[i1] ], beta_weight_exponent));
+                        amrex::ParticleReal const w1_scaled = std::pow(w1[ indices_1[i1] ], beta_weight_exponent);
+                        amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w1_scaled);
                         amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w1[ indices_1[i1] ]*u1x[ indices_1[i1] ]*m1);
                         amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w1[ indices_1[i1] ]*u1y[ indices_1[i1] ]*m1);
                         amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w1[ indices_1[i1] ]*u1z[ indices_1[i1] ]*m1);
@@ -692,7 +693,7 @@ public:
                         amrex::ParticleReal const px_avg = px_in_each_cell[i_cell]/ww_weighted_sum;
                         amrex::ParticleReal const py_avg = py_in_each_cell[i_cell]/ww_weighted_sum;
                         amrex::ParticleReal const pz_avg = pz_in_each_cell[i_cell]/ww_weighted_sum;
-                        amrex::ParticleReal const w_factor = std::pow(w1[ indices_1[i1] ], beta_weight_exponent - 1)/m1;
+                        amrex::ParticleReal const w_factor = std::pow(w1[ indices_1[i1] ], beta_weight_exponent - 1._prt)/m1;
                         u1x[ indices_1[i1] ] += w_factor*px_avg;
                         u1y[ indices_1[i1] ] += w_factor*py_avg;
                         u1z[ indices_1[i1] ] += w_factor*pz_avg;
@@ -964,7 +965,7 @@ public:
             }
 
             bool const correct_energy_momentum = m_correct_energy_momentum;
-            int const beta_weight_exponent = m_beta_weight_exponent;
+            amrex::ParticleReal const beta_weight_exponent = m_beta_weight_exponent;
 
             // Loop over cells
             WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures", prof_findDensityTemperatures);
@@ -980,7 +981,9 @@ public:
 
                     // Compute the local energy and momentum.
                     if (correct_energy_momentum) {
-                        amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], std::pow(w1[ indices_1[i1] ], beta_weight_exponent));
+
+                        amrex::ParticleReal const w1_scaled = std::pow(w1[ indices_1[i1] ], beta_weight_exponent);
+                        amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w1_scaled);
                         amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w1[ indices_1[i1] ]*u1x[ indices_1[i1] ]*m1);
                         amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w1[ indices_1[i1] ]*u1y[ indices_1[i1] ]*m1);
                         amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w1[ indices_1[i1] ]*u1z[ indices_1[i1] ]*m1);
@@ -1003,7 +1006,8 @@ public:
 
                     // Compute the local energy and momentum.
                     if (correct_energy_momentum) {
-                        amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], std::pow(w2[ indices_2[i2] ], beta_weight_exponent));
+                        amrex::ParticleReal const w2_scaled = std::pow(w2[ indices_2[i2] ], beta_weight_exponent);
+                        amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w2_scaled);
                         amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w2[ indices_2[i2] ]*u2x[ indices_2[i2] ]*m2);
                         amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w2[ indices_2[i2] ]*u2y[ indices_2[i2] ]*m2);
                         amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w2[ indices_2[i2] ]*u2z[ indices_2[i2] ]*m2);
@@ -1191,7 +1195,7 @@ public:
                         amrex::ParticleReal const px_avg = px_in_each_cell[i_cell]/ww_weighted_sum;
                         amrex::ParticleReal const py_avg = py_in_each_cell[i_cell]/ww_weighted_sum;
                         amrex::ParticleReal const pz_avg = pz_in_each_cell[i_cell]/ww_weighted_sum;
-                        amrex::ParticleReal const w_factor = std::pow(w1[ indices_1[i1] ], beta_weight_exponent - 1)/m1;
+                        amrex::ParticleReal const w_factor = std::pow(w1[ indices_1[i1] ], beta_weight_exponent - 1._prt)/m1;
                         u1x[ indices_1[i1] ] += w_factor*px_avg;
                         u1y[ indices_1[i1] ] += w_factor*py_avg;
                         u1z[ indices_1[i1] ] += w_factor*pz_avg;
@@ -1207,7 +1211,7 @@ public:
                         amrex::ParticleReal const px_avg = px_in_each_cell[i_cell]/ww_weighted_sum;
                         amrex::ParticleReal const py_avg = py_in_each_cell[i_cell]/ww_weighted_sum;
                         amrex::ParticleReal const pz_avg = pz_in_each_cell[i_cell]/ww_weighted_sum;
-                        amrex::ParticleReal const w_factor = std::pow(w2[ indices_2[i2] ], beta_weight_exponent - 1)/m2;
+                        amrex::ParticleReal const w_factor = std::pow(w2[ indices_2[i2] ], beta_weight_exponent - 1._prt)/m2;
                         u2x[ indices_2[i2] ] += w_factor*px_avg;
                         u2y[ indices_2[i2] ] += w_factor*py_avg;
                         u2z[ indices_2[i2] ] += w_factor*pz_avg;
@@ -1318,7 +1322,7 @@ private:
     bool m_have_product_species;
 
     bool m_correct_energy_momentum = false;
-    int m_beta_weight_exponent = 1.;
+    amrex::ParticleReal m_beta_weight_exponent = 1.;
     amrex::ParticleReal m_energy_fraction = 0.5;
     amrex::ParticleReal m_energy_fraction_max = 0.5;
 
