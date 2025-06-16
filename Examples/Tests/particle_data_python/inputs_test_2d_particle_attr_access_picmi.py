@@ -66,7 +66,11 @@ solver = picmi.ElectrostaticSolver(
 # physics components
 ##########################
 
-electrons = picmi.Species(particle_type="electron", name="electrons")
+electrons = picmi.Species(
+    particle_type="electron",
+    name="electrons",
+    warpx_add_real_attributes={"z_birth": "z"},
+)
 
 ##########################
 # diagnostics
@@ -151,11 +155,16 @@ sim.step(max_steps - 1)
 
 assert elec_wrapper.nps == 270 / (2 - args.unique)
 assert elec_wrapper.particle_container.get_real_comp_index("w") == 2
-assert elec_wrapper.particle_container.get_real_comp_index("newPid") == 6
+assert elec_wrapper.particle_container.get_real_comp_index("newPid") == 7
 
 new_pid_vals = elec_wrapper.get_particle_real_arrays("newPid", 0)
 for vals in new_pid_vals:
     assert np.allclose(vals, 5)
+
+z_birth_vals = elec_wrapper.get_particle_real_arrays("z_birth", 0)
+for vals in z_birth_vals:
+    print(vals)
+    assert np.all((vals >= 0.005) & (vals <= 0.025))
 
 ##########################
 # take the final sim step
