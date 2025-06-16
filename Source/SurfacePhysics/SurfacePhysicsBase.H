@@ -19,6 +19,7 @@ public:
 
     ~SurfacePhysicsBase() = default;
 
+    void ReadInputs ();
     void InitData ();
     void initializeMapping ();
     void AllocAndInitInfluxBndVectors();
@@ -45,7 +46,23 @@ public:
     amrex::Vector< amrex::Vector< amrex::Real > > num_in_particles;
     amrex::Vector< amrex::Vector< amrex::Real > > num_out_particles;
 
-    
+
+private:
+    struct Reaction {
+        std::string equation;
+        amrex::Vector<std::string> reactants;
+        amrex::Vector<std::string> products;
+        double P_energy0;
+        double P0;
+        double E_ref;
+        double E_th;
+        double exp;
+    };
+    amrex::Vector<std::string> tokenize_reaction (const std::string& input);
+
+    std::map<std::string, std::string> gas_species; //stores gas_species with the symbol
+    std::map<std::string, std::string> surface_species; //stores surface_species with the symbol
+    std::vector<Reaction> reactions;
 
 };
 

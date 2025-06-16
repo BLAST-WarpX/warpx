@@ -10,6 +10,7 @@
 #include "SurfacePhysicsBase.H"
 #include "EmbeddedBoundary/Enabled.H"
 #include "Particles/MultiParticleContainer.H"
+#include "Utils/Parser/ParserUtils.H"
 #include "WarpX.H"
 
 #include <AMReX.H>
@@ -19,8 +20,99 @@
 SurfacePhysicsBase::SurfacePhysicsBase ()
 {
     amrex::Print() << " in surface physics base class \n";
+    ReadInputs();
 }
 
+void SurfacePhysicsBase::ReadInputs ()
+{
+    amrex::ParmParse const pp_surface_chemistry("surface_chemistry");
+    std::string chemistry_file;
+    pp_surface_chemistry.query("input_file", chemistry_file);
+
+    amrex::ParmParse::addfile(chemistry_file);
+    amrex::ParmParse const pp_chem("chem");
+
+    // Read gas species that participate in gas-surface physics
+    amrex::Vector<std::string> chem_gas_species;
+    pp_chem.queryarr("gasphase_species", chem_gas_species);
+    amrex::ParmParse const pp_gasphase("gasphase_species");
+    for (const auto& species : chem_gas_species) {
+        std::string symbol;
+        //pp_chem.query(("gasphase_species."+ species + ".symbol").c_str(), symbol);
+        utils::parser::query(pp_gasphase, species, "symbol", symbol);
+        gas_species[species] = symbol;
+    }
+
+    // Read surface species that participate in gas-surface physics
+    amrex::Vector<std::string> chem_surface_species;
+    pp_chem.queryarr("surface_species", chem_surface_species);
+    amrex::ParmParse const pp_surface("surface_species");
+    for (const auto& species : chem_surface_species) {
+        std::string symbol;
+        utils::parser::query(pp_surface, species, "symbol", symbol);
+        surface_species[species] = symbol;
+    }
+
+    std::set<std::string> known_symbols;
+    for (const auto& [_, symbol] : gas_species) known_symbols.insert(symbol);
+    for (const auto& [_, symbol] : surface_species) known_symbols.insert(symbol);
+
+
+    amrex::Vector<std::string> gas_surface_reactions;
+    if (pp_chem.queryarr("reactions", gas_surface_reactions)) {
+        for (const auto& line : gas_surface_reactions) {
+            amrex::Print() << " Reading reaction : " << line << "\n";
+            Reaction rxn;
+            std::vector<std::string> equation_params = amrex::split(line,";");
+
+            rxn.equation = amrex::trim(equation_params[0]);
+            auto arrow_pos = rxn.equation.find("=>");
+            if (arrow_pos == std::string::npos) {
+                amrex::Abort( " Reaction eqution must contain '=>' separator.");
+            }
+            std::string lhs = amrex::trim(rxn.equation.substr(0,arrow_pos));
+            std::string rhs = amrex::trim(rxn.equation.substr(arrow_pos+2));
+            rxn.reactants = tokenize_reaction(lhs);
+            rxn.products = tokenize_reaction(rhs);
+
+            rxn.P_energy0 = std::stod(equation_params[1]);
+            rxn.P0        = std::stod(equation_params[2]);
+            rxn.E_ref     = std::stod(equation_params[3]);
+            rxn.E_th      = std::stod(equation_params[4]);
+            rxn.exp       = std::stod(equation_params[5]);
+
+            reactions.push_back(rxn);
+        }
+    } else {
+        amrex::Print() << " no reactions specified for surface physics \n";
+    }
+}
+
+amrex::Vector<std::string>
+SurfacePhysicsBase::tokenize_reaction (const std::string& input) {
+
+    amrex::Vector<std::string> result;
+    std::string modified = input;
+
+    // replacing "+_" with "%_" temporarily
+    std::string::size_type pos = 0;
+    while ((pos = modified.find("+_", pos)) != std::string::npos) {
+        modified.replace(pos, 2, "%_");
+        pos += 2;
+    }
+
+    std::vector<std::string> terms = amrex::split(modified, "+");
+    for (auto& term : terms) {
+        std::string restored = amrex::trim(term);
+        std::string::size_type p = 0;
+        while ((p = restored.find("%_", p)) != std::string::npos) {
+            restored.replace(p, 2, "+_");
+            p += 2;
+        }
+        result.push_back(restored);
+    }
+    return result;
+}
 
 void
 SurfacePhysicsBase::InitData ()
