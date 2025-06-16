@@ -520,7 +520,8 @@ public:
                         u1x_before_ptr[ip] = u1x[ip];
                         u1y_before_ptr[ip] = u1y[ip];
                         u1z_before_ptr[ip] = u1z[ip];
-                    });
+                    }
+                );
             }
 
             bool const correct_energy_momentum = m_correct_energy_momentum;
@@ -528,18 +529,14 @@ public:
 
             // Loop over cells
             WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::computeDensityTemperatures", prof_computeDensityTemperatures);
-            amrex::ParallelFor( np1,
-                [=] AMREX_GPU_DEVICE (int i1) noexcept
-                {
+            if (correct_energy_momentum) {
+                amrex::ParallelFor( np1,
+                    [=] AMREX_GPU_DEVICE (int i1) noexcept
+                    {
 
-                    const int i_cell = amrex::bisect( cell_offsets_1, 0, n_cells, i1 );
+                        const int i_cell = amrex::bisect( cell_offsets_1, 0, n_cells, i1 );
 
-                    if (binary_collision_functor.m_computeSpeciesDensities) {
-                        amrex::Gpu::Atomic::AddNoRet(&n1_in_each_cell[i_cell], w1[ indices_1[i1] ]);
-                    }
-
-                    // Compute the local energy and momentum.
-                    if (correct_energy_momentum) {
+                        // Compute the local energy and momentum.
                         amrex::ParticleReal const w1_scaled = std::pow(w1[ indices_1[i1] ], beta_weight_exponent);
                         amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w1_scaled);
                         amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w1[ indices_1[i1] ]*u1x[ indices_1[i1] ]*m1);
@@ -549,10 +546,8 @@ public:
                                                                                                  u1y[ indices_1[i1] ],
                                                                                                  u1z[ indices_1[i1] ], m1));
                     }
-
-                });
-
-            amrex::Gpu::streamSynchronize();
+                );
+            }
 
             amrex::ParallelForRNG( n_cells,
                 [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
@@ -567,7 +562,13 @@ public:
 
                     // compute local density [1/m^3]
                     if (binary_collision_functor.m_computeSpeciesDensities) {
-                        n1_in_each_cell[i_cell] /= dV*volume_factor(i_cell);
+                        amrex::ParticleReal wtot1 = 0.0;
+                        amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
+                        for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
+                            wtot1 += w1[ indices_1[i1] ];
+                        }
+
+                        n1_in_each_cell[i_cell] = wtot1/(dV*volume_factor(i_cell));
                     }
 
                     // compute local temperature [Joules]
@@ -679,7 +680,8 @@ public:
                         amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], -px);
                         amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], -py);
                         amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], -pz);
-                    });
+                    }
+                );
 
                 amrex::Gpu::streamSynchronize();
 
@@ -702,7 +704,8 @@ public:
                                                                                   u1y[ indices_1[i1] ],
                                                                                   u1z[ indices_1[i1] ], m1);
                         amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], -KE_after);
-                    });
+                    }
+                );
 
                 amrex::Gpu::streamSynchronize();
 
@@ -928,7 +931,8 @@ public:
                         u1x_before_ptr[ip] = u1x[ip];
                         u1y_before_ptr[ip] = u1y[ip];
                         u1z_before_ptr[ip] = u1z[ip];
-                    });
+                    }
+                );
 
             }
 
@@ -961,7 +965,8 @@ public:
                         u2x_before_ptr[ip] = u2x[ip];
                         u2y_before_ptr[ip] = u2y[ip];
                         u2z_before_ptr[ip] = u2z[ip];
-                    });
+                    }
+                );
             }
 
             bool const correct_energy_momentum = m_correct_energy_momentum;
@@ -969,18 +974,14 @@ public:
 
             // Loop over cells
             WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures", prof_findDensityTemperatures);
-            amrex::ParallelFor( np1,
-                [=] AMREX_GPU_DEVICE (int i1) noexcept
-                {
+            if (correct_energy_momentum) {
+                amrex::ParallelFor( np1,
+                    [=] AMREX_GPU_DEVICE (int i1) noexcept
+                    {
 
-                    const int i_cell = amrex::bisect( cell_offsets_1, 0, n_cells, i1 );
+                        const int i_cell = amrex::bisect( cell_offsets_1, 0, n_cells, i1 );
 
-                    if (binary_collision_functor.m_computeSpeciesDensities) {
-                        amrex::Gpu::Atomic::AddNoRet(&n1_in_each_cell[i_cell], w1[ indices_1[i1] ]);
-                    }
-
-                    // Compute the local energy and momentum.
-                    if (correct_energy_momentum) {
+                        // Compute the local energy and momentum.
 
                         amrex::ParticleReal const w1_scaled = std::pow(w1[ indices_1[i1] ], beta_weight_exponent);
                         amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w1_scaled);
@@ -991,21 +992,15 @@ public:
                                                                                                  u1y[ indices_1[i1] ],
                                                                                                  u1z[ indices_1[i1] ], m1));
                     }
+                );
 
-                });
+                amrex::ParallelFor( np2,
+                    [=] AMREX_GPU_DEVICE (int i2) noexcept
+                    {
 
-            amrex::ParallelFor( np2,
-                [=] AMREX_GPU_DEVICE (int i2) noexcept
-                {
+                        const int i_cell = amrex::bisect( cell_offsets_2, 0, n_cells, i2 );
 
-                    const int i_cell = amrex::bisect( cell_offsets_2, 0, n_cells, i2 );
-
-                    if (binary_collision_functor.m_computeSpeciesDensities) {
-                        amrex::Gpu::Atomic::AddNoRet(&n2_in_each_cell[i_cell], w2[ indices_2[i2] ]);
-                    }
-
-                    // Compute the local energy and momentum.
-                    if (correct_energy_momentum) {
+                        // Compute the local energy and momentum.
                         amrex::ParticleReal const w2_scaled = std::pow(w2[ indices_2[i2] ], beta_weight_exponent);
                         amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w2_scaled);
                         amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w2[ indices_2[i2] ]*u2x[ indices_2[i2] ]*m2);
@@ -1015,10 +1010,9 @@ public:
                                                                                                  u2y[ indices_2[i2] ],
                                                                                                  u2z[ indices_2[i2] ], m2));
                     }
+                );
 
-                });
-
-            amrex::Gpu::streamSynchronize();
+            }
 
             amrex::ParallelForRNG( n_cells,
                 [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
@@ -1041,8 +1035,18 @@ public:
 
                     // compute local densities [1/m^3]
                     if (binary_collision_functor.m_computeSpeciesDensities) {
-                        n1_in_each_cell[i_cell] /= dV*volume_factor(i_cell);
-                        n2_in_each_cell[i_cell] /= dV*volume_factor(i_cell);
+                        amrex::ParticleReal w1tot = 0.0;
+                        amrex::ParticleReal w2tot = 0.0;
+                        amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
+                        amrex::ParticleReal * const AMREX_RESTRICT w2 = soa_2.m_rdata[PIdx::w];
+                        for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
+                            w1tot += w1[ indices_1[i1] ];
+                        }
+                        for (index_type i2=cell_start_2; i2<cell_stop_2; ++i2) {
+                            w2tot += w2[ indices_2[i2] ];
+                        }
+                        n1_in_each_cell[i_cell] = w1tot/(dV*volume_factor(i_cell));
+                        n2_in_each_cell[i_cell] = w2tot/(dV*volume_factor(i_cell));
                     }
 
                     // compute local temperatures [Joules]
@@ -1165,7 +1169,8 @@ public:
                         amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], -px);
                         amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], -py);
                         amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], -pz);
-                    });
+                    }
+                );
 
                 amrex::ParallelFor( np2,
                     [=] AMREX_GPU_DEVICE (int i2) noexcept
@@ -1181,7 +1186,8 @@ public:
                         amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], -px);
                         amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], -py);
                         amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], -pz);
-                    });
+                    }
+                );
 
                 amrex::Gpu::streamSynchronize();
 
@@ -1199,7 +1205,8 @@ public:
                         u1x[ indices_1[i1] ] += w_factor*px_avg;
                         u1y[ indices_1[i1] ] += w_factor*py_avg;
                         u1z[ indices_1[i1] ] += w_factor*pz_avg;
-                    });
+                    }
+                );
 
                 amrex::ParallelFor( np2,
                     [=] AMREX_GPU_DEVICE (int i2) noexcept
@@ -1215,7 +1222,8 @@ public:
                         u2x[ indices_2[i2] ] += w_factor*px_avg;
                         u2y[ indices_2[i2] ] += w_factor*py_avg;
                         u2z[ indices_2[i2] ] += w_factor*pz_avg;
-                    });
+                    }
+                );
 
                 amrex::Gpu::streamSynchronize();
 
