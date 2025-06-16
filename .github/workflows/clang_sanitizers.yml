@@ -57,9 +57,7 @@ jobs:
           -DWarpX_FFT=ON                    \
           -DWarpX_QED=ON                    \
           -DWarpX_QED_TABLE_GEN=ON          \
-          -DWarpX_OPENPMD=ON                \
-          -DWarpX_PRECISION=SINGLE          \
-          -DWarpX_PARTICLE_PRECISION=SINGLE
+          -DWarpX_OPENPMD=ON
         cmake --build build -j 4
 
         ccache -s

@@ -4,14 +4,15 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef WARPX_RELATIVE_CELL_POSITION_H_
-#define WARPX_RELATIVE_CELL_POSITION_H_
+
+#ifndef ABLASTR_UTILS_RELATIVE_CELL_POSITION_H_
+#define ABLASTR_UTILS_RELATIVE_CELL_POSITION_H_
 
 #include <AMReX_BaseFwd.H>
 
 #include <vector>
 
-namespace utils
+namespace ablastr::utils
 {
     /** Get the Relative Cell Position of Values in an MultiFab
      *
@@ -21,8 +22,8 @@ namespace utils
      * @param[in] mf the amrex::MultiFab to get relative cell positions for
      * @return relative position to the lower corner, scaled to cell size [0.0:1.0)
      */
-    std::vector< double >
+    [[nodiscard]] std::vector< double >
     getRelativeCellPosition (amrex::MultiFab const& mf);
 }
 
-#endif // WARPX_RELATIVE_CELL_POSITION_H_
+#endif // ABLASTR_UTILS_RELATIVE_CELL_POSITION_H_
