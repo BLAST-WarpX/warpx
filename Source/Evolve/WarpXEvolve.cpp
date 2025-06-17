@@ -234,40 +234,43 @@ WarpX::Evolve (int numsteps)
 
         ExecutePythonCallback("particleinjection");
 
+        // implicit solver
         if (m_implicit_solver) {
             m_implicit_solver->OneStep(cur_time, dt[0], step);
         }
-        else if ( electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
-             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC )
-        {
-            // Electrostatic or hybrid-PIC case: only gather fields and push
-            // particles, deposition and calculation of fields done further below
-            const bool skip_deposition = true;
-            PushParticlesandDeposit(cur_time, skip_deposition);
-        }
-        // Electromagnetic case: JRhom algorithm
-        else if (m_JRhom)
-        {
-            OneStep_JRhom(cur_time);
-        }
-        // Electromagnetic case: no subcycling or no mesh refinement
-        else if ( !m_do_subcycling || (finest_level == 0))
-        {
-            OneStep_nosub(cur_time);
-            // E: guard cells are up-to-date
-            // B: guard cells are NOT up-to-date
-            // F: guard cells are NOT up-to-date
-        }
-        // Electromagnetic case: subcycling with one level of mesh refinement
-        else if (m_do_subcycling && (finest_level == 1))
-        {
-            OneStep_sub1(cur_time);
-        }
-        else
-        {
-            WARPX_ABORT_WITH_MESSAGE(
-                "do_subcycling = " + std::to_string(m_do_subcycling)
-                + " is an unsupported do_subcycling type.");
+        // explicit solver
+        else {
+            // electrostatic solver or hybrid solver
+            if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
+                electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
+                // only gather fields and push particles,
+                // deposition and calculation of fields done further below
+                const bool skip_deposition = true;
+                PushParticlesandDeposit(cur_time, skip_deposition);
+            }
+            // electromagnetic solver
+            else {
+                // no subcycling or no mesh refinement
+                if (!m_do_subcycling || (finest_level == 0)) {
+                    OneStep_nosub(cur_time);
+                    // E: guard cells are up-to-date
+                    // B: guard cells are NOT up-to-date
+                    // F: guard cells are NOT up-to-date
+                }
+                // subcycling with one level of mesh refinement
+                else if (m_do_subcycling && (finest_level == 1)) {
+                    OneStep_sub1(cur_time);
+                }
+                // JRhom algorithm
+                else if (m_JRhom) {
+                    OneStep_JRhom(cur_time);
+                }
+                else {
+                    WARPX_ABORT_WITH_MESSAGE(
+                        "do_subcycling = " + std::to_string(m_do_subcycling)
+                        + " is an unsupported do_subcycling type.");
+                }
+            }
         }
 
         // Resample particles
