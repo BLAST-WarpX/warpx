@@ -2089,6 +2089,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     Only for ``dsmc``, ``linear_breit_wheeler``, and ``nuclearfusion``. The name(s) of the species in which to add
     the new macroparticles created by the reaction.
     If using ``dsmc`` with ionization reactions, the first species in this list must be an electron.
+    If using ``dsmc`` with charge exchange, the order of the ``product_species`` should match the order of the species in ``<collision_name>.species``.
     If using ``linear_breit_wheeler`` these should be two species: one of electrons and one of positrons.
 
 * ``<collision_name>.ndt`` (`int`) optional
