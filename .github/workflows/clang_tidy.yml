@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 250
     needs: check_changes
-    if: ${{ github.event.pull_request.draft }}
+    if: ${{ github.event.pull_request.draft == false }}
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies
