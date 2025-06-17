@@ -96,8 +96,8 @@ DSMCFunc::DSMCFunc (
             const amrex::ParticleReal delta_charge1 = species1.getCharge() - product_species1.getCharge();
             const amrex::ParticleReal delta_charge2 = species2.getCharge() - product_species2.getCharge();
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            (((delta_charge1 - q_e) <= 0.01_prt && (delta_charge2 + q_e) <= 0.0_prt) ||
-            ((delta_charge1 + q_e) <= 0.01_prt && (delta_charge2 - q_e) <= 0.0_prt)),
+            (( std::abs(delta_charge1 - q_e) <= 0.01_prt*q_e && std::abs(delta_charge2 + q_e) <= 0.01_prt*q_e) ||
+            ( std::abs(delta_charge1 + q_e) <= 0.01_prt*q_e && std::abs(delta_charge2 - q_e) <= 0.01_prt*q_e)),
             std::string("Charge exchange product species are not in the correct order.\n") +
             "Please reverse the order to:\n" +
              "  " + collision_name + ".product_species = " + product_species_name[1] + " " + product_species_name[0]
