@@ -563,7 +563,6 @@ public:
                     // compute local density [1/m^3]
                     if (binary_collision_functor.m_computeSpeciesDensities) {
                         amrex::ParticleReal wtot1 = 0.0;
-                        amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
                         for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
                             wtot1 += w1[ indices_1[i1] ];
                         }
@@ -1037,8 +1036,6 @@ public:
                     if (binary_collision_functor.m_computeSpeciesDensities) {
                         amrex::ParticleReal w1tot = 0.0;
                         amrex::ParticleReal w2tot = 0.0;
-                        amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
-                        amrex::ParticleReal * const AMREX_RESTRICT w2 = soa_2.m_rdata[PIdx::w];
                         for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
                             w1tot += w1[ indices_1[i1] ];
                         }
