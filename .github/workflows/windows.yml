@@ -97,7 +97,7 @@ jobs:
         cmake -S . -B build                 `
               -T "ClangCl"                  `
               -DCMAKE_VERBOSE_MAKEFILE=ON   `
-              -DWarpX_COMPUTE=OMP           `
+              -DWarpX_COMPUTE=NOACC         `
               -DWarpX_EB=OFF                `
               -DWarpX_PYTHON=ON             `
               -DWarpX_MPI=OFF               `
