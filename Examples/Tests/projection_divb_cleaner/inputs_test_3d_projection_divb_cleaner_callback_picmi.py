@@ -148,10 +148,10 @@ class ProjectionDivCleanerTest(object):
             warpx_blocking_factor=self.BLOCKING_FACTOR,
             lower_bound=[-self.Lx / 2.0, -self.Ly / 2.0, -self.Lz / 2],
             upper_bound=[self.Lx / 2.0, self.Ly / 2.0, self.Lz / 2.0],
-            lower_boundary_conditions=["periodic", "periodic", "neumann"],
-            upper_boundary_conditions=["periodic", "periodic", "neumann"],
-            lower_boundary_conditions_particles=["periodic", "periodic", "absorbing"],
-            upper_boundary_conditions_particles=["periodic", "periodic", "absorbing"],
+            lower_boundary_conditions=["dirichlet", "dirichlet", "neumann"],
+            upper_boundary_conditions=["dirichlet", "dirichlet", "neumann"],
+            lower_boundary_conditions_particles=["absorbing", "absorbing", "absorbing"],
+            upper_boundary_conditions_particles=["absorbing", "absorbing", "absorbing"],
         )
         simulation.time_step_size = self.dt
         simulation.max_steps = self.total_steps

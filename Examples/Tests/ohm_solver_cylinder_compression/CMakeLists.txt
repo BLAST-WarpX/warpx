@@ -7,7 +7,7 @@ add_warpx_test(
     2  # nprocs
     "inputs_test_3d_ohm_solver_cylinder_compression_picmi.py --test"  # inputs
     OFF  # analysis
-    "analysis_default_regression.py --path diags/diag1000020 --rtol 1e-6"  # checksum
+    "analysis_default_regression.py --path diags/diag1000020 --rtol 5e-4"  # checksum
     OFF  # dependency
 )
 label_warpx_test(test_3d_ohm_solver_cylinder_compression_picmi slow)

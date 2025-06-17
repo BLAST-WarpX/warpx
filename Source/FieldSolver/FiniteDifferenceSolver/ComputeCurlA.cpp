@@ -16,6 +16,7 @@
 #   include "FiniteDifferenceAlgorithms/SphericalYeeAlgorithm.H"
 #else
 #   include "FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
+#   include "FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
 #endif
 
 #include "Utils/TextMsg.H"
@@ -43,9 +44,16 @@ void FiniteDifferenceSolver::ComputeCurlA (
         );
 
 #else
+    if (WarpX::GetInstance().grid_type == GridType::Staggered)
+    {
         ComputeCurlACartesian <CartesianYeeAlgorithm> (
             Bfield, Afield, eb_update_B, lev
         );
+    } else {
+        ComputeCurlACartesian <CartesianNodalAlgorithm> (
+            Bfield, Afield, eb_update_B, lev
+        );
+    }
 
 #endif
     } else {
