@@ -19,7 +19,7 @@
  */
 TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name) {
     // Set defaults
-    amrex::Real theta;
+    amrex::Real theta = 0; // quiet GCC warning maybe-uninitialized
     std::string temp_dist_s = "constant";
     std::string mom_dist_s;
 
