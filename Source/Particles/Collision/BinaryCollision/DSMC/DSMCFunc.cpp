@@ -79,6 +79,29 @@ DSMCFunc::DSMCFunc (
 
             // TODO: add a check that the ionization species has the same mass
             // (and a positive charge), compared to the target species
+        } else if (process.type() == ScatteringProcessType::CHARGE_EXCHANGE) {
+            // Ensure that the order of the product species in the charge exchange process is correct.
+            // One product must have gained an electron (charge difference ≈ -q_e),
+            // and the other must have lost an electron (charge difference ≈ +q_e).
+            // This check verifies that the user did not swap the product_species in the input file.
+            amrex::Vector<std::string> species_names;
+            pp_collision_name.getarr("species", species_names);
+            auto& species1 = mypc->GetParticleContainerFromName(species_names[0]);
+            auto& species2 = mypc->GetParticleContainerFromName(species_names[1]);
+            amrex::Vector<std::string> product_species_name;
+            pp_collision_name.getarr("product_species", product_species_name);
+            auto& product_species1 = mypc->GetParticleContainerFromName(product_species_name[0]);
+            auto& product_species2 = mypc->GetParticleContainerFromName(product_species_name[1]);
+            amrex::ParticleReal constexpr q_e = PhysConst::q_e;
+            const amrex::ParticleReal delta_charge1 = species1.getCharge() - product_species1.getCharge();
+            const amrex::ParticleReal delta_charge2 = species2.getCharge() - product_species2.getCharge();
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            (((delta_charge1 - q_e) <= 0.01_prt && (delta_charge2 + q_e) <= 0.0_prt) ||
+            ((delta_charge1 + q_e) <= 0.01_prt && (delta_charge2 - q_e) <= 0.0_prt)),
+            std::string("Charge exchange product species are not in the correct order.\n") +
+            "Please reverse the order to:\n" +
+             "  " + collision_name + ".product_species = " + product_species_name[1] + " " + product_species_name[0]
+            );
         }
 
         m_scattering_processes.push_back(std::move(process));
