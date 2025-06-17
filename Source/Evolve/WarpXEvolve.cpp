@@ -216,8 +216,6 @@ WarpX::Evolve (int numsteps)
             HybridPICDepositInitialRhoAndJ();
         }
 
-        // Run multi-physics modules:
-        // ionization, Coulomb collisions, QED
         doFieldIonization();
 
         ExecutePythonCallback("beforecollisions");
@@ -250,25 +248,31 @@ WarpX::Evolve (int numsteps)
             }
             // electromagnetic solver
             else {
-                // no subcycling or no mesh refinement
-                if (!m_do_subcycling || (finest_level == 0)) {
-                    OneStep_nosub(cur_time);
-                    // E: guard cells are up-to-date
-                    // B: guard cells are NOT up-to-date
-                    // F: guard cells are NOT up-to-date
+                // without mesh refinement
+                if (finest_level == 0) {
+                        // standard PIC loop
+                        if (!m_JRhom) {
+                            OneStep_nosub(cur_time);
+                        }
+                        // JRhom PIC loop
+                        else {
+                            OneStep_JRhom(cur_time);
+                        }
                 }
-                // subcycling with one level of mesh refinement
-                else if (m_do_subcycling && (finest_level == 1)) {
-                    OneStep_sub1(cur_time);
-                }
-                // JRhom algorithm
-                else if (m_JRhom) {
-                    OneStep_JRhom(cur_time);
-                }
+                // with mesh refinement
                 else {
-                    WARPX_ABORT_WITH_MESSAGE(
-                        "do_subcycling = " + std::to_string(m_do_subcycling)
-                        + " is an unsupported do_subcycling type.");
+                    // without subcycling
+                    if (!m_do_subcycling) {
+                        OneStep_nosub(cur_time);
+                    }
+                    // with subcycling
+                    else {
+                        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                            finest_level == 1,
+                            "Subcycling not implemented with more than 1 mesh refinement level"
+                        );
+                        OneStep_sub1(cur_time);
+                    }
                 }
             }
         }
