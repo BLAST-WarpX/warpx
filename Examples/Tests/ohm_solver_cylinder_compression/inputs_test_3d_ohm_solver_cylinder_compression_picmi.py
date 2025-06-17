@@ -158,7 +158,7 @@ class PlasmaCylinderCompression(object):
             self.NZ = 32
         else:
             self.total_steps = int(self.LT / self.DT)
-            self.diag_steps = 100
+            self.diag_steps = 20
 
         # print out plasma parameters
         if comm.rank == 0:
@@ -343,7 +343,7 @@ class PlasmaCylinderCompression(object):
         # Add diagnostics                                                     #
         #######################################################################
 
-        if self.test and False:
+        if self.test:
             particle_diag = picmi.ParticleDiagnostic(
                 name="diag1",
                 period=self.diag_steps,
@@ -359,9 +359,7 @@ class PlasmaCylinderCompression(object):
             period=self.diag_steps,
             data_list=["B", "E", "rho", "Tx_ions", "Ty_ions", "Tz_ions", "divB"],
             write_dir="diags",
-            warpx_format="openpmd",
-            warpx_openpmd_backend="h5",
-            warpx_file_prefix="field_diags",
+            warpx_format="plotfile",
         )
         simulation.add_diagnostic(field_diag)
 
