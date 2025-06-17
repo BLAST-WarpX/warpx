@@ -41,7 +41,7 @@ struct InjectorPositionRandomPlane
                         amrex::RandomEngine const& engine) const noexcept
     {
         using namespace amrex::literals;
-#if ((defined WARPX_DIM_3D) || (defined WARPX_DIM_RZ))
+#if ((defined WARPX_DIM_3D) || (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE))
         // In RZ, the 3 components of the `XDim3` vector below correspond to r, theta, z respectively
         if (dir == 0)  { return amrex::XDim3{0._rt, amrex::Random(engine), amrex::Random(engine)}; }
         if (dir == 1)  { return amrex::XDim3{amrex::Random(engine), 0._rt, amrex::Random(engine)}; }
@@ -51,8 +51,9 @@ struct InjectorPositionRandomPlane
         if (dir == 0) { return amrex::XDim3{0._rt, amrex::Random(engine), 0._rt}; }
         if (dir == 1) { return amrex::XDim3{amrex::Random(engine), amrex::Random(engine), 0._rt}; }
         else          { return amrex::XDim3{amrex::Random(engine), 0._rt, 0._rt }; }
-#elif (defined(WARPX_DIM_1D_Z))
-        // In 2D, the first components of the `XDim3` vector below correspond to z
+#elif (defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE))
+        // In 1D, the first components of the `XDim3` vector below correspond to the first dimension,
+        // z for 1D Cartesian, and r for 1D cylindrical and spherical.
         if (dir == 0) { return amrex::XDim3{amrex::Random(engine), 0._rt, 0._rt}; }
         if (dir == 1) { return amrex::XDim3{amrex::Random(engine), 0._rt, 0._rt}; }
         else          { return amrex::XDim3{0._rt, 0._rt, 0._rt}; }
@@ -88,6 +89,14 @@ struct InjectorPositionRegular
         int const nx = ref_fac[0]*ppc.x;
         int const ny = ref_fac[1]*ppc.y;
         int const nz = ppc.z; // Number of particles in theta ; no refinement
+#elif (defined WARPX_DIM_RCYLINDER)
+        int const nx = ref_fac[0]*ppc.x;
+        int const ny = ppc.y;
+        int const nz = 1;
+#elif (defined WARPX_DIM_RSPHERE)
+        int const nx = ref_fac[0]*ppc.x;
+        int const ny = ppc.y; // Number of particles in theta ; no refinement
+        int const nz = ppc.z; // Number of particles in phi ; no refinement
 #elif (defined WARPX_DIM_XZ)
         int const nx = ref_fac[0]*ppc.x;
         int const ny = ref_fac[1]*ppc.y;

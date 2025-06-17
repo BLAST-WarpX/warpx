@@ -250,6 +250,8 @@ computePhi (
             {{ beta[2] }};  // beta_x and beta_z
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             {{ beta[0], beta[2] }};  // beta_x and beta_z
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            {{ beta[0] }};  // beta_x
 #else
             {{ beta[0], beta[1], beta[2] }};
 #endif

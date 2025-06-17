@@ -44,10 +44,10 @@ public:
     void PushPSATD (int lev, ablastr::fields::MultiFabRegister& fields, SpectralSolverRZ& spec_solver);
 #endif
 
-    void FillBoundaryE (ablastr::fields::MultiFabRegister& fields,
-                        PatchType patch_type, std::optional<bool> nodal_sync=std::nullopt);
-    void FillBoundaryB (ablastr::fields::MultiFabRegister& fields,
-                        PatchType patch_type, std::optional<bool> nodal_sync=std::nullopt);
+    void FillBoundaryE (ablastr::fields::MultiFabRegister& fields, PatchType patch_type,
+        bool do_single_precision_comms, std::optional<bool> nodal_sync=std::nullopt);
+    void FillBoundaryB (ablastr::fields::MultiFabRegister& fields, PatchType patch_type,
+        bool do_single_precision_comms, std::optional<bool> nodal_sync=std::nullopt);
 
     void CheckPoint (ablastr::fields::MultiFabRegister& fields, std::string const& dir) const;
     void Restart (ablastr::fields::MultiFabRegister& fields, std::string const& dir);

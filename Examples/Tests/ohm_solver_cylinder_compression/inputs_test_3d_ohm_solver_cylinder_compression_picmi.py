@@ -57,7 +57,7 @@ class PlasmaCylinderCompression(object):
     NZ = 128
 
     # Starting number of particles per cell
-    NPPC = 100
+    NPPC = 10
 
     # Number of substeps used to update B
     substeps = 20
@@ -357,7 +357,7 @@ class PlasmaCylinderCompression(object):
             name="diag1",
             grid=self.grid,
             period=self.diag_steps,
-            data_list=["B", "E", "rho", "Tx_ions", "Ty_ions", "Tz_ions"],
+            data_list=["B", "E", "rho", "Tx_ions", "Ty_ions", "Tz_ions", "divB"],
             write_dir="diags",
             warpx_format="openpmd",
             warpx_openpmd_backend="h5",

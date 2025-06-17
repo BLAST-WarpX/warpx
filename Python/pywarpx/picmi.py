@@ -2576,8 +2576,8 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
         The scattering process to use and any needed information
 
     product_species: list
-        The species produced by collision processes (currently only ionization
-        products are supported).
+        The species produced by collision processes (currently both
+        ionization and charge-exchange require defining the product species).
 
     ndt: integer, optional
         The collisions will be applied every "ndt" steps. Must be 1 or larger.
@@ -3428,6 +3428,7 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                     "divB",
                     "proc_number",
                     "part_per_cell",
+                    "eb_covered",
                 ]:
                     fields_to_plot.add(dataname)
                 elif dataname in J_fields_list:

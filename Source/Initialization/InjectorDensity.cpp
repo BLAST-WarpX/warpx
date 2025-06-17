@@ -38,7 +38,7 @@ void InjectorDensity::clear ()
 }
 
 InjectorDensityPredefined::InjectorDensityPredefined (
-    std::string const& a_species_name) noexcept
+    std::string const& a_species_name)
 {
     const ParmParse pp_species_name(a_species_name);
 
