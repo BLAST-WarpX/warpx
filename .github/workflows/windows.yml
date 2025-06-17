@@ -101,6 +101,8 @@ jobs:
               -G "Ninja"      ^
               -DCMAKE_C_COMPILER=clang-cl   ^
               -DCMAKE_CXX_COMPILER=clang-cl ^
+              -DCMAKE_LINKER=lld-link       ^
+              -DCMAKE_NM=llvm-nm            ^
               -DCMAKE_BUILD_TYPE=Release    ^
               -DCMAKE_VERBOSE_MAKEFILE=ON   ^
               -DWarpX_COMPUTE=OMP           ^
