@@ -20,10 +20,10 @@
 SurfacePhysicsBase::SurfacePhysicsBase ()
 {
     amrex::Print() << " in surface physics base class \n";
-    ReadInputs();
+    ReadParameters();
 }
 
-void SurfacePhysicsBase::ReadInputs ()
+void SurfacePhysicsBase::ReadParameters ()
 {
     amrex::ParmParse const pp_surface_chemistry("surface_chemistry");
     std::string chemistry_file;

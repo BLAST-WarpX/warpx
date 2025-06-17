@@ -19,7 +19,7 @@ public:
 
     ~SurfacePhysicsBase() = default;
 
-    void ReadInputs ();
+    void ReadParameters ();
     void InitData ();
     void initializeMapping ();
     void AllocAndInitInfluxBndVectors();
