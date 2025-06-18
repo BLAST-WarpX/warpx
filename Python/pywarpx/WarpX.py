@@ -24,7 +24,7 @@ from .HybridPICModel import external_vector_potential, hybridpicmodel
 from .Interpolation import interpolation
 from .Lasers import lasers, lasers_list
 from .Particles import particles, particles_list
-from .ProjectionDivBCleaner import projectiondivbcleaner
+from .ProjectionDivCleaner import projectiondivcleaner
 from .PSATD import psatd
 
 
@@ -50,7 +50,7 @@ class WarpX(Bucket):
         argv += boundary.attrlist()
         argv += algo.attrlist()
         argv += interpolation.attrlist()
-        argv += projectiondivbcleaner.attrlist()
+        argv += projectiondivcleaner.attrlist()
         argv += psatd.attrlist()
         argv += eb2.attrlist()
 

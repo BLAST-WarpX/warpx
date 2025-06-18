@@ -1100,9 +1100,9 @@ WarpX::ReadParameters ()
                 || WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic)
                 && WarpX::poisson_solver_id == PoissonSolverAlgo::Multigrid)))
         {
-            m_do_divb_cleaning_external = true;
+            m_do_initial_div_cleaning = true;
         }
-        pp_warpx.query("do_divb_cleaning_external", m_do_divb_cleaning_external);
+        pp_warpx.query("do_initial_div_cleaning", m_do_initial_div_cleaning);
 
         // If true, the current is deposited on a nodal grid and centered onto
         // a staggered grid. Setting warpx.do_current_centering=1 makes sense

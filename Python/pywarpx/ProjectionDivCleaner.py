@@ -8,4 +8,4 @@
 
 from .Bucket import Bucket
 
-projectiondivbcleaner = Bucket("projection_divb_cleaner")
+projectiondivcleaner = Bucket("projection_div_cleaner")

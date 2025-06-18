@@ -676,7 +676,7 @@ WarpX::InitData ()
     ::WriteUsedInputsFile();
 
     // Run div cleaner here on loaded external fields
-    if (m_do_divb_cleaning_external) {
+    if (m_do_initial_div_cleaning) {
         WarpX::ProjectionCleanDivB();
     }
 
