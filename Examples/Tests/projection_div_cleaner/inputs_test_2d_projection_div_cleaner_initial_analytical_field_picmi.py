@@ -71,6 +71,7 @@ B_ext = picmi.AnalyticInitialField(
     By_expression=By,
     Bz_expression=Bz,
     warpx_do_initial_div_cleaning=True,
+    warpx_projection_div_cleaner_rtol=5e-12,
 )
 
 #################################

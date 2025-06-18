@@ -2230,8 +2230,12 @@ class LoadInitialField(picmistandard.PICMI_LoadGriddedField):
         if self.load_B:
             pywarpx.warpx.B_ext_grid_init_style = "read_from_file"
             pywarpx.warpx.do_initial_div_cleaning = self.do_initial_div_cleaning
-            pywarpx.projectiondivcleaner.atol = self.div_cleaner_atol
-            pywarpx.projectiondivcleaner.rtol = self.div_cleaner_rtol
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "atol", self.div_cleaner_atol
+            )
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "rtol", self.div_cleaner_rtol
+            )
 
 
 class LoadInitialFieldFromPython:
@@ -2276,8 +2280,12 @@ class LoadInitialFieldFromPython:
         if self.load_B:
             pywarpx.warpx.B_ext_grid_init_style = "load_from_python"
             pywarpx.warpx.do_initial_div_cleaning = self.do_initial_div_cleaning
-            pywarpx.projectiondivcleaner.atol = self.div_cleaner_atol
-            pywarpx.projectiondivcleaner.rtol = self.div_cleaner_rtol
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "atol", self.div_cleaner_atol
+            )
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "rtol", self.div_cleaner_rtol
+            )
 
         pywarpx.callbacks.installloadExternalFields(self.load_from_python)
 
@@ -2351,8 +2359,12 @@ class AnalyticInitialField(picmistandard.PICMI_AnalyticAppliedField):
                     f"B{sdir}_external_grid_function(x,y,z)", expression
                 )
             pywarpx.warpx.do_initial_div_cleaning = self.do_initial_div_cleaning
-            pywarpx.projectiondivcleaner.atol = self.div_cleaner_atol
-            pywarpx.projectiondivcleaner.rtol = self.div_cleaner_rtol
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "atol", self.div_cleaner_atol
+            )
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "rtol", self.div_cleaner_rtol
+            )
 
 
 class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
@@ -2370,8 +2382,12 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
         if self.load_B:
             pywarpx.particles.B_ext_particle_init_style = "read_from_file"
             pywarpx.warpx.do_initial_div_cleaning = self.do_initial_div_cleaning
-            pywarpx.projectiondivcleaner.atol = self.div_cleaner_atol
-            pywarpx.projectiondivcleaner.rtol = self.div_cleaner_rtol
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "atol", self.div_cleaner_atol
+            )
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "rtol", self.div_cleaner_rtol
+            )
 
 
 class ConstantAppliedField(picmistandard.PICMI_ConstantAppliedField):

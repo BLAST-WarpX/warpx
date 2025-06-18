@@ -135,7 +135,7 @@ ProjectionDivCleaner::ReadParameters ()
         m_atol = 0.0;
     }
 
-    const ParmParse pp_div_cleaner("projection_div_cleaner");
+    const ParmParse pp_div_cleaner("warpx.projection_div_cleaner");
 
     // Defaults to rtol 5e-12 for double fields and 5e-5 for single
     utils::parser::queryWithParser(pp_div_cleaner, "atol", m_atol);

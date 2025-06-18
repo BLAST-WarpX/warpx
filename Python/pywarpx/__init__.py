@@ -38,7 +38,6 @@ from .Interpolation import interpolation  # noqa
 from .Lasers import lasers  # noqa
 from .LoadThirdParty import load_cupy  # noqa
 from .Particles import newspecies, particles  # noqa
-from .ProjectionDivCleaner import projectiondivcleaner  # noqa
 from .PSATD import psatd  # noqa
 from .WarpX import warpx  # noqa
 

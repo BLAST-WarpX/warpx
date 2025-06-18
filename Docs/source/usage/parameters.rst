@@ -2656,10 +2656,10 @@ Additional parameters
     Whether to use projection method to scrub A/B field divergence in externally
     loaded fields. This is automatically turned on if external/initial B or time varying A fields are loaded.
 
-* ``projection_div_cleaner.rtol`` (`float`) optional (default `5e12` when double precision and `5e-5` for single precision)
+* ``warpx.projection_div_cleaner.rtol`` (`float`) optional (default `5e-12` when double precision and `5e-5` for single precision)
     Controls the relative tolerance when solving for the projected divergence of the field in the MLMG AMReX solver.
 
-* ``projection_div_cleaner.atol`` (`float`) optional (default `0`)
+* ``warpx.projection_div_cleaner.atol`` (`float`) optional (default `0`)
     Controls the absolute tolerance when solving for the projected divergence of the field in the MLMG AMReX solver.
 
 * ``warpx.do_subcycling`` (`0` or `1`; default: 0)
