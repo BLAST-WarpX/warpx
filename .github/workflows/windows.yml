@@ -103,10 +103,10 @@ jobs:
               -DWarpX_MPI=OFF               `
               -DWarpX_OPENPMD=ON
         if(!$?) { Exit $LASTEXITCODE }
-        cmake --build build --config RelWithDebInfo --parallel 4
+        cmake --build build --config Debug --parallel 4
         if(!$?) { Exit $LASTEXITCODE }
 
-        cmake --build build --config RelWithDebInfo --target install
+        cmake --build build --config Debug --target install
         if(!$?) { Exit $LASTEXITCODE }
 
         python3 -m pip install --upgrade pip
@@ -116,7 +116,7 @@ jobs:
         python3 -m pip install --upgrade -r requirements.txt
         if(!$?) { Exit $LASTEXITCODE }
 
-        cmake --build build --config RelWithDebInfo --target pip_install
+        cmake --build build --config Debug --target pip_install
         if(!$?) { Exit $LASTEXITCODE }
 
     - name: Test
