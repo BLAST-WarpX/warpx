@@ -232,7 +232,7 @@ WarpX::Evolve (int numsteps)
 
         // multi-physics: collisions
         ExecutePythonCallback("beforecollisions");
-        mypc->doCollisions(cur_time, dt[0]);
+        mypc->doCollisions(step, cur_time, dt[0]);
         ExecutePythonCallback("aftercollisions");
 
         // implicit solver

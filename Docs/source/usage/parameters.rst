@@ -1395,7 +1395,7 @@ Particle initialization
     ``sim.extension.get_particle_boundary_buffer()``, can be
     used to access the scraped particle buffer. An entry is included for every
     particle in the buffer of the timestep at which the particle was scraped.
-    This can be accessed by passing the argument ``comp_name="step_scraped"`` to
+    This can be accessed by passing the argument ``comp_name="stepScraped"`` to
     the above mentioned function.
 
     .. note::
