@@ -421,7 +421,7 @@ WarpX::WarpX ()
 
         auto resize_vector = amrex::Vector{max_level};
         for (int i = 0; i < max_level; ++i){
-            resize_vector[i] = 
+            resize_vector[i] =
         }
         warpx::load_balancing::ScopedTimeTracker::resize(resize_vector);
         // TODO //
