@@ -169,6 +169,8 @@ WarpX::SaveParticlesAtImplicitStepStart ( )
                 amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
                 amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
 
+                amrex::ParticleReal* w_save = pti.GetAttribs("w_save").dataPtr();
+
                 const long np = pti.numParticles();
 
                 amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (long ip)
@@ -189,6 +191,8 @@ WarpX::SaveParticlesAtImplicitStepStart ( )
                     ux_n[ip] = ux[ip];
                     uy_n[ip] = uy[ip];
                     uz_n[ip] = uz[ip];
+
+                    w_save[ip] = 0.;
 
                 });
 

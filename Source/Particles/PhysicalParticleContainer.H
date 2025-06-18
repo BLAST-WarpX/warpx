@@ -130,7 +130,25 @@ public:
                          long np_to_push,
                          int lev, int gather_lev,
                          amrex::Real dt, ScaleFields scaleFields,
+                         long & num_unconverged_particles,
                          DtType a_dt_type=DtType::Full);
+
+    void ImplicitPushXPSubOrbits (WarpXParIter& pti,
+                                  amrex::FArrayBox const * exfab,
+                                  amrex::FArrayBox const * eyfab,
+                                  amrex::FArrayBox const * ezfab,
+                                  amrex::FArrayBox const * bxfab,
+                                  amrex::FArrayBox const * byfab,
+                                  amrex::FArrayBox const * bzfab,
+                                  amrex::IntVect ngEB,
+                                  amrex::MultiFab * const jx,
+                                  amrex::MultiFab * const jy,
+                                  amrex::MultiFab * const jz,
+                                  long offset,
+                                  long np_to_push,
+                                  int lev, int gather_lev,
+                                  amrex::Real dt, ScaleFields scaleFields,
+                                  bool skip_deposition);
 
     void PushP (int lev, amrex::Real dt,
                         const amrex::MultiFab& Ex,

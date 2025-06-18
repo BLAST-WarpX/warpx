@@ -26,6 +26,10 @@ void ImplicitSolver::CreateParticleAttributes () const
         pc->AddRealComp("ux_n", comm);
         pc->AddRealComp("uy_n", comm);
         pc->AddRealComp("uz_n", comm);
+
+        // w_save is used to save the particle weight and to flag particles that require suborbits to
+        // obtain convergence during their advance
+        pc->AddRealComp("w_save", comm);
     }
 }
 
