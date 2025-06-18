@@ -27,6 +27,7 @@ jobs:
     if: ${{ github.event.pull_request.draft == false }}
     steps:
     - uses: actions/checkout@v4
+      if: ${{ needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     - name: install dependencies
       if: ${{ needs.check_changes.outputs.has_non_docs_changes == 'true' }}
       run: |
