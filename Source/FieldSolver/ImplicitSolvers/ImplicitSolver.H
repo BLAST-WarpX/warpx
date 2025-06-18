@@ -9,6 +9,7 @@
 
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "NonlinearSolvers/NonlinearSolverLibrary.H"
+#include "Python/callbacks.H"
 
 #include <AMReX_Array.H>
 #include <AMReX_REAL.H>
@@ -58,6 +59,15 @@ public:
     }
 
     void CreateParticleAttributes () const;
+
+    /**
+     * \brief Wrapper to call MultiParticleContainer's collision method
+     */
+    void DoCollisions (
+        amrex::Real a_step,
+        amrex::Real a_cur_time,
+        amrex::Real a_dt
+    ) const;
 
     /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm

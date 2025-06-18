@@ -230,17 +230,18 @@ WarpX::Evolve (int numsteps)
         // defined particle distribution to be injected each time step
         ExecutePythonCallback("particleinjection");
 
-        // multi-physics: collisions
-        ExecutePythonCallback("beforecollisions");
-        mypc->doCollisions(step, cur_time, dt[0]);
-        ExecutePythonCallback("aftercollisions");
-
         // implicit solver
         if (m_implicit_solver) {
             m_implicit_solver->OneStep(cur_time, dt[0], step);
         }
         // explicit solver
         else {
+            // multi-physics: collisions
+            // TODO move to OneStep functions
+            ExecutePythonCallback("beforecollisions");
+            mypc->doCollisions(step, cur_time, dt[0]);
+            ExecutePythonCallback("aftercollisions");
+
             // electrostatic solver or hybrid solver
             if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
                 electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
