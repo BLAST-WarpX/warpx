@@ -4,14 +4,15 @@
  *
  * License: BSD-3-Clause-LBNL
  */
+
 #include "RelativeCellPosition.H"
 
 #include <AMReX_Config.H>
 #include <AMReX_IndexType.H>
 #include <AMReX_MultiFab.H>
 
-std::vector< double >
-utils::getRelativeCellPosition(amrex::MultiFab const& mf)
+[[nodiscard]] std::vector< double >
+ablastr::utils::getRelativeCellPosition(amrex::MultiFab const& mf)
 {
     amrex::IndexType const idx_type = mf.ixType();
 

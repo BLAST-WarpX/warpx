@@ -10,8 +10,8 @@
 #include "ProjectionDivCleaner.H"
 
 #include <AMReX_MLPoisson.H>
+#include <AMReX_MLNodeLaplacian.H>
 #include <AMReX_MultiFabUtil.H>
-#include <AMReX_LO_BCTYPES.H>
 
 #include <WarpX.H>
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
@@ -20,6 +20,7 @@
     #include <FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/SphericalYeeAlgorithm.H>
 #else
     #include <FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H>
+    #include <FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H>
 #endif
 #include "Fields.H"
 #include <Initialization/ExternalField.H>
@@ -32,13 +33,15 @@ using namespace amrex;
 
 namespace warpx::initialization {
 
-ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name) :
-    m_field_name(a_field_name)
+ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name, bool a_vector_potential) :
+    m_field_name(a_field_name), m_vector_potential(a_vector_potential)
 {
     using ablastr::fields::Direction;
     ReadParameters();
 
     auto& warpx = WarpX::GetInstance();
+
+    m_grid_type = warpx.grid_type;
 
     // Only div clean level 0
     if (warpx.finestLevel() > 0) {
@@ -53,6 +56,14 @@ ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name) :
     const int ncomps = WarpX::ncomps;
     auto const& ng = warpx.m_fields.get(m_field_name, Direction{0}, 0)->nGrowVect();
 
+    IntVect nodal_flag{};
+    if (m_grid_type == GridType::Collocated || m_vector_potential) {
+        nodal_flag = IntVect::TheNodeVector();
+    } else {
+        nodal_flag = IntVect::TheCellVector();
+    }
+
+
     for (int lev = 0; lev < m_levels; ++lev)
     {
         // Default BoxArray and DistributionMap for initializing the output MultiFab, m_mf_output.
@@ -63,10 +74,10 @@ ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name) :
         m_source[lev].reset();
 
         const auto tag1 = amrex::MFInfo().SetTag("div_cleaner_solution");
-        m_solution[lev] = std::make_unique<MultiFab>(amrex::convert(ba, IntVect::TheCellVector()),
+        m_solution[lev] = std::make_unique<MultiFab>(amrex::convert(ba, nodal_flag),
             dmap, ncomps, ng, tag1);
         const auto tag2 = amrex::MFInfo().SetTag("div_cleaner_source");
-        m_source[lev] = std::make_unique<MultiFab>(amrex::convert(ba, IntVect::TheCellVector()),
+        m_source[lev] = std::make_unique<MultiFab>(amrex::convert(ba, nodal_flag),
             dmap, ncomps, ng, tag2);
 
         m_solution[lev]->setVal(0.0, ng);
@@ -76,15 +87,19 @@ ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name) :
     auto cell_size = WarpX::CellSize(0);
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     CylindricalYeeAlgorithm::InitializeStencilCoefficients( cell_size,
-            m_h_stencil_coefs_x, m_h_stencil_coefs_z );
+        m_h_stencil_coefs_x, m_h_stencil_coefs_z );
 #elif defined(WARPX_DIM_RSPHERE)
     SphericalYeeAlgorithm::InitializeStencilCoefficients( cell_size,
-            m_h_stencil_coefs_x );
+        m_h_stencil_coefs_x );
 #else
-    CartesianYeeAlgorithm::InitializeStencilCoefficients( cell_size,
+    if (m_grid_type == GridType::Collocated) {
+        CartesianNodalAlgorithm::InitializeStencilCoefficients( cell_size,
             m_h_stencil_coefs_x, m_h_stencil_coefs_y, m_h_stencil_coefs_z );
+    } else {
+        CartesianYeeAlgorithm::InitializeStencilCoefficients( cell_size,
+            m_h_stencil_coefs_x, m_h_stencil_coefs_y, m_h_stencil_coefs_z );
+    }
 #endif
-
 
     if (!m_h_stencil_coefs_x.empty()) {
         m_stencil_coefs_x.resize(m_h_stencil_coefs_x.size());
@@ -178,36 +193,30 @@ ProjectionDivCleaner::solve ()
 
     for (int ilev = 0; ilev < m_levels; ++ilev)
     {
-        MLPoisson mlpoisson({geom[ilev]}, {ba[ilev]}, {dmap[ilev]}, info);
+        if (m_grid_type == GridType::Collocated || m_vector_potential) {
+#if defined(AMREX_USE_EB)
+            const amrex::Vector<amrex::EBFArrayBoxFactory const *> eb_farray_box_factory{};
+#else
+            const amrex::Vector<amrex::FabFactory<amrex::FArrayBox> const*> eb_farray_box_factory{};
+#endif
 
-        mlpoisson.setMaxOrder(m_linop_maxorder);
-        mlpoisson.setDomainBC(lobc, hibc);
-
-        if (ilev > 0) {
-            mlpoisson.setCoarseFineBC(m_solution[ilev-1].get(), m_ref_ratio);
+            MLNodeLaplacian linop({geom[ilev]}, {ba[ilev]}, {dmap[ilev]}, info, eb_farray_box_factory, 1.0_rt);
+            runMLMG<MLNodeLaplacian>(linop, lobc, hibc, ilev);
+        } else {
+            MLPoisson linop({geom[ilev]}, {ba[ilev]}, {dmap[ilev]}, info);
+            runMLMG<MLPoisson>(linop, lobc, hibc, ilev);
         }
-
-        mlpoisson.setLevelBC(ilev, m_solution[ilev].get());
-
-        MLMG mlmg(mlpoisson);
-        mlmg.setMaxIter(m_max_iter);
-        mlmg.setMaxFmgIter(m_max_fmg_iter);
-        mlmg.setBottomSolver(m_bottom_solver);
-        mlmg.setVerbose(m_verbose);
-        mlmg.setBottomVerbose(m_bottom_verbose);
-        mlmg.setAlwaysUseBNorm(false);
-        mlmg.solve({m_solution[ilev].get()}, {m_source[ilev].get()}, m_rtol, m_atol);
-
         // Synchronize the ghost cells, do halo exchange
         ablastr::utils::communication::FillBoundary(*m_solution[ilev],
                                                 m_solution[ilev]->nGrowVect(),
                                                 WarpX::do_single_precision_comms,
-                                                geom[ilev].periodicity());
+                                                geom[ilev].periodicity(),
+                                                true);
     }
 }
 
 void
-ProjectionDivCleaner::setSourceFromBfield ()
+ProjectionDivCleaner::setSourceFromField ()
 {
     using ablastr::fields::Direction;
 
@@ -218,12 +227,36 @@ ProjectionDivCleaner::setSourceFromBfield ()
     // This function will compute -divB and store it in the source multifab
     for (int ilev = 0; ilev < m_levels; ++ilev)
     {
+        // Grab B-field multifabs at this level
+        amrex::MultiFab* Bx = warpx.m_fields.get(m_field_name, Direction{0}, ilev);
+        amrex::MultiFab* By = warpx.m_fields.get(m_field_name, Direction{1}, ilev);
+        amrex::MultiFab* Bz = warpx.m_fields.get(m_field_name, Direction{2}, ilev);
+
+        // Synchronize the ghost cells, do halo exchange
+        // This is done to ensure the boundaries ae filled prior to
+        // generating source
+        ablastr::utils::communication::FillBoundary(*Bx,
+                Bx->nGrowVect(),
+                WarpX::do_single_precision_comms,
+                geom[ilev].periodicity(),
+                true);
+        ablastr::utils::communication::FillBoundary(*By,
+                By->nGrowVect(),
+                WarpX::do_single_precision_comms,
+                geom[ilev].periodicity(),
+                true);
+        ablastr::utils::communication::FillBoundary(*Bz,
+                Bz->nGrowVect(),
+                WarpX::do_single_precision_comms,
+                geom[ilev].periodicity(),
+                true);
+
+        amrex::Gpu::streamSynchronize();
+
         WarpX::ComputeDivB(
             *m_source[ilev],
             0,
-            {warpx.m_fields.get(m_field_name, Direction{0}, ilev),
-             warpx.m_fields.get(m_field_name, Direction{1}, ilev),
-             warpx.m_fields.get(m_field_name, Direction{2}, ilev)},
+            {Bx, By, Bz},
             WarpX::CellSize(0)
             );
 
@@ -233,12 +266,42 @@ ProjectionDivCleaner::setSourceFromBfield ()
         ablastr::utils::communication::FillBoundary(*m_source[ilev],
                                                 m_source[ilev]->nGrowVect(),
                                                 WarpX::do_single_precision_comms,
-                                                geom[ilev].periodicity());
+                                                geom[ilev].periodicity(),
+                                                true);
     }
 }
 
+template <typename T>
+AMREX_FORCE_INLINE
+void correctFieldCartesian_kernel (
+    const Box & tbx, const Box & tby, const Box & tbz,
+    Real const * const AMREX_RESTRICT coefs_x,
+    Real const * const AMREX_RESTRICT coefs_y,
+    Real const * const AMREX_RESTRICT coefs_z,
+    const int n_coefs_x, const int n_coefs_y, const int n_coefs_z,
+    amrex::Array4<Real> const& Bx_arr,
+    amrex::Array4<Real> const& By_arr,
+    amrex::Array4<Real> const& Bz_arr,
+    amrex::Array4<Real> const& sol_arr
+    )
+{
+    amrex::ParallelFor(tbx, tby, tbz,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            Bx_arr(i,j,k) += T::DownwardDx(sol_arr, coefs_x, n_coefs_x, i, j, k);
+        },
+        [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            By_arr(i,j,k) += T::DownwardDy(sol_arr, coefs_y, n_coefs_y, i, j, k);
+        },
+        [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            Bz_arr(i,j,k) += T::DownwardDz(sol_arr, coefs_z, n_coefs_z, i, j, k);
+        });
+}
+
 void
-ProjectionDivCleaner::correctBfield ()
+ProjectionDivCleaner::correctField ()
 {
     using ablastr::fields::Direction;
 
@@ -249,7 +312,7 @@ ProjectionDivCleaner::correctBfield ()
     // This function computes the gradient of the solution and subtracts out divB component from B
     for (int ilev = 0; ilev < m_levels; ++ilev)
     {
-        // Grab B-field multifabs at this level
+        // Grab field multifabs at this level
         amrex::MultiFab* Bx = warpx.m_fields.get(m_field_name, Direction{0}, ilev);
         amrex::MultiFab* By = warpx.m_fields.get(m_field_name, Direction{1}, ilev);
         amrex::MultiFab* Bz = warpx.m_fields.get(m_field_name, Direction{2}, ilev);
@@ -298,34 +361,32 @@ ProjectionDivCleaner::correctBfield ()
                 Bx_arr(i,0,0) += SphericalYeeAlgorithm::DownwardDr(sol_arr, coefs_x, n_coefs_x, i, 0, 0, 0);
             });
 #else
-            amrex::ParallelFor(tbx, tby, tbz,
-            [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            if (m_grid_type == GridType::Collocated)
             {
-                Bx_arr(i,j,k) += CartesianYeeAlgorithm::DownwardDx(sol_arr, coefs_x, n_coefs_x, i, j, k);
-            },
-            [=] AMREX_GPU_DEVICE (int i, int j, int k)
-            {
-                By_arr(i,j,k) += CartesianYeeAlgorithm::DownwardDy(sol_arr, coefs_y, n_coefs_y, i, j, k);
-            },
-            [=] AMREX_GPU_DEVICE (int i, int j, int k)
-            {
-                Bz_arr(i,j,k) += CartesianYeeAlgorithm::DownwardDz(sol_arr, coefs_z, n_coefs_z, i, j, k);
-            });
+                correctFieldCartesian_kernel<CartesianNodalAlgorithm>(tbx, tby, tbz, coefs_x, coefs_y, coefs_z,
+                    n_coefs_x, n_coefs_y, n_coefs_z, Bx_arr, By_arr, Bz_arr, sol_arr);
+            } else {
+                correctFieldCartesian_kernel<CartesianYeeAlgorithm>(tbx, tby, tbz, coefs_x, coefs_y, coefs_z,
+                    n_coefs_x, n_coefs_y, n_coefs_z, Bx_arr, By_arr, Bz_arr, sol_arr);
+            }
 #endif
         }
         // Synchronize the ghost cells, do halo exchange
         ablastr::utils::communication::FillBoundary(*Bx,
                                                     Bx->nGrowVect(),
                                                     WarpX::do_single_precision_comms,
-                                                    geom[ilev].periodicity());
+                                                    geom[ilev].periodicity(),
+                                                    true);
         ablastr::utils::communication::FillBoundary(*By,
                                                     By->nGrowVect(),
                                                     WarpX::do_single_precision_comms,
-                                                    geom[ilev].periodicity());
+                                                    geom[ilev].periodicity(),
+                                                    true);
         ablastr::utils::communication::FillBoundary(*Bz,
                                                     Bz->nGrowVect(),
                                                     WarpX::do_single_precision_comms,
-                                                    geom[ilev].periodicity());
+                                                    geom[ilev].periodicity(),
+                                                    true);
         amrex::Gpu::synchronize();
     }
 }
@@ -336,15 +397,16 @@ void
 WarpX::ProjectionCleanDivB() {
     WARPX_PROFILE("WarpX::ProjectionDivCleanB()");
 
-    if (grid_type == GridType::Collocated) {
-        ablastr::warn_manager::WMRecordWarning("Projection Div Cleaner",
-            "Grid Type is collocated, so divB not cleaned. Interpolation may lead to non-zero B field divergence.",
-            ablastr::warn_manager::WarnPriority::low);
-    } else if ( WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee
+    if ( (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee
             ||  WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC
             ||  ( (WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrame
                 || WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic)
-                && WarpX::poisson_solver_id == PoissonSolverAlgo::Multigrid)) {
+                && WarpX::poisson_solver_id == PoissonSolverAlgo::Multigrid))
+#if defined(WARPX_DIM_RZ)
+                && WarpX::grid_type == GridType::Staggered
+#endif
+            )
+    {
         amrex::Print() << Utils::TextMsg::Info( "Starting Projection B-Field divergence cleaner.");
 
         if constexpr (!std::is_same_v<Real, double>) {
@@ -357,9 +419,9 @@ WarpX::ProjectionCleanDivB() {
         warpx::initialization::ProjectionDivCleaner dc("Bfield_fp_external");
 
 
-        dc.setSourceFromBfield();
+        dc.setSourceFromField();
         dc.solve();
-        dc.correctBfield();
+        dc.correctField();
 
         amrex::Print() << Utils::TextMsg::Info( "Finished Projection B-Field divergence cleaner.");
     } else {

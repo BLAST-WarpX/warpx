@@ -21,30 +21,6 @@
 namespace utils::parser
 {
     /**
-    * \brief Do a safe cast of a real to an int
-    * This ensures that the float value is within the range of ints and if not,
-    * raises an exception.
-    *
-    * \param x Real value to cast
-    * \param real_name String, the name of the variable being casted to use in the error message
-    */
-    int
-    safeCastToInt(amrex::Real x, const std::string& real_name);
-
-
-    /**
-    * \brief Do a safe cast of a real to a long
-    * This ensures that the float value is within the range of longs and if not,
-    * raises an exception.
-    *
-    * \param x Real value to cast
-    * \param real_name String, the name of the variable being casted to use in the error message
-    */
-    long
-    safeCastToLong(amrex::Real x, const std::string& real_name);
-
-
-    /**
     * \brief Initialize an amrex::Parser object from a string containing a math expression
     *
     * \param parse_function String to read to initialize the parser.
@@ -87,7 +63,6 @@ namespace utils::parser
         std::string const& query_string,
         std::string& stored_string);
 
-
     /**
     * \brief If the input is provided, parse the string (typically a mathematical expression) from the
     * input file and store it into a variable, replacing its contents.
@@ -101,30 +76,6 @@ namespace utils::parser
         std::string const& query_string,
         std::string& stored_string);
 
-
-    /** Parse a string and return as a double precision floating point number
-    *
-    * In case the string cannot be interpreted as a double,
-    * this function ... <throws an exception? aborts with error message?>
-    *
-    * \param str The string to be parsed
-    * \return representation as a double
-    */
-    double parseStringtoDouble(const std::string& str);
-
-
-    /** Parse a string and return an int
-     *
-     * In case the string cannot be interpreted as Real,
-     * this function ... <throws an exception? aborts with error message?>
-     *
-     * \param str The string to be parsed
-     * \param name For integers, the name, to be used in error messages
-     * \return rounded closest integer
-     */
-    int parseStringtoInt(const std::string& str, const std::string& name);
-
-
     template <int N>
     amrex::ParserExecutor<N> compileParser (amrex::Parser const* parser)
     {
@@ -136,7 +87,7 @@ namespace utils::parser
     }
 
 
-    /** Similar to amrex::ParmParse::query, but also supports math expressions for the value.
+    /** Similar to amrex::ParmParse::queryAsDouble
      *
      * amrex::ParmParse::query reads a name and a value from the input file. This function does the
      * same, and applies the amrex::Parser to the value, so the user has the choice to specify a value or
@@ -150,59 +101,24 @@ namespace utils::parser
     template <typename T>
     int queryWithParser (const amrex::ParmParse& a_pp, char const * const str, T& val)
     {
-        // call amrex::ParmParse::query, check if the user specified str.
-        std::string tmp_str;
-        const int is_specified = a_pp.query(str, tmp_str);
-        if (is_specified)
-        {
-            // If so, create a parser object and apply it to the value provided by the user.
-            std::string str_val;
-            Store_parserString(a_pp, str, str_val);
-
-            auto parser = makeParser(str_val, {});
-
-            if constexpr (std::is_same_v<T, int>) {
-
-                val = safeCastToInt(
-                    static_cast<amrex::Real>(std::round(parser.compileHost<0>()())), str);
-            }
-            else {
-                val = static_cast<T>(parser.compileHost<0>()());
-            }
-        }
-        // return the same output as amrex::ParmParse::query
-        return is_specified;
+        return a_pp.queryAsDouble(str, val);
     }
 
 
     template <typename T>
     int queryArrWithParser (const amrex::ParmParse& a_pp, char const * const str, std::vector<T>& val)
     {
-        // call amrex::ParmParse::query, check if the user specified str.
-        std::vector<std::string> tmp_str_arr;
-        const int is_specified = a_pp.queryarr(str, tmp_str_arr);
-        if (is_specified)
-        {
-            // If so, create parser objects and apply them to the values provided by the user.
-            int const n = static_cast<int>(tmp_str_arr.size());
-            val.resize(n);
-            for (int i=0 ; i < n ; i++) {
-                auto parser = makeParser(tmp_str_arr[i], {});
-                if constexpr (std::is_same_v<T, int>) {
-                    val[i] = safeCastToInt(
-                        static_cast<amrex::Real>(std::round(parser.compileHost<0>()())), str);
-                }
-                else {
-                    val[i] = static_cast<T>(parser.compileHost<0>()());
-                }
-            }
+        auto nvals = a_pp.countval(str);
+        if (nvals > 0) {
+            val.resize(nvals);
+            return a_pp.queryarrAsDouble(str, nvals, val.data());
+        } else {
+            return 0;
         }
-        // return the same output as amrex::ParmParse::query
-        return is_specified;
     }
 
 
-    /** Similar to amrex::ParmParse::query, but also supports math expressions for the value.
+    /** Similar to amrex::ParmParse::queryarrWithParser
      *
      * amrex::ParmParse::query reads a name and a value from the input file. This function does the
      * same, and applies the amrex::Parser to the value, so the user has the choice to specify a value or
@@ -221,23 +137,13 @@ namespace utils::parser
     int queryArrWithParser (const amrex::ParmParse& a_pp, char const * const str, std::vector<T>& val,
                             const int start_ix, const int num_val)
     {
-        // call amrex::ParmParse::query, check if the user specified str.
-        std::vector<std::string> tmp_str_arr;
-        const int is_specified = a_pp.queryarr(str, tmp_str_arr, start_ix, num_val);
+        const int is_specified = queryArrWithParser(a_pp, str, val);
         if (is_specified)
         {
-            // If so, create parser objects and apply them to the values provided by the user.
-            int const n = static_cast<int>(tmp_str_arr.size());
-            val.resize(n);
-            for (int i=0 ; i < n ; i++) {
-                auto parser = makeParser(tmp_str_arr[i], {});
-                if constexpr (std::is_same_v<T, int>) {
-                    val[i] = safeCastToInt(
-                        static_cast<amrex::Real>(std::round(parser.compileHost<0>()())), str);
-                }
-                else {
-                    val[i] = static_cast<T>(parser.compileHost<0>()());
-                }
+            val.erase(val.begin(), val.begin()+start_ix);
+            if (num_val != amrex::ParmParse::LAST) {
+                if (num_val > int(val.size())) { return 0; }
+                val.resize(num_val);
             }
         }
         // return the same output as amrex::ParmParse::query
@@ -245,7 +151,7 @@ namespace utils::parser
     }
 
 
-    /** Similar to amrex::ParmParse::get, but also supports math expressions for the value.
+    /** Similar to amrex::ParmParse::getWithParser
      *
      * amrex::ParmParse::get reads a name and a value from the input file. This function does the
      * same, and applies the Parser to the value, so the user has the choice to specify a value or
@@ -259,43 +165,20 @@ namespace utils::parser
     template <typename T>
     void getWithParser (const amrex::ParmParse& a_pp, char const * const str, T& val)
     {
-        // If so, create a parser object and apply it to the value provided by the user.
-        std::string str_val;
-        Store_parserString(a_pp, str, str_val);
-
-        auto parser = makeParser(str_val, {});
-        if constexpr (std::is_same_v<T, int>) {
-            val = safeCastToInt(
-                static_cast<amrex::Real>(std::round(parser.compileHost<0>()())), str);
-        }
-        else {
-            val = static_cast<T>(parser.compileHost<0>()());
-        }
+        a_pp.getAsDouble(str, val);
     }
 
     template <typename T>
     void getArrWithParser (const amrex::ParmParse& a_pp, char const * const str, std::vector<T>& val)
     {
-        // Create parser objects and apply them to the values provided by the user.
-        std::vector<std::string> tmp_str_arr;
-        a_pp.getarr(str, tmp_str_arr);
-
-        int const n = static_cast<int>(tmp_str_arr.size());
-        val.resize(n);
-        for (int i=0 ; i < n ; i++) {
-            auto parser = makeParser(tmp_str_arr[i], {});
-            if constexpr (std::is_same_v<T, int>) {
-                val[i] = safeCastToInt(
-                    static_cast<amrex::Real>(std::round(parser.compileHost<0>()())), str);
-            }
-            else {
-                val[i] = static_cast<T>(parser.compileHost<0>()());
-            }
+        int const is_specified = queryArrWithParser(a_pp, str, val);
+        if (is_specified == 0) {
+            throw std::runtime_error("utils::parser::getArrWithParser failed");
         }
     }
 
 
-    /** Similar to amrex::ParmParse::get, but also supports math expressions for the value.
+    /** Similar to amrex::ParmParse::getarrWithParser
      *
      * amrex::ParmParse::get reads a name and a value from the input file. This function does the
      * same, and applies the Parser to the value, so the user has the choice to specify a value or
@@ -314,26 +197,14 @@ namespace utils::parser
     void getArrWithParser (const amrex::ParmParse& a_pp, char const * const str, std::vector<T>& val,
                         const int start_ix, const int num_val)
     {
-        // Create parser objects and apply them to the values provided by the user.
-        std::vector<std::string> tmp_str_arr;
-        a_pp.getarr(str, tmp_str_arr, start_ix, num_val);
-
-        int const n = static_cast<int>(tmp_str_arr.size());
-        val.resize(n);
-        for (int i=0 ; i < n ; i++) {
-            auto parser = makeParser(tmp_str_arr[i], {});
-            if constexpr (std::is_same_v<T, int>) {
-                val[i] = safeCastToInt(
-                    static_cast<amrex::Real>(std::round(parser.compileHost<0>()())), str);
-            }
-            else {
-                val[i] = static_cast<T>(parser.compileHost<0>()());
-            }
+        int const is_specified = queryArrWithParser(a_pp, str, val, start_ix, num_val);
+        if (is_specified == 0) {
+            throw std::runtime_error("utils::parser::getArrWithParser failed");
         }
     }
 
 
-    /** Similar to amrex::ParmParse::query, but also supports math expressions for the value.
+    /** Similar to amrex::ParmParse::queryWithParser
      *
      * amrex::ParmParse::query reads a name and a value from the input file. This function does the
      * same, and applies the amrex::Parser to the value, so the user has the choice to specify a value or
@@ -383,7 +254,7 @@ namespace utils::parser
     }
 
 
-    /** Similar to amrex::ParmParse::query, but also supports math expressions for the value.
+    /** Similar to amrex::ParmParse::queryarrWithParser
      *
      * amrex::ParmParse::query reads a name and a value from the input file. This function does the
      * same, and applies the amrex::Parser to the value, so the user has the choice to specify a value or
@@ -434,7 +305,7 @@ namespace utils::parser
      */
     int query (const amrex::ParmParse& a_pp, std::string const& group, char const * str, std::string& val);
 
-    /** Similar to amrex::ParmParse::get, but also supports math expressions for the value.
+    /** Similar to amrex::ParmParse::getWithParser
      *
      * amrex::ParmParse::get reads a name and a value from the input file. This function does the
      * same, and applies the Parser to the value, so the user has the choice to specify a value or
@@ -483,7 +354,7 @@ namespace utils::parser
     }
 
 
-    /** Similar to amrex::ParmParse::get, but also supports math expressions for the value.
+    /** Similar to amrex::ParmParse::getarrWithParser
      *
      * amrex::ParmParse::get reads a name and a value from the input file. This function does the
      * same, and applies the Parser to the value, so the user has the choice to specify a value or

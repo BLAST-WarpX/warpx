@@ -141,6 +141,8 @@ int WarpX::nox = 0;
 int WarpX::noy = 0;
 int WarpX::noz = 0;
 
+int WarpX::particle_max_grid_crossings = 1;
+
 // Order of finite-order centering of fields (staggered to nodal)
 int WarpX::field_centering_nox = 2;
 int WarpX::field_centering_noy = 2;
@@ -1089,7 +1091,9 @@ WarpX::ReadParameters ()
         if (!do_divb_cleaning
             && m_p_ext_field_params->B_ext_grid_type != ExternalFieldType::default_zero
             && m_p_ext_field_params->B_ext_grid_type != ExternalFieldType::constant
-            && grid_type != GridType::Collocated
+#if defined(WARPX_DIM_RZ)
+            && WarpX::grid_type == GridType::Staggered
+#endif
             && (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee
             ||  WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC
             ||  ( (WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrame
@@ -1401,6 +1405,11 @@ WarpX::ReadParameters ()
                     "When algo.particle_shape > 1,"
                     "some numerical artifact will be present at the interface between coarse and fine patch."
                     "We recommend setting algo.particle_shape = 1 in order to avoid this issue");
+            }
+
+            if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
+                evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+                pp_particles.query("max_grid_crossings", particle_max_grid_crossings);
             }
 
             // default sort interval for particles if species or lasers vector is not empty
@@ -2184,10 +2193,12 @@ WarpX::AllocLevelData (int lev, const BoxArray& ba, const DistributionMapping& d
         grid_type,
         do_moving_window,
         moving_window_dir,
+        particle_max_grid_crossings,
         WarpX::nox,
         nox_fft, noy_fft, noz_fft,
         NCIGodfreyFilter::m_stencil_width,
         electromagnetic_solver_id,
+        evolve_scheme,
         maxLevel(),
         WarpX::m_v_galilean,
         WarpX::m_v_comoving,
@@ -3143,9 +3154,6 @@ WarpX::ComputeDivB (amrex::MultiFab& divB, int const dcomp,
                     ablastr::fields::VectorField const& B,
                     const std::array<amrex::Real,3>& dx, IntVect const ngrow)
 {
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(grid_type != GridType::Collocated,
-        "ComputeDivB not implemented with warpx.grid_type=collocated.");
-
     const Real dxinv = 1._rt/dx[0], dyinv = 1._rt/dx[1], dzinv = 1._rt/dx[2];
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
@@ -3163,14 +3171,16 @@ WarpX::ComputeDivB (amrex::MultiFab& divB, int const dcomp,
         amrex::Array4<const amrex::Real> const& Bzfab = B[2]->array(mfi);
         amrex::Array4<amrex::Real> const& divBfab = divB.array(mfi);
 
+        const bool collocated_grid_flag = (grid_type == GridType::Collocated);
+
         ParallelFor(bx,
         [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
         {
-            warpx_computedivb(i, j, k, dcomp, divBfab, Bxfab, Byfab, Bzfab, dxinv, dyinv, dzinv
+            warpx_computedivb(i, j, k, dcomp, divBfab, Bxfab, Byfab, Bzfab, dxinv, dyinv, dzinv,
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                              ,rmin
+                              rmin,
 #endif
-                              );
+                              collocated_grid_flag);
         });
     }
 }

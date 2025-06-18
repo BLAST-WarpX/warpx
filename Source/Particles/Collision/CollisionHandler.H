@@ -26,7 +26,7 @@ public:
     CollisionHandler (const MultiParticleContainer*  mypc);
 
     /* Perform all of the collisions */
-    void doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc);
+    void doCollisions (int step, amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc);
 
 private:
 

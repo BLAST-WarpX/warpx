@@ -73,8 +73,10 @@ jobs:
   build_win_clang:
     name: Clang C++17 w/ OMP w/o MPI
     runs-on: windows-2019
-    needs: check_changes
-    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
+    # disabled due to windows-2019 not being available anymore ; see #5930
+    if: 0
+    #needs: check_changes
+    #if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
