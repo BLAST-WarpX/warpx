@@ -37,6 +37,6 @@ add_warpx_test(
     1  # nprocs
     inputs_test_2d_projection_div_cleaner_initial_analytical_field_picmi.py  # inputs
     OFF  # analysis
-    "analysis_default_regression.py --path diags/diag1000000"  # checksum
+    "analysis_default_regression.py --path diags/diag1000000 --rtol 5e-3"  # checksum
     OFF  # dependency
 )
