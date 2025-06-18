@@ -52,6 +52,8 @@ private:
         std::string equation;
         amrex::Vector<std::string> reactants;
         amrex::Vector<std::string> products;
+        amrex::Vector<std::string> reactant_type;
+        amrex::Vector<std::string> product_type;
         double P_energy0;
         double P0;
         double E_ref;
@@ -59,6 +61,8 @@ private:
         double exp;
     };
     amrex::Vector<std::string> tokenize_reaction (const std::string& input);
+    bool is_gas_species (std::string species_symbol);
+    bool is_surface_species (std::string species_symbol);
 
     std::map<std::string, std::string> gas_species; //stores gas_species with the symbol
     std::map<std::string, std::string> surface_species; //stores surface_species with the symbol

@@ -61,7 +61,6 @@ void SurfacePhysicsBase::ReadParameters ()
     amrex::Vector<std::string> gas_surface_reactions;
     if (pp_chem.queryarr("reactions", gas_surface_reactions)) {
         for (const auto& line : gas_surface_reactions) {
-            amrex::Print() << " Reading reaction : " << line << "\n";
             Reaction rxn;
             std::vector<std::string> equation_params = amrex::split(line,";");
 
@@ -74,18 +73,45 @@ void SurfacePhysicsBase::ReadParameters ()
             std::string rhs = amrex::trim(rxn.equation.substr(arrow_pos+2));
             rxn.reactants = tokenize_reaction(lhs);
             rxn.products = tokenize_reaction(rhs);
+            for (const auto& reactant : rxn.reactants) {
+                std::string species_type = is_gas_species(reactant) ? "gas" : "surface";
+                rxn.reactant_type.push_back(species_type);
+            }
+            for (const auto& product : rxn.products) {
+                std::string species_type = is_gas_species(product) ? "gas" : "surface";
+                rxn.product_type.push_back(species_type);
+            }
 
-            rxn.P_energy0 = std::stod(equation_params[1]);
-            rxn.P0        = std::stod(equation_params[2]);
-            rxn.E_ref     = std::stod(equation_params[3]);
-            rxn.E_th      = std::stod(equation_params[4]);
-            rxn.exp       = std::stod(equation_params[5]);
+            rxn.P_energy0 = std::stod(amrex::trim(equation_params[1]));
+            rxn.P0        = std::stod(amrex::trim(equation_params[2]));
+            rxn.E_ref     = std::stod(amrex::trim(equation_params[3]));
+            rxn.E_th      = std::stod(amrex::trim(equation_params[4]));
+            rxn.exp       = std::stod(amrex::trim(equation_params[5]));
 
             reactions.push_back(rxn);
         }
     } else {
         amrex::Print() << " no reactions specified for surface physics \n";
     }
+}
+
+bool
+SurfacePhysicsBase::is_gas_species (std::string species_symbol)
+{
+    for (const auto& [_,symbol] : gas_species) {
+        if (symbol == species_symbol) return true;
+    }
+    return false;
+}
+
+
+bool
+SurfacePhysicsBase::is_surface_species (std::string species_symbol)
+{
+    for (const auto& [_,symbol] : surface_species) {
+        if (symbol == species_symbol) return true;
+    }
+    return false;
 }
 
 amrex::Vector<std::string>
