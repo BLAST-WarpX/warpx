@@ -17,10 +17,10 @@
 #   include "FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
 #   include "FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
 #endif
+#include "LoadBalancing/ScopedTimeTracker.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "WarpX.H"
 
 #include <AMReX.H>
 #include <AMReX_Array4.H>
@@ -132,18 +132,13 @@ void FiniteDifferenceSolver::EvolveBCartesian (
     amrex::MultiFab const * Gfield,
     int lev, amrex::Real const dt ) {
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
     for ( MFIter mfi(*Bfield[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-        }
-        auto wt = static_cast<amrex::Real>(amrex::second());
+
+        const auto time_tracker = warpx::load_balancing::get_scoped_time_tracker(lev, mfi.index());
 
         // Extract field data for this grid/tile
         Array4<Real> const& Bx = Bfield[0]->array(mfi);
@@ -214,13 +209,6 @@ void FiniteDifferenceSolver::EvolveBCartesian (
                 }
             );
         }
-
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-            wt = static_cast<amrex::Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
     }
 }
 
@@ -241,8 +229,6 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
         "EvolveBCartesianECT: Embedded Boundaries are only implemented in 2D3V and 3D3V");
 #endif
 
-    amrex::LayoutData<amrex::Real> *cost = WarpX::getCosts(lev);
-
     Venl[0]->setVal(0.);
     Venl[1]->setVal(0.);
     Venl[2]->setVal(0.);
@@ -253,10 +239,7 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
 #endif
     for (MFIter mfi(*Bfield[0]); mfi.isValid(); ++mfi) {
 
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers) {
-            amrex::Gpu::synchronize();
-        }
-        auto wt = static_cast<amrex::Real>(amrex::second());
+        const auto time_tracker = warpx::load_balancing::get_scoped_time_tracker(lev, mfi.index());
 
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             // Extract field data for this grid/tile
@@ -375,12 +358,6 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
             });
 
         }
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-            wt = static_cast<amrex::Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
     }
 #else
     amrex::ignore_unused(Bfield, face_areas, area_mod, ECTRhofield, Venl, flag_info_cell, borrowing,
@@ -403,11 +380,8 @@ void FiniteDifferenceSolver::EvolveBCylindrical (
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
     for ( MFIter mfi(*Bfield[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-        }
-        auto wt = static_cast<amrex::Real>(amrex::second());
+
+        const auto time_tracker = warpx::load_balancing::get_scoped_time_tracker(lev, mfi.index());
 
         // Extract field data for this grid/tile
         Array4<Real> const& Br = Bfield[0]->array(mfi);
@@ -495,13 +469,6 @@ void FiniteDifferenceSolver::EvolveBCylindrical (
             }
 
         );
-
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-            wt = static_cast<amrex::Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
     }
 }
 
@@ -513,18 +480,13 @@ void FiniteDifferenceSolver::EvolveBSpherical (
     ablastr::fields::VectorField const& Efield,
     int lev, amrex::Real const dt ) {
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
     for ( MFIter mfi(*Bfield[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-        }
-        auto wt = static_cast<amrex::Real>(amrex::second());
+
+        const auto time_tracker = warpx::load_balancing::get_scoped_time_tracker(lev, mfi.index());
 
         // Extract field data for this grid/tile
         Array4<Real> const& Br = Bfield[0]->array(mfi);
@@ -565,12 +527,6 @@ void FiniteDifferenceSolver::EvolveBSpherical (
 
         );
 
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-            wt = static_cast<amrex::Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
     }
 }
 

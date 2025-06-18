@@ -6,10 +6,10 @@
  */
 #include "BackgroundStopping.H"
 
+#include "LoadBalancing/ScopedTimeTracker.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/ParticleUtils.H"
 #include "Utils/WarpXProfilerWrapper.H"
-#include "WarpX.H"
 
 #include <AMReX_ParmParse.H>
 #include <AMReX_REAL.H>
@@ -104,30 +104,18 @@ BackgroundStopping::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiPar
     auto const flvl = species.finestLevel();
     for (int lev = 0; lev <= flvl; ++lev) {
 
-        auto *cost = WarpX::getCosts(lev);
-
         // loop over particles box by box
 #ifdef _OPENMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
         for (WarpXParIter pti(species, lev); pti.isValid(); ++pti) {
-            if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-            {
-                amrex::Gpu::synchronize();
-            }
-            auto wt = static_cast<amrex::Real>(amrex::second());
+
+            const auto time_tracker = warpx::load_balancing::get_scoped_time_tracker(lev, pti.index());
 
             if (background_type == BackgroundStoppingType::ELECTRONS) {
                 doBackgroundStoppingOnElectronsWithinTile(pti, dt, cur_time, species_mass, species_charge);
             } else if (background_type == BackgroundStoppingType::IONS) {
                 doBackgroundStoppingOnIonsWithinTile(pti, dt, cur_time, species_mass, species_charge);
-            }
-
-            if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-            {
-                amrex::Gpu::synchronize();
-                wt = static_cast<amrex::Real>(amrex::second()) - wt;
-                amrex::HostDevice::Atomic::Add(&(*cost)[pti.index()], wt);
             }
         }
 

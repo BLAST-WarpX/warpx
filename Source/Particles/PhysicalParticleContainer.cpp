@@ -16,6 +16,7 @@
 #include "Initialization/InjectorMomentum.H"
 #include "Initialization/InjectorPosition.H"
 #include "MultiParticleContainer.H"
+#include "LoadBalancing/ScopedTimeTracker.H"
 #include "Particles/AddPlasmaUtilities.H"
 #ifdef WARPX_QED
 #   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
@@ -959,8 +960,6 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
 
     defineAllParticleTiles();
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
     Box fine_injection_box;
     amrex::IntVect rrfac(AMREX_D_DECL(1,1,1));
     const bool refine_injection = findRefinedInjectionBox(fine_injection_box, rrfac);
@@ -998,11 +997,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
 #endif
     for (MFIter mfi = MakeMFIter(lev, info); mfi.isValid(); ++mfi)
     {
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-        }
-        auto wt = static_cast<amrex::Real>(amrex::second());
+        const auto time_tracker = warpx::load_balancing::get_scoped_time_tracker(lev, mfi.index());
 
         const Box& tile_box = mfi.tilebox();
         const RealBox tile_realbox = WarpX::getRealBox(tile_box, lev);
@@ -1363,14 +1358,6 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
 #endif
             }
         });
-
-        amrex::Gpu::synchronize();
-
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            wt = static_cast<amrex::Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
     }
 
     // Remove particles that are inside the embedded boundaries
@@ -1416,8 +1403,6 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
     }
 #endif
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(0);
-
     // Create temporary particle container to which particles will be added;
     // we will then call Redistribute on this new container and finally
     // add the new particles to the original container.
@@ -1451,6 +1436,8 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                                                      m_user_int_attrib_parser,
                                                      m_user_real_attrib_parser);
 
+    constexpr int lev0 = 0;
+
     MFItInfo info;
     if (do_tiling && Gpu::notInLaunchRegion()) {
         info.EnableTiling(tile_size);
@@ -1459,16 +1446,12 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
     info.SetDynamic(true);
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-    for (MFIter mfi = MakeMFIter(0, info); mfi.isValid(); ++mfi)
+    for (MFIter mfi = MakeMFIter(lev0, info); mfi.isValid(); ++mfi)
     {
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-        }
-        auto wt = static_cast<amrex::Real>(amrex::second());
+        const auto time_tracker = warpx::load_balancing::get_scoped_time_tracker(lev0, mfi.index());
 
         const Box& tile_box = mfi.tilebox();
-        const RealBox tile_realbox = WarpX::getRealBox(tile_box, 0);
+        const RealBox tile_realbox = WarpX::getRealBox(tile_box, lev0);
 
         // Find the cells of part_realbox that overlap with tile_realbox
         // If there is no overlap, just go to the next tile in the loop
@@ -1888,14 +1871,6 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 #endif
             }
         });
-
-        amrex::Gpu::synchronize();
-
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            wt = static_cast<amrex::Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
     }
 
     // Remove particles that are inside the embedded boundaries
@@ -1935,8 +1910,6 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
     BL_ASSERT(OnSameGrids(lev, *fields.get(FieldType::current_fp, Direction{0}, lev)));
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
     const iMultiFab* current_masks = WarpX::CurrentBufferMasks(lev);
     const iMultiFab* gather_masks = WarpX::GatherBufferMasks(lev);
 
@@ -1967,11 +1940,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
         for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
         {
-            if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-            {
-                amrex::Gpu::synchronize();
-            }
-            auto wt = static_cast<amrex::Real>(amrex::second());
+            const auto time_tracker = warpx::load_balancing::get_scoped_time_tracker(lev, pti.index());
 
             const Box& box = pti.validbox();
 
@@ -2178,14 +2147,6 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                       np-np_current, thread_num, lev, lev-1);
                     }
                 }
-            }
-
-            amrex::Gpu::synchronize();
-
-            if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-            {
-                wt = static_cast<amrex::Real>(amrex::second()) - wt;
-                amrex::HostDevice::Atomic::Add( &(*cost)[pti.index()], wt);
             }
         }
     }

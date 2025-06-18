@@ -62,7 +62,6 @@ public:
      */
     void doBackgroundIonization (
                                  int lev,
-                                 amrex::LayoutData<amrex::Real>* cost,
                                  WarpXParticleContainer& species1,
                                  WarpXParticleContainer& species2,
                                  amrex::Real t

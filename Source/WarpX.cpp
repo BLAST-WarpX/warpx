@@ -37,6 +37,7 @@
 #include "Filter/NCIGodfreyFilter.H"
 #include "Initialization/ExternalField.H"
 #include "Initialization/WarpXInit.H"
+#include "LoadBalancing/ScopedTimeTracker.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
@@ -413,7 +414,15 @@ WarpX::WarpX ()
     do_pml_Lo.resize(nlevs_max);
     do_pml_Hi.resize(nlevs_max);
 
-    costs.resize(nlevs_max);
+    const bool enable_time_tracking = load_balance_costs_update_algo==LoadBalanceCostsUpdateAlgo::Timers;
+    if (enable_time_tracking)
+    {
+        warpx::load_balancing::ScopedTimeTracker::toggle_tracking(true);
+        warpx::load_balancing::ScopedTimeTracker::resize(true);
+        // TODO //
+        //     costs.resize(nlevs_max);
+    }
+
     load_balance_efficiency.resize(nlevs_max);
 
     m_field_factory.resize(nlevs_max);
@@ -2167,7 +2176,7 @@ WarpX::ClearLevel (int lev)
     }
 #endif
 
-    costs[lev].reset();
+    warpx::load_balancing::ScopedTimeTracker::reset_values(lev);
     load_balance_efficiency[lev] = -1;
 }
 

@@ -12,6 +12,7 @@
 #include "Evolve/WarpXPushType.H"
 #include "Fields.H"
 #include "Laser/LaserProfiles.H"
+#include "LoadBalancing/ScopedTimeTracker.H"
 #include "Particles/LaserParticleContainer.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/WarpXParticleContainer.H"
@@ -605,11 +606,7 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
         for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
         {
-            if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-            {
-                amrex::Gpu::synchronize();
-            }
-            Real wt = static_cast<Real>(amrex::second());
+            const auto time_tracker = warpx::load_balancing::get_scoped_time_tracker(lev, pti.index());
 
             auto& attribs = pti.GetAttribs();
 
@@ -705,12 +702,6 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
             // This is necessary because of plane_Xp, plane_Yp and amplitude_E
             amrex::Gpu::synchronize();
-
-            if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-            {
-                wt = static_cast<Real>(amrex::second()) - wt;
-                amrex::HostDevice::Atomic::Add( &(*cost)[pti.index()], wt);
-            }
         }
     }
 }
