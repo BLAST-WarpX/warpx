@@ -216,21 +216,24 @@ WarpX::Evolve (int numsteps)
             HybridPICDepositInitialRhoAndJ();
         }
 
+        // multi-physics: field ionization
         doFieldIonization();
 
-        ExecutePythonCallback("beforecollisions");
-        mypc->doCollisions( cur_time, dt[0] );
-        ExecutePythonCallback("aftercollisions");
-
 #ifdef WARPX_QED
+        // multi-physics: QED effects
         doQEDEvents();
         mypc->doQEDSchwinger();
 #endif
 
-        // Main PIC operation:
-        // gather fields, push particles, deposit sources, update fields
-
+        // callback called when particle injection happens, after the position
+        // advance and before deposition is called, allowing a user
+        // defined particle distribution to be injected each time step
         ExecutePythonCallback("particleinjection");
+
+        // multi-physics: collisions
+        ExecutePythonCallback("beforecollisions");
+        mypc->doCollisions(cur_time, dt[0]);
+        ExecutePythonCallback("aftercollisions");
 
         // implicit solver
         if (m_implicit_solver) {
