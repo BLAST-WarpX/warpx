@@ -83,7 +83,7 @@ namespace warpx::load_balancing
         }
     }
 
-    void ScopedTimeTracker::reset_values (const int leve)
+    void ScopedTimeTracker::reset_values (const int lev)
     {
         for (auto& lev_index_data : ScopedTimeTracker::all_times[lev]){
             lev_index_data = 0.0;
@@ -100,7 +100,6 @@ namespace warpx::load_balancing
             amrex::HostDevice::Atomic::Add(&all_times[m_lev][m_index], wall_time);
         }
     }
-<<<<<<< HEAD
 
     [[nodiscard]]
     ScopedTimeTracker get_scoped_time_tracker (
@@ -108,6 +107,4 @@ namespace warpx::load_balancing
     {
         return ScopedTimeTracker {lev, mfi_iter_index, enabled_local};
     }
-=======
->>>>>>> edfcf69b6d661d371f19a24e6490ba2925bf18c6
 }

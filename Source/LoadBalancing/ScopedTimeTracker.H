@@ -11,6 +11,8 @@
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
 
+class WarpX;
+
 namespace warpx::load_balancing
 {
     class ScopedTimeTracker
@@ -33,12 +35,6 @@ namespace warpx::load_balancing
         ScopedTimeTracker& operator=(const ScopedTimeTracker&) = delete;
         ScopedTimeTracker& operator=(ScopedTimeTracker&&) = delete;
 
-        friend
-        class WarpX;
-
-        friend
-        ScopedTimeTracker get_scoped_time_tracker (int lev, int mfi_iter_index, bool enabled_local);
-
     private:
         static void toggle_tracking (bool do_tracking_flag);
         static void resize (const amrex::Vector<std::size_t>& max_index_per_level);
@@ -59,6 +55,11 @@ namespace warpx::load_balancing
 
         bool m_enabled_local;
         bool m_stopped  = false;
+
+        friend class ::WarpX;
+
+        friend
+        ScopedTimeTracker get_scoped_time_tracker (int lev, int mfi_iter_index, bool enabled_local);
     };
 
     [[nodiscard]]

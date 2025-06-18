@@ -979,8 +979,6 @@ MultiParticleContainer::doFieldIonization (int lev,
 {
     WARPX_PROFILE("MultiParticleContainer::doFieldIonization()");
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
     // Loop over all species.
     // Ionized particles in pc_source create particles in pc_product
     for (auto& pc_source : allcontainers)
@@ -1594,8 +1592,6 @@ void MultiParticleContainer::doQedBreitWheeler (int lev,
 {
     WARPX_PROFILE("MultiParticleContainer::doQedBreitWheeler()");
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
     // Loop over all species.
     // Photons undergoing Breit Wheeler process create electrons
     // in pc_product_ele and positrons in pc_product_pos
@@ -1665,8 +1661,6 @@ void MultiParticleContainer::doQedQuantumSync (int lev,
                                                const MultiFab& Bz)
 {
     WARPX_PROFILE("MultiParticleContainer::doQedQuantumSync()");
-
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
     // Loop over all species.
     // Electrons or positrons undergoing Quantum photon emission process

@@ -587,8 +587,6 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
     BL_ASSERT(OnSameGrids(lev, *fields.get(FieldType::current_fp, Direction{0}, lev)));
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
     const bool has_rho = fields.has(FieldType::rho_fp, lev);
     const bool has_buffer = fields.has_vector(FieldType::current_buf, lev);
 

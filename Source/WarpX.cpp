@@ -418,7 +418,12 @@ WarpX::WarpX ()
     if (enable_time_tracking)
     {
         warpx::load_balancing::ScopedTimeTracker::toggle_tracking(true);
-        warpx::load_balancing::ScopedTimeTracker::resize(true);
+
+        auto resize_vector = amrex::Vector{max_level};
+        for (int i = 0; i < max_level; ++i){
+            resize_vector[i] = 
+        }
+        warpx::load_balancing::ScopedTimeTracker::resize(resize_vector);
         // TODO //
         //     costs.resize(nlevs_max);
     }
