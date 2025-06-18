@@ -23,10 +23,6 @@ comm = mpi.COMM_WORLD
 
 simulation = picmi.Simulation(warpx_serialize_initial_conditions=True, verbose=False)
 
-from pywarpx import warpx as warpx_bucket
-
-warpx_bucket.do_divb_cleaning_external = False
-
 
 class PlasmaCylinderCompression(object):
     # B0 is chosen with all other quantities scaled by it
@@ -293,7 +289,7 @@ class PlasmaCylinderCompression(object):
         # Add field loader callback
         B_ext = picmi.LoadInitialFieldFromPython(
             load_from_python=self.load_fields,
-            # warpx_do_divb_cleaning_external=True,
+            warpx_do_divb_cleaning_external=True,
             load_B=True,
             load_E=False,
         )
