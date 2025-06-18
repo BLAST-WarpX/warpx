@@ -54,7 +54,7 @@ namespace warpx::load_balancing
         amrex::Real m_start_time;
 
         bool m_enabled_local;
-        bool m_valid  = true;
+        bool m_stopped  = false;
     };
 }
 

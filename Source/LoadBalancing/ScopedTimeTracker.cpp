@@ -52,12 +52,11 @@ namespace warpx::load_balancing
     void ScopedTimeTracker::stop_and_record ()
     {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            m_valid,
+            !m_stopped,
             "ScopedTimeTracker can't be stopped multiple times!");
 
         record_time();
-
-        m_valid = false;
+        m_stopped = true;
     }
 
     void ScopedTimeTracker::toggle_tracking(const bool do_tracking_flag)
@@ -86,7 +85,7 @@ namespace warpx::load_balancing
 
     void ScopedTimeTracker::record_time ()
     {
-        if (ScopedTimeTracker::do_tracking && m_enabled_local && m_valid)
+        if (ScopedTimeTracker::do_tracking && m_enabled_local && (!m_stopped))
         {
             amrex::Gpu::synchronize();
             const auto end_time = static_cast<amrex::Real>(amrex::second());
