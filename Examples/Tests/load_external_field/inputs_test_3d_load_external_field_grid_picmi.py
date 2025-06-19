@@ -67,7 +67,7 @@ ions = picmi.Species(
 initial_field = picmi.LoadInitialField(
     read_fields_from_path="../../../../openPMD-example-datasets/example-femm-3d.h5",
     load_E=False,
-    warpx_do_divb_cleaning_external=False,
+    warpx_do_initial_div_cleaning=False,
 )
 
 #################################

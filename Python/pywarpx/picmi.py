@@ -2203,10 +2203,25 @@ class LaserAntenna(picmistandard.PICMI_LaserAntenna):
 
 
 class LoadInitialField(picmistandard.PICMI_LoadGriddedField):
+    """
+    Field Initializer that loads the initial field from a file.
+
+    Parameters
+    ----------
+    warpx_do_initial_div_cleaning: bool, default=True
+        Flag that controls whether or not to execute the Projection based B-field divergence cleaner.
+
+    warpx_projection_div_cleaner_atol: float
+        Controls the absolute tolerance used in the divergence cleaner solve.
+
+    warpx_projection_div_cleaner_rtol: float
+        Controls the relative tolerance used in the divergence cleaner solve.
+    """
+
     def init(self, kw):
-        self.do_divb_cleaning_external = kw.pop("warpx_do_divb_cleaning_external", None)
-        self.divb_cleaner_atol = kw.pop("warpx_projection_divb_cleaner_atol", None)
-        self.divb_cleaner_rtol = kw.pop("warpx_projection_divb_cleaner_rtol", None)
+        self.do_initial_div_cleaning = kw.pop("warpx_do_initial_div_cleaning", None)
+        self.div_cleaner_atol = kw.pop("warpx_projection_div_cleaner_atol", None)
+        self.div_cleaner_rtol = kw.pop("warpx_projection_div_cleaner_rtol", None)
 
     def applied_field_initialize_inputs(self):
         pywarpx.warpx.read_fields_from_path = self.read_fields_from_path
@@ -2214,9 +2229,13 @@ class LoadInitialField(picmistandard.PICMI_LoadGriddedField):
             pywarpx.warpx.E_ext_grid_init_style = "read_from_file"
         if self.load_B:
             pywarpx.warpx.B_ext_grid_init_style = "read_from_file"
-            pywarpx.warpx.do_divb_cleaning_external = self.do_divb_cleaning_external
-            pywarpx.projectiondivbcleaner.atol = self.divb_cleaner_atol
-            pywarpx.projectiondivbcleaner.rtol = self.divb_cleaner_rtol
+            pywarpx.warpx.do_initial_div_cleaning = self.do_initial_div_cleaning
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "atol", self.div_cleaner_atol
+            )
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "rtol", self.div_cleaner_rtol
+            )
 
 
 class LoadInitialFieldFromPython:
@@ -2229,8 +2248,14 @@ class LoadInitialFieldFromPython:
 
     Parameters
     ----------
-    warpx_do_divb_cleaning_external: bool, default=True
+    warpx_do_initial_div_cleaning: bool, default=True
         Flag that controls whether or not to execute the Projection based B-field divergence cleaner.
+
+    warpx_projection_div_cleaner_atol: float
+        Controls the absolute tolerance used in the divergence cleaner solve.
+
+    warpx_projection_div_cleaner_rtol: float
+        Controls the relative tolerance used in the divergence cleaner solve.
 
     load_E: bool, default=True
         E field is expected to be loaded in the registered callback.
@@ -2240,9 +2265,9 @@ class LoadInitialFieldFromPython:
     """
 
     def __init__(self, **kw):
-        self.do_divb_cleaning_external = kw.pop("warpx_do_divb_cleaning_external", None)
-        self.divb_cleaner_atol = kw.pop("warpx_projection_divb_cleaner_atol", None)
-        self.divb_cleaner_rtol = kw.pop("warpx_projection_divb_cleaner_rtol", None)
+        self.do_initial_div_cleaning = kw.pop("warpx_do_initial_div_cleaning", None)
+        self.div_cleaner_atol = kw.pop("warpx_projection_div_cleaner_atol", None)
+        self.div_cleaner_rtol = kw.pop("warpx_projection_div_cleaner_rtol", None)
 
         # If using load_from_python, a function handle is expected for callback
         self.load_from_python = kw.pop("load_from_python")
@@ -2254,17 +2279,42 @@ class LoadInitialFieldFromPython:
             pywarpx.warpx.E_ext_grid_init_style = "load_from_python"
         if self.load_B:
             pywarpx.warpx.B_ext_grid_init_style = "load_from_python"
-            pywarpx.warpx.do_divb_cleaning_external = self.do_divb_cleaning_external
-            pywarpx.projectiondivbcleaner.atol = self.divb_cleaner_atol
-            pywarpx.projectiondivbcleaner.rtol = self.divb_cleaner_rtol
+            pywarpx.warpx.do_initial_div_cleaning = self.do_initial_div_cleaning
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "atol", self.div_cleaner_atol
+            )
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "rtol", self.div_cleaner_rtol
+            )
 
         pywarpx.callbacks.installloadExternalFields(self.load_from_python)
 
 
 class AnalyticInitialField(picmistandard.PICMI_AnalyticAppliedField):
-    def init(self, kw):
+    """
+    Field Initializer that takes an implicit function to be loaded as an initial E/B field.
+
+    Parameters
+    ----------
+    warpx_do_initial_div_cleaning: bool, default=True
+        Flag that controls whether or not to execute the Projection based B-field divergence cleaner.
+
+    warpx_projection_div_cleaner_atol: float
+        Controls the absolute tolerance used in the divergence cleaner solve.
+
+    warpx_projection_div_cleaner_rtol: float
+        Controls the relative tolerance used in the divergence cleaner solve.
+    """
+
+    def __init__(self, **kw):
         self.mangle_dict = None
         self.maxlevel_extEMfield_init = kw.pop("warpx_maxlevel_extEMfield_init", None)
+
+        self.do_initial_div_cleaning = kw.pop("warpx_do_initial_div_cleaning", None)
+        self.div_cleaner_atol = kw.pop("warpx_projection_div_cleaner_atol", None)
+        self.div_cleaner_rtol = kw.pop("warpx_projection_div_cleaner_rtol", None)
+
+        super().__init__(**kw)
 
     def applied_field_initialize_inputs(self):
         # Note that lower and upper_bound are not used by WarpX
@@ -2308,15 +2358,36 @@ class AnalyticInitialField(picmistandard.PICMI_AnalyticAppliedField):
                 pywarpx.warpx.__setattr__(
                     f"B{sdir}_external_grid_function(x,y,z)", expression
                 )
+            pywarpx.warpx.do_initial_div_cleaning = self.do_initial_div_cleaning
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "atol", self.div_cleaner_atol
+            )
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "rtol", self.div_cleaner_rtol
+            )
 
 
 class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
+    def __init__(self, **kw):
+        self.do_initial_div_cleaning = kw.pop("warpx_do_initial_div_cleaning", None)
+        self.div_cleaner_atol = kw.pop("warpx_projection_div_cleaner_atol", None)
+        self.div_cleaner_rtol = kw.pop("warpx_projection_div_cleaner_rtol", None)
+
+        super().__init__(**kw)
+
     def applied_field_initialize_inputs(self):
         pywarpx.particles.read_fields_from_path = self.read_fields_from_path
         if self.load_E:
             pywarpx.particles.E_ext_particle_init_style = "read_from_file"
         if self.load_B:
             pywarpx.particles.B_ext_particle_init_style = "read_from_file"
+            pywarpx.warpx.do_initial_div_cleaning = self.do_initial_div_cleaning
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "atol", self.div_cleaner_atol
+            )
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "rtol", self.div_cleaner_rtol
+            )
 
 
 class ConstantAppliedField(picmistandard.PICMI_ConstantAppliedField):
