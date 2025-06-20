@@ -64,7 +64,7 @@ public:
      * \brief Wrapper to call MultiParticleContainer's collision method
      */
     void DoCollisions (
-        amrex::Real a_step,
+        int a_step,
         amrex::Real a_cur_time,
         amrex::Real a_dt
     ) const;

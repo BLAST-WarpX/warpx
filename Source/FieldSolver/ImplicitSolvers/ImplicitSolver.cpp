@@ -30,7 +30,7 @@ void ImplicitSolver::CreateParticleAttributes () const
 }
 
 void ImplicitSolver::DoCollisions (
-    amrex::Real a_step,
+    int a_step,
     amrex::Real a_cur_time,
     amrex::Real a_dt
 ) const

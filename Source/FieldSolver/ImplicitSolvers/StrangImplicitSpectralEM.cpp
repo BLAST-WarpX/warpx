@@ -65,6 +65,8 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real start_time,
 {
     amrex::ignore_unused(a_step);
 
+    DoCollisions(a_step, start_time, a_dt);
+
     // Fields have E^{n} and B^{n}
     // Particles have p^{n} and x^{n}.
 
