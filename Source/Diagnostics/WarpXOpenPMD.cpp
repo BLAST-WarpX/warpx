@@ -12,12 +12,12 @@
 #include "Particles/Filter/FilterFunctors.H"
 #include "Utils/TextMsg.H"
 #include "Utils/Parser/ParserUtils.H"
-#include "Utils/RelativeCellPosition.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 #include "OpenPMDHelpFunction.H"
 
+#include <ablastr/utils/RelativeCellPosition.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX.H>
@@ -1312,7 +1312,7 @@ WarpXOpenPMDPlot::SetupMeshComp (openPMD::Mesh& mesh,
     mesh_comp.resetDataset(dataset);
 
     ::detail::setOpenPMDUnit( mesh, field_name );
-    auto relative_cell_pos = utils::getRelativeCellPosition(mf);     // AMReX Fortran index order
+    auto relative_cell_pos = ablastr::utils::getRelativeCellPosition(mf);     // AMReX Fortran index order
     std::reverse( relative_cell_pos.begin(), relative_cell_pos.end() ); // now in C order
     mesh_comp.setPosition( relative_cell_pos );
 }

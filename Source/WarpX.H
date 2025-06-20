@@ -284,6 +284,9 @@ public:
     //! Order of the particle shape factors (splines) along z
     static int noz;
 
+    //! Maximum number of allowed grid crossings for particles
+    static int particle_max_grid_crossings;
+
     //! Order of finite centering of fields (from staggered grid to nodal grid), along x
     static int field_centering_nox;
     //! Order of finite centering of fields (from staggered grid to nodal grid), along y
@@ -506,6 +509,14 @@ public:
      * push), to be used in the ``HybridPICEvolveFields()`` function.
      */
     void HybridPICDepositInitialRhoAndJ ();
+
+    /**
+     * \brief Hybrid-PIC deposition function.
+     * Helper function to contain all the needed logic to deposit charge and
+     * current densities for use in the Ohm's law solver. The deposition is
+     * done into the ``rho_fp`` and ``current_fp`` multifabs.
+     */
+    void HybridPICDepositRhoAndJ ();
 
     /** apply QED correction on electric field
      *
@@ -1399,7 +1410,7 @@ private:
 
     //! Solve Poisson equation when loading an external magnetic field to clean divergence
     //! This is useful to remove errors that could lead to non-zero B field divergence
-    bool m_do_divb_cleaning_external = false;
+    bool m_do_initial_div_cleaning = false;
 
     //! Domain decomposition on Level 0
     amrex::IntVect numprocs{0};

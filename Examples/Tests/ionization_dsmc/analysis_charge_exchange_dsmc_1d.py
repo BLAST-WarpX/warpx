@@ -7,7 +7,7 @@ from scipy.constants import c
 
 # Read in the cross-section data for comparison with theory
 cross_section_data = np.loadtxt(
-    "../../../../warpx-data/MCC_cross_sections/H/H_on_H2_ionization.dat"
+    "../../../../warpx-data/MCC_cross_sections/H/Hion_on_H2_charge_exchange.dat"
 )
 E_eV = 12e3
 E_com_eV = E_eV * 2.0 / 3
@@ -20,12 +20,12 @@ ts = OpenPMDTimeSeries("./diags/diag")
 
 # Compute the beam flux for ions and neutral, as a function of z, and compute with theory
 iteration = 100
-sim_flux = {"Hneutral": [], "Hplus": []}
-theory_flux = {"Hneutral": [], "Hplus": []}
+sim_flux = {"H": [], "Hplus": []}
+theory_flux = {"H": [], "Hplus": []}
 
 # Compute the simulation flux
 # Loop over species
-for species in ["Hneutral", "Hplus"]:
+for species in ["H", "Hplus"]:
     z, w, uz = ts.get_particle(
         ["z", "w", "uz"],
         species=species,
@@ -40,18 +40,19 @@ for species in ["Hneutral", "Hplus"]:
 # Compute the theoretical flux
 n = 1e21
 flux = 1e20
-zmax = 0.2
 z_th = bins[:-1]
-theory_flux["Hneutral"] = flux * np.exp(-z_th * n * cross_section)
-theory_flux["Hplus"] = flux * (1 - np.exp(-z_th * n * cross_section))
+theory_flux["Hplus"] = flux * np.exp(-z_th * n * cross_section)  # remaining Hplus flux
+theory_flux["H"] = flux * (
+    1 - np.exp(-z_th * n * cross_section)
+)  # H flux, which underwent the charge exchange
 
 # Compare the fluxes
-assert np.allclose(sim_flux["Hneutral"], theory_flux["Hneutral"], atol=5e-2 * flux)
 assert np.allclose(sim_flux["Hplus"], theory_flux["Hplus"], atol=5e-2 * flux)
+assert np.allclose(sim_flux["H"], theory_flux["H"], atol=5e-2 * flux)
 
 # Plot the computed fluxes
 plt.figure()
-for species, color in zip(["Hneutral", "Hplus"], ["b", "r"]):
+for species, color in zip(["H", "Hplus"], ["b", "r"]):
     plt.plot(bins[:-1], sim_flux[species], color=color, label=species)
     plt.plot(z_th, theory_flux[species], color=color, ls=":")
 plt.legend(loc=0)

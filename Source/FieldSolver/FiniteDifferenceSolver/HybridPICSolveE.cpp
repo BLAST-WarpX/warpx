@@ -17,6 +17,7 @@
 #   include "FiniteDifferenceAlgorithms/SphericalYeeAlgorithm.H"
 #else
 #   include "FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
+#   include "FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
 #endif
 #include "HybridPICModel/HybridPICModel.H"
 #include "Utils/TextMsg.H"
@@ -47,9 +48,16 @@ void FiniteDifferenceSolver::CalculateCurrentAmpere (
         );
 
 #else
+    if (WarpX::GetInstance().grid_type == GridType::Staggered)
+    {
         CalculateCurrentAmpereCartesian <CartesianYeeAlgorithm> (
             Jfield, Bfield, eb_update_E, lev
         );
+    } else {
+        CalculateCurrentAmpereCartesian <CartesianNodalAlgorithm> (
+            Jfield, Bfield, eb_update_E, lev
+        );
+    }
 
 #endif
     } else {
@@ -500,12 +508,18 @@ void FiniteDifferenceSolver::HybridPICSolveE (
         );
 
 #else
-
+    if (WarpX::GetInstance().grid_type == GridType::Staggered)
+    {
         HybridPICSolveECartesian <CartesianYeeAlgorithm> (
             Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
             eb_update_E, lev, hybrid_model, solve_for_Faraday
         );
-
+    } else {
+        HybridPICSolveECartesian <CartesianNodalAlgorithm> (
+            Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
+            eb_update_E, lev, hybrid_model, solve_for_Faraday
+        );
+    }
 #endif
     } else {
         amrex::Abort(Utils::TextMsg::Err(
