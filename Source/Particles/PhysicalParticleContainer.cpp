@@ -3496,7 +3496,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
             // Try advancing the particle a fraction of a step
             amrex::ParticleReal step_norm = 1._prt;
-            for (int iter=0; iter<max_iterations;) {
+            int iter;
+            for (iter = 0; iter < max_iterations;) {
 
                 dxp = 0.0;
                 dyp = 0.0;
@@ -3590,42 +3591,46 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
                 iter++;
 
-                // particle did not converge
-                if ( iter > 1 && iter == max_iterations ) {
-                    // Increase the number of suborbits and start over
-                    num_suborbits++;
-                    isuborbit = 0;
-
-                    xp_n = xp_n0;
-                    yp_n = yp_n0;
-                    zp_n = zp_n0;
-
-                    uxp_n = uxp_n0;
-                    uyp_n = uyp_n0;
-                    uzp_n = uzp_n0;
-
-                    ux[ip] = uxp_n0;
-                    uy[ip] = uyp_n0;
-                    uz[ip] = uzp_n0;
-                }
-
             } // end Picard iterations
 
-            // That step was successful, update the starting values for the next suborbit
-            // interpolating to the end of the step.
-            xp_n = 2.*xp - xp_n;
-            yp_n = 2.*yp - yp_n;
-            zp_n = 2.*zp - zp_n;
-            uxp_n = 2.*ux[ip] - uxp_n;
-            uyp_n = 2.*uy[ip] - uyp_n;
-            uzp_n = 2.*uz[ip] - uzp_n;
-            ux[ip] = uxp_n;
-            uy[ip] = uyp_n;
-            uz[ip] = uzp_n;
+            if ( iter == max_iterations ) {
 
-            isuborbit++;
+                // particle did not converge
+                // Increase the number of suborbits and start over
+                num_suborbits++;
+                isuborbit = 0;
 
-            if (isuborbit >= max_suborbits) {
+                xp_n = xp_n0;
+                yp_n = yp_n0;
+                zp_n = zp_n0;
+
+                uxp_n = uxp_n0;
+                uyp_n = uyp_n0;
+                uzp_n = uzp_n0;
+
+                ux[ip] = uxp_n0;
+                uy[ip] = uyp_n0;
+                uz[ip] = uzp_n0;
+
+            } else {
+
+                isuborbit++;
+
+                // That step was successful, update the starting values for the next suborbit
+                // interpolating to the end of the step.
+                xp_n = 2.*xp - xp_n;
+                yp_n = 2.*yp - yp_n;
+                zp_n = 2.*zp - zp_n;
+                uxp_n = 2.*ux[ip] - uxp_n;
+                uyp_n = 2.*uy[ip] - uyp_n;
+                uzp_n = 2.*uz[ip] - uzp_n;
+                ux[ip] = uxp_n;
+                uy[ip] = uyp_n;
+                uz[ip] = uzp_n;
+
+            }
+
+            if (num_suborbits >= max_suborbits) {
                 // This is very bad
                 amrex::Gpu::Atomic::Add(unconverged_particles_ptr, amrex::Long(1));
                 break;
@@ -3646,6 +3651,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
             if (do_ionization){
                 wq *= ion_lev[ip];
             }
+
+            wq /= num_suborbits;
 
             amrex::Real const dt_suborbit = dt/num_suborbits;
 
