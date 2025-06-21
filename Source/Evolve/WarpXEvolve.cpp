@@ -236,49 +236,8 @@ WarpX::Evolve (int numsteps)
         }
         // explicit solver
         else {
-            // multi-physics: collisions
-            // TODO move to OneStep functions
-            ExecutePythonCallback("beforecollisions");
-            mypc->doCollisions(step, cur_time, dt[0]);
-            ExecutePythonCallback("aftercollisions");
-
-            // electrostatic solver or hybrid solver
-            if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
-                electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
-                // only gather fields and push particles,
-                // deposition and calculation of fields done further below
-                const bool skip_deposition = true;
-                PushParticlesandDeposit(cur_time, skip_deposition);
-            }
-            // electromagnetic solver
-            else {
-                // without mesh refinement
-                if (finest_level == 0) {
-                        // standard PIC loop
-                        if (!m_JRhom) {
-                            OneStep_nosub(cur_time);
-                        }
-                        // JRhom PIC loop
-                        else {
-                            OneStep_JRhom(cur_time);
-                        }
-                }
-                // with mesh refinement
-                else {
-                    // without subcycling
-                    if (!m_do_subcycling) {
-                        OneStep_nosub(cur_time);
-                    }
-                    // with subcycling
-                    else {
-                        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                            finest_level == 1,
-                            "Subcycling not implemented with more than 1 mesh refinement level"
-                        );
-                        OneStep_sub1(cur_time);
-                    }
-                }
-            }
+            // TODO m_explicit_solver->OneStep(cur_time, dt[0], step);
+            OneStep(cur_time, dt[0], step);
         }
 
         // Resample particles
@@ -423,6 +382,61 @@ WarpX::Evolve (int numsteps)
 
     amrex::Print() <<
         ablastr::warn_manager::GetWMInstance().PrintGlobalWarnings("THE END");
+}
+
+void WarpX::OneStep(
+    amrex::Real a_cur_time,
+    amrex::Real a_dt,
+    int a_step
+)
+{
+    WARPX_PROFILE("WarpX::OneStep()");
+
+    // electrostatic solver or hybrid solver
+    if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
+        electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
+        // multi-physics: collisions
+        ExecutePythonCallback("beforecollisions");
+        mypc->doCollisions(a_step, a_cur_time, a_dt);
+        ExecutePythonCallback("aftercollisions");
+        // only gather fields and push particles,
+        // deposition and calculation of fields done further below
+        const bool skip_deposition = true;
+        PushParticlesandDeposit(a_cur_time, skip_deposition);
+    }
+    // electromagnetic solver
+    else {
+        // multi-physics: collisions
+        ExecutePythonCallback("beforecollisions");
+        mypc->doCollisions(a_step, a_cur_time, a_dt);
+        ExecutePythonCallback("aftercollisions");
+        // without mesh refinement
+        if (finest_level == 0) {
+                // standard PIC loop
+                if (!m_JRhom) {
+                    OneStep_nosub(a_cur_time);
+                }
+                // JRhom PIC loop
+                else {
+                    OneStep_JRhom(a_cur_time);
+                }
+        }
+        // with mesh refinement
+        else {
+            // without subcycling
+            if (!m_do_subcycling) {
+                OneStep_nosub(a_cur_time);
+            }
+            // with subcycling
+            else {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    finest_level == 1,
+                    "Subcycling not implemented with more than 1 mesh refinement level"
+                );
+                OneStep_sub1(a_cur_time);
+            }
+        }
+    }
 }
 
 /**

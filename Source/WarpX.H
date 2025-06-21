@@ -1056,6 +1056,16 @@ private:
 
     void AddExternalFields (int lev);
 
+    /**
+     * \brief
+     * Perform one PIC loop iteration in the explicit formulation.
+    */
+    void OneStep (
+        amrex::Real a_cur_time,
+        amrex::Real a_dt,
+        int a_step
+    );
+
     void OneStep_nosub (amrex::Real cur_time);
     void OneStep_sub1 (amrex::Real cur_time);
 
