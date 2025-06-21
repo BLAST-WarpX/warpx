@@ -37,7 +37,7 @@ def update(args):
 
     # loop over repositories and update configuration data
     for repo_name, repo_url in repo_dict.items():
-        print(f"Updating {repo_labels[repo_name]} dependency...")
+        print(f"\nUpdating {repo_labels[repo_name]} dependency...")
         # set keys to access configuration data
         commit_key = f"commit_{repo_name}"
         version_key = f"version_{repo_name}"
@@ -49,11 +49,21 @@ def update(args):
         # update repository commit
         print(f"- old commit/branch/sha: {config_data[commit_key]}")
         print(f"- new commit/branch/sha: {repo_commit}")
-        config_data[f"commit_{repo_name}"] = repo_commit
+        proceed = input("Do you want to continue? [y/n] ")
+        if proceed not in ["y", "Y"]:
+            print("Skipping update of commit/branch/sha...")
+        else:
+            print("Updating commit/branch/sha...")
+            config_data[f"commit_{repo_name}"] = repo_commit
         # update repository version
         print(f"- old minimal version required: {config_data[version_key]}")
         print(f"- new minimal version required: {repo_version}")
-        config_data[f"version_{repo_name}"] = repo_version
+        proceed = input("Do you want to continue? [y/n] ")
+        if proceed not in ["y", "Y"]:
+            print("Skipping update of minimal version required...")
+        else:
+            print("Updating minimal version required...")
+            config_data[f"version_{repo_name}"] = repo_version
 
     # write to JSON file with configuration data
     with open(config_file, "w") as file:
