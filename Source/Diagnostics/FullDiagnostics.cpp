@@ -444,6 +444,17 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                 if (update_varnames) {
                     AddRZModesToOutputNames(std::string("j"+field_names[idir]+"_displacement"), ncomp);
                 }
+            }  else if ( m_varnames_fields[comp].rfind("T"+field_names[idir]+"_", 0) == 0 ){
+                // Remove component to get string to lookup in field register.
+                std::string T_arr_str = std::string(m_varnames_fields[comp]);
+                T_arr_str.erase(T_arr_str.begin() + 1);
+                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(
+                    warpx.m_fields.get(T_arr_str, Direction{idir}, lev),
+                    lev, m_crse_ratio);
+
+                if (update_varnames) {
+                    AddRZModesToOutputNames(m_varnames_fields[comp], ncomp);
+                }
             }
         }
         // Check if comp was found above

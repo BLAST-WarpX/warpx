@@ -1803,7 +1803,7 @@ WarpXParticleContainer::DepositTotalNGPTemperature (amrex::MultiFab* temperature
 }
 
 std::unique_ptr<amrex::MultiFab>
-WarpXParticleContainer::GetIsotropicNGPTemperature (int lev)
+WarpXParticleContainer::GetAverageNGPTemperature (int lev)
 {
     auto const& ba = m_gdb->ParticleBoxArray(lev);
     auto const& dm = m_gdb->DistributionMap(lev);
@@ -1908,7 +1908,7 @@ WarpXParticleContainer::GetDebyeLength (int lev)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(mass*charge != 0.,
         "The Debye length can not be calculated for a massless or neutral species.");
 
-    std::unique_ptr<amrex::MultiFab> temperature = GetIsotropicNGPTemperature(lev);
+    std::unique_ptr<amrex::MultiFab> temperature = GetAverageNGPTemperature(lev);
     std::unique_ptr<amrex::MultiFab> number_density = GetNumberDensity(lev);
 
     amrex::BoxArray const & ba = temperature->boxArray();

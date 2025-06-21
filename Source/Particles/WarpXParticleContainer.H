@@ -372,7 +372,7 @@ public:
     {}
 
     void DepositTotalNGPTemperature (amrex::MultiFab* temperature, const int lev);
-    std::unique_ptr<amrex::MultiFab> GetIsotropicNGPTemperature (int lev);
+    std::unique_ptr<amrex::MultiFab> GetAverageNGPTemperature (int lev);
 
     void DepositNumberDensity (amrex::MultiFab* number_density, const int lev);
     std::unique_ptr<amrex::MultiFab> GetNumberDensity (int lev);
