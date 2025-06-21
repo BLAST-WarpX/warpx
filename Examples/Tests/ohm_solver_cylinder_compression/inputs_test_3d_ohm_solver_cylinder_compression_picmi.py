@@ -57,7 +57,7 @@ class PlasmaCylinderCompression(object):
     NZ = 128
 
     # Starting number of particles per cell
-    NPPC = 100
+    NPPC = 10
 
     # Number of substeps used to update B
     substeps = 20
@@ -95,8 +95,8 @@ class PlasmaCylinderCompression(object):
 
             RM = np.sqrt(XM**2 + YM**2)
 
-            Ax_data = -0.5 * YM * self.dB
-            Ay_data = 0.5 * XM * self.dB
+            Ax_data = -0.25 * YM * self.dB
+            Ay_data = 0.25 * XM * self.dB
             Az_data = np.zeros_like(RM)
 
             # Write vector potential to file to exercise field loading via OpenPMD
@@ -261,11 +261,17 @@ class PlasmaCylinderCompression(object):
         #######################################################################
         # External Field definition. Sigmoid starting around 2.5 us
         A_ext = {
-            "uniform": {
+            "uniform_file": {
                 "read_from_file": True,
                 "path": "Afield.h5",
                 "A_time_external_function": "1/(1+exp(5*(1-(t-t0_ramp)*sqrt(2)/tau_ramp)))",
-            }
+            },
+            "uniform_analytical": {
+                "Ax_external_function": f"-0.25*y*{self.dB}",
+                "Ay_external_function": f"0.25*x*{self.dB}",
+                "Az_external_function": "0",
+                "A_time_external_function": "1/(1+exp(5*(1-(t-t0_ramp)*sqrt(2)/tau_ramp)))",
+            },
         }
 
         self.solver = picmi.HybridPICSolver(
@@ -349,7 +355,7 @@ class PlasmaCylinderCompression(object):
             name="diag1",
             grid=self.grid,
             period=self.diag_steps,
-            data_list=["B", "E", "rho"],
+            data_list=["B", "E", "rho", "divB"],
             write_dir="diags",
             warpx_format="plotfile",
         )

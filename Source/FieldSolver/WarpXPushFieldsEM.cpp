@@ -100,6 +100,169 @@ namespace {
         solver.BackwardTransform(lev, *vector_field[2], compz, fill_guards);
 #endif
     }
+
+    /**
+     * \brief Correct current in Fourier space so that the continuity equation is satisfied
+     */
+    template <typename SpectralSolverType>
+    void PSATDCurrentCorrection (
+        const int finest_level,
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_fp,
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_cp)
+    {
+        for (int lev = 0; lev <= finest_level; ++lev)
+        {
+            spectral_solver_fp[lev]->CurrentCorrection();
+            if (spectral_solver_cp[lev])
+            {
+                spectral_solver_cp[lev]->CurrentCorrection();
+            }
+        }
+    }
+
+    /**
+     * \brief Vay deposition in Fourier space (https://doi.org/10.1016/j.jcp.2013.03.010)
+     */
+    template <typename SpectralSolverType>
+    void PSATDVayDeposition (
+        const int finest_level,
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_fp,
+        amrex::Vector<std::unique_ptr<SpectralSolverType>>& spectral_solver_cp)
+    {
+        for (int lev = 0; lev <= finest_level; ++lev)
+        {
+            spectral_solver_fp[lev]->VayDeposition();
+            if (spectral_solver_cp[lev])
+            {
+                spectral_solver_cp[lev]->VayDeposition();
+            }
+        }
+    }
+
+    /**
+     * \brief Subtract the average of the cumulative sums of the preliminary current D
+     *        from the current J (computed from D according to the Vay deposition scheme)
+     */
+    void PSATDSubtractCurrentPartialSumsAvg (
+        [[maybe_unused]] const amrex::Vector<std::array<Real,3>> cell_size_at_all_levels,
+        [[maybe_unused]] ablastr::fields::MultiFabRegister& fields)
+    {
+        using ablastr::fields::Direction;
+
+        // Subtraction of cumulative sum for Vay deposition
+        // implemented only in 2D and 3D Cartesian geometry
+    #if !defined (WARPX_DIM_1D_Z) && !defined (WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+
+        // TODO Implementation with coarse patches
+        // TODO Implementation with current centering
+
+        const auto num_levels = cell_size_at_all_levels.size();
+        for (int lev = 0; lev < num_levels; ++lev)
+        {
+            const std::array<amrex::Real,3>& dx = cell_size_at_all_levels[lev];
+
+            amrex::MultiFab const& Dx = *fields.get(FieldType::current_fp_vay, Direction{0}, lev);
+            amrex::MultiFab const& Dy = *fields.get(FieldType::current_fp_vay, Direction{1}, lev);
+            amrex::MultiFab const& Dz = *fields.get(FieldType::current_fp_vay, Direction{2}, lev);
+
+    #if defined (WARPX_DIM_XZ)
+            amrex::ignore_unused(Dy);
+    #endif
+
+        amrex::MultiFab& Jx = *fields.get(FieldType::current_fp, Direction{0}, lev);
+
+
+    #ifdef AMREX_USE_OMP
+    #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+    #endif
+            // Subtract average of cumulative sum from Jx
+            for (amrex::MFIter mfi(Jx); mfi.isValid(); ++mfi)
+            {
+                const amrex::Box& bx = mfi.fabbox();
+
+                amrex::Array4<amrex::Real> const& Jx_arr = Jx.array(mfi);
+                amrex::Array4<amrex::Real const> const& Dx_arr = Dx.const_array(mfi);
+
+                const amrex::Dim3 lo = amrex::lbound(bx);
+                const amrex::Dim3 hi = amrex::ubound(bx);
+                const int nx = hi.x - lo.x + 1;
+                const amrex::Real facx = dx[0] / static_cast<amrex::Real>(nx);
+
+                // Subtract average of cumulative sum along x only
+                amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+                {
+                    for (int ii = lo.x; ii <= hi.x; ++ii)
+                    {
+                        Jx_arr(i,j,k) -= (nx-ii) * Dx_arr(ii,j,k) * facx;
+                    }
+                });
+            }
+
+    #if defined (WARPX_DIM_3D)
+            // Subtract average of cumulative sum from Jy
+            amrex::MultiFab& Jy = *fields.get(FieldType::current_fp, Direction{1}, lev);;
+            for (amrex::MFIter mfi(Jy); mfi.isValid(); ++mfi)
+            {
+                const amrex::Box& bx = mfi.fabbox();
+
+                amrex::Array4<amrex::Real> const& Jy_arr = Jy.array(mfi);
+                amrex::Array4<amrex::Real const> const& Dy_arr = Dy.const_array(mfi);
+
+                const amrex::Dim3 lo = amrex::lbound(bx);
+                const amrex::Dim3 hi = amrex::ubound(bx);
+                const int ny = hi.y - lo.y + 1;
+                const amrex::Real facy = dx[1] / static_cast<amrex::Real>(ny);
+
+                // Subtract average of cumulative sum along y only
+                amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+                {
+                    for (int jj = lo.y; jj <= hi.y; ++jj)
+                    {
+                        Jy_arr(i,j,k) -= (ny-jj) * Dy_arr(i,jj,k) * facy;
+                    }
+                });
+            }
+    #endif
+
+            // Subtract average of cumulative sum from Jz
+            amrex::MultiFab& Jz = *fields.get(FieldType::current_fp, Direction{2}, lev);
+            for (amrex::MFIter mfi(Jz); mfi.isValid(); ++mfi)
+            {
+                const amrex::Box& bx = mfi.fabbox();
+
+                amrex::Array4<amrex::Real> const& Jz_arr = Jz.array(mfi);
+                amrex::Array4<amrex::Real const> const& Dz_arr = Dz.const_array(mfi);
+
+                const amrex::Dim3 lo = amrex::lbound(bx);
+                const amrex::Dim3 hi = amrex::ubound(bx);
+    #if defined (WARPX_DIM_XZ)
+                const int nz = hi.y - lo.y + 1;
+    #elif defined (WARPX_DIM_3D)
+                const int nz = hi.z - lo.z + 1;
+    #endif
+                const amrex::Real facz = dx[2] / static_cast<amrex::Real>(nz);
+
+                // Subtract average of cumulative sum along z only
+                amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+                {
+    #if defined (WARPX_DIM_XZ)
+                    // z direction is in the second component
+                    for (int jj = lo.y; jj <= hi.y; ++jj)
+                    {
+                        Jz_arr(i,j,k) -= (nz-jj) * Dz_arr(i,jj,k) * facz;
+                    }
+    #elif defined (WARPX_DIM_3D)
+                    // z direction is in the third component
+                    for (int kk = lo.z; kk <= hi.z; ++kk)
+                    {
+                        Jz_arr(i,j,k) -= (nz-kk) * Dz_arr(i,j,kk) * facz;
+                    }
+    #endif
+                });
+            }
+        }
+    #endif
+    }
 }
 
 void WarpX::PSATDForwardTransformEB ()
@@ -325,9 +488,9 @@ void WarpX::PSATDForwardTransformJ (
     {
         Idx = spectral_solver_fp[lev]->m_spectral_index;
 
-        idx_jx = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jx_new) : static_cast<int>(Idx.Jx_mid);
-        idx_jy = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jy_new) : static_cast<int>(Idx.Jy_mid);
-        idx_jz = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jz_new) : static_cast<int>(Idx.Jz_mid);
+        idx_jx = (time_dependency_J != TimeDependencyJ::Constant) ? static_cast<int>(Idx.Jx_new) : static_cast<int>(Idx.Jx_mid);
+        idx_jy = (time_dependency_J != TimeDependencyJ::Constant) ? static_cast<int>(Idx.Jy_new) : static_cast<int>(Idx.Jy_mid);
+        idx_jz = (time_dependency_J != TimeDependencyJ::Constant) ? static_cast<int>(Idx.Jz_new) : static_cast<int>(Idx.Jz_mid);
 
         if (m_fields.has_vector(J_fp_string, lev)) {
             ablastr::fields::VectorField const J_fp = m_fields.get_alldirs(J_fp_string, lev);
@@ -338,9 +501,9 @@ void WarpX::PSATDForwardTransformJ (
         {
             Idx = spectral_solver_cp[lev]->m_spectral_index;
 
-            idx_jx = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jx_new) : static_cast<int>(Idx.Jx_mid);
-            idx_jy = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jy_new) : static_cast<int>(Idx.Jy_mid);
-            idx_jz = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jz_new) : static_cast<int>(Idx.Jz_mid);
+            idx_jx = (time_dependency_J != TimeDependencyJ::Constant) ? static_cast<int>(Idx.Jx_new) : static_cast<int>(Idx.Jx_mid);
+            idx_jy = (time_dependency_J != TimeDependencyJ::Constant) ? static_cast<int>(Idx.Jy_new) : static_cast<int>(Idx.Jy_mid);
+            idx_jz = (time_dependency_J != TimeDependencyJ::Constant) ? static_cast<int>(Idx.Jz_new) : static_cast<int>(Idx.Jz_mid);
 
             if (m_fields.has_vector(J_cp_string, lev)) {
                 ablastr::fields::VectorField const J_cp =  m_fields.get_alldirs(J_cp_string, lev);
@@ -357,9 +520,9 @@ void WarpX::PSATDForwardTransformJ (
         {
             Idx = spectral_solver_fp[lev]->m_spectral_index;
 
-            idx_jx = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jx_new) : static_cast<int>(Idx.Jx_mid);
-            idx_jy = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jy_new) : static_cast<int>(Idx.Jy_mid);
-            idx_jz = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jz_new) : static_cast<int>(Idx.Jz_mid);
+            idx_jx = (time_dependency_J == TimeDependencyJ::Linear) ? static_cast<int>(Idx.Jx_new) : static_cast<int>(Idx.Jx_mid);
+            idx_jy = (time_dependency_J == TimeDependencyJ::Linear) ? static_cast<int>(Idx.Jy_new) : static_cast<int>(Idx.Jy_mid);
+            idx_jz = (time_dependency_J == TimeDependencyJ::Linear) ? static_cast<int>(Idx.Jz_new) : static_cast<int>(Idx.Jz_mid);
 
             spectral_solver_fp[lev]->ApplyFilter(lev, idx_jx, idx_jy, idx_jz);
 
@@ -367,9 +530,9 @@ void WarpX::PSATDForwardTransformJ (
             {
                 Idx = spectral_solver_cp[lev]->m_spectral_index;
 
-                idx_jx = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jx_new) : static_cast<int>(Idx.Jx_mid);
-                idx_jy = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jy_new) : static_cast<int>(Idx.Jy_mid);
-                idx_jz = (J_in_time == JInTime::Linear) ? static_cast<int>(Idx.Jz_new) : static_cast<int>(Idx.Jz_mid);
+                idx_jx = (time_dependency_J == TimeDependencyJ::Linear) ? static_cast<int>(Idx.Jx_new) : static_cast<int>(Idx.Jx_mid);
+                idx_jy = (time_dependency_J == TimeDependencyJ::Linear) ? static_cast<int>(Idx.Jy_new) : static_cast<int>(Idx.Jy_mid);
+                idx_jz = (time_dependency_J == TimeDependencyJ::Linear) ? static_cast<int>(Idx.Jz_new) : static_cast<int>(Idx.Jz_mid);
 
                 spectral_solver_cp[lev]->ApplyFilter(lev, idx_jx, idx_jy, idx_jz);
             }
@@ -466,150 +629,6 @@ void WarpX::PSATDForwardTransformRho (
 #endif
 }
 
-void WarpX::PSATDCurrentCorrection ()
-{
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        spectral_solver_fp[lev]->CurrentCorrection();
-
-        if (spectral_solver_cp[lev])
-        {
-            spectral_solver_cp[lev]->CurrentCorrection();
-        }
-    }
-}
-
-void WarpX::PSATDVayDeposition ()
-{
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        spectral_solver_fp[lev]->VayDeposition();
-
-        if (spectral_solver_cp[lev])
-        {
-            spectral_solver_cp[lev]->VayDeposition();
-        }
-    }
-}
-
-void WarpX::PSATDSubtractCurrentPartialSumsAvg ()
-{
-    using ablastr::fields::Direction;
-
-    // Subtraction of cumulative sum for Vay deposition
-    // implemented only in 2D and 3D Cartesian geometry
-#if !defined (WARPX_DIM_1D_Z) && !defined (WARPX_DIM_RZ)
-
-    // TODO Implementation with coarse patches
-    // TODO Implementation with current centering
-
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        const std::array<amrex::Real,3>& dx = WarpX::CellSize(lev);
-
-        amrex::MultiFab const& Dx = *m_fields.get(FieldType::current_fp_vay, Direction{0}, lev);
-        amrex::MultiFab const& Dy = *m_fields.get(FieldType::current_fp_vay, Direction{1}, lev);
-        amrex::MultiFab const& Dz = *m_fields.get(FieldType::current_fp_vay, Direction{2}, lev);
-
-#if defined (WARPX_DIM_XZ)
-        amrex::ignore_unused(Dy);
-#endif
-
-    amrex::MultiFab& Jx = *m_fields.get(FieldType::current_fp, Direction{0}, lev);
-
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-        // Subtract average of cumulative sum from Jx
-        for (amrex::MFIter mfi(Jx); mfi.isValid(); ++mfi)
-        {
-            const amrex::Box& bx = mfi.fabbox();
-
-            amrex::Array4<amrex::Real> const& Jx_arr = Jx.array(mfi);
-            amrex::Array4<amrex::Real const> const& Dx_arr = Dx.const_array(mfi);
-
-            const amrex::Dim3 lo = amrex::lbound(bx);
-            const amrex::Dim3 hi = amrex::ubound(bx);
-            const int nx = hi.x - lo.x + 1;
-            const amrex::Real facx = dx[0] / static_cast<amrex::Real>(nx);
-
-            // Subtract average of cumulative sum along x only
-            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-            {
-                for (int ii = lo.x; ii <= hi.x; ++ii)
-                {
-                    Jx_arr(i,j,k) -= (nx-ii) * Dx_arr(ii,j,k) * facx;
-                }
-            });
-        }
-
-#if defined (WARPX_DIM_3D)
-        // Subtract average of cumulative sum from Jy
-        amrex::MultiFab& Jy = *m_fields.get(FieldType::current_fp, Direction{1}, lev);;
-        for (amrex::MFIter mfi(Jy); mfi.isValid(); ++mfi)
-        {
-            const amrex::Box& bx = mfi.fabbox();
-
-            amrex::Array4<amrex::Real> const& Jy_arr = Jy.array(mfi);
-            amrex::Array4<amrex::Real const> const& Dy_arr = Dy.const_array(mfi);
-
-            const amrex::Dim3 lo = amrex::lbound(bx);
-            const amrex::Dim3 hi = amrex::ubound(bx);
-            const int ny = hi.y - lo.y + 1;
-            const amrex::Real facy = dx[1] / static_cast<amrex::Real>(ny);
-
-            // Subtract average of cumulative sum along y only
-            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-            {
-                for (int jj = lo.y; jj <= hi.y; ++jj)
-                {
-                    Jy_arr(i,j,k) -= (ny-jj) * Dy_arr(i,jj,k) * facy;
-                }
-            });
-        }
-#endif
-
-        // Subtract average of cumulative sum from Jz
-        amrex::MultiFab& Jz = *m_fields.get(FieldType::current_fp, Direction{2}, lev);
-        for (amrex::MFIter mfi(Jz); mfi.isValid(); ++mfi)
-        {
-            const amrex::Box& bx = mfi.fabbox();
-
-            amrex::Array4<amrex::Real> const& Jz_arr = Jz.array(mfi);
-            amrex::Array4<amrex::Real const> const& Dz_arr = Dz.const_array(mfi);
-
-            const amrex::Dim3 lo = amrex::lbound(bx);
-            const amrex::Dim3 hi = amrex::ubound(bx);
-#if defined (WARPX_DIM_XZ)
-            const int nz = hi.y - lo.y + 1;
-#elif defined (WARPX_DIM_3D)
-            const int nz = hi.z - lo.z + 1;
-#endif
-            const amrex::Real facz = dx[2] / static_cast<amrex::Real>(nz);
-
-            // Subtract average of cumulative sum along z only
-            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-            {
-#if defined (WARPX_DIM_XZ)
-                // z direction is in the second component
-                for (int jj = lo.y; jj <= hi.y; ++jj)
-                {
-                    Jz_arr(i,j,k) -= (nz-jj) * Dz_arr(i,jj,k) * facz;
-                }
-#elif defined (WARPX_DIM_3D)
-                // z direction is in the third component
-                for (int kk = lo.z; kk <= hi.z; ++kk)
-                {
-                    Jz_arr(i,j,k) -= (nz-kk) * Dz_arr(i,j,kk) * facz;
-                }
-#endif
-            });
-        }
-    }
-#endif
-}
-
 void
 WarpX::PSATDPushSpectralFields ()
 {
@@ -641,6 +660,22 @@ WarpX::PSATDMoveRhoNewToRhoOld ()
 }
 
 void
+WarpX::PSATDMoveRhoNewToRhoMid ()
+{
+    const SpectralFieldIndex& Idx = spectral_solver_fp[0]->m_spectral_index;
+
+    for (int lev = 0; lev <= finest_level; ++lev)
+    {
+        spectral_solver_fp[lev]->CopySpectralDataComp(Idx.rho_new, Idx.rho_mid);
+
+        if (spectral_solver_cp[lev])
+        {
+            spectral_solver_cp[lev]->CopySpectralDataComp(Idx.rho_new, Idx.rho_mid);
+        }
+    }
+}
+
+void
 WarpX::PSATDMoveJNewToJOld ()
 {
     const SpectralFieldIndex& Idx = spectral_solver_fp[0]->m_spectral_index;
@@ -656,6 +691,26 @@ WarpX::PSATDMoveJNewToJOld ()
             spectral_solver_cp[lev]->CopySpectralDataComp(Idx.Jx_new, Idx.Jx_old);
             spectral_solver_cp[lev]->CopySpectralDataComp(Idx.Jy_new, Idx.Jy_old);
             spectral_solver_cp[lev]->CopySpectralDataComp(Idx.Jz_new, Idx.Jz_old);
+        }
+    }
+}
+
+void
+WarpX::PSATDMoveJNewToJMid ()
+{
+    const SpectralFieldIndex& Idx = spectral_solver_fp[0]->m_spectral_index;
+
+    for (int lev = 0; lev <= finest_level; ++lev)
+    {
+        spectral_solver_fp[lev]->CopySpectralDataComp(Idx.Jx_new, Idx.Jx_mid);
+        spectral_solver_fp[lev]->CopySpectralDataComp(Idx.Jy_new, Idx.Jy_mid);
+        spectral_solver_fp[lev]->CopySpectralDataComp(Idx.Jz_new, Idx.Jz_mid);
+
+        if (spectral_solver_cp[lev])
+        {
+            spectral_solver_cp[lev]->CopySpectralDataComp(Idx.Jx_new, Idx.Jx_mid);
+            spectral_solver_cp[lev]->CopySpectralDataComp(Idx.Jy_new, Idx.Jy_mid);
+            spectral_solver_cp[lev]->CopySpectralDataComp(Idx.Jz_new, Idx.Jz_mid);
         }
     }
 }
@@ -744,7 +799,7 @@ WarpX::PushPSATD (amrex::Real start_time)
             PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 1, rho_new);
 
             // Correct J in k-space
-            PSATDCurrentCorrection();
+            ::PSATDCurrentCorrection(finest_level, spectral_solver_fp, spectral_solver_cp);
 
             // Inverse FFT of J
             PSATDBackwardTransformJ(current_fp_string, current_cp_string);
@@ -759,13 +814,17 @@ WarpX::PushPSATD (amrex::Real start_time)
             PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 1, rho_new);
 
             // Compute J from D in k-space
-            PSATDVayDeposition();
+            ::PSATDVayDeposition(finest_level, spectral_solver_fp, spectral_solver_cp);
 
             // Inverse FFT of J, subtract cumulative sums of D
             current_fp_string = "current_fp";
             PSATDBackwardTransformJ(current_fp_string, current_cp_string);
             // TODO Cumulative sums need to be fixed with periodic single box
-            PSATDSubtractCurrentPartialSumsAvg();
+            auto cell_size_at_all_levels = amrex::Vector<std::array<Real,3>>{};
+            for (int lev = 0; lev <= finest_level; ++lev){
+                cell_size_at_all_levels.push_back(CellSize(lev));
+            }
+            ::PSATDSubtractCurrentPartialSumsAvg(cell_size_at_all_levels, m_fields);
 
             // FFT of J after subtraction of cumulative sums
             PSATDForwardTransformJ(current_fp_string, current_cp_string);
@@ -797,7 +856,7 @@ WarpX::PushPSATD (amrex::Real start_time)
 #endif
 
             // Correct J in k-space
-            PSATDCurrentCorrection();
+            ::PSATDCurrentCorrection(finest_level, spectral_solver_fp, spectral_solver_cp);
 
             // Inverse FFT of J
             PSATDBackwardTransformJ(current_fp_string, current_cp_string);
@@ -813,12 +872,16 @@ WarpX::PushPSATD (amrex::Real start_time)
             PSATDForwardTransformJ(current_fp_string, current_cp_string);
 
             // Compute J from D in k-space
-            PSATDVayDeposition();
+            ::PSATDVayDeposition(finest_level, spectral_solver_fp, spectral_solver_cp);
 
             // Inverse FFT of J, subtract cumulative sums of D
             current_fp_string = "current_fp";
             PSATDBackwardTransformJ(current_fp_string, current_cp_string);
-            PSATDSubtractCurrentPartialSumsAvg();
+            auto cell_size_at_all_levels = amrex::Vector<std::array<Real,3>>{};
+            for (int lev = 0; lev <= finest_level; ++lev){
+                cell_size_at_all_levels.push_back(CellSize(lev));
+            }
+            ::PSATDSubtractCurrentPartialSumsAvg(cell_size_at_all_levels, m_fields);
 
             // Synchronize J and rho (if used).
             // Here we call SumBoundaryJ instead of SyncCurrent, because
@@ -840,7 +903,8 @@ WarpX::PushPSATD (amrex::Real start_time)
     PSATDForwardTransformEB();
 
 #ifdef WARPX_DIM_RZ
-    if (pml_rz[0]) { pml_rz[0]->PushPSATD(0); }
+    constexpr auto lev0 = 0;
+    if (pml_rz[lev0]) { pml_rz[lev0]->PushPSATD(lev0, m_fields, get_spectral_solver_fp(lev0)); }
 #endif
 
     // FFT of F and G
@@ -1330,7 +1394,7 @@ void WarpX::DampFieldsInGuards(const int lev, amrex::MultiFab* mf)
     }
 }
 
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
 // This scales the current by the inverse volume and wraps around the deposition at negative radius.
 // It is faster to apply this on the grid than to do it particle by particle.
 // It is put here since there isn't another nice place for it.
@@ -1338,13 +1402,15 @@ void
 WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, MultiFab* Jz, int lev) const
 {
     const amrex::IntVect ngJ = Jx->nGrowVect();
-    const std::array<Real,3>& dx = WarpX::CellSize(lev);
+    const std::array<Real,3>& dx = CellSize(lev);
     const Real dr = dx[0];
 
     constexpr int NODE = amrex::IndexType::NODE;
 
     // See Verboncoeur JCP 174, 421-427 (2001) for the modified volume factor
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
+#endif
 
     for ( MFIter mfi(*Jx, TilingIfNotGPU()); mfi.isValid(); ++mfi )
     {
@@ -1374,8 +1440,6 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
         int const ishift_t = (rmint > rmin ? 1 : 0);
         int const ishift_z = (rminz > rmin ? 1 : 0);
 
-        const int nmodes = n_rz_azimuthal_modes;
-
         // Grow the tileboxes to include the guard cells, except for the
         // guard cells at negative radius.
         if (rmin > 0._rt) {
@@ -1386,9 +1450,13 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
         tbr.growHi(0, ngJ[0]);
         tbt.growHi(0, ngJ[0]);
         tbz.growHi(0, ngJ[0]);
+#if defined(WARPX_DIM_RZ)
         tbr.grow(1, ngJ[1]);
         tbt.grow(1, ngJ[1]);
         tbz.grow(1, ngJ[1]);
+
+        const int nmodes = n_rz_azimuthal_modes;
+#endif
 
         // Rescale current in r-z mode since the inverse volume factor was not
         // included in the current deposition.
@@ -1406,11 +1474,18 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
             // Jr is forced to zero on axis
             const amrex::Real r = amrex::Math::abs(rminr + (i - irmin)*dr);
             if (r == 0._rt) {
-                Jr_arr(i,j,0,0) = 0._rt;
+                Jr_arr(i,j,0,0) = 0.0_rt;
             } else {
-                Jr_arr(i,j,0,0) /= (2._rt*MathConst::pi*r);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                Jr_arr(i,j,0,0) /= 2.0_rt*MathConst::pi*r;
+#elif defined(WARPX_DIM_RSPHERE)
+                // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr,
+                // leaving out the highest order term
+                Jr_arr(i,j,0,0) /= 4.0_rt*MathConst::pi*r*r;
+#endif
             }
 
+#if defined(WARPX_DIM_RZ)
             for (int imode=1 ; imode < nmodes ; imode++) {
                 // Wrap the current density deposited in the guard cells around
                 // to the cells above the axis.
@@ -1421,13 +1496,14 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
                 // Apply the inverse volume scaling
                 // Jr is forced to zero on axis.
                 if (r == 0._rt) {
-                    Jr_arr(i,j,0,2*imode-1) = 0._rt;
-                    Jr_arr(i,j,0,2*imode) = 0._rt;
+                    Jr_arr(i,j,0,2*imode-1) = 0.0_rt;
+                    Jr_arr(i,j,0,2*imode) = 0.0_rt;
                 } else {
-                    Jr_arr(i,j,0,2*imode-1) /= (2._rt*MathConst::pi*r);
-                    Jr_arr(i,j,0,2*imode) /= (2._rt*MathConst::pi*r);
+                    Jr_arr(i,j,0,2*imode-1) /= (2.0_rt*MathConst::pi*r);
+                    Jr_arr(i,j,0,2*imode) /= (2.0_rt*MathConst::pi*r);
                 }
             }
+#endif
         },
         [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
         {
@@ -1443,11 +1519,18 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
             // Jt is forced to zero on axis.
             const amrex::Real r = amrex::Math::abs(rmint + (i - irmin)*dr);
             if (r == 0._rt) {
-                Jt_arr(i,j,0,0) = 0._rt;
+                Jt_arr(i,j,0,0) = 0.0_rt;
             } else {
-                Jt_arr(i,j,0,0) /= (2._rt*MathConst::pi*r);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                Jt_arr(i,j,0,0) /= (2.0_rt*MathConst::pi*r);
+#elif defined(WARPX_DIM_RSPHERE)
+                // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr,
+                // leaving out the highest order term
+                Jt_arr(i,j,0,0) /= 4.0_rt*MathConst::pi*r*r;
+#endif
             }
 
+#if defined(WARPX_DIM_RZ)
             for (int imode=1 ; imode < nmodes ; imode++) {
                 // Wrap the current density deposited in the guard cells around
                 // to the cells above the axis.
@@ -1459,13 +1542,14 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
                 // Apply the inverse volume scaling
                 // Jt is forced to zero on axis.
                 if (r == 0._rt) {
-                    Jt_arr(i,j,0,2*imode-1) = 0._rt;
-                    Jt_arr(i,j,0,2*imode) = 0._rt;
+                    Jt_arr(i,j,0,2*imode-1) = 0.0_rt;
+                    Jt_arr(i,j,0,2*imode) = 0.0_rt;
                 } else {
-                    Jt_arr(i,j,0,2*imode-1) /= (2._rt*MathConst::pi*r);
-                    Jt_arr(i,j,0,2*imode) /= (2._rt*MathConst::pi*r);
+                    Jt_arr(i,j,0,2*imode-1) /= (2.0_rt*MathConst::pi*r);
+                    Jt_arr(i,j,0,2*imode) /= (2.0_rt*MathConst::pi*r);
                 }
             }
+#endif
         },
         [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
         {
@@ -1474,17 +1558,32 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
             // If Jz is node centered, Jz[0] is located on the boundary.
             // If Jz is cell centered, Jz[0] is at 1/2 dr.
             if (rmin == 0._rt && 1-ishift_z <= i && i <= ngJ[0]-ishift_z) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 Jz_arr(i,j,0,0) += Jz_arr(-ishift_z-i,j,0,0);
+#elif defined(WARPX_DIM_RSPHERE)
+                Jz_arr(i,j,0,0) -= Jz_arr(-ishift_z-i,j,0,0);
+#endif
             }
 
             // Apply the inverse volume scaling
             const amrex::Real r = amrex::Math::abs(rminz + (i - irmin)*dr);
             if (r == 0._rt) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 Jz_arr(i,j,0,0) /= (MathConst::pi*dr*axis_volume_factor);
+#elif defined(WARPX_DIM_RSPHERE)
+                Jz_arr(i,j,0,0) = 0.0_rt;
+#endif
             } else {
-                Jz_arr(i,j,0,0) /= (2._rt*MathConst::pi*r);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                Jz_arr(i,j,0,0) /= (2.0_rt*MathConst::pi*r);
+#elif defined(WARPX_DIM_RSPHERE)
+                // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr,
+                // leaving out the highest order term
+                Jz_arr(i,j,0,0) /= 4.0_rt*MathConst::pi*r*r;
+#endif
             }
 
+#if defined(WARPX_DIM_RZ)
             for (int imode=1 ; imode < nmodes ; imode++) {
                 // Wrap the current density deposited in the guard cells around
                 // to the cells above the axis.
@@ -1498,11 +1597,11 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
                     Jz_arr(i,j,0,2*imode-1) /= (MathConst::pi*dr*axis_volume_factor);
                     Jz_arr(i,j,0,2*imode) /= (MathConst::pi*dr*axis_volume_factor);
                 } else {
-                    Jz_arr(i,j,0,2*imode-1) /= (2._rt*MathConst::pi*r);
-                    Jz_arr(i,j,0,2*imode) /= (2._rt*MathConst::pi*r);
+                    Jz_arr(i,j,0,2*imode-1) /= (2.0_rt*MathConst::pi*r);
+                    Jz_arr(i,j,0,2*imode) /= (2.0_rt*MathConst::pi*r);
                 }
             }
-
+#endif
         });
     }
 }
@@ -1517,7 +1616,11 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev) const
     constexpr int NODE = amrex::IndexType::NODE;
 
     // See Verboncoeur JCP 174, 421-427 (2001) for the modified volume factor
-    const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+    const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1.0_rt/3.0_rt : 1.0_rt/4.0_rt);
+#elif defined(WARPX_DIM_RSPHERE)
+    const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1.0_rt/4.0_rt : 1.0_rt/8.0_rt);
+#endif
 
     Box tilebox;
 
@@ -1545,7 +1648,9 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev) const
            tb.growLo(0, ngRho[0]);
         }
         tb.growHi(0, ngRho[0]);
+#if defined(WARPX_DIM_RZ)
         tb.grow(1, ngRho[1]);
+#endif
 
         // Rescale charge in r-z mode since the inverse volume factor was not
         // included in the charge deposition.
@@ -1575,9 +1680,20 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev) const
             // Apply the inverse volume scaling
             const amrex::Real r = amrex::Math::abs(rminr + (i - irmin)*dr);
             if (r == 0.) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 Rho_arr(i,j,0,icomp) /= (MathConst::pi*dr*axis_volume_factor);
+#elif defined(WARPX_DIM_RSPHERE)
+                Rho_arr(i,j,0,icomp) /= 4.0_rt/3.0_rt*MathConst::pi*dr*dr*axis_volume_factor;
+#endif
             } else {
-                Rho_arr(i,j,0,icomp) /= (2._rt*MathConst::pi*r);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                // Scale factor is pi*((r + dr/2)**2 - (r - dr/2)**2)/dr
+                Rho_arr(i,j,0,icomp) /= (2.0_rt*MathConst::pi*r);
+#elif defined(WARPX_DIM_RSPHERE)
+                // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr,
+                // leaving out the highest order term
+                Rho_arr(i,j,0,icomp) /= 4.0_rt*MathConst::pi*r*r;
+#endif
             }
         });
     }

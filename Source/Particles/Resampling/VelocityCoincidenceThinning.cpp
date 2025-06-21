@@ -61,8 +61,9 @@ VelocityCoincidenceThinning::VelocityCoincidenceThinning (const std::string& spe
     }
 }
 
-void VelocityCoincidenceThinning::operator() (WarpXParIter& pti, const int lev,
-                                   WarpXParticleContainer * const pc) const
+void VelocityCoincidenceThinning::operator() (
+    const amrex::Geometry& geom_lev, WarpXParIter& pti,
+    const int lev, WarpXParticleContainer * const pc) const
 {
     using namespace amrex::literals;
 
@@ -71,13 +72,15 @@ void VelocityCoincidenceThinning::operator() (WarpXParIter& pti, const int lev,
     auto& soa = ptile.GetStructOfArrays();
 #if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_3D)
     auto * const AMREX_RESTRICT x = soa.GetRealData(PIdx::x).data();
-#elif defined(WARPX_DIM_RZ)
+#elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     auto * const AMREX_RESTRICT x = soa.GetRealData(PIdx::x).data(); // rename to PIdx::r after PR #4667
 #endif
 #if defined(WARPX_DIM_3D)
     auto * const AMREX_RESTRICT y = soa.GetRealData(PIdx::y).data();
 #endif
+#if defined(WARPX_ZINDEX)
     auto * const AMREX_RESTRICT z = soa.GetRealData(PIdx::z).data();
+#endif
     auto * const AMREX_RESTRICT ux = soa.GetRealData(PIdx::ux).data();
     auto * const AMREX_RESTRICT uy = soa.GetRealData(PIdx::uy).data();
     auto * const AMREX_RESTRICT uz = soa.GetRealData(PIdx::uz).data();
@@ -85,7 +88,7 @@ void VelocityCoincidenceThinning::operator() (WarpXParIter& pti, const int lev,
     auto * const AMREX_RESTRICT idcpu = soa.GetIdCPUData().data();
 
     // Using this function means that we must loop over the cells in the ParallelFor.
-    auto bins = ParticleUtils::findParticlesInEachCell(lev, pti, ptile);
+    auto bins = ParticleUtils::findParticlesInEachCell(geom_lev, pti, ptile);
 
     const auto n_cells = static_cast<int>(bins.numBins());
     auto *const indices = bins.permutationPtr();
@@ -190,7 +193,9 @@ void VelocityCoincidenceThinning::operator() (WarpXParIter& pti, const int lev,
 #if defined(WARPX_DIM_3D)
             amrex::ParticleReal cluster_y = 0._prt;
 #endif
+#if defined(WARPX_ZINDEX)
             amrex::ParticleReal cluster_z = 0._prt;
+#endif
             amrex::ParticleReal cluster_ux = 0._prt, cluster_uy = 0._prt, cluster_uz = 0._prt;
 
             // Finally, loop through the particles in the cell and merge
@@ -206,7 +211,9 @@ void VelocityCoincidenceThinning::operator() (WarpXParIter& pti, const int lev,
 #if defined(WARPX_DIM_3D)
                 cluster_y += w[part_idx]*y[part_idx];
 #endif
+#if defined(WARPX_ZINDEX)
                 cluster_z += w[part_idx]*z[part_idx];
+#endif
                 cluster_ux += w[part_idx]*ux[part_idx];
                 cluster_uy += w[part_idx]*uy[part_idx];
                 cluster_uz += w[part_idx]*uz[part_idx];
@@ -232,7 +239,9 @@ void VelocityCoincidenceThinning::operator() (WarpXParIter& pti, const int lev,
 #if defined(WARPX_DIM_3D)
                         cluster_y /= total_weight;
 #endif
+#if defined(WARPX_ZINDEX)
                         cluster_z /= total_weight;
+#endif
                         cluster_ux /= total_weight;
                         cluster_uy /= total_weight;
                         cluster_uz /= total_weight;
@@ -289,8 +298,10 @@ void VelocityCoincidenceThinning::operator() (WarpXParIter& pti, const int lev,
                         y[part_idx] = cluster_y;
                         y[part_idx2] = cluster_y;
 #endif
+#if defined(WARPX_ZINDEX)
                         z[part_idx] = cluster_z;
                         z[part_idx2] = cluster_z;
+#endif
 
                         ux[part_idx] = ux_new;
                         uy[part_idx] = uy_new;
@@ -315,7 +326,9 @@ void VelocityCoincidenceThinning::operator() (WarpXParIter& pti, const int lev,
 #if defined(WARPX_DIM_3D)
                     cluster_y = 0_prt;
 #endif
+#if defined(WARPX_ZINDEX)
                     cluster_z = 0_prt;
+#endif
                     cluster_ux = 0_prt;
                     cluster_uy = 0_prt;
                     cluster_uz = 0_prt;

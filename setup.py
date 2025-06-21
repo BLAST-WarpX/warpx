@@ -280,7 +280,7 @@ with open("./requirements.txt") as f:
 setup(
     name="pywarpx",
     # note PEP-440 syntax: x.y.zaN but x.y.z.devN
-    version="25.02",
+    version="25.06",
     packages=["pywarpx"],
     package_dir={"pywarpx": "Python/pywarpx"},
     author="Jean-Luc Vay, David P. Grote, Maxence Thévenet, Rémi Lehe, Andrew Myers, Weiqun Zhang, Axel Huebl, et al.",
@@ -299,8 +299,8 @@ setup(
         "Documentation": "https://warpx.readthedocs.io",
         "Doxygen": "https://warpx.readthedocs.io/en/latest/_static/doxyhtml/index.html",
         #'Reference': 'https://doi.org/...', (Paper and/or Zenodo)
-        "Source": "https://github.com/ECP-WarpX/WarpX",
-        "Tracker": "https://github.com/ECP-WarpX/WarpX/issues",
+        "Source": "https://github.com/BLAST-WarpX/warpx",
+        "Tracker": "https://github.com/BLAST-WarpX/warpx/issues",
     },
     # CMake: self-built as extension module
     ext_modules=cxx_modules,

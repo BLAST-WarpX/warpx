@@ -3,6 +3,7 @@
 #include "ComputeDiagFunctors/CellCenterFunctor.H"
 #include "ComputeDiagFunctors/DivBFunctor.H"
 #include "ComputeDiagFunctors/DivEFunctor.H"
+#include "ComputeDiagFunctors/EBCoveredFunctor.H"
 #include "ComputeDiagFunctors/JFunctor.H"
 #include "ComputeDiagFunctors/JdispFunctor.H"
 #include "ComputeDiagFunctors/PartPerCellFunctor.H"
@@ -16,6 +17,7 @@
 #include "FlushFormats/FlushFormat.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/Algorithms/IsIn.H"
+#include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "WarpX.H"
@@ -132,7 +134,6 @@ FullDiagnostics::ReadParameters ()
         const amrex::ParmParse pp_warpx("warpx");
         std::vector<std::string> dt_interval_vec = {"-1"};
         const bool timestep_may_vary = pp_warpx.queryarr("dt_update_interval", dt_interval_vec);
-        amrex::Print() << Utils::TextMsg::Warn("Time step varies?" + std::to_string(timestep_may_vary));
         if (timestep_may_vary) {
             WARPX_ABORT_WITH_MESSAGE(
                     "Time-averaged diagnostics (encountered in: "
@@ -155,9 +156,8 @@ FullDiagnostics::ReadParameters ()
         const bool averaging_period_steps_specified = pp_diag_name.query(
                 "average_period_steps", m_average_period_steps
         );
-        const bool averaging_period_time_specified = pp_diag_name.queryWithParser(
-                "average_period_time", m_average_period_time
-        );
+        const bool averaging_period_time_specified = utils::parser::queryWithParser
+            (pp_diag_name, "average_period_time", m_average_period_time);
 
         if (m_time_average_mode == TimeAverageType::Static) {
             // This fails if users do not specify a start.
@@ -366,7 +366,7 @@ FullDiagnostics::DoComputeAndPack (int step, bool force_flush)
 void
 FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
 {
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     using ablastr::fields::Direction;
 
     auto & warpx = WarpX::GetInstance();
@@ -409,7 +409,11 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
     // diagnostic output
     bool deposit_current = !m_solver_deposits_current;
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     std::vector<std::string> field_names = {"r", "t", "z"};
+#elif defined(WARPX_DIM_RSPHERE)
+    std::vector<std::string> field_names = {"r", "t", "p"};
+#endif
 
     // Fill vector of functors for all components except individual cylindrical modes.
     const auto m_varname_fields_size = static_cast<int>(m_varnames_fields.size());
@@ -508,6 +512,11 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                 lev, m_crse_ratio, false, ncomp);
             if (update_varnames) {
                 AddRZModesToOutputNames(std::string("divE"), ncomp);
+            }
+        } else if ( m_varnames_fields[comp] == "eb_covered" ){
+            m_all_field_functors[lev][comp] = std::make_unique<EBCoveredFunctor>(lev, m_crse_ratio);
+            if (update_varnames) {
+                m_varnames.push_back(std::string("eb_covered"));
             }
         }
         else {
@@ -644,7 +653,7 @@ FullDiagnostics::AddRZModesToDiags (int lev)
 
 void
 FullDiagnostics::AddRZModesToOutputNames (const std::string& field, int ncomp){
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ)
     // In cylindrical geometry, real and imag part of each mode are also
     // dumped to file separately, so they need to be added to m_varnames
     m_varnames.push_back( field + "_0_real" );
@@ -792,7 +801,7 @@ FullDiagnostics::InitializeBufferData (int i_buffer, int lev, bool restart ) {
 void
 FullDiagnostics::InitializeFieldFunctors (int lev)
 {
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     // For RZ, with openPMD, we need a special initialization instead
     if (m_format == "openpmd") {
         InitializeFieldFunctorsRZopenPMD(lev);
@@ -821,8 +830,10 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
 
     using ablastr::fields::Direction;
 
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     std::vector<std::string> field_names = {"r", "t", "z"};
+#elif defined(WARPX_DIM_RSPHERE)
+    std::vector<std::string> field_names = {"r", "t", "p"};
 #else
     std::vector<std::string> field_names = {"x", "y", "z"};
 #endif
@@ -872,6 +883,8 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
             m_all_field_functors[lev][comp] = std::make_unique<DivBFunctor>(warpx.m_fields.get_alldirs(FieldType::Bfield_aux, lev), lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "divE" ){
             m_all_field_functors[lev][comp] = std::make_unique<DivEFunctor>(warpx.m_fields.get_alldirs(FieldType::Efield_aux, lev), lev, m_crse_ratio);
+        } else if ( m_varnames[comp] == "eb_covered" ){
+            m_all_field_functors[lev][comp] = std::make_unique<EBCoveredFunctor>(lev, m_crse_ratio);
         } else {
             std::cout << "Error on component " << m_varnames[comp] << "\n";
             WARPX_ABORT_WITH_MESSAGE(m_varnames[comp] + " is not a known field output type for this geometry");
@@ -947,6 +960,12 @@ FullDiagnostics::MovingWindowAndGalileanDomainShift (int step)
     {
         new_lo[0] = current_lo[0] + warpx.m_galilean_shift[2];
         new_hi[0] = current_hi[0] + warpx.m_galilean_shift[2];
+    }
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    {
+        // No shift is applied
+        new_lo[0] = current_lo[0];
+        new_hi[0] = current_hi[0];
     }
 #endif
     // Update RealBox of geometry with galilean-shifted boundary.

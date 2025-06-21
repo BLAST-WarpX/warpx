@@ -6,12 +6,14 @@
  */
 #include "WarpX.H"
 
-#ifndef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+#   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
+#elif defined(WARPX_DIM_RSPHERE)
+#   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/SphericalYeeAlgorithm.H"
+#else
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
-#else
-#   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
 #endif
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/TextMsg.H"
@@ -72,10 +74,14 @@ WarpX::ComputeDt ()
         deltat = cfl * minDim(dx) / PhysConst::c;
     } else {
         // Computation of dt for FDTD algorithm
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
         // - In RZ geometry
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee) {
             deltat = cfl * CylindricalYeeAlgorithm::ComputeMaxDt(dx,  n_rz_azimuthal_modes);
+#elif defined(WARPX_DIM_RSPHERE)
+        // - In RZ geometry
+        if (electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee) {
+            deltat = cfl * SphericalYeeAlgorithm::ComputeMaxDt(dx);
 #else
         // - In Cartesian geometry
         if (grid_type == GridType::Collocated) {
@@ -132,24 +138,5 @@ WarpX::UpdateDtFromParticleSpeeds ()
 
     for (int lev = max_level-1; lev >= 0; --lev) {
         dt[lev] = dt[lev+1] * refRatio(lev)[0];
-    }
-}
-
-void
-WarpX::PrintDtDxDyDz ()
-{
-    for (int lev=0; lev <= max_level; lev++) {
-        const amrex::Real* dx_lev = geom[lev].CellSize();
-        amrex::Print() << "Level " << lev << ": dt = " << dt[lev]
-#if defined(WARPX_DIM_1D_Z)
-                       << " ; dz = " << dx_lev[0] << '\n';
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                       << " ; dx = " << dx_lev[0]
-                       << " ; dz = " << dx_lev[1] << '\n';
-#elif defined(WARPX_DIM_3D)
-                       << " ; dx = " << dx_lev[0]
-                       << " ; dy = " << dx_lev[1]
-                       << " ; dz = " << dx_lev[2] << '\n';
-#endif
     }
 }

@@ -1,7 +1,7 @@
 # Preamble ####################################################################
 #
 cmake_minimum_required(VERSION 3.24.0)
-project(WarpX VERSION 25.02)
+project(WarpX VERSION 25.06)
 
 include(${WarpX_SOURCE_DIR}/cmake/WarpXFunctions.cmake)
 
@@ -97,8 +97,8 @@ if(WarpX_BACKTRACE_INFO)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g1")
 endif()
 
-set(WarpX_DIMS_VALUES 1 2 3 RZ)
-set(WarpX_DIMS 3 CACHE STRING "Simulation dimensionality <1;2;3;RZ>")
+set(WarpX_DIMS_VALUES 1 2 3 RZ RCYLINDER RSPHERE)
+set(WarpX_DIMS 3 CACHE STRING "Simulation dimensionality <1;2;3;RZ;RCYLINDER;RSPHERE>")
 list(REMOVE_DUPLICATES WarpX_DIMS)
 foreach(D IN LISTS WarpX_DIMS)
     if(NOT D IN_LIST WarpX_DIMS_VALUES)
@@ -166,6 +166,10 @@ option(WarpX_PYTHON_IPO
     ${_WarpX_PYTHON_IPO_DEFAULT}
 )
 
+# Unity builds combine all .cpp files into a single one (a single translation
+# unit, TU).
+option(WarpX_UNITY_BUILD          "WarpX library as unity build" OFF)
+
 set(pyWarpX_VERSION_INFO "" CACHE STRING
     "PEP-440 conformant version (set by setup.py)")
 
@@ -206,6 +210,8 @@ include(CTest)
 #   builds AMReX from source (default) or finds an existing install
 set(WarpX_amrex_dim ${WarpX_DIMS})  # RZ is AMReX 2D
 list(TRANSFORM WarpX_amrex_dim REPLACE RZ 2)
+list(TRANSFORM WarpX_amrex_dim REPLACE RCYLINDER 1)
+list(TRANSFORM WarpX_amrex_dim REPLACE RSPHERE 1)
 list(REMOVE_DUPLICATES WarpX_amrex_dim)
 
 include(${WarpX_SOURCE_DIR}/cmake/dependencies/AMReX.cmake)
@@ -277,6 +283,17 @@ foreach(D IN LISTS WarpX_DIMS)
             POSITION_INDEPENDENT_CODE ON
             WINDOWS_EXPORT_ALL_SYMBOLS ON
         )
+
+        # Optional: build only a single TU
+        if(WarpX_UNITY_BUILD)
+            set_target_properties(lib_${SD} PROPERTIES
+                UNITY_BUILD ON
+                UNITY_BUILD_MODE BATCH
+                UNITY_BUILD_UNIQUE_ID "WARPX_UNITY_ID"
+                # Number must be more than the number of .cpp files in WarpX
+                UNITY_BUILD_BATCH_SIZE 10000
+            )
+        endif()
     endif()
 
     # executable application
@@ -438,6 +455,7 @@ if(WarpX_LIB)
     add_subdirectory(Source/Fluids)
     add_subdirectory(Source/Initialization)
     add_subdirectory(Source/Laser)
+    add_subdirectory(Source/NonlinearSolvers)
     add_subdirectory(Source/Parallelization)
     add_subdirectory(Source/Particles)
     add_subdirectory(Source/Python)
@@ -457,6 +475,10 @@ foreach(D IN LISTS WarpX_DIMS)
     warpx_set_suffix_dims(SD ${D})
     if(D STREQUAL "RZ")
         target_link_libraries(ablastr_${SD} PUBLIC WarpX::thirdparty::amrex_2d)
+    elseif(D STREQUAL "RCYLINDER")
+        target_link_libraries(ablastr_${SD} PUBLIC WarpX::thirdparty::amrex_1d)
+    elseif(D STREQUAL "RSPHERE")
+        target_link_libraries(ablastr_${SD} PUBLIC WarpX::thirdparty::amrex_1d)
     else()
         target_link_libraries(ablastr_${SD} PUBLIC WarpX::thirdparty::amrex_${D}d)
     endif()
@@ -544,6 +566,10 @@ foreach(D IN LISTS WarpX_DIMS)
         target_compile_definitions(ablastr_${SD} PUBLIC WARPX_DIM_1D_Z WARPX_ZINDEX=0)
     elseif(D STREQUAL "RZ")
         target_compile_definitions(ablastr_${SD} PUBLIC WARPX_DIM_RZ WARPX_ZINDEX=1)
+    elseif(D STREQUAL "RCYLINDER")
+        target_compile_definitions(ablastr_${SD} PUBLIC WARPX_DIM_RCYLINDER)
+    elseif(D STREQUAL "RSPHERE")
+        target_compile_definitions(ablastr_${SD} PUBLIC WARPX_DIM_RSPHERE)
     endif()
 
     if(WarpX_OPENPMD)

@@ -63,8 +63,10 @@ class Bucket(object):
             if value is None:
                 continue
             if isinstance(value, str):
-                if value.find("=") > -1:
-                    # --- Expressions with temporary variables need to be inside quotes
+                if value.find('"') == -1:
+                    # All expressions are wrapped in double quotes
+                    # (unless there are already double quotes).
+                    # This makes the string parsing more robust
                     rhs = f'"{value}"'
                 else:
                     rhs = value

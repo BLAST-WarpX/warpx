@@ -19,8 +19,6 @@
 #   include "Utils/WarpX_Complex.H"
 #endif
 
-#include "WarpX.H" // todo: remove include and pass globals as args
-
 #include <AMReX.H>
 #include <AMReX_Arena.H>
 #include <AMReX_Array4.H>
@@ -73,30 +71,49 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
     constexpr int CELL = amrex::IndexType::CELL;
 
     // wqx, wqy wqz are particle current in each direction
-#if defined(WARPX_DIM_RZ)
-    // In RZ, wqx is actually wqr, and wqy is wqtheta
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+    // In RZ and RCYLINDER, wqx is actually wqr, and wqy is wqtheta
     // Convert to cylindrical at the mid point
     const amrex::Real xpmid = xp + relative_time*vx;
     const amrex::Real ypmid = yp + relative_time*vy;
     const amrex::Real rpmid = std::sqrt(xpmid*xpmid + ypmid*ypmid);
     const amrex::Real costheta = (rpmid > 0._rt ? xpmid/rpmid : 1._rt);
     const amrex::Real sintheta = (rpmid > 0._rt ? ypmid/rpmid : 0._rt);
-    const Complex xy0 = Complex{costheta, sintheta};
     const amrex::Real wqx = wq*invvol*(+vx*costheta + vy*sintheta);
     const amrex::Real wqy = wq*invvol*(-vx*sintheta + vy*costheta);
+    const amrex::Real wqz = wq*invvol*vz;
+    #if defined(WARPX_DIM_RZ)
+    const Complex xy0 = Complex{costheta, sintheta};
+    #endif
+#elif defined(WARPX_DIM_RSPHERE)
+    // Convert to cylindrical at the mid point
+    const amrex::Real xpmid = xp + relative_time*vx;
+    const amrex::Real ypmid = yp + relative_time*vy;
+    const amrex::Real zpmid = zp + relative_time*vz;
+    const amrex::Real rpxymid = std::sqrt(xpmid*xpmid + ypmid*ypmid);
+    const amrex::Real rpmid = std::sqrt(xpmid*xpmid + ypmid*ypmid + zpmid*zpmid);
+    const amrex::Real costheta = (rpxymid > 0._rt ? xpmid/rpxymid : 1._rt);
+    const amrex::Real sintheta = (rpxymid > 0._rt ? ypmid/rpxymid : 0._rt);
+    const amrex::Real cosphi = (rpmid > 0._rt ? rpxymid/rpmid : 1._rt);
+    const amrex::Real sinphi = (rpmid > 0._rt ? zpmid/rpmid : 0._rt);
+    // convert from Cartesian to spherical
+    const amrex::Real wqx = wq*invvol*(+vx*costheta*cosphi + vy*sintheta*cosphi + vz*sinphi);
+    const amrex::Real wqy = wq*invvol*(-vx*sintheta + vy*costheta);
+    const amrex::Real wqz = wq*invvol*(-vx*costheta*sinphi - vy*sintheta*sinphi + vz*cosphi);
 #else
     const amrex::Real wqx = wq*invvol*vx;
     const amrex::Real wqy = wq*invvol*vy;
-#endif
     const amrex::Real wqz = wq*invvol*vz;
+#endif
 
     // --- Compute shape factors
     Compute_shape_factor< depos_order > const compute_shape_factor;
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
     // x direction
     // Get particle position after 1/2 push back in position
     // Keep these double to avoid bug in single precision
-#if defined(WARPX_DIM_RZ)
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     const double xmid = (rpmid - xyzmin.x)*dinv.x;
 #else
     const double xmid = ((xp - xyzmin.x) + relative_time*vx)*dinv.x;
@@ -161,6 +178,7 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
     int const k_jz = ((jz_type[1] == NODE) ? k_node : k_cell);
 #endif
 
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     // z direction
     // Keep these double to avoid bug in single precision
     constexpr int zdir = WARPX_ZINDEX;
@@ -187,6 +205,7 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
     int const l_jx = ((jx_type[zdir] == NODE) ? l_node : l_cell);
     int const l_jy = ((jy_type[zdir] == NODE) ? l_node : l_cell);
     int const l_jz = ((jz_type[zdir] == NODE) ? l_node : l_cell);
+#endif
 
     // Deposit current into jx_arr, jy_arr and jz_arr
 #if defined(WARPX_DIM_1D_Z)
@@ -201,8 +220,13 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
             &jz_arr(lo.x+l_jz+iz, 0, 0, 0),
             sz_jz[iz]*wqz);
     }
-#endif
-#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    for (int ix=0; ix<=depos_order; ix++){
+        amrex::Gpu::Atomic::AddNoRet( &jx_arr(lo.x+j_jx+ix, 0, 0, 0), sx_jx[ix]*wqx);
+        amrex::Gpu::Atomic::AddNoRet( &jy_arr(lo.x+j_jy+ix, 0, 0, 0), sx_jy[ix]*wqy);
+        amrex::Gpu::Atomic::AddNoRet( &jz_arr(lo.x+j_jz+ix, 0, 0, 0), sx_jz[ix]*wqz);
+    }
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     for (int iz=0; iz<=depos_order; iz++){
         for (int ix=0; ix<=depos_order; ix++){
             amrex::Gpu::Atomic::AddNoRet(
@@ -449,6 +473,12 @@ void doDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPosition,
  * \param lo           Index lower bounds of domain.
  * \param q            species charge.
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
+ * \param a_bins             bins used for particle sorting
+ * \param box                the current box
+ * \param geom               the geometry of the current level
+ * \param a_tbox_max_size    the maximum size of a tilebox
+ * \param threads_per_block  number of threads to use per block in shared deposition
+ * \param bin_size           tileSize to use for shared current deposition operations
  */
 template <int depos_order>
 void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
@@ -470,7 +500,9 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                const amrex::DenseBins<WarpXParticleContainer::ParticleTileType::ParticleTileDataType>& a_bins,
                                const amrex::Box& box,
                                const amrex::Geometry& geom,
-                               const amrex::IntVect& a_tbox_max_size)
+                               const amrex::IntVect& a_tbox_max_size,
+                               const int threads_per_block,
+                               const amrex::IntVect bin_size)
 {
     using namespace amrex::literals;
 
@@ -505,11 +537,9 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
     const auto npts = amrex::max(sample_tbox_x.numPts(), sample_tbox_y.numPts(), sample_tbox_z.numPts());
 
     const int nblocks = a_bins.numBins();
-    const int threads_per_block = WarpX::shared_mem_current_tpb;
     const auto offsets_ptr = a_bins.offsetsPtr();
 
     const std::size_t shared_mem_bytes = npts*sizeof(amrex::Real);
-    const amrex::IntVect bin_size = WarpX::shared_tilesize;
     const std::size_t max_shared_mem_bytes = amrex::Gpu::Device::sharedMemPerBlock();
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(shared_mem_bytes <= max_shared_mem_bytes,
                                      "Tile size too big for GPU shared memory current deposition");
@@ -539,6 +569,8 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                  int( amrex::Math::floor((zp-plo[1]) * dxiarr[1]) ));
 #elif defined(WARPX_DIM_1D_Z)
             IntVect iv = IntVect(int( amrex::Math::floor((zp-plo[0]) * dxiarr[0]) ));
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            IntVect iv = IntVect(int( amrex::Math::floor((xp-plo[0]) * dxiarr[0]) ));
 #endif
             iv += domain.smallEnd();
             getTileIndex(iv, box, true, bin_size, buffer_box);
@@ -610,7 +642,11 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
     // Note, you should never reach this part of the code. This funcion cannot be called unless
     // using HIP/CUDA, and those things are checked prior
     //don't use any args
-    ignore_unused(GetPosition, wp, uxp, uyp, uzp, ion_lev, jx_fab, jy_fab, jz_fab, np_to_deposit, relative_time, dinv, xyzmin, lo, q, n_rz_azimuthal_modes, a_bins, box, geom, a_tbox_max_size);
+    ignore_unused(
+        GetPosition, wp, uxp, uyp, uzp, ion_lev, jx_fab, jy_fab, jz_fab,
+        np_to_deposit, relative_time, dinv, xyzmin, lo, q,
+        n_rz_azimuthal_modes, a_bins, box, geom, a_tbox_max_size,
+        threads_per_block, bin_size);
     WARPX_ABORT_WITH_MESSAGE("Shared memory only implemented for HIP/CUDA");
 #endif
 }
@@ -680,7 +716,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
     Real constexpr clightsq = 1.0_rt / ( PhysConst::c * PhysConst::c );
 
-#if !defined(WARPX_DIM_1D_Z)
+#if (AMREX_SPACEDIM > 1)
     Real constexpr one_third = 1.0_rt / 3.0_rt;
     Real constexpr one_sixth = 1.0_rt / 6.0_rt;
 #endif
@@ -708,7 +744,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             GetPosition(ip, xp, yp, zp);
 
             // computes current and old position in grid units
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
             Real const xp_new = xp + (relative_time + 0.5_rt*dt)*uxp[ip]*gaminv;
             Real const yp_new = yp + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv;
             Real const xp_mid = xp_new - 0.5_rt*dt*uxp[ip]*gaminv;
@@ -720,6 +756,10 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old);
             const amrex::Real costheta_mid = (rp_mid > 0._rt ? xp_mid/rp_mid : 1._rt);
             const amrex::Real sintheta_mid = (rp_mid > 0._rt ? yp_mid/rp_mid : 0._rt);
+            // Keep these double to avoid bug in single precision
+            double const x_new = (rp_new - xyzmin.x)*dinv.x;
+            double const x_old = (rp_old - xyzmin.x)*dinv.x;
+#if defined(WARPX_DIM_RZ)
             const amrex::Real costheta_new = (rp_new > 0._rt ? xp_new/rp_new : 1._rt);
             const amrex::Real sintheta_new = (rp_new > 0._rt ? yp_new/rp_new : 0._rt);
             const amrex::Real costheta_old = (rp_old > 0._rt ? xp_old/rp_old : 1._rt);
@@ -727,6 +767,27 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const Complex xy_new0 = Complex{costheta_new, sintheta_new};
             const Complex xy_mid0 = Complex{costheta_mid, sintheta_mid};
             const Complex xy_old0 = Complex{costheta_old, sintheta_old};
+#endif
+#elif defined(WARPX_DIM_RSPHERE)
+            Real const xp_new = xp + (relative_time + 0.5_rt*dt)*uxp[ip]*gaminv;
+            Real const yp_new = yp + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv;
+            Real const zp_new = zp + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv;
+            Real const xp_mid = xp_new - 0.5_rt*dt*uxp[ip]*gaminv;
+            Real const yp_mid = yp_new - 0.5_rt*dt*uyp[ip]*gaminv;
+            Real const zp_mid = zp_new - 0.5_rt*dt*uzp[ip]*gaminv;
+            Real const xp_old = xp_new - dt*uxp[ip]*gaminv;
+            Real const yp_old = yp_new - dt*uyp[ip]*gaminv;
+            Real const zp_old = zp_new - dt*uzp[ip]*gaminv;
+            Real const rpxy_mid = std::sqrt(xp_mid*xp_mid + yp_mid*yp_mid);
+            Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new + zp_new*zp_new);
+            Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old + zp_old*zp_old);
+            Real const rp_mid = (rp_new + rp_old)*0.5_rt;
+
+            amrex::Real const costheta_mid = (rpxy_mid > 0. ? xp_mid/rpxy_mid : 1._rt);
+            amrex::Real const sintheta_mid = (rpxy_mid > 0. ? yp_mid/rpxy_mid : 0._rt);
+            amrex::Real const cosphi_mid = (rp_mid > 0. ? rpxy_mid/rp_mid : 1._rt);
+            amrex::Real const sinphi_mid = (rp_mid > 0. ? zp_mid/rp_mid : 0._rt);
+
             // Keep these double to avoid bug in single precision
             double const x_new = (rp_new - xyzmin.x)*dinv.x;
             double const x_old = (rp_old - xyzmin.x)*dinv.x;
@@ -742,9 +803,11 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             double const y_new = (yp - xyzmin.y + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv)*dinv.y;
             double const y_old = y_new - dt*dinv.y*uyp[ip]*gaminv;
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
             // Keep these double to avoid bug in single precision
             double const z_new = (zp - xyzmin.z + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv)*dinv.z;
             double const z_old = z_new - dt*dinv.z*uzp[ip]*gaminv;
+#endif
 
             // Check whether the particle is close to the EB at the old and new position
             bool reduce_shape_old, reduce_shape_new;
@@ -770,6 +833,13 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                     lo.x + int(amrex::Math::floor(x_new)),
                     lo.y + int(amrex::Math::floor(z_new)),
                     0);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                reduce_shape_old = reduced_particle_shape_mask(
+                    lo.x + int(amrex::Math::floor(x_old)),
+                    0, 0);
+                reduce_shape_new = reduced_particle_shape_mask(
+                    lo.x + int(amrex::Math::floor(x_new)),
+                    0, 0);
 #elif defined(WARPX_DIM_1D_Z)
                 reduce_shape_old = reduced_particle_shape_mask(
                     lo.x + int(amrex::Math::floor(z_old)),
@@ -790,6 +860,13 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 #elif defined(WARPX_DIM_1D_Z)
             Real const vx = uxp[ip]*gaminv;
             Real const vy = uyp[ip]*gaminv;
+#elif defined(WARPX_DIM_RCYLINDER)
+            Real const vy = (-uxp[ip]*sintheta_mid + uyp[ip]*costheta_mid)*gaminv;
+            Real const vz = uzp[ip]*gaminv;
+#elif defined(WARPX_DIM_RSPHERE)
+            // convert from Cartesian to spherical
+            Real const vy = (-uxp[ip]*sintheta_mid + uyp[ip]*costheta_mid)*gaminv;
+            Real const vz = (-uxp[ip]*costheta_mid*sinphi_mid - uyp[ip]*sintheta_mid*sinphi_mid + uzp[ip]*cosphi_mid)*gaminv;
 #endif
 
             // --- Compute shape factors
@@ -844,6 +921,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                 // to which the particle can deposit, with shape of order `depos_order` vs with shape of order 1
             }
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
             double sz_new[depos_order + 3] = {0.};
             double sz_old[depos_order + 3] = {0.};
             const int k_new = compute_shape_factor(sz_new+1, z_new );
@@ -861,6 +939,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                 // Note: depos_order/2 in the above code corresponds to the shift between the index of the lowest point
                 // to which the particle can deposit, with shape of order `depos_order` vs with shape of order 1
             }
+#endif
 
             // computes min/max positions of current contributions
 #if !defined(WARPX_DIM_1D_Z)
@@ -873,9 +952,11 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             if (j_old < j_new) { djl = 0; }
             if (j_old > j_new) { dju = 0; }
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
             int dkl = 1, dku = 1;
             if (k_old < k_new) { dkl = 0; }
             if (k_old > k_new) { dku = 0; }
+#endif
 
 #if defined(WARPX_DIM_3D)
 
@@ -990,6 +1071,22 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             for (int k=dkl; k<=depos_order+1-dku; k++) {
                 sdzk += wq*invdtd.z*(sz_old[k] - sz_new[k]);
                 amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+k_new-1+k, 0, 0, 0), sdzk);
+            }
+
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+
+            amrex::Real sdri = 0._rt;
+            for (int i=dil; i<=depos_order+1-diu; i++) {
+                sdri += wq*invdtd.x*(sx_old[i] - sx_new[i]);
+                amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i_new-1+i, 0, 0, 0), sdri);
+            }
+            for (int i=dil; i<=depos_order+2-diu; i++) {
+                amrex::Real const sdyj = wq*vy*invvol*0.5_rt*(sx_old[i] + sx_new[i]);
+                amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i_new-1+i, 0, 0, 0), sdyj);
+            }
+            for (int i=dil; i<=depos_order+2-diu; i++) {
+                amrex::Real const sdzi = wq*vz*invvol*0.5_rt*(sx_old[i] + sx_new[i]);
+                amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i_new-1+i, 0, 0, 0), sdzi);
             }
 #endif
         }
@@ -1058,7 +1155,7 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
                                              (1.0_rt/dt)*dinv.x*dinv.z,
                                              (1.0_rt/dt)*dinv.x*dinv.y};
 
-#if !defined(WARPX_DIM_1D_Z)
+#if (AMREX_SPACEDIM > 1)
     Real constexpr one_third = 1.0_rt / 3.0_rt;
     Real constexpr one_sixth = 1.0_rt / 6.0_rt;
 #endif
@@ -1091,13 +1188,15 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
 #if !defined(WARPX_DIM_1D_Z)
             ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n[ip];
 #endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n[ip];
 #endif
+#if !defined(WARPX_DIM_RCYLINDER)
             ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n[ip];
+#endif
 
             // computes current and old position in grid units
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
             amrex::Real const xp_new = xp_np1;
             amrex::Real const yp_new = yp_np1;
             amrex::Real const xp_mid = xp_nph;
@@ -1109,6 +1208,10 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
             amrex::Real const rp_mid = (rp_new + rp_old)/2._rt;
             const amrex::Real costheta_mid = (rp_mid > 0._rt ? xp_mid/rp_mid : 1._rt);
             const amrex::Real sintheta_mid = (rp_mid > 0._rt ? yp_mid/rp_mid : 0._rt);
+            // Keep these double to avoid bug in single precision
+            double const x_new = (rp_new - xyzmin.x)*dinv.x;
+            double const x_old = (rp_old - xyzmin.x)*dinv.x;
+#if defined(WARPX_DIM_RZ)
             const amrex::Real costheta_new = (rp_new > 0._rt ? xp_new/rp_new : 1._rt);
             const amrex::Real sintheta_new = (rp_new > 0._rt ? yp_new/rp_new : 0._rt);
             const amrex::Real costheta_old = (rp_old > 0._rt ? xp_old/rp_old : 1._rt);
@@ -1116,6 +1219,27 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
             const Complex xy_new0 = Complex{costheta_new, sintheta_new};
             const Complex xy_mid0 = Complex{costheta_mid, sintheta_mid};
             const Complex xy_old0 = Complex{costheta_old, sintheta_old};
+#endif
+#elif defined(WARPX_DIM_RSPHERE)
+            amrex::Real const xp_new = xp_np1;
+            amrex::Real const yp_new = yp_np1;
+            amrex::Real const zp_new = zp_np1;
+            amrex::Real const xp_mid = xp_nph;
+            amrex::Real const yp_mid = yp_nph;
+            amrex::Real const zp_mid = zp_nph;
+            amrex::Real const xp_old = xp_n[ip];
+            amrex::Real const yp_old = yp_n[ip];
+            amrex::Real const zp_old = zp_n[ip];
+            amrex::Real const rpxy_mid = std::sqrt(xp_mid*xp_mid + yp_mid*yp_mid);
+            amrex::Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new + zp_new*zp_new);
+            amrex::Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old + zp_old*zp_old);
+            amrex::Real const rp_mid = (rp_new + rp_old)*0.5_rt;
+
+            amrex::Real const costheta_mid = (rpxy_mid > 0. ? xp_mid/rpxy_mid : 1._rt);
+            amrex::Real const sintheta_mid = (rpxy_mid > 0. ? yp_mid/rpxy_mid : 0._rt);
+            amrex::Real const cosphi_mid = (rp_mid > 0. ? rpxy_mid/rp_mid : 1._rt);
+            amrex::Real const sinphi_mid = (rp_mid > 0. ? zp_mid/rp_mid : 0._rt);
+
             // Keep these double to avoid bug in single precision
             double const x_new = (rp_new - xyzmin.x)*dinv.x;
             double const x_old = (rp_old - xyzmin.x)*dinv.x;
@@ -1131,9 +1255,11 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
             double const y_new = (yp_np1 - xyzmin.y)*dinv.y;
             double const y_old = (yp_n[ip] - xyzmin.y)*dinv.y;
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
             // Keep these double to avoid bug in single precision
             double const z_new = (zp_np1 - xyzmin.z)*dinv.z;
             double const z_old = (zp_n[ip] - xyzmin.z)*dinv.z;
+#endif
 
 #if defined(WARPX_DIM_RZ)
             amrex::Real const vy = (-uxp_nph[ip]*sintheta_mid + uyp_nph[ip]*costheta_mid)*gaminv;
@@ -1142,6 +1268,13 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
 #elif defined(WARPX_DIM_1D_Z)
             amrex::Real const vx = uxp_nph[ip]*gaminv;
             amrex::Real const vy = uyp_nph[ip]*gaminv;
+#elif defined(WARPX_DIM_RCYLINDER)
+            amrex::Real const vy = (-uxp_nph[ip]*sintheta_mid + uyp_nph[ip]*costheta_mid)*gaminv;
+            amrex::Real const vz = uzp_nph[ip]*gaminv;
+#elif defined(WARPX_DIM_RSPHERE)
+            // convert from Cartesian to spherical
+            amrex::Real const vy = (-uxp_nph[ip]*sintheta_mid + uyp_nph[ip]*costheta_mid)*gaminv;
+            amrex::Real const vz = (-uxp_nph[ip]*costheta_mid*sinphi_mid - uyp_nph[ip]*sintheta_mid*sinphi_mid + uzp_nph[ip]*cosphi_mid)*gaminv;
 #endif
 
             // --- Compute shape factors
@@ -1167,10 +1300,12 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
             const int j_new = compute_shape_factor(sy_new+1, y_new);
             const int j_old = compute_shifted_shape_factor(sy_old, y_old, j_new);
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
             double sz_new[depos_order + 3] = {0.};
             double sz_old[depos_order + 3] = {0.};
             const int k_new = compute_shape_factor(sz_new+1, z_new);
             const int k_old = compute_shifted_shape_factor(sz_old, z_old, k_new);
+#endif
 
             // computes min/max positions of current contributions
 #if !defined(WARPX_DIM_1D_Z)
@@ -1183,9 +1318,11 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
             if (j_old < j_new) { djl = 0; }
             if (j_old > j_new) { dju = 0; }
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
             int dkl = 1, dku = 1;
             if (k_old < k_new) { dkl = 0; }
             if (k_old > k_new) { dku = 0; }
+#endif
 
 #if defined(WARPX_DIM_3D)
 
@@ -1301,9 +1438,774 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
                 sdzk += wq*invdtd.z*(sz_old[k] - sz_new[k]);
                 amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+k_new-1+k, 0, 0, 0), sdzk);
             }
+
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+
+            amrex::Real sdri = 0._rt;
+            for (int i=dil; i<=depos_order+1-diu; i++) {
+                sdri += wq*invdtd.x*(sx_old[i] - sx_new[i]);
+                amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i_new-1+i, 0, 0, 0), sdri);
+            }
+            for (int i=dil; i<=depos_order+2-diu; i++) {
+                amrex::Real const sdyj = wq*vy*invvol*0.5_rt*(sx_old[i] + sx_new[i]);
+                amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i_new-1+i, 0, 0, 0), sdyj);
+            }
+            for (int i=dil; i<=depos_order+2-diu; i++) {
+                amrex::Real const sdzk = wq*vz*invvol*0.5_rt*(sx_old[i] + sx_new[i]);
+                amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i_new-1+i, 0, 0, 0), sdzk);
+            }
 #endif
         }
     );
+}
+
+/**
+ * \brief Villasenor and Buneman Current Deposition for thread thread_num kernal.
+ *        This is a charge-conserving deposition. The difference from Esirkepov is that the deposit is done segment
+ *        by segment, where the segments are determined by cell crossings. In general, this results
+ *        in a tighter stencil. The implementation is valid for an arbitrary number of cell crossings.
+ *
+ * \param depos_order  deposition order
+ * \param xp_old,yp_old,zp_old  Old particle positions (nominally at start of step)
+ * \param xp_new,yp_new,zp_new  New particle positions (nominally at end of step)
+ * \param wp           Pointer to array of particle weights.
+ * \param uxp_mid,uyp_mid,uzp_mid  Particle momentum at middle of step
+ * \param gaminv       One over gamma for particle at middle of step
+ * \param Jx_arr,Jy_arr,Jz_arr  Array4 of current density, either full array or tile
+ * \param dt                    Time step for particle level
+ * \param dinv                  3D cell size inverse
+ * \param xyzmin                Physical lower bounds of domain
+ * \param lo                    Index lower bounds of domain
+ * \param invvol                One over cell volume
+ * \param q                     Species charge
+ * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry
+ */
+template <int depos_order>
+AMREX_GPU_HOST_DEVICE AMREX_INLINE
+void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const xp_old,
+                                       [[maybe_unused]]amrex::ParticleReal const yp_old,
+                                       [[maybe_unused]]amrex::ParticleReal const zp_old,
+                                       [[maybe_unused]]amrex::ParticleReal const xp_new,
+                                       [[maybe_unused]]amrex::ParticleReal const yp_new,
+                                       [[maybe_unused]]amrex::ParticleReal const zp_new,
+                                       amrex::ParticleReal const wq,
+                                       [[maybe_unused]]amrex::ParticleReal const uxp_mid,
+                                       [[maybe_unused]]amrex::ParticleReal const uyp_mid,
+                                       [[maybe_unused]]amrex::ParticleReal const uzp_mid,
+                                       [[maybe_unused]]amrex::ParticleReal const gaminv,
+                                       amrex::Array4<amrex::Real>const & Jx_arr,
+                                       amrex::Array4<amrex::Real>const & Jy_arr,
+                                       amrex::Array4<amrex::Real>const & Jz_arr,
+                                       amrex::Real const dt,
+                                       amrex::XDim3 const & dinv,
+                                       amrex::XDim3 const & xyzmin,
+                                       amrex::Dim3 const lo,
+                                       amrex::Real const invvol,
+                                       [[maybe_unused]] int const n_rz_azimuthal_modes)
+{
+
+    using namespace amrex::literals;
+
+#if (AMREX_SPACEDIM > 1)
+    amrex::Real constexpr one_third = 1.0_rt / 3.0_rt;
+    amrex::Real constexpr one_sixth = 1.0_rt / 6.0_rt;
+#endif
+
+    // computes current and old position in grid units
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+    amrex::Real const xp_mid = (xp_new + xp_old)*0.5_rt;
+    amrex::Real const yp_mid = (yp_new + yp_old)*0.5_rt;
+    amrex::Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new);
+    amrex::Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old);
+    amrex::Real const rp_mid = (rp_new + rp_old)/2._rt;
+    amrex::Real const costheta_mid = (rp_mid > 0._rt ? xp_mid/rp_mid : 1._rt);
+    amrex::Real const sintheta_mid = (rp_mid > 0._rt ? yp_mid/rp_mid : 0._rt);
+#if defined(WARPX_DIM_RZ)
+    Complex const xy_mid0 = Complex{costheta_mid, sintheta_mid};
+#endif
+
+    // Keep these double to avoid bug in single precision
+    double const x_new = (rp_new - xyzmin.x)*dinv.x;
+    double const x_old = (rp_old - xyzmin.x)*dinv.x;
+    amrex::Real const vx = (rp_new - rp_old)/dt;
+    amrex::Real const vy = (-uxp_mid*sintheta_mid + uyp_mid*costheta_mid)*gaminv;
+#if defined(WARPX_DIM_RCYLINDER)
+    amrex::Real const vz = uzp_mid*gaminv;
+#endif
+#elif defined(WARPX_DIM_RSPHERE)
+    amrex::Real const xp_mid = (xp_new + xp_old)*0.5_rt;
+    amrex::Real const yp_mid = (yp_new + yp_old)*0.5_rt;
+    amrex::Real const zp_mid = (zp_new + zp_old)*0.5_rt;
+    amrex::Real const rpxy_mid = std::sqrt(xp_mid*xp_mid + yp_mid*yp_mid);
+    amrex::Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new + zp_new*zp_new);
+    amrex::Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old + zp_old*zp_old);
+    amrex::Real const rp_mid = (rp_new + rp_old)*0.5_rt;
+
+    amrex::Real const costheta_mid = (rpxy_mid > 0. ? xp_mid/rpxy_mid : 1._rt);
+    amrex::Real const sintheta_mid = (rpxy_mid > 0. ? yp_mid/rpxy_mid : 0._rt);
+    amrex::Real const cosphi_mid = (rp_mid > 0. ? rpxy_mid/rp_mid : 1._rt);
+    amrex::Real const sinphi_mid = (rp_mid > 0. ? zp_mid/rp_mid : 0._rt);
+
+    // Keep these double to avoid bug in single precision
+    double const x_new = (rp_new - xyzmin.x)*dinv.x;
+    double const x_old = (rp_old - xyzmin.x)*dinv.x;
+    amrex::Real const vx = (rp_new - rp_old)/dt;
+    // convert from Cartesian to spherical
+    amrex::Real const vy = (-uxp_mid*sintheta_mid + uyp_mid*costheta_mid)*gaminv;
+    amrex::Real const vz = (-uxp_mid*costheta_mid*sinphi_mid - uyp_mid*sintheta_mid*sinphi_mid + uzp_mid*cosphi_mid)*gaminv;
+#elif defined(WARPX_DIM_XZ)
+    // Keep these double to avoid bug in single precision
+    double const x_new = (xp_new - xyzmin.x)*dinv.x;
+    double const x_old = (xp_old - xyzmin.x)*dinv.x;
+    amrex::Real const vx = (xp_new - xp_old)/dt;
+    amrex::Real const vy = uyp_mid*gaminv;
+#elif defined(WARPX_DIM_1D_Z)
+    amrex::Real const vx = uxp_mid*gaminv;
+    amrex::Real const vy = uyp_mid*gaminv;
+#elif defined(WARPX_DIM_3D)
+    // Keep these double to avoid bug in single precision
+    double const x_new = (xp_new - xyzmin.x)*dinv.x;
+    double const x_old = (xp_old - xyzmin.x)*dinv.x;
+    double const y_new = (yp_new - xyzmin.y)*dinv.y;
+    double const y_old = (yp_old - xyzmin.y)*dinv.y;
+    amrex::Real const vx = (xp_new - xp_old)/dt;
+    amrex::Real const vy = (yp_new - yp_old)/dt;
+#endif
+
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+    // Keep these double to avoid bug in single precision
+    double const z_new = (zp_new - xyzmin.z)*dinv.z;
+    double const z_old = (zp_old - xyzmin.z)*dinv.z;
+    amrex::Real const vz = (zp_new - zp_old)/dt;
+#endif
+
+    // Define velocity kernals to deposit
+    amrex::Real const wqx = wq*vx*invvol;
+    amrex::Real const wqy = wq*vy*invvol;
+    amrex::Real const wqz = wq*vz*invvol;
+
+    // 1) Determine the number of segments.
+    // 2) Loop over segments and deposit current.
+
+    // cell crossings are defined at cell edges if depos_order is odd
+    // cell crossings are defined at cell centers if depos_order is even
+
+    int num_segments = 1;
+    double shift = 0.0;
+    if ( (depos_order % 2) == 0 ) { shift = 0.5; }
+
+#if defined(WARPX_DIM_3D)
+
+    // compute cell crossings in X-direction
+    const auto i_old = static_cast<int>(x_old-shift);
+    const auto i_new = static_cast<int>(x_new-shift);
+    const int cell_crossings_x = std::abs(i_new-i_old);
+    num_segments += cell_crossings_x;
+
+    // compute cell crossings in Y-direction
+    const auto j_old = static_cast<int>(y_old-shift);
+    const auto j_new = static_cast<int>(y_new-shift);
+    const int cell_crossings_y = std::abs(j_new-j_old);
+    num_segments += cell_crossings_y;
+
+    // compute cell crossings in Z-direction
+    const auto k_old = static_cast<int>(z_old-shift);
+    const auto k_new = static_cast<int>(z_new-shift);
+    const int cell_crossings_z = std::abs(k_new-k_old);
+    num_segments += cell_crossings_z;
+
+    // need to assert that the number of cell crossings in each direction
+    // is within the range permitted by the number of guard cells
+    // e.g., if (num_segments > 7) ...
+
+    // compute total change in particle position and the initial cell
+    // locations in each direction used to find the position at cell crossings.
+    const double dxp = x_new - x_old;
+    const double dyp = y_new - y_old;
+    const double dzp = z_new - z_old;
+    const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
+    const auto dirY_sign = static_cast<double>(dyp < 0. ? -1. : 1.);
+    const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
+    double Xcell = 0., Ycell = 0., Zcell = 0.;
+    if (num_segments > 1) {
+        Xcell = static_cast<double>(i_old) + shift + 0.5*(1.-dirX_sign);
+        Ycell = static_cast<double>(j_old) + shift + 0.5*(1.-dirY_sign);
+        Zcell = static_cast<double>(k_old) + shift + 0.5*(1.-dirZ_sign);
+    }
+
+    // loop over the number of segments and deposit
+    const Compute_shape_factor< depos_order-1 > compute_shape_factor_cell;
+    const Compute_shape_factor_pair< depos_order > compute_shape_factors_node;
+    double dxp_seg, dyp_seg, dzp_seg;
+    double x0_new, y0_new, z0_new;
+    double x0_old = x_old;
+    double y0_old = y_old;
+    double z0_old = z_old;
+
+    for (int ns=0; ns<num_segments; ns++) {
+
+        if (ns == num_segments-1) { // final segment
+
+            x0_new = x_new;
+            y0_new = y_new;
+            z0_new = z_new;
+            dxp_seg = x0_new - x0_old;
+            dyp_seg = y0_new - y0_old;
+            dzp_seg = z0_new - z0_old;
+
+        }
+        else {
+
+            x0_new = Xcell + dirX_sign;
+            y0_new = Ycell + dirY_sign;
+            z0_new = Zcell + dirZ_sign;
+            dxp_seg = x0_new - x0_old;
+            dyp_seg = y0_new - y0_old;
+            dzp_seg = z0_new - z0_old;
+
+            if ( (dyp == 0. || std::abs(dxp_seg) < std::abs(dxp/dyp*dyp_seg))
+              && (dzp == 0. || std::abs(dxp_seg) < std::abs(dxp/dzp*dzp_seg)) ) {
+                Xcell = x0_new;
+                dyp_seg = dyp/dxp*dxp_seg;
+                dzp_seg = dzp/dxp*dxp_seg;
+                y0_new = y0_old + dyp_seg;
+                z0_new = z0_old + dzp_seg;
+            }
+            else if (dzp == 0. || std::abs(dyp_seg) < std::abs(dyp/dzp*dzp_seg)) {
+                Ycell = y0_new;
+                dxp_seg = dxp/dyp*dyp_seg;
+                dzp_seg = dzp/dyp*dyp_seg;
+                x0_new = x0_old + dxp_seg;
+                z0_new = z0_old + dzp_seg;
+            }
+            else {
+                Zcell = z0_new;
+                dxp_seg = dxp/dzp*dzp_seg;
+                dyp_seg = dyp/dzp*dzp_seg;
+                x0_new = x0_old + dxp_seg;
+                y0_new = y0_old + dyp_seg;
+            }
+
+        }
+
+        // compute the segment factors (each equal to dt_seg/dt for nonzero dxp, dyp, or dzp)
+        const auto seg_factor_x = static_cast<double>(dxp == 0. ? 1. : dxp_seg/dxp);
+        const auto seg_factor_y = static_cast<double>(dyp == 0. ? 1. : dyp_seg/dyp);
+        const auto seg_factor_z = static_cast<double>(dzp == 0. ? 1. : dzp_seg/dzp);
+
+        // compute cell-based weights using the average segment position
+        double sx_cell[depos_order] = {0.};
+        double sy_cell[depos_order] = {0.};
+        double sz_cell[depos_order] = {0.};
+        double const x0_bar = (x0_new + x0_old)/2.0;
+        double const y0_bar = (y0_new + y0_old)/2.0;
+        double const z0_bar = (z0_new + z0_old)/2.0;
+        const int i0_cell = compute_shape_factor_cell( sx_cell, x0_bar-0.5 );
+        const int j0_cell = compute_shape_factor_cell( sy_cell, y0_bar-0.5 );
+        const int k0_cell = compute_shape_factor_cell( sz_cell, z0_bar-0.5 );
+
+        if constexpr (depos_order >= 3) { // higher-order correction to the cell-based weights
+            const Compute_shape_factor_pair<depos_order-1> compute_shape_factors_cell;
+            double sx_old_cell[depos_order] = {0.};
+            double sx_new_cell[depos_order] = {0.};
+            double sy_old_cell[depos_order] = {0.};
+            double sy_new_cell[depos_order] = {0.};
+            double sz_old_cell[depos_order] = {0.};
+            double sz_new_cell[depos_order] = {0.};
+            const int i0_cell_2 = compute_shape_factors_cell( sx_old_cell, sx_new_cell, x0_old-0.5, x0_new-0.5 );
+            const int j0_cell_2 = compute_shape_factors_cell( sy_old_cell, sy_new_cell, y0_old-0.5, y0_new-0.5 );
+            const int k0_cell_2 = compute_shape_factors_cell( sz_old_cell, sz_new_cell, z0_old-0.5, z0_new-0.5 );
+            amrex::ignore_unused(i0_cell_2, j0_cell_2, k0_cell_2);
+            for (int m=0; m<depos_order; m++) {
+                sx_cell[m] = (4.0*sx_cell[m] + sx_old_cell[m] + sx_new_cell[m])/6.0;
+                sy_cell[m] = (4.0*sy_cell[m] + sy_old_cell[m] + sy_new_cell[m])/6.0;
+                sz_cell[m] = (4.0*sz_cell[m] + sz_old_cell[m] + sz_new_cell[m])/6.0;
+            }
+        }
+
+        // compute node-based weights using the old and new segment positions
+        double sx_old_node[depos_order+1] = {0.};
+        double sx_new_node[depos_order+1] = {0.};
+        double sy_old_node[depos_order+1] = {0.};
+        double sy_new_node[depos_order+1] = {0.};
+        double sz_old_node[depos_order+1] = {0.};
+        double sz_new_node[depos_order+1] = {0.};
+        const int i0_node = compute_shape_factors_node( sx_old_node, sx_new_node, x0_old, x0_new );
+        const int j0_node = compute_shape_factors_node( sy_old_node, sy_new_node, y0_old, y0_new );
+        const int k0_node = compute_shape_factors_node( sz_old_node, sz_new_node, z0_old, z0_new );
+
+        // deposit Jx for this segment
+        amrex::Real this_Jx;
+        for (int i=0; i<=depos_order-1; i++) {
+            for (int j=0; j<=depos_order; j++) {
+                for (int k=0; k<=depos_order; k++) {
+                    this_Jx = wqx*sx_cell[i]*( sy_old_node[j]*sz_old_node[k]*one_third
+                                             + sy_old_node[j]*sz_new_node[k]*one_sixth
+                                             + sy_new_node[j]*sz_old_node[k]*one_sixth
+                                             + sy_new_node[j]*sz_new_node[k]*one_third )*seg_factor_x;
+                    amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i0_cell+i, lo.y+j0_node+j, lo.z+k0_node+k), this_Jx);
+                }
+            }
+        }
+
+        // deposit Jy for this segment
+        amrex::Real this_Jy;
+        for (int i=0; i<=depos_order; i++) {
+            for (int j=0; j<=depos_order-1; j++) {
+                for (int k=0; k<=depos_order; k++) {
+                    this_Jy = wqy*sy_cell[j]*( sx_old_node[i]*sz_old_node[k]*one_third
+                                             + sx_old_node[i]*sz_new_node[k]*one_sixth
+                                             + sx_new_node[i]*sz_old_node[k]*one_sixth
+                                             + sx_new_node[i]*sz_new_node[k]*one_third )*seg_factor_y;
+                    amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i0_node+i, lo.y+j0_cell+j, lo.z+k0_node+k), this_Jy);
+                }
+            }
+        }
+
+        // deposit Jz for this segment
+        amrex::Real this_Jz;
+        for (int i=0; i<=depos_order; i++) {
+            for (int j=0; j<=depos_order; j++) {
+                for (int k=0; k<=depos_order-1; k++) {
+                    this_Jz = wqz*sz_cell[k]*( sx_old_node[i]*sy_old_node[j]*one_third
+                                             + sx_old_node[i]*sy_new_node[j]*one_sixth
+                                             + sx_new_node[i]*sy_old_node[j]*one_sixth
+                                             + sx_new_node[i]*sy_new_node[j]*one_third )*seg_factor_z;
+                    amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node+i, lo.y+j0_node+j, lo.z+k0_cell+k), this_Jz);
+                }
+            }
+        }
+
+        // update old segment values
+        if (ns < num_segments-1) {
+            x0_old = x0_new;
+            y0_old = y0_new;
+            z0_old = z0_new;
+        }
+
+    } // end loop over segments
+
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+
+    // compute cell crossings in X-direction
+    const auto i_old = static_cast<int>(x_old-shift);
+    const auto i_new = static_cast<int>(x_new-shift);
+    const int cell_crossings_x = std::abs(i_new-i_old);
+    num_segments += cell_crossings_x;
+
+    // compute cell crossings in Z-direction
+    const auto k_old = static_cast<int>(z_old-shift);
+    const auto k_new = static_cast<int>(z_new-shift);
+    const int cell_crossings_z = std::abs(k_new-k_old);
+    num_segments += cell_crossings_z;
+
+    // need to assert that the number of cell crossings in each direction
+    // is within the range permitted by the number of guard cells
+    // e.g., if (num_segments > 5) ...
+
+    // compute total change in particle position and the initial cell
+    // locations in each direction used to find the position at cell crossings.
+    const double dxp = x_new - x_old;
+    const double dzp = z_new - z_old;
+    const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
+    const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
+    double Xcell = 0., Zcell = 0.;
+    if (num_segments > 1) {
+        Xcell = static_cast<double>(i_old) + shift + 0.5*(1.-dirX_sign);
+        Zcell = static_cast<double>(k_old) + shift + 0.5*(1.-dirZ_sign);
+    }
+
+    // loop over the number of segments and deposit
+    const Compute_shape_factor< depos_order-1 > compute_shape_factor_cell;
+    const Compute_shape_factor_pair< depos_order > compute_shape_factors_node;
+    double dxp_seg, dzp_seg;
+    double x0_new, z0_new;
+    double x0_old = x_old;
+    double z0_old = z_old;
+
+    for (int ns=0; ns<num_segments; ns++) {
+
+        if (ns == num_segments-1) { // final segment
+
+            x0_new = x_new;
+            z0_new = z_new;
+            dxp_seg = x0_new - x0_old;
+            dzp_seg = z0_new - z0_old;
+
+        }
+        else {
+
+            x0_new = Xcell + dirX_sign;
+            z0_new = Zcell + dirZ_sign;
+            dxp_seg = x0_new - x0_old;
+            dzp_seg = z0_new - z0_old;
+
+            if (dzp == 0. || std::abs(dxp_seg) < std::abs(dxp/dzp*dzp_seg)) {
+                Xcell = x0_new;
+                dzp_seg = dzp/dxp*dxp_seg;
+                z0_new = z0_old + dzp_seg;
+            }
+            else {
+                Zcell = z0_new;
+                dxp_seg = dxp/dzp*dzp_seg;
+                x0_new = x0_old + dxp_seg;
+            }
+
+        }
+
+        // compute the segment factors (each equal to dt_seg/dt for nonzero dxp, or dzp)
+        const auto seg_factor_x = static_cast<double>(dxp == 0. ? 1. : dxp_seg/dxp);
+        const auto seg_factor_z = static_cast<double>(dzp == 0. ? 1. : dzp_seg/dzp);
+
+        // compute cell-based weights using the average segment position
+        double sx_cell[depos_order] = {0.};
+        double sz_cell[depos_order] = {0.};
+        double const x0_bar = (x0_new + x0_old)/2.0;
+        double const z0_bar = (z0_new + z0_old)/2.0;
+        const int i0_cell = compute_shape_factor_cell( sx_cell, x0_bar-0.5 );
+        const int k0_cell = compute_shape_factor_cell( sz_cell, z0_bar-0.5 );
+
+        if constexpr (depos_order >= 3) { // higher-order correction to the cell-based weights
+            const Compute_shape_factor_pair<depos_order-1> compute_shape_factors_cell;
+            double sx_old_cell[depos_order] = {0.};
+            double sx_new_cell[depos_order] = {0.};
+            double sz_old_cell[depos_order] = {0.};
+            double sz_new_cell[depos_order] = {0.};
+            const int i0_cell_2 = compute_shape_factors_cell( sx_old_cell, sx_new_cell, x0_old-0.5, x0_new-0.5 );
+            const int k0_cell_2 = compute_shape_factors_cell( sz_old_cell, sz_new_cell, z0_old-0.5, z0_new-0.5 );
+            amrex::ignore_unused(i0_cell_2, k0_cell_2);
+            for (int m=0; m<depos_order; m++) {
+                sx_cell[m] = (4.0*sx_cell[m] + sx_old_cell[m] + sx_new_cell[m])/6.0;
+                sz_cell[m] = (4.0*sz_cell[m] + sz_old_cell[m] + sz_new_cell[m])/6.0;
+            }
+        }
+
+        // compute node-based weights using the old and new segment positions
+        double sx_old_node[depos_order+1] = {0.};
+        double sx_new_node[depos_order+1] = {0.};
+        double sz_old_node[depos_order+1] = {0.};
+        double sz_new_node[depos_order+1] = {0.};
+        const int i0_node = compute_shape_factors_node( sx_old_node, sx_new_node, x0_old, x0_new );
+        const int k0_node = compute_shape_factors_node( sz_old_node, sz_new_node, z0_old, z0_new );
+
+        // deposit Jx for this segment
+        amrex::Real this_Jx;
+        for (int i=0; i<=depos_order-1; i++) {
+            for (int k=0; k<=depos_order; k++) {
+                this_Jx = wqx*sx_cell[i]*(sz_old_node[k] + sz_new_node[k])/2.0_rt*seg_factor_x;
+                amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i0_cell+i, lo.y+k0_node+k, 0, 0), this_Jx);
+#if defined(WARPX_DIM_RZ)
+                Complex xy_mid = xy_mid0; // Throughout the following loop, xy_mid takes the value e^{i m theta}
+                for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
+                    // The factor 2 comes from the normalization of the modes
+                    const Complex djr_cmplx = 2._rt*this_Jx*xy_mid;
+                    amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i0_cell+i, lo.y+k0_node+k, 0, 2*imode-1), djr_cmplx.real());
+                    amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i0_cell+i, lo.y+k0_node+k, 0, 2*imode), djr_cmplx.imag());
+                    xy_mid = xy_mid*xy_mid0;
+                }
+#endif
+            }
+        }
+
+        // deposit out-of-plane Jy for this segment
+        const auto seg_factor_y = std::min(seg_factor_x,seg_factor_z);
+        amrex::Real this_Jy;
+        for (int i=0; i<=depos_order; i++) {
+            for (int k=0; k<=depos_order; k++) {
+                this_Jy = wqy*( sx_old_node[i]*sz_old_node[k]*one_third
+                              + sx_old_node[i]*sz_new_node[k]*one_sixth
+                              + sx_new_node[i]*sz_old_node[k]*one_sixth
+                              + sx_new_node[i]*sz_new_node[k]*one_third )*seg_factor_y;
+                amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i0_node+i, lo.y+k0_node+k, 0, 0), this_Jy);
+#if defined(WARPX_DIM_RZ)
+                Complex xy_mid = xy_mid0;
+                // Throughout the following loop, xy_ takes the value e^{i m theta_}
+                for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
+                    // The factor 2 comes from the normalization of the modes
+                    const Complex djy_cmplx = 2._rt*this_Jy*xy_mid;
+                    amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i0_node+i, lo.y+k0_node+k, 0, 2*imode-1), djy_cmplx.real());
+                    amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i0_node+i, lo.y+k0_node+k, 0, 2*imode), djy_cmplx.imag());
+                    xy_mid = xy_mid*xy_mid0;
+                }
+#endif
+            }
+        }
+
+        // deposit Jz for this segment
+        amrex::Real this_Jz;
+        for (int i=0; i<=depos_order; i++) {
+            for (int k=0; k<=depos_order-1; k++) {
+                this_Jz = wqz*sz_cell[k]*(sx_old_node[i] + sx_new_node[i])/2.0_rt*seg_factor_z;
+                amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node+i, lo.y+k0_cell+k, 0, 0), this_Jz);
+#if defined(WARPX_DIM_RZ)
+                Complex xy_mid = xy_mid0; // Throughout the following loop, xy_mid takes the value e^{i m theta}
+                for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
+                    // The factor 2 comes from the normalization of the modes
+                    const Complex djz_cmplx = 2._rt*this_Jz*xy_mid;
+                    amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node+i, lo.y+k0_cell+k, 0, 2*imode-1), djz_cmplx.real());
+                    amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node+i, lo.y+k0_cell+k, 0, 2*imode), djz_cmplx.imag());
+                    xy_mid = xy_mid*xy_mid0;
+                }
+#endif
+            }
+        }
+
+        // update old segment values
+        if (ns < num_segments-1) {
+            x0_old = x0_new;
+            z0_old = z0_new;
+        }
+
+    } // end loop over segments
+
+#elif defined(WARPX_DIM_1D_Z)
+
+    // compute cell crossings in Z-direction
+    const auto k_old = static_cast<int>(z_old-shift);
+    const auto k_new = static_cast<int>(z_new-shift);
+    const int cell_crossings_z = std::abs(k_new-k_old);
+    num_segments += cell_crossings_z;
+
+    // need to assert that the number of cell crossings in each direction
+    // is within the range permitted by the number of guard cells
+    // e.g., if (num_segments > 3) ...
+
+    // compute dzp and the initial cell location used to find the cell crossings.
+    double const dzp = z_new - z_old;
+    const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
+    double Zcell = static_cast<double>(k_old) + shift + 0.5*(1.-dirZ_sign);
+
+    // loop over the number of segments and deposit
+    const Compute_shape_factor< depos_order-1 > compute_shape_factor_cell;
+    const Compute_shape_factor_pair< depos_order > compute_shape_factors_node;
+    double dzp_seg;
+    double z0_new;
+    double z0_old = z_old;
+
+    for (int ns=0; ns<num_segments; ns++) {
+
+        if (ns == num_segments-1) { // final segment
+            z0_new = z_new;
+            dzp_seg = z0_new - z0_old;
+        }
+        else {
+            Zcell = Zcell + dirZ_sign;
+            z0_new = Zcell;
+            dzp_seg = z0_new - z0_old;
+        }
+
+        // compute the segment factor (equal to dt_seg/dt for nonzero dzp)
+        const auto seg_factor = static_cast<double>(dzp == 0. ? 1. : dzp_seg/dzp);
+
+        // compute cell-based weights using the average segment position
+        double sz_cell[depos_order] = {0.};
+        double const z0_bar = (z0_new + z0_old)/2.0;
+        const int k0_cell = compute_shape_factor_cell( sz_cell, z0_bar-0.5 );
+
+        if constexpr (depos_order >= 3) { // higher-order correction to the cell-based weights
+            const Compute_shape_factor_pair<depos_order-1> compute_shape_factors_cell;
+            double sz_old_cell[depos_order] = {0.};
+            double sz_new_cell[depos_order] = {0.};
+            const int k0_cell_2 = compute_shape_factors_cell( sz_old_cell, sz_new_cell, z0_old-0.5, z0_new-0.5 );
+            amrex::ignore_unused(k0_cell_2);
+            for (int m=0; m<depos_order; m++) {
+                sz_cell[m] = (4.0*sz_cell[m] + sz_old_cell[m] + sz_new_cell[m])/6.0;
+            }
+        }
+
+        // compute node-based weights using the old and new segment positions
+        double sz_old_node[depos_order+1] = {0.};
+        double sz_new_node[depos_order+1] = {0.};
+        const int k0_node = compute_shape_factors_node( sz_old_node, sz_new_node, z0_old, z0_new );
+
+        // deposit out-of-plane Jx and Jy for this segment
+        for (int k=0; k<=depos_order; k++) {
+            const amrex::Real weight = 0.5_rt*(sz_old_node[k] + sz_new_node[k])*seg_factor;
+            amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+k0_node+k, 0, 0), wqx*weight);
+            amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+k0_node+k, 0, 0), wqy*weight);
+        }
+
+        // deposit Jz for this segment
+        for (int k=0; k<=depos_order-1; k++) {
+            const amrex::Real this_Jz = wqz*sz_cell[k]*seg_factor;
+            amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+k0_cell+k, 0, 0), this_Jz);
+        }
+
+        // update old segment values
+        if (ns < num_segments-1) {
+            z0_old = z0_new;
+        }
+
+    }
+
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+
+    // compute cell crossings in X-direction
+    const auto i_old = static_cast<int>(x_old-shift);
+    const auto i_new = static_cast<int>(x_new-shift);
+    const int cell_crossings_x = std::abs(i_new-i_old);
+    num_segments += cell_crossings_x;
+
+    // need to assert that the number of cell crossings in each direction
+    // is within the range permitted by the number of guard cells
+    // e.g., if (num_segments > 3) ...
+
+    // compute dxp and the initial cell location used to find the cell crossings.
+    double const dxp = x_new - x_old;
+    const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
+    double Xcell = static_cast<double>(i_old) + shift + 0.5*(1.-dirX_sign);
+
+    // loop over the number of segments and deposit
+    const Compute_shape_factor< depos_order-1 > compute_shape_factor_cell;
+    const Compute_shape_factor_pair< depos_order > compute_shape_factors_node;
+    double dxp_seg;
+    double x0_new;
+    double x0_old = x_old;
+
+    for (int ns=0; ns<num_segments; ns++) {
+
+        if (ns == num_segments-1) { // final segment
+            x0_new = x_new;
+            dxp_seg = x0_new - x0_old;
+        }
+        else {
+            Xcell = Xcell + dirX_sign;
+            x0_new = Xcell;
+            dxp_seg = x0_new - x0_old;
+        }
+
+        // compute the segment factor (equal to dt_seg/dt for nonzero dxp)
+        const auto seg_factor = static_cast<double>(dxp == 0. ? 1. : dxp_seg/dxp);
+
+        // compute cell-based weights using the average segment position
+        double sx_cell[depos_order] = {0.};
+        double const x0_bar = (x0_new + x0_old)/2.0;
+        const int i0_cell = compute_shape_factor_cell( sx_cell, x0_bar-0.5 );
+
+        if constexpr (depos_order >= 3) { // higher-order correction to the cell-based weights
+            const Compute_shape_factor_pair<depos_order-1> compute_shape_factors_cell;
+            double sx_old_cell[depos_order] = {0.};
+            double sx_new_cell[depos_order] = {0.};
+            const int i0_cell_2 = compute_shape_factors_cell( sx_old_cell, sx_new_cell, x0_old-0.5, x0_new-0.5 );
+            amrex::ignore_unused(i0_cell_2);
+            for (int m=0; m<depos_order; m++) {
+                sx_cell[m] = (4.0*sx_cell[m] + sx_old_cell[m] + sx_new_cell[m])/6.0;
+            }
+        }
+
+        // compute node-based weights using the old and new segment positions
+        double sx_old_node[depos_order+1] = {0.};
+        double sx_new_node[depos_order+1] = {0.};
+        const int i0_node = compute_shape_factors_node( sx_old_node, sx_new_node, x0_old, x0_new );
+
+        // deposit out-of-plane Jy and Jz for this segment
+        for (int i=0; i<=depos_order; i++) {
+            const amrex::Real weight = 0.5_rt*(sx_old_node[i] + sx_new_node[i])*seg_factor;
+            amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i0_node+i, 0, 0), wqy*weight);
+            amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node+i, 0, 0), wqz*weight);
+        }
+
+        // deposit Jx for this segment
+        for (int i=0; i<=depos_order-1; i++) {
+            const amrex::Real this_Jx = wqx*sx_cell[i]*seg_factor;
+            amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i0_cell+i, 0, 0), this_Jx);
+        }
+
+        // update old segment values
+        if (ns < num_segments-1) {
+            x0_old = x0_new;
+        }
+
+    }
+
+#endif
+}
+
+/**
+ * \brief Villasenor and Buneman Current Deposition for thread thread_num for explicit scheme.
+ *        The specifics for the explicit scheme are in how the old and new positions and gamma are determined.
+ *        This is a charge-conserving deposition. The difference from Esirkepov is that the deposit is done segment
+ *        by segment, where the segments are determined by cell crossings. In general, this results
+ *        in a tighter stencil. The implementation is valid for an arbitrary number of cell crossings.
+ *
+ * \param depos_order  deposition order
+ * \param xp_n,yp_n,zp_n  Pointer to arrays of particle position at time level n.
+ * \param GetPosition  A functor for returning the particle position.
+ * \param wp           Pointer to array of particle weights.
+ * \param uxp_n,uyp_n,uzp_n  Pointer to arrays of particle momentum at time level n.
+ * \param uxp_nph,uyp_nph,uzp_nph  Pointer to arrays of particle momentum at time level n + 1/2.
+ * \param ion_lev      Pointer to array of particle ionization level. This is
+                       required to have the charge of each macroparticle
+                       since q is a scalar. For non-ionizable species,
+                       ion_lev is a null pointer.
+ * \param Jx_arr,Jy_arr,Jz_arr  Array4 of current density, either full array or tile.
+ * \param np_to_deposit         Number of particles for which current is deposited.
+ * \param dt                    Time step for particle level
+ * \param dinv                  3D cell size inverse
+ * \param xyzmin                Physical lower bounds of domain.
+ * \param lo                    Index lower bounds of domain.
+ * \param q                     species charge.
+ * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry.
+ */
+template <int depos_order>
+void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetPosition,
+                                           const amrex::ParticleReal * const wp,
+                                           [[maybe_unused]]const amrex::ParticleReal * const uxp,
+                                           [[maybe_unused]]const amrex::ParticleReal * const uyp,
+                                           [[maybe_unused]]const amrex::ParticleReal * const uzp,
+                                           const int * const ion_lev,
+                                           const amrex::Array4<amrex::Real>& Jx_arr,
+                                           const amrex::Array4<amrex::Real>& Jy_arr,
+                                           const amrex::Array4<amrex::Real>& Jz_arr,
+                                           const long np_to_deposit,
+                                           const amrex::Real dt,
+                                           const amrex::Real relative_time,
+                                           const amrex::XDim3 & dinv,
+                                           const amrex::XDim3 & xyzmin,
+                                           const amrex::Dim3 lo,
+                                           const amrex::Real q,
+                                           [[maybe_unused]] const int n_rz_azimuthal_modes)
+{
+    using namespace amrex::literals;
+
+    // Whether ion_lev is a null pointer (do_ionization=0) or a real pointer
+    // (do_ionization=1)
+    bool const do_ionization = ion_lev;
+
+    const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
+
+    // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
+    amrex::ParallelFor(
+        np_to_deposit,
+        [=] AMREX_GPU_DEVICE (long const ip) {
+
+            constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
+            const amrex::Real gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*inv_c2
+                                                               + uyp[ip]*uyp[ip]*inv_c2
+                                                               + uzp[ip]*uzp[ip]*inv_c2);
+
+            amrex::Real wq = q*wp[ip];
+            if (do_ionization){
+                wq *= ion_lev[ip];
+            }
+
+            amrex::ParticleReal xp, yp, zp;
+            GetPosition(ip, xp, yp, zp);
+
+            // computes current and old position
+            amrex::Real const xp_new = xp + (relative_time + 0.5_rt*dt)*uxp[ip]*gaminv;
+            amrex::Real const xp_old = xp_new - dt*uxp[ip]*gaminv;
+            amrex::Real const yp_new = yp + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv;
+            amrex::Real const yp_old = yp_new - dt*uyp[ip]*gaminv;
+            amrex::Real const zp_new = zp + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv;
+            amrex::Real const zp_old = zp_new - dt*uzp[ip]*gaminv;
+
+            VillasenorDepositionShapeNKernel<depos_order>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
+                                                          uxp[ip], uyp[ip], uzp[ip], gaminv,
+                                                          Jx_arr, Jy_arr, Jz_arr,
+                                                          dt, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
+
+    });
 }
 
 /**
@@ -1333,9 +2235,9 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
  * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry.
  */
 template <int depos_order>
-void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::ParticleReal * const xp_n,
-                                           [[maybe_unused]]const amrex::ParticleReal * const yp_n,
-                                           [[maybe_unused]]const amrex::ParticleReal * const zp_n,
+void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::ParticleReal * const xp_n_data,
+                                           [[maybe_unused]]const amrex::ParticleReal * const yp_n_data,
+                                           [[maybe_unused]]const amrex::ParticleReal * const zp_n_data,
                                            const GetParticlePosition<PIdx>& GetPosition,
                                            const amrex::ParticleReal * const wp,
                                            [[maybe_unused]]const amrex::ParticleReal * const uxp_n,
@@ -1356,18 +2258,13 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
                                            const amrex::Real q,
                                            [[maybe_unused]] const int n_rz_azimuthal_modes)
 {
-    using namespace amrex;
+    using namespace amrex::literals;
 
     // Whether ion_lev is a null pointer (do_ionization=0) or a real pointer
     // (do_ionization=1)
     bool const do_ionization = ion_lev;
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
-
-#if (AMREX_SPACEDIM > 1)
-    Real constexpr one_third = 1.0_rt / 3.0_rt;
-    Real constexpr one_sixth = 1.0_rt / 6.0_rt;
-#endif
 
     // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
     amrex::ParallelFor(
@@ -1378,543 +2275,40 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
 
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
-            // The uxp,uyp,uzp are the velocities at time level n+1/2
+            // The uxp_nhp, uyp_nhp, uzp_nhp are the velocities at time level n+1/2
             const amrex::ParticleReal uxp_np1 = 2._prt*uxp_nph[ip] - uxp_n[ip];
             const amrex::ParticleReal uyp_np1 = 2._prt*uyp_nph[ip] - uyp_n[ip];
             const amrex::ParticleReal uzp_np1 = 2._prt*uzp_nph[ip] - uzp_n[ip];
             const amrex::ParticleReal gamma_n = std::sqrt(1._prt + (uxp_n[ip]*uxp_n[ip] + uyp_n[ip]*uyp_n[ip] + uzp_n[ip]*uzp_n[ip])*inv_c2);
             const amrex::ParticleReal gamma_np1 = std::sqrt(1._prt + (uxp_np1*uxp_np1 + uyp_np1*uyp_np1 + uzp_np1*uzp_np1)*inv_c2);
             const amrex::ParticleReal gaminv = 2.0_prt/(gamma_n + gamma_np1);
+#else
+            // gaminv is unused in 3D
+            const amrex::ParticleReal gaminv = 1.;
 #endif
 
-            Real wq = q*wp[ip];
+            amrex::Real wq = q*wp[ip];
             if (do_ionization){
                 wq *= ion_lev[ip];
             }
 
-            ParticleReal xp_nph, yp_nph, zp_nph;
+            amrex::ParticleReal xp_nph, yp_nph, zp_nph;
             GetPosition(ip, xp_nph, yp_nph, zp_nph);
 
-#if !defined(WARPX_DIM_1D_Z)
-            ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n[ip];
-#endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-            ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n[ip];
-#endif
-            ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n[ip];
-
-            // computes current and old position in grid units
-#if defined(WARPX_DIM_RZ)
-            amrex::Real const xp_new = xp_np1;
-            amrex::Real const yp_new = yp_np1;
-            amrex::Real const xp_mid = xp_nph;
-            amrex::Real const yp_mid = yp_nph;
-            amrex::Real const xp_old = xp_n[ip];
-            amrex::Real const yp_old = yp_n[ip];
-            amrex::Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new);
-            amrex::Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old);
-            amrex::Real const rp_mid = (rp_new + rp_old)/2._rt;
-            amrex::Real costheta_mid, sintheta_mid;
-            if (rp_mid > 0._rt) {
-                costheta_mid = xp_mid/rp_mid;
-                sintheta_mid = yp_mid/rp_mid;
-            } else {
-                costheta_mid = 1._rt;
-                sintheta_mid = 0._rt;
-            }
-            const Complex xy_mid0 = Complex{costheta_mid, sintheta_mid};
-
-            // Keep these double to avoid bug in single precision
-            double const x_new = (rp_new - xyzmin.x)*dinv.x;
-            double const x_old = (rp_old - xyzmin.x)*dinv.x;
-            amrex::Real const vx = (rp_new - rp_old)/dt;
-            amrex::Real const vy = (-uxp_nph[ip]*sintheta_mid + uyp_nph[ip]*costheta_mid)*gaminv;
-#elif defined(WARPX_DIM_XZ)
-            // Keep these double to avoid bug in single precision
-            double const x_new = (xp_np1 - xyzmin.x)*dinv.x;
-            double const x_old = (xp_n[ip] - xyzmin.x)*dinv.x;
-            amrex::Real const vx = (xp_np1 - xp_n[ip])/dt;
-            amrex::Real const vy = uyp_nph[ip]*gaminv;
-#elif defined(WARPX_DIM_1D_Z)
-            amrex::Real const vx = uxp_nph[ip]*gaminv;
-            amrex::Real const vy = uyp_nph[ip]*gaminv;
-#elif defined(WARPX_DIM_3D)
-            // Keep these double to avoid bug in single precision
-            double const x_new = (xp_np1 - xyzmin.x)*dinv.x;
-            double const x_old = (xp_n[ip] - xyzmin.x)*dinv.x;
-            double const y_new = (yp_np1 - xyzmin.y)*dinv.y;
-            double const y_old = (yp_n[ip] - xyzmin.y)*dinv.y;
-            amrex::Real const vx = (xp_np1 - xp_n[ip])/dt;
-            amrex::Real const vy = (yp_np1 - yp_n[ip])/dt;
-#endif
-
-            // Keep these double to avoid bug in single precision
-            double const z_new = (zp_np1 - xyzmin.z)*dinv.z;
-            double const z_old = (zp_n[ip] - xyzmin.z)*dinv.z;
-            amrex::Real const vz = (zp_np1 - zp_n[ip])/dt;
-
-            // Define velocity kernals to deposit
-            amrex::Real const wqx = wq*vx*invvol;
-            amrex::Real const wqy = wq*vy*invvol;
-            amrex::Real const wqz = wq*vz*invvol;
-
-            // 1) Determine the number of segments.
-            // 2) Loop over segments and deposit current.
-
-            // cell crossings are defined at cell edges if depos_order is odd
-            // cell crossings are defined at cell centers if depos_order is even
-
-            int num_segments = 1;
-            double shift = 0.0;
-            if ( (depos_order % 2) == 0 ) { shift = 0.5; }
-
-#if defined(WARPX_DIM_3D)
-
-            // compute cell crossings in X-direction
-            const auto i_old = static_cast<int>(x_old-shift);
-            const auto i_new = static_cast<int>(x_new-shift);
-            const int cell_crossings_x = std::abs(i_new-i_old);
-            num_segments += cell_crossings_x;
-
-            // compute cell crossings in Y-direction
-            const auto j_old = static_cast<int>(y_old-shift);
-            const auto j_new = static_cast<int>(y_new-shift);
-            const int cell_crossings_y = std::abs(j_new-j_old);
-            num_segments += cell_crossings_y;
-
-            // compute cell crossings in Z-direction
-            const auto k_old = static_cast<int>(z_old-shift);
-            const auto k_new = static_cast<int>(z_new-shift);
-            const int cell_crossings_z = std::abs(k_new-k_old);
-            num_segments += cell_crossings_z;
-
-            // need to assert that the number of cell crossings in each direction
-            // is within the range permitted by the number of guard cells
-            // e.g., if (num_segments > 7) ...
-
-            // compute total change in particle position and the initial cell
-            // locations in each direction used to find the position at cell crossings.
-            const double dxp = x_new - x_old;
-            const double dyp = y_new - y_old;
-            const double dzp = z_new - z_old;
-            const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
-            const auto dirY_sign = static_cast<double>(dyp < 0. ? -1. : 1.);
-            const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
-            double Xcell = 0., Ycell = 0., Zcell = 0.;
-            if (num_segments > 1) {
-                Xcell = static_cast<double>(i_old) + shift + 0.5*(1.-dirX_sign);
-                Ycell = static_cast<double>(j_old) + shift + 0.5*(1.-dirY_sign);
-                Zcell = static_cast<double>(k_old) + shift + 0.5*(1.-dirZ_sign);
-            }
-
-            // loop over the number of segments and deposit
-            const Compute_shape_factor< depos_order-1 > compute_shape_factor_cell;
-            const Compute_shape_factor_pair< depos_order > compute_shape_factors_node;
-            double dxp_seg, dyp_seg, dzp_seg;
-            double x0_new, y0_new, z0_new;
-            double x0_old = x_old;
-            double y0_old = y_old;
-            double z0_old = z_old;
-
-            for (int ns=0; ns<num_segments; ns++) {
-
-                if (ns == num_segments-1) { // final segment
-
-                    x0_new = x_new;
-                    y0_new = y_new;
-                    z0_new = z_new;
-                    dxp_seg = x0_new - x0_old;
-                    dyp_seg = y0_new - y0_old;
-                    dzp_seg = z0_new - z0_old;
-
-                }
-                else {
-
-                    x0_new = Xcell + dirX_sign;
-                    y0_new = Ycell + dirY_sign;
-                    z0_new = Zcell + dirZ_sign;
-                    dxp_seg = x0_new - x0_old;
-                    dyp_seg = y0_new - y0_old;
-                    dzp_seg = z0_new - z0_old;
-
-                    if ( (dyp == 0. || std::abs(dxp_seg) < std::abs(dxp/dyp*dyp_seg))
-                      && (dzp == 0. || std::abs(dxp_seg) < std::abs(dxp/dzp*dzp_seg)) ) {
-                        Xcell = x0_new;
-                        dyp_seg = dyp/dxp*dxp_seg;
-                        dzp_seg = dzp/dxp*dxp_seg;
-                        y0_new = y0_old + dyp_seg;
-                        z0_new = z0_old + dzp_seg;
-                    }
-                    else if (dzp == 0. || std::abs(dyp_seg) < std::abs(dyp/dzp*dzp_seg)) {
-                        Ycell = y0_new;
-                        dxp_seg = dxp/dyp*dyp_seg;
-                        dzp_seg = dzp/dyp*dyp_seg;
-                        x0_new = x0_old + dxp_seg;
-                        z0_new = z0_old + dzp_seg;
-                    }
-                    else {
-                        Zcell = z0_new;
-                        dxp_seg = dxp/dzp*dzp_seg;
-                        dyp_seg = dyp/dzp*dzp_seg;
-                        x0_new = x0_old + dxp_seg;
-                        y0_new = y0_old + dyp_seg;
-                    }
-
-                }
-
-                // compute the segment factors (each equal to dt_seg/dt for nonzero dxp, dyp, or dzp)
-                const auto seg_factor_x = static_cast<double>(dxp == 0. ? 1. : dxp_seg/dxp);
-                const auto seg_factor_y = static_cast<double>(dyp == 0. ? 1. : dyp_seg/dyp);
-                const auto seg_factor_z = static_cast<double>(dzp == 0. ? 1. : dzp_seg/dzp);
-
-                // compute cell-based weights using the average segment position
-                double sx_cell[depos_order] = {0.};
-                double sy_cell[depos_order] = {0.};
-                double sz_cell[depos_order] = {0.};
-                double const x0_bar = (x0_new + x0_old)/2.0;
-                double const y0_bar = (y0_new + y0_old)/2.0;
-                double const z0_bar = (z0_new + z0_old)/2.0;
-                const int i0_cell = compute_shape_factor_cell( sx_cell, x0_bar-0.5 );
-                const int j0_cell = compute_shape_factor_cell( sy_cell, y0_bar-0.5 );
-                const int k0_cell = compute_shape_factor_cell( sz_cell, z0_bar-0.5 );
-
-                if constexpr (depos_order >= 3) { // higher-order correction to the cell-based weights
-                    const Compute_shape_factor_pair<depos_order-1> compute_shape_factors_cell;
-                    double sx_old_cell[depos_order] = {0.};
-                    double sx_new_cell[depos_order] = {0.};
-                    double sy_old_cell[depos_order] = {0.};
-                    double sy_new_cell[depos_order] = {0.};
-                    double sz_old_cell[depos_order] = {0.};
-                    double sz_new_cell[depos_order] = {0.};
-                    const int i0_cell_2 = compute_shape_factors_cell( sx_old_cell, sx_new_cell, x0_old-0.5, x0_new-0.5 );
-                    const int j0_cell_2 = compute_shape_factors_cell( sy_old_cell, sy_new_cell, y0_old-0.5, y0_new-0.5 );
-                    const int k0_cell_2 = compute_shape_factors_cell( sz_old_cell, sz_new_cell, z0_old-0.5, z0_new-0.5 );
-                    ignore_unused(i0_cell_2, j0_cell_2, k0_cell_2);
-                    for (int m=0; m<depos_order; m++) {
-                        sx_cell[m] = (4.0*sx_cell[m] + sx_old_cell[m] + sx_new_cell[m])/6.0;
-                        sy_cell[m] = (4.0*sy_cell[m] + sy_old_cell[m] + sy_new_cell[m])/6.0;
-                        sz_cell[m] = (4.0*sz_cell[m] + sz_old_cell[m] + sz_new_cell[m])/6.0;
-                    }
-                }
-
-                // compute node-based weights using the old and new segment positions
-                double sx_old_node[depos_order+1] = {0.};
-                double sx_new_node[depos_order+1] = {0.};
-                double sy_old_node[depos_order+1] = {0.};
-                double sy_new_node[depos_order+1] = {0.};
-                double sz_old_node[depos_order+1] = {0.};
-                double sz_new_node[depos_order+1] = {0.};
-                const int i0_node = compute_shape_factors_node( sx_old_node, sx_new_node, x0_old, x0_new );
-                const int j0_node = compute_shape_factors_node( sy_old_node, sy_new_node, y0_old, y0_new );
-                const int k0_node = compute_shape_factors_node( sz_old_node, sz_new_node, z0_old, z0_new );
-
-                // deposit Jx for this segment
-                amrex::Real this_Jx;
-                for (int i=0; i<=depos_order-1; i++) {
-                    for (int j=0; j<=depos_order; j++) {
-                        for (int k=0; k<=depos_order; k++) {
-                            this_Jx = wqx*sx_cell[i]*( sy_old_node[j]*sz_old_node[k]*one_third
-                                                     + sy_old_node[j]*sz_new_node[k]*one_sixth
-                                                     + sy_new_node[j]*sz_old_node[k]*one_sixth
-                                                     + sy_new_node[j]*sz_new_node[k]*one_third )*seg_factor_x;
-                            amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i0_cell+i, lo.y+j0_node+j, lo.z+k0_node+k), this_Jx);
-                        }
-                    }
-                }
-
-                // deposit Jy for this segment
-                amrex::Real this_Jy;
-                for (int i=0; i<=depos_order; i++) {
-                    for (int j=0; j<=depos_order-1; j++) {
-                        for (int k=0; k<=depos_order; k++) {
-                            this_Jy = wqy*sy_cell[j]*( sx_old_node[i]*sz_old_node[k]*one_third
-                                                     + sx_old_node[i]*sz_new_node[k]*one_sixth
-                                                     + sx_new_node[i]*sz_old_node[k]*one_sixth
-                                                     + sx_new_node[i]*sz_new_node[k]*one_third )*seg_factor_y;
-                            amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i0_node+i, lo.y+j0_cell+j, lo.z+k0_node+k), this_Jy);
-                        }
-                    }
-                }
-
-                // deposit Jz for this segment
-                amrex::Real this_Jz;
-                for (int i=0; i<=depos_order; i++) {
-                    for (int j=0; j<=depos_order; j++) {
-                        for (int k=0; k<=depos_order-1; k++) {
-                            this_Jz = wqz*sz_cell[k]*( sx_old_node[i]*sy_old_node[j]*one_third
-                                                     + sx_old_node[i]*sy_new_node[j]*one_sixth
-                                                     + sx_new_node[i]*sy_old_node[j]*one_sixth
-                                                     + sx_new_node[i]*sy_new_node[j]*one_third )*seg_factor_z;
-                            amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node+i, lo.y+j0_node+j, lo.z+k0_cell+k), this_Jz);
-                        }
-                    }
-                }
-
-                // update old segment values
-                if (ns < num_segments-1) {
-                    x0_old = x0_new;
-                    y0_old = y0_new;
-                    z0_old = z0_new;
-                }
-
-            } // end loop over segments
-
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-
-            // compute cell crossings in X-direction
-            const auto i_old = static_cast<int>(x_old-shift);
-            const auto i_new = static_cast<int>(x_new-shift);
-            const int cell_crossings_x = std::abs(i_new-i_old);
-            num_segments += cell_crossings_x;
-
-            // compute cell crossings in Z-direction
-            const auto k_old = static_cast<int>(z_old-shift);
-            const auto k_new = static_cast<int>(z_new-shift);
-            const int cell_crossings_z = std::abs(k_new-k_old);
-            num_segments += cell_crossings_z;
-
-            // need to assert that the number of cell crossings in each direction
-            // is within the range permitted by the number of guard cells
-            // e.g., if (num_segments > 5) ...
-
-            // compute total change in particle position and the initial cell
-            // locations in each direction used to find the position at cell crossings.
-            const double dxp = x_new - x_old;
-            const double dzp = z_new - z_old;
-            const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
-            const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
-            double Xcell = 0., Zcell = 0.;
-            if (num_segments > 1) {
-                Xcell = static_cast<double>(i_old) + shift + 0.5*(1.-dirX_sign);
-                Zcell = static_cast<double>(k_old) + shift + 0.5*(1.-dirZ_sign);
-            }
-
-            // loop over the number of segments and deposit
-            const Compute_shape_factor< depos_order-1 > compute_shape_factor_cell;
-            const Compute_shape_factor_pair< depos_order > compute_shape_factors_node;
-            double dxp_seg, dzp_seg;
-            double x0_new, z0_new;
-            double x0_old = x_old;
-            double z0_old = z_old;
-
-            for (int ns=0; ns<num_segments; ns++) {
-
-                if (ns == num_segments-1) { // final segment
-
-                    x0_new = x_new;
-                    z0_new = z_new;
-                    dxp_seg = x0_new - x0_old;
-                    dzp_seg = z0_new - z0_old;
-
-                }
-                else {
-
-                    x0_new = Xcell + dirX_sign;
-                    z0_new = Zcell + dirZ_sign;
-                    dxp_seg = x0_new - x0_old;
-                    dzp_seg = z0_new - z0_old;
-
-                    if (dzp == 0. || std::abs(dxp_seg) < std::abs(dxp/dzp*dzp_seg)) {
-                        Xcell = x0_new;
-                        dzp_seg = dzp/dxp*dxp_seg;
-                        z0_new = z0_old + dzp_seg;
-                    }
-                    else {
-                        Zcell = z0_new;
-                        dxp_seg = dxp/dzp*dzp_seg;
-                        x0_new = x0_old + dxp_seg;
-                    }
-
-                }
-
-                // compute the segment factors (each equal to dt_seg/dt for nonzero dxp, or dzp)
-                const auto seg_factor_x = static_cast<double>(dxp == 0. ? 1. : dxp_seg/dxp);
-                const auto seg_factor_z = static_cast<double>(dzp == 0. ? 1. : dzp_seg/dzp);
-
-                // compute cell-based weights using the average segment position
-                double sx_cell[depos_order] = {0.};
-                double sz_cell[depos_order] = {0.};
-                double const x0_bar = (x0_new + x0_old)/2.0;
-                double const z0_bar = (z0_new + z0_old)/2.0;
-                const int i0_cell = compute_shape_factor_cell( sx_cell, x0_bar-0.5 );
-                const int k0_cell = compute_shape_factor_cell( sz_cell, z0_bar-0.5 );
-
-                if constexpr (depos_order >= 3) { // higher-order correction to the cell-based weights
-                    const Compute_shape_factor_pair<depos_order-1> compute_shape_factors_cell;
-                    double sx_old_cell[depos_order] = {0.};
-                    double sx_new_cell[depos_order] = {0.};
-                    double sz_old_cell[depos_order] = {0.};
-                    double sz_new_cell[depos_order] = {0.};
-                    const int i0_cell_2 = compute_shape_factors_cell( sx_old_cell, sx_new_cell, x0_old-0.5, x0_new-0.5 );
-                    const int k0_cell_2 = compute_shape_factors_cell( sz_old_cell, sz_new_cell, z0_old-0.5, z0_new-0.5 );
-                    ignore_unused(i0_cell_2, k0_cell_2);
-                    for (int m=0; m<depos_order; m++) {
-                        sx_cell[m] = (4.0*sx_cell[m] + sx_old_cell[m] + sx_new_cell[m])/6.0;
-                        sz_cell[m] = (4.0*sz_cell[m] + sz_old_cell[m] + sz_new_cell[m])/6.0;
-                    }
-                }
-
-                // compute node-based weights using the old and new segment positions
-                double sx_old_node[depos_order+1] = {0.};
-                double sx_new_node[depos_order+1] = {0.};
-                double sz_old_node[depos_order+1] = {0.};
-                double sz_new_node[depos_order+1] = {0.};
-                const int i0_node = compute_shape_factors_node( sx_old_node, sx_new_node, x0_old, x0_new );
-                const int k0_node = compute_shape_factors_node( sz_old_node, sz_new_node, z0_old, z0_new );
-
-                // deposit Jx for this segment
-                amrex::Real this_Jx;
-                for (int i=0; i<=depos_order-1; i++) {
-                    for (int k=0; k<=depos_order; k++) {
-                        this_Jx = wqx*sx_cell[i]*(sz_old_node[k] + sz_new_node[k])/2.0_rt*seg_factor_x;
-                        amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i0_cell+i, lo.y+k0_node+k, 0, 0), this_Jx);
-#if defined(WARPX_DIM_RZ)
-                        Complex xy_mid = xy_mid0; // Throughout the following loop, xy_mid takes the value e^{i m theta}
-                        for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
-                            // The factor 2 comes from the normalization of the modes
-                            const Complex djr_cmplx = 2._rt*this_Jx*xy_mid;
-                            amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i0_cell+i, lo.y+k0_node+k, 0, 2*imode-1), djr_cmplx.real());
-                            amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i0_cell+i, lo.y+k0_node+k, 0, 2*imode), djr_cmplx.imag());
-                            xy_mid = xy_mid*xy_mid0;
-                        }
-#endif
-                    }
-                }
-
-                // deposit out-of-plane Jy for this segment
-                const auto seg_factor_y = std::min(seg_factor_x,seg_factor_z);
-                amrex::Real this_Jy;
-                for (int i=0; i<=depos_order; i++) {
-                    for (int k=0; k<=depos_order; k++) {
-                        this_Jy = wqy*( sx_old_node[i]*sz_old_node[k]*one_third
-                                      + sx_old_node[i]*sz_new_node[k]*one_sixth
-                                      + sx_new_node[i]*sz_old_node[k]*one_sixth
-                                      + sx_new_node[i]*sz_new_node[k]*one_third )*seg_factor_y;
-                        amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i0_node+i, lo.y+k0_node+k, 0, 0), this_Jy);
-#if defined(WARPX_DIM_RZ)
-                        Complex xy_mid = xy_mid0;
-                        // Throughout the following loop, xy_ takes the value e^{i m theta_}
-                        for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
-                            // The factor 2 comes from the normalization of the modes
-                            const Complex djy_cmplx = 2._rt*this_Jy*xy_mid;
-                            amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i0_node+i, lo.y+k0_node+k, 0, 2*imode-1), djy_cmplx.real());
-                            amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i0_node+i, lo.y+k0_node+k, 0, 2*imode), djy_cmplx.imag());
-                            xy_mid = xy_mid*xy_mid0;
-                        }
-#endif
-                    }
-                }
-
-                // deposit Jz for this segment
-                amrex::Real this_Jz;
-                for (int i=0; i<=depos_order; i++) {
-                    for (int k=0; k<=depos_order-1; k++) {
-                        this_Jz = wqz*sz_cell[k]*(sx_old_node[i] + sx_new_node[i])/2.0_rt*seg_factor_z;
-                        amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node+i, lo.y+k0_cell+k, 0, 0), this_Jz);
-#if defined(WARPX_DIM_RZ)
-                        Complex xy_mid = xy_mid0; // Throughout the following loop, xy_mid takes the value e^{i m theta}
-                        for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
-                            // The factor 2 comes from the normalization of the modes
-                            const Complex djz_cmplx = 2._rt*this_Jz*xy_mid;
-                            amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node+i, lo.y+k0_cell+k, 0, 2*imode-1), djz_cmplx.real());
-                            amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node+i, lo.y+k0_cell+k, 0, 2*imode), djz_cmplx.imag());
-                            xy_mid = xy_mid*xy_mid0;
-                        }
-#endif
-                    }
-                }
-
-                // update old segment values
-                if (ns < num_segments-1) {
-                    x0_old = x0_new;
-                    z0_old = z0_new;
-                }
-
-            } // end loop over segments
-
-#elif defined(WARPX_DIM_1D_Z)
-
-            // compute cell crossings in Z-direction
-            const auto k_old = static_cast<int>(z_old-shift);
-            const auto k_new = static_cast<int>(z_new-shift);
-            const int cell_crossings_z = std::abs(k_new-k_old);
-            num_segments += cell_crossings_z;
-
-            // need to assert that the number of cell crossings in each direction
-            // is within the range permitted by the number of guard cells
-            // e.g., if (num_segments > 3) ...
-
-            // compute dzp and the initial cell location used to find the cell crossings.
-            double const dzp = z_new - z_old;
-            const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
-            double Zcell = static_cast<double>(k_old) + shift + 0.5*(1.-dirZ_sign);
-
-            // loop over the number of segments and deposit
-            const Compute_shape_factor< depos_order-1 > compute_shape_factor_cell;
-            const Compute_shape_factor_pair< depos_order > compute_shape_factors_node;
-            double dzp_seg;
-            double z0_new;
-            double z0_old = z_old;
-
-            for (int ns=0; ns<num_segments; ns++) {
-
-                if (ns == num_segments-1) { // final segment
-                    z0_new = z_new;
-                    dzp_seg = z0_new - z0_old;
-                }
-                else {
-                    Zcell = Zcell + dirZ_sign;
-                    z0_new = Zcell;
-                    dzp_seg = z0_new - z0_old;
-                }
-
-                // compute the segment factor (equal to dt_seg/dt for nonzero dzp)
-                const auto seg_factor = static_cast<double>(dzp == 0. ? 1. : dzp_seg/dzp);
-
-                // compute cell-based weights using the average segment position
-                double sz_cell[depos_order] = {0.};
-                double const z0_bar = (z0_new + z0_old)/2.0;
-                const int k0_cell = compute_shape_factor_cell( sz_cell, z0_bar-0.5 );
-
-                if constexpr (depos_order >= 3) { // higher-order correction to the cell-based weights
-                    const Compute_shape_factor_pair<depos_order-1> compute_shape_factors_cell;
-                    double sz_old_cell[depos_order] = {0.};
-                    double sz_new_cell[depos_order] = {0.};
-                    const int k0_cell_2 = compute_shape_factors_cell( sz_old_cell, sz_new_cell, z0_old-0.5, z0_new-0.5 );
-                    ignore_unused(k0_cell_2);
-                    for (int m=0; m<depos_order; m++) {
-                        sz_cell[m] = (4.0*sz_cell[m] + sz_old_cell[m] + sz_new_cell[m])/6.0;
-                    }
-                }
-
-                // compute node-based weights using the old and new segment positions
-                double sz_old_node[depos_order+1] = {0.};
-                double sz_new_node[depos_order+1] = {0.};
-                const int k0_node = compute_shape_factors_node( sz_old_node, sz_new_node, z0_old, z0_new );
-
-                // deposit out-of-plane Jx and Jy for this segment
-                for (int k=0; k<=depos_order; k++) {
-                    const amrex::Real weight = 0.5_rt*(sz_old_node[k] + sz_new_node[k])*seg_factor;
-                    amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+k0_node+k, 0, 0), wqx*weight);
-                    amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+k0_node+k, 0, 0), wqy*weight);
-                }
-
-                // deposit Jz for this segment
-                for (int k=0; k<=depos_order-1; k++) {
-                    const amrex::Real this_Jz = wqz*sz_cell[k]*seg_factor;
-                    amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+k0_cell+k, 0, 0), this_Jz);
-                }
-
-                // update old segment values
-                if (ns < num_segments-1) {
-                    z0_old = z0_new;
-                }
-
-            }
-
-#endif
-        }
-    );
+            amrex::ParticleReal const xp_n = (xp_n_data ? xp_n_data[ip] : 0._prt);
+            amrex::ParticleReal const yp_n = (yp_n_data ? yp_n_data[ip] : 0._prt);
+            amrex::ParticleReal const zp_n = (zp_n_data ? zp_n_data[ip] : 0._prt);
+
+            amrex::ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n;
+            amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n;
+            amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n;
+
+            VillasenorDepositionShapeNKernel<depos_order>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq,
+                                                          uxp_nph[ip], uyp_nph[ip], uzp_nph[ip], gaminv,
+                                                          Jx_arr, Jy_arr, Jz_arr,
+                                                          dt, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
+
+    });
 }
 
 /**
@@ -1971,14 +2365,14 @@ void doVayDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     WARPX_ABORT_WITH_MESSAGE("Vay deposition not implemented in RZ geometry");
 #endif
 
-#if defined(WARPX_DIM_1D_Z)
+#if defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     amrex::ignore_unused(GetPosition,
         wp, uxp, uyp, uzp, ion_lev, Dx_fab, Dy_fab, Dz_fab,
         np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q);
     WARPX_ABORT_WITH_MESSAGE("Vay deposition not implemented in 1D geometry");
 #endif
 
-#if !(defined WARPX_DIM_RZ || defined WARPX_DIM_1D_Z)
+#if !(defined WARPX_DIM_RZ || defined WARPX_DIM_1D_Z || defined WARPX_DIM_RCYLINDER || defined WARPX_DIM_RSPHERE)
 
     // If ion_lev is a null pointer, then do_ionization=0, else do_ionization=1
     const bool do_ionization = ion_lev;

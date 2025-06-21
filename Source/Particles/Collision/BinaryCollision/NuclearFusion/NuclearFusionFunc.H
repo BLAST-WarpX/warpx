@@ -16,7 +16,6 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
-#include "WarpX.H"
 
 #include <AMReX_Algorithm.H>
 #include <AMReX_DenseBins.H>
@@ -71,11 +70,11 @@ public:
 
         const amrex::ParmParse pp_collision_name(collision_name);
         utils::parser::queryWithParser(
-            pp_collision_name, "fusion_multiplier", m_fusion_multiplier);
+            pp_collision_name, "event_multiplier", m_fusion_multiplier);
         utils::parser::queryWithParser(
-            pp_collision_name, "fusion_probability_threshold", m_probability_threshold);
+            pp_collision_name, "probability_threshold", m_probability_threshold);
         utils::parser::queryWithParser(
-            pp_collision_name, "fusion_probability_target_value",
+            pp_collision_name, "probability_target_value",
             m_probability_target_value);
 
         m_exe.m_fusion_multiplier = m_fusion_multiplier;
@@ -133,6 +132,7 @@ public:
             GetParticlePosition<PIdx> /*get_position_1*/, GetParticlePosition<PIdx> /*get_position_2*/,
             amrex::ParticleReal const /*n1*/, amrex::ParticleReal const /*n2*/,
             amrex::ParticleReal const /*T1*/, amrex::ParticleReal const /*T2*/,
+            amrex::Real const /*global_lamdb*/,
             amrex::ParticleReal const  /*q1*/, amrex::ParticleReal const  /*q2*/,
             amrex::ParticleReal const  m1, amrex::ParticleReal const  m2,
             amrex::Real const  dt, amrex::Real const dV, index_type coll_idx,
@@ -243,6 +243,8 @@ public:
     };
 
     [[nodiscard]] Executor const& executor () const { return m_exe; }
+
+    bool use_global_debye_length() { return false; }
 
 private:
     // Factor used to increase the number of fusion reaction by decreasing the weight of the

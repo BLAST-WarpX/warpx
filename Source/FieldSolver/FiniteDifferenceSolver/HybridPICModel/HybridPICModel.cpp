@@ -10,6 +10,8 @@
 
 #include "HybridPICModel.H"
 
+#include <ablastr/utils/Communication.H>
+
 #include "EmbeddedBoundary/Enabled.H"
 #include "Python/callbacks.H"
 #include "Fields.H"
@@ -48,9 +50,9 @@ void HybridPICModel::ReadParameters ()
     }
 
     pp_hybrid.query("plasma_resistivity(rho,J)", m_eta_expression);
-    utils::parser::queryWithParser(pp_hybrid, "n_floor", m_n_floor);
+    pp_hybrid.query("plasma_hyper_resistivity(rho,B)", m_eta_h_expression);
 
-    utils::parser::queryWithParser(pp_hybrid, "plasma_hyper_resistivity", m_eta_h);
+    utils::parser::queryWithParser(pp_hybrid, "n_floor", m_n_floor);
 
     // convert electron temperature from eV to J
     m_elec_temp *= PhysConst::q_e;
@@ -152,13 +154,20 @@ void HybridPICModel::AllocateLevelMFs (
 #endif
 }
 
-void HybridPICModel::InitData ()
+void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
 {
     m_resistivity_parser = std::make_unique<amrex::Parser>(
         utils::parser::makeParser(m_eta_expression, {"rho","J"}));
     m_eta = m_resistivity_parser->compile<2>();
     const std::set<std::string> resistivity_symbols = m_resistivity_parser->symbols();
     m_resistivity_has_J_dependence += resistivity_symbols.count("J");
+
+    m_include_hyper_resistivity_term = (m_eta_h_expression != "0.0");
+    m_hyper_resistivity_parser = std::make_unique<amrex::Parser>(
+        utils::parser::makeParser(m_eta_h_expression, {"rho","B"}));
+    m_eta_h = m_hyper_resistivity_parser->compile<2>();
+    const std::set<std::string> hyper_resistivity_symbols = m_hyper_resistivity_parser->symbols();
+    m_hyper_resistivity_has_B_dependence += hyper_resistivity_symbols.count("B");
 
     m_J_external_parser[0] = std::make_unique<amrex::Parser>(
         utils::parser::makeParser(m_Jx_ext_grid_function,{"x","y","z","t"}));
@@ -176,39 +185,19 @@ void HybridPICModel::InitData ()
         m_external_current_has_time_dependence += J_ext_symbols.count("t");
     }
 
-    auto & warpx = WarpX::GetInstance();
+    auto& warpx = WarpX::GetInstance();
     using ablastr::fields::Direction;
 
     // Get the grid staggering of the fields involved in calculating E
-    amrex::IntVect Jx_stag = warpx.m_fields.get(FieldType::current_fp, Direction{0}, 0)->ixType().toIntVect();
-    amrex::IntVect Jy_stag = warpx.m_fields.get(FieldType::current_fp, Direction{1}, 0)->ixType().toIntVect();
-    amrex::IntVect Jz_stag = warpx.m_fields.get(FieldType::current_fp, Direction{2}, 0)->ixType().toIntVect();
-    amrex::IntVect Bx_stag = warpx.m_fields.get(FieldType::Bfield_fp, Direction{0}, 0)->ixType().toIntVect();
-    amrex::IntVect By_stag = warpx.m_fields.get(FieldType::Bfield_fp, Direction{1}, 0)->ixType().toIntVect();
-    amrex::IntVect Bz_stag = warpx.m_fields.get(FieldType::Bfield_fp, Direction{2}, 0)->ixType().toIntVect();
-    amrex::IntVect Ex_stag = warpx.m_fields.get(FieldType::Efield_fp, Direction{0}, 0)->ixType().toIntVect();
-    amrex::IntVect Ey_stag = warpx.m_fields.get(FieldType::Efield_fp, Direction{1}, 0)->ixType().toIntVect();
-    amrex::IntVect Ez_stag = warpx.m_fields.get(FieldType::Efield_fp, Direction{2}, 0)->ixType().toIntVect();
-
-    // Check that the grid types are appropriate
-    const bool appropriate_grids = (
-#if   defined(WARPX_DIM_1D_Z)
-        // AMReX convention: x = missing dimension, y = missing dimension, z = only dimension
-        Ex_stag == IntVect(1) && Ey_stag == IntVect(1) && Ez_stag == IntVect(0) &&
-        Bx_stag == IntVect(0) && By_stag == IntVect(0) && Bz_stag == IntVect(1) &&
-#elif   defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-        // AMReX convention: x = first dimension, y = missing dimension, z = second dimension
-        Ex_stag == IntVect(0,1) && Ey_stag == IntVect(1,1) && Ez_stag == IntVect(1,0) &&
-        Bx_stag == IntVect(1,0) && By_stag == IntVect(0,0) && Bz_stag == IntVect(0,1) &&
-#elif defined(WARPX_DIM_3D)
-        Ex_stag == IntVect(0,1,1) && Ey_stag == IntVect(1,0,1) && Ez_stag == IntVect(1,1,0) &&
-        Bx_stag == IntVect(1,0,0) && By_stag == IntVect(0,1,0) && Bz_stag == IntVect(0,0,1) &&
-#endif
-        Jx_stag == Ex_stag && Jy_stag == Ey_stag && Jz_stag == Ez_stag
-    );
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        appropriate_grids,
-        "Ohm's law E-solve only works with staggered (Yee) grids.");
+    amrex::IntVect Jx_stag = fields.get(FieldType::current_fp, Direction{0}, 0)->ixType().toIntVect();
+    amrex::IntVect Jy_stag = fields.get(FieldType::current_fp, Direction{1}, 0)->ixType().toIntVect();
+    amrex::IntVect Jz_stag = fields.get(FieldType::current_fp, Direction{2}, 0)->ixType().toIntVect();
+    amrex::IntVect Bx_stag = fields.get(FieldType::Bfield_fp, Direction{0}, 0)->ixType().toIntVect();
+    amrex::IntVect By_stag = fields.get(FieldType::Bfield_fp, Direction{1}, 0)->ixType().toIntVect();
+    amrex::IntVect Bz_stag = fields.get(FieldType::Bfield_fp, Direction{2}, 0)->ixType().toIntVect();
+    amrex::IntVect Ex_stag = fields.get(FieldType::Efield_fp, Direction{0}, 0)->ixType().toIntVect();
+    amrex::IntVect Ey_stag = fields.get(FieldType::Efield_fp, Direction{1}, 0)->ixType().toIntVect();
+    amrex::IntVect Ez_stag = fields.get(FieldType::Efield_fp, Direction{2}, 0)->ixType().toIntVect();
 
     // copy data to device
     for ( int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
@@ -411,7 +400,11 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
         *rho_fp
     );
     warpx.ApplyElectronPressureBoundary(lev, PatchType::fine);
-    electron_pressure_fp->FillBoundary(warpx.Geom(lev).periodicity());
+    ablastr::utils::communication::FillBoundary(
+        *electron_pressure_fp,
+        WarpX::do_single_precision_comms,
+        warpx.Geom(lev).periodicity(),
+        true);
 }
 
 void HybridPICModel::FillElectronPressureMF (

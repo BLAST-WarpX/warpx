@@ -26,7 +26,7 @@ sudo apt-get update
 
 df -h
 # Install and reduce disk space
-# https://github.com/ECP-WarpX/WarpX/pull/1566#issuecomment-790934878
+# https://github.com/BLAST-WarpX/warpx/pull/1566#issuecomment-790934878
 
 # try apt install up to five times, to avoid connection splits
 # FIXME install latest version of IntelLLVM, Intel MKL

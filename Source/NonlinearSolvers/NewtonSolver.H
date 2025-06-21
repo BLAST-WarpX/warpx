@@ -7,15 +7,18 @@
 #ifndef NEWTON_SOLVER_H_
 #define NEWTON_SOLVER_H_
 
+#include "LinearSolverLibrary.H"
 #include "NonlinearSolver.H"
 #include "JacobianFunctionMF.H"
 #include "Preconditioner.H"
 #include "Utils/TextMsg.H"
 
-#include <AMReX_GMRES.H>
 #include <AMReX_ParmParse.H>
+#include <AMReX_Config.H>
 
 #include <vector>
+#include <istream>
+#include <filesystem>
 
 /**
  * \brief Newton method to solve nonlinear equation of form:
@@ -45,7 +48,8 @@ public:
     void Solve ( Vec&   a_U,
            const Vec&   a_b,
            amrex::Real  a_time,
-           amrex::Real  a_dt ) const override;
+           amrex::Real  a_dt,
+           int          a_step) const override;
 
     void GetSolverParams ( amrex::Real&  a_rtol,
                            amrex::Real&  a_atol,
@@ -75,11 +79,13 @@ public:
         amrex::Print()     << "Newton relative tolerance:  " << m_rtol << "\n";
         amrex::Print()     << "Newton absolute tolerance:  " << m_atol << "\n";
         amrex::Print()     << "Newton require convergence: " << (m_require_convergence?"true":"false") << "\n";
-        amrex::Print()     << "GMRES verbose:            " << m_gmres_verbose_int << "\n";
-        amrex::Print()     << "GMRES restart length:     " << m_gmres_restart_length << "\n";
-        amrex::Print()     << "GMRES max iterations:     " << m_gmres_maxits << "\n";
-        amrex::Print()     << "GMRES relative tolerance: " << m_gmres_rtol << "\n";
-        amrex::Print()     << "GMRES absolute tolerance: " << m_gmres_atol << "\n";
+        auto linsol_name = amrex::getEnumNameString(m_linear_solver_type);
+        amrex::Print()     << "Newton linear solver:       " << linsol_name << "\n";
+        amrex::Print()     << "Linear solver (" << linsol_name << ") verbose:            " << m_linsol_verbose_int << "\n";
+        amrex::Print()     << "Linear solver (" << linsol_name << ") restart length:     " << m_linsol_restart_length << "\n";
+        amrex::Print()     << "Linear solver (" << linsol_name << ") max iterations:     " << m_linsol_maxits << "\n";
+        amrex::Print()     << "Linear solver (" << linsol_name << ") relative tolerance: " << m_linsol_rtol << "\n";
+        amrex::Print()     << "Linear solver (" << linsol_name << ") absolute tolerance: " << m_linsol_atol << "\n";
         amrex::Print()     << "Preconditioner type:      " << amrex::getEnumNameString(m_pc_type) << "\n";
 
         m_linear_function->printParams();
@@ -118,29 +124,29 @@ private:
     int m_maxits = 100;
 
     /**
-     * \brief Relative tolerance for GMRES.
+     * \brief Relative tolerance for linear solver.
      */
-    amrex::Real m_gmres_rtol = 1.0e-4;
+    amrex::Real m_linsol_rtol = 1.0e-4;
 
     /**
-     * \brief Absolute tolerance for GMRES.
+     * \brief Absolute tolerance for linear solver.
      */
-    amrex::Real m_gmres_atol = 0.;
+    amrex::Real m_linsol_atol = 0.;
 
     /**
-     * \brief Maximum iterations for GMRES.
+     * \brief Maximum iterations for linear solver.
      */
-    int m_gmres_maxits = 1000;
+    int m_linsol_maxits = 1000;
 
     /**
-     * \brief Verbosity flag for GMRES.
+     * \brief Verbosity flag for linear solver.
      */
-    int m_gmres_verbose_int = 2;
+    int m_linsol_verbose_int = 2;
 
     /**
-     * \brief Restart iteration for GMRES.
+     * \brief Restart iteration for linear solver.
      */
-    int m_gmres_restart_length = 30;
+    int m_linsol_restart_length = 30;
 
     /**
      * \brief Preconditioner type
@@ -150,15 +156,20 @@ private:
     mutable amrex::Real m_cur_time, m_dt;
 
     /**
-     * \brief The linear function used by GMRES to compute A*v.
+     * \brief The linear function used by linear solver to compute A*v.
      * In the contect of JFNK, A = dF/dU (i.e., system Jacobian)
      */
     std::unique_ptr<JacobianFunctionMF<Vec,Ops>> m_linear_function;
 
     /**
-     * \brief The linear solver (GMRES) object.
+     * \brief Choice of linear solver
      */
-    std::unique_ptr<amrex::GMRES<Vec,JacobianFunctionMF<Vec,Ops>>> m_linear_solver;
+    LinearSolverType m_linear_solver_type = LinearSolverType::amrex_gmres;
+
+    /**
+     * \brief The linear solver object.
+     */
+    std::unique_ptr<LinearSolver<Vec,JacobianFunctionMF<Vec,Ops>>> m_linear_solver;
 
     void ParseParameters ();
 
@@ -177,6 +188,7 @@ template <class Vec, class Ops>
 void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
                                      Ops*        a_ops )
 {
+    BL_PROFILE("NewtonSolver::Define()");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !this->m_is_defined,
         "Newton nonlinear solver object is already defined!");
@@ -192,14 +204,54 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
     m_linear_function = std::make_unique<JacobianFunctionMF<Vec,Ops>>();
     m_linear_function->define(m_F, m_ops, m_pc_type);
 
-    m_linear_solver = std::make_unique<amrex::GMRES<Vec,JacobianFunctionMF<Vec,Ops>>>();
+    if (m_linear_solver_type == LinearSolverType::amrex_gmres) {
+        m_linear_solver = std::make_unique<AMReXGMRES<Vec,JacobianFunctionMF<Vec,Ops>>>();
+    } else if (m_linear_solver_type == LinearSolverType::petsc_ksp) {
+#ifdef AMREX_USE_PETSC
+        m_linear_solver = std::make_unique<PETScKSP<Vec,JacobianFunctionMF<Vec,Ops>>>();
+#else
+        WARPX_ABORT_WITH_MESSAGE("NewtonSolver::Define(): must compile with PETSc to use petsc_ksp (AMREX_USE_PETSC must be defined)");
+#endif
+    } else {
+        WARPX_ABORT_WITH_MESSAGE("NewtonSolver::Define(): invalid linear solver type");
+    }
     m_linear_solver->define(*m_linear_function);
-    m_linear_solver->setVerbose( m_gmres_verbose_int );
-    m_linear_solver->setRestartLength( m_gmres_restart_length );
-    m_linear_solver->setMaxIters( m_gmres_maxits );
+    m_linear_solver->setVerbose( m_linsol_verbose_int );
+    m_linear_solver->setRestartLength( m_linsol_restart_length );
+    m_linear_solver->setMaxIters( m_linsol_maxits );
 
     this->m_is_defined = true;
 
+    // Create diagnostic file and write header
+    if (amrex::ParallelDescriptor::IOProcessor()
+        && !this->m_diagnostic_file.empty()
+        && !amrex::FileExists(this->m_diagnostic_file)) {
+
+        std::filesystem::path const diagnostic_path(this->m_diagnostic_file);
+        std::filesystem::path const diagnostic_dir = diagnostic_path.parent_path();
+        if (!diagnostic_dir.empty()) {
+            std::filesystem::create_directories(diagnostic_dir);
+        }
+
+        std::ofstream diagnostic_file{this->m_diagnostic_file, std::ofstream::out | std::ofstream::trunc};
+        int c = 0;
+        diagnostic_file << "#";
+        diagnostic_file << "[" << c++ << "]step()";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]time(s)";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]iters";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]norm_abs";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]norm_rel";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]gmres_iters";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]gmres_last_res";
+        diagnostic_file << "\n";
+        diagnostic_file.close();
+    }
 }
 
 template <class Vec, class Ops>
@@ -207,17 +259,28 @@ void NewtonSolver<Vec,Ops>::ParseParameters ()
 {
     const amrex::ParmParse pp_newton("newton");
     pp_newton.query("verbose",             this->m_verbose);
+    pp_newton.query("linear_solver",       m_linear_solver_type);
     pp_newton.query("absolute_tolerance",  m_atol);
     pp_newton.query("relative_tolerance",  m_rtol);
     pp_newton.query("max_iterations",      m_maxits);
     pp_newton.query("require_convergence", m_require_convergence);
+    pp_newton.query("diagnostic_file",     this->m_diagnostic_file);
+    pp_newton.query("diagnostic_interval", this->m_diagnostic_interval);
 
+    const amrex::ParmParse pp_l(amrex::getEnumNameString(m_linear_solver_type));
+    pp_l.query("verbose_int",         m_linsol_verbose_int);
+    pp_l.query("restart_length",      m_linsol_restart_length);
+    pp_l.query("absolute_tolerance",  m_linsol_atol);
+    pp_l.query("relative_tolerance",  m_linsol_rtol);
+    pp_l.query("max_iterations",      m_linsol_maxits);
+
+    /* backward compatibility */
     const amrex::ParmParse pp_gmres("gmres");
-    pp_gmres.query("verbose_int",         m_gmres_verbose_int);
-    pp_gmres.query("restart_length",      m_gmres_restart_length);
-    pp_gmres.query("absolute_tolerance",  m_gmres_atol);
-    pp_gmres.query("relative_tolerance",  m_gmres_rtol);
-    pp_gmres.query("max_iterations",      m_gmres_maxits);
+    pp_gmres.query("verbose_int",         m_linsol_verbose_int);
+    pp_gmres.query("restart_length",      m_linsol_restart_length);
+    pp_gmres.query("absolute_tolerance",  m_linsol_atol);
+    pp_gmres.query("relative_tolerance",  m_linsol_rtol);
+    pp_gmres.query("max_iterations",      m_linsol_maxits);
 
     const amrex::ParmParse pp_jac("jacobian");
     pp_jac.query("pc_type", m_pc_type);
@@ -227,7 +290,8 @@ template <class Vec, class Ops>
 void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
                               const Vec&         a_b,
                                     amrex::Real  a_time,
-                                    amrex::Real  a_dt ) const
+                                    amrex::Real  a_dt,
+                                    int          a_step) const
 {
     BL_PROFILE("NewtonSolver::Solve()");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -248,6 +312,7 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
     amrex::Real norm_rel = 0.;
 
     int iter;
+    int linear_solver_iters = 0;
     for (iter = 0; iter < m_maxits;) {
 
         // Compute residual: F(U) = U - b - R(U)
@@ -269,14 +334,18 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
         }
 
         if (norm_abs < m_rtol) {
-            amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
-                           << ". Satisfied absolute tolerance " << m_atol << "\n";
+            if (this->m_verbose) {
+                amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
+                               << ". Satisfied absolute tolerance " << m_atol << "\n";
+            }
             break;
         }
 
         if (norm_rel < m_rtol) {
-            amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
-                           << ". Satisfied relative tolerance " << m_rtol << "\n";
+            if (this->m_verbose) {
+                amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
+                               << ". Satisfied relative tolerance " << m_rtol << "\n";
+            }
             break;
         }
 
@@ -292,15 +361,18 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
 
         // Solve linear system for Newton step [Jac]*dU = F
         m_dU.zero();
-        m_linear_solver->solve( m_dU, m_F, m_gmres_rtol, m_gmres_atol );
+        m_linear_solver->solve( m_dU, m_F, m_linsol_rtol, m_linsol_atol );
+        linear_solver_iters += m_linear_solver->getNumIters();
 
         // Update solution
         a_U -= m_dU;
 
         iter++;
         if (iter >= m_maxits) {
-            amrex::Print() << "Newton: exiting at iter = " << std::setw(3) << iter
-                           << ". Maximum iteration reached: iter = " << m_maxits << "\n";
+            if (this->m_verbose) {
+                amrex::Print() << "Newton: exiting at iter = " << std::setw(3) << iter
+                               << ". Maximum iteration reached: iter = " << m_maxits << "\n";
+            }
             break;
         }
 
@@ -321,6 +393,27 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
        }
     }
 
+    if (!this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor() &&
+        ((a_step+1)%this->m_diagnostic_interval==0 || a_step==0)) {
+        std::ofstream diagnostic_file{this->m_diagnostic_file, std::ofstream::out | std::ofstream::app};
+        diagnostic_file << std::setprecision(14);
+        diagnostic_file << a_step+1;
+        diagnostic_file << " ";;
+        diagnostic_file << a_time + a_dt;
+        diagnostic_file << " ";;
+        diagnostic_file << iter;
+        diagnostic_file << " ";;
+        diagnostic_file << norm_abs;
+        diagnostic_file << " ";;
+        diagnostic_file << norm_rel;
+        diagnostic_file << " ";;
+        diagnostic_file << linear_solver_iters;
+        diagnostic_file << " ";;
+        diagnostic_file << m_linear_solver->getResidualNorm();
+        diagnostic_file << "\n";
+        diagnostic_file.close();
+    }
+
 }
 
 template <class Vec, class Ops>
@@ -330,7 +423,7 @@ void NewtonSolver<Vec,Ops>::EvalResidual ( Vec&         a_F,
                                            amrex::Real  a_time,
                                            int          a_iter ) const
 {
-
+    BL_PROFILE("NewtonSolver::EvalResidual()");
     m_ops->ComputeRHS( m_R, a_U, a_time, a_iter, false );
 
     // set base U and R(U) for matrix-free Jacobian action calculation

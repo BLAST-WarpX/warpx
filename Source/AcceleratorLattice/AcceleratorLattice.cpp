@@ -20,6 +20,8 @@
 AcceleratorLattice::AcceleratorLattice ()
 {
 
+#if defined(WARPX_ZINDEX)
+
     using namespace amrex::literals;
 
     /* Get the inputs for and initialize all of the lattice element types */
@@ -28,6 +30,9 @@ AcceleratorLattice::AcceleratorLattice ()
 
     h_quad.WriteToDevice();
     h_plasmalens.WriteToDevice();
+
+#endif
+
 }
 
 void
@@ -78,32 +83,33 @@ AcceleratorLattice::ReadLattice (std::string const & root_name, amrex::ParticleR
 void
 AcceleratorLattice::InitElementFinder (
     int const lev, amrex::Real const gamma_boost,
+    const amrex::Vector<amrex::Real>& time,
     amrex::BoxArray const & ba, amrex::DistributionMapping const & dm)
 {
     if (m_lattice_defined) {
         m_element_finder = std::make_unique<amrex::LayoutData<LatticeElementFinder>>(ba, dm);
         for (amrex::MFIter mfi(*m_element_finder); mfi.isValid(); ++mfi)
         {
-            (*m_element_finder)[mfi].InitElementFinder(lev, gamma_boost, mfi, *this);
+            (*m_element_finder)[mfi].InitElementFinder(lev, gamma_boost, time, mfi, *this);
         }
     }
 }
 
 void
-AcceleratorLattice::UpdateElementFinder (int const lev) // NOLINT(readability-make-member-function-const)
-{                                                       // Techniquely clang-tidy is correct because
+AcceleratorLattice::UpdateElementFinder (int const lev, const amrex::Vector<amrex::Real>& time) // NOLINT(readability-make-member-function-const)
+{                                                       // Technically clang-tidy is correct because
                                                         // m_element_finder is unique_ptr, not const*.
     if (m_lattice_defined) {
         for (amrex::MFIter mfi(*m_element_finder); mfi.isValid(); ++mfi)
         {
-            (*m_element_finder)[mfi].UpdateIndices(lev, mfi, *this);
+            (*m_element_finder)[mfi].UpdateIndices(lev, mfi, *this, time);
         }
     }
 }
 
 LatticeElementFinderDevice
-AcceleratorLattice::GetFinderDeviceInstance (WarpXParIter const& a_pti, int const a_offset) const
+AcceleratorLattice::GetFinderDeviceInstance (WarpXParIter const& a_pti, int const a_offset, const amrex::Vector<amrex::Real>& dts) const
 {
     const LatticeElementFinder & finder = (*m_element_finder)[a_pti];
-    return finder.GetFinderDeviceInstance(a_pti, a_offset, *this);
+    return finder.GetFinderDeviceInstance(a_pti, a_offset, *this, dts);
 }

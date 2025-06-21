@@ -11,6 +11,7 @@ import sys
 
 import numpy as np
 import yt
+from scipy.constants import c, m_e
 
 # This script checks if photons initialized with different momenta and
 # different initial directions propagate along straight lines at the speed of
@@ -20,9 +21,6 @@ import yt
 # inputfile according to the initial conditions listed below.
 
 
-# Physical constants
-c = 299792458.0
-m_e = 9.1093837015e-31
 # ________________________________________
 
 # Test cases
@@ -86,7 +84,7 @@ init_pos = np.array([0.0, 0.0, 0.0])
 
 # Tolerance
 tol_pos = 1.0e-14
-tol_mom = 0.0  # momentum should be conserved exactly
+tol_mom = np.finfo(np.float64).eps  # momentum should be conserved exactly
 # ________________________________________
 
 # Input filename

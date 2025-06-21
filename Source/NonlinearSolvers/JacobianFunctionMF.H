@@ -7,7 +7,11 @@
 #ifndef JacobianFunctionMF_H_
 #define JacobianFunctionMF_H_
 
+#include "LinearFunction.H"
 #include "CurlCurlMLMGPC.H"
+#include "JacobiPC.H"
+#include "Utils/TextMsg.H"
+#include <AMReX_Config.H>
 #include <string>
 
 /**
@@ -18,7 +22,7 @@
  */
 
 template <class T, class Ops>
-class JacobianFunctionMF
+class JacobianFunctionMF : public LinearFunction<T,Ops>
 {
     public:
 
@@ -33,10 +37,10 @@ class JacobianFunctionMF
     JacobianFunctionMF(JacobianFunctionMF&&) noexcept = default;
     JacobianFunctionMF& operator=(JacobianFunctionMF&&) noexcept = default;
 
-    void apply ( T& a_dF, const T& a_dU );
+    void apply ( T& a_dF, const T& a_dU ) override;
 
     inline
-    void precond ( T& a_U, const T& a_X )
+    void precond ( T& a_U, const T& a_X ) override
     {
         if (m_usePreCond) {
             a_U.zero();
@@ -47,75 +51,22 @@ class JacobianFunctionMF
     }
 
     inline
-    void updatePreCondMat ( const T&  a_X )
+    void updatePreCondMat ( const T&  a_X ) override
     {
         if (m_usePreCond) { m_preCond->Update(a_X); }
     }
 
-    inline
-    void create ( T& a_Z, const T& a_U )
-    {
-        a_Z.define(a_U);
-    }
-
-    T makeVecLHS () const;
-    T makeVecRHS () const;
+    T makeVecLHS () const override;
+    T makeVecRHS () const override;
 
     inline
-    void assign( T& a_Z, const T& a_U ) {
-        a_Z.Copy(a_U);
-    }
-
-    inline
-    void increment( T& a_Z, const T& a_U, RT a_scale )
-    {
-        a_Z.increment(a_U,a_scale);
-    }
-
-    inline
-    void scale ( T& a_U, RT a_scale )
-    {
-        a_U.scale(a_scale);
-    }
-
-    inline
-    void linComb ( T& a_U, RT a, const T& X, RT b, const T& Y )
-    {
-        a_U.linComb( a, X, b, Y );
-    }
-
-    inline
-    void setToZero ( T& a_U )
-    {
-        a_U.zero();
-    }
-
-    inline
-    void setVal ( T& a_U, RT a_val )
-    {
-        a_U.setVal(a_val);
-    }
-
-    inline
-    RT dotProduct( const T& a_X, const T& a_Y )
-    {
-        return( a_X.dotProduct(a_Y) );
-    }
-
-    inline
-    RT norm2( const T& a_U )
-    {
-        return ( a_U.norm2() );
-    }
-
-    [[nodiscard]] inline
     bool isDefined() const { return m_is_defined;  }
 
     inline
     void setBaseSolution ( const T&  a_U )
     {
         m_Y0.Copy(a_U);
-        m_normY0 = norm2(m_Y0);
+        m_normY0 = this->norm2(m_Y0);
     }
 
     inline
@@ -158,7 +109,10 @@ class JacobianFunctionMF
         }
     }
 
-    void define( const T&, Ops*, const PreconditionerType& );
+    void define( const T&, Ops*, const PreconditionerType& ) override;
+
+    inline
+    PreconditionerType pcType () const override { return m_pc_type; }
 
     private:
 
@@ -181,6 +135,7 @@ void JacobianFunctionMF<T,Ops>::define ( const T& a_U,
                                          Ops* a_ops,
                                          const PreconditionerType& a_pc_type )
 {
+    BL_PROFILE("JacobianFunctionMF::::define()");
     m_Z.Define(a_U);
     m_Y0.Define(a_U);
     m_R0.Define(a_U);
@@ -193,6 +148,14 @@ void JacobianFunctionMF<T,Ops>::define ( const T& a_U,
         m_pc_type = a_pc_type;
         if (m_pc_type == PreconditionerType::pc_curl_curl_mlmg) {
             m_preCond = std::make_unique<CurlCurlMLMGPC<T,Ops>>();
+        } else if (m_pc_type == PreconditionerType::pc_jacobi) {
+            m_preCond = std::make_unique<JacobiPC<T,Ops>>();
+        } else if (m_pc_type == PreconditionerType::pc_petsc) {
+#ifdef AMREX_USE_PETSC
+            WARPX_ABORT_WITH_MESSAGE("JacobianFunctionMF::Define(): pc_petsc not yet implemented");
+#else
+            WARPX_ABORT_WITH_MESSAGE("JacobianFunctionMF::Define(): must compile with PETSc to use pc_petsc (AMREX_USE_PETSC must be defined)");
+#endif
         } else {
             std::stringstream convergenceMsg;
             convergenceMsg << "JacobianFunctionMF::define(): " << amrex::getEnumNameString(m_pc_type)
@@ -208,17 +171,19 @@ void JacobianFunctionMF<T,Ops>::define ( const T& a_U,
 template <class T, class Ops>
 auto JacobianFunctionMF<T,Ops>::makeVecRHS () const -> T
 {
-    T Vec;
-    Vec.Define(m_R);
-    return Vec;
+    BL_PROFILE("JacobianFunctionMF::::makeVecRHS()");
+    T x;
+    x.Define(m_R);
+    return x;
 }
 
 template <class T, class Ops>
 auto JacobianFunctionMF<T,Ops>::makeVecLHS () const -> T
 {
-    T Vec;
-    Vec.Define(m_R);
-    return Vec;
+    BL_PROFILE("JacobianFunctionMF::::makeVecLHS()");
+    T x;
+    x.Define(m_R);
+    return x;
 }
 
 template <class T, class Ops>
@@ -226,7 +191,7 @@ void JacobianFunctionMF<T,Ops>::apply (T& a_dF, const T& a_dU)
 {
     BL_PROFILE("JacobianFunctionMF::apply()");
     using namespace amrex::literals;
-    RT const normY = norm2(a_dU); // always 1 when called from GMRES
+    RT const normY = this->norm2(a_dU); // always 1 when called from GMRES
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         isDefined(),
@@ -243,7 +208,7 @@ void JacobianFunctionMF<T,Ops>::apply (T& a_dF, const T& a_dU)
              * M. Pernice and H. F. Walker, "NITSOL: A Newton Iterative Solver for
              * Nonlinear Systems", SIAM J. Sci. Stat. Comput., 1998, vol 19,
              * pp. 302--318. */
-            if (m_normY0==0.0) { eps = m_epsJFNK * norm2(m_R0) / normY; }
+            if (m_normY0==0.0) { eps = m_epsJFNK * this->norm2(m_R0) / normY; }
             else {
                 // m_epsJFNK * sqrt(1.0 + m_normY0) / normY
                 // above commonly used form not recommend for poorly scaled Y0

@@ -223,12 +223,16 @@ endfunction()
 
 # Set the suffix for targets and binaries depending on dimension
 #
-# User specify 1;2;RZ;D in WarpX_DIMS.
-# We append to CMake targets and binaries the suffix "Nd" for 1,2,3 and "rz" for RZ.
+# User specify 1;2;3;RZ;RCYLINDER;RSPHERE in WarpX_DIMS.
+# We append to CMake targets and binaries the suffix "Nd" for 1,2,3 or otherwise the lowercase dimension string
 #
 macro(warpx_set_suffix_dims suffix dim)
     if("${dim}" STREQUAL "RZ")
         set(${suffix} rz)
+    elseif("${dim}" STREQUAL "RCYLINDER")
+        set(${suffix} rcylinder)
+    elseif("${dim}" STREQUAL "RSPHERE")
+        set(${suffix} rsphere)
     else()
         set(${suffix} ${dim}d)
     endif()
@@ -436,10 +440,14 @@ function(warpx_print_summary)
     set(LIB_TYPE "")
     if(WarpX_LIB)
         if(BUILD_SHARED_LIBS)
-            set(LIB_TYPE " (shared)")
+            set(LIB_TYPE " (shared")
         else()
-            set(LIB_TYPE " (static)")
+            set(LIB_TYPE " (static")
         endif()
+        if(WarpX_UNITY_BUILD)
+            set(LIB_TYPE "${LIB_TYPE}, unity build")
+        endif()
+        set(LIB_TYPE "${LIB_TYPE})")
     endif()
     #message("  Testing: ${BUILD_TESTING}")
     message("  Build options:")

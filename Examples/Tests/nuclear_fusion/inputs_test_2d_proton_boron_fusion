@@ -180,29 +180,29 @@ collisions.collision_names = PBF1 PBF2 PBF3 PBF4 PBF5
 PBF1.species = proton1 boron1
 PBF1.product_species = alpha1
 PBF1.type = nuclearfusion
-PBF1.fusion_multiplier = 1.e50
+PBF1.event_multiplier = 1.e50
 
 PBF2.species = proton2 boron2
 PBF2.product_species = alpha2
 PBF2.type = nuclearfusion
-PBF2.fusion_multiplier = 1.e15
-PBF2.fusion_probability_target_value = 0.02
+PBF2.event_multiplier = 1.e15
+PBF2.probability_target_value = 0.02
 
 PBF3.species = proton3 boron3
 PBF3.product_species = alpha3
 PBF3.type = nuclearfusion
-PBF3.fusion_multiplier = 1.e15
+PBF3.event_multiplier = 1.e15
 
 PBF4.species = proton4 boron4
 PBF4.product_species = alpha4
 PBF4.type = nuclearfusion
-PBF4.fusion_multiplier = 1.e21
+PBF4.event_multiplier = 1.e21
 
 PBF5.species = proton5 boron5
 PBF5.product_species = alpha5
 PBF5.type = nuclearfusion
-PBF5.fusion_multiplier = 1.e21
-PBF5.fusion_probability_threshold = 1e123
+PBF5.event_multiplier = 1.e21
+PBF5.probability_threshold = 1e123
 
 # Diagnostics
 diagnostics.diags_names = diag1

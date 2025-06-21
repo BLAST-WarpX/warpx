@@ -80,6 +80,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <variant>
 #include <vector>
 
 class WARPX_EXPORT WarpX
@@ -129,17 +130,14 @@ public:
     void Evolve (int numsteps = -1);
 
     /** Push momentum one half step forward to synchronize with position.
-     *  Also sets is_synchronized to `true`.
+     *  Also sets m_is_synchronized to `true`.
      */
-    void Synchronize ();
+    void SynchronizeVelocityWithPosition ();
 
     //
     // Functions used by implicit solvers
     //
-    void ImplicitPreRHSOp ( amrex::Real cur_time,
-                            amrex::Real a_full_dt,
-                            int         a_nl_iter,
-                            bool        a_from_jacobian );
+    void SyncMassMatricesPC ();
     void SaveParticlesAtImplicitStepStart ();
     void FinishImplicitParticleUpdate ();
     void SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time );
@@ -157,9 +155,7 @@ public:
 
     MultiParticleContainer& GetPartContainer () { return *mypc; }
     MultiFluidContainer& GetFluidContainer () { return *myfl; }
-    MacroscopicProperties& GetMacroscopicProperties () { return *m_macroscopic_properties; }
     ElectrostaticSolver& GetElectrostaticSolver () {return *m_electrostatic_solver;}
-    HybridPICModel& GetHybridPICModel () { return *m_hybrid_pic_model; }
     [[nodiscard]] HybridPICModel * get_pointer_HybridPICModel () const { return m_hybrid_pic_model.get(); }
     MultiDiagnostics& GetMultiDiags () {return *multi_diags;}
     ParticleBoundaryBuffer& GetParticleBoundaryBuffer () { return *m_particle_boundary_buffer; }
@@ -238,8 +234,8 @@ public:
 
     //! Integers that correspond to the time dependency of J (constant, linear)
     //! and rho (linear, quadratic) for the PSATD algorithm
-    static inline auto J_in_time = JInTime::Default;
-    static inline auto rho_in_time = RhoInTime::Default;
+    static inline auto time_dependency_J = TimeDependencyJ::Default;
+    static inline auto time_dependency_rho = TimeDependencyRho::Default;
 
     //! If true, the current is deposited on a nodal grid and then centered onto a staggered grid
     //! using finite centering of order given by #current_centering_nox, #current_centering_noy,
@@ -288,19 +284,15 @@ public:
     //! Order of the particle shape factors (splines) along z
     static int noz;
 
+    //! Maximum number of allowed grid crossings for particles
+    static int particle_max_grid_crossings;
+
     //! Order of finite centering of fields (from staggered grid to nodal grid), along x
     static int field_centering_nox;
     //! Order of finite centering of fields (from staggered grid to nodal grid), along y
     static int field_centering_noy;
     //! Order of finite centering of fields (from staggered grid to nodal grid), along z
     static int field_centering_noz;
-
-    //! Order of finite centering of currents (from nodal grid to staggered grid), along x
-    static int current_centering_nox;
-    //! Order of finite centering of currents (from nodal grid to staggered grid), along y
-    static int current_centering_noy;
-    //! Order of finite centering of currents (from nodal grid to staggered grid), along z
-    static int current_centering_noz;
 
     //! Number of modes for the RZ multi-mode version
     static int n_rz_azimuthal_modes;
@@ -358,9 +350,6 @@ public:
     static bool sort_particles_for_deposition;
     //! Specifies the type of grid used for the above sorting, i.e. cell-centered, nodal, or mixed
     static amrex::IntVect sort_idx_type;
-
-    static bool do_multi_J;
-    static int do_multi_J_n_depositions;
 
     //! With mesh refinement, particles located inside a refinement patch, but within
     //! #n_field_gather_buffer cells of the edge of the patch, will gather the fields
@@ -459,12 +448,6 @@ public:
     /** Print main PIC parameters to stdout */
     void PrintMainPICparameters ();
 
-    /** Write a file that record all inputs: inputs file + command line options */
-    void WriteUsedInputsFile () const;
-
-    /** Print dt and dx,dy,dz */
-    void PrintDtDxDyDz ();
-
     /**
      * \brief
      * Compute the last time step of the simulation
@@ -526,6 +509,14 @@ public:
      * push), to be used in the ``HybridPICEvolveFields()`` function.
      */
     void HybridPICDepositInitialRhoAndJ ();
+
+    /**
+     * \brief Hybrid-PIC deposition function.
+     * Helper function to contain all the needed logic to deposit charge and
+     * current densities for use in the Ohm's law solver. The deposition is
+     * done into the ``rho_fp`` and ``current_fp`` multifabs.
+     */
+    void HybridPICDepositRhoAndJ ();
 
     /** apply QED correction on electric field
      *
@@ -597,7 +588,7 @@ public:
      */
     void DampFieldsInGuards (int lev, amrex::MultiFab* mf);
 
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     void ApplyInverseVolumeScalingToCurrentDensity(amrex::MultiFab* Jx,
                                                    amrex::MultiFab* Jy,
                                                    amrex::MultiFab* Jz,
@@ -627,7 +618,7 @@ public:
     void ApplyEfieldBoundary (int lev, PatchType patch_type, amrex::Real cur_time);
     void ApplyBfieldBoundary (int lev, PatchType patch_type, DtType dt_type, amrex::Real cur_time);
 
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     // Applies the boundary conditions that are specific to the axis when in RZ.
     void ApplyFieldBoundaryOnAxis (amrex::MultiFab* Er, amrex::MultiFab* Et, amrex::MultiFab* Ez, int lev) const;
 #endif
@@ -663,40 +654,22 @@ public:
 
     /** Run the ionization module on all species */
     void doFieldIonization ();
-    /** Run the ionization module on all species at level lev
-     * \param lev level
-     */
-    void doFieldIonization (int lev);
 
 #ifdef WARPX_QED
     /** Run the QED module on all species */
     void doQEDEvents ();
-    /** Run the QED module on all species at level lev
-     * \param lev level
-     */
-    void doQEDEvents (int lev);
 #endif
 
     void PushParticlesandDeposit (int lev, amrex::Real cur_time, DtType a_dt_type=DtType::Full, bool skip_current=false,
-                                 PushType push_type=PushType::Explicit);
+                                  bool deposit_mass_matrices=false, PushType push_type=PushType::Explicit);
     void PushParticlesandDeposit (amrex::Real cur_time, bool skip_current=false,
-                                 PushType push_type=PushType::Explicit);
+                                  bool deposit_mass_matrices=false, PushType push_type=PushType::Explicit);
 
     // This function does aux(lev) = fp(lev) + I(aux(lev-1)-cp(lev)).
     // Caller must make sure fp and cp have ghost cells filled.
     void UpdateAuxilaryData ();
     void UpdateAuxilaryDataStagToNodal ();
     void UpdateAuxilaryDataSameType ();
-
-    /**
-     * \brief This function is called if \c warpx.do_current_centering = 1 and
-     * it centers the currents from a nodal grid to a staggered grid (Yee) using
-     * finite-order interpolation based on the Fornberg coefficients.
-     *
-     * \param[in,out] dst destination \c MultiFab where the results of the finite-order centering are stored
-     * \param[in] src source \c MultiFab that contains the values of the nodal current to be centered
-     */
-    void UpdateCurrentNodalToStag (amrex::MultiFab& dst, amrex::MultiFab const& src);
 
     // Fill boundary cells including coarse/fine boundaries
     void FillBoundaryB   (amrex::IntVect ng, std::optional<bool> nodal_sync = std::nullopt);
@@ -757,20 +730,12 @@ public:
     [[nodiscard]] amrex::Real getdt (int lev) const {return dt.at(lev);}
     [[nodiscard]] int getdo_moving_window() const {return do_moving_window;}
     [[nodiscard]] amrex::Real getmoving_window_x() const {return moving_window_x;}
-    [[nodiscard]] bool getis_synchronized() const {return is_synchronized;}
+    [[nodiscard]] bool getis_synchronized() const {return m_is_synchronized;}
 
     [[nodiscard]] int maxStep () const {return max_step;}
     void updateMaxStep (const int new_max_step) {max_step = new_max_step;}
     [[nodiscard]] amrex::Real stopTime () const {return stop_time;}
     void updateStopTime (const amrex::Real new_stop_time) {stop_time = new_stop_time;}
-
-    void AverageAndPackFields( amrex::Vector<std::string>& varnames,
-        amrex::Vector<amrex::MultiFab>& mf_avg, amrex::IntVect ngrow) const;
-
-    void prepareFields( int step, amrex::Vector<std::string>& varnames,
-        amrex::Vector<amrex::MultiFab>& mf_avg,
-        amrex::Vector<const amrex::MultiFab*>& output_mf,
-        amrex::Vector<amrex::Geometry>& output_geom ) const;
 
     static std::array<amrex::Real,3> CellSize (int lev);
     static amrex::XDim3 InvCellSize (int lev);
@@ -877,7 +842,7 @@ public:
      * on the staggered yee-grid or cell-centered grid, in the interior cells
      * and guard cells.
      *
-     * \param[in] field FieldType to grab from register to write into
+     * \param[in] field FieldType or string containing field name to grab from register to write into
      * \param[in] fx_parser parser function to initialize x-field
      * \param[in] fy_parser parser function to initialize y-field
      * \param[in] fz_parser parser function to initialize z-field
@@ -887,59 +852,13 @@ public:
      * \param[in] use_eb_flags (default:true) flag indicating if eb points should be excluded or not
      */
     void ComputeExternalFieldOnGridUsingParser (
-        warpx::fields::FieldType field,
+        const std::variant<warpx::fields::FieldType, std::string>& field,
         amrex::ParserExecutor<4> const& fx_parser,
         amrex::ParserExecutor<4> const& fy_parser,
         amrex::ParserExecutor<4> const& fz_parser,
         int lev, PatchType patch_type,
         amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field,
-        bool use_eb_flags);
-
-    void ComputeExternalFieldOnGridUsingParser (
-        warpx::fields::FieldType field,
-        amrex::ParserExecutor<4> const& fx_parser,
-        amrex::ParserExecutor<4> const& fy_parser,
-        amrex::ParserExecutor<4> const& fz_parser,
-        int lev, PatchType patch_type,
-        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field);
-
-     /**
-     * \brief
-     * This function computes the E, B, and J fields on each level
-     * using the parser and the user-defined function for the external fields.
-     * The subroutine will parse the x_/y_z_external_grid_function and
-     * then, the field multifab is initialized based on the (x,y,z) position
-     * on the staggered yee-grid or cell-centered grid, in the interior cells
-     * and guard cells.
-     *
-     * \param[in] field string containing field name to grab from register
-     * \param[in] fx_parser parser function to initialize x-field
-     * \param[in] fy_parser parser function to initialize y-field
-     * \param[in] fz_parser parser function to initialize z-field
-     * \param[in] edge_lengths edge lengths information
-     * \param[in] face_areas face areas information
-     * \param[in] topology flag indicating if field is edge-based or face-based
-     * \param[in] lev level of the Multifabs that is initialized
-     * \param[in] patch_type PatchType on which the field is initialized (fine or coarse)
-     * \param[in] eb_update_field flag indicating which gridpoints should be modified by this functions
-     * \param[in] use_eb_flags (default:true) flag indicating if eb points should be excluded or not
-     */
-    void ComputeExternalFieldOnGridUsingParser (
-        std::string const& field,
-        amrex::ParserExecutor<4> const& fx_parser,
-        amrex::ParserExecutor<4> const& fy_parser,
-        amrex::ParserExecutor<4> const& fz_parser,
-        int lev, PatchType patch_type,
-        amrex::Vector< std::array< std::unique_ptr<amrex::iMultiFab>,3> > const& eb_update_field,
-        bool use_eb_flags);
-
-    void ComputeExternalFieldOnGridUsingParser (
-        std::string const& field,
-        amrex::ParserExecutor<4> const& fx_parser,
-        amrex::ParserExecutor<4> const& fy_parser,
-        amrex::ParserExecutor<4> const& fz_parser,
-        int lev, PatchType patch_type,
-        amrex::Vector< std::array< std::unique_ptr<amrex::iMultiFab>,3> > const& eb_update_field);
+        bool use_eb_flags = true);
 
     /**
      * \brief Load field values from a user-specified openPMD file,
@@ -974,6 +893,15 @@ public:
 
     void ApplyFilterandSumBoundaryRho (int lev, int glev, amrex::MultiFab& rho, int icomp, int ncomp);
 
+    void ApplyFilterMF (
+        const ablastr::fields::MultiLevelVectorField& mfvec,
+        int lev,
+        int idim);
+
+    void ApplyFilterMF (
+        const ablastr::fields::MultiLevelVectorField& mfvec,
+        int lev);
+
     // Device vectors of stencil coefficients used for finite-order centering of fields
     amrex::Gpu::DeviceVector<amrex::Real> device_field_centering_stencil_coeffs_x;
     amrex::Gpu::DeviceVector<amrex::Real> device_field_centering_stencil_coeffs_y;
@@ -1007,10 +935,6 @@ public:
     */
     void ComputeDistanceToEB ();
     /**
-    * \brief Auxiliary function to count the amount of faces which still need to be extended
-    */
-    amrex::Array1D<int, 0, 2> CountExtFaces();
-    /**
     * \brief Main function computing the cell extension. Where possible it computes one-way
     *       extensions and, when this is not possible, it does eight-ways extensions.
     */
@@ -1031,21 +955,6 @@ public:
     * \brief Do the eight-ways extension
     */
     void ComputeEightWaysExtensions();
-    /**
-    * \brief Whenever an unstable cell cannot be extended we increase its area to be the minimal for stability.
-    *        This is the method Benkler-Chavannes-Kuster method and it is less accurate than the regular ECT but it
-    *        still works better than staircasing. (see https://ieeexplore.ieee.org/document/1638381)
-    *
-    * @param idim Integer indicating the dimension (x->0, y->1, z->2) for which the BCK correction is done
-    *
-    */
-    void ApplyBCKCorrection(int idim);
-
-    /**
-     * \brief Subtract the average of the cumulative sums of the preliminary current D
-     *        from the current J (computed from D according to the Vay deposition scheme)
-     */
-    void PSATDSubtractCurrentPartialSumsAvg ();
 
 #ifdef WARPX_USE_FFT
     auto&  get_spectral_solver_fp (int lev) {return *spectral_solver_fp[lev];}
@@ -1055,6 +964,7 @@ public:
 
     // Field container
     ablastr::fields::MultiFabRegister m_fields;
+    ablastr::fields::MultiFabRegister& GetMultiFabRegister() {return m_fields;}
 
 protected:
 
@@ -1152,7 +1062,7 @@ private:
     /**
      * \brief Perform one PIC iteration, with the multiple J deposition per time step
      */
-    void OneStep_multiJ (amrex::Real cur_time);
+    void OneStep_JRhom (amrex::Real cur_time);
 
     void RestrictCurrentFromFineToCoarsePatch (
         const ablastr::fields::MultiLevelVectorField& J_fp,
@@ -1163,15 +1073,6 @@ private:
         const ablastr::fields::MultiLevelVectorField& J_cp,
         const ablastr::fields::MultiLevelVectorField& J_buffer,
         int lev);
-    void StoreCurrent (int lev);
-    void RestoreCurrent (int lev);
-    void ApplyFilterMF (
-        const ablastr::fields::MultiLevelVectorField& mfvec,
-        int lev,
-        int idim);
-    void ApplyFilterMF (
-        const ablastr::fields::MultiLevelVectorField& mfvec,
-        int lev);
     void SumBoundaryJ (
         const ablastr::fields::MultiLevelVectorField& current,
         int lev,
@@ -1181,11 +1082,6 @@ private:
         const ablastr::fields::MultiLevelVectorField& current,
         int lev,
         const amrex::Periodicity& period);
-    void NodalSyncJ (
-        const ablastr::fields::MultiLevelVectorField& J_fp,
-        const ablastr::fields::MultiLevelVectorField& J_cp,
-        int lev,
-        PatchType patch_type);
 
     void RestrictRhoFromFineToCoarsePatch (int lev );
     void ApplyFilterandSumBoundaryRho (
@@ -1200,13 +1096,6 @@ private:
         const ablastr::fields::MultiLevelScalarField& charge_cp,
         ablastr::fields::MultiLevelScalarField const & charge_buffer,
         int lev,
-        int icomp,
-        int ncomp);
-    void NodalSyncRho (
-        const amrex::Vector<std::unique_ptr<amrex::MultiFab>>& charge_fp,
-        const amrex::Vector<std::unique_ptr<amrex::MultiFab>>& charge_cp,
-        int lev,
-        PatchType patch_type,
         int icomp,
         int ncomp);
 
@@ -1242,11 +1131,6 @@ private:
      */
     void CheckGuardCells();
 
-    /**
-     * \brief Checks for known numerical issues involving different WarpX modules
-     */
-    void CheckKnownIssues();
-
     void BuildBufferMasks ();
 
     [[nodiscard]] const amrex::iMultiFab* getCurrentBufferMasks (int lev) const {
@@ -1257,26 +1141,6 @@ private:
     {
         return gather_buffer_masks[lev].get();
     }
-
-    /**
-     * \brief Allocates and initializes the stencil coefficients used for the finite-order centering
-     * of fields and currents, and stores them in the given device vectors.
-     *
-     * \param[in,out] device_centering_stencil_coeffs_x device vector where the stencil coefficients along x will be stored
-     * \param[in,out] device_centering_stencil_coeffs_y device vector where the stencil coefficients along y will be stored
-     * \param[in,out] device_centering_stencil_coeffs_z device vector where the stencil coefficients along z will be stored
-     * \param[in] centering_nox order of the finite-order centering along x
-     * \param[in] centering_noy order of the finite-order centering along y
-     * \param[in] centering_noz order of the finite-order centering along z
-     * \param[in] a_grid_type type of grid (collocated or not)
-     */
-    void AllocateCenteringCoefficients (amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_x,
-                                        amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_y,
-                                        amrex::Gpu::DeviceVector<amrex::Real>& device_centering_stencil_coeffs_z,
-                                        int centering_nox,
-                                        int centering_noy,
-                                        int centering_noz,
-                                        ablastr::utils::enums::GridType a_grid_type);
 
     void AllocLevelMFs (int lev, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm,
                         const amrex::IntVect& ngEB, amrex::IntVect& ngJ,
@@ -1316,6 +1180,13 @@ private:
     // Particle container
     std::unique_ptr<MultiParticleContainer> mypc;
     std::unique_ptr<MultiDiagnostics> multi_diags;
+
+    //! Order of finite centering of currents (from nodal grid to staggered grid), along x
+    int m_current_centering_nox  = 2;
+    //! Order of finite centering of currents (from nodal grid to staggered grid), along y
+    int m_current_centering_noy = 2;
+    //! Order of finite centering of currents (from nodal grid to staggered grid), along z
+    int m_current_centering_noz = 2;
 
     // Fluid container
     bool do_fluid_species = false;
@@ -1470,6 +1341,7 @@ private:
 
     // Other runtime parameters
     int verbose = 1;
+    bool m_limit_verbose_step = false;
 
     bool use_hybrid_QED = false;
 
@@ -1493,6 +1365,8 @@ private:
     amrex::VisMF::Header::Version plotfile_headerversion  = amrex::VisMF::Header::Version_v1;
     amrex::VisMF::Header::Version slice_plotfile_headerversion  = amrex::VisMF::Header::Version_v1;
 
+    bool synchronize_velocity_for_diagnostics = false;
+
     bool use_single_read = true;
     bool use_single_write = true;
     int mffile_nstreams = 4;
@@ -1504,7 +1378,7 @@ private:
     //! User-defined parser to define refinement patches
     std::unique_ptr<amrex::Parser> ref_patch_parser;
 
-    bool is_synchronized = true;
+    bool m_is_synchronized = true;
 
     // Synchronization of nodal points
     static constexpr bool sync_nodal_points = true;
@@ -1522,9 +1396,21 @@ private:
     int noy_fft = 16;
     int noz_fft = 16;
 
+
+
+    //! If true, particles will be sorted in the order x -> y -> z -> ppc for faster deposition
+#if defined(AMREX_USE_CUDA)
+    bool m_sort_particles_for_deposition = true;
+#else
+    bool m_sort_particles_for_deposition = false;
+#endif
+
+    //! Specifies the type of grid used for the above sorting, i.e. cell-centered, nodal, or mixed
+    amrex::IntVect m_sort_idx_type = amrex::IntVect(AMREX_D_DECL(0,0,0));
+
     //! Solve Poisson equation when loading an external magnetic field to clean divergence
     //! This is useful to remove errors that could lead to non-zero B field divergence
-    bool m_do_divb_cleaning_external = false;
+    bool m_do_initial_div_cleaning = false;
 
     //! Domain decomposition on Level 0
     amrex::IntVect numprocs{0};
@@ -1541,12 +1427,6 @@ private:
 
     // Factory for field data
     amrex::Vector<std::unique_ptr<amrex::FabFactory<amrex::FArrayBox> > > m_field_factory;
-
-    [[nodiscard]]
-    amrex::FabFactory<amrex::FArrayBox> const& fieldFactory (int lev) const noexcept
-    {
-        return *m_field_factory[lev];
-    }
 
     /** Stop the simulation at the end of the current step due to a received Unix signal?
      */
@@ -1667,6 +1547,16 @@ private:
     void PSATDMoveJNewToJOld ();
 
     /**
+     * \brief Copy rho_new to rho_mid in spectral space (when rho is quadratic in time)
+     */
+    void PSATDMoveRhoNewToRhoMid ();
+
+    /**
+     * \brief Copy J_new to J_mid in spectral space (when J is quadratic in time)
+     */
+    void PSATDMoveJNewToJMid ();
+
+    /**
      * \brief Forward FFT of F on all mesh refinement levels
      */
     void PSATDForwardTransformF ();
@@ -1685,16 +1575,6 @@ private:
      * \brief Backward FFT of G on all mesh refinement levels
      */
     void PSATDBackwardTransformG ();
-
-    /**
-     * \brief Correct current in Fourier space so that the continuity equation is satisfied
-     */
-    void PSATDCurrentCorrection ();
-
-    /**
-     * \brief Vay deposition in Fourier space (https://doi.org/10.1016/j.jcp.2013.03.010)
-     */
-    void PSATDVayDeposition ();
 
     /**
      * \brief Update all necessary fields in spectral space
@@ -1728,6 +1608,10 @@ private:
 
     // implicit solver object
     std::unique_ptr<ImplicitSolver> m_implicit_solver;
+
+    //! PSATD JRhom algorithm
+    bool m_JRhom = false;
+    int m_JRhom_subintervals;
 
 };
 

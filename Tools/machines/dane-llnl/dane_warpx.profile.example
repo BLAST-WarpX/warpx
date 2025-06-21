@@ -17,8 +17,8 @@ module load hdf5-parallel/1.14.0
 
 SW_DIR="/usr/workspace/${USER}/dane"
 export CMAKE_PREFIX_PATH=${SW_DIR}/install/c-blosc-1.21.6:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${SW_DIR}/install/adios2-2.8.3:$CMAKE_PREFIX_PATH
-export PATH=${SW_DIR}/install/adios2-2.8.3/bin:${PATH}
+export CMAKE_PREFIX_PATH=${SW_DIR}/install/adios2-2.10.2:$CMAKE_PREFIX_PATH
+export PATH=${SW_DIR}/install/adios2-2.10.2/bin:${PATH}
 
 # optional: for PSATD in RZ geometry support
 export CMAKE_PREFIX_PATH=${SW_DIR}/install/blaspp-2024.10.26:$CMAKE_PREFIX_PATH

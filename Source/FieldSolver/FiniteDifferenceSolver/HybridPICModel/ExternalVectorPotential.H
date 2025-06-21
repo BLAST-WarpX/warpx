@@ -60,6 +60,9 @@ protected:
     std::vector<bool> m_read_A_from_file;
     std::vector<std::string> m_external_file_path;
 
+    // Clean div A
+    bool m_do_clean_divA = true;
+
 public:
 
     // Default Constructor
@@ -86,7 +89,7 @@ public:
     void CalculateExternalCurlA (std::string& coil_name);
 
     AMREX_FORCE_INLINE
-    void PopulateExternalFieldFromVectorPotential (
+    void AddExternalFieldFromVectorPotential (
         ablastr::fields::VectorField const& dstField,
         amrex::Real scale_factor,
         ablastr::fields::VectorField const& srcField,

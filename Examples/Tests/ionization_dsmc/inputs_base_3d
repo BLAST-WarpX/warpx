@@ -1,0 +1,119 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 250
+amr.n_cell = 8 8 8
+amr.max_level = 0
+
+algo.maxwell_solver = none
+algo.current_deposition = direct
+algo.particle_shape = 1
+amrex.verbose = 1
+geometry.coord_sys = 0
+
+#################################
+############ CONSTANTS #############
+#################################
+my_constants.Te = 10
+my_constants.Ti = 2000
+my_constants.Tn = 0.01
+warpx.const_dt = 1e-09
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+geometry.dims = 3
+geometry.prob_hi = 0.1 0.1 0.1
+geometry.prob_lo = 0 0 0
+amr.max_grid_size = 4
+
+#################################
+###### BOUNDARY CONDITIONS ######
+#################################
+boundary.field_hi = periodic periodic periodic
+boundary.field_lo = periodic periodic periodic
+boundary.particle_hi = periodic periodic periodic
+boundary.particle_lo = periodic periodic periodic
+
+#################################
+############ PLASMA #############
+#################################
+particles.species_names = electrons ions neutrals
+
+electrons.charge = -q_e
+electrons.density = 1e+14
+electrons.initialize_self_fields = 0
+electrons.injection_style = nuniformpercell
+electrons.mass = m_e
+electrons.momentum_distribution_type = gaussian
+electrons.num_particles_per_cell_each_dim = 5 5 5
+electrons.profile = constant
+electrons.ux_m = 0.0
+electrons.ux_th =  sqrt(q_e * Te / m_e) / clight
+electrons.uy_m = 0.0
+electrons.uy_th =  sqrt(q_e * Te / m_e)/ clight
+electrons.uz_m = 0.0
+electrons.uz_th =  sqrt(q_e * Te / m_e)/ clight
+
+ions.charge = q_e
+ions.density = 1e+14
+ions.initialize_self_fields = 0
+ions.injection_style = nuniformpercell
+ions.mass = m_p
+ions.momentum_distribution_type = gaussian
+ions.num_particles_per_cell_each_dim = 4 4 4
+ions.profile = constant
+ions.ux_m = 0.0
+ions.ux_th = sqrt(q_e * Ti / m_p) / clight
+ions.uy_m = 0.0
+ions.uy_th = sqrt(q_e * Ti / m_p) / clight
+ions.uz_m = 0.0
+ions.uz_th = sqrt(q_e * Ti / m_p) / clight
+
+neutrals.charge = 0
+neutrals.density = 1e+20
+neutrals.initialize_self_fields = 0
+neutrals.injection_style = nuniformpercell
+neutrals.mass = m_p
+neutrals.momentum_distribution_type = gaussian
+neutrals.num_particles_per_cell_each_dim = 2 2 2
+neutrals.profile = constant
+neutrals.ux_m = 0.0
+neutrals.ux_th = sqrt(q_e * Tn / m_p) / clight
+neutrals.uy_m = 0.0
+neutrals.uy_th = sqrt(q_e * Tn / m_p) / clight
+neutrals.uz_m = 0.0
+neutrals.uz_th = sqrt(q_e * Tn / m_p) / clight
+
+collisions.collision_names = ioniz
+
+ioniz.ionization_energy = 13.59844
+ioniz.product_species = electrons ions
+ioniz.ionization_target_species = neutrals
+ioniz.ndt = 1
+ioniz.scattering_processes = ionization
+ioniz.type = dsmc
+
+#################################
+############ DIAGNOSTICS #############
+#################################
+diagnostics.diags_names = diag1 diag2
+warpx.reduced_diags_names = counts
+counts.intervals = 5
+counts.path = diags/
+counts.type = ParticleNumber
+
+warpx.synchronize_velocity_for_diagnostics = 1
+
+# Diagnostics
+diag1.intervals = 250
+diag1.diag_type = Full
+diag1.electrons.variables = ux uy uz
+diag1.neutrals.variables = ux uy uz
+diag1.format = plotfile
+
+diag2.intervals = 5
+diag2.diag_type = Full
+diag2.electrons.variables = ux uy uz
+diag2.neutrals.variables = ux uy uz
+diag2.format = openpmd

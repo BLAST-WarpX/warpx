@@ -76,6 +76,8 @@ FieldPoyntingFlux::FieldPoyntingFlux (const std::string& rd_name)
             std::vector<std::string> space_coords = {"z"};
 #elif defined(WARPX_DIM_RZ)
             std::vector<std::string> space_coords = {"r", "z"};
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            std::vector<std::string> space_coords = {"r"};
 #endif
 
             // Only on level 0
@@ -200,7 +202,7 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
         // For 1D : it is always 2
         int const normal_dir = 2;
 #else
-        // For 3D : it is the same as the face direction
+        // For 3D, RCYLINDER, and RSPHERE : it is the same as the face direction
         int const normal_dir = face_dir;
 #endif
 
@@ -229,7 +231,7 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
             amrex::Box const boundary_matched = amrex::convert(boundary, box.ixType());
             box &= boundary_matched;
 
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             // Lower corner of box physical domain
             amrex::XDim3 const xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
             amrex::Dim3 const lo = amrex::lbound(box);
@@ -240,45 +242,52 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
 
             auto area_factor = [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                 amrex::ignore_unused(i,j,k);
-#if defined WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 amrex::Real r;
                 if (normal_dir == 0) {
                     r = rmin + (i - irmin)*dr;
                 } else {
                     r = rmin + (i + 0.5_rt - irmin)*dr;
                 }
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 return 2._rt*MathConst::pi*r;
+#elif defined(WARPX_DIM_RSPHERE)
+                return 4._rt*MathConst::pi*r*r;
+#endif
 #else
                 return 1._rt;
 #endif
             };
 
             // Compute E x B
-            reduce_ops.eval(box, reduce_data,
-                [=] AMREX_GPU_DEVICE (int i, int j, int k) -> amrex::GpuTuple<amrex::Real>
-                {
-                    amrex::Real Ex_cc = 0._rt, Ey_cc = 0._rt, Ez_cc = 0._rt;
-                    amrex::Real Bx_cc = 0._rt, By_cc = 0._rt, Bz_cc = 0._rt;
+            // On GPU, reduce_ops doesn't work with empty boxes.
+            if (box.ok()) {
+                reduce_ops.eval(box, reduce_data,
+                    [=] AMREX_GPU_DEVICE (int i, int j, int k) -> amrex::GpuTuple<amrex::Real>
+                    {
+                        amrex::Real Ex_cc = 0._rt, Ey_cc = 0._rt, Ez_cc = 0._rt;
+                        amrex::Real Bx_cc = 0._rt, By_cc = 0._rt, Bz_cc = 0._rt;
 
-                    if (normal_dir == 1 || normal_dir == 2) {
-                        Ex_cc = ablastr::coarsen::sample::Interp(Ex_arr, Ex_stag, cc, cr, i, j, k, comp);
-                        Bx_cc = ablastr::coarsen::sample::Interp(Bx_arr, Bx_stag, cc, cr, i, j, k, comp);
-                    }
+                        if (normal_dir == 1 || normal_dir == 2) {
+                            Ex_cc = ablastr::coarsen::sample::Interp(Ex_arr, Ex_stag, cc, cr, i, j, k, comp);
+                            Bx_cc = ablastr::coarsen::sample::Interp(Bx_arr, Bx_stag, cc, cr, i, j, k, comp);
+                        }
 
-                    if (normal_dir == 0 || normal_dir == 2) {
-                        Ey_cc = ablastr::coarsen::sample::Interp(Ey_arr, Ey_stag, cc, cr, i, j, k, comp);
-                        By_cc = ablastr::coarsen::sample::Interp(By_arr, By_stag, cc, cr, i, j, k, comp);
-                    }
-                    if (normal_dir == 0 || normal_dir == 1) {
-                        Ez_cc = ablastr::coarsen::sample::Interp(Ez_arr, Ez_stag, cc, cr, i, j, k, comp);
-                        Bz_cc = ablastr::coarsen::sample::Interp(Bz_arr, Bz_stag, cc, cr, i, j, k, comp);
-                    }
+                        if (normal_dir == 0 || normal_dir == 2) {
+                            Ey_cc = ablastr::coarsen::sample::Interp(Ey_arr, Ey_stag, cc, cr, i, j, k, comp);
+                            By_cc = ablastr::coarsen::sample::Interp(By_arr, By_stag, cc, cr, i, j, k, comp);
+                        }
+                        if (normal_dir == 0 || normal_dir == 1) {
+                            Ez_cc = ablastr::coarsen::sample::Interp(Ez_arr, Ez_stag, cc, cr, i, j, k, comp);
+                            Bz_cc = ablastr::coarsen::sample::Interp(Bz_arr, Bz_stag, cc, cr, i, j, k, comp);
+                        }
 
-                    amrex::Real const af = area_factor(i,j,k);
-                    if      (normal_dir == 0) { return af*(Ey_cc * Bz_cc - Ez_cc * By_cc); }
-                    else if (normal_dir == 1) { return af*(Ez_cc * Bx_cc - Ex_cc * Bz_cc); }
-                    else                      { return af*(Ex_cc * By_cc - Ey_cc * Bx_cc); }
-                });
+                        amrex::Real const af = area_factor(i,j,k);
+                        if      (normal_dir == 0) { return af*(Ey_cc * Bz_cc - Ez_cc * By_cc); }
+                        else if (normal_dir == 1) { return af*(Ez_cc * Bx_cc - Ex_cc * Bz_cc); }
+                        else                      { return af*(Ex_cc * By_cc - Ey_cc * Bx_cc); }
+                    });
+            }
         }
 
         int const sign = (face().isLow() ? -1 : 1);

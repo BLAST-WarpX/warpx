@@ -46,30 +46,6 @@
 #include <vector>
 
 void
-WarpX::ImplicitPreRHSOp ( amrex::Real  a_cur_time,
-                          amrex::Real  a_full_dt,
-                          int          a_nl_iter,
-                          bool         a_from_jacobian )
-{
-    using namespace amrex::literals;
-    using warpx::fields::FieldType;
-    amrex::ignore_unused( a_full_dt, a_nl_iter, a_from_jacobian );
-
-    if (use_filter) { ApplyFilterMF(m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level), 0); }
-
-    // Advance the particle positions by 1/2 dt,
-    // particle velocities by dt, then take average of old and new v,
-    // deposit currents, giving J at n+1/2
-    // This uses Efield_fp and Bfield_fp, the field at n+1/2 from the previous iteration.
-    const bool skip_current = false;
-    const PushType push_type = PushType::Implicit;
-    PushParticlesandDeposit(a_cur_time, skip_current, push_type);
-
-    SyncCurrentAndRho();
-
-}
-
-void
 WarpX::SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time )
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -180,13 +156,15 @@ WarpX::SaveParticlesAtImplicitStepStart ( )
                 amrex::ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
                 amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
                 amrex::ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr();
 #endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 amrex::ParticleReal* y_n = pti.GetAttribs("y_n").dataPtr();
 #endif
+#if !defined(WARPX_DIM_RCYLINDER)
                 amrex::ParticleReal* z_n = pti.GetAttribs("z_n").dataPtr();
+#endif
                 amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
                 amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
                 amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
@@ -198,13 +176,15 @@ WarpX::SaveParticlesAtImplicitStepStart ( )
                     amrex::ParticleReal xp, yp, zp;
                     getPosition(ip, xp, yp, zp);
 
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
                     x_n[ip] = xp;
 #endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                     y_n[ip] = yp;
 #endif
+#if !defined(WARPX_DIM_RCYLINDER)
                     z_n[ip] = zp;
+#endif
 
                     ux_n[ip] = ux[ip];
                     uy_n[ip] = uy[ip];
@@ -251,13 +231,15 @@ WarpX::FinishImplicitParticleUpdate ()
                 amrex::ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
                 amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
                 amrex::ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr();
 #endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 amrex::ParticleReal* y_n = pti.GetAttribs("y_n").dataPtr();
 #endif
+#if !defined(WARPX_DIM_RCYLINDER)
                 amrex::ParticleReal* z_n = pti.GetAttribs("z_n").dataPtr();
+#endif
                 amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
                 amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
                 amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
@@ -269,13 +251,15 @@ WarpX::FinishImplicitParticleUpdate ()
                     amrex::ParticleReal xp, yp, zp;
                     getPosition(ip, xp, yp, zp);
 
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
                     xp = 2._rt*xp - x_n[ip];
 #endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                     yp = 2._rt*yp - y_n[ip];
 #endif
+#if !defined(WARPX_DIM_RCYLINDER)
                     zp = 2._rt*zp - z_n[ip];
+#endif
 
                     ux[ip] = 2._rt*ux[ip] - ux_n[ip];
                     uy[ip] = 2._rt*uy[ip] - uy_n[ip];

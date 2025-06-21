@@ -89,7 +89,7 @@ namespace SpeciesUtils {
         std::transform(rho_prof_s.begin(), rho_prof_s.end(),
                     rho_prof_s.begin(), ::tolower);
         if (rho_prof_s == "constant") {
-            amrex::Real density;
+            amrex::Real density = 0;
             utils::parser::getWithParser(pp_species, source_name, "density", density);
             // Construct InjectorDensity with InjectorDensityConstant.
             h_inj_rho.reset(new InjectorDensity((InjectorDensityConstant*)nullptr, density));

@@ -5,19 +5,22 @@ on:
     branches:
       - "development"
   pull_request:
-    paths-ignore:
-      - "Docs/**"
-      - "**.rst"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-macos
   cancel-in-progress: true
 
 jobs:
+
+  check_changes:
+    name: Analyze
+    uses: ./.github/workflows/check_changes.yml
+
   build_appleclang:
     name: AppleClang
     runs-on: macos-latest
-    if: github.event.pull_request.draft == false
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
       HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: TRUE
       # For macOS, Ninja is slower than the default:
@@ -47,7 +50,7 @@ jobs:
     - name: install pip dependencies
       run: |
         python3 -m pip install --upgrade pip
-        python3 -m pip install --upgrade build packaging setuptools wheel
+        python3 -m pip install --upgrade build packaging setuptools[core] wheel
         python3 -m pip install --upgrade mpi4py
         python3 -m pip install --upgrade -r Regression/requirements.txt
     - name: CCache Cache

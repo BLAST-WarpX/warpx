@@ -64,17 +64,20 @@ void EffectivePotentialES::ComputeSpaceChargeField (
     setPhiBC(phi_fp, warpx.gett_new(0));
 
     // perform phi calculation
-    computePhi(rho_fp, phi_fp);
+    computePhi(rho_fp, phi_fp, Efield_fp);
 
     // Compute the electric field. Note that if an EB is used the electric
     // field will be calculated in the computePhi call.
-    const std::array<Real, 3> beta = {0._rt};
-    if (!EB::enabled()) { computeE( Efield_fp, phi_fp, beta ); }
+    if (!EB::enabled()) {
+        const std::array<Real, 3> beta = {0._rt};
+        computeE( Efield_fp, phi_fp, beta );
+    }
 }
 
 void EffectivePotentialES::computePhi (
     ablastr::fields::MultiLevelScalarField const& rho,
-    ablastr::fields::MultiLevelScalarField const& phi) const
+    ablastr::fields::MultiLevelScalarField const& phi,
+    ablastr::fields::MultiLevelVectorField const& efield ) const
 {
     // Calculate the mass enhancement factor - see  Appendix A of
     // Barnes, Journal of Comp. Phys., 424 (2021), 109852.
@@ -85,7 +88,7 @@ void EffectivePotentialES::computePhi (
     ComputeSigma(sigma);
 
     // Use the AMREX MLMG solver
-    computePhi(rho, phi, sigma, self_fields_required_precision,
+    computePhi(rho, phi, efield, sigma, self_fields_required_precision,
                 self_fields_absolute_tolerance, self_fields_max_iters,
                 self_fields_verbosity);
 }
@@ -115,7 +118,7 @@ void EffectivePotentialES::ComputeSigma (MultiFab& sigma) const
     amrex::GpuArray<int, 3> const nodal = {1, 1, 1};
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     amrex::GpuArray<int, 3> const nodal = {1, 1, 0};
-#elif defined(WARPX_DIM_1D_Z)
+#elif defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     amrex::GpuArray<int, 3> const nodal = {1, 0, 0};
 #endif
 
@@ -133,7 +136,9 @@ void EffectivePotentialES::ComputeSigma (MultiFab& sigma) const
     // Loop over each species to calculate the Poisson equation dressing
     for (auto const& pc : mypc) {
         // grab the charge density for this species
-        auto rho = pc->GetChargeDensity(lev, false);
+        // Note: local deposition is done since the guard cells values are added
+        // to the valid cells after filtering in `ApplyFilterandSumBoundaryRho` below
+        auto rho = pc->GetChargeDensity(lev, true);
 
         // Handle the parallel transfer of guard cells and apply filtering
         warpx.ApplyFilterandSumBoundaryRho(lev, lev, *rho, 0, rho->nComp());
@@ -159,7 +164,6 @@ void EffectivePotentialES::ComputeSigma (MultiFab& sigma) const
                 // C_SI * w_p^2 * dt^2 / 4 = C_SI / 4 * q*rho/(m*eps0) * dt^2
                 sigma_arr(i, j, k, 0) += mult_factor_pc * rho_cc;
             });
-
         }
     }
 }
@@ -168,6 +172,7 @@ void EffectivePotentialES::ComputeSigma (MultiFab& sigma) const
 void EffectivePotentialES::computePhi (
     ablastr::fields::MultiLevelScalarField const& rho,
     ablastr::fields::MultiLevelScalarField const& phi,
+    ablastr::fields::MultiLevelVectorField const& efield,
     amrex::MultiFab const& sigma,
     amrex::Real required_precision,
     amrex::Real absolute_tolerance,
@@ -175,9 +180,6 @@ void EffectivePotentialES::computePhi (
     int verbosity
 ) const
 {
-    using ablastr::fields::Direction;
-    using warpx::fields::FieldType;
-
     // create a vector to our fields, sorted by level
     amrex::Vector<amrex::MultiFab *> sorted_rho;
     amrex::Vector<amrex::MultiFab *> sorted_phi;
@@ -186,6 +188,8 @@ void EffectivePotentialES::computePhi (
         sorted_phi.emplace_back(phi[lev]);
     }
 
+    auto & warpx = WarpX::GetInstance();
+
     std::optional<EBCalcEfromPhiPerLevel> post_phi_calculation;
 #ifdef AMREX_USE_EB
     // TODO: double check no overhead occurs on "m_eb_enabled == false"
@@ -193,7 +197,6 @@ void EffectivePotentialES::computePhi (
 #else
     std::optional<amrex::Vector<amrex::FArrayBoxFactory const *> > const eb_farray_box_factory;
 #endif
-    auto & warpx = WarpX::GetInstance();
     if (EB::enabled())
     {
         // EB: use AMReX to directly calculate the electric field since with EB's the
@@ -207,18 +210,19 @@ void EffectivePotentialES::computePhi (
             e_field.push_back(
 #if defined(WARPX_DIM_1D_Z)
                 amrex::Array<amrex::MultiFab*, 1>{
-                    warpx.m_fields.get(FieldType::Efield_fp, Direction{2}, lev)
+                    efield[lev][2]
+                }
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                amrex::Array<amrex::MultiFab*, 1>{
+                    efield[lev][0]
                 }
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                 amrex::Array<amrex::MultiFab*, 2>{
-                    warpx.m_fields.get(FieldType::Efield_fp, Direction{0}, lev),
-                    warpx.m_fields.get(FieldType::Efield_fp, Direction{2}, lev)
+                    efield[lev][0], efield[lev][2]
                 }
 #elif defined(WARPX_DIM_3D)
                 amrex::Array<amrex::MultiFab *, 3>{
-                    warpx.m_fields.get(FieldType::Efield_fp, Direction{0}, lev),
-                    warpx.m_fields.get(FieldType::Efield_fp, Direction{1}, lev),
-                    warpx.m_fields.get(FieldType::Efield_fp, Direction{2}, lev)
+                    efield[lev][0], efield[lev][1], efield[lev][2]
                 }
 #endif
             );
