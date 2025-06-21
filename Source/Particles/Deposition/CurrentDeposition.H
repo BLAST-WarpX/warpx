@@ -884,7 +884,7 @@ void EsirkepovDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const 
     }
     for (int k=dkl; k<=depos_order+2-dku; k++) {
         for (int i=dil; i<=depos_order+2-diu; i++) {
-            Real const sdyj = wq*vy*invvol*(
+            amrex::Real const sdyj = wq*vy*invvol*(
                 one_third*(sx_new[i]*sz_new[k] + sx_old[i]*sz_old[k])
                +one_sixth*(sx_new[i]*sz_old[k] + sx_old[i]*sz_new[k]));
             amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i_new-1+i, lo.y+k_new-1+k, 0, 0), sdyj);
@@ -910,7 +910,7 @@ void EsirkepovDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const 
         }
     }
     for (int i=dil; i<=depos_order+2-diu; i++) {
-        Real sdzk = 0._rt;
+        amrex::Real sdzk = 0._rt;
         for (int k=dkl; k<=depos_order+1-dku; k++) {
             sdzk += wq*invdtd.z*(sz_old[k] - sz_new[k])*0.5_rt*(sx_new[i] + sx_old[i]);
             amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i_new-1+i, lo.y+k_new-1+k, 0, 0), sdzk);
@@ -1478,7 +1478,7 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
             const amrex::ParticleReal gaminv = 1.;
 #endif
 
-            Real wq = q*wp[ip];
+            amrex::Real wq = q*wp[ip];
             if (do_ionization){
                 wq *= ion_lev[ip];
             }
