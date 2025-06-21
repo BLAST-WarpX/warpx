@@ -19,6 +19,7 @@
 #include <AMReX_REAL.H>
 
 #include <algorithm>
+#include <limits>
 #include <string>
 
 // for MPI_COMM_WORLD in non-MPI build
@@ -122,6 +123,8 @@ namespace {
         pp_constants.queryAdd("kb", tmp);
         tmp =       MathConst::pi;
         pp_constants.queryAdd("pi", tmp);
+        tmp =       std::numeric_limits<amrex::Real>::max();
+        pp_constants.queryAdd("inf", tmp);
     }
 
     /** Overwrite defaults in AMReX Inputs
