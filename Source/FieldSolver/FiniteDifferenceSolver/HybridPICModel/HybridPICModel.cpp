@@ -10,6 +10,8 @@
 
 #include "HybridPICModel.H"
 
+#include <ablastr/utils/Communication.H>
+
 #include "EmbeddedBoundary/Enabled.H"
 #include "Python/callbacks.H"
 #include "Fields.H"
@@ -196,26 +198,6 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
     amrex::IntVect Ex_stag = fields.get(FieldType::Efield_fp, Direction{0}, 0)->ixType().toIntVect();
     amrex::IntVect Ey_stag = fields.get(FieldType::Efield_fp, Direction{1}, 0)->ixType().toIntVect();
     amrex::IntVect Ez_stag = fields.get(FieldType::Efield_fp, Direction{2}, 0)->ixType().toIntVect();
-
-    // Check that the grid types are appropriate
-    const bool appropriate_grids = (
-#if   defined(WARPX_DIM_1D_Z)
-        // AMReX convention: x = missing dimension, y = missing dimension, z = only dimension
-        Ex_stag == IntVect(1) && Ey_stag == IntVect(1) && Ez_stag == IntVect(0) &&
-        Bx_stag == IntVect(0) && By_stag == IntVect(0) && Bz_stag == IntVect(1) &&
-#elif   defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-        // AMReX convention: x = first dimension, y = missing dimension, z = second dimension
-        Ex_stag == IntVect(0,1) && Ey_stag == IntVect(1,1) && Ez_stag == IntVect(1,0) &&
-        Bx_stag == IntVect(1,0) && By_stag == IntVect(0,0) && Bz_stag == IntVect(0,1) &&
-#elif defined(WARPX_DIM_3D)
-        Ex_stag == IntVect(0,1,1) && Ey_stag == IntVect(1,0,1) && Ez_stag == IntVect(1,1,0) &&
-        Bx_stag == IntVect(1,0,0) && By_stag == IntVect(0,1,0) && Bz_stag == IntVect(0,0,1) &&
-#endif
-        Jx_stag == Ex_stag && Jy_stag == Ey_stag && Jz_stag == Ez_stag
-    );
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        appropriate_grids,
-        "Ohm's law E-solve only works with staggered (Yee) grids.");
 
     // copy data to device
     for ( int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
@@ -418,7 +400,11 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
         *rho_fp
     );
     warpx.ApplyElectronPressureBoundary(lev, PatchType::fine);
-    electron_pressure_fp->FillBoundary(warpx.Geom(lev).periodicity());
+    ablastr::utils::communication::FillBoundary(
+        *electron_pressure_fp,
+        WarpX::do_single_precision_comms,
+        warpx.Geom(lev).periodicity(),
+        true);
 }
 
 void HybridPICModel::FillElectronPressureMF (
