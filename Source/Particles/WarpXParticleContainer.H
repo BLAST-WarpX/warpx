@@ -60,11 +60,16 @@ struct PIdx
 #if defined (WARPX_DIM_3D)
         y,
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
         z,
+#endif
         w,      ///< weight
         ux, uy, uz,
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         theta,      ///< RZ needs all three position components
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+        phi,      ///< 1D Sphere needs all three position components
 #endif
         nattribs    ///< number of compile-time attributes
     };
@@ -77,13 +82,18 @@ struct PIdx
 #if defined (WARPX_DIM_3D)
                                    "y",
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
                                    "z",
+#endif
                                    "w",
                                    "ux",
                                    "uy",
                                    "uz",
-#ifdef WARPX_DIM_RZ
-                                   "theta"
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                                   "theta",  // azimuthal angle
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+                                   "phi", // polar angle, relative to the x-y plane
 #endif
     };
 
@@ -279,7 +289,8 @@ public:
      * \param[in,out] rho vector of charge densities (one pointer to MultiFab per mesh refinement level)
      * \param[in] local if false, exchange the data in the guard cells after the deposition
      * \param[in] reset if true, reset all values of rho to zero
-     * \param[in] apply_boundary_and_scale_volume whether to apply boundary conditions and scale the final density by some volume norm in RZ geometry
+     * \param[in] apply_boundary_and_scale_volume whether to apply boundary conditions and scale the
+     *            final density by some volume norm in cylindrical and spherical geometry
      * \param[in] interpolate_across_levels whether to average down from the fine patch to the coarse patch
      * \param[in] icomp component of the MultiFab where rho is deposited (old, new)
      */

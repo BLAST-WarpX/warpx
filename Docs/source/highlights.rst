@@ -14,6 +14,11 @@ Plasma-Based Acceleration
 
 Scientific works in laser-plasma and beam-plasma acceleration.
 
+#. Chu M., Luan S., Yang H., Feng K., Tian Y., Yang X., and Wang W.
+   **Controlled Betatron radiation from high-charge electron beams in multiple plasma channels**.
+   Optics Express **33**, 10, 2025.
+   `DOI:10.1364/OE.557855 <https://doi.org/10.1364/OE.557855>`__
+
 #. Ma M, Zeng M, Wang J, Lu G, Yan W, Chen L, and Li D.
    **Particle-in-cell simulation of laser wakefield accelerators with oblique lasers in quasicylindrical geometry**.
    Phys. Rev. Accel. Beams **28**, 021301, 2025
@@ -236,8 +241,8 @@ Nuclear Fusion and Plasma Confinement
 
 #. Scheffel J. and Jäderberg J. and Bendtz K. and Holmberg R. and Lindvall K.,
    **Axial Confinement in the Novatron Mirror Machine**.
-   arXiv 2410.20134
-   `DOI:10.48550/arXiv.2410.20134 <https://doi.org/10.48550/arXiv.2410.20134>`__
+   Nuclear Fusion, **65**, Number 6, 2025.
+   `DOI:10.1088/1741-4326/add173 <https://doi.org/10.1088/1741-4326/add173>`__
 
 #. Affolter M., Thompson R., Hepner S., Hayes E. C., Podolsky V., Borghei M., Carlsson J., Gargone A., Merthe D., McKee E., Langtry R.,
    **The Orbitron: A crossed-field device for co-confinement of high energy ions and electrons**.
@@ -254,8 +259,18 @@ Nuclear Fusion and Plasma Confinement
    Physics of Plasmas **30**, 122508, 2023.
    `DOI:10.1063/5.0178288 <https://doi.org/10.1063/5.0178288>`__
 
-Plasma Thrusters and Electric Propulsion
-****************************************
+Plasma Thrusters and Spacecraft Physics
+***************************************
+
+#. Sam A., Elschot S.,
+   **Self-consistent charging of complex objects in flowing plasma: Implementation and analysis in WarpX**.
+   Computer Physics Communications, **314**, 109680, 2025.
+   `DOI:10.1016/j.cpc.2025.109680 <https://doi.org/10.1016/j.cpc.2025.109680>`__
+
+#. Marks T. A. and Gorodetsky A. A.,
+   **GPU-accelerated kinetic Hall thruster simulations in WarpX**.
+   Journal of Electric Propulsion (2025) 4:34.
+   `DOI:10.1007/s44205-025-00133-1 <https://doi.org/10.1007/s44205-025-00133-1>`__
 
 #. Xie L., Luo X., Zhou Z. and Zhao Y.,
    **Effect of plasma initialization on 3D PIC simulation of Hall thruster azimuthal instability**.

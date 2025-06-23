@@ -638,7 +638,7 @@ WarpXLaserProfiles::FromFileLaserProfile::internal_fill_amplitude_uniform_binary
         (m_params.t_max-m_params.t_min)/(m_params.nt-1) +
         m_params.t_min;
 
-#if (defined WARPX_DIM_1D_Z)
+#if (defined WARPX_DIM_1D_Z) || (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE)
     WARPX_ABORT_WITH_MESSAGE("WarpXLaserProfiles::FromFileLaserProfile Not implemented for 1D");
 #endif
 

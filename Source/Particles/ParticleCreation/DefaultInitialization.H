@@ -168,7 +168,11 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                 // Otherwise (e.g. particle tile allocated in pinned memory), run on CPU
                 } else {
                     for (int ip = start; ip < stop; ++ip) {
+#ifdef AMREX_USE_GPU
+                        attr_ptr[ip] = quantum_sync_get_opt(amrex::RandomEngine{nullptr});
+#else
                         attr_ptr[ip] = quantum_sync_get_opt(amrex::RandomEngine{});
+#endif
                     }
                 }
             }
@@ -191,7 +195,11 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                 // Otherwise (e.g. particle tile allocated in pinned memory), run on CPU
                 } else {
                     for (int ip = start; ip < stop; ++ip) {
+#ifdef AMREX_USE_GPU
+                        attr_ptr[ip] = breit_wheeler_get_opt(amrex::RandomEngine{nullptr});
+#else
                         attr_ptr[ip] = breit_wheeler_get_opt(amrex::RandomEngine{});
+#endif
                     }
                 }
             }
