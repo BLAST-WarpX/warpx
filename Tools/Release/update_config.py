@@ -7,6 +7,9 @@
 import argparse
 import datetime
 import json
+import os
+import sys
+from pathlib import Path
 
 import requests
 
@@ -31,9 +34,14 @@ def update(args):
     repo_labels = {"amrex": "AMReX", "pyamrex": "pyAMReX", "picsar": "PICSAR"}
 
     # read from JSON file with configuration data
-    config_file = "../../config.json"
-    with open(config_file, "r") as file:
-        config_data = json.load(file)
+    repo_dir = Path(__file__).parent.parent.parent.absolute()
+    config_file = os.path.join(repo_dir, "config.json")
+    try:
+        with open(config_file, "r") as file:
+            config_data = json.load(file)
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        sys.exit()
 
     # loop over repositories and update configuration data
     for repo_name, repo_url in repo_dict.items():
