@@ -29,7 +29,7 @@ class PlasmaCylinderCompression(object):
     n0 = 1e20
     T_i = 10  # eV
     T_e = 10
-    p0 = n0 * constants.q_e * T_i
+    p0 = n0 * constants.q_e * (T_i + T_e)
 
     B0 = np.sqrt(2 * constants.mu0 * p0)  # Initial magnetic field strength (T)
 
@@ -46,18 +46,18 @@ class PlasmaCylinderCompression(object):
     # Domain parameters
     LX = 2.0 * R_c * 1.05  # m
     LY = 2.0 * R_c * 1.05
-    LZ = 0.5  # m
+    LZ = 0.5 * R_c  # m
 
     LT = 10  # ion cyclotron periods
     DT = 1e-3  # ion cyclotron periods
 
     # Resolution parameters
-    NX = 160
-    NY = 160
-    NZ = 80
+    NX = 256
+    NY = 256
+    NZ = 32
 
     # Starting number of particles per cell
-    NPPC = 25
+    NPPC = 50
 
     # Number of substeps used to update B
     substeps = 30
@@ -151,7 +151,7 @@ class PlasmaCylinderCompression(object):
 
         # run very low resolution as a CI test
         if self.test:
-            self.total_steps = 100
+            self.total_steps = 20
             self.diag_steps = self.total_steps // 5
             self.NX = 64
             self.NY = 64
@@ -159,7 +159,7 @@ class PlasmaCylinderCompression(object):
             self.NPPC = 10
         else:
             self.total_steps = int(self.LT / self.DT)
-            self.diag_steps = 20
+            self.diag_steps = 1000
 
         # print out plasma parameters
         if comm.rank == 0:
@@ -256,7 +256,7 @@ class PlasmaCylinderCompression(object):
         simulation.particle_shape = 1
         simulation.use_filter = True
         simulation.verbose = self.verbose
-        # simulation.grid_type = "collocated"
+        simulation.grid_type = "collocated"
 
         #######################################################################
         # Field solver and external field                                     #
@@ -279,7 +279,7 @@ class PlasmaCylinderCompression(object):
         self.solver = picmi.HybridPICSolver(
             grid=self.grid,
             gamma=5.0 / 3.0,
-            Te=self.T_e * 11604.0,
+            Te=self.T_e,
             n0=self.n0,
             n_floor=0.05 * self.n0,
             plasma_resistivity=1e-4 * constants.mu0 * self.R_c * self.vA,
@@ -322,7 +322,7 @@ class PlasmaCylinderCompression(object):
                 density_expression="n0_p/(1+exp((sqrt(x*x+y*y)-R_p)/delta_p))",
                 momentum_expressions=momentum_expr,
                 warpx_momentum_spread_expressions=[f"{str(self.vi_th)}"] * 3,
-                warpx_density_min=0.05 * self.n0,
+                warpx_density_min=0.01 * self.n0,
                 R_p=self.R_p,
                 delta_p=self.delta_p,
                 n0_p=self.n0,
@@ -355,7 +355,7 @@ class PlasmaCylinderCompression(object):
                 name="diag1",
                 grid=self.grid,
                 period=self.diag_steps,
-                data_list=["B", "E", "rho", "Tr_ions", "Tt_ions", "Tz_ions"],
+                data_list=["B", "E", "rho", "Tx_ions", "Ty_ions", "Tz_ions"],
                 write_dir="diags",
                 warpx_format="plotfile",
             )
@@ -364,7 +364,7 @@ class PlasmaCylinderCompression(object):
                 name="diag1",
                 grid=self.grid,
                 period=self.diag_steps,
-                data_list=["B", "E", "rho", "Tr_ions", "Tt_ions", "Tz_ions"],
+                data_list=["B", "E", "rho", "Tx_ions", "Ty_ions", "Tz_ions"],
                 write_dir="diags",
                 warpx_format="openpmd",
                 warpx_file_prefix="field_diags",

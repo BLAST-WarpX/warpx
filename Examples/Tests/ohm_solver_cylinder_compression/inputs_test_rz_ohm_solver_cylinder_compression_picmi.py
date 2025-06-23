@@ -271,7 +271,7 @@ class PlasmaCylinderCompression(object):
         self.solver = picmi.HybridPICSolver(
             grid=self.grid,
             gamma=5.0 / 3.0,
-            Te=self.T_e * constants.q_e,
+            Te=self.T_e,
             n0=self.n0,
             n_floor=0.05 * self.n0,
             plasma_resistivity=1e-4 * constants.mu0 * self.R_c * self.vA,
