@@ -273,7 +273,7 @@ macro(find_amrex)
         endif()
         set(COMPONENT_PRECISION ${WarpX_PRECISION} P${WarpX_PARTICLE_PRECISION})
 
-        find_package(AMReX ${AMReX_VERSION} CONFIG REQUIRED COMPONENTS ${COMPONENT_ASCENT} ${COMPONENT_CATALYST} ${COMPONENT_DIMS} ${COMPONENT_EB} ${COMPONENT_FFT} PARTICLES ${COMPONENT_PIC} ${COMPONENT_PRECISION} ${COMPONENT_SENSEI} LSOLVERS)
+        find_package(AMReX ${amrex_version} CONFIG REQUIRED COMPONENTS ${COMPONENT_ASCENT} ${COMPONENT_CATALYST} ${COMPONENT_DIMS} ${COMPONENT_EB} ${COMPONENT_FFT} PARTICLES ${COMPONENT_PIC} ${COMPONENT_PRECISION} ${COMPONENT_SENSEI} LSOLVERS)
         # note: TINYP skipped because user-configured and optional
 
         # AMReX CMake helper scripts
@@ -299,10 +299,10 @@ set(WarpX_amrex_repo "https://github.com/AMReX-Codes/amrex.git"
 
 # Parse AMReX version and commit information
 file(READ "${CMAKE_SOURCE_DIR}/config.json" config_json)
-string(JSON AMReX_VERSION GET "${config_json}" version_amrex)
-string(JSON AMReX_COMMIT GET "${config_json}" commit_amrex)
+string(JSON amrex_version GET "${config_json}" version_amrex)
+string(JSON amrex_commit GET "${config_json}" commit_amrex)
 
-set(WarpX_amrex_branch ${AMReX_COMMIT}
+set(WarpX_amrex_branch ${amrex_commit}
     CACHE STRING
     "Repository branch for WarpX_amrex_repo if(WarpX_amrex_internal)")
 

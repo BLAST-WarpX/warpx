@@ -112,10 +112,10 @@ if(WarpX_QED)
 
     # Parse PICSAR version and commit information
     file(READ "${CMAKE_SOURCE_DIR}/config.json" config_json)
-    string(JSON PICSAR_VERSION GET "${config_json}" version_picsar)
-    string(JSON PICSAR_COMMIT GET "${config_json}" commit_picsar)
+    string(JSON picsar_version GET "${config_json}" version_picsar)
+    string(JSON picsar_commit GET "${config_json}" commit_picsar)
 
-    set(WarpX_picsar_branch ${PICSAR_COMMIT}
+    set(WarpX_picsar_branch ${picsar_commit}
         CACHE STRING
         "Repository branch for WarpX_picsar_repo if(WarpX_picsar_internal)")
 
