@@ -131,6 +131,8 @@ public:
                          int lev, int gather_lev,
                          amrex::Real dt, ScaleFields scaleFields,
                          long & num_unconverged_particles,
+                         amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                         amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights,
                          DtType a_dt_type=DtType::Full);
 
     void ImplicitPushXPSubOrbits (WarpXParIter& pti,
@@ -148,7 +150,9 @@ public:
                                   long np_to_push,
                                   int lev, int gather_lev,
                                   amrex::Real dt, ScaleFields scaleFields,
-                                  bool skip_deposition);
+                                  bool skip_deposition,
+                                  amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                                  amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
 
     void PushP (int lev, amrex::Real dt,
                         const amrex::MultiFab& Ex,

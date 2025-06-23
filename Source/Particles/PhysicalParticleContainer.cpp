@@ -2050,24 +2050,31 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
                 int e_is_nodal = Ex.is_nodal() and Ey.is_nodal() and Ez.is_nodal();
 
+                // Temporary data used in the implicit advance
+                amrex::Gpu::DeviceVector<long> unconverged_indices;
+                amrex::Gpu::DeviceVector<amrex::ParticleReal> saved_weights;
+                long num_unconverged_particles = 0;
+                long num_unconverged_particles_c = 0;
+
                 //
                 // Gather and push for particles not in the buffer
                 //
                 WARPX_PROFILE_VAR_START(blp_fg);
                 const auto np_to_push = np_gather;
                 const auto gather_lev = lev;
-                long num_unconverged_particles;
                 if (push_type == PushType::Explicit) {
                     PushPX(pti, exfab, eyfab, ezfab,
                            bxfab, byfab, bzfab,
                            Ex.nGrowVect(), e_is_nodal,
                            0, np_to_push, lev, gather_lev, dt, ScaleFields(false), a_dt_type);
                 } else if (push_type == PushType::Implicit) {
+                    long const offset = 0;
                     ImplicitPushXP(pti, exfab, eyfab, ezfab,
                                    bxfab, byfab, bzfab,
                                    Ex.nGrowVect(), e_is_nodal,
-                                   0, np_to_push, lev, gather_lev, dt, ScaleFields(false),
-                                   num_unconverged_particles, a_dt_type);
+                                   offset, np_to_push, lev, gather_lev, dt, ScaleFields(false),
+                                   num_unconverged_particles, unconverged_indices, saved_weights,
+                                   a_dt_type);
                 }
 
                 if (np_gather < np)
@@ -2106,7 +2113,6 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
                     // Field gather and push for particles in gather buffers
                     e_is_nodal = cEx.is_nodal() and cEy.is_nodal() and cEz.is_nodal();
-                    long num_unconverged_particles_c;
                     if (push_type == PushType::Explicit) {
                         PushPX(pti, cexfab, ceyfab, cezfab,
                                cbxfab, cbyfab, cbzfab,
@@ -2119,8 +2125,8 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                        cEx.nGrowVect(), e_is_nodal,
                                        nfine_gather, np-nfine_gather,
                                        lev, lev-1, dt, ScaleFields(false),
-                                       num_unconverged_particles_c, a_dt_type);
-                        num_unconverged_particles += num_unconverged_particles_c;
+                                       num_unconverged_particles_c, unconverged_indices, saved_weights,
+                                       a_dt_type);
                     }
                 }
 
@@ -2164,16 +2170,48 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                     }
                 } // end of "if skip_deposition"
 
-                if (push_type == PushType::Implicit && num_unconverged_particles > 0) {
-                    amrex::MultiFab * jx = fields.get(current_fp_string, Direction{0}, lev);
-                    amrex::MultiFab * jy = fields.get(current_fp_string, Direction{1}, lev);
-                    amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
-                    ImplicitPushXPSubOrbits(pti, exfab, eyfab, ezfab,
-                                            bxfab, byfab, bzfab,
-                                            Ex.nGrowVect(),
-                                            jx, jy, jz,
-                                            0, np_to_push, lev, gather_lev, dt, ScaleFields(false),
-                                            skip_deposition);
+                if (push_type == PushType::Implicit) {
+                    if (num_unconverged_particles > 0) {
+                        amrex::MultiFab * jx = fields.get(current_fp_string, Direction{0}, lev);
+                        amrex::MultiFab * jy = fields.get(current_fp_string, Direction{1}, lev);
+                        amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
+                        long const offset = 0;
+                        ImplicitPushXPSubOrbits(pti, exfab, eyfab, ezfab,
+                                                bxfab, byfab, bzfab,
+                                                Ex.nGrowVect(),
+                                                jx, jy, jz,
+                                                0, num_unconverged_particles, lev, gather_lev, dt, ScaleFields(false),
+                                                skip_deposition, unconverged_indices, saved_weights);
+                    }
+                    if (num_unconverged_particles_c > 0) {
+
+                        amrex::MultiFab & cEx = *fields.get(FieldType::Efield_cax, Direction{0}, lev);
+                        amrex::MultiFab & cEy = *fields.get(FieldType::Efield_cax, Direction{1}, lev);
+                        amrex::MultiFab & cEz = *fields.get(FieldType::Efield_cax, Direction{2}, lev);
+                        amrex::MultiFab & cBx = *fields.get(FieldType::Bfield_cax, Direction{0}, lev);
+                        amrex::MultiFab & cBy = *fields.get(FieldType::Bfield_cax, Direction{1}, lev);
+                        amrex::MultiFab & cBz = *fields.get(FieldType::Bfield_cax, Direction{2}, lev);
+
+                        // Data on the grid
+                        FArrayBox const* cexfab = &cEx[pti];
+                        FArrayBox const* ceyfab = &cEy[pti];
+                        FArrayBox const* cezfab = &cEz[pti];
+                        FArrayBox const* cbxfab = &cBx[pti];
+                        FArrayBox const* cbyfab = &cBy[pti];
+                        FArrayBox const* cbzfab = &cBz[pti];
+
+                        amrex::MultiFab * cjx = fields.get(FieldType::current_buf, Direction{0}, lev);
+                        amrex::MultiFab * cjy = fields.get(FieldType::current_buf, Direction{1}, lev);
+                        amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
+
+                        long const offset = num_unconverged_particles;
+                        ImplicitPushXPSubOrbits(pti, cexfab, ceyfab, cezfab,
+                                                cbxfab, cbyfab, cbzfab,
+                                                cEx.nGrowVect(),
+                                                cjx, cjy, cjz,
+                                                offset, num_unconverged_particles_c, lev, lev-1, dt, ScaleFields(false),
+                                                skip_deposition, unconverged_indices, saved_weights);
+                    }
                 }
 
             } // end of "if do_not_push"
@@ -2952,6 +2990,8 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
                                            int lev, int gather_lev,
                                            amrex::Real dt, ScaleFields scaleFields,
                                            long & num_unconverged_particles,
+                                           amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                                           amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights,
                                            DtType a_dt_type)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE((gather_lev==(lev-1)) ||
@@ -3016,6 +3056,8 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
     ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr() + offset;
     ParticleReal* const AMREX_RESTRICT w  = attribs[PIdx::w ].dataPtr() + offset;
 
+    auto * const AMREX_RESTRICT idcpu = pti.GetStructOfArrays().GetIdCPUData().data() + offset;
+
 #if !defined(WARPX_DIM_1D_Z)
     ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr() + offset;
 #endif
@@ -3028,7 +3070,6 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
     ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr() + offset;
     ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr() + offset;
     ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr() + offset;
-    ParticleReal* w_save = pti.GetAttribs("w_save").dataPtr() + offset;
 
     const int do_copy = (m_do_back_transformed_particles && (a_dt_type!=DtType::SecondHalf) );
     CopyParticleAttribs copyAttribs;
@@ -3237,11 +3278,9 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
                 ablastr::warn_manager::WMRecordWarning("ImplicitPushXP", convergenceMsg.str());
 #endif
 
-                // Save the particle weight and flag that it needs suborbit integration.
-                // Set the weight to zero so that it does not contribute to the
-                // current and/or mass matrix.
-                w_save[ip] = w[ip];
-                w[ip] = 0.;
+                // Flag the particle as invalid. It will be handled later in a special
+                // loop with suborbiting.
+                amrex::ParticleIDWrapper{idcpu[ip]}.make_invalid();
 
                 // write signaling flag: how many particles did not converge?
                 amrex::Gpu::Atomic::Add(unconverged_particles_ptr, amrex::Long(1));
@@ -3250,6 +3289,41 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
         } // end Picard iterations
 
     });
+
+    // Setup for handling the unconverged particles. A list of their indices is
+    // gathered, their weights saved, and their weight set to zero (so they
+    // don't contribute to the current density).
+    num_unconverged_particles = *(unconverged_particles.copyToHost());
+
+    auto num_previous = unconverged_indices.size();
+    unconverged_indices.resize(num_previous + num_unconverged_particles);
+    saved_weights.resize(num_previous + num_unconverged_particles);
+
+    long * unconverged_i = unconverged_indices.data() + num_previous;
+    amrex::ParticleReal * saved_w = saved_weights.data() + num_previous;
+
+    long num_flagged = amrex::Scan::PrefixSum<long>(np_to_push,
+        [=] AMREX_GPU_DEVICE (long ip) -> long
+            {
+                auto pidw = amrex::ParticleIDWrapper{idcpu[ip]};
+                return !pidw.is_valid();
+            },
+        [=] AMREX_GPU_DEVICE (long ip, long x) // x is the exclusive sum at position ip
+            {
+                auto pidw = amrex::ParticleIDWrapper{idcpu[ip]};
+                if (!pidw.is_valid()) {
+                    if (x < num_unconverged_particles)  {
+                        // The index saved is relative to the full array
+                        unconverged_i[x] = ip + offset;
+                        saved_w[x] = w[ip];
+                        w[ip] = 0.;
+                    }
+                }
+            },
+         amrex::Scan::Type::exclusive, amrex::Scan::retSum);
+
+     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(num_flagged == num_unconverged_particles,
+                                      "ImplicitPushXP: wrong number of invalid particles found");
 
     num_unconverged_particles = *(unconverged_particles.copyToHost());
     if (num_unconverged_particles > 0) {
@@ -3283,16 +3357,18 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                     amrex::MultiFab * const jy,
                                                     amrex::MultiFab * const jz,
                                                     long offset,
-                                                    long np_to_push,
+                                                    long num_unconverged_particles,
                                                     int lev, int gather_lev,
                                                     amrex::Real dt, ScaleFields scaleFields,
-                                                    bool skip_deposition)
+                                                    bool skip_deposition,
+                                                    amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                                                    amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE((gather_lev==(lev-1)) ||
                                      (gather_lev==(lev  )),
                                      "Gather buffers only work for lev-1");
     // If no particles, do not do anything
-    if (np_to_push == 0) { return; }
+    if (num_unconverged_particles == 0) { return; }
 
     // Get cell size on gather_lev
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));
@@ -3311,9 +3387,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     // Add guard cells to the box.
     box.grow(ngEB);
 
-    auto setPosition = SetParticlePosition(pti, offset);
+    auto setPosition = SetParticlePosition(pti, 0);
 
-    const auto getExternalEB = GetExternalEBField(pti, offset);
+    const auto getExternalEB = GetExternalEBField(pti, 0);
 
     const amrex::ParticleReal Ex_external_particle = m_E_external_particle[0];
     const amrex::ParticleReal Ey_external_particle = m_E_external_particle[1];
@@ -3349,28 +3425,29 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     amrex::IndexType const bz_type = bzfab->box().ixType();
 
     auto& attribs = pti.GetAttribs();
-    amrex::ParticleReal* const AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr() + offset;
-    amrex::ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr() + offset;
-    amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr() + offset;
-    amrex::ParticleReal* const AMREX_RESTRICT w  = attribs[PIdx::w ].dataPtr() + offset;
+    amrex::ParticleReal* const AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
+    amrex::ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
+    amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
+    amrex::ParticleReal* const AMREX_RESTRICT w  = attribs[PIdx::w ].dataPtr();
+
+    auto * const AMREX_RESTRICT idcpu = pti.GetStructOfArrays().GetIdCPUData().data();
 
 #if !defined(WARPX_DIM_1D_Z)
-    amrex::ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr() + offset;
+    amrex::ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr();
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    amrex::ParticleReal* y_n = pti.GetAttribs("y_n").dataPtr() + offset;
+    amrex::ParticleReal* y_n = pti.GetAttribs("y_n").dataPtr();
 #endif
 #if !defined(WARPX_DIM_RCYLINDER)
-    amrex::ParticleReal* z_n = pti.GetAttribs("z_n").dataPtr() + offset;
+    amrex::ParticleReal* z_n = pti.GetAttribs("z_n").dataPtr();
 #endif
-    amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr() + offset;
-    amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr() + offset;
-    amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr() + offset;
-    amrex::ParticleReal* w_save = pti.GetAttribs("w_save").dataPtr() + offset;
+    amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
+    amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
+    amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
 
     int* AMREX_RESTRICT ion_lev = nullptr;
     if (do_field_ionization) {
-        ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr() + offset;
+        ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
     }
     bool const do_ionization = do_field_ionization;
 
@@ -3390,7 +3467,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     const bool local_has_quantum_sync = has_quantum_sync();
     if (local_has_quantum_sync) {
         evolve_opt = m_shr_p_qs_engine->build_evolve_functor();
-        p_optical_depth_QSR = pti.GetAttribs("opticalDepthQSR").dataPtr()  + offset;
+        p_optical_depth_QSR = pti.GetAttribs("opticalDepthQSR").dataPtr();
     }
 #endif
 
@@ -3414,22 +3491,27 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
     int constexpr max_suborbits = 10;
 
+    long * unconverged_i = unconverged_indices.data() + offset;
+    amrex::ParticleReal * saved_w = saved_weights.data() + offset;
+
     // Using this version of ParallelFor with compile time options
     // improves performance when qed or external EB are not used by reducing
     // register pressure.
     amrex::ParallelFor(TypeList<CompileTimeOptions<no_exteb,has_exteb>,
                                 CompileTimeOptions<no_qed  ,has_qed>>{},
                        {exteb_runtime_flag, qed_runtime_flag},
-                       np_to_push, [=] AMREX_GPU_DEVICE (long ip, auto exteb_control,
-                                                         auto qed_control)
+                       num_unconverged_particles, [=] AMREX_GPU_DEVICE (long i,
+                                                                 auto exteb_control, auto qed_control)
     {
 
-        // Check if suborbits are needed
-        if (w_save[ip] == 0.) { return; }
+        long ip = unconverged_i[i];
 
         // Restore the particle weight
-        w[ip] = w_save[ip];
-        w_save[ip] = 0.;
+        w[ip] = saved_w[i];
+
+        // Reset valid flag
+        auto pidw = amrex::ParticleIDWrapper{idcpu[ip]};
+        pidw.make_valid();
 
         // Create temporary arrays to hold the particle suborbit data
         // which is used to deposit the current of the suborbits after
@@ -3744,11 +3826,11 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
     });
 
-    long const num_unconverged_particles = *(unconverged_particles.copyToHost());
-    if (num_unconverged_particles > 0) {
+    long const num_failed_particles = *(unconverged_particles.copyToHost());
+    if (num_failed_particles > 0) {
         ablastr::warn_manager::WMRecordWarning("ImplicitPushXPSubOrbits",
             "Picard solver for " +
-            std::to_string(num_unconverged_particles) +
+            std::to_string(num_failed_particles) +
             " particles failed to converge after " +
             std::to_string(max_iterations) + " iterations and " + std::to_string(max_suborbits) + " sub-orbits."
          );
