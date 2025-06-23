@@ -195,7 +195,7 @@ ProjectionDivCleaner::solve ()
         mlmg.setBottomSolver(m_bottom_solver);
         mlmg.setVerbose(m_verbose);
         mlmg.setBottomVerbose(m_bottom_verbose);
-        mlmg.setAlwaysUseBNorm(false);
+        mlmg.setConvergenceNormType(amrex::MLMGNormType::greater);
         mlmg.solve({m_solution[ilev].get()}, {m_source[ilev].get()}, m_rtol, m_atol);
 
         // Synchronize the ghost cells, do halo exchange
