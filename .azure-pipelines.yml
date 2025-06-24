@@ -157,6 +157,8 @@ jobs:
       echo "mpirun --do-not-launch --display-allocation:"
       warpx_exec=$(find /home/vsts/work/1/s/build/bin -type f -name 'warpx.*' -executable | head -n 1)
       mpirun --do-not-launch --display-allocation ${warpx_exec}
+      echo "Open MPI environment variables:"
+      env | grep "OMPI"
       # TODO remove debugging block............................................
       # set options
       set -o nounset errexit pipefail
