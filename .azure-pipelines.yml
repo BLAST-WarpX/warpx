@@ -154,8 +154,9 @@ jobs:
       echo "number of processing units: $(nproc)"
       echo "mpirun --version:"
       mpirun --version
-      echo "mpirun --display-allocation:"
-      mpirun --display-allocation
+      echo "mpirun --do-not-launch --display-allocation:"
+      warpx_exec=$(find /home/vsts/work/1/s/build/bin -type f -name 'warpx.*' -executable | head -n 1)
+      mpirun --do-not-launch --display-allocation ${warpx_exec}
       # TODO remove debugging block............................................
       # set options
       set -o nounset errexit pipefail
@@ -167,7 +168,7 @@ jobs:
           -D ExperimentalTest -D ExperimentalSubmit
       else
         # run tests (exclude pytest.AMReX when running Python tests)
-        ctest --test-dir build --output-on-failure -E AMReX
+        ctest --test-dir build --verbose -E AMReX
       fi
     displayName: 'Test'
 
