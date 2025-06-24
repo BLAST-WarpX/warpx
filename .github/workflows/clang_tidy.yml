@@ -24,13 +24,16 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 250
     needs: check_changes
-    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
+    if: ${{ github.event.pull_request.draft == false }}
     steps:
     - uses: actions/checkout@v4
+      if: ${{ needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     - name: install dependencies
+      if: ${{ needs.check_changes.outputs.has_non_docs_changes == 'true' }}
       run: |
         .github/workflows/dependencies/clang.sh 17
     - name: set up cache
+      if: ${{ needs.check_changes.outputs.has_non_docs_changes == 'true' }}
       uses: actions/cache@v4
       with:
         path: ~/.cache/ccache
@@ -38,6 +41,7 @@ jobs:
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: build WarpX & run clang-tidy
+      if: ${{ needs.check_changes.outputs.has_non_docs_changes == 'true' }}
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -45,10 +49,8 @@ jobs:
         export CCACHE_EXTRAFILES=${{ github.workspace }}/.clang-tidy
         export CCACHE_LOGFILE=${{ github.workspace }}/ccache.log.txt
         ccache -z
-
         export CXX=$(which clang++-17)
         export CC=$(which clang-17)
-
         cmake -S . -B build_clang_tidy      \
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
           -DWarpX_DIMS="${{ matrix.dim }}"  \
@@ -60,13 +62,10 @@ jobs:
           -DWarpX_OPENPMD=ON                \
           -DWarpX_PRECISION=SINGLE          \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-
         cmake --build build_clang_tidy -j 4
-
         ${{github.workspace}}/.github/workflows/source/makeMakefileForClangTidy.py --input ${{github.workspace}}/ccache.log.txt
         make -j4 --keep-going -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-17 \
             CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
-
         ccache -s
         du -hs ~/.cache/ccache
