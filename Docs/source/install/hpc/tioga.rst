@@ -8,8 +8,12 @@ It is equipped with two nodes that have each four AMD MI300A APUs.
 Tioga is an LLNL El Capitan Early Access System.
 
 There are also "conventional" MI250X GPUs on Tioga nodes, which we did not yet document.
-El Capitan will use MI300A GPUs.
+El Capitan & Tuolumne use MI300A GPUs.
 
+.. note::
+
+   The MI300A GPUs were moved out of Tioga and El Capitan & Tuolumne are now available.
+   We will update the documention shortly.
 
 Introduction
 ------------
