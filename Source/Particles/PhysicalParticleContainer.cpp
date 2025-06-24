@@ -2180,7 +2180,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                                 bxfab, byfab, bzfab,
                                                 Ex.nGrowVect(),
                                                 jx, jy, jz,
-                                                0, num_unconverged_particles, lev, gather_lev, dt, ScaleFields(false),
+                                                offset, num_unconverged_particles, lev, gather_lev, dt, ScaleFields(false),
                                                 skip_deposition, unconverged_indices, saved_weights);
                     }
                     if (num_unconverged_particles_c > 0) {
@@ -3377,7 +3377,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
     // Get box from which field is gathered.
     // If not gathering from the finest level, the box is coarsened.
-    Box box;
+    amrex::Box box;
     if (lev == gather_lev) {
         box = pti.tilebox();
     } else {
@@ -3772,22 +3772,22 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 #endif
 
                 if (depos_type == CurrentDepositionAlgo::Esirkepov) {
-                    if (WarpX::nox == 1) {
+                    if (nox == 1) {
                         EsirkepovDepositionShapeNKernel<1>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
                                                            uxp_nph, uyp_nph, uzp_nph, gaminv,
                                                            Jx_arr, Jy_arr, Jz_arr,
                                                            dt_suborbit, dinv, xyzmin, lo, n_rz_azimuthal_modes);
-                    } else if (WarpX::nox == 2) {
+                    } else if (nox == 2) {
                         EsirkepovDepositionShapeNKernel<2>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
                                                            uxp_nph, uyp_nph, uzp_nph, gaminv,
                                                            Jx_arr, Jy_arr, Jz_arr,
                                                            dt_suborbit, dinv, xyzmin, lo, n_rz_azimuthal_modes);
-                    } else if (WarpX::nox == 3) {
+                    } else if (nox == 3) {
                         EsirkepovDepositionShapeNKernel<3>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
                                                            uxp_nph, uyp_nph, uzp_nph, gaminv,
                                                            Jx_arr, Jy_arr, Jz_arr,
                                                            dt_suborbit, dinv, xyzmin, lo, n_rz_azimuthal_modes);
-                    } else if (WarpX::nox == 4) {
+                    } else if (nox == 4) {
                         EsirkepovDepositionShapeNKernel<4>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
                                                            uxp_nph, uyp_nph, uzp_nph, gaminv,
                                                            Jx_arr, Jy_arr, Jz_arr,
@@ -3795,25 +3795,25 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     }
 
                 } else if (depos_type == CurrentDepositionAlgo::Villasenor) {
-                    if (WarpX::nox == 1) {
+                    if (nox == 1) {
                         VillasenorDepositionShapeNKernel<1>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
                                                             uxp_nph, uyp_nph, uzp_nph, gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr,
                                                             dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                     }
-                    else if (WarpX::nox == 2) {
+                    else if (nox == 2) {
                         VillasenorDepositionShapeNKernel<2>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
                                                             uxp_nph, uyp_nph, uzp_nph, gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr,
                                                             dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                     }
-                    else if (WarpX::nox == 3) {
+                    else if (nox == 3) {
                         VillasenorDepositionShapeNKernel<3>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
                                                             uxp_nph, uyp_nph, uzp_nph, gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr,
                                                             dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                     }
-                    else if (WarpX::nox == 4) {
+                    else if (nox == 4) {
                         VillasenorDepositionShapeNKernel<4>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
                                                             uxp_nph, uyp_nph, uzp_nph, gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr,
