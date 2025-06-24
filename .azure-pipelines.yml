@@ -150,6 +150,13 @@ jobs:
     displayName: 'Build'
 
   - bash: |
+      # TODO remove debugging block............................................
+      echo "number of processing units: $(nproc)"
+      echo "mpirun --version:"
+      mpirun --version
+      echo "mpirun --display-allocation:"
+      mpirun --display-allocation
+      # TODO remove debugging block............................................
       # set options
       set -o nounset errexit pipefail
       # determine if the build was triggered by a push to the development branch
