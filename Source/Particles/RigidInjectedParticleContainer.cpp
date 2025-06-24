@@ -251,11 +251,18 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
 }
 
 void
-RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
-                                        int lev,
-                                        const std::string& current_fp_string,
-                                        Real t, Real dt, DtType a_dt_type, bool skip_deposition,
-                                        bool /*deposit_mass_matrices*/, PushType push_type)
+RigidInjectedParticleContainer::Evolve (
+    ablastr::fields::MultiFabRegister& fields,
+    int lev,
+    const std::string& current_fp_string,
+    Real t,
+    Real dt,
+    DtType a_dt_type,
+    bool skip_deposition,
+    bool const half_step,
+    bool /*deposit_mass_matrices*/,
+    PushType push_type
+)
 {
 
     // Update location of injection plane in the boosted frame
@@ -277,10 +284,19 @@ RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& field
     done_injecting_lev = ((zinject_plane_levels[lev] < plo[zindex] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c >= 0.) ||
                            (zinject_plane_levels[lev] > phi[zindex] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c <= 0.));
 
-    PhysicalParticleContainer::Evolve (fields,
-                                       lev,
-                                       current_fp_string,
-                                       t, dt, a_dt_type, skip_deposition, false, push_type);
+    bool const deposit_mass_matrices = false;
+    PhysicalParticleContainer::Evolve(
+        fields,
+        lev,
+        current_fp_string,
+        t,
+        dt,
+        a_dt_type,
+        skip_deposition,
+        half_step,
+        deposit_mass_matrices,
+        push_type
+    );
 }
 
 void

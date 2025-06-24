@@ -232,17 +232,30 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
 }
 
 void
-PhotonParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
-                                 int lev,
-                                 const std::string& current_fp_string,
-                                 Real t, Real dt, DtType a_dt_type, bool skip_deposition,
-                                 bool /*deposit_mass_matrices*/, PushType push_type)
+PhotonParticleContainer::Evolve (
+    ablastr::fields::MultiFabRegister& fields,
+    int lev,
+    const std::string& current_fp_string,
+    Real t,
+    Real dt,
+    DtType a_dt_type,
+    bool skip_deposition,
+    bool const half_step,
+    bool /*deposit_mass_matrices*/, PushType push_type)
 {
     // This does gather, push and deposit.
     // Push and deposit have been re-written for photons
-    PhysicalParticleContainer::Evolve (fields,
-                                       lev,
-                                       current_fp_string,
-                                       t, dt, a_dt_type, skip_deposition, false, push_type);
-
+    bool const deposit_mass_matrices = false;
+    PhysicalParticleContainer::Evolve(
+        fields,
+        lev,
+        current_fp_string,
+        t,
+        dt,
+        a_dt_type,
+        skip_deposition,
+        half_step,
+        deposit_mass_matrices,
+        push_type
+    );
 }

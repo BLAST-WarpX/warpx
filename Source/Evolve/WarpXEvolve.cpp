@@ -395,14 +395,17 @@ void WarpX::OneStep(
     // electrostatic solver or hybrid solver
     if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
         electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
+        bool const skip_deposition = true;
+        bool const half_step = false;
+        // TODO bool const half_step = true;
+        // TODO PushParticlesandDeposit(a_cur_time, skip_deposition, half_step);
         // multi-physics: collisions
         ExecutePythonCallback("beforecollisions");
         mypc->doCollisions(a_step, a_cur_time, a_dt);
         ExecutePythonCallback("aftercollisions");
         // only gather fields and push particles,
         // deposition and calculation of fields done further below
-        const bool skip_deposition = true;
-        PushParticlesandDeposit(a_cur_time, skip_deposition);
+        PushParticlesandDeposit(a_cur_time, skip_deposition, half_step);
     }
     // electromagnetic solver
     else {
@@ -1211,20 +1214,39 @@ WarpX::doQEDEvents ()
 #endif
 
 void
-WarpX::PushParticlesandDeposit (amrex::Real cur_time, bool skip_current,
-                                bool deposit_mass_matrices, PushType push_type)
+WarpX::PushParticlesandDeposit (
+    amrex::Real cur_time,
+    bool skip_current,
+    bool const half_step,
+    bool deposit_mass_matrices,
+    PushType push_type
+)
 {
     // Evolve particles to p^{n+1/2} and x^{n+1}
     // Deposit current, j^{n+1/2}
     for (int lev = 0; lev <= finest_level; ++lev) {
-        PushParticlesandDeposit(lev, cur_time, DtType::Full, skip_current,
-                                deposit_mass_matrices, push_type);
+        PushParticlesandDeposit(
+            lev,
+            cur_time,
+            DtType::Full,
+            skip_current,
+            half_step,
+            deposit_mass_matrices,
+            push_type
+        );
     }
 }
 
 void
-WarpX::PushParticlesandDeposit (int lev, amrex::Real cur_time, DtType a_dt_type, bool skip_current,
-                               bool deposit_mass_matrices, PushType push_type)
+WarpX::PushParticlesandDeposit (
+    int lev,
+    amrex::Real cur_time,
+    DtType a_dt_type,
+    bool skip_current,
+    bool const half_step,
+    bool deposit_mass_matrices,
+    PushType push_type
+)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -1252,9 +1274,11 @@ WarpX::PushParticlesandDeposit (int lev, amrex::Real cur_time, DtType a_dt_type,
         dt[lev],
         a_dt_type,
         skip_current,
+        half_step,
         deposit_mass_matrices,
         push_type
     );
+
     if (! skip_current) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         // This is called after all particles have deposited their current and charge.

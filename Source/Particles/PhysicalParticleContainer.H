@@ -94,15 +94,18 @@ public:
      * field gather, particle push and current deposition for all particles
      * in the box.
      */
-    void Evolve (ablastr::fields::MultiFabRegister& fields,
-                 int lev,
-                 const std::string& current_fp_string,
-                 amrex::Real t,
-                 amrex::Real dt,
-                 DtType a_dt_type=DtType::Full,
-                 bool skip_deposition=false,
-                 bool deposit_mass_matrices=false,
-                 PushType push_type=PushType::Explicit) override;
+    void Evolve (
+        ablastr::fields::MultiFabRegister& fields,
+        int lev,
+        const std::string& current_fp_string,
+        amrex::Real t,
+        amrex::Real dt,
+        DtType a_dt_type=DtType::Full,
+        bool skip_deposition=false,
+        bool const half_step=false,
+        bool deposit_mass_matrices=false,
+        PushType push_type=PushType::Explicit
+    ) override;
 
     virtual void PushPX (WarpXParIter& pti,
                          amrex::FArrayBox const * exfab,

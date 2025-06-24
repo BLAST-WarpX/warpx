@@ -457,11 +457,18 @@ MultiParticleContainer::InitMultiPhysicsModules ()
 }
 
 void
-MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
-                                int lev,
-                                std::string const& current_fp_string,
-                                Real t, Real dt, DtType a_dt_type, bool skip_deposition,
-                                bool deposit_mass_matrices, PushType push_type)
+MultiParticleContainer::Evolve (
+    ablastr::fields::MultiFabRegister& fields,
+    int lev,
+    std::string const& current_fp_string,
+    Real t,
+    Real dt,
+    DtType a_dt_type,
+    bool skip_deposition,
+    bool const half_step,
+    bool deposit_mass_matrices,
+    PushType push_type
+)
 {
     if (! skip_deposition) {
         using ablastr::fields::Direction;
@@ -481,7 +488,7 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         }
     }
     for (auto& pc : allcontainers) {
-        pc->Evolve(fields, lev, current_fp_string, t, dt, a_dt_type, skip_deposition, deposit_mass_matrices, push_type);
+        pc->Evolve(fields, lev, current_fp_string, t, dt, a_dt_type, skip_deposition, half_step, deposit_mass_matrices, push_type);
     }
 }
 
