@@ -3290,6 +3290,8 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
 
     });
 
+    amrex::Gpu::synchronize();
+
     // Setup for handling the unconverged particles. A list of their indices is
     // gathered, their weights saved, and their weight set to zero (so they
     // don't contribute to the current density).
@@ -3325,7 +3327,6 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
      WARPX_ALWAYS_ASSERT_WITH_MESSAGE(num_flagged == num_unconverged_particles,
                                       "ImplicitPushXP: wrong number of invalid particles found");
 
-    num_unconverged_particles = *(unconverged_particles.copyToHost());
     if (num_unconverged_particles > 0) {
         ablastr::warn_manager::WMRecordWarning("ImplicitPushXP",
             "Picard solver for " +
