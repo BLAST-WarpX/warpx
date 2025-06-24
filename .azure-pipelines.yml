@@ -7,6 +7,10 @@ trigger:
   branches:
     include:
     - development
+  paths:
+    exclude:
+    - Docs
+    - '**/*.rst'
 pr:
   autoCancel: true
   drafts: false
