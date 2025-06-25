@@ -2652,9 +2652,15 @@ Additional parameters
     to propagate (at the speed of light) to the boundaries of the simulation
     domain, where it can be absorbed.
 
-* ``warpx.do_divb_cleaning_external`` (`0` or `1` ; default: 0)
-    Whether to use projection method to scrub B field divergence in externally
-    loaded fields. This is automatically turned on if external B fields are loaded.
+* ``warpx.do_initial_div_cleaning`` (`0` or `1` ; default: 0)
+    Whether to use projection method to scrub A/B field divergence in externally
+    loaded fields. This is automatically turned on if external/initial B or time varying A fields are loaded.
+
+* ``warpx.projection_div_cleaner.rtol`` (`float`) optional (default `5e-12` when double precision and `5e-5` for single precision)
+    Controls the relative tolerance when solving for the projected divergence of the field in the MLMG AMReX solver.
+
+* ``warpx.projection_div_cleaner.atol`` (`float`) optional (default `0`)
+    Controls the absolute tolerance when solving for the projected divergence of the field in the MLMG AMReX solver.
 
 * ``warpx.do_subcycling`` (`0` or `1`; default: 0)
     Whether or not to use sub-cycling. Different refinement levels have a
