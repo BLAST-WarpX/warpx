@@ -3,7 +3,7 @@
 Aurora (ALCF)
 ==============
 
-The `Aurora cluster <https://docs.alcf.anl.gov/aurora/getting-started/>`__ is located at ALCF.
+The `Aurora cluster <https://docs.alcf.anl.gov/aurora/>`__ is located at ALCF.
 
 
 Introduction
@@ -29,7 +29,7 @@ Use the following commands to download the WarpX source code:
    git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
 We use system software modules, add environment hints and further dependencies via the file ``$HOME/aurora_warpx.profile``.
-      Create it now:
+Create it now:
 
 .. code-block:: bash
 
@@ -64,7 +64,7 @@ Finally, since Aurora does not yet provide software modules for some of our depe
 
 .. code-block:: bash
 
-   bash $HOME/src/warpx/Tools/machines/aurora-alcf/install_gpu_dependencies.sh
+   bash $HOME/src/warpx/Tools/machines/aurora-alcf/install_dependencies.sh
    source ${CFS}/${proj%_g}/${USER}/sw/aurora/gpu/venvs/warpx/bin/activate
 
 .. dropdown:: Script Details
@@ -72,7 +72,7 @@ Finally, since Aurora does not yet provide software modules for some of our depe
    :icon: info
    :animate: fade-in-slide-down
 
-   .. literalinclude:: ../../../../Tools/machines/aurora-alcf/install_gpu_dependencies.sh
+   .. literalinclude:: ../../../../Tools/machines/aurora-alcf/install_dependencies.sh
       :language: bash
 
 
