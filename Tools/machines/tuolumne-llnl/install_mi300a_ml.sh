@@ -14,15 +14,15 @@ set -eu -o pipefail
 
 # Check: ######################################################################
 #
-#   Was tioga_mi300a_warpx.profile sourced and configured correctly?
+#   Was tuolumne_mi300a_warpx.profile sourced and configured correctly?
 #   early access: not yet used!
-#if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your tioga_mi300a_warpx.profile file! Please edit its line 2 to continue!"; exit 1; fi
+#if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your tuolumne_mi300a_warpx.profile file! Please edit its line 2 to continue!"; exit 1; fi
 
 
 # Remove old dependencies #####################################################
 #
-SRC_DIR="/p/lustre1/${USER}/tioga/src"
-SW_DIR="/p/lustre1/${USER}/tioga/warpx/mi300a"
+SRC_DIR="/p/lustre5/${USER}/tuolumne/src"
+SW_DIR="/p/lustre5/${USER}/tuolumne/warpx/mi300a"
 
 # remove common user mistakes in python, located in .local instead of a venv
 python3 -m pip uninstall -qqq -y torch 2>/dev/null || true
@@ -35,7 +35,7 @@ python3 -m pip uninstall -qqq -y torch 2>/dev/null || true
 # sometimes, the Lassen PIP Index is down
 export PIP_EXTRA_INDEX_URL="https://pypi.org/simple"
 
-source ${SW_DIR}/venvs/warpx-trioga-mi300a/bin/activate
+source ${SW_DIR}/venvs/warpx-tuolumne-mi300a/bin/activate
 
 python3 -m pip install --upgrade torch torchvision --index-url https://download.pytorch.org/whl/rocm6.1
 python3 -m pip install --upgrade scikit-learn
