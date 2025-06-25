@@ -3552,9 +3552,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
         amrex::ParticleReal uyp_n = uyp_n0;
         amrex::ParticleReal uzp_n = uzp_n0;
 
-        amrex::ParticleReal xp;
-        amrex::ParticleReal yp;
-        amrex::ParticleReal zp;
+        amrex::ParticleReal xp = xp_n;
+        amrex::ParticleReal yp = yp_n;
+        amrex::ParticleReal zp = zp_n;
 
         amrex::ParticleReal dxp, dxp_save;
         amrex::ParticleReal dyp, dyp_save;
