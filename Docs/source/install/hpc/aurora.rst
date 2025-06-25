@@ -99,7 +99,7 @@ Additionally, the following commands will install WarpX as a Python module:
    cd $HOME/src/warpx
    rm -rf build_aurora_py
 
-   cmake -S . -B build_aurora_py -DWarpX_COMPUTE=SYCL -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_aurora_py -DWarpX_COMPUTE=SYCL -DWarpX_FFT=OFF -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
    cmake --build build_aurora_py -j 16 --target pip_install
 
 Now, you can :ref:`submit Aurora compute jobs <running-cpp-aurora>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).
