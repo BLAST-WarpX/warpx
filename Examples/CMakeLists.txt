@@ -112,7 +112,7 @@ function(add_warpx_test
     # Avoid the following error seen with Open MPI 4.1.6 in the Azure pipelines:
     # "There are not enough slots available in the system to satisfy the 2 slots
     # that were requested by the application"
-    set(MPI_HOST_NUMPROC "--host localhost:${nprocs}")
+    set(MPI_HOST_NUMPROC --host localhost:${nprocs})
 
     # set MPI executable
     set(THIS_MPI_TEST_EXE
