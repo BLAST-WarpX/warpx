@@ -168,16 +168,25 @@ void doVarianceDepositionShapeNKernel(
 
     // --- Compute shape factors
     Compute_shape_factor< depos_order > const compute_shape_factor;
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
     // x direction
     // Get particle position after 1/2 push back in position
     // Keep these double to avoid bug in single precision
-#if defined(WARPX_DIM_RZ)
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     // In RZ, wqx is actually wqr, and wqy is wqtheta
     // Convert to cylindrical at the mid point
     const amrex::Real xpmid = xp + relative_time*vx;
     const amrex::Real ypmid = yp + relative_time*vy;
     const amrex::Real rpmid = std::sqrt(xpmid*xpmid + ypmid*ypmid);
+
+    const double xmid = (rpmid - xyzmin.x)*dinv.x;
+#elif defined(WARPX_DIM_RSPHERE)
+    // Convert to spherical at the mid point
+    const amrex::Real xpmid = xp + relative_time*vx;
+    const amrex::Real ypmid = yp + relative_time*vy;
+    const amrex::Real zpmid = zp + relative_time*vz;
+    const amrex::Real rpmid = std::sqrt(xpmid*xpmid + ypmid*ypmid + zpmid*zpmid);
 
     const double xmid = (rpmid - xyzmin.x)*dinv.x;
 #else
@@ -213,7 +222,7 @@ void doVarianceDepositionShapeNKernel(
     int const j_jx = ((varx_type[0] == NODE) ? j_node : j_cell);
     int const j_jy = ((vary_type[0] == NODE) ? j_node : j_cell);
     int const j_jz = ((varz_type[0] == NODE) ? j_node : j_cell);
-#endif //AMREX_SPACEDIM >= 2
+#endif //!defined(WARPX_DIM_1D_Z)
 
 #if defined(WARPX_DIM_3D)
     // y direction
@@ -243,6 +252,7 @@ void doVarianceDepositionShapeNKernel(
     int const k_jz = ((varz_type[1] == NODE) ? k_node : k_cell);
 #endif
 
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     // z direction
     // Keep these double to avoid bug in single precision
     constexpr int zdir = WARPX_ZINDEX;
@@ -269,6 +279,7 @@ void doVarianceDepositionShapeNKernel(
     int const l_jx = ((varx_type[zdir] == NODE) ? l_node : l_cell);
     int const l_jy = ((vary_type[zdir] == NODE) ? l_node : l_cell);
     int const l_jz = ((varz_type[zdir] == NODE) ? l_node : l_cell);
+#endif
 
 #if defined(WARPX_DIM_1D_Z)
     for (int iz=0; iz<=depos_order; iz++){
@@ -290,8 +301,27 @@ void doVarianceDepositionShapeNKernel(
             vxbar_arr, vybar_arr, vzbar_arr
         );
     }
-#endif
-#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    for (int ix=0; ix<=depos_order; ix++){
+        const amrex::Real wqx_var = wq*sx_jx[ix];
+        const amrex::Real wqy_var = wq*sx_jy[ix];
+        const amrex::Real wqz_var = wq*sx_jz[ix];
+
+        amrex::IntVectND<3> ixv{lo.x+j_jx+ix, 0, 0};
+        amrex::IntVectND<3> iyv{lo.x+j_jy+ix, 0, 0};
+        amrex::IntVectND<3> izv{lo.x+j_jz+ix, 0, 0};
+
+        varianceDepositionSubKernel(
+            vx, vy, vz,
+            ixv, iyv, izv,
+            wqx_var, wqy_var, wqz_var,
+            varx_arr, vary_arr, varz_arr,
+            wx_arr, wy_arr, wz_arr,
+            w2x_arr, w2y_arr, w2z_arr,
+            vxbar_arr, vybar_arr, vzbar_arr
+        );
+    }
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     for (int iz=0; iz<=depos_order; iz++){
         for (int ix=0; ix<=depos_order; ix++){
             const amrex::Real wqx_var = wq*sx_jx[ix]*sz_jx[iz];
