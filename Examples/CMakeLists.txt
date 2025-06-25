@@ -113,6 +113,7 @@ function(add_warpx_test
     set(THIS_MPI_TEST_EXE
         ${MPIEXEC_EXECUTABLE}
         ${MPI_ALLOW_ROOT}
+        --host localhost:${nprocs}
         ${MPIEXEC_NUMPROC_FLAG} ${nprocs}
         ${MPIEXEC_POSTFLAGS}
         ${MPIEXEC_PREFLAGS}
