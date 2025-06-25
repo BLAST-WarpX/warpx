@@ -11,9 +11,9 @@ Introduction
 
 If you are new to this system, **please see the following resources**:
 
-* `ALCF user guide <https://docs.alcf.anl.gov/>`_
-* Batch system: `PBS <https://docs.alcf.anl.gov/running-jobs/>`_
-* `Filesystems <https://docs.alcf.anl.gov/data-management/filesystem-and-storage/>`_:
+* `ALCF user guide <https://docs.alcf.anl.gov/>`__
+* Batch system: `PBS <https://docs.alcf.anl.gov/running-jobs/>`__
+* `Filesystems <https://docs.alcf.anl.gov/data-management/filesystem-and-storage/>`__:
 
   * ``/lus/flare/projects/$proj/``: shared with all members of a project, Lustre
 
