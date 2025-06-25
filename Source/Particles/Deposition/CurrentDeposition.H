@@ -1486,8 +1486,12 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
             amrex::ParticleReal xp_nph, yp_nph, zp_nph;
             GetPosition(ip, xp_nph, yp_nph, zp_nph);
 
-            amrex::ParticleReal xp_old, yp_old, zp_old;
-            amrex::ParticleReal xp_new, yp_new, zp_new;
+            amrex::ParticleReal xp_old = 0.0_prt;
+            amrex::ParticleReal yp_old = 0.0_prt;
+            amrex::ParticleReal zp_old = 0.0_prt;
+            amrex::ParticleReal xp_new = 0.0_prt;
+            amrex::ParticleReal yp_new = 0.0_prt;
+            amrex::ParticleReal zp_new = 0.0_prt;
 
 #if !defined(WARPX_DIM_1D_Z)
             xp_old = xp_n[ip];
