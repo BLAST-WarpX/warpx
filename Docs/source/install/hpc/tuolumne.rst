@@ -201,6 +201,7 @@ Note that we append these non-default runtime options:
 
 * ``amrex.use_gpu_aware_mpi=1``: make use of fast APU to APU MPI communications
 * ``amrex.the_arena_init_size=1``: avoid overallocating memory that is *shared* on APUs between CPU & GPU
+* ``amrex.the_arena_release_threshold=0``: avoid severe `memory overheads in communication <https://github.com/AMReX-Codes/amrex/pull/4527>`__
 
 .. literalinclude:: ../../../../Tools/machines/tuolumne-llnl/tuolumne_mi300a.sbatch
    :language: bash
