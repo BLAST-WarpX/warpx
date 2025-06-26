@@ -71,27 +71,14 @@ jobs:
         #MPI implementations often leak memory
         export "ASAN_OPTIONS=detect_leaks=0"
 
-        echo "=================================================================================================== "
-        echo "=======================  Examples/Physics_applications/beam_beam_collision ======================== "
-        echo "=================================================================================================== "
+        git clone https://github.com/ECP-WarpX/warpx-data ../warpx-data
+
 
         ctest --test-dir build --output-on-failure -R "3d_beam_beam_collision.run"
 
-        echo "=================================================================================================== "
-        echo "=======================  Examples/Physics_applications/capacitive_discharge ======================= "
-        echo "=================================================================================================== "
-
         ctest --test-dir build --output-on-failure -R "2d_background_mcc.run"
 
-        echo "=================================================================================================== "
-        echo "=======================  Examples/Physics_applications/free_electron_laser ======================== "
-        echo "=================================================================================================== "
-
         ctest --test-dir build --output-on-failure -R "1d_fel.run"
-
-        echo "=================================================================================================== "
-        echo "========================  Examples/Physics_applications/laser_acceleration ======================== "
-        echo "=================================================================================================== "
 
         ctest --test-dir build --output-on-failure -R "3d_laser_acceleration_btd.run"
         ctest --test-dir build --output-on-failure -R "1d_laser_acceleration.run"
@@ -103,15 +90,7 @@ jobs:
         ctest --test-dir build --output-on-failure -R "rz_laser_acceleration.run"
         ctest --test-dir build --output-on-failure -R "rz_laser_acceleration_opmd.run"
 
-        echo "=================================================================================================== "
-        echo "============================  Examples/Physics_applications/laser_ion ============================= "
-        echo "=================================================================================================== "
-
         ctest --test-dir build --output-on-failure -R "2d_laser_ion_acc.run"
-
-        echo "=================================================================================================== "
-        echo "======================  Examples/Physics_applications/plasma_acceleration/ ======================== "
-        echo "=================================================================================================== "
 
         ctest --test-dir build --output-on-failure -R "2d_plasma_acceleration_boosted.run"
         ctest --test-dir build --output-on-failure -R "2d_plasma_acceleration_mr.run"
@@ -119,29 +98,13 @@ jobs:
         ctest --test-dir build --output-on-failure -R "3d_plasma_acceleration_boosted.run"
         ctest --test-dir build --output-on-failure -R "3d_plasma_acceleration_boosted_hybrid.run"
 
-        echo "=================================================================================================== "
-        echo "==========================  Examples/Physics_applications/plasma_mirror =========================== "
-        echo "=================================================================================================== "
-
         ctest --test-dir build --output-on-failure -R "2d_plasma_mirror.run"
 
-        echo "=================================================================================================== "
-        echo "==================  Examples/Physics_applications/thomson_parabola_spectrometer =================== "
-        echo "=================================================================================================== "
-
         ctest --test-dir build --output-on-failure -R "3d_thomson_parabola_spectrometer.run"
-
-        echo "=================================================================================================== "
-        echo "=========================  Examples/Physics_applications/uniform_plasma =========================== "
-        echo "=================================================================================================== "
 
         ctest --test-dir build --output-on-failure -R "2d_uniform_plasma.run"
         ctest --test-dir build --output-on-failure -R "3d_uniform_plasma.run"
         ctest --test-dir build --output-on-failure -R "3d_uniform_plasma_restart.run"
-
-        echo "=================================================================================================== "
-        echo "===============  Examples/Tests/implicit/inputs_test_2d_theta_implicit_jfnk_vandb ================= "
-        echo "=================================================================================================== "
 
         ctest --test-dir build --output-on-failure -R "2d_theta_implicit_jfnk_vandb.run"
         ctest --test-dir build --output-on-failure -R "2d_theta_implicit_jfnk_vandb_filtered.run"
