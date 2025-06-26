@@ -341,7 +341,6 @@ public:
      *
      * \param[in,out] T_vf vector field of Temperatures (one three-dimensional array of pointers
      *                to MultiFabs per mesh refinement level)
-     * \param[in] dt Time step for particle level
      * \param[in] relative_time Time at which to deposit J, relative to the time of the
      *                          current positions of the particles. When different than 0,
      *                          the particle position will be temporarily modified to match

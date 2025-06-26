@@ -170,7 +170,7 @@ void doVarianceDepositionShapeNKernel(
     Compute_shape_factor< depos_order > const compute_shape_factor;
 #if !defined(WARPX_DIM_1D_Z)
     // x direction
-    // Get particle position after 1/2 push back in position
+    // Get particle position at dt=relative time from particle time
     // Keep these double to avoid bug in single precision
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
@@ -371,7 +371,7 @@ void doVarianceDepositionShapeNKernel(
 }
 
 /**
- * \brief Temperature Deposition for thread thread_num
+ * \brief Temperature Deposition for thread thread_num similar to: https://doi.org/10.1145%2F359146.359153
  * \tparam depos_order deposition order
  * \param GetPosition  A functor for returning the particle position.
  * \param wp           Pointer to array of particle weights.

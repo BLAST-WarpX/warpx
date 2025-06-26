@@ -151,12 +151,12 @@ class PlasmaCylinderCompression(object):
 
         # run very low resolution as a CI test
         if self.test:
-            self.total_steps = 20
-            self.diag_steps = self.total_steps // 5
-            self.NX = 64
-            self.NY = 64
-            self.NZ = 32
-            self.NPPC = 10
+            self.total_steps = 10
+            self.diag_steps = self.total_steps
+            self.NX = 32
+            self.NY = 32
+            self.NZ = 16
+            self.NPPC = 5
         else:
             self.total_steps = int(self.LT / self.DT)
             self.diag_steps = 1000

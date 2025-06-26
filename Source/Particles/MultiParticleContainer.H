@@ -174,7 +174,6 @@ public:
      *        species and can be used in the future for a single pass update of rho, J, and T.
      *
      * \param[in,out] fields Multifab field register to grab Temperature MFs
-     * \param[in] dt Time step for particle level
      * \param[in] relative_time Time at which to deposit velocities, relative to the time of the
      *                          current positions of the particles. When different than 0,
      *                          the particle position will be temporarily modified to match
