@@ -57,7 +57,7 @@ class PlasmaCylinderCompression(object):
     NZ = 128
 
     # Starting number of particles per cell
-    NPPC = 100
+    NPPC = 10
 
     # Number of substeps used to update B
     substeps = 20
@@ -355,7 +355,7 @@ class PlasmaCylinderCompression(object):
             name="diag1",
             grid=self.grid,
             period=self.diag_steps,
-            data_list=["B", "E", "rho"],
+            data_list=["B", "E", "rho", "divB"],
             write_dir="diags",
             warpx_format="plotfile",
         )

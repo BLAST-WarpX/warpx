@@ -71,8 +71,8 @@ public:
         // there were no new particles added.
         if (n_total_pairs == 0) { return amrex::Vector<int>(m_num_product_species, 0); }
 
-        // The following is used to calculate the appropriate offsets for
-        // non-product producing processes (i.e., non ionization processes).
+        // The following is used to calculate the appropriate offsets for processes
+        // that do not produce macroparticles in new species (i.e., not ionization, not charge exchange).
         // Note that a standard cummulative sum is not appropriate since the
         // mask is also used to specify the type of collision and can therefore
         // have values >1
@@ -81,7 +81,9 @@ public:
         const index_type* AMREX_RESTRICT no_product_p_offsets = no_product_offsets.dataPtr();
         auto const no_product_total = amrex::Scan::PrefixSum<index_type>(n_total_pairs,
             [=] AMREX_GPU_DEVICE (index_type i) -> index_type {
-                return ((mask[i] > 0) & (mask[i] != int(ScatteringProcessType::IONIZATION))) ? 1 : 0;
+                return ((mask[i] > 0) &
+                        (mask[i] != int(ScatteringProcessType::IONIZATION)) &
+                        (mask[i] != int(ScatteringProcessType::CHARGE_EXCHANGE))) ? 1 : 0;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { no_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -98,7 +100,7 @@ public:
         }
 
         // The following is used to calculate the appropriate offsets for
-        // product producing processes (i.e., ionization).
+        // product producing processes (i.e., ionization and charge exchange).
         // Note that a standard cummulative sum is not appropriate since the
         // mask is also used to specify the type of collision and can therefore
         // have values >1
@@ -107,7 +109,8 @@ public:
         const index_type* AMREX_RESTRICT with_product_p_offsets = with_product_offsets.dataPtr();
         auto const with_product_total = amrex::Scan::PrefixSum<index_type>(n_total_pairs,
             [=] AMREX_GPU_DEVICE (index_type i) -> index_type {
-                return (mask[i] == int(ScatteringProcessType::IONIZATION)) ? 1 : 0;
+                return ((mask[i] == int(ScatteringProcessType::IONIZATION)) |
+                        (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE))) ? 1 : 0;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { with_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -176,7 +179,7 @@ public:
         amrex::ParallelForRNG(n_total_pairs,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
         {
-            if ((mask[i] > 0) & (mask[i] != int(ScatteringProcessType::IONIZATION)))
+            if ((mask[i] > 0) & (mask[i] != int(ScatteringProcessType::IONIZATION)) & (mask[i] != int(ScatteringProcessType::CHARGE_EXCHANGE)))
             {
                 const auto product1_index = products_np_data[0] + no_product_p_offsets[i];
                 // Make a copy of the particle from species 1
@@ -252,21 +255,6 @@ public:
                     ux2 *= -1.0_prt;
                     uy2 *= -1.0_prt;
                     uz2 *= -1.0_prt;
-                } else if (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE)) {
-                    if (std::abs(m1 - m2) < 1e-28) {
-                        auto const temp_ux = ux1;
-                        auto const temp_uy = uy1;
-                        auto const temp_uz = uz1;
-                        ux1 = ux2;
-                        uy1 = uy2;
-                        uz1 = uz2;
-                        ux2 = temp_ux;
-                        uy2 = temp_uy;
-                        uz2 = temp_uz;
-                    }
-                    else {
-                        amrex::Abort("Uneven mass charge-exchange not implemented yet.");
-                    }
                 } else if (mask[i] == int(ScatteringProcessType::FORWARD)) {
                     amrex::Abort("Forward scattering with DSMC not implemented yet.");
                 }
@@ -289,7 +277,23 @@ public:
 #endif
             }
 
-            // Next perform all product producing collisions
+            // Next perform all product-producing collisions
+            else if (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE))
+            {
+                // create a copy of the first product species at the location of species 1
+                const auto product1_index = products_np_data[2] + with_product_p_offsets[i];
+                copy_species1[2](soa_products_data[2], soa_1, static_cast<int>(p_pair_indices_1[i]),
+                                static_cast<int>(product1_index), engine);
+                // Set the weight of the new particle to p_pair_reaction_weight[i]
+                soa_products_data[2].m_rdata[PIdx::w][product1_index] = p_pair_reaction_weight[i];
+
+                // create a copy of the other product species at the location of species 2
+                const auto product2_index = products_np_data[3] + with_product_p_offsets[i];
+                copy_species2[3](soa_products_data[3], soa_2, static_cast<int>(p_pair_indices_2[i]),
+                                static_cast<int>(product2_index), engine);
+                // Set the weight of the new particle to p_pair_reaction_weight[i]
+                soa_products_data[3].m_rdata[PIdx::w][product2_index] = p_pair_reaction_weight[i];
+            }
             else if (mask[i] == int(ScatteringProcessType::IONIZATION))
             {
                 const auto species1_index = products_np_data[0] + no_product_total + with_product_p_offsets[i];

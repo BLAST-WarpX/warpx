@@ -1410,7 +1410,7 @@ private:
 
     //! Solve Poisson equation when loading an external magnetic field to clean divergence
     //! This is useful to remove errors that could lead to non-zero B field divergence
-    bool m_do_divb_cleaning_external = false;
+    bool m_do_initial_div_cleaning = false;
 
     //! Domain decomposition on Level 0
     amrex::IntVect numprocs{0};
