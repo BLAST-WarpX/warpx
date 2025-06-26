@@ -3604,7 +3604,6 @@ PhysicalParticleContainer::DepositTemperature (
         tilebox = amrex::coarsen(pti.tilebox(),ref_ratio);
     }
 
-    // ng_J.diagShift(1);
     tilebox.grow(ng_J);
 
     amrex::ignore_unused(thread_num);

@@ -193,7 +193,7 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
                         if (w_arr(i,j,k) > 0.0_rt) {
                             amrex::Real denom = (w_arr(i,j,k) - w2_arr(i,j,k)/w_arr(i,j,k) );
                             if (denom > 10._rt * std::numeric_limits<amrex::Real>::epsilon()) {
-                                variance_arr(i,j,k) /= (w_arr(i,j,k) - w2_arr(i,j,k)/w_arr(i,j,k) );
+                                variance_arr(i,j,k) /= denom;
                             } else {
                                 // This occurs when only a single sample is within a bin
                                 // In this case should be zero variance

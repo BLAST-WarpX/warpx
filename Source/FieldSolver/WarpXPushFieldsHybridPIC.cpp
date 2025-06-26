@@ -242,7 +242,7 @@ void WarpX::HybridPICDepositRhoAndJ ()
     mypc->DepositCurrent(m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), dt[0], -0.5_rt * dt[0]);
 
     // TODO: Perhaps add flag here for when using temperature accumulation in Hybrid
-    // Perform Temperature Deposition at time t_{n+1}
+    // Perform Temperature Deposition at time t_{n}
     mypc->DepositTemperatures(m_fields, 0.0_rt);
 
     // Deposit cold-relativistic fluid charge and current
