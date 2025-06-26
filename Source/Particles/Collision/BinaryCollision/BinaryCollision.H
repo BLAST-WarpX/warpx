@@ -679,7 +679,7 @@ public:
             amrex::ParallelForRNG( 2*n_cells,
                 [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
                 {
-		    int i_cell = i/2;
+            int i_cell = i/2;
                     // The particles from species1 that are in the cell `i_cell` are
                     // given by the `indices_1[cell_start_1:cell_stop_1]`
                     index_type const cell_start_1 = cell_offsets_1[i_cell];
@@ -698,50 +698,50 @@ public:
                         amrex::ParticleReal w2tot = 0.0;
                         amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
                         amrex::ParticleReal * const AMREX_RESTRICT w2 = soa_2.m_rdata[PIdx::w];
-			if (i < n_cells) {
-			  for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
+            if (i < n_cells) {
+              for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
                             w1tot += w1[ indices_1[i1] ];
-			  }
-			  n1_in_each_cell[i_cell] = w1tot/(dV*volume_factor(i_cell));
-			} else {
-			  for (index_type i2=cell_start_2; i2<cell_stop_2; ++i2) {
+              }
+              n1_in_each_cell[i_cell] = w1tot/(dV*volume_factor(i_cell));
+            } else {
+              for (index_type i2=cell_start_2; i2<cell_stop_2; ++i2) {
                             w2tot += w2[ indices_2[i2] ];
-			  }
-			  n2_in_each_cell[i_cell] = w2tot/(dV*volume_factor(i_cell));
-			}
-		    }
+              }
+              n2_in_each_cell[i_cell] = w2tot/(dV*volume_factor(i_cell));
+            }
+            }
 
                     // compute local temperatures [Joules]
                     if (binary_collision_functor.m_computeSpeciesTemperatures) {
-		      if (i < n_cells) {
-			amrex::ParticleReal * const AMREX_RESTRICT w1  = soa_1.m_rdata[PIdx::w];
-			amrex::ParticleReal * const AMREX_RESTRICT u1x = soa_1.m_rdata[PIdx::ux];
-			amrex::ParticleReal * const AMREX_RESTRICT u1y = soa_1.m_rdata[PIdx::uy];
-			amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
-			T1_in_each_cell[i_cell] = ComputeTemperature( cell_start_1, cell_stop_1, indices_1,
-								      w1, u1x, u1y, u1z, m1 );
-		      } else {
-			amrex::ParticleReal * const AMREX_RESTRICT w2  = soa_2.m_rdata[PIdx::w];
-			amrex::ParticleReal * const AMREX_RESTRICT u2x = soa_2.m_rdata[PIdx::ux];
-			amrex::ParticleReal * const AMREX_RESTRICT u2y = soa_2.m_rdata[PIdx::uy];
-			amrex::ParticleReal * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];
-			T2_in_each_cell[i_cell] = ComputeTemperature( cell_start_2, cell_stop_2, indices_2,
-								      w2, u2x, u2y, u2z, m2 );
-		      }
-		    }
+              if (i < n_cells) {
+            amrex::ParticleReal * const AMREX_RESTRICT w1  = soa_1.m_rdata[PIdx::w];
+            amrex::ParticleReal * const AMREX_RESTRICT u1x = soa_1.m_rdata[PIdx::ux];
+            amrex::ParticleReal * const AMREX_RESTRICT u1y = soa_1.m_rdata[PIdx::uy];
+            amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
+            T1_in_each_cell[i_cell] = ComputeTemperature( cell_start_1, cell_stop_1, indices_1,
+                                      w1, u1x, u1y, u1z, m1 );
+              } else {
+            amrex::ParticleReal * const AMREX_RESTRICT w2  = soa_2.m_rdata[PIdx::w];
+            amrex::ParticleReal * const AMREX_RESTRICT u2x = soa_2.m_rdata[PIdx::ux];
+            amrex::ParticleReal * const AMREX_RESTRICT u2y = soa_2.m_rdata[PIdx::uy];
+            amrex::ParticleReal * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];
+            T2_in_each_cell[i_cell] = ComputeTemperature( cell_start_2, cell_stop_2, indices_2,
+                                      w2, u2x, u2y, u2z, m2 );
+              }
+            }
 
                     // Do not collide if one species is missing in the cell
                     if ( cell_stop_1 - cell_start_1 < 1 ||
                          cell_stop_2 - cell_start_2 < 1 ) { return; }
 
                     // shuffle
-		    if (i < n_cells) {
-		      ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine);
-		    } else {
-		      ShuffleFisherYates(indices_2, cell_start_2, cell_stop_2, engine);
-		    }
-		}
-	    );
+            if (i < n_cells) {
+              ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine);
+            } else {
+              ShuffleFisherYates(indices_2, cell_start_2, cell_stop_2, engine);
+            }
+        }
+        );
             WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures);
             // Loop over independent particle pairs
             // To speed up binary collisions on GPU, we try to expose as much parallelism
