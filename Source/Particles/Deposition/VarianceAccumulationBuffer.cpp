@@ -64,10 +64,16 @@ VarianceAccumulationBuffer::get(std::string arr, ablastr::fields::Direction dir,
 }
 
 void
-VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fields::MultiLevelVectorField const& var_vf)
+VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (
+    ablastr::fields::MultiLevelVectorField const& var_vf,
+    amrex::Real normalization_factor,
+    bool apply_filter)
 {
     using ablastr::fields::Direction;
     auto &warpx = WarpX::GetInstance();
+
+    // This update algorithm follows this reference:
+    // Chan, Golub, LeVeque, http://i.stanford.edu/pub/cstr/reports/cs/tr/79/773/CS-TR-79-773.pdf
 
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
         auto const& periodicity = warpx.Geom(lev).periodicity();
@@ -108,17 +114,24 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
                 variancemf.nGrowVect()
             };
 
-            // Do a local copy of the weights to vbarmf_old
+            // Do a local copy of the weight sum to vbarmf_old
             amrex::MultiFab::Copy(vbarmf_old, wmf, 0, 0, 1, vbarmf_old.nGrowVect());
-
             amrex::Gpu::streamSynchronize();
 
+            // Do a local multiply of the weight sum by vbar so we end up with w_a * vbar_a
+            // This is the first part of teh vbar update, which is being computed as
+            // vbar_ab = (wsum_a * vbar_a + wsum_b * vbar_b) / wsum_ab,  where the owner cell
+            // is a and b would be contributions from overlapping non-owner cells.
+            // This can support tile corners wehre more than 2 boxes overlap as well since the
+            // weights are combined prior to summantion via the Guard Cell summation.
             amrex::MultiFab::Multiply(vbarmf_old, vbarmf, 0, 0, 1, vbarmf_old.nGrowVect());
 
             amrex::Gpu::streamSynchronize();
 
             // Combine guard cells so that the summation is over accumulated quantities
-            // vbarmf_old really holds the vsum
+            // vbarmf_old currently holds the w_i * vbar_i for
+            // WarpSumXGuardCells does an unweighted sum of all overlapping boxes
+            // It contains contributions from 4 boxes at the corners of the tiles
             WarpXSumGuardCells(vbarmf_old, periodicity, vbarmf_old.nGrowVect(), 0, 1);
 
             // Sum the overlapping cells together and place in temporary MFs
@@ -136,9 +149,16 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
 
             amrex::Gpu::streamSynchronize();
 
+            // Now the old arrays should only have summation contributions from neighboring tiles.
+            // The kernel below handles the weighted combination for the online variance update.
+            // These gymnastics are required due to the current interface in AMReX for MF synchronizations.
+            // Perhaps a weighted guard cell summation could be include in AMReX to avoid this way of
+            // doing things.
+
             auto const &owner_mask = amrex::OwnerMask(variancemf, periodicity);
 
             // Kernel that updates remainder of ghost values after communicating weight sums
+            // It only occurs in cells that are owned by the current tile.
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -171,7 +191,7 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
                             amrex::Real v_b = vbar_arr(i,j,k);
 
                             // Delta squared is ill-behaved when v_b and v_a are close.
-                            // Check this for underflow when squaring.
+                            // Check this to avoid underflow when squaring a small number.
                             amrex::Real delta = v_b - v_a;
                             if (2.*delta/(v_a+v_b) < 10._rt * std::numeric_limits<amrex::Real>::epsilon()) {
                                 delta = 0._rt;
@@ -203,6 +223,35 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (ablastr::fi
                     });
             }
             amrex::Gpu::streamSynchronize();
+
+            // Multiplies internal cells to convert variance to temperature
+            var_vf[lev][Direction{idir}]->mult(normalization_factor, 0, 1);
+
+            amrex::Gpu::streamSynchronize();
+
+            // Synchronize Ghost cells after normalization.
+            ablastr::utils::communication::FillBoundary(
+                *var_vf[lev][Direction{idir}],
+                WarpX::do_single_precision_comms,
+                warpx.Geom(lev).periodicity(),
+                true);
+
+            // If filtering, apply filter
+            if (apply_filter) {
+                amrex::Gpu::streamSynchronize();
+
+                warpx.ApplyFilterMF(var_vf, lev, idir);
+
+                amrex::Gpu::streamSynchronize();
+
+                // Re-synchronize MF after filtering
+                ablastr::utils::communication::FillBoundary(
+                    *var_vf[lev][Direction{idir}],
+                    WarpX::do_single_precision_comms,
+                    warpx.Geom(lev).periodicity(),
+                    true);
+            }
         }
     }
+    amrex::Gpu::streamSynchronize();
 }

@@ -26,7 +26,9 @@ class VarianceAccumulationBuffer {
 
     // This public member functions
     void setAllValues (amrex::Real val);
-    void SynchronizeBoundaryAndNormalizeVariance (ablastr::fields::MultiLevelVectorField const& var_vf);
+    void SynchronizeBoundaryAndNormalizeVariance (ablastr::fields::MultiLevelVectorField const& var_vf,
+                                                  amrex::Real normalization_factor,
+                                                  bool apply_filter);
 
     // Data MF Accessor
     amrex::MultiFab* get(std::string arr, ablastr::fields::Direction dir, int lev);

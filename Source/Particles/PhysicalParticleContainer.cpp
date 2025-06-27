@@ -3712,36 +3712,11 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
         // Handle synchronization and update of accumulation arrays
         amrex::Gpu::streamSynchronize();
 
-        // Sum boundaries for accumulation MFs
-        local_temperature_arrays->SynchronizeBoundaryAndNormalizeVariance(T_vf);
-
         // Multiply variance by species mass over the Boltzmann constant to convert to temperature in K
         amrex::Real Tnorm = this->getMass()/ablastr::constant::SI::kb;
-        for (int idim = 0; idim < 3; ++idim) {
-            // Multiplies internal cells to convert from variance to temperature
-            T_vf[lev][Direction{idim}]->mult(Tnorm, 0, 1);
 
-            // Synchronize Ghost cells after normalization.
-            ablastr::utils::communication::FillBoundary(
-                *T_vf[lev][Direction{idim}],
-                WarpX::do_single_precision_comms,
-                WarpX::GetInstance().Geom(lev).periodicity(),
-                true);
-
-            // If filtering, apply filter
-            if (WarpX::use_filter) {
-                WarpX::GetInstance().ApplyFilterMF(T_vf, lev, idim);
-
-                amrex::Gpu::streamSynchronize();
-
-                // Re-synchronize MF after filtering
-                ablastr::utils::communication::FillBoundary(
-                    *T_vf[lev][Direction{idim}],
-                    WarpX::do_single_precision_comms,
-                    WarpX::GetInstance().Geom(lev).periodicity(),
-                    true);
-            }
-        }
-        amrex::Gpu::streamSynchronize();
+        // Sum boundaries for accumulation MFs, apply normalization, and filter to end up with
+        // temperature in K in T_vf
+        local_temperature_arrays->SynchronizeBoundaryAndNormalizeVariance(T_vf, Tnorm, WarpX::use_filter);
     }
 }
