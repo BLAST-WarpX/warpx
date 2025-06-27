@@ -3154,6 +3154,10 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
         const amrex::ParticleReal zp_n = 0._rt;
 #endif
 
+#ifdef WARPX_QED
+        const amrex::ParticleReal p_optical_depth_QSR0 = p_optical_depth_QSR[ip];
+#endif
+
         amrex::ParticleReal dxp, dxp_save;
         amrex::ParticleReal dyp, dyp_save;
         amrex::ParticleReal dzp, dzp_save;
@@ -3281,6 +3285,11 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
                 // Flag the particle as invalid. It will be handled later in a special
                 // loop with suborbiting.
                 amrex::ParticleIDWrapper{idcpu[ip]}.make_invalid();
+
+#ifdef WARPX_QED
+                // Reset the QED parameter to what is was at the start of the step
+                p_optical_depth_QSR[ip] = p_optical_depth_QSR0;
+#endif
 
                 // write signaling flag: how many particles did not converge?
                 amrex::Gpu::Atomic::Add(unconverged_particles_ptr, amrex::Long(1));
