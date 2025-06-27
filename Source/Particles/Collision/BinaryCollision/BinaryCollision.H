@@ -542,9 +542,10 @@ public:
                         amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w1[ indices_1[i1] ]*u1x[ indices_1[i1] ]*m1);
                         amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w1[ indices_1[i1] ]*u1y[ indices_1[i1] ]*m1);
                         amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w1[ indices_1[i1] ]*u1z[ indices_1[i1] ]*m1);
-                        amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w1[ indices_1[i1] ]*Algorithms::KineticEnergy(u1x[ indices_1[i1] ],
-                                                                                                 u1y[ indices_1[i1] ],
-                                                                                                 u1z[ indices_1[i1] ], m1));
+                        amrex::ParticleReal KE = Algorithms::KineticEnergy(u1x[ indices_1[i1] ],
+                                                                           u1y[ indices_1[i1] ],
+                                                                           u1z[ indices_1[i1] ], m1));
+                        amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w1[ indices_1[i1] ]*KE);
                     }
                 );
             }
@@ -698,11 +699,10 @@ public:
                         u1x[ indices_1[i1] ] += w_factor*px_avg;
                         u1y[ indices_1[i1] ] += w_factor*py_avg;
                         u1z[ indices_1[i1] ] += w_factor*pz_avg;
-                        amrex::ParticleReal const KE_after =
-                                    w1[ indices_1[i1] ]*Algorithms::KineticEnergy(u1x[ indices_1[i1] ],
-                                                                                  u1y[ indices_1[i1] ],
-                                                                                  u1z[ indices_1[i1] ], m1);
-                        amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], -KE_after);
+                        amrex::ParticleReal const KE_after = Algorithms::KineticEnergy(u1x[ indices_1[i1] ],
+                                                                                       u1y[ indices_1[i1] ],
+                                                                                       u1z[ indices_1[i1] ], m1);
+                        amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], -w1[ indices_1[i1] ]*KE_after);
                     }
                 );
 
@@ -987,9 +987,10 @@ public:
                         amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w1[ indices_1[i1] ]*u1x[ indices_1[i1] ]*m1);
                         amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w1[ indices_1[i1] ]*u1y[ indices_1[i1] ]*m1);
                         amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w1[ indices_1[i1] ]*u1z[ indices_1[i1] ]*m1);
-                        amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w1[ indices_1[i1] ]*Algorithms::KineticEnergy(u1x[ indices_1[i1] ],
-                                                                                                 u1y[ indices_1[i1] ],
-                                                                                                 u1z[ indices_1[i1] ], m1));
+                        amrex::ParticleReal KE1 = Algorithms::KineticEnergy(u1x[ indices_1[i1] ],
+                                                                            u1y[ indices_1[i1] ],
+                                                                            u1z[ indices_1[i1] ], m1));
+                        amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w1[ indices_1[i1] ]*KE1);
                     }
                 );
 
@@ -1005,9 +1006,10 @@ public:
                         amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w2[ indices_2[i2] ]*u2x[ indices_2[i2] ]*m2);
                         amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w2[ indices_2[i2] ]*u2y[ indices_2[i2] ]*m2);
                         amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w2[ indices_2[i2] ]*u2z[ indices_2[i2] ]*m2);
-                        amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w2[ indices_2[i2] ]*Algorithms::KineticEnergy(u2x[ indices_2[i2] ],
-                                                                                                 u2y[ indices_2[i2] ],
-                                                                                                 u2z[ indices_2[i2] ], m2));
+                        amrex::ParticleReal KE2 = Algorithms::KineticEnergy(u2x[ indices_2[i2] ],
+                                                                            u2y[ indices_2[i2] ],
+                                                                            u2z[ indices_2[i2] ], m1));
+                        amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w2[ indices_2[i2] ]*KE2);
                     }
                 );
 
