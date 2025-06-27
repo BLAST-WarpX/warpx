@@ -3517,12 +3517,12 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
         // Create temporary arrays to hold the particle suborbit data
         // which is used to deposit the current of the suborbits after
         // convergence is found
-        amrex::GpuArray<amrex::Real, max_suborbits + 1> x_n_sub;
-        amrex::GpuArray<amrex::Real, max_suborbits + 1> y_n_sub;
-        amrex::GpuArray<amrex::Real, max_suborbits + 1> z_n_sub;
-        amrex::GpuArray<amrex::Real, max_suborbits + 1> ux_n_sub;
-        amrex::GpuArray<amrex::Real, max_suborbits + 1> uy_n_sub;
-        amrex::GpuArray<amrex::Real, max_suborbits + 1> uz_n_sub;
+        amrex::GpuArray<amrex::Real, max_suborbits + 1> x_n_save;
+        amrex::GpuArray<amrex::Real, max_suborbits + 1> y_n_save;
+        amrex::GpuArray<amrex::Real, max_suborbits + 1> z_n_save;
+        amrex::GpuArray<amrex::Real, max_suborbits + 1> ux_n_save;
+        amrex::GpuArray<amrex::Real, max_suborbits + 1> uy_n_save;
+        amrex::GpuArray<amrex::Real, max_suborbits + 1> uz_n_save;
 
 #if !defined(WARPX_DIM_1D_Z)
         amrex::ParticleReal const xp_n0 = x_n[ip];
@@ -3568,12 +3568,12 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
         int isuborbit = 0;
         while (isuborbit < num_suborbits) {
-            x_n_sub[isuborbit] = xp_n;
-            y_n_sub[isuborbit] = yp_n;
-            z_n_sub[isuborbit] = zp_n;
-            ux_n_sub[isuborbit] = uxp_n;
-            uy_n_sub[isuborbit] = uyp_n;
-            uz_n_sub[isuborbit] = uzp_n;
+            x_n_save[isuborbit] = xp_n;
+            y_n_save[isuborbit] = yp_n;
+            z_n_save[isuborbit] = zp_n;
+            ux_n_save[isuborbit] = uxp_n;
+            uy_n_save[isuborbit] = uyp_n;
+            uz_n_save[isuborbit] = uzp_n;
 
             amrex::Real const dt_suborbit = dt/num_suborbits;
 
@@ -3723,12 +3723,12 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
         if (!skip_deposition) {
             // Save the values at the end of the orbit
-            x_n_sub[isuborbit] = xp_n;
-            y_n_sub[isuborbit] = yp_n;
-            z_n_sub[isuborbit] = zp_n;
-            ux_n_sub[isuborbit] = uxp_n;
-            uy_n_sub[isuborbit] = uyp_n;
-            uz_n_sub[isuborbit] = uzp_n;
+            x_n_save[isuborbit] = xp_n;
+            y_n_save[isuborbit] = yp_n;
+            z_n_save[isuborbit] = zp_n;
+            ux_n_save[isuborbit] = uxp_n;
+            uy_n_save[isuborbit] = uyp_n;
+            uz_n_save[isuborbit] = uzp_n;
 
             amrex::Real wq = q*w[ip];
             if (do_ionization){
@@ -3741,19 +3741,19 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
             // Deposit the current density from the suborbit steps
             for (int is=0 ; is < num_suborbits ; is++) {
-                const amrex::ParticleReal xp_old = x_n_sub[is];
-                const amrex::ParticleReal yp_old = y_n_sub[is];
-                const amrex::ParticleReal zp_old = z_n_sub[is];
-                const amrex::ParticleReal xp_new = x_n_sub[is+1];
-                const amrex::ParticleReal yp_new = y_n_sub[is+1];
-                const amrex::ParticleReal zp_new = z_n_sub[is+1];
+                const amrex::ParticleReal xp_old = x_n_save[is];
+                const amrex::ParticleReal yp_old = y_n_save[is];
+                const amrex::ParticleReal zp_old = z_n_save[is];
+                const amrex::ParticleReal xp_new = x_n_save[is+1];
+                const amrex::ParticleReal yp_new = y_n_save[is+1];
+                const amrex::ParticleReal zp_new = z_n_save[is+1];
 
-                const amrex::ParticleReal uxp_old = ux_n_sub[is];
-                const amrex::ParticleReal uyp_old = uy_n_sub[is];
-                const amrex::ParticleReal uzp_old = uz_n_sub[is];
-                const amrex::ParticleReal uxp_new = ux_n_sub[is+1];
-                const amrex::ParticleReal uyp_new = uy_n_sub[is+1];
-                const amrex::ParticleReal uzp_new = uz_n_sub[is+1];
+                const amrex::ParticleReal uxp_old = ux_n_save[is];
+                const amrex::ParticleReal uyp_old = uy_n_save[is];
+                const amrex::ParticleReal uzp_old = uz_n_save[is];
+                const amrex::ParticleReal uxp_new = ux_n_save[is+1];
+                const amrex::ParticleReal uyp_new = uy_n_save[is+1];
+                const amrex::ParticleReal uzp_new = uz_n_save[is+1];
                 const amrex::ParticleReal uxp_nph = 0.5_prt*(uxp_old + uxp_new);
                 const amrex::ParticleReal uyp_nph = 0.5_prt*(uyp_old + uyp_new);
                 const amrex::ParticleReal uzp_nph = 0.5_prt*(uzp_old + uzp_new);
