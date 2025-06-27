@@ -59,19 +59,25 @@ public:
         PushType push_type=PushType::Explicit
     ) override;
 
-    void PushPX (WarpXParIter& pti,
-                        amrex::FArrayBox const * exfab,
-                        amrex::FArrayBox const * eyfab,
-                        amrex::FArrayBox const * ezfab,
-                        amrex::FArrayBox const * bxfab,
-                        amrex::FArrayBox const * byfab,
-                        amrex::FArrayBox const * bzfab,
-                        amrex::IntVect ngEB, int /*e_is_nodal*/,
-                        long offset,
-                        long np_to_push,
-                        int lev, int gather_lev,
-                        amrex::Real dt, ScaleFields scaleFields,
-                        DtType a_dt_type) override;
+    void PushPX (
+        WarpXParIter& pti,
+        amrex::FArrayBox const * exfab,
+        amrex::FArrayBox const * eyfab,
+        amrex::FArrayBox const * ezfab,
+        amrex::FArrayBox const * bxfab,
+        amrex::FArrayBox const * byfab,
+        amrex::FArrayBox const * bzfab,
+        amrex::IntVect ngEB,
+        int /*e_is_nodal*/,
+        long offset,
+        long np_to_push,
+        int lev,
+        int gather_lev,
+        amrex::Real dt,
+        ScaleFields scaleFields,
+        DtType a_dt_type,
+        bool const half_step=false
+    ) override;
 
     // Do nothing
     void PushP (int /*lev*/,

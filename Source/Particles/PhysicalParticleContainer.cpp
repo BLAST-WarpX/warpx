@@ -2066,7 +2066,7 @@ PhysicalParticleContainer::Evolve (
                     PushPX(pti, exfab, eyfab, ezfab,
                            bxfab, byfab, bzfab,
                            Ex.nGrowVect(), e_is_nodal,
-                           0, np_to_push, lev, gather_lev, dt, ScaleFields(false), a_dt_type);
+                           0, np_to_push, lev, gather_lev, dt, ScaleFields(false), a_dt_type, half_step);
                 } else if (push_type == PushType::Implicit) {
                     ImplicitPushXP(pti, exfab, eyfab, ezfab,
                                    bxfab, byfab, bzfab,
@@ -2115,7 +2115,7 @@ PhysicalParticleContainer::Evolve (
                                cbxfab, cbyfab, cbzfab,
                                cEx.nGrowVect(), e_is_nodal,
                                nfine_gather, np-nfine_gather,
-                               lev, lev-1, dt, ScaleFields(false), a_dt_type);
+                               lev, lev-1, dt, ScaleFields(false), a_dt_type, half_step);
                     } else if (push_type == PushType::Implicit) {
                         ImplicitPushXP(pti, cexfab, ceyfab, cezfab,
                                        cbxfab, cbyfab, cbzfab,
@@ -2672,23 +2672,26 @@ PhysicalParticleContainer::ContinuousFluxInjection (amrex::Real t, amrex::Real d
     }
 }
 
-/* \brief Perform the field gather and particle push operations in one fused kernel
- *
- */
 void
-PhysicalParticleContainer::PushPX (WarpXParIter& pti,
-                                   amrex::FArrayBox const * exfab,
-                                   amrex::FArrayBox const * eyfab,
-                                   amrex::FArrayBox const * ezfab,
-                                   amrex::FArrayBox const * bxfab,
-                                   amrex::FArrayBox const * byfab,
-                                   amrex::FArrayBox const * bzfab,
-                                   const amrex::IntVect ngEB, const int /*e_is_nodal*/,
-                                   const long offset,
-                                   const long np_to_push,
-                                   int lev, int gather_lev,
-                                   amrex::Real dt, ScaleFields scaleFields,
-                                   DtType a_dt_type)
+PhysicalParticleContainer::PushPX (
+    WarpXParIter& pti,
+    amrex::FArrayBox const * exfab,
+    amrex::FArrayBox const * eyfab,
+    amrex::FArrayBox const * ezfab,
+    amrex::FArrayBox const * bxfab,
+    amrex::FArrayBox const * byfab,
+    amrex::FArrayBox const * bzfab,
+    const amrex::IntVect ngEB,
+    const int /*e_is_nodal*/,
+    const long offset,
+    const long np_to_push,
+    int lev,
+    int gather_lev,
+    amrex::Real dt,
+    ScaleFields scaleFields,
+    DtType a_dt_type,
+    bool const half_step
+)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE((gather_lev==(lev-1)) ||
                                      (gather_lev==(lev  )),
@@ -2877,7 +2880,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 #endif
                                       dt);
 
-            UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], dt);
+            UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], (half_step ? dt*0.5_rt : dt));
             setPosition(ip, xp, yp, zp);
         }
 #ifdef WARPX_QED
@@ -2895,7 +2898,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                                           t_chi_max,
                                           dt);
 
-                UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], dt);
+                UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], (half_step ? dt*0.5_rt : dt));
                 setPosition(ip, xp, yp, zp);
             }
         }

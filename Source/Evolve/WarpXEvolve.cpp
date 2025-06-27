@@ -384,7 +384,7 @@ WarpX::Evolve (int numsteps)
         ablastr::warn_manager::GetWMInstance().PrintGlobalWarnings("THE END");
 }
 
-void WarpX::OneStep(
+void WarpX::OneStep (
     amrex::Real a_cur_time,
     amrex::Real a_dt,
     int a_step
@@ -396,8 +396,8 @@ void WarpX::OneStep(
     if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
         electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
         bool const skip_deposition = true;
+        // TODO parse from input file
         bool const half_step = false;
-        // TODO bool const half_step = true;
         // TODO PushParticlesandDeposit(a_cur_time, skip_deposition, half_step);
         // multi-physics: collisions
         ExecutePythonCallback("beforecollisions");
