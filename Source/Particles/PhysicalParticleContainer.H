@@ -363,7 +363,7 @@ public:
         return GetVecOfPtrs(m_user_real_attrib_parser);
     }
 
-    // By default this returns false, can be overridden in PysicalParticleContainer
+    // By default this returns false; overridden here to return runtime value
     virtual bool getTemperatureDepositionFlag () const noexcept override {return m_do_temperature_deposition;}
 
     virtual void AccumulateVelocitiesAndComputeTemperature (
