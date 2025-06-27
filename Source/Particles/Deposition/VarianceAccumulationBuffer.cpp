@@ -119,11 +119,11 @@ VarianceAccumulationBuffer::SynchronizeBoundaryAndNormalizeVariance (
             amrex::Gpu::streamSynchronize();
 
             // Do a local multiply of the weight sum by vbar so we end up with w_a * vbar_a
-            // This is the first part of teh vbar update, which is being computed as
+            // This is the first part of the vbar update, which is being computed as
             // vbar_ab = (wsum_a * vbar_a + wsum_b * vbar_b) / wsum_ab,  where the owner cell
             // is a and b would be contributions from overlapping non-owner cells.
-            // This can support tile corners wehre more than 2 boxes overlap as well since the
-            // weights are combined prior to summantion via the Guard Cell summation.
+            // This can support tile corners where more than 2 boxes overlap as well since the
+            // weights are combined prior to summation via the Guard Cell summation.
             amrex::MultiFab::Multiply(vbarmf_old, vbarmf, 0, 0, 1, vbarmf_old.nGrowVect());
 
             amrex::Gpu::streamSynchronize();
