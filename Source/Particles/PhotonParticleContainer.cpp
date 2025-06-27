@@ -232,7 +232,7 @@ PhotonParticleContainer::PushPX (
             amrex::ignore_unused(qed_control);
 #endif
 
-            UpdatePositionPhoton( x, y, z, ux[i], uy[i], uz[i], dt );
+            UpdatePositionPhoton(x, y, z, ux[i], uy[i], uz[i], (half_step ? dt*0.5_rt : dt));
             SetPosition(i, x, y, z);
         }
     );

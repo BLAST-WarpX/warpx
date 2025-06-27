@@ -221,7 +221,7 @@ RigidInjectedParticleContainer::PushPX (
                                       ngEB, e_is_nodal, offset, np_to_push, lev, gather_lev, dt,
                                       ScaleFields(do_scale, dt, zinject_plane_lev_previous,
                                                   vzbeam_ave_boosted, v_boost),
-                                      a_dt_type);
+                                      a_dt_type, half_step);
 
     if (!done_injecting_lev) {
 
@@ -231,6 +231,7 @@ RigidInjectedParticleContainer::PushPX (
 
         // Undo the push for particles not injected yet.
         // The zp are advanced a fixed amount.
+        // FIXME Use half_step here as well?
         const amrex::ParticleReal z_plane_lev = zinject_plane_lev;
         const amrex::ParticleReal vz_ave_boosted = vzbeam_ave_boosted;
         const bool rigid = rigid_advance;
