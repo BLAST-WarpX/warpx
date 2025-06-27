@@ -3540,6 +3540,10 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
         amrex::ParticleReal const zp_n0 = 0._rt;
 #endif
 
+#if WARPX_QED
+        amrex::ParticleReal const p_optical_depth_QSR0 = p_optical_depth_QSR[ip];
+#endif
+
         amrex::ParticleReal const uxp_n0 = ux_n[ip];
         amrex::ParticleReal const uyp_n0 = uy_n[ip];
         amrex::ParticleReal const uzp_n0 = uz_n[ip];
@@ -3577,7 +3581,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
             amrex::Real const dt_suborbit = dt/num_suborbits;
 
-            // Try advancing the particle a fraction of a step
+            // Try advancing the particle one suborbit step
             amrex::ParticleReal step_norm = 1._prt;
             int iter;
             for (iter = 0; iter < max_iterations;) {
@@ -3651,8 +3655,6 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 #endif
 
 #ifdef WARPX_QED
-                // NOTE!! The suborbits does not handle resetting the QED quandities if
-                // the suborbits fails.
                 [[maybe_unused]] auto foo_local_has_quantum_sync = local_has_quantum_sync;
                 [[maybe_unused]] auto *foo_podq = p_optical_depth_QSR;
                 [[maybe_unused]] const auto& foo_evolve_opt = evolve_opt; // have to do all these for nvcc
@@ -3694,6 +3696,10 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                 ux[ip] = uxp_n0;
                 uy[ip] = uyp_n0;
                 uz[ip] = uzp_n0;
+
+#ifdef WARPX_QED
+                p_optical_depth_QSR[ip] = p_optical_depth_QSR0;
+#endif
 
             } else {
 
