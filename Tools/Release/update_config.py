@@ -29,9 +29,18 @@ def update(args):
         repo_dict["picsar"] = (
             "https://api.github.com/repos/ECP-WarpX/picsar/commits/development"
         )
+    if args.all or args.warpx:
+        repo_dict["warpx"] = (
+            "https://api.github.com/repos/BLAST-WarpX/warpx/commits/development"
+        )
 
     # list of repositories labels for logging convenience
-    repo_labels = {"amrex": "AMReX", "pyamrex": "pyAMReX", "picsar": "PICSAR"}
+    repo_labels = {
+        "amrex": "AMReX",
+        "pyamrex": "pyAMReX",
+        "picsar": "PICSAR",
+        "warpx": "WarpX",
+    }
 
     # read from JSON file with configuration data
     repo_dir = Path(__file__).parent.parent.parent.absolute()
@@ -45,7 +54,7 @@ def update(args):
 
     # loop over repositories and update configuration data
     for repo_name, repo_url in repo_dict.items():
-        print(f"\nUpdating {repo_labels[repo_name]} dependency...")
+        print(f"\nUpdating {repo_labels[repo_name]}...")
         # set keys to access configuration data
         commit_key = f"commit_{repo_name}"
         version_key = f"version_{repo_name}"
@@ -55,22 +64,23 @@ def update(args):
         # set new repository version
         repo_version = datetime.date.today().strftime("%y.%m")
         # update repository commit
-        print(f"- old commit/branch/sha: {config_data[commit_key]}")
-        print(f"- new commit/branch/sha: {repo_commit}")
-        proceed = input("Do you want to continue? [y/n] ")
-        if proceed not in ["y", "Y"]:
-            print("Skipping update of commit/branch/sha...")
-        else:
-            print("Updating commit/branch/sha...")
-            config_data[f"commit_{repo_name}"] = repo_commit
+        if repo_name != "warpx":
+            print(f"- old commit: {config_data[commit_key]}")
+            print(f"- new commit: {repo_commit}")
+            proceed = input("Do you want to continue? [y/n] ")
+            if proceed not in ["y", "Y"]:
+                print("Skipping commit update...")
+            else:
+                print("Updating commit...")
+                config_data[f"commit_{repo_name}"] = repo_commit
         # update repository version
-        print(f"- old minimal version required: {config_data[version_key]}")
-        print(f"- new minimal version required: {repo_version}")
+        print(f"- old version: {config_data[version_key]}")
+        print(f"- new version: {repo_version}")
         proceed = input("Do you want to continue? [y/n] ")
         if proceed not in ["y", "Y"]:
-            print("Skipping update of minimal version required...")
+            print("Skipping version update...")
         else:
-            print("Updating minimal version required...")
+            print("Updating version...")
             config_data[f"version_{repo_name}"] = repo_version
 
     # write to JSON file with configuration data
@@ -106,11 +116,21 @@ if __name__ == "__main__":
         dest="picsar",
     )
 
+    # add arguments: WarpX option
+    parser.add_argument(
+        "--warpx",
+        help="Update WarpX only",
+        action="store_true",
+        dest="warpx",
+    )
+
     # parse arguments
     args = parser.parse_args()
 
     # set args.all automatically
-    args.all = False if (args.amrex or args.pyamrex or args.picsar) else True
+    args.all = (
+        False if (args.amrex or args.pyamrex or args.picsar or args.warpx) else True
+    )
 
     # update
     update(args)

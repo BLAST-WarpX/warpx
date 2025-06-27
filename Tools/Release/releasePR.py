@@ -142,7 +142,7 @@ subprocess.run(
 answers = concat_answers(["y", WarpX_version_yr, WarpX_version_mn, "", "", "y"])
 
 process = subprocess.Popen(
-    [Path(REPO_DIR).joinpath("Tools/Release/newVersion.sh")],
+    [Path(REPO_DIR).joinpath("Tools/Release/update_config.py"), "--warpx"],
     stdin=subprocess.PIPE,
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
@@ -178,7 +178,7 @@ subprocess.run(
 ./Tools/Release/update_config.py --picsar # no changes, still {PICSAR_version}
 ./Tools/Release/update_config.py --pyamrex
 # bump version number
-./Tools/Release/newVersion.sh
+./Tools/Release/update_config.py --warpx
 ```
 
 Following this workflow: https://warpx.readthedocs.io/en/latest/maintenance/release.html
