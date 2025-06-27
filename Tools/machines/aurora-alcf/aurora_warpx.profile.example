@@ -4,7 +4,6 @@ export proj=""  # change me!
 # required dependencies
 module load cmake
 module load adios2/2.10.2-cpu
-module load hdf5/1.14.5
 
 # optional: for QED support with detailed tables
 module load boost
