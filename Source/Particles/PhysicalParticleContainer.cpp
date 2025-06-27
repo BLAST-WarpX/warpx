@@ -3357,7 +3357,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                     amrex::MultiFab * const jx,
                                                     amrex::MultiFab * const jy,
                                                     amrex::MultiFab * const jz,
-                                                    long offset,
+                                                    long index_offset,
                                                     long num_unconverged_particles,
                                                     int lev, int gather_lev,
                                                     amrex::Real dt, ScaleFields scaleFields,
@@ -3492,8 +3492,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
     int constexpr max_suborbits = 10;
 
-    long * unconverged_i = unconverged_indices.data() + offset;
-    amrex::ParticleReal * saved_w = saved_weights.data() + offset;
+    long * unconverged_i = unconverged_indices.data() + index_offset;
+    amrex::ParticleReal * saved_w = saved_weights.data() + index_offset;
 
     // Using this version of ParallelFor with compile time options
     // improves performance when qed or external EB are not used by reducing
