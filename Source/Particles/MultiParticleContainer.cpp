@@ -593,6 +593,36 @@ MultiParticleContainer::DepositCharge (
 #endif
 }
 
+void
+MultiParticleContainer::DepositTemperatures (
+    ablastr::fields::MultiFabRegister & fields,
+    const amrex::Real relative_time)
+{
+    using ablastr::fields::Direction;
+
+    // Call the deposition kernel for each species
+    for (auto& pc : allcontainers)
+    {
+        // If this species does not use temperature deposition then skip to next one
+        if (!pc->getTemperatureDepositionFlag()) { continue; }
+
+        // Generate Name to look up temperature MF in the register
+        const std::string temperature_vf_str = "T_" + species_names[pc->getSpeciesId()];
+        ablastr::fields::MultiLevelVectorField T_vf =
+            fields.get_mr_levels_alldirs(temperature_vf_str, WarpX::GetInstance().finestLevel());
+
+        // Clear temperature MF for this species
+        for (int idim = 0; idim < 3; ++idim) {
+            for (int lev = 0; lev <= WarpX::GetInstance().finestLevel(); ++lev) {
+                T_vf[lev][Direction{idim}]->setVal(0.0_rt);
+            }
+        }
+
+        // Accumulate velocities for this species
+        pc->AccumulateVelocitiesAndComputeTemperature(T_vf, relative_time);
+    }
+}
+
 std::unique_ptr<MultiFab>
 MultiParticleContainer::GetChargeDensity (int lev, bool local)
 {

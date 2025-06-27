@@ -21,6 +21,7 @@
 #   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
 #   include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper.H"
 #endif
+#include "Particles/Deposition/TemperatureDeposition.H"
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/Gather/GetExternalFields.H"
 #include "Particles/ParticleCreation/DefaultInitialization.H"
@@ -49,6 +50,7 @@
 #include "WarpX.H"
 
 #include <ablastr/warn_manager/WarnManager.H>
+#include <ablastr/utils/Communication.H>
 
 #include <AMReX.H>
 #include <AMReX_Algorithm.H>
@@ -299,6 +301,8 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
         species_name + "'."
     );
 
+    utils::parser::queryWithParser(pp_species_name, "do_temperature_deposition", m_do_temperature_deposition);
+
     pp_species_name.query("boost_adjust_transverse_positions", boost_adjust_transverse_positions);
     pp_species_name.query("do_backward_propagation", do_backward_propagation);
     pp_species_name.query("random_theta", m_rz_random_theta);
@@ -428,6 +432,41 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
         amrex::Real boundary_uth = 0;
         utils::parser::getWithParser(pp_species_boundary,"u_th",boundary_uth);
         m_boundary_conditions.SetThermalVelocity(boundary_uth);
+    }
+}
+
+void
+PhysicalParticleContainer::AllocData ()
+{
+    // Call Base class Data allocation
+    WarpXParticleContainer::AllocData();
+
+    if (m_do_temperature_deposition) {
+        using ablastr::fields::Direction;
+
+        auto& warpx = WarpX::GetInstance();
+        ablastr::fields::MultiLevelVectorField J_vf =
+            warpx.m_fields.get_mr_levels_alldirs(warpx::fields::FieldType::current_fp, warpx.finestLevel());
+
+        const std::string T_field_name = "T_" + species_name;
+
+        for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+            for (int idir = 0; idir < 3; ++idir) {
+                amrex::BoxArray const& ba = J_vf[lev][Direction{idir}]->boxArray();
+                amrex::DistributionMapping const& dm = J_vf[lev][Direction{idir}]->DistributionMap();
+                amrex::IntVect const& ng = J_vf[lev][Direction{idir}]->nGrowVect();
+
+                warpx.m_fields.alloc_init(T_field_name, Direction{idir},
+                    lev, ba, dm, WarpX::ncomps, ng, 0.0_rt);
+            }
+        }
+
+        ablastr::fields::MultiLevelVectorField T_vf =
+            warpx.m_fields.get_mr_levels_alldirs(T_field_name, warpx.finestLevel());
+
+        // Allocate Accumulation Arrays
+        local_temperature_arrays = std::make_unique<warpx::particles::deposition::VarianceAccumulationBuffer>(
+            T_vf, species_name);
     }
 }
 
@@ -3456,3 +3495,228 @@ PhysicalParticleContainer::getPairGenerationFilterFunc ()
 }
 
 #endif
+
+/* \brief Temperature Deposition for thread thread_num
+ * \param pti         Particle iterator
+ * \param wp          Array of particle weights
+ * \param uxp uyp uzp Array of particle momenta
+ * \param ion_lev     Pointer to array of particle ionization level. This is
+                      required to have the charge of each macroparticle
+                      since q is a scalar. For non-ionizable species,
+                      ion_lev is a null pointer.
+ * \param Tx Ty Tz    Full array of temperature components
+ * \param offset      Index of first particle for which temperature is deposited
+ * \param np_to_deposit Number of particles for which temperature is deposited.
+                        Particles [offset,offset+np_to_deposit] deposit temperature
+ * \param thread_num  Thread number (if tiling)
+ * \param lev         Level of box that contains particles
+ * \param depos_lev   Level on which particles deposit (if buffers are used)
+ * \param dt          Time step for particle level
+ * \param relative_time  Time at which to deposit T, relative to the time of the
+ *                       current positions of the particles. When different than 0,
+ *                       the particle position will be temporarily modified to match
+ *                       the time of the deposition.
+ */
+void
+PhysicalParticleContainer::DepositTemperature (
+    WarpXParIter& pti,
+    RealVector const & wp, RealVector const & uxp,
+    RealVector const & uyp, RealVector const & uzp,
+    int const * const ion_lev,
+    amrex::MultiFab * const Tx, amrex::MultiFab * const Ty, amrex::MultiFab * const Tz,
+    long const offset, long const np_to_deposit,
+    int const thread_num, const int lev, int const depos_lev,
+    amrex::Real const relative_time, PushType push_type)
+{
+    using ablastr::fields::Direction;
+
+    WARPX_PROFILE("PhysicalParticleContainer::DepositTemperature()");
+
+    // Return if we are not depositing temperature.
+    if (!m_do_temperature_deposition) { return; }
+
+    if (WarpX::current_deposition_algo != CurrentDepositionAlgo::Direct
+        || push_type != PushType::Explicit
+        || WarpX::do_shared_mem_current_deposition
+        )
+    {
+        WARPX_ABORT_WITH_MESSAGE(
+            "Temperature Deposition only works with explicit solvers, direct current deposition, "
+            "and non-shared memory deposition."
+        );
+    }
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE((depos_lev==(lev-1)) ||
+                                     (depos_lev==(lev  )),
+                                     "Deposition buffers only work for lev-1");
+
+    // If no particles, do not do anything
+    if (np_to_deposit == 0) { return; }
+
+    // If user decides not to deposit
+    if (do_not_deposit) { return; }
+
+    // Number of guard cells for local deposition of J
+    const WarpX& warpx = WarpX::GetInstance();
+
+    amrex::IntVect ng_J = warpx.get_ng_depos_J();
+
+    // Extract deposition order and check that particles shape fits within the guard cells.
+    // NOTE: In specific situations where the staggering of J and the current deposition algorithm
+    // are not trivial, this check might be too relaxed and we might include a particle that should
+    // deposit part of its current in a neighboring box. However, this should catch particles
+    // traveling many cells away, for example with algorithms that allow for large time steps.
+
+#if   defined(WARPX_DIM_1D_Z)
+    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(WarpX::noz/2));
+#elif   defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(WarpX::nox/2));
+#elif   defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(WarpX::nox/2),
+                                                       static_cast<int>(WarpX::noz/2));
+#elif defined(WARPX_DIM_3D)
+    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(WarpX::nox/2),
+                                                       static_cast<int>(WarpX::noy/2),
+                                                       static_cast<int>(WarpX::noz/2));
+#endif
+
+    // On GPU: particles deposit directly on the J arrays, which usually have a larger number of guard cells
+    // Jx, Jy and Jz have the same number of guard cells, hence it is sufficient to check for Jx
+    const amrex::IntVect range = Tx->nGrowVect() - shape_extent;
+
+    amrex::ignore_unused(range); // for release builds
+    AMREX_ASSERT_WITH_MESSAGE(
+        amrex::numParticlesOutOfRange(pti, range) == 0,
+        "Particles shape does not fit within tile (CPU) or guard cells (GPU) used for current deposition");
+
+    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(depos_lev,0));
+
+    const amrex::ParticleReal q = this->charge;
+
+    // Get tile box where current is deposited.
+    // The tile box is different when depositing in the buffers (depos_lev<lev)
+    // or when depositing inside the level (depos_lev=lev)
+    Box tilebox;
+    if (lev == depos_lev) {
+        tilebox = pti.tilebox();
+    } else {
+        const IntVect& ref_ratio = WarpX::RefRatio(depos_lev);
+        tilebox = amrex::coarsen(pti.tilebox(),ref_ratio);
+    }
+
+    tilebox.grow(ng_J);
+
+    amrex::ignore_unused(thread_num);
+    // GPU, no tiling: j<xyz>_arr point to the full j<xyz> arrays
+    auto & Tx_fab = Tx->get(pti);
+    auto & Ty_fab = Ty->get(pti);
+    auto & Tz_fab = Tz->get(pti);
+
+    auto & wx_fab =    local_temperature_arrays->get("w", Direction{0}, lev)->get(pti);
+    auto & wy_fab =    local_temperature_arrays->get("w", Direction{1}, lev)->get(pti);
+    auto & wz_fab =    local_temperature_arrays->get("w", Direction{2}, lev)->get(pti);
+    auto & w2x_fab =   local_temperature_arrays->get("w2", Direction{0}, lev)->get(pti);
+    auto & w2y_fab =   local_temperature_arrays->get("w2", Direction{1}, lev)->get(pti);
+    auto & w2z_fab =   local_temperature_arrays->get("w2", Direction{2}, lev)->get(pti);
+    auto & vxbar_fab = local_temperature_arrays->get("vbar", Direction{0}, lev)->get(pti);
+    auto & vybar_fab = local_temperature_arrays->get("vbar", Direction{1}, lev)->get(pti);
+    auto & vzbar_fab = local_temperature_arrays->get("vbar", Direction{2}, lev)->get(pti);
+
+    const auto GetPosition = GetParticlePosition<PIdx>(pti, offset);
+
+    // Lower corner of tile box physical domain
+    // Note that this includes guard cells since it is after tilebox.ngrow
+    const Dim3 lo = lbound(tilebox);
+    // Take into account Galilean shift
+    const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, depos_lev, 0.0_rt);
+
+    if        (WarpX::nox == 1){
+        warpx::particles::deposition::doVarianceDepositionShapeN<1>(
+            GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
+            uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
+            Tx_fab, Ty_fab, Tz_fab, wx_fab, wy_fab, wz_fab,
+            w2x_fab, w2y_fab, w2z_fab, vxbar_fab, vybar_fab, vzbar_fab,
+            np_to_deposit, relative_time, dinv,
+            xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
+    } else if (WarpX::nox == 2){
+        warpx::particles::deposition::doVarianceDepositionShapeN<2>(
+            GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
+            uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
+            Tx_fab, Ty_fab, Tz_fab, wx_fab, wy_fab, wz_fab,
+            w2x_fab, w2y_fab, w2z_fab, vxbar_fab, vybar_fab, vzbar_fab,
+            np_to_deposit, relative_time, dinv,
+            xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
+    } else if (WarpX::nox == 3){
+        warpx::particles::deposition::doVarianceDepositionShapeN<3>(
+            GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
+            uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
+            Tx_fab, Ty_fab, Tz_fab, wx_fab, wy_fab, wz_fab,
+            w2x_fab, w2y_fab, w2z_fab, vxbar_fab, vybar_fab, vzbar_fab,
+            np_to_deposit, relative_time, dinv,
+            xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
+    } else if (WarpX::nox == 4){
+        warpx::particles::deposition::doVarianceDepositionShapeN<4>(
+            GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
+            uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
+            Tx_fab, Ty_fab, Tz_fab, wx_fab, wy_fab, wz_fab,
+            w2x_fab, w2y_fab, w2z_fab, vxbar_fab, vybar_fab, vzbar_fab,
+            np_to_deposit, relative_time, dinv,
+            xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
+    }
+}
+
+void
+PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
+    ablastr::fields::MultiLevelVectorField const & T_vf,
+    const amrex::Real relative_time)
+{
+    using ablastr::fields::Direction;
+
+    // Loop over the refinement levels
+    auto const finest_level = static_cast<int>(T_vf.size() - 1);
+    for (int lev = 0; lev <= finest_level; ++lev)
+    {
+        // Clear accumulation arrays
+        local_temperature_arrays->setAllValues(0.0_rt);
+
+        // Loop over particle tiles and deposit current on each level
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+        {
+        const int thread_num = omp_get_thread_num();
+#else
+        const int thread_num = 0;
+#endif
+        for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
+        {
+            const long np = pti.numParticles();
+            const auto & wp = pti.GetAttribs(PIdx::w);
+            const auto & uxp = pti.GetAttribs(PIdx::ux);
+            const auto & uyp = pti.GetAttribs(PIdx::uy);
+            const auto & uzp = pti.GetAttribs(PIdx::uz);
+
+            int* AMREX_RESTRICT ion_lev = nullptr;
+            if (do_field_ionization)
+            {
+                ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
+            }
+
+            DepositTemperature(pti, wp, uxp, uyp, uzp, ion_lev,
+                            T_vf[lev][0], T_vf[lev][1], T_vf[lev][2],
+                            0, np, thread_num, lev, lev, relative_time, PushType::Explicit);
+        }
+#ifdef AMREX_USE_OMP
+        }
+#endif
+
+        // Handle synchronization and update of accumulation arrays
+        amrex::Gpu::streamSynchronize();
+
+        // Multiply variance by species mass over the Boltzmann constant to convert to temperature in K
+        amrex::Real Tnorm = this->getMass()/ablastr::constant::SI::kb;
+
+        // Sum boundaries for accumulation MFs, apply normalization, and filter to end up with
+        // temperature in K in T_vf
+        local_temperature_arrays->SynchronizeBoundaryAndNormalizeVariance(T_vf, Tnorm, WarpX::use_filter);
+    }
+}
