@@ -3028,7 +3028,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
     const amrex::ParticleReal Bz_external_particle = m_B_external_particle[2];
 
     // Lower corner of tile box physical domain (take into account Galilean shift)
-    const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, gather_lev, 0._rt);
+    const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, gather_lev, 0.0_rt);
 
     const Dim3 lo = lbound(box);
 
@@ -3327,7 +3327,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
                         // The index saved is relative to the full array
                         unconverged_i[x] = ip + offset;
                         saved_w[x] = w[ip];
-                        w[ip] = 0.;
+                        w[ip] = 0.0_prt;
                     }
                 }
             },
@@ -3347,12 +3347,8 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
 }
 
 /* \brief Perform the implicit particle push operation in one fused kernel
- *        The main difference from PushPX is the order of operations:
- *         - push position by 1/2 dt
- *         - gather fields
- *         - push velocity by dt
- *         - average old and new velocity to get time centered value
- *        The routines ends with both position and velocity at the half time level.
+ *        using suborbits. This routine is used for particles where the
+ *        iteration in ImplicitPushXP failed to converge.
  */
 void
 PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
@@ -3409,7 +3405,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     const amrex::ParticleReal Bz_external_particle = m_B_external_particle[2];
 
     // Lower corner of tile box physical domain (take into account Galilean shift)
-    const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, gather_lev, 0._rt);
+    const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, gather_lev, 0.0_rt);
 
     const Dim3 lo = lbound(box);
 
@@ -3536,17 +3532,17 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 #if !defined(WARPX_DIM_1D_Z)
         amrex::ParticleReal const xp_n0 = x_n[ip];
 #else
-        amrex::ParticleReal const xp_n0 = 0._rt;
+        amrex::ParticleReal const xp_n0 = 0.0_rt;
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         amrex::ParticleReal const yp_n0 = y_n[ip];
 #else
-        amrex::ParticleReal const yp_n0 = 0._rt;
+        amrex::ParticleReal const yp_n0 = 0.0_rt;
 #endif
 #if !defined(WARPX_DIM_RCYLINDER)
         amrex::ParticleReal const zp_n0 = z_n[ip];
 #else
-        amrex::ParticleReal const zp_n0 = 0._rt;
+        amrex::ParticleReal const zp_n0 = 0.0_rt;
 #endif
 
 #if WARPX_QED
@@ -3591,13 +3587,13 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
             amrex::Real const dt_suborbit = dt/num_suborbits;
 
             // Try advancing the particle one suborbit step
-            amrex::ParticleReal step_norm = 1._prt;
+            amrex::ParticleReal step_norm = 1.0_prt;
             int iter;
             for (iter = 0; iter < max_iterations;) {
 
-                dxp = 0.0;
-                dyp = 0.0;
-                dzp = 0.0;
+                dxp = 0.0_prt;
+                dyp = 0.0_prt;
+                dzp = 0.0_prt;
                 UpdatePositionImplicit(dxp, dyp, dzp, uxp_n, uyp_n, uzp_n, ux[ip], uy[ip], uz[ip], 0.5_rt*dt_suborbit);
                 xp = xp_n + dxp;
                 yp = yp_n + dyp;
@@ -3679,9 +3675,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 #endif
 
                 // Take average to get the time centered value
-                ux[ip] = 0.5_rt*(ux[ip] + ux_n[ip]);
-                uy[ip] = 0.5_rt*(uy[ip] + uy_n[ip]);
-                uz[ip] = 0.5_rt*(uz[ip] + uz_n[ip]);
+                ux[ip] = 0.5_rt*(ux[ip] + uxp_n);
+                uy[ip] = 0.5_rt*(uy[ip] + uyp_n);
+                uz[ip] = 0.5_rt*(uz[ip] + uzp_n);
 
                 iter++;
 
@@ -3716,12 +3712,12 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
                 // That step was successful, update the starting values for the next suborbit
                 // interpolating to the end of the step.
-                xp_n = 2.*xp - xp_n;
-                yp_n = 2.*yp - yp_n;
-                zp_n = 2.*zp - zp_n;
-                uxp_n = 2.*ux[ip] - uxp_n;
-                uyp_n = 2.*uy[ip] - uyp_n;
-                uzp_n = 2.*uz[ip] - uzp_n;
+                xp_n = 2.0_prt*xp - xp_n;
+                yp_n = 2.0_prt*yp - yp_n;
+                zp_n = 2.0_prt*zp - zp_n;
+                uxp_n = 2.0_prt*ux[ip] - uxp_n;
+                uyp_n = 2.0_prt*uy[ip] - uyp_n;
+                uzp_n = 2.0_prt*uz[ip] - uzp_n;
                 ux[ip] = uxp_n;
                 uy[ip] = uyp_n;
                 uz[ip] = uzp_n;
@@ -3735,6 +3731,18 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
             }
 
         } // end suborbits
+
+        // Set position and momentum to be at the half time level relative to the
+        // full time step
+        xp = 0.5_prt*(xp_n0 + xp_n);
+        yp = 0.5_prt*(yp_n0 + yp_n);
+        zp = 0.5_prt*(zp_n0 + zp_n);
+        setPosition(ip, xp, yp, zp);
+
+        ux[ip] = 0.5_prt*(uxp_n0 + uxp_n);
+        uy[ip] = 0.5_prt*(uyp_n0 + uyp_n);
+        uz[ip] = 0.5_prt*(uzp_n0 + uzp_n);
+
 
         if (!skip_deposition) {
             // Save the values at the end of the orbit
@@ -3774,12 +3782,12 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                 const amrex::ParticleReal uzp_nph = 0.5_prt*(uzp_old + uzp_new);
 
 #if !defined(WARPX_DIM_3D)
-                constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
+                constexpr amrex::ParticleReal inv_c2 = 1.0_prt/(PhysConst::c*PhysConst::c);
 
                 // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
                 // The uxp,uyp,uzp are the velocities at time level n+1/2
-                const amrex::ParticleReal gamma_old = std::sqrt(1._prt + (uxp_old*uxp_old + uyp_old*uyp_old + uzp_old*uzp_old)*inv_c2);
-                const amrex::ParticleReal gamma_new = std::sqrt(1._prt + (uxp_new*uxp_new + uyp_new*uyp_new + uzp_new*uzp_new)*inv_c2);
+                const amrex::ParticleReal gamma_old = std::sqrt(1.0_prt + (uxp_old*uxp_old + uyp_old*uyp_old + uzp_old*uzp_old)*inv_c2);
+                const amrex::ParticleReal gamma_new = std::sqrt(1.0_prt + (uxp_new*uxp_new + uyp_new*uyp_new + uzp_new*uzp_new)*inv_c2);
                 const amrex::ParticleReal gaminv = 2.0_prt/(gamma_old + gamma_new);
 #else
                 // unused
