@@ -1511,6 +1511,10 @@ Particle initialization
     Resampling is performed everytime the number of macroparticles per cell of the species
     averaged over the whole simulation domain exceeds this parameter.
 
+* ``<species>.do_temperature_deposition`` (`boolean`) optional (default `false`)
+    When running with Ohm's Law Hybrid Solver, this will enable temperature deposition
+    in each dimension with a matched shape function and filtering used for current deposition.
+    This is required when using the electron energy solver with electron-ion temperature relaxation.
 
 .. _running-cpp-parameters-fluids:
 
