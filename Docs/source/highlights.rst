@@ -241,8 +241,8 @@ Nuclear Fusion and Plasma Confinement
 
 #. Scheffel J. and Jäderberg J. and Bendtz K. and Holmberg R. and Lindvall K.,
    **Axial Confinement in the Novatron Mirror Machine**.
-   arXiv 2410.20134
-   `DOI:10.48550/arXiv.2410.20134 <https://doi.org/10.48550/arXiv.2410.20134>`__
+   Nuclear Fusion, **65**, Number 6, 2025.
+   `DOI:10.1088/1741-4326/add173 <https://doi.org/10.1088/1741-4326/add173>`__
 
 #. Affolter M., Thompson R., Hepner S., Hayes E. C., Podolsky V., Borghei M., Carlsson J., Gargone A., Merthe D., McKee E., Langtry R.,
    **The Orbitron: A crossed-field device for co-confinement of high energy ions and electrons**.
