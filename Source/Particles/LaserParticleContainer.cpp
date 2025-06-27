@@ -567,7 +567,7 @@ LaserParticleContainer::Evolve (
     Real dt,
     DtType /*a_dt_type*/,
     bool skip_deposition,
-    bool const half_step,
+    bool const /*half_step*/,
     bool /*deposit_mass_matrices*/,
     PushType push_type
 )
