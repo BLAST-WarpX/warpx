@@ -37,17 +37,10 @@ export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 # GPU-aware MPI optimizations
 GPU_AWARE_MPI="amrex.use_gpu_aware_mpi=1"
 
-# APUs share memory with the host:
-# Do NOT pre-allocate a large heap in AMReX
-# Note: the release threshold flag is temporarily needed to avoid severe
-#       memory overheads in communication
-#       https://github.com/AMReX-Codes/amrex/pull/4527
-APU_SHARED_MEMORY="amrex.the_arena_init_size=1 amrex.the_arena_release_threshold=0"
-
 # MPI parallel processes
 NNODES=$(flux resource list -s up -no {nnodes})
 srun -N ${NNODES} \
   --ntasks-per-node=4 \
   ${EXE} ${INPUTS} \
-  ${GPU_AWARE_MPI} ${APU_SHARED_MEMORY} \
+  ${GPU_AWARE_MPI} \
   > output.txt
