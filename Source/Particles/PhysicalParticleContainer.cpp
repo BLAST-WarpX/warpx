@@ -3155,7 +3155,10 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
 #endif
 
 #ifdef WARPX_QED
-        const amrex::ParticleReal p_optical_depth_QSR0 = p_optical_depth_QSR[ip];
+        amrex::ParticleReal p_optical_depth_QSR0 = 0.0_prt;
+        if (local_has_quantum_sync) {
+            p_optical_depth_QSR0 = p_optical_depth_QSR[ip];
+        }
 #endif
 
         amrex::ParticleReal dxp, dxp_save;
@@ -3288,7 +3291,9 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
 
 #ifdef WARPX_QED
                 // Reset the QED parameter to what is was at the start of the step
-                p_optical_depth_QSR[ip] = p_optical_depth_QSR0;
+                if (local_has_quantum_sync) {
+                    p_optical_depth_QSR[ip] = p_optical_depth_QSR0;
+                }
 #endif
 
                 // write signaling flag: how many particles did not converge?
@@ -3546,7 +3551,10 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 #endif
 
 #if WARPX_QED
-        amrex::ParticleReal const p_optical_depth_QSR0 = p_optical_depth_QSR[ip];
+        amrex::ParticleReal p_optical_depth_QSR0 = 0.0_prt;
+        if (local_has_quantum_sync) {
+            p_optical_depth_QSR0 = p_optical_depth_QSR[ip];
+        }
 #endif
 
         amrex::ParticleReal const uxp_n0 = ux_n[ip];
@@ -3703,7 +3711,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                 uz[ip] = uzp_n0;
 
 #ifdef WARPX_QED
-                p_optical_depth_QSR[ip] = p_optical_depth_QSR0;
+                if (local_has_quantum_sync) {
+                    p_optical_depth_QSR[ip] = p_optical_depth_QSR0;
+                }
 #endif
 
             } else {
