@@ -169,6 +169,19 @@ public:
     DepositCurrent (ablastr::fields::MultiLevelVectorField const& J,
                     amrex::Real dt, amrex::Real relative_time);
 
+    /**
+     * \brief Deposit temperature to species MFs. This is done for each
+     *        species and can be used in the future for a single pass update of rho, J, and T.
+     *
+     * \param[in,out] fields Multifab field register to grab Temperature MFs
+     * \param[in] relative_time Time at which to deposit velocities, relative to the time of the
+     *                          current positions of the particles. When different than 0,
+     *                          the particle position will be temporarily modified to match
+     *                          the time of the deposition.
+     */
+    void
+    DepositTemperatures (ablastr::fields::MultiFabRegister & fields, amrex::Real relative_time);
+
     ///
     /// This deposits the particle charge onto a node-centered MultiFab and returns a unique ptr
     /// to it. The charge density is accumulated over all the particles in the MultiParticleContainer
