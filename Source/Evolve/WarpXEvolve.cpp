@@ -396,9 +396,9 @@ void WarpX::OneStep (
     if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
         electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
         bool const skip_deposition = true;
-        // TODO parse from input file
-        bool const half_step = false;
-        // TODO PushParticlesandDeposit(a_cur_time, skip_deposition, half_step);
+        // TODO parse half_step from input file
+        bool const half_step = true;
+        PushParticlesandDeposit(a_cur_time, skip_deposition, half_step);
         // multi-physics: collisions
         ExecutePythonCallback("beforecollisions");
         mypc->doCollisions(a_step, a_cur_time, a_dt);
