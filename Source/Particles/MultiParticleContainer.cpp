@@ -464,9 +464,10 @@ MultiParticleContainer::Evolve (
     Real t,
     Real dt,
     DtType a_dt_type,
-    bool skip_deposition,
-    bool const half_step,
-    bool deposit_mass_matrices,
+    bool const skip_deposition,
+    bool const position_push_half,
+    bool const momentum_push_skip,
+    bool const deposit_mass_matrices,
     PushType push_type
 )
 {
@@ -488,7 +489,19 @@ MultiParticleContainer::Evolve (
         }
     }
     for (auto& pc : allcontainers) {
-        pc->Evolve(fields, lev, current_fp_string, t, dt, a_dt_type, skip_deposition, half_step, deposit_mass_matrices, push_type);
+        pc->Evolve(
+            fields,
+            lev,
+            current_fp_string,
+            t,
+            dt,
+            a_dt_type,
+            skip_deposition,
+            position_push_half,
+            momentum_push_skip,
+            deposit_mass_matrices,
+            push_type
+        );
     }
 }
 

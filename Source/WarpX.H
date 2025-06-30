@@ -664,16 +664,18 @@ public:
         int lev,
         amrex::Real cur_time,
         DtType a_dt_type=DtType::Full,
-        bool skip_current=false,
-        bool const half_step=false,
-        bool deposit_mass_matrices=false,
+        bool const skip_current=false,
+        bool const position_push_half=false,
+        bool const momentum_push_skip=false,
+        bool const deposit_mass_matrices=false,
         PushType push_type=PushType::Explicit
     );
     void PushParticlesandDeposit (
         amrex::Real cur_time,
-        bool skip_current=false,
-        bool const half_step=false,
-        bool deposit_mass_matrices=false,
+        bool const skip_current=false,
+        bool const position_push_half=false,
+        bool const momentum_push_skip=false,
+        bool const deposit_mass_matrices=false,
         PushType push_type=PushType::Explicit
     );
 

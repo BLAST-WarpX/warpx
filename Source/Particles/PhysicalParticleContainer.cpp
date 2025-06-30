@@ -1967,9 +1967,10 @@ PhysicalParticleContainer::Evolve (
     Real /*t*/,
     Real dt,
     DtType a_dt_type,
-    bool skip_deposition,
-    bool const half_step,
-    bool deposit_mass_matrices,
+    bool const skip_deposition,
+    bool const position_push_half,
+    bool const momentum_push_skip,
+    bool const deposit_mass_matrices,
     PushType push_type
 )
 {
@@ -2105,7 +2106,7 @@ PhysicalParticleContainer::Evolve (
                     PushPX(pti, exfab, eyfab, ezfab,
                            bxfab, byfab, bzfab,
                            Ex.nGrowVect(), e_is_nodal,
-                           0, np_to_push, lev, gather_lev, dt, ScaleFields(false), a_dt_type, half_step);
+                           0, np_to_push, lev, gather_lev, dt, ScaleFields(false), a_dt_type, position_push_half, momentum_push_skip);
                 } else if (push_type == PushType::Implicit) {
                     ImplicitPushXP(pti, exfab, eyfab, ezfab,
                                    bxfab, byfab, bzfab,
@@ -2154,7 +2155,7 @@ PhysicalParticleContainer::Evolve (
                                cbxfab, cbyfab, cbzfab,
                                cEx.nGrowVect(), e_is_nodal,
                                nfine_gather, np-nfine_gather,
-                               lev, lev-1, dt, ScaleFields(false), a_dt_type, half_step);
+                               lev, lev-1, dt, ScaleFields(false), a_dt_type, position_push_half, momentum_push_skip);
                     } else if (push_type == PushType::Implicit) {
                         ImplicitPushXP(pti, cexfab, ceyfab, cezfab,
                                        cbxfab, cbyfab, cbzfab,
@@ -2729,7 +2730,8 @@ PhysicalParticleContainer::PushPX (
     amrex::Real dt,
     ScaleFields scaleFields,
     DtType a_dt_type,
-    bool const half_step
+    bool const position_push_half,
+    bool const momentum_push_skip
 )
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE((gather_lev==(lev-1)) ||
@@ -2910,16 +2912,38 @@ PhysicalParticleContainer::PushPX (
                 copyAttribs(ip);
             }
 
-            doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
-                                      Exp, Eyp, Ezp, Bxp, Byp, Bzp,
-                                      ion_lev ? ion_lev[ip] : 1,
-                                      m, q, pusher_algo, do_crr,
+            if (!momentum_push_skip) {
+                doParticleMomentumPush<0>(
+                    ux[ip],
+                    uy[ip],
+                    uz[ip],
+                    Exp,
+                    Eyp,
+                    Ezp,
+                    Bxp,
+                    Byp,
+                    Bzp,
+                    ion_lev ? ion_lev[ip] : 1,
+                    m,
+                    q,
+                    pusher_algo,
+                    do_crr,
 #ifdef WARPX_QED
-                                      t_chi_max,
+                    t_chi_max,
 #endif
-                                      dt);
+                    dt
+                );
+            }
 
-            UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], (half_step ? dt*0.5_rt : dt));
+            UpdatePosition(
+                xp,
+                yp,
+                zp,
+                ux[ip],
+                uy[ip],
+                uz[ip],
+                (position_push_half ? dt*0.5_rt : dt)
+            );
             setPosition(ip, xp, yp, zp);
         }
 #ifdef WARPX_QED
@@ -2930,14 +2954,36 @@ PhysicalParticleContainer::PushPX (
                     copyAttribs(ip);
                 }
 
-                doParticleMomentumPush<1>(ux[ip], uy[ip], uz[ip],
-                                          Exp, Eyp, Ezp, Bxp, Byp, Bzp,
-                                          ion_lev ? ion_lev[ip] : 1,
-                                          m, q, pusher_algo, do_crr,
-                                          t_chi_max,
-                                          dt);
+                if (!momentum_push_skip) {
+                    doParticleMomentumPush<1>(
+                        ux[ip],
+                        uy[ip],
+                        uz[ip],
+                        Exp,
+                        Eyp,
+                        Ezp,
+                        Bxp,
+                        Byp,
+                        Bzp,
+                        ion_lev ? ion_lev[ip] : 1,
+                        m,
+                        q,
+                        pusher_algo,
+                        do_crr,
+                        t_chi_max,
+                        dt
+                    );
+                }
 
-                UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], (half_step ? dt*0.5_rt : dt));
+                UpdatePosition(
+                    xp,
+                    yp,
+                    zp,
+                    ux[ip],
+                    uy[ip],
+                    uz[ip],
+                    (position_push_half ? dt*0.5_rt : dt)
+                );
                 setPosition(ip, xp, yp, zp);
             }
         }

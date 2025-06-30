@@ -68,9 +68,10 @@ public:
         amrex::Real t,
         amrex::Real dt,
         DtType a_dt_type=DtType::Full,
-        bool skip_deposition=false,
-        bool const half_step=false,
-        bool deposit_mass_matrices=false,
+        bool const skip_deposition=false,
+        bool const position_push_half=false,
+        bool const momentum_push_skip=false,
+        bool const deposit_mass_matrices=false,
         PushType push_type=PushType::Explicit
     ) override;
 
@@ -91,7 +92,8 @@ public:
         amrex::Real dt,
         ScaleFields scaleFields,
         DtType a_dt_type=DtType::Full,
-        bool const half_step=false
+        bool const position_push_half=false,
+        bool const momentum_push_skip=false
     ) override;
 
     void PushP (int lev, amrex::Real dt,

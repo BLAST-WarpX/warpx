@@ -176,7 +176,8 @@ RigidInjectedParticleContainer::PushPX (
     amrex::Real dt,
     ScaleFields /*scaleFields*/,
     DtType a_dt_type,
-    bool const half_step
+    bool const position_push_half,
+    bool const momentum_push_skip
 )
 {
     auto& attribs = pti.GetAttribs();
@@ -217,11 +218,26 @@ RigidInjectedParticleContainer::PushPX (
 
     const bool do_scale = not done_injecting_lev;
     const Real v_boost = WarpX::beta_boost*PhysConst::c;
-    PhysicalParticleContainer::PushPX(pti, exfab, eyfab, ezfab, bxfab, byfab, bzfab,
-                                      ngEB, e_is_nodal, offset, np_to_push, lev, gather_lev, dt,
-                                      ScaleFields(do_scale, dt, zinject_plane_lev_previous,
-                                                  vzbeam_ave_boosted, v_boost),
-                                      a_dt_type, half_step);
+    PhysicalParticleContainer::PushPX(
+        pti,
+        exfab,
+        eyfab,
+        ezfab,
+        bxfab,
+        byfab,
+        bzfab,
+        ngEB,
+        e_is_nodal,
+        offset,
+        np_to_push,
+        lev,
+        gather_lev,
+        dt,
+        ScaleFields(do_scale, dt, zinject_plane_lev_previous, vzbeam_ave_boosted, v_boost),
+        a_dt_type,
+        position_push_half,
+        momentum_push_skip
+    );
 
     if (!done_injecting_lev) {
 
@@ -231,7 +247,7 @@ RigidInjectedParticleContainer::PushPX (
 
         // Undo the push for particles not injected yet.
         // The zp are advanced a fixed amount.
-        // FIXME Use half_step here as well?
+        // FIXME Use position_push_half here as well?
         const amrex::ParticleReal z_plane_lev = zinject_plane_lev;
         const amrex::ParticleReal vz_ave_boosted = vzbeam_ave_boosted;
         const bool rigid = rigid_advance;
@@ -265,9 +281,10 @@ RigidInjectedParticleContainer::Evolve (
     Real t,
     Real dt,
     DtType a_dt_type,
-    bool skip_deposition,
-    bool const half_step,
-    bool /*deposit_mass_matrices*/,
+    bool const skip_deposition,
+    bool const position_push_half,
+    bool const momentum_push_skip,
+    bool const /*deposit_mass_matrices*/,
     PushType push_type
 )
 {
@@ -300,7 +317,8 @@ RigidInjectedParticleContainer::Evolve (
         dt,
         a_dt_type,
         skip_deposition,
-        half_step,
+        position_push_half,
+        momentum_push_skip,
         deposit_mass_matrices,
         push_type
     );

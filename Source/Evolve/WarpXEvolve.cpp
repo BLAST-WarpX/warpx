@@ -396,16 +396,28 @@ void WarpX::OneStep (
     if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
         electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
         bool const skip_deposition = true;
-        // TODO parse half_step from input file
-        bool const half_step = true;
-        PushParticlesandDeposit(a_cur_time, skip_deposition, half_step);
+        // TODO parse position_push_half from input file
+        bool position_push_half = true;
+        bool momentum_push_skip = false;
+        PushParticlesandDeposit(
+            a_cur_time,
+            skip_deposition,
+            position_push_half,
+            momentum_push_skip
+        );
         // multi-physics: collisions
         ExecutePythonCallback("beforecollisions");
         mypc->doCollisions(a_step, a_cur_time, a_dt);
         ExecutePythonCallback("aftercollisions");
         // only gather fields and push particles,
         // deposition and calculation of fields done further below
-        PushParticlesandDeposit(a_cur_time, skip_deposition, half_step);
+        momentum_push_skip = true;
+        PushParticlesandDeposit(
+            a_cur_time,
+            skip_deposition,
+            position_push_half,
+            momentum_push_skip
+        );
     }
     // electromagnetic solver
     else {
@@ -1216,9 +1228,10 @@ WarpX::doQEDEvents ()
 void
 WarpX::PushParticlesandDeposit (
     amrex::Real cur_time,
-    bool skip_current,
-    bool const half_step,
-    bool deposit_mass_matrices,
+    bool const skip_current,
+    bool const position_push_half,
+    bool const momentum_push_skip,
+    bool const deposit_mass_matrices,
     PushType push_type
 )
 {
@@ -1230,7 +1243,8 @@ WarpX::PushParticlesandDeposit (
             cur_time,
             DtType::Full,
             skip_current,
-            half_step,
+            position_push_half,
+            momentum_push_skip,
             deposit_mass_matrices,
             push_type
         );
@@ -1242,9 +1256,10 @@ WarpX::PushParticlesandDeposit (
     int lev,
     amrex::Real cur_time,
     DtType a_dt_type,
-    bool skip_current,
-    bool const half_step,
-    bool deposit_mass_matrices,
+    bool const skip_current,
+    bool const position_push_half,
+    bool const momentum_push_skip,
+    bool const deposit_mass_matrices,
     PushType push_type
 )
 {
@@ -1274,7 +1289,8 @@ WarpX::PushParticlesandDeposit (
         dt[lev],
         a_dt_type,
         skip_current,
-        half_step,
+        position_push_half,
+        momentum_push_skip,
         deposit_mass_matrices,
         push_type
     );

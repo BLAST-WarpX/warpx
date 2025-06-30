@@ -97,7 +97,8 @@ PhotonParticleContainer::PushPX (
     amrex::Real dt,
     ScaleFields /*scaleFields*/,
     DtType a_dt_type,
-    bool const half_step
+    bool const position_push_half,
+    bool const momentum_push_skip
 )
 {
     // Get inverse cell size on gather_lev
@@ -232,7 +233,7 @@ PhotonParticleContainer::PushPX (
             amrex::ignore_unused(qed_control);
 #endif
 
-            UpdatePositionPhoton(x, y, z, ux[i], uy[i], uz[i], (half_step ? dt*0.5_rt : dt));
+            UpdatePositionPhoton(x, y, z, ux[i], uy[i], uz[i], (position_push_half ? dt*0.5_rt : dt));
             SetPosition(i, x, y, z);
         }
     );
@@ -246,9 +247,12 @@ PhotonParticleContainer::Evolve (
     Real t,
     Real dt,
     DtType a_dt_type,
-    bool skip_deposition,
-    bool const half_step,
-    bool /*deposit_mass_matrices*/, PushType push_type)
+    bool const skip_deposition,
+    bool const position_push_half,
+    bool const momentum_push_skip,
+    bool const /*deposit_mass_matrices*/,
+    PushType push_type
+)
 {
     // This does gather, push and deposit.
     // Push and deposit have been re-written for photons
@@ -261,7 +265,8 @@ PhotonParticleContainer::Evolve (
         dt,
         a_dt_type,
         skip_deposition,
-        half_step,
+        position_push_half,
+        momentum_push_skip,
         deposit_mass_matrices,
         push_type
     );

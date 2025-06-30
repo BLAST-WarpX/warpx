@@ -154,10 +154,17 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     // This uses Efield_fp and Bfield_fp, the field at n+1/2 from the previous iteration.
     const PushType push_type = PushType::Implicit;
     bool const skip_current = false;
-    bool const half_step = false;
-    bool deposit_mass_matrices = false;
-    if (m_use_mass_matrices && !a_from_jacobian) { deposit_mass_matrices = true; }
-    m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, half_step, deposit_mass_matrices, push_type);
+    bool const position_push_half = false;
+    bool const momentum_push_skip = false;
+    bool const deposit_mass_matrices = (m_use_mass_matrices && !a_from_jacobian) ? true : false;
+    m_WarpX->PushParticlesandDeposit(
+        a_cur_time,
+        skip_current,
+        position_push_half,
+        momentum_push_skip,
+        deposit_mass_matrices,
+        push_type
+    );
 
     m_WarpX->SyncCurrentAndRho();
     if (deposit_mass_matrices) {
