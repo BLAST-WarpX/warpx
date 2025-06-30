@@ -42,20 +42,20 @@ def update(args):
         "warpx": "WarpX",
     }
 
-    # read from JSON file with configuration data
+    # read from JSON file with dependencies data
     repo_dir = Path(__file__).parent.parent.parent.absolute()
-    config_file = os.path.join(repo_dir, "config.json")
+    dependencies_file = os.path.join(repo_dir, "dependencies.json")
     try:
-        with open(config_file, "r") as file:
-            config_data = json.load(file)
+        with open(dependencies_file, "r") as file:
+            dependencies_data = json.load(file)
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
         sys.exit()
 
-    # loop over repositories and update configuration data
+    # loop over repositories and update dependencies data
     for repo_name, repo_url in repo_dict.items():
         print(f"\nUpdating {repo_labels[repo_name]}...")
-        # set keys to access configuration data
+        # set keys to access dependencies data
         commit_key = f"commit_{repo_name}"
         version_key = f"version_{repo_name}"
         # set new repository commit
@@ -65,27 +65,27 @@ def update(args):
         repo_version = datetime.date.today().strftime("%y.%m")
         # update repository commit
         if repo_name != "warpx":
-            print(f"- old commit: {config_data[commit_key]}")
+            print(f"- old commit: {dependencies_data[commit_key]}")
             print(f"- new commit: {repo_commit}")
             proceed = input("Do you want to continue? [y/n] ")
             if proceed not in ["y", "Y"]:
                 print("Skipping commit update...")
             else:
                 print("Updating commit...")
-                config_data[f"commit_{repo_name}"] = repo_commit
+                dependencies_data[f"commit_{repo_name}"] = repo_commit
         # update repository version
-        print(f"- old version: {config_data[version_key]}")
+        print(f"- old version: {dependencies_data[version_key]}")
         print(f"- new version: {repo_version}")
         proceed = input("Do you want to continue? [y/n] ")
         if proceed not in ["y", "Y"]:
             print("Skipping version update...")
         else:
             print("Updating version...")
-            config_data[f"version_{repo_name}"] = repo_version
+            dependencies_data[f"version_{repo_name}"] = repo_version
 
-    # write to JSON file with configuration data
-    with open(config_file, "w") as file:
-        json.dump(config_data, file, indent=4)
+    # write to JSON file with dependencies data
+    with open(dependencies_file, "w") as file:
+        json.dump(dependencies_data, file, indent=4)
 
 
 if __name__ == "__main__":

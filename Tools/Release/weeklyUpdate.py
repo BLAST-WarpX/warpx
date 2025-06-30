@@ -65,7 +65,7 @@ subprocess.run(["git", "checkout", "-b", update_branch], capture_output=True, te
 answers = concat_answers(["y", "", "", "y"])
 
 process = subprocess.Popen(
-    [Path(REPO_DIR).joinpath("Tools/Release/update_config.py"), "--amrex"],
+    [Path(REPO_DIR).joinpath("Tools/Release/update_dependencies.py"), "--amrex"],
     stdin=subprocess.PIPE,
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
@@ -92,7 +92,7 @@ PICSAR_version = "25.04"
 answers = concat_answers(["y", PICSAR_version, PICSAR_version, "y"])
 
 process = subprocess.Popen(
-    [Path(REPO_DIR).joinpath("Tools/Release/update_config.py"), "--picsar"],
+    [Path(REPO_DIR).joinpath("Tools/Release/update_dependencies.py"), "--picsar"],
     stdin=subprocess.PIPE,
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
@@ -120,7 +120,7 @@ subprocess.run(
 answers = concat_answers(["y", "", "", "y"])
 
 process = subprocess.Popen(
-    [Path(REPO_DIR).joinpath("Tools/Release/update_config.py"), "--pyamrex"],
+    [Path(REPO_DIR).joinpath("Tools/Release/update_dependencies.py"), "--pyamrex"],
     stdin=subprocess.PIPE,
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
@@ -163,9 +163,9 @@ Weekly update to latest pyAMReX{pyamrex_changes}.
 Weekly update to latest PICSAR{picsar_changes}.
 
 ```console
-./Tools/Release/update_config.py --amrex
-./Tools/Release/update_config.py --pyamrex
-./Tools/Release/update_config.py --picsar
+./Tools/Release/update_dependencies.py --amrex
+./Tools/Release/update_dependencies.py --pyamrex
+./Tools/Release/update_dependencies.py --picsar
 ```
 """,
         "--label",

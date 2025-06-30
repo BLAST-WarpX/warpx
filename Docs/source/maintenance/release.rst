@@ -8,11 +8,11 @@ Update WarpX' Core Dependencies
 
 WarpX has direct dependencies on AMReX, pyAMReX, and PICSAR, which we periodically update.
 
-The script ``update_config.py`` from `Tools/Release/update_config.py <https://github.com/BLAST-WarpX/warpx/blob/development/Tools/Release/update_config.py>`__ automates this workflow, in case one needs a newer commit of AMReX, pyAMReX, or PICSAR between releases:
+The script ``update_dependencies.py`` from `Tools/Release/update_dependencies.py <https://github.com/BLAST-WarpX/warpx/blob/development/Tools/Release/update_dependencies.py>`__ automates this workflow, in case one needs a newer commit of AMReX, pyAMReX, or PICSAR between releases:
 
 .. code-block:: bash
 
-     usage: update_config.py [-h] [--amrex] [--pyamrex] [--picsar] [--warpx]
+     usage: update_dependencies.py [-h] [--amrex] [--pyamrex] [--picsar] [--warpx]
      options:
        -h, --help  show this help message and exit
        --amrex     Update AMReX only

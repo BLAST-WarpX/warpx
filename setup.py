@@ -277,10 +277,10 @@ with open("./requirements.txt") as f:
         install_requires.append("mpi4py>=2.1.0")
 
 # Parse WarpX version information
-config_json_file = "config.json"
-with open(config_json_file, "r") as file:
-    config_json = json.load(file)
-warpx_version = config_json.get("version_warpx")
+dependencies_file = "dependencies.json"
+with open(dependencies_file, "r") as file:
+    dependencies_data = json.load(file)
+warpx_version = dependencies_data.get("version_warpx")
 
 # keyword reference:
 #   https://packaging.python.org/guides/distributing-packages-using-setuptools

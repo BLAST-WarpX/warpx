@@ -109,10 +109,10 @@ copyright = "2017-2021, WarpX collaboration"
 author = "WarpX collaboration"
 
 # Parse WarpX version information
-config_json_file = "../../config.json"
-with open(config_json_file, "r") as file:
-    config_json = json.load(file)
-warpx_version = config_json.get("version_warpx")
+dependencies_file = "../../dependencies.json"
+with open(dependencies_file, "r") as file:
+    dependencies_data = json.load(file)
+warpx_version = dependencies_data.get("version_warpx")
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

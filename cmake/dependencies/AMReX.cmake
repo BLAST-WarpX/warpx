@@ -298,9 +298,9 @@ set(WarpX_amrex_repo "https://github.com/AMReX-Codes/amrex.git"
     "Repository URI to pull and build AMReX from if(WarpX_amrex_internal)")
 
 # Parse AMReX version and commit information
-file(READ "${CMAKE_SOURCE_DIR}/config.json" config_json)
-string(JSON amrex_version GET "${config_json}" version_amrex)
-string(JSON amrex_commit GET "${config_json}" commit_amrex)
+file(READ "${CMAKE_SOURCE_DIR}/dependencies.json" dependencies_data)
+string(JSON amrex_version GET "${dependencies_data}" version_amrex)
+string(JSON amrex_commit GET "${dependencies_data}" commit_amrex)
 
 set(WarpX_amrex_branch ${amrex_commit}
     CACHE STRING

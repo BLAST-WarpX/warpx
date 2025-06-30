@@ -1,6 +1,6 @@
 # Parse WarpX version information
-file(READ "${CMAKE_SOURCE_DIR}/config.json" config_json)
-string(JSON warpx_version GET "${config_json}" version_warpx)
+file(READ "${CMAKE_SOURCE_DIR}/dependencies.json" dependencies_data)
+string(JSON warpx_version GET "${dependencies_data}" version_warpx)
 
 # Preamble ####################################################################
 #
