@@ -32,7 +32,7 @@ for species in ["Hneutral", "Hplus"]:
         iteration=iteration,
         select={"uz": [1e-3, None]},
     )
-    w_binned, bins = np.histogram(z, bins=25, weights=w * uz)
+    w_binned, bins = np.histogram(z, bins=32, range=[0, 0.2], weights=w * uz)
     # Convert from number of particles per bin to beam current
     dz_bin = bins[1] - bins[0]
     sim_flux[species] = w_binned / dz_bin * c

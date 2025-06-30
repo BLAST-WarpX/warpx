@@ -593,6 +593,36 @@ MultiParticleContainer::DepositCharge (
 #endif
 }
 
+void
+MultiParticleContainer::DepositTemperatures (
+    ablastr::fields::MultiFabRegister & fields,
+    const amrex::Real relative_time)
+{
+    using ablastr::fields::Direction;
+
+    // Call the deposition kernel for each species
+    for (auto& pc : allcontainers)
+    {
+        // If this species does not use temperature deposition then skip to next one
+        if (!pc->getTemperatureDepositionFlag()) { continue; }
+
+        // Generate Name to look up temperature MF in the register
+        const std::string temperature_vf_str = "T_" + species_names[pc->getSpeciesId()];
+        ablastr::fields::MultiLevelVectorField T_vf =
+            fields.get_mr_levels_alldirs(temperature_vf_str, WarpX::GetInstance().finestLevel());
+
+        // Clear temperature MF for this species
+        for (int idim = 0; idim < 3; ++idim) {
+            for (int lev = 0; lev <= WarpX::GetInstance().finestLevel(); ++lev) {
+                T_vf[lev][Direction{idim}]->setVal(0.0_rt);
+            }
+        }
+
+        // Accumulate velocities for this species
+        pc->AccumulateVelocitiesAndComputeTemperature(T_vf, relative_time);
+    }
+}
+
 std::unique_ptr<MultiFab>
 MultiParticleContainer::GetChargeDensity (int lev, bool local)
 {
@@ -1034,10 +1064,10 @@ MultiParticleContainer::doFieldIonization (int lev,
 }
 
 void
-MultiParticleContainer::doCollisions ( Real cur_time, amrex::Real dt )
+MultiParticleContainer::doCollisions ( int step, Real cur_time, amrex::Real dt )
 {
     WARPX_PROFILE("MultiParticleContainer::doCollisions()");
-    collisionhandler->doCollisions(cur_time, dt, this);
+    collisionhandler->doCollisions(step, cur_time, dt, this);
 }
 
 void MultiParticleContainer::doResampling (
@@ -1183,7 +1213,7 @@ void MultiParticleContainer::InitBreitWheeler ()
     // bw_minimum_chi_phot is the minimum chi parameter to be
     // considered for pair production. If a photon has chi < chi_min,
     // the optical depth is not evolved and photon generation is ignored
-    amrex::Real bw_minimum_chi_part;
+    amrex::Real bw_minimum_chi_part = 0;
     if(!utils::parser::queryWithParser(pp_qed_bw, "chi_min", bw_minimum_chi_part)) {
         WARPX_ABORT_WITH_MESSAGE("qed_bw.chi_min should be provided!");
     }

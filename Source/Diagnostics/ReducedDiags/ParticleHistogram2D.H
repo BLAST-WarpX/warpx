@@ -43,7 +43,7 @@ public:
     int m_bin_num_ord;
 
     /// output data
-    amrex::TableData<amrex::Real,2> m_h_data_2D;
+    amrex::TableData<amrex::ParticleReal,2> m_h_data_2D;
 
     /// selected species index
     int m_selected_species_id = -1;

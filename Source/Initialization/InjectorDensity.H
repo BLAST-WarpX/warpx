@@ -58,7 +58,7 @@ struct InjectorDensityParser
 // struct whose getDensity returns local density computed from predefined profile.
 struct InjectorDensityPredefined
 {
-    InjectorDensityPredefined (std::string const& a_species_name) noexcept;
+    InjectorDensityPredefined (std::string const& a_species_name);
 
     void clear ();
 
@@ -198,7 +198,7 @@ private:
             : constant(a_rho) {}
         Object (InjectorDensityParser*, amrex::ParserExecutor<3> const& a_parser) noexcept
             : parser(a_parser) {}
-        Object (InjectorDensityPredefined*, std::string const& a_species_name) noexcept
+        Object (InjectorDensityPredefined*, std::string const& a_species_name)
             : predefined(a_species_name) {}
         InjectorDensityConstant   constant;
         InjectorDensityParser     parser;
