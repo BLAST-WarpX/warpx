@@ -444,6 +444,17 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                 if (update_varnames) {
                     AddRZModesToOutputNames(std::string("j"+field_names[idir]+"_displacement"), ncomp);
                 }
+            }  else if ( m_varnames_fields[comp].rfind("T"+field_names[idir]+"_", 0) == 0 ){
+                // Remove component to get string to lookup in field register.
+                std::string T_arr_str = std::string(m_varnames_fields[comp]);
+                T_arr_str.erase(T_arr_str.begin() + 1);
+                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(
+                    warpx.m_fields.get(T_arr_str, Direction{idir}, lev),
+                    lev, m_crse_ratio);
+
+                if (update_varnames) {
+                    AddRZModesToOutputNames(m_varnames_fields[comp], ncomp);
+                }
             }
         }
         // Check if comp was found above
@@ -853,6 +864,11 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
                     m_all_field_functors[lev][comp] = std::make_unique<JdispFunctor>(idir, lev, m_crse_ratio, true);
             } else if ( m_varnames[comp] == "A"+field_names[idir] ){
                 m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::vector_potential_fp_nodal, Direction{idir}, lev), lev, m_crse_ratio);
+            } else if ( m_varnames[comp].rfind("T"+field_names[idir]+"_", 0) == 0 ){
+                // Remove component to get string to lookup in field register.
+                std::string T_arr_str = std::string(m_varnames[comp]);
+                T_arr_str.erase(T_arr_str.begin() + 1);
+                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(T_arr_str, Direction{idir}, lev), lev, m_crse_ratio);
             }
         }
         // Check if comp was found above
