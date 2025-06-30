@@ -1288,7 +1288,7 @@ Particle initialization
     Only read if ``<species_name>`` is in ``particles.rigid_injected_species``.
 
     * If ``false``, each particle is advanced with its
-      own velocity ``vz`` until it reaches ``zinject_plane``.
+      own velocity until it reaches ``zinject_plane``.
 
     * If ``true``, each particle is advanced with the average speed of the species
       ``vzbar`` until it reaches ``zinject_plane``.

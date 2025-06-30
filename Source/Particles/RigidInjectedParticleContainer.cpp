@@ -229,24 +229,28 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
         const amrex::ParticleReal vz_ave_boosted = vzbeam_ave_boosted;
         const bool rigid = rigid_advance;
         constexpr amrex::ParticleReal inv_csq = 1._prt/(PhysConst::c*PhysConst::c);
-        amrex::ParallelFor( np_to_push,
-                            [=] AMREX_GPU_DEVICE (long i) {
-                                amrex::ParticleReal xp, yp, zp;
-                                GetPosition(i, xp, yp, zp);
-                                if (zp <= z_plane_lev) {
-                                    xp = x_save[i];
-                                    yp = y_save[i];
-                                    if (rigid) {
-                                        zp = z_save[i] + dt*vz_ave_boosted;
-                                    }
-                                    else {
-                                        const amrex::ParticleReal gi = 1._prt/std::sqrt(1._prt + (ux[i]*ux[i]
-                                                             + uy[i]*uy[i] + uz[i]*uz[i])*inv_csq);
-                                        zp = z_save[i] + dt*uz[i]*gi;
-                                    }
-                                    SetPosition(i, xp, yp, zp);
-                                }
-                            });
+        amrex::ParallelFor(np_to_push, [=] AMREX_GPU_DEVICE(long i) {
+            amrex::ParticleReal xp, yp, zp;
+            GetPosition(i, xp, yp, zp);
+            if (zp <= z_plane_lev) {
+                xp = x_save[i];
+                yp = y_save[i];
+                zp = z_save[i];
+                if (rigid) {
+                    zp += dt * vz_ave_boosted;
+                } else {
+                    const amrex::ParticleReal gi =
+                        1._prt /
+                        std::sqrt(1._prt + (ux[i] * ux[i] + uy[i] * uy[i] +
+                                            uz[i] * uz[i]) *
+                                               inv_csq);
+                    xp += dt * ux[i] * gi;
+                    yp += dt * uy[i] * gi;
+                    zp += dt * uz[i] * gi;
+                }
+                SetPosition(i, xp, yp, zp);
+            }
+        });
     }
 }
 
