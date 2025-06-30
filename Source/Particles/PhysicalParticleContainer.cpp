@@ -795,6 +795,11 @@ void PhysicalParticleContainer::AddTwiss (PlasmaInjector const& plasma_injector)
             constexpr amrex::Real x = 0_rt;
             constexpr amrex::Real y = 0_rt;
             const amrex::Real z = amrex::RandomNormal(0_rt, sigma_x.z);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            const amrex::Real weight = q_tot/(npart*charge*sigma_x.y*sigma_x.z);
+            const amrex::Real x = amrex::RandomNormal(0_rt, sigma_x.x);
+            constexpr amrex::Real y = 0._prt;
+            constexpr amrex::Real z = 0._prt;
 #endif
             const amrex::XDim3 u = plasma_injector.getMomentum(0_rt, 0_rt, 0_rt);
 
