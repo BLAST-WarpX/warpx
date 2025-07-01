@@ -1,5 +1,5 @@
 ---
-name: Blank issue
+name: 🗒️ Blank issue
 about: Ask us a question
 labels: [question]
 ---
