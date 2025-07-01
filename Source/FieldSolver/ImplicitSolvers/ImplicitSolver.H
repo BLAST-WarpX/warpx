@@ -106,7 +106,7 @@ public:
 
     [[nodiscard]] amrex::Real  GetTheta () const { return m_theta; }
 
-    void ComputeJfromMassMatrices();
+    void ComputeJfromMassMatrices ();
 
 protected:
 
@@ -186,7 +186,7 @@ protected:
     /**
      * \brief parse nonlinear solver parameters (if one is used)
      */
-    void parseNonlinearSolverParams( const amrex::ParmParse&  pp )
+    void parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
     {
 
         std::string nlsolver_type_str;
@@ -263,7 +263,7 @@ protected:
     /**
      * \brief Save E and J at start of each Newton step
      */
-    void SaveEandJ();
+    void SaveEandJ ();
 
     /**
      * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType

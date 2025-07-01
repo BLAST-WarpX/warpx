@@ -114,7 +114,7 @@ void ImplicitSolver::SaveEandJ ()
 
 }
 
-void ImplicitSolver::ComputeJfromMassMatrices()
+void ImplicitSolver::ComputeJfromMassMatrices ()
 {
     BL_PROFILE("ImplicitSolver::ComputeJfromMassMatrices()");
     using namespace amrex::literals;
