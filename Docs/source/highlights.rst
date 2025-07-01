@@ -229,6 +229,11 @@ Related works using WarpX:
 Nuclear Fusion and Plasma Confinement
 *************************************
 
+#. Groenewald R. E., Gupta S., Veksler A., Tobin M., Galeotti L., Onofri M., Ceccherini F., Barnes D. C., Belova E. and Dettrick S. A.
+   **Fast ion stabilization of tilt in large radius FRCs**.
+   Physics of Plasmas **32**, 072503, 2025.
+   `DOI:10.1063/5.0277175 <https://doi.org/10.1063/5.0277175>`__
+
 #. Tyushev M., Smolyakov A., Sabo A., Groenewald R., Necas A., and Yushmanov P.
    **Drift-kinetic PIC simulations of plasma flow and energy transport in the magnetic mirror configuration**.
    Physics of Plasmas **32**, 032514, 2025.
