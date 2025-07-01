@@ -1,7 +1,11 @@
+# Parse WarpX version information
+file(READ "${CMAKE_SOURCE_DIR}/dependencies.json" dependencies_data)
+string(JSON warpx_version GET "${dependencies_data}" version_warpx)
+
 # Preamble ####################################################################
 #
 cmake_minimum_required(VERSION 3.24.0)
-project(WarpX VERSION 25.06)
+project(WarpX VERSION ${warpx_version})
 
 include(${WarpX_SOURCE_DIR}/cmake/WarpXFunctions.cmake)
 
