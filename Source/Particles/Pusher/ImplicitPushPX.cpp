@@ -269,8 +269,6 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
 
             PositionNorm( dxp, dyp, dzp, dxp_save, dyp_save, dzp_save,
                           idxg2, idyg2, idzg2, step_norm, iter );
-            amrex::ParticleReal de0 = 5.314093266999431e-09;
-            amrex::Print() << "STEP " << iter << " " << xp/de0 << " " << yp/de0 << " " << zp/de0 << " " << (dxp - dxp_save)/de0 << " " << (dyp - dyp_save)/de0 << " " << (dzp - dzp_save)/de0 << " " << step_norm << " " << max_iterations << "\n";
             if( step_norm < particle_tolerance ) { break; }
 
             amrex::ParticleReal Exp = Ex_external_particle;
@@ -693,8 +691,6 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
                 PositionNorm( dxp, dyp, dzp, dxp_save, dyp_save, dzp_save,
                               idxg2, idyg2, idzg2, step_norm, iter );
-            amrex::ParticleReal de0 = 5.314093266999431e-09;
-            amrex::Print() << "SUBSTEP " << isuborbit << "/" << num_suborbits << " " << iter << "/" << max_iterations << " " << xp/de0 << " " << yp/de0 << " " << zp/de0 << " " << (dxp - dxp_save)/de0 << " " << (dyp - dyp_save)/de0 << " " << (dzp - dzp_save)/de0 << " " << step_norm << "\n";
                 if( step_norm < particle_tolerance ) { break; }
 
                 amrex::ParticleReal Exp = Ex_external_particle;
