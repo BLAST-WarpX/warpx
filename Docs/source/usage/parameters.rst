@@ -1284,14 +1284,16 @@ Particle initialization
     Injection plane when using the rigid injection method.
     See ``particles.rigid_injected_species`` above.
 
-* ``<species_name>.rigid_advance`` (`bool`)
+* ``<species_name>.rigid_advance`` (`string` or `bool`; default: ``vzbar``)
     Only read if ``<species_name>`` is in ``particles.rigid_injected_species``.
+    Until reaching ``zinject_plane``, each particle is rigidly advanced according to
+    a specified velocity,
 
-    * If ``false``, each particle is advanced with its
-      own velocity ``vz`` until it reaches ``zinject_plane``.
+    * ``vz`` or ``false``: each particle's longitudinal velocity :math:`v_z`
 
-    * If ``true``, each particle is advanced with the average speed of the species
-      ``vzbar`` until it reaches ``zinject_plane``.
+    * ``vzbar`` or ``true``: the species' average longitudinal velocity :math:`\overline{v_z}`
+
+    * ``v``: each particle's velocity :math:`{\bf v}`, including transverse components
 
 * ``species_name.predefined_profile_name`` (`string`)
     Only read if ``<species_name>.profile`` is ``predefined``.
