@@ -2506,7 +2506,7 @@ PhysicalParticleContainer::SplitParticles (int lev)
     amrex::Vector<amrex::Vector<ParticleReal>> attr;
     attr.push_back(wp);
     const amrex::Vector<amrex::Vector<int>> attr_int;
-    pctmp_split.AddNParticles(lev,   // TODO
+    pctmp_split.AddNParticles(lev,
                               np_split_to_add,
                               xp,
                               yp,
