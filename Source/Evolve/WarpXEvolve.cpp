@@ -236,8 +236,13 @@ WarpX::Evolve (int numsteps)
         }
         // explicit solver
         else {
+            // check if input file requests collisions
+            amrex::Vector<std::string> collision_names;
+            const amrex::ParmParse pp_collisions("collisions");
+            pp_collisions.queryarr("collision_names", collision_names);
+            bool const collisions = (static_cast<int>(collision_names.size()) == 0) ? false : true;
             // TODO m_explicit_solver->OneStep(cur_time, dt[0], step);
-            OneStep(cur_time, dt[0], step);
+            OneStep(cur_time, dt[0], step, collisions);
         }
 
         // Resample particles
@@ -387,7 +392,8 @@ WarpX::Evolve (int numsteps)
 void WarpX::OneStep (
     amrex::Real a_cur_time,
     amrex::Real a_dt,
-    int a_step
+    int a_step,
+    bool const collisions
 )
 {
     WARPX_PROFILE("WarpX::OneStep()");
@@ -396,28 +402,45 @@ void WarpX::OneStep (
     if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
         electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
         bool const skip_deposition = true;
-        // TODO parse position_push_half from input file
-        bool position_push_half = true;
-        bool momentum_push_skip = false;
-        PushParticlesandDeposit(
-            a_cur_time,
-            skip_deposition,
-            position_push_half,
-            momentum_push_skip
-        );
-        // multi-physics: collisions
-        ExecutePythonCallback("beforecollisions");
-        mypc->doCollisions(a_step, a_cur_time, a_dt);
-        ExecutePythonCallback("aftercollisions");
-        // only gather fields and push particles,
-        // deposition and calculation of fields done further below
-        momentum_push_skip = true;
-        PushParticlesandDeposit(
-            a_cur_time,
-            skip_deposition,
-            position_push_half,
-            momentum_push_skip
-        );
+        if (collisions)
+        {
+            bool position_push_half = true;
+            bool momentum_push_skip = false;
+            PushParticlesandDeposit(
+                a_cur_time,
+                skip_deposition,
+                position_push_half,
+                momentum_push_skip
+            );
+            // multi-physics: collisions
+            ExecutePythonCallback("beforecollisions");
+            // FIXME Should this be a_cur_time + a_dt*0.5?
+            mypc->doCollisions(a_step, a_cur_time, a_dt);
+            ExecutePythonCallback("aftercollisions");
+            // only gather fields and push particles,
+            // deposition and calculation of fields done further below
+            momentum_push_skip = true;
+            PushParticlesandDeposit(
+                // FIXME Should this be a_cur_time + a_dt*0.5?
+                a_cur_time,
+                skip_deposition,
+                position_push_half,
+                momentum_push_skip
+            );
+        }
+        else // no collisions
+        {
+            bool position_push_half = false;
+            bool momentum_push_skip = false;
+            // only gather fields and push particles,
+            // deposition and calculation of fields done further below
+            PushParticlesandDeposit(
+                a_cur_time,
+                skip_deposition,
+                position_push_half,
+                momentum_push_skip
+            );
+        }
     }
     // electromagnetic solver
     else {

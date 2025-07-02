@@ -1077,7 +1077,8 @@ private:
     void OneStep (
         amrex::Real a_cur_time,
         amrex::Real a_dt,
-        int a_step
+        int a_step,
+        bool const collisions
     );
 
     void OneStep_nosub (amrex::Real cur_time);
