@@ -13,6 +13,7 @@ setup.py file for WarpX
 """
 
 import argparse
+import json
 import os
 import sys
 
@@ -63,9 +64,15 @@ elif args.with_lib_dir or PYWARPX_LIB_DIR:
 else:
     package_data = {}
 
+# Parse WarpX version information
+dependencies_file = "../dependencies.json"
+with open(dependencies_file, "r") as file:
+    dependencies_data = json.load(file)
+warpx_version = dependencies_data.get("version_warpx")
+
 setup(
     name="pywarpx",
-    version="25.06",
+    version=warpx_version,
     packages=["pywarpx"],
     package_dir={"pywarpx": "pywarpx"},
     description="""Wrapper of WarpX""",
