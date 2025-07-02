@@ -224,7 +224,6 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     : WarpXParticleContainer(amr_core, ispecies),
       species_name(name)
 {
-    amrex::Print() << "PhysicalParticleContainer::PhysicalParticleContainer\n";
     BackwardCompatibility();
 
     const ParmParse pp_species_name(species_name);
