@@ -224,6 +224,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     : WarpXParticleContainer(amr_core, ispecies),
       species_name(name)
 {
+    amrex::Print() << "PhysicalParticleContainer::PhysicalParticleContainer\n";
     BackwardCompatibility();
 
     const ParmParse pp_species_name(species_name);
@@ -2322,8 +2323,8 @@ PhysicalParticleContainer::applyNCIFilter (
 void
 PhysicalParticleContainer::SplitParticles (int lev)
 {
-    auto& mypc = WarpX::GetInstance().GetPartContainer();
-    auto& pctmp_split = mypc.GetPCtmp();
+    auto& mypc = WarpX::GetInstance().GetPartContainer().GetParticleContainerFromName(this->species_name);
+    auto pctmp_split = mypc.make_alike<amrex::DefaultAllocator>();
     RealVector psplit_x, psplit_y, psplit_z, psplit_w;
     RealVector psplit_ux, psplit_uy, psplit_uz;
     long np_split_to_add = 0;
@@ -2507,7 +2508,7 @@ PhysicalParticleContainer::SplitParticles (int lev)
     amrex::Vector<amrex::Vector<ParticleReal>> attr;
     attr.push_back(wp);
     const amrex::Vector<amrex::Vector<int>> attr_int;
-    pctmp_split.AddNParticles(lev,
+    pctmp_split.AddNParticles(lev,   // TODO
                               np_split_to_add,
                               xp,
                               yp,
