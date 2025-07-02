@@ -200,7 +200,6 @@ WarpX runs with one MPI rank per GPU.
 Note that we append these non-default runtime options:
 
 * ``amrex.use_gpu_aware_mpi=1``: make use of fast APU to APU MPI communications
-* ``amrex.the_arena_init_size=1``: avoid overallocating memory that is *shared* on APUs between CPU & GPU
 
 .. literalinclude:: ../../../../Tools/machines/tuolumne-llnl/tuolumne_mi300a.sbatch
    :language: bash
