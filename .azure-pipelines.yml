@@ -7,13 +7,21 @@ trigger:
   branches:
     include:
     - development
+  paths:
+    exclude:
+    - 'Docs/**'
+    - 'Tools/machines/**'
+    - '**/*.rst'
+    - '**/*.md'
 pr:
   autoCancel: true
   drafts: false
   paths:
     exclude:
-    - Docs
+    - 'Docs/**'
+    - 'Tools/machines/**'
     - '**/*.rst'
+    - '**/*.md'
 
 jobs:
 - job:
@@ -30,9 +38,9 @@ jobs:
 
   strategy:
     matrix:
-      # Cartesian 1D
-      cartesian_1d:
-        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=1 -DWarpX_FFT=ON -DWarpX_PYTHON=ON
+      # 1D Cartesian, Cylindrical, Spherical
+      1d:
+        WARPX_CMAKE_FLAGS: -DWarpX_DIMS='1;RCYLINDER;RSPHERE' -DWarpX_FFT=ON -DWarpX_PYTHON=ON
       # Cartesian 2D
       cartesian_2d:
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS=2 -DWarpX_FFT=ON -DWarpX_PYTHON=ON

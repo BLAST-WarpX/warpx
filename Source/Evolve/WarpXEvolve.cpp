@@ -171,8 +171,20 @@ WarpX::Evolve (int numsteps)
 
         multi_diags->NewIteration();
 
+        bool verbose_step = (bool)verbose;
+        if (verbose && m_limit_verbose_step) {
+
+            int verbose_step_interval = 1;
+            if (step<10) { verbose_step_interval = 1; }
+            else if (step<100) { verbose_step_interval = 10; }
+            else { verbose_step_interval = 100; }
+
+            verbose_step = !((step+1)%verbose_step_interval);
+
+        }
+
         // Start loop on time steps
-        if (verbose) {
+        if (verbose_step) {
             amrex::Print() << "STEP " << step+1 << " starts ...\n";
         }
         ExecutePythonCallback("beforestep");
@@ -183,7 +195,7 @@ WarpX::Evolve (int numsteps)
         // This first synchronizes the position and velocity before setting the new timestep
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None &&
             !m_const_dt.has_value() && m_dt_update_interval.contains(step+1)) {
-            if (verbose) {
+            if (verbose_step) {
                 amrex::Print() << Utils::TextMsg::Info("updating timestep");
             }
             SynchronizeVelocityWithPosition();
@@ -209,7 +221,7 @@ WarpX::Evolve (int numsteps)
         doFieldIonization();
 
         ExecutePythonCallback("beforecollisions");
-        mypc->doCollisions( cur_time, dt[0] );
+        mypc->doCollisions( step, cur_time, dt[0] );
         ExecutePythonCallback("aftercollisions");
 
 #ifdef WARPX_QED
@@ -261,7 +273,7 @@ WarpX::Evolve (int numsteps)
         // Resample particles
         // +1 is necessary here because value of step seen by user (first step is 1) is different than
         // value of step in code (first step is 0)
-        mypc->doResampling(Geom(), istep[0]+1, verbose);
+        mypc->doResampling(Geom(), istep[0]+1, verbose_step);
 
         if (evolve_scheme == EvolveScheme::Explicit) {
             applyMirrors(cur_time);
@@ -374,7 +386,7 @@ WarpX::Evolve (int numsteps)
 
         HandleSignals();
 
-        if (verbose) {
+        if (verbose_step) {
             amrex::Print()<< "STEP " << step+1 << " ends." << " TIME = " << cur_time
                         << " DT = " << dt[0] << "\n";
             amrex::Print()<< "Evolve time = " << evolve_time
@@ -595,14 +607,15 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
     {
         // Electromagnetic solver: due to CFL condition, particles can
         // only move by one or two cells per time step
+        // The implicit scheme can allow additional cell crossings, as specified by particle_max_grid_crossings.
         if (max_level == 0) {
             int num_redistribute_ghost = num_moved;
             if ((m_v_galilean[0]!=0) or (m_v_galilean[1]!=0) or (m_v_galilean[2]!=0)) {
-                // Galilean algorithm ; particles can move by up to 2 cells
-                num_redistribute_ghost += 2;
+                // Galilean algorithm ; particles can move by up to one additional cell beyond the max number
+                num_redistribute_ghost += particle_max_grid_crossings + 1;
             } else {
-                // Standard algorithm ; particles can move by up to 1 cell
-                num_redistribute_ghost += 1;
+                // Standard algorithm ; particles can move by up to the max number
+                num_redistribute_ghost += particle_max_grid_crossings;
             }
             mypc->RedistributeLocal(num_redistribute_ghost);
         }
@@ -1218,7 +1231,7 @@ WarpX::PushParticlesandDeposit (int lev, amrex::Real cur_time, DtType a_dt_type,
         push_type
     );
     if (! skip_current) {
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         // This is called after all particles have deposited their current and charge.
         ApplyInverseVolumeScalingToCurrentDensity(
             m_fields.get(FieldType::current_fp, Direction{0}, lev),

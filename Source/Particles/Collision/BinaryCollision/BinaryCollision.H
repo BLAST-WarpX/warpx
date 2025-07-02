@@ -125,20 +125,10 @@ public:
             }
 
             m_product_species.insert( m_product_species.begin(), m_species_names.begin(), m_species_names.end() );
-
-            // During an ionization event, the non-ionizing target species could
-            // also be a product (for example, electron impact ionization producing another
-            // electron). We check that if this is the case, the product species is
-            // only listed once. The number of product particles is appropriately
-            // handled in `SplitAndScatterFunc` in that case.
-            if (m_product_species.size() > 2) {
-                if (m_product_species[2] == m_product_species[0]) {
-                    m_product_species.erase(m_product_species.begin() + 2);
-                }
-                else if (m_product_species[3] == m_product_species[0]) {
-                    m_product_species.erase(m_product_species.begin() + 3);
-                }
-            }
+            // Note that, if a species is both a colliding species and a product species
+            // (e.g., e- in e- + H -> 2 e- + H+) then it will be listed twice in `m_product_species`.
+            // (e.g., m_product_species = [e-, H, e-, H+])
+            // The code for ionization in `SplitAndScatterFunc` handles this case correctly.
         }
         m_have_product_species = !m_product_species.empty();
 
@@ -308,23 +298,38 @@ public:
 
         amrex::Geometry const& geom_lev = WarpX::GetInstance().Geom(lev);
         auto const dV = AMREX_D_TERM(geom_lev.CellSize(0), *geom_lev.CellSize(1), *geom_lev.CellSize(2));
-#if defined WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ)
         amrex::Box const& cbx = mfi.tilebox(amrex::IntVect::TheZeroVector()); //Cell-centered box
         auto const lo = lbound(cbx);
         auto const hi = ubound(cbx);
         int const nz = hi.y - lo.y + 1;
+#endif
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         auto const dr = geom_lev.CellSize(0);
 #endif
 
         auto volume_factor = [=] AMREX_GPU_DEVICE(int i_cell) noexcept {
-#if defined WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ)
             // Return the radial factor for the volume element, dV
             int const ri = (i_cell - i_cell%nz)/nz;
-            return MathConst::pi*(2.0_prt*ri + 1.0_prt)*dr;
+            // rr is radius at the cell center
+            amrex::ParticleReal const rr = (ri + 0.5_prt)*dr;
+            return 2.0_prt*MathConst::pi*rr;
+#elif defined(WARPX_DIM_RCYLINDER)
+            int const ri = i_cell;
+            // rr is radius at the cell center
+            amrex::ParticleReal const rr = (ri + 0.5_prt)*dr;
+            return 2.0_prt*MathConst::pi*rr;
+#elif defined(WARPX_DIM_RSPHERE)
+            // This needs double checking
+            int const ri = i_cell;
+            // rr is radius at the cell center
+            amrex::ParticleReal const rr = (ri + 0.5_prt)*dr;
+            return 4.0_prt*MathConst::pi*rr*rr;
 #else
             // No factor is needed for Cartesian
             amrex::ignore_unused(i_cell);
-            return 1._prt;
+            return 1.0_prt;
 #endif
         };
 
