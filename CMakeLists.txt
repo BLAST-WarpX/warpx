@@ -1,5 +1,5 @@
 # Parse WarpX version information
-file(READ "${CMAKE_SOURCE_DIR}/dependencies.json" dependencies_data)
+file(READ "${CMAKE_CURRENT_LIST_DIR}/dependencies.json" dependencies_data)
 string(JSON warpx_version GET "${dependencies_data}" version_warpx)
 
 # Preamble ####################################################################
