@@ -2322,8 +2322,7 @@ PhysicalParticleContainer::applyNCIFilter (
 void
 PhysicalParticleContainer::SplitParticles (int lev)
 {
-    auto& mypc = WarpX::GetInstance().GetPartContainer();
-    auto& pctmp_split = mypc.GetPCtmp();
+    PhysicalParticleContainer pctmp_split(&WarpX::GetInstance());
     RealVector psplit_x, psplit_y, psplit_z, psplit_w;
     RealVector psplit_ux, psplit_uy, psplit_uz;
     long np_split_to_add = 0;
@@ -2522,8 +2521,6 @@ PhysicalParticleContainer::SplitParticles (int lev)
     // Copy particles from tmp to current particle container
     constexpr bool local_flag = true;
     addParticles(pctmp_split,local_flag);
-    // Clear tmp container
-    pctmp_split.clearParticles();
 }
 
 void

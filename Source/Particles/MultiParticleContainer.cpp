@@ -119,8 +119,6 @@ MultiParticleContainer::MultiParticleContainer (AmrCore* amr_core)
         allcontainers[i]->m_deposit_on_main_grid = m_laser_deposit_on_main_grid[i-nspecies];
     }
 
-    pc_tmp = std::make_unique<PhysicalParticleContainer>(amr_core);
-
     // Setup particle collisions
     collisionhandler = std::make_unique<CollisionHandler>(this);
 
@@ -412,7 +410,6 @@ MultiParticleContainer::AllocData ()
     for (auto& pc : allcontainers) {
         pc->AllocData();
     }
-    pc_tmp->AllocData();
 }
 
 void
@@ -423,8 +420,6 @@ MultiParticleContainer::InitData ()
     for (auto& pc : allcontainers) {
         pc->InitData();
     }
-    pc_tmp->InitData();
-
 }
 
 void
@@ -435,7 +430,6 @@ MultiParticleContainer::PostRestart ()
     for (auto& pc : allcontainers) {
         pc->PostRestart();
     }
-    pc_tmp->PostRestart();
 }
 
 void
