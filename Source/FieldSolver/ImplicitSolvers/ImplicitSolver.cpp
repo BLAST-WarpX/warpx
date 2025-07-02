@@ -95,7 +95,7 @@ void ImplicitSolver::SaveEandJ ()
 {
 
     // Copy Efield_fp and current_fp to Efield_fp_save and current_fp_save
-    // Do this BEFORE call to SyncCurrentAndRho() so that BCs are set for J
+    // Do this BEFORE call to SyncCurrentAndRho()
 
     using warpx::fields::FieldType;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
