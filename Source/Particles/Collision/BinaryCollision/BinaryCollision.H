@@ -441,7 +441,8 @@ public:
             amrex::ParticleReal* AMREX_RESTRICT vz1_in_each_cell = vz1_vec.dataPtr();
             amrex::ParticleReal* AMREX_RESTRICT vs1_in_each_cell = vs1_vec.dataPtr();
 
-            WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::computeDensityTemperatures", prof_computeDensityTemperatures);
+            WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures", prof_findDensityTemperatures);
+	    WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::atomics", prof_findDensityTemperatures_atomics);
             // Loop over particles and compute density and temperature
             amrex::ParallelFor( np1,
                 [=] AMREX_GPU_DEVICE (int ip) noexcept
@@ -470,17 +471,18 @@ public:
                     }
                 }
             );
+            WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_atomics);
 
             // Finish temperature calculation
-            amrex::ParallelForRNG( n_cells,
-                [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
+	    WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::finishTemperature", prof_findDensityTemperatures_finish);
+            amrex::ParallelFor( n_cells, [=] AMREX_GPU_DEVICE (int i_cell) noexcept
                 {
                     // The particles from species1 that are in the cell `i_cell` are
                     // given by the `indices_1[cell_start_1:cell_stop_1]`
                     index_type const cell_start_1 = cell_offsets_1[i_cell];
                     index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
 
-                    // Do not shuffle if there is only one particle in the cell
+                    // Do not need if there is only one particle in the cell
                     if ( cell_stop_1 - cell_start_1 <= 1 ) { return; }
 
                     // finish temperature calculation if needed
@@ -493,11 +495,28 @@ public:
 
                         T1_in_each_cell[i_cell] = m1/(3._prt)*(vs1 -(vx1*vx1+vy1*vy1+vz1*vz1));
                     }
+                }
+            );
+            WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_finish);
+
+            // shuffle
+	    WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
+            amrex::ParallelForRNG( n_cells,
+                [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
+                {
+                    // The particles from species1 that are in the cell `i_cell` are
+                    // given by the `indices_1[cell_start_1:cell_stop_1]`
+                    index_type const cell_start_1 = cell_offsets_1[i_cell];
+                    index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
+
+                    // Do not shuffle if there is only one particle in the cell
+                    if ( cell_stop_1 - cell_start_1 <= 1 ) { return; }
 
                     ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine);
                 }
             );
-            WARPX_PROFILE_VAR_STOP(prof_computeDensityTemperatures);
+            WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
+	    WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures);
 
             // Loop over independent particle pairs
             // To speed up binary collisions on GPU, we try to expose as much parallelism
@@ -727,8 +746,9 @@ public:
             amrex::ParticleReal* AMREX_RESTRICT vs2_in_each_cell = vs2_vec.dataPtr();
 
             WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures", prof_findDensityTemperatures);
-            WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::atomics", prof_findDensityTemperatures1);
-        // Loop over particles and compute density and temperature
+
+	    // Loop over particles and compute density and temperature with atomics
+            WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::atomics", prof_findDensityTemperatures_atomics);
             amrex::ParallelFor( std::max(np1, np2),
                 [=] AMREX_GPU_DEVICE (int ip) noexcept
                 {
@@ -779,11 +799,14 @@ public:
                     }
                 }
             );
-            WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures1);
-        WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::finishTemperature", prof_findDensityTemperatures2);
-            // Finish temperature calculation
-            amrex::ParallelFor( n_cells, [=] AMREX_GPU_DEVICE (int i_cell) noexcept
-                {
+            WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_atomics);
+
+            // Finish temperature calculation	    
+	    WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::finishTemperature", prof_findDensityTemperatures_finish);
+            amrex::ParallelFor( 2*n_cells, [=] AMREX_GPU_DEVICE (int i) noexcept
+	        {
+		    int i_cell = i < n_cells ? i : i - n_cells;
+
                     // The particles from species1 that are in the cell `i_cell` are
                     // given by the `indices_1[cell_start_1:cell_stop_1]`
                     index_type const cell_start_1 = cell_offsets_1[i_cell];
@@ -793,12 +816,13 @@ public:
                     index_type const cell_start_2 = cell_offsets_2[i_cell];
                     index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
 
-                    // Do not collide if one species is missing in the cell
+                    // Do not need if one species is missing in the cell
                     if ( cell_stop_1 - cell_start_1 < 1 ||
                          cell_stop_2 - cell_start_2 < 1 ) { return; }
 
                     // finish temperature calculation if needed
                     if (binary_collision_functor.m_computeSpeciesTemperatures) {
+		      if (i < n_cells) {
                         const amrex::ParticleReal invsum1 = 1._prt/T1_in_each_cell[i_cell];
                         auto vx1 = vx1_in_each_cell[i_cell] * invsum1;
                         auto vy1 = vy1_in_each_cell[i_cell] * invsum1;
@@ -806,7 +830,7 @@ public:
                         auto vs1 = vs1_in_each_cell[i_cell] * invsum1;
 
                         T1_in_each_cell[i_cell] = m1/(3._prt)*(vs1 -(vx1*vx1+vy1*vy1+vz1*vz1));
-
+		      } else {
                         const amrex::ParticleReal invsum2 = 1._prt/T2_in_each_cell[i_cell];
                         auto vx2 = vx2_in_each_cell[i_cell] * invsum2;
                         auto vy2 = vy2_in_each_cell[i_cell] * invsum2;
@@ -814,41 +838,42 @@ public:
                         auto vs2 = vs2_in_each_cell[i_cell] * invsum2;
 
                         T2_in_each_cell[i_cell] = m2/(3._prt)*(vs2 -(vx2*vx2+vy2*vy2+vz2*vz2));
+		      }
                     }
                 }
             );
-            WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures2);
+            WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_finish);
 
             // shuffle
-        WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures3);
+	    WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
             amrex::ParallelForRNG( 2*n_cells,
                 [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
                 {
-          int i_cell = i/2;
+		  int i_cell = i < n_cells ? i : i - n_cells;
 
-          // The particles from species1 that are in the cell `i_cell` are
-          // given by the `indices_1[cell_start_1:cell_stop_1]`
-          index_type const cell_start_1 = cell_offsets_1[i_cell];
-          index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
+		  // The particles from species1 that are in the cell `i_cell` are
+		  // given by the `indices_1[cell_start_1:cell_stop_1]`
+		  index_type const cell_start_1 = cell_offsets_1[i_cell];
+		  index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
 
-          // Same for species 2
-          index_type const cell_start_2 = cell_offsets_2[i_cell];
-          index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
+		  // Same for species 2
+		  index_type const cell_start_2 = cell_offsets_2[i_cell];
+		  index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
 
-          // Do not collide if one species is missing in the cell
-          if ( cell_stop_1 - cell_start_1 < 1 ||
-               cell_stop_2 - cell_start_2 < 1 ) { return; }
+		  // Do not collide if one species is missing in the cell
+		  if ( cell_stop_1 - cell_start_1 < 1 ||
+		       cell_stop_2 - cell_start_2 < 1 ) { return; }
 
-          if (i < n_cells) {
-            ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine);
-          } else {
-            ShuffleFisherYates(indices_2, cell_start_2, cell_stop_2, engine);
-          }
+		  if (i < n_cells) {
+		    ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine);
+		  } else {
+		    ShuffleFisherYates(indices_2, cell_start_2, cell_stop_2, engine);
+		  }
                 }
-            );
-            WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures3);
+	    );
+            WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
 
-        WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures);
+	    WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures);
             // Loop over independent particle pairs
             // To speed up binary collisions on GPU, we try to expose as much parallelism
             // as possible (while avoiding race conditions): Instead of looping with one GPU
