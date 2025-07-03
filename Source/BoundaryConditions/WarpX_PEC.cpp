@@ -368,7 +368,6 @@ namespace
      * \param[in] mirrorfac          mirror cell is given by mirrorfac - ijk_vec
      * \param[in] psign              Whether the field value should be flipped across the boundary
      * \param[in] is_pec_pmc_bndy    True if the field boundary is either pec or pmc
-     * \param[in] tangent_to_bndy    Whether a given direction is perpendicular to the boundary
      * \param[in] fabbox             multifab box including ghost cells
      */
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -378,7 +377,6 @@ namespace
                                 amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> const& mirrorfac,
                                 amrex::GpuArray<GpuArray<amrex::Real, 2>, AMREX_SPACEDIM> const& psign,
                                 amrex::GpuArray<GpuArray<bool, 2>, AMREX_SPACEDIM> const& is_pec_pmc_bndy,
-                                amrex::GpuArray<bool, AMREX_SPACEDIM> const& tangent_to_bndy,
                                 [[maybe_unused]]int const is_nodal_r,
                                 amrex::Box const& fabbox)
     {
@@ -457,7 +455,6 @@ namespace
      * \param[in] mirrorfac    mirror cell is given by mirrorfac - ijk_vec
      * \param[in] psign        Whether the field value should be flipped across the boundary
      * \param[in] is_pec       Whether the given boundary is PEC
-     * \param[in] tangent_to_bndy    Whether a given direction is perpendicular to the boundary
      * \param[in] fabbox       multifab box including ghost cells
      */
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -697,7 +694,6 @@ PEC::ApplyBoundarytoRhofield (
     amrex::Box grown_domain_box = domain_box;
 
     amrex::GpuArray<GpuArray<bool,2>, AMREX_SPACEDIM> is_pec_pmc_bndy;
-    amrex::GpuArray<bool, AMREX_SPACEDIM> is_tangent_to_bndy;
     amrex::GpuArray<GpuArray<amrex::Real,2>, AMREX_SPACEDIM> psign;
     amrex::GpuArray<GpuArray<int,2>, AMREX_SPACEDIM> mirrorfac;
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
@@ -707,10 +703,6 @@ PEC::ApplyBoundarytoRhofield (
                                   || field_boundary_hi[idim] == FieldBoundaryType::PMC );
         if (!is_pec_pmc_bndy[idim][0]) { grown_domain_box.growLo(idim, ng_fieldgather[idim]); }
         if (!is_pec_pmc_bndy[idim][1]) { grown_domain_box.growHi(idim, ng_fieldgather[idim]); }
-
-        // rho values inside guard cells are updated the same as tangential
-        // components of the current density
-        is_tangent_to_bndy[idim] = true;
 
         // Default is -1 for PEC boundary
         psign[idim][0] = (field_boundary_lo[idim] == FieldBoundaryType::PMC ? 1._rt : -1._rt);
@@ -745,7 +737,7 @@ PEC::ApplyBoundarytoRhofield (
 
             ::SetRhoOrJfieldFromPEC(
                 n, iv, rho_array, mirrorfac, psign, is_pec_pmc_bndy,
-                is_tangent_to_bndy, rho_nodal[0], fabbox
+                rho_nodal[0], fabbox
             );
         });
     }
@@ -803,7 +795,7 @@ PEC::ApplyBoundarytoJfield(
     const amrex::IntVect ng_fieldgather = Jx->nGrowVect();
 
     amrex::GpuArray<GpuArray<bool, 2>, AMREX_SPACEDIM> is_pec_pmc_bndy;
-    amrex::GpuArray<GpuArray<bool, AMREX_SPACEDIM>, 3> is_tangent_to_bndy;
+    bool is_tangent_to_bndy;
     amrex::GpuArray<GpuArray<GpuArray<amrex::Real, 2>, AMREX_SPACEDIM>, 3> psign;
     amrex::GpuArray<GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM>, 3> mirrorfac;
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
@@ -830,7 +822,7 @@ PEC::ApplyBoundarytoJfield(
             is_tangent_to_bndy = (icomp != idim);
 #endif
 
-            if (is_tangent_to_bndy[icomp][idim]){
+            if (is_tangent_to_bndy) {
                 // Default is -1 for PEC boundary
                 psign[icomp][idim][0] = ( field_boundary_lo[idim] == FieldBoundaryType::PMC ? 1._rt : -1._rt );
                 psign[icomp][idim][1] = ( field_boundary_hi[idim] == FieldBoundaryType::PMC ? 1._rt : -1._rt );
@@ -879,7 +871,7 @@ PEC::ApplyBoundarytoJfield(
 
             ::SetRhoOrJfieldFromPEC(
                 n, iv, Jx_array, mirrorfac[0], psign[0], is_pec_pmc_bndy,
-                is_tangent_to_bndy[0], Jx_nodal[0], fabbox
+                Jx_nodal[0], fabbox
             );
         });
     }
@@ -910,7 +902,7 @@ PEC::ApplyBoundarytoJfield(
 
             ::SetRhoOrJfieldFromPEC(
                 n, iv, Jy_array, mirrorfac[1], psign[1], is_pec_pmc_bndy,
-                is_tangent_to_bndy[1], Jy_nodal[0], fabbox
+                Jy_nodal[0], fabbox
             );
         });
     }
@@ -941,7 +933,7 @@ PEC::ApplyBoundarytoJfield(
 
             ::SetRhoOrJfieldFromPEC(
                 n, iv, Jz_array, mirrorfac[2], psign[2], is_pec_pmc_bndy,
-                is_tangent_to_bndy[2], Jz_nodal[0], fabbox
+                Jz_nodal[0], fabbox
             );
         });
     }
