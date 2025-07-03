@@ -2586,6 +2586,9 @@ Maxwell solver: kinetic-fluid hybrid
 * ``hybid_pic_model.add_external_fields`` (`bool`) optional (default ``false``)
     If ``algo.maxwell_solver`` is set to ``hybrid``, this sets the hybrid solver to use split external fields defined in external_vector_potential inputs.
 
+* ``external_vector_potential.do_diva_cleaning`` (`bool`) optional (default ``true``)
+    This enables or disables the divergence cleaner application to the external A fields.
+
 * ``external_vector_potential.fields`` (list of `str`) optional (default ``empty``)
     If ``hybid_pic_model.add_external_fields`` is set to ``true``, this adds a list names for external time varying vector potentials to be added to hybrid solver.
 
