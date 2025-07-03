@@ -28,6 +28,8 @@ VarianceAccumulationBuffer::VarianceAccumulationBuffer (ablastr::fields::MultiLe
 
     const int ncomps = 1;
 
+    m_memory_lock.resize(0);
+
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
         for (int idir = 0; idir < 3; ++idir) {
             amrex::BoxArray const& ba = T_vf[lev][Direction{idir}]->boxArray();
@@ -37,6 +39,12 @@ VarianceAccumulationBuffer::VarianceAccumulationBuffer (ablastr::fields::MultiLe
             warpx.m_fields.alloc_init("variance_buffer_w_" + m_species_name, Direction{idir}, lev, ba, dm, ncomps, ng, 0.0_rt);
             warpx.m_fields.alloc_init("variance_buffer_w2_" + m_species_name, Direction{idir}, lev, ba, dm, ncomps, ng, 0.0_rt);
             warpx.m_fields.alloc_init("variance_buffer_vbar_" + m_species_name, Direction{idir}, lev, ba, dm, ncomps, ng, 0.0_rt);
+
+            if (idir == 0) {
+                // Instantiate and emplace each levels iMultiFab into the memory lock vector.
+                m_memory_lock.emplace_back(amrex::iMultiFab{ba, dm, ncomps, ng});
+                m_memory_lock.back().setVal(0);
+            }
         }
     }
 }

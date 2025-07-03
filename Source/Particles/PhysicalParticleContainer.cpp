@@ -3621,6 +3621,7 @@ PhysicalParticleContainer::DepositTemperature (
     auto & vxbar_fab = local_temperature_arrays->get("vbar", Direction{0}, lev)->get(pti);
     auto & vybar_fab = local_temperature_arrays->get("vbar", Direction{1}, lev)->get(pti);
     auto & vzbar_fab = local_temperature_arrays->get("vbar", Direction{2}, lev)->get(pti);
+    auto & mem_lock_iab = local_temperature_arrays->getLocks(lev)->get(pti);
 
     const auto GetPosition = GetParticlePosition<PIdx>(pti, offset);
 
@@ -3636,6 +3637,7 @@ PhysicalParticleContainer::DepositTemperature (
             uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
             Tx_fab, Ty_fab, Tz_fab, wx_fab, wy_fab, wz_fab,
             w2x_fab, w2y_fab, w2z_fab, vxbar_fab, vybar_fab, vzbar_fab,
+            mem_lock_iab,
             np_to_deposit, relative_time, dinv,
             xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
     } else if (WarpX::nox == 2){
@@ -3644,6 +3646,7 @@ PhysicalParticleContainer::DepositTemperature (
             uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
             Tx_fab, Ty_fab, Tz_fab, wx_fab, wy_fab, wz_fab,
             w2x_fab, w2y_fab, w2z_fab, vxbar_fab, vybar_fab, vzbar_fab,
+            mem_lock_iab,
             np_to_deposit, relative_time, dinv,
             xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
     } else if (WarpX::nox == 3){
@@ -3652,6 +3655,7 @@ PhysicalParticleContainer::DepositTemperature (
             uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
             Tx_fab, Ty_fab, Tz_fab, wx_fab, wy_fab, wz_fab,
             w2x_fab, w2y_fab, w2z_fab, vxbar_fab, vybar_fab, vzbar_fab,
+            mem_lock_iab,
             np_to_deposit, relative_time, dinv,
             xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
     } else if (WarpX::nox == 4){
@@ -3660,6 +3664,7 @@ PhysicalParticleContainer::DepositTemperature (
             uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
             Tx_fab, Ty_fab, Tz_fab, wx_fab, wy_fab, wz_fab,
             w2x_fab, w2y_fab, w2z_fab, vxbar_fab, vybar_fab, vzbar_fab,
+            mem_lock_iab,
             np_to_deposit, relative_time, dinv,
             xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
     }

@@ -20,6 +20,10 @@ class VarianceAccumulationBuffer {
     std::string m_species_name;
 
     public:
+
+    // This iMultiFab holds an effective "mutex" for each memory location.
+    amrex::Vector<amrex::iMultiFab> m_memory_lock;
+
     // Constructor for accumulation buffer
     // This is built after the T vector fields are created, so use it to allocate the
     VarianceAccumulationBuffer (ablastr::fields::MultiLevelVectorField const& T_vf, std::string const& species_name );
@@ -32,6 +36,10 @@ class VarianceAccumulationBuffer {
 
     // Data MF Accessor
     amrex::MultiFab* get(std::string arr, ablastr::fields::Direction dir, int lev);
+
+    amrex::iMultiFab* getLocks(int lev) { return &m_memory_lock[lev]; }
+
+
 };
 
 } // namespace warpx::particles::deposition
