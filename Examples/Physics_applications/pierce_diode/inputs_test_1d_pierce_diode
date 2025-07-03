@@ -1,0 +1,76 @@
+# --- This input defines 1D Pierce Diode Example:
+# --- This test simulates a classic Pierce diode configuration:
+# --- two parallel conducting plates separated by a distance
+# --- zplate = 8 cm and powered by a voltage difference
+# --- extractor_voltage = -93 kV. For a suitable voltage,
+# --- the field accelerates charged particles initially at rest
+# --- at the cathode towards the anode.
+
+# constants
+my_constants.ion_mass = 39*m_u # [kg] Assuming ion potassium
+my_constants.kV = 1000
+my_constants.cm = 0.01
+my_constants.channel_radius     = 15.*cm
+my_constants.extractor_voltage  = -93.*kV
+my_constants.diode_current      = 1.
+my_constants.zplate = 8.*cm
+my_constants.dz = zplate/nz
+my_constants.vzfinal = sqrt(2.*abs(extractor_voltage)*q_e/ion_mass)
+my_constants.dt = 0.4*(dz/vzfinal)
+my_constants.nz = 128
+my_constants.diode_current = 6
+my_constants.source_radius = 0.15
+my_constants.n0 = diode_current / (vzfinal * pi * source_radius**2 * q_e)
+
+# algo
+warpx.do_electrostatic = labframe
+algo.particle_shape = 1
+
+# amr
+amr.n_cell = nz
+amr.max_level = 0
+
+# maxamx step
+max_step = 2000
+
+# timestep
+warpx.const_dt = dt
+
+# geometry
+geometry.dims = 1
+geometry.prob_lo = 0.0
+geometry.prob_hi = zplate
+
+# boundary
+boundary.field_lo = pec
+boundary.field_hi = pec
+# set fixed potential at the plates (V difference)
+boundary.potential_lo_z = 0.0      # cathode at x = 0 V
+boundary.potential_hi_z = extractor_voltage  # anode at x = 1 kV
+boundary.particle_lo = absorbing
+boundary.particle_hi = absorbing
+
+# ions
+particles.species_names = ions
+ions.charge = q_e
+ions.mass = ion_mass
+ions.do_continuous_injection = 1
+ions.injection_style = "NFluxPerCell"
+ions.num_particles_per_cell = 15
+ions.uz_m =  0.
+ions.ux_th = 0.
+ions.uy_th = 0.
+ions.uz_th = 0.
+ions.surface_flux_pos = 0
+ions.flux_normal_axis = z
+ions.flux_direction = 1
+ions.flux_profile = constant
+ions.flux = n0 * vzfinal
+ions.momentum_distribution_type = constant
+
+# diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 100
+diag1.diag_type = Full
+diag1.format=openpmd
+diag1.fields_to_plot = Ex Ey Ez rho jx jz phi
