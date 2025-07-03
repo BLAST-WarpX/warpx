@@ -46,11 +46,6 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
         int vphotons_index = primary.getVirtualPhotonSpeciesIndex();
         auto& vphotons = mypc->GetParticleContainer(vphotons_index);
 
-
-
-        //amrex::Print(0) << "XXXXXX   " <<  << std::endl;
-
-
         //vphotons.resizeData(); //RemoveParticlesAtLevel(0);
 
         const amrex::ParmParse pp_species_name(mypc->GetSpeciesNames()[vphotons_index]);
@@ -96,12 +91,9 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
         amrex::Real const inv_c2 = 1._rt / (PhysConst::c * PhysConst::c);
         amrex::Real const mass = primary.getMass();
         amrex::Real const gamma_em = 0.57721566490153286060_rt; // Euler-Mascheroni constant
-        amrex::Real const coeff = + std::log(4._rt) - 2._rt*gamma_em - 1._rt;
+        amrex::Real const coeff = 0. ; //+ std::log(4._rt) - 2._rt*gamma_em - 1._rt;
 
         amrex::Real umin = 0.25_rt * coeff * coeff;
-
-
-
 
         int const nlevs = std::max(0, primary.finestLevel()+1);
         for (int lev = 0; lev < nlevs; ++lev) {
