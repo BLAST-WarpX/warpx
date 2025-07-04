@@ -23,6 +23,7 @@
 #include "Particles/Gather/ScaleFields.H"
 #include "Particles/Resampling/Resampling.H"
 #include "WarpXParticleContainer.H"
+#include "Particles/Deposition/TemperatureDepositionTypes.H"
 
 #include <AMReX_GpuContainers.H>
 #include <AMReX_Particles.H>
@@ -378,7 +379,9 @@ public:
         amrex::MultiFab * const Tx, amrex::MultiFab * const Ty, amrex::MultiFab * const Tz,
         long const offset, long const np_to_deposit,
         int const thread_num, const int lev, int const depos_lev,
-        amrex::Real const relative_time, PushType push_type) override;
+        amrex::Real const relative_time, PushType push_type,
+        const warpx::particles::deposition::TemperatureDepositionType type,
+        const warpx::particles::deposition::TemperatureDepositionPass pass) override;
 
 protected:
 

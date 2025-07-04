@@ -24,6 +24,7 @@
 #endif
 #include "MultiParticleContainer_fwd.H"
 
+#include "Particles/Deposition/TemperatureDepositionTypes.H"
 #include "Particles/Deposition/VarianceAccumulationBuffer.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
@@ -367,7 +368,9 @@ public:
         [[maybe_unused]]const int lev,
         [[maybe_unused]]int const depos_lev,
         [[maybe_unused]]amrex::Real const relative_time,
-        [[maybe_unused]]PushType push_type)
+        [[maybe_unused]]PushType push_type,
+        [[maybe_unused]]const warpx::particles::deposition::TemperatureDepositionType type,
+        [[maybe_unused]]const warpx::particles::deposition::TemperatureDepositionPass pass)
     {}
 
     void DepositTotalNGPTemperature (amrex::MultiFab* temperature, const int lev);

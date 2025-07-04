@@ -16,6 +16,7 @@
 #include "Initialization/InjectorMomentum.H"
 #include "Initialization/InjectorPosition.H"
 #include "MultiParticleContainer.H"
+#include "Parallelization/WarpXSumGuardCells.H"
 #include "Particles/AddPlasmaUtilities.H"
 #ifdef WARPX_QED
 #   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
@@ -3523,10 +3524,12 @@ PhysicalParticleContainer::DepositTemperature (
     RealVector const & wp, RealVector const & uxp,
     RealVector const & uyp, RealVector const & uzp,
     int const * const ion_lev,
-    amrex::MultiFab * const Tx, amrex::MultiFab * const Ty, amrex::MultiFab * const Tz,
+    amrex::MultiFab * Tx, amrex::MultiFab * Ty, amrex::MultiFab * Tz,
     long const offset, long const np_to_deposit,
     int const thread_num, const int lev, int const depos_lev,
-    amrex::Real const relative_time, PushType push_type)
+    amrex::Real const relative_time, PushType push_type,
+    const warpx::particles::deposition::TemperatureDepositionType type,
+    const warpx::particles::deposition::TemperatureDepositionPass pass)
 {
     using ablastr::fields::Direction;
 
@@ -3607,16 +3610,23 @@ PhysicalParticleContainer::DepositTemperature (
     tilebox.grow(ng_J);
 
     amrex::ignore_unused(thread_num);
+    // GPU, no tiling: j<xyz>_arr point to the full j<xyz> arrays
+    auto & Tx_fab = Tx->get(pti);
+    auto & Ty_fab = Ty->get(pti);
+    auto & Tz_fab = Tz->get(pti);
 
-    auto const& wx_mf =    local_temperature_arrays->get("w", Direction{0}, lev);
-    auto const& wy_mf =    local_temperature_arrays->get("w", Direction{1}, lev);
-    auto const& wz_mf =    local_temperature_arrays->get("w", Direction{2}, lev);
-    auto const& w2x_mf =   local_temperature_arrays->get("w2", Direction{0}, lev);
-    auto const& w2y_mf =   local_temperature_arrays->get("w2", Direction{1}, lev);
-    auto const& w2z_mf =   local_temperature_arrays->get("w2", Direction{2}, lev);
-    auto const& vxbar_mf = local_temperature_arrays->get("vbar", Direction{0}, lev);
-    auto const& vybar_mf = local_temperature_arrays->get("vbar", Direction{1}, lev);
-    auto const& vzbar_mf = local_temperature_arrays->get("vbar", Direction{2}, lev);
+    auto & nx_iab =    local_temperature_arrays->get_n(Direction{0}, lev)->get(pti);
+    auto & ny_iab =    local_temperature_arrays->get_n(Direction{1}, lev)->get(pti);
+    auto & nz_iab =    local_temperature_arrays->get_n(Direction{2}, lev)->get(pti);
+    auto & wx_fab =    local_temperature_arrays->get("w", Direction{0}, lev)->get(pti);
+    auto & wy_fab =    local_temperature_arrays->get("w", Direction{1}, lev)->get(pti);
+    auto & wz_fab =    local_temperature_arrays->get("w", Direction{2}, lev)->get(pti);
+    auto & w2x_fab =   local_temperature_arrays->get("w2", Direction{0}, lev)->get(pti);
+    auto & w2y_fab =   local_temperature_arrays->get("w2", Direction{1}, lev)->get(pti);
+    auto & w2z_fab =   local_temperature_arrays->get("w2", Direction{2}, lev)->get(pti);
+    auto & vxbar_fab = local_temperature_arrays->get("vbar", Direction{0}, lev)->get(pti);
+    auto & vybar_fab = local_temperature_arrays->get("vbar", Direction{1}, lev)->get(pti);
+    auto & vzbar_fab = local_temperature_arrays->get("vbar", Direction{2}, lev)->get(pti);
 
     const auto GetPosition = GetParticlePosition<PIdx>(pti, offset);
 
@@ -3628,35 +3638,39 @@ PhysicalParticleContainer::DepositTemperature (
 
     if        (WarpX::nox == 1){
         warpx::particles::deposition::doVarianceDepositionShapeN<1>(
-            pti, GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
+            GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
             uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-            Tx, Ty, Tz, wx_mf, wy_mf, wz_mf,
-            w2x_mf, w2y_mf, w2z_mf, vxbar_mf, vybar_mf, vzbar_mf,
-            np_to_deposit, relative_time, dinv,
+            Tx_fab, Ty_fab, Tz_fab,
+            nx_iab, ny_iab, nz_iab, wx_fab, wy_fab, wz_fab,
+            w2x_fab, w2y_fab, w2z_fab, vxbar_fab, vybar_fab, vzbar_fab,
+            type, pass, np_to_deposit, relative_time, dinv,
             xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
     } else if (WarpX::nox == 2){
         warpx::particles::deposition::doVarianceDepositionShapeN<2>(
-            pti, GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
+            GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
             uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-            Tx, Ty, Tz, wx_mf, wy_mf, wz_mf,
-            w2x_mf, w2y_mf, w2z_mf, vxbar_mf, vybar_mf, vzbar_mf,
-            np_to_deposit, relative_time, dinv,
+            Tx_fab, Ty_fab, Tz_fab,
+            nx_iab, ny_iab, nz_iab, wx_fab, wy_fab, wz_fab,
+            w2x_fab, w2y_fab, w2z_fab, vxbar_fab, vybar_fab, vzbar_fab,
+            type, pass, np_to_deposit, relative_time, dinv,
             xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
     } else if (WarpX::nox == 3){
         warpx::particles::deposition::doVarianceDepositionShapeN<3>(
-            pti, GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
+            GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
             uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-            Tx, Ty, Tz, wx_mf, wy_mf, wz_mf,
-            w2x_mf, w2y_mf, w2z_mf, vxbar_mf, vybar_mf, vzbar_mf,
-            np_to_deposit, relative_time, dinv,
+            Tx_fab, Ty_fab, Tz_fab,
+            nx_iab, ny_iab, nz_iab, wx_fab, wy_fab, wz_fab,
+            w2x_fab, w2y_fab, w2z_fab, vxbar_fab, vybar_fab, vzbar_fab,
+            type, pass, np_to_deposit, relative_time, dinv,
             xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
     } else if (WarpX::nox == 4){
         warpx::particles::deposition::doVarianceDepositionShapeN<4>(
-            pti, GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
+            GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
             uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-            Tx, Ty, Tz, wx_mf, wy_mf, wz_mf,
-            w2x_mf, w2y_mf, w2z_mf, vxbar_mf, vybar_mf, vzbar_mf,
-            np_to_deposit, relative_time, dinv,
+            Tx_fab, Ty_fab, Tz_fab,
+            nx_iab, ny_iab, nz_iab, wx_fab, wy_fab, wz_fab,
+            w2x_fab, w2y_fab, w2z_fab, vxbar_fab, vybar_fab, vzbar_fab,
+            type, pass, np_to_deposit, relative_time, dinv,
             xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
     }
 }
@@ -3667,13 +3681,23 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
     const amrex::Real relative_time)
 {
     using ablastr::fields::Direction;
+    using warpx::particles::deposition::TemperatureDepositionType;
+    using warpx::particles::deposition::TemperatureDepositionPass;
+
+    // Todo: link this to inputs (hardcoded for the time being)
+    // Will fix this in a follow up PR.
+    auto depos_type = TemperatureDepositionType::DOUBLE_PASS;
+
+    const auto& warpx = WarpX::GetInstance();
 
     // Loop over the refinement levels
     auto const finest_level = static_cast<int>(T_vf.size() - 1);
     for (int lev = 0; lev <= finest_level; ++lev)
     {
+        auto const& periodicity = warpx.Geom(lev).periodicity();
+
         // Clear accumulation arrays
-        local_temperature_arrays->setAllValues(0.0_rt);
+        local_temperature_arrays->reset();
 
         // Loop over particle tiles and deposit current on each level
 #ifdef AMREX_USE_OMP
@@ -3698,22 +3722,96 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
             }
 
             DepositTemperature(pti, wp, uxp, uyp, uzp, ion_lev,
-                            T_vf[lev][0], T_vf[lev][1], T_vf[lev][2],
-                            0, np, thread_num, lev, lev, relative_time, PushType::Explicit);
+                               T_vf[lev][0], T_vf[lev][1], T_vf[lev][2],
+                               0, np, thread_num, lev, lev, relative_time, PushType::Explicit,
+                               depos_type,
+                               TemperatureDepositionPass::FIRST);
         }
 #ifdef AMREX_USE_OMP
         }
 #endif
 
-        auto wx_mf =    local_temperature_arrays->get("w", Direction{0}, lev);
-        auto wy_mf =    local_temperature_arrays->get("w", Direction{1}, lev);
-        auto wz_mf =    local_temperature_arrays->get("w", Direction{2}, lev);
-        auto w2x_mf =   local_temperature_arrays->get("w2", Direction{0}, lev);
-        auto w2y_mf =   local_temperature_arrays->get("w2", Direction{1}, lev);
-        auto w2z_mf =   local_temperature_arrays->get("w2", Direction{2}, lev);
-        auto vxbar_mf = local_temperature_arrays->get("vbar", Direction{0}, lev);
-        auto vybar_mf = local_temperature_arrays->get("vbar", Direction{1}, lev);
-        auto vzbar_mf = local_temperature_arrays->get("vbar", Direction{2}, lev);
+        amrex::Gpu::streamSynchronize();
+
+        // Fist pass done, now lets sum the boundaries for the accumulation arrays
+        for (int idir=0; idir < 3; ++idir)
+        {
+            amrex::iMultiFab* n_mf    = local_temperature_arrays->get_n(Direction{idir}, lev);
+            amrex::MultiFab*  w_mf    = local_temperature_arrays->get("w", Direction{idir}, lev);
+            amrex::MultiFab*  vbar_mf = local_temperature_arrays->get("vbar", Direction{idir}, lev);
+
+            n_mf->SumBoundary(0, 1, n_mf->nGrowVect(), n_mf->nGrowVect(), periodicity);
+            WarpXSumGuardCells(*w_mf, periodicity, w_mf->nGrowVect(), 0, 1);
+            WarpXSumGuardCells(*vbar_mf, periodicity, vbar_mf->nGrowVect(), 0, 1);
+        }
+
+        amrex::Gpu::streamSynchronize();
+
+        if (depos_type == TemperatureDepositionType::DOUBLE_PASS)
+        {
+            // First step is to clear wv2 for re-accumulation
+            for (int idir = 0; idir < 3; ++idir)
+            {
+                local_temperature_arrays->get("w2", Direction{idir}, lev)->setVal(0.);
+            }
+
+            amrex::Gpu::streamSynchronize();
+
+            // Now run deposition loop again
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+            {
+            const int thread_num = omp_get_thread_num();
+#else
+            const int thread_num = 0;
+#endif
+            for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
+            {
+                const long np = pti.numParticles();
+                const auto & wp = pti.GetAttribs(PIdx::w);
+                const auto & uxp = pti.GetAttribs(PIdx::ux);
+                const auto & uyp = pti.GetAttribs(PIdx::uy);
+                const auto & uzp = pti.GetAttribs(PIdx::uz);
+
+                int* AMREX_RESTRICT ion_lev = nullptr;
+                if (do_field_ionization)
+                {
+                    ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
+                }
+
+                DepositTemperature(pti, wp, uxp, uyp, uzp, ion_lev,
+                                T_vf[lev][0], T_vf[lev][1], T_vf[lev][2],
+                                0, np, thread_num, lev, lev, relative_time, PushType::Explicit,
+                                depos_type, TemperatureDepositionPass::SECOND);
+            }
+#ifdef AMREX_USE_OMP
+            }
+#endif
+            amrex::Gpu::streamSynchronize();
+
+        } //if (depos_type == TemperatureDepositionType::DOUBLE_PASS)
+
+        // Do boundary sum for w2
+        for (int idir=0; idir < 3; ++idir)
+        {
+            amrex::MultiFab*  w2_mf    = local_temperature_arrays->get("w2", Direction{idir}, lev);
+
+            WarpXSumGuardCells(*w2_mf, periodicity, w2_mf->nGrowVect(), 0, 1);
+        }
+
+        // Get MF pointers for all deposition multifabs
+        amrex::iMultiFab* nx_mf    = local_temperature_arrays->get_n(Direction{0}, lev);
+        amrex::iMultiFab* ny_mf    = local_temperature_arrays->get_n(Direction{1}, lev);
+        amrex::iMultiFab* nz_mf    = local_temperature_arrays->get_n(Direction{2}, lev);
+        amrex::MultiFab*  wx_mf    = local_temperature_arrays->get("w", Direction{0}, lev);
+        amrex::MultiFab*  wy_mf    = local_temperature_arrays->get("w", Direction{1}, lev);
+        amrex::MultiFab*  wz_mf    = local_temperature_arrays->get("w", Direction{2}, lev);
+        amrex::MultiFab*  w2x_mf   = local_temperature_arrays->get("w2", Direction{0}, lev);
+        amrex::MultiFab*  w2y_mf   = local_temperature_arrays->get("w2", Direction{1}, lev);
+        amrex::MultiFab*  w2z_mf   = local_temperature_arrays->get("w2", Direction{2}, lev);
+        amrex::MultiFab*  vbarx_mf = local_temperature_arrays->get("vbar", Direction{0}, lev);
+        amrex::MultiFab*  vbary_mf = local_temperature_arrays->get("vbar", Direction{1}, lev);
+        amrex::MultiFab*  vbarz_mf = local_temperature_arrays->get("vbar", Direction{2}, lev);
 
         // Normalize variance after accumulating sums cell by cell
 #ifdef AMREX_USE_OMP
@@ -3724,46 +3822,68 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
             amrex::Array4<amrex::Real> const& varx_arr = T_vf[lev][0]->array(mfi);
             amrex::Array4<amrex::Real> const& vary_arr = T_vf[lev][1]->array(mfi);
             amrex::Array4<amrex::Real> const& varz_arr = T_vf[lev][2]->array(mfi);
+            const amrex::Array4<const int> & nx_arr = nx_mf->const_array(mfi);
+            const amrex::Array4<const int> & ny_arr = ny_mf->const_array(mfi);
+            const amrex::Array4<const int> & nz_arr = nz_mf->const_array(mfi);
             const amrex::Array4<const amrex::Real> & wx_arr = wx_mf->const_array(mfi);
             const amrex::Array4<const amrex::Real> & wy_arr = wy_mf->const_array(mfi);
             const amrex::Array4<const amrex::Real> & wz_arr = wz_mf->const_array(mfi);
             const amrex::Array4<const amrex::Real> & w2x_arr = w2x_mf->const_array(mfi);
             const amrex::Array4<const amrex::Real> & w2y_arr = w2y_mf->const_array(mfi);
             const amrex::Array4<const amrex::Real> & w2z_arr = w2z_mf->const_array(mfi);
-            amrex::Array4<amrex::Real> vxbar_arr = vxbar_mf->array(mfi);
-            amrex::Array4<amrex::Real> vybar_arr = vybar_mf->array(mfi);
-            amrex::Array4<amrex::Real> vzbar_arr = vzbar_mf->array(mfi);
+            amrex::Array4<amrex::Real> const& vxbar_arr = vbarx_mf->array(mfi);
+            amrex::Array4<amrex::Real> const& vybar_arr = vbary_mf->array(mfi);
+            amrex::Array4<amrex::Real> const& vzbar_arr = vbarz_mf->array(mfi);
 
             const amrex::Box& tbx  = mfi.growntilebox( T_vf[lev][0]->ixType().toIntVect() );
             const amrex::Box& tby  = mfi.growntilebox( T_vf[lev][1]->ixType().toIntVect() );
             const amrex::Box& tbz  = mfi.growntilebox( T_vf[lev][2]->ixType().toIntVect() );
 
+
+            bool single_pass = (depos_type == warpx::particles::deposition::TemperatureDepositionType::SINGLE_PASS);
+
             // Update Mean and Variance values after running through weight deposition loop
             amrex::ParallelFor(tbx, tby, tbz,
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                    amrex::Real sumwx = wx_arr(i,j,k);
-                    amrex::Real sumwvx = vxbar_arr(i,j,k);
-                    if (sumwx > 0._rt) {
-                        vxbar_arr(i,j,k) = sumwvx/sumwx;
-                        varx_arr(i,j,k) = w2x_arr(i,j,k) - sumwvx*sumwvx/sumwx;
+                    if (nx_arr(i,j,k) > 1) {
+                        amrex::Real sumw = wx_arr(i,j,k);
+                        amrex::Real sumwv = vxbar_arr(i,j,k);
+                        amrex::Real n = static_cast<amrex::Real>(nx_arr(i,j,k));
+                        amrex::Real norm = n/((n-1._rt)*sumw);
+
+                        vxbar_arr(i,j,k) = sumwv/sumw;
+                        varx_arr(i,j,k) = norm*w2x_arr(i,j,k);
+                        if (single_pass)
+                            varx_arr(i,j,k) -= norm*sumwv*sumwv/sumw;
                     }
                 },
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                    amrex::Real sumwy = wy_arr(i,j,k);
-                    amrex::Real sumwvy = vybar_arr(i,j,k);
-                    if (sumwy > 0._rt) {
-                        vybar_arr(i,j,k) = sumwvy/sumwy;
-                        vary_arr(i,j,k) = w2y_arr(i,j,k) - sumwvy*sumwvy/sumwy;
+                    if (ny_arr(i,j,k) > 1) {
+                        amrex::Real sumw = wy_arr(i,j,k);
+                        amrex::Real sumwv = vybar_arr(i,j,k);
+                        amrex::Real n = static_cast<amrex::Real>(ny_arr(i,j,k));
+                        amrex::Real norm = n/((n-1._rt)*sumw);
+
+                        vybar_arr(i,j,k) = sumwv/sumw;
+                        vary_arr(i,j,k) = norm*w2y_arr(i,j,k);
+                        if (single_pass)
+                            vary_arr(i,j,k) -= norm*sumwv*sumwv/sumw;
                     }
                 },
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                    amrex::Real sumwz = wz_arr(i,j,k);
-                    amrex::Real sumwvz = vzbar_arr(i,j,k);
-                    if (sumwz > 0._rt) {
-                        vzbar_arr(i,j,k) = sumwvz/sumwz;
-                        varz_arr(i,j,k) = w2z_arr(i,j,k) - sumwvz*sumwvz/sumwz;
+                    if (nz_arr(i,j,k) > 1) {
+                        amrex::Real sumw = wz_arr(i,j,k);
+                        amrex::Real sumwv = vzbar_arr(i,j,k);
+                        amrex::Real n = static_cast<amrex::Real>(nz_arr(i,j,k));
+                        amrex::Real norm = n/((n-1._rt)*sumw);
+
+                        vzbar_arr(i,j,k) = sumwv/sumw;
+                        varz_arr(i,j,k) = norm*w2z_arr(i,j,k);
+                        if (single_pass)
+                            varz_arr(i,j,k) -= norm*sumwv*sumwv/sumw;
                     }
                 });
+
         }
 
         amrex::Gpu::streamSynchronize();
@@ -3773,6 +3893,6 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
 
         // Sum boundaries for accumulation MFs, apply normalization, and filter to end up with
         // temperature in K in T_vf
-        local_temperature_arrays->SynchronizeBoundaryAndNormalizeVariance(T_vf, Tnorm, WarpX::use_filter);
+        local_temperature_arrays->ConvertVarianceToTemperatureAndFilter(T_vf, Tnorm, WarpX::use_filter);
     }
 }

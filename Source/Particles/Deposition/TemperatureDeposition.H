@@ -24,6 +24,8 @@
 
 #include "WarpX.H" // todo: remove include and pass globals as args
 
+#include "TemperatureDepositionTypes.H"
+
 #include <AMReX.H>
 #include <AMReX_Arena.H>
 #include <AMReX_Array4.H>
@@ -43,45 +45,92 @@ void varianceDepositionSubKernel(
     amrex::Real wqx_var,
     amrex::Real wqy_var,
     amrex::Real wqz_var,
-    amrex::Array4<amrex::Real> const& wx_arr,
-    amrex::Array4<amrex::Real> const& wy_arr,
-    amrex::Array4<amrex::Real> const& wz_arr,
-    amrex::Array4<amrex::Real> const& w2x_arr,
-    amrex::Array4<amrex::Real> const& w2y_arr,
-    amrex::Array4<amrex::Real> const& w2z_arr,
-    amrex::Array4<amrex::Real> const& vxbar_arr,
-    amrex::Array4<amrex::Real> const& vybar_arr,
-    amrex::Array4<amrex::Real> const& vzbar_arr
+    const amrex::Array4<int> & nx_arr,
+    const amrex::Array4<int> & ny_arr,
+    const amrex::Array4<int> & nz_arr,
+    const amrex::Array4<amrex::Real> & wx_arr,
+    const amrex::Array4<amrex::Real> & wy_arr,
+    const amrex::Array4<amrex::Real> & wz_arr,
+    const amrex::Array4<amrex::Real> & w2x_arr,
+    const amrex::Array4<amrex::Real> & w2y_arr,
+    const amrex::Array4<amrex::Real> & w2z_arr,
+    const amrex::Array4<amrex::Real> & vxbar_arr,
+    const amrex::Array4<amrex::Real> & vybar_arr,
+    const amrex::Array4<amrex::Real> & vzbar_arr,
+    const TemperatureDepositionType type,
+    const TemperatureDepositionPass pass
 )
 {
-    // Cast from ParticleReal to Real
     const amrex::Real vxr = static_cast<amrex::Real>(vx);
     const amrex::Real vyr = static_cast<amrex::Real>(vy);
     const amrex::Real vzr = static_cast<amrex::Real>(vz);
 
-    // Update w_sum
-    amrex::Gpu::Atomic::AddNoRet(
-        &wx_arr(ixv[0], ixv[1], ixv[2], 0), wqx_var);
-    amrex::Gpu::Atomic::AddNoRet(
-        &wy_arr(iyv[0], iyv[1], iyv[2], 0), wqy_var);
-    amrex::Gpu::Atomic::AddNoRet(
-        &wz_arr(izv[0], izv[1], izv[2], 0), wqz_var);
+    if (type == TemperatureDepositionType::SINGLE_PASS || pass == TemperatureDepositionPass::FIRST)
+    {
+        // Update sample count
+        amrex::Gpu::Atomic::AddNoRet(
+            &nx_arr(ixv[0], ixv[1], ixv[2], 0), 1);
+        amrex::Gpu::Atomic::AddNoRet(
+            &ny_arr(iyv[0], iyv[1], iyv[2], 0), 1);
+        amrex::Gpu::Atomic::AddNoRet(
+            &nz_arr(izv[0], izv[1], izv[2], 0), 1);
 
-    // Update w2_sum which is holding sum(w*v**2)
-    amrex::Gpu::Atomic::AddNoRet(
-        &w2x_arr(ixv[0], ixv[1], ixv[2], 0), wqx_var*vxr*vxr);
-    amrex::Gpu::Atomic::AddNoRet(
-        &w2y_arr(iyv[0], iyv[1], iyv[2], 0), wqy_var*vyr*vyr);
-    amrex::Gpu::Atomic::AddNoRet(
-        &w2z_arr(izv[0], izv[1], izv[2], 0), wqz_var*vzr*vzr);
+        // Update w_sum
+        amrex::Gpu::Atomic::AddNoRet(
+            &wx_arr(ixv[0], ixv[1], ixv[2], 0), wqx_var);
+        amrex::Gpu::Atomic::AddNoRet(
+            &wy_arr(iyv[0], iyv[1], iyv[2], 0), wqy_var);
+        amrex::Gpu::Atomic::AddNoRet(
+            &wz_arr(izv[0], izv[1], izv[2], 0), wqz_var);
+    }
 
-    // Update mean sum, to be normalized after summation loop
-    amrex::Gpu::Atomic::AddNoRet(
-        &vxbar_arr(ixv[0], ixv[1], ixv[2], 0), wqx_var*vxr);
-    amrex::Gpu::Atomic::AddNoRet(
-        &vybar_arr(iyv[0], iyv[1], iyv[2], 0), wqy_var*vyr);
-    amrex::Gpu::Atomic::AddNoRet(
-        &vzbar_arr(izv[0], izv[1], izv[2], 0), wqz_var*vzr);
+    if (type == TemperatureDepositionType::SINGLE_PASS || pass == TemperatureDepositionPass::SECOND)
+    {
+        // For a single pass run through, the vbar arrays will be zeroed, so this should work
+        // in either case. Will be non-demeaned in 1 pass
+        amrex::Real vxb = 0.;
+        amrex::Real vyb = 0.;
+        amrex::Real vzb = 0.;
+
+        // Normalization of accumulation arrays are not done until after all deposition, so nomralize
+        // here for double pass algorithm
+        if (type == TemperatureDepositionType::DOUBLE_PASS)
+        {
+            if (nx_arr(ixv[0], ixv[1], ixv[2], 0) > 0) {
+                vxb = vxbar_arr(ixv[0], ixv[1], ixv[2], 0)/wx_arr(ixv[0], ixv[1], ixv[2], 0);
+            }
+            if (ny_arr(iyv[0], iyv[1], iyv[2], 0) > 0) {
+                vyb = vybar_arr(iyv[0], iyv[1], iyv[2], 0)/wy_arr(iyv[0], iyv[1], iyv[2], 0);
+            }
+            if (nz_arr(izv[0], izv[1], izv[2], 0) > 0) {
+                vzb = vzbar_arr(izv[0], izv[1], izv[2], 0)/wz_arr(izv[0], izv[1], izv[2], 0);
+            }
+
+        }
+
+        const amrex::Real vxd = vxr - vxb;
+        const amrex::Real vyd = vyr - vyb;
+        const amrex::Real vzd = vzr - vzb;
+
+            // Update wv2_sum
+        amrex::Gpu::Atomic::AddNoRet(
+            &w2x_arr(ixv[0], ixv[1], ixv[2], 0), wqx_var*vxd*vxd);
+        amrex::Gpu::Atomic::AddNoRet(
+            &w2y_arr(iyv[0], iyv[1], iyv[2], 0), wqy_var*vyd*vyd);
+        amrex::Gpu::Atomic::AddNoRet(
+            &w2z_arr(izv[0], izv[1], izv[2], 0), wqz_var*vzd*vzd);
+    }
+
+    if (type == TemperatureDepositionType::SINGLE_PASS || pass == TemperatureDepositionPass::FIRST)
+    {
+        // Update wv_sum to be normalized to vbar
+        amrex::Gpu::Atomic::AddNoRet(
+            &vxbar_arr(ixv[0], ixv[1], ixv[2], 0), wqx_var*vxr);
+        amrex::Gpu::Atomic::AddNoRet(
+            &vybar_arr(iyv[0], iyv[1], iyv[2], 0), wqy_var*vyr);
+        amrex::Gpu::Atomic::AddNoRet(
+            &vzbar_arr(izv[0], izv[1], izv[2], 0), wqz_var*vzr);
+    }
 }
 
 /**
@@ -90,9 +139,12 @@ void varianceDepositionSubKernel(
  * \param xp, yp, zp    The particle positions.
  * \param wq            The charge of the macroparticle
  * \param vx,vy,vz      The particle velocities
+ * \param nx_arr,ny_arr,nz_arr Array4 of velocity variance, either full array or tile.
  * \param wx_arr,wy_arr,wz_arr Array4 of weight sums, either full array or tile.
  * \param w2x_arr,w2y_arr,w2z_arr Array4 of weight**2 sums, either full array or tile.
  * \param varx_type,vary_type,varz_type The grid types along each direction, either NODE or CELL
+ * \param type The type of deposition reoutine, either SINGLE_PASS or DOUBLE_PASS
+ * \param pass The pass that is occurring, either FIRST or SECOND
  * \param relative_time Time at which to deposit J, relative to the time of the
  *                      current positions of the particles. When different than 0,
  *                      the particle position will be temporarily modified to match
@@ -112,18 +164,23 @@ void doVarianceDepositionShapeNKernel(
     const amrex::ParticleReal vx,
     const amrex::ParticleReal vy,
     const amrex::ParticleReal vz,
-    amrex::Array4<amrex::Real> const& wx_arr,
-    amrex::Array4<amrex::Real> const& wy_arr,
-    amrex::Array4<amrex::Real> const& wz_arr,
-    amrex::Array4<amrex::Real> const& w2x_arr,
-    amrex::Array4<amrex::Real> const& w2y_arr,
-    amrex::Array4<amrex::Real> const& w2z_arr,
-    amrex::Array4<amrex::Real> const& vxbar_arr,
-    amrex::Array4<amrex::Real> const& vybar_arr,
-    amrex::Array4<amrex::Real> const& vzbar_arr,
+    const amrex::Array4<int> & nx_arr,
+    const amrex::Array4<int> & ny_arr,
+    const amrex::Array4<int> & nz_arr,
+    const amrex::Array4<amrex::Real> & wx_arr,
+    const amrex::Array4<amrex::Real> & wy_arr,
+    const amrex::Array4<amrex::Real> & wz_arr,
+    const amrex::Array4<amrex::Real> & w2x_arr,
+    const amrex::Array4<amrex::Real> & w2y_arr,
+    const amrex::Array4<amrex::Real> & w2z_arr,
+    const amrex::Array4<amrex::Real> & vxbar_arr,
+    const amrex::Array4<amrex::Real> & vybar_arr,
+    const amrex::Array4<amrex::Real> & vzbar_arr,
     const amrex::IntVect & varx_type,
     const amrex::IntVect & vary_type,
     const amrex::IntVect & varz_type,
+    const TemperatureDepositionType type,
+    const TemperatureDepositionPass pass,
     const amrex::Real relative_time,
     const amrex::XDim3 & dinv,
     const amrex::XDim3 & xyzmin,
@@ -264,9 +321,11 @@ void doVarianceDepositionShapeNKernel(
             vx, vy, vz,
             ixv, iyv, izv,
             wqx_var, wqy_var, wqz_var,
+            nx_arr, ny_arr, nz_arr,
             wx_arr, wy_arr, wz_arr,
             w2x_arr, w2y_arr, w2z_arr,
-            vxbar_arr, vybar_arr, vzbar_arr
+            vxbar_arr, vybar_arr, vzbar_arr,
+            type, pass
         );
     }
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
@@ -283,9 +342,11 @@ void doVarianceDepositionShapeNKernel(
             vx, vy, vz,
             ixv, iyv, izv,
             wqx_var, wqy_var, wqz_var,
+            nx_arr, ny_arr, nz_arr,
             wx_arr, wy_arr, wz_arr,
             w2x_arr, w2y_arr, w2z_arr,
-            vxbar_arr, vybar_arr, vzbar_arr
+            vxbar_arr, vybar_arr, vzbar_arr,
+            type, pass
         );
     }
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
@@ -303,9 +364,11 @@ void doVarianceDepositionShapeNKernel(
                 vx, vy, vz,
                 ixv, iyv, izv,
                 wqx_var, wqy_var, wqz_var,
+                nx_arr, ny_arr, nz_arr,
                 wx_arr, wy_arr, wz_arr,
                 w2x_arr, w2y_arr, w2z_arr,
-                vxbar_arr, vybar_arr, vzbar_arr
+                vxbar_arr, vybar_arr, vzbar_arr,
+                type, pass
             );
         }
     }
@@ -325,9 +388,11 @@ void doVarianceDepositionShapeNKernel(
                     vx, vy, vz,
                     ixv, iyv, izv,
                     wqx_var, wqy_var, wqz_var,
+                    nx_arr, ny_arr, nz_arr,
                     wx_arr, wy_arr, wz_arr,
                     w2x_arr, w2y_arr, w2z_arr,
-                    vxbar_arr, vybar_arr, vzbar_arr
+                    vxbar_arr, vybar_arr, vzbar_arr,
+                    type, pass
                 );
             }
         }
@@ -336,7 +401,11 @@ void doVarianceDepositionShapeNKernel(
 }
 
 /**
- * \brief Temperature Deposition for thread thread_num similar to: https://doi.org/10.1145%2F359146.359153
+ * \brief Temperature Deposition Algorithm from Bell (1979) https://dl.acm.org/doi/pdf/10.1145/359146.359153
+ *        This can run either WV1 (Double Pass), or WV4 (Single Pass) Algorithms
+ *        It should be noted that becuase of GPU Weak memory ordering in kernels it is
+ *        quite difficult to perform online update algorithms (i.e.) WV2 and WV3 because of
+ *        difficulties creating critical regions in kernels for all GPU kernel types.
  * \tparam depos_order deposition order
  * \param GetPosition  A functor for returning the particle position.
  * \param wp           Pointer to array of particle weights.
@@ -345,10 +414,13 @@ void doVarianceDepositionShapeNKernel(
                          required to have the charge of each macroparticle
                          since q is a scalar. For non-ionizable species,
                          ion_lev is a null pointer.
- * \param varx_mf,vary_mf,varz_mf FArrayBox of variance, either full array or tile.
- * \param wx_mf,wy_mf,wz_mf FArrayBox for running weights buffer, either full array or tile.
- * \param w2x_mf,w2y_mf,w2z_mf FArrayBox for weights^2 buffer, either full array or tile.
- * \param vxbar_mf,vybar_mf,vzbar_mf FArrayBox of current density, either full array or tile.
+ * \param varx_fab,vary_fab,varz_fab FArrayBox of variance, either full array or tile.
+ * \param nx_iab,ny_iab,nz_iab IArrayBox of sample count buffer, either full array or tile.
+ * \param wx_fab,wy_fab,wz_fab FArrayBox for running weights buffer, either full array or tile.
+ * \param w2x_fab,w2y_fab,w2z_fab FArrayBox for weights^2 buffer, either full array or tile.
+ * \param vxbar_fab,vybar_fab,vzbar_fab FArrayBox of current density, either full array or tile.
+ * \param type The type of deposition reoutine, either SINGLE_PASS or DOUBLE_PASS
+ * \param pass The pass that is occurring, either FIRST or SECOND
  * \param np_to_deposit Number of particles for which current is deposited.
  * \param relative_time Time at which to deposit J, relative to the time of the
  *                      current positions of the particles. When different than 0,
@@ -361,33 +433,36 @@ void doVarianceDepositionShapeNKernel(
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
  */
 template <int depos_order>
-void doVarianceDepositionShapeN (
-    WarpXParIter& pti,
-    const GetParticlePosition<PIdx>& GetPosition,
-    const amrex::ParticleReal * wp,
-    const amrex::ParticleReal * uxp,
-    const amrex::ParticleReal * uyp,
-    const amrex::ParticleReal * uzp,
-    const int * const ion_lev,
-    amrex::MultiFab* varx_mf,
-    amrex::MultiFab* vary_mf,
-    amrex::MultiFab* varz_mf,
-    amrex::MultiFab* wx_mf,
-    amrex::MultiFab* wy_mf,
-    amrex::MultiFab* wz_mf,
-    amrex::MultiFab* w2x_mf,
-    amrex::MultiFab* w2y_mf,
-    amrex::MultiFab* w2z_mf,
-    amrex::MultiFab* vxbar_mf,
-    amrex::MultiFab* vybar_mf,
-    amrex::MultiFab* vzbar_mf,
-    const long np_to_deposit,
-    const amrex::Real relative_time,
-    const amrex::XDim3 & dinv,
-    const amrex::XDim3 & xyzmin,
-    const amrex::Dim3 lo,
-    const amrex::Real q,
-    [[maybe_unused]]const int n_rz_azimuthal_modes)
+void doVarianceDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
+                         const amrex::ParticleReal * wp,
+                         const amrex::ParticleReal * uxp,
+                         const amrex::ParticleReal * uyp,
+                         const amrex::ParticleReal * uzp,
+                         const int* ion_lev,
+                         amrex::FArrayBox& varx_fab,
+                         amrex::FArrayBox& vary_fab,
+                         amrex::FArrayBox& varz_fab,
+                         amrex::IArrayBox& nx_iab,
+                         amrex::IArrayBox& ny_iab,
+                         amrex::IArrayBox& nz_iab,
+                         amrex::FArrayBox& wx_fab,
+                         amrex::FArrayBox& wy_fab,
+                         amrex::FArrayBox& wz_fab,
+                         amrex::FArrayBox& w2x_fab,
+                         amrex::FArrayBox& w2y_fab,
+                         amrex::FArrayBox& w2z_fab,
+                         amrex::FArrayBox& vxbar_fab,
+                         amrex::FArrayBox& vybar_fab,
+                         amrex::FArrayBox& vzbar_fab,
+                         const TemperatureDepositionType type,
+                         const TemperatureDepositionPass pass,
+                         const long np_to_deposit,
+                         const amrex::Real relative_time,
+                         const amrex::XDim3 & dinv,
+                         const amrex::XDim3 & xyzmin,
+                         const amrex::Dim3 lo,
+                         const amrex::Real q,
+                         [[maybe_unused]]const int n_rz_azimuthal_modes)
 {
     using namespace amrex::literals;
 
@@ -405,18 +480,21 @@ void doVarianceDepositionShapeN (
 
     const amrex::Real clightsq = 1.0_rt/PhysConst::c/PhysConst::c;
 
-    amrex::Array4<amrex::Real> const& wx_arr = wx_mf->get(pti).array();
-    amrex::Array4<amrex::Real> const& wy_arr = wy_mf->get(pti).array();
-    amrex::Array4<amrex::Real> const& wz_arr = wz_mf->get(pti).array();
-    amrex::Array4<amrex::Real> const& w2x_arr = w2x_mf->get(pti).array();
-    amrex::Array4<amrex::Real> const& w2y_arr = w2y_mf->get(pti).array();
-    amrex::Array4<amrex::Real> const& w2z_arr = w2z_mf->get(pti).array();
-    amrex::Array4<amrex::Real> const& vxbar_arr = vxbar_mf->get(pti).array();
-    amrex::Array4<amrex::Real> const& vybar_arr = vybar_mf->get(pti).array();
-    amrex::Array4<amrex::Real> const& vzbar_arr = vzbar_mf->get(pti).array();
-    const amrex::IntVect & varx_type = varx_mf->get(pti).box().type();
-    const amrex::IntVect & vary_type = vary_mf->get(pti).box().type();
-    const amrex::IntVect & varz_type = varz_mf->get(pti).box().type();
+    const amrex::Array4<int> & nx_arr = nx_iab.array();
+    const amrex::Array4<int> & ny_arr = ny_iab.array();
+    const amrex::Array4<int> & nz_arr = nz_iab.array();
+    const amrex::Array4<amrex::Real> & wx_arr = wx_fab.array();
+    const amrex::Array4<amrex::Real> & wy_arr = wy_fab.array();
+    const amrex::Array4<amrex::Real> & wz_arr = wz_fab.array();
+    const amrex::Array4<amrex::Real> & w2x_arr = w2x_fab.array();
+    const amrex::Array4<amrex::Real> & w2y_arr = w2y_fab.array();
+    const amrex::Array4<amrex::Real> & w2z_arr = w2z_fab.array();
+    const amrex::Array4<amrex::Real> & vxbar_arr = vxbar_fab.array();
+    const amrex::Array4<amrex::Real> & vybar_arr = vybar_fab.array();
+    const amrex::Array4<amrex::Real> & vzbar_arr = vzbar_fab.array();
+    const amrex::IntVect & varx_type = varx_fab.box().type();
+    const amrex::IntVect & vary_type = vary_fab.box().type();
+    const amrex::IntVect & varz_type = varz_fab.box().type();
 
     // Loop over particles and deposit into the deposition buffers
     amrex::ParallelFor(
@@ -440,10 +518,12 @@ void doVarianceDepositionShapeN (
 
             doVarianceDepositionShapeNKernel<depos_order>(
                 xp, yp, zp, wq, vx, vy, vz,
+                nx_arr, ny_arr, nz_arr,
                 wx_arr, wy_arr, wz_arr,
                 w2x_arr, w2y_arr, w2z_arr,
                 vxbar_arr, vybar_arr, vzbar_arr,
                 varx_type, vary_type, varz_type,
+                type, pass,
                 relative_time, dinv, xyzmin,
                 lo, n_rz_azimuthal_modes);
         }
