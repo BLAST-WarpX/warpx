@@ -3762,8 +3762,6 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
             {
             const int thread_num = omp_get_thread_num();
-#else
-            const int thread_num = 0;
 #endif
             for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
             {
