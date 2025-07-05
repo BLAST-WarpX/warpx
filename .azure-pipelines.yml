@@ -7,13 +7,21 @@ trigger:
   branches:
     include:
     - development
+  paths:
+    exclude:
+    - 'Docs/**'
+    - 'Tools/machines/**'
+    - '**/*.rst'
+    - '**/*.md'
 pr:
   autoCancel: true
   drafts: false
   paths:
     exclude:
-    - Docs
+    - 'Docs/**'
+    - 'Tools/machines/**'
     - '**/*.rst'
+    - '**/*.md'
 
 jobs:
 - job:

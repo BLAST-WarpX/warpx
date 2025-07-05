@@ -69,8 +69,17 @@ RigidInjectedParticleContainer::RigidInjectedParticleContainer (AmrCore* amr_cor
 
     utils::parser::getWithParser(
         pp_species_name, "zinject_plane", zinject_plane);
-    pp_species_name.query("rigid_advance", rigid_advance);
-
+    std::string raw;
+    if (pp_species_name.query("rigid_advance", raw)) {
+        raw = amrex::toLower(raw);
+        if (raw == "true"  || raw == "1") {
+            rigid_advance_mode = RigidAdvanceMode::vzbar;
+        } else if (raw == "false" || raw == "0") {
+            rigid_advance_mode = RigidAdvanceMode::vz;
+        } else {
+            pp_species_name.query_enum_sloppy("rigid_advance", rigid_advance_mode, "-_");
+        }
+    }
 }
 
 void RigidInjectedParticleContainer::InitData()
@@ -94,7 +103,7 @@ RigidInjectedParticleContainer::RemapParticles()
 {
     // For rigid_advance == false, nothing needs to be done
 
-    if (rigid_advance) {
+    if (rigid_advance_mode == RigidAdvanceMode::vzbar) {
 
         // The particle z positions are adjusted to account for the difference between
         // advancing with vzbar and wih vz[i] before injection
@@ -227,26 +236,32 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
         // The zp are advanced a fixed amount.
         const amrex::ParticleReal z_plane_lev = zinject_plane_lev;
         const amrex::ParticleReal vz_ave_boosted = vzbeam_ave_boosted;
-        const bool rigid = rigid_advance;
+        const RigidAdvanceMode rigid = rigid_advance_mode;
         constexpr amrex::ParticleReal inv_csq = 1._prt/(PhysConst::c*PhysConst::c);
-        amrex::ParallelFor( np_to_push,
-                            [=] AMREX_GPU_DEVICE (long i) {
-                                amrex::ParticleReal xp, yp, zp;
-                                GetPosition(i, xp, yp, zp);
-                                if (zp <= z_plane_lev) {
-                                    xp = x_save[i];
-                                    yp = y_save[i];
-                                    if (rigid) {
-                                        zp = z_save[i] + dt*vz_ave_boosted;
-                                    }
-                                    else {
-                                        const amrex::ParticleReal gi = 1._prt/std::sqrt(1._prt + (ux[i]*ux[i]
-                                                             + uy[i]*uy[i] + uz[i]*uz[i])*inv_csq);
-                                        zp = z_save[i] + dt*uz[i]*gi;
-                                    }
-                                    SetPosition(i, xp, yp, zp);
-                                }
-                            });
+        amrex::ParallelFor(np_to_push, [=] AMREX_GPU_DEVICE(long i) {
+            amrex::ParticleReal xp, yp, zp;
+            GetPosition(i, xp, yp, zp);
+            if (zp <= z_plane_lev) {
+                xp = x_save[i];
+                yp = y_save[i];
+                zp = z_save[i];
+                if (rigid == RigidAdvanceMode::vzbar) {
+                    zp += dt * vz_ave_boosted;
+                } else {
+                    const amrex::ParticleReal gi =
+                        1._prt /
+                        std::sqrt(1._prt + (ux[i] * ux[i] + uy[i] * uy[i] +
+                                            uz[i] * uz[i]) *
+                                               inv_csq);
+                    zp += dt * uz[i] * gi;
+                    if (rigid == RigidAdvanceMode::v) {
+                        xp += dt * ux[i] * gi;
+                        yp += dt * uy[i] * gi;
+                    }
+                }
+                SetPosition(i, xp, yp, zp);
+            }
+        });
     }
 }
 
