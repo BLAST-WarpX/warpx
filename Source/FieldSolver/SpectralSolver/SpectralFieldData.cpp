@@ -215,11 +215,9 @@ SpectralFieldData::~SpectralFieldData()
 void
 SpectralFieldData::ForwardTransform (const int lev,
                                      const MultiFab& mf, const int field_index,
-                                     const int i_comp)
+                                     const int i_comp,
+                                     const bool do_costs)
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-    const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, mf.boxArray(), mf.DistributionMap());
-
     // Check field index type, in order to apply proper shift in spectral space
     const bool is_nodal_0 = mf.is_nodal(0);
 #if AMREX_SPACEDIM > 1
@@ -305,10 +303,9 @@ SpectralFieldData::BackwardTransform (const int lev,
                                       MultiFab& mf,
                                       const int field_index,
                                       const amrex::IntVect& fill_guards,
-                                      const int i_comp)
+                                      const int i_comp,
+                                      const bool do_costs)
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-    const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, mf.boxArray(), mf.DistributionMap());
 
     // Check field index type, in order to apply proper shift in spectral space
     const bool is_nodal_0 = mf.is_nodal(0);
