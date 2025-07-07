@@ -29,7 +29,7 @@ electron.injection_style = "NUniformPerCell"
 electron.num_particles_per_cell_each_dim = 6 2 2
 electron.profile = parse_density_function
 electron.density_function(x,y,z) = "(x*x + y*y + z*z < R0*R0)*n0"
-electron.radial_weight_power = 0.
+electron.radial_numpercell_power = 1.
 electron.xmax = R0
 electron.momentum_distribution_type = at_rest
 
