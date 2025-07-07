@@ -54,10 +54,10 @@ VarianceAccumulationBuffer::reset ()
 
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
         for (int idir = 0; idir < 3; ++idir) {
-            get("w", Direction{idir}, lev)->setVal(0._rt);
-            get("w2", Direction{idir}, lev)->setVal(0._rt);
-            get("vbar", Direction{idir}, lev)->setVal(0._rt);
-            get_n(Direction{idir}, lev)->setVal(0);
+            warpx.m_fields.get("variance_buffer_w_" + m_species_name, dir, lev)->setVal(0._rt);
+            warpx.m_fields.get("variance_buffer_w2_" + m_species_name, dir, lev)->setVal(0._rt);
+            warpx.m_fields.get("variance_buffer_vbar_" + m_species_name, dir, lev)->setVal(0._rt);
+            m_nsamples[lev][dir]->setVal(0);
         }
     }
 }

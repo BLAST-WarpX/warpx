@@ -82,6 +82,14 @@ void varianceDepositionSubKernel(
             &wy_arr(iyv[0], iyv[1], iyv[2], 0), wqy_var);
         amrex::Gpu::Atomic::AddNoRet(
             &wz_arr(izv[0], izv[1], izv[2], 0), wqz_var);
+
+        // Update wv_sum to be normalized to vbar
+        amrex::Gpu::Atomic::AddNoRet(
+            &vxbar_arr(ixv[0], ixv[1], ixv[2], 0), wqx_var*vxr);
+        amrex::Gpu::Atomic::AddNoRet(
+            &vybar_arr(iyv[0], iyv[1], iyv[2], 0), wqy_var*vyr);
+        amrex::Gpu::Atomic::AddNoRet(
+            &vzbar_arr(izv[0], izv[1], izv[2], 0), wqz_var*vzr);
     }
 
     if (type == TemperatureDepositionType::SINGLE_PASS || pass == TemperatureDepositionPass::SECOND)
@@ -119,17 +127,6 @@ void varianceDepositionSubKernel(
             &w2y_arr(iyv[0], iyv[1], iyv[2], 0), wqy_var*vyd*vyd);
         amrex::Gpu::Atomic::AddNoRet(
             &w2z_arr(izv[0], izv[1], izv[2], 0), wqz_var*vzd*vzd);
-    }
-
-    if (type == TemperatureDepositionType::SINGLE_PASS || pass == TemperatureDepositionPass::FIRST)
-    {
-        // Update wv_sum to be normalized to vbar
-        amrex::Gpu::Atomic::AddNoRet(
-            &vxbar_arr(ixv[0], ixv[1], ixv[2], 0), wqx_var*vxr);
-        amrex::Gpu::Atomic::AddNoRet(
-            &vybar_arr(iyv[0], iyv[1], iyv[2], 0), wqy_var*vyr);
-        amrex::Gpu::Atomic::AddNoRet(
-            &vzbar_arr(izv[0], izv[1], izv[2], 0), wqz_var*vzr);
     }
 }
 
