@@ -1,6 +1,7 @@
 CEXE_sources += PEC_Insulator.cpp
 CEXE_sources += PML.cpp WarpXEvolvePML.cpp
 CEXE_sources += WarpXFieldBoundaries.cpp WarpX_PEC.cpp
+CEXE_sources += Quartz.cpp
 
 ifeq ($(USE_RZ),TRUE)
     CEXE_sources += PML_RZ.cpp

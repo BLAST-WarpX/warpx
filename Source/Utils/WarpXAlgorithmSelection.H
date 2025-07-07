@@ -137,6 +137,7 @@ AMREX_ENUM(FieldBoundaryType,
                     // Note that the solver implicitely assumes open BCs:
                     // no need to enforce them separately
            PECInsulator, // Mixed boundary with PEC and insulator
+           Quartz,  //!< quartz boundary condition with dielectric properties
            Default = PML);
 
 /** Particle boundary conditions at the domain boundary

@@ -1823,6 +1823,9 @@ WarpX::ReadParameters ()
 
     // Setup pec_insulator boundary conditions
     pec_insulator_boundary = std::make_unique<PEC_Insulator>();
+    
+    // Setup quartz boundary conditions
+    quartz_boundary = std::make_unique<Quartz>();
 
     // for slice generation //
     {

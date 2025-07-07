@@ -1,0 +1,92 @@
+# CCP (Capacitively Coupled Plasma) 石英环边界条件示例
+# 模拟等离子体刻蚀设备中的石英环边界
+
+# 网格设置
+amr.n_cell = 64 64 32
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 16
+
+# 几何设置
+geometry.dims = 3
+geometry.prob_lo = -0.1 -0.1 -0.05
+geometry.prob_hi =  0.1  0.1  0.05
+geometry.is_periodic = 0 0 0
+
+# 边界条件设置
+boundary.field_lo = quartz quartz quartz
+boundary.field_hi = quartz quartz quartz
+
+# 石英环参数
+quartz.epsilon_r = 3.8                    # 石英相对介电常数
+quartz.mu_r = 1.0                         # 石英相对磁导率
+quartz.sigma = 1e-12                      # 石英电导率 (S/m)
+quartz.ring_inner_radius = 0.05           # 石英环内半径 (m)
+quartz.ring_outer_radius = 0.08           # 石英环外半径 (m)
+quartz.ring_height = 0.02                 # 石英环高度 (m)
+quartz.ring_center_x = 0.0                # 石英环中心x坐标 (m)
+quartz.ring_center_y = 0.0                # 石英环中心y坐标 (m)
+quartz.ring_bottom_z = -0.01              # 石英环底部z坐标 (m)
+
+# 时间步长设置
+warpx.dt = 1e-12
+max_step = 1000
+warpx.fixed_dt = 1
+
+# 诊断设置
+diagnostics.diags_names = diag1
+diag1.diag_type = Full
+diag1.intervals = 100
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz rho
+diag1.plot_int = 100
+diag1.format = plotfile
+
+# 等离子体设置
+particles.species_names = electrons ions
+
+# 电子设置
+electrons.charge = -1.602176634e-19
+electrons.mass = 9.1093837015e-31
+electrons.injection_style = NUniformPerCell
+electrons.num_particles_per_cell_each_dim = 2 2 2
+electrons.xmin = -0.1
+electrons.xmax =  0.1
+electrons.ymin = -0.1
+electrons.ymax =  0.1
+electrons.zmin = -0.05
+electrons.zmax =  0.05
+electrons.profile = constant
+electrons.density = 1e16
+electrons.temperature = 2.0
+electrons.theta = 2.0
+electrons.mean_velocity = 0.0 0.0 0.0
+electrons.momentum_distribution_type = maxwell_boltzmann
+
+# 离子设置
+ions.charge = 1.602176634e-19
+ions.mass = 6.644657230e-26  # Ar+
+ions.injection_style = NUniformPerCell
+ions.num_particles_per_cell_each_dim = 2 2 2
+ions.xmin = -0.1
+ions.xmax =  0.1
+ions.ymin = -0.1
+ions.ymax =  0.1
+ions.zmin = -0.05
+ions.zmax =  0.05
+ions.profile = constant
+ions.density = 1e16
+ions.temperature = 0.1
+ions.theta = 0.1
+ions.mean_velocity = 0.0 0.0 0.0
+ions.momentum_distribution_type = maxwell_boltzmann
+
+# 电磁场求解器
+algo.field_solver = yee
+algo.maxwell_solver = yee
+algo.particle_pusher = vay
+algo.particle_shape = 2
+
+# 输出设置
+diag1.intervals = 100
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz rho
+diag1.plot_int = 100 

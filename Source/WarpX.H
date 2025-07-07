@@ -14,6 +14,7 @@
 
 #include "BoundaryConditions/PEC_Insulator_fwd.H"
 #include "BoundaryConditions/PML_fwd.H"
+#include "BoundaryConditions/Quartz.H"
 #include "Diagnostics/MultiDiagnostics_fwd.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags_fwd.H"
 #include "EmbeddedBoundary/WarpXFaceInfoBox_fwd.H"
@@ -1264,6 +1265,7 @@ private:
 
     // Insulator boundary conditions
     std::unique_ptr<PEC_Insulator> pec_insulator_boundary;
+    std::unique_ptr<Quartz> quartz_boundary;
 
     // External fields parameters
     std::unique_ptr<ExternalFieldParams> m_p_ext_field_params;

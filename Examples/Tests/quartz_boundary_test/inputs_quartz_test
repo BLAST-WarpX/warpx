@@ -1,0 +1,68 @@
+# Test input file for quartz boundary condition
+# This example demonstrates how to use the new quartz boundary condition
+
+# Domain setup
+amr.n_cell = 64 64 64
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 32
+
+# Geometry
+geometry.dims = 3
+geometry.coord_sys = 0
+geometry.prob_lo = -1.0 -1.0 -1.0
+geometry.prob_hi = 1.0 1.0 1.0
+geometry.is_periodic = 0 0 0
+
+# Boundary conditions
+boundary.field_lo = quartz quartz quartz
+boundary.field_hi = quartz quartz quartz
+boundary.particle_lo = absorbing absorbing absorbing
+boundary.particle_hi = absorbing absorbing absorbing
+
+# Quartz boundary parameters
+quartz.epsilon_r = 3.8
+quartz.mu_r = 1.0
+quartz.sigma = 0.0
+
+# Quartz ring geometry parameters for CCP applications
+quartz.ring_inner_radius = 0.05    # Inner radius of the ring (m)
+quartz.ring_outer_radius = 0.08    # Outer radius of the ring (m)
+quartz.ring_height = 0.02          # Height of the ring (m)
+quartz.ring_center_x = 0.0         # Center x-coordinate (m)
+quartz.ring_center_y = 0.0         # Center y-coordinate (m)
+quartz.ring_bottom_z = 0.0         # Bottom z-coordinate (m)
+
+# Time stepping
+warpx.time_step_max = 100
+warpx.time_step_min = 0
+warpx.max_step = 100
+warpx.stop_time = 10.0
+
+# Electromagnetic solver
+algo.electromagnetic_solver = yee
+algo.particle_pusher = boris
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 10
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz
+diag1.format = plotfile
+
+# Particles (optional - for testing with particles)
+particles.nspecies = 1
+particles.species_names = electrons
+electrons.charge = -1.0
+electrons.mass = 1.0
+electrons.injection_style = gaussian_beam
+electrons.gaussian_beam_position_mean = 0.0 0.0 0.0
+electrons.gaussian_beam_position_std = 0.1 0.1 0.1
+electrons.gaussian_beam_total_charge = 1.0e-12
+electrons.gaussian_beam_velocity_mean = 0.0 0.0 0.1
+electrons.gaussian_beam_velocity_std = 0.0 0.0 0.01
+
+# External fields (optional - for testing with external fields)
+warpx.do_external_field = 1
+warpx.external_field_type = constant
+warpx.external_field_E = 0.0 0.0 1.0e6
+warpx.external_field_B = 0.0 0.0 0.0 

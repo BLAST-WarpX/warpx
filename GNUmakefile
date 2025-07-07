@@ -15,7 +15,8 @@ DIM = 3
 QED	       = TRUE
 #QED_TABLE_GEN = TRUE
 
-COMP = gcc
+#COMP = gcc
+COMP = clang
 #COMP = intel
 #COMP = pgi
 
