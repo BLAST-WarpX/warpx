@@ -66,7 +66,7 @@ add_warpx_test(
     RZ  # dims
     2  # nprocs
     inputs_test_rz_electrostatic_sphere_uniform_weighting  # inputs
-    analysis_electrostatic_sphere.py  # analysis
-    diags/diag1000030  # output
+    "analysis_electrostatic_sphere.py diags/diag1000030" # analysis
+    "analysis_default_regression.py --path diags/diag1000030"  # checksum
     OFF  # dependency
 )
