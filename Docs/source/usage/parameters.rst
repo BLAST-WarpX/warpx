@@ -2233,7 +2233,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     conserve energy and momentum. When this option is on, after the collisions, small modifications are made to the
     particle mometum so that the energy and momentum are exactly conserved in each cell.
 
-* ``collisions.energy_fraction`` (`float`) optional (default 0.5)
+* ``collisions.energy_fraction`` (`float`) optional (default 0.05)
     For pairwisecoulomb collisions, when correcting the energy and momentum conservation, the energy correction is applied to pairs of particles in their center of momentum frame.
     This parameter is the fraction of the relative energy in the COM frame that is used in the correction.
 

@@ -1320,7 +1320,7 @@ private:
 
     bool m_correct_energy_momentum = false;
     amrex::ParticleReal m_beta_weight_exponent = 1.;
-    amrex::ParticleReal m_energy_fraction = 0.5;
+    amrex::ParticleReal m_energy_fraction = 0.05;
     amrex::ParticleReal m_energy_fraction_max = 0.5;
 
     amrex::Vector<std::string> m_product_species;
