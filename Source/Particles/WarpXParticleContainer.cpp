@@ -12,6 +12,8 @@
 #include "ablastr/particles/DepositCharge.H"
 #include "Deposition/ChargeDeposition.H"
 #include "Deposition/CurrentDeposition.H"
+#include "Deposition/VarianceAccumulationBuffer.H"
+#include "Deposition/TemperatureDeposition.H"
 #include "Deposition/MassMatricesDeposition.H"
 #include "Deposition/SharedDepositionUtils.H"
 #include "EmbeddedBoundary/Enabled.H"
@@ -151,6 +153,7 @@ void
 WarpXParticleContainer::ReadParameters ()
 {
     static bool initialized = false;
+
     if (!initialized)
     {
         const ParmParse pp_particles("particles");
@@ -1692,7 +1695,7 @@ WarpXParticleContainer::GetChargeDensity (int lev, bool local)
  * \param lev         Level of box that contains particles
  */
 void
-WarpXParticleContainer::DepositTemperature (amrex::MultiFab* temperature, const int lev)
+WarpXParticleContainer::DepositTotalNGPTemperature (amrex::MultiFab* temperature, const int lev)
 {
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(mass > 0.,
@@ -1801,7 +1804,7 @@ WarpXParticleContainer::DepositTemperature (amrex::MultiFab* temperature, const 
 }
 
 std::unique_ptr<amrex::MultiFab>
-WarpXParticleContainer::GetTemperature (int lev)
+WarpXParticleContainer::GetAverageNGPTemperature (int lev)
 {
     auto const& ba = m_gdb->ParticleBoxArray(lev);
     auto const& dm = m_gdb->DistributionMap(lev);
@@ -1814,7 +1817,7 @@ WarpXParticleContainer::GetTemperature (int lev)
 
     // Thermodynamic temperature is not defined for massless particles
     if (mass > 0.) {
-        DepositTemperature(temperature.get(), lev);
+        DepositTotalNGPTemperature(temperature.get(), lev);
     }
 
     return temperature;
@@ -1906,7 +1909,7 @@ WarpXParticleContainer::GetDebyeLength (int lev)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(mass*charge != 0.,
         "The Debye length can not be calculated for a massless or neutral species.");
 
-    std::unique_ptr<amrex::MultiFab> temperature = GetTemperature(lev);
+    std::unique_ptr<amrex::MultiFab> temperature = GetAverageNGPTemperature(lev);
     std::unique_ptr<amrex::MultiFab> number_density = GetNumberDensity(lev);
 
     amrex::BoxArray const & ba = temperature->boxArray();

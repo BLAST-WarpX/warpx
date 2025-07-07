@@ -52,6 +52,7 @@
 #   include <AMReX_EBFabFactory.H>
 #endif
 
+#include <algorithm>
 #include <array>
 #include <optional>
 #include <stdexcept>
@@ -256,6 +257,11 @@ computePhi (
             {{ beta[0], beta[1], beta[2] }};
 #endif
 
+    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE (
+        std::all_of(beta_solver.begin(), beta_solver.end(),
+            [](const auto b){return (b<1.0_rt);}),
+        "Components of beta_solver must be < 1.");
+
     // determine if rho is zero everywhere
     const amrex::Real max_norm_b = getMaxNormRho(
         amrex::GetVecOfConstPtrs(rho), finest_level, absolute_tolerance);
@@ -399,7 +405,7 @@ computePhi (
         amrex::MLMG mlmg(*linop); // actual solver defined here
         mlmg.setVerbose(verbosity);
         mlmg.setMaxIter(max_iters);
-        mlmg.setAlwaysUseBNorm((max_norm_b > 0));
+        mlmg.setConvergenceNormType((max_norm_b > 0) ? amrex::MLMGNormType::bnorm : amrex::MLMGNormType::greater);
 
         const int ng = int(grid_type == utils::enums::GridType::Collocated); // ghost cells
         if (ng) {

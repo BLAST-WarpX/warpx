@@ -420,9 +420,9 @@ WarpX::WarpX ()
     {
         warpx::load_balancing::ScopedTimeTracker::toggle_tracking(true);
 
-        auto resize_vector = amrex::Vector{max_level};
-        for (int i = 0; i < max_level; ++i){
-            resize_vector[i] = 
+        auto resize_vector = amrex::Vector<int>(max_level);
+        for (int lev = 0; lev < max_level; ++lev){
+            resize_vector[lev] = /.../
         }
         warpx::load_balancing::ScopedTimeTracker::resize(resize_vector);
         // TODO //
