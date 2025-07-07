@@ -111,7 +111,7 @@ if(WarpX_QED)
         "Repository URI to pull and build PICSAR from if(WarpX_picsar_internal)")
 
     # Parse PICSAR version and commit information
-    file(READ "${CMAKE_SOURCE_DIR}/dependencies.json" dependencies_data)
+    file(READ "${WarpX_SOURCE_DIR}/dependencies.json" dependencies_data)
     string(JSON picsar_version GET "${dependencies_data}" version_picsar)
     string(JSON picsar_commit GET "${dependencies_data}" commit_picsar)
 

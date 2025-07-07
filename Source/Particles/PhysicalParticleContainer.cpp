@@ -2174,12 +2174,18 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                     amrex::MultiFab * jy = fields.get(current_fp_string, Direction{1}, lev);
                     amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
                     if (push_type == PushType::Implicit && deposit_mass_matrices) {
-                        amrex::MultiFab * Sx = fields.get(FieldType::MassMatrices, Direction{0}, lev);
-                        amrex::MultiFab * Sy = fields.get(FieldType::MassMatrices, Direction{1}, lev);
-                        amrex::MultiFab * Sz = fields.get(FieldType::MassMatrices, Direction{2}, lev);
+                        amrex::MultiFab * Sxx = fields.get(FieldType::MassMatrices_X, Direction{0}, lev);
+                        amrex::MultiFab * Sxy = fields.get(FieldType::MassMatrices_X, Direction{1}, lev);
+                        amrex::MultiFab * Sxz = fields.get(FieldType::MassMatrices_X, Direction{2}, lev);
+                        amrex::MultiFab * Syx = fields.get(FieldType::MassMatrices_Y, Direction{0}, lev);
+                        amrex::MultiFab * Syy = fields.get(FieldType::MassMatrices_Y, Direction{1}, lev);
+                        amrex::MultiFab * Syz = fields.get(FieldType::MassMatrices_Y, Direction{2}, lev);
+                        amrex::MultiFab * Szx = fields.get(FieldType::MassMatrices_Z, Direction{0}, lev);
+                        amrex::MultiFab * Szy = fields.get(FieldType::MassMatrices_Z, Direction{1}, lev);
+                        amrex::MultiFab * Szz = fields.get(FieldType::MassMatrices_Z, Direction{2}, lev);
                         DepositCurrentAndMassMatrices(pti, wp, uxp, uyp, uzp, jx, jy, jz,
-                                       Sx, Sy, Sz, bxfab, byfab, bzfab, 0, np_current, thread_num,
-                                       lev, lev, dt);
+                                       Sxx, Sxy, Sxz, Syx, Syy, Syz, Szx, Szy, Szz,
+                                       bxfab, byfab, bzfab, 0, np_current, thread_num, lev, lev, dt);
                     }
                     else {
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
@@ -2323,8 +2329,7 @@ PhysicalParticleContainer::applyNCIFilter (
 void
 PhysicalParticleContainer::SplitParticles (int lev)
 {
-    auto& mypc = WarpX::GetInstance().GetPartContainer();
-    auto& pctmp_split = mypc.GetPCtmp();
+    PhysicalParticleContainer pctmp_split(&WarpX::GetInstance());
     RealVector psplit_x, psplit_y, psplit_z, psplit_w;
     RealVector psplit_ux, psplit_uy, psplit_uz;
     long np_split_to_add = 0;
@@ -2523,8 +2528,6 @@ PhysicalParticleContainer::SplitParticles (int lev)
     // Copy particles from tmp to current particle container
     constexpr bool local_flag = true;
     addParticles(pctmp_split,local_flag);
-    // Clear tmp container
-    pctmp_split.clearParticles();
 }
 
 void

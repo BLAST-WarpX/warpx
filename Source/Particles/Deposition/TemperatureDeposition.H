@@ -12,7 +12,6 @@
 
 #include "Particles/Deposition/VarianceAccumulationBuffer.H"
 #include "Particles/Deposition/SharedDepositionUtils.H"
-#include "ablastr/parallelization/KernelTimer.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/ShapeFactors.H"
 #include "Utils/TextMsg.H"

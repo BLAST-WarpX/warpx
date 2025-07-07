@@ -76,7 +76,7 @@ set(WarpX_pyamrex_repo "https://github.com/AMReX-Codes/pyamrex.git"
     "Repository URI to pull and build pyamrex from if(WarpX_pyamrex_internal)")
 
 # Parse pyAMReX version and commit information
-file(READ "${CMAKE_SOURCE_DIR}/dependencies.json" dependencies_data)
+file(READ "${WarpX_SOURCE_DIR}/dependencies.json" dependencies_data)
 string(JSON pyamrex_version GET "${dependencies_data}" version_pyamrex)
 string(JSON pyamrex_commit GET "${dependencies_data}" commit_pyamrex)
 
