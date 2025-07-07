@@ -267,6 +267,11 @@ Nuclear Fusion and Plasma Confinement
 Plasma Thrusters and Spacecraft Physics
 ***************************************
 
+#. Xie L., Zhou Z., Luo X., Zhao Y.
+   **The influence of adding Monte Carlo collisions on convergence in 3D PIC simulations of Hall thruster azimuthal instability**.
+   Phys. Scr. **100**, 075616, 2025.
+   `DOI:10.1088/1402-4896/ade636 <https://doi.org/10.1088/1402-4896/ade636>`__
+
 #. Sam A., Elschot S.,
    **Self-consistent charging of complex objects in flowing plasma: Implementation and analysis in WarpX**.
    Computer Physics Communications, **314**, 109680, 2025.

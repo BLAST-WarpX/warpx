@@ -213,7 +213,7 @@ WarpX::Evolve (int numsteps)
         if (step == step_begin &&
             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC
         ) {
-            HybridPICDepositInitialRhoAndJ();
+            HybridPICInitializeRhoJandB();
         }
 
         // Run multi-physics modules:
