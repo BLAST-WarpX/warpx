@@ -1954,7 +1954,7 @@ WarpXParticleContainer::GetDebyeLength (int lev)
     return debye_length;
 }
 
-std::pair<amrex::ParticleReal, amrex::ParticleReal> WarpXParticleContainer::sumParticleWeightAndEnergy(bool local) const {
+std::pair<amrex::ParticleReal, amrex::ParticleReal> WarpXParticleContainer::sumParticleWeightAndEnergy (bool local) const {
 
     // Get mass (used only for particles other than photons, see below)
     const amrex::Real m = this->mass;
@@ -2008,19 +2008,19 @@ std::pair<amrex::ParticleReal, amrex::ParticleReal> WarpXParticleContainer::sumP
     return {Etot,Ws};
 }
 
-amrex::ParticleReal WarpXParticleContainer::sumParticleEnergy(bool local) const {
+amrex::ParticleReal WarpXParticleContainer::sumParticleEnergy (bool local) const {
 
     auto [total_energy, total_weight] = this->sumParticleWeightAndEnergy(local);
     return total_energy;
 }
 
-amrex::ParticleReal WarpXParticleContainer::sumParticleWeight(bool local) const {
+amrex::ParticleReal WarpXParticleContainer::sumParticleWeight (bool local) const {
 
     auto [total_energy, total_weight] = this->sumParticleWeightAndEnergy(local);
     return total_weight;
 }
 
-amrex::ParticleReal WarpXParticleContainer::sumParticleCharge(bool local) const {
+amrex::ParticleReal WarpXParticleContainer::sumParticleCharge (bool local) const {
 
     return this->sumParticleWeight(local) * this->charge;
 }
