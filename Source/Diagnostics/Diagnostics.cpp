@@ -524,7 +524,10 @@ Diagnostics::InitBaseData ()
     // current moving_window location
     if (WarpX::do_moving_window) {
         const int moving_dir = WarpX::moving_window_dir;
-        const int shift_num_base = static_cast<int>((warpx.getmoving_window_x() - m_lo[moving_dir]) / warpx.Geom(0).CellSize(moving_dir) );
+        const amrex::Real displacement =
+            warpx.getmoving_window_x() - warpx.Geom(0).ProbLo(moving_dir);
+        const int shift_num_base = static_cast<int>
+            (displacement / warpx.Geom(0).CellSize(moving_dir));
         m_lo[moving_dir] += shift_num_base * warpx.Geom(0).CellSize(moving_dir);
         m_hi[moving_dir] += shift_num_base * warpx.Geom(0).CellSize(moving_dir);
     }
