@@ -718,7 +718,6 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
                         }
                     });
             }
-
         }
 
 #ifdef AMREX_USE_OMP
@@ -738,9 +737,7 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
                     }
                 });
         }
-
     }
-
 }
 
 void

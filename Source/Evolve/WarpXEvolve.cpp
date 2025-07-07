@@ -419,6 +419,7 @@ void WarpX::OneStep (
             ExecutePythonCallback("aftercollisions");
             // only gather fields and push particles,
             // deposition and calculation of fields done further below
+            position_push_half = true;
             momentum_push_skip = true;
             PushParticlesandDeposit(
                 // FIXME Should this be a_cur_time + a_dt*0.5?
