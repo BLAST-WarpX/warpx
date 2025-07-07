@@ -478,8 +478,38 @@ void ImplicitSolver::InitializeMassMatrices ()
                 Nc_tot_zz *= m_ncomp_zz[dir];
             }
         }
+        else if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                shape==2,
+                "Mass Matrices for Jacobian with Villasenor deposition requires shape = 2.");
+#if AMREX_SPACEDIM == 1
+            int max_crossings = ngJ[0] - 1;
+            m_ncomp_xx[0] = 3 + 2*max_crossings;
+            m_ncomp_xy[0] = 4 + 2*max_crossings;
+            m_ncomp_xz[0] = 4 + 2*max_crossings;
+            m_ncomp_yx[0] = 4 + 2*max_crossings;
+            m_ncomp_yy[0] = 5 + 2*max_crossings;
+            m_ncomp_yz[0] = 5 + 2*max_crossings;
+            m_ncomp_zx[0] = 4 + 2*max_crossings;
+            m_ncomp_zy[0] = 5 + 2*max_crossings;
+            m_ncomp_zz[0] = 5 + 2*max_crossings;
+            //
+            Nc_tot_xx *= m_ncomp_xx[0];
+            Nc_tot_xy *= m_ncomp_xy[0];
+            Nc_tot_xz *= m_ncomp_xz[0];
+            Nc_tot_yx *= m_ncomp_yx[0];
+            Nc_tot_yy *= m_ncomp_yy[0];
+            Nc_tot_yz *= m_ncomp_yz[0];
+            Nc_tot_zx *= m_ncomp_zx[0];
+            Nc_tot_zy *= m_ncomp_zy[0];
+            Nc_tot_zz *= m_ncomp_zz[0];
+#else
+            int max_crossings = ngJ[0] - 2;
+#endif
+            AMREX_ASSERT(max_crossings>0);
+        }
         else {
-            WARPX_ABORT_WITH_MESSAGE("Mass matrices can only be used with Direct deposition (for now).");
+            WARPX_ABORT_WITH_MESSAGE("Mass matrices can only be used with Direct and Villasenor depositions.");
         }
     }
     else { // Mass matrices used for PC only
