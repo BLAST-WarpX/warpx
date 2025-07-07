@@ -1921,7 +1921,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                     // Update the weight based on the specified power.
                     // The coefficient ensures that the correct density distribution is obtained.
                     const amrex::Real coeff = 4._rt*MathConst::pi/(1._rt + radial_numpercell_power)
-                        *(rmax*rmax - std::pow(rmax, 1._rt - radial_numpercell_powert)*std::pow(rmin, 1._rt + radial_numpercell_power));
+                        *(rmax*rmax - std::pow(rmax, 1._rt - radial_numpercell_power)*std::pow(rmin, 1._rt + radial_numpercell_power));
                     t_weight *= coeff*std::pow(radial_position/rmax, 2._rt - radial_numpercell_power);
                 }
                 const Real weight = t_weight;
