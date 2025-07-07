@@ -416,18 +416,11 @@ WarpX::WarpX ()
     do_pml_Hi.resize(nlevs_max);
 
     const bool enable_time_tracking = load_balance_costs_update_algo==LoadBalanceCostsUpdateAlgo::Timers;
-    if (enable_time_tracking)
-    {
-        warpx::load_balancing::ScopedTimeTracker::toggle_tracking(true);
-
-        auto resize_vector = amrex::Vector<int>(max_level);
-        for (int lev = 0; lev < max_level; ++lev){
-            resize_vector[lev] = /.../
-        }
-        warpx::load_balancing::ScopedTimeTracker::resize(resize_vector);
-        // TODO //
-        //     costs.resize(nlevs_max);
+    if (enable_time_tracking){
+        warpx::load_balancing::ScopedTimeTracker::toggle_tracking(enable_time_tracking);
+        warpx::load_balancing::ScopedTimeTracker::resize(max_level);
     }
+
 
     load_balance_efficiency.resize(nlevs_max);
 
@@ -2945,7 +2938,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
 
     if (load_balance_intervals.isActivated())
     {
-        costs[lev] = std::make_unique<LayoutData<Real>>(ba, dm);
+        warpx::load_balancing::ScopedTimeTracker::resize_level(lev, ba, dm);
         load_balance_efficiency[lev] = -1;
     }
 }

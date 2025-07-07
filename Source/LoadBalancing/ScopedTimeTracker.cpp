@@ -17,10 +17,10 @@ namespace warpx::load_balancing
 {
 
     bool ScopedTimeTracker::do_tracking = false;
-    amrex::Vector<amrex::Vector<amrex::Real>> ScopedTimeTracker::all_times = amrex::Vector<amrex::Vector<amrex::Real>>{};
+    amrex::Vector<amrex::LayoutData<amrex::Real>> ScopedTimeTracker::all_times = amrex::Vector<amrex::LayoutData<amrex::Real>>{};
 
     [[nodiscard]]
-    const amrex::Vector<amrex::Vector<amrex::Real>>& ScopedTimeTracker::view_tracked_times ()
+    const amrex::Vector<amrex::LayoutData<amrex::Real>>& ScopedTimeTracker::view_tracked_times ()
     {
         return ScopedTimeTracker::all_times;
     }
@@ -64,29 +64,32 @@ namespace warpx::load_balancing
         ScopedTimeTracker::do_tracking = do_tracking_flag;
     }
 
-    void ScopedTimeTracker::resize (const amrex::Vector<std::size_t>& max_index_per_level)
+    void ScopedTimeTracker::resize (const int max_num_levels)
     {
-        const auto max_index_per_level_size = max_index_per_level.size();
-        all_times.resize(max_index_per_level_size);
-        for (int i = 0; i < max_index_per_level_size; ++i)
-        {
-            all_times[i].resize(max_index_per_level[i]);
-        }
+        all_times.resize(max_num_levels);
+    }
+
+    void ScopedTimeTracker::resize_level (const int lev, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm)
+    {
+        all_times.at(lev) = amrex::LayoutData<amrex::Real>{ba, dm};
     }
 
     void ScopedTimeTracker::reset_values ()
     {
         for (auto& lev_data : ScopedTimeTracker::all_times){
-            for (auto& lev_index_data : lev_data){
-                lev_index_data = 0.0;
+            const auto& idxs = lev_data.IndexArray();
+            for (const auto& idx : idxs){
+                lev_data[idx] = 0.0;
             }
         }
     }
 
     void ScopedTimeTracker::reset_values (const int lev)
     {
-        for (auto& lev_index_data : ScopedTimeTracker::all_times[lev]){
-            lev_index_data = 0.0;
+        auto& lev_data = ScopedTimeTracker::all_times[lev];
+        const auto& idxs = lev_data.IndexArray();
+        for (const auto& idx : idxs){
+            lev_data[idx] = 0.0;
         }
     }
 

@@ -126,9 +126,11 @@ Overall simulation parameters
     , this sets the relative tolerance for the iterative method used to obtain a self-consistent update of the particles at
     each iteration in the JFNK process.
 
-* ``implicit_evolve.use_mass_matrices`` (`bool`, default: false)
-    When `algo.evolve_scheme` is either `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton` and a preconditioner is being used
-    , the diagonal components of the diagonal mass matrices are used to capture the plasma response in the preconditioner.
+* ``implicit_evolve.use_mass_matrices_jacobian`` (`bool`, default: false)
+    When `algo.evolve_scheme` is `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton`, mass matrices are computed at each nonlinear JFNK iteration and are used during the linear iterations to compute the plasma current density, replacing direct particle calculations.
+
+* ``implicit_evolve.use_mass_matrices_pc`` (`bool`, default: false)
+    When `algo.evolve_scheme` is `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton` and a preconditioner is used, this flag determines whether the plasma response is captured in the preconditioner.
 
 * ``picard.verbose`` (`bool`, default: 1)
     When `implicit_evolve.nonlinear_solver = picard`, this sets the verbosity of the Picard solver. If true, then information

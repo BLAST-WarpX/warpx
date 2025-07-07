@@ -8,6 +8,9 @@
 #ifndef WARPX_LOAD_BALANCING_SCOPED_TIME_TRACKER_H_
 #define WARPX_LOAD_BALANCING_SCOPED_TIME_TRACKER_H_
 
+#include <AMReX_BoxArray.H>
+#include <AMReX_DistributionMapping.H>
+#include <AMReX_LayoutData.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
 
@@ -20,7 +23,7 @@ namespace warpx::load_balancing
 
     public:
         [[nodiscard]]
-        static const amrex::Vector<amrex::Vector<amrex::Real>>& view_tracked_times ();
+        static const amrex::Vector<amrex::LayoutData<amrex::Real>>& view_tracked_times ();
 
         [[nodiscard]]
         static bool enabled ();
@@ -37,12 +40,13 @@ namespace warpx::load_balancing
 
     private:
         static void toggle_tracking (bool do_tracking_flag);
-        static void resize (const amrex::Vector<std::size_t>& max_index_per_level);
+        static void resize (int max_num_levels);
+        static void resize_level (int lev, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm);
         static void reset_values ();
         static void reset_values (int lev);
 
         static bool do_tracking;
-        static amrex::Vector<amrex::Vector<amrex::Real>> all_times;
+        static amrex::Vector<amrex::LayoutData<amrex::Real>> all_times;
 
         ScopedTimeTracker(int lev, int mfi_iter_index, bool enabled_local);
 
