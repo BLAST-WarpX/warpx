@@ -482,8 +482,19 @@ void ImplicitSolver::InitializeMassMatrices ()
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 shape==2,
                 "Mass Matrices for Jacobian with Villasenor deposition requires shape = 2.");
-#if AMREX_SPACEDIM == 1
+#if (AMREX_SPACEDIM == 1)
             int max_crossings = ngJ[0] - 1;
+#if defined(WARPX_DIM_1D_Z)
+            m_ncomp_xx[0] = 5 + 2*max_crossings;
+            m_ncomp_xy[0] = 5 + 2*max_crossings;
+            m_ncomp_xz[0] = 4 + 2*max_crossings;
+            m_ncomp_yx[0] = 5 + 2*max_crossings;
+            m_ncomp_yy[0] = 5 + 2*max_crossings;
+            m_ncomp_yz[0] = 4 + 2*max_crossings;
+            m_ncomp_zx[0] = 4 + 2*max_crossings;
+            m_ncomp_zy[0] = 4 + 2*max_crossings;
+            m_ncomp_zz[0] = 3 + 2*max_crossings;
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             m_ncomp_xx[0] = 3 + 2*max_crossings;
             m_ncomp_xy[0] = 4 + 2*max_crossings;
             m_ncomp_xz[0] = 4 + 2*max_crossings;
@@ -493,7 +504,7 @@ void ImplicitSolver::InitializeMassMatrices ()
             m_ncomp_zx[0] = 4 + 2*max_crossings;
             m_ncomp_zy[0] = 5 + 2*max_crossings;
             m_ncomp_zz[0] = 5 + 2*max_crossings;
-            //
+#endif
             Nc_tot_xx *= m_ncomp_xx[0];
             Nc_tot_xy *= m_ncomp_xy[0];
             Nc_tot_xz *= m_ncomp_xz[0];
