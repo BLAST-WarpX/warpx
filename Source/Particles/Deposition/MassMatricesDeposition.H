@@ -652,7 +652,9 @@ void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
  * \param Sxx_nComp                number of Sxx components
  * \param Syy_nComp                number of Syy components
  * \param Szz_nComp                number of Szz components
- * \param Sxx_arr,Syy_arr,Szz_arr  Array4 of mass matrices, either full array or tile
+ * \param Sxx_arr,Sxy_arr,Sxz_arr  Array4 of mass matrices for Jx, either full array or tile
+ * \param Syx_arr,Syy_arr,Syz_arr  Array4 of mass matrices for Jy, either full array or tile
+ * \param Szx_arr,Szy_arr,Szz_arr  Array4 of mass matrices for Jz, either full array or tile
  * \param dt                       Time step for particle level
  * \param dinv                     3D cell size inverse
  * \param xyzmin                   Physical lower bounds of domain
@@ -681,7 +683,13 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                                              int Syy_nComp,
                                              int Szz_nComp,
                                              amrex::Array4<amrex::Real> const& Sxx_arr,
+                                             [[maybe_unused]] amrex::Array4<amrex::Real> const& Sxy_arr,
+                                             [[maybe_unused]] amrex::Array4<amrex::Real> const& Sxz_arr,
+                                             [[maybe_unused]] amrex::Array4<amrex::Real> const& Syx_arr,
                                              amrex::Array4<amrex::Real> const& Syy_arr,
+                                             [[maybe_unused]] amrex::Array4<amrex::Real> const& Syz_arr,
+                                             [[maybe_unused]] amrex::Array4<amrex::Real> const& Szx_arr,
+                                             [[maybe_unused]] amrex::Array4<amrex::Real> const& Szy_arr,
                                              amrex::Array4<amrex::Real> const& Szz_arr,
                                              const amrex::Real dt,
                                              const amrex::XDim3& dinv,
@@ -1300,7 +1308,9 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
  * \param Sxx_nComp                number of Sxx components
  * \param Syy_nComp                number of Syy components
  * \param Szz_nComp                number of Szz components
- * \param Sxx_arr,Syy_arr,Szz_arr  Array4 of mass matrices, either full array or tile.
+ * \param Sxx_arr,Sxy_arr,Sxz_arr  Array4 of mass matrices for Jx, either full array or tile.
+ * \param Syx_arr,Syy_arr,Syz_arr  Array4 of mass matrices for Jy, either full array or tile.
+ * \param Szx_arr,Szy_arr,Szz_arr  Array4 of mass matrices for Jz, either full array or tile.
  * \param Bx_arr,By_arr,Bz_arr     Array4 of the magnetic field, either full array or tile.
  * \param Bx_type,By_type,Bz_type  IndexType of the magnetic field
  * \param np_to_deposit            Number of particles for which current is deposited.
@@ -1330,7 +1340,13 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
                                        int Syy_nComp,
                                        int Szz_nComp,
                                        amrex::Array4<amrex::Real> const& Sxx_arr,
+                                       amrex::Array4<amrex::Real> const& Sxy_arr,
+                                       amrex::Array4<amrex::Real> const& Sxz_arr,
+                                       amrex::Array4<amrex::Real> const& Syx_arr,
                                        amrex::Array4<amrex::Real> const& Syy_arr,
+                                       amrex::Array4<amrex::Real> const& Syz_arr,
+                                       amrex::Array4<amrex::Real> const& Szx_arr,
+                                       amrex::Array4<amrex::Real> const& Szy_arr,
                                        amrex::Array4<amrex::Real> const& Szz_arr,
                                        const amrex::Array4<amrex::Real const>& Bx_arr,
                                        const amrex::Array4<amrex::Real const>& By_arr,
@@ -1417,7 +1433,9 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
                                                                 fpxx, fpyy, fpzz,
                                                                 Jx_arr, Jy_arr, Jz_arr,
                                                                 Sxx_nComp, Syy_nComp, Szz_nComp,
-                                                                Sxx_arr, Syy_arr, Szz_arr,
+                                                                Sxx_arr, Sxy_arr, Sxz_arr,
+                                                                Syx_arr, Syy_arr, Syz_arr,
+                                                                Szx_arr, Szy_arr, Szz_arr,
                                                                 dt, dinv, xyzmin, lo );
 
     });
