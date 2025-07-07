@@ -329,8 +329,6 @@ public:
         return tmp;
     }
 
-    PhysicalParticleContainer& GetPCtmp () { return *pc_tmp; }
-
     void ScrapeParticlesAtEB (ablastr::fields::MultiLevelScalarField const& distance_to_eb);
 
     std::string m_B_ext_particle_s = "none";
@@ -527,8 +525,6 @@ private:
 
     // physical particles (+ laser)
     amrex::Vector<std::unique_ptr<WarpXParticleContainer>> allcontainers;
-    // Temporary particle container, used e.g. for particle splitting.
-    std::unique_ptr<PhysicalParticleContainer> pc_tmp;
 
     void ReadParameters ();
 

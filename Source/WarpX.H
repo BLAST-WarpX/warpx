@@ -508,7 +508,7 @@ public:
      * deposits the initial ion charge and current (before the first particle
      * push), to be used in the ``HybridPICEvolveFields()`` function.
      */
-    void HybridPICDepositInitialRhoAndJ ();
+    void HybridPICInitializeRhoJandB ();
 
     /**
      * \brief Hybrid-PIC deposition function.

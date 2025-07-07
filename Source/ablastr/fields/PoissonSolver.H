@@ -52,6 +52,7 @@
 #   include <AMReX_EBFabFactory.H>
 #endif
 
+#include <algorithm>
 #include <array>
 #include <optional>
 #include <stdexcept>
@@ -255,6 +256,11 @@ computePhi (
 #else
             {{ beta[0], beta[1], beta[2] }};
 #endif
+
+    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE (
+        std::all_of(beta_solver.begin(), beta_solver.end(),
+            [](const auto b){return (b<1.0_rt);}),
+        "Components of beta_solver must be < 1.");
 
     // determine if rho is zero everywhere
     const amrex::Real max_norm_b = getMaxNormRho(
