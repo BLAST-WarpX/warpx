@@ -129,6 +129,8 @@ jobs:
           -DBUILD_SHARED_LIBS=ON       \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_COMPUTE=SYCL         \
+          -DAMReX_SYCL_AOT=ON          \
+          -DAMReX_INTEL_ARCH=pvc       \
           -DWarpX_EB=ON                \
           -DWarpX_FFT=ON               \
           -DWarpX_PYTHON=ON            \
