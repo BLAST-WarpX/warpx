@@ -201,7 +201,7 @@ namespace ParticleUtils {
                                amrex::ParticleReal const mass,
                                amrex::ParticleReal const energy_fraction,
                                amrex::ParticleReal const energy_fraction_max,
-                               amrex::ParticleReal & deltaE )
+                               amrex::ParticleReal deltaE )
     {
         using namespace amrex::literals;
 
@@ -330,7 +330,7 @@ namespace ParticleUtils {
                 // the amount of "free" energy available.
                 // If deltaE < 0, this check always passes since the amount of energy that
                 // can be added is unlimited.
-                energy_frac_eff = deltaE/Erel_cumm;
+                energy_frac_eff = std::abs(deltaE)/Erel_cumm;
                 if (energy_frac_eff > energy_fraction_max || loop_count > max_loop_count) {
 #ifndef AMREX_USE_GPU
                     if (numCell > 50) {
@@ -346,7 +346,7 @@ namespace ParticleUtils {
                 } else if (deltaE < 0.) {
                     // If after the first time around, there is energy left to distribute,
                     // increase the multiplier to distribute the rest faster.
-                    fmult_fact = energy_frac_eff/energy_fraction;
+                    fmult_fact = std::max(1._prt, energy_frac_eff/energy_fraction);
                 }
             }
 

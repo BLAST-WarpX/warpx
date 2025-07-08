@@ -998,7 +998,7 @@ public:
                         amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w2[ indices_2[i2] ]*u2z[ indices_2[i2] ]*m2);
                         amrex::ParticleReal KE2 = Algorithms::KineticEnergy(u2x[ indices_2[i2] ],
                                                                             u2y[ indices_2[i2] ],
-                                                                            u2z[ indices_2[i2] ], m1);
+                                                                            u2z[ indices_2[i2] ], m2);
                         amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w2[ indices_2[i2] ]*KE2);
                     }
                 );
@@ -1269,37 +1269,36 @@ public:
                                 deltaEp2 = w2_sum*KE2_after/Etotdenom*deltaE/numCell2;
                             }
 
+                            bool correction1_failed = false;
+                            bool correction2_failed = false;
                             if (deltaEp1 != 0.) {
                                 // Adjust species 1 particles to absorb deltaEp1.
-                                bool correction_failed =
+                                correction1_failed =
                                      ParticleUtils::ModifyEnergyPairwise(u1x, u1y, u1z, w1, indices_1,
                                                                          cell_start_1, cell_stop_1, m1,
                                                                          energy_fraction, energy_fraction_max, deltaEp1);
-                                if (correction_failed) {
-                                    // If the correction failed, give up on the collision and restore the
-                                    // momentum to what it was beforehand.
-                                    for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
-                                        u1x[ indices_1[i1] ] = u1x_before_ptr[ indices_1[i1] ];
-                                        u1y[ indices_1[i1] ] = u1y_before_ptr[ indices_1[i1] ];
-                                        u1z[ indices_1[i1] ] = u1z_before_ptr[ indices_1[i1] ];
-                                    }
-                                }
                             }
 
                             if (deltaEp2 != 0.) {
                                 // Adjust species 2 particles to absorb deltaEp2.
-                                bool correction_failed =
+                                correction2_failed =
                                      ParticleUtils::ModifyEnergyPairwise(u2x, u2y, u2z, w2, indices_2,
                                                                          cell_start_2, cell_stop_2, m2,
                                                                          energy_fraction, energy_fraction_max, deltaEp2);
-                                if (correction_failed) {
-                                    // If the correction failed, give up on the collision and restore the
-                                    // momentum to what it was beforehand.
-                                    for (index_type i2=cell_start_2; i2<cell_stop_2; ++i2) {
-                                        u2x[ indices_2[i2] ] = u2x_before_ptr[ indices_2[i2] ];
-                                        u2y[ indices_2[i2] ] = u2y_before_ptr[ indices_2[i2] ];
-                                        u2z[ indices_2[i2] ] = u2z_before_ptr[ indices_2[i2] ];
-                                    }
+                            }
+
+                            if (correction1_failed || correction2_failed) {
+                                // If the correction failed, give up on the collision and restore the
+                                // momentum to what it was beforehand.
+                                for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
+                                    u1x[ indices_1[i1] ] = u1x_before_ptr[ indices_1[i1] ];
+                                    u1y[ indices_1[i1] ] = u1y_before_ptr[ indices_1[i1] ];
+                                    u1z[ indices_1[i1] ] = u1z_before_ptr[ indices_1[i1] ];
+                                }
+                                for (index_type i2=cell_start_2; i2<cell_stop_2; ++i2) {
+                                    u2x[ indices_2[i2] ] = u2x_before_ptr[ indices_2[i2] ];
+                                    u2y[ indices_2[i2] ] = u2y_before_ptr[ indices_2[i2] ];
+                                    u2z[ indices_2[i2] ] = u2z_before_ptr[ indices_2[i2] ];
                                 }
                             }
 
