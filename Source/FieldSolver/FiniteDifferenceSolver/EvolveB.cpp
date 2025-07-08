@@ -373,8 +373,6 @@ void FiniteDifferenceSolver::EvolveBCylindrical (
     ablastr::fields::VectorField const& Efield,
     int lev, amrex::Real const dt ) {
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
