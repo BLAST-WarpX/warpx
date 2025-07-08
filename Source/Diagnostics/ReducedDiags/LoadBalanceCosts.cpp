@@ -90,10 +90,8 @@ void LoadBalanceCosts::ComputeDiags (int step)
     int nBoxes = 0;
     for (int lev = 0; lev < nLevels; ++lev)
     {
-        auto *const cost = WarpX::getCosts(lev);
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            cost, "ERROR: costs are not initialized on level " + std::to_string(lev) + " !");
-        nBoxes += cost->size();
+        const auto& cost = WarpX::getCosts(lev);
+        nBoxes += cost.size();
     }
 
     // keep track of the max number of boxes, this is needed later on to fill
@@ -113,7 +111,7 @@ void LoadBalanceCosts::ComputeDiags (int step)
     costs.resize(nLevels);
     for (int lev = 0; lev < nLevels; ++lev)
     {
-        costs[lev] = std::make_unique<LayoutData<Real>>(*WarpX::getCosts(lev));
+        costs[lev] = std::make_unique<LayoutData<Real>>(WarpX::getCosts(lev));
     }
 
     if (WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Heuristic)

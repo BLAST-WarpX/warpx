@@ -149,7 +149,8 @@ class SpectralFieldData
                            const SpectralKSpace& k_space,
                            const amrex::DistributionMapping& dm,
                            int n_field_required,
-                           bool periodic_single_box);
+                           bool periodic_single_box,
+                           bool do_costs = true);
         SpectralFieldData() = default; // Default constructor
         ~SpectralFieldData();
 

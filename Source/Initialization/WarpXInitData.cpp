@@ -28,6 +28,7 @@
 #include "Filter/NCIGodfreyFilter.H"
 #include "Initialization/ExternalField.H"
 #include "Initialization/DivCleaner/ProjectionDivCleaner.H"
+#include "LoadBalancing/ScopedTimeTracker.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/Logo/GetLogo.H"
 #include "Utils/Parser/ParserUtils.H"
@@ -1135,13 +1136,10 @@ WarpX::InitLevelData (int lev, Real /*time*/)
     // load external grid fields into E/Bfield_fp_external multifabs
     LoadExternalFields(lev);
 
-    if (costs[lev]) {
-        const auto iarr = costs[lev]->IndexArray();
-        for (const auto& i : iarr) {
-            (*costs[lev])[i] = 0.0;
-            WarpX::setLoadBalanceEfficiency(lev, -1);
-        }
+    if (warpx::load_balancing::ScopedTimeTracker::enabled()){
+        warpx::load_balancing::ScopedTimeTracker::reset_values(lev);
     }
+    WarpX::setLoadBalanceEfficiency(lev, -1);
 }
 
 template<typename T>

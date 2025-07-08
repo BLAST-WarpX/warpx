@@ -414,7 +414,7 @@ public:
     /** get low-high-low-high-... vector for each direction indicating if mother grid PMLs are enabled */
     [[nodiscard]] std::vector<bool> getPMLdirections() const;
 
-    static amrex::LayoutData<amrex::Real>* getCosts (int lev);
+    static const amrex::LayoutData<amrex::Real>& getCosts (int lev);
 
     void setLoadBalanceEfficiency (int lev, amrex::Real efficiency);
 

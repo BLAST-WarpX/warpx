@@ -54,13 +54,13 @@ class SpectralFieldDataRZ
 
 
         void ForwardTransform (int lev, const amrex::MultiFab& mf, int field_index,
-                               int i_comp=0);
+                               int i_comp=0, bool do_costs=true);
         void ForwardTransform (int lev, const amrex::MultiFab& mf_r, int field_index_r,
-                               const amrex::MultiFab& mf_t, int field_index_t);
+                               const amrex::MultiFab& mf_t, int field_index_t, bool do_costs=true);
         void BackwardTransform (int lev, amrex::MultiFab& mf, int field_index,
-                                int i_comp=0);
+                                int i_comp=0, bool do_costs=true);
         void BackwardTransform (int lev, amrex::MultiFab& mf_r, int field_index_r,
-                                amrex::MultiFab& mf_t, int field_index_t);
+                                amrex::MultiFab& mf_t, int field_index_t, bool do_costs=true);
 
         void FABZForwardTransform (amrex::MFIter const & mfi, amrex::Box const & realspace_bx,
                                    amrex::MultiFab const & tempHTransformedSplit,
@@ -134,9 +134,10 @@ class SpectralFieldDataRZ
         void InitFilter (amrex::IntVect const & filter_npass_each_dir, bool compensation,
                          SpectralKSpaceRZ const & k_space);
 
-        void ApplyFilter (int lev, int field_index);
+        void ApplyFilter (int lev, int field_index, bool do_costs = true);
         void ApplyFilter (int lev, int field_index1,
-                          int field_index2, int field_index3);
+                          int field_index2, int field_index3,
+                          bool do_costs = true);
 
         // Returns an array that holds the kr for all of the modes
         HankelTransform::RealVector const & getKrArray (amrex::MFIter const & mfi) const {

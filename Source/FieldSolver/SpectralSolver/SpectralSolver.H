@@ -106,7 +106,8 @@ class SpectralSolver
         void ForwardTransform (int lev,
                                const amrex::MultiFab& mf,
                                int field_index,
-                               int i_comp = 0);
+                               int i_comp = 0,
+                               bool do_costs = true);
 
         /**
          * \brief Transform spectral field specified by `field_index` back to
@@ -116,7 +117,8 @@ class SpectralSolver
                                 amrex::MultiFab& mf,
                                 int field_index,
                                 const amrex::IntVect& fill_guards,
-                                int i_comp=0 );
+                                int i_comp=0,
+                                bool do_costs = true);
 
         /**
          * \brief Update the fields in spectral space, over one timestep

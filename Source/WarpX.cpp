@@ -3252,15 +3252,15 @@ WarpX::getPMLdirections() const
     return dirsWithPML;
 }
 
-amrex::LayoutData<amrex::Real>*
+const amrex::LayoutData<amrex::Real>&
 WarpX::getCosts (int lev)
 {
-    if (m_instance)
-    {
-        return m_instance->costs[lev].get();
-    } else
-    {
-        return nullptr;
+    if (warpx::load_balancing::ScopedTimeTracker::enabled()){
+        return warpx::load_balancing::ScopedTimeTracker::view_tracked_times()[lev];
+    }
+    else{
+        // TODO //
+        return warpx::load_balancing::ScopedTimeTracker::view_tracked_times()[lev];
     }
 }
 

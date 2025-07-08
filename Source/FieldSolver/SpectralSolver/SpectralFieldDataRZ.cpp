@@ -451,11 +451,9 @@ SpectralFieldDataRZ::FABZBackwardTransform (amrex::MFIter const & mfi, amrex::Bo
 void
 SpectralFieldDataRZ::ForwardTransform (const int lev,
                                        amrex::MultiFab const & field_mf, int const field_index,
-                                       int const i_comp)
+                                       int const i_comp,
+                                       const bool do_costs)
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-    const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, field_mf.boxArray(), field_mf.DistributionMap());
-
     // Check field index type, in order to apply proper shift in spectral space.
     // Only cell centered in r is supported.
     bool const is_nodal_z = field_mf.is_nodal(1);
@@ -500,11 +498,9 @@ SpectralFieldDataRZ::ForwardTransform (const int lev,
 void
 SpectralFieldDataRZ::ForwardTransform (const int lev,
                                        amrex::MultiFab const & field_mf_r, int const field_index_r,
-                                       amrex::MultiFab const & field_mf_t, int const field_index_t)
+                                       amrex::MultiFab const & field_mf_t, int const field_index_t,
+                                       const bool do_costs)
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-    const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, field_mf_r.boxArray(), field_mf_r.DistributionMap());
-
     // Check field index type, in order to apply proper shift in spectral space.
     // Only cell centered in r is supported.
     const bool is_nodal_z = field_mf_r.is_nodal(1);
@@ -554,11 +550,9 @@ SpectralFieldDataRZ::ForwardTransform (const int lev,
 void
 SpectralFieldDataRZ::BackwardTransform (const int lev,
                                         amrex::MultiFab& field_mf, int const field_index,
-                                        int const i_comp)
+                                        int const i_comp,
+                                        const bool do_costs)
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-    const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, field_mf.boxArray(), field_mf.DistributionMap());
-
     // Check field index type, in order to apply proper shift in spectral space.
     const bool is_nodal_z = field_mf.is_nodal(1);
 
@@ -627,11 +621,9 @@ SpectralFieldDataRZ::BackwardTransform (const int lev,
 void
 SpectralFieldDataRZ::BackwardTransform (const int lev,
                                         amrex::MultiFab& field_mf_r, int const field_index_r,
-                                        amrex::MultiFab& field_mf_t, int const field_index_t)
+                                        amrex::MultiFab& field_mf_t, int const field_index_t,
+                                        const bool do_costs)
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-    const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, field_mf_r.boxArray(), field_mf_r.DistributionMap());
-
     // Check field index type, in order to apply proper shift in spectral space.
     bool const is_nodal_z = field_mf_r.is_nodal(1);
 
@@ -728,11 +720,8 @@ SpectralFieldDataRZ::InitFilter (amrex::IntVect const & filter_npass_each_dir, b
 
 /* \brief Apply K-space filtering on a scalar */
 void
-SpectralFieldDataRZ::ApplyFilter (const int lev, int const field_index)
+SpectralFieldDataRZ::ApplyFilter (const int lev, int const field_index, const bool do_costs)
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-    const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, binomialfilter.boxArray(), binomialfilter.DistributionMap());
-
     for (amrex::MFIter mfi(binomialfilter); mfi.isValid(); ++mfi){
 
         const auto time_tracker = warpx::load_balancing::get_scoped_time_tracker(lev, mfi.index(), do_costs);
@@ -762,11 +751,9 @@ SpectralFieldDataRZ::ApplyFilter (const int lev, int const field_index)
 /* \brief Apply K-space filtering on a vector */
 void
 SpectralFieldDataRZ::ApplyFilter (const int lev, int const field_index1,
-                                  int const field_index2, int const field_index3)
+                                  int const field_index2, int const field_index3,
+                                  const bool do_costs)
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-    const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, binomialfilter.boxArray(), binomialfilter.DistributionMap());
-
     for (amrex::MFIter mfi(binomialfilter); mfi.isValid(); ++mfi){
 
         const auto time_tracker = warpx::load_balancing::get_scoped_time_tracker(lev, mfi.index(), do_costs);
