@@ -26,8 +26,11 @@ first_fn = sys.argv[1]
 last_fn = sys.argv[2]
 
 # tolerance for the relative change in the momentum and energy
+# The tolerance on the energy is larger since the calculation of
+# the correction can have large numerical errors due to its nature,
+# involving the difference between similar numbers.
 p_tolerance = 1.0e-14
-KE_tolerance = 1.0e-13
+KE_tolerance = 1.0e-10
 
 ds0 = yt.load(first_fn)
 ds1 = yt.load(last_fn)
