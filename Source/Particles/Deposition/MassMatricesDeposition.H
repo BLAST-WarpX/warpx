@@ -1247,8 +1247,8 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     // Save the start index and interpolation weights for each segment
     int k0_cell[num_segments_max];
     int k0_node[num_segments_max];
-    int weight_cell[num_segments_max][depos_order];
-    int weight_node[num_segments_max][depos_order+1];
+    double weight_cell[num_segments_max][depos_order];
+    double weight_node[num_segments_max][depos_order+1];
 
     for (int ns=0; ns<num_segments; ns++) {
 
