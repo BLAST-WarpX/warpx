@@ -1251,6 +1251,9 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     double weight_cell[num_segments_max][depos_order];
     double weight_node[num_segments_max][depos_order+1];
 
+    const auto k_mid = static_cast<int>(0.5*(z_new+z_old)-shift);
+    int SegNum[num_segments_max];
+
     for (int ns=0; ns<num_segments; ns++) {
 
         if (ns == num_segments-1) { // final segment
@@ -1270,6 +1273,10 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
         double sz_cell[depos_order] = {0.};
         double const z0_bar = (z0_new + z0_old)/2.0;
         k0_cell[ns] = compute_shape_factor_cell( sz_cell, z0_bar-0.5 );
+
+        // Set the segment number for the mass matrix component calc
+        const auto k0_mid = static_cast<int>(z0_bar-shift);
+        SegNum[ns] = 1 + k0_mid - k_mid;
 
         if constexpr (depos_order >= 3) { // higher-order correction to the cell-based weights
             const Compute_shape_factor_pair<depos_order-1> compute_shape_factors_cell;
@@ -1323,29 +1330,6 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     if (Szz_nComp>1) {
 
     const int max_crossings = (Szz_nComp - 3)/2;
-
-    const auto k_mid = static_cast<int>(0.5*(z_new+z_old)-shift);
-    const int k_min = std::min(k_old,k_new);
-
-    int SegNum[num_segments_max];
-    if (num_segments==1) {
-        SegNum[0] = 1;
-    }
-    else if (num_segments==2) {
-        if (k_min<k_mid) {
-            SegNum[0] = 0;
-            SegNum[1] = 1;
-        }
-        else {
-            SegNum[0] = 1;
-            SegNum[1] = 2;
-        }
-    }
-    else if (num_segments==3) {
-        SegNum[0] = 0;
-        SegNum[1] = 1;
-        SegNum[2] = 2;
-    }
 
     // Loop over segments and deposit full mass matrices
     for (int ns=0; ns<num_segments; ns++) {
