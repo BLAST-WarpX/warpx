@@ -6,8 +6,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef WARPX_PARTICLES_COLLISION_HYBRIDRESISTIVITYDRAG_H_
-#define WARPX_PARTICLES_COLLISION_HYBRIDRESISTIVITYDRAG_H_
+#ifndef WARPX_PARTICLES_COLLISION_HYBRIDRESISTIVEDRAG_H_
+#define WARPX_PARTICLES_COLLISION_HYBRIDRESISTIVEDRAG_H_
 
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/Collision/CollisionBase.H"
@@ -16,18 +16,18 @@
 
 #include <string>
 
-class HybridResistivityDrag final
+class HybridResistiveDrag final
     : public CollisionBase
 {
 public:
-    HybridResistivityDrag (const std::string& collision_name);
+    HybridResistiveDrag (const std::string& collision_name);
 
-    ~HybridResistivityDrag () override = default;
+    ~HybridResistiveDrag () override = default;
 
-    HybridResistivityDrag ( HybridResistivityDrag const &)             = delete;
-    HybridResistivityDrag& operator= ( HybridResistivityDrag const & ) = delete;
-    HybridResistivityDrag ( HybridResistivityDrag&& )                  = delete;
-    HybridResistivityDrag& operator= ( HybridResistivityDrag&& )       = delete;
+    HybridResistiveDrag ( HybridResistiveDrag const &)             = delete;
+    HybridResistiveDrag& operator= ( HybridResistiveDrag const & ) = delete;
+    HybridResistiveDrag ( HybridResistiveDrag&& )                  = delete;
+    HybridResistiveDrag& operator= ( HybridResistiveDrag&& )       = delete;
 
     /** Perform the stopping calculation
      *
@@ -52,9 +52,9 @@ public:
 
 private:
 
-    amrex::Parser m_background_resistivity_parser;
+    amrex::Parser m_resistivity_parser;
 
-    amrex::ParserExecutor<4> m_background_resistivity_func;
+    amrex::ParserExecutor<4> m_resistivity_func;
 };
 
-#endif // WARPX_PARTICLES_COLLISION_HYBRIDRESISTIVITYDRAG_H_
+#endif // WARPX_PARTICLES_COLLISION_HYBRIDRESISTIVEDRAG_H_
