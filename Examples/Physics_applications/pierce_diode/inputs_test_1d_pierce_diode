@@ -10,17 +10,12 @@
 my_constants.ion_mass = 39*m_u # [kg] Assuming ion potassium
 my_constants.kV = 1000
 my_constants.cm = 0.01
-my_constants.channel_radius     = 15.*cm
 my_constants.extractor_voltage  = -93.*kV
-my_constants.diode_current      = 1.
 my_constants.zplate = 8.*cm
 my_constants.dz = zplate/nz
 my_constants.vzfinal = sqrt(2.*abs(extractor_voltage)*q_e/ion_mass)
 my_constants.dt = 0.4*(dz/vzfinal)
 my_constants.nz = 128
-my_constants.diode_current = 6
-my_constants.source_radius = 0.15
-my_constants.n0 = diode_current / (vzfinal * pi * source_radius**2 * q_e)
 
 # algo
 warpx.do_electrostatic = labframe
@@ -31,10 +26,13 @@ amr.n_cell = nz
 amr.max_level = 0
 
 # maxamx step
-max_step = 2000
+max_step = 3000
 
 # timestep
 warpx.const_dt = dt
+
+# number of procs
+warpx.numprocs = 1 2   # 2 MPI ranks
 
 # geometry
 geometry.dims = 1
@@ -65,7 +63,7 @@ ions.surface_flux_pos = 0
 ions.flux_normal_axis = z
 ions.flux_direction = 1
 ions.flux_profile = constant
-ions.flux = n0 * vzfinal
+ions.flux = 38.79/q_e
 ions.momentum_distribution_type = constant
 
 # diagnostics
