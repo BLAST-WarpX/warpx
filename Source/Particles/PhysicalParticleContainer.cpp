@@ -1984,6 +1984,23 @@ PhysicalParticleContainer::Evolve (
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
+    // whether this is an unsplit push (i.e., position_push_half is false)
+    // or a split push in the first half (i.e., position_push_half is true
+    // and momentum_push_skip is false, meaning that the momentum has not
+    // been pushed yet)
+    bool const unsplit_or_split_first_half = (
+        !position_push_half ||
+        (position_push_half && !momentum_push_skip)
+    );
+    // whether this is an unsplit push (i.e., position_push_half is false)
+    // or a split push in the second half (i.e., position_push_half is true
+    // and momentum_push_skip is true, meaning that the momentum has already
+    // been pushed - in the first half)
+    bool const unsplit_or_split_second_half = (
+        !position_push_half ||
+        (position_push_half && momentum_push_skip)
+    );
+
     const iMultiFab* current_masks = WarpX::CurrentBufferMasks(lev);
     const iMultiFab* gather_masks = WarpX::GatherBufferMasks(lev);
 
@@ -2041,17 +2058,17 @@ PhysicalParticleContainer::Evolve (
 
             Elixir exeli, eyeli, ezeli, bxeli, byeli, bzeli;
 
-            if (WarpX::use_fdtd_nci_corr)
-            {
-                // Filter arrays Ex[pti], store the result in
-                // filtered_Ex and update pointer exfab so that it
-                // points to filtered_Ex (and do the same for all
-                // components of E and B).
-                applyNCIFilter(lev, pti.tilebox(), exeli, eyeli, ezeli, bxeli, byeli, bzeli,
-                               filtered_Ex, filtered_Ey, filtered_Ez,
-                               filtered_Bx, filtered_By, filtered_Bz,
-                               Ex[pti], Ey[pti], Ez[pti], Bx[pti], By[pti], Bz[pti],
-                               exfab, eyfab, ezfab, bxfab, byfab, bzfab);
+            if (unsplit_or_split_first_half) {
+                if (WarpX::use_fdtd_nci_corr) {
+                    // Filter arrays Ex[pti], store the result in filtered_Ex,
+                    // update pointer exfab so that it points to filtered_Ex,
+                    // repeat for all components of E and B
+                    applyNCIFilter(lev, pti.tilebox(), exeli, eyeli, ezeli, bxeli, byeli, bzeli,
+                        filtered_Ex, filtered_Ey, filtered_Ez,
+                        filtered_Bx, filtered_By, filtered_Bz,
+                        Ex[pti], Ey[pti], Ez[pti], Bx[pti], By[pti], Bz[pti],
+                        exfab, eyfab, ezfab, bxfab, byfab, bzfab);
+                }
             }
 
             // Determine which particles deposit/gather in the buffer, and
@@ -2243,11 +2260,7 @@ PhysicalParticleContainer::Evolve (
         }
     }
 
-    // check if this is an unsplit push (i.e., position_push_half is false)
-    // or a split push in the second part (i.e., position_push_half is true
-    // and momentum_push_skip is true, meaning that the momentum has already
-    // been pushed - in the first part)
-    if (!position_push_half || (position_push_half && momentum_push_skip)) {
+    if (unsplit_or_split_second_half) {
         // Split particles at the end of the time step.
         // When subcycling is ON, the splitting is done on the last call to
         // PhysicalParticleContainer::Evolve on the finest level, i.e., at the
