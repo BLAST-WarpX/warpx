@@ -2229,23 +2229,25 @@ PhysicalParticleContainer::Evolve (
                 } // end of "if electrostatic_solver_id == ElectrostaticSolverAlgo::None"
             } // end of "if do_not_push"
 
-            if (has_rho && ! skip_deposition && ! do_not_deposit) {
-                // Deposit charge after particle push, in component 1 of MultiFab rho.
-                // (Skipped for electrostatic solver, as this may lead to out-of-bounds)
-                if (WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::None) {
-                    amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
-                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(rho->nComp() >= 2,
-                        "Cannot deposit charge in rho component 1: only component 0 is allocated!");
+            if (unsplit_or_split_second_half) {
+                if (has_rho && ! skip_deposition && ! do_not_deposit) {
+                    // Deposit charge after particle push, in component 1 of MultiFab rho.
+                    // (Skipped for electrostatic solver, as this may lead to out-of-bounds)
+                    if (WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::None) {
+                        amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
+                        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(rho->nComp() >= 2,
+                            "Cannot deposit charge in rho component 1: only component 0 is allocated!");
 
-                    const int* const AMREX_RESTRICT ion_lev = (do_field_ionization)?
-                        pti.GetiAttribs("ionizationLevel").dataPtr():nullptr;
+                        const int* const AMREX_RESTRICT ion_lev = (do_field_ionization)?
+                            pti.GetiAttribs("ionizationLevel").dataPtr():nullptr;
 
-                    DepositCharge(pti, wp, ion_lev, rho, 1, 0,
-                                  np_current, thread_num, lev, lev);
-                    if (has_buffer){
-                        amrex::MultiFab* crho = fields.get(FieldType::rho_buf, lev);
-                        DepositCharge(pti, wp, ion_lev, crho, 1, np_current,
-                                      np-np_current, thread_num, lev, lev-1);
+                        DepositCharge(pti, wp, ion_lev, rho, 1, 0,
+                                      np_current, thread_num, lev, lev);
+                        if (has_buffer){
+                            amrex::MultiFab* crho = fields.get(FieldType::rho_buf, lev);
+                            DepositCharge(pti, wp, ion_lev, crho, 1, np_current,
+                                          np-np_current, thread_num, lev, lev-1);
+                        }
                     }
                 }
             }
