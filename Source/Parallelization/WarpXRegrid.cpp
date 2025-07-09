@@ -15,6 +15,7 @@
 #include "Fields.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #include "Initialization/ExternalField.H"
+#include "LoadBalancing/ScopedTimeTracker.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/ParticleBoundaryBuffer.H"
 #include "Particles/WarpXParticleContainer.H"
@@ -62,7 +63,7 @@ WarpX::CheckLoadBalance (int step)
         LoadBalance();
 
         // Reset the costs to 0
-        ResetCosts();
+        ResetTimers();
     }
     if (!costs.empty())
     {
@@ -361,19 +362,10 @@ WarpX::ComputeCostsHeuristic (amrex::Vector<std::unique_ptr<amrex::LayoutData<am
 }
 
 void
-WarpX::ResetCosts ()
+WarpX::ResetTimers ()
 {
-    AMREX_ALWAYS_ASSERT(!costs.empty());
-    AMREX_ALWAYS_ASSERT(costs[0] != nullptr);
-
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        const auto iarr = costs[lev]->IndexArray();
-        for (const auto& i : iarr)
-        {
-            // Reset costs
-            (*costs[lev])[i] = 0.0;
-        }
+    if (warpx::load_balancing::ScopedTimeTracker::enabled()){
+        warpx::load_balancing::ScopedTimeTracker::reset_values();
     }
 }
 

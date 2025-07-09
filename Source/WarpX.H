@@ -549,9 +549,9 @@ public:
      */
     void LoadBalance ();
 
-    /** \brief resets costs to zero
+    /** \brief resets timers for load balancing to zero
      */
-    void ResetCosts ();
+    void ResetTimers ();
 
     /** Perform running average of the LB costs
      *
