@@ -131,6 +131,7 @@ jobs:
           -DWarpX_COMPUTE=SYCL         \
           -DAMReX_SYCL_AOT=ON          \
           -DAMReX_INTEL_ARCH=pvc       \
+          -DAMReX_PARALLEL_LINK_JOBS=4 \
           -DWarpX_EB=ON                \
           -DWarpX_FFT=ON               \
           -DWarpX_PYTHON=ON            \
