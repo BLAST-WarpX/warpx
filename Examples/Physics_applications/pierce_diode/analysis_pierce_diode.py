@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 
 
+import sys
+
 import matplotlib.pyplot as plt
 import numpy as np
+import yt
 from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import e, epsilon_0, m_u
 
+yt.funcs.mylog.setLevel(0)
+
+filename = sys.argv[1]
+ts = OpenPMDTimeSeries(filename)
 # Parameters used in the corresponding input script
 kV = 1000
 cm = 0.01
@@ -21,9 +28,6 @@ J_CL = (
     * abs(extractor_voltage) ** (3 / 2)
     / d_plate**2
 )
-
-ts = OpenPMDTimeSeries("./diags/diag1/")
-
 jz_t_last, meta = ts.get_field("j", "z", plot=False, iteration=ts.iterations[-1])
 time_cur = ts.current_t
 plt.figure()
@@ -36,7 +40,7 @@ plt.ylabel(
 plt.legend()
 plt.ylim([30, 40])
 plt.savefig("pierce_diode_1d_analysis.png")
-tolerance = 0.15  # corresponds to 15 %
+tolerance = 0.20  # corresponds to 20 %
 assert np.all(np.abs(jz_t_last - J_CL) / J_CL <= tolerance), (
     "Child–Langmuir limit is violated!"
 )

@@ -26,7 +26,7 @@ amr.n_cell = nz
 amr.max_level = 0
 
 # maxamx step
-max_step = 3000
+max_step = 5000
 
 # timestep
 warpx.const_dt = dt
@@ -55,10 +55,6 @@ ions.mass = ion_mass
 ions.do_continuous_injection = 1
 ions.injection_style = "NFluxPerCell"
 ions.num_particles_per_cell = 15
-ions.uz_m =  0.
-ions.ux_th = 0.
-ions.uy_th = 0.
-ions.uz_th = 0.
 ions.surface_flux_pos = 0
 ions.flux_normal_axis = z
 ions.flux_direction = 1
@@ -68,7 +64,7 @@ ions.momentum_distribution_type = constant
 
 # diagnostics
 diagnostics.diags_names = diag1
-diag1.intervals = 100
+diag1.intervals = 500
 diag1.diag_type = Full
 diag1.format=openpmd
 diag1.fields_to_plot = Ez rho jz phi
