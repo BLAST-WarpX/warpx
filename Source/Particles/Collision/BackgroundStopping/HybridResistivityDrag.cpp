@@ -1,10 +1,12 @@
-/* Copyright 2022 David Grote
+/* Copyright 2025 The WarpX Community
  *
  * This file is part of WarpX.
  *
+ * Authors: S. Eric Clark (Helion Energy)
+ *
  * License: BSD-3-Clause-LBNL
  */
-#include "BackgroundStopping.H"
+#include "HybridResistivityDrag.H"
 
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/ParticleUtils.H"
@@ -16,25 +18,15 @@
 
 #include <string>
 
-BackgroundStopping::BackgroundStopping (std::string const& collision_name)
+HybridResistivityDrag::HybridResistivityDrag (std::string const& ion_species_name)
     : CollisionBase(collision_name)
 {
     using namespace amrex::literals;
 
+    //Assert that we are running the Hybrid Solver
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(m_species_names.size() == 1,
                                      "Background stopping must have exactly one species.");
 
-    const amrex::ParmParse pp_collision_name(collision_name);
-
-    std::string background_type_str;
-    pp_collision_name.get("background_type", background_type_str);
-    if (background_type_str == "electrons") {
-        m_background_type = BackgroundStoppingType::ELECTRONS;
-    } else if (background_type_str == "ions") {
-        m_background_type = BackgroundStoppingType::IONS;
-    } else {
-        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(false, "background_type must be either electrons or ions");
-    }
 
     amrex::ParticleReal background_density;
     std::string background_density_str;
@@ -70,11 +62,11 @@ BackgroundStopping::BackgroundStopping (std::string const& collision_name)
     m_background_density_func = m_background_density_parser.compile<num_parser_args>();
     m_background_temperature_func = m_background_temperature_parser.compile<num_parser_args>();
 
-    if (m_background_type == BackgroundStoppingType::ELECTRONS) {
+    if (m_background_type == HybridResistivityDragType::ELECTRONS) {
         m_background_mass = PhysConst::m_e;
         utils::parser::queryWithParser(
             pp_collision_name, "background_mass", m_background_mass);
-    } else if (m_background_type == BackgroundStoppingType::IONS) {
+    } else if (m_background_type == HybridResistivityDragType::IONS) {
         utils::parser::getWithParser(
             pp_collision_name, "background_mass", m_background_mass);
         utils::parser::getWithParser(
@@ -86,9 +78,9 @@ BackgroundStopping::BackgroundStopping (std::string const& collision_name)
 }
 
 void
-BackgroundStopping::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
+HybridResistivityDrag::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
 {
-    WARPX_PROFILE("BackgroundStopping::doCollisions()");
+    WARPX_PROFILE("HybridResistivityDrag::doCollisions()");
     using namespace amrex::literals;
 
     auto& species = mypc->GetParticleContainerFromName(m_species_names[0]);
@@ -98,7 +90,7 @@ BackgroundStopping::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiPar
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(species_mass > 0_prt, "Error: With background stopping, the species mass must be > 0");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(species_charge != 0_prt, "Error: With background stopping, the species charge must be nonzero");
 
-    const BackgroundStoppingType background_type = m_background_type;
+    const HybridResistivityDragType background_type = m_background_type;
 
     // Loop over refinement levels
     auto const flvl = species.finestLevel();
@@ -117,10 +109,10 @@ BackgroundStopping::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiPar
             }
             auto wt = static_cast<amrex::Real>(amrex::second());
 
-            if (background_type == BackgroundStoppingType::ELECTRONS) {
-                doBackgroundStoppingOnElectronsWithinTile(pti, dt, cur_time, species_mass, species_charge);
-            } else if (background_type == BackgroundStoppingType::IONS) {
-                doBackgroundStoppingOnIonsWithinTile(pti, dt, cur_time, species_mass, species_charge);
+            if (background_type == HybridResistivityDragType::ELECTRONS) {
+                doHybridResistivityDragOnElectronsWithinTile(pti, dt, cur_time, species_mass, species_charge);
+            } else if (background_type == HybridResistivityDragType::IONS) {
+                doHybridResistivityDragOnIonsWithinTile(pti, dt, cur_time, species_mass, species_charge);
             }
 
             if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
@@ -134,7 +126,7 @@ BackgroundStopping::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiPar
     }
 }
 
-void BackgroundStopping::doBackgroundStoppingOnElectronsWithinTile (WarpXParIter& pti, amrex::Real dt, amrex::Real t,
+void HybridResistivityDrag::doHybridResistivityDragOnElectronsWithinTile (WarpXParIter& pti, amrex::Real dt, amrex::Real t,
                                                                     amrex::ParticleReal species_mass, amrex::ParticleReal species_charge)
 {
     using namespace amrex::literals;
@@ -208,7 +200,7 @@ void BackgroundStopping::doBackgroundStoppingOnElectronsWithinTile (WarpXParIter
         );
 }
 
-void BackgroundStopping::doBackgroundStoppingOnIonsWithinTile (WarpXParIter& pti, amrex::Real dt, amrex::Real t,
+void HybridResistivityDrag::doHybridResistivityDragOnIonsWithinTile (WarpXParIter& pti, amrex::Real dt, amrex::Real t,
                                                                amrex::ParticleReal species_mass, amrex::ParticleReal species_charge)
 {
     using namespace amrex::literals;
