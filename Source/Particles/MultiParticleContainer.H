@@ -169,6 +169,26 @@ public:
     DepositCurrent (ablastr::fields::MultiLevelVectorField const& J,
                     amrex::Real dt, amrex::Real relative_time);
 
+/**
+     * \brief Deposit current density for only a single species
+     *        This is useful for depoisting just one speceis to compute
+     *        quantities like species based average velocities and currents.
+     *        It can be used for interspecies collisions, etc.
+     *
+     * \param[in,out] J vector of current densities (one three-dimensional array of pointers
+     *                to MultiFabs per mesh refinement level)
+     * \param[in] dt Time step for particle level
+     * \param[in] relative_time Time at which to deposit J, relative to the time of the
+     *                          current positions of the particles. When different than 0,
+     *                          the particle position will be temporarily modified to match
+     *                          the time of the deposition.
+     *  \param[in] species_name Name of the species to do current dposition
+     */
+    void
+    DepositSpeciesCurrent (ablastr::fields::MultiLevelVectorField const& J,
+                           amrex::Real dt, amrex::Real relative_time,
+                           const std::string & species_name);
+
     /**
      * \brief Deposit temperature to species MFs. This is done for each
      *        species and can be used in the future for a single pass update of rho, J, and T.

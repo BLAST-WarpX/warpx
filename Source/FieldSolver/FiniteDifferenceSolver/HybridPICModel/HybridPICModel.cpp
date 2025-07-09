@@ -29,6 +29,10 @@ HybridPICModel::HybridPICModel ()
 
 void HybridPICModel::ReadParameters ()
 {
+    // Store a local copy of species names given in the particle parser
+    const ParmParse pp_particles("particles");
+    pp_particles.queryarr("species_names", m_ion_species_names);
+
     const ParmParse pp_hybrid("hybrid_pic_model");
 
     // The B-field update is subcycled to improve stability - the number
@@ -124,6 +128,30 @@ void HybridPICModel::AllocateLevelMFs (
     fields.alloc_init(FieldType::hybrid_current_fp_plasma, Direction{2},
         lev, amrex::convert(ba, jz_nodal_flag),
         dm, ncomps, ngJ, 0.0_rt);
+
+    // Allocate species specific multifabs to deposit individual currents
+    for (const auto & specname : m_ion_species_names)
+    {
+        fields.alloc_init("hybrid_current_fp_" + specname, Direction{0},
+            lev, amrex::convert(ba, jx_nodal_flag),
+            dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("hybrid_current_fp_" + specname, Direction{1},
+            lev, amrex::convert(ba, jy_nodal_flag),
+            dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("hybrid_current_fp_" + specname, Direction{2},
+            lev, amrex::convert(ba, jz_nodal_flag),
+            dm, ncomps, ngJ, 0.0_rt);
+
+        fields.alloc_init("hybrid_current_fp_temp_" + specname, Direction{0},
+            lev, amrex::convert(ba, jx_nodal_flag),
+            dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("hybrid_current_fp_temp_" + specname, Direction{1},
+            lev, amrex::convert(ba, jy_nodal_flag),
+            dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("hybrid_current_fp_temp_" + specname, Direction{2},
+            lev, amrex::convert(ba, jz_nodal_flag),
+            dm, ncomps, ngJ, 0.0_rt);
+    }
 
     // the external current density multifab matches the current staggering and
     // one ghost cell is used since we interpolate the current to a nodal grid

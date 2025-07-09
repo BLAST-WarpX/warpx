@@ -238,11 +238,52 @@ void WarpX::HybridPICDepositRhoAndJ ()
 
     // Perform charge deposition in component 0 of rho_fp at current time.
     mypc->DepositCharge(m_fields.get_mr_levels(FieldType::rho_fp, finest_level), 0._rt);
-    // Perform current deposition at t_{n-1/2}.
-    mypc->DepositCurrent(m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), dt[0], -0.5_rt * dt[0]);
 
-    // TODO: Perhaps add flag here for when using temperature accumulation in Hybrid
+    // Perform current deposition at t_{n-1/2}.
+    // This is broken up into deposition across multiple species MultiFabs to preserve
+    // Species average velocities, whic is used in collision processes.
+
+    auto & J_all = m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level);
+
+    // Zero all components of the total current density array.
+    for (const auto& J_lev : J_all)
+    {
+        J_lev[0]->setVal(0.0_rt);
+        J_lev[1]->setVal(0.0_rt);
+        J_lev[2]->setVal(0.0_rt);
+    }
+
+    for (const auto & spec : mypc->GetSpeciesNames())
+    {
+        auto & J_species = m_fields.get_mr_levels_alldirs("hybrid_current_fp_" + spec, finest_level);
+
+        // Retrieve species specific array for deposition
+        mypc->DepositSpeciesCurrent(J_species, dt[0], -0.5_rt * dt[0]);
+
+        // Filter and sychronize current for each species
+        SyncCurrent("hybrid_current_fp_" + spec);
+
+        for (int lev = 0; lev <= finest_level; ++lev)
+        {
+            ApplyJfieldBoundary(lev,
+                m_fields.get("hybrid_current_fp_" + spec, Direction{0}, lev),
+                m_fields.get("hybrid_current_fp_" + spec, Direction{1}, lev),
+                m_fields.get("hybrid_current_fp_" + spec, Direction{2}, lev),
+                PatchType::fine);
+        }
+
+        // Add to total current
+        for (for int lev = 0; lev <= finest_level; ++lev)
+        {
+            for (int idir = 0; idir < 3; ++idir)
+            {
+                amrex::MultiFab::Add(J_all[lev][idir], J_species[lev][idir], 0, 0, 1, J_all[lev][idir]->nGrowVect());
+            }
+        }
+    }
+
     // Perform Temperature Deposition at time t_{n}
+    // Testing for accumulation done in particle container.
     mypc->DepositTemperatures(m_fields, 0.0_rt);
 
     // Deposit cold-relativistic fluid charge and current
@@ -259,7 +300,14 @@ void WarpX::HybridPICDepositRhoAndJ ()
     // Synchronize J and rho:
     // filter (if used), exchange guard cells, interpolate across MR levels
     // and apply boundary conditions
-    SyncCurrentAndRho();
+    SyncRho();
+
+    // Reflect charge and current density over PEC boundaries, if needed.
+    for (int lev = 0; lev <= finest_level; ++lev)
+    {
+        ApplyRhofieldBoundary(lev, m_fields.get(FieldType::rho_fp,lev), PatchType::fine);
+    }
+
 
     // SyncCurrent does not include a call to FillBoundary, but it is needed
     // for the hybrid-PIC solver since current values are interpolated to
@@ -276,6 +324,16 @@ void WarpX::HybridPICDepositRhoAndJ ()
             ablastr::utils::communication::FillBoundary(
                 *m_fields.get(FieldType::current_fp, Direction{idim}, lev),
                 m_fields.get(FieldType::current_fp, Direction{idim}, lev)->nGrowVect(),
+                WarpX::do_single_precision_comms,
+                Geom(lev).periodicity(),
+                true
+            );
+        }
+        for (const auto & spec : mypc->GetSpeciesNames())
+        {
+            ablastr::utils::communication::FillBoundary(
+                *m_fields.get("hybrid_current_fp_" + spec, Direction{idim}, lev),
+                m_fields.get("hybrid_current_fp_" + spec, Direction{idim}, lev)->nGrowVect(),
                 WarpX::do_single_precision_comms,
                 Geom(lev).periodicity(),
                 true
