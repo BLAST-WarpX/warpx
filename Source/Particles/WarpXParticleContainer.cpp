@@ -2025,35 +2025,73 @@ WarpXParticleContainer::GetDebyeLength (int lev)
     return debye_length;
 }
 
-amrex::ParticleReal WarpXParticleContainer::sumParticleWeight(bool local) {
+std::pair<amrex::ParticleReal, amrex::ParticleReal> WarpXParticleContainer::sumParticleWeightAndEnergy (bool local) const {
 
-    amrex::ParticleReal total_weight = 0.0;
-    ReduceOps<ReduceOpSum> reduce_op;
-    ReduceData<ParticleReal> reduce_data(reduce_op);
+    // Get mass (used only for particles other than photons, see below)
+    const amrex::Real m = this->mass;
 
-    const int nLevels = finestLevel();
+    using PType = typename WarpXParticleContainer::SuperParticleType;
 
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-    for (int lev = 0; lev <= nLevels; ++lev) {
-        for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
-        {
-            auto *const wp = pti.GetAttribs(PIdx::w).data();
+    amrex::Real Etot = 0.0_rt;
+    amrex::Real Ws   = 0.0_rt;
 
-            reduce_op.eval(pti.numParticles(), reduce_data,
-                            [=] AMREX_GPU_DEVICE (int ip)
-                            { return wp[ip]; });
-        }
+    // Use amrex::ParticleReduce to compute the sum of energies and weights of all particles
+    // held by the current MPI rank for this species (loop over all boxes held by this MPI rank):
+    // the result r is the tuple (Etot, Ws)
+    amrex::ReduceOps<ReduceOpSum, ReduceOpSum> reduce_ops;
+    if(this->AmIA<PhysicalSpecies::photon>())
+    {
+        auto r = amrex::ParticleReduce<amrex::ReduceData<Real, Real>>(
+            *this,
+            [=] AMREX_GPU_DEVICE(const PType& p) noexcept -> amrex::GpuTuple<Real, Real>
+            {
+                const amrex::ParticleReal w  = p.rdata(PIdx::w);
+                const amrex::ParticleReal ux = p.rdata(PIdx::ux);
+                const amrex::ParticleReal uy = p.rdata(PIdx::uy);
+                const amrex::ParticleReal uz = p.rdata(PIdx::uz);
+                return {w*Algorithms::KineticEnergyPhotons(ux,uy,uz),w};
+            },
+            reduce_ops);
+
+        Etot = amrex::get<0>(r);
+        Ws   = amrex::get<1>(r);
+    }
+    else // particle other than photons
+    {
+        auto r = amrex::ParticleReduce<amrex::ReduceData<Real, Real>>(
+            *this,
+            [=] AMREX_GPU_DEVICE(const PType& p) noexcept -> amrex::GpuTuple<Real, Real>
+            {
+                const amrex::ParticleReal w  = p.rdata(PIdx::w);
+                const amrex::ParticleReal ux = p.rdata(PIdx::ux);
+                const amrex::ParticleReal uy = p.rdata(PIdx::uy);
+                const amrex::ParticleReal uz = p.rdata(PIdx::uz);
+
+                return {w*Algorithms::KineticEnergy(ux,uy,uz,m), w};
+            },
+            reduce_ops);
+
+        Etot = amrex::get<0>(r);
+        Ws   = amrex::get<1>(r);
     }
 
-    total_weight = get<0>(reduce_data.value());
+    if (!local) { ParallelDescriptor::ReduceRealSum({Etot,Ws}); }
+    return {Etot,Ws};
+}
 
-    if (!local) { ParallelDescriptor::ReduceRealSum(total_weight); }
+amrex::ParticleReal WarpXParticleContainer::sumParticleEnergy (bool local) const {
+
+    auto [total_energy, total_weight] = this->sumParticleWeightAndEnergy(local);
+    return total_energy;
+}
+
+amrex::ParticleReal WarpXParticleContainer::sumParticleWeight (bool local) const {
+
+    auto [total_energy, total_weight] = this->sumParticleWeightAndEnergy(local);
     return total_weight;
 }
 
-amrex::ParticleReal WarpXParticleContainer::sumParticleCharge(bool local) {
+amrex::ParticleReal WarpXParticleContainer::sumParticleCharge (bool local) const {
 
     return this->sumParticleWeight(local) * this->charge;
 }

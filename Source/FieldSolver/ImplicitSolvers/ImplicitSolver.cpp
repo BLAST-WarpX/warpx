@@ -280,7 +280,8 @@ void ImplicitSolver::ComputeJfromMassMatrices ()
                 }
 
                 Jx(i,j,k,n) = Jx0(i,j,k,n) + SxxdEx + SxydEy + SxzdEz;
-            },
+            });
+            amrex::ParallelFor(
             Jby, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
                 const int idx[3] = {i, j, k};
@@ -342,7 +343,8 @@ void ImplicitSolver::ComputeJfromMassMatrices ()
                 }
 
                 Jy(i,j,k,n) = Jy0(i,j,k,n) + SyxdEx + SyydEy + SyzdEz;
-            },
+            });
+            amrex::ParallelFor(
             Jbz, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
                 const int idx[3] = {i, j, k};
