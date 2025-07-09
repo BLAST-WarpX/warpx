@@ -71,4 +71,4 @@ diagnostics.diags_names = diag1
 diag1.intervals = 100
 diag1.diag_type = Full
 diag1.format=openpmd
-diag1.fields_to_plot = Ex Ey Ez rho jx jz phi
+diag1.fields_to_plot = Ez rho jz phi
