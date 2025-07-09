@@ -32,7 +32,7 @@ max_step = 3000
 warpx.const_dt = dt
 
 # number of procs
-warpx.numprocs = 1 2   # 2 MPI ranks
+warpx.numprocs = 2   # 2 MPI ranks
 
 # geometry
 geometry.dims = 1
