@@ -53,7 +53,6 @@ jobs:
         set +e
         source /opt/intel/oneapi/setvars.sh
         set -e
-        export PATH=$PATH:/opt/intel/oneapi/compiler/2024.2/bin  # FIXME
         export CXX=$(which icpx)
         export CC=$(which icx)
 
@@ -61,7 +60,6 @@ jobs:
         python3 -m pip install --upgrade build packaging setuptools[core] wheel
 
         cmake -S . -B build_sp         \
-          -DCMAKE_CXX_FLAGS_RELEASE="-O1 -DNDEBUG" \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_EB=OFF               \
           -DWarpX_PYTHON=ON            \
@@ -119,13 +117,11 @@ jobs:
         set +e
         source /opt/intel/oneapi/setvars.sh
         set -e
-        export PATH=$PATH:/opt/intel/oneapi/compiler/2024.2/bin  # FIXME
         export CXX=$(which icpx)
         export CC=$(which icx)
         export CXXFLAGS="-fsycl ${CXXFLAGS}"
 
         cmake -S . -B build_sp         \
-          -DCMAKE_CXX_FLAGS_RELEASE="-O1 -DNDEBUG" \
           -DBUILD_SHARED_LIBS=ON       \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_COMPUTE=SYCL         \
