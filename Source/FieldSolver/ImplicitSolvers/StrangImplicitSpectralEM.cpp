@@ -30,11 +30,12 @@ void StrangImplicitSpectralEM::Define ( WarpX* const a_WarpX )
     const amrex::ParmParse pp_implicit_evolve("implicit_evolve");
     parseNonlinearSolverParams( pp_implicit_evolve );
 
+    // Define the nonlinear solver
+    m_nlsolver->Define(m_E, this);
+
     // Initialize the mass matrices for plasma response
     if (m_use_mass_matrices) { InitializeMassMatrices(); }
 
-    // Define the nonlinear solver
-    m_nlsolver->Define(m_E, this);
     m_is_defined = true;
 
 }
@@ -54,6 +55,7 @@ void StrangImplicitSpectralEM::PrintParameters () const
     else if (m_nlsolver_type==NonlinearSolverType::Newton) {
         amrex::Print() << "Nonlinear solver type:      Newton\n";
         amrex::Print() << "use mass matrices:          " << (m_use_mass_matrices ? "true":"false") << "\n";
+        PrintMassMatricesParameters();
     }
     m_nlsolver->PrintParams();
     amrex::Print() << "-----------------------------------------------------------\n\n";
@@ -116,7 +118,7 @@ void StrangImplicitSpectralEM::ComputeRHS ( WarpXSolverVec& a_RHS,
 
     // Self consistently update particle positions and velocities using the
     // current state of the fields E and B. Deposit current density at time n+1/2.
-    m_WarpX->ImplicitPreRHSOp( half_time, m_theta, m_dt, a_nl_iter, a_from_jacobian, m_use_mass_matrices );
+    PreRHSOp( half_time, a_nl_iter, a_from_jacobian );
 
     // For Strang split implicit PSATD, the RHS = -dt*mu*c**2*J
     bool const allow_type_mismatch = true;

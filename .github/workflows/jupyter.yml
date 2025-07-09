@@ -5,19 +5,22 @@ on:
     branches:
       - "development"
   pull_request:
-    paths-ignore:
-      - "Docs/**"
-      - "**.rst"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-jupyter
   cancel-in-progress: true
 
 jobs:
+
+  check_changes:
+    name: Analyze
+    uses: ./.github/workflows/check_changes.yml
+
   jupyter_notebooks:
     name: Notebooks
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python

@@ -40,7 +40,7 @@ BeamRelevant::BeamRelevant (const std::string& rd_name)
     pp_rd_name.get("species",m_beam_name);
 
     // resize data array
-#if (defined WARPX_DIM_3D || defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RSPHERE)
     //  0, 1, 2: mean x,y,z
     //  3, 4, 5: mean px,py,pz
     //        6: gamma
@@ -52,7 +52,7 @@ BeamRelevant::BeamRelevant (const std::string& rd_name)
     //    19,20: beta-function x,y
     //       21: charge
     m_data.resize(22, 0.0_rt);
-#elif (defined WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_XZ)
     //     0, 1: mean x,z
     //  2, 3, 4: mean px,py,pz
     //        5: gamma
@@ -64,6 +64,18 @@ BeamRelevant::BeamRelevant (const std::string& rd_name)
     //       15: beta-function x
     //       16: charge
     m_data.resize(17, 0.0_rt);
+#elif defined(WARPX_DIM_RCYLINDER)
+    //        0: mean x
+    //  1, 2, 3: mean px,py,pz
+    //        4: gamma
+    //        5: rms x
+    //  6, 7, 8: rms px,py,pz
+    //        9: rms gamma
+    //       10: emittance x
+    //       11: Twiss-alpha x
+    //       12: beta-function x
+    //       13: charge
+    m_data.resize(14, 0.0_rt);
 #elif (defined WARPX_DIM_1D_Z)
     //       0 : mean z
     //   1,2,3 : mean px,py,pz
@@ -83,7 +95,7 @@ BeamRelevant::BeamRelevant (const std::string& rd_name)
             // open file
             std::ofstream ofs{m_path + m_rd_name + "." + m_extension, std::ofstream::out};
             // write header row
-#if (defined WARPX_DIM_3D || defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RSPHERE)
             int c = 0;
             ofs << "#";
             ofs << "[" << c++ << "]step()";           ofs << m_sep;
@@ -110,25 +122,44 @@ BeamRelevant::BeamRelevant (const std::string& rd_name)
             ofs << "[" << c++ << "]beta_x(m)";        ofs << m_sep;
             ofs << "[" << c++ << "]beta_y(m)";        ofs << m_sep;
             ofs << "[" << c++ << "]charge(C)";        ofs << "\n";
-#elif (defined WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_XZ)
             int c = 0;
             ofs << "#";
             ofs << "[" << c++ << "]step()";           ofs << m_sep;
             ofs << "[" << c++ << "]time(s)";          ofs << m_sep;
             ofs << "[" << c++ << "]x_mean(m)";        ofs << m_sep;
-            ofs << "[" << c++ << "]z_mean(m)";        ofs << m_sep;
+            ofs << "[" << c++ << "]z_mean(m)"; ofs << m_sep;
             ofs << "[" << c++ << "]px_mean(kg*m/s)";  ofs << m_sep;
             ofs << "[" << c++ << "]py_mean(kg*m/s)";  ofs << m_sep;
             ofs << "[" << c++ << "]pz_mean(kg*m/s)";  ofs << m_sep;
             ofs << "[" << c++ << "]gamma_mean()";     ofs << m_sep;
             ofs << "[" << c++ << "]x_rms(m)";         ofs << m_sep;
-            ofs << "[" << c++ << "]z_rms(m)";         ofs << m_sep;
+            ofs << "[" << c++ << "]z_rms(m)";  ofs << m_sep;
             ofs << "[" << c++ << "]px_rms(kg*m/s)";   ofs << m_sep;
             ofs << "[" << c++ << "]py_rms(kg*m/s)";   ofs << m_sep;
             ofs << "[" << c++ << "]pz_rms(kg*m/s)";   ofs << m_sep;
             ofs << "[" << c++ << "]gamma_rms()";      ofs << m_sep;
             ofs << "[" << c++ << "]emittance_x(m)";   ofs << m_sep;
-            ofs << "[" << c++ << "]emittance_z(m)";   ofs << m_sep;
+            ofs << "[" << c++ << "]emittance_z(m)"; ofs << m_sep;
+            ofs << "[" << c++ << "]alpha_x()";        ofs << m_sep;
+            ofs << "[" << c++ << "]beta_x(m)";        ofs << m_sep;
+            ofs << "[" << c++ << "]charge(C)";        ofs << "\n";
+#elif defined(WARPX_DIM_RCYLINDER)
+            int c = 0;
+            ofs << "#";
+            ofs << "[" << c++ << "]step()";           ofs << m_sep;
+            ofs << "[" << c++ << "]time(s)";          ofs << m_sep;
+            ofs << "[" << c++ << "]x_mean(m)";        ofs << m_sep;
+            ofs << "[" << c++ << "]px_mean(kg*m/s)";  ofs << m_sep;
+            ofs << "[" << c++ << "]py_mean(kg*m/s)";  ofs << m_sep;
+            ofs << "[" << c++ << "]pz_mean(kg*m/s)";  ofs << m_sep;
+            ofs << "[" << c++ << "]gamma_mean()";     ofs << m_sep;
+            ofs << "[" << c++ << "]x_rms(m)";         ofs << m_sep;
+            ofs << "[" << c++ << "]px_rms(kg*m/s)";   ofs << m_sep;
+            ofs << "[" << c++ << "]py_rms(kg*m/s)";   ofs << m_sep;
+            ofs << "[" << c++ << "]pz_rms(kg*m/s)";   ofs << m_sep;
+            ofs << "[" << c++ << "]gamma_rms()";      ofs << m_sep;
+            ofs << "[" << c++ << "]emittance_x(m)";   ofs << m_sep;
             ofs << "[" << c++ << "]alpha_x()";        ofs << m_sep;
             ofs << "[" << c++ << "]beta_x(m)";        ofs << m_sep;
             ofs << "[" << c++ << "]charge(C)";        ofs << "\n";
@@ -327,7 +358,7 @@ void BeamRelevant::ComputeDiags (int step)
         const ParticleReal charge = values_per_rank_2nd.at(10);
 
         // save data
-#if (defined WARPX_DIM_3D || defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RSPHERE)
         m_data[0]  = x_mean;
         m_data[1]  = y_mean;
         m_data[2]  = z_mean;
@@ -369,6 +400,22 @@ void BeamRelevant::ComputeDiags (int step)
         m_data[15] = (PhysConst::c * x_ms) / std::sqrt(x_ms*ux_ms-xux*xux);
         m_data[16] = charge;
         amrex::ignore_unused(y_mean, y_ms, yuy);
+#elif defined(WARPX_DIM_RCYLINDER)
+        m_data[0]  = x_mean;
+        m_data[1]  = ux_mean * m;
+        m_data[2]  = uy_mean * m;
+        m_data[3]  = uz_mean * m;
+        m_data[4]  = gm_mean;
+        m_data[5]  = std::sqrt(x_ms);
+        m_data[6]  = std::sqrt(ux_ms) * m;
+        m_data[7]  = std::sqrt(uy_ms) * m;
+        m_data[8]  = std::sqrt(uz_ms) * m;
+        m_data[9]  = std::sqrt(gm_ms);
+        m_data[10] = std::sqrt(x_ms*ux_ms-xux*xux) / PhysConst::c;
+        m_data[11] = - (PhysConst::c * xux) / std::sqrt(x_ms*ux_ms-xux*xux);
+        m_data[12] = (PhysConst::c * x_ms) / std::sqrt(x_ms*ux_ms-xux*xux);
+        m_data[13] = charge;
+        amrex::ignore_unused(y_ms, yuy, z_mean, z_ms, zuz);
 #elif (defined WARPX_DIM_1D_Z)
         m_data[0]  = z_mean;
         m_data[1]  = ux_mean * m;

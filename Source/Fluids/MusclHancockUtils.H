@@ -187,13 +187,17 @@ void plus_index_offsets (int i, int j, int k, int& ip, int& jp, int& kp, int com
     } else if (comp == 2){ //z
         ip =  i; jp =  j; kp = k - 1;
     }
- #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
     if (comp == 0) { //x
         ip =  i - 1; jp =  j; kp = k;
     } else if (comp == 2){ //z
         ip =  i; jp =  j - 1; kp = k;
     }
-#else
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    if (comp == 0) { //z
+        ip =  i - 1; jp =  j; kp = k;
+    }
+#elif defined(WARPX_DIM_1D_Z)
     if (comp == 2) { //z
         ip =  i - 1; jp =  j; kp = k;
     }
@@ -299,11 +303,11 @@ amrex::Real DownDx_N (const amrex::Array4<amrex::Real>& N, int i, int j, int k)
 {
     using namespace amrex::literals;
     // Write the correct differences
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
-    return N(i,j,k) -  N(i-1,j,k);
-#else
+#if defined(WARPX_DIM_1D_Z)
     amrex::ignore_unused(N, i, j, k);
     return 0.0_rt;
+#else
+    return N(i,j,k) -  N(i-1,j,k);
 #endif
 }
 // Compute the difference in N (up-x)
@@ -312,11 +316,11 @@ amrex::Real UpDx_N (const amrex::Array4<amrex::Real>& N, int i, int j, int k)
 {
     using namespace amrex::literals;
     // Write the correct differences
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
-    return N(i+1,j,k) -  N(i,j,k);
-#else
+#if defined(WARPX_DIM_1D_Z)
     amrex::ignore_unused(N, i, j, k);
     return 0.0_rt;
+#else
+    return N(i+1,j,k) -  N(i,j,k);
 #endif
 }
 // Compute the difference in N (down-y)
@@ -355,8 +359,11 @@ amrex::Real DownDz_N (const amrex::Array4<amrex::Real>& N, int i, int j, int k)
     return N(i,j,k) -  N(i,j,k-1);
 #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
     return N(i,j,k) -  N(i,j-1,k);
-#else
+#elif defined(WARPX_DIM_1D_Z)
     return N(i,j,k) -  N(i-1,j,k);
+#else
+    amrex::ignore_unused(N, i, j, k);
+    return 0.0_rt;
 #endif
 }
 // Compute the difference in N (up-z)
@@ -369,8 +376,11 @@ amrex::Real UpDz_N (const amrex::Array4<amrex::Real>& N, int i, int j, int k)
     return N(i,j,k+1) -  N(i,j,k);
 #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
     return N(i,j+1,k) -  N(i,j,k);
-#else
+#elif defined(WARPX_DIM_1D_Z)
     return N(i+1,j,k) -  N(i,j,k);
+#else
+    amrex::ignore_unused(N, i, j, k);
+    return 0.0_rt;
 #endif
 }
 
@@ -382,14 +392,14 @@ const amrex::Array4<amrex::Real>& NU, amrex::Real& U, int i, int j, int k)
 {
     using namespace amrex::literals;
     // Write the correct differences
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
+#if defined(WARPX_DIM_1D_Z)
+    amrex::ignore_unused(N, NU, U, i, j, k);
+    return 0.0_rt;
+#else
     // U is zero if N is zero, Check positivity before dividing
     amrex::Real U_m = 0;
     if (N(i-1,j,k) > 0) { U_m = NU(i-1,j,k)/N(i-1,j,k); }
     return U - U_m;
-#else
-    amrex::ignore_unused(N, NU, U, i, j, k);
-    return 0.0_rt;
 #endif
 }
 // Compute the difference in U (up-x)
@@ -399,14 +409,14 @@ const amrex::Array4<amrex::Real>& NU, amrex::Real& U, int i, int j, int k)
 {
     using namespace amrex::literals;
     // Write the correct differences
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
+#if defined(WARPX_DIM_1D_Z)
+    amrex::ignore_unused(N, NU, U, i, j, k);
+    return 0.0_rt;
+#else
     // U is zero if N is zero, Check positivity before dividing
     amrex::Real U_p = 0;
     if (N(i+1,j,k) > 0) { U_p = NU(i+1,j,k)/N(i+1,j,k); }
     return U_p - U;
-#else
-    amrex::ignore_unused(N, NU, U, i, j, k);
-    return 0.0_rt;
 #endif
 }
 
@@ -459,8 +469,11 @@ const amrex::Array4<amrex::Real>& NU, amrex::Real& U, int i, int j, int k)
     if (N(i,j,k-1) > 0) { U_m = NU(i,j,k-1)/N(i,j,k-1); }
 #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
     if (N(i,j-1,k) > 0) { U_m = NU(i,j-1,k)/N(i,j-1,k); }
-#else
+#elif defined(WARPX_DIM_1D_Z)
     if (N(i-1,j,k) > 0) { U_m = NU(i-1,j,k)/N(i-1,j,k); }
+#else
+    amrex::ignore_unused(N, NU, U, i, j, k);
+    return 0.0_rt;
 #endif
 
     // Return the difference
@@ -480,8 +493,11 @@ const amrex::Array4<amrex::Real>& NU, amrex::Real& U, int i, int j, int k)
     if (N(i,j,k+1) > 0) { U_p = NU(i,j,k+1)/N(i,j,k+1); }
 #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
     if (N(i,j+1,k) > 0) { U_p = NU(i,j+1,k)/N(i,j+1,k); }
-#else
+#elif defined(WARPX_DIM_1D_Z)
     if (N(i+1,j,k) > 0) { U_p = NU(i+1,j,k)/N(i+1,j,k); }
+#else
+    amrex::ignore_unused(N, NU, U, i, j, k);
+    return 0.0_rt;
 #endif
 
     // Return the difference

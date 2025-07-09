@@ -58,6 +58,8 @@ Abbreviations
 * **QED:** `quantum electrodynamics <https://en.wikipedia.org/wiki/Quantum_electrodynamics>`__
 * **RPA:** radiation-pressure acceleration (of protons/ions), e.g. hole-boring (HB) or light-sail (LS) acceleration
 * **RPP:** Random Phase Plate (a laser pulse manipulation technique)
+* **RCYLINDER:** for the one dimensional coordinate system ``r`` in cylindrical geometry
+* **RSPHERE:** for the one dimensional coordinate system ``r`` in spherical geometry
 * **RZ:** for the coordinate system ``r-z`` in cylindrical geometry; we use "RZ" when we refer to quasi-cylindrical geometry, decomposed in azimuthal modes (see details `here <https://fbpic.github.io/overview/pic_algorithm.html#cylindrical-grid-with-azimuthal-decomposition>`__)
 * **SENSEI:** `Scalable in situ analysis and visualization <https://sensei-insitu.org/>`__, light weight framework for in situ data analysis offering access to multiple visualization and analysis backends
 * **SEE:** secondary electron emission
