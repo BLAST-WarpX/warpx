@@ -9,7 +9,6 @@
 #define WARPX_MASS_MATRICES_DEPOSITION_H_
 
 #include "Particles/Deposition/SharedDepositionUtils.H"
-#include "ablastr/parallelization/KernelTimer.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/ShapeFactors.H"
