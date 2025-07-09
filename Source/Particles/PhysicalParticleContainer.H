@@ -375,7 +375,6 @@ public:
         WarpXParIter& pti,
         RealVector const & wp, RealVector const & uxp,
         RealVector const & uyp, RealVector const & uzp,
-        int const * const ion_lev,
         amrex::MultiFab * const Tx, amrex::MultiFab * const Ty, amrex::MultiFab * const Tz,
         long const offset, long const np_to_deposit,
         int const thread_num, const int lev, int const depos_lev,

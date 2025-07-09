@@ -99,7 +99,7 @@ void varianceDepositionSubKernel(
         amrex::Real vyb = 0.;
         amrex::Real vzb = 0.;
 
-        // Normalization of accumulation arrays are not done until after all deposition, so nomralize
+        // Normalization of accumulation arrays are not done until after all deposition, so normalize
         // here for double pass algorithm
         if (type == TemperatureDepositionType::DOUBLE_PASS)
         {
@@ -135,11 +135,11 @@ void varianceDepositionSubKernel(
  * \param xp, yp, zp    The particle positions.
  * \param wq            The charge of the macroparticle
  * \param vx,vy,vz      The particle velocities
- * \param nx_arr,ny_arr,nz_arr Array4 of velocity variance, either full array or tile.
+ * \param nx_arr,ny_arr,nz_arr Array4<int> of velocity variance sample count, either full array or tile.
  * \param wx_arr,wy_arr,wz_arr Array4 of weight sums, either full array or tile.
  * \param w2x_arr,w2y_arr,w2z_arr Array4 of weight**2 sums, either full array or tile.
  * \param varx_type,vary_type,varz_type The grid types along each direction, either NODE or CELL
- * \param type The type of deposition reoutine, either SINGLE_PASS or DOUBLE_PASS
+ * \param type The type of deposition routine, either SINGLE_PASS or DOUBLE_PASS
  * \param pass The pass that is occurring, either FIRST or SECOND
  * \param relative_time Time at which to deposit J, relative to the time of the
  *                      current positions of the particles. When different than 0,
@@ -406,16 +406,12 @@ void doVarianceDepositionShapeNKernel(
  * \param GetPosition  A functor for returning the particle position.
  * \param wp           Pointer to array of particle weights.
  * \param uxp,uyp,uzp  Pointer to arrays of particle momentum.
- * \param ion_lev      Pointer to array of particle ionization level. This is
-                         required to have the charge of each macroparticle
-                         since q is a scalar. For non-ionizable species,
-                         ion_lev is a null pointer.
  * \param varx_fab,vary_fab,varz_fab FArrayBox of variance, either full array or tile.
  * \param nx_iab,ny_iab,nz_iab IArrayBox of sample count buffer, either full array or tile.
  * \param wx_fab,wy_fab,wz_fab FArrayBox for running weights buffer, either full array or tile.
  * \param w2x_fab,w2y_fab,w2z_fab FArrayBox for weights^2 buffer, either full array or tile.
  * \param vxbar_fab,vybar_fab,vzbar_fab FArrayBox of current density, either full array or tile.
- * \param type The type of deposition reoutine, either SINGLE_PASS or DOUBLE_PASS
+ * \param type The type of deposition routine, either SINGLE_PASS or DOUBLE_PASS
  * \param pass The pass that is occurring, either FIRST or SECOND
  * \param np_to_deposit Number of particles for which current is deposited.
  * \param relative_time Time at which to deposit J, relative to the time of the
@@ -434,7 +430,6 @@ void doVarianceDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                          const amrex::ParticleReal * uxp,
                          const amrex::ParticleReal * uyp,
                          const amrex::ParticleReal * uzp,
-                         const int* ion_lev,
                          amrex::FArrayBox& varx_fab,
                          amrex::FArrayBox& vary_fab,
                          amrex::FArrayBox& varz_fab,
@@ -457,7 +452,6 @@ void doVarianceDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                          const amrex::XDim3 & dinv,
                          const amrex::XDim3 & xyzmin,
                          const amrex::Dim3 lo,
-                         const amrex::Real q,
                          [[maybe_unused]]const int n_rz_azimuthal_modes)
 {
     using namespace amrex::literals;
@@ -469,10 +463,6 @@ void doVarianceDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
         " Only mode=0 supported in RZ."
     );
 #endif
-
-    // Whether ion_lev is a null pointer (do_ionization=0) or a real pointer
-    // (do_ionization=1)
-    const bool do_ionization = ion_lev;
 
     const amrex::Real clightsq = 1.0_rt/PhysConst::c/PhysConst::c;
 
@@ -507,10 +497,7 @@ void doVarianceDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const amrex::ParticleReal vy  = uyp[ip]*gaminv;
             const amrex::ParticleReal vz  = uzp[ip]*gaminv;
 
-            amrex::ParticleReal wq  = q*wp[ip];
-            if (do_ionization){
-                wq *= ion_lev[ip];
-            }
+            amrex::ParticleReal wq  = wp[ip];
 
             doVarianceDepositionShapeNKernel<depos_order>(
                 xp, yp, zp, wq, vx, vy, vz,

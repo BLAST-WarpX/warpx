@@ -358,7 +358,6 @@ public:
         [[maybe_unused]]RealVector const & uxp,
         [[maybe_unused]]RealVector const & uyp,
         [[maybe_unused]]RealVector const & uzp,
-        [[maybe_unused]]int const * const ion_lev,
         [[maybe_unused]]amrex::MultiFab * const Tx,
         [[maybe_unused]]amrex::MultiFab * const Ty,
         [[maybe_unused]]amrex::MultiFab * const Tz,

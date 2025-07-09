@@ -3504,10 +3504,6 @@ PhysicalParticleContainer::getPairGenerationFilterFunc ()
  * \param pti         Particle iterator
  * \param wp          Array of particle weights
  * \param uxp uyp uzp Array of particle momenta
- * \param ion_lev     Pointer to array of particle ionization level. This is
-                      required to have the charge of each macroparticle
-                      since q is a scalar. For non-ionizable species,
-                      ion_lev is a null pointer.
  * \param Tx Ty Tz    Full array of temperature components
  * \param offset      Index of first particle for which temperature is deposited
  * \param np_to_deposit Number of particles for which temperature is deposited.
@@ -3526,7 +3522,6 @@ PhysicalParticleContainer::DepositTemperature (
     WarpXParIter& pti,
     RealVector const & wp, RealVector const & uxp,
     RealVector const & uyp, RealVector const & uzp,
-    int const * const ion_lev,
     amrex::MultiFab * Tx, amrex::MultiFab * Ty, amrex::MultiFab * Tz,
     long const offset, long const np_to_deposit,
     int const thread_num, const int lev, int const depos_lev,
@@ -3597,8 +3592,6 @@ PhysicalParticleContainer::DepositTemperature (
 
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(depos_lev,0));
 
-    const amrex::ParticleReal q = this->charge;
-
     // Get tile box where current is deposited.
     // The tile box is different when depositing in the buffers (depos_lev<lev)
     // or when depositing inside the level (depos_lev=lev)
@@ -3642,39 +3635,39 @@ PhysicalParticleContainer::DepositTemperature (
     if        (WarpX::nox == 1){
         warpx::particles::deposition::doVarianceDepositionShapeN<1>(
             GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
-            uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
+            uyp.dataPtr() + offset, uzp.dataPtr() + offset,
             Tx_fab, Ty_fab, Tz_fab,
             nx_iab, ny_iab, nz_iab, wx_fab, wy_fab, wz_fab,
             w2x_fab, w2y_fab, w2z_fab, vxbar_fab, vybar_fab, vzbar_fab,
             type, pass, np_to_deposit, relative_time, dinv,
-            xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
+            xyzmin, lo, WarpX::n_rz_azimuthal_modes);
     } else if (WarpX::nox == 2){
         warpx::particles::deposition::doVarianceDepositionShapeN<2>(
             GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
-            uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
+            uyp.dataPtr() + offset, uzp.dataPtr() + offset,
             Tx_fab, Ty_fab, Tz_fab,
             nx_iab, ny_iab, nz_iab, wx_fab, wy_fab, wz_fab,
             w2x_fab, w2y_fab, w2z_fab, vxbar_fab, vybar_fab, vzbar_fab,
             type, pass, np_to_deposit, relative_time, dinv,
-            xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
+            xyzmin, lo, WarpX::n_rz_azimuthal_modes);
     } else if (WarpX::nox == 3){
         warpx::particles::deposition::doVarianceDepositionShapeN<3>(
             GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
-            uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
+            uyp.dataPtr() + offset, uzp.dataPtr() + offset,
             Tx_fab, Ty_fab, Tz_fab,
             nx_iab, ny_iab, nz_iab, wx_fab, wy_fab, wz_fab,
             w2x_fab, w2y_fab, w2z_fab, vxbar_fab, vybar_fab, vzbar_fab,
             type, pass, np_to_deposit, relative_time, dinv,
-            xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
+            xyzmin, lo, WarpX::n_rz_azimuthal_modes);
     } else if (WarpX::nox == 4){
         warpx::particles::deposition::doVarianceDepositionShapeN<4>(
             GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
-            uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
+            uyp.dataPtr() + offset, uzp.dataPtr() + offset,
             Tx_fab, Ty_fab, Tz_fab,
             nx_iab, ny_iab, nz_iab, wx_fab, wy_fab, wz_fab,
             w2x_fab, w2y_fab, w2z_fab, vxbar_fab, vybar_fab, vzbar_fab,
             type, pass, np_to_deposit, relative_time, dinv,
-            xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
+            xyzmin, lo, WarpX::n_rz_azimuthal_modes);
     }
 }
 
@@ -3718,13 +3711,7 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
             const auto & uyp = pti.GetAttribs(PIdx::uy);
             const auto & uzp = pti.GetAttribs(PIdx::uz);
 
-            int* AMREX_RESTRICT ion_lev = nullptr;
-            if (do_field_ionization)
-            {
-                ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
-            }
-
-            DepositTemperature(pti, wp, uxp, uyp, uzp, ion_lev,
+            DepositTemperature(pti, wp, uxp, uyp, uzp,
                                T_vf[lev][0], T_vf[lev][1], T_vf[lev][2],
                                0, np, thread_num, lev, lev, relative_time, PushType::Explicit,
                                depos_type,
@@ -3774,13 +3761,7 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
                 const auto & uyp = pti.GetAttribs(PIdx::uy);
                 const auto & uzp = pti.GetAttribs(PIdx::uz);
 
-                int* AMREX_RESTRICT ion_lev = nullptr;
-                if (do_field_ionization)
-                {
-                    ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
-                }
-
-                DepositTemperature(pti, wp, uxp, uyp, uzp, ion_lev,
+                DepositTemperature(pti, wp, uxp, uyp, uzp,
                                 T_vf[lev][0], T_vf[lev][1], T_vf[lev][2],
                                 0, np, thread_num, lev, lev, relative_time, PushType::Explicit,
                                 depos_type, TemperatureDepositionPass::SECOND);
