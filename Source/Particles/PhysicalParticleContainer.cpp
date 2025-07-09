@@ -2242,15 +2242,21 @@ PhysicalParticleContainer::Evolve (
             }
         }
     }
-    // Split particles at the end of the timestep.
-    // When subcycling is ON, the splitting is done on the last call to
-    // PhysicalParticleContainer::Evolve on the finest level, i.e., at the
-    // end of the large timestep. Otherwise, the pushes on different levels
-    // are not consistent, and the call to Redistribute (inside
-    // SplitParticles) may result in split particles to deposit twice on the
-    // coarse level.
-    if (do_splitting && (a_dt_type == DtType::SecondHalf || a_dt_type == DtType::Full) ){
-        SplitParticles(lev);
+
+    // check if this is an unsplit push (i.e., position_push_half is false)
+    // or a split push in the second part (i.e., position_push_half is true
+    // and momentum_push_skip is true, meaning that the momentum has already
+    // been pushed - in the first part)
+    if (!position_push_half || (position_push_half && momentum_push_skip)) {
+        // Split particles at the end of the time step.
+        // When subcycling is ON, the splitting is done on the last call to
+        // PhysicalParticleContainer::Evolve on the finest level, i.e., at the
+        // end of the large time step. Otherwise, the pushes on different levels
+        // are not consistent, and the call to Redistribute (in SplitParticles)
+        // may result in split particles to deposit twice on the coarse level.
+        if (do_splitting && (a_dt_type == DtType::SecondHalf || a_dt_type == DtType::Full)) {
+            SplitParticles(lev);
+        }
     }
 }
 
