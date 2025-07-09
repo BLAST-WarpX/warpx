@@ -2049,23 +2049,23 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
             // Determine which particles deposit/gather in the buffer, and
             // which particles deposit/gather in the fine patch
-            long nfine_current = np;
+            long nfine_deposit = np;
             long nfine_gather = np;
             if (has_buffer && !do_not_push) {
-                // - Modify `nfine_current` and `nfine_gather` (in place)
+                // - Modify `nfine_deposit` and `nfine_gather` (in place)
                 //    so that they correspond to the number of particles
                 //    that deposit/gather in the fine patch respectively.
                 // - Reorder the particle arrays,
-                //    so that the `nfine_current`/`nfine_gather` first particles
+                //    so that the `nfine_deposit`/`nfine_gather` first particles
                 //    deposit/gather in the fine patch
-                //    and (thus) the `np-nfine_current`/`np-nfine_gather` last particles
+                //    and (thus) the `np-nfine_deposit`/`np-nfine_gather` last particles
                 //    deposit/gather in the buffer
-                PartitionParticlesInBuffers( nfine_current, nfine_gather, np,
+                PartitionParticlesInBuffers( nfine_deposit, nfine_gather, np,
                     pti, lev, WarpX::n_field_gather_buffer,
                     WarpX::n_current_deposition_buffer, current_masks, gather_masks );
             }
 
-            const long np_current = has_J_buf ? nfine_current : np;
+            const long np_to_deposit = has_J_buf ? nfine_deposit : np;
 
             if (has_rho && ! skip_deposition && ! do_not_deposit) {
                 // Deposit charge before particle push, in component 0 of MultiFab rho.
@@ -2075,11 +2075,11 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
                 amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
                 DepositCharge(pti, wp, ion_lev, rho, 0, 0,
-                              np_current, thread_num, lev, lev);
+                              np_to_deposit, thread_num, lev, lev);
                 if (has_buffer){
                     amrex::MultiFab* crho = fields.get(FieldType::rho_buf, lev);
-                    DepositCharge(pti, wp, ion_lev, crho, 0, np_current,
-                                  np-np_current, thread_num, lev, lev-1);
+                    DepositCharge(pti, wp, ion_lev, crho, 0, np_to_deposit,
+                                  np-np_to_deposit, thread_num, lev, lev-1);
                 }
             }
 
@@ -2185,11 +2185,11 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * Szz = fields.get(FieldType::MassMatrices_Z, Direction{2}, lev);
                         DepositCurrentAndMassMatrices(pti, wp, uxp, uyp, uzp, jx, jy, jz,
                                        Sxx, Sxy, Sxz, Syx, Syy, Syz, Szx, Szy, Szz,
-                                       bxfab, byfab, bzfab, 0, np_current, thread_num, lev, lev, dt);
+                                       bxfab, byfab, bzfab, 0, np_to_deposit, thread_num, lev, lev, dt);
                     }
                     else {
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
-                                       0, np_current, thread_num,
+                                       0, np_to_deposit, thread_num,
                                        lev, lev, dt, relative_time, push_type);
                     }
                     if (has_buffer)
@@ -2199,7 +2199,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * cjy = fields.get(FieldType::current_buf, Direction{1}, lev);
                         amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, cjx, cjy, cjz,
-                                       np_current, np-np_current, thread_num,
+                                       np_to_deposit, np-np_to_deposit, thread_num,
                                        lev, lev-1, dt, relative_time, push_type);
                     }
                 } // end of "if electrostatic_solver_id == ElectrostaticSolverAlgo::None"
@@ -2217,11 +2217,11 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         pti.GetiAttribs("ionizationLevel").dataPtr():nullptr;
 
                     DepositCharge(pti, wp, ion_lev, rho, 1, 0,
-                                  np_current, thread_num, lev, lev);
+                                  np_to_deposit, thread_num, lev, lev);
                     if (has_buffer){
                         amrex::MultiFab* crho = fields.get(FieldType::rho_buf, lev);
-                        DepositCharge(pti, wp, ion_lev, crho, 1, np_current,
-                                      np-np_current, thread_num, lev, lev-1);
+                        DepositCharge(pti, wp, ion_lev, crho, 1, np_to_deposit,
+                                      np-np_to_deposit, thread_num, lev, lev-1);
                     }
                 }
             }
