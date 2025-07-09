@@ -41,9 +41,9 @@ void varianceDepositionSubKernel(
     const amrex::IntVectND<3>& ixv,
     const amrex::IntVectND<3>& iyv,
     const amrex::IntVectND<3>& izv,
-    amrex::Real wqx_var,
-    amrex::Real wqy_var,
-    amrex::Real wqz_var,
+    amrex::Real wpx_var,
+    amrex::Real wpy_var,
+    amrex::Real wpz_var,
     const amrex::Array4<int> & nx_arr,
     const amrex::Array4<int> & ny_arr,
     const amrex::Array4<int> & nz_arr,
@@ -76,19 +76,19 @@ void varianceDepositionSubKernel(
 
         // Update w_sum
         amrex::Gpu::Atomic::AddNoRet(
-            &wx_arr(ixv[0], ixv[1], ixv[2], 0), wqx_var);
+            &wx_arr(ixv[0], ixv[1], ixv[2], 0), wpx_var);
         amrex::Gpu::Atomic::AddNoRet(
-            &wy_arr(iyv[0], iyv[1], iyv[2], 0), wqy_var);
+            &wy_arr(iyv[0], iyv[1], iyv[2], 0), wpy_var);
         amrex::Gpu::Atomic::AddNoRet(
-            &wz_arr(izv[0], izv[1], izv[2], 0), wqz_var);
+            &wz_arr(izv[0], izv[1], izv[2], 0), wpz_var);
 
         // Update wv_sum to be normalized to vbar
         amrex::Gpu::Atomic::AddNoRet(
-            &vxbar_arr(ixv[0], ixv[1], ixv[2], 0), wqx_var*vxr);
+            &vxbar_arr(ixv[0], ixv[1], ixv[2], 0), wpx_var*vxr);
         amrex::Gpu::Atomic::AddNoRet(
-            &vybar_arr(iyv[0], iyv[1], iyv[2], 0), wqy_var*vyr);
+            &vybar_arr(iyv[0], iyv[1], iyv[2], 0), wpy_var*vyr);
         amrex::Gpu::Atomic::AddNoRet(
-            &vzbar_arr(izv[0], izv[1], izv[2], 0), wqz_var*vzr);
+            &vzbar_arr(izv[0], izv[1], izv[2], 0), wpz_var*vzr);
     }
 
     if (type == TemperatureDepositionType::SINGLE_PASS || pass == TemperatureDepositionPass::SECOND)
@@ -121,11 +121,11 @@ void varianceDepositionSubKernel(
 
             // Update wv2_sum
         amrex::Gpu::Atomic::AddNoRet(
-            &w2x_arr(ixv[0], ixv[1], ixv[2], 0), wqx_var*vxd*vxd);
+            &w2x_arr(ixv[0], ixv[1], ixv[2], 0), wpx_var*vxd*vxd);
         amrex::Gpu::Atomic::AddNoRet(
-            &w2y_arr(iyv[0], iyv[1], iyv[2], 0), wqy_var*vyd*vyd);
+            &w2y_arr(iyv[0], iyv[1], iyv[2], 0), wpy_var*vyd*vyd);
         amrex::Gpu::Atomic::AddNoRet(
-            &w2z_arr(izv[0], izv[1], izv[2], 0), wqz_var*vzd*vzd);
+            &w2z_arr(izv[0], izv[1], izv[2], 0), wpz_var*vzd*vzd);
     }
 }
 
@@ -133,7 +133,7 @@ void varianceDepositionSubKernel(
  * \brief Kernel for the direct current deposition for thread thread_num
  * \tparam depos_order deposition order
  * \param xp, yp, zp    The particle positions.
- * \param wq            The charge of the macroparticle
+ * \param wp            The weight of the macroparticle
  * \param vx,vy,vz      The particle velocities
  * \param nx_arr,ny_arr,nz_arr Array4<int> of velocity variance sample count, either full array or tile.
  * \param wx_arr,wy_arr,wz_arr Array4 of weight sums, either full array or tile.
@@ -156,7 +156,7 @@ void doVarianceDepositionShapeNKernel(
     [[maybe_unused]] const amrex::ParticleReal xp,
     [[maybe_unused]] const amrex::ParticleReal yp,
     [[maybe_unused]] const amrex::ParticleReal zp,
-    const amrex::ParticleReal wq,
+    const amrex::ParticleReal wp,
     const amrex::ParticleReal vx,
     const amrex::ParticleReal vy,
     const amrex::ParticleReal vz,
@@ -196,7 +196,7 @@ void doVarianceDepositionShapeNKernel(
     // Keep these double to avoid bug in single precision
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-    // In RZ, wqx is actually wqr, and wqy is wqtheta
+    // In RZ, wpx is actually wpr, and wpy is wptheta
     // Convert to cylindrical at the mid point
     const amrex::Real xpmid = xp + relative_time*vx;
     const amrex::Real ypmid = yp + relative_time*vy;
@@ -305,9 +305,9 @@ void doVarianceDepositionShapeNKernel(
 
 #if defined(WARPX_DIM_1D_Z)
     for (int iz=0; iz<=depos_order; iz++){
-        const amrex::Real wqx_var = static_cast<amrex::Real>(wq)*sz_jx[iz];
-        const amrex::Real wqy_var = static_cast<amrex::Real>(wq)*sz_jy[iz];
-        const amrex::Real wqz_var = static_cast<amrex::Real>(wq)*sz_jz[iz];
+        const amrex::Real wpx_var = static_cast<amrex::Real>(wp)*sz_jx[iz];
+        const amrex::Real wpy_var = static_cast<amrex::Real>(wp)*sz_jy[iz];
+        const amrex::Real wpz_var = static_cast<amrex::Real>(wp)*sz_jz[iz];
 
         amrex::IntVectND<3> ixv{lo.z+l_jx+iz, 0, 0};
         amrex::IntVectND<3> iyv{lo.z+l_jy+iz, 0, 0};
@@ -316,7 +316,7 @@ void doVarianceDepositionShapeNKernel(
         varianceDepositionSubKernel(
             vx, vy, vz,
             ixv, iyv, izv,
-            wqx_var, wqy_var, wqz_var,
+            wpx_var, wpy_var, wpz_var,
             nx_arr, ny_arr, nz_arr,
             wx_arr, wy_arr, wz_arr,
             w2x_arr, w2y_arr, w2z_arr,
@@ -326,9 +326,9 @@ void doVarianceDepositionShapeNKernel(
     }
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     for (int ix=0; ix<=depos_order; ix++){
-        const amrex::Real wqx_var = wq*sx_jx[ix];
-        const amrex::Real wqy_var = wq*sx_jy[ix];
-        const amrex::Real wqz_var = wq*sx_jz[ix];
+        const amrex::Real wpx_var = wp*sx_jx[ix];
+        const amrex::Real wpy_var = wp*sx_jy[ix];
+        const amrex::Real wpz_var = wp*sx_jz[ix];
 
         amrex::IntVectND<3> ixv{lo.x+j_jx+ix, 0, 0};
         amrex::IntVectND<3> iyv{lo.x+j_jy+ix, 0, 0};
@@ -337,7 +337,7 @@ void doVarianceDepositionShapeNKernel(
         varianceDepositionSubKernel(
             vx, vy, vz,
             ixv, iyv, izv,
-            wqx_var, wqy_var, wqz_var,
+            wpx_var, wpy_var, wpz_var,
             nx_arr, ny_arr, nz_arr,
             wx_arr, wy_arr, wz_arr,
             w2x_arr, w2y_arr, w2z_arr,
@@ -348,9 +348,9 @@ void doVarianceDepositionShapeNKernel(
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     for (int iz=0; iz<=depos_order; iz++){
         for (int ix=0; ix<=depos_order; ix++){
-            const amrex::Real wqx_var = wq*sx_jx[ix]*sz_jx[iz];
-            const amrex::Real wqy_var = wq*sx_jy[ix]*sz_jy[iz];
-            const amrex::Real wqz_var = wq*sx_jz[ix]*sz_jz[iz];
+            const amrex::Real wpx_var = wp*sx_jx[ix]*sz_jx[iz];
+            const amrex::Real wpy_var = wp*sx_jy[ix]*sz_jy[iz];
+            const amrex::Real wpz_var = wp*sx_jz[ix]*sz_jz[iz];
 
             amrex::IntVectND<3> ixv{lo.x+j_jx+ix, lo.z+l_jx+iz, 0};
             amrex::IntVectND<3> iyv{lo.x+j_jy+ix, lo.z+l_jy+iz, 0};
@@ -359,7 +359,7 @@ void doVarianceDepositionShapeNKernel(
             varianceDepositionSubKernel(
                 vx, vy, vz,
                 ixv, iyv, izv,
-                wqx_var, wqy_var, wqz_var,
+                wpx_var, wpy_var, wpz_var,
                 nx_arr, ny_arr, nz_arr,
                 wx_arr, wy_arr, wz_arr,
                 w2x_arr, w2y_arr, w2z_arr,
@@ -372,9 +372,9 @@ void doVarianceDepositionShapeNKernel(
     for (int iz=0; iz<=depos_order; iz++){
         for (int iy=0; iy<=depos_order; iy++){
             for (int ix=0; ix<=depos_order; ix++){
-                const amrex::Real wqx_var = wq*sx_jx[ix]*sy_jx[iy]*sz_jx[iz];
-                const amrex::Real wqy_var = wq*sx_jy[ix]*sy_jy[iy]*sz_jy[iz];
-                const amrex::Real wqz_var = wq*sx_jz[ix]*sy_jz[iy]*sz_jz[iz];
+                const amrex::Real wpx_var = wp*sx_jx[ix]*sy_jx[iy]*sz_jx[iz];
+                const amrex::Real wpy_var = wp*sx_jy[ix]*sy_jy[iy]*sz_jy[iz];
+                const amrex::Real wpz_var = wp*sx_jz[ix]*sy_jz[iy]*sz_jz[iz];
 
                 amrex::IntVectND<3> ixv{lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz};
                 amrex::IntVectND<3> iyv{lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz};
@@ -383,7 +383,7 @@ void doVarianceDepositionShapeNKernel(
                 varianceDepositionSubKernel(
                     vx, vy, vz,
                     ixv, iyv, izv,
-                    wqx_var, wqy_var, wqz_var,
+                    wpx_var, wpy_var, wpz_var,
                     nx_arr, ny_arr, nz_arr,
                     wx_arr, wy_arr, wz_arr,
                     w2x_arr, w2y_arr, w2z_arr,
@@ -421,7 +421,6 @@ void doVarianceDepositionShapeNKernel(
  * \param dinv         3D cell size inverse
  * \param xyzmin       Physical lower bounds of domain.
  * \param lo           Index lower bounds of domain.
- * \param q            species charge.
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
  */
 template <int depos_order>
@@ -497,10 +496,8 @@ void doVarianceDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const amrex::ParticleReal vy  = uyp[ip]*gaminv;
             const amrex::ParticleReal vz  = uzp[ip]*gaminv;
 
-            amrex::ParticleReal wq  = wp[ip];
-
             doVarianceDepositionShapeNKernel<depos_order>(
-                xp, yp, zp, wq, vx, vy, vz,
+                xp, yp, zp, wp[ip], vx, vy, vz,
                 nx_arr, ny_arr, nz_arr,
                 wx_arr, wy_arr, wz_arr,
                 w2x_arr, w2y_arr, w2z_arr,
