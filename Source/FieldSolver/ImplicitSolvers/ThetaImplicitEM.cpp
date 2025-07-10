@@ -93,6 +93,8 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  start_time,
 
     amrex::ignore_unused(a_step);
 
+    DoCollisions(a_step, start_time, a_dt);
+
     // Fields have Eg^{n} and Bg^{n}
     // Particles have up^{n} and xp^{n}.
 

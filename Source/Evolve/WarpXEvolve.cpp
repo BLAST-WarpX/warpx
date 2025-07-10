@@ -216,58 +216,28 @@ WarpX::Evolve (int numsteps)
             HybridPICInitializeRhoJandB();
         }
 
-        // Run multi-physics modules:
-        // ionization, Coulomb collisions, QED
+        // multi-physics: field ionization
         doFieldIonization();
 
-        ExecutePythonCallback("beforecollisions");
-        mypc->doCollisions( step, cur_time, dt[0] );
-        ExecutePythonCallback("aftercollisions");
-
 #ifdef WARPX_QED
+        // multi-physics: QED effects
         doQEDEvents();
         mypc->doQEDSchwinger();
 #endif
 
-        // Main PIC operation:
-        // gather fields, push particles, deposit sources, update fields
-
+        // callback called when particle injection happens, after the position
+        // advance and before deposition is called, allowing a user
+        // defined particle distribution to be injected each time step
         ExecutePythonCallback("particleinjection");
 
+        // implicit solver
         if (m_implicit_solver) {
             m_implicit_solver->OneStep(cur_time, dt[0], step);
         }
-        else if ( electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
-             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC )
-        {
-            // Electrostatic or hybrid-PIC case: only gather fields and push
-            // particles, deposition and calculation of fields done further below
-            const bool skip_deposition = true;
-            PushParticlesandDeposit(cur_time, skip_deposition);
-        }
-        // Electromagnetic case: JRhom algorithm
-        else if (m_JRhom)
-        {
-            OneStep_JRhom(cur_time);
-        }
-        // Electromagnetic case: no subcycling or no mesh refinement
-        else if ( !m_do_subcycling || (finest_level == 0))
-        {
-            OneStep_nosub(cur_time);
-            // E: guard cells are up-to-date
-            // B: guard cells are NOT up-to-date
-            // F: guard cells are NOT up-to-date
-        }
-        // Electromagnetic case: subcycling with one level of mesh refinement
-        else if (m_do_subcycling && (finest_level == 1))
-        {
-            OneStep_sub1(cur_time);
-        }
-        else
-        {
-            WARPX_ABORT_WITH_MESSAGE(
-                "do_subcycling = " + std::to_string(m_do_subcycling)
-                + " is an unsupported do_subcycling type.");
+        // explicit solver
+        else {
+            // Maybe TODO: m_explicit_solver->OneStep(cur_time, dt[0], step);
+            OneStep(cur_time, dt[0], step);
         }
 
         // Resample particles
@@ -412,6 +382,63 @@ WarpX::Evolve (int numsteps)
 
     amrex::Print() <<
         ablastr::warn_manager::GetWMInstance().PrintGlobalWarnings("THE END");
+}
+
+void WarpX::OneStep (
+    amrex::Real cur_time,
+    amrex::Real dt,
+    int step
+)
+{
+    WARPX_PROFILE("WarpX::OneStep()");
+
+    // electrostatic solver or hybrid solver
+    if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
+        electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
+        // perform collisions
+        ExecutePythonCallback("beforecollisions");
+        mypc->doCollisions(step, cur_time, dt);
+        ExecutePythonCallback("aftercollisions");
+        // gather fields, push particles, skip deposition
+        bool const skip_deposition = true;
+        PushParticlesandDeposit(
+            cur_time,
+            skip_deposition
+        );
+    }
+    // electromagnetic solver
+    else {
+        // perform collisions
+        ExecutePythonCallback("beforecollisions");
+        mypc->doCollisions(step, cur_time, dt);
+        ExecutePythonCallback("aftercollisions");
+        // without mesh refinement
+        if (finest_level == 0) {
+            // standard PIC loop
+            if (!m_JRhom) {
+                OneStep_nosub(cur_time);
+            }
+            // JRhom PIC loop
+            else {
+                OneStep_JRhom(cur_time);
+            }
+        }
+        // with mesh refinement
+        else {
+            // without subcycling
+            if (!m_do_subcycling) {
+                OneStep_nosub(cur_time);
+            }
+            // with subcycling
+            else {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    finest_level == 1,
+                    "Subcycling not implemented with more than 1 mesh refinement level"
+                );
+                OneStep_sub1(cur_time);
+            }
+        }
+    }
 }
 
 /**
@@ -1186,20 +1213,36 @@ WarpX::doQEDEvents ()
 #endif
 
 void
-WarpX::PushParticlesandDeposit (amrex::Real cur_time, bool skip_current,
-                                bool deposit_mass_matrices, PushType push_type)
+WarpX::PushParticlesandDeposit (
+    amrex::Real cur_time,
+    bool const skip_current,
+    bool const deposit_mass_matrices,
+    PushType push_type
+)
 {
     // Evolve particles to p^{n+1/2} and x^{n+1}
     // Deposit current, j^{n+1/2}
     for (int lev = 0; lev <= finest_level; ++lev) {
-        PushParticlesandDeposit(lev, cur_time, DtType::Full, skip_current,
-                                deposit_mass_matrices, push_type);
+        PushParticlesandDeposit(
+            lev,
+            cur_time,
+            DtType::Full,
+            skip_current,
+            deposit_mass_matrices,
+            push_type
+        );
     }
 }
 
 void
-WarpX::PushParticlesandDeposit (int lev, amrex::Real cur_time, DtType a_dt_type, bool skip_current,
-                               bool deposit_mass_matrices, PushType push_type)
+WarpX::PushParticlesandDeposit (
+    int lev,
+    amrex::Real cur_time,
+    DtType a_dt_type,
+    bool const skip_current,
+    bool const deposit_mass_matrices,
+    PushType push_type
+)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -1230,6 +1273,7 @@ WarpX::PushParticlesandDeposit (int lev, amrex::Real cur_time, DtType a_dt_type,
         deposit_mass_matrices,
         push_type
     );
+
     if (! skip_current) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         // This is called after all particles have deposited their current and charge.

@@ -660,10 +660,10 @@ public:
     void doQEDEvents ();
 #endif
 
-    void PushParticlesandDeposit (int lev, amrex::Real cur_time, DtType a_dt_type=DtType::Full, bool skip_current=false,
-                                  bool deposit_mass_matrices=false, PushType push_type=PushType::Explicit);
-    void PushParticlesandDeposit (amrex::Real cur_time, bool skip_current=false,
-                                  bool deposit_mass_matrices=false, PushType push_type=PushType::Explicit);
+    void PushParticlesandDeposit (int lev, amrex::Real cur_time, DtType a_dt_type=DtType::Full, bool const skip_current=false,
+                                  bool const deposit_mass_matrices=false, PushType push_type=PushType::Explicit);
+    void PushParticlesandDeposit (amrex::Real cur_time, bool const skip_current=false,
+                                  bool const deposit_mass_matrices=false, PushType push_type=PushType::Explicit);
 
     // This function does aux(lev) = fp(lev) + I(aux(lev-1)-cp(lev)).
     // Caller must make sure fp and cp have ghost cells filled.
@@ -1055,6 +1055,16 @@ private:
     void FillBoundaryE_avg (int lev, PatchType patch_type, amrex::IntVect ng);
 
     void AddExternalFields (int lev);
+
+    /**
+     * \brief
+     * Perform one PIC loop in the explicit formulation.
+    */
+    void OneStep (
+        amrex::Real cur_time,
+        amrex::Real dt,
+        int step
+    );
 
     void OneStep_nosub (amrex::Real cur_time);
     void OneStep_sub1 (amrex::Real cur_time);

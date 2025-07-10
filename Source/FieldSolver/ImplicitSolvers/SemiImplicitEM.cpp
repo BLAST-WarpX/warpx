@@ -70,6 +70,8 @@ void SemiImplicitEM::OneStep ( amrex::Real  start_time,
 
     amrex::ignore_unused(a_step);
 
+    DoCollisions(a_step, start_time, a_dt);
+
     // Set the member time step
     m_dt = a_dt;
 
