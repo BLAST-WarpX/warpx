@@ -1896,6 +1896,10 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
             },
             '<field_name2>: {...}'
         }
+
+    do_external_diva_cleaning: bool (default=True)
+        This flag can be used to disable divA cleaning. This may be necessary when using a non-periodic
+        external A with periodic field boundary conditions.
     """
 
     def __init__(
@@ -1913,6 +1917,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Jy_external_function=None,
         Jz_external_function=None,
         A_external=None,
+        do_external_diva_cleaning=None,
         **kw,
     ):
         self.grid = grid
@@ -1934,6 +1939,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.Jz_external_function = Jz_external_function
 
         self.A_external = A_external
+
+        self.do_external_diva_cleaning = do_external_diva_cleaning
 
         # Handle keyword arguments used in expressions
         self.user_defined_kw = {}
@@ -1996,6 +2003,9 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                 pywarpx.my_constants.mangle_expression(
                     list(self.A_external.keys()), self.mangle_dict
                 ),
+            )
+            pywarpx.external_vector_potential.do_diva_cleaning = (
+                self.do_external_diva_cleaning
             )
             for field_name, field_dict in self.A_external.items():
                 if field_dict.get("read_from_file", False):

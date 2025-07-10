@@ -1,3 +1,5 @@
+CEXE_sources += AddParticles.cpp
+CEXE_sources += AddPlasmaUtilities.cpp
 CEXE_sources += SmartUtils.cpp
 
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/Particles/ParticleCreation/

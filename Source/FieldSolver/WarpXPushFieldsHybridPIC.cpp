@@ -284,7 +284,7 @@ void WarpX::HybridPICDepositRhoAndJ ()
     }
 }
 
-void WarpX::HybridPICDepositInitialRhoAndJ ()
+void WarpX::HybridPICInitializeRhoJandB ()
 {
     // The Ohm's law solver requires two timesteps' values for the charge
     // and current densities. This function is called at the start of
@@ -298,6 +298,25 @@ void WarpX::HybridPICDepositInitialRhoAndJ ()
         // This is not a restart, so the rho_fp and current_fp multifabs are
         // still empty.
         HybridPICDepositRhoAndJ();
+
+        // Handle field splitting for Hybrid field push
+        if (m_hybrid_pic_model->m_add_external_fields) {
+            // Get the external fields
+            m_hybrid_pic_model->m_external_vector_potential->UpdateHybridExternalFields(
+                gett_old(0),
+                0.5_rt*dt[0]);
+
+            // If using split fields, add the external field at t=0
+            for (int lev = 0; lev <= finest_level; ++lev) {
+                for (int idim = 0; idim < 3; ++idim) {
+                    MultiFab::Add(
+                        *m_fields.get(FieldType::Bfield_fp, Direction{idim}, lev),
+                        *m_fields.get(FieldType::hybrid_B_fp_external, Direction{idim}, lev),
+                        0, 0, 1,
+                        m_fields.get(FieldType::Bfield_fp, Direction{idim}, lev)->nGrowVect());
+                }
+            }
+        }
     }
 
     // Copy the rho_fp values to rho_fp_temp and the current_fp values to

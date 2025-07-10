@@ -117,6 +117,10 @@ void init_WarpXParticleContainer (py::module& m)
             &WarpXParticleContainer::sumParticleCharge,
             py::arg("local")
         )
+        .def("sum_particle_energy",
+            &WarpXParticleContainer::sumParticleEnergy,
+            py::arg("local")
+        )
         .def("deposit_charge",
             [](WarpXParticleContainer& pc,
             amrex::MultiFab* rho, const int lev)

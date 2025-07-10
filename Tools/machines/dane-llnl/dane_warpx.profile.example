@@ -27,7 +27,8 @@ export LD_LIBRARY_PATH=${SW_DIR}/install/blaspp-2024.10.26/lib64:$LD_LIBRARY_PAT
 export LD_LIBRARY_PATH=${SW_DIR}/install/lapackpp-2024.10.26/lib64:$LD_LIBRARY_PATH
 
 # optional: for Python bindings
-module load python/3.12.2
+#module load python/3.12.2 # Note this version uses a too new GLIBCXX and breaks the adios build
+module load python/3.11.5
 
 if [ -d "${SW_DIR}/venvs/warpx-dane" ]
 then

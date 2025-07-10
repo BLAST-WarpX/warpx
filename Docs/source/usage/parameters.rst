@@ -126,9 +126,11 @@ Overall simulation parameters
     , this sets the relative tolerance for the iterative method used to obtain a self-consistent update of the particles at
     each iteration in the JFNK process.
 
-* ``implicit_evolve.use_mass_matrices`` (`bool`, default: false)
-    When `algo.evolve_scheme` is either `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton` and a preconditioner is being used
-    , the diagonal components of the diagonal mass matrices are used to capture the plasma response in the preconditioner.
+* ``implicit_evolve.use_mass_matrices_jacobian`` (`bool`, default: false)
+    When `algo.evolve_scheme` is `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton`, mass matrices are computed at each nonlinear JFNK iteration and are used during the linear iterations to compute the plasma current density, replacing direct particle calculations.
+
+* ``implicit_evolve.use_mass_matrices_pc`` (`bool`, default: false)
+    When `algo.evolve_scheme` is `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton` and a preconditioner is used, this flag determines whether the plasma response is captured in the preconditioner.
 
 * ``picard.verbose`` (`bool`, default: 1)
     When `implicit_evolve.nonlinear_solver = picard`, this sets the verbosity of the Picard solver. If true, then information
@@ -1284,14 +1286,16 @@ Particle initialization
     Injection plane when using the rigid injection method.
     See ``particles.rigid_injected_species`` above.
 
-* ``<species_name>.rigid_advance`` (`bool`)
+* ``<species_name>.rigid_advance`` (`string` or `bool`; default: ``vzbar``)
     Only read if ``<species_name>`` is in ``particles.rigid_injected_species``.
+    Until reaching ``zinject_plane``, each particle is rigidly advanced according to
+    a specified velocity,
 
-    * If ``false``, each particle is advanced with its
-      own velocity ``vz`` until it reaches ``zinject_plane``.
+    * ``vz`` or ``false``: each particle's longitudinal velocity :math:`v_z`
 
-    * If ``true``, each particle is advanced with the average speed of the species
-      ``vzbar`` until it reaches ``zinject_plane``.
+    * ``vzbar`` or ``true``: the species' average longitudinal velocity :math:`\overline{v_z}`
+
+    * ``v``: each particle's velocity :math:`{\bf v}`, including transverse components
 
 * ``species_name.predefined_profile_name`` (`string`)
     Only read if ``<species_name>.profile`` is ``predefined``.
@@ -2583,6 +2587,9 @@ Maxwell solver: kinetic-fluid hybrid
 
 * ``hybid_pic_model.add_external_fields`` (`bool`) optional (default ``false``)
     If ``algo.maxwell_solver`` is set to ``hybrid``, this sets the hybrid solver to use split external fields defined in external_vector_potential inputs.
+
+* ``external_vector_potential.do_diva_cleaning`` (`bool`) optional (default ``true``)
+    This enables or disables the divergence cleaner application to the external A fields.
 
 * ``external_vector_potential.fields`` (list of `str`) optional (default ``empty``)
     If ``hybid_pic_model.add_external_fields`` is set to ``true``, this adds a list names for external time varying vector potentials to be added to hybrid solver.

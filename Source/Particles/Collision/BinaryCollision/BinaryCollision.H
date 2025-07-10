@@ -348,9 +348,11 @@ public:
             // Extract low-level data
             auto const n_cells = static_cast<int>(bins_1.numBins());
             // - Species 1
+            auto np1 = ptile_1.numParticles();
             const auto soa_1 = ptile_1.getParticleTileData();
             index_type* AMREX_RESTRICT indices_1 = bins_1.permutationPtr();
             index_type const* AMREX_RESTRICT cell_offsets_1 = bins_1.offsetsPtr();
+            index_type const* AMREX_RESTRICT bins_1_ptr = bins_1.binsPtr();
             const amrex::ParticleReal q1 = species_1.getCharge();
             const amrex::ParticleReal m1 = species_1.getMass();
             auto get_position_1  = GetParticlePosition<PIdx>(ptile_1, getpos_offset);
@@ -423,37 +425,39 @@ public:
             // create vectors to store density and temperature on cell level
             amrex::Gpu::DeviceVector<amrex::ParticleReal> n1_vec;
             amrex::Gpu::DeviceVector<amrex::ParticleReal> T1_vec;
+            amrex::Gpu::DeviceVector<amrex::ParticleReal> vx1_vec;
+            amrex::Gpu::DeviceVector<amrex::ParticleReal> vy1_vec;
+            amrex::Gpu::DeviceVector<amrex::ParticleReal> vz1_vec;
+            amrex::Gpu::DeviceVector<amrex::ParticleReal> vs1_vec;
+
             if (binary_collision_functor.m_computeSpeciesDensities) {
-                n1_vec.resize(n_cells);
+                n1_vec.resize(n_cells, 0.0_prt);
             }
             if (binary_collision_functor.m_computeSpeciesTemperatures) {
-                T1_vec.resize(n_cells);
+                T1_vec.resize(n_cells, 0.0_prt);
+                vx1_vec.resize(n_cells, 0.0_prt);
+                vy1_vec.resize(n_cells, 0.0_prt);
+                vz1_vec.resize(n_cells, 0.0_prt);
+                vs1_vec.resize(n_cells, 0.0_prt);
             }
             amrex::ParticleReal* AMREX_RESTRICT n1_in_each_cell = n1_vec.dataPtr();
             amrex::ParticleReal* AMREX_RESTRICT T1_in_each_cell = T1_vec.dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT vx1_in_each_cell = vx1_vec.dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT vy1_in_each_cell = vy1_vec.dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT vz1_in_each_cell = vz1_vec.dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT vs1_in_each_cell = vs1_vec.dataPtr();
 
-            // Loop over cells
-            WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::computeDensityTemperatures", prof_computeDensityTemperatures);
-            amrex::ParallelForRNG( n_cells,
-                [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
+            WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures", prof_findDensityTemperatures);
+        WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::atomics", prof_findDensityTemperatures_atomics);
+            // Loop over particles and compute density and temperature
+            amrex::ParallelFor( np1,
+                [=] AMREX_GPU_DEVICE (int ip) noexcept
                 {
-                    // The particles from species1 that are in the cell `i_cell` are
-                    // given by the `indices_1[cell_start_1:cell_stop_1]`
-                    index_type const cell_start_1 = cell_offsets_1[i_cell];
-                    index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
-
-                    // Do not collide if there is only one particle in the cell
-                    if ( cell_stop_1 - cell_start_1 <= 1 ) { return; }
-
                     // compute local density [1/m^3]
                     if (binary_collision_functor.m_computeSpeciesDensities) {
-                        amrex::ParticleReal wtot1 = 0.0;
                         amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
-                        for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
-                            wtot1 += w1[ indices_1[i1] ];
-                        }
-
-                        n1_in_each_cell[i_cell] = wtot1/(dV*volume_factor(i_cell));
+                        amrex::Gpu::Atomic::AddNoRet(&n1_in_each_cell[bins_1_ptr[ip]],
+                                                     w1[ip]/(dV*volume_factor(bins_1_ptr[ip])));
                     }
 
                     // compute local temperature [Joules]
@@ -462,15 +466,63 @@ public:
                         amrex::ParticleReal * const AMREX_RESTRICT u1x = soa_1.m_rdata[PIdx::ux];
                         amrex::ParticleReal * const AMREX_RESTRICT u1y = soa_1.m_rdata[PIdx::uy];
                         amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
-                        T1_in_each_cell[i_cell] = ComputeTemperature( cell_start_1, cell_stop_1, indices_1,
-                                                                      w1, u1x, u1y, u1z, m1 );
+                        amrex::ParticleReal us = u1x[ip]*u1x[ip] + u1y[ip]*u1y[ip] + u1z[ip]*u1z[ip];
+                        amrex::ParticleReal constexpr inv_c2 = 1.0_prt / ( PhysConst::c * PhysConst::c );
+                        amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
+                        amrex::Gpu::Atomic::AddNoRet(&T1_in_each_cell[bins_1_ptr[ip]],  w1[ip]);
+                        amrex::Gpu::Atomic::AddNoRet(&vx1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1x[ip]/gm);
+                        amrex::Gpu::Atomic::AddNoRet(&vy1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1y[ip]/gm);
+                        amrex::Gpu::Atomic::AddNoRet(&vz1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1z[ip]/gm);
+                        amrex::Gpu::Atomic::AddNoRet(&vs1_in_each_cell[bins_1_ptr[ip]], w1[ip]*us/gm/gm);
                     }
+                }
+            );
+            WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_atomics);
 
-                    // shuffle
+            // Finish temperature calculation
+        WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::finishTemperature", prof_findDensityTemperatures_finish);
+            amrex::ParallelFor( n_cells, [=] AMREX_GPU_DEVICE (int i_cell) noexcept
+                {
+                    // The particles from species1 that are in the cell `i_cell` are
+                    // given by the `indices_1[cell_start_1:cell_stop_1]`
+                    index_type const cell_start_1 = cell_offsets_1[i_cell];
+                    index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
+
+                    // Do not need if there is only one particle in the cell
+                    if ( cell_stop_1 - cell_start_1 <= 1 ) { return; }
+
+                    // finish temperature calculation if needed
+                    if (binary_collision_functor.m_computeSpeciesTemperatures) {
+                        const amrex::ParticleReal invsum = 1._prt/T1_in_each_cell[i_cell];
+                        auto vx1 = vx1_in_each_cell[i_cell] * invsum;
+                        auto vy1 = vy1_in_each_cell[i_cell] * invsum;
+                        auto vz1 = vz1_in_each_cell[i_cell] * invsum;
+                        auto vs1 = vs1_in_each_cell[i_cell] * invsum;
+
+                        T1_in_each_cell[i_cell] = m1/(3._prt)*(vs1 -(vx1*vx1+vy1*vy1+vz1*vz1));
+                    }
+                }
+            );
+            WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_finish);
+
+            // shuffle
+        WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
+            amrex::ParallelForRNG( n_cells,
+                [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
+                {
+                    // The particles from species1 that are in the cell `i_cell` are
+                    // given by the `indices_1[cell_start_1:cell_stop_1]`
+                    index_type const cell_start_1 = cell_offsets_1[i_cell];
+                    index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
+
+                    // Do not shuffle if there is only one particle in the cell
+                    if ( cell_stop_1 - cell_start_1 <= 1 ) { return; }
+
                     ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine);
                 }
             );
-            WARPX_PROFILE_VAR_STOP(prof_computeDensityTemperatures);
+            WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
+        WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures);
 
             // Loop over independent particle pairs
             // To speed up binary collisions on GPU, we try to expose as much parallelism
@@ -566,16 +618,20 @@ public:
             // Extract low-level data
             auto const n_cells = static_cast<int>(bins_1.numBins());
             // - Species 1
+            auto np1 = ptile_1.numParticles();
             const auto soa_1 = ptile_1.getParticleTileData();
             index_type* AMREX_RESTRICT indices_1 = bins_1.permutationPtr();
             index_type const* AMREX_RESTRICT cell_offsets_1 = bins_1.offsetsPtr();
+            index_type const* AMREX_RESTRICT bins_1_ptr = bins_1.binsPtr();
             const amrex::ParticleReal q1 = species_1.getCharge();
             const amrex::ParticleReal m1 = species_1.getMass();
             auto get_position_1  = GetParticlePosition<PIdx>(ptile_1, getpos_offset);
             // - Species 2
+            auto np2 = ptile_2.numParticles();
             const auto soa_2 = ptile_2.getParticleTileData();
             index_type* AMREX_RESTRICT indices_2 = bins_2.permutationPtr();
             index_type const* AMREX_RESTRICT cell_offsets_2 = bins_2.offsetsPtr();
+            index_type const* AMREX_RESTRICT bins_2_ptr = bins_2.binsPtr();
             const amrex::ParticleReal q2 = species_2.getCharge();
             const amrex::ParticleReal m2 = species_2.getMass();
             auto get_position_2  = GetParticlePosition<PIdx>(ptile_2, getpos_offset);
@@ -661,79 +717,169 @@ public:
             // create vectors to store density and temperature on cell level
             amrex::Gpu::DeviceVector<amrex::ParticleReal> n1_vec, n2_vec;
             amrex::Gpu::DeviceVector<amrex::ParticleReal> T1_vec, T2_vec;
+            amrex::Gpu::DeviceVector<amrex::ParticleReal> vx1_vec, vx2_vec;
+            amrex::Gpu::DeviceVector<amrex::ParticleReal> vy1_vec, vy2_vec;
+            amrex::Gpu::DeviceVector<amrex::ParticleReal> vz1_vec, vz2_vec;
+            amrex::Gpu::DeviceVector<amrex::ParticleReal> vs1_vec, vs2_vec;
+
             if (binary_collision_functor.m_computeSpeciesDensities) {
-                n1_vec.resize(n_cells);
-                n2_vec.resize(n_cells);
+                n1_vec.resize(n_cells, 0.0_prt);
+                n2_vec.resize(n_cells, 0.0_prt);
             }
             if (binary_collision_functor.m_computeSpeciesTemperatures) {
-                T1_vec.resize(n_cells);
-                T2_vec.resize(n_cells);
+                T1_vec.resize(n_cells, 0.0_prt);
+                T2_vec.resize(n_cells, 0.0_prt);
+                vx1_vec.resize(n_cells, 0.0_prt);
+                vx2_vec.resize(n_cells, 0.0_prt);
+                vy1_vec.resize(n_cells, 0.0_prt);
+                vy2_vec.resize(n_cells, 0.0_prt);
+                vz1_vec.resize(n_cells, 0.0_prt);
+                vz2_vec.resize(n_cells, 0.0_prt);
+                vs1_vec.resize(n_cells, 0.0_prt);
+                vs2_vec.resize(n_cells, 0.0_prt);
             }
             amrex::ParticleReal* AMREX_RESTRICT n1_in_each_cell = n1_vec.dataPtr();
             amrex::ParticleReal* AMREX_RESTRICT n2_in_each_cell = n2_vec.dataPtr();
             amrex::ParticleReal* AMREX_RESTRICT T1_in_each_cell = T1_vec.dataPtr();
             amrex::ParticleReal* AMREX_RESTRICT T2_in_each_cell = T2_vec.dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT vx1_in_each_cell = vx1_vec.dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT vx2_in_each_cell = vx2_vec.dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT vy1_in_each_cell = vy1_vec.dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT vy2_in_each_cell = vy2_vec.dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT vz1_in_each_cell = vz1_vec.dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT vz2_in_each_cell = vz2_vec.dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT vs1_in_each_cell = vs1_vec.dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT vs2_in_each_cell = vs2_vec.dataPtr();
 
-            // Loop over cells
             WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures", prof_findDensityTemperatures);
-            amrex::ParallelForRNG( n_cells,
-                [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
+
+        // Loop over particles and compute density and temperature with atomics
+            WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::atomics", prof_findDensityTemperatures_atomics);
+            amrex::ParallelFor( std::max(np1, np2),
+                [=] AMREX_GPU_DEVICE (int ip) noexcept
                 {
-                    // The particles from species1 that are in the cell `i_cell` are
-                    // given by the `indices_1[cell_start_1:cell_stop_1]`
-                    index_type const cell_start_1 = cell_offsets_1[i_cell];
-                    index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
-                    // Same for species 2
-                    index_type const cell_start_2 = cell_offsets_2[i_cell];
-                    index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
-
-                    // ux from species1 can be accessed like this:
-                    // ux_1[ indices_1[i] ], where i is between
-                    // cell_start_1 (inclusive) and cell_start_2 (exclusive)
-
                     // compute local densities [1/m^3]
                     if (binary_collision_functor.m_computeSpeciesDensities) {
-                        amrex::ParticleReal w1tot = 0.0;
-                        amrex::ParticleReal w2tot = 0.0;
                         amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
                         amrex::ParticleReal * const AMREX_RESTRICT w2 = soa_2.m_rdata[PIdx::w];
-                        for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
-                            w1tot += w1[ indices_1[i1] ];
+                        if (ip < np1) {
+                            amrex::Gpu::Atomic::AddNoRet(&n1_in_each_cell[bins_1_ptr[ip]],
+                                                         w1[ip]/(dV*volume_factor(bins_1_ptr[ip])));
                         }
-                        for (index_type i2=cell_start_2; i2<cell_stop_2; ++i2) {
-                            w2tot += w2[ indices_2[i2] ];
+                        if (ip < np2) {
+                            amrex::Gpu::Atomic::AddNoRet(&n2_in_each_cell[bins_2_ptr[ip]],
+                                                         w2[ip]/(dV*volume_factor(bins_2_ptr[ip])));
                         }
-                        n1_in_each_cell[i_cell] = w1tot/(dV*volume_factor(i_cell));
-                        n2_in_each_cell[i_cell] = w2tot/(dV*volume_factor(i_cell));
                     }
 
                     // compute local temperatures [Joules]
                     if (binary_collision_functor.m_computeSpeciesTemperatures) {
-                        amrex::ParticleReal * const AMREX_RESTRICT w1  = soa_1.m_rdata[PIdx::w];
-                        amrex::ParticleReal * const AMREX_RESTRICT u1x = soa_1.m_rdata[PIdx::ux];
-                        amrex::ParticleReal * const AMREX_RESTRICT u1y = soa_1.m_rdata[PIdx::uy];
-                        amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
-                        T1_in_each_cell[i_cell] = ComputeTemperature( cell_start_1, cell_stop_1, indices_1,
-                                                                      w1, u1x, u1y, u1z, m1 );
-
-                        amrex::ParticleReal * const AMREX_RESTRICT w2  = soa_2.m_rdata[PIdx::w];
-                        amrex::ParticleReal * const AMREX_RESTRICT u2x = soa_2.m_rdata[PIdx::ux];
-                        amrex::ParticleReal * const AMREX_RESTRICT u2y = soa_2.m_rdata[PIdx::uy];
-                        amrex::ParticleReal * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];
-                        T2_in_each_cell[i_cell] = ComputeTemperature( cell_start_2, cell_stop_2, indices_2,
-                                                                      w2, u2x, u2y, u2z, m2 );
+                        if (ip < np1) {
+                            amrex::ParticleReal * const AMREX_RESTRICT w1  = soa_1.m_rdata[PIdx::w];
+                            amrex::ParticleReal * const AMREX_RESTRICT u1x = soa_1.m_rdata[PIdx::ux];
+                            amrex::ParticleReal * const AMREX_RESTRICT u1y = soa_1.m_rdata[PIdx::uy];
+                            amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
+                            amrex::ParticleReal us = u1x[ip]*u1x[ip] + u1y[ip]*u1y[ip] + u1z[ip]*u1z[ip];
+                            amrex::ParticleReal constexpr inv_c2 = 1.0_prt / ( PhysConst::c * PhysConst::c );
+                            amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
+                            amrex::Gpu::Atomic::AddNoRet(&T1_in_each_cell[bins_1_ptr[ip]],  w1[ip]);
+                            amrex::Gpu::Atomic::AddNoRet(&vx1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1x[ip]/gm);
+                            amrex::Gpu::Atomic::AddNoRet(&vy1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1y[ip]/gm);
+                            amrex::Gpu::Atomic::AddNoRet(&vz1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1z[ip]/gm);
+                            amrex::Gpu::Atomic::AddNoRet(&vs1_in_each_cell[bins_1_ptr[ip]], w1[ip]*us/gm/gm);
+                        }
+                        if (ip < np2) {
+                            amrex::ParticleReal * const AMREX_RESTRICT w2  = soa_2.m_rdata[PIdx::w];
+                            amrex::ParticleReal * const AMREX_RESTRICT u2x = soa_2.m_rdata[PIdx::ux];
+                            amrex::ParticleReal * const AMREX_RESTRICT u2y = soa_2.m_rdata[PIdx::uy];
+                            amrex::ParticleReal * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];
+                            amrex::ParticleReal us = u2x[ip]*u2x[ip] + u2y[ip]*u2y[ip] + u2z[ip]*u2z[ip];
+                            amrex::ParticleReal constexpr inv_c2 = 1.0_prt / ( PhysConst::c * PhysConst::c );
+                            amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
+                            amrex::Gpu::Atomic::AddNoRet(&T2_in_each_cell [bins_2_ptr[ip]], w2[ip]);
+                            amrex::Gpu::Atomic::AddNoRet(&vx2_in_each_cell[bins_2_ptr[ip]], w2[ip]*u2x[ip]/gm);
+                            amrex::Gpu::Atomic::AddNoRet(&vy2_in_each_cell[bins_2_ptr[ip]], w2[ip]*u2y[ip]/gm);
+                            amrex::Gpu::Atomic::AddNoRet(&vz2_in_each_cell[bins_2_ptr[ip]], w2[ip]*u2z[ip]/gm);
+                            amrex::Gpu::Atomic::AddNoRet(&vs2_in_each_cell[bins_2_ptr[ip]], w2[ip]*us/gm/gm);
+                        }
                     }
+                }
+            );
+            WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_atomics);
 
-                    // Do not collide if one species is missing in the cell
+            // Finish temperature calculation - we launch 2*n_cells threads to compute both species simultaneously
+        WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::finishTemperature", prof_findDensityTemperatures_finish);
+            amrex::ParallelFor( 2*n_cells, [=] AMREX_GPU_DEVICE (int i) noexcept
+            {
+                int i_cell = i < n_cells ? i : i - n_cells;
+
+                    // The particles from species1 that are in the cell `i_cell` are
+                    // given by the `indices_1[cell_start_1:cell_stop_1]`
+                    index_type const cell_start_1 = cell_offsets_1[i_cell];
+                    index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
+
+                    // Same for species 2
+                    index_type const cell_start_2 = cell_offsets_2[i_cell];
+                    index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
+
+                    // Do not need if one species is missing in the cell
                     if ( cell_stop_1 - cell_start_1 < 1 ||
                          cell_stop_2 - cell_start_2 < 1 ) { return; }
 
-                    // shuffle
-                    ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine);
-                    ShuffleFisherYates(indices_2, cell_start_2, cell_stop_2, engine);
+                    // finish temperature calculation if needed
+                    if (binary_collision_functor.m_computeSpeciesTemperatures) {
+              if (i < n_cells) {
+                        const amrex::ParticleReal invsum1 = 1._prt/T1_in_each_cell[i_cell];
+                        auto vx1 = vx1_in_each_cell[i_cell] * invsum1;
+                        auto vy1 = vy1_in_each_cell[i_cell] * invsum1;
+                        auto vz1 = vz1_in_each_cell[i_cell] * invsum1;
+                        auto vs1 = vs1_in_each_cell[i_cell] * invsum1;
+
+                        T1_in_each_cell[i_cell] = m1/(3._prt)*(vs1 -(vx1*vx1+vy1*vy1+vz1*vz1));
+              } else {
+                        const amrex::ParticleReal invsum2 = 1._prt/T2_in_each_cell[i_cell];
+                        auto vx2 = vx2_in_each_cell[i_cell] * invsum2;
+                        auto vy2 = vy2_in_each_cell[i_cell] * invsum2;
+                        auto vz2 = vz2_in_each_cell[i_cell] * invsum2;
+                        auto vs2 = vs2_in_each_cell[i_cell] * invsum2;
+
+                        T2_in_each_cell[i_cell] = m2/(3._prt)*(vs2 -(vx2*vx2+vy2*vy2+vz2*vz2));
+              }
+                    }
                 }
             );
-            WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures);
+            WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_finish);
+
+            // shuffle - we launch 2*n_cells threads to compute both species simultaneously
+        WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
+            amrex::ParallelForRNG( 2*n_cells,
+                [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
+                {
+          int i_cell = i < n_cells ? i : i - n_cells;
+
+          // The particles from species1 that are in the cell `i_cell` are
+          // given by the `indices_1[cell_start_1:cell_stop_1]`
+          index_type const cell_start_1 = cell_offsets_1[i_cell];
+          index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
+
+          // Same for species 2
+          index_type const cell_start_2 = cell_offsets_2[i_cell];
+          index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
+
+          // Do not collide if one species is missing in the cell
+          if ( cell_stop_1 - cell_start_1 < 1 ||
+               cell_stop_2 - cell_start_2 < 1 ) { return; }
+
+          if (i < n_cells) {
+            ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine);
+          } else {
+            ShuffleFisherYates(indices_2, cell_start_2, cell_stop_2, engine);
+          }
+                }
+            );
+            WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
+
+        WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures);
             // Loop over independent particle pairs
             // To speed up binary collisions on GPU, we try to expose as much parallelism
             // as possible (while avoiding race conditions): Instead of looping with one GPU
