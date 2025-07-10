@@ -2234,8 +2234,9 @@ Details about the collision models can be found in the :ref:`theory section <mul
 * ``collisions.correct_energy_momentum`` (`bool`) optional (default 0)
     For pairwisecoulomb collisions, whether to correct the energy and momentum after the collisions so that they are conserved.
     In binary collisions, if the weights of the colliding particles are not the same, the collision does not
-    conserve energy and momentum. When this option is on, after the collisions, small modifications are made to the
-    particle mometum so that the energy and momentum are exactly conserved in each cell.
+    exactly conserve energy and momentum. When this option is on, after the collisions, small modifications are made to the
+    particle momentum so that the energy and momentum are exactly conserved in each cell.
+    This uses the algorithm described in https://doi.org/10.1016/j.jcp.2025.113927.
 
 * ``collisions.energy_fraction`` (`float`) optional (default 0.05)
     For pairwisecoulomb collisions, when correcting the energy and momentum conservation, the energy correction is applied to pairs of particles in their center of momentum frame.
