@@ -15,6 +15,7 @@
 #include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
 #include "Initialization/PlasmaInjector.H"
+#include "Particles/Algorithms/KineticEnergy.H"
 #include "Particles/ParticleBoundaries.H"
 #include "SpeciesPhysicalProperties.H"
 
@@ -24,6 +25,7 @@
 #endif
 #include "MultiParticleContainer_fwd.H"
 
+#include "Particles/Deposition/TemperatureDepositionTypes.H"
 #include "Particles/Deposition/VarianceAccumulationBuffer.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
@@ -365,7 +367,6 @@ public:
         [[maybe_unused]]RealVector const & uxp,
         [[maybe_unused]]RealVector const & uyp,
         [[maybe_unused]]RealVector const & uzp,
-        [[maybe_unused]]int const * const ion_lev,
         [[maybe_unused]]amrex::MultiFab * const Tx,
         [[maybe_unused]]amrex::MultiFab * const Ty,
         [[maybe_unused]]amrex::MultiFab * const Tz,
@@ -375,7 +376,9 @@ public:
         [[maybe_unused]]const int lev,
         [[maybe_unused]]int const depos_lev,
         [[maybe_unused]]amrex::Real const relative_time,
-        [[maybe_unused]]PushType push_type)
+        [[maybe_unused]]PushType push_type,
+        [[maybe_unused]]const warpx::particles::deposition::TemperatureDepositionType type,
+        [[maybe_unused]]const warpx::particles::deposition::TemperatureDepositionPass pass)
     {}
 
     void DepositTotalNGPTemperature (amrex::MultiFab* temperature, const int lev);
@@ -437,11 +440,13 @@ public:
     int getSpeciesId() const {return species_id;}
 
     ///
-    /// This returns the total charge for all the particles in this ParticleContainer.
-    /// This is needed when solving Poisson's equation with periodic boundary conditions.
+    /// This returns the total energy/weight/charge for all the particles in this ParticleContainer.
+    /// The total charge is needed when solving Poisson's equation with periodic boundary conditions.
     ///
-    amrex::ParticleReal sumParticleCharge(bool local = false);
-    amrex::ParticleReal sumParticleWeight(bool local = false);
+    std::pair<amrex::ParticleReal, amrex::ParticleReal> sumParticleWeightAndEnergy (bool local = false) const;
+    amrex::ParticleReal sumParticleCharge (bool local = false) const;
+    amrex::ParticleReal sumParticleWeight (bool local = false) const;
+    amrex::ParticleReal sumParticleEnergy (bool local = false) const;
 
     std::array<amrex::ParticleReal, 3> meanParticleVelocity(bool local = false);
 
