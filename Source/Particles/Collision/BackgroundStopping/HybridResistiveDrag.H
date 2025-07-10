@@ -16,6 +16,15 @@
 
 #include <string>
 
+namespace warpx::particles::collision::backgroundstopping {
+
+// Types are to set whether specifying plasma resistivity directly as
+// eta, or via the collision frequency (nu)
+AMREX_ENUM(HybridResistiveDragType,
+    COLLISION_FREQUENCY,
+    RESISTIVITY
+)
+
 class HybridResistiveDrag final
     : public CollisionBase
 {
@@ -52,9 +61,12 @@ public:
 
 private:
 
-    amrex::Parser m_resistivity_parser;
+    HybridResistiveDragType m_type;
 
-    amrex::ParserExecutor<4> m_resistivity_func;
+    amrex::Parser m_expression_parser;
+    amrex::ParserExecutor<6> m_expression_func;
 };
+
+} // namespace warpx::particles::collision::backgroundstopping
 
 #endif // WARPX_PARTICLES_COLLISION_HYBRIDRESISTIVEDRAG_H_
