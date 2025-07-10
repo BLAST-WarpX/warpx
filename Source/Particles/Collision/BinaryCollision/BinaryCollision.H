@@ -519,38 +519,31 @@ public:
                     u1z_before_ptr = u1z_before.dataPtr();
                 }
 
-                amrex::ParallelFor( np1, [=] AMREX_GPU_DEVICE (int ip) noexcept
-                    {
-                        u1x_before_ptr[ip] = u1x[ip];
-                        u1y_before_ptr[ip] = u1y[ip];
-                        u1z_before_ptr[ip] = u1z[ip];
-                    }
-                );
             }
 
-            bool const correct_energy_momentum = m_correct_energy_momentum;
             amrex::ParticleReal const beta_weight_exponent = m_beta_weight_exponent;
 
             WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures", prof_findDensityTemperatures);
 
-            if (correct_energy_momentum) {
+            if (m_correct_energy_momentum) {
                 WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findMomentumEnergy", prof_findMomentumEnergy);
                 amrex::ParallelFor( np1,
                     [=] AMREX_GPU_DEVICE (int i1) noexcept
                     {
+                        u1x_before_ptr[i1] = u1x[i1];
+                        u1y_before_ptr[i1] = u1y[i1];
+                        u1z_before_ptr[i1] = u1z[i1];
 
                         const int i_cell = bins_1_ptr[i1];
 
                         // Compute the local energy and momentum.
-                        amrex::ParticleReal const w1_scaled = std::pow(w1[ indices_1[i1] ], beta_weight_exponent);
+                        amrex::ParticleReal const w1_scaled = std::pow(w1[i1], beta_weight_exponent);
                         amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w1_scaled);
-                        amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w1[ indices_1[i1] ]*u1x[ indices_1[i1] ]*m1);
-                        amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w1[ indices_1[i1] ]*u1y[ indices_1[i1] ]*m1);
-                        amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w1[ indices_1[i1] ]*u1z[ indices_1[i1] ]*m1);
-                        amrex::ParticleReal KE = Algorithms::KineticEnergy(u1x[ indices_1[i1] ],
-                                                                           u1y[ indices_1[i1] ],
-                                                                           u1z[ indices_1[i1] ], m1);
-                        amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w1[ indices_1[i1] ]*KE);
+                        amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w1[i1]*u1x[i1]*m1);
+                        amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w1[i1]*u1y[i1]*m1);
+                        amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w1[i1]*u1z[i1]*m1);
+                        amrex::ParticleReal KE = Algorithms::KineticEnergy(u1x[i1], u1y[i1], u1z[i1], m1);
+                        amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w1[i1]*KE);
                     }
                 );
                 WARPX_PROFILE_VAR_STOP(prof_findMomentumEnergy);
@@ -718,9 +711,9 @@ public:
 
                         // Subract the momentum from the initial values.
                         // Whatever is left over, will be distributed among the particles.
-                        amrex::ParticleReal const px = w1[ indices_1[i1] ]*u1x[ indices_1[i1] ]*m1;
-                        amrex::ParticleReal const py = w1[ indices_1[i1] ]*u1y[ indices_1[i1] ]*m1;
-                        amrex::ParticleReal const pz = w1[ indices_1[i1] ]*u1z[ indices_1[i1] ]*m1;
+                        amrex::ParticleReal const px = w1[i1]*u1x[i1]*m1;
+                        amrex::ParticleReal const py = w1[i1]*u1y[i1]*m1;
+                        amrex::ParticleReal const pz = w1[i1]*u1z[i1]*m1;
                         amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], -px);
                         amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], -py);
                         amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], -pz);
@@ -734,17 +727,13 @@ public:
                         const int i_cell = bins_1_ptr[i1];
 
                         amrex::ParticleReal const ww_weighted_sum = ww_weighted_sum_in_each_cell[i_cell];
-                        amrex::ParticleReal const px_avg = px_in_each_cell[i_cell]/ww_weighted_sum;
-                        amrex::ParticleReal const py_avg = py_in_each_cell[i_cell]/ww_weighted_sum;
-                        amrex::ParticleReal const pz_avg = pz_in_each_cell[i_cell]/ww_weighted_sum;
-                        amrex::ParticleReal const w_factor = std::pow(w1[ indices_1[i1] ], beta_weight_exponent - 1._prt)/m1;
-                        u1x[ indices_1[i1] ] += w_factor*px_avg;
-                        u1y[ indices_1[i1] ] += w_factor*py_avg;
-                        u1z[ indices_1[i1] ] += w_factor*pz_avg;
-                        amrex::ParticleReal const KE_after = Algorithms::KineticEnergy(u1x[ indices_1[i1] ],
-                                                                                       u1y[ indices_1[i1] ],
-                                                                                       u1z[ indices_1[i1] ], m1);
-                        amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], -w1[ indices_1[i1] ]*KE_after);
+                        amrex::ParticleReal const w_factor = std::pow(w1[i1], beta_weight_exponent - 1._prt)/m1;
+                        u1x[i1] += w_factor*px_in_each_cell[i_cell]/ww_weighted_sum;
+                        u1y[i1] += w_factor*py_in_each_cell[i_cell]/ww_weighted_sum;
+                        u1z[i1] += w_factor*pz_in_each_cell[i_cell]/ww_weighted_sum;
+
+                        amrex::ParticleReal const KE_after = Algorithms::KineticEnergy(u1x[i1], u1y[i1], u1z[i1], m1);
+                        amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], -w1[i1]*KE_after);
                     }
                 );
 
@@ -987,15 +976,6 @@ public:
                     u1y_before_ptr = u1y_before.dataPtr();
                     u1z_before_ptr = u1z_before.dataPtr();
                 }
-
-                amrex::ParallelFor( np1, [=] AMREX_GPU_DEVICE (int ip) noexcept
-                    {
-                        u1x_before_ptr[ip] = u1x[ip];
-                        u1y_before_ptr[ip] = u1y[ip];
-                        u1z_before_ptr[ip] = u1z[ip];
-                    }
-                );
-
             }
 
             amrex::Gpu::DeviceVector<amrex::ParticleReal> u2x_before;
@@ -1021,60 +1001,56 @@ public:
                     u2y_before_ptr = u2y_before.dataPtr();
                     u2z_before_ptr = u2z_before.dataPtr();
                 }
-
-                amrex::ParallelFor( np2, [=] AMREX_GPU_DEVICE (int ip) noexcept
-                    {
-                        u2x_before_ptr[ip] = u2x[ip];
-                        u2y_before_ptr[ip] = u2y[ip];
-                        u2z_before_ptr[ip] = u2z[ip];
-                    }
-                );
             }
 
-            bool const correct_energy_momentum = m_correct_energy_momentum;
             amrex::ParticleReal const beta_weight_exponent = m_beta_weight_exponent;
 
             WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures", prof_findDensityTemperatures);
 
             // Loop over cells
-            if (correct_energy_momentum) {
+            if (m_correct_energy_momentum) {
                 WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findMomentumEnergy", prof_findMomentumEnergy);
-                amrex::ParallelFor( np1,
-                    [=] AMREX_GPU_DEVICE (int i1) noexcept
+                amrex::ParallelFor( std::max(np1, np2),
+                    [=] AMREX_GPU_DEVICE (int ip) noexcept
                     {
 
-                        const int i_cell = bins_1_ptr[i1];
+                        if (ip < np1) {
+                            const int i1 = ip;
+                            const int i_cell = bins_1_ptr[i1];
 
-                        // Compute the local energy and momentum.
+                            // Save the momenta before the collision
+                            u1x_before_ptr[i1] = u1x[i1];
+                            u1y_before_ptr[i1] = u1y[i1];
+                            u1z_before_ptr[i1] = u1z[i1];
 
-                        amrex::ParticleReal const w1_scaled = std::pow(w1[ indices_1[i1] ], beta_weight_exponent);
-                        amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w1_scaled);
-                        amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w1[ indices_1[i1] ]*u1x[ indices_1[i1] ]*m1);
-                        amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w1[ indices_1[i1] ]*u1y[ indices_1[i1] ]*m1);
-                        amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w1[ indices_1[i1] ]*u1z[ indices_1[i1] ]*m1);
-                        amrex::ParticleReal KE1 = Algorithms::KineticEnergy(u1x[ indices_1[i1] ],
-                                                                            u1y[ indices_1[i1] ],
-                                                                            u1z[ indices_1[i1] ], m1);
-                        amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w1[ indices_1[i1] ]*KE1);
-                    }
-                );
+                            // Compute the local energy and momentum.
+                            amrex::ParticleReal const w1_scaled = std::pow(w1[i1], beta_weight_exponent);
+                            amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w1_scaled);
+                            amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w1[i1]*u1x[i1]*m1);
+                            amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w1[i1]*u1y[i1]*m1);
+                            amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w1[i1]*u1z[i1]*m1);
+                            amrex::ParticleReal KE1 = Algorithms::KineticEnergy(u1x[i1], u1y[i1], u1z[i1], m1);
+                            amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w1[i1]*KE1);
+                        }
 
-                amrex::ParallelFor( np2,
-                    [=] AMREX_GPU_DEVICE (int i2) noexcept
-                    {
+                        if (ip < np2) {
+                            const int i2 = ip;
+                            const int i_cell = bins_2_ptr[i2];
 
-                        const int i_cell = bins_2_ptr[i2];
+                            // Save the momenta before the collision
+                            u2x_before_ptr[i2] = u2x[i2];
+                            u2y_before_ptr[i2] = u2y[i2];
+                            u2z_before_ptr[i2] = u2z[i2];
 
-                        // Compute the local energy and momentum.
-                        amrex::ParticleReal const w2_scaled = std::pow(w2[ indices_2[i2] ], beta_weight_exponent);
-                        amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w2_scaled);
-                        amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w2[ indices_2[i2] ]*u2x[ indices_2[i2] ]*m2);
-                        amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w2[ indices_2[i2] ]*u2y[ indices_2[i2] ]*m2);
-                        amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w2[ indices_2[i2] ]*u2z[ indices_2[i2] ]*m2);
-                        amrex::ParticleReal KE2 = Algorithms::KineticEnergy(u2x[ indices_2[i2] ],
-                                                                            u2y[ indices_2[i2] ],
-                                                                            u2z[ indices_2[i2] ], m2);
-                        amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w2[ indices_2[i2] ]*KE2);
+                            // Compute the local energy and momentum.
+                            amrex::ParticleReal const w2_scaled = std::pow(w2[i2], beta_weight_exponent);
+                            amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w2_scaled);
+                            amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w2[i2]*u2x[i2]*m2);
+                            amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w2[i2]*u2y[i2]*m2);
+                            amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w2[i2]*u2z[i2]*m2);
+                            amrex::ParticleReal KE2 = Algorithms::KineticEnergy(u2x[i2], u2y[i2], u2z[i2], m2);
+                            amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w2[i2]*KE2);
+                        }
                     }
                 );
                 WARPX_PROFILE_VAR_STOP(prof_findMomentumEnergy);
@@ -1288,71 +1264,64 @@ public:
                 amrex::ParticleReal const energy_fraction_max = m_energy_fraction_max;
 
                 WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::correctEnergyMomentum", prof_correctEnergyMomentum);
-                amrex::ParallelFor( np1,
-                    [=] AMREX_GPU_DEVICE (int i1) noexcept
+                amrex::ParallelFor( std::max(np1, np2),
+                    [=] AMREX_GPU_DEVICE (int ip) noexcept
                     {
 
-                        const int i_cell = bins_1_ptr[i1];
+                        if (ip < np1) {
+                            const int i1 = ip;
+                            const int i_cell = bins_1_ptr[i1];
 
-                        // Subract the momentum from the initial values.
-                        // Whatever is left over, will be distributed among the particles.
-                        amrex::ParticleReal const px = w1[ indices_1[i1] ]*u1x[ indices_1[i1] ]*m1;
-                        amrex::ParticleReal const py = w1[ indices_1[i1] ]*u1y[ indices_1[i1] ]*m1;
-                        amrex::ParticleReal const pz = w1[ indices_1[i1] ]*u1z[ indices_1[i1] ]*m1;
-                        amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], -px);
-                        amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], -py);
-                        amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], -pz);
+                            // Subract the momentum from the initial values.
+                            // Whatever is left over, will be distributed among the particles.
+                            amrex::ParticleReal const px = w1[i1]*u1x[i1]*m1;
+                            amrex::ParticleReal const py = w1[i1]*u1y[i1]*m1;
+                            amrex::ParticleReal const pz = w1[i1]*u1z[i1]*m1;
+                            amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], -px);
+                            amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], -py);
+                            amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], -pz);
+                        }
+
+                        if (ip < np2) {
+                            const int i2 = ip;
+                            const int i_cell = bins_2_ptr[i2];
+
+                            // Subract the momentum from the initial values.
+                            // Whatever is left over, will be distributed among the particles.
+                            amrex::ParticleReal const px = w2[i2]*u2x[i2]*m2;
+                            amrex::ParticleReal const py = w2[i2]*u2y[i2]*m2;
+                            amrex::ParticleReal const pz = w2[i2]*u2z[i2]*m2;
+                            amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], -px);
+                            amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], -py);
+                            amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], -pz);
+                        }
                     }
                 );
 
-                amrex::ParallelFor( np2,
-                    [=] AMREX_GPU_DEVICE (int i2) noexcept
+                amrex::ParallelFor( std::max(np1, np2),
+                    [=] AMREX_GPU_DEVICE (int ip) noexcept
                     {
+                        if (ip < np1) {
+                            const int i1 = ip;
+                            const int i_cell = bins_1_ptr[i1];
 
-                        const int i_cell = bins_2_ptr[i2];
+                            amrex::ParticleReal const ww_weighted_sum = ww_weighted_sum_in_each_cell[i_cell];
+                            amrex::ParticleReal const w_factor = std::pow(w1[i1], beta_weight_exponent - 1._prt)/m1;
+                            u1x[i1] += w_factor*px_in_each_cell[i_cell]/ww_weighted_sum;
+                            u1y[i1] += w_factor*py_in_each_cell[i_cell]/ww_weighted_sum;
+                            u1z[i1] += w_factor*pz_in_each_cell[i_cell]/ww_weighted_sum;
+                        }
 
-                        // Subract the momentum from the initial values.
-                        // Whatever is left over, will be distributed among the particles.
-                        amrex::ParticleReal const px = w2[ indices_2[i2] ]*u2x[ indices_2[i2] ]*m2;
-                        amrex::ParticleReal const py = w2[ indices_2[i2] ]*u2y[ indices_2[i2] ]*m2;
-                        amrex::ParticleReal const pz = w2[ indices_2[i2] ]*u2z[ indices_2[i2] ]*m2;
-                        amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], -px);
-                        amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], -py);
-                        amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], -pz);
-                    }
-                );
+                        if (ip < np2) {
+                            const int i2 = ip;
+                            const int i_cell = bins_2_ptr[i2];
 
-                amrex::ParallelFor( np1,
-                    [=] AMREX_GPU_DEVICE (int i1) noexcept
-                    {
-
-                        const int i_cell = bins_1_ptr[i1];
-
-                        amrex::ParticleReal const ww_weighted_sum = ww_weighted_sum_in_each_cell[i_cell];
-                        amrex::ParticleReal const px_avg = px_in_each_cell[i_cell]/ww_weighted_sum;
-                        amrex::ParticleReal const py_avg = py_in_each_cell[i_cell]/ww_weighted_sum;
-                        amrex::ParticleReal const pz_avg = pz_in_each_cell[i_cell]/ww_weighted_sum;
-                        amrex::ParticleReal const w_factor = std::pow(w1[ indices_1[i1] ], beta_weight_exponent - 1._prt)/m1;
-                        u1x[ indices_1[i1] ] += w_factor*px_avg;
-                        u1y[ indices_1[i1] ] += w_factor*py_avg;
-                        u1z[ indices_1[i1] ] += w_factor*pz_avg;
-                    }
-                );
-
-                amrex::ParallelFor( np2,
-                    [=] AMREX_GPU_DEVICE (int i2) noexcept
-                    {
-
-                        const int i_cell = bins_2_ptr[i2];
-
-                        amrex::ParticleReal const ww_weighted_sum = ww_weighted_sum_in_each_cell[i_cell];
-                        amrex::ParticleReal const px_avg = px_in_each_cell[i_cell]/ww_weighted_sum;
-                        amrex::ParticleReal const py_avg = py_in_each_cell[i_cell]/ww_weighted_sum;
-                        amrex::ParticleReal const pz_avg = pz_in_each_cell[i_cell]/ww_weighted_sum;
-                        amrex::ParticleReal const w_factor = std::pow(w2[ indices_2[i2] ], beta_weight_exponent - 1._prt)/m2;
-                        u2x[ indices_2[i2] ] += w_factor*px_avg;
-                        u2y[ indices_2[i2] ] += w_factor*py_avg;
-                        u2z[ indices_2[i2] ] += w_factor*pz_avg;
+                            amrex::ParticleReal const ww_weighted_sum = ww_weighted_sum_in_each_cell[i_cell];
+                            amrex::ParticleReal const w_factor = std::pow(w2[i2], beta_weight_exponent - 1._prt)/m2;
+                            u2x[i2] += w_factor*px_in_each_cell[i_cell]/ww_weighted_sum;
+                            u2y[i2] += w_factor*py_in_each_cell[i_cell]/ww_weighted_sum;
+                            u2z[i2] += w_factor*pz_in_each_cell[i_cell]/ww_weighted_sum;
+                        }
                     }
                 );
 
