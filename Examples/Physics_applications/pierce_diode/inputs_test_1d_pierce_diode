@@ -59,12 +59,12 @@ ions.surface_flux_pos = 0
 ions.flux_normal_axis = z
 ions.flux_direction = 1
 ions.flux_profile = constant
-ions.flux = 54.305/q_e # corresponds to Child-Langmuir limit
+ions.flux = 38.79/q_e # corresponds to Child-Langmuir limit
 ions.momentum_distribution_type = constant
 
 # diagnostics
 diagnostics.diags_names = diag1
-diag1.intervals = 500
+diag1.intervals = 5000
 diag1.diag_type = Full
 diag1.format=openpmd
 diag1.fields_to_plot = Ez rho jz phi

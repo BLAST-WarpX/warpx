@@ -12,6 +12,7 @@ from scipy.constants import e, epsilon_0, m_u
 yt.funcs.mylog.setLevel(0)
 
 filename = sys.argv[1]
+print("-----", filename)
 ts = OpenPMDTimeSeries(filename)
 # Parameters used in the corresponding input script
 kV = 1000
@@ -28,16 +29,16 @@ J_CL = (
     * abs(extractor_voltage) ** (3 / 2)
     / d_plate**2
 )
-
+print(ts.iterations[-1])
 it = ts.iterations[-1]
-time_cur = ts.current_t
 phi, meta = ts.get_field("phi", iteration=it, plot=False)
+
 phi_analyt = extractor_voltage * (meta.z / d_plate) ** (4 / 3)
 ez, _ = ts.get_field("E", "z", iteration=ts.iterations[-1], plot=False)
 rho, _ = ts.get_field("rho", iteration=it, plot=False)
 jz, _ = ts.get_field("j", "z", iteration=it, plot=False)
 z, uz = ts.get_particle(["z", "uz"], iteration=it)
-
+time_cur = ts.current_t
 color = "orange"
 title = r"$\Gamma_{ions}=38.79 \approx \Gamma_{CL}$"
 
@@ -66,7 +67,6 @@ axs[1, 1].set_xlabel("z, mm")
 axs[1, 1].plot(meta.z, phi_analyt, label="theory", ls=":", color="black")
 axs[1, 1].legend()
 plt.tight_layout()
-plt.show()
 
 rel_error_phi = np.abs(phi[1:] - phi_analyt[1:]) / np.abs(phi_analyt[1:])
 rel_error_jz = np.abs(jz - J_CL) / J_CL
