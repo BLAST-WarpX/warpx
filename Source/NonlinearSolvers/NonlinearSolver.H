@@ -73,6 +73,11 @@ public:
     virtual void GetSolverParams (amrex::Real&, amrex::Real&, int&) = 0;
 
     /**
+     * \brief Whether a preconditioner is used by the nonlinear solver.
+     */
+    virtual bool UsePreconditioner () { return m_usePC; }
+
+    /**
      * \brief Allow caller to dynamically change the verbosity flag. For
      * example, one may want to only print solver information every 100 steps.
      */
@@ -84,6 +89,7 @@ protected:
     mutable bool m_verbose = true;
     std::string m_diagnostic_file;
     int m_diagnostic_interval = 1;
+    bool m_usePC = false;
 
 };
 

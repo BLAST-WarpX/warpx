@@ -624,20 +624,20 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
             amplitude_E.resize(np);
 
             // Determine whether particles will deposit on the fine or coarse level
-            long np_current = np;
+            long np_to_deposit = np;
             if (lev > 0 && m_deposit_on_main_grid && has_buffer) {
-                np_current = 0;
+                np_to_deposit = 0;
             }
 
             if (has_rho && ! skip_deposition && ! do_not_deposit) {
                 int* AMREX_RESTRICT ion_lev = nullptr;
                 amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
                 DepositCharge(pti, wp, ion_lev, rho, 0, 0,
-                              np_current, thread_num, lev, lev);
+                              np_to_deposit, thread_num, lev, lev);
                 if (has_buffer) {
                     amrex::MultiFab* crho = fields.get(FieldType::rho_buf, lev);
-                    DepositCharge(pti, wp, ion_lev, crho, 0, np_current,
-                                  np-np_current, thread_num, lev, lev-1);
+                    DepositCharge(pti, wp, ion_lev, crho, 0, np_to_deposit,
+                                  np-np_to_deposit, thread_num, lev, lev-1);
                 }
             }
 
@@ -675,7 +675,7 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 amrex::MultiFab * jy = fields.get(current_fp_string, Direction{1}, lev);
                 amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
                 DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
-                               0, np_current, thread_num,
+                               0, np_to_deposit, thread_num,
                                lev, lev, dt, relative_time, push_type);
 
                 if (has_buffer)
@@ -685,7 +685,7 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                     amrex::MultiFab * cjy = fields.get(FieldType::current_buf, Direction{1}, lev);
                     amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
                     DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, cjx, cjy, cjz,
-                                   np_current, np-np_current, thread_num,
+                                   np_to_deposit, np-np_to_deposit, thread_num,
                                    lev, lev-1, dt, relative_time, push_type);
                 }
             }
@@ -695,11 +695,11 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 int* AMREX_RESTRICT ion_lev = nullptr;
                 amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
                 DepositCharge(pti, wp, ion_lev, rho, 1, 0,
-                              np_current, thread_num, lev, lev);
+                              np_to_deposit, thread_num, lev, lev);
                 if (has_buffer) {
                     amrex::MultiFab* crho = fields.get(FieldType::rho_buf, lev);
-                    DepositCharge(pti, wp, ion_lev, crho, 1, np_current,
-                                  np-np_current, thread_num, lev, lev-1);
+                    DepositCharge(pti, wp, ion_lev, crho, 1, np_to_deposit,
+                                  np-np_to_deposit, thread_num, lev, lev-1);
                 }
             }
 
