@@ -727,8 +727,6 @@ public:
                     }
                 );
 
-                amrex::Gpu::streamSynchronize();
-
                 amrex::ParallelFor( np1,
                     [=] AMREX_GPU_DEVICE (int i1) noexcept
                     {
@@ -749,8 +747,6 @@ public:
                         amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], -w1[ indices_1[i1] ]*KE_after);
                     }
                 );
-
-                amrex::Gpu::streamSynchronize();
 
                 amrex::ParallelFor( n_cells,
                     [=] AMREX_GPU_DEVICE (int i_cell) noexcept
@@ -1326,8 +1322,6 @@ public:
                     }
                 );
 
-                amrex::Gpu::streamSynchronize();
-
                 amrex::ParallelFor( np1,
                     [=] AMREX_GPU_DEVICE (int i1) noexcept
                     {
@@ -1361,8 +1355,6 @@ public:
                         u2z[ indices_2[i2] ] += w_factor*pz_avg;
                     }
                 );
-
-                amrex::Gpu::streamSynchronize();
 
                 amrex::ParallelFor( n_cells,
                     [=] AMREX_GPU_DEVICE (int i_cell) noexcept
