@@ -2257,7 +2257,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     For pairwisecoulomb collisions, override the parameter ``collisions.energy_fraction`` for the specific collision.
 
 * ``<collision_name>.energy_fraction_max`` (`float`) optional
-    For pairwisecoulomb collisions, override the parameter ``collisions.energy_fraction_ma`` for the specific collision.
+    For pairwisecoulomb collisions, override the parameter ``collisions.energy_fraction_max`` for the specific collision.
 
 * ``<collision_name>.beta_weight_exponent`` (`float`) optional
     For pairwisecoulomb collisions, override the parameter ``collisions.beta_weight_exponent`` for the specific collision.
