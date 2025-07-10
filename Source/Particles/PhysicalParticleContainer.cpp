@@ -1266,7 +1266,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
                 amrex::Real const rc = std::pow(rmax, 1._rt + radial_numpercell_power)
                                      - std::pow(rmin, 1._rt + radial_numpercell_power);
                 amrex::Real const rminp = std::pow(rmin, 1._rt + radial_numpercell_power);
-                amrex::Real const xb = std::pow(xu*rc + rminp, 1._rt/(1._rt + radial_numpercell_power))*rmax;
+                amrex::Real const xb = std::pow(xu*rc + rminp, 1._rt/(1._rt + radial_numpercell_power));
                 amrex::Real const yb = theta;
 
                 pos.x = xb*cos_phi*std::cos(theta);
