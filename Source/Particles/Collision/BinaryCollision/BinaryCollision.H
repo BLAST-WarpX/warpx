@@ -539,7 +539,7 @@ public:
                     [=] AMREX_GPU_DEVICE (int i1) noexcept
                     {
 
-                        const int i_cell = amrex::bisect( cell_offsets_1, 0, n_cells, i1 );
+                        const int i_cell = bins_1_ptr[i1];
 
                         // Compute the local energy and momentum.
                         amrex::ParticleReal const w1_scaled = std::pow(w1[ indices_1[i1] ], beta_weight_exponent);
@@ -714,7 +714,7 @@ public:
                     [=] AMREX_GPU_DEVICE (int i1) noexcept
                     {
 
-                        const int i_cell = amrex::bisect( cell_offsets_1, 0, n_cells, i1 );
+                        const int i_cell = bins_1_ptr[i1];
 
                         // Subract the momentum from the initial values.
                         // Whatever is left over, will be distributed among the particles.
@@ -733,7 +733,7 @@ public:
                     [=] AMREX_GPU_DEVICE (int i1) noexcept
                     {
 
-                        const int i_cell = amrex::bisect( cell_offsets_1, 0, n_cells, i1 );
+                        const int i_cell = bins_1_ptr[i1];
 
                         amrex::ParticleReal const ww_weighted_sum = ww_weighted_sum_in_each_cell[i_cell];
                         amrex::ParticleReal const px_avg = px_in_each_cell[i_cell]/ww_weighted_sum;
@@ -1047,7 +1047,7 @@ public:
                     [=] AMREX_GPU_DEVICE (int i1) noexcept
                     {
 
-                        const int i_cell = amrex::bisect( cell_offsets_1, 0, n_cells, i1 );
+                        const int i_cell = bins_1_ptr[i1];
 
                         // Compute the local energy and momentum.
 
@@ -1067,7 +1067,7 @@ public:
                     [=] AMREX_GPU_DEVICE (int i2) noexcept
                     {
 
-                        const int i_cell = amrex::bisect( cell_offsets_2, 0, n_cells, i2 );
+                        const int i_cell = bins_2_ptr[i2];
 
                         // Compute the local energy and momentum.
                         amrex::ParticleReal const w2_scaled = std::pow(w2[ indices_2[i2] ], beta_weight_exponent);
@@ -1296,7 +1296,7 @@ public:
                     [=] AMREX_GPU_DEVICE (int i1) noexcept
                     {
 
-                        const int i_cell = amrex::bisect( cell_offsets_1, 0, n_cells, i1 );
+                        const int i_cell = bins_1_ptr[i1];
 
                         // Subract the momentum from the initial values.
                         // Whatever is left over, will be distributed among the particles.
@@ -1313,7 +1313,7 @@ public:
                     [=] AMREX_GPU_DEVICE (int i2) noexcept
                     {
 
-                        const int i_cell = amrex::bisect( cell_offsets_2, 0, n_cells, i2 );
+                        const int i_cell = bins_2_ptr[i2];
 
                         // Subract the momentum from the initial values.
                         // Whatever is left over, will be distributed among the particles.
@@ -1332,7 +1332,7 @@ public:
                     [=] AMREX_GPU_DEVICE (int i1) noexcept
                     {
 
-                        const int i_cell = amrex::bisect( cell_offsets_1, 0, n_cells, i1 );
+                        const int i_cell = bins_1_ptr[i1];
 
                         amrex::ParticleReal const ww_weighted_sum = ww_weighted_sum_in_each_cell[i_cell];
                         amrex::ParticleReal const px_avg = px_in_each_cell[i_cell]/ww_weighted_sum;
@@ -1349,7 +1349,7 @@ public:
                     [=] AMREX_GPU_DEVICE (int i2) noexcept
                     {
 
-                        const int i_cell = amrex::bisect( cell_offsets_2, 0, n_cells, i2 );
+                        const int i_cell = bins_2_ptr[i2];
 
                         amrex::ParticleReal const ww_weighted_sum = ww_weighted_sum_in_each_cell[i_cell];
                         amrex::ParticleReal const px_avg = px_in_each_cell[i_cell]/ww_weighted_sum;
