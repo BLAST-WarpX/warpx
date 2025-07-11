@@ -506,7 +506,6 @@ void ImplicitSolver::InitializeMassMatrices ()
             m_ncomp_zz[0] = 5 + 2*max_crossings;
 #endif
 #elif (AMREX_SPACEDIM == 2)
-#if defined(WARPX_DIM_XZ)
             m_ncomp_xx[0] = 3 + 2*max_crossings;
             m_ncomp_xy[0] = 4 + 2*max_crossings;
             m_ncomp_xz[0] = 4 + 2*max_crossings;
@@ -526,9 +525,6 @@ void ImplicitSolver::InitializeMassMatrices ()
             m_ncomp_zx[1] = 4 + 2*max_crossings;
             m_ncomp_zy[1] = 4 + 2*max_crossings;
             m_ncomp_zz[1] = 3 + 2*max_crossings;
-#else
-            WARPX_ABORT_WITH_MESSAGE("Mass matrices can only be used with DIM_Z and DIM_ZX for Villasenor depositions.");
-#endif
 #endif
             for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
                 Nc_tot_xx *= m_ncomp_xx[dir];
