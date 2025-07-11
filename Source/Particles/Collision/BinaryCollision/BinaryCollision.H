@@ -738,6 +738,11 @@ public:
                     }
                 );
 
+                amrex::Gpu::Buffer<amrex::Long> failed_corrections({0});
+                amrex::Gpu::Buffer<amrex::ParticleReal> remaining_energy({0.});
+                amrex::Long* failed_corrections_ptr = failed_corrections.data();
+                amrex::ParticleReal* remaining_energy_ptr = remaining_energy.data();
+
                 amrex::ParallelFor( n_cells,
                     [=] AMREX_GPU_DEVICE (int i_cell) noexcept
                     {
@@ -760,11 +765,24 @@ public:
                                     u1y[ indices_1[i1] ] = u1y_before_ptr[ indices_1[i1] ];
                                     u1z[ indices_1[i1] ] = u1z_before_ptr[ indices_1[i1] ];
                                 }
+                                amrex::Gpu::Atomic::Add(failed_corrections_ptr, amrex::Long(1));
+                                amrex::Gpu::Atomic::Add(remaining_energy_ptr, deltaEp1);
                             }
                         }
 
                     }
                 );
+
+                amrex::Long const num_failed_corrections = *(failed_corrections.copyToHost());
+                amrex::ParticleReal const total_remaining_energy = *(remaining_energy.copyToHost());
+                if (num_failed_corrections > 0) {
+                    ablastr::warn_manager::WMRecordWarning("BinaryCollision::doCollisionsWithinTile",
+                        "The energy correction failed for " + std::to_string(num_failed_corrections) + " cells " +
+                        "for Coulomb collisions for species " + m_species_names[0] + ". " +
+                        "The remaining energy is " + std::to_string(total_remaining_energy/PhysConst::q_e) + " eV. " +
+                        "The collisions in those cells was cancelled.");
+                }
+
                 WARPX_PROFILE_VAR_STOP(prof_correctEnergyMomentum);
             }
 
@@ -1325,6 +1343,11 @@ public:
                     }
                 );
 
+                amrex::Gpu::Buffer<amrex::Long> failed_corrections({0});
+                amrex::Gpu::Buffer<amrex::ParticleReal> remaining_energy({0.});
+                amrex::Long* failed_corrections_ptr = failed_corrections.data();
+                amrex::ParticleReal* remaining_energy_ptr = remaining_energy.data();
+
                 amrex::ParallelFor( n_cells,
                     [=] AMREX_GPU_DEVICE (int i_cell) noexcept
                     {
@@ -1409,11 +1432,24 @@ public:
                                     u2y[ indices_2[i2] ] = u2y_before_ptr[ indices_2[i2] ];
                                     u2z[ indices_2[i2] ] = u2z_before_ptr[ indices_2[i2] ];
                                 }
+                                amrex::Gpu::Atomic::Add(failed_corrections_ptr, amrex::Long(1));
+                                amrex::Gpu::Atomic::Add(remaining_energy_ptr, deltaEp1 + deltaEp2);
                             }
 
                         }
                     }
                 );
+
+                amrex::Long const num_failed_corrections = *(failed_corrections.copyToHost());
+                amrex::ParticleReal const total_remaining_energy = *(remaining_energy.copyToHost());
+                if (num_failed_corrections > 0) {
+                    ablastr::warn_manager::WMRecordWarning("BinaryCollision::doCollisionsWithinTile",
+                        "The energy correction failed for " + std::to_string(num_failed_corrections) + " cells " +
+                        "for Coulomb collisions between species " + m_species_names[0] + " and " + m_species_names[1] + ". " +
+                        "The remaining energy is " + std::to_string(total_remaining_energy/PhysConst::q_e) + " eV. " +
+                        "The collisions in those cells was cancelled.");
+                }
+
                 WARPX_PROFILE_VAR_STOP(prof_correctEnergyMomentum);
             }
 

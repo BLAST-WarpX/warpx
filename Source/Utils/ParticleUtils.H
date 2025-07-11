@@ -201,7 +201,7 @@ namespace ParticleUtils {
                                amrex::ParticleReal const mass,
                                amrex::ParticleReal const energy_fraction,
                                amrex::ParticleReal const energy_fraction_max,
-                               amrex::ParticleReal deltaE )
+                               amrex::ParticleReal & deltaE )
     {
         using namespace amrex::literals;
 
@@ -332,15 +332,6 @@ namespace ParticleUtils {
                 // can be added is unlimited.
                 energy_frac_eff = std::abs(deltaE)/Erel_cumm;
                 if (energy_frac_eff > energy_fraction_max || loop_count > max_loop_count) {
-#ifndef AMREX_USE_GPU
-                    if (numCell > 50) {
-                        amrex::Print() << "Notice: energy_frac_eff = " << energy_frac_eff << "\n";
-                        amrex::Print() << "        on loop_count = " << loop_count << "\n";
-                        amrex::Print() << "        is larger than energy_frac_max = " << energy_fraction_max << "\n";
-                        amrex::Print() << "        num_parts    = " << numCell << "\n";
-                        amrex::Print() << "        deltaE     = " << deltaE << "\n";
-                    }
-#endif
                     correction_failed = true;
                     break;
                 } else if (deltaE < 0.) {
