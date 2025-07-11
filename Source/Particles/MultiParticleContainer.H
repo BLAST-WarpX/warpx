@@ -171,7 +171,7 @@ public:
 
 /**
      * \brief Deposit current density for only a single species
-     *        This is useful for depoisting just one speceis to compute
+     *        This is useful for depositing just one species to compute
      *        quantities like species based average velocities and currents.
      *        It can be used for interspecies collisions, etc.
      *

@@ -99,7 +99,7 @@ void HybridResistiveDrag::doHybridResistiveDragOnIonsWithinTile (WarpXParIter& p
 {
     using namespace amrex::literals;
 
-    // So that CUDA code gets its intrinsic, not the host-only C++ library version
+    // So that GPU code gets its intrinsic, not the host-only C++ library version
     using std::sqrt, std::abs, std::log, std::exp, std::pow;
 
     // get particle count

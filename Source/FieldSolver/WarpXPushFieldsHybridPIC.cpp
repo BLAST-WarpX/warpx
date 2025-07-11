@@ -241,7 +241,7 @@ void WarpX::HybridPICDepositRhoAndJ ()
 
     // Perform current deposition at t_{n-1/2}.
     // This is broken up into deposition across multiple species MultiFabs to preserve
-    // Species average velocities, whic is used in collision processes.
+    // Species average velocities, which is used in collision processes.
 
     auto & J_all = m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level);
 
@@ -302,7 +302,7 @@ void WarpX::HybridPICDepositRhoAndJ ()
     // and apply boundary conditions
     SyncRho();
 
-    // Reflect charge and current density over PEC boundaries, if needed.
+    // Reflect charge density over PEC boundaries, if needed.
     for (int lev = 0; lev <= finest_level; ++lev)
     {
         ApplyRhofieldBoundary(lev, m_fields.get(FieldType::rho_fp,lev), PatchType::fine);
