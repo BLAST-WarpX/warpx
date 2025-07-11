@@ -525,55 +525,56 @@ public:
 
             WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures", prof_findDensityTemperatures);
 
-            if (m_correct_energy_momentum) {
-                WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findMomentumEnergy", prof_findMomentumEnergy);
+            if (m_correct_energy_momentum ||
+                binary_collision_functor.m_computeSpeciesDensities ||
+                binary_collision_functor.m_computeSpeciesTemperatures) {
+
+                bool const correct_energy_momentum = m_correct_energy_momentum;
+
+                WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::atomics", prof_findDensityTemperatures_atomics);
+                // Loop over particles and compute quantities needed for energy conservation and the collsion parameters
                 amrex::ParallelFor( np1,
-                    [=] AMREX_GPU_DEVICE (int i1) noexcept
+                    [=] AMREX_GPU_DEVICE (int ip) noexcept
                     {
-                        u1x_before_ptr[i1] = u1x[i1];
-                        u1y_before_ptr[i1] = u1y[i1];
-                        u1z_before_ptr[i1] = u1z[i1];
+                        if (correct_energy_momentum) {
+                            u1x_before_ptr[ip] = u1x[ip];
+                            u1y_before_ptr[ip] = u1y[ip];
+                            u1z_before_ptr[ip] = u1z[ip];
 
-                        const int i_cell = bins_1_ptr[i1];
+                            const int i_cell = bins_1_ptr[ip];
 
-                        // Compute the local energy and momentum.
-                        amrex::ParticleReal const w1_scaled = std::pow(w1[i1], beta_weight_exponent);
-                        amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w1_scaled);
-                        amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w1[i1]*u1x[i1]*m1);
-                        amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w1[i1]*u1y[i1]*m1);
-                        amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w1[i1]*u1z[i1]*m1);
-                        amrex::ParticleReal KE = Algorithms::KineticEnergy(u1x[i1], u1y[i1], u1z[i1], m1);
-                        amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w1[i1]*KE);
+                            // Compute the local energy and momentum.
+                            amrex::ParticleReal const w1_scaled = std::pow(w1[ip], beta_weight_exponent);
+                            amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w1_scaled);
+                            amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w1[ip]*u1x[ip]*m1);
+                            amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w1[ip]*u1y[ip]*m1);
+                            amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w1[ip]*u1z[ip]*m1);
+                            amrex::ParticleReal KE = Algorithms::KineticEnergy(u1x[ip], u1y[ip], u1z[ip], m1);
+                            amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w1[ip]*KE);
+                        }
+
+                        // compute local density [1/m^3]
+                        if (binary_collision_functor.m_computeSpeciesDensities) {
+                            amrex::Gpu::Atomic::AddNoRet(&n1_in_each_cell[bins_1_ptr[ip]],
+                                                         w1[ip]/(dV*volume_factor(bins_1_ptr[ip])));
+                        }
+
+                        // compute local temperature [Joules]
+                        if (binary_collision_functor.m_computeSpeciesTemperatures) {
+                            amrex::ParticleReal us = u1x[ip]*u1x[ip] + u1y[ip]*u1y[ip] + u1z[ip]*u1z[ip];
+                            amrex::ParticleReal constexpr inv_c2 = 1.0_prt / ( PhysConst::c * PhysConst::c );
+                            amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
+                            amrex::Gpu::Atomic::AddNoRet(&T1_in_each_cell[bins_1_ptr[ip]],  w1[ip]);
+                            amrex::Gpu::Atomic::AddNoRet(&vx1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1x[ip]/gm);
+                            amrex::Gpu::Atomic::AddNoRet(&vy1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1y[ip]/gm);
+                            amrex::Gpu::Atomic::AddNoRet(&vz1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1z[ip]/gm);
+                            amrex::Gpu::Atomic::AddNoRet(&vs1_in_each_cell[bins_1_ptr[ip]], w1[ip]*us/gm/gm);
+                        }
                     }
                 );
-                WARPX_PROFILE_VAR_STOP(prof_findMomentumEnergy);
+                WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_atomics);
+
             }
-
-            WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::atomics", prof_findDensityTemperatures_atomics);
-            // Loop over particles and compute density and temperature
-            amrex::ParallelFor( np1,
-                [=] AMREX_GPU_DEVICE (int ip) noexcept
-                {
-                    // compute local density [1/m^3]
-                    if (binary_collision_functor.m_computeSpeciesDensities) {
-                        amrex::Gpu::Atomic::AddNoRet(&n1_in_each_cell[bins_1_ptr[ip]],
-                                                     w1[ip]/(dV*volume_factor(bins_1_ptr[ip])));
-                    }
-
-                    // compute local temperature [Joules]
-                    if (binary_collision_functor.m_computeSpeciesTemperatures) {
-                        amrex::ParticleReal us = u1x[ip]*u1x[ip] + u1y[ip]*u1y[ip] + u1z[ip]*u1z[ip];
-                        amrex::ParticleReal constexpr inv_c2 = 1.0_prt / ( PhysConst::c * PhysConst::c );
-                        amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
-                        amrex::Gpu::Atomic::AddNoRet(&T1_in_each_cell[bins_1_ptr[ip]],  w1[ip]);
-                        amrex::Gpu::Atomic::AddNoRet(&vx1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1x[ip]/gm);
-                        amrex::Gpu::Atomic::AddNoRet(&vy1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1y[ip]/gm);
-                        amrex::Gpu::Atomic::AddNoRet(&vz1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1z[ip]/gm);
-                        amrex::Gpu::Atomic::AddNoRet(&vs1_in_each_cell[bins_1_ptr[ip]], w1[ip]*us/gm/gm);
-                    }
-                }
-            );
-            WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_atomics);
 
             // Finish temperature calculation
             WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::finishTemperature", prof_findDensityTemperatures_finish);
@@ -1007,98 +1008,97 @@ public:
 
             WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures", prof_findDensityTemperatures);
 
-            // Loop over cells
-            if (m_correct_energy_momentum) {
-                WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findMomentumEnergy", prof_findMomentumEnergy);
+            if (m_correct_energy_momentum ||
+                binary_collision_functor.m_computeSpeciesDensities ||
+                binary_collision_functor.m_computeSpeciesTemperatures) {
+
+                bool const correct_energy_momentum = m_correct_energy_momentum;
+
+                // Loop over particles and compute quantities needed for energy conservation and the collsion parameters
+                WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::atomics", prof_findDensityTemperatures_atomics);
                 amrex::ParallelFor( std::max(np1, np2),
                     [=] AMREX_GPU_DEVICE (int ip) noexcept
                     {
+                        if (correct_energy_momentum) {
+                            if (ip < np1) {
+                                const int i1 = ip;
+                                const int i_cell = bins_1_ptr[i1];
 
-                        if (ip < np1) {
-                            const int i1 = ip;
-                            const int i_cell = bins_1_ptr[i1];
+                                // Save the momenta before the collision
+                                u1x_before_ptr[i1] = u1x[i1];
+                                u1y_before_ptr[i1] = u1y[i1];
+                                u1z_before_ptr[i1] = u1z[i1];
 
-                            // Save the momenta before the collision
-                            u1x_before_ptr[i1] = u1x[i1];
-                            u1y_before_ptr[i1] = u1y[i1];
-                            u1z_before_ptr[i1] = u1z[i1];
+                                // Compute the local energy and momentum.
+                                amrex::ParticleReal const w1_scaled = std::pow(w1[i1], beta_weight_exponent);
+                                amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w1_scaled);
+                                amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w1[i1]*u1x[i1]*m1);
+                                amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w1[i1]*u1y[i1]*m1);
+                                amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w1[i1]*u1z[i1]*m1);
+                                amrex::ParticleReal KE1 = Algorithms::KineticEnergy(u1x[i1], u1y[i1], u1z[i1], m1);
+                                amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w1[i1]*KE1);
+                            }
 
-                            // Compute the local energy and momentum.
-                            amrex::ParticleReal const w1_scaled = std::pow(w1[i1], beta_weight_exponent);
-                            amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w1_scaled);
-                            amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w1[i1]*u1x[i1]*m1);
-                            amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w1[i1]*u1y[i1]*m1);
-                            amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w1[i1]*u1z[i1]*m1);
-                            amrex::ParticleReal KE1 = Algorithms::KineticEnergy(u1x[i1], u1y[i1], u1z[i1], m1);
-                            amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w1[i1]*KE1);
+                            if (ip < np2) {
+                                const int i2 = ip;
+                                const int i_cell = bins_2_ptr[i2];
+
+                                // Save the momenta before the collision
+                                u2x_before_ptr[i2] = u2x[i2];
+                                u2y_before_ptr[i2] = u2y[i2];
+                                u2z_before_ptr[i2] = u2z[i2];
+
+                                // Compute the local energy and momentum.
+                                amrex::ParticleReal const w2_scaled = std::pow(w2[i2], beta_weight_exponent);
+                                amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w2_scaled);
+                                amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w2[i2]*u2x[i2]*m2);
+                                amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w2[i2]*u2y[i2]*m2);
+                                amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w2[i2]*u2z[i2]*m2);
+                                amrex::ParticleReal KE2 = Algorithms::KineticEnergy(u2x[i2], u2y[i2], u2z[i2], m2);
+                                amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w2[i2]*KE2);
+                            }
                         }
 
-                        if (ip < np2) {
-                            const int i2 = ip;
-                            const int i_cell = bins_2_ptr[i2];
+                        // compute local densities [1/m^3]
+                        if (binary_collision_functor.m_computeSpeciesDensities) {
+                            if (ip < np1) {
+                                amrex::Gpu::Atomic::AddNoRet(&n1_in_each_cell[bins_1_ptr[ip]],
+                                                             w1[ip]/(dV*volume_factor(bins_1_ptr[ip])));
+                            }
+                            if (ip < np2) {
+                                amrex::Gpu::Atomic::AddNoRet(&n2_in_each_cell[bins_2_ptr[ip]],
+                                                             w2[ip]/(dV*volume_factor(bins_2_ptr[ip])));
+                            }
+                        }
 
-                            // Save the momenta before the collision
-                            u2x_before_ptr[i2] = u2x[i2];
-                            u2y_before_ptr[i2] = u2y[i2];
-                            u2z_before_ptr[i2] = u2z[i2];
-
-                            // Compute the local energy and momentum.
-                            amrex::ParticleReal const w2_scaled = std::pow(w2[i2], beta_weight_exponent);
-                            amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w2_scaled);
-                            amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w2[i2]*u2x[i2]*m2);
-                            amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w2[i2]*u2y[i2]*m2);
-                            amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w2[i2]*u2z[i2]*m2);
-                            amrex::ParticleReal KE2 = Algorithms::KineticEnergy(u2x[i2], u2y[i2], u2z[i2], m2);
-                            amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w2[i2]*KE2);
+                        // compute local temperatures [Joules]
+                        if (binary_collision_functor.m_computeSpeciesTemperatures) {
+                            if (ip < np1) {
+                                amrex::ParticleReal us = u1x[ip]*u1x[ip] + u1y[ip]*u1y[ip] + u1z[ip]*u1z[ip];
+                                amrex::ParticleReal constexpr inv_c2 = 1.0_prt / ( PhysConst::c * PhysConst::c );
+                                amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
+                                amrex::Gpu::Atomic::AddNoRet(&T1_in_each_cell[bins_1_ptr[ip]],  w1[ip]);
+                                amrex::Gpu::Atomic::AddNoRet(&vx1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1x[ip]/gm);
+                                amrex::Gpu::Atomic::AddNoRet(&vy1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1y[ip]/gm);
+                                amrex::Gpu::Atomic::AddNoRet(&vz1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1z[ip]/gm);
+                                amrex::Gpu::Atomic::AddNoRet(&vs1_in_each_cell[bins_1_ptr[ip]], w1[ip]*us/gm/gm);
+                            }
+                            if (ip < np2) {
+                                amrex::ParticleReal us = u2x[ip]*u2x[ip] + u2y[ip]*u2y[ip] + u2z[ip]*u2z[ip];
+                                amrex::ParticleReal constexpr inv_c2 = 1.0_prt / ( PhysConst::c * PhysConst::c );
+                                amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
+                                amrex::Gpu::Atomic::AddNoRet(&T2_in_each_cell [bins_2_ptr[ip]], w2[ip]);
+                                amrex::Gpu::Atomic::AddNoRet(&vx2_in_each_cell[bins_2_ptr[ip]], w2[ip]*u2x[ip]/gm);
+                                amrex::Gpu::Atomic::AddNoRet(&vy2_in_each_cell[bins_2_ptr[ip]], w2[ip]*u2y[ip]/gm);
+                                amrex::Gpu::Atomic::AddNoRet(&vz2_in_each_cell[bins_2_ptr[ip]], w2[ip]*u2z[ip]/gm);
+                                amrex::Gpu::Atomic::AddNoRet(&vs2_in_each_cell[bins_2_ptr[ip]], w2[ip]*us/gm/gm);
+                            }
                         }
                     }
                 );
-                WARPX_PROFILE_VAR_STOP(prof_findMomentumEnergy);
+                WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_atomics);
+
             }
-
-            // Loop over particles and compute density and temperature with atomics
-            WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::atomics", prof_findDensityTemperatures_atomics);
-            amrex::ParallelFor( std::max(np1, np2),
-                [=] AMREX_GPU_DEVICE (int ip) noexcept
-                {
-                    // compute local densities [1/m^3]
-                    if (binary_collision_functor.m_computeSpeciesDensities) {
-                        if (ip < np1) {
-                            amrex::Gpu::Atomic::AddNoRet(&n1_in_each_cell[bins_1_ptr[ip]],
-                                                         w1[ip]/(dV*volume_factor(bins_1_ptr[ip])));
-                        }
-                        if (ip < np2) {
-                            amrex::Gpu::Atomic::AddNoRet(&n2_in_each_cell[bins_2_ptr[ip]],
-                                                         w2[ip]/(dV*volume_factor(bins_2_ptr[ip])));
-                        }
-                    }
-
-                    // compute local temperatures [Joules]
-                    if (binary_collision_functor.m_computeSpeciesTemperatures) {
-                        if (ip < np1) {
-                            amrex::ParticleReal us = u1x[ip]*u1x[ip] + u1y[ip]*u1y[ip] + u1z[ip]*u1z[ip];
-                            amrex::ParticleReal constexpr inv_c2 = 1.0_prt / ( PhysConst::c * PhysConst::c );
-                            amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
-                            amrex::Gpu::Atomic::AddNoRet(&T1_in_each_cell[bins_1_ptr[ip]],  w1[ip]);
-                            amrex::Gpu::Atomic::AddNoRet(&vx1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1x[ip]/gm);
-                            amrex::Gpu::Atomic::AddNoRet(&vy1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1y[ip]/gm);
-                            amrex::Gpu::Atomic::AddNoRet(&vz1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1z[ip]/gm);
-                            amrex::Gpu::Atomic::AddNoRet(&vs1_in_each_cell[bins_1_ptr[ip]], w1[ip]*us/gm/gm);
-                        }
-                        if (ip < np2) {
-                            amrex::ParticleReal us = u2x[ip]*u2x[ip] + u2y[ip]*u2y[ip] + u2z[ip]*u2z[ip];
-                            amrex::ParticleReal constexpr inv_c2 = 1.0_prt / ( PhysConst::c * PhysConst::c );
-                            amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
-                            amrex::Gpu::Atomic::AddNoRet(&T2_in_each_cell [bins_2_ptr[ip]], w2[ip]);
-                            amrex::Gpu::Atomic::AddNoRet(&vx2_in_each_cell[bins_2_ptr[ip]], w2[ip]*u2x[ip]/gm);
-                            amrex::Gpu::Atomic::AddNoRet(&vy2_in_each_cell[bins_2_ptr[ip]], w2[ip]*u2y[ip]/gm);
-                            amrex::Gpu::Atomic::AddNoRet(&vz2_in_each_cell[bins_2_ptr[ip]], w2[ip]*u2z[ip]/gm);
-                            amrex::Gpu::Atomic::AddNoRet(&vs2_in_each_cell[bins_2_ptr[ip]], w2[ip]*us/gm/gm);
-                        }
-                    }
-                }
-            );
-            WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_atomics);
 
             // Finish temperature calculation - we launch 2*n_cells threads to compute both species simultaneously
             WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::finishTemperature", prof_findDensityTemperatures_finish);
