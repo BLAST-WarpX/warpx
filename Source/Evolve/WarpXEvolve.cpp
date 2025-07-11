@@ -385,9 +385,9 @@ WarpX::Evolve (int numsteps)
 }
 
 void WarpX::OneStep (
-    amrex::Real cur_time,
-    amrex::Real dt,
-    int step
+    amrex::Real a_cur_time,
+    amrex::Real a_dt,
+    int a_step
 )
 {
     WARPX_PROFILE("WarpX::OneStep()");
@@ -397,12 +397,12 @@ void WarpX::OneStep (
         electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
         // perform collisions
         ExecutePythonCallback("beforecollisions");
-        mypc->doCollisions(step, cur_time, dt);
+        mypc->doCollisions(a_step, a_cur_time, a_dt);
         ExecutePythonCallback("aftercollisions");
         // gather fields, push particles, skip deposition
         bool const skip_deposition = true;
         PushParticlesandDeposit(
-            cur_time,
+            a_cur_time,
             skip_deposition
         );
     }
@@ -410,24 +410,24 @@ void WarpX::OneStep (
     else {
         // perform collisions
         ExecutePythonCallback("beforecollisions");
-        mypc->doCollisions(step, cur_time, dt);
+        mypc->doCollisions(a_step, a_cur_time, a_dt);
         ExecutePythonCallback("aftercollisions");
         // without mesh refinement
         if (finest_level == 0) {
             // standard PIC loop
             if (!m_JRhom) {
-                OneStep_nosub(cur_time);
+                OneStep_nosub(a_cur_time);
             }
             // JRhom PIC loop
             else {
-                OneStep_JRhom(cur_time);
+                OneStep_JRhom(a_cur_time);
             }
         }
         // with mesh refinement
         else {
             // without subcycling
             if (!m_do_subcycling) {
-                OneStep_nosub(cur_time);
+                OneStep_nosub(a_cur_time);
             }
             // with subcycling
             else {
@@ -435,7 +435,7 @@ void WarpX::OneStep (
                     finest_level == 1,
                     "Subcycling not implemented with more than 1 mesh refinement level"
                 );
-                OneStep_sub1(cur_time);
+                OneStep_sub1(a_cur_time);
             }
         }
     }

@@ -1061,9 +1061,9 @@ private:
      * Perform one PIC loop in the explicit formulation.
     */
     void OneStep (
-        amrex::Real cur_time,
-        amrex::Real dt,
-        int step
+        amrex::Real a_cur_time,
+        amrex::Real a_dt,
+        int a_step
     );
 
     void OneStep_nosub (amrex::Real cur_time);
