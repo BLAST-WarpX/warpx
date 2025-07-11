@@ -181,7 +181,7 @@ def return_energies(iteration):
 
 ts = OpenPMDTimeSeries("./diags/diag2")
 if "phi" in ts.avail_record_components["electron"]:
-    if test_name.endswith('uniform_weighting'):
+    if test_name.endswith("uniform_weighting"):
         # A larger tolerance is needed with uniform weighting, perhaps because
         # of more noise near the axis.
         energy_fraction = 0.012
@@ -194,7 +194,9 @@ if "phi" in ts.avail_record_components["electron"]:
     print(f"Ek_i + Ep_i = {Ek_i} + {Ep_i} = {Ek_i + Ep_i}")
     print(f"Ek_f + Ep_f = {Ek_f} + {Ep_f} = {Ek_f + Ep_f}")
     print(f"(Ek_i + Ep_i) - (Ek_f + Ep_f) = {(Ek_i + Ep_i) - (Ek_f + Ep_f)}")
-    print(f"Energy change tolerance = {energy_fraction}*(Ek_i + Ep_i) = {energy_fraction * (Ek_i + Ep_i)}")
+    print(
+        f"Energy change tolerance = {energy_fraction}*(Ek_i + Ep_i) = {energy_fraction * (Ek_i + Ep_i)}"
+    )
     assert Ep_f < 0.7 * Ep_i  # Check that potential energy changes significantly
     assert abs((Ek_i + Ep_i) - (Ek_f + Ep_f)) < energy_fraction * (
         Ek_i + Ep_i
