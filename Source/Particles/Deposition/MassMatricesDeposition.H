@@ -1027,6 +1027,24 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     double x0_old = x_old;
     double z0_old = z_old;
 
+    constexpr int num_segments_max = 1 + 2*AMREX_SPACEDIM;
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE( num_segments <= num_segments_max,
+        "Error: num_segments must be less than or equal to 1 + 2*AMREX_SPACEDIM.");
+
+    // Save the start index and interpolation weights for each segment
+    int i0_cell[num_segments_max];
+    int i0_node[num_segments_max];
+    int k0_cell[num_segments_max];
+    int k0_node[num_segments_max];
+    double weight_cellX_nodeZ[num_segments_max][depos_order][depos_order+1];
+    double weight_nodeX_cellZ[num_segments_max][depos_order+1][depos_order];
+    double weight_nodeX_nodeZ[num_segments_max][depos_order+1][depos_order+1];
+
+    const auto i_mid = static_cast<int>(0.5*(x_new+x_old)-shift);
+    const auto k_mid = static_cast<int>(0.5*(z_new+z_old)-shift);
+    int SegNumX[num_segments_max];
+    int SegNumZ[num_segments_max];
+
     for (int ns=0; ns<num_segments; ns++) {
 
         if (ns == num_segments-1) { // final segment
@@ -1066,8 +1084,16 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
         double sz_cell[depos_order] = {0.};
         double const x0_bar = (x0_new + x0_old)/2.0;
         double const z0_bar = (z0_new + z0_old)/2.0;
-        const int i0_cell = compute_shape_factor_cell( sx_cell, x0_bar-0.5 );
-        const int k0_cell = compute_shape_factor_cell( sz_cell, z0_bar-0.5 );
+        i0_cell[ns] = compute_shape_factor_cell( sx_cell, x0_bar-0.5 );
+        k0_cell[ns] = compute_shape_factor_cell( sz_cell, z0_bar-0.5 );
+
+        // Set the segment number for the mass matrix component calc
+        if (Sxx_nComp>1) {
+            const auto i0_mid = static_cast<int>(x0_bar-shift);
+            const auto k0_mid = static_cast<int>(z0_bar-shift);
+            SegNumX[ns] = 1 + i0_mid - i_mid;
+            SegNumZ[ns] = 1 + k0_mid - k_mid;
+        }
 
         if constexpr (depos_order >= 3) { // higher-order correction to the cell-based weights
             const Compute_shape_factor_pair<depos_order-1> compute_shape_factors_cell;
@@ -1089,16 +1115,19 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
         double sx_new_node[depos_order+1] = {0.};
         double sz_old_node[depos_order+1] = {0.};
         double sz_new_node[depos_order+1] = {0.};
-        const int i0_node = compute_shape_factors_node( sx_old_node, sx_new_node, x0_old, x0_new );
-        const int k0_node = compute_shape_factors_node( sz_old_node, sz_new_node, z0_old, z0_new );
+        i0_node[ns] = compute_shape_factors_node( sx_old_node, sx_new_node, x0_old, x0_new );
+        k0_node[ns] = compute_shape_factors_node( sz_old_node, sz_new_node, z0_old, z0_new );
 
         // deposit Jx and Sx for this segment
         amrex::Real weight;
         for (int i=0; i<=depos_order-1; i++) {
             for (int k=0; k<=depos_order; k++) {
                 weight = sx_cell[i]*(sz_old_node[k] + sz_new_node[k])/2.0_rt*seg_factor_x;
-                amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i0_cell+i, lo.y+k0_node+k, 0, 0), wqx*weight);
-                amrex::Gpu::Atomic::AddNoRet( &Sxx_arr(lo.x+i0_cell+i, lo.y+k0_node+k, 0, diag_comp_xx), fpxx*weight*weight);
+                amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i0_cell[ns]+i, lo.y+k0_node[ns]+k, 0, 0), wqx*weight);
+                if (Sxx_nComp==1) {
+                    amrex::Gpu::Atomic::AddNoRet( &Sxx_arr(lo.x+i0_cell[ns]+i, lo.y+k0_node[ns]+k, 0, diag_comp_xx), fpxx*weight*weight);
+                }
+                else { weight_cellX_nodeZ[ns][i][k] = weight; }
             }
         }
 
@@ -1110,8 +1139,11 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                        +   sx_old_node[i]*sz_new_node[k]*one_sixth
                        +   sx_new_node[i]*sz_old_node[k]*one_sixth
                        +   sx_new_node[i]*sz_new_node[k]*one_third )*seg_factor_y;
-                amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i0_node+i, lo.y+k0_node+k, 0, 0), wqy*weight);
-                amrex::Gpu::Atomic::AddNoRet( &Syy_arr(lo.x+i0_node+i, lo.y+k0_node+k, 0, diag_comp_yy), fpyy*weight*weight);
+                amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i0_node[ns]+i, lo.y+k0_node[ns]+k, 0, 0), wqy*weight);
+                if (Syy_nComp==1) {
+                    amrex::Gpu::Atomic::AddNoRet( &Syy_arr(lo.x+i0_node[ns]+i, lo.y+k0_node[ns]+k, 0, diag_comp_yy), fpyy*weight*weight);
+                }
+                else { weight_nodeX_nodeZ[ns][i][k] = weight; }
             }
         }
 
@@ -1119,8 +1151,11 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
         for (int i=0; i<=depos_order; i++) {
             for (int k=0; k<=depos_order-1; k++) {
                 weight = sz_cell[k]*(sx_old_node[i] + sx_new_node[i])/2.0_rt*seg_factor_z;
-                amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node+i, lo.y+k0_cell+k, 0, 0), wqz*weight);
-                amrex::Gpu::Atomic::AddNoRet( &Szz_arr(lo.x+i0_node+i, lo.y+k0_cell+k, 0, diag_comp_zz), fpzz*weight*weight);
+                amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node[ns]+i, lo.y+k0_cell[ns]+k, 0, 0), wqz*weight);
+                if (Szz_nComp==1) {
+                    amrex::Gpu::Atomic::AddNoRet( &Szz_arr(lo.x+i0_node[ns]+i, lo.y+k0_cell[ns]+k, 0, diag_comp_zz), fpzz*weight*weight);
+                }
+                else { weight_nodeX_cellZ[ns][i][k] = weight; }
             }
         }
 
@@ -1275,8 +1310,10 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
         k0_cell[ns] = compute_shape_factor_cell( sz_cell, z0_bar-0.5 );
 
         // Set the segment number for the mass matrix component calc
-        const auto k0_mid = static_cast<int>(z0_bar-shift);
-        SegNum[ns] = 1 + k0_mid - k_mid;
+        if (Szz_nComp>1) {
+            const auto k0_mid = static_cast<int>(z0_bar-shift);
+            SegNum[ns] = 1 + k0_mid - k_mid;
+        }
 
         if constexpr (depos_order >= 3) { // higher-order correction to the cell-based weights
             const Compute_shape_factor_pair<depos_order-1> compute_shape_factors_cell;
