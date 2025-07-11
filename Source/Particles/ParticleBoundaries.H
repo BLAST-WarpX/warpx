@@ -19,8 +19,7 @@
 namespace warpx::particles
 {
     /**
-     * \brief Reads the particle boundary conditions from
-     * the inputfile
+     * \brief Reads the particle boundary conditions from the input file
      *
      * \param[in] field_boundary_lo the field boundary condition for the lower boundary
      * \param[in] field_boundary_hi the field boundary condition for the upper boundary
