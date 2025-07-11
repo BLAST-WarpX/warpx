@@ -482,8 +482,8 @@ void ImplicitSolver::InitializeMassMatrices ()
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 shape==2,
                 "Mass Matrices for Jacobian with Villasenor deposition requires shape = 2.");
-#if (AMREX_SPACEDIM == 1)
             int max_crossings = ngJ[0] - 1;
+#if (AMREX_SPACEDIM == 1)
 #if defined(WARPX_DIM_1D_Z)
             m_ncomp_xx[0] = 5 + 2*max_crossings;
             m_ncomp_xy[0] = 5 + 2*max_crossings;
@@ -505,18 +505,42 @@ void ImplicitSolver::InitializeMassMatrices ()
             m_ncomp_zy[0] = 5 + 2*max_crossings;
             m_ncomp_zz[0] = 5 + 2*max_crossings;
 #endif
-            Nc_tot_xx *= m_ncomp_xx[0];
-            Nc_tot_xy *= m_ncomp_xy[0];
-            Nc_tot_xz *= m_ncomp_xz[0];
-            Nc_tot_yx *= m_ncomp_yx[0];
-            Nc_tot_yy *= m_ncomp_yy[0];
-            Nc_tot_yz *= m_ncomp_yz[0];
-            Nc_tot_zx *= m_ncomp_zx[0];
-            Nc_tot_zy *= m_ncomp_zy[0];
-            Nc_tot_zz *= m_ncomp_zz[0];
+#elif (AMREX_SPACEDIM == 2)
+#if defined(WARPX_DIM_XZ)
+            m_ncomp_xx[0] = 3 + 2*max_crossings;
+            m_ncomp_xy[0] = 4 + 2*max_crossings;
+            m_ncomp_xz[0] = 4 + 2*max_crossings;
+            m_ncomp_yx[0] = 4 + 2*max_crossings;
+            m_ncomp_yy[0] = 5 + 2*max_crossings;
+            m_ncomp_yz[0] = 5 + 2*max_crossings;
+            m_ncomp_zx[0] = 4 + 2*max_crossings;
+            m_ncomp_zy[0] = 5 + 2*max_crossings;
+            m_ncomp_zz[0] = 5 + 2*max_crossings;
+            //
+            m_ncomp_xx[1] = 5 + 2*max_crossings;
+            m_ncomp_xy[1] = 5 + 2*max_crossings;
+            m_ncomp_xz[1] = 4 + 2*max_crossings;
+            m_ncomp_yx[1] = 5 + 2*max_crossings;
+            m_ncomp_yy[1] = 5 + 2*max_crossings;
+            m_ncomp_yz[1] = 4 + 2*max_crossings;
+            m_ncomp_zx[1] = 4 + 2*max_crossings;
+            m_ncomp_zy[1] = 4 + 2*max_crossings;
+            m_ncomp_zz[1] = 3 + 2*max_crossings;
 #else
-            int max_crossings = ngJ[0] - 2;
+            WARPX_ABORT_WITH_MESSAGE("Mass matrices can only be used with DIM_Z and DIM_ZX for Villasenor depositions.");
 #endif
+#endif
+            for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
+                Nc_tot_xx *= m_ncomp_xx[dir];
+                Nc_tot_xy *= m_ncomp_xy[dir];
+                Nc_tot_xz *= m_ncomp_xz[dir];
+                Nc_tot_yx *= m_ncomp_yx[dir];
+                Nc_tot_yy *= m_ncomp_yy[dir];
+                Nc_tot_yz *= m_ncomp_yz[dir];
+                Nc_tot_zx *= m_ncomp_zx[dir];
+                Nc_tot_zy *= m_ncomp_zy[dir];
+                Nc_tot_zz *= m_ncomp_zz[dir];
+            }
             AMREX_ASSERT(max_crossings>0);
         }
         else {
