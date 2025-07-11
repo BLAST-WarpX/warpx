@@ -124,6 +124,11 @@ private:
     int m_maxits = 100;
 
     /**
+     * \brief Total nonlinear iterations for the diagnostic file
+     */
+    mutable int m_total_iters = 0;
+
+    /**
      * \brief Relative tolerance for linear solver.
      */
     amrex::Real m_linsol_rtol = 1.0e-4;
@@ -137,6 +142,11 @@ private:
      * \brief Maximum iterations for linear solver.
      */
     int m_linsol_maxits = 1000;
+
+    /**
+     * \brief Total linear iterations for the diagnostic file
+     */
+    mutable int m_total_linsol_iters = 0;
 
     /**
      * \brief Verbosity flag for linear solver.
@@ -243,11 +253,15 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
         diagnostic_file << " ";
         diagnostic_file << "[" << c++ << "]iters";
         diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]total_iters";
+        diagnostic_file << " ";
         diagnostic_file << "[" << c++ << "]norm_abs";
         diagnostic_file << " ";
         diagnostic_file << "[" << c++ << "]norm_rel";
         diagnostic_file << " ";
         diagnostic_file << "[" << c++ << "]gmres_iters";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]gmres_total_iters";
         diagnostic_file << " ";
         diagnostic_file << "[" << c++ << "]gmres_last_res";
         diagnostic_file << "\n";
@@ -379,6 +393,10 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
 
     }
 
+    // Update total iteration count
+    m_total_iters += iter;
+    m_total_linsol_iters += linear_solver_iters;
+
     if (m_rtol > 0. && iter == m_maxits) {
        std::stringstream convergenceMsg;
        convergenceMsg << "Newton solver failed to converge after " << iter <<
@@ -399,17 +417,21 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
         std::ofstream diagnostic_file{this->m_diagnostic_file, std::ofstream::out | std::ofstream::app};
         diagnostic_file << std::setprecision(14);
         diagnostic_file << a_step+1;
-        diagnostic_file << " ";;
+        diagnostic_file << " ";
         diagnostic_file << a_time + a_dt;
-        diagnostic_file << " ";;
+        diagnostic_file << " ";
         diagnostic_file << iter;
-        diagnostic_file << " ";;
+        diagnostic_file << " ";
+        diagnostic_file << m_total_iters;
+        diagnostic_file << " ";
         diagnostic_file << norm_abs;
-        diagnostic_file << " ";;
+        diagnostic_file << " ";
         diagnostic_file << norm_rel;
-        diagnostic_file << " ";;
+        diagnostic_file << " ";
         diagnostic_file << linear_solver_iters;
-        diagnostic_file << " ";;
+        diagnostic_file << " ";
+        diagnostic_file << m_total_linsol_iters;
+        diagnostic_file << " ";
         diagnostic_file << m_linear_solver->getResidualNorm();
         diagnostic_file << "\n";
         diagnostic_file.close();
