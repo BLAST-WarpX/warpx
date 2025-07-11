@@ -15,8 +15,7 @@
 namespace warpx::boundary_conditions
 {
     /**
-     * \brief Reads the field boundary conditions from
-     * the inputfile
+     * \brief Reads the field boundary conditions from the input file
      *
      * \returns a pair of amrex::Array<FieldBoundaryType, AMREX_SPACEDIM>
      *          containing the boundary conditions for the lower and the
