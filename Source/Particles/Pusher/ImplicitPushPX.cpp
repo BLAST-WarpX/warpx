@@ -355,17 +355,6 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
 
             // particle did not converge
             if ( iter > 1 && iter == max_iterations ) {
-#if !defined(AMREX_USE_GPU)
-                std::stringstream convergenceMsg;
-                convergenceMsg << "Picard solver for particle failed to converge after " <<
-                    iter << " iterations.\n";
-                convergenceMsg << "Position step norm is " << step_norm <<
-                    " and the tolerance is " << particle_tolerance << "\n";
-                convergenceMsg << " ux = " << ux[ip] << ", uy = " << uy[ip] << ", uz = " << uz[ip] << "\n";
-                convergenceMsg << " xp = " << xp     << ", yp = " << yp     << ", zp = " << zp;
-                ablastr::warn_manager::WMRecordWarning("ImplicitPushXP", convergenceMsg.str());
-#endif
-
                 // Flag the particle as invalid. It will be handled later in a special
                 // loop with suborbiting.
                 amrex::ParticleIDWrapper{idcpu[ip]}.make_invalid();
