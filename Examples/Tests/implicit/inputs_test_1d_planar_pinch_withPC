@@ -76,7 +76,8 @@ gmres.max_iterations = 1000
 gmres.relative_tolerance = 1.0e-4
 gmres.absolute_tolerance = 0.0
 
-implicit_evolve.use_mass_matrices = true
+implicit_evolve.use_mass_matrices_jacobian = false
+implicit_evolve.use_mass_matrices_pc = true
 jacobian.pc_type = "pc_curl_curl_mlmg"
 pc_curl_curl_mlmg.verbose = true
 pc_curl_curl_mlmg.max_iter = 10
@@ -84,6 +85,7 @@ pc_curl_curl_mlmg.relative_tolerance = 1e-4
 
 algo.particle_pusher = "boris"
 
+particles.max_grid_crossings = 2
 algo.particle_shape = 2
 algo.current_deposition = "villasenor"
 

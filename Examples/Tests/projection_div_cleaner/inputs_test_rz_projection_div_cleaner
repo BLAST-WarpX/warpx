@@ -38,7 +38,8 @@ warpx.serialize_initial_conditions = 1
 warpx.verbose = 1
 warpx.const_dt = 4.40917904849092e-7
 warpx.use_filter = 0
-warpx.do_divb_cleaning_external = true
+warpx.do_initial_div_cleaning = true
+warpx.projection_div_cleaner.rtol = 5e-12
 
 # Diagnostics
 diagnostics.diags_names = diag1

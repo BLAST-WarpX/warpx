@@ -88,7 +88,7 @@ neutrals.uz_th = sqrt(q_e * Tn / m_p) / clight
 collisions.collision_names = ioniz
 
 ioniz.ionization_energy = 13.59844
-ioniz.product_species = ions electrons
+ioniz.product_species = electrons ions
 ioniz.ionization_target_species = neutrals
 ioniz.ndt = 1
 ioniz.scattering_processes = ionization

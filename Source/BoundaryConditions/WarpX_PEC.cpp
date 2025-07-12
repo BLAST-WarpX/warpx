@@ -360,7 +360,6 @@ namespace
      * \param[in] mirrorfac         mirror cell is given by mirrorfac - ijk_vec
      * \param[in] psign             Whether the field value should be flipped across the boundary
      * \param[in] is_reflective     Whether the given particle boundary is reflecting or field boundary is pec
-     * \param[in] tangent_to_bndy   Whether a given direction is perpendicular to the boundary
      * \param[in] is_nodal_r        Whether data is nodal along r
      * \param[in] fabbox            multifab box including ghost cells
      */
@@ -371,7 +370,6 @@ namespace
                                 amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> const& mirrorfac,
                                 amrex::GpuArray<GpuArray<amrex::Real, 2>, AMREX_SPACEDIM> const& psign,
                                 amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> const& is_reflective,
-                                amrex::GpuArray<bool, AMREX_SPACEDIM> const& tangent_to_bndy,
                                 [[maybe_unused]]int const is_nodal_r,
                                 amrex::Box const& fabbox)
     {
@@ -406,7 +404,7 @@ namespace
 #endif
                     }
 #endif
-                    field(ijk_vec,n) += rscale*psign[idim][iside] * field(iv_mirror,n);
+                    field(ijk_vec,n) += rscale * psign[idim][iside] * field(iv_mirror,n);
                 }
             }
         }
@@ -435,11 +433,7 @@ namespace
 #endif
                     }
 #endif
-                    if (tangent_to_bndy[idim]) {
-                        field(iv_mirror, n) = -rscale*field(ijk_vec, n);
-                    } else {
-                        field(iv_mirror, n) = rscale*field(ijk_vec, n);
-                    }
+                    field(iv_mirror, n) = rscale * psign[idim][iside] * field(ijk_vec, n);
                 }
             }
         }
@@ -697,7 +691,6 @@ PEC::ApplyReflectiveBoundarytoRhofield (
     amrex::Box grown_domain_box = domain_box;
 
     amrex::GpuArray<GpuArray<int,2>, AMREX_SPACEDIM> is_reflective;
-    amrex::GpuArray<bool, AMREX_SPACEDIM> is_tangent_to_bndy;
     amrex::GpuArray<GpuArray<amrex::Real,2>, AMREX_SPACEDIM> psign;
     amrex::GpuArray<GpuArray<int,2>, AMREX_SPACEDIM> mirrorfac;
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
@@ -711,10 +704,6 @@ PEC::ApplyReflectiveBoundarytoRhofield (
         if (field_boundary_hi[idim] == FieldBoundaryType::PMC) { is_reflective[idim][1] = 2; }
         if (!is_reflective[idim][0]) { grown_domain_box.growLo(idim, ng_fieldgather[idim]); }
         if (!is_reflective[idim][1]) { grown_domain_box.growHi(idim, ng_fieldgather[idim]); }
-
-        // rho values inside guard cells are updated the same as tangential
-        // components of the current density
-        is_tangent_to_bndy[idim] = true;
 
         psign[idim][0] = ((particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
                         ||(particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
@@ -753,7 +742,7 @@ PEC::ApplyReflectiveBoundarytoRhofield (
 
             ::SetRhoOrJfieldFromPEC(
                 n, iv, rho_array, mirrorfac, psign, is_reflective,
-                is_tangent_to_bndy, rho_nodal[0], fabbox
+                rho_nodal[0], fabbox
             );
         });
     }
@@ -797,7 +786,7 @@ PEC::ApplyReflectiveBoundarytoJfield(
     const amrex::IntVect ng_fieldgather = Jx->nGrowVect();
 
     amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> is_reflective;
-    amrex::GpuArray<GpuArray<bool, AMREX_SPACEDIM>, 3> is_tangent_to_bndy;
+    bool is_tangent_to_bndy;
     amrex::GpuArray<GpuArray<GpuArray<amrex::Real, 2>, AMREX_SPACEDIM>, 3> psign;
     amrex::GpuArray<GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM>, 3> mirrorfac;
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
@@ -820,17 +809,17 @@ PEC::ApplyReflectiveBoundarytoJfield(
 #if (defined WARPX_DIM_1D_Z)
             // For 1D : icomp=0 and icomp=1 (Ex and Ey are tangential to the z boundary)
             //          The logic below ensures that the flags are set right for 1D
-            is_tangent_to_bndy[icomp][idim] = (icomp != (idim+2));
+            is_tangent_to_bndy = (icomp != (idim+2));
 #elif (defined WARPX_DIM_XZ) || (defined WARPX_DIM_RZ)
             // For 2D : for icomp==1, (Ey in XZ, Etheta in RZ),
             //          icomp=1 is tangential to both x and z boundaries
             //          The logic below ensures that the flags are set right for 2D
-            is_tangent_to_bndy[icomp][idim] = (icomp != AMREX_SPACEDIM*idim);
+            is_tangent_to_bndy = (icomp != AMREX_SPACEDIM*idim);
 #else
-            is_tangent_to_bndy[icomp][idim] = (icomp != idim);
+            is_tangent_to_bndy = (icomp != idim);
 #endif
 
-            if (is_tangent_to_bndy[icomp][idim]){
+            if (is_tangent_to_bndy){
                 psign[icomp][idim][0] = ( (particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
                                         ||(particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
                                         ||(field_boundary_lo[idim] == FieldBoundaryType::PMC))
@@ -889,7 +878,7 @@ PEC::ApplyReflectiveBoundarytoJfield(
 
             ::SetRhoOrJfieldFromPEC(
                 n, iv, Jx_array, mirrorfac[0], psign[0], is_reflective,
-                is_tangent_to_bndy[0], Jx_nodal[0], fabbox
+                Jx_nodal[0], fabbox
             );
         });
     }
@@ -920,7 +909,7 @@ PEC::ApplyReflectiveBoundarytoJfield(
 
             ::SetRhoOrJfieldFromPEC(
                 n, iv, Jy_array, mirrorfac[1], psign[1], is_reflective,
-                is_tangent_to_bndy[1], Jy_nodal[0], fabbox
+                Jy_nodal[0], fabbox
             );
         });
     }
@@ -951,7 +940,7 @@ PEC::ApplyReflectiveBoundarytoJfield(
 
             ::SetRhoOrJfieldFromPEC(
                 n, iv, Jz_array, mirrorfac[2], psign[2], is_reflective,
-                is_tangent_to_bndy[2], Jz_nodal[0], fabbox
+                Jz_nodal[0], fabbox
             );
         });
     }

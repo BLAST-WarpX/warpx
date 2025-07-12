@@ -62,8 +62,13 @@ PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
 
     const amrex::ParmParse pp_species(species_name);
 
-    utils::parser::queryWithParser(pp_species, source_name, "radially_weighted", radially_weighted);
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(radially_weighted, "ERROR: Only radially_weighted=true is supported");
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    // Default radial_numpercell_power is uniform number of particles per cell
+    radial_numpercell_power = 0._rt;
+    utils::parser::queryWithParser(pp_species, source_name, "radial_numpercell_power", radial_numpercell_power);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(radial_numpercell_power > -1.,
+        "The radial_numpercell_power must be greater than -1");
+#endif
 
     // Unlimited boundaries
     xmin = std::numeric_limits<amrex::Real>::lowest();

@@ -57,9 +57,7 @@ jobs:
           -DWarpX_FFT=ON                    \
           -DWarpX_QED=ON                    \
           -DWarpX_QED_TABLE_GEN=ON          \
-          -DWarpX_OPENPMD=ON                \
-          -DWarpX_PRECISION=SINGLE          \
-          -DWarpX_PARTICLE_PRECISION=SINGLE
+          -DWarpX_OPENPMD=ON
         cmake --build build -j 4
 
         ccache -s
@@ -73,11 +71,9 @@ jobs:
         #MPI implementations often leak memory
         export "ASAN_OPTIONS=detect_leaks=0"
 
-        mpirun -n 2 ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_base_rz
-        mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d
-        mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d
-        mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d
-        mpirun -n 2 ./build/bin/warpx.2d Examples/Tests/implicit/inputs_test_2d_theta_implicit_jfnk_vandb
+        git clone https://github.com/ECP-WarpX/warpx-data ../warpx-data
+
+        ctest --test-dir build/Examples/Physics_applications/ -R ".*\.run" --output-on-failure
 
   build_thread_sanitizer:
     name: Clang thread sanitizer

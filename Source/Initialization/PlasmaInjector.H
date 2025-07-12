@@ -131,9 +131,10 @@ public:
     int flux_normal_axis;
     int flux_direction; // -1 for left, +1 for right
 
-    bool m_inject_from_eb = false; // whether to inject from the embedded boundary
+    // With radial geometry, the number of particles per cell will be proportional to r**radial_numpercell_power
+    amrex::Real radial_numpercell_power;
 
-    bool radially_weighted = true;
+    bool m_inject_from_eb = false; // whether to inject from the embedded boundary
 
     std::string str_flux_function;
 

@@ -179,5 +179,5 @@ else:
     amps = np.abs(F_kw[2, 1, len(kz) // 2 - 2 : len(kz) // 2 + 2])
     print("Amplitude sample: ", repr(amps))
     assert np.allclose(
-        amps, np.array([80.99103401, 27.98511857, 215.63733823, 24.81072749])
+        amps, np.array([80.96657673, 28.00280807, 215.66708608, 24.83326728])
     )

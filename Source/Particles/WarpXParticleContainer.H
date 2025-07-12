@@ -15,6 +15,7 @@
 #include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
 #include "Initialization/PlasmaInjector.H"
+#include "Particles/Algorithms/KineticEnergy.H"
 #include "Particles/ParticleBoundaries.H"
 #include "SpeciesPhysicalProperties.H"
 
@@ -23,6 +24,9 @@
 #    include "ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper_fwd.H"
 #endif
 #include "MultiParticleContainer_fwd.H"
+
+#include "Particles/Deposition/TemperatureDepositionTypes.H"
+#include "Particles/Deposition/VarianceAccumulationBuffer.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 
@@ -239,7 +243,7 @@ public:
 
     virtual void PostRestart () = 0;
 
-    void AllocData ();
+    virtual void AllocData ();
 
     /**
      * \brief Virtual method to initialize runtime attributes. Must be overriden by each derived
@@ -334,9 +338,43 @@ public:
                                 amrex::Real dt,
                                 amrex::Real relative_time,
                                 PushType push_type);
+    /**
+     * \brief Accumulate velocity moments for matched temperature deposition using particle shapes
+     *
+     * \param[in,out] T_vf vector field of Temperatures (one three-dimensional array of pointers
+     *                to MultiFabs per mesh refinement level)
+     * \param[in] relative_time Time at which to deposit J, relative to the time of the
+     *                          current positions of the particles. When different than 0,
+     *                          the particle position will be temporarily modified to match
+     *                          the time of the deposition.
+     */
+    virtual void AccumulateVelocitiesAndComputeTemperature (
+        [[maybe_unused]]ablastr::fields::MultiLevelVectorField const & T_vf,
+        [[maybe_unused]]amrex::Real relative_time)
+    {}
 
-    void DepositTemperature (amrex::MultiFab* temperature, const int lev);
-    std::unique_ptr<amrex::MultiFab> GetTemperature (int lev);
+    virtual void DepositTemperature (
+        [[maybe_unused]]WarpXParIter& pti,
+        [[maybe_unused]]RealVector const & wp,
+        [[maybe_unused]]RealVector const & uxp,
+        [[maybe_unused]]RealVector const & uyp,
+        [[maybe_unused]]RealVector const & uzp,
+        [[maybe_unused]]amrex::MultiFab * const Tx,
+        [[maybe_unused]]amrex::MultiFab * const Ty,
+        [[maybe_unused]]amrex::MultiFab * const Tz,
+        [[maybe_unused]]long const offset,
+        [[maybe_unused]]long const np_to_deposit,
+        [[maybe_unused]]int const thread_num,
+        [[maybe_unused]]const int lev,
+        [[maybe_unused]]int const depos_lev,
+        [[maybe_unused]]amrex::Real const relative_time,
+        [[maybe_unused]]PushType push_type,
+        [[maybe_unused]]const warpx::particles::deposition::TemperatureDepositionType type,
+        [[maybe_unused]]const warpx::particles::deposition::TemperatureDepositionPass pass)
+    {}
+
+    void DepositTotalNGPTemperature (amrex::MultiFab* temperature, const int lev);
+    std::unique_ptr<amrex::MultiFab> GetAverageNGPTemperature (int lev);
 
     void DepositNumberDensity (amrex::MultiFab* number_density, const int lev);
     std::unique_ptr<amrex::MultiFab> GetNumberDensity (int lev);
@@ -352,9 +390,15 @@ public:
                                          amrex::MultiFab* jx,
                                          amrex::MultiFab* jy,
                                          amrex::MultiFab* jz,
-                                         amrex::MultiFab* Sx,
-                                         amrex::MultiFab* Sy,
-                                         amrex::MultiFab* Sz,
+                                         amrex::MultiFab* Sxx,
+                                         amrex::MultiFab* Sxy,
+                                         amrex::MultiFab* Sxz,
+                                         amrex::MultiFab* Syx,
+                                         amrex::MultiFab* Syy,
+                                         amrex::MultiFab* Syz,
+                                         amrex::MultiFab* Szx,
+                                         amrex::MultiFab* Szy,
+                                         amrex::MultiFab* Szz,
                                    const amrex::FArrayBox* bxfab,
                                    const amrex::FArrayBox* byfab,
                                    const amrex::FArrayBox* bzfab,
@@ -388,11 +432,13 @@ public:
     int getSpeciesId() const {return species_id;}
 
     ///
-    /// This returns the total charge for all the particles in this ParticleContainer.
-    /// This is needed when solving Poisson's equation with periodic boundary conditions.
+    /// This returns the total energy/weight/charge for all the particles in this ParticleContainer.
+    /// The total charge is needed when solving Poisson's equation with periodic boundary conditions.
     ///
-    amrex::ParticleReal sumParticleCharge(bool local = false);
-    amrex::ParticleReal sumParticleWeight(bool local = false);
+    std::pair<amrex::ParticleReal, amrex::ParticleReal> sumParticleWeightAndEnergy (bool local = false) const;
+    amrex::ParticleReal sumParticleCharge (bool local = false) const;
+    amrex::ParticleReal sumParticleWeight (bool local = false) const;
+    amrex::ParticleReal sumParticleEnergy (bool local = false) const;
 
     std::array<amrex::ParticleReal, 3> meanParticleVelocity(bool local = false);
 
@@ -610,14 +656,23 @@ protected:
     amrex::Vector<amrex::FArrayBox> local_jz;
 
     // local containers for mass matrix deposit used by implicit solvers
-    amrex::Vector<amrex::FArrayBox> local_Sx;
-    amrex::Vector<amrex::FArrayBox> local_Sy;
-    amrex::Vector<amrex::FArrayBox> local_Sz;
+    amrex::Vector<amrex::FArrayBox> local_Sxx;
+    amrex::Vector<amrex::FArrayBox> local_Sxy;
+    amrex::Vector<amrex::FArrayBox> local_Sxz;
+    amrex::Vector<amrex::FArrayBox> local_Syx;
+    amrex::Vector<amrex::FArrayBox> local_Syy;
+    amrex::Vector<amrex::FArrayBox> local_Syz;
+    amrex::Vector<amrex::FArrayBox> local_Szx;
+    amrex::Vector<amrex::FArrayBox> local_Szy;
+    amrex::Vector<amrex::FArrayBox> local_Szz;
 
 public:
     using PairIndex = std::pair<int, int>;
 
     int getIonizationInitialLevel () const noexcept {return ionization_initial_level;}
+
+    // By default this returns false, can be overridden in PysicalParticleContainer
+    virtual bool getTemperatureDepositionFlag () const noexcept {return false;}
 
 private:
     void particlePostLocate(ParticleType& p, const amrex::ParticleLocData& pld, int lev) override;

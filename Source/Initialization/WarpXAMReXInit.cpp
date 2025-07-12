@@ -9,6 +9,7 @@
 
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
+#include "Utils/WarpXConst.H"
 
 #include <AMReX.H>
 #include <AMReX_BLProfiler.H>
@@ -98,6 +99,31 @@ namespace {
         pp_particles.queryAdd("do_tiling", do_tiling);
     }
 
+    void add_constants ()
+    {
+        amrex::ParmParse::SetParserPrefix("my_constants");
+        amrex::ParmParse pp_constants("my_constants");
+        // Add constants only if it's not defined already.
+        amrex::Real tmp = PhysConst::c;
+        pp_constants.queryAdd("clight", tmp);
+        tmp =       PhysConst::ep0;
+        pp_constants.queryAdd("epsilon0", tmp);
+        tmp =       PhysConst::mu0;
+        pp_constants.queryAdd("mu0", tmp);
+        tmp =       PhysConst::q_e;
+        pp_constants.queryAdd("q_e", tmp);
+        tmp =       PhysConst::m_e;
+        pp_constants.queryAdd("m_e", tmp);
+        tmp =       PhysConst::m_p;
+        pp_constants.queryAdd("m_p", tmp);
+        tmp =       PhysConst::m_u;
+        pp_constants.queryAdd("m_u", tmp);
+        tmp =       PhysConst::kb;
+        pp_constants.queryAdd("kb", tmp);
+        tmp =       MathConst::pi;
+        pp_constants.queryAdd("pi", tmp);
+    }
+
     /** Overwrite defaults in AMReX Inputs
      *
      * This overwrites defaults in amrex::ParmParse for inputs.
@@ -105,6 +131,7 @@ namespace {
     void
     overwrite_amrex_parser_defaults ()
     {
+        add_constants();
         override_default_abort_on_out_of_gpu_memory();
         override_default_the_arena_is_managed();
         override_default_omp_threads();

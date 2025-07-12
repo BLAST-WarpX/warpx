@@ -90,7 +90,7 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
  * @param mypc MultiParticleContainer calling this method
  *
  */
-void CollisionHandler::doCollisions ( amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
+void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
 {
 
     if (m_use_global_debye_length) {
@@ -99,7 +99,7 @@ void CollisionHandler::doCollisions ( amrex::Real cur_time, amrex::Real dt, Mult
 
     for (auto& collision : allcollisions) {
         int const ndt = collision->get_ndt();
-        if ( int(std::floor(cur_time/dt)) % ndt == 0 ) {
+        if ( step % ndt == 0 ) {
             collision->doCollisions(cur_time, dt*ndt, mypc);
         }
     }

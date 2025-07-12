@@ -104,6 +104,25 @@ struct CartesianNodalAlgorithm {
     }
 
     /**
+     * Perform second derivative along x on any grid, from the field `F`*/
+    template< typename T_Field>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real Dxx (
+        T_Field const& F,
+        amrex::Real const * const coefs_x, int const /*n_coefs_x*/,
+        int const i, int const j, int const k, int const ncomp=0 ) {
+
+        using namespace amrex;
+#if (defined WARPX_DIM_1D_Z)
+        amrex::ignore_unused(F, coefs_x, i, j, k, ncomp);
+        return 0._rt; // 1D Cartesian: derivative along x is 0
+#else
+        amrex::Real const inv_dx2 = coefs_x[0]*coefs_x[0];
+        return inv_dx2*( F(i-1,j,k,ncomp) - 2._rt*F(i,j,k,ncomp) + F(i+1,j,k,ncomp) );
+#endif
+    }
+
+    /**
      * Perform derivative along y
      * (For a solver on a staggered grid, `UpwardDy` and `DownwardDy` take into
      * account the staggering; but for `CartesianNodalAlgorithm`, they are equivalent) */
@@ -135,6 +154,25 @@ struct CartesianNodalAlgorithm {
 
         return UpwardDy( F, coefs_y, n_coefs_y, i, j, k ,ncomp);
         // For CartesianNodalAlgorithm, UpwardDy and DownwardDy are equivalent
+    }
+
+    /**
+     * Perform second derivative along y on any grid, from the field `F`*/
+    template< typename T_Field>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real Dyy (
+        T_Field const& F,
+        amrex::Real const * const coefs_y, int const /*n_coefs_y*/,
+        int const i, int const j, int const k, int const ncomp=0 ) {
+
+        using namespace amrex;
+#if defined WARPX_DIM_3D
+        Real const inv_dy2 = coefs_y[0]*coefs_y[0];
+        return inv_dy2*( F(i,j-1,k,ncomp) - 2._rt*F(i,j,k,ncomp) + F(i,j+1,k,ncomp) );
+#elif (defined WARPX_DIM_XZ || WARPX_DIM_1D_Z)
+        amrex::ignore_unused(F, coefs_y, i, j, k, ncomp);
+        return 0._rt; // 1D and 2D Cartesian: derivative along y is 0
+#endif
     }
 
     /**
@@ -172,6 +210,26 @@ struct CartesianNodalAlgorithm {
         // For CartesianNodalAlgorithm, UpwardDz and DownwardDz are equivalent
     }
 
+
+    /**
+     * Perform second derivative along z on any grid, from the field `F`*/
+    template< typename T_Field>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real Dzz (
+        T_Field const& F,
+        amrex::Real const * const coefs_z, int const /*n_coefs_z*/,
+        int const i, int const j, int const k, int const ncomp=0 ) {
+
+        using namespace amrex;
+        Real const inv_dz2 = coefs_z[0]*coefs_z[0];
+#if defined WARPX_DIM_3D
+        return inv_dz2*( F(i,j,k-1,ncomp) - 2._rt*F(i,j,k,ncomp) + F(i,j,k+1,ncomp) );
+#elif (defined WARPX_DIM_XZ)
+        return inv_dz2*( F(i,j-1,k,ncomp) - 2._rt*F(i,j,k,ncomp) + F(i,j+1,k,ncomp) );
+#elif (defined WARPX_DIM_1D_Z)
+        return inv_dz2*( F(i-1,j,k,ncomp) - 2._rt*F(i,j,k,ncomp) + F(i+1,j,k,ncomp) );
+#endif
+    }
 };
 
 #endif // WARPX_FINITE_DIFFERENCE_ALGORITHM_CARTESIAN_NODAL_H_

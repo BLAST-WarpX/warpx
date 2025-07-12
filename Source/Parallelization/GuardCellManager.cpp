@@ -41,10 +41,12 @@ guardCellManager::Init (
     ablastr::utils::enums::GridType grid_type,
     const bool do_moving_window,
     const int moving_window_dir,
+    const int particle_max_grid_crossings,
     const int nox,
     const int nox_fft, const int noy_fft, const int noz_fft,
     const int nci_corr_stencil,
     const ElectromagneticSolverAlgo electromagnetic_solver_id,
+    const EvolveScheme evolve_scheme,
     const int max_level,
     const amrex::Vector<amrex::Real>& v_galilean,
     const amrex::Vector<amrex::Real>& v_comoving,
@@ -144,7 +146,8 @@ guardCellManager::Init (
     // both at the beginning and at the end of the PIC iteration).
     // For the hybrid-PIC solver, the same number of guard cells are used as for
     // the electrostatic solver.
-    if (electromagnetic_solver_id != ElectromagneticSolverAlgo::None &&
+    if (evolve_scheme == EvolveScheme::Explicit &&
+        electromagnetic_solver_id != ElectromagneticSolverAlgo::None &&
         electromagnetic_solver_id != ElectromagneticSolverAlgo::HybridPIC)
     {
         for (int i = 0; i < AMREX_SPACEDIM; i++)
@@ -165,6 +168,14 @@ guardCellManager::Init (
             }
             ng_alloc_Rho[i] += static_cast<int>(std::ceil(PhysConst::c * dt_Rho / dx[i]));
             ng_alloc_J[i]   += static_cast<int>(std::ceil(PhysConst::c * dt_J / dx[i]));
+        }
+    } else if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
+               evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+        // When using these implicit schemes, the speed of light Courant limit may be significantly
+        // violated, but the number of guard cells only need to be adjusted based on the particle motion.
+        for (int i = 0; i < AMREX_SPACEDIM; i++) {
+            ng_alloc_Rho[i] += particle_max_grid_crossings - 1;
+            ng_alloc_J[i]   += particle_max_grid_crossings - 1;
         }
     }
 
@@ -308,6 +319,14 @@ guardCellManager::Init (
 
     if (do_moving_window && electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
         ng_afterPushPSATD = ng_alloc_EB;
+    }
+
+    if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
+        evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+        // For these implicit schemes, for energy conservation, the number of ghost cells
+        // must be the same for J and EB.
+        ng_alloc_EB = ng_alloc_EB.max(ng_alloc_J);
+        ng_alloc_J = ng_alloc_J.max(ng_alloc_EB);
     }
 
     if (safe_guard_cells){

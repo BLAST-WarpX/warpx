@@ -9,7 +9,6 @@
 #define WARPX_CURRENTDEPOSITION_H_
 
 #include "Particles/Deposition/SharedDepositionUtils.H"
-#include "ablastr/parallelization/KernelTimer.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/ShapeFactors.H"
 #include "Utils/TextMsg.H"
@@ -148,7 +147,7 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
     int const j_jx = ((jx_type[0] == NODE) ? j_node : j_cell);
     int const j_jy = ((jy_type[0] == NODE) ? j_node : j_cell);
     int const j_jz = ((jz_type[0] == NODE) ? j_node : j_cell);
-#endif //AMREX_SPACEDIM >= 2
+#endif //!defined(WARPX_DIM_1D_Z)
 
 #if defined(WARPX_DIM_3D)
     // y direction

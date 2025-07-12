@@ -292,7 +292,7 @@ class CapacitiveDischargeExample(object):
             electron_colls_dsmc = picmi.DSMCCollisions(
                 name="coll_elec_dsmc",
                 species=[self.electrons, self.neutrals],
-                product_species=[self.ions, self.electrons],
+                product_species=[self.electrons, self.ions],
                 ndt=4,
                 scattering_processes=ionization,
             )

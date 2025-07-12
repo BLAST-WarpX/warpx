@@ -229,7 +229,7 @@ computeEffectivePotentialPhi (
         amrex::MLMG mlmg(*linop); // actual solver defined here
         mlmg.setVerbose(verbosity);
         mlmg.setMaxIter(max_iters);
-        mlmg.setAlwaysUseBNorm((max_norm_b > 0));
+        mlmg.setConvergenceNormType((max_norm_b > 0) ? amrex::MLMGNormType::bnorm : amrex::MLMGNormType::greater);
 
         const int ng = int(grid_type == utils::enums::GridType::Collocated); // ghost cells
         if (ng) {
