@@ -420,8 +420,6 @@ void ImplicitSolver::InitializeMassMatrices ()
 
     // Initializes the MassMatrices and MassMatrices_PC containers
     // The latter has a reduced number of elements that is used for the preconditioner.
-    // They are the same for now as we only include the diagonal elements of the diagonal matrices.
-    // Off-diagonal matrices (e.g. MassMatrices_xy) are not yet included.
     //
     // dJx = MassMatrices_xx*dEx + MassMatrices_xy*dEy + MassMatrices_xz*dEz
     // dJy = MassMatrices_yx*dEx + MassMatrices_yy*dEy + MassMatrices_yz*dEz
