@@ -450,11 +450,16 @@ void ImplicitSolver::InitializeMassMatrices ()
     int Nc_tot_xx = 1, Nc_tot_xy = 1, Nc_tot_xz = 1;
     int Nc_tot_yx = 1, Nc_tot_yy = 1, Nc_tot_yz = 1;
     int Nc_tot_zx = 1, Nc_tot_zy = 1, Nc_tot_zz = 1;
-    if (m_use_mass_matrices_jacobian) { // else only for PC
+    if (m_use_mass_matrices_jacobian) {
+
+        // Ensure that the guard cells for J and E are the same
+        for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
+            AMREX_ASSERT(ngJ[dir]>=shape);
+            AMREX_ASSERT(ngE[dir]>=shape);
+        }
+
         if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Direct) {
             for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
-                AMREX_ASSERT(ngJ[dir]>=shape);
-                AMREX_ASSERT(ngE[dir]>=shape);
                 m_ncomp_xx[dir] = 1 + 2*shape;
                 m_ncomp_xy[dir] = 1 + 2*shape + ( (Jx_nodal[dir] + Jy_nodal[dir]) % 2 );
                 m_ncomp_xz[dir] = 1 + 2*shape + ( (Jx_nodal[dir] + Jz_nodal[dir]) % 2 );
@@ -481,7 +486,7 @@ void ImplicitSolver::InitializeMassMatrices ()
                 shape==2,
                 "Mass Matrices for Jacobian with Villasenor deposition requires shape = 2.");
             int max_crossings = ngJ[0] - 1;
-#if (AMREX_SPACEDIM == 1)
+            AMREX_ASSERT(max_crossings>0);
 #if defined(WARPX_DIM_1D_Z)
             m_ncomp_xx[0] = 5 + 2*max_crossings;
             m_ncomp_xy[0] = 5 + 2*max_crossings;
@@ -502,8 +507,7 @@ void ImplicitSolver::InitializeMassMatrices ()
             m_ncomp_zx[0] = 4 + 2*max_crossings;
             m_ncomp_zy[0] = 5 + 2*max_crossings;
             m_ncomp_zz[0] = 5 + 2*max_crossings;
-#endif
-#elif (AMREX_SPACEDIM == 2)
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             m_ncomp_xx[0] = 3 + 2*max_crossings;
             m_ncomp_xy[0] = 4 + 2*max_crossings;
             m_ncomp_xz[0] = 4 + 2*max_crossings;
@@ -535,7 +539,6 @@ void ImplicitSolver::InitializeMassMatrices ()
                 Nc_tot_zy *= m_ncomp_zy[dir];
                 Nc_tot_zz *= m_ncomp_zz[dir];
             }
-            AMREX_ASSERT(max_crossings>0);
         }
         else {
             WARPX_ABORT_WITH_MESSAGE("Mass matrices can only be used with Direct and Villasenor depositions.");
