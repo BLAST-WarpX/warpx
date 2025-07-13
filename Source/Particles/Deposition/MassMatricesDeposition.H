@@ -1271,7 +1271,7 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                         for (int kE=0; kE<=depos_order; kE++) {
                             const amrex::Real weight_E = weight_cellX_nodeZ[ms][iE][kE];
                             const int comp_yx = 2 + max_crossings + iE - i + SegNumX[ms] - SegNumX[ns]
-                                  +  Ncomp_yx0*(1 + max_crossings + kE - k + SegNumZ[ms] - SegNumZ[ns]);
+                                  +  Ncomp_yx0*(2 + max_crossings + kE - k + SegNumZ[ms] - SegNumZ[ns]);
                             amrex::Gpu::Atomic::AddNoRet( &Syx_arr(i_J, k_J, 0, comp_yx), fpyx*weight_J*weight_E);
                         }
                     }
@@ -1281,7 +1281,7 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                         for (int kE=0; kE<=depos_order-1; kE++) {
                             const amrex::Real weight_E = weight_nodeX_cellZ[ms][iE][kE];
                             const int comp_yz = 2 + max_crossings + iE - i + SegNumX[ms] - SegNumX[ns]
-                                   + Ncomp_yz0*(1 + max_crossings + kE - k + SegNumZ[ms] - SegNumZ[ns]);
+                                   + Ncomp_yz0*(2 + max_crossings + kE - k + SegNumZ[ms] - SegNumZ[ns]);
                             amrex::Gpu::Atomic::AddNoRet( &Syz_arr(i_J, k_J, 0, comp_yz), fpyz*weight_J*weight_E);
                         }
                     }
