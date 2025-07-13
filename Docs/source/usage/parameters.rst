@@ -865,6 +865,7 @@ mu0      vacuum permeability
 clight   speed of light
 kb       Boltzmann's constant (J/K)
 pi       math constant pi
+inf      maximum finite value of type ``amrex::Real``
 ======== ===================
 
 See ``Source/Utils/WarpXConst.H`` for the values.
@@ -1047,8 +1048,146 @@ Particle initialization
 
           \sigma_{x,y}(z) &= \sigma^*_{x,y} \sqrt{1 + \left( \frac{z - z^*}{\beta^*_{x,y}} \right)^2}
 
+    * ``twiss``: Inject particle beam, whose particles have mean position :math:`\mathbf{x}_0` and mean normalized momentum :math:`u_0 \mathbf{\hat{n}}_z`, with distribution function
 
-    * ``external_file``: Inject macroparticles with properties (mass, charge, position, and momentum - :math:`\gamma \beta m c`) read from an external openPMD file.
+      .. math::
+         f \left( \mathbf{R} \cdot \mathbf{x} + \mathbf{x}_0, \mathbf{R} \cdot (\mathbf{u} + u_0 \mathbf{\hat{z}}) \right) = N f_x(x, u_x) f_y(y, u_z) f_\zeta(\zeta, u_\zeta),
+      where the rotation matrix is
+
+      .. math::
+         \mathbf{R} = \begin{pmatrix}
+           \mathbf{\hat{n}}_x \cdot \mathbf{\hat{x}} &
+           \mathbf{\hat{n}}_y \cdot \mathbf{\hat{x}} &
+           \mathbf{\hat{n}}_z \cdot \mathbf{\hat{x}} \\
+           \mathbf{\hat{n}}_x \cdot \mathbf{\hat{y}} &
+           \mathbf{\hat{n}}_y \cdot \mathbf{\hat{y}} &
+           \mathbf{\hat{n}}_z \cdot \mathbf{\hat{y}} \\
+           \mathbf{\hat{n}}_x \cdot \mathbf{\hat{z}} &
+           \mathbf{\hat{n}}_y \cdot \mathbf{\hat{z}} &
+           \mathbf{\hat{n}}_z \cdot \mathbf{\hat{z}} \end{pmatrix},
+
+      and the initialization coordinates are
+
+      .. math::
+         \mathbf{x} = x \mathbf{\hat{x}} + y \mathbf{\hat{y}} + \zeta \mathbf{\hat{z}}~~~~~\text{and}~~~~
+         \mathbf{u} = u_x \mathbf{\hat{x}} + u_y \mathbf{\hat{y}} + u_\zeta \mathbf{\hat{z}}.
+
+      Each factor of the distribution function is a bivariate normal distribution, conventionally described by the Courant-Snyder (Twiss) parameters,
+
+      .. math::
+         f_i(x_i, u_i) = \frac{1}{2 \pi \epsilon_i} \exp \left( - \frac{\gamma_i x_i^2 + 2 \alpha_i x_i u_i + \beta_i u_i^2}{2 \epsilon_i} \right),
+
+      where :math:`\epsilon_i` is the RMS normalized emittance.
+
+      * ``<species_name>.q_tot`` (`float`, coulomb) Beam charge :math:`Q_\text{tot} = N q`.
+
+      * ``<species_name>.npart`` (`int`) Number of macroparticles.
+
+      * ``<species_name>.x0/y0/z0`` (`float`, meter) Initial beam position :math:`\mathbf{x}_0`.
+
+      * ``<species_name>.twiss.ellipsoidal_cut`` (list of 6 `floats`, optional) Cut particles with
+
+        .. math::
+           \Biggl[ \left(
+           \frac{x}{a_1} \right)^2 +
+           \left( \frac{y}{a_2} \right)^2 +
+           \left( \frac{\zeta}{a_3} \right)^2 +
+           \left( \frac{u_x}{a_4} \right)^2 +
+           \left( \frac{u_y}{a_5} \right)^2 +
+           \left( \frac{u_\zeta}{a_6} \right)^2 \Biggr] > 1
+
+        Parameters:
+
+        * :math:`(a_1, a_2, a_3, a_4, a_5, a_6)` in units of :math:`(\sigma^\star_x, \sigma^\star_y, \sigma^\star_\zeta, \sigma^\star_{u_x}, \sigma^\star_{u_y}, \sigma^\star_{u_\zeta})`
+
+        The charge of the uncut beam is ``<species_name>.q_tot``, so that cutting the distribution generally results in lower total injected charge.  Specifying ``inf`` for any parameter disables the corresponding cut.
+
+      * ``<species_name>.twiss.planar_cut`` (list of 6 `floats`, optional)  Cut particles with
+
+        .. math::
+           \max \Biggl ( \frac{|x|}{a_1}, \frac{|y|}{a_2}, \frac{|\zeta|}{a_3}, \frac{|u_x|}{a_4},  \frac{|u_y|}{a_5}, \frac{|u_\zeta|}{a_6} \Biggr) > 1
+
+        Parameters:
+
+        * :math:`(a_1, a_2, a_3, a_4, a_5, a_6)` in units of :math:`(\sigma^\star_x, \sigma^\star_y, \sigma^\star_\zeta, \sigma^\star_{u_x}, \sigma^\star_{u_y}, \sigma^\star_{u_\zeta})`
+
+        The charge of the uncut beam is ``<species_name>.q_tot``, so that cutting the distribution generally results in lower total injected charge.  Specifying ``inf`` for any parameter disables the corresponding cut.
+
+      * ``<species_name>.twiss.u0`` (`float`) Mean normalized particle momentum :math:`u_0 = \beta_0 \gamma_0 > 0`.
+
+      * ``<species_name>.twiss.nz`` (list of 3 `floats`, default: `0 0 1`) Longitudinal beam direction :math:`\mathbf{\hat{n}}_z`.
+
+      * ``<species_name>.twiss.nx`` (list of 3 `floats`, default: `1 0 0`) Transverse beam direction :math:`\mathbf{\hat{n}}_x`.  In the code, this is projected into the plane perpendicular to :math:`\mathbf{\hat{n}}_z`, so that we only require :math:`\mathbf{\hat{n}}_z` and :math:`\mathbf{\hat{n}}_x` not be parallel.  Both unit vectors are then normalized and used to calculate :math:`\mathbf{\hat{n}}_y = \mathbf{\hat{n}}_z \times \mathbf{\hat{n}}_x`.
+
+      * ``<species_name>.twiss.euler`` (list of 3 `floats`, radian, optional) If given, provides an alternative way to specify :math:`\mathbf{\hat{n}}_z` and :math:`\mathbf{\hat{n}}_x` in terms of an intrinsic :math:`Z\text{-}X\text{-}Z` Euler rotation.  Parameters are:
+
+        * :math:`\mathbf{\alpha}` = right-handed rotation about :math:`\mathbf{\hat{z}}`
+
+        * :math:`\mathbf{\beta}` = right-handed rotation about :math:`\mathbf{\hat{x}}'`
+
+        * :math:`\mathbf{\gamma}` = right-handed rotation about :math:`\mathbf{\hat{z}}''`
+
+      * ``<species_name>.twiss.symmetrization_order`` (`int`, default=1) Symmetrization of 4D uncorrelated transverse phase-space.  Allowed values:
+
+        * ``1`` Include only the identity transformation:
+
+        .. math::
+             (x,u_x;y,u_y) \mapsto (x,u_x;y,u_y)
+
+        * ``8`` In addition to the identity transformation, include all remaining even-parity symmetry transformations:
+
+          .. math::
+             \begin{align*}
+             (x,u_x;y,u_y) \mapsto
+               & (-x,-u_x;y,u_y), (-x,u_x;-y,u_y), (-x,u_x;y,-u_y), \\
+               &  (x,-u_x;-y,u_y), (x,-u_x;y,-u_y), (x,u_x;-y,-u_y), \\
+               &  (-x,-u_x;-y,-u_y)
+             \end{align*}
+
+        * ``16`` In addition to all the even-parity symmetry transformations, include all the odd-parity symmetry transformations:
+
+          .. math::
+             \begin{align*}
+             (x,u_x;y,u_y) \mapsto
+             & (-x,u_x;y,u_y), (x,-u_x;y,u_y), (x,u_x;-y,u_y), \\
+             & (x,u_x;y,-u_y), (x,-u_x;-y,-u_y), (-x,u_x;-y,-u_y), \\
+             & (-x,-u_x;y,-u_y), (-x,-u_x;-y,u_y)
+             \end{align*}
+
+      Each of the three bivariate distributions is separately specified by three of the following parameters:
+
+      * ``<species_name>.twiss.focal_distance_x/y/zeta`` (`float`, meter) Focal distance :math:`L_i`.  Can be positive, negative, or zero.  A negative value corresponds to the focus occurring prior to the initialization time.
+
+      * ``<species_name>.twiss.sigma_x/y/zeta`` (`float`, meter) RMS beam spread :math:`\sigma^\star_{x_i}` at focus.
+
+      * ``<species_name>.twiss.sigma_ux/uy/uzeta`` (`float`) RMS normalized momentum spread :math:`\sigma^\star_{u_i}` at focus, in units of :math:`u_0`.
+
+      * ``<species_name>.twiss.emittance_x/y/zeta`` (`float`, radian meter) RMS normalized emittance :math:`\epsilon_i`.
+
+      * ``<species_name>.twiss.alpha_x/y/zeta`` (`float`, dimensionless) Twiss parameter :math:`\alpha_i`.
+
+      * ``<species_name>.twiss.beta_x/y/zeta`` (`float`, meter) Twiss parameter :math:`\beta_i`.
+
+      For each Cartesian direction, any set of three parameters may be used as long as it can be used to determine the primary set of initialization parameters :math:`\{L_i, \sigma^\star_{x_i}, \sigma^\star_{u_i}\}` using the relations
+
+      .. math::
+         \beta_i \gamma_i &= 1 + \alpha_i^2
+
+         \alpha_i &= L_i \gamma_i
+
+         \sigma^\star_{x_i} \sigma^\star_{u_i} &= \epsilon_i
+
+         \gamma_i \sigma^{\star 2}_{x_i} &= \epsilon_i
+
+      In addition to the primary set, common choices of parameters include :math:`\{L_i, \sigma^\star_{x_i}, \epsilon_i\}` and :math:`\{\alpha_i, \beta_i, \epsilon_i\}`.
+
+      To use ``injection_style = twiss``, you must also set ``momentum_distribution_type = twiss``.
+
+    ..
+         gaussian distribution in space in all directions. This requires additional parameters:
+
+
+      * ``external_file``: Inject macroparticles with properties (mass, charge, position, and momentum - :math:`\gamma \beta m c`) read from an external openPMD file.
       With it users can specify the additional arguments:
 
       * ``<species_name>.injection_file`` (`string`) openPMD file name and
@@ -1206,6 +1345,8 @@ Particle initialization
       well as standard deviations along each direction ``<species_name>.ux_th``,
       ``<species_name>.uy_th`` and ``<species_name>.uz_th``.
       These 6 parameters are all ``0.`` by default.
+
+    * ``twiss``: Only valid for ``injection_style = twiss``, from which the momentum parameters are calculated.  No further parameters are specified here.
 
     * ``gaussianflux``: Gaussian momentum flux distribution, which is Gaussian in the plane and v*Gaussian normal to the plane.
       It can only be used when ``injection_style = NFluxPerCell``.

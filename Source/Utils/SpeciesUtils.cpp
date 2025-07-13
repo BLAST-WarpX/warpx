@@ -135,6 +135,14 @@ namespace SpeciesUtils {
                        mom_dist_s.end(),
                        mom_dist_s.begin(),
                        ::tolower);
+
+        if (style == "twiss") {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                mom_dist_s == "twiss",
+                "'injection_style = twiss' requires "
+                "'momentum_distribution_type = twiss'");
+        }
+
         if (mom_dist_s == "at_rest") {
             constexpr amrex::Real ux = 0._rt;
             constexpr amrex::Real uy = 0._rt;
@@ -166,6 +174,14 @@ namespace SpeciesUtils {
             // Construct InjectorMomentum with InjectorMomentumGaussian.
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumGaussian*)nullptr,
                                                 ux_m, uy_m, uz_m, ux_th, uy_th, uz_th));
+        } else if (mom_dist_s == "twiss") {
+            amrex::Real u0;
+            amrex::XDim3 sigma_u;
+            utils::parser::getWithParser(pp_species, source_name, "twiss.u0", u0);
+            utils::parser::getWithParser(pp_species, source_name, "twiss.sigma_ux", sigma_u.x);
+            utils::parser::getWithParser(pp_species, source_name, "twiss.sigma_uy", sigma_u.y);
+            utils::parser::getWithParser(pp_species, source_name, "twiss.sigma_uzeta", sigma_u.z);
+            h_inj_mom.reset(new InjectorMomentum((InjectorMomentumTwiss*) nullptr, u0, sigma_u));
         } else if (mom_dist_s == "gaussianflux") {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(style == "nfluxpercell",
                 "Error: gaussianflux can only be used with injection_style = NFluxPerCell");
