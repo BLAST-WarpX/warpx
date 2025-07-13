@@ -210,6 +210,17 @@ include(CTest)
 # Dependencies ################################################################
 #
 
+# Old GCCs: std::filesystem as a separate library
+try_compile(CXX_HAS_STD_FS "${WarpX_BINARY_DIR}/temp"
+    "${WarpX_SOURCE_DIR}/cmake/has_filesystem.cpp"
+    CMAKE_FLAGS -DCMAKE_CXX_STANDARD=17 -DCMAKE_CXX_STANDARD_REQUIRED=ON
+)
+try_compile(CXX_HAS_STD_FS_WITH_LINK "${WarpX_BINARY_DIR}/temp"
+    "${WarpX_SOURCE_DIR}/cmake/has_filesystem.cpp"
+    CMAKE_FLAGS -DCMAKE_CXX_STANDARD=17 -DCMAKE_CXX_STANDARD_REQUIRED=ON
+    LINK_LIBRARIES stdc++fs
+)
+
 # AMReX
 #   builds AMReX from source (default) or finds an existing install
 set(WarpX_amrex_dim ${WarpX_DIMS})  # RZ is AMReX 2D
@@ -297,6 +308,16 @@ foreach(D IN LISTS WarpX_DIMS)
                 # Number must be more than the number of .cpp files in WarpX
                 UNITY_BUILD_BATCH_SIZE 10000
             )
+        endif()
+
+        # GCC < 9 need to manually link std::filesystem
+        if(NOT CXX_HAS_STD_FS)
+            if(CXX_HAS_STD_FS_WITH_LINK)
+                target_link_libraries(ablastr_${SD} PUBLIC stdc++fs)
+            else()
+                message(FATAL_ERROR "Your compiler does not support C++17 "
+                        "<filesystem> Please use a newer C++ compiler.")
+            endif()
         endif()
     endif()
 
