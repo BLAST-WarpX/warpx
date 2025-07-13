@@ -1154,53 +1154,67 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
 #else
         const ParticleReal* zp_n_data = nullptr;
 #endif
+
+        if (Szz_nComp>1) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( WarpX::nox==2,
+                "Full mass matrix deposition only permitted for shape = 2 with Villasenor deposition.");
+        }
+
         if (WarpX::nox == 1){
-            doVillasenorJandSigmaDeposition<1>(
+            doVillasenorJandSigmaDeposition<1,false>(
                 xp_n_data, yp_n_data, zp_n_data,
                 GetPosition, wp.dataPtr() + offset,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                 jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
-                Sxx_nComp, Syy_nComp, Szz_nComp,
                 Sxx_arr, Sxy_arr, Sxz_arr,
                 Syx_arr, Syy_arr, Syz_arr,
                 Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                 np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
-        } else if (WarpX::nox == 2){
-            doVillasenorJandSigmaDeposition<2>(
+        } else if (WarpX::nox == 2 && Szz_nComp==1){
+            doVillasenorJandSigmaDeposition<2,false>(
                 xp_n_data, yp_n_data, zp_n_data,
                 GetPosition, wp.dataPtr() + offset,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                 jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
-                Sxx_nComp, Syy_nComp, Szz_nComp,
+                Sxx_arr, Sxy_arr, Sxz_arr,
+                Syx_arr, Syy_arr, Syz_arr,
+                Szx_arr, Szy_arr, Szz_arr,
+                Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
+                np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
+        } else if (WarpX::nox == 2 && Szz_nComp>1){
+            doVillasenorJandSigmaDeposition<2,true>(
+                xp_n_data, yp_n_data, zp_n_data,
+                GetPosition, wp.dataPtr() + offset,
+                uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
+                uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
+                jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
                 Sxx_arr, Sxy_arr, Sxz_arr,
                 Syx_arr, Syy_arr, Syz_arr,
                 Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                 np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
         } else if (WarpX::nox == 3){
-            doVillasenorJandSigmaDeposition<3>(
+            doVillasenorJandSigmaDeposition<3,false>(
                 xp_n_data, yp_n_data, zp_n_data,
                 GetPosition, wp.dataPtr() + offset,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                 jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
-                Sxx_nComp, Syy_nComp, Szz_nComp,
                 Sxx_arr, Sxy_arr, Sxz_arr,
                 Syx_arr, Syy_arr, Syz_arr,
                 Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                 np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
         } else if (WarpX::nox == 4){
-            doVillasenorJandSigmaDeposition<4>(
+            doVillasenorJandSigmaDeposition<4,false>(
                 xp_n_data, yp_n_data, zp_n_data,
                 GetPosition, wp.dataPtr() + offset,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                 jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
-                Sxx_nComp, Syy_nComp, Szz_nComp,
                 Sxx_arr, Sxy_arr, Sxz_arr,
                 Syx_arr, Syy_arr, Syz_arr,
                 Szx_arr, Szy_arr, Szz_arr,
