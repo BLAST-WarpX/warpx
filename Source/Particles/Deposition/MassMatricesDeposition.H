@@ -1476,12 +1476,12 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
         for (int k=0; k<=depos_order; k++) {
             const amrex::Real weight = 0.5_rt*(sz_old_node[k] + sz_new_node[k])*seg_factor;
             const int k_J = lo.x + k0_node[ns] + k;
-            amrex::Gpu::Atomic::AddNoRet( &Jx_arr(k_J, 0, 0), wqx*weight);
-            amrex::Gpu::Atomic::AddNoRet( &Jy_arr(k_J, 0, 0), wqy*weight);
+            amrex::Gpu::Atomic::AddNoRet(&Jx_arr(k_J, 0, 0), wqx*weight);
+            amrex::Gpu::Atomic::AddNoRet(&Jy_arr(k_J, 0, 0), wqy*weight);
             if constexpr (full_mass_matrices) { weight_node[ns][k] = weight; }
             else {
-                amrex::Gpu::Atomic::AddNoRet( &Sxx_arr(k_J, 0, 0), fpxx*weight*weight);
-                amrex::Gpu::Atomic::AddNoRet( &Syy_arr(k_J, 0, 0), fpyy*weight*weight);
+                amrex::Gpu::Atomic::AddNoRet(&Sxx_arr(k_J, 0, 0), fpxx*weight*weight);
+                amrex::Gpu::Atomic::AddNoRet(&Syy_arr(k_J, 0, 0), fpyy*weight*weight);
             }
         }
 
@@ -1489,10 +1489,10 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
         for (int k=0; k<=depos_order-1; k++) {
             const amrex::Real weight = sz_cell[k]*seg_factor;
             const int k_J = lo.x + k0_cell[ns] + k;
-            amrex::Gpu::Atomic::AddNoRet( &Jz_arr(k_J, 0, 0), wqz*weight);
+            amrex::Gpu::Atomic::AddNoRet(&Jz_arr(k_J, 0, 0), wqz*weight);
             if constexpr (full_mass_matrices) { weight_cell[ns][k] = weight; }
             else {
-                amrex::Gpu::Atomic::AddNoRet( &Szz_arr(k_J, 0, 0), fpzz*weight*weight);
+                amrex::Gpu::Atomic::AddNoRet(&Szz_arr(k_J, 0, 0), fpzz*weight*weight);
             }
         }
 
@@ -1514,19 +1514,20 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
             const int k_J = lo.x + k0_node[ns] + k;
             const amrex::Real weight_J = weight_node[ns][k];
             for (int ms=0; ms<num_segments; ms++) {
+                const int SegShift = max_crossings + SegNum[ms] - SegNum[ns];
                 for (int kE=0; kE<=depos_order; kE++) {
                     const amrex::Real weight_E = weight_node[ms][kE];
-                    const int comp_yy = 2 + max_crossings + kE - k + SegNum[ms] - SegNum[ns];
-                    amrex::Gpu::Atomic::AddNoRet( &Sxx_arr(k_J, 0, comp_yy), fpxx*weight_J*weight_E);
-                    amrex::Gpu::Atomic::AddNoRet( &Syy_arr(k_J, 0, comp_yy), fpyy*weight_J*weight_E);
-                    amrex::Gpu::Atomic::AddNoRet( &Sxy_arr(k_J, 0, comp_yy), fpxy*weight_J*weight_E);
-                    amrex::Gpu::Atomic::AddNoRet( &Syx_arr(k_J, 0, comp_yy), fpyx*weight_J*weight_E);
+                    const int comp_yy = 2 + kE - k + SegShift;
+                    amrex::Gpu::Atomic::AddNoRet(&Sxx_arr(k_J, 0, comp_yy), fpxx*weight_J*weight_E);
+                    amrex::Gpu::Atomic::AddNoRet(&Syy_arr(k_J, 0, comp_yy), fpyy*weight_J*weight_E);
+                    amrex::Gpu::Atomic::AddNoRet(&Sxy_arr(k_J, 0, comp_yy), fpxy*weight_J*weight_E);
+                    amrex::Gpu::Atomic::AddNoRet(&Syx_arr(k_J, 0, comp_yy), fpyx*weight_J*weight_E);
                 }
                 for (int kE=0; kE<=depos_order-1; kE++) {
                     const amrex::Real weight_E = weight_cell[ms][kE];
-                    const int comp_yz = 2 + max_crossings + kE - k + SegNum[ms] - SegNum[ns];
-                    amrex::Gpu::Atomic::AddNoRet( &Sxz_arr(k_J, 0, comp_yz), fpxz*weight_J*weight_E);
-                    amrex::Gpu::Atomic::AddNoRet( &Syz_arr(k_J, 0, comp_yz), fpyz*weight_J*weight_E);
+                    const int comp_yz = 2 + kE - k + SegShift;
+                    amrex::Gpu::Atomic::AddNoRet(&Sxz_arr(k_J, 0, comp_yz), fpxz*weight_J*weight_E);
+                    amrex::Gpu::Atomic::AddNoRet(&Syz_arr(k_J, 0, comp_yz), fpyz*weight_J*weight_E);
                 }
             }
 
@@ -1538,16 +1539,17 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
             const int k_J = lo.x + k0_cell[ns] + k;
             const amrex::Real weight_J = weight_cell[ns][k];
             for (int ms=0; ms<num_segments; ms++) {
+                const int SegShift = max_crossings + SegNum[ms] - SegNum[ns];
                 for (int kE=0; kE<=depos_order-1; kE++) {
                     const amrex::Real weight_E = weight_cell[ms][kE];
-                    const int comp_zz = 1 + max_crossings + kE - k + SegNum[ms] - SegNum[ns];
-                    amrex::Gpu::Atomic::AddNoRet( &Szz_arr(k_J, 0, comp_zz), fpzz*weight_J*weight_E);
+                    const int comp_zz = 1 + kE - k + SegShift;
+                    amrex::Gpu::Atomic::AddNoRet(&Szz_arr(k_J, 0, comp_zz), fpzz*weight_J*weight_E);
                 }
                 for (int kE=0; kE<=depos_order; kE++) {
                     const amrex::Real weight_E = weight_node[ms][kE];
-                    const int comp_zy = 1 + max_crossings + kE - k + SegNum[ms] - SegNum[ns];
-                    amrex::Gpu::Atomic::AddNoRet( &Szx_arr(k_J, 0, comp_zy), fpzx*weight_J*weight_E);
-                    amrex::Gpu::Atomic::AddNoRet( &Szy_arr(k_J, 0, comp_zy), fpzy*weight_J*weight_E);
+                    const int comp_zy = 1 + kE - k + SegShift;
+                    amrex::Gpu::Atomic::AddNoRet(&Szx_arr(k_J, 0, comp_zy), fpzx*weight_J*weight_E);
+                    amrex::Gpu::Atomic::AddNoRet(&Szy_arr(k_J, 0, comp_zy), fpzy*weight_J*weight_E);
                 }
             }
 
