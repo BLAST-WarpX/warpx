@@ -652,6 +652,7 @@ void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
  * \param fpyx,fpyy,fpyz           Mass matrix kernels for Jy
  * \param fpzx,fpzy,fpzz           Mass matrix kernels for Jz
  * \param Jx_arr,Jy_arr,Jz_arr     Array4 of current density, either full array or tile
+ * \param max_crossings            Maximum number of particle cell crossings in each dir
  * \param Sxx_nComp                number of Sxx components
  * \param Syy_nComp                number of Syy components
  * \param Szz_nComp                number of Szz components
@@ -688,6 +689,7 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                                              amrex::Array4<amrex::Real> const& Jx_arr,
                                              amrex::Array4<amrex::Real> const& Jy_arr,
                                              amrex::Array4<amrex::Real> const& Jz_arr,
+                                             [[maybe_unused]] int max_crossings,
                                              int Sxx_nComp,
                                              int Syy_nComp,
                                              int Szz_nComp,
@@ -1175,8 +1177,6 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
 
     if (Szz_nComp>1) {
 
-    const auto max_crossings = static_cast<int>((std::sqrt(Syy_nComp) - 5)/2);
-
     // Loop over segments and deposit full mass matrices
     for (int ns=0; ns<num_segments; ns++) {
 
@@ -1515,8 +1515,6 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
 
     if (Szz_nComp>1) {
 
-    const int max_crossings = (Szz_nComp - 3)/2;
-
     // Loop over segments and deposit full mass matrices
     for (int ns=0; ns<num_segments; ns++) {
 
@@ -1581,6 +1579,7 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
  * \param uxp_n,uyp_n,uzp_n        Pointer to arrays of particle momentum at time level n.
  * \param uxp,uyp,uzp              Pointer to arrays of particle momentum at time level n + 1/2.
  * \param Jx_arr,Jy_arr,Jz_arr     Array4 of the current density, either full array or tile.
+ * \param max_crossings            Maximum number of particle cell crossings in each dir
  * \param Sxx_nComp                number of Sxx components
  * \param Syy_nComp                number of Syy components
  * \param Szz_nComp                number of Szz components
@@ -1612,6 +1611,7 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
                                        amrex::Array4<amrex::Real> const& Jx_arr,
                                        amrex::Array4<amrex::Real> const& Jy_arr,
                                        amrex::Array4<amrex::Real> const& Jz_arr,
+                                       int max_crossings,
                                        int Sxx_nComp,
                                        int Syy_nComp,
                                        int Szz_nComp,
@@ -1707,6 +1707,7 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
                                                                 fpyx, fpyy, fpyz,
                                                                 fpzx, fpzy, fpzz,
                                                                 Jx_arr, Jy_arr, Jz_arr,
+                                                                max_crossings,
                                                                 Sxx_nComp, Syy_nComp, Szz_nComp,
                                                                 Sxx_arr, Sxy_arr, Sxz_arr,
                                                                 Syx_arr, Syy_arr, Syz_arr,

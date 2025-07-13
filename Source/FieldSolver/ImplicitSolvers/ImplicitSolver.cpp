@@ -487,6 +487,7 @@ void ImplicitSolver::InitializeMassMatrices ()
                 "Mass Matrices for Jacobian with Villasenor deposition requires shape = 2.");
             int max_crossings = ngJ[0] - 1;
             AMREX_ASSERT(max_crossings>0);
+            AMREX_ASSERT(max_crossings==m_WarpX->particle_max_grid_crossings);
 #if defined(WARPX_DIM_1D_Z)
             m_ncomp_xx[0] = 5 + 2*max_crossings;
             m_ncomp_xy[0] = 5 + 2*max_crossings;
