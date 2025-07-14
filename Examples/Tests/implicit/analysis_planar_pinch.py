@@ -11,6 +11,7 @@
 # the curl curl PC including the diagonal response from mass matrices.
 
 import sys
+
 import numpy as np
 import yt
 from scipy.constants import e, epsilon_0
@@ -34,16 +35,16 @@ Eplasma = ele_energy + ion_energy
 if poynting_flux.shape[1] == 10:
     print("2D simulation")
     gmres_iters_tol = 21
-    Eout_lo_x = poynting_flux[:,6]
-    Eout_lo_z = poynting_flux[:,7]
-    Eout_hi_x = poynting_flux[:,8]
-    Eout_hi_z = poynting_flux[:,9]
+    Eout_lo_x = poynting_flux[:, 6]
+    Eout_lo_z = poynting_flux[:, 7]
+    Eout_hi_x = poynting_flux[:, 8]
+    Eout_hi_z = poynting_flux[:, 9]
     dE_poynting = Eout_hi_x + Eout_lo_x + Eout_hi_z + Eout_lo_z
 else:
     print("1D simulation")
     gmres_iters_tol = 10
-    Eout_lo_x = poynting_flux[:,4]
-    Eout_hi_x = poynting_flux[:,5]
+    Eout_lo_x = poynting_flux[:, 4]
+    Eout_hi_x = poynting_flux[:, 5]
     dE_poynting = Eout_hi_x + Eout_lo_x
 
 # check that violation of energy conservation is below tolerance
@@ -56,15 +57,15 @@ print(f"relative delta energy tolerance : {rel_net_energy_tol}")
 assert max_rel_net_energy < rel_net_energy_tol
 
 # check that the number of gmres iterations is below tolerance
-print(f"gmres iters per newton: {total_gmres_iters/total_newton_iters}")
+print(f"gmres iters per newton: {total_gmres_iters / total_newton_iters}")
 print(f"gmres iters tolerance: {gmres_iters_tol}")
-assert total_gmres_iters/total_newton_iters < gmres_iters_tol
+assert total_gmres_iters / total_newton_iters < gmres_iters_tol
 
 # check that the number of newton iterations is below tolerance
 newton_iters_tol = 5
-print(f"newton iters per time step: {total_newton_iters/num_steps}")
+print(f"newton iters per time step: {total_newton_iters / num_steps}")
 print(f"newton iters tolerance: {newton_iters_tol}")
-assert total_newton_iters/num_steps < newton_iters_tol
+assert total_newton_iters / num_steps < newton_iters_tol
 
 # check for machine precision conservation of charge density
 n0 = 1.0e23
