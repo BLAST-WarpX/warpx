@@ -61,49 +61,41 @@ namespace PEC {
                         bool split_pml_field = false);
 
     /**
-     * \brief Reflects charge density deposited over the PEC boundary back into
+     * \brief Reflects charge density deposited over the PEC or PMC boundary back into
      * the simulation domain.
      *
      * \param[in,out] rho                    Multifab containing the charge density
      * \param[in]     field_boundary_lo      Boundary types of the "low" field boundaries
      * \param[in]     field_boundary_hi      Boundary types of the "high" field boundaries
-     * \param[in]     particle_boundary_lo   Boundary types of the "low" particle boundaries
-     * \param[in]     particle_boundary_hi   Boundary types of the "high" particle boundaries
      * \param[in]     geom                   geometry object of level "lev"
      * \param[in]     lev                    level of the Multifab
      * \param[in]     patch_type             coarse or fine
      * \param[in]     ref_ratios             vector containing the refinement ratios of the refinement levels
      */
-    void ApplyReflectiveBoundarytoRhofield(
+    void ApplyBoundarytoRhofield(
                         amrex::MultiFab* rho,
                         const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_lo,
                         const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_hi,
-                        const amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>& particle_boundary_lo,
-                        const amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>& particle_boundary_hi,
                         const amrex::Geometry& geom,
                         int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios);
 
     /**
-     * \brief Reflects current density deposited over the PEC boundary back into
+     * \brief Reflects current density deposited over the PEC or PMC boundary back into
      * the simulation domain.
      *
      * \param[in,out] Jx, Jy, Jz             Multifabs containing the current density
      * \param[in]     field_boundary_lo      Boundary types of the "low" field boundaries
      * \param[in]     field_boundary_hi      Boundary types of the "high" field boundaries
-     * \param[in]     particle_boundary_lo   Boundary types of the "low" particle boundaries
-     * \param[in]     particle_boundary_hi   Boundary types of the "high" particle boundaries
      * \param[in]     geom                   geometry object of level "lev"
      * \param[in]     lev                    level of the Multifab
      * \param[in]     patch_type             coarse or fine
      * \param[in]     ref_ratios             vector containing the refinement ratios of the refinement levels
      */
-    void ApplyReflectiveBoundarytoJfield(
+    void ApplyBoundarytoJfield(
                         amrex::MultiFab* Jx, amrex::MultiFab* Jy,
                         amrex::MultiFab* Jz,
                         const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_lo,
                         const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_hi,
-                        const amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>& particle_boundary_lo,
-                        const amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>& particle_boundary_hi,
                         const amrex::Geometry& geom,
                         int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios);
 
