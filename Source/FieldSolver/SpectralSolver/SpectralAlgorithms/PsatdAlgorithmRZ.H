@@ -60,7 +60,7 @@ class PsatdAlgorithmRZ : public SpectralBaseAlgorithmRZ
 
     private:
 
-        bool coefficients_initialized;
+        bool coefficients_initialized = false;
         // Note that dt is saved to use in InitializeSpectralCoefficients
         amrex::Real m_dt;
         bool m_update_with_rho;
