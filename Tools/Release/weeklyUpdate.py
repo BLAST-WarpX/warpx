@@ -167,6 +167,8 @@ Weekly update to latest PICSAR{picsar_changes}.
 ./Tools/Release/update_dependencies.py --pyamrex
 ./Tools/Release/update_dependencies.py --picsar
 ```
+
+This pull request was created with this script: `./Tools/Release/weeklyUpdate.py`
 """,
         "--label",
         "component: documentation",
