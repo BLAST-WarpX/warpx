@@ -86,34 +86,34 @@ private:
 
     /** Relative permittivity of quartz (default: 3.8) */
     amrex::Real m_epsilon_r = 3.8;
-    
+
     /** Relative permeability of quartz (default: 1.0) */
     amrex::Real m_mu_r = 1.0;
-    
+
     /** Conductivity of quartz (default: 0.0) */
     amrex::Real m_sigma = 0.0;
-    
+
     /** Whether to use space-dependent properties */
     bool m_use_space_dependent = false;
-    
+
     /** Parser for space-dependent epsilon_r */
     std::unique_ptr<amrex::Parser> m_epsilon_r_parser;
-    
+
     /** Parser for space-dependent mu_r */
     std::unique_ptr<amrex::Parser> m_mu_r_parser;
-    
+
     /** Parser for space-dependent sigma */
     std::unique_ptr<amrex::Parser> m_sigma_parser;
 
     /** String for epsilon_r function */
     std::string m_str_epsilon_r_function;
-    
+
     /** String for mu_r function */
     std::string m_str_mu_r_function;
-    
+
     /** String for sigma function */
     std::string m_str_sigma_function;
-    
+
     /** Quartz ring geometry parameters for CCP applications */
     amrex::Real m_ring_inner_radius = 0.05;    // Inner radius of the ring (m)
     amrex::Real m_ring_outer_radius = 0.08;    // Outer radius of the ring (m)
@@ -121,10 +121,10 @@ private:
     amrex::Real m_ring_center_x = 0.0;         // Center x-coordinate (m)
     amrex::Real m_ring_center_y = 0.0;         // Center y-coordinate (m)
     amrex::Real m_ring_bottom_z = 0.0;         // Bottom z-coordinate (m)
-    
+
     /** Parser for custom ring geometry */
     std::unique_ptr<amrex::Parser> m_ring_geometry_parser;
     std::string m_str_ring_geometry_function;
 };
 
-#endif // QUARTZ_H_ 
+#endif // QUARTZ_H_

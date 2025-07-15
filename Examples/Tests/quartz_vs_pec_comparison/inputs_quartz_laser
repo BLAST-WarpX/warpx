@@ -60,4 +60,4 @@ diagnostics.diags_names = diag1
 diag1.intervals = 20
 diag1.fields_to_plot = Ex Ey Ez Bx By Bz rho
 diag1.format = plotfile
-diag1.diag_type = Full 
+diag1.diag_type = Full
