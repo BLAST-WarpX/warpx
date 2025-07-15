@@ -21,7 +21,7 @@ my_constants.t0 = R0/u0             # implosion time [m/s]
 ###   simulation parameters
 my_constants.tsim = 220.e-9       # sim time = 1.35*t0 [s]
 my_constants.rise_time = t0/20.0  # current rise time [s]
-my_constants.dt = 4.0e-3*1.0e-9   # time step [s]
+my_constants.dt = 1.0e-3*1.0e-9   # time step [s]
 my_constants.Nppc = 100           # particles per cell
 
 #################################
@@ -65,12 +65,12 @@ algo.evolve_scheme = "theta_implicit_em"
 
 implicit_evolve.theta = 0.5
 implicit_evolve.max_particle_iterations = 21
-implicit_evolve.particle_tolerance = 1.0e-10
+implicit_evolve.particle_tolerance = 1.0e-12
 
 implicit_evolve.nonlinear_solver = "newton"
 newton.verbose = true
 newton.max_iterations = 100
-newton.relative_tolerance = 1.0e-8
+newton.relative_tolerance = 1.0e-10
 newton.absolute_tolerance = 0.0
 newton.require_convergence = false
 newton.diagnostic_file = "diags/reduced_files/newton_solver.txt"

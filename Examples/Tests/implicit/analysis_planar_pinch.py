@@ -51,7 +51,7 @@ else:
 dE = Efields + Eplasma + dE_poynting
 rel_net_energy = np.abs(dE - dE[0]) / Eplasma
 max_rel_net_energy = rel_net_energy.max()
-rel_net_energy_tol = 1.0e-10
+rel_net_energy_tol = 1.0e-12
 print(f"max relative delta energy : {max_rel_net_energy}")
 print(f"relative delta energy tolerance : {rel_net_energy_tol}")
 assert max_rel_net_energy < rel_net_energy_tol
