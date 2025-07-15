@@ -67,6 +67,9 @@ public:
                       int              a_nl_iter,
                       bool             a_from_jacobian ) override;
 
+    // This function should return zero if light waves are not treated implicitly
+    [[nodiscard]] amrex::Real  GetThetaForPC () const override { return 0.; }
+
 private:
 
     /**

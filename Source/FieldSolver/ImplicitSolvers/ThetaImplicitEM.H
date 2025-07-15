@@ -84,6 +84,10 @@ public:
                       int              a_nl_iter,
                       bool             a_from_jacobian ) override;
 
+    // This parameter is used for the time-step fraction in the PC for implicit
+    // treatment of light waves in the curl-curl MLMG solver.
+    [[nodiscard]] virtual amrex::Real  GetThetaForPC () const override { return m_theta; }
+
 private:
 
     /**

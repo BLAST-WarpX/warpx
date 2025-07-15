@@ -104,7 +104,9 @@ public:
         else { return nullptr; }
     }
 
-    [[nodiscard]] amrex::Real  GetTheta () const { return m_theta; }
+    // This parameter is used for the time-step fraction in the PC for implicit
+    // treatment of light waves in the curl-curl MLMG solver.
+    [[nodiscard]] virtual amrex::Real  GetThetaForPC () const = 0;
 
     void ComputeJfromMassMatrices ();
 
