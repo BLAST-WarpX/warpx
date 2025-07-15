@@ -45,7 +45,7 @@ Visualize
 
 The figure below shows the results of the simulation (orange curves), which agrees well with the analytical Child–Langmuir law (black curves) (:eq:`child-langmuir-phi`, :eq:`child-langmuir-J`).
 
-.. figure:: https://gist.githubusercontent.com/oshapoval/aaafd8d131c3e1ed0fefe348bc8db28b/raw/92c4089e1b9eb23ae258f60c386e38e04f9499a2/Pierce_Diode.png
+.. figure:: https://gist.githubusercontent.com/oshapoval/aaafd8d131c3e1ed0fefe348bc8db28b/raw/fc76b371d323dbca4e1c43b45055405ff1fc6de4/Pierce_Diode.png
    :alt: Results of the WarpX Pierce Diode simulation.
    :width: 100%
 
