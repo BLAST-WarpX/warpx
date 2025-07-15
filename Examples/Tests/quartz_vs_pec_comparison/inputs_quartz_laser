@@ -1,0 +1,63 @@
+warpx.use_laser = 1
+# 激光脉冲石英边界条件测试 - 产生明显的电磁场分布
+# 物理验证：石英边界条件应该表现出介电材料的特性
+
+max_step = 200
+amr.n_cell = 64 64 64
+amr.max_level = 0
+amr.blocking_factor = 16
+amr.max_grid_size = 32
+
+geometry.dims = 3
+geometry.prob_lo = -0.1 -0.1 -0.1
+geometry.prob_hi =  0.1  0.1  0.1
+geometry.is_periodic = 0 0 0
+
+# 石英边界条件设置
+boundary.field_lo = quartz quartz quartz
+boundary.field_hi = quartz quartz quartz
+boundary.particle_lo = absorbing absorbing absorbing
+boundary.particle_hi = absorbing absorbing absorbing
+
+# 石英材料参数 (εr = 3.8, μr = 1.0, σ = 0.0)
+quartz.epsilon_r = 3.8
+quartz.mu_r = 1.0
+quartz.sigma = 0.0
+
+# 石英环几何参数
+quartz.ring_inner_radius = 0.05
+quartz.ring_outer_radius = 0.08
+quartz.ring_height = 0.02
+quartz.ring_center_x = 0.0
+quartz.ring_center_y = 0.0
+quartz.ring_bottom_z = 0.0
+
+# 算法设置
+algo.charge_deposition = standard
+algo.field_gathering = energy-conserving
+algo.particle_shape = 1
+algo.electromagnetic_solver = yee
+algo.particle_pusher = boris
+
+# 时间步长设置
+warpx.cfl = 1.0
+
+# 激光脉冲设置
+lasers.names = laser1
+laser1.profile = gaussian
+laser1.wavelength = 0.8e-6
+laser1.e_max = 1.0e12
+laser1.profile_waist = 0.02
+laser1.profile_duration = 10e-15
+laser1.profile_t_peak = 50e-15
+laser1.profile_focal_distance = 0.0
+laser1.direction = 0 0 1
+laser1.polarization = 1 0 0
+laser1.position = 0.0 0.0 -0.05
+
+# 诊断设置 - 输出电场和磁场
+diagnostics.diags_names = diag1
+diag1.intervals = 20
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz rho
+diag1.format = plotfile
+diag1.diag_type = Full 

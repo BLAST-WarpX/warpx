@@ -1,0 +1,12 @@
+Quartz vs PEC Boundary Statistics
+========================================
+
+Field    Max Diff     Mean Diff    Max Rel(%)   Corr    
+------------------------------------------------------------
+Ex       4.27e-02     V/m 8.35e-03     V/m 7053167.70   dimensionless 0.0176  
+Ey       6.61e-03     V/m 1.06e-03     V/m 3957736.42   dimensionless 0.6992  
+Ez       9.65e-03     V/m 1.94e-03     V/m 4085892.79   dimensionless 0.7041  
+Bx       1.02e-25     T 8.93e-27     T 0.00         dimensionless 0.1128  
+By       1.38e-10     T 3.05e-11     T 8568.49      dimensionless -0.1553 
+Bz       5.60e-11     T 1.05e-11     T 3528.54      dimensionless -0.0013 
+rho      0.00e+00     dimensionless 0.00e+00     dimensionless 0.00         dimensionless 1.0000  
