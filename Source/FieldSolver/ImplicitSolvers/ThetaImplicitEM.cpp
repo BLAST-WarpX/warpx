@@ -51,11 +51,12 @@ void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
     // Parse nonlinear solver parameters
     parseNonlinearSolverParams( pp );
 
+    // Define the nonlinear solver
+    m_nlsolver->Define(m_E, this);
+
     // Initialize the mass matrices for plasma response
     if (m_use_mass_matrices) { InitializeMassMatrices(); }
 
-    // Define the nonlinear solver
-    m_nlsolver->Define(m_E, this);
     m_is_defined = true;
 
 }
@@ -78,6 +79,7 @@ void ThetaImplicitEM::PrintParameters () const
     else if (m_nlsolver_type==NonlinearSolverType::Newton) {
         amrex::Print() << "Nonlinear solver type:      Newton\n";
         amrex::Print() << "use mass matrices:          " << (m_use_mass_matrices ? "true":"false") << "\n";
+        PrintMassMatricesParameters();
     }
     m_nlsolver->PrintParams();
     amrex::Print() << "-----------------------------------------------------------\n\n";

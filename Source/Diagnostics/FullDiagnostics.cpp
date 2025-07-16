@@ -902,8 +902,9 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
         } else if ( m_varnames[comp] == "eb_covered" ){
             m_all_field_functors[lev][comp] = std::make_unique<EBCoveredFunctor>(lev, m_crse_ratio);
         } else {
-            std::cout << "Error on component " << m_varnames[comp] << "\n";
-            WARPX_ABORT_WITH_MESSAGE(m_varnames[comp] + " is not a known field output type for this geometry");
+            WARPX_ABORT_WITH_MESSAGE(
+                "Error on component " + m_varnames[comp] + ": "
+                + m_varnames[comp] + " is not a known field output type for this geometry");
         }
     }
     // Add functors for average particle data for each species

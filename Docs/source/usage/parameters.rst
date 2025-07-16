@@ -126,9 +126,11 @@ Overall simulation parameters
     , this sets the relative tolerance for the iterative method used to obtain a self-consistent update of the particles at
     each iteration in the JFNK process.
 
-* ``implicit_evolve.use_mass_matrices`` (`bool`, default: false)
-    When `algo.evolve_scheme` is either `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton` and a preconditioner is being used
-    , the diagonal components of the diagonal mass matrices are used to capture the plasma response in the preconditioner.
+* ``implicit_evolve.use_mass_matrices_jacobian`` (`bool`, default: false)
+    When `algo.evolve_scheme` is `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton`, mass matrices are computed at each nonlinear JFNK iteration and are used during the linear iterations to compute the plasma current density, replacing direct particle calculations.
+
+* ``implicit_evolve.use_mass_matrices_pc`` (`bool`, default: false)
+    When `algo.evolve_scheme` is `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton` and a preconditioner is used, this flag determines whether the plasma response is captured in the preconditioner.
 
 * ``picard.verbose`` (`bool`, default: 1)
     When `implicit_evolve.nonlinear_solver = picard`, this sets the verbosity of the Picard solver. If true, then information
@@ -823,6 +825,19 @@ Distribution across MPI ranks and parallelization
     initialization by avoiding putting neighboring boxes on the same
     process.
 
+* ``warpx.split_high_density_boxes`` (`bool`) optional (default: false)
+    Whether to split high density boxes during initialization. This can
+    improve the potential for load balancing.
+
+* ``warpx.split_high_density_boxes_threshold`` (`float`) optional (default: 1.1)
+    Threshold used in splitting high density boxes. If a Box has more
+    particles than the average number of particles per MPI process
+    multiplied by this factor, we try to split this Box into smaller ones.
+
+* ``warpx.split_high_density_boxes_min_box_size`` (`integer`) optional (default: 8)
+    During splitting high density boxes, if a Box's longest side is already
+    less than or equal to this number, it will not be split.
+
 .. _running-cpp-parameters-parser:
 
 Math parser and user-defined constants
@@ -1159,9 +1174,14 @@ Particle initialization
 * ``<species_name>.density_max`` (`float`) optional (default `infinity`)
     Maximum plasma density. The density at each point is the minimum between the value given in the profile, and `density_max`.
 
-* ``<species_name>.radially_weighted`` (`bool`) optional (default `true`)
-    Whether particle's weight is varied with their radius. This only applies to cylindrical geometry.
-    The only valid value is true.
+* ``<species_name>.radial_numpercell_power`` (`float`) optional (default `0`)
+    With cylindrical and spherical geometry, specifies the radial power scaling of the number of particles per cell.
+    The number of particles per cell will be proportional to :math:`r^p`, where :math:`r` is the radius, and :math:`p` is the specified power.
+    The power must be greater than -1.
+    When the power is 0, the default value, the number of particles per cell will be uniform.
+    With a uniform density, a power of 1 for cylindrical, and a power of 2 for spherical, will give uniform particle weights.
+    The total number of particles loaded along the radius will be :math:`rmax/dr*N_{percell}`, :math:`rmax` the maximum radius particles are loaded, :math:`dr` the radial grid cell size, and :math:`N_{percell}` the number of particles per cell.
+    The particle weights are set accordingly depending on the power and on the specified density profile.
 
 * ``<species_name>.momentum_distribution_type`` (`string`)
     Distribution of the normalized momentum (`u=p/mc`) for this species. The options are:
@@ -2228,6 +2248,37 @@ Details about the collision models can be found in the :ref:`theory section <mul
 * ``<collision_name>.ionization_target_species`` (`string`)
     Only for ``dsmc`` with impact ionization. This specifies which one of the
     colliding particles is ionized.
+
+* ``collisions.correct_energy_momentum`` (`bool`) optional (default 0)
+    For pairwisecoulomb collisions, whether to correct the energy and momentum after the collisions so that they are conserved.
+    In binary collisions, if the weights of the colliding particles are not the same, the collision does not
+    exactly conserve energy and momentum. When this option is on, after the collisions, small modifications are made to the
+    particle momentum so that the energy and momentum are exactly conserved in each cell.
+    This uses the algorithm described in https://doi.org/10.1016/j.jcp.2025.113927.
+
+* ``collisions.energy_fraction`` (`float`) optional (default 0.05)
+    For pairwisecoulomb collisions, when correcting the energy and momentum conservation, the energy correction is applied to pairs of particles in their center of momentum frame.
+    This parameter is the fraction of the relative energy in the COM frame that is used in the correction.
+
+* ``collisions.energy_fraction_max`` (`float`) optional (default 0.5)
+    For pairwisecoulomb collisions, when correcting the energy and momentum conservation, the energy correction is applied to pairs of particles in their center of momentum frame.
+    This parameter is the fraction of the total relative energy in the COM frame of all pairs that is used in the correction.
+
+* ``collisions.beta_weight_exponent`` (`float`) optional (default 1.)
+    For pairwisecoulomb collisions, when correcting the energy and momentum conservation, this parameter controls the exponent used on the particle weight when distributing the momentum correction.
+    With a value greater than 1, it will distribute more of the correction to particles with higher weights.
+
+* ``<collision_name>.correct_energy_momentum`` (`bool`) optional
+    For pairwisecoulomb collisions, override the parameter ``collisions.correct_energy_momentum`` for the specific collision.
+
+* ``<collision_name>.energy_fraction`` (`float`) optional
+    For pairwisecoulomb collisions, override the parameter ``collisions.energy_fraction`` for the specific collision.
+
+* ``<collision_name>.energy_fraction_max`` (`float`) optional
+    For pairwisecoulomb collisions, override the parameter ``collisions.energy_fraction_max`` for the specific collision.
+
+* ``<collision_name>.beta_weight_exponent`` (`float`) optional
+    For pairwisecoulomb collisions, override the parameter ``collisions.beta_weight_exponent`` for the specific collision.
 
 .. _running-cpp-parameters-numerics:
 

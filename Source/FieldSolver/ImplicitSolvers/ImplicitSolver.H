@@ -100,11 +100,13 @@ public:
      * \brief Return pointer to MultiFab array for mass matrix
      */
     [[nodiscard]] const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetMassMatricesCoeff() const {
-        if (m_use_mass_matrices) { return &m_mmpc_mfarrvec; }
+        if (m_use_mass_matrices_pc) { return &m_mmpc_mfarrvec; }
         else { return nullptr; }
     }
 
     [[nodiscard]] amrex::Real  GetTheta () const { return m_theta; }
+
+    void ComputeJfromMassMatrices ();
 
 protected:
 
@@ -154,6 +156,29 @@ protected:
     bool m_use_mass_matrices = false;
 
     /**
+     * \brief Whether to use mass matrices to compute J during linear stage of JFNK
+     */
+    bool m_use_mass_matrices_jacobian = false;
+
+    /**
+     * \brief Whether to use mass matrices in the preconditioner
+     */
+    bool m_use_mass_matrices_pc = false;
+
+    /**
+     * \brief Direction-dependent component number of mass matrices elements
+     */
+    amrex::IntVect m_ncomp_xx = amrex::IntVect::TheZeroVector();
+    amrex::IntVect m_ncomp_xy = amrex::IntVect::TheZeroVector();
+    amrex::IntVect m_ncomp_xz = amrex::IntVect::TheZeroVector();
+    amrex::IntVect m_ncomp_yx = amrex::IntVect::TheZeroVector();
+    amrex::IntVect m_ncomp_yy = amrex::IntVect::TheZeroVector();
+    amrex::IntVect m_ncomp_yz = amrex::IntVect::TheZeroVector();
+    amrex::IntVect m_ncomp_zx = amrex::IntVect::TheZeroVector();
+    amrex::IntVect m_ncomp_zy = amrex::IntVect::TheZeroVector();
+    amrex::IntVect m_ncomp_zz = amrex::IntVect::TheZeroVector();
+
+    /**
      * \brief Array of multifab pointers to mass matrix preconditioner
      */
     amrex::Vector<amrex::Array<amrex::MultiFab*,3>> m_mmpc_mfarrvec;
@@ -161,7 +186,7 @@ protected:
     /**
      * \brief parse nonlinear solver parameters (if one is used)
      */
-    void parseNonlinearSolverParams( const amrex::ParmParse&  pp )
+    void parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
     {
 
         std::string nlsolver_type_str;
@@ -178,7 +203,31 @@ protected:
             m_nlsolver = std::make_unique<NewtonSolver<WarpXSolverVec,ImplicitSolver>>();
             pp.query("max_particle_iterations", m_max_particle_iterations);
             pp.query("particle_tolerance", m_particle_tolerance);
-            pp.query("use_mass_matrices", m_use_mass_matrices);
+            pp.query("use_mass_matrices_jacobian", m_use_mass_matrices_jacobian);
+            pp.query("use_mass_matrices_pc", m_use_mass_matrices_pc);
+            if (m_use_mass_matrices_jacobian || m_use_mass_matrices_pc) {
+                m_use_mass_matrices = true;
+            }
+#if defined(WARPX_DIM_RCYLINDER)
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !m_use_mass_matrices,
+                "Using mass matrices is not setup for DIM = RCYLINDER!");
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !m_use_mass_matrices,
+                "Using mass matrices is not setup for DIM = RSHERE!");
+#endif
+#if defined(WARPX_DIM_RZ)
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !m_use_mass_matrices,
+                "Using mass matrices is not setup for DIM = RZ");
+#endif
+#if defined(WARPX_DIM_3D)
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !m_use_mass_matrices_jacobian,
+                "Using mass matrices for jacobian can not be used for DIM = 3");
+#endif
         }
         else {
             WARPX_ABORT_WITH_MESSAGE(
@@ -191,6 +240,8 @@ protected:
      * \brief Initialize the Mass Matrices used for plasma response in nonlinear Newton solver
      */
     void InitializeMassMatrices ();
+
+    void PrintMassMatricesParameters () const;
 
     /**
      * \brief Perform operations needed before computing the Right Hand Side
@@ -208,6 +259,11 @@ protected:
      * \brief Scale mass matrices used for PC by c^2*mu0*theta*dt and add 1 to diagonal terms
      */
     void SetMassMatricesForPC ( const amrex::Real a_theta_dt );
+
+    /**
+     * \brief Save E and J at start of each Newton step
+     */
+    void SaveEandJ ();
 
     /**
      * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType
