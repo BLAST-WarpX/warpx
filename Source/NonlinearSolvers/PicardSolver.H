@@ -96,6 +96,11 @@ private:
      */
     int m_maxits = 100;
 
+    /**
+     * \brief Total iterations for the diagnostic file
+     */
+    mutable int m_total_iters = 0;
+
     void ParseParameters( );
 
 };
@@ -136,6 +141,8 @@ void PicardSolver<Vec,Ops>::Define ( const Vec&  a_U,
         diagnostic_file << "[" << c++ << "]time(s)";
         diagnostic_file << " ";
         diagnostic_file << "[" << c++ << "]iters";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]total_iters";
         diagnostic_file << " ";
         diagnostic_file << "[" << c++ << "]norm_abs";
         diagnostic_file << " ";
@@ -235,6 +242,9 @@ void PicardSolver<Vec,Ops>::Solve ( Vec&         a_U,
 
     }
 
+    // Update total iteration count
+    m_total_iters += iter;
+
     if (m_rtol > 0. && iter == m_maxits) {
        std::stringstream convergenceMsg;
        convergenceMsg << "Picard solver failed to converge after " << iter <<
@@ -259,6 +269,8 @@ void PicardSolver<Vec,Ops>::Solve ( Vec&         a_U,
         diagnostic_file << a_time + a_dt;
         diagnostic_file << " ";
         diagnostic_file << iter;
+        diagnostic_file << " ";
+        diagnostic_file << m_total_iters;
         diagnostic_file << " ";
         diagnostic_file << norm_abs;
         diagnostic_file << " ";

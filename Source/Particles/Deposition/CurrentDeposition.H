@@ -9,7 +9,6 @@
 #define WARPX_CURRENTDEPOSITION_H_
 
 #include "Particles/Deposition/SharedDepositionUtils.H"
-#include "ablastr/parallelization/KernelTimer.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/ShapeFactors.H"
 #include "Utils/TextMsg.H"

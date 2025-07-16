@@ -1,37 +1,43 @@
 .. _examples-pierce-diode:
 
 Pierce Diode at the Child–Langmuir Limit
-===================
+========================================
 
 This example shows how to simulate the physics of a 1D Pierce diode configuration operating
 at the Child–Langmuir limit using WarpX. In this setup, an electron beam is injected
-into a planar diode gap, consisting of by parallel conducting plates separated by the distance :math:`d` and powered by a voltage difference :math:`V`.
-For a suitable voltage, the field accelerates charged particles initially at rest (:math:`v = 0`) at the cathode towards the anode.
+into a planar diode gap, consisting of by parallel conducting plates separated by the distance :math:`d` and powered by a voltage difference :math:`V` :numref:`fig_geom`.
 The injected current density is chosen to match the space-charge-limited current predicted by the Child–Langmuir law :cite:t:`ex-Zhang2017`.
+The law predicts the maximum current density that can flow between two parallel plates due to space-charge effects.
+This test demonstrates that WarpX correctly reproduces the Child–Langmuir law for a given voltage and gap length.
 
 Geometry
----------
+--------
 
 The figure below schematically illustrates the problem geometry described above.
 
+.. _fig_geom:
+
 .. figure:: https://gist.githubusercontent.com/oshapoval/aaafd8d131c3e1ed0fefe348bc8db28b/raw/92c4089e1b9eb23ae258f60c386e38e04f9499a2/geometry_pierce_diode.png
-   :alt: Two parallel conducting plates separated by the distance :math:`d` and powered by a voltage difference :math:`V` will.
+   :alt:  [fig:geom] Two parallel conducting plates separated by the distance :math:`d` and powered by a voltage difference :math:`V`. Given that the two plates are parallel, here we simulate the problem in 1D with WarpX.
    :width: 80%
    :align: center
 
+   Two parallel conducting plates separated by the distance :math:`d` and powered by a voltage difference :math:`V`. Given that the two plates are parallel, here we simulate the problem in 1D with WarpX.
+
+
 Сhild–Langmuir Limit
----------
+--------------------
 
 In steady state, the emitted current is limited by the Child–Langmuir law,
 which defines the maximum current that can be transported across a planar diode for a given voltage and gap length :cite:t:`ex-Zhang2017`.
-From the Poisson solver, the current density can be expressed in terms of the voltage and the diode gap length, which in 1D writes as:
+It can be shown that, at the Child-Langmuir limit (i.e. when this maximum current is reached), the potential and current density in the gap have the following expression:
 
 .. math::
    \phi(z)=V\Big(\frac{z}{d}\Big)^{4/3},
    :label: child-langmuir-phi
 
 .. math::
-   J = \frac{4}{9} \varepsilon_0 \sqrt{\frac{2 |q|}{m}} \frac{|V|^{3/2}}{d^2}.
+   J(z) = \frac{4}{9} \varepsilon_0 \sqrt{\frac{2 |q|}{m}} \frac{|V|^{3/2}}{d^2}.
    :label: child-langmuir-J
 
 Run
