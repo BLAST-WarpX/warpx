@@ -88,7 +88,7 @@ print("Fraction of Compton-scattered photons / bunch electrons")
 print(f"From simulation : {simulated_frac}")
 print(f"From theory     : {expected_frac}")
 print(f"Relative error  : {abs(simulated_frac - expected_frac) / expected_frac:.2%}")
-# assert abs(simulated_frac-expected_frac) < 0.1*expected_frac
+assert abs(simulated_frac-expected_frac) < 0.1*expected_frac
 
 # %%
 # Bin the photons on a grid in frequency and angle
