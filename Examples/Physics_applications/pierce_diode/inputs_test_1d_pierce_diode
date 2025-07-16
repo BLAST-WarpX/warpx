@@ -1,7 +1,7 @@
 # --- This input defines 1D Pierce Diode Example:
 # --- This test simulates a classic Pierce diode configuration:
 # --- two parallel conducting plates separated by a distance
-# --- zplate = 8 cm and powered by a voltage difference
+# --- d_plate = 8 cm and powered by a voltage difference
 # --- extractor_voltage = -93 kV. For a suitable voltage,
 # --- the field accelerates charged particles initially at rest
 # --- at the cathode towards the anode.
@@ -11,12 +11,14 @@ my_constants.ion_mass = 39*m_u # [kg] Assuming ion potassium
 my_constants.kV = 1000
 my_constants.cm = 0.01
 my_constants.extractor_voltage  = -93.*kV
-my_constants.zplate = 8.*cm
-my_constants.dz = zplate/nz
+my_constants.d_plate = 8.*cm
+my_constants.nz = 128
+my_constants.dz = d_plate/nz
 my_constants.vzfinal = sqrt(2.*abs(extractor_voltage)*q_e/ion_mass)
 my_constants.dt = 0.4*(dz/vzfinal)
-my_constants.nz = 128
-
+my_constants.ep0 = 8.8541878188e-12
+# current density at Child-Langmuir limit
+my_constants.J_CL = ( (4 / 9)* ep0 * sqrt(2 * abs(q_e) / ion_mass) * abs(extractor_voltage) ** (3 / 2) / d_plate**2 )
 # algo
 warpx.do_electrostatic = labframe
 algo.particle_shape = 1
@@ -37,7 +39,7 @@ warpx.numprocs = 2   # 2 MPI ranks
 # geometry
 geometry.dims = 1
 geometry.prob_lo = 0.0
-geometry.prob_hi = zplate
+geometry.prob_hi = d_plate
 
 # boundary
 boundary.field_lo = pec
@@ -59,7 +61,7 @@ ions.surface_flux_pos = 0
 ions.flux_normal_axis = z
 ions.flux_direction = 1
 ions.flux_profile = constant
-ions.flux = 38.79/q_e # corresponds to Child-Langmuir limit
+ions.flux = J_CL/q_e # corresponds to Child-Langmuir limit
 ions.momentum_distribution_type = constant
 
 # diagnostics
