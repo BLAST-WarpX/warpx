@@ -12,23 +12,27 @@ The injected current density is chosen to match the space-charge-limited current
 Geometry
 ---------
 
-The figure below schematically illustrates the problem geometry.
+The figure below schematically illustrates the problem geometry described above.
 
 .. figure:: https://gist.githubusercontent.com/oshapoval/aaafd8d131c3e1ed0fefe348bc8db28b/raw/92c4089e1b9eb23ae258f60c386e38e04f9499a2/geometry_pierce_diode.png
-   :alt: Two parallel conducting plates separated by the distance :math:`d` and powered by a voltage difference :math:`V` will. For a suitable voltage, the field accelerates charged particles initially at rest at the cathode towards the anode.
+   :alt: Two parallel conducting plates separated by the distance :math:`d` and powered by a voltage difference :math:`V` will.
    :width: 80%
    :align: center
 
-The simulation is performed in 1D. In steady state, the emitted current and potential distribution are limited by the Child–Langmuir law,
-which defines the maximum current that can be extracted for a given voltage and gap :cite:t:`ex-Zhang2020`:
+Сhild–Langmuir Limit
+---------
+
+In steady state, the emitted current is limited by the Child–Langmuir law,
+which defines the maximum current that can be transported across a planar diode for a given voltage and gap length :cite:t:`ex-Zhang2017`.
+From the Poisson solver, the current density can be expressed in terms of the voltage and the diode gap length, which in 1D writes as:
 
 .. math::
-   \phi(z)=V\Big(\frac{z}{d}\Big)^{4/3}
+   \phi(z)=V\Big(\frac{z}{d}\Big)^{4/3},
    :label: child-langmuir-phi
 
 .. math::
    J = \frac{4}{9} \varepsilon_0 \sqrt{\frac{2 |q|}{m}} \frac{|V|^{3/2}}{d^2}.
-   :label: child-langmuir
+   :label: child-langmuir-J
 
 Run
 ---
