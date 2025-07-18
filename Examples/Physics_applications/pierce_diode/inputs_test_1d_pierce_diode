@@ -2,9 +2,11 @@
 # --- This test simulates a classic Pierce diode configuration:
 # --- two parallel conducting plates separated by a distance
 # --- d_plate = 8 cm and powered by a voltage difference
-# --- extractor_voltage = -93 kV. For a suitable voltage,
-# --- the field accelerates charged particles initially at rest
-# --- at the cathode towards the anode.
+# --- extractor_voltage = -93 kV. The injected current density is
+# --- chosen to match the space-charge-limited current predicted by
+# --- the Child–Langmuir law, that predicts the maximum current density
+# --- that can flow between two parallel plates due to space-charge effects
+# --- for a given voltage and gap length.
 
 # constants
 my_constants.ion_mass = 39*m_u # [kg] Assuming ion potassium
