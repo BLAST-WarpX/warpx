@@ -771,6 +771,11 @@ PEC::ApplyReflectiveBoundarytoRhofield (
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
+    // The false flag here is to ensure that this loop does not use tiling.
+    // The boxes are grown to include transverse ghost cells prior to the reflection.
+    // Tiling is problematic because neighboring tiles will have overlapping boxes
+    // in the direction transverse to the boundary, thereby reflecting the value multiple
+    // times in the overlapping region.
     for (amrex::MFIter mfi(*rho, false); mfi.isValid(); ++mfi) {
 
         // Get the multifab box including ghost cells
@@ -952,6 +957,11 @@ PEC::ApplyReflectiveBoundarytoJfield (
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
+    // The false flag here is to ensure that this loop does not use tiling.
+    // The boxes are grown to include transverse ghost cells prior to the reflection.
+    // Tiling is problematic because neighboring tiles will have overlapping boxes
+    // in the direction transverse to the boundary, thereby reflecting the value multiple
+    // times in the overlapping region.
     for (amrex::MFIter mfi(*Jx, false); mfi.isValid(); ++mfi) {
 
         // Get the multifab box including ghost cells
