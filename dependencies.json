@@ -3,7 +3,7 @@
     "version_amrex": "25.07",
     "version_pyamrex": "25.07",
     "version_picsar": "25.04",
-    "commit_amrex": "25.07",
-    "commit_pyamrex": "25.07",
-    "commit_picsar": "25.04"
+    "commit_amrex": "850a0fb2545732346ac75604d654cf73db7f6ac0",
+    "commit_pyamrex": "2a2587b9333d3beb6bf6d92c3470935d032f853d",
+    "commit_picsar": "0c329e66010267662a82219f7de7abbd231463f4"
 }
