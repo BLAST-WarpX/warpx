@@ -121,7 +121,7 @@ jobs:
         export CC=$(which icx)
         export CXXFLAGS="-fsycl ${CXXFLAGS}"
 
-        cmake -S . -B build_sp         \
+        cmake -S . -B build_dpsp       \
           -DBUILD_SHARED_LIBS=ON       \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_COMPUTE=SYCL         \
@@ -133,8 +133,9 @@ jobs:
           -DWarpX_PYTHON=ON            \
           -DWarpX_MPI=OFF              \
           -DWarpX_OPENPMD=ON           \
-          -DWarpX_PRECISION=SINGLE
-        cmake --build build_sp -j 4
+          -DWarpX_PRECISION=DOUBLE     \
+          -DWarpX_PARTICLE_PRECISION=SINGLE
+        cmake --build build_dpsp -j 4
 
         ccache -s
         du -hs ~/.cache/ccache
