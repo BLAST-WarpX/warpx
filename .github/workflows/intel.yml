@@ -80,8 +80,8 @@ jobs:
         export OMP_NUM_THREADS=2
         Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_picmi.py
 
-  build_dpcc:
-    name: oneAPI DPC++ SP
+  build_dpc:
+    name: oneAPI DPC++ DP SP
     runs-on: ubuntu-24.04
     # Since 2021.4.0, AMReX_GpuUtility.H: error: comparison with NaN always evaluates to false in fast floating point modes
     # oneAPI 2022.2.0 hangs for -O2 and higher:
