@@ -399,7 +399,8 @@ void FieldProbe::ComputeDiags (int step)
         bool const update_particles_moving_window =
             do_moving_window_FP &&
             step > WarpX::start_moving_window_step &&
-            step <= WarpX::end_moving_window_step;
+            (WarpX::end_moving_window_step < 0 ||
+             step <= WarpX::end_moving_window_step);
         if (update_particles_moving_window)
         {
             const int step_diff = step - m_last_compute_step;
