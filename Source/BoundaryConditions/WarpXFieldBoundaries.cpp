@@ -5,6 +5,7 @@
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #include "Evolve/WarpXDtType.H"
 #include "WarpX_PEC.H"
+#include "BoundaryConditions/Quartz.H"
 
 #include <AMReX.H>
 #include <AMReX_Geometry.H>
@@ -52,6 +53,39 @@ namespace
 void WarpX::ApplyEfieldBoundary(const int lev, PatchType patch_type, amrex::Real time)
 {
     using ablastr::fields::Direction;
+
+    if (::isAnyBoundary<FieldBoundaryType::Quartz>(field_boundary_lo, field_boundary_hi)) {
+        static QuartzBoundary quartz_boundary;
+        if (patch_type == PatchType::fine) {
+            quartz_boundary.ApplytoEfield(
+                m_fields.get_alldirs(FieldType::Efield_fp, lev),
+                field_boundary_lo, field_boundary_hi,
+                get_ng_fieldgather(), Geom(lev),
+                lev, patch_type, ref_ratio, time);
+            if (::isAnyBoundary<FieldBoundaryType::PML>(field_boundary_lo, field_boundary_hi)) {
+                const bool split_pml_field = true;
+                quartz_boundary.ApplytoEfield(
+                    m_fields.get_alldirs(FieldType::pml_E_fp, lev),
+                    field_boundary_lo, field_boundary_hi,
+                    get_ng_fieldgather(), Geom(lev),
+                    lev, patch_type, ref_ratio, time, split_pml_field);
+            }
+        } else {
+            quartz_boundary.ApplytoEfield(
+                m_fields.get_alldirs(FieldType::Efield_cp, lev),
+                field_boundary_lo, field_boundary_hi,
+                get_ng_fieldgather(), Geom(lev),
+                lev, patch_type, ref_ratio, time);
+            if (::isAnyBoundary<FieldBoundaryType::PML>(field_boundary_lo, field_boundary_hi)) {
+                const bool split_pml_field = true;
+                quartz_boundary.ApplytoEfield(
+                    m_fields.get_alldirs(FieldType::pml_E_cp, lev),
+                    field_boundary_lo, field_boundary_hi,
+                    get_ng_fieldgather(), Geom(lev),
+                    lev, patch_type, ref_ratio, time, split_pml_field);
+            }
+        }
+    }
 
     if (::isAnyBoundary<FieldBoundaryType::PEC>(field_boundary_lo, field_boundary_hi)) {
         if (patch_type == PatchType::fine) {

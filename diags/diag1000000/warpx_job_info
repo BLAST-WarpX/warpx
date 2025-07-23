@@ -1,0 +1,162 @@
+==============================================================================
+ WarpX Job Information
+==============================================================================
+number of MPI processes: 1
+number of threads:       10
+
+
+==============================================================================
+ Build Information
+==============================================================================
+build date:    Jul 22 2025 15:26:31
+build machine: macOS feiwuzailiyongdeMacBook-Air.local 15.5 24F74 arm64
+build dir:     /Users/caoyuanhao/warpx/build
+AMReX dir:     /Users/caoyuanhao/warpx/build/_deps/fetchedamrex-src
+
+COMP:          AppleClang
+COMP version:  17.0.0.17000013
+
+C++ compiler:  /usr/bin/c++
+C++ flags:     -O3 -DNDEBUG -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include
+
+Fortran comp:  
+Fortran flags: 
+
+Link flags:    
+Libraries:     
+
+WarpX  git describe: 25.07-28-g928d867485ac-dirty
+AMReX  git describe: 25.07-26-g7c99975cf909
+
+
+==============================================================================
+ Grid Information
+==============================================================================
+ level: 0
+   number of boxes = 2
+   maximum zones   = 32 32 128 
+
+ Boundary conditions
+   -x: interior
+   +x: interior
+   -y: interior
+   +y: interior
+   -z: interior
+   +z: interior
+
+
+==============================================================================
+ Inputs File Parameters
+==============================================================================
+DistributionMapping.verbose = 0
+algo.current_deposition = esirkepov
+algo.maxwell_solver = Yee
+algo.particle_shape = 1
+amr.blocking_factor = 32
+amr.check_input = 1
+amr.grid_eff = 0.69999999999999996
+amr.max_grid_size = 64
+amr.max_level = 0
+amr.n_cell = 32 32 128
+amr.n_proper = 1
+amr.refine_grid_layout = 1
+amr.verbose = 0
+amrex.abort_on_out_of_gpu_memory = 1
+amrex.abort_on_unused_inputs = 0
+amrex.async_out = 0
+amrex.async_out_nfiles = 64
+amrex.fpe_trap_invalid = 0
+amrex.fpe_trap_overflow = 0
+amrex.fpe_trap_zero = 0
+amrex.handle_sigabrt = 1
+amrex.handle_sigfpe = 1
+amrex.handle_sigill = 1
+amrex.handle_sigint = 1
+amrex.handle_sigsegv = 1
+amrex.handle_sigterm = 0
+amrex.init_snan = 0
+amrex.mf.alloc_single_chunk = 0
+amrex.omp_threads = nosmt
+amrex.signal_handling = 1
+amrex.the_arena_defragmentation = 1
+amrex.the_arena_init_size = 8388608
+amrex.the_arena_is_managed = 0
+amrex.the_arena_release_threshold = 9223372036854775807
+amrex.the_async_arena_release_threshold = 9223372036854775807
+amrex.the_comms_arena_defragmentation = 1
+amrex.the_comms_arena_init_size = 8388608
+amrex.the_comms_arena_release_threshold = 9223372036854775807
+amrex.the_device_arena_defragmentation = 1
+amrex.the_device_arena_init_size = 8388608
+amrex.the_device_arena_release_threshold = 9223372036854775807
+amrex.the_managed_arena_defragmentation = 1
+amrex.the_managed_arena_init_size = 8388608
+amrex.the_managed_arena_release_threshold = 9223372036854775807
+amrex.the_pinned_arena_defragmentation = 1
+amrex.the_pinned_arena_init_size = 8388608
+amrex.the_pinned_arena_release_threshold = 9223372036854775807
+amrex.throw_exception = 0
+amrex.use_gpu_aware_mpi = 0
+amrex.use_profiler_syncs = 0
+amrex.vector_growth_factor = 1.5
+amrex.verbose = 1
+boundary.field_hi = periodic periodic quartz
+boundary.field_lo = periodic periodic quartz
+diag1.diag_type = Full
+diag1.fields_to_plot = Ey Bx
+diag1.intervals = 20
+diagnostics.diags_names = diag1
+eb2.extend_domain_face = 1
+eb2.max_grid_size = 64
+eb2.num_coarsen_opt = 0
+epsilon_r = 3.8
+fabarray.comm_tile_size = 1024000 8 8
+fabarray.mfiter_tile_size = 1024000 8 8
+geometry.coord_sys = 0
+geometry.dims = 3
+geometry.is_periodic = 1 1 0
+geometry.prob_hi = 1.e-6 1.e-6 4.e-6
+geometry.prob_hi = 9.9999999999999995e-07 9.9999999999999995e-07 3.9999999999999998e-06
+geometry.prob_lo = -1.e-6 -1.e-6 0.e-6
+geometry.prob_lo = -9.9999999999999995e-07 -9.9999999999999995e-07 0
+lattice.reverse = 0
+max_step = 80
+mu_r = 1.0
+my_constants.E0 = 1.e5
+my_constants.clight = 299792458
+my_constants.epsilon0 = 8.8541878188000004e-12
+my_constants.k = 2*pi/wavelength
+my_constants.kb = 1.3806490000000001e-23
+my_constants.m_e = 9.1093837138999998e-31
+my_constants.m_p = 1.6726219259499999e-27
+my_constants.m_u = 1.6605390689199999e-27
+my_constants.mu0 = 1.2566370612685e-06
+my_constants.omega = 2*pi*clight/wavelength
+my_constants.pi = 3.1415926535897931
+my_constants.q_e = 1.6021766339999999e-19
+my_constants.wavelength = 1.e-6
+particles.do_tiling = 1
+particles.particles_nfiles = 1024
+sigma = 0.0
+tiny_profiler.device_synchronize_around_region = 0
+tiny_profiler.enabled = 1
+tiny_profiler.memprof_enabled = 1
+tiny_profiler.print_threshold = 1
+tiny_profiler.verbose = 0
+vismf.usesingleread = 1
+vismf.usesinglewrite = 1
+warpx.B_ext_grid_init_style = parse_B_ext_grid_function
+warpx.Bx_external_grid_function(x,y,z) = -(E0/clight)*sin(k*z - omega*0)
+warpx.By_external_grid_function(x,y,z) = 0.
+warpx.Bz_external_grid_function(x,y,z) = 0.
+warpx.E_ext_grid_init_style = parse_E_ext_grid_function
+warpx.Ex_external_grid_function(x,y,z) = 0.
+warpx.Ey_external_grid_function(x,y,z) = E0*sin(k*z - omega*0)
+warpx.Ez_external_grid_function(x,y,z) = 0.
+warpx.cfl = 0.9
+warpx.do_div_cleaning = 0
+warpx.do_pml_divb_cleaning = 0
+warpx.do_pml_dive_cleaning = 0
+warpx.serialize_initial_conditions = 1
+warpx.used_inputs_file = warpx_used_inputs
+warpx.verbose = 1

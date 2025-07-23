@@ -1,0 +1,58 @@
+warpx.do_div_cleaning = 0
+warpx.do_pml_dive_cleaning = 0
+warpx.do_pml_divb_cleaning = 0
+# 3D Quartz Boundary Condition Test Input
+
+# Maximum number of time steps
+max_step = 80
+
+# Number of grid points (3D)
+amr.n_cell = 32 32 128
+amr.max_grid_size = 64
+amr.blocking_factor = 32
+amr.max_level = 0
+
+# Geometry
+geometry.dims = 3
+geometry.prob_lo = -1.e-6 -1.e-6  0.e-6
+geometry.prob_hi =  1.e-6  1.e-6  4.e-6
+
+# Boundary condition: quartz on both z boundaries
+boundary.field_lo = periodic periodic quartz
+boundary.field_hi = periodic periodic quartz
+
+# Quartz boundary parameters
+epsilon_r = 3.8
+mu_r = 1.0
+sigma = 0.0
+
+warpx.serialize_initial_conditions = 1
+warpx.verbose = 1
+
+# Algorithms
+algo.current_deposition = esirkepov
+algo.particle_shape = 1
+algo.maxwell_solver = Yee
+warpx.cfl = 0.9
+
+# External field initialization: plane wave in z direction
+my_constants.wavelength = 1.e-6
+my_constants.E0 = 1.e5
+my_constants.k = 2*pi/wavelength
+my_constants.omega = 2*pi*clight/wavelength
+
+warpx.E_ext_grid_init_style = parse_E_ext_grid_function
+warpx.Ex_external_grid_function(x,y,z) = "0."
+warpx.Ey_external_grid_function(x,y,z) = "E0*sin(k*z - omega*0)"
+warpx.Ez_external_grid_function(x,y,z) = "0."
+
+warpx.B_ext_grid_init_style = parse_B_ext_grid_function
+warpx.Bx_external_grid_function(x,y,z) = "-(E0/clight)*sin(k*z - omega*0)"
+warpx.By_external_grid_function(x,y,z) = "0."
+warpx.Bz_external_grid_function(x,y,z) = "0."
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 20
+diag1.diag_type = Full
+diag1.fields_to_plot = Ey Bx 
