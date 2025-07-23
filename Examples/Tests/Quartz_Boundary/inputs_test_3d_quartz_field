@@ -55,4 +55,4 @@ warpx.Bz_external_grid_function(x,y,z) = "0."
 diagnostics.diags_names = diag1
 diag1.intervals = 20
 diag1.diag_type = Full
-diag1.fields_to_plot = Ey Bx 
+diag1.fields_to_plot = Ey Bx

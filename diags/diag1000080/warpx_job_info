@@ -19,11 +19,11 @@ COMP version:  17.0.0.17000013
 C++ compiler:  /usr/bin/c++
 C++ flags:     -O3 -DNDEBUG -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include
 
-Fortran comp:  
-Fortran flags: 
+Fortran comp:
+Fortran flags:
 
-Link flags:    
-Libraries:     
+Link flags:
+Libraries:
 
 WarpX  git describe: 25.07-28-g928d867485ac-dirty
 AMReX  git describe: 25.07-26-g7c99975cf909
@@ -34,7 +34,7 @@ AMReX  git describe: 25.07-26-g7c99975cf909
 ==============================================================================
  level: 0
    number of boxes = 2
-   maximum zones   = 32 32 128 
+   maximum zones   = 32 32 128
 
  Boundary conditions
    -x: interior

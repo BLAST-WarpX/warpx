@@ -5,9 +5,11 @@
 # and visualizes the field distribution near the quartz boundary.
 
 import sys
-import yt
-import numpy as np
+
 import matplotlib
+import numpy as np
+import yt
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
@@ -21,7 +23,9 @@ if len(sys.argv) < 2:
 plotfile = sys.argv[1]
 
 ds = yt.load(plotfile)
-data = ds.covering_grid(level=0, left_edge=ds.domain_left_edge, dims=ds.domain_dimensions)
+data = ds.covering_grid(
+    level=0, left_edge=ds.domain_left_edge, dims=ds.domain_dimensions
+)
 
 # Extract field data
 Ey = data[("mesh", "Ey")].to_ndarray()
@@ -53,10 +57,12 @@ plt.savefig("quartz_boundary_fields_z.png", dpi=150)
 max_Ey = np.max(np.abs(Ey_z))
 min_Ey = np.min(np.abs(Ey_z))
 std_Ey = np.std(Ey_z)
-print(f"Max |Ey|: {max_Ey:.2e} V/m, Min |Ey|: {min_Ey:.2e} V/m, Std |Ey|: {std_Ey:.2e} V/m")
+print(
+    f"Max |Ey|: {max_Ey:.2e} V/m, Min |Ey|: {min_Ey:.2e} V/m, Std |Ey|: {std_Ey:.2e} V/m"
+)
 
 # Assert field is not zero everywhere (sanity check)
 assert max_Ey > 1e4, "Ey field amplitude too small, check simulation setup."
 assert std_Ey > 1e3, "Ey field variation too small, check simulation setup."
 
-print("Analysis complete. Field plot saved as quartz_boundary_fields_z.png.") 
+print("Analysis complete. Field plot saved as quartz_boundary_fields_z.png.")

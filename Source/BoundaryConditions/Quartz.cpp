@@ -220,4 +220,4 @@ bool QuartzBoundary::IsInsideRing(amrex::Real x, amrex::Real y, amrex::Real z) c
     bool in_radius = (r >= m_ring_inner_radius) && (r <= m_ring_outer_radius); // within ring radii
     bool in_height = (z >= m_ring_bottom_z) && (z <= m_ring_bottom_z + m_ring_height); // within ring height
     return in_radius && in_height;
-} 
+}

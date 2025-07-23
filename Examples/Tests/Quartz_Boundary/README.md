@@ -44,4 +44,4 @@ This directory contains a minimal 3D input file for testing the Quartz (dielectr
 - Divergence cleaning is disabled for quartz boundaries in this test.
 
 ---
-For more advanced tests or analysis scripts, please refer to the official WarpX documentation or contact the developers. 
+For more advanced tests or analysis scripts, please refer to the official WarpX documentation or contact the developers.
