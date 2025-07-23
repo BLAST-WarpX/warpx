@@ -84,7 +84,7 @@ drho = (rho - epsilon_0 * divE) / e / n0
 
 # compute RMS error in charge conservation on the grid
 # excluding the upper boundary where the insulator is located
-drho_trimmed = drho[:-1,...]
+drho_trimmed = drho[:-1, ...]
 Ng = drho_trimmed.size
 drho2_avg = (drho_trimmed**2).sum() / Ng
 drho_rms = np.sqrt(drho2_avg)
