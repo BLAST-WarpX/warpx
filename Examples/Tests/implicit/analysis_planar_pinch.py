@@ -82,10 +82,11 @@ rho = data["boxlib", "rho"].value
 # compute local error in Gauss's law
 drho = (rho - epsilon_0 * divE) / e / n0
 
-# compute RMS on in error on the grid
-nX = drho.shape[0]
-nZ = drho.shape[1]
-drho2_avg = (drho**2).sum() / (nX * nZ)
+# compute RMS error in charge conservation on the grid
+# excluding the upper boundary where the insulator is located
+drho_trimmed = drho[:-1,...]
+Ng = drho_trimmed.size
+drho2_avg = (drho_trimmed**2).sum() / Ng
 drho_rms = np.sqrt(drho2_avg)
 tolerance_rel_charge = 1.0e-12
 print(f"rms error in charge conservation: {drho_rms}")
