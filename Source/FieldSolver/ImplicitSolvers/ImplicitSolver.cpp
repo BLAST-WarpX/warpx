@@ -197,12 +197,12 @@ void ImplicitSolver::ComputeJfromMassMatrices ()
             amrex::Array4<const amrex::Real> const& Szz = SZ[2]->array(mfi);
 
             // Use grown boxes here with all guard cells
-            amrex::Box Jbx = amrex::convert(mfi.validbox(),J[0]->ixType().toIntVect());
-            amrex::Box Jby = amrex::convert(mfi.validbox(),J[1]->ixType().toIntVect());
-            amrex::Box Jbz = amrex::convert(mfi.validbox(),J[2]->ixType().toIntVect());
-            amrex::Box Ebx = amrex::convert(mfi.validbox(),E[0]->ixType().toIntVect());
-            amrex::Box Eby = amrex::convert(mfi.validbox(),E[1]->ixType().toIntVect());
-            amrex::Box Ebz = amrex::convert(mfi.validbox(),E[2]->ixType().toIntVect());
+            amrex::Box Jbx = amrex::convert(mfi.validbox(),J[0]->ixType());
+            amrex::Box Jby = amrex::convert(mfi.validbox(),J[1]->ixType());
+            amrex::Box Jbz = amrex::convert(mfi.validbox(),J[2]->ixType());
+            amrex::Box Ebx = amrex::convert(mfi.validbox(),E[0]->ixType());
+            amrex::Box Eby = amrex::convert(mfi.validbox(),E[1]->ixType());
+            amrex::Box Ebz = amrex::convert(mfi.validbox(),E[2]->ixType());
 
             Jbx.grow(J[0]->nGrowVect());
             Jby.grow(J[1]->nGrowVect());
