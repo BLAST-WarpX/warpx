@@ -392,13 +392,14 @@ void WarpX::OneStep (
 {
     WARPX_PROFILE("WarpX::OneStep()");
 
+    // perform collisions
+    ExecutePythonCallback("beforecollisions");
+    mypc->doCollisions(a_step, a_cur_time, a_dt);
+    ExecutePythonCallback("aftercollisions");
+
     // electrostatic solver or hybrid solver
     if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
         electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
-        // perform collisions
-        ExecutePythonCallback("beforecollisions");
-        mypc->doCollisions(a_step, a_cur_time, a_dt);
-        ExecutePythonCallback("aftercollisions");
         // gather fields, push particles, skip deposition
         bool const skip_deposition = true;
         PushParticlesandDeposit(
@@ -408,10 +409,6 @@ void WarpX::OneStep (
     }
     // electromagnetic solver
     else {
-        // perform collisions
-        ExecutePythonCallback("beforecollisions");
-        mypc->doCollisions(a_step, a_cur_time, a_dt);
-        ExecutePythonCallback("aftercollisions");
         // without mesh refinement
         if (finest_level == 0) {
             // standard PIC loop
