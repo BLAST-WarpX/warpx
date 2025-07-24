@@ -171,15 +171,15 @@ protected:
     /**
      * \brief Direction-dependent component number of mass matrices elements
      */
-    amrex::IntVect m_ncomp_xx = amrex::IntVect::TheZeroVector();
-    amrex::IntVect m_ncomp_xy = amrex::IntVect::TheZeroVector();
-    amrex::IntVect m_ncomp_xz = amrex::IntVect::TheZeroVector();
-    amrex::IntVect m_ncomp_yx = amrex::IntVect::TheZeroVector();
-    amrex::IntVect m_ncomp_yy = amrex::IntVect::TheZeroVector();
-    amrex::IntVect m_ncomp_yz = amrex::IntVect::TheZeroVector();
-    amrex::IntVect m_ncomp_zx = amrex::IntVect::TheZeroVector();
-    amrex::IntVect m_ncomp_zy = amrex::IntVect::TheZeroVector();
-    amrex::IntVect m_ncomp_zz = amrex::IntVect::TheZeroVector();
+    amrex::IntVect m_ncomp_xx = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_xy = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_xz = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_yx = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_yy = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_yz = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_zx = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_zy = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_zz = amrex::IntVect{0};
 
     /**
      * \brief Array of multifab pointers to mass matrix preconditioner
