@@ -197,7 +197,8 @@ subprocess.run(
 ./Tools/Release/update_dependencies.py --warpx --release
 ```
 
-Following this workflow: https://warpx.readthedocs.io/en/latest/maintenance/release.html
+This pull request was created with the script `./Tools/Release/releasePR.py`,
+following the instructions described in https://warpx.readthedocs.io/en/latest/maintenance/release.html#create-a-new-warpx-release.
 """,
         "--label",
         "component: documentation",
