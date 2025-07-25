@@ -1,0 +1,40 @@
+{
+  "driver": {
+    "particle_momentum_x": 8.797594225445831e-19,
+    "particle_momentum_y": 8.915526078533055e-19,
+    "particle_momentum_z": 5.457336220532847e-16,
+    "particle_position_x": 0.006357854182735252,
+    "particle_position_y": 0.017668811118486814,
+    "particle_theta": 1570.7963267948967,
+    "particle_weight": 6241509074.460762
+  },
+  "lev=0": {
+    "Bt": 5697.94221428875,
+    "Er": 1182489679834.821,
+    "Ez": 1076480067379.7953,
+    "jr": 87574510461713.88,
+    "jz": 399282784880937.3,
+    "rho": 943936.5720196235,
+    "rho_driver": 1137717.128522131,
+    "rho_plasma_e": 12215188.589610536,
+    "rho_plasma_p": 12452339.76249787
+  },
+  "plasma_e": {
+    "particle_momentum_x": 1.2988986599729689e-20,
+    "particle_momentum_y": 1.5174732461626922e-20,
+    "particle_momentum_z": 6.0792228257625e-21,
+    "particle_position_x": 0.2850736155343445,
+    "particle_position_y": 0.14920697116630646,
+    "particle_theta": 5011.181913404598,
+    "particle_weight": 1001422925327.4291
+  },
+  "plasma_p": {
+    "particle_momentum_x": 1.4269303923607478e-20,
+    "particle_momentum_y": 1.3069876608038295e-20,
+    "particle_momentum_z": 1.0749558097030452e-20,
+    "particle_position_x": 0.2838368240681578,
+    "particle_position_y": 0.14950438513728465,
+    "particle_theta": 4995.577541103405,
+    "particle_weight": 1001422925327.4291
+  }
+}

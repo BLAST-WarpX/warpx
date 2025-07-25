@@ -80,6 +80,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <variant>
 #include <vector>
 
 class WARPX_EXPORT WarpX
@@ -129,22 +130,14 @@ public:
     void Evolve (int numsteps = -1);
 
     /** Push momentum one half step forward to synchronize with position.
-     *  Also sets is_synchronized to `true`.
+     *  Also sets m_is_synchronized to `true`.
      */
-    void Synchronize ();
+    void SynchronizeVelocityWithPosition ();
 
     //
     // Functions used by implicit solvers
     //
-    void ImplicitPreRHSOp ( amrex::Real cur_time,
-                            amrex::Real a_theta,
-                            amrex::Real a_full_dt,
-                            int         a_nl_iter,
-                            bool        a_from_jacobian,
-                            bool        a_use_mass_matrices );
-    void SyncMassMatricesAndApplyBCs ();
-    void SyncMassMatrices ();
-    void SetMassMatricesForPC ( amrex::Real a_theta_dt );
+    void SyncMassMatricesPC ();
     void SaveParticlesAtImplicitStepStart ();
     void FinishImplicitParticleUpdate ();
     void SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time );
@@ -241,8 +234,8 @@ public:
 
     //! Integers that correspond to the time dependency of J (constant, linear)
     //! and rho (linear, quadratic) for the PSATD algorithm
-    static inline auto J_in_time = JInTime::Default;
-    static inline auto rho_in_time = RhoInTime::Default;
+    static inline auto time_dependency_J = TimeDependencyJ::Default;
+    static inline auto time_dependency_rho = TimeDependencyRho::Default;
 
     //! If true, the current is deposited on a nodal grid and then centered onto a staggered grid
     //! using finite centering of order given by #current_centering_nox, #current_centering_noy,
@@ -290,6 +283,9 @@ public:
     static int noy;
     //! Order of the particle shape factors (splines) along z
     static int noz;
+
+    //! Maximum number of allowed grid crossings for particles
+    static int particle_max_grid_crossings;
 
     //! Order of finite centering of fields (from staggered grid to nodal grid), along x
     static int field_centering_nox;
@@ -350,8 +346,10 @@ public:
     static utils::parser::IntervalsParser sort_intervals;
     static amrex::IntVect sort_bin_size;
 
-    static bool do_multi_J;
-    static int do_multi_J_n_depositions;
+    //! If true, particles will be sorted in the order x -> y -> z -> ppc for faster deposition
+    static bool sort_particles_for_deposition;
+    //! Specifies the type of grid used for the above sorting, i.e. cell-centered, nodal, or mixed
+    static amrex::IntVect sort_idx_type;
 
     //! With mesh refinement, particles located inside a refinement patch, but within
     //! #n_field_gather_buffer cells of the edge of the patch, will gather the fields
@@ -450,9 +448,6 @@ public:
     /** Print main PIC parameters to stdout */
     void PrintMainPICparameters ();
 
-    /** Write a file that record all inputs: inputs file + command line options */
-    void WriteUsedInputsFile () const;
-
     /**
      * \brief
      * Compute the last time step of the simulation
@@ -513,7 +508,15 @@ public:
      * deposits the initial ion charge and current (before the first particle
      * push), to be used in the ``HybridPICEvolveFields()`` function.
      */
-    void HybridPICDepositInitialRhoAndJ ();
+    void HybridPICInitializeRhoJandB ();
+
+    /**
+     * \brief Hybrid-PIC deposition function.
+     * Helper function to contain all the needed logic to deposit charge and
+     * current densities for use in the Ohm's law solver. The deposition is
+     * done into the ``rho_fp`` and ``current_fp`` multifabs.
+     */
+    void HybridPICDepositRhoAndJ ();
 
     /** apply QED correction on electric field
      *
@@ -585,7 +588,7 @@ public:
      */
     void DampFieldsInGuards (int lev, amrex::MultiFab* mf);
 
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     void ApplyInverseVolumeScalingToCurrentDensity(amrex::MultiFab* Jx,
                                                    amrex::MultiFab* Jy,
                                                    amrex::MultiFab* Jz,
@@ -615,7 +618,7 @@ public:
     void ApplyEfieldBoundary (int lev, PatchType patch_type, amrex::Real cur_time);
     void ApplyBfieldBoundary (int lev, PatchType patch_type, DtType dt_type, amrex::Real cur_time);
 
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     // Applies the boundary conditions that are specific to the axis when in RZ.
     void ApplyFieldBoundaryOnAxis (amrex::MultiFab* Er, amrex::MultiFab* Et, amrex::MultiFab* Ez, int lev) const;
 #endif
@@ -727,7 +730,7 @@ public:
     [[nodiscard]] amrex::Real getdt (int lev) const {return dt.at(lev);}
     [[nodiscard]] int getdo_moving_window() const {return do_moving_window;}
     [[nodiscard]] amrex::Real getmoving_window_x() const {return moving_window_x;}
-    [[nodiscard]] bool getis_synchronized() const {return is_synchronized;}
+    [[nodiscard]] bool getis_synchronized() const {return m_is_synchronized;}
 
     [[nodiscard]] int maxStep () const {return max_step;}
     void updateMaxStep (const int new_max_step) {max_step = new_max_step;}
@@ -839,7 +842,7 @@ public:
      * on the staggered yee-grid or cell-centered grid, in the interior cells
      * and guard cells.
      *
-     * \param[in] field FieldType to grab from register to write into
+     * \param[in] field FieldType or string containing field name to grab from register to write into
      * \param[in] fx_parser parser function to initialize x-field
      * \param[in] fy_parser parser function to initialize y-field
      * \param[in] fz_parser parser function to initialize z-field
@@ -849,59 +852,13 @@ public:
      * \param[in] use_eb_flags (default:true) flag indicating if eb points should be excluded or not
      */
     void ComputeExternalFieldOnGridUsingParser (
-        warpx::fields::FieldType field,
+        const std::variant<warpx::fields::FieldType, std::string>& field,
         amrex::ParserExecutor<4> const& fx_parser,
         amrex::ParserExecutor<4> const& fy_parser,
         amrex::ParserExecutor<4> const& fz_parser,
         int lev, PatchType patch_type,
         amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field,
-        bool use_eb_flags);
-
-    void ComputeExternalFieldOnGridUsingParser (
-        warpx::fields::FieldType field,
-        amrex::ParserExecutor<4> const& fx_parser,
-        amrex::ParserExecutor<4> const& fy_parser,
-        amrex::ParserExecutor<4> const& fz_parser,
-        int lev, PatchType patch_type,
-        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field);
-
-     /**
-     * \brief
-     * This function computes the E, B, and J fields on each level
-     * using the parser and the user-defined function for the external fields.
-     * The subroutine will parse the x_/y_z_external_grid_function and
-     * then, the field multifab is initialized based on the (x,y,z) position
-     * on the staggered yee-grid or cell-centered grid, in the interior cells
-     * and guard cells.
-     *
-     * \param[in] field string containing field name to grab from register
-     * \param[in] fx_parser parser function to initialize x-field
-     * \param[in] fy_parser parser function to initialize y-field
-     * \param[in] fz_parser parser function to initialize z-field
-     * \param[in] edge_lengths edge lengths information
-     * \param[in] face_areas face areas information
-     * \param[in] topology flag indicating if field is edge-based or face-based
-     * \param[in] lev level of the Multifabs that is initialized
-     * \param[in] patch_type PatchType on which the field is initialized (fine or coarse)
-     * \param[in] eb_update_field flag indicating which gridpoints should be modified by this functions
-     * \param[in] use_eb_flags (default:true) flag indicating if eb points should be excluded or not
-     */
-    void ComputeExternalFieldOnGridUsingParser (
-        std::string const& field,
-        amrex::ParserExecutor<4> const& fx_parser,
-        amrex::ParserExecutor<4> const& fy_parser,
-        amrex::ParserExecutor<4> const& fz_parser,
-        int lev, PatchType patch_type,
-        amrex::Vector< std::array< std::unique_ptr<amrex::iMultiFab>,3> > const& eb_update_field,
-        bool use_eb_flags);
-
-    void ComputeExternalFieldOnGridUsingParser (
-        std::string const& field,
-        amrex::ParserExecutor<4> const& fx_parser,
-        amrex::ParserExecutor<4> const& fy_parser,
-        amrex::ParserExecutor<4> const& fz_parser,
-        int lev, PatchType patch_type,
-        amrex::Vector< std::array< std::unique_ptr<amrex::iMultiFab>,3> > const& eb_update_field);
+        bool use_eb_flags = true);
 
     /**
      * \brief Load field values from a user-specified openPMD file,
@@ -936,6 +893,15 @@ public:
 
     void ApplyFilterandSumBoundaryRho (int lev, int glev, amrex::MultiFab& rho, int icomp, int ncomp);
 
+    void ApplyFilterMF (
+        const ablastr::fields::MultiLevelVectorField& mfvec,
+        int lev,
+        int idim);
+
+    void ApplyFilterMF (
+        const ablastr::fields::MultiLevelVectorField& mfvec,
+        int lev);
+
     // Device vectors of stencil coefficients used for finite-order centering of fields
     amrex::Gpu::DeviceVector<amrex::Real> device_field_centering_stencil_coeffs_x;
     amrex::Gpu::DeviceVector<amrex::Real> device_field_centering_stencil_coeffs_y;
@@ -969,10 +935,6 @@ public:
     */
     void ComputeDistanceToEB ();
     /**
-    * \brief Auxiliary function to count the amount of faces which still need to be extended
-    */
-    amrex::Array1D<int, 0, 2> CountExtFaces();
-    /**
     * \brief Main function computing the cell extension. Where possible it computes one-way
     *       extensions and, when this is not possible, it does eight-ways extensions.
     */
@@ -993,15 +955,6 @@ public:
     * \brief Do the eight-ways extension
     */
     void ComputeEightWaysExtensions();
-    /**
-    * \brief Whenever an unstable cell cannot be extended we increase its area to be the minimal for stability.
-    *        This is the method Benkler-Chavannes-Kuster method and it is less accurate than the regular ECT but it
-    *        still works better than staircasing. (see https://ieeexplore.ieee.org/document/1638381)
-    *
-    * @param idim Integer indicating the dimension (x->0, y->1, z->2) for which the BCK correction is done
-    *
-    */
-    void ApplyBCKCorrection(int idim);
 
 #ifdef WARPX_USE_FFT
     auto&  get_spectral_solver_fp (int lev) {return *spectral_solver_fp[lev];}
@@ -1011,6 +964,11 @@ public:
 
     // Field container
     ablastr::fields::MultiFabRegister m_fields;
+    ablastr::fields::MultiFabRegister& GetMultiFabRegister() {return m_fields;}
+
+    //! Use this function to override the Level 0 grids made by AMReX.
+    //! This function is called in amrex::AmrCore::InitFromScratch.
+    void PostProcessBaseGrids (amrex::BoxArray& ba0) const final;
 
 protected:
 
@@ -1040,10 +998,6 @@ protected:
      *  can be used in the function used to define the E and B fields on the grid.
      */
     void InitLevelData (int lev, amrex::Real time);
-
-    //! Use this function to override the Level 0 grids made by AMReX.
-    //! This function is called in amrex::AmrCore::InitFromScratch.
-    void PostProcessBaseGrids (amrex::BoxArray& ba0) const final;
 
     //! Use this function to override how DistributionMapping is made.
     [[nodiscard]] amrex::DistributionMapping
@@ -1108,7 +1062,7 @@ private:
     /**
      * \brief Perform one PIC iteration, with the multiple J deposition per time step
      */
-    void OneStep_multiJ (amrex::Real cur_time);
+    void OneStep_JRhom (amrex::Real cur_time);
 
     void RestrictCurrentFromFineToCoarsePatch (
         const ablastr::fields::MultiLevelVectorField& J_fp,
@@ -1118,15 +1072,6 @@ private:
         const ablastr::fields::MultiLevelVectorField& J_fp,
         const ablastr::fields::MultiLevelVectorField& J_cp,
         const ablastr::fields::MultiLevelVectorField& J_buffer,
-        int lev);
-    void StoreCurrent (int lev);
-    void RestoreCurrent (int lev);
-    void ApplyFilterMF (
-        const ablastr::fields::MultiLevelVectorField& mfvec,
-        int lev,
-        int idim);
-    void ApplyFilterMF (
-        const ablastr::fields::MultiLevelVectorField& mfvec,
         int lev);
     void SumBoundaryJ (
         const ablastr::fields::MultiLevelVectorField& current,
@@ -1185,11 +1130,6 @@ private:
      * for all available MultiFabs, and abort otherwise.
      */
     void CheckGuardCells();
-
-    /**
-     * \brief Checks for known numerical issues involving different WarpX modules
-     */
-    void CheckKnownIssues();
 
     void BuildBufferMasks ();
 
@@ -1401,6 +1341,7 @@ private:
 
     // Other runtime parameters
     int verbose = 1;
+    bool m_limit_verbose_step = false;
 
     bool use_hybrid_QED = false;
 
@@ -1437,7 +1378,7 @@ private:
     //! User-defined parser to define refinement patches
     std::unique_ptr<amrex::Parser> ref_patch_parser;
 
-    bool is_synchronized = true;
+    bool m_is_synchronized = true;
 
     // Synchronization of nodal points
     static constexpr bool sync_nodal_points = true;
@@ -1469,7 +1410,7 @@ private:
 
     //! Solve Poisson equation when loading an external magnetic field to clean divergence
     //! This is useful to remove errors that could lead to non-zero B field divergence
-    bool m_do_divb_cleaning_external = false;
+    bool m_do_initial_div_cleaning = false;
 
     //! Domain decomposition on Level 0
     amrex::IntVect numprocs{0};
@@ -1606,6 +1547,16 @@ private:
     void PSATDMoveJNewToJOld ();
 
     /**
+     * \brief Copy rho_new to rho_mid in spectral space (when rho is quadratic in time)
+     */
+    void PSATDMoveRhoNewToRhoMid ();
+
+    /**
+     * \brief Copy J_new to J_mid in spectral space (when J is quadratic in time)
+     */
+    void PSATDMoveJNewToJMid ();
+
+    /**
      * \brief Forward FFT of F on all mesh refinement levels
      */
     void PSATDForwardTransformF ();
@@ -1657,6 +1608,10 @@ private:
 
     // implicit solver object
     std::unique_ptr<ImplicitSolver> m_implicit_solver;
+
+    //! PSATD JRhom algorithm
+    bool m_JRhom = false;
+    int m_JRhom_subintervals;
 
 };
 

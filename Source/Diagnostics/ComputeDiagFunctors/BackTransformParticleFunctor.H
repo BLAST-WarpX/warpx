@@ -116,12 +116,9 @@ struct LorentzTransformParticles
                                         + m_uypold[i_src] * m_uypold[i_src]
                                         + m_uzpold[i_src] * m_uzpold[i_src]));
         const amrex::Real t_new_p = m_gammaboost * m_t_boost - m_uzfrm * zpnew * m_inv_c2;
-        const amrex::Real z_new_p = m_gammaboost* ( zpnew + m_betaboost * m_Phys_c * m_t_boost);
         const amrex::Real uz_new_p = m_gammaboost * m_uzpnew[i_src] - gamma_new_p * m_uzfrm;
         const amrex::Real t_old_p = m_gammaboost * (m_t_boost - m_dt)
                                     - m_uzfrm * m_zpold[i_src] * m_inv_c2;
-        const amrex::Real z_old_p = m_gammaboost * ( m_zpold[i_src] + m_betaboost
-                                                     * m_Phys_c * (m_t_boost - m_dt ) );
         const amrex::Real uz_old_p = m_gammaboost * m_uzpold[i_src] - gamma_old_p * m_uzfrm;
         // interpolate in time to t_lab
         const amrex::Real weight_old = (t_new_p - m_t_lab)
@@ -129,13 +126,18 @@ struct LorentzTransformParticles
         const amrex::Real weight_new = (m_t_lab - t_old_p)
                                      / (t_new_p - t_old_p);
         // weighted sum of old and new values
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
         const amrex::ParticleReal xp = m_xpold[i_src] * weight_old + xpnew * weight_new;
 #endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         const amrex::ParticleReal yp = m_ypold[i_src] * weight_old + ypnew * weight_new;
 #endif
+#if !defined(WARPX_DIM_RCYLINDER)
+        const amrex::Real z_new_p = m_gammaboost* ( zpnew + m_betaboost * m_Phys_c * m_t_boost);
+        const amrex::Real z_old_p = m_gammaboost * ( m_zpold[i_src] + m_betaboost
+                                                     * m_Phys_c * (m_t_boost - m_dt ) );
         const amrex::ParticleReal zp = z_old_p * weight_old + z_new_p * weight_new;
+#endif
         const amrex::ParticleReal uxp = m_uxpold[i_src] * weight_old
                                       + m_uxpnew[i_src] * weight_new;
         const amrex::ParticleReal uyp = m_uypold[i_src] * weight_old
@@ -150,6 +152,14 @@ struct LorentzTransformParticles
         dst.m_rdata[PIdx::x][i_dst] = std::sqrt(xp*xp + yp*yp);
         dst.m_rdata[PIdx::z][i_dst] = zp;
         dst.m_rdata[PIdx::theta][i_dst] = std::atan2(yp, xp);
+#elif defined(WARPX_DIM_RCYLINDER)
+        dst.m_rdata[PIdx::x][i_dst] = std::sqrt(xp*xp + yp*yp);
+        dst.m_rdata[PIdx::theta][i_dst] = std::atan2(yp, xp);
+#elif defined(WARPX_DIM_RSPHERE)
+        amrex::ParticleReal const rpxy = std::sqrt(xp*xp + yp*yp);
+        dst.m_rdata[PIdx::x][i_dst] = std::sqrt(xp*xp + yp*yp + zp*zp);
+        dst.m_rdata[PIdx::theta][i_dst] = std::atan2(yp, xp);
+        dst.m_rdata[PIdx::phi][i_dst] = std::atan2(rpxy, zp);
 #elif defined (WARPX_DIM_XZ)
         dst.m_rdata[PIdx::x][i_dst] = xp;
         dst.m_rdata[PIdx::z][i_dst] = zp;
