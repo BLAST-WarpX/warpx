@@ -31,18 +31,6 @@ void ImplicitSolver::CreateParticleAttributes () const
     }
 }
 
-void ImplicitSolver::DoCollisions (
-    int step,
-    amrex::Real cur_time,
-    amrex::Real dt
-) const
-{
-    // multi-physics: collisions
-    ExecutePythonCallback("beforecollisions");
-    m_WarpX->GetPartContainer().doCollisions(step, cur_time, dt);
-    ExecutePythonCallback("aftercollisions");
-}
-
 const Geometry& ImplicitSolver::GetGeometry (const int a_lvl) const
 {
     AMREX_ASSERT((a_lvl >= 0) && (a_lvl < m_num_amr_levels));

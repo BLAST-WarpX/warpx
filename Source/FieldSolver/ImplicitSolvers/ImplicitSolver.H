@@ -61,15 +61,6 @@ public:
     void CreateParticleAttributes () const;
 
     /**
-     * \brief Wrapper to call MultiParticleContainer's collision method
-     */
-    void DoCollisions (
-        int step,
-        amrex::Real cur_time,
-        amrex::Real dt
-    ) const;
-
-    /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
      */
     virtual void OneStep ( amrex::Real  a_time,

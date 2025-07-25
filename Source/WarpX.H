@@ -1058,9 +1058,9 @@ private:
 
     /**
      * \brief
-     * Perform one PIC loop in the explicit formulation.
+     * Perform collisions and advance fields and particles by one time step.
     */
-    void OneStep (
+    void OneStepWithCollisions (
         amrex::Real a_cur_time,
         amrex::Real a_dt,
         int a_step

@@ -230,15 +230,8 @@ WarpX::Evolve (int numsteps)
         // defined particle distribution to be injected each time step
         ExecutePythonCallback("particleinjection");
 
-        // implicit solver
-        if (m_implicit_solver) {
-            m_implicit_solver->OneStep(cur_time, dt[0], step);
-        }
-        // explicit solver
-        else {
-            // Maybe TODO: m_explicit_solver->OneStep(cur_time, dt[0], step);
-            OneStep(cur_time, dt[0], step);
-        }
+        // perform collisions and advance fields and particles by one time step
+        OneStepWithCollisions(cur_time, dt[0], step);
 
         // Resample particles
         // +1 is necessary here because value of step seen by user (first step is 1) is different than
@@ -384,55 +377,63 @@ WarpX::Evolve (int numsteps)
         ablastr::warn_manager::GetWMInstance().PrintGlobalWarnings("THE END");
 }
 
-void WarpX::OneStep (
+void WarpX::OneStepWithCollisions (
     amrex::Real a_cur_time,
     amrex::Real a_dt,
     int a_step
 )
 {
-    WARPX_PROFILE("WarpX::OneStep()");
+    WARPX_PROFILE("WarpX::OneStepWithCollisions()");
 
     // perform collisions
     ExecutePythonCallback("beforecollisions");
     mypc->doCollisions(a_step, a_cur_time, a_dt);
     ExecutePythonCallback("aftercollisions");
 
-    // electrostatic solver or hybrid solver
-    if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
-        electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
-        // gather fields, push particles, skip deposition
-        bool const skip_deposition = true;
-        PushParticlesandDeposit(
-            a_cur_time,
-            skip_deposition
-        );
+    // implicit solver
+    if (m_implicit_solver) {
+        // advance fields and particles by one time step
+        m_implicit_solver->OneStep(a_cur_time, a_dt, a_step);
     }
-    // electromagnetic solver
+    // explicit solver
     else {
-        // without mesh refinement
-        if (finest_level == 0) {
-            // standard PIC loop
-            if (!m_JRhom) {
-                OneStep_nosub(a_cur_time);
-            }
-            // JRhom PIC loop
-            else {
-                OneStep_JRhom(a_cur_time);
-            }
+        // electrostatic solver or hybrid solver
+        if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
+            electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
+            // gather fields, push particles, skip deposition
+            bool const skip_deposition = true;
+            PushParticlesandDeposit(
+                a_cur_time,
+                skip_deposition
+            );
         }
-        // with mesh refinement
+        // electromagnetic solver
         else {
-            // without subcycling
-            if (!m_do_subcycling) {
-                OneStep_nosub(a_cur_time);
+            // without mesh refinement
+            if (finest_level == 0) {
+                // standard PIC loop
+                if (!m_JRhom) {
+                    OneStep_nosub(a_cur_time);
+                }
+                // JRhom PIC loop
+                else {
+                    OneStep_JRhom(a_cur_time);
+                }
             }
-            // with subcycling
+            // with mesh refinement
             else {
-                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                    finest_level == 1,
-                    "Subcycling not implemented with more than 1 mesh refinement level"
-                );
-                OneStep_sub1(a_cur_time);
+                // without subcycling
+                if (!m_do_subcycling) {
+                    OneStep_nosub(a_cur_time);
+                }
+                // with subcycling
+                else {
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        finest_level == 1,
+                        "Subcycling not implemented with more than 1 mesh refinement level"
+                    );
+                    OneStep_sub1(a_cur_time);
+                }
             }
         }
     }
