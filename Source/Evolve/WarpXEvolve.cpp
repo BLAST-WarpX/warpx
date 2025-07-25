@@ -1213,8 +1213,8 @@ WarpX::doQEDEvents ()
 void
 WarpX::PushParticlesandDeposit (
     amrex::Real cur_time,
-    bool const skip_current,
-    bool const deposit_mass_matrices,
+    bool skip_current,
+    bool deposit_mass_matrices,
     PushType push_type
 )
 {
@@ -1237,8 +1237,8 @@ WarpX::PushParticlesandDeposit (
     int lev,
     amrex::Real cur_time,
     DtType a_dt_type,
-    bool const skip_current,
-    bool const deposit_mass_matrices,
+    bool skip_current,
+    bool deposit_mass_matrices,
     PushType push_type
 )
 {
