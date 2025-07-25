@@ -66,71 +66,28 @@ void SingleLinearBreitWheelerCollisionEvent (const amrex::ParticleReal& u1x, con
                                        const amrex::ParticleReal& probability_target_value,
                                        const amrex::RandomEngine& engine)
 {
-    // General notations in this function:
-    //     x_sq denotes the square of x
-    //     x_star denotes the value of x in the center of mass frame
+    amrex::ParticleReal E_coll, v_coll, lab_to_COM_factor;
+
+    // By convention in WarpX, the momentum of photons is normalized by m_e
+    // i.e. `p = m_e u`.
+    constexpr amrex::ParticleReal me = PhysConst::m_e;
+    BinaryCollisionUtils::get_collision_parameters(
+        me*u1x, me*u1y, me*u1z, me*u2x, me*u2y, me*u2z, 0, 0,
+        E_coll, v_coll, lab_to_COM_factor);
 
     using namespace amrex::literals;
 
     const amrex::ParticleReal w_min = amrex::min(w1, w2);
     const amrex::ParticleReal w_max = amrex::max(w1, w2);
 
-    constexpr auto one_pr = amrex::ParticleReal(1.);
-    constexpr auto two_pr = amrex::ParticleReal(2.);
-    constexpr auto one_half_pr = amrex::ParticleReal(1./2.);
-    constexpr amrex::ParticleReal c = PhysConst::c;
-    constexpr amrex::ParticleReal c_sq = c*c;
-    constexpr amrex::ParticleReal me = PhysConst::m_e;
-    auto constexpr pow2 = [](double const x) { return x*x; };
-
-    // Compute momenta in the lab frame
-    const amrex::ParticleReal p1x = u1x * me;
-    const amrex::ParticleReal p1y = u1y * me;
-    const amrex::ParticleReal p1z = u1z * me;
-    const amrex::ParticleReal p2x = u2x * me;
-    const amrex::ParticleReal p2y = u2y * me;
-    const amrex::ParticleReal p2z = u2z * me;
-    const amrex::ParticleReal p1 = std::sqrt(pow2(p1x)+pow2(p1y)+pow2(p1z));
-    const amrex::ParticleReal p2 = std::sqrt(pow2(p2x)+pow2(p2y)+pow2(p2z));
-
-    // Compute Lorentz factor gamma in the lab frame
-    const amrex::ParticleReal g1 = p1 / ( me * c );
-    const amrex::ParticleReal g2 = p2 / ( me * c );
-
-    // Compute the cosine of the angle between the two photon momenta in the lab frame
-    const amrex::ParticleReal cos_ang = (p1x*p2x+p1y*p2y+p1z*p2z)/(p1*p2);
-
-    // Energy squared of each and every particle involved in the collision
-    // (both colliding photons and the produced electron and positron)
-    // in the center of momentum frame (they are all equal),
-    // calculated using the Lorentz invariance of the total four-momentum norm
-    const amrex::ParticleReal E_star_sq = one_half_pr*c_sq*p1*p2*(one_pr - cos_ang);
-
-    // Kinetic energy of each particle in the center of momentum frame
-    const amrex::ParticleReal E_star = std::sqrt(E_star_sq);
-
     // Compute linear Breit Wheeler cross section as a function of the kinetic energy
     // in the center of momentum frame
     auto lbw_cross_section = amrex::ParticleReal(0.);
-    lbw_cross_section = LinearBreitWheelerCrossSection(E_star);
-
-    // Lorentz factors in the center of momentum frame
-    const amrex::ParticleReal g1_star = E_star / (me*c_sq);
-    const amrex::ParticleReal g2_star = g1_star;
-
-    // relative velocity in the center of momentum frame
-    const amrex::ParticleReal v_rel = two_pr*c;
-
-    // Cross section and relative velocity are computed in the center of momentum frame.
-    // On the other hand, the particle densities (weight over volume) in the lab frame are used. To
-    // take into account this discrepancy, we need to multiply the collision probability by the ratio
-    // between the Lorentz factors in the COM frame and the Lorentz factors in the lab frame
-    // (see Perez et al., Phys.Plasmas.19.083104 (2012))
-    const amrex::ParticleReal lab_to_COM_factor = g1_star*g2_star/(g1*g2);
+    lbw_cross_section = LinearBreitWheelerCrossSection(E_coll/2);
 
     // First estimate of probability to produce an electron-positron pair
     amrex::ParticleReal probability_estimate = multiplier_ratio * event_multiplier *
-                                lab_to_COM_factor * w_max * lbw_cross_section * v_rel * dt / dV;
+                                lab_to_COM_factor * w_max * lbw_cross_section * v_coll * dt / dV;
 
     // Effective event multiplier
     amrex::ParticleReal event_multiplier_eff = event_multiplier;
@@ -143,7 +100,7 @@ void SingleLinearBreitWheelerCollisionEvent (const amrex::ParticleReal& u1x, con
         // We aim for a pair-production probability of probability_target_value but take into account
         // the constraint that the event_multiplier cannot be smaller than one
         event_multiplier_eff  = amrex::max(event_multiplier *
-                                         probability_target_value / probability_estimate , one_pr);
+                                         probability_target_value / probability_estimate , 1._prt);
         probability_estimate *= event_multiplier_eff/event_multiplier;
     }
 
@@ -152,10 +109,6 @@ void SingleLinearBreitWheelerCollisionEvent (const amrex::ParticleReal& u1x, con
     // However, the computation of this quantity can fail numerically when probability_estimate is
     // too small (e.g. exp(-probability_estimate) returns 1 and the computation returns 0).
     // In this case, we simply use "probability_estimate" instead of 1 - exp(-probability_estimate)
-    // The threshold exp_threshold at which we switch between the two formulas is determined by the
-    // fact that computing the exponential is only useful if it can resolve the x^2/2 term of its
-    // Taylor expansion, i.e. the square of probability_estimate should be greater than the
-    // machine epsilon.
     const amrex::ParticleReal probability = -std::expm1(-probability_estimate);
 
     // Get a random number

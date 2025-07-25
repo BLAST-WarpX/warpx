@@ -132,12 +132,13 @@ This example accesses the :math:`E_x(x,y,z)` field at level 0 after every time s
    @callfromafterstep
    def set_E_x():
        warpx = sim.extension.warpx
+       multifab_register = warpx.multifab_register()
 
        # data access
        #   vector field E, component x, on the fine patch of MR level 0
-       E_x_mf = warpx.multifab("Efield_fp", dir=0, level=0)
+       E_x_mf = multifab_register.get("Efield_fp", dir=0, level=0)
        #   scalar field rho, on the fine patch of MR level 0
-       rho_mf = warpx.multifab("rho_fp", level=0)
+       rho_mf = multifab_register.get("rho_fp", level=0)
 
        # compute on E_x_mf
        # iterate over mesh-refinement levels
@@ -170,19 +171,74 @@ This example accesses the :math:`E_x(x,y,z)` field at level 0 after every time s
 
 For further details on how to `access GPU data <https://pyamrex.readthedocs.io/en/latest/usage/zerocopy.html>`__ or compute on ``E_x``, please see the `pyAMReX documentation <https://pyamrex.readthedocs.io/en/latest/usage/compute.html#fields>`__.
 
+A warning is that it is recommended that the reference to the MultiFab returned by multifab_register.get should not be saved across time steps. If there is load balancing, the MultiFabs will be regenerated and that reference will become invalid.
 
 High-Level Field Wrapper
-""""""""""""""""""""""""
+^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. note::
+The ``fields`` module provides wrappers around the MultiFabs that are defined in the WarpX class, those that are added to the MultiFab registry.
+For a list of all of the available wrappers, see the file ``Python/pywarpx/fields.py``.
+For each MultiFab, there is a function that will return a wrapper around the data.
+The wrappers provide a convenient interface to the MultiFabs, which have the advantage that they can be used when load balancing is done.
+For example, the function ``ExWrapper`` returns a wrapper around the ``x`` component of the MultiFab vector ``Efield_aux`` at level 0.
 
-   TODO
+.. code-block:: python
 
-.. note::
+   from pywarpx import fields
+   Ex = fields.ExWrapper(level=0)
 
-   TODO: What are the benefits of using the high-level wrapper?
-   TODO: What are the limitations (e.g., in memory usage or compute scalability) of using the high-level wrapper?
+The wrapper provides access to the data via global indexing.
+Using standard array indexing with square brackets, the data can be accessed using indices that are relative to the full domain (across the MultiFab and across processors).
+When the data is fetched the result is a numpy array that contains a copy of the data, and when using multiple processors is broadcast to all processors (and is a global operation).
+For indices within the domain, values from valid cells are always returned.
+The ghost cells at the exterior of the domain are accessed using imaginary numbers, with negative values accessing the lower ghost cells, and positive the upper ghost cells.
+This example will return the ``Bz`` field at all valid interior points along ``x`` at the specified ``y`` and ``z`` indices.
 
+.. code-block:: python
+
+   from pywarpx import fields
+   Bz = fields.BzWrapper()
+   Bz_along_x = Bz[:,5,6]
+
+The same global indexing can be done to set values. This example will set the values over a range in ``y`` and ``z`` at the
+specified ``x``. The data will be scattered appropriately to the underlying FABs. The set is a local operation.
+
+.. code-block:: python
+
+   from pywarpx import fields
+   Jy = fields.JyFPWrapper()
+   Jy[5,6:20,8:30] = 7.
+
+In this example, seven is added to all of the values along ``x``, including both valid and ghost cells (specified by using the empty tuple, ``()``), the first ghost cell at the lower boundary in ``y``, and the last valid cell and first upper ghost cell in ``z``.
+Note that the ``+=`` will be a global operation.
+
+.. code-block:: python
+
+   from pywarpx import fields
+   Jx = fields.JxFPWrapper()
+   Jx[(),-1j,-1:2j] += 7.
+
+To fetch the data from all of the valid cells of all dimensions, the ellipsis can be used, ``Jx[...]``.
+Similarly, to fetch all of the data including valid cells and ghost cells, use an empty tuple, ``Jx[()]``.
+The code does error checking to ensure that the specified indices are within the bounds of the global domain.
+
+The wrapper allows new MultiFabs to be created at the Python level and added to the registry.
+In this example, a new MultiFab is added with the same properties as `Ex`.
+
+.. code-block:: python
+
+   from pywarpx import fields
+   Ex = fields.ExWrapper()
+   normalized_Ex = fields.MultiFabWrapper(create_new=True,
+                                          mf_name="normalized_Ex",
+                                          idir=0,
+                                          ba=Ex.box_array(),
+                                          ngrow=Ex.n_grow_vect)
+
+Under the covers, the wrapper object is using the Python wrapper of a MultiFab, relying on its global array indexing capability.
+The wrappers are always up to date since whenever an access is done (either a get or a set), the wrapper fetches the underlying MultiFab object.
+
+Through the wrapper, all of the operations available on the underlying MultiFab can be done. For example, to find the max value, use ``Jx.max()``, and to multiply the data by a factor, ``Jx.mult(2.)``.
 
 Particles
 ^^^^^^^^^
@@ -241,7 +297,7 @@ For further details on how to `access GPU data <https://pyamrex.readthedocs.io/e
 
 
 High-Level Particle Wrapper
-"""""""""""""""""""""""""""
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. note::
 

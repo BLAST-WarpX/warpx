@@ -12,7 +12,7 @@
 import numpy as np
 
 newton_solver = np.loadtxt("diags/reduced_files/newton_solver.txt", skiprows=1)
-gmres_iters = newton_solver[:, 5]
+gmres_iters = newton_solver[:, 6]
 
 field_energy = np.loadtxt("diags/reduced_files/field_energy.txt", skiprows=1)
 particle_energy = np.loadtxt("diags/reduced_files/particle_energy.txt", skiprows=1)

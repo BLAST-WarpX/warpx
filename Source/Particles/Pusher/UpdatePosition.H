@@ -35,13 +35,16 @@ void UpdatePosition([[maybe_unused]] amrex::ParticleReal& x,
     // Compute inverse Lorentz factor
     const amrex::ParticleReal inv_gamma = 1._prt/std::sqrt(1._prt + (ux*ux + uy*uy + uz*uz)*inv_c2);
     // Update positions over one time step
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
     x += ux * inv_gamma * dt;
 #endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) // RZ pushes particles in 3D
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    // Radial pushes particles in 3D
     y += uy * inv_gamma * dt;
 #endif
+#if !defined(WARPX_DIM_RCYLINDER)
     z += uz * inv_gamma * dt;
+#endif
 }
 
 /** \brief Push the particle's positions over one timestep,
@@ -72,13 +75,16 @@ void UpdatePositionImplicit ([[maybe_unused]] amrex::ParticleReal& x,
     const amrex::ParticleReal inv_gamma = 2.0_prt/(gamma_n + gamma_np1);
 
     // Update positions over one time step
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
     x += ux * inv_gamma * dt;
 #endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) // RZ pushes particles in 3D
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    // Radial pushes particles in 3D
     y += uy * inv_gamma * dt;
 #endif
+#if !defined(WARPX_DIM_RCYLINDER)
     z += uz * inv_gamma * dt;
+#endif
 }
 
 /** \brief Check particle position for convergence. This is used by the theta-implicit
@@ -101,22 +107,28 @@ void PositionNorm ([[maybe_unused]] amrex::ParticleReal dxp,
 
     if (iter==0) { step_norm = 1.0_prt; }
     else {
+#if !defined(WARPX_DIM_RCYLINDER)
         step_norm = (dzp - dzp_save)*(dzp - dzp_save)*idzg2;
+#else
+        step_norm = 0._prt;
+#endif
 #if !defined(WARPX_DIM_1D_Z)
         step_norm += (dxp - dxp_save)*(dxp - dxp_save)*idxg2;
 #endif
 #if defined(WARPX_DIM_3D)
         step_norm += (dyp - dyp_save)*(dyp - dyp_save)*idyg2;
-#elif defined(WARPX_DIM_RZ)
+#elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         step_norm += (dyp - dyp_save)*(dyp - dyp_save)*idxg2;
 #endif
         step_norm = std::sqrt(step_norm);
     }
+#if !defined(WARPX_DIM_RCYLINDER)
     dzp_save = dzp;
+#endif
 #if !defined(WARPX_DIM_1D_Z)
     dxp_save = dxp;
 #endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     dyp_save = dyp;
 #endif
 

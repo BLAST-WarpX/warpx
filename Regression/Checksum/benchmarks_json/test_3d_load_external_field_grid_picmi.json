@@ -11,9 +11,9 @@
     "jz": 0.0
   },
   "proton": {
-    "particle_momentum_x": 1.2118959018435722e-23,
-    "particle_momentum_y": 7.822512514550813e-23,
-    "particle_momentum_z": 2.2761898475893665e-23,
+    "particle_momentum_x": 1.8873824254616765e-23,
+    "particle_momentum_y": 7.693704954620495e-23,
+    "particle_momentum_z": 2.255244020230331e-23,
     "particle_position_x": 0.122380722759106,
     "particle_position_y": 0.009653949671674482,
     "particle_position_z": 4.317544766532689,

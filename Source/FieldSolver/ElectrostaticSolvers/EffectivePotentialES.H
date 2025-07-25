@@ -42,6 +42,12 @@ public:
         ablastr::fields::MultiLevelScalarField const& phi
     ) const;
 
+    void computePhi (
+        ablastr::fields::MultiLevelScalarField const& rho,
+        ablastr::fields::MultiLevelScalarField const& phi,
+        ablastr::fields::MultiLevelVectorField const& efield
+    ) const;
+
     /**
      * Compute the potential `phi` by solving the semi-implicit Poisson equation using the Effective Potential method
      * with `rho` as the source.
@@ -51,6 +57,7 @@ public:
      *  \f]
      * \param[in] rho The total charge density
      * \param[out] phi The potential to be computed by this function
+     * \param[out] efield The electric field corresponding to the calculated phi (only used with embedded boundaries)
      * \param[in] sigma Represents the modified dielectric
      * \param[in] required_precision The relative convergence threshold for the MLMG solver
      * \param[in] absolute_tolerance The absolute convergence threshold for the MLMG solver
@@ -60,13 +67,13 @@ public:
     void computePhi (
         ablastr::fields::MultiLevelScalarField const& rho,
         ablastr::fields::MultiLevelScalarField const& phi,
+        ablastr::fields::MultiLevelVectorField const& efield,
         amrex::MultiFab const& sigma,
         amrex::Real required_precision,
         amrex::Real absolute_tolerance,
         int max_iters,
         int verbosity
     ) const;
-
 };
 
 #endif // WARPX_EFFECTIVEPOTENTIALES_H_

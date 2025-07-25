@@ -68,8 +68,11 @@ Diagnostics::BaseReadParameters ()
     // Query list of grid fields to write to output
     const bool varnames_specified = pp_diag_name.queryarr("fields_to_plot", m_varnames_fields);
     if (!varnames_specified){
-        if( dims == "RZ" ) {
+        if( dims == "RZ" || dims == "RCYLINDER") {
             m_varnames_fields = {"Er", "Et", "Ez", "Br", "Bt", "Bz", "jr", "jt", "jz"};
+        }
+        else if( dims == "RSPHERE") {
+            m_varnames_fields = {"Er", "Et", "Ep", "Br", "Bt", "Bp", "jr", "jt", "jp"};
         }
         else {
             m_varnames_fields = {"Ex", "Ey", "Ez", "Bx", "By", "Bz", "jx", "jy", "jz"};
@@ -308,6 +311,28 @@ Diagnostics::BaseReadParameters ()
                 + ".fields_to_plot does not match any species"
             );
         }
+
+        // Check if m_varnames contains a string of the form T_<species_name>
+        if (var.rfind("Tx_", 0) == 0 || var.rfind("Ty_", 0) == 0 || var.rfind("Tz_", 0) == 0) {
+            // Extract species name from the string T_<species_name>
+            const std::string species = var.substr(var.find("T") + 3);
+            // Boolean used to check if species name was misspelled
+            bool species_name_is_wrong = true;
+            // Loop over all species
+            for (int i = 0, n = int(m_all_species_names.size()); i < n; i++) {
+                // Check if species name extracted from the string T_<species_name>
+                // matches any of the species in the simulation
+                if (species == m_all_species_names[i]) {
+                    species_name_is_wrong = false;
+                }
+            }
+            // If species name was misspelled, abort with error message
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !species_name_is_wrong,
+                "Input error: string " + var + " in " + m_diag_name
+                + ".fields_to_plot does not match any species"
+            );
+        }
     }
 
     const bool checkpoint_compatibility = (
@@ -499,7 +524,10 @@ Diagnostics::InitBaseData ()
     // current moving_window location
     if (WarpX::do_moving_window) {
         const int moving_dir = WarpX::moving_window_dir;
-        const int shift_num_base = static_cast<int>((warpx.getmoving_window_x() - m_lo[moving_dir]) / warpx.Geom(0).CellSize(moving_dir) );
+        const amrex::Real displacement =
+            warpx.getmoving_window_x() - warpx.Geom(0).ProbLo(moving_dir);
+        const int shift_num_base = static_cast<int>
+            (displacement / warpx.Geom(0).CellSize(moving_dir));
         m_lo[moving_dir] += shift_num_base * warpx.Geom(0).CellSize(moving_dir);
         m_hi[moving_dir] += shift_num_base * warpx.Geom(0).CellSize(moving_dir);
     }

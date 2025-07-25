@@ -3,9 +3,9 @@
     "phi": 0.001516261624941828
   },
   "electrons": {
-    "particle_momentum_x": 7.751654452209936e-26,
+    "particle_momentum_x": 7.751660664078511e-26,
     "particle_momentum_y": 6.938526607259151e-26,
-    "particle_momentum_z": 6.572520047836908e-26,
+    "particle_momentum_z": 6.572519504193923e-26,
     "particle_newPid": 500.0,
     "particle_position_x": 1.4999588764815643,
     "particle_position_y": 1.4999551809411737,

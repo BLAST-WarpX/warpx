@@ -69,7 +69,7 @@ For example, this builds WarpX in all geometries, enables Python bindings and Nv
 
 .. code-block:: bash
 
-   cmake -S . -B build -DWarpX_DIMS="1;2;RZ;3" -DWarpX_COMPUTE=CUDA
+   cmake -S . -B build -DWarpX_DIMS="1;2;3;RZ;RCYLINDER;RSPHERE" -DWarpX_COMPUTE=CUDA
 
 
 .. _building-cmake-options:
@@ -87,8 +87,8 @@ CMake Option                  Default & Values                             Descr
 ``WarpX_ASCENT``              ON/**OFF**                                   Ascent in situ visualization
 ``WarpX_CATALYST``            ON/**OFF**                                   Catalyst in situ visualization
 ``WarpX_COMPUTE``             NOACC/**OMP**/CUDA/SYCL/HIP                  On-node, accelerated computing backend
-``WarpX_DIMS``                **3**/2/1/RZ                                 Simulation dimensionality. Use ``"1;2;RZ;3"`` for all.
-``WarpX_EB``                  **ON**/OFF                                   Embedded boundary support (not supported in RZ yet)
+``WarpX_DIMS``                **3**/2/1/RZ/RCYLINDER/RSPHERE               Simulation dimensionality. Use ``"1;2;3;RZ;RCYLINDER;RSPHERE"`` for all.
+``WarpX_EB``                  **ON**/OFF                                   Embedded boundary support (not supported in RZ, RCYLINDER, and RSPHERE  yet)
 ``WarpX_IPO``                 ON/**OFF**                                   Compile WarpX with interprocedural optimization (aka LTO)
 ``WarpX_LIB``                 ON/**OFF**                                   Build WarpX as a library, e.g., for PICMI Python
 ``WarpX_MPI``                 **ON**/OFF                                   Multi-node support (message-passing)
@@ -204,7 +204,7 @@ Run
 ---
 
 An executable WarpX binary with the current compile-time options encoded in its file name will be created in ``build/bin/``.
-Note that you need separate binaries to run 1D, 2D, 3D, and RZ geometry inputs scripts.
+Note that you need separate binaries to run 1D, 2D, 3D, RZ, RCYLINDER, RSPHERE geometry inputs scripts.
 Additionally, a `symbolic link <https://en.wikipedia.org/wiki/Symbolic_link>`__ named ``warpx`` can be found in that directory, which points to the last built WarpX executable.
 
 More details on running simulations are in the section :ref:`Run WarpX <usage_run>`.
@@ -232,7 +232,7 @@ For PICMI Python bindings, configure WarpX to produce a library and call our ``p
 .. code-block:: bash
 
    # find dependencies & configure for all WarpX dimensionalities
-   cmake -S . -B build_py -DWarpX_DIMS="1;2;RZ;3" -DWarpX_PYTHON=ON
+   cmake -S . -B build_py -DWarpX_DIMS="1;2;3;RZ;RCYLINDER;RSPHERE" -DWarpX_PYTHON=ON
 
 
    # build and then call "python3 -m pip install ..."
@@ -272,8 +272,8 @@ Environment variables can be used to control the build step:
 Environment Variable          Default & Values                             Description
 ============================= ============================================ ================================================================
 ``WARPX_COMPUTE``             NOACC/**OMP**/CUDA/SYCL/HIP                  On-node, accelerated computing backend
-``WARPX_DIMS``                ``"1;2;3;RZ"``                               Simulation dimensionalities (semicolon-separated list)
-``WARPX_EB``                  **ON**/OFF                                   Embedded boundary support (not supported in RZ yet)
+``WARPX_DIMS``                ``"1;2;3;RZ;RCYLINDER;RSPHERE"``             Simulation dimensionalities (semicolon-separated list)
+``WARPX_EB``                  **ON**/OFF                                   Embedded boundary support (not supported in RZ, RCYLINDER, and RSPHERE yet)
 ``WARPX_MPI``                 ON/**OFF**                                   Multi-node support (message-passing)
 ``WARPX_OPENPMD``             **ON**/OFF                                   openPMD I/O (HDF5, ADIOS)
 ``WARPX_PRECISION``           SINGLE/**DOUBLE**                            Floating point precision (single/double)
@@ -333,7 +333,7 @@ This is the workflow most developers will prefer as it allows rapid re-compiles:
 .. code-block:: bash
 
    # build WarpX executables and libraries
-   cmake -S . -B build_py -DWarpX_DIMS="1;2;RZ;3" -DWarpX_PYTHON=ON
+   cmake -S . -B build_py -DWarpX_DIMS="1;2;3;RZ;RCYLINDER;RSPHERE" -DWarpX_PYTHON=ON
 
    # build & install Python only
    cmake --build build_py -j 4 --target pip_install
