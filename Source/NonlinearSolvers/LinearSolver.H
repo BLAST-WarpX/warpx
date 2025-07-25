@@ -43,7 +43,7 @@ public:
      * \param a_rhs     RHS, i.e., b in A x = b.
      * \param a_tol_rel relative tolerance.
      * \param a_tol_abs absolute tolerance.
-     * \patam a_its     optional argument specifying the maximum number of iterations.
+     * \param a_its     optional argument specifying the maximum number of iterations.
      */
     virtual void solve (Vec& a_sol,
                         Vec const& a_rhs,

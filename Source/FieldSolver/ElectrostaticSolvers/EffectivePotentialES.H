@@ -39,11 +39,6 @@ public:
 
     void computePhi (
         ablastr::fields::MultiLevelScalarField const& rho,
-        ablastr::fields::MultiLevelScalarField const& phi
-    ) const;
-
-    void computePhi (
-        ablastr::fields::MultiLevelScalarField const& rho,
         ablastr::fields::MultiLevelScalarField const& phi,
         ablastr::fields::MultiLevelVectorField const& efield
     ) const;

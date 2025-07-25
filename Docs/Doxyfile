@@ -2710,3 +2710,6 @@ GENERATE_LEGEND        = YES
 # The default value is: YES.
 
 DOT_CLEANUP            = YES
+
+# Overwrite value of WARN_AS_ERROR
+WARN_AS_ERROR = YES

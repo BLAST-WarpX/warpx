@@ -93,6 +93,7 @@ void setMassMatricesKernels ( const amrex::ParticleReal qs,
  * \param xp, yp, zp               The particle positions.
  * \param wqx,wqy,wqz              The particle velocity multiplied by the charge / volume
  * \param fpxx,fpyy,fpzz           The diagonal mass matrix kernels
+ * \param fpxy, fpxz, fpyx, fpyz, fpzx, fpzy The off-diagonal mass matrix kernels
  * \param jx_arr,jy_arr,jz_arr     Array4 of current density, either full array or tile.
  * \param Sxx_nComp                number of Sxx components
  * \param Syy_nComp                number of Syy components
