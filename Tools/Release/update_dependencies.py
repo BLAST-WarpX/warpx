@@ -100,7 +100,7 @@ def update(args):
             # current date version for the WarpX release update
             repo_version_tag = datetime.date.today().strftime("%y.%m")
         else:
-            # last available tag (index 0) for all other dependencies
+            # latest available tag (index 0) for all other dependencies
             repo_version_tag = tags_list_filtered[0]["name"]
         # use version tag instead of commit sha for a release update
         new_commit_sha = repo_version_tag if args.release else repo_commit_sha
