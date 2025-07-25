@@ -635,7 +635,7 @@ MultiParticleContainer::DepositTemperatures (
 
         // Generate Name to look up temperature MF in the register
         const std::string temperature_vf_str = "T_" + species_names[pc->getSpeciesId()];
-        ablastr::fields::MultiLevelVectorField T_vf =
+        ablastr::fields::MultiLevelVectorField const& T_vf =
             fields.get_mr_levels_alldirs(temperature_vf_str, WarpX::GetInstance().finestLevel());
 
         // Clear temperature MF for this species
@@ -647,6 +647,13 @@ MultiParticleContainer::DepositTemperatures (
 
         // Accumulate velocities for this species
         pc->AccumulateVelocitiesAndComputeTemperature(T_vf, relative_time);
+
+        // Compute average temperature from components
+        pc->InterpolateAndAverageTemperatureVectorToScalar(
+            T_vf,
+            fields.get_mr_levels_alldirs("Tavg_" + species_names[pc->getSpeciesId()],
+                                         WarpX::GetInstance().finestLevel())
+            );
     }
 }
 

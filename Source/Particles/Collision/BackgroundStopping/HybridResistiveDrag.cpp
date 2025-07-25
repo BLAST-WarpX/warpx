@@ -42,8 +42,15 @@ HybridResistiveDrag::HybridResistiveDrag (std::string const& collision_name)
     }
 
     // Set up parser for eta with rho, v_i, v_e, T_i, T_e, B inputs
+    // Currently these are magnitude values and resistivity is considered isotropic
     const std::string & function_string;
     pp_collision_name.query("drag_function(rho,v_i,v_e,T_i,T_e,B)", function_string);
+
+    // If expression is collision frequency, modify to multiply in conversion to eta
+    if (m_type = HybridResistiveDragType::COLLISION_FREQUENCY) {
+        function_string = "(" + function_string + ")*m_e/(rho*q_e)";
+    }
+
     m_expression_parser = utils::parser::makeParser(function_string,{"rho","v_i","v_e","T_i","T_e","B"});
     m_expression_func = m_expression_parser->compile<6>();
 }
@@ -70,7 +77,7 @@ HybridResistiveDrag::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiPa
             auto *cost = WarpX::getCosts(lev);
 
             // loop over particles box by box
-#ifdef _OPENMP
+#ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
             for (WarpXParIter pti(species, lev); pti.isValid(); ++pti) {
@@ -171,6 +178,20 @@ void HybridResistiveDrag::doHybridResistiveDragOnIonsWithinTile (WarpXParIter& p
 
         }
         );
+}
+
+amrex::Real
+AMREX_HOST_GPU_DEVICE AMREX_FORCE_INLINE
+HybridResistiveDrag::Resistivity(
+    amrex::Real rho,
+    amrex::Real Te,
+    amrex::Real Ti,
+    amrex::Real ve,
+    amrex::Real vi,
+    amrex::Real Bmag)
+{
+    // Evaluate Function
+    return self->m_expression_func(rho,Te,Ti,ve,vi,Bmag);
 }
 
 } // namespace warpx::particles::collision::backgroundstopping

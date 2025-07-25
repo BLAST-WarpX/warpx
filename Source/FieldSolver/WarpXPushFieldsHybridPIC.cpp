@@ -255,20 +255,20 @@ void WarpX::HybridPICDepositRhoAndJ ()
 
     for (const auto & spec : mypc->GetSpeciesNames())
     {
-        auto & J_species = m_fields.get_mr_levels_alldirs("hybrid_current_fp_" + spec, finest_level);
+        auto & J_species = m_fields.get_mr_levels_alldirs("current_fp_" + spec, finest_level);
 
         // Retrieve species specific array for deposition
         mypc->DepositSpeciesCurrent(J_species, dt[0], -0.5_rt * dt[0]);
 
         // Filter and sychronize current for each species
-        SyncCurrent("hybrid_current_fp_" + spec);
+        SyncCurrent("current_fp_" + spec);
 
         for (int lev = 0; lev <= finest_level; ++lev)
         {
             ApplyJfieldBoundary(lev,
-                m_fields.get("hybrid_current_fp_" + spec, Direction{0}, lev),
-                m_fields.get("hybrid_current_fp_" + spec, Direction{1}, lev),
-                m_fields.get("hybrid_current_fp_" + spec, Direction{2}, lev),
+                m_fields.get("current_fp_" + spec, Direction{0}, lev),
+                m_fields.get("current_fp_" + spec, Direction{1}, lev),
+                m_fields.get("current_fp_" + spec, Direction{2}, lev),
                 PatchType::fine);
         }
 

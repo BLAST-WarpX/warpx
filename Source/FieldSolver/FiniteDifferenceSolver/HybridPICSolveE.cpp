@@ -1195,36 +1195,35 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ex(i, j, k) = (enE_x - grad_Pe) / rho_val_limited;
             }
 
-            // Add resistivity only if E field value is used to update B
-            if (solve_for_Faraday) {
-                Real jtot_val = 0._rt;
-                if (resistivity_has_J_dependence) {
-                    // Interpolate current to appropriate staggering to match E field
-                    const Real jx_val = Jx(i, j, k);
-                    const Real jy_val = Interp(Jy, Jy_stag, Ex_stag, coarsen, i, j, k, 0);
-                    const Real jz_val = Interp(Jz, Jz_stag, Ex_stag, coarsen, i, j, k, 0);
-                    jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
+            // Add resistivity contribution from each ion species
+            Real jtot_val = 0._rt;
+            if (resistivity_has_J_dependence) {
+                // Interpolate current to appropriate staggering to match E field
+                const Real jx_val = Jx(i, j, k);
+                const Real jy_val = Interp(Jy, Jy_stag, Ex_stag, coarsen, i, j, k, 0);
+                const Real jz_val = Interp(Jz, Jz_stag, Ex_stag, coarsen, i, j, k, 0);
+                jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
+            }
+
+            Ex(i, j, k) += eta(rho_val, jtot_val) * Jx(i, j, k);
+
+            // Add hyper-resistivity only if E field value is used to update B
+            if (solve_for_Faraday && include_hyper_resistivity_term) {
+
+                // Interpolate B field to appropriate staggering to match E field
+                Real btot_val = 0._rt;
+                if (hyper_resistivity_has_B_dependence) {
+                    const Real bx_val = Interp(Bx, Bx_stag, Ex_stag, coarsen, i, j, k, 0);
+                    const Real by_val = Interp(By, By_stag, Ex_stag, coarsen, i, j, k, 0);
+                    const Real bz_val = Interp(Bz, Bz_stag, Ex_stag, coarsen, i, j, k, 0);
+                    btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
                 }
 
-                Ex(i, j, k) += eta(rho_val, jtot_val) * Jx(i, j, k);
+                auto nabla2Jx = T_Algo::Dxx(Jx, coefs_x, n_coefs_x, i, j, k)
+                    + T_Algo::Dyy(Jx, coefs_y, n_coefs_y, i, j, k)
+                    + T_Algo::Dzz(Jx, coefs_z, n_coefs_z, i, j, k);
 
-                if (include_hyper_resistivity_term) {
-
-                    // Interpolate B field to appropriate staggering to match E field
-                    Real btot_val = 0._rt;
-                    if (hyper_resistivity_has_B_dependence) {
-                        const Real bx_val = Interp(Bx, Bx_stag, Ex_stag, coarsen, i, j, k, 0);
-                        const Real by_val = Interp(By, By_stag, Ex_stag, coarsen, i, j, k, 0);
-                        const Real bz_val = Interp(Bz, Bz_stag, Ex_stag, coarsen, i, j, k, 0);
-                        btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
-                    }
-
-                    auto nabla2Jx = T_Algo::Dxx(Jx, coefs_x, n_coefs_x, i, j, k)
-                        + T_Algo::Dyy(Jx, coefs_y, n_coefs_y, i, j, k)
-                        + T_Algo::Dzz(Jx, coefs_z, n_coefs_z, i, j, k);
-
-                    Ex(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jx;
-                }
+                Ex(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jx;
             }
 
             if (include_external_fields && (rho_val >= rho_floor)) {
@@ -1259,36 +1258,35 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ey(i, j, k) = (enE_y - grad_Pe) / rho_val_limited;
             }
 
-            // Add resistivity only if E field value is used to update B
-            if (solve_for_Faraday) {
-                Real jtot_val = 0._rt;
-                if (resistivity_has_J_dependence) {
-                    // Interpolate current to appropriate staggering to match E field
-                    const Real jx_val = Interp(Jx, Jx_stag, Ey_stag, coarsen, i, j, k, 0);
-                    const Real jy_val = Jy(i, j, k);
-                    const Real jz_val = Interp(Jz, Jz_stag, Ey_stag, coarsen, i, j, k, 0);
-                    jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
+            // Add resistivity
+            Real jtot_val = 0._rt;
+            if (resistivity_has_J_dependence) {
+                // Interpolate current to appropriate staggering to match E field
+                const Real jx_val = Interp(Jx, Jx_stag, Ey_stag, coarsen, i, j, k, 0);
+                const Real jy_val = Jy(i, j, k);
+                const Real jz_val = Interp(Jz, Jz_stag, Ey_stag, coarsen, i, j, k, 0);
+                jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
+            }
+
+            Ey(i, j, k) += eta(rho_val, jtot_val) * Jy(i, j, k);
+
+            // Add hyper-resistivity only if E field value is used to update B
+            if (solve_for_Faraday && include_hyper_resistivity_term) {
+
+                // Interpolate B field to appropriate staggering to match E field
+                Real btot_val = 0._rt;
+                if (hyper_resistivity_has_B_dependence) {
+                    const Real bx_val = Interp(Bx, Bx_stag, Ey_stag, coarsen, i, j, k, 0);
+                    const Real by_val = Interp(By, By_stag, Ey_stag, coarsen, i, j, k, 0);
+                    const Real bz_val = Interp(Bz, Bz_stag, Ey_stag, coarsen, i, j, k, 0);
+                    btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
                 }
 
-                Ey(i, j, k) += eta(rho_val, jtot_val) * Jy(i, j, k);
+                auto nabla2Jy = T_Algo::Dxx(Jy, coefs_x, n_coefs_x, i, j, k)
+                    + T_Algo::Dyy(Jy, coefs_y, n_coefs_y, i, j, k)
+                    + T_Algo::Dzz(Jy, coefs_z, n_coefs_z, i, j, k);
 
-                if (include_hyper_resistivity_term) {
-
-                    // Interpolate B field to appropriate staggering to match E field
-                    Real btot_val = 0._rt;
-                    if (hyper_resistivity_has_B_dependence) {
-                        const Real bx_val = Interp(Bx, Bx_stag, Ey_stag, coarsen, i, j, k, 0);
-                        const Real by_val = Interp(By, By_stag, Ey_stag, coarsen, i, j, k, 0);
-                        const Real bz_val = Interp(Bz, Bz_stag, Ey_stag, coarsen, i, j, k, 0);
-                        btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
-                    }
-
-                    auto nabla2Jy = T_Algo::Dxx(Jy, coefs_x, n_coefs_x, i, j, k)
-                        + T_Algo::Dyy(Jy, coefs_y, n_coefs_y, i, j, k)
-                        + T_Algo::Dzz(Jy, coefs_z, n_coefs_z, i, j, k);
-
-                    Ey(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jy;
-                }
+                Ey(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jy;
             }
 
             if (include_external_fields && (rho_val >= rho_floor)) {
@@ -1324,35 +1322,33 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             }
 
             // Add resistivity only if E field value is used to update B
-            if (solve_for_Faraday) {
-                Real jtot_val = 0._rt;
-                if (resistivity_has_J_dependence) {
-                    // Interpolate current to appropriate staggering to match E field
-                    const Real jx_val = Interp(Jx, Jx_stag, Ez_stag, coarsen, i, j, k, 0);
-                    const Real jy_val = Interp(Jy, Jy_stag, Ez_stag, coarsen, i, j, k, 0);
-                    const Real jz_val = Jz(i, j, k);
-                    jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
+            Real jtot_val = 0._rt;
+            if (resistivity_has_J_dependence) {
+                // Interpolate current to appropriate staggering to match E field
+                const Real jx_val = Interp(Jx, Jx_stag, Ez_stag, coarsen, i, j, k, 0);
+                const Real jy_val = Interp(Jy, Jy_stag, Ez_stag, coarsen, i, j, k, 0);
+                const Real jz_val = Jz(i, j, k);
+                jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
+            }
+
+            Ez(i, j, k) += eta(rho_val, jtot_val) * Jz(i, j, k);
+
+            if (solve_for_Faraday && include_hyper_resistivity_term) {
+
+                // Interpolate B field to appropriate staggering to match E field
+                Real btot_val = 0._rt;
+                if (hyper_resistivity_has_B_dependence) {
+                    const Real bx_val = Interp(Bx, Bx_stag, Ez_stag, coarsen, i, j, k, 0);
+                    const Real by_val = Interp(By, By_stag, Ez_stag, coarsen, i, j, k, 0);
+                    const Real bz_val = Interp(Bz, Bz_stag, Ez_stag, coarsen, i, j, k, 0);
+                    btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
                 }
 
-                Ez(i, j, k) += eta(rho_val, jtot_val) * Jz(i, j, k);
+                auto nabla2Jz = T_Algo::Dxx(Jz, coefs_x, n_coefs_x, i, j, k)
+                    + T_Algo::Dyy(Jz, coefs_y, n_coefs_y, i, j, k)
+                    + T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, k);
 
-                if (include_hyper_resistivity_term) {
-
-                    // Interpolate B field to appropriate staggering to match E field
-                    Real btot_val = 0._rt;
-                    if (hyper_resistivity_has_B_dependence) {
-                        const Real bx_val = Interp(Bx, Bx_stag, Ez_stag, coarsen, i, j, k, 0);
-                        const Real by_val = Interp(By, By_stag, Ez_stag, coarsen, i, j, k, 0);
-                        const Real bz_val = Interp(Bz, Bz_stag, Ez_stag, coarsen, i, j, k, 0);
-                        btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
-                    }
-
-                    auto nabla2Jz = T_Algo::Dxx(Jz, coefs_x, n_coefs_x, i, j, k)
-                        + T_Algo::Dyy(Jz, coefs_y, n_coefs_y, i, j, k)
-                        + T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, k);
-
-                    Ez(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jz;
-                }
+                Ez(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jz;
             }
 
             if (include_external_fields && (rho_val >= rho_floor)) {
