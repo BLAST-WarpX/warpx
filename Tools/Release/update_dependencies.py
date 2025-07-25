@@ -63,16 +63,18 @@ def update(args):
         repo_commit = repo_gh.json()["sha"]
         # set new repository version
         repo_version = datetime.date.today().strftime("%y.%m")
+        # use version tag for new release
+        new_commit = repo_version if args.release else repo_commit
         # update repository commit
         if repo_name != "warpx":
             print(f"- old commit: {dependencies_data[commit_key]}")
-            print(f"- new commit: {repo_commit}")
+            print(f"- new commit: {new_commit}")
             proceed = input("Do you want to continue? [y/n] ")
             if proceed not in ["y", "Y"]:
                 print("Skipping commit update...")
             else:
                 print("Updating commit...")
-                dependencies_data[f"commit_{repo_name}"] = repo_commit
+                dependencies_data[f"commit_{repo_name}"] = new_commit
         # update repository version
         print(f"- old version: {dependencies_data[version_key]}")
         print(f"- new version: {repo_version}")
@@ -122,6 +124,14 @@ if __name__ == "__main__":
         help="Update WarpX only",
         action="store_true",
         dest="warpx",
+    )
+
+    # add arguments: release option
+    parser.add_argument(
+        "--release",
+        help="New release",
+        action="store_true",
+        dest="release",
     )
 
     # parse arguments
