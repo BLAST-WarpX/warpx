@@ -102,15 +102,17 @@ def update(args):
         else:
             # last available tag (index 0) for all other dependencies
             repo_version_tag = tags_list_filtered[0]["name"]
+        # use version tag instead of commit sha for a release update
+        new_commit_sha = repo_version_tag if args.release else repo_commit_sha
         # update commit
         if repo_name != "warpx":
             print(f"- old commit: {dependencies_data[commit_key]}")
-            print(f"- new commit: {repo_commit_sha}")
+            print(f"- new commit: {new_commit_sha}")
             if dependencies_data[commit_key] == repo_commit_sha:
                 print("Skipping commit update...")
             else:
                 print("Updating commit...")
-                dependencies_data[f"commit_{repo_name}"] = repo_commit_sha
+                dependencies_data[f"commit_{repo_name}"] = new_commit_sha
         # update version
         print(f"- old version: {dependencies_data[version_key]}")
         print(f"- new version: {repo_version_tag}")
@@ -159,6 +161,14 @@ if __name__ == "__main__":
         help="Update WarpX only",
         action="store_true",
         dest="warpx",
+    )
+
+    # add arguments: release option
+    parser.add_argument(
+        "--release",
+        help="New release",
+        action="store_true",
+        dest="release",
     )
 
     # parse arguments

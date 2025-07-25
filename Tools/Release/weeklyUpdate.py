@@ -168,7 +168,8 @@ Weekly update to latest PICSAR{picsar_changes}.
 ./Tools/Release/update_dependencies.py --picsar
 ```
 
-This pull request was created with this script: `./Tools/Release/weeklyUpdate.py`
+This pull request was created with the script `./Tools/Release/weeklyUpdate.py`,
+following the instructions described in https://warpx.readthedocs.io/en/latest/maintenance/release.html#update-warpx-core-dependencies.
 """,
         "--label",
         "component: documentation",
