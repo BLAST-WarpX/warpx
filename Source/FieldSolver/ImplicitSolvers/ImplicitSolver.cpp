@@ -490,7 +490,13 @@ void ImplicitSolver::InitializeMassMatrices ()
             AMREX_ASSERT(max_crossings>0);
             AMREX_ASSERT(max_crossings==m_WarpX->particle_max_grid_crossings);
 #endif
+            // Comment on direction-dependent number of mass matrices components
+            // set below for charge-conserving Villasenor deposition:
+            // 3 = 1 + 2*(shape - 1) (both comps centered)
+            // 4 = 0 + 2*shape       (mixed nodal/centered comps)
+            // 5 = 1 + 2*shape       (both comps nodal)
 #if defined(WARPX_DIM_1D_Z)
+            // x and y are nodal, z is centered
             m_ncomp_xx[0] = 5 + 2*max_crossings;
             m_ncomp_xy[0] = 5 + 2*max_crossings;
             m_ncomp_xz[0] = 4 + 2*max_crossings;
@@ -501,6 +507,7 @@ void ImplicitSolver::InitializeMassMatrices ()
             m_ncomp_zy[0] = 4 + 2*max_crossings;
             m_ncomp_zz[0] = 3 + 2*max_crossings;
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            // x is centered, y and z are nodal
             m_ncomp_xx[0] = 3 + 2*max_crossings;
             m_ncomp_xy[0] = 4 + 2*max_crossings;
             m_ncomp_xz[0] = 4 + 2*max_crossings;
@@ -511,6 +518,7 @@ void ImplicitSolver::InitializeMassMatrices ()
             m_ncomp_zy[0] = 5 + 2*max_crossings;
             m_ncomp_zz[0] = 5 + 2*max_crossings;
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+            // dir = 0: x is centered, y and z are nodal
             m_ncomp_xx[0] = 3 + 2*max_crossings;
             m_ncomp_xy[0] = 4 + 2*max_crossings;
             m_ncomp_xz[0] = 4 + 2*max_crossings;
@@ -520,7 +528,7 @@ void ImplicitSolver::InitializeMassMatrices ()
             m_ncomp_zx[0] = 4 + 2*max_crossings;
             m_ncomp_zy[0] = 5 + 2*max_crossings;
             m_ncomp_zz[0] = 5 + 2*max_crossings;
-            //
+            // dir = 1: x and y are nodal, z is centered
             m_ncomp_xx[1] = 5 + 2*max_crossings;
             m_ncomp_xy[1] = 5 + 2*max_crossings;
             m_ncomp_xz[1] = 4 + 2*max_crossings;
