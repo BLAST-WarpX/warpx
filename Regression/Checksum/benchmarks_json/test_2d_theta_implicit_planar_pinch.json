@@ -17,7 +17,7 @@
     "particle_momentum_y": 5.295981363178306e-20,
     "particle_momentum_z": 5.2829658537615036e-20,
     "particle_position_x": 1309.3090607484742,
-    "particle_position_z": 96.00683559953801,
+    "particle_position_y": 96.00683559953801,
     "particle_weight": 1.6501375e+18
   },
   "deuterium": {
@@ -25,7 +25,7 @@
     "particle_momentum_y": 3.2209130431028616e-18,
     "particle_momentum_z": 3.226813184396913e-18,
     "particle_position_x": 1309.3091292978781,
-    "particle_position_z": 96.00796866718042,
+    "particle_position_y": 96.00796866718042,
     "particle_weight": 1.6501375e+18
   }
 }
