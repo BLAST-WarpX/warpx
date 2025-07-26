@@ -34,5 +34,5 @@ jobs:
     - name: Doxygen
       run: |
         sudo apt update
-        sudo apt install -y doxygen texlive-latex-base texlive-latex-extra
+        sudo apt install -y doxygen texlive-latex-base texlive-latex-extra ghostscript
         .github/workflows/source/doxygen
