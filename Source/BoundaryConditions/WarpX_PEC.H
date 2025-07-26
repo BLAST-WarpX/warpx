@@ -27,7 +27,7 @@ namespace PEC {
      * \param[in]     lev                 level of the Multifab
      * \param[in]     patch_type          coarse or fine
      * \param[in]     ref_ratios          vector containing the refinement ratios of the refinement levels
-     * \param[in]     split_pml_field     whether pml the multifab is the regular Efield or split pml field
+     * \param[in]     split_pml_field     whether the MultiFab is the regular Efield or the split PML field
      */
     void ApplyPECtoEfield (
                         std::array<amrex::MultiFab*, 3> Efield,
@@ -51,7 +51,7 @@ namespace PEC {
      * \param[in]     lev                 level of the Multifab
      * \param[in]     patch_type          coarse or fine
      * \param[in]     ref_ratios          vector containing the refinement ratios of the refinement levels
-     * \param[in]     split_pml_field     TODO
+     * \param[in]     split_pml_field     whether the MultiFab is the regular Bfield or the split PML field
      */
     void ApplyPECtoBfield (
                         std::array<amrex::MultiFab*, 3> Bfield,

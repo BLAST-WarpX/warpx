@@ -60,7 +60,7 @@ public:
      * dimension according to the desired values from the simulation input file,
      * boundary.potential_lo and boundary.potential_hi.
      * \param[inout] phi The electrostatic potential
-     * \param[in] t TODO
+     * \param[in] t current time
      */
     void setPhiBC (
         ablastr::fields::MultiLevelScalarField const& phi,

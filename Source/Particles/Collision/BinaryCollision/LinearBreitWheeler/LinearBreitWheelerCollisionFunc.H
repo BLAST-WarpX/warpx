@@ -121,7 +121,7 @@ public:
          * @param[in] soa_1,soa_2 contain the struct of array data of the two species
          * @param[in] dt is the time step length between two collision calls.
          * @param[in] dV is the volume of the corresponding cell.
-         * @param[in] coll_idx TODO
+         * @param[in] coll_idx collision index type
          * @param[in] cell_start_pair is the start index of the pairs in that cell.
          * @param[out] p_mask is a mask that will be set to true if a collision occurs for a given
          * pair. It is only needed here to store information that will be used later on when actually
