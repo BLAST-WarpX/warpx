@@ -482,13 +482,17 @@ void ImplicitSolver::InitializeMassMatrices ()
             }
         }
         else if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
+#ifndef WARPX_DIM_1D_Z
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 shape==2,
                 "Mass Matrices for Jacobian with Villasenor deposition requires shape = 2.");
+#endif
 #ifndef WARPX_DIM_3D
-            int max_crossings = ngJ[0] - 1;
-            AMREX_ASSERT(max_crossings>0);
-            AMREX_ASSERT(max_crossings==m_WarpX->particle_max_grid_crossings);
+            int max_crossings = ngJ[0] - shape + 1;
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( max_crossings>0,
+                "Mass Matrices for Jacobian with Villasenor deposition requires particles.max_grid_crossings > 0.");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( max_crossings==m_WarpX->particle_max_grid_crossings,
+                "Guard cells for J are not consistent with particle_max_grid_crossings.");
 #endif
             // Comment on direction-dependent number of mass matrices components
             // set below for charge-conserving Villasenor deposition:
@@ -497,15 +501,15 @@ void ImplicitSolver::InitializeMassMatrices ()
             // 5 = 1 + 2*shape       (both comps nodal)
 #if defined(WARPX_DIM_1D_Z)
             // x and y are nodal, z is centered
-            m_ncomp_xx[0] = 5 + 2*max_crossings;
-            m_ncomp_xy[0] = 5 + 2*max_crossings;
-            m_ncomp_xz[0] = 4 + 2*max_crossings;
-            m_ncomp_yx[0] = 5 + 2*max_crossings;
-            m_ncomp_yy[0] = 5 + 2*max_crossings;
-            m_ncomp_yz[0] = 4 + 2*max_crossings;
-            m_ncomp_zx[0] = 4 + 2*max_crossings;
-            m_ncomp_zy[0] = 4 + 2*max_crossings;
-            m_ncomp_zz[0] = 3 + 2*max_crossings;
+            m_ncomp_xx[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_xy[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_xz[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_yx[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_yy[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_yz[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_zx[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_zy[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_zz[0] = 1 + 2*(shape-1) + 2*max_crossings;
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             // x is centered, y and z are nodal
             m_ncomp_xx[0] = 3 + 2*max_crossings;

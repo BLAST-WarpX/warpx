@@ -1517,7 +1517,7 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                 const int SegShift = max_crossings + SegNum[ms] - SegNum[ns];
                 for (int kE=0; kE<=depos_order; kE++) {
                     const amrex::Real weight_E = weight_node[ms][kE];
-                    const int comp_yy = 2 + kE - k + SegShift;
+                    const int comp_yy = depos_order - k + kE + SegShift;
                     amrex::Gpu::Atomic::AddNoRet(&Sxx_arr(k_J, 0, comp_yy), fpxx*weight_J*weight_E);
                     amrex::Gpu::Atomic::AddNoRet(&Syy_arr(k_J, 0, comp_yy), fpyy*weight_J*weight_E);
                     amrex::Gpu::Atomic::AddNoRet(&Sxy_arr(k_J, 0, comp_yy), fpxy*weight_J*weight_E);
@@ -1525,7 +1525,7 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                 }
                 for (int kE=0; kE<=depos_order-1; kE++) {
                     const amrex::Real weight_E = weight_cell[ms][kE];
-                    const int comp_yz = 2 + kE - k + SegShift;
+                    const int comp_yz = depos_order - k + kE + SegShift;
                     amrex::Gpu::Atomic::AddNoRet(&Sxz_arr(k_J, 0, comp_yz), fpxz*weight_J*weight_E);
                     amrex::Gpu::Atomic::AddNoRet(&Syz_arr(k_J, 0, comp_yz), fpyz*weight_J*weight_E);
                 }
@@ -1542,12 +1542,12 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                 const int SegShift = max_crossings + SegNum[ms] - SegNum[ns];
                 for (int kE=0; kE<=depos_order-1; kE++) {
                     const amrex::Real weight_E = weight_cell[ms][kE];
-                    const int comp_zz = 1 + kE - k + SegShift;
+                    const int comp_zz = depos_order-1 - k + kE + SegShift;
                     amrex::Gpu::Atomic::AddNoRet(&Szz_arr(k_J, 0, comp_zz), fpzz*weight_J*weight_E);
                 }
                 for (int kE=0; kE<=depos_order; kE++) {
                     const amrex::Real weight_E = weight_node[ms][kE];
-                    const int comp_zy = 1 + kE - k + SegShift;
+                    const int comp_zy = depos_order-1 - k + kE + SegShift;
                     amrex::Gpu::Atomic::AddNoRet(&Szx_arr(k_J, 0, comp_zy), fpzx*weight_J*weight_E);
                     amrex::Gpu::Atomic::AddNoRet(&Szy_arr(k_J, 0, comp_zy), fpzy*weight_J*weight_E);
                 }
