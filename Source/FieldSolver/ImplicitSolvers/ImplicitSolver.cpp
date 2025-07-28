@@ -196,20 +196,18 @@ void ImplicitSolver::ComputeJfromMassMatrices ()
             amrex::Array4<const amrex::Real> const& Szy = SZ[1]->array(mfi);
             amrex::Array4<const amrex::Real> const& Szz = SZ[2]->array(mfi);
 
-            // Use grown boxes here with all guard cells
+            // Use grown boxes here with all J guard cells
             amrex::Box Jbx = amrex::convert(mfi.validbox(),J[0]->ixType());
             amrex::Box Jby = amrex::convert(mfi.validbox(),J[1]->ixType());
             amrex::Box Jbz = amrex::convert(mfi.validbox(),J[2]->ixType());
-            amrex::Box Ebx = amrex::convert(mfi.validbox(),E[0]->ixType());
-            amrex::Box Eby = amrex::convert(mfi.validbox(),E[1]->ixType());
-            amrex::Box Ebz = amrex::convert(mfi.validbox(),E[2]->ixType());
-
             Jbx.grow(J[0]->nGrowVect());
             Jby.grow(J[1]->nGrowVect());
             Jbz.grow(J[2]->nGrowVect());
-            Ebx.grow(E[0]->nGrowVect());
-            Eby.grow(E[1]->nGrowVect());
-            Ebz.grow(E[2]->nGrowVect());
+
+            // Use same box for E as for J (requires ngE >= ngJ)
+            amrex::Box Ebx = Jbx;
+            amrex::Box Eby = Jby;
+            amrex::Box Ebz = Jbz;
 
             const amrex::IntVect ncomp_xx = m_ncomp_xx;
             const amrex::IntVect ncomp_xy = m_ncomp_xy;
@@ -514,8 +512,9 @@ void ImplicitSolver::InitializeMassMatrices ()
 
         // Ensure that the guard cells for J and E are the same
         for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( ngJ[dir]==ngE[dir],
-                "Mass Matrices for Jacobian requires guard cells for J and E to be the same.");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( ngE[dir]>=ngJ[dir],
+                "Mass Matrices for Jacobian requires guard cells for E "
+                "to be at least as many as those for J.");
         }
 
         if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Direct) {
