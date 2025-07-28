@@ -1156,13 +1156,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
 #endif
 
         bool full_mass_matrices = false;
-        if (Szz_nComp>1) {
-#ifndef WARPX_DIM_1D_Z
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( WarpX::nox==2,
-                "Full mass matrix deposition only permitted for shape = 2 with Villasenor deposition.");
-#endif
-            full_mass_matrices = true;
-        }
+        if (Szz_nComp>1) { full_mass_matrices = true; }
 
         if (WarpX::nox == 1 && !full_mass_matrices){
             doVillasenorJandSigmaDeposition<1,false>(

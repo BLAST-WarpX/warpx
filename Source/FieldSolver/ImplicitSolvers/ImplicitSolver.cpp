@@ -482,11 +482,6 @@ void ImplicitSolver::InitializeMassMatrices ()
             }
         }
         else if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
-#ifndef WARPX_DIM_1D_Z
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                shape==2,
-                "Mass Matrices for Jacobian with Villasenor deposition requires shape = 2.");
-#endif
 #ifndef WARPX_DIM_3D
             int max_crossings = ngJ[0] - shape + 1;
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE( max_crossings>0,
@@ -496,9 +491,9 @@ void ImplicitSolver::InitializeMassMatrices ()
 #endif
             // Comment on direction-dependent number of mass matrices components
             // set below for charge-conserving Villasenor deposition:
-            // 3 = 1 + 2*(shape - 1) (both comps centered)
-            // 4 = 0 + 2*shape       (mixed nodal/centered comps)
-            // 5 = 1 + 2*shape       (both comps nodal)
+            // 1 + 2*(shape - 1) (both comps centered)
+            // 0 + 2*shape       (mixed nodal/centered comps)
+            // 1 + 2*shape       (both comps nodal)
 #if defined(WARPX_DIM_1D_Z)
             // x and y are nodal, z is centered
             m_ncomp_xx[0] = 1 + 2*shape + 2*max_crossings;
@@ -512,36 +507,36 @@ void ImplicitSolver::InitializeMassMatrices ()
             m_ncomp_zz[0] = 1 + 2*(shape-1) + 2*max_crossings;
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             // x is centered, y and z are nodal
-            m_ncomp_xx[0] = 3 + 2*max_crossings;
-            m_ncomp_xy[0] = 4 + 2*max_crossings;
-            m_ncomp_xz[0] = 4 + 2*max_crossings;
-            m_ncomp_yx[0] = 4 + 2*max_crossings;
-            m_ncomp_yy[0] = 5 + 2*max_crossings;
-            m_ncomp_yz[0] = 5 + 2*max_crossings;
-            m_ncomp_zx[0] = 4 + 2*max_crossings;
-            m_ncomp_zy[0] = 5 + 2*max_crossings;
-            m_ncomp_zz[0] = 5 + 2*max_crossings;
+            m_ncomp_xx[0] = 1 + 2*(shape-1) + 2*max_crossings;
+            m_ncomp_xy[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_xz[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_yx[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_yy[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_yz[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_zx[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_zy[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_zz[0] = 1 + 2*shape + 2*max_crossings;
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             // dir = 0: x is centered, y and z are nodal
-            m_ncomp_xx[0] = 3 + 2*max_crossings;
-            m_ncomp_xy[0] = 4 + 2*max_crossings;
-            m_ncomp_xz[0] = 4 + 2*max_crossings;
-            m_ncomp_yx[0] = 4 + 2*max_crossings;
-            m_ncomp_yy[0] = 5 + 2*max_crossings;
-            m_ncomp_yz[0] = 5 + 2*max_crossings;
-            m_ncomp_zx[0] = 4 + 2*max_crossings;
-            m_ncomp_zy[0] = 5 + 2*max_crossings;
-            m_ncomp_zz[0] = 5 + 2*max_crossings;
+            m_ncomp_xx[0] = 1 + 2*(shape-1) + 2*max_crossings;
+            m_ncomp_xy[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_xz[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_yx[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_yy[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_yz[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_zx[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_zy[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_zz[0] = 1 + 2*shape + 2*max_crossings;
             // dir = 1: x and y are nodal, z is centered
-            m_ncomp_xx[1] = 5 + 2*max_crossings;
-            m_ncomp_xy[1] = 5 + 2*max_crossings;
-            m_ncomp_xz[1] = 4 + 2*max_crossings;
-            m_ncomp_yx[1] = 5 + 2*max_crossings;
-            m_ncomp_yy[1] = 5 + 2*max_crossings;
-            m_ncomp_yz[1] = 4 + 2*max_crossings;
-            m_ncomp_zx[1] = 4 + 2*max_crossings;
-            m_ncomp_zy[1] = 4 + 2*max_crossings;
-            m_ncomp_zz[1] = 3 + 2*max_crossings;
+            m_ncomp_xx[1] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_xy[1] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_xz[1] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_yx[1] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_yy[1] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_yz[1] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_zx[1] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_zy[1] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_zz[1] = 1 + 2*(shape-1) + 2*max_crossings;
 #endif
             for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
                 Nc_tot_xx *= m_ncomp_xx[dir];
