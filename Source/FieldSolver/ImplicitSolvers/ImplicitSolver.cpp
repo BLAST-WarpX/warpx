@@ -461,9 +461,9 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
         if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Villasenor ||
             m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Esirkepov) {
             std::stringstream outputMsg;
-            outputMsg << "Particle-suppressed JFNK (e.g., theta-implicit evolve with newton nonlinear solver) \n";
+            outputMsg << "Particle-suppressed JFNK (e.g., theta-implicit evolve with newton nonlinear solver) ";
             outputMsg << "with charge-conserving depositions (esirkepov and villasenor) require particle_shape > 1.\n";
-            outputMsg << "Using PS-JFNK and charge-conserving depositions with shape = 1 is known to result \n";
+            outputMsg << "Using PS-JFNK and charge-conserving depositions with shape = 1 is known to result ";
             outputMsg << "in particle orbits that will not converge.\n";
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE( m_WarpX->nox > 1, outputMsg.str());
         }
