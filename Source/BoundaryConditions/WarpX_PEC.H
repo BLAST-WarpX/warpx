@@ -21,7 +21,7 @@ namespace PEC {
      * \param[in,out] Efield              Boundary values of tangential Efield are set to zero
      * \param[in]     field_boundary_lo   Boundary types of the "low" boundaries
      * \param[in]     field_boundary_hi   Boundary types of the "high" boundaries
-     * \param[in]     bc_type             TODO
+     * \param[in]     bc_type             Boundary condition type to be applied
      * \param[in]     ng_fieldgather      number of guard cells used by field gather
      * \param[in]     geom                geometry object of level "lev"
      * \param[in]     lev                 level of the Multifab
@@ -45,7 +45,7 @@ namespace PEC {
      * \param[in,out] Bfield              Boundary values of normal Bfield are set to zero.
      * \param[in]     field_boundary_lo   Boundary types of the "low" field boundaries
      * \param[in]     field_boundary_hi   Boundary types of the "high" field boundaries
-     * \param[in]     bc_type             TODO
+     * \param[in]     bc_type             Boundary condition type to be applied
      * \param[in]     ng_fieldgather      number of guard cells used by field gather
      * \param[in]     geom                geometry object of level "lev"
      * \param[in]     lev                 level of the Multifab
