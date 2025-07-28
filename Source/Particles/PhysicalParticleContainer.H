@@ -91,7 +91,7 @@ public:
      * \param dt time step by which particles are advanced
      * \param a_dt_type type of time step (used for sub-cycling)
      * \param skip_deposition Skip the charge and current deposition.
-     * \param deposit_mass_matrices TODO
+     * \param deposit_mass_matrices whether to deposit the mass matrices (in the case of the implicit solver)
      * \param push_type Type of particle push, explicit or implicit. Defaults to explicit
      *
      * Evolve iterates over particle iterator (each box) and performs filtering,

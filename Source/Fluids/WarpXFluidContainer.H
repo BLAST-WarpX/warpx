@@ -99,7 +99,7 @@ public:
      *
      * \brief Lorentz Momentum Source
      *
-     * \param[in,out] m_fields TODO
+     * \param[in,out] m_fields MultiFab register of fields
      * \param[in] Ex Yee electric field (x)
      * \param[in] Ey Yee electric field (y)
      * \param[in] Ez Yee electric field (z)
@@ -120,7 +120,7 @@ public:
      *
      * \brief Deposit fluid current density.
      *
-     * \param[in,out] m_fields TODO
+     * \param[in,out] m_fields MultiFab register of fields
      * \param[in,out] jx current density MultiFab x comp.
      * \param[in,out] jy current density MultiFab y comp.
      * \param[in,out] jz current density MultiFab z comp.
@@ -138,7 +138,7 @@ public:
      * \param m_fields reference to MultiFab register storing all fields
      * \param[in,out] rho charge density MultiFab.
      * \param[in] lev refinement level
-     * \param[in] icomp TODO
+     * \param[in] icomp Fourth component index of the rho MultiFab to deposit in
      */
     void DepositCharge (ablastr::fields::MultiFabRegister& m_fields, amrex::MultiFab &rho, int lev, int icomp = 0);
 
