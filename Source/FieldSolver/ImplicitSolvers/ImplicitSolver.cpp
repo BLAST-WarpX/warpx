@@ -510,7 +510,6 @@ void ImplicitSolver::InitializeMassMatrices ()
     int Nc_tot_zx = 1, Nc_tot_zy = 1, Nc_tot_zz = 1;
     if (m_use_mass_matrices_jacobian) {
 
-        // Ensure that the guard cells for J and E are the same
         for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE( ngE[dir]>=ngJ[dir],
                 "Mass Matrices for Jacobian requires guard cells for E "
