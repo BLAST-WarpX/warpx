@@ -174,8 +174,8 @@ guardCellManager::Init (
         // When using these implicit schemes, the speed of light Courant limit may be significantly
         // violated, but the number of guard cells only need to be adjusted based on the particle motion.
         for (int i = 0; i < AMREX_SPACEDIM; i++) {
-            ng_alloc_Rho[i] += particle_max_grid_crossings - 1;
-            ng_alloc_J[i]   += particle_max_grid_crossings - 1;
+            ng_alloc_Rho[i] = nox + particle_max_grid_crossings - 1;
+            ng_alloc_J[i]   = nox + particle_max_grid_crossings - 1;
         }
     }
 
@@ -325,8 +325,7 @@ guardCellManager::Init (
         evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
         // For these implicit schemes, for energy conservation, the number of ghost cells
         // must be the same for J and EB.
-        ng_alloc_EB = ng_alloc_EB.max(ng_alloc_J);
-        ng_alloc_J = ng_alloc_J.max(ng_alloc_EB);
+        ng_alloc_EB = ng_alloc_J;
     }
 
     if (safe_guard_cells){
