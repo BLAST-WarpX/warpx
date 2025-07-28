@@ -35,10 +35,10 @@ public:
      * Then electric and magnetic fields are updated to include potential variation
      * due to boundary conditions using the function ``AddBoundaryField``
      *
-     * \param fields TODO
-     * \param mpc TODO
-     * \param mfl TODO
-     * \param max_level TODO
+     * \param fields MultiFab register of fields
+     * \param mpc Reference to multi-particle container
+     * \param mfl Pointer to multi-fluid container
+     * \param max_level Maximum level of mesh refinement
      */
     void ComputeSpaceChargeField (
         ablastr::fields::MultiFabRegister& fields,

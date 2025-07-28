@@ -2136,7 +2136,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
  * \param Jx_arr,Jy_arr,Jz_arr  Array4 of current density, either full array or tile.
  * \param np_to_deposit         Number of particles for which current is deposited.
  * \param dt                    Time step for particle level
- * \param relative_time         TODO
+ * \param relative_time         Time at which to deposit, relative to the time of the current positions of the particles.
  * \param dinv                  3D cell size inverse
  * \param xyzmin                Physical lower bounds of domain.
  * \param lo                    Index lower bounds of domain.
