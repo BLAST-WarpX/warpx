@@ -189,55 +189,7 @@ protected:
     /**
      * \brief parse nonlinear solver parameters (if one is used)
      */
-    void parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
-    {
-
-        std::string nlsolver_type_str;
-        pp.get("nonlinear_solver", nlsolver_type_str);
-
-        if (nlsolver_type_str=="picard") {
-            m_nlsolver_type = NonlinearSolverType::Picard;
-            m_nlsolver = std::make_unique<PicardSolver<WarpXSolverVec,ImplicitSolver>>();
-            m_max_particle_iterations = 1;
-            m_particle_tolerance = 0.0;
-        }
-        else if (nlsolver_type_str=="newton") {
-            m_nlsolver_type = NonlinearSolverType::Newton;
-            m_nlsolver = std::make_unique<NewtonSolver<WarpXSolverVec,ImplicitSolver>>();
-            pp.query("max_particle_iterations", m_max_particle_iterations);
-            pp.query("particle_tolerance", m_particle_tolerance);
-            pp.query("use_mass_matrices_jacobian", m_use_mass_matrices_jacobian);
-            pp.query("use_mass_matrices_pc", m_use_mass_matrices_pc);
-            if (m_use_mass_matrices_jacobian || m_use_mass_matrices_pc) {
-                m_use_mass_matrices = true;
-            }
-#if defined(WARPX_DIM_RCYLINDER)
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                !m_use_mass_matrices,
-                "Using mass matrices is not setup for DIM = RCYLINDER!");
-#endif
-#if defined(WARPX_DIM_RSPHERE)
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                !m_use_mass_matrices,
-                "Using mass matrices is not setup for DIM = RSHERE!");
-#endif
-#if defined(WARPX_DIM_RZ)
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                !m_use_mass_matrices,
-                "Using mass matrices is not setup for DIM = RZ");
-#endif
-#if defined(WARPX_DIM_3D)
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                !m_use_mass_matrices_jacobian,
-                "Using mass matrices for jacobian can not be used for DIM = 3");
-#endif
-        }
-        else {
-            WARPX_ABORT_WITH_MESSAGE(
-                "invalid nonlinear_solver specified. Valid options are picard and newton.");
-        }
-
-    }
+    void parseNonlinearSolverParams ( const amrex::ParmParse&  pp );
 
     /**
      * \brief Initialize the Mass Matrices used for plasma response in nonlinear Newton solver

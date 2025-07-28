@@ -415,6 +415,66 @@ void ImplicitSolver::ComputeJfromMassMatrices ()
     }
 }
 
+
+void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
+{
+
+    std::string nlsolver_type_str;
+    pp.get("nonlinear_solver", nlsolver_type_str);
+
+    if (nlsolver_type_str=="picard") {
+        m_nlsolver_type = NonlinearSolverType::Picard;
+        m_nlsolver = std::make_unique<PicardSolver<WarpXSolverVec,ImplicitSolver>>();
+        m_max_particle_iterations = 1;
+        m_particle_tolerance = 0.0;
+    }
+    else if (nlsolver_type_str=="newton") {
+        m_nlsolver_type = NonlinearSolverType::Newton;
+        m_nlsolver = std::make_unique<NewtonSolver<WarpXSolverVec,ImplicitSolver>>();
+        pp.query("max_particle_iterations", m_max_particle_iterations);
+        pp.query("particle_tolerance", m_particle_tolerance);
+        pp.query("use_mass_matrices_jacobian", m_use_mass_matrices_jacobian);
+        pp.query("use_mass_matrices_pc", m_use_mass_matrices_pc);
+        if (m_use_mass_matrices_jacobian || m_use_mass_matrices_pc) {
+            m_use_mass_matrices = true;
+        }
+#if defined(WARPX_DIM_RCYLINDER)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !m_use_mass_matrices,
+            "Using mass matrices is not setup for DIM = RCYLINDER!");
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !m_use_mass_matrices,
+            "Using mass matrices is not setup for DIM = RSHERE!");
+#endif
+#if defined(WARPX_DIM_RZ)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !m_use_mass_matrices,
+            "Using mass matrices is not setup for DIM = RZ");
+#endif
+#if defined(WARPX_DIM_3D)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !m_use_mass_matrices_jacobian,
+            "Using mass matrices for jacobian can not be used for DIM = 3");
+#endif
+        if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Villasenor ||
+            m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Esirkepov) {
+            std::stringstream outputMsg;
+            outputMsg << "Particle-suppressed JFNK (e.g., theta-implicit evolve with newton nonlinear solver) \n";
+            outputMsg << "with charge-conserving depositions (esirkepov and villasenor) require particle_shape > 1.\n";
+            outputMsg << "Using PS-JFNK and charge-conserving depositions with shape = 1 is known to result \n";
+            outputMsg << "in particle orbits that will not converge.\n";
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( m_WarpX->nox > 1, outputMsg.str());
+        }
+    }
+    else {
+        WARPX_ABORT_WITH_MESSAGE(
+            "invalid nonlinear_solver specified. Valid options are picard and newton.");
+    }
+
+}
+
 void ImplicitSolver::InitializeMassMatrices ()
 {
 
@@ -454,8 +514,8 @@ void ImplicitSolver::InitializeMassMatrices ()
 
         // Ensure that the guard cells for J and E are the same
         for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
-            AMREX_ASSERT(ngJ[dir]>=shape);
-            AMREX_ASSERT(ngE[dir]>=shape);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( ngJ[dir]==ngE[dir],
+                "Mass Matrices for Jacobian requires guard cells for J and E to be the same.");
         }
 
         if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Direct) {
