@@ -461,8 +461,9 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
              (m_WarpX->nox < 2) ) {
             std::stringstream warningMsg;
             warningMsg << "Particle-suppressed JFNK (e.g., theta-implicit evolve with newton nonlinear solver) ";
-            warningMsg << "with charge-conserving depositions (esirkepov and villasenor) and particle_shape = 1.\n";
-            warningMsg << "Some particle orbits will not converge.\n";
+            warningMsg << "is being used with a charge-conserving deposition (esirkepov or villasenor) and particle_shape = 1.\n";
+            warningMsg << "Some particle orbits may not converge!!!\n";
+            warningMsg << "Consider using particle_shape > 1.\n";
             ablastr::warn_manager::WMRecordWarning("ImplicitSolver", warningMsg.str());
         }
     }
