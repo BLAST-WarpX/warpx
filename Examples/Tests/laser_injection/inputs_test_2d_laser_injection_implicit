@@ -45,7 +45,7 @@ gmres.relative_tolerance = 1.0e-4
 warpx.cfl = 1.0
 
 # Order of particle shape factors
-algo.particle_shape = 2
+algo.particle_shape = 1
 
 # Laser
 lasers.names        = laser1

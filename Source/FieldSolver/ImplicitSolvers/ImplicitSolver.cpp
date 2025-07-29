@@ -456,14 +456,14 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
             !m_use_mass_matrices_jacobian,
             "Using mass matrices for jacobian can not be used for DIM = 3");
 #endif
-        if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Villasenor ||
-            m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Esirkepov) {
-            std::stringstream outputMsg;
-            outputMsg << "Particle-suppressed JFNK (e.g., theta-implicit evolve with newton nonlinear solver) ";
-            outputMsg << "with charge-conserving depositions (esirkepov and villasenor) require particle_shape > 1.\n";
-            outputMsg << "Using PS-JFNK and charge-conserving depositions with shape = 1 is known to result ";
-            outputMsg << "in particle orbits that will not converge.\n";
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( m_WarpX->nox > 1, outputMsg.str());
+        if ( (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Villasenor ||
+              m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Esirkepov) &&
+             (m_WarpX->nox < 2) ) {
+            std::stringstream warningMsg;
+            warningMsg << "Particle-suppressed JFNK (e.g., theta-implicit evolve with newton nonlinear solver) ";
+            warningMsg << "with charge-conserving depositions (esirkepov and villasenor) and particle_shape = 1.\n";
+            warningMsg << "Some particle orbits will not converge.\n";
+            ablastr::warn_manager::WMRecordWarning("ImplicitSolver", warningMsg.str());
         }
     }
     else {
