@@ -371,6 +371,10 @@ namespace detail
                                           {openPMD::UnitDimension::I,  1},
                                           {openPMD::UnitDimension::T,  1},
                                   });
+        } else if (field_name.substr(0,2) == "T_"){ // temperature in eV
+            mesh.setUnitDimension({
+                                          {openPMD::UnitDimension::theta,  1},
+                                  });
         }
     }
 #endif // WARPX_USE_OPENPMD
