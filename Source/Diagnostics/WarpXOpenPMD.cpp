@@ -1471,6 +1471,9 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                                         field_name,
                                         mf[lev],
                                         var_in_theta_mode );
+                        if (field_name.substr(0,2) == "T_") {
+                            mesh.setUnitSI(11604.5);  // temperature in eV -> K
+                        }
                     }
                 } else {
                     auto mesh = meshes[field_name];
