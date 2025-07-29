@@ -1567,7 +1567,7 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
  * \tparam depos_order             Deposition order
  * \tparam full_mass_matrices      Whether to deposit the full mass matrices
  *                                 (can only be true for depos_order = 2)
- * \param xp_n,yp_n,zp_n           Pointer to arrays of particle position at time level n.
+ * \param xp_n_data,yp_n_data,zp_n_data Pointer to arrays of particle position at time level n.
  * \param GetPosition              A functor for returning the particle position.
  * \param wp                       Pointer to array of particle weights.
  * \param uxp_n,uyp_n,uzp_n        Pointer to arrays of particle momentum at time level n.
