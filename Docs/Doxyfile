@@ -958,7 +958,6 @@ FILE_PATTERNS          = *.c \
                          *.c++ \
                          *.h \
                          *.H \
-                         *.py \
                          *.f90 \
                          *.f
 
