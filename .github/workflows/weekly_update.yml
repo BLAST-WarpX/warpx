@@ -1,0 +1,39 @@
+name: Autoupdate
+
+on:
+  schedule:
+    - cron: "0 0 * * 1"  # every Monday at midnight
+
+jobs:
+  weekly_update:
+    name: Weekly update
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Create new branch
+        run: |
+          git checkout -b weekly_update
+      - name: Update dependencies
+        run: |
+          python Tools/Release/update_dependencies.py
+      - name: Commit changes
+        run: |
+          git add .
+          git commit -m "Update dependencies"
+      - name: Push changes
+        run: |
+          git push --set-upstream origin weekly_update
+      - name: Open pull request
+        run: |
+          gh pr create \
+            --base development \
+            --body "Automated via .github/workflows/weekly_update.yml." \
+            --label "component: third party" \
+            --title "Update dependencies"
