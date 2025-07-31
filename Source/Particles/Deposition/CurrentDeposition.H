@@ -462,7 +462,6 @@ void doDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPosition,
                          ion_lev is a null pointer.
  * \param jx_fab,jy_fab,jz_fab FArrayBox of current density, either full array or tile.
  * \param np_to_deposit Number of particles for which current is deposited.
- * \param dt           Time step for particle level
  * \param relative_time Time at which to deposit J, relative to the time of the
  *                      current positions of the particles. When different than 0,
  *                      the particle position will be temporarily modified to match
@@ -1464,10 +1463,10 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
  *        by segment, where the segments are determined by cell crossings. In general, this results
  *        in a tighter stencil. The implementation is valid for an arbitrary number of cell crossings.
  *
- * \param depos_order  deposition order
+ * \tparam depos_order  deposition order
  * \param xp_old,yp_old,zp_old  Old particle positions (nominally at start of step)
  * \param xp_new,yp_new,zp_new  New particle positions (nominally at end of step)
- * \param wp           Pointer to array of particle weights.
+ * \param wq           Pointer to array of particle weights.
  * \param uxp_mid,uyp_mid,uzp_mid  Particle momentum at middle of step
  * \param gaminv       One over gamma for particle at middle of step
  * \param Jx_arr,Jy_arr,Jz_arr  Array4 of current density, either full array or tile
@@ -1476,7 +1475,6 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
  * \param xyzmin                Physical lower bounds of domain
  * \param lo                    Index lower bounds of domain
  * \param invvol                One over cell volume
- * \param q                     Species charge
  * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry
  */
 template <int depos_order>
@@ -2127,12 +2125,10 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
  *        by segment, where the segments are determined by cell crossings. In general, this results
  *        in a tighter stencil. The implementation is valid for an arbitrary number of cell crossings.
  *
- * \param depos_order  deposition order
- * \param xp_n,yp_n,zp_n  Pointer to arrays of particle position at time level n.
+ * \tparam depos_order  deposition order
  * \param GetPosition  A functor for returning the particle position.
  * \param wp           Pointer to array of particle weights.
- * \param uxp_n,uyp_n,uzp_n  Pointer to arrays of particle momentum at time level n.
- * \param uxp_nph,uyp_nph,uzp_nph  Pointer to arrays of particle momentum at time level n + 1/2.
+ * \param uxp,uyp,uzp  Pointer to arrays of particle momentum.
  * \param ion_lev      Pointer to array of particle ionization level. This is
                        required to have the charge of each macroparticle
                        since q is a scalar. For non-ionizable species,
@@ -2140,6 +2136,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
  * \param Jx_arr,Jy_arr,Jz_arr  Array4 of current density, either full array or tile.
  * \param np_to_deposit         Number of particles for which current is deposited.
  * \param dt                    Time step for particle level
+ * \param relative_time         Time at which to deposit, relative to the time of the current positions of the particles.
  * \param dinv                  3D cell size inverse
  * \param xyzmin                Physical lower bounds of domain.
  * \param lo                    Index lower bounds of domain.
@@ -2214,8 +2211,8 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
  *        by segment, where the segments are determined by cell crossings. In general, this results
  *        in a tighter stencil. The implementation is valid for an arbitrary number of cell crossings.
  *
- * \param depos_order  deposition order
- * \param xp_n,yp_n,zp_n  Pointer to arrays of particle position at time level n.
+ * \tparam depos_order  deposition order
+ * \param xp_n_data,yp_n_data,zp_n_data  Pointer to arrays of particle position at time level n.
  * \param GetPosition  A functor for returning the particle position.
  * \param wp           Pointer to array of particle weights.
  * \param uxp_n,uyp_n,uzp_n  Pointer to arrays of particle momentum at time level n.

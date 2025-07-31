@@ -530,7 +530,7 @@ foreach(D IN LISTS WarpX_DIMS)
                 warpx_enable_IPO(pyWarpX_${SD})
             else()
                 # conditionally defined target in pybind11
-                # https://github.com/pybind/pybind11/blob/v2.13.0/tools/pybind11Common.cmake#L407-L413
+                # https://github.com/pybind/pybind11/blob/v3.0.0/tools/pybind11Common.cmake#L420-L426
                 target_link_libraries(pyWarpX_${SD} PRIVATE pybind11::lto)
             endif()
         endif()

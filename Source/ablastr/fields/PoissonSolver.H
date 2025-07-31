@@ -66,7 +66,6 @@ namespace ablastr::fields {
  * \param[in] rho The charge density a given species
  * \param[in] finest_level The most refined mesh refinement level
  * \param[in] absolute_tolerance The absolute convergence threshold for the MLMG solver
- * \param[out] max_norm_rho The maximum L-infinity norm of `rho` across all levels
  */
 inline amrex::Real getMaxNormRho (
     ablastr::fields::ConstMultiLevelScalarField const& rho,

@@ -85,8 +85,9 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
 
 /** Perform all collisions
  *
+ * @param step Current iteration
  * @param cur_time Current time
- * @param dt time step size
+ * @param dt Time step
  * @param mypc MultiParticleContainer calling this method
  *
  */

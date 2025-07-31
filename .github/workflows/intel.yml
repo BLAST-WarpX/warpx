@@ -80,8 +80,8 @@ jobs:
         export OMP_NUM_THREADS=2
         Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_picmi.py
 
-  build_dpcc:
-    name: oneAPI DPC++ SP
+  build_dpc:
+    name: oneAPI DPC++ DP SP
     runs-on: ubuntu-24.04
     # Since 2021.4.0, AMReX_GpuUtility.H: error: comparison with NaN always evaluates to false in fast floating point modes
     # oneAPI 2022.2.0 hangs for -O2 and higher:
@@ -121,7 +121,7 @@ jobs:
         export CC=$(which icx)
         export CXXFLAGS="-fsycl ${CXXFLAGS}"
 
-        cmake -S . -B build_sp         \
+        cmake -S . -B build_dpsp       \
           -DBUILD_SHARED_LIBS=ON       \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_COMPUTE=SYCL         \
@@ -133,8 +133,9 @@ jobs:
           -DWarpX_PYTHON=ON            \
           -DWarpX_MPI=OFF              \
           -DWarpX_OPENPMD=ON           \
-          -DWarpX_PRECISION=SINGLE
-        cmake --build build_sp -j 4
+          -DWarpX_PRECISION=DOUBLE     \
+          -DWarpX_PARTICLE_PRECISION=SINGLE
+        cmake --build build_dpsp -j 4
 
         ccache -s
         du -hs ~/.cache/ccache

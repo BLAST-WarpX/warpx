@@ -1155,7 +1155,7 @@ void MultiParticleContainer::InitQuantumSync ()
     // qs_minimum_chi_part is the minimum chi parameter to be
     // considered for Synchrotron emission. If a lepton has chi < chi_min,
     // the optical depth is not evolved and photon generation is ignored
-    amrex::Real qs_minimum_chi_part;
+    amrex::Real qs_minimum_chi_part = 0;
     utils::parser::getWithParser(pp_qed_qs, "chi_min", qs_minimum_chi_part);
 
 
@@ -1277,7 +1277,7 @@ MultiParticleContainer::QuantumSyncGenerateTable ()
     // qs_minimum_chi_part is the minimum chi parameter to be
     // considered for Synchrotron emission. If a lepton has chi < chi_min,
     // the optical depth is not evolved and photon generation is ignored
-    amrex::Real qs_minimum_chi_part;
+    amrex::Real qs_minimum_chi_part = 0;
     utils::parser::getWithParser(pp_qed_qs, "chi_min", qs_minimum_chi_part);
 
     if(ParallelDescriptor::IOProcessor()){
@@ -1367,7 +1367,7 @@ MultiParticleContainer::BreitWheelerGenerateTable ()
     // bw_minimum_chi_phot is the minimum chi parameter to be
     // considered for pair production. If a photon has chi < chi_min,
     // the optical depth is not evolved and photon generation is ignored
-    amrex::Real bw_minimum_chi_part;
+    amrex::Real bw_minimum_chi_part = 0;
     utils::parser::getWithParser(pp_qed_bw, "chi_min", bw_minimum_chi_part);
 
     if(ParallelDescriptor::IOProcessor()){

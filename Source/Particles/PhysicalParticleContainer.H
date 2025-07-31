@@ -91,6 +91,7 @@ public:
      * \param dt time step by which particles are advanced
      * \param a_dt_type type of time step (used for sub-cycling)
      * \param skip_deposition Skip the charge and current deposition.
+     * \param deposit_mass_matrices whether to deposit the mass matrices (in the case of the implicit solver)
      * \param push_type Type of particle push, explicit or implicit. Defaults to explicit
      *
      * Evolve iterates over particle iterator (each box) and performs filtering,
@@ -176,7 +177,7 @@ public:
      * number of particles per cell (in the cells of `part_realbox`).
      * The new particles are only created inside the intersection of `part_realbox`
      * with the local grid for the current proc.
-     * @param[in] the PlasmaInjector instance holding the input parameters
+     * @param[in] plasma_injector the PlasmaInjector instance holding the input parameters
      * @param[in] lev the index of the refinement level
      * @param[in] part_realbox the box in which new particles should be created
      * (this box should correspond to an integer number of cells in each direction,
@@ -187,7 +188,7 @@ public:
     /**
      * Create new macroparticles for this species, with a fixed
      * number of particles per cell in a plane.
-     * @param[in] the PlasmaInjector instance holding the input parameters
+     * @param[in] plasma_injector the PlasmaInjector instance holding the input parameters
      * @param[in] dt time step size, used to partially advance the particles
     */
     void AddPlasmaFlux (PlasmaInjector const& plasma_injector, amrex::Real dt);
@@ -199,7 +200,7 @@ public:
     void AddGaussianBeam (PlasmaInjector const& plasma_injector);
 
     /** Load a particle beam from an external file
-     * @param[in] the PlasmaInjector instance holding the input parameters
+     * @param[in] plasma_injector the PlasmaInjector instance holding the input parameters
      * @param[in] q_tot total charge of the particle species to be initialized
      * @param[in] z_shift optional shift to the z position of particles (useful for boosted frame runs)
      */
@@ -230,7 +231,6 @@ public:
      * These are NOT initialized by this function.
      * @param[in] n_external_attr_int The number of integer attributes that have been externally set.
      * These are NOT initialized by this function.
-     * @param[in] engine the random engine, used in initialization of QED optical depths
      */
     void DefaultInitializeRuntimeAttributes (
         typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType& pinned_tile,
