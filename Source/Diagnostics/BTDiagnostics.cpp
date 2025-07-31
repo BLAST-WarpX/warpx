@@ -1342,7 +1342,7 @@ BTDiagnostics::InterleaveBufferAndSnapshotHeader ( const std::string& buffer_Hea
     amrex::IntVect box_lo(0);
     amrex::IntVect box_hi(1);
     // Update prob_lo with min of buffer and snapshot
-    for (int idim = 0; idim < snapshot_HeaderImpl.spaceDim(); ++idim) {
+    for (int idim = 0; idim < std::min(snapshot_HeaderImpl.spaceDim(),AMREX_SPACEDIM); ++idim) {
         const amrex::Real min_prob_lo = amrex::min(buffer_HeaderImpl.problo(idim),
                                              snapshot_HeaderImpl.problo(idim));
         const amrex::Real max_prob_hi = amrex::max(buffer_HeaderImpl.probhi(idim),

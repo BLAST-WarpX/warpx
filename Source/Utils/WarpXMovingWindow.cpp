@@ -260,6 +260,11 @@ WarpX::UpdateInjectionPosition (const amrex::Real a_dt)
 {
     const int dir = moving_window_dir;
 
+    if (dir < 0 || dir >= AMREX_SPACEDIM) {
+        WARPX_ABORT_WITH_MESSAGE("Invalid moving window direction: "+std::to_string(dir));
+        return;
+    }
+
     // Loop over species (particles and lasers)
     const int n_containers = mypc->nContainers();
     for (int i=0; i<n_containers; i++)
@@ -365,6 +370,11 @@ WarpX::MoveWindow (const int step, bool move_j)
     // and of the plasma injection
     moving_window_x += (moving_window_v - WarpX::beta_boost * PhysConst::c)/(1 - moving_window_v * WarpX::beta_boost / PhysConst::c) * dt[0];
     const int dir = moving_window_dir;
+
+    if (dir < 0 || dir >= AMREX_SPACEDIM) {
+        WARPX_ABORT_WITH_MESSAGE("Invalid moving window direction: "+std::to_string(dir));
+        return 0;
+    }
 
     // Update current injection position for all containers
     UpdateInjectionPosition(dt[0]);
