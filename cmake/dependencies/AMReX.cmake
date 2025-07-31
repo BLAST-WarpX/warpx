@@ -53,6 +53,16 @@ macro(find_amrex)
 
         set(AMReX_SIMD "${WarpX_SIMD}" CACHE INTERNAL "")
 
+        if(WarpX_FASTMATH OR ABLASTR_FASTMATH)
+            set(AMReX_FASTMATH ON CACHE INTERNAL "")
+            # TODO: set consistently (default: ON)
+            # set(AMReX_CUDA_FASTMATH ON CACHE INTERNAL "")
+        else()
+            # TODO: set consistently (default: ON)
+            # set(AMReX_CUDA_FASTMATH ON CACHE INTERNAL "")
+            set(AMReX_FASTMATH OFF CACHE INTERNAL "")
+        endif()
+
         if(WarpX_FFT OR ABLASTR_FFT)
             set(AMReX_FFT ON CACHE INTERNAL "")
         else()
