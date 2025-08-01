@@ -265,7 +265,7 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
                         flux += Poynting::Kernel<2, PoyntingStaggered>(box, Ex_arr, Ey_arr, Ez_arr, Bx_arr, By_arr, Bz_arr, area_factor);
                     }
                 }
-                else if (Ex.is_nodal()) {
+                else if (warpx.grid_type == ablastr::utils::enums::GridType::Collocated && Ex.is_nodal()) {
                     if (normal_dir == 0) {
                         flux += Poynting::Kernel<0, PoyntingNodal>(box, Ex_arr, Ey_arr, Ez_arr, Bx_arr, By_arr, Bz_arr, area_factor);
                     }
@@ -276,7 +276,7 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
                         flux += Poynting::Kernel<2, PoyntingNodal>(box, Ex_arr, Ey_arr, Ez_arr, Bx_arr, By_arr, Bz_arr, area_factor);
                     }
                 }
-                else if (Ex.is_cell_centered()) {
+                else if (warpx.grid_type == ablastr::utils::enums::GridType::Collocated && Ex.is_cell_centered()) {
                     if (normal_dir == 0) {
                         flux += Poynting::Kernel<0, PoyntingCell>(box, Ex_arr, Ey_arr, Ez_arr, Bx_arr, By_arr, Bz_arr, area_factor);
                     }
