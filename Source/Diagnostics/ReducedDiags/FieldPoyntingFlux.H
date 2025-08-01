@@ -22,6 +22,12 @@ using namespace amrex::literals;
 
 struct PoyntingStaggered {
     // This requires the arrays to have Yee centering
+    // The procedure (in 3D) is to interpolate the B (which is centered on faces normal
+    // to the plane of the calculaton) to the edge in the plane of the calculation to match
+    // the location of the E. Then the product E*B is interpolated to the face center in
+    // the plane of the calculation.
+    // The procedure is mapped to lower dimensions, and in some cases the second interpolation
+    // is not needed.
 
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     static amrex::Real EyBx(int i, int j, int k, int comp,
