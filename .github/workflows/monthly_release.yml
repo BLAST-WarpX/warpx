@@ -25,11 +25,11 @@ jobs:
           python Tools/Release/update_dependencies.py --release
       - name: Commit changes
         run: |
-          git add .
+          git add -u
           git commit -m "Update dependencies and release"
       - name: Push changes
         run: |
-          git push --set-upstream origin monthly_release
+          git push -u origin monthly_release
       - name: Open pull request
         run: |
           gh pr create \
