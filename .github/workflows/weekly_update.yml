@@ -19,7 +19,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
       - name: Create new branch
         run: |
-          git checkout -b weekly_update
+          git checkout weekly_update || git checkout -b weekly_update
       - name: Update dependencies
         run: |
           python Tools/Release/update_dependencies.py
