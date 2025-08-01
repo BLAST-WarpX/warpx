@@ -343,6 +343,10 @@ namespace Poynting {
 
                 constexpr int comp = 0;
 
+                // This is needed by the GPU compilers where captured variables cannot first appear
+                // in a constexpr-if context
+                amrex::ignore_unused(Ez_arr, By_arr, Ex_arr, Bz_arr, Ey_arr, Bx_arr);
+
                 amrex::Real const af = area_factor(i,j,k);
                 if constexpr (normal_dir == 0) {
                     return af*(T_Algo::EyBz(i,j,k,comp,Ey_arr,Bz_arr) - T_Algo::EzBy(i,j,k,comp,Ez_arr,By_arr));
