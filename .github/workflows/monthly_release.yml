@@ -17,7 +17,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-      - name: Create new branch
+      - name: Checkout branch
         run: |
           git checkout monthly_release || git checkout -b monthly_release
       - name: Update dependencies
