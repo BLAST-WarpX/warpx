@@ -41,13 +41,13 @@ For other GPUs, adjust ``-DCMAKE_CUDA_ARCHITECTURES``:
 - H100: `90`
 
 .. note::
-  
+
   SLURM tip (S3DF):
 
   -  Use srun to have GPU nodes allocated. WarpX requires a "task" per CPU-GPU pair, so if you want to run WarpX e.g. on 4 GPUs, you would do:
 
   .. code-block:: bash
-  
+
     srun --pty --cpus-per-task=8 --ntasks-per-node=4 --gpus=4 --mem=100GB --nodes=1 --time=2:00:00 --partition=ampere --account=atlas bash
 
 
@@ -58,27 +58,27 @@ For other GPUs, adjust ``-DCMAKE_CUDA_ARCHITECTURES``:
 
 
   .. code-block:: bash
-    
+
     # A) create env (example set; versions can vary by site repos)
-    
+
     conda create -n warpx-gpu-test -y python=3.11
     conda activate warpx-gpu-test
 
     #Get the full CUDA toolkit in your conda env.
     conda install -c nvidia -y "cuda=12.9.*"
-    
+
     # Additionally install NVTX dev tools (cuda separates from the runtime version)
     conda install -c nvidia -y "cuda-nvtx-dev=12.9.*"
-    
+
     # B) Install build tools
     conda install -c conda-forge -y \
       "cmake>=3.27" ninja make pkg-config git \
       openmpi ucx mpi4py \
       gcc_linux-64=13 gxx_linux-64=13
-    
+
     # C) Install ADIOS2 with OpenMPI (so we can use openpmd_backend = bp)
     conda install -c conda-forge "adios2=*=mpi_openmpi*"
-    
+
     # D) Verify build tools
     which cmake && cmake --version     # should show cmake >= 3.24 from your env
     which nvcc  && nvcc  --version     # should show CUDA 12.9 from the nvidia 'cuda' metapackage
@@ -97,7 +97,7 @@ For other GPUs, adjust ``-DCMAKE_CUDA_ARCHITECTURES``:
 
 .. code-block:: bash
 
-  git clone https://github.com/BLAST-WarpX/warpx.git 
+  git clone https://github.com/BLAST-WarpX/warpx.git
   cd warpx
 
 
@@ -113,19 +113,19 @@ Recent NVTX installs the header under ``nvtx3/nvToolsExt.h``. Add it to your inc
 
   # ensure libdl is not dropped by the linker (GCC + gold/ld with --as-needed)
   export LDFLAGS="${LDFLAGS} -Wl,--no-as-needed -ldl"
-  
+
   # verify the header exists (one of these should print a path)
   ls "$CONDA_PREFIX/targets/x86_64-linux/include/nvtx3/nvToolsExt.h" \
    || ls "$CONDA_PREFIX/include/nvtx3/nvToolsExt.h"
-  
+
   # include & library paths from the conda CUDA toolchain
   export CUDACXX="$CONDA_PREFIX/bin/nvcc"
   export CUDA_HOME="$CONDA_PREFIX"
-  
+
   export CPATH="$CONDA_PREFIX/targets/x86_64-linux/include/nvtx3:$CONDA_PREFIX/targets/x86_64-linux/include"
   export LIBRARY_PATH="$CONDA_PREFIX/targets/x86_64-linux/lib"
   export LD_LIBRARY_PATH="$CONDA_PREFIX/targets/x86_64-linux/lib"
-  
+
   # help CMake find ADIOS2/openPMD (if using conda-provided openPMD)
   export ADIOS2_DIR="$CONDA_PREFIX"
   export openPMD_DIR="$CONDA_PREFIX"
@@ -187,7 +187,3 @@ From the build dir:
   cp Examples/Physics_applications/beam_beam_collision/inputs_test_3d_beam_beam_collision run_test/ #copy input file!
   cd run_test/
   mpirun -np 4 ./warpx.3d inputs_test_3d_beam_beam_collision # run!
-
-
-
-
