@@ -1158,6 +1158,12 @@ Particle initialization
       ``electrons.density_function(x,y,z) = "n0+n0*x**2*1.e12"`` where ``n0`` is a
       user-defined constant, see above. WARNING: where ``density_function(x,y,z)`` is close to zero, particles will still be injected between ``xmin`` and ``xmax`` etc., with a null weight. This is undesirable because it results in useless computing. To avoid this, see option ``density_min`` below.
 
+    * ``fromfile``: The density profile is computed from data in an openPMD
+      file. It requires additional parameters
+      ``<species_name>.read_density_from_path`` and
+      ``<species_name>.density_name`` specifying the file name and the
+      variable name for density, respectively.
+
 * ``<species_name>.flux_profile`` (`string`)
     Defines the expression of the flux, when using ``<species_name>.injection_style=NFluxPerCell``
 

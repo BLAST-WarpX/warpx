@@ -104,6 +104,12 @@ namespace SpeciesUtils {
                 utils::parser::makeParser(str_density_function,{"x","y","z"}));
             h_inj_rho.reset(new InjectorDensity((InjectorDensityParser*)nullptr,
                 density_parser->compile<3>()));
+        } else if (rho_prof_s == "fromfile") {
+            std::string density_file, density_name;
+            utils::parser::get(pp_species, source_name, "read_density_from_path", density_file);
+            utils::parser::get(pp_species, source_name, "density_name", density_name);
+            h_inj_rho.reset(new InjectorDensity((InjectorDensityFromFile*)nullptr,
+                                                density_file, density_name));
         } else {
             StringParseAbortMessage("Density profile type", rho_prof_s);
         }
