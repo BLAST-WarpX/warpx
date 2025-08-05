@@ -22,8 +22,7 @@ namespace warpx::particles
      * \brief Reads the particle boundary conditions from
      * the inputfile
      *
-     * \param[in] field_boundary_lo the field boundary condition for the lower boundary
-     * \param[in] field_boundary_hi the field boundary condition for the upper boundary
+     * \param[in] is_field_boundary_periodic a bool array indicating if field boundary conditions are periodic in each direction
      *
      * \returns a pair of amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM>
      *          containing the boundary conditions for the lower and the
@@ -34,8 +33,7 @@ namespace warpx::particles
         amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM>
     >
     parse_particle_boundaries (
-        const amrex::Array<FieldBoundaryType, AMREX_SPACEDIM>& field_boundary_lo,
-        const amrex::Array<FieldBoundaryType, AMREX_SPACEDIM>& field_boundary_hi);
+        const amrex::Array<bool, AMREX_SPACEDIM>& is_field_boundary_periodic);
 }
 
 /**

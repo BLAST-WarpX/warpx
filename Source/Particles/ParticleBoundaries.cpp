@@ -12,13 +12,49 @@
 
 namespace warpx::particles
 {
+
+    namespace detail
+    {
+        void set_to_periodic_if_field_boundary_is_periodic (
+            amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM>& particle_boundary_lo,
+            amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM>& particle_boundary_hi,
+            const amrex::Array<bool, AMREX_SPACEDIM>& is_field_boundary_periodic
+        )
+        {
+            for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                if (is_field_boundary_periodic[idim]){
+                    particle_boundary_lo[idim] = ParticleBoundaryType::Periodic;
+                    particle_boundary_hi[idim] = ParticleBoundaryType::Periodic;
+                }
+            }
+        }
+
+        void check_consistency (
+            const amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM>& particle_boundary_lo,
+            const amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM>& particle_boundary_hi,
+            const amrex::Array<bool, AMREX_SPACEDIM>& is_field_boundary_periodic
+        )
+        {
+            for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                if (is_field_boundary_periodic[idim] ||
+                    particle_boundary_lo[idim] == ParticleBoundaryType::Periodic ||
+                    particle_boundary_hi[idim] == ParticleBoundaryType::Periodic ) {
+                    // to ensure both lo and hi are set to periodic consistently for both field and particles.
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        (particle_boundary_lo[idim] == ParticleBoundaryType::Periodic) &&
+                        (particle_boundary_hi[idim] == ParticleBoundaryType::Periodic),
+                        "field and particle boundary must be periodic in both lo and hi");
+                }
+            }
+        }
+    }
+
     std::pair<
         amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM>,
         amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM>
     >
     parse_particle_boundaries (
-        const amrex::Array<FieldBoundaryType, AMREX_SPACEDIM>& field_boundary_lo,
-        const amrex::Array<FieldBoundaryType, AMREX_SPACEDIM>& field_boundary_hi)
+        const amrex::Array<bool, AMREX_SPACEDIM>& is_field_boundary_periodic)
     {
         auto particle_boundary_lo =
             amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM>{
@@ -34,31 +70,21 @@ namespace warpx::particles
             pp_boundary.contains("particle_lo") ||
             pp_boundary.contains("particle_hi");
 
+        if (! particle_boundary_specified){
+            detail::set_to_periodic_if_field_boundary_is_periodic(
+                particle_boundary_lo, particle_boundary_hi,
+                is_field_boundary_periodic);
+        }
+        else{
             for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
                 pp_boundary.query_enum_sloppy("particle_lo", particle_boundary_lo[idim], "-_", idim);
                 pp_boundary.query_enum_sloppy("particle_hi", particle_boundary_hi[idim], "-_", idim);
-
-                if (field_boundary_lo[idim] == FieldBoundaryType::Periodic ||
-                    field_boundary_hi[idim] == FieldBoundaryType::Periodic ||
-                    particle_boundary_lo[idim] == ParticleBoundaryType::Periodic ||
-                    particle_boundary_hi[idim] == ParticleBoundaryType::Periodic ) {
-                    // to ensure both lo and hi are set to periodic consistently for both field and particles.
-                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                        (field_boundary_lo[idim]  == FieldBoundaryType::Periodic) &&
-                        (field_boundary_hi[idim]  == FieldBoundaryType::Periodic),
-                        "field boundary must be consistenly periodic in both lo and hi");
-                    if (particle_boundary_specified) {
-                        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                            (particle_boundary_lo[idim] == ParticleBoundaryType::Periodic) &&
-                            (particle_boundary_hi[idim] == ParticleBoundaryType::Periodic),
-                            "field and particle boundary must be periodic in both lo and hi");
-                    } else {
-                        // set particle boundary to periodic
-                        particle_boundary_lo[idim] = ParticleBoundaryType::Periodic;
-                        particle_boundary_hi[idim] = ParticleBoundaryType::Periodic;
-                    }
-                }
             }
+
+            detail::check_consistency(
+                particle_boundary_lo, particle_boundary_hi,
+                is_field_boundary_periodic);
+        }
 
         return {particle_boundary_lo, particle_boundary_hi};
     }
