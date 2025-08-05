@@ -1058,9 +1058,9 @@ private:
 
     /**
      * \brief
-     * Perform collisions and advance fields and particles by one time step.
+     * Perform collisions, particle injection, and advance fields and particles by one time step.
     */
-    void OneStepWithCollisions (
+    void OneStep (
         amrex::Real a_cur_time,
         amrex::Real a_dt,
         int a_step

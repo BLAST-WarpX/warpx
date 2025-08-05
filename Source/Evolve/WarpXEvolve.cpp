@@ -225,13 +225,8 @@ WarpX::Evolve (int numsteps)
         mypc->doQEDSchwinger();
 #endif
 
-        // callback called when particle injection happens, after the position
-        // advance and before deposition is called, allowing a user
-        // defined particle distribution to be injected each time step
-        ExecutePythonCallback("particleinjection");
-
         // perform collisions and advance fields and particles by one time step
-        OneStepWithCollisions(cur_time, dt[0], step);
+        OneStep(cur_time, dt[0], step);
 
         // Resample particles
         // +1 is necessary here because value of step seen by user (first step is 1) is different than
@@ -377,18 +372,21 @@ WarpX::Evolve (int numsteps)
         ablastr::warn_manager::GetWMInstance().PrintGlobalWarnings("THE END");
 }
 
-void WarpX::OneStepWithCollisions (
+void WarpX::OneStep (
     amrex::Real a_cur_time,
     amrex::Real a_dt,
     int a_step
 )
 {
-    WARPX_PROFILE("WarpX::OneStepWithCollisions()");
+    WARPX_PROFILE("WarpX::OneStep()");
 
-    // perform collisions
+    // perform particle collisions
     ExecutePythonCallback("beforecollisions");
     mypc->doCollisions(a_step, a_cur_time, a_dt);
     ExecutePythonCallback("aftercollisions");
+
+    // perform particle injection
+    ExecutePythonCallback("particleinjection");
 
     // implicit solver
     if (m_implicit_solver) {
