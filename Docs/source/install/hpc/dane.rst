@@ -26,13 +26,15 @@ Preparation
 
 Use the following commands to download the WarpX source code.
 Note that these commands and the shell scripts all assume the bash shell.
+This downloads WarpX into the workspace directory, which is recommended.
+WarpX can be downloaded elsewhere if that doesn't work with your directory structure, but note that the commands shown below refer to WarpX in the workspace directory.
 
 .. code-block:: bash
 
    git clone https://github.com/BLAST-WarpX/warpx.git /usr/workspace/${USER}/dane/src/warpx
 
-We use system software modules, add environment hints and further dependencies via the file ``$HOME/dane_warpx.profile``.
-Create it now:
+The system software modules, environment hints, and further dependencies are setup via the file ``$HOME/dane_warpx.profile`` which is copied from the WarpX source.
+Set it up now:
 
 .. code-block:: bash
 
@@ -58,13 +60,18 @@ Exit the ``vi`` editor with ``Esc`` and then type ``:wq`` (write & quit).
 
 .. important::
 
-   Now, and as the first step on future logins to Dane, activate these environment settings:
+   Now, and as the first step on future logins to Dane, activate these environment settings by executing the file:
 
    .. code-block:: bash
 
       source $HOME/dane_warpx.profile
 
-Finally, since Dane does not yet provide software modules for some of our dependencies, install them once:
+Finally, since Dane does not yet provide software modules for some of our dependencies, WarpX provides a script to install them.
+This is done executed now.
+They are by default installed in the workspace directory (which is recommended), but can be installed elsewhere by setting the environment variable ``WARPX_SW_DIR``.
+The second command activates the Python virtual environment.
+This would normally be done by the ``dane_warpx.profile`` script, but the environment is created by the install script and so wasn't created yet when the profile was run above.
+So the activation needs to be done this way only this one time.
 
 .. code-block:: bash
 
@@ -85,7 +92,8 @@ Finally, since Dane does not yet provide software modules for some of our depend
 Compilation
 -----------
 
-Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
+Use the following :ref:`cmake commands <building-cmake>` to compile the application executable.
+The options should be modified to suit your needs, for example only building for the dimensions needed.
 
 .. code-block:: bash
 
@@ -125,7 +133,6 @@ If you already installed WarpX in the past and want to update it, start by getti
    git status
 
    # get the latest WarpX source code
-   git fetch
    git pull
 
    # read the output of these commands - do they look ok?

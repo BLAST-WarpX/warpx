@@ -136,6 +136,7 @@ private:
      *  m_t_lab, and z-positions for the i^th snapshot, i_buffer, and level, lev.
      * \param[in] i_buffer i^th snapshot or buffer
      * \param[in] lev mesh-refinement level for which the field and/or particle buffer data is initialized.
+     * \param[in] restart whether this is called upon restarting a previous simulation
      */
     void InitializeBufferData ( int i_buffer , int lev, bool restart=false) override;
     /** Whether to compute back-tranformed values for field-data.

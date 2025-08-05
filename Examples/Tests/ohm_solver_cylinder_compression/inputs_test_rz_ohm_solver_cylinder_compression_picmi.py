@@ -213,9 +213,9 @@ class PlasmaCylinderCompression(object):
         self.rho_i = self.vi_th / self.w_ci
 
     def load_fields(self):
-        Br = fields.BxFPExternalWrapper(include_ghosts=False)
-        Bt = fields.ByFPExternalWrapper(include_ghosts=False)
-        Bz = fields.BzFPExternalWrapper(include_ghosts=False)
+        Br = fields.BxFPExternalWrapper()
+        Bt = fields.ByFPExternalWrapper()
+        Bz = fields.BzFPExternalWrapper()
 
         Br[:, :] = 0.0
         Bt[:, :] = 0.0

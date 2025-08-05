@@ -29,6 +29,8 @@
  * \tparam CreateFunc2 the create function type for dst2
  * \tparam TransFunc the transform function type
  *
+ * \param[in,out] pc1  the first destination particle container
+ * \param[in,out] pc2  the second destination particle container
  * \param[in,out] dst1 the first destination tile
  * \param[in,out] dst2 the second destination tile
  * \param[in] box the box where the particles are created
@@ -190,6 +192,8 @@ Index filterCreateTransformFromFAB (DstPC& pc1, DstPC& pc2,
  * \tparam CreateFunc2 the create function type for dst2
  * \tparam TransFunc the transform function type
  *
+ * \param[in,out] pc1  the first destination particle container
+ * \param[in,out] pc2  the second destination particle container
  * \param[in,out] dst1 the first destination tile
  * \param[in,out] dst2 the second destination tile
  * \param[in] box the box where the particles are created

@@ -35,13 +35,10 @@ public:
      * Then electric and magnetic fields are updated to include potential variation
      * due to boundary conditions using the function ``AddBoundaryField``
      *
-     * \param[in,unused] rho_fp A temporary multifab is used for species charge density
-     * \param[in,unused] rho_cp A temporary multifab is used to store species charge density on coarse patch
-     * \param[in] charge_buf Buffer region to synchronize charge density from fine and coarse patch
-     * \param[in,unused] phi_fp A temporary multifab is used to compute electrostatic potentail for each species
-     * \param[in] mpc Pointer to multi particle container to access species data
-     * \param[in,out] Efield_fp Field contribution from phi computed from each species' charge density is added
-     * \param[in,out] Bfield Field contribution from phi computed from each species' charge density is added
+     * \param fields MultiFab register of fields
+     * \param mpc Reference to multi-particle container
+     * \param mfl Pointer to multi-fluid container
+     * \param max_level Maximum level of mesh refinement
      */
     void ComputeSpaceChargeField (
         ablastr::fields::MultiFabRegister& fields,
@@ -53,11 +50,9 @@ public:
      * Compute the charge density of the species paricle container, pc,
      * and obtain the corresponding electrostatic potential to
      * update the electric and magnetic fields.
-     * \param[in] charge_buf Multifab that stores buffer region to
-     *                       synchronize charge density on fine and coarse patch
      * \param[in] pc particle container for the selected species
-     * \param[in] Efield Efield updated to include potential computed for selected species charge density as source
-     * \param[in] Bfield Bfield updated to include potential computed for selected species charge density as source
+     * \param[in] Efield_fp Efield updated to include potential computed for selected species charge density as source
+     * \param[in] Bfield_fp Bfield updated to include potential computed for selected species charge density as source
      */
     void AddSpaceChargeField (
         WarpXParticleContainer& pc,

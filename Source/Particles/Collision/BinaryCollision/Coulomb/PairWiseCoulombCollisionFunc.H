@@ -83,6 +83,7 @@ public:
          * @param[in,out] soa_1,soa_2 contain the struct of array data of the two species.
          * @param[in] n1,n2 are local densities.
          * @param[in] T1,T2 are local temperatures.
+         * @param[in] global_lamdb global Debye length.
          * @param[in] q1,q2 are charges.
          * @param[in] m1,m2 are masses.
          * @param[in] dt is the time step length between two collision calls.

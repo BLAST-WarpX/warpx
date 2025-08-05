@@ -229,8 +229,8 @@ public:
     static inline auto time_dependency_rho = TimeDependencyRho::Default;
 
     //! If true, the current is deposited on a nodal grid and then centered onto a staggered grid
-    //! using finite centering of order given by #current_centering_nox, #current_centering_noy,
-    //! and #current_centering_noz
+    //! using finite centering of order given by current_centering_nox, current_centering_noy,
+    //! and current_centering_noz
     bool do_current_centering = false;
 
     //! If true, a correction is applied to the current in Fourier space,
@@ -957,6 +957,10 @@ public:
     ablastr::fields::MultiFabRegister m_fields;
     ablastr::fields::MultiFabRegister& GetMultiFabRegister() {return m_fields;}
 
+    //! Use this function to override the Level 0 grids made by AMReX.
+    //! This function is called in amrex::AmrCore::InitFromScratch.
+    void PostProcessBaseGrids (amrex::BoxArray& ba0) const final;
+
 protected:
 
     /**
@@ -985,10 +989,6 @@ protected:
      *  can be used in the function used to define the E and B fields on the grid.
      */
     void InitLevelData (int lev, amrex::Real time);
-
-    //! Use this function to override the Level 0 grids made by AMReX.
-    //! This function is called in amrex::AmrCore::InitFromScratch.
-    void PostProcessBaseGrids (amrex::BoxArray& ba0) const final;
 
     //! Use this function to override how DistributionMapping is made.
     [[nodiscard]] amrex::DistributionMapping
@@ -1340,7 +1340,7 @@ private:
     amrex::Real stop_time = std::numeric_limits<amrex::Real>::max();
 
     //! If specified, the maximum number of iterations is computed automatically so that
-    //! the lower end of the simulation domain along z reaches #zmax_plasma_to_compute_max_step
+    //! the lower end of the simulation domain along z reaches zmax_plasma_to_compute_max_step
     //! in the boosted frame
     std::optional<amrex::Real> m_zmax_plasma_to_compute_max_step = std::nullopt;
 
@@ -1487,10 +1487,8 @@ private:
      * \brief Forward FFT of J on all mesh refinement levels,
      *        with k-space filtering (if needed)
      *
-     * \param J_fp Vector of three-dimensional arrays (for each level)
-     *             storing the fine patch current to be transformed
-     * \param J_cp Vector of three-dimensional arrays (for each level)
-     *             storing the coarse patch current to be transformed
+     * \param J_fp_string String representing the fine patch current to be transformed
+     * \param J_cp_string String representing the coarse patch current to be transformed
      * \param[in] apply_kspace_filter Control whether to apply filtering
      *                                (only used in RZ geometry to avoid double filtering)
      */
@@ -1502,10 +1500,8 @@ private:
     /**
      * \brief Backward FFT of J on all mesh refinement levels
      *
-     * \param J_fp Vector of three-dimensional arrays (for each level)
-     *             storing the fine patch current to be transformed
-     * \param J_cp Vector of three-dimensional arrays (for each level)
-     *             storing the coarse patch current to be transformed
+     * \param J_fp_string String representing the fine patch current to be transformed
+     * \param J_cp_string String representing the coarse patch current to be transformed
      */
     void PSATDBackwardTransformJ (
         std::string const & J_fp_string,
@@ -1515,8 +1511,8 @@ private:
      * \brief Forward FFT of rho on all mesh refinement levels,
      *        with k-space filtering (if needed)
      *
-     * \param charge_fp Vector (for each level) storing the fine patch charge to be transformed
-     * \param charge_cp Vector (for each level) storing the coarse patch charge to be transformed
+     * \param charge_fp_string String representing the fine patch charge to be transformed
+     * \param charge_cp_string String representing the coarse patch charge to be transformed
      * \param[in] icomp index of fourth component (0 for rho_old, 1 for rho_new)
      * \param[in] dcomp index of spectral component (0 for rho_old, 1 for rho_new)
      * \param[in] apply_kspace_filter Control whether to apply filtering
