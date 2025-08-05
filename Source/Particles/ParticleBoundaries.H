@@ -19,8 +19,7 @@
 namespace warpx::particles
 {
     /**
-     * \brief Reads the particle boundary conditions from
-     * the inputfile
+     * \brief Reads the particle boundary conditions from the input file
      *
      * \param[in] is_field_boundary_periodic a bool array indicating if field boundary conditions are periodic in each direction
      *
