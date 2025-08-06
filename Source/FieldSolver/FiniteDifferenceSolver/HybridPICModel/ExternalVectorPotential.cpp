@@ -28,6 +28,8 @@ ExternalVectorPotential::ReadParameters ()
 {
     const ParmParse pp_ext_A("external_vector_potential");
 
+    pp_ext_A.query("do_diva_cleaning", m_do_clean_divA);
+
     pp_ext_A.queryarr("fields", m_field_names);
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_field_names.empty(),
@@ -199,12 +201,9 @@ ExternalVectorPotential::InitData ()
                     lev, PatchType::fine,
                     warpx.GetEBUpdateEFlag(),
                     false);
-
-                for (int idir = 0; idir < 3; ++idir) {
-                    warpx.m_fields.get(Aext_field, Direction{idir}, lev)->
-                        FillBoundary(warpx.Geom(lev).periodicity());
-                }
             }
+            // NOTE: Fill Boundary is not done here since non-periodic A fields can lead to periodic E/B fields
+            // This requires valid definitions of the vector potential in the ghost cells.
         }
 
         amrex::Gpu::streamSynchronize();

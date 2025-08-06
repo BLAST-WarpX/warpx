@@ -14,15 +14,15 @@ set -eu -o pipefail
 
 # Check: ######################################################################
 #
-#   Was tioga_mi300a_warpx.profile sourced and configured correctly?
+#   Was tuolumne_mi300a_warpx.profile sourced and configured correctly?
 #   early access: not yet used!
-#if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your tioga_mi300a_warpx.profile file! Please edit its line 2 to continue!"; exit 1; fi
+#if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your tuolumne_mi300a_warpx.profile file! Please edit its line 2 to continue!"; exit 1; fi
 
 
 # Remove old dependencies #####################################################
 #
-SRC_DIR="/p/lustre1/${USER}/tioga/src"
-SW_DIR="/p/lustre1/${USER}/tioga/warpx/mi300a"
+SRC_DIR="/p/lustre5/${USER}/tuolumne/src"
+SW_DIR="/p/lustre5/${USER}/tuolumne/warpx/mi300a"
 rm -rf ${SW_DIR}
 mkdir -p ${SW_DIR}
 
@@ -107,16 +107,16 @@ fi
 cmake \
     --fresh \
     -S ${SRC_DIR}/blaspp                      \
-    -B ${build_dir}/blaspp-tioga-mi300a-build \
+    -B ${build_dir}/blaspp-tuolumne-mi300a-build \
     -Duse_openmp=OFF                          \
     -Dgpu_backend=hip                         \
     -DCMAKE_CXX_STANDARD=17                   \
     -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
 cmake \
-    --build ${build_dir}/blaspp-tioga-mi300a-build \
+    --build ${build_dir}/blaspp-tuolumne-mi300a-build \
     --target install                               \
     --parallel ${build_procs}
-rm -rf ${build_dir}/blaspp-tioga-mi300a-build
+rm -rf ${build_dir}/blaspp-tuolumne-mi300a-build
 
 # LAPACK++ (for PSATD+RZ)
 if [ -d ${SRC_DIR}/lapackpp ]
@@ -131,29 +131,28 @@ fi
 cmake \
     --fresh                                     \
     -S ${SRC_DIR}/lapackpp                      \
-    -B ${build_dir}/lapackpp-tioga-mi300a-build \
+    -B ${build_dir}/lapackpp-tuolumne-mi300a-build \
     -DCMAKE_CXX_STANDARD=17                     \
     -Dgpu_backend=hip                           \
     -Dbuild_tests=OFF                           \
     -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON      \
     -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
 cmake \
-    --build ${build_dir}/lapackpp-tioga-mi300a-build \
+    --build ${build_dir}/lapackpp-tuolumne-mi300a-build \
     --target install                                 \
     --parallel ${build_procs}
-rm -rf ${build_dir}/lapackpp-tioga-mi300a-build
+rm -rf ${build_dir}/lapackpp-tuolumne-mi300a-build
 
 # Python ######################################################################
 #
-# sometimes, the Lassen PIP Index is down
+# sometimes, the Tuolumne PIP Index is down
 export PIP_EXTRA_INDEX_URL="https://pypi.org/simple"
 
 python3 -m pip install --upgrade pip
-python3 -m pip install --upgrade virtualenv
 # python3 -m pip cache purge || true  # Cache disabled on system
-rm -rf ${SW_DIR}/venvs/warpx-trioga-mi300a
-python3 -m venv ${SW_DIR}/venvs/warpx-trioga-mi300a
-source ${SW_DIR}/venvs/warpx-trioga-mi300a/bin/activate
+rm -rf ${SW_DIR}/venvs/warpx-tuolumne-mi300a
+python3 -m venv ${SW_DIR}/venvs/warpx-tuolumne-mi300a
+source ${SW_DIR}/venvs/warpx-tuolumne-mi300a/bin/activate
 python3 -m pip install --upgrade pip
 python3 -m pip install --upgrade build
 python3 -m pip install --upgrade packaging
@@ -178,7 +177,7 @@ python3 -m pip install --upgrade -r ${SRC_DIR}/warpx/requirements.txt
 #   https://github.com/cupy/cupy/pull/8319
 #python3 -m pip install --upgrade "cython<3"
 #HIPCC=${CXX} \
-#CXXFLAGS="-I${ROCM_PATH}/include/hipblas -I${ROCM_PATH}/include/hipsparse -I${ROCM_PATH}/include/hipfft -I${ROCM_PATH}/include/rocsolver -I${ROCM_PATH}/include/rccl" \
+#CXXFLAGS="-I${ROCM_PATH}/include/hipblas -I${ROCM_PATH}/include/hipsparse -I${ROCM_PATH}/include/hipfft -I${ROCM_PATH}/include/rocsolver -I${ROCM_PATH}/include/rccl -I${ROCM_PATH}/include/thrust" \
 #CUPY_INSTALL_USE_HIP=1  \
 #ROCM_HOME=${ROCM_PATH}  \
 #HCC_AMDGPU_TARGET=${AMREX_AMD_ARCH}  \

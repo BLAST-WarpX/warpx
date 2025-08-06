@@ -1,0 +1,28 @@
+# Set the project name
+export proj=""  # change me!
+
+# required dependencies
+module load cmake
+module load adios2/2.10.2-cpu
+
+# optional: for QED support with detailed tables
+module load boost
+
+# optional: for openPMD and PSATD+RZ support
+module load hdf5/1.14.5
+export CMAKE_PREFIX_PATH=/home/${USER}/sw/aurora/gpu/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=/home/${USER}/sw/aurora/gpu/lapackpp-2024.05.31:$CMAKE_PREFIX_PATH
+
+export LD_LIBRARY_PATH=/home/${USER}/sw/aurora/gpu/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/home/${USER}/sw/aurora/gpu/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
+
+# necessary for Python and AI/ML on Aurora:
+module load frameworks
+
+if [ -d "/home/${USER}/sw/aurora/gpu/venvs/warpx-aurora" ]
+then
+  source /home/${USER}/sw/aurora/gpu/venvs/warpx-aurora/bin/activate
+fi
+
+# necessary to use build or run with GPU-aware MPICH
+export MPIR_CVAR_ENABLE_GPU=1

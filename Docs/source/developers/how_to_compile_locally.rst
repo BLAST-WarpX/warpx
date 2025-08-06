@@ -35,6 +35,9 @@ For instance, clone these dependencies to ``$HOME/src``:
    git clone https://github.com/BLAST-WarpX/warpx.git warpx
    git clone https://github.com/AMReX-Codes/amrex.git
    git clone https://github.com/openPMD/openPMD-api.git
+   git clone --branch v2.13.10 https://github.com/catchorg/Catch2.git catch2
+   git clone https://github.com/nlohmann/json.git
+   git clone https://github.com/ToruNiina/toml11.git
    git clone https://github.com/ECP-WarpX/picsar.git
    git clone https://github.com/AMReX-Codes/pyamrex.git
    git clone https://github.com/pybind/pybind11.git
@@ -54,7 +57,10 @@ When building WarpX, :ref:`the following CMake flags <building-cmake-options>` w
      -DWarpX_openpmd_src=$HOME/src/openPMD-api  \
      -DWarpX_picsar_src=$HOME/src/picsar        \
      -DWarpX_pyamrex_src=$HOME/src/pyamrex      \
-     -DWarpX_pybind11_src=$HOME/src/pybind11
+     -DWarpX_pybind11_src=$HOME/src/pybind11    \
+     -DopenPMD_catch_src=$HOME/src/catch2       \
+     -DopenPMD_json_src=$HOME/src/json          \
+     -DopenPMD_toml11_src=$HOME/src/toml11
 
    cmake --build build -j 8
    cmake --build build -j 8 --target pip_install
