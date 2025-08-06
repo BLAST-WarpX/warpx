@@ -186,7 +186,7 @@ class FiniteDifferenceSolver
           *
           * \param[out] Bfield  vector of current MultiFabs at a given level
           * \param[in] Afield   vector of magnetic field MultiFabs at a given level
-          * \param[in] edge_lengths length of edges along embedded boundaries
+          * \param[in] eb_update_B  array indicating where the field should be updated with respect to the position of the embedded boundary
           * \param[in] lev  level number for the calculation
           */
         void ComputeCurlA (

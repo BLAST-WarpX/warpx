@@ -225,25 +225,8 @@ WarpX::Evolve (int numsteps)
         mypc->doQEDSchwinger();
 #endif
 
-        // callback called when particle injection happens, after the position
-        // advance and before deposition is called, allowing a user
-        // defined particle distribution to be injected each time step
-        ExecutePythonCallback("particleinjection");
-
-        // implicit solver
-        if (m_implicit_solver) {
-            m_implicit_solver->OneStep(cur_time, dt[0], step);
-        }
-        // explicit solver
-        else {
-            // check if input file requests collisions
-            amrex::Vector<std::string> collision_names;
-            const amrex::ParmParse pp_collisions("collisions");
-            pp_collisions.queryarr("collision_names", collision_names);
-            bool const collisions = (static_cast<int>(collision_names.size()) == 0) ? false : true;
-            // TODO m_explicit_solver->OneStep(cur_time, dt[0], step);
-            OneStep(cur_time, dt[0], step, collisions);
-        }
+        // perform collisions and advance fields and particles by one time step
+        OneStep(cur_time, dt[0], step);
 
         // Resample particles
         // +1 is necessary here because value of step seen by user (first step is 1) is different than
@@ -392,65 +375,72 @@ WarpX::Evolve (int numsteps)
 void WarpX::OneStep (
     amrex::Real a_cur_time,
     amrex::Real a_dt,
-    int a_step,
-    bool const collisions
+    int a_step
 )
 {
     WARPX_PROFILE("WarpX::OneStep()");
 
-    // electrostatic solver or hybrid solver
-    if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
-        electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
-        bool const skip_deposition = true;
-        if (collisions)
-        {
-            bool position_push_half = true;
-            bool momentum_push_skip = false;
-            PushParticlesandDeposit(
-                a_cur_time,
-                skip_deposition,
-                position_push_half,
-                momentum_push_skip
-            );
-            // multi-physics: collisions
-            ExecutePythonCallback("beforecollisions");
-            // FIXME Should this be a_cur_time + a_dt*0.5?
-            mypc->doCollisions(a_step, a_cur_time, a_dt);
-            ExecutePythonCallback("aftercollisions");
-            // only gather fields and push particles,
-            // deposition and calculation of fields done further below
-            position_push_half = true;
-            momentum_push_skip = true;
-            PushParticlesandDeposit(
-                // FIXME Should this be a_cur_time + a_dt*0.5?
-                a_cur_time,
-                skip_deposition,
-                position_push_half,
-                momentum_push_skip
-            );
-        }
-        else // no collisions
-        {
-            bool position_push_half = false;
-            bool momentum_push_skip = false;
-            // only gather fields and push particles,
-            // deposition and calculation of fields done further below
-            PushParticlesandDeposit(
-                a_cur_time,
-                skip_deposition,
-                position_push_half,
-                momentum_push_skip
-            );
-        }
-    }
-    // electromagnetic solver
-    else {
-        // multi-physics: collisions
+    // implicit solver
+    if (m_implicit_solver) {
+        // perform particle collisions
         ExecutePythonCallback("beforecollisions");
         mypc->doCollisions(a_step, a_cur_time, a_dt);
         ExecutePythonCallback("aftercollisions");
-        // without mesh refinement
-        if (finest_level == 0) {
+
+        // perform particle injection
+        ExecutePythonCallback("particleinjection");
+
+        // advance fields and particles by one time step
+        m_implicit_solver->OneStep(a_cur_time, a_dt, a_step);
+    }
+    // explicit solver
+    else {
+        // electrostatic solver or hybrid solver
+        if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
+            electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
+            // FIXME
+            //// push particles (half position and full momentum)
+            //bool position_push_half = true;
+            //bool momentum_push_skip = false;
+            //bool skip_deposition = true;
+            //PushParticlesandDeposit(
+            //    a_cur_time,
+            //    skip_deposition,
+            //    position_push_half,
+            //    momentum_push_skip
+            //);
+
+            // perform particle collisions
+            ExecutePythonCallback("beforecollisions");
+            mypc->doCollisions(a_step, a_cur_time, a_dt);
+            ExecutePythonCallback("aftercollisions");
+
+            // perform particle injection
+            ExecutePythonCallback("particleinjection");
+
+            // push particles (half position)
+            bool position_push_half = false; // FIXME
+            bool momentum_push_skip = false; // FIXME
+            bool skip_deposition = true;
+            PushParticlesandDeposit(
+                a_cur_time,
+                skip_deposition,
+                position_push_half,
+                momentum_push_skip
+            );
+        }
+        // electromagnetic solver
+        else {
+            // perform particle collisions
+            ExecutePythonCallback("beforecollisions");
+            mypc->doCollisions(a_step, a_cur_time, a_dt);
+            ExecutePythonCallback("aftercollisions");
+
+            // perform particle injection
+            ExecutePythonCallback("particleinjection");
+
+            // without mesh refinement
+            if (finest_level == 0) {
                 // standard PIC loop
                 if (!m_JRhom) {
                     OneStep_nosub(a_cur_time);
@@ -459,20 +449,21 @@ void WarpX::OneStep (
                 else {
                     OneStep_JRhom(a_cur_time);
                 }
-        }
-        // with mesh refinement
-        else {
-            // without subcycling
-            if (!m_do_subcycling) {
-                OneStep_nosub(a_cur_time);
             }
-            // with subcycling
+            // with mesh refinement
             else {
-                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                    finest_level == 1,
-                    "Subcycling not implemented with more than 1 mesh refinement level"
-                );
-                OneStep_sub1(a_cur_time);
+                // without subcycling
+                if (!m_do_subcycling) {
+                    OneStep_nosub(a_cur_time);
+                }
+                // with subcycling
+                else {
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        finest_level == 1,
+                        "Subcycling not implemented with more than 1 mesh refinement level"
+                    );
+                    OneStep_sub1(a_cur_time);
+                }
             }
         }
     }
@@ -1252,10 +1243,10 @@ WarpX::doQEDEvents ()
 void
 WarpX::PushParticlesandDeposit (
     amrex::Real cur_time,
-    bool const skip_current,
+    bool skip_current,
     bool const position_push_half,
     bool const momentum_push_skip,
-    bool const deposit_mass_matrices,
+    bool deposit_mass_matrices,
     PushType push_type
 )
 {
@@ -1280,10 +1271,10 @@ WarpX::PushParticlesandDeposit (
     int lev,
     amrex::Real cur_time,
     DtType a_dt_type,
-    bool const skip_current,
+    bool skip_current,
     bool const position_push_half,
     bool const momentum_push_skip,
-    bool const deposit_mass_matrices,
+    bool deposit_mass_matrices,
     PushType push_type
 )
 {

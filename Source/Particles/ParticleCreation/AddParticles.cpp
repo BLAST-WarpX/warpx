@@ -76,6 +76,7 @@
 #   include <openPMD/openPMD.hpp>
 #endif
 
+#include <any>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -564,10 +565,10 @@ PhysicalParticleContainer::AddPlasmaFromFile(PlasmaInjector & plasma_injector,
     //TODO: Make changes for read/write in multiple MPI ranks
     if (ParallelDescriptor::IOProcessor()) {
         // take ownership of the series and close it when done
-        auto series = std::move(plasma_injector.m_openpmd_input_series);
+        auto series = std::any_cast<openPMD::Series>(std::move(plasma_injector.m_openpmd_input_series));
 
         // assumption asserts: see PlasmaInjector
-        openPMD::Iteration it = series->iterations.begin()->second;
+        openPMD::Iteration it = series.iterations.begin()->second;
         const ParmParse pp_species_name(species_name);
         pp_species_name.query("impose_t_lab_from_file", impose_t_lab_from_file);
         double t_lab = 0._prt;
@@ -610,7 +611,7 @@ PhysicalParticleContainer::AddPlasmaFromFile(PlasmaInjector & plasma_injector,
             ptr_uy = ps["momentum"]["y"].loadChunk<ParticleReal>();
             momentum_unit_y = static_cast<ParticleReal>(ps["momentum"]["y"].unitSI());
         }
-        series->flush();  // shared_ptr data can be read now
+        series.flush();  // shared_ptr data can be read now
 
         if (q_tot != 0.0) {
             std::stringstream warnMsg;

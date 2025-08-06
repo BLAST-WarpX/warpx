@@ -314,7 +314,7 @@ public:
         }
 
         amrex::Geometry const& geom_lev = WarpX::GetInstance().Geom(lev);
-        auto const dV = AMREX_D_TERM(geom_lev.CellSize(0), *geom_lev.CellSize(1), *geom_lev.CellSize(2));
+        amrex::ParticleReal const dV = AMREX_D_TERM(geom_lev.CellSize(0), *geom_lev.CellSize(1), *geom_lev.CellSize(2));
 #if defined(WARPX_DIM_RZ)
         amrex::Box const& cbx = mfi.tilebox(amrex::IntVect::TheZeroVector()); //Cell-centered box
         auto const lo = lbound(cbx);
@@ -331,18 +331,18 @@ public:
             int const ri = (i_cell - i_cell%nz)/nz;
             // rr is radius at the cell center
             amrex::ParticleReal const rr = (ri + 0.5_prt)*dr;
-            return 2.0_prt*MathConst::pi*rr;
+            return 2.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*rr;
 #elif defined(WARPX_DIM_RCYLINDER)
             int const ri = i_cell;
             // rr is radius at the cell center
             amrex::ParticleReal const rr = (ri + 0.5_prt)*dr;
-            return 2.0_prt*MathConst::pi*rr;
+            return 2.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*rr;
 #elif defined(WARPX_DIM_RSPHERE)
             // This needs double checking
             int const ri = i_cell;
             // rr is radius at the cell center
             amrex::ParticleReal const rr = (ri + 0.5_prt)*dr;
-            return 4.0_prt*MathConst::pi*rr*rr;
+            return 4.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*rr*rr;
 #else
             // No factor is needed for Cartesian
             amrex::ignore_unused(i_cell);

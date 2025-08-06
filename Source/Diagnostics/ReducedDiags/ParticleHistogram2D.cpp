@@ -137,7 +137,7 @@ void ParticleHistogram2D::ComputeDiags (int step)
     // resize data array
     Array<int,2> tlo{0,0}; // lower bounds
     Array<int,2> thi{m_bin_num_abs-1, m_bin_num_ord-1}; // inclusive upper bounds
-    amrex::TableData<amrex::Real,2> d_data_2D(tlo, thi);
+    amrex::TableData<amrex::ParticleReal,2> d_data_2D(tlo, thi);
     m_h_data_2D.resize(tlo, thi, The_Pinned_Arena());
     auto const& h_table_data = m_h_data_2D.table();
 
@@ -228,7 +228,7 @@ void ParticleHistogram2D::ComputeDiags (int step)
                                        // continue function if particle is not filtered out
                                        auto const f_abs = fun_partparser_abs(t, x, y, z, ux, uy, uz, w);
                                        auto const f_ord = fun_partparser_ord(t, x, y, z, ux, uy, uz, w);
-                                       auto const weight = fun_valueparser(t, x, y, z, ux, uy, uz, w);
+                                       auto const weight = static_cast<amrex::ParticleReal>(fun_valueparser(t, x, y, z, ux, uy, uz, w));
 
                                        // determine particle bin
                                        int const bin_abs = int(Math::floor((f_abs-bin_min_abs)/bin_size_abs));
@@ -237,7 +237,7 @@ void ParticleHistogram2D::ComputeDiags (int step)
                                        int const bin_ord = int(Math::floor((f_ord-bin_min_ord)/bin_size_ord));
                                        if ( bin_ord<0 || bin_ord>=num_bins_ord ) { return; } // discard if out-of-range
 
-                                       amrex::Real &data = d_table(bin_abs, bin_ord);
+                                       auto &data = d_table(bin_abs, bin_ord);
                                        amrex::HostDevice::Atomic::Add(&data, weight);
                                    });
             }

@@ -37,6 +37,12 @@ public:
 
     void ComputeSigma ( amrex::MultiFab& sigma ) const;
 
+    void computePhi (
+        ablastr::fields::MultiLevelScalarField const& rho,
+        ablastr::fields::MultiLevelScalarField const& phi,
+        ablastr::fields::MultiLevelVectorField const& efield
+    ) const;
+
     /**
      * Compute the potential `phi` by solving the semi-implicit Poisson equation using the Effective Potential method
      * with `rho` as the source.
@@ -56,11 +62,6 @@ public:
     void computePhi (
         ablastr::fields::MultiLevelScalarField const& rho,
         ablastr::fields::MultiLevelScalarField const& phi,
-        ablastr::fields::MultiLevelVectorField const& efield
-    ) const;
-    void computePhi (
-        ablastr::fields::MultiLevelScalarField const& rho,
-        ablastr::fields::MultiLevelScalarField const& phi,
         ablastr::fields::MultiLevelVectorField const& efield,
         amrex::MultiFab const& sigma,
         amrex::Real required_precision,
@@ -68,7 +69,6 @@ public:
         int max_iters,
         int verbosity
     ) const;
-
 };
 
 #endif // WARPX_EFFECTIVEPOTENTIALES_H_

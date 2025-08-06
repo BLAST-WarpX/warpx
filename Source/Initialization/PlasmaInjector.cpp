@@ -35,6 +35,10 @@
 #include <AMReX_RandomEngine.H>
 #include <AMReX_REAL.H>
 
+#ifdef WARPX_USE_OPENPMD
+#   include <openPMD/openPMD.hpp>
+#endif
+
 #include <algorithm>
 #include <cctype>
 #include <map>
@@ -469,13 +473,13 @@ void PlasmaInjector::setupExternalFile (amrex::ParmParse const& pp_species)
     const bool species_is_specified = pp_species.contains("species_type");
 
     if (amrex::ParallelDescriptor::IOProcessor()) {
-        m_openpmd_input_series = std::make_unique<openPMD::Series>(
+        auto series = openPMD::Series(
             str_injection_file, openPMD::Access::READ_ONLY);
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            m_openpmd_input_series->iterations.size() == 1u,
+            series.iterations.size() == 1u,
             "External file should contain only 1 iteration\n");
-        openPMD::Iteration it = m_openpmd_input_series->iterations.begin()->second;
+        openPMD::Iteration it = series.iterations.begin()->second;
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             it.particles.size() == 1u,
             "External file should contain only 1 species\n");
@@ -502,7 +506,7 @@ void PlasmaInjector::setupExternalFile (amrex::ParmParse const& pp_species)
                 // TODO: Add ASSERT_WITH_MESSAGE to test if charge is a constant record
                 auto p_q_ptr =
                     ps["charge"][openPMD::RecordComponent::SCALAR].loadChunk<amrex::ParticleReal>();
-                m_openpmd_input_series->flush();
+                series.flush();
                 amrex::ParticleReal const p_q = p_q_ptr.get()[0];
                 auto const charge_unit = static_cast<amrex::Real>(ps["charge"][openPMD::RecordComponent::SCALAR].unitSI());
                 charge = p_q * charge_unit;
@@ -525,12 +529,13 @@ void PlasmaInjector::setupExternalFile (amrex::ParmParse const& pp_species)
                 // TODO: Add ASSERT_WITH_MESSAGE to test if mass is a constant record
                 auto p_m_ptr =
                     ps["mass"][openPMD::RecordComponent::SCALAR].loadChunk<amrex::ParticleReal>();
-                m_openpmd_input_series->flush();
+                series.flush();
                 amrex::ParticleReal const p_m = p_m_ptr.get()[0];
                 auto const mass_unit = static_cast<amrex::Real>(ps["mass"][openPMD::RecordComponent::SCALAR].unitSI());
                 mass = p_m * mass_unit;
             }
         }
+        m_openpmd_input_series = series;
     } // IOProcessor
 
     // Broadcast charge and mass to non-IO processors if read in from the file
