@@ -3,6 +3,7 @@ name: Autoupdate
 on:
   schedule:
     - cron: "0 0 1 * *"  # every first day of the month at midnight
+  workflow_dispatch:
 
 jobs:
   monthly_release:

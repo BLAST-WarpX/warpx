@@ -3,6 +3,7 @@ name: Autoupdate
 on:
   schedule:
     - cron: "0 0 * * 1"  # every Monday at midnight
+  workflow_dispatch:
 
 jobs:
   weekly_update:
