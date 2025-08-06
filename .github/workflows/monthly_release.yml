@@ -11,6 +11,9 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
+      - name: Set current date
+        run: |
+          echo "DATE=$(date +'%y.%m')" >> $GITHUB_ENV
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Configure Git
@@ -26,7 +29,7 @@ jobs:
       - name: Commit changes
         run: |
           git add -u
-          git commit -m "Update dependencies and release"
+          git commit -m "Update dependencies.json"
       - name: Push changes
         run: |
           git push -u origin monthly_release
@@ -36,4 +39,4 @@ jobs:
             --base development \
             --body "Automated via .github/workflows/monthly_release.yml." \
             --label "component: third party" \
-            --title "Update dependencies and release"
+            --title "Release: WarpX ${{ env.DATE }}"

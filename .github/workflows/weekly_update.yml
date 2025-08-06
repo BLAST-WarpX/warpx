@@ -26,7 +26,7 @@ jobs:
       - name: Commit changes
         run: |
           git add -u
-          git commit -m "Update dependencies"
+          git commit -m "Update dependencies.json"
       - name: Push changes
         run: |
           git push -u origin weekly_update
@@ -36,4 +36,4 @@ jobs:
             --base development \
             --body "Automated via .github/workflows/weekly_update.yml." \
             --label "component: third party" \
-            --title "Update dependencies"
+            --title "Dependencies: weekly update"
