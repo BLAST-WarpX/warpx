@@ -91,6 +91,8 @@ public:
      * \param dt time step by which particles are advanced
      * \param a_dt_type type of time step (used for sub-cycling)
      * \param skip_deposition Skip the charge and current deposition.
+     * \param position_push_half Push particle positions for only the first half of the time step.
+     * \param momentum_push_skip Skip particle momentum push (used when particle position push is split).
      * \param deposit_mass_matrices whether to deposit the mass matrices (in the case of the implicit solver)
      * \param push_type Type of particle push, explicit or implicit. Defaults to explicit
      *
