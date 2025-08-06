@@ -398,17 +398,13 @@ void WarpX::OneStep (
         // electrostatic solver or hybrid solver
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
-            // FIXME
-            //// push particles (half position and full momentum)
-            //bool position_push_half = true;
-            //bool momentum_push_skip = false;
-            //bool skip_deposition = true;
-            //PushParticlesandDeposit(
-            //    a_cur_time,
-            //    skip_deposition,
-            //    position_push_half,
-            //    momentum_push_skip
-            //);
+            // push particles (half position and full momentum)
+            PushParticlesandDeposit(
+                a_cur_time,
+                /*skip_current=*/true,
+                /*position_push_half=*/true,
+                /*momentum_push_skip=*/false
+            );
 
             // perform particle collisions
             ExecutePythonCallback("beforecollisions");
@@ -419,14 +415,11 @@ void WarpX::OneStep (
             ExecutePythonCallback("particleinjection");
 
             // push particles (half position)
-            bool position_push_half = false; // FIXME
-            bool momentum_push_skip = false; // FIXME
-            bool skip_deposition = true;
             PushParticlesandDeposit(
                 a_cur_time,
-                skip_deposition,
-                position_push_half,
-                momentum_push_skip
+                /*skip_deposition=*/true,
+                /*position_push_half=*/true,
+                /*momentum_push_skip=*/true
             );
         }
         // electromagnetic solver
