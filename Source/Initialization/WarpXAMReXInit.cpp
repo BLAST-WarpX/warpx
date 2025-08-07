@@ -120,7 +120,7 @@ namespace {
             warpx::boundary_conditions::parse_field_boundaries();
 
         const auto is_field_boundary_periodic =
-            warpx::boundary_conditions::get_periodicity_array (field_boundary_lo, field_boundary_hi);
+            warpx::boundary_conditions::get_periodicity_array(field_boundary_lo, field_boundary_hi);
 
         const auto [particle_boundary_lo, particle_boundary_hi] =
             warpx::particles::parse_particle_boundaries(is_field_boundary_periodic);
