@@ -120,7 +120,6 @@ public:
          * @param[out] p_pair_reaction_weight stores the weight of the product particles. It is only
          * needed here to store information that will be used later on when actually creating the
          * product particles.
-         * @param[out] p_product_data stores addition data for the product particles. It is not used here.
          * @param[in] engine the random engine.
          */
         AMREX_GPU_HOST_DEVICE AMREX_INLINE
