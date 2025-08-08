@@ -126,9 +126,11 @@ Overall simulation parameters
     , this sets the relative tolerance for the iterative method used to obtain a self-consistent update of the particles at
     each iteration in the JFNK process.
 
-* ``implicit_evolve.use_mass_matrices`` (`bool`, default: false)
-    When `algo.evolve_scheme` is either `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton` and a preconditioner is being used
-    , the diagonal components of the diagonal mass matrices are used to capture the plasma response in the preconditioner.
+* ``implicit_evolve.use_mass_matrices_jacobian`` (`bool`, default: false)
+    When `algo.evolve_scheme` is `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton`, mass matrices are computed at each nonlinear JFNK iteration and are used during the linear iterations to compute the plasma current density, replacing direct particle calculations.
+
+* ``implicit_evolve.use_mass_matrices_pc`` (`bool`, default: false)
+    When `algo.evolve_scheme` is `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton` and a preconditioner is used, this flag determines whether the plasma response is captured in the preconditioner.
 
 * ``picard.verbose`` (`bool`, default: 1)
     When `implicit_evolve.nonlinear_solver = picard`, this sets the verbosity of the Picard solver. If true, then information
@@ -823,6 +825,19 @@ Distribution across MPI ranks and parallelization
     initialization by avoiding putting neighboring boxes on the same
     process.
 
+* ``warpx.split_high_density_boxes`` (`bool`) optional (default: false)
+    Whether to split high density boxes during initialization. This can
+    improve the potential for load balancing.
+
+* ``warpx.split_high_density_boxes_threshold`` (`float`) optional (default: 1.1)
+    Threshold used in splitting high density boxes. If a Box has more
+    particles than the average number of particles per MPI process
+    multiplied by this factor, we try to split this Box into smaller ones.
+
+* ``warpx.split_high_density_boxes_min_box_size`` (`integer`) optional (default: 8)
+    During splitting high density boxes, if a Box's longest side is already
+    less than or equal to this number, it will not be split.
+
 .. _running-cpp-parameters-parser:
 
 Math parser and user-defined constants
@@ -1159,9 +1174,14 @@ Particle initialization
 * ``<species_name>.density_max`` (`float`) optional (default `infinity`)
     Maximum plasma density. The density at each point is the minimum between the value given in the profile, and `density_max`.
 
-* ``<species_name>.radially_weighted`` (`bool`) optional (default `true`)
-    Whether particle's weight is varied with their radius. This only applies to cylindrical geometry.
-    The only valid value is true.
+* ``<species_name>.radial_numpercell_power`` (`float`) optional (default `0`)
+    With cylindrical and spherical geometry, specifies the radial power scaling of the number of particles per cell.
+    The number of particles per cell will be proportional to :math:`r^p`, where :math:`r` is the radius, and :math:`p` is the specified power.
+    The power must be greater than -1.
+    When the power is 0, the default value, the number of particles per cell will be uniform.
+    With a uniform density, a power of 1 for cylindrical, and a power of 2 for spherical, will give uniform particle weights.
+    The total number of particles loaded along the radius will be :math:`rmax/dr*N_{percell}`, :math:`rmax` the maximum radius particles are loaded, :math:`dr` the radial grid cell size, and :math:`N_{percell}` the number of particles per cell.
+    The particle weights are set accordingly depending on the power and on the specified density profile.
 
 * ``<species_name>.momentum_distribution_type`` (`string`)
     Distribution of the normalized momentum (`u=p/mc`) for this species. The options are:
@@ -1284,14 +1304,16 @@ Particle initialization
     Injection plane when using the rigid injection method.
     See ``particles.rigid_injected_species`` above.
 
-* ``<species_name>.rigid_advance`` (`bool`)
+* ``<species_name>.rigid_advance`` (`string` or `bool`; default: ``vzbar``)
     Only read if ``<species_name>`` is in ``particles.rigid_injected_species``.
+    Until reaching ``zinject_plane``, each particle is rigidly advanced according to
+    a specified velocity,
 
-    * If ``false``, each particle is advanced with its
-      own velocity ``vz`` until it reaches ``zinject_plane``.
+    * ``vz`` or ``false``: each particle's longitudinal velocity :math:`v_z`
 
-    * If ``true``, each particle is advanced with the average speed of the species
-      ``vzbar`` until it reaches ``zinject_plane``.
+    * ``vzbar`` or ``true``: the species' average longitudinal velocity :math:`\overline{v_z}`
+
+    * ``v``: each particle's velocity :math:`{\bf v}`, including transverse components
 
 * ``species_name.predefined_profile_name`` (`string`)
     Only read if ``<species_name>.profile`` is ``predefined``.
@@ -1395,7 +1417,7 @@ Particle initialization
     ``sim.extension.get_particle_boundary_buffer()``, can be
     used to access the scraped particle buffer. An entry is included for every
     particle in the buffer of the timestep at which the particle was scraped.
-    This can be accessed by passing the argument ``comp_name="step_scraped"`` to
+    This can be accessed by passing the argument ``comp_name="stepScraped"`` to
     the above mentioned function.
 
     .. note::
@@ -1511,6 +1533,10 @@ Particle initialization
     Resampling is performed everytime the number of macroparticles per cell of the species
     averaged over the whole simulation domain exceeds this parameter.
 
+* ``<species>.do_temperature_deposition`` (`boolean`) optional (default `false`)
+    When running with Ohm's Law Hybrid Solver, this will enable temperature deposition
+    in each dimension with a matched shape function and filtering used for current deposition.
+    This is required when using the electron energy solver with electron-ion temperature relaxation.
 
 .. _running-cpp-parameters-fluids:
 
@@ -2086,8 +2112,10 @@ Details about the collision models can be found in the :ref:`theory section <mul
     If using ``linear_breit_wheeler`` these should be two photon species.
 
 * ``<collision_name>.product_species`` (`strings`)
-    Only for ``dsmc`` and ``nuclearfusion``. The name(s) of the species in which to add
+    Only for ``dsmc``, ``linear_breit_wheeler``, and ``nuclearfusion``. The name(s) of the species in which to add
     the new macroparticles created by the reaction.
+    If using ``dsmc`` with ionization reactions, the first species in this list must be an electron.
+    If using ``dsmc`` with charge exchange, the order of the ``product_species`` should match the order of the species in ``<collision_name>.species``.
     If using ``linear_breit_wheeler`` these should be two species: one of electrons and one of positrons.
 
 * ``<collision_name>.ndt`` (`int`) optional
@@ -2221,6 +2249,37 @@ Details about the collision models can be found in the :ref:`theory section <mul
     Only for ``dsmc`` with impact ionization. This specifies which one of the
     colliding particles is ionized.
 
+* ``collisions.correct_energy_momentum`` (`bool`) optional (default 0)
+    For pairwisecoulomb collisions, whether to correct the energy and momentum after the collisions so that they are conserved.
+    In binary collisions, if the weights of the colliding particles are not the same, the collision does not
+    exactly conserve energy and momentum. When this option is on, after the collisions, small modifications are made to the
+    particle momentum so that the energy and momentum are exactly conserved in each cell.
+    This uses the algorithm described in https://doi.org/10.1016/j.jcp.2025.113927.
+
+* ``collisions.energy_fraction`` (`float`) optional (default 0.05)
+    For pairwisecoulomb collisions, when correcting the energy and momentum conservation, the energy correction is applied to pairs of particles in their center of momentum frame.
+    This parameter is the fraction of the relative energy in the COM frame that is used in the correction.
+
+* ``collisions.energy_fraction_max`` (`float`) optional (default 0.5)
+    For pairwisecoulomb collisions, when correcting the energy and momentum conservation, the energy correction is applied to pairs of particles in their center of momentum frame.
+    This parameter is the fraction of the total relative energy in the COM frame of all pairs that is used in the correction.
+
+* ``collisions.beta_weight_exponent`` (`float`) optional (default 1.)
+    For pairwisecoulomb collisions, when correcting the energy and momentum conservation, this parameter controls the exponent used on the particle weight when distributing the momentum correction.
+    With a value greater than 1, it will distribute more of the correction to particles with higher weights.
+
+* ``<collision_name>.correct_energy_momentum`` (`bool`) optional
+    For pairwisecoulomb collisions, override the parameter ``collisions.correct_energy_momentum`` for the specific collision.
+
+* ``<collision_name>.energy_fraction`` (`float`) optional
+    For pairwisecoulomb collisions, override the parameter ``collisions.energy_fraction`` for the specific collision.
+
+* ``<collision_name>.energy_fraction_max`` (`float`) optional
+    For pairwisecoulomb collisions, override the parameter ``collisions.energy_fraction_max`` for the specific collision.
+
+* ``<collision_name>.beta_weight_exponent`` (`float`) optional
+    For pairwisecoulomb collisions, override the parameter ``collisions.beta_weight_exponent`` for the specific collision.
+
 .. _running-cpp-parameters-numerics:
 
 Numerics and algorithms
@@ -2346,6 +2405,10 @@ Particle push, charge and current deposition, field gathering
     High-order shape factors are computationally more expensive, but may increase the overall accuracy of the results. For production runs it is generally safer to use high-order shape factors, such as cubic order.
 
     Note that this input parameter is not optional and must always be set in all input files provided that there is at least one particle species (set in input as ``particles.species_names``) or one laser species (set in input as ``lasers.names``) in the simulation. No default value is provided automatically.
+
+* ``particles.max_grid_crossings`` (`integer`) optional (default `1`)
+    Maximum number of grid crossings the particles can do per time step.
+    This is only used with the Strang and theta-implicit schemes since they allow the speed of light Courant limit to be violated.
 
 Maxwell solver
 ^^^^^^^^^^^^^^
@@ -2574,6 +2637,9 @@ Maxwell solver: kinetic-fluid hybrid
 * ``hybid_pic_model.add_external_fields`` (`bool`) optional (default ``false``)
     If ``algo.maxwell_solver`` is set to ``hybrid``, this sets the hybrid solver to use split external fields defined in external_vector_potential inputs.
 
+* ``external_vector_potential.do_diva_cleaning`` (`bool`) optional (default ``true``)
+    This enables or disables the divergence cleaner application to the external A fields.
+
 * ``external_vector_potential.fields`` (list of `str`) optional (default ``empty``)
     If ``hybid_pic_model.add_external_fields`` is set to ``true``, this adds a list names for external time varying vector potentials to be added to hybrid solver.
 
@@ -2646,9 +2712,15 @@ Additional parameters
     to propagate (at the speed of light) to the boundaries of the simulation
     domain, where it can be absorbed.
 
-* ``warpx.do_divb_cleaning_external`` (`0` or `1` ; default: 0)
-    Whether to use projection method to scrub B field divergence in externally
-    loaded fields. This is automatically turned on if external B fields are loaded.
+* ``warpx.do_initial_div_cleaning`` (`0` or `1` ; default: 0)
+    Whether to use projection method to scrub A/B field divergence in externally
+    loaded fields. This is automatically turned on if external/initial B or time varying A fields are loaded.
+
+* ``warpx.projection_div_cleaner.rtol`` (`float`) optional (default `5e-12` when double precision and `5e-5` for single precision)
+    Controls the relative tolerance when solving for the projected divergence of the field in the MLMG AMReX solver.
+
+* ``warpx.projection_div_cleaner.atol`` (`float`) optional (default `0`)
+    Controls the absolute tolerance when solving for the projected divergence of the field in the MLMG AMReX solver.
 
 * ``warpx.do_subcycling`` (`0` or `1`; default: 0)
     Whether or not to use sub-cycling. Different refinement levels have a
@@ -2893,9 +2965,11 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
 
 * ``<diag_name>.fields_to_plot`` (list of `strings`, optional)
     Fields written to output.
-    Possible scalar fields: ``part_per_cell`` ``rho`` ``phi`` ``F`` ``part_per_grid`` ``divE`` ``divB`` ``rho_<species_name>`` and ``T_<species_name>``, where ``<species_name>`` must match the name of one of the available particle species.
+    Possible scalar fields: ``part_per_cell`` ``rho`` ``phi`` ``F`` ``part_per_grid`` ``divE`` ``divB`` ``eb_covered`` ``rho_<species_name>`` and ``T_<species_name>``, where ``<species_name>`` must match the name of one of the available particle species.
     ``T_<species_name>`` is the temperature in eV.
-    Note that ``phi`` will only be written out when do_electrostatic==labframe. Also, note that for ``<diag_name>.diag_type = BackTransformed``, the only scalar field currently supported is ``rho``.
+    ``eb_covered`` is a number between 0 and 1 that indicates the fraction of the cell that is covered by the embedded boundary.
+    Note that ``phi`` will only be written out when ``do_electrostatic==labframe``.
+    Also, note that for ``<diag_name>.diag_type = BackTransformed``, the only scalar field currently supported is ``rho``.
     Possible vector field components in Cartesian geometry: ``Ex`` ``Ey`` ``Ez`` ``Bx`` ``By`` ``Bz`` ``jx`` ``jy`` ``jz``.
     Possible vector field components in RZ and RCYLINDER geometry: ``Er`` ``Et`` ``Ez`` ``Br`` ``Bt`` ``Bz`` ``jr`` ``jt`` ``jz``.
     Possible vector field components in RSPHERE geometry: ``Er`` ``Et`` ``Ep`` ``Br`` ``Bt`` ``Bp`` ``jr`` ``jt`` ``jp``.

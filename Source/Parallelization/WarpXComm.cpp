@@ -760,7 +760,7 @@ WarpX::FillBoundaryE (const int lev, const PatchType patch_type, const amrex::In
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
         if (pml_rz[lev])
         {
-            pml_rz[lev]->FillBoundaryE(m_fields, patch_type, nodal_sync);
+            pml_rz[lev]->FillBoundaryE(m_fields, patch_type, do_single_precision_comms, nodal_sync);
         }
 #endif
     }
@@ -773,7 +773,7 @@ WarpX::FillBoundaryE (const int lev, const PatchType patch_type, const amrex::In
             "Error: in FillBoundaryE, requested more guard cells than allocated");
 
         const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
-        ablastr::utils::communication::FillBoundary(*mf[i], nghost, WarpX::do_single_precision_comms, period, nodal_sync);
+        ablastr::utils::communication::FillBoundary(*mf[i], nghost, do_single_precision_comms, period, nodal_sync);
     }
 }
 
@@ -825,7 +825,7 @@ WarpX::FillBoundaryB (const int lev, const PatchType patch_type, const amrex::In
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
         if (pml_rz[lev])
         {
-            pml_rz[lev]->FillBoundaryB(m_fields, patch_type, nodal_sync);
+            pml_rz[lev]->FillBoundaryB(m_fields, patch_type, do_single_precision_comms, nodal_sync);
         }
 #endif
     }
@@ -838,7 +838,7 @@ WarpX::FillBoundaryB (const int lev, const PatchType patch_type, const amrex::In
             "Error: in FillBoundaryB, requested more guard cells than allocated");
 
         const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
-        ablastr::utils::communication::FillBoundary(*mf[i], nghost, WarpX::do_single_precision_comms, period, nodal_sync);
+        ablastr::utils::communication::FillBoundary(*mf[i], nghost, do_single_precision_comms, period, nodal_sync);
     }
 }
 

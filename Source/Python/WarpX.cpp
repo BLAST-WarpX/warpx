@@ -113,6 +113,8 @@ void init_WarpX (py::module& m)
             //py::overload_cast< int >(&WarpX::boxArray, py::const_),
             py::arg("lev")
         )
+        .def("multifab_register",&WarpX::GetMultiFabRegister,
+            py::return_value_policy::reference_internal)
         .def("multifab",
              [](WarpX & wx, std::string internal_name) {
                  if (wx.m_fields.internal_has(internal_name)) {
