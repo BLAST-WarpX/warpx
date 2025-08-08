@@ -69,7 +69,6 @@ public:
          * @param[in] soa_1,soa_2 contain the struct of array data of the two species
          * @param[in] m1,m2 are masses.
          * @param[in] dt is the time step length between two collision calls.
-         * @param[in] dV is the volume of the corresponding cell.
          * @param[in] coll_idx is the collision index offset.
          * @param[in] cell_start_pair is the start index of the pairs in that cell.
          * @param[out] p_mask is a mask that will be set to true for all pairs.
