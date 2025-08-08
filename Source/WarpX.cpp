@@ -11,6 +11,7 @@
  */
 #include "WarpX.H"
 
+#include "BoundaryConditions/FieldBoundaries.H"
 #include "BoundaryConditions/PEC_Insulator.H"
 #include "BoundaryConditions/PML.H"
 #include "Diagnostics/MultiDiagnostics.H"
@@ -37,6 +38,7 @@
 #include "Filter/NCIGodfreyFilter.H"
 #include "Initialization/ExternalField.H"
 #include "Initialization/WarpXInit.H"
+#include "Particles/ParticleBoundaries.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
@@ -278,7 +280,15 @@ void WarpX::MakeWarpX ()
         moving_window_dir, moving_window_v);
 
     ConvertLabParamsToBoost();
-    ReadBCParams();
+
+    std::tie(field_boundary_lo, field_boundary_hi) =
+        warpx::boundary_conditions::parse_field_boundaries();
+
+    const auto is_field_boundary_periodic =
+        warpx::boundary_conditions::get_periodicity_array(field_boundary_lo, field_boundary_hi);
+
+    std::tie(particle_boundary_lo, particle_boundary_hi) =
+        warpx::particles::parse_particle_boundaries(is_field_boundary_periodic);
 
     CheckGriddingForRZSpectral();
 
@@ -558,6 +568,23 @@ WarpX::ReadParameters ()
         }
 #endif
 
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        (electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) ||
+        (
+            std::none_of(field_boundary_lo.begin(), field_boundary_lo.end(), [](auto fb){ return fb == FieldBoundaryType::PEC;})  &&
+            std::none_of(field_boundary_hi.begin(), field_boundary_hi.end(), [](auto fb){ return fb == FieldBoundaryType::PEC;})
+        ),
+        "PEC boundary not implemented for PSATD, yet!");
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        (electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) ||
+        (
+            std::none_of(field_boundary_lo.begin(), field_boundary_lo.end(), [](auto fb){ return fb == FieldBoundaryType::PMC;})  &&
+            std::none_of(field_boundary_hi.begin(), field_boundary_hi.end(), [](auto fb){ return fb == FieldBoundaryType::PMC;})
+        ),
+        "PMC boundary not implemented for PSATD, yet!");
+
+
         pp_algo.query_enum_sloppy("evolve_scheme", evolve_scheme, "-_");
     }
 
@@ -724,6 +751,18 @@ WarpX::ReadParameters ()
         poisson_solver_id!=PoissonSolverAlgo::IntegratedGreenFunction,
         "The FFT Poisson solver only works in 3D.");
 #endif
+
+        const bool is_any_boundary_open =
+            std::any_of(field_boundary_lo.begin(), field_boundary_lo.end(), [](auto fb){return (fb == FieldBoundaryType::Open ); }) ||
+            std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(), [](auto fb){return (fb == FieldBoundaryType::Open ); }) ;
+
+        if(is_any_boundary_open){
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                poisson_solver_id == PoissonSolverAlgo::IntegratedGreenFunction,
+                "Field open boundary conditions are only implemented for the FFT-based Poisson solver");
+        }
+
+
 #ifndef WARPX_USE_FFT
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         poisson_solver_id!=PoissonSolverAlgo::IntegratedGreenFunction,

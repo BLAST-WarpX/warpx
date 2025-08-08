@@ -112,16 +112,16 @@ public:
          * - 3) Here, we divide the weight of a particle by the number of times it is paired with other
          * particles. This was not explicitly specified in Higginson's paper.
          *
-         * In the following, the word <<pair>> refers to the pairs of colliding macrophotons in a
+         * In the following, the word 'pair' refers to the pairs of colliding macrophotons in a
          * given cell, not to the electron-positron products of each collision.
          *
          * @param[in] I1s,I2s is the start index for I1,I2 (inclusive).
          * @param[in] I1e,I2e is the stop index for I1,I2 (exclusive).
          * @param[in] I1,I2 index arrays. They determine all elements that will be used.
          * @param[in] soa_1,soa_2 contain the struct of array data of the two species
-         * @param[in] m1,m2 are masses.
          * @param[in] dt is the time step length between two collision calls.
          * @param[in] dV is the volume of the corresponding cell.
+         * @param[in] coll_idx collision index type
          * @param[in] cell_start_pair is the start index of the pairs in that cell.
          * @param[out] p_mask is a mask that will be set to true if a collision occurs for a given
          * pair. It is only needed here to store information that will be used later on when actually

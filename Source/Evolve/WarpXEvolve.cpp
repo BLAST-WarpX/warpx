@@ -216,59 +216,17 @@ WarpX::Evolve (int numsteps)
             HybridPICInitializeRhoJandB();
         }
 
-        // Run multi-physics modules:
-        // ionization, Coulomb collisions, QED
+        // multi-physics: field ionization
         doFieldIonization();
 
-        ExecutePythonCallback("beforecollisions");
-        mypc->doCollisions( step, cur_time, dt[0] );
-        ExecutePythonCallback("aftercollisions");
-
 #ifdef WARPX_QED
+        // multi-physics: QED effects
         doQEDEvents();
         mypc->doQEDSchwinger();
 #endif
 
-        // Main PIC operation:
-        // gather fields, push particles, deposit sources, update fields
-
-        ExecutePythonCallback("particleinjection");
-
-        if (m_implicit_solver) {
-            m_implicit_solver->OneStep(cur_time, dt[0], step);
-        }
-        else if ( electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
-             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC )
-        {
-            // Electrostatic or hybrid-PIC case: only gather fields and push
-            // particles, deposition and calculation of fields done further below
-            const bool skip_deposition = true;
-            PushParticlesandDeposit(cur_time, skip_deposition);
-        }
-        // Electromagnetic case: JRhom algorithm
-        else if (m_JRhom)
-        {
-            OneStep_JRhom(cur_time);
-        }
-        // Electromagnetic case: no subcycling or no mesh refinement
-        else if ( !m_do_subcycling || (finest_level == 0))
-        {
-            OneStep_nosub(cur_time);
-            // E: guard cells are up-to-date
-            // B: guard cells are NOT up-to-date
-            // F: guard cells are NOT up-to-date
-        }
-        // Electromagnetic case: subcycling with one level of mesh refinement
-        else if (m_do_subcycling && (finest_level == 1))
-        {
-            OneStep_sub1(cur_time);
-        }
-        else
-        {
-            WARPX_ABORT_WITH_MESSAGE(
-                "do_subcycling = " + std::to_string(m_do_subcycling)
-                + " is an unsupported do_subcycling type.");
-        }
+        // perform collisions and advance fields and particles by one time step
+        OneStep(cur_time, dt[0], step);
 
         // Resample particles
         // +1 is necessary here because value of step seen by user (first step is 1) is different than
@@ -412,6 +370,71 @@ WarpX::Evolve (int numsteps)
 
     amrex::Print() <<
         ablastr::warn_manager::GetWMInstance().PrintGlobalWarnings("THE END");
+}
+
+void WarpX::OneStep (
+    amrex::Real a_cur_time,
+    amrex::Real a_dt,
+    int a_step
+)
+{
+    WARPX_PROFILE("WarpX::OneStep()");
+
+    // perform particle collisions
+    ExecutePythonCallback("beforecollisions");
+    mypc->doCollisions(a_step, a_cur_time, a_dt);
+    ExecutePythonCallback("aftercollisions");
+
+    // perform particle injection
+    ExecutePythonCallback("particleinjection");
+
+    // implicit solver
+    if (m_implicit_solver) {
+        // advance fields and particles by one time step
+        m_implicit_solver->OneStep(a_cur_time, a_dt, a_step);
+    }
+    // explicit solver
+    else {
+        // electrostatic solver or hybrid solver
+        if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
+            electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
+            // gather fields, push particles, skip deposition
+            bool const skip_deposition = true;
+            PushParticlesandDeposit(
+                a_cur_time,
+                skip_deposition
+            );
+        }
+        // electromagnetic solver
+        else {
+            // without mesh refinement
+            if (finest_level == 0) {
+                // standard PIC loop
+                if (!m_JRhom) {
+                    OneStep_nosub(a_cur_time);
+                }
+                // JRhom PIC loop
+                else {
+                    OneStep_JRhom(a_cur_time);
+                }
+            }
+            // with mesh refinement
+            else {
+                // without subcycling
+                if (!m_do_subcycling) {
+                    OneStep_nosub(a_cur_time);
+                }
+                // with subcycling
+                else {
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        finest_level == 1,
+                        "Subcycling not implemented with more than 1 mesh refinement level"
+                    );
+                    OneStep_sub1(a_cur_time);
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -1186,20 +1209,36 @@ WarpX::doQEDEvents ()
 #endif
 
 void
-WarpX::PushParticlesandDeposit (amrex::Real cur_time, bool skip_current,
-                                bool deposit_mass_matrices, PushType push_type)
+WarpX::PushParticlesandDeposit (
+    amrex::Real cur_time,
+    bool skip_current,
+    bool deposit_mass_matrices,
+    PushType push_type
+)
 {
     // Evolve particles to p^{n+1/2} and x^{n+1}
     // Deposit current, j^{n+1/2}
     for (int lev = 0; lev <= finest_level; ++lev) {
-        PushParticlesandDeposit(lev, cur_time, DtType::Full, skip_current,
-                                deposit_mass_matrices, push_type);
+        PushParticlesandDeposit(
+            lev,
+            cur_time,
+            DtType::Full,
+            skip_current,
+            deposit_mass_matrices,
+            push_type
+        );
     }
 }
 
 void
-WarpX::PushParticlesandDeposit (int lev, amrex::Real cur_time, DtType a_dt_type, bool skip_current,
-                               bool deposit_mass_matrices, PushType push_type)
+WarpX::PushParticlesandDeposit (
+    int lev,
+    amrex::Real cur_time,
+    DtType a_dt_type,
+    bool skip_current,
+    bool deposit_mass_matrices,
+    PushType push_type
+)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -1230,6 +1269,7 @@ WarpX::PushParticlesandDeposit (int lev, amrex::Real cur_time, DtType a_dt_type,
         deposit_mass_matrices,
         push_type
     );
+
     if (! skip_current) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         // This is called after all particles have deposited their current and charge.
