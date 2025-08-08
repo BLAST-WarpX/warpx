@@ -63,20 +63,21 @@ public:
          * Note that this function does not yet create the resulting photons, but
          * instead sets p_mask and calculates the weight and energy
          *
-         * @param[in] I1s,I2s is the start index for I1,I2 (inclusive).
-         * @param[in] I1e,I2e is the stop index for I1,I2 (exclusive).
-         * @param[in] I1,I2 index arrays. They determine all elements that will be used.
-         * @param[in] soa_1,soa_2 contain the struct of array data of the two species
-         * @param[in] m1,m2 are masses.
-         * @param[in] dt is the time step length between two collision calls.
-         * @param[in] coll_idx is the collision index offset.
-         * @param[in] cell_start_pair is the start index of the pairs in that cell.
-         * @param[out] p_mask is a mask that will be set to true for all pairs.
-         * @param[out] p_pair_indices_1,p_pair_indices_2 arrays that store the indices of the
-         * particles of a given pair. Only p_pair_indices_1 will be used when creating photons.
-         * @param[out] p_pair_reaction_weight stores the weight of the resulting photons.
-         * @param[out] p_product_data stores the energy of the resulting photons.
-         * @param[in] engine the random engine.
+         * @param[in] I1s, I1e is the start and step index for I1 (start inclusive, step exclusive)
+         * @param[in] I2s, I2e is the start and step index for I2 (start inclusive, step exclusive)
+         * @param[in] I1, I2 index arrays. They determine all elements that will be used
+         * @param[in] soa_1, soa_2 contain the struct of array data of the two species
+         * @param[in] n1, n2 the species number densities
+         * @param[in] m1, m2 the species masses
+         * @param[in] dt is the time step length between two collision calls
+         * @param[in] coll_idx is the collision index offset
+         * @param[in] cell_start_pair is the start index of the pairs in that cell
+         * @param[out] p_mask is a mask that will be set to true for all pairs
+         * @param[out] p_pair_indices_1, p_pair_indices_2 arrays that store the indices of the
+         * particles of a given pair. Only p_pair_indices_1 will be used when creating photons
+         * @param[out] p_pair_reaction_weight stores the weight of the resulting photons
+         * @param[out] p_product_data stores the energy of the resulting photons
+         * @param[in] engine the random engine
          */
         AMREX_GPU_HOST_DEVICE AMREX_INLINE
         void operator() (
