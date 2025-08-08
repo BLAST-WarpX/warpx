@@ -11,9 +11,9 @@
     "jz": 0.0
   },
   "beam": {
-    "particle_momentum_x": 2.3895400734653724e-27,
-    "particle_momentum_y": 2.372944416874367e-27,
-    "particle_momentum_z": 2.3908019081631997e-27,
+    "particle_momentum_x": 2.380211309094067e-27,
+    "particle_momentum_y": 2.3636778210275964e-27,
+    "particle_momentum_z": 2.3814656376335936e-27,
     "particle_position_x": 0.031866021988156114,
     "particle_position_y": 0.032281276107277185,
     "particle_position_z": 0.03185444043880588,

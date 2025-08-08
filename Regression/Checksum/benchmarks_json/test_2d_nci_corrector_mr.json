@@ -22,17 +22,17 @@
     "jz": 2.5158044856860013e+17
   },
   "electrons": {
-    "particle_momentum_x": 5.153966187033951e-22,
-    "particle_momentum_y": 3.2961227616508874e-24,
-    "particle_momentum_z": 5.592933547140762e-16,
+    "particle_momentum_x": 3.505244556257641e-22,
+    "particle_momentum_y": 3.313426614205358e-24,
+    "particle_momentum_z": 5.59293354745763e-16,
     "particle_position_x": 0.01023999998515573,
     "particle_position_y": 0.020479999999998985,
     "particle_weight": 8e+19
   },
   "ions": {
-    "particle_momentum_x": 5.153840757193389e-22,
-    "particle_momentum_y": 4.310806532266832e-24,
-    "particle_momentum_z": 1.0269479700068355e-12,
+    "particle_momentum_x": 3.504937999495217e-22,
+    "particle_momentum_y": 4.3070622779912424e-24,
+    "particle_momentum_z": 1.0269479700068402e-12,
     "particle_position_x": 0.010239999999972996,
     "particle_position_y": 0.020479999999999998,
     "particle_weight": 8e+19

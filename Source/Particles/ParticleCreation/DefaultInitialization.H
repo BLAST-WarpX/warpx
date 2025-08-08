@@ -94,7 +94,7 @@ namespace ParticleCreation {
      * first n_external_attr_real real attributes and the first n_external_attr_int integer
      * attributes, which have been in principle externally set elsewhere.
      *
-     * @tparam[in] The type of the particle tile to operate on (e.g. could use different allocators)
+     * @tparam PTile The type of the particle tile to operate on (e.g. could use different allocators)
      * @param[inout] ptile the tile in which attributes are initialized
      * @param[in] n_external_attr_real The number of real attributes that have been externally set.
      * These are NOT initialized by this function.
@@ -168,7 +168,11 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                 // Otherwise (e.g. particle tile allocated in pinned memory), run on CPU
                 } else {
                     for (int ip = start; ip < stop; ++ip) {
+#ifdef AMREX_USE_GPU
+                        attr_ptr[ip] = quantum_sync_get_opt(amrex::RandomEngine{nullptr});
+#else
                         attr_ptr[ip] = quantum_sync_get_opt(amrex::RandomEngine{});
+#endif
                     }
                 }
             }
@@ -191,7 +195,11 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                 // Otherwise (e.g. particle tile allocated in pinned memory), run on CPU
                 } else {
                     for (int ip = start; ip < stop; ++ip) {
+#ifdef AMREX_USE_GPU
+                        attr_ptr[ip] = breit_wheeler_get_opt(amrex::RandomEngine{nullptr});
+#else
                         attr_ptr[ip] = breit_wheeler_get_opt(amrex::RandomEngine{});
+#endif
                     }
                 }
             }

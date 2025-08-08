@@ -1,4 +1,3 @@
-CEXE_sources += AddPlasmaUtilities.cpp
 CEXE_sources += MultiParticleContainer.cpp
 CEXE_sources += WarpXParticleContainer.cpp
 CEXE_sources += RigidInjectedParticleContainer.cpp

@@ -81,6 +81,15 @@ Usage
    usage/workflows
    usage/faq
 
+Tutorials
+------------
+.. toctree::
+   :caption: TUTORIALS
+   :maxdepth: 1
+   :hidden:
+
+   tutorials
+
 Data Analysis
 -------------
 .. toctree::

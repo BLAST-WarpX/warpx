@@ -36,8 +36,8 @@ SpectralSolverRZ::SpectralSolverRZ (const int lev,
                                     bool const with_pml,
                                     bool const update_with_rho,
                                     const bool fft_do_time_averaging,
-                                    const JInTime J_in_time,
-                                    const RhoInTime rho_in_time,
+                                    const TimeDependencyJ time_dependency_J,
+                                    const TimeDependencyRho time_dependency_rho,
                                     const bool dive_cleaning,
                                     const bool divb_cleaning)
     : m_dt(dt), k_space(realspace_ba, dm, dx)
@@ -50,7 +50,7 @@ SpectralSolverRZ::SpectralSolverRZ (const int lev,
 
     const bool is_pml = false;
     m_spectral_index = SpectralFieldIndex(
-        update_with_rho, fft_do_time_averaging, J_in_time, rho_in_time,
+        update_with_rho, fft_do_time_averaging, time_dependency_J, time_dependency_rho,
         dive_cleaning, divb_cleaning, is_pml, with_pml);
 
     // - Select the algorithm depending on the input parameters
@@ -63,7 +63,7 @@ SpectralSolverRZ::SpectralSolverRZ (const int lev,
          // v_galilean is 0: use standard PSATD algorithm
         algorithm = std::make_unique<PsatdAlgorithmRZ>(
             k_space, dm, m_spectral_index, n_rz_azimuthal_modes, norder_z, grid_type, dt,
-            update_with_rho, fft_do_time_averaging, J_in_time, rho_in_time, dive_cleaning, divb_cleaning);
+            update_with_rho, fft_do_time_averaging, time_dependency_J, time_dependency_rho, dive_cleaning, divb_cleaning);
     } else {
         // Otherwise: use the Galilean algorithm
         algorithm = std::make_unique<PsatdAlgorithmGalileanRZ>(

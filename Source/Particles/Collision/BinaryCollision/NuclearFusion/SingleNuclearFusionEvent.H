@@ -69,7 +69,7 @@ void SingleNuclearFusionEvent (const amrex::ParticleReal& u1x, const amrex::Part
     amrex::ParticleReal E_coll, v_coll, lab_to_COM_factor;
 
     BinaryCollisionUtils::get_collision_parameters(
-        u1x, u1y, u1z, u2x, u2y, u2z, m1, m2,
+        m1*u1x, m1*u1y, m1*u1z, m2*u2x, m2*u2y, m2*u2z, m1, m2,
         E_coll, v_coll, lab_to_COM_factor);
 
     using namespace amrex::literals;

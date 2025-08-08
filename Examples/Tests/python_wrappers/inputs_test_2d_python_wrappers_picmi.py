@@ -99,9 +99,6 @@ sim.add_diagnostic(field_diag)
 # Write input file to run with compiled version
 sim.write_input_file(file_name="inputs_2d")
 
-# Whether to include guard cells in data returned by Python wrappers
-include_ghosts = 1
-
 
 # Compute min and max of fields data
 def compute_minmax(data):
@@ -111,7 +108,7 @@ def compute_minmax(data):
 
 
 # Plot fields data either in valid domain or in PML
-def plot_data(data, pml, title, name):
+def plot_data(data, comp, pml, title, name):
     fig, ax = plt.subplots(
         nrows=1, ncols=1, gridspec_kw=dict(wspace=0.5), figsize=[6, 5]
     )
@@ -258,7 +255,7 @@ def plot_data(data, pml, title, name):
         )
         # Set extent and sliced data
         extent = np.array([-nxg, nx + nxg, -nzg, nz + nzg])
-    X = data[:, :].transpose()
+    X = data[(), (), comp].transpose()
     # Min and max for colorbar
     vmin, vmax = compute_minmax(X)
     # Display data as image
@@ -293,22 +290,22 @@ sim.initialize_warpx()
 # Get fields data using Python wrappers
 import pywarpx.fields as pwxf
 
-Ex = pwxf.ExFPWrapper(include_ghosts=include_ghosts)
-Ey = pwxf.EyFPWrapper(include_ghosts=include_ghosts)
-Ez = pwxf.EzFPWrapper(include_ghosts=include_ghosts)
-Bx = pwxf.BxFPWrapper(include_ghosts=include_ghosts)
-By = pwxf.ByFPWrapper(include_ghosts=include_ghosts)
-Bz = pwxf.BzFPWrapper(include_ghosts=include_ghosts)
-F = pwxf.FFPWrapper(include_ghosts=include_ghosts)
-G = pwxf.GFPWrapper(include_ghosts=include_ghosts)
-Expml = pwxf.ExFPPMLWrapper(include_ghosts=include_ghosts)
-Eypml = pwxf.EyFPPMLWrapper(include_ghosts=include_ghosts)
-Ezpml = pwxf.EzFPPMLWrapper(include_ghosts=include_ghosts)
-Bxpml = pwxf.BxFPPMLWrapper(include_ghosts=include_ghosts)
-Bypml = pwxf.ByFPPMLWrapper(include_ghosts=include_ghosts)
-Bzpml = pwxf.BzFPPMLWrapper(include_ghosts=include_ghosts)
-Fpml = pwxf.FFPPMLWrapper(include_ghosts=include_ghosts)
-Gpml = pwxf.GFPPMLWrapper(include_ghosts=include_ghosts)
+Ex = pwxf.ExFPWrapper()
+Ey = pwxf.EyFPWrapper()
+Ez = pwxf.EzFPWrapper()
+Bx = pwxf.BxFPWrapper()
+By = pwxf.ByFPWrapper()
+Bz = pwxf.BzFPWrapper()
+F = pwxf.FFPWrapper()
+G = pwxf.GFPWrapper()
+Expml = pwxf.ExFPPMLWrapper()
+Eypml = pwxf.EyFPPMLWrapper()
+Ezpml = pwxf.EzFPPMLWrapper()
+Bxpml = pwxf.BxFPPMLWrapper()
+Bypml = pwxf.ByFPPMLWrapper()
+Bzpml = pwxf.BzFPPMLWrapper()
+Fpml = pwxf.FFPPMLWrapper()
+Gpml = pwxf.GFPPMLWrapper()
 
 # Initialize fields data in valid domain
 init_data(Ex)
@@ -324,53 +321,55 @@ init_data(G)
 sim.step(max_steps)
 
 # Plot E
-plot_data(Ex, pml=False, title="Ex", name="Ex")
-plot_data(Ey, pml=False, title="Ey", name="Ey")
-plot_data(Ez, pml=False, title="Ez", name="Ez")
+plot_data(Ex, 0, pml=False, title="Ex", name="Ex")
+plot_data(Ey, 0, pml=False, title="Ey", name="Ey")
+plot_data(Ez, 0, pml=False, title="Ez", name="Ez")
 
 # Plot B
-plot_data(Bx, pml=False, title="Bx", name="Bx")
-plot_data(By, pml=False, title="By", name="By")
-plot_data(Bz, pml=False, title="Bz", name="Bz")
+plot_data(Bx, 0, pml=False, title="Bx", name="Bx")
+plot_data(By, 0, pml=False, title="By", name="By")
+plot_data(Bz, 0, pml=False, title="Bz", name="Bz")
 
 # F and G
-plot_data(F, pml=False, title="F", name="F")
-plot_data(G, pml=False, title="G", name="G")
+plot_data(F, 0, pml=False, title="F", name="F")
+plot_data(G, 0, pml=False, title="G", name="G")
 
 # Plot E in PML
-plot_data(Expml[:, :, 0], pml=True, title="Exy in PML", name="Exy")
-plot_data(Expml[:, :, 1], pml=True, title="Exz in PML", name="Exz")
-plot_data(Expml[:, :, 2], pml=True, title="Exx in PML", name="Exx")
-plot_data(Eypml[:, :, 0], pml=True, title="Eyz in PML", name="Eyz")
-plot_data(Eypml[:, :, 1], pml=True, title="Eyx in PML", name="Eyx")
-plot_data(Eypml[:, :, 2], pml=True, title="Eyy in PML", name="Eyy")  # zero
-plot_data(Ezpml[:, :, 0], pml=True, title="Ezx in PML", name="Ezx")
-plot_data(Ezpml[:, :, 1], pml=True, title="Ezy in PML", name="Ezy")  # zero
-plot_data(Ezpml[:, :, 2], pml=True, title="Ezz in PML", name="Ezz")
+plot_data(Expml, 0, pml=True, title="Exy in PML", name="Exy")
+plot_data(Expml, 1, pml=True, title="Exz in PML", name="Exz")
+plot_data(Expml, 2, pml=True, title="Exx in PML", name="Exx")
+plot_data(Eypml, 0, pml=True, title="Eyz in PML", name="Eyz")
+plot_data(Eypml, 1, pml=True, title="Eyx in PML", name="Eyx")
+plot_data(Eypml, 2, pml=True, title="Eyy in PML", name="Eyy")  # zero
+plot_data(Ezpml, 0, pml=True, title="Ezx in PML", name="Ezx")
+plot_data(Ezpml, 1, pml=True, title="Ezy in PML", name="Ezy")  # zero
+plot_data(Ezpml, 2, pml=True, title="Ezz in PML", name="Ezz")
 
 # Plot B in PML
-plot_data(Bxpml[:, :, 0], pml=True, title="Bxy in PML", name="Bxy")
-plot_data(Bxpml[:, :, 1], pml=True, title="Bxz in PML", name="Bxz")
-plot_data(Bxpml[:, :, 2], pml=True, title="Bxx in PML", name="Bxx")
-plot_data(Bypml[:, :, 0], pml=True, title="Byz in PML", name="Byz")
-plot_data(Bypml[:, :, 1], pml=True, title="Byx in PML", name="Byx")
-plot_data(Bypml[:, :, 2], pml=True, title="Byy in PML", name="Byy")  # zero
-plot_data(Bzpml[:, :, 0], pml=True, title="Bzx in PML", name="Bzx")
-plot_data(Bzpml[:, :, 1], pml=True, title="Bzy in PML", name="Bzy")  # zero
-plot_data(Bzpml[:, :, 2], pml=True, title="Bzz in PML", name="Bzz")
+plot_data(Bxpml, 0, pml=True, title="Bxy in PML", name="Bxy")
+plot_data(Bxpml, 1, pml=True, title="Bxz in PML", name="Bxz")
+plot_data(Bxpml, 2, pml=True, title="Bxx in PML", name="Bxx")
+plot_data(Bypml, 0, pml=True, title="Byz in PML", name="Byz")
+plot_data(Bypml, 1, pml=True, title="Byx in PML", name="Byx")
+plot_data(Bypml, 2, pml=True, title="Byy in PML", name="Byy")  # zero
+plot_data(Bzpml, 0, pml=True, title="Bzx in PML", name="Bzx")
+plot_data(Bzpml, 1, pml=True, title="Bzy in PML", name="Bzy")  # zero
+plot_data(Bzpml, 2, pml=True, title="Bzz in PML", name="Bzz")
 
 # Plot F and G in PML
-plot_data(Fpml[:, :, 0], pml=True, title="Fx in PML", name="Fx")
-plot_data(Fpml[:, :, 1], pml=True, title="Fy in PML", name="Fy")
-plot_data(Fpml[:, :, 2], pml=True, title="Fz in PML", name="Fz")
-plot_data(Gpml[:, :, 0], pml=True, title="Gx in PML", name="Gx")
-plot_data(Gpml[:, :, 1], pml=True, title="Gy in PML", name="Gy")
-plot_data(Gpml[:, :, 2], pml=True, title="Gz in PML", name="Gz")
+plot_data(Fpml, 0, pml=True, title="Fx in PML", name="Fx")
+plot_data(Fpml, 1, pml=True, title="Fy in PML", name="Fy")
+plot_data(Fpml, 2, pml=True, title="Fz in PML", name="Fz")
+plot_data(Gpml, 0, pml=True, title="Gx in PML", name="Gx")
+plot_data(Gpml, 1, pml=True, title="Gy in PML", name="Gy")
+plot_data(Gpml, 2, pml=True, title="Gz in PML", name="Gz")
 
 
 # Check values with benchmarks (precomputed from the same Python arrays)
-def check_values(benchmark, data, rtol, atol):
-    passed = np.allclose(benchmark, np.sum(np.abs(data[:, :])), rtol=rtol, atol=atol)
+def check_values(benchmark, data, comp, rtol, atol):
+    passed = np.allclose(
+        benchmark, np.sum(np.abs(data[(), (), comp])), rtol=rtol, atol=atol
+    )
     assert passed
 
 
@@ -378,40 +377,40 @@ rtol = 5e-08
 atol = 1e-12
 
 # E
-check_values(1013263608.6369569, Ex[:, :], rtol, atol)
-check_values(717278256.7957529, Ey[:, :], rtol, atol)
-check_values(717866566.5718911, Ez[:, :], rtol, atol)
+check_values(1013263608.6369569, Ex, 0, rtol, atol)
+check_values(717278256.7957529, Ey, 0, rtol, atol)
+check_values(717866566.5718911, Ez, 0, rtol, atol)
 # B
-check_values(3.0214509313437636, Bx[:, :], rtol, atol)
-check_values(3.0242765102729985, By[:, :], rtol, atol)
-check_values(3.0214509326970465, Bz[:, :], rtol, atol)
+check_values(3.0214509313437636, Bx, 0, rtol, atol)
+check_values(3.0242765102729985, By, 0, rtol, atol)
+check_values(3.0214509326970465, Bz, 0, rtol, atol)
 # F and G
-check_values(3.0188584528062377, F[:, :], rtol, atol)
-check_values(1013672631.8764204, G[:, :], rtol, atol)
+check_values(3.0188584528062377, F, 0, rtol, atol)
+check_values(1013672631.8764204, G, 0, rtol, atol)
 # E in PML
-check_values(364287936.1526477, Expml[:, :, 0], rtol, atol)
-check_values(183582352.20753333, Expml[:, :, 1], rtol, atol)
-check_values(190065766.41491824, Expml[:, :, 2], rtol, atol)
-check_values(440581907.0828975, Eypml[:, :, 0], rtol, atol)
-check_values(178117294.05871135, Eypml[:, :, 1], rtol, atol)
-check_values(0.0, Eypml[:, :, 2], rtol, atol)
-check_values(430277101.26568377, Ezpml[:, :, 0], rtol, atol)
-check_values(0.0, Ezpml[:, :, 1], rtol, atol)
-check_values(190919663.2167449, Ezpml[:, :, 2], rtol, atol)
+check_values(364287936.1526477, Expml, 0, rtol, atol)
+check_values(183582352.20753333, Expml, 1, rtol, atol)
+check_values(190065766.41491824, Expml, 2, rtol, atol)
+check_values(440581907.0828975, Eypml, 0, rtol, atol)
+check_values(178117294.05871135, Eypml, 1, rtol, atol)
+check_values(0.0, Eypml, 2, rtol, atol)
+check_values(430277101.26568377, Ezpml, 0, rtol, atol)
+check_values(0.0, Ezpml, 1, rtol, atol)
+check_values(190919663.2167449, Ezpml, 2, rtol, atol)
 # B in PML
-check_values(1.0565189315366146, Bxpml[:, :, 0], rtol, atol)
-check_values(0.46181913800643065, Bxpml[:, :, 1], rtol, atol)
-check_values(0.6849858305343736, Bxpml[:, :, 2], rtol, atol)
-check_values(1.7228584190213505, Bypml[:, :, 0], rtol, atol)
-check_values(0.47697332248020935, Bypml[:, :, 1], rtol, atol)
-check_values(0.0, Bypml[:, :, 2], rtol, atol)
-check_values(1.518338068658267, Bzpml[:, :, 0], rtol, atol)
-check_values(0.0, Bzpml[:, :, 1], rtol, atol)
-check_values(0.6849858291863835, Bzpml[:, :, 2], rtol, atol)
+check_values(1.0565189315366146, Bxpml, 0, rtol, atol)
+check_values(0.46181913800643065, Bxpml, 1, rtol, atol)
+check_values(0.6849858305343736, Bxpml, 2, rtol, atol)
+check_values(1.7228584190213505, Bypml, 0, rtol, atol)
+check_values(0.47697332248020935, Bypml, 1, rtol, atol)
+check_values(0.0, Bypml, 2, rtol, atol)
+check_values(1.518338068658267, Bzpml, 0, rtol, atol)
+check_values(0.0, Bzpml, 1, rtol, atol)
+check_values(0.6849858291863835, Bzpml, 2, rtol, atol)
 # F and G in PML
-check_values(1.7808748509425263, Fpml[:, :, 0], rtol, atol)
-check_values(0.0, Fpml[:, :, 1], rtol, atol)
-check_values(0.4307845604625681, Fpml[:, :, 2], rtol, atol)
-check_values(536552745.42701197, Gpml[:, :, 0], rtol, atol)
-check_values(0.0, Gpml[:, :, 1], rtol, atol)
-check_values(196016270.97767758, Gpml[:, :, 2], rtol, atol)
+check_values(1.7808748509425263, Fpml, 0, rtol, atol)
+check_values(0.0, Fpml, 1, rtol, atol)
+check_values(0.4307845604625681, Fpml, 2, rtol, atol)
+check_values(536552745.42701197, Gpml, 0, rtol, atol)
+check_values(0.0, Gpml, 1, rtol, atol)
+check_values(196016270.97767758, Gpml, 2, rtol, atol)

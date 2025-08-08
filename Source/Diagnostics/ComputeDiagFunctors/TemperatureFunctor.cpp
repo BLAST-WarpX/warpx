@@ -35,7 +35,7 @@ TemperatureFunctor::operator() (amrex::MultiFab& mf_dst, const int dcomp, const 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(mass > 0.,
         "The temperature diagnostic can not be calculated for a massless species.");
 
-    pc.CalculateTemperature(m_lev);
+    pc.DepositTotalNGPTemperature(m_lev);
     amrex::MultiFab const & temperature = *warpx.m_fields.get("T_" + pc.getName(), m_lev);
 
     // Coarsen and interpolate from temperature to the output diagnostic MultiFab, mf_dst.
