@@ -2098,6 +2098,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
       from Goldston and Rutherford, section 14.2.
     - ``inverse_bremsstrahlung`` for inverse bremstrahlung absorption of photons from the collisions
       of electrons and ions.
+      The absorbed energy and momentum is distributed among the electrons so that the quantities are exactly conserved.
     - ``linear_breit_wheeler`` for electron-positron pair creation from the annihilation of two photons, according to the linear Breit-Wheeler mechanism
       (see for example `Gould et al. (Phys. Rev. 155, 1404, 1967) <https://doi.org/10.1103/PhysRev.155.1404>`__).
       This implements the generation of electron-positron pairs based on the analytical cross-section, e.g.
@@ -2261,11 +2262,11 @@ Details about the collision models can be found in the :ref:`theory section <mul
     This uses the algorithm described in https://doi.org/10.1016/j.jcp.2025.113927.
 
 * ``collisions.energy_fraction`` (`float`) optional (default 0.05)
-    For pairwisecoulomb collisions, when correcting the energy and momentum conservation, the energy correction is applied to pairs of particles in their center of momentum frame.
+    For pairwisecoulomb and inverse_bremsstrahlung collisions, when correcting the energy and momentum conservation, the energy correction is applied to pairs of particles in their center of momentum frame.
     This parameter is the fraction of the relative energy in the COM frame that is used in the correction.
 
 * ``collisions.energy_fraction_max`` (`float`) optional (default 0.5)
-    For pairwisecoulomb collisions, when correcting the energy and momentum conservation, the energy correction is applied to pairs of particles in their center of momentum frame.
+    For pairwisecoulomb and inverse_bremsstrahlung collisions, when correcting the energy and momentum conservation, the energy correction is applied to pairs of particles in their center of momentum frame.
     This parameter is the fraction of the total relative energy in the COM frame of all pairs that is used in the correction.
 
 * ``collisions.beta_weight_exponent`` (`float`) optional (default 1.)
