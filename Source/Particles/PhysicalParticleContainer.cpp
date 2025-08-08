@@ -441,22 +441,22 @@ PhysicalParticleContainer::Evolve (
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
-    // whether this is an unsplit push (i.e., position_push_half is false)
-    // or a split push in the first half (i.e., position_push_half is true
-    // and momentum_push_skip is false, meaning that the momentum has not
-    // been pushed yet)
-    bool const unsplit_or_split_first_half = (
-        !position_push_half ||
-        (position_push_half && !momentum_push_skip)
-    );
-    // whether this is an unsplit push (i.e., position_push_half is false)
-    // or a split push in the second half (i.e., position_push_half is true
-    // and momentum_push_skip is true, meaning that the momentum has already
-    // been pushed - in the first half)
-    bool const unsplit_or_split_second_half = (
-        !position_push_half ||
-        (position_push_half && momentum_push_skip)
-    );
+    //// whether this is an unsplit push (i.e., position_push_half is false)
+    //// or a split push in the first half (i.e., position_push_half is true
+    //// and momentum_push_skip is false, meaning that the momentum has not
+    //// been pushed yet)
+    //bool const unsplit_or_split_first_half = (
+    //    !position_push_half ||
+    //    (position_push_half && !momentum_push_skip)
+    //);
+    //// whether this is an unsplit push (i.e., position_push_half is false)
+    //// or a split push in the second half (i.e., position_push_half is true
+    //// and momentum_push_skip is true, meaning that the momentum has already
+    //// been pushed - in the first half)
+    //bool const unsplit_or_split_second_half = (
+    //    !position_push_half ||
+    //    (position_push_half && momentum_push_skip)
+    //);
 
     const iMultiFab* current_masks = WarpX::CurrentBufferMasks(lev);
     const iMultiFab* gather_masks = WarpX::GatherBufferMasks(lev);
@@ -515,17 +515,15 @@ PhysicalParticleContainer::Evolve (
 
             Elixir exeli, eyeli, ezeli, bxeli, byeli, bzeli;
 
-            if (unsplit_or_split_first_half) {
-                if (WarpX::use_fdtd_nci_corr) {
-                    // Filter arrays Ex[pti], store the result in filtered_Ex,
-                    // update pointer exfab so that it points to filtered_Ex,
-                    // repeat for all components of E and B
-                    applyNCIFilter(lev, pti.tilebox(), exeli, eyeli, ezeli, bxeli, byeli, bzeli,
-                        filtered_Ex, filtered_Ey, filtered_Ez,
-                        filtered_Bx, filtered_By, filtered_Bz,
-                        Ex[pti], Ey[pti], Ez[pti], Bx[pti], By[pti], Bz[pti],
-                        exfab, eyfab, ezfab, bxfab, byfab, bzfab);
-                }
+            if (WarpX::use_fdtd_nci_corr) {
+                // Filter arrays Ex[pti], store the result in filtered_Ex,
+                // update pointer exfab so that it points to filtered_Ex,
+                // repeat for all components of E and B
+                applyNCIFilter(lev, pti.tilebox(), exeli, eyeli, ezeli, bxeli, byeli, bzeli,
+                    filtered_Ex, filtered_Ey, filtered_Ez,
+                    filtered_Bx, filtered_By, filtered_Bz,
+                    Ex[pti], Ey[pti], Ez[pti], Bx[pti], By[pti], Bz[pti],
+                    exfab, eyfab, ezfab, bxfab, byfab, bzfab);
             }
 
             // Determine which particles deposit/gather in the buffer, and
@@ -686,25 +684,23 @@ PhysicalParticleContainer::Evolve (
                 } // end of "if electrostatic_solver_id == ElectrostaticSolverAlgo::None"
             } // end of "if do_not_push"
 
-            if (unsplit_or_split_second_half) {
-                if (has_rho && ! skip_deposition && ! do_not_deposit) {
-                    // Deposit charge after particle push, in component 1 of MultiFab rho.
-                    // (Skipped for electrostatic solver, as this may lead to out-of-bounds)
-                    if (WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::None) {
-                        amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
-                        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(rho->nComp() >= 2,
-                            "Cannot deposit charge in rho component 1: only component 0 is allocated!");
+            if (has_rho && ! skip_deposition && ! do_not_deposit) {
+                // Deposit charge after particle push, in component 1 of MultiFab rho.
+                // (Skipped for electrostatic solver, as this may lead to out-of-bounds)
+                if (WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::None) {
+                    amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(rho->nComp() >= 2,
+                        "Cannot deposit charge in rho component 1: only component 0 is allocated!");
 
-                        const int* const AMREX_RESTRICT ion_lev = (do_field_ionization)?
-                            pti.GetiAttribs("ionizationLevel").dataPtr():nullptr;
+                    const int* const AMREX_RESTRICT ion_lev = (do_field_ionization)?
+                        pti.GetiAttribs("ionizationLevel").dataPtr():nullptr;
 
-                        DepositCharge(pti, wp, ion_lev, rho, 1, 0,
-                                      np_to_deposit, thread_num, lev, lev);
-                        if (has_buffer){
-                            amrex::MultiFab* crho = fields.get(FieldType::rho_buf, lev);
-                            DepositCharge(pti, wp, ion_lev, crho, 1, np_to_deposit,
-                                          np-np_to_deposit, thread_num, lev, lev-1);
-                        }
+                    DepositCharge(pti, wp, ion_lev, rho, 1, 0,
+                                  np_to_deposit, thread_num, lev, lev);
+                    if (has_buffer){
+                        amrex::MultiFab* crho = fields.get(FieldType::rho_buf, lev);
+                        DepositCharge(pti, wp, ion_lev, crho, 1, np_to_deposit,
+                                      np-np_to_deposit, thread_num, lev, lev-1);
                     }
                 }
             }
@@ -719,16 +715,14 @@ PhysicalParticleContainer::Evolve (
         }
     }
 
-    if (unsplit_or_split_second_half) {
-        // Split particles at the end of the time step.
-        // When subcycling is ON, the splitting is done on the last call to
-        // PhysicalParticleContainer::Evolve on the finest level, i.e., at the
-        // end of the large time step. Otherwise, the pushes on different levels
-        // are not consistent, and the call to Redistribute (in SplitParticles)
-        // may result in split particles to deposit twice on the coarse level.
-        if (do_splitting && (a_dt_type == DtType::SecondHalf || a_dt_type == DtType::Full)) {
-            SplitParticles(lev);
-        }
+    // Split particles at the end of the time step.
+    // When subcycling is ON, the splitting is done on the last call to
+    // PhysicalParticleContainer::Evolve on the finest level, i.e., at the
+    // end of the large time step. Otherwise, the pushes on different levels
+    // are not consistent, and the call to Redistribute (in SplitParticles)
+    // may result in split particles to deposit twice on the coarse level.
+    if (do_splitting && (a_dt_type == DtType::SecondHalf || a_dt_type == DtType::Full)) {
+        SplitParticles(lev);
     }
 }
 
