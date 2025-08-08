@@ -100,6 +100,8 @@ void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Rea
 {
 
     if (m_use_global_debye_length) {
+        // This will calculate the temperature, Vbar, and particle number that are needed by
+        // the various collision algorithms
         mypc->GenerateGlobalDebyeLength();
     }
 

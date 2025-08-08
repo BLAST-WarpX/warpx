@@ -2045,6 +2045,7 @@ WarpXParticleContainer::CalculateNuei(amrex::MultiFab & species_nuei,
         "The nuei can not be calculated for a massless or neutral species.");
 
     // This assumes that all of these quantities have already been calculated
+    // from the call to GenerateGlobalDebyeLength at the start of the collisions
     WarpX & warpx = WarpX::GetInstance();
     amrex::MultiFab const & vxi_mf = *warpx.m_fields.get("v_" + species_name, Direction{0}, lev);
     amrex::MultiFab const & vyi_mf = *warpx.m_fields.get("v_" + species_name, Direction{1}, lev);
