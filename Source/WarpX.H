@@ -204,33 +204,24 @@ public:
     /** Boundary conditions applied to fields at the lower domain boundaries
      *  (Possible values PML, Periodic, PEC, PMC, Neumann, Damped, Absorbing Silver-Mueller, None)
      */
-    static inline amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>
-        field_boundary_lo {AMREX_D_DECL(FieldBoundaryType::Default,
-                                        FieldBoundaryType::Default,
-                                        FieldBoundaryType::Default)};
+    static inline amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> field_boundary_lo;
+
     /** Boundary conditions applied to fields at the upper domain boundaries
      *  (Possible values PML, Periodic, PEC, PMC, Neumann, Damped, Absorbing Silver-Mueller, None)
      */
-    static inline amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>
-        field_boundary_hi {AMREX_D_DECL(FieldBoundaryType::Default,
-                                        FieldBoundaryType::Default,
-                                        FieldBoundaryType::Default)};
+    static inline amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> field_boundary_hi;
+
     /** Integers that correspond to boundary condition applied to particles at the
      *  lower domain boundaries
      *  (0 to 4 correspond to Absorbing, Open, Reflecting, Periodic, Thermal)
      */
-    static inline amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>
-        particle_boundary_lo {AMREX_D_DECL(ParticleBoundaryType::Default,
-                                           ParticleBoundaryType::Default,
-                                           ParticleBoundaryType::Default)};
+    static inline amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM> particle_boundary_lo;
+
     /** Integers that correspond to boundary condition applied to particles at the
      *  upper domain boundaries
      *  (0 to 4 correspond to Absorbing, Open, Reflecting, Periodic, Thermal)
      */
-    static inline amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>
-        particle_boundary_hi {AMREX_D_DECL(ParticleBoundaryType::Default,
-                                           ParticleBoundaryType::Default,
-                                           ParticleBoundaryType::Default)};
+    static inline amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM> particle_boundary_hi;
 
     //! Integers that correspond to the time dependency of J (constant, linear)
     //! and rho (linear, quadratic) for the PSATD algorithm
