@@ -53,7 +53,7 @@ public:
      * @param lev refinement lev
      * @param mfi the MFIter for the tile
      * @param photons the photons particle container
-     * @param electrins the electrons particle container
+     * @param electrons the electrons particle container
      *
      */
     void doInverseBremsstrahlungWithinTile (amrex::Real dt, int lev, amrex::MFIter const& mfi,
