@@ -29,6 +29,12 @@ InverseBremsstrahlung::InverseBremsstrahlung (std::string const& collision_name,
     auto& species_1 = mypc->GetParticleContainerFromName(m_species_names[0]);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(species_1.AmIA<PhysicalSpecies::photon>(),
                                      "InverseBremsstrahlung: The first species must be photons");
+
+    const amrex::ParmParse pp_collision_name(collision_name);
+
+    pp_collision_name.query("energy_fraction", m_energy_fraction);
+    pp_collision_name.query("energy_fraction_max", m_energy_fraction_max);
+
 }
 
 void
@@ -84,18 +90,25 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile(
 {
     using namespace amrex::literals;
 
-   ParticleTileType& ptile_p = photons.ParticlesAt(lev, mfi);
+    ParticleTileType& ptile_photons = photons.ParticlesAt(lev, mfi);
+    ParticleTileType& ptile_electrons = electrons.ParticlesAt(lev, mfi);
+    auto np_photons = ptile_photons.numParticles();
+    auto np_electrons = ptile_electrons.numParticles();
 
-   // Find the particles that are in each cell of this tile
-   ParticleBins bins_p = ParticleUtils::findParticlesInEachCell(photons.Geom(lev), mfi, ptile_p);
+    // Find the particles that are in each cell of this tile
+    ParticleBins bins_photons = ParticleUtils::findParticlesInEachCell(photons.Geom(lev), mfi, ptile_photons);
+    ParticleBins bins_electrons = ParticleUtils::findParticlesInEachCell(electrons.Geom(lev), mfi, ptile_electrons);
 
-    // Extract low-level data
-    auto const n_cells = static_cast<int>(bins_p.numBins());
+    auto const n_cells = static_cast<int>(bins_photons.numBins());
 
-    // - Species 1
-    const auto soa_p = ptile_p.getParticleTileData();
-    index_type* AMREX_RESTRICT indices_p = bins_p.permutationPtr();
-    index_type const* AMREX_RESTRICT cell_offsets_p = bins_p.offsetsPtr();
+    const auto soa_photons = ptile_photons.getParticleTileData();
+    const auto soa_electrons = ptile_electrons.getParticleTileData();
+    index_type const* AMREX_RESTRICT bins_photons_ptr = bins_photons.binsPtr();
+    index_type const* AMREX_RESTRICT bins_electrons_ptr = bins_electrons.binsPtr();
+    index_type const* AMREX_RESTRICT cell_offsets_electrons = bins_electrons.offsetsPtr();
+    index_type* AMREX_RESTRICT indices_electrons = bins_electrons.permutationPtr();
+
+    const amrex::ParticleReal m_electrons = electrons.getMass();
 
     WarpX & warpx = WarpX::GetInstance();
     amrex::MultiFab const & nuei = *warpx.m_fields.get("nuei_" + electrons.getName(), lev);
@@ -128,77 +141,182 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile(
 #endif
     };
 
-    // Loop over cells
-    amrex::ParallelFor(n_cells,
-        [=] AMREX_GPU_DEVICE (int i_cell) noexcept
+    amrex::Gpu::DeviceVector<amrex::ParticleReal> KE_vec(n_cells, 0._prt);
+    amrex::Gpu::DeviceVector<amrex::ParticleReal> px_vec(n_cells, 0._prt);
+    amrex::Gpu::DeviceVector<amrex::ParticleReal> py_vec(n_cells, 0._prt);
+    amrex::Gpu::DeviceVector<amrex::ParticleReal> pz_vec(n_cells, 0._prt);
+    amrex::Gpu::DeviceVector<amrex::ParticleReal> w_sum_electrons_vec(n_cells, 0._prt);
+
+    amrex::ParticleReal* AMREX_RESTRICT KE_in_each_cell = KE_vec.dataPtr();
+    amrex::ParticleReal* AMREX_RESTRICT px_in_each_cell = px_vec.dataPtr();
+    amrex::ParticleReal* AMREX_RESTRICT py_in_each_cell = py_vec.dataPtr();
+    amrex::ParticleReal* AMREX_RESTRICT pz_in_each_cell = pz_vec.dataPtr();
+    amrex::ParticleReal* AMREX_RESTRICT w_sum_electrons_in_each_cell = w_sum_electrons_vec.dataPtr();
+
+    amrex::ParticleReal * const AMREX_RESTRICT w_photons = soa_photons.m_rdata[PIdx::w];
+    amrex::ParticleReal * const AMREX_RESTRICT ux_photons = soa_photons.m_rdata[PIdx::ux];
+    amrex::ParticleReal * const AMREX_RESTRICT uy_photons = soa_photons.m_rdata[PIdx::uy];
+    amrex::ParticleReal * const AMREX_RESTRICT uz_photons = soa_photons.m_rdata[PIdx::uz];
+    uint64_t * AMREX_RESTRICT idcpu_photons = soa_photons.m_idcpu;
+
+    amrex::ParticleReal * const AMREX_RESTRICT w_electrons = soa_electrons.m_rdata[PIdx::w];
+    amrex::ParticleReal * const AMREX_RESTRICT ux_electrons = soa_electrons.m_rdata[PIdx::ux];
+    amrex::ParticleReal * const AMREX_RESTRICT uy_electrons = soa_electrons.m_rdata[PIdx::uy];
+    amrex::ParticleReal * const AMREX_RESTRICT uz_electrons = soa_electrons.m_rdata[PIdx::uz];
+
+    // Loop over photons
+    amrex::ParallelFor( np_photons,
+        [=] AMREX_GPU_DEVICE (int ip) noexcept
         {
-            // The particles from photons that are in the cell `i_cell` are
-            // given by the `indices_p[cell_start_p:cell_stop_p]`
-            index_type const cell_start_p = cell_offsets_p[i_cell];
-            index_type const cell_stop_p = cell_offsets_p[i_cell+1];
-
-            amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_p.m_rdata[PIdx::w];
-
-            amrex::ParticleReal * const AMREX_RESTRICT u1x = soa_p.m_rdata[PIdx::ux];
-            amrex::ParticleReal * const AMREX_RESTRICT u1y = soa_p.m_rdata[PIdx::uy];
-            amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_p.m_rdata[PIdx::uz];
-
-            uint64_t * AMREX_RESTRICT idcpu1 = soa_p.m_idcpu;
+            const int i_cell = bins_photons_ptr[ip];
 
             // Calculate electron number density (now only the colliding species
             // but presumably should be all electrons?)
             amrex::ParticleReal const cell_ne = N_e_data[i_cell]/(dV*volume_factor(i_cell));
 
             amrex::ParticleReal const cell_wpe = PhysConst::q_e*std::sqrt(cell_ne/PhysConst::m_e/PhysConst::ep0);
-            amrex::ParticleReal const cell_Ewpe_eV = PhysConst::hbar*cell_wpe/PhysConst::q_e;
+            amrex::ParticleReal const cell_Ewpe_J = PhysConst::hbar*cell_wpe;
 
             amrex::ParticleReal const cell_nuei = nuei_data[i_cell];
 
-            // loop over photons, adjust weight based on abosrpotion
+            amrex::ParticleReal const wp = w_photons[ip];
+            amrex::ParticleReal const upx = ux_photons[ip];
+            amrex::ParticleReal const upy = uy_photons[ip];
+            amrex::ParticleReal const upz = uz_photons[ip];
+
+            // adjust weight based on abosrpotion
             // tabulate total momentum and energy absorbed
-            /* amrex::ParticleReal sum_deltaE_eV = 0.0_prt; */
-            /* amrex::ParticleReal sum_dPx = 0.0_prt; */
-            /* amrex::ParticleReal sum_dPy = 0.0_prt; */
-            /* amrex::ParticleReal sum_dPz = 0.0_prt; */
 
-            for (index_type i1=cell_start_p; i1<cell_stop_p; ++i1) {
+            // compute photon energy
+            amrex::ParticleReal const Ephoton_J = Algorithms::KineticEnergyPhotons(upx, upy, upz);
+            amrex::ParticleReal const nuIB = std::pow(cell_Ewpe_J/Ephoton_J, 2)*cell_nuei*0.5_prt;
 
-                amrex::ParticleReal const upx = u1x[indices_p[i1]];
-                amrex::ParticleReal const upy = u1y[indices_p[i1]];
-                amrex::ParticleReal const upz = u1z[indices_p[i1]];
+            // update photon weight based on absorption
+            amrex::ParticleReal dw = wp*std::min(nuIB*dt, 1.0_prt); // weight to be removed from photon
 
-                // compute photon energy in [eV]
-                amrex::ParticleReal const up = std::sqrt(upx*upx + upy*upy + upz*upz);
-                amrex::ParticleReal const Ephoton_eV = up*PhysConst::m_e*PhysConst::c/PhysConst::q_e;
-                amrex::ParticleReal const nuIB = std::pow(cell_Ewpe_eV/Ephoton_eV, 2)*cell_nuei*0.5_prt;
-
-                // update photon weight based on absorption
-                amrex::ParticleReal const wp1 = w1[indices_p[i1]];
-                amrex::ParticleReal dw = wp1*std::min(nuIB*dt, 1.0_prt); // weight to be removed from photon
-
-                if (dw < wp1) {
-                    // Remove weight from the photon
-                    w1[indices_p[i1]] -= dw;
-                } else {
-                    // set kill tag for photon if weight is too small
-                    dw = wp1;
-                    w1[indices_p[i1]] = 0.0_prt;
-                    idcpu1[indices_p[i1]] = amrex::ParticleIdCpus::Invalid;
-                }
-
-                // update total energy lost
-                /* sum_deltaE_eV += dw*Ephoton_eV; */
-
-                // update total momentum lost
-                /* sum_dPx += dw*upx; */
-                /* sum_dPy += dw*upy; */
-                /* sum_dPz += dw*upz; */
-
+            if (dw < wp) {
+                // Remove weight from the photon
+                w_photons[ip] -= dw;
+            } else {
+                // set kill tag for photon if weight is too small
+                dw = wp;
+                w_photons[ip] = 0.0_prt;
+                idcpu_photons[ip] = amrex::ParticleIdCpus::Invalid;
             }
 
+            // update total energy and momentum lost
+            // note that the photon upx, y, z is scaled by m_e
+            amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], dw*Ephoton_J);
+            amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], dw*upx*PhysConst::m_e);
+            amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], dw*upy*PhysConst::m_e);
+            amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], dw*upz*PhysConst::m_e);
+
             // update probe for energy gain via absorption
-            /* m_deltaE_IBremsstrahlung += sum_deltaE_eV*PhysConst::q_e; // Joules */
+            /* m_deltaE_IBremsstrahlung += sum_deltaE_J*PhysConst::q_e; // Joules */
 
         });
+
+    // Need total electron weight to determine how much momentum is given to each electron
+    amrex::ParallelFor( np_electrons,
+        [=] AMREX_GPU_DEVICE (int ie) noexcept
+        {
+            const int i_cell = bins_electrons_ptr[ie];
+            amrex::Gpu::Atomic::AddNoRet(&w_sum_electrons_in_each_cell[i_cell], w_electrons[ie]);
+        });
+
+    // Distribute momentum absorbed from photons to electrons
+    amrex::ParallelFor( np_electrons,
+        [=] AMREX_GPU_DEVICE (int ie) noexcept
+        {
+            const int i_cell = bins_electrons_ptr[ie];
+
+            amrex::ParticleReal const KE_before = Algorithms::KineticEnergy(ux_electrons[ie],
+                                                                            uy_electrons[ie],
+                                                                            uz_electrons[ie],
+                                                                            m_electrons);
+
+            ux_electrons[ie] += px_in_each_cell[i_cell]/(w_sum_electrons_in_each_cell[i_cell]*m_electrons);
+            uy_electrons[ie] += py_in_each_cell[i_cell]/(w_sum_electrons_in_each_cell[i_cell]*m_electrons);
+            uz_electrons[ie] += pz_in_each_cell[i_cell]/(w_sum_electrons_in_each_cell[i_cell]*m_electrons);
+
+            amrex::ParticleReal const KE_after = Algorithms::KineticEnergy(ux_electrons[ie],
+                                                                           uy_electrons[ie],
+                                                                           uz_electrons[ie],
+                                                                           m_electrons);
+
+            // Update the energy in the cell by subracting off the energy added to the electron
+            amrex::ParticleReal const KE_change = KE_after - KE_before;
+            amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], -w_electrons[ie]*KE_change);
+
+        });
+
+    amrex::Gpu::Buffer<amrex::Long> failed_corrections({0});
+    amrex::Long* failed_corrections_ptr = failed_corrections.data();
+
+    amrex::ParticleReal energy_fraction = m_energy_fraction;
+    amrex::ParticleReal energy_fraction_max = m_energy_fraction_max;
+
+    // Distribute any remaining energy to the electrons using the pairwise
+    // operation (that does not affect the total momentum)
+    amrex::ParallelFor( n_cells,
+        [=] AMREX_GPU_DEVICE (int i_cell) noexcept
+        {
+
+            index_type const cell_start_electrons = cell_offsets_electrons[i_cell];
+            index_type const cell_stop_electrons  = cell_offsets_electrons[i_cell + 1];
+            amrex::ParticleReal deltaEp_subtract = -KE_in_each_cell[i_cell];
+
+            if (deltaEp_subtract != 0.) {
+                // Adjust electrons to absorb deltaEp_subtract.
+                bool correction_failed =
+                     ParticleUtils::ModifyEnergyPairwise(ux_electrons, uy_electrons, uz_electrons, w_electrons,
+                                                         indices_electrons,
+                                                         cell_start_electrons, cell_stop_electrons, m_electrons,
+                                                         energy_fraction, energy_fraction_max, deltaEp_subtract);
+                KE_in_each_cell[i_cell] = -deltaEp_subtract;
+                if (correction_failed) {
+                    amrex::Gpu::Atomic::Add(failed_corrections_ptr, amrex::Long(1));
+                }
+            }
+
+        }
+    );
+
+    amrex::Long const num_failed_corrections = *(failed_corrections.copyToHost());
+
+    if (num_failed_corrections > 0) {
+        ablastr::warn_manager::WMRecordWarning("InverseBremsstrahlung::doInverseBremsstrahlungWithinTile",
+            "Pair-wise energy distribution failed, resorting to method that does not conserve momentum");
+
+        // Distribute the remaining energy among the electrons without conserving momentum
+        // Note that this only works if the particle energy is nonzero
+        amrex::ParallelFor( np_electrons,
+            [=] AMREX_GPU_DEVICE (int ie) noexcept
+            {
+                const int i_cell = bins_electrons_ptr[ie];
+                amrex::ParticleReal const dKE = KE_in_each_cell[i_cell]/w_sum_electrons_in_each_cell[i_cell];
+                if (dKE == 0.) { return; }
+
+                amrex::ParticleReal constexpr c2 = PhysConst::c * PhysConst::c;
+
+                amrex::ParticleReal const dgamma = dKE/(m_electrons*c2);
+
+                amrex::ParticleReal const u2 = ux_electrons[ie]*ux_electrons[ie]
+                                             + uy_electrons[ie]*uy_electrons[ie]
+                                             + uz_electrons[ie]*uz_electrons[ie];
+                if (u2 == 0.) { return; }
+
+                amrex::ParticleReal const gamma = std::sqrt(1._prt + u2/c2);
+                amrex::ParticleReal const gamma_new = gamma + dgamma;
+                amrex::ParticleReal const fsq = (gamma_new + 1._prt)*(u2/(1._prt + gamma) + dgamma*c2)/u2;
+                amrex::ParticleReal const f = std::sqrt(fsq);
+
+                ux_electrons[ie] *= f;
+                uy_electrons[ie] *= f;
+                uz_electrons[ie] *= f;
+
+            });
+
+        }
 
 }

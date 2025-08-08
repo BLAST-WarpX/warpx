@@ -59,6 +59,9 @@ public:
 
 private:
 
+    amrex::ParticleReal m_energy_fraction = 0.05;
+    amrex::ParticleReal m_energy_fraction_max = 0.5;
+
 };
 
 #endif // WARPX_PARTICLES_COLLISION_INVERSEBREMSSTRAHLUNG_H
