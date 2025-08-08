@@ -571,7 +571,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     bool const momentum_push_skip = false;
 
     if (m_use_mass_matrices && !a_from_jacobian) { // Called from non-linear stage of JFNK and using mass matrices
-        bool deposit_mass_matrices = true;
+        bool const deposit_mass_matrices = true;
         m_WarpX->PushParticlesandDeposit(
             a_cur_time,
             skip_current,
@@ -591,7 +591,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         ComputeJfromMassMatrices();
     }
     else {  // Conventional particle-suppressed JFNK
-        bool deposit_mass_matrices = false;
+        bool const deposit_mass_matrices = false;
         m_WarpX->PushParticlesandDeposit(
             a_cur_time,
             skip_current,
