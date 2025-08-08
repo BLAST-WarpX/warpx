@@ -38,7 +38,7 @@ public:
     InverseBremsstrahlung ( InverseBremsstrahlung&& )                  = delete;
     InverseBremsstrahlung& operator= ( InverseBremsstrahlung&& )       = delete;
 
-    /** Perform the collisions
+    /** \brief Perform the collisions
      *
      * @param cur_time Current time
      * @param dt Time step size
@@ -47,10 +47,13 @@ public:
      */
     void doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc) override;
 
-    /** Perform inverse Bremsstrahlung
+    /** \brief Perform inverse Bremsstrahlung within the tile
      *
-     * @param pti particle iterator
-     * @param t current time
+     * @param dt time step size
+     * @param lev refinement lev
+     * @param mfi the MFIter for the tile
+     * @param photons the photons particle container
+     * @param electrins the electrons particle container
      *
      */
     void doInverseBremsstrahlungWithinTile (amrex::Real dt, int lev, amrex::MFIter const& mfi,
