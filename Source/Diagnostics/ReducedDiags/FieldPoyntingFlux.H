@@ -131,7 +131,7 @@ struct PoyntingStaggered {
 
 };
 
-struct PoyntingCell {
+struct PoyntingCellCentered {
 
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     static amrex::Real EyBx(int i, int j, int k, int comp,

@@ -278,14 +278,17 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
                 }
                 else if (warpx.grid_type == ablastr::utils::enums::GridType::Collocated && Ex.is_cell_centered()) {
                     if (normal_dir == 0) {
-                        flux += Poynting::Kernel<0, PoyntingCell>(box, Ex_arr, Ey_arr, Ez_arr, Bx_arr, By_arr, Bz_arr, area_factor);
+                        flux += Poynting::Kernel<0, PoyntingCellCentered>(box, Ex_arr, Ey_arr, Ez_arr, Bx_arr, By_arr, Bz_arr, area_factor);
                     }
                     else if (normal_dir == 1) {
-                        flux += Poynting::Kernel<1, PoyntingCell>(box, Ex_arr, Ey_arr, Ez_arr, Bx_arr, By_arr, Bz_arr, area_factor);
+                        flux += Poynting::Kernel<1, PoyntingCellCentered>(box, Ex_arr, Ey_arr, Ez_arr, Bx_arr, By_arr, Bz_arr, area_factor);
                     }
                     else if (normal_dir == 2) {
-                        flux += Poynting::Kernel<2, PoyntingCell>(box, Ex_arr, Ey_arr, Ez_arr, Bx_arr, By_arr, Bz_arr, area_factor);
+                        flux += Poynting::Kernel<2, PoyntingCellCentered>(box, Ex_arr, Ey_arr, Ez_arr, Bx_arr, By_arr, Bz_arr, area_factor);
                     }
+                }
+                else {
+                    WARPX_ABORT_WITH_MESSAGE("FieldPoyntingFlux::ComputePoyntingFlux: unknown grid centering being used");
                 }
             }
         }
