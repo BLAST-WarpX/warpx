@@ -753,8 +753,6 @@ MultiParticleContainer::CalculateNuei (std::string const & electron_species_name
         amrex::MultiFab & species_nuei = *warpx.m_fields.get(field_name, lev);
         species_nuei.setVal(amrex::Real(0.0));
 
-        electron_species.CalculateAverageVelocity(lev);
-
         for (auto& pc : allcontainers) {
             // Only include interactions with ion species
             if (pc->species_name == electron_species_name ||

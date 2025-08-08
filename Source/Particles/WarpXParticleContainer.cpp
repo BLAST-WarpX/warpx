@@ -1804,8 +1804,8 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
     amrex::MultiFab & temperature = *warpx.m_fields.get(T_field_name, lev);
     temperature.setVal(0., 0, temperature.nComp(), temperature.nGrowVect());
 
-    amrex::MultiFab & number = *warpx.m_fields.get(N_field_name, lev);
-    number.setVal(0., 0, number.nComp(), number.nGrowVect());
+    amrex::MultiFab & particle_number = *warpx.m_fields.get(N_field_name, lev);
+    particle_number.setVal(0., 0, particle_number.nComp(), particle_number.nGrowVect());
 
     amrex::MultiFab & vx = *warpx.m_fields.get(v_field_name, Direction{0}, lev);
     amrex::MultiFab & vy = *warpx.m_fields.get(v_field_name, Direction{1}, lev);
@@ -1827,7 +1827,7 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
         amrex::ParticleReal const * uyp = pti.GetAttribs(PIdx::uy).dataPtr();
         amrex::ParticleReal const * uzp = pti.GetAttribs(PIdx::uz).dataPtr();
 
-        amrex::Array4<amrex::Real> const& N_array = number.array(pti);
+        amrex::Array4<amrex::Real> const& N_array = particle_number.array(pti);
         amrex::Array4<amrex::Real> const& vx_array = vx.array(pti);
         amrex::Array4<amrex::Real> const& vy_array = vy.array(pti);
         amrex::Array4<amrex::Real> const& vz_array = vz.array(pti);
@@ -1859,7 +1859,7 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
     for (amrex::MFIter mfi(temperature, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
         const amrex::Box& box = mfi.tilebox();
-        amrex::Array4<amrex::Real> const& N_array = number.array(mfi);
+        amrex::Array4<amrex::Real> const& N_array = particle_number.array(mfi);
         amrex::Array4<amrex::Real> const& vx_array = vx.array(mfi);
         amrex::Array4<amrex::Real> const& vy_array = vy.array(mfi);
         amrex::Array4<amrex::Real> const& vz_array = vz.array(mfi);
@@ -1921,7 +1921,7 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
     for (amrex::MFIter mfi(temperature, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
         const amrex::Box& box = mfi.tilebox();
-        amrex::Array4<amrex::Real> const& N_array = number.array(mfi);
+        amrex::Array4<amrex::Real> const& N_array = particle_number.array(mfi);
         amrex::Array4<amrex::Real> const& temp_array = temperature.array(mfi);
         amrex::ParallelFor(box,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
@@ -1932,103 +1932,6 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
             });
     }
 
-}
-
-/* \brief Calculate the average velocity from the particles.
- *        The result is put in the MultiFab registry.
- * \param lev Level of box that contains particles
- */
-void
-WarpXParticleContainer::CalculateAverageVelocity (int lev)
-{
-    using ablastr::fields::Direction;
-
-    // Create cell centered MultiFab with no guard cells
-    WarpX & warpx = WarpX::GetInstance();
-
-    std::string const v_field_name = "v_" + species_name;
-    std::string const N_field_name = "N_" + species_name;
-    auto const& ba = m_gdb->ParticleBoxArray(lev);
-    auto const& dm = m_gdb->DistributionMap(lev);
-    int const ncomps = 1;
-    amrex::IntVect ng = amrex::IntVect::TheZeroVector();
-    bool const remake = true;
-    bool const redistribute_on_remake = false;
-    if (!warpx.m_fields.has(v_field_name, Direction{0}, lev)) {
-        warpx.m_fields.alloc_init(v_field_name, Direction{0}, lev, ba, dm, ncomps, ng, 0., remake, redistribute_on_remake);
-        warpx.m_fields.alloc_init(v_field_name, Direction{1}, lev, ba, dm, ncomps, ng, 0., remake, redistribute_on_remake);
-        warpx.m_fields.alloc_init(v_field_name, Direction{2}, lev, ba, dm, ncomps, ng, 0., remake, redistribute_on_remake);
-    }
-    if (!warpx.m_fields.has(N_field_name, lev)) {
-        warpx.m_fields.alloc_init(N_field_name, lev, ba, dm, ncomps, ng, 0., remake, redistribute_on_remake);
-    }
-    amrex::MultiFab & vx = *warpx.m_fields.get(v_field_name, Direction{0}, lev);
-    amrex::MultiFab & vy = *warpx.m_fields.get(v_field_name, Direction{1}, lev);
-    amrex::MultiFab & vz = *warpx.m_fields.get(v_field_name, Direction{2}, lev);
-    vx.setVal(0., 0, vx.nComp(), vx.nGrowVect());
-    vy.setVal(0., 0, vy.nComp(), vy.nGrowVect());
-    vz.setVal(0., 0, vz.nComp(), vz.nGrowVect());
-
-    amrex::MultiFab & number = *warpx.m_fields.get(N_field_name, lev);
-    number.setVal(0., 0, number.nComp(), number.nGrowVect());
-
-    const auto plo = Geom(lev).ProbLoArray();
-    const auto dxi = Geom(lev).InvCellSizeArray();
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-    for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
-    {
-        const long np = pti.numParticles();
-        auto& tile = pti.GetParticleTile();
-        auto ptd = tile.getParticleTileData();
-        amrex::ParticleReal* wp = pti.GetAttribs(PIdx::w).dataPtr();
-        amrex::ParticleReal* uxp = pti.GetAttribs(PIdx::ux).dataPtr();
-        amrex::ParticleReal* uyp = pti.GetAttribs(PIdx::uy).dataPtr();
-        amrex::ParticleReal* uzp = pti.GetAttribs(PIdx::uz).dataPtr();
-
-        amrex::Array4<amrex::Real> const& vx_array = vx.array(pti);
-        amrex::Array4<amrex::Real> const& vy_array = vy.array(pti);
-        amrex::Array4<amrex::Real> const& vz_array = vz.array(pti);
-        amrex::Array4<amrex::Real> const& N_array = number.array(pti);
-
-        amrex::ParallelFor(np,
-            [=] AMREX_GPU_DEVICE (long ip) {
-                // Get position in AMReX convention to calculate corresponding index.
-                const auto p = WarpXParticleContainer::ParticleType(ptd, ip);
-                const auto [ii, jj, kk] = getParticleCell(p, plo, dxi).dim3();
-
-                amrex::ParticleReal const usq = uxp[ip]*uxp[ip] + uyp[ip]*uyp[ip] + uzp[ip]*uzp[ip];
-                amrex::ParticleReal const gaminv = 1._rt/std::sqrt(1._rt + usq/(PhysConst::c*PhysConst::c));
-                amrex::Gpu::Atomic::AddNoRet(&N_array(ii, jj, kk), wp[ip]);
-                amrex::Gpu::Atomic::AddNoRet(&vx_array(ii, jj, kk), wp[ip]*uxp[ip]*gaminv);
-                amrex::Gpu::Atomic::AddNoRet(&vy_array(ii, jj, kk), wp[ip]*uyp[ip]*gaminv);
-                amrex::Gpu::Atomic::AddNoRet(&vz_array(ii, jj, kk), wp[ip]*uzp[ip]*gaminv);
-            });
-    }
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-    for (amrex::MFIter mfi(number, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
-    {
-        const amrex::Box& box = mfi.tilebox();
-
-        amrex::Array4<amrex::Real> const& vx_array = vx.array(mfi);
-        amrex::Array4<amrex::Real> const& vy_array = vy.array(mfi);
-        amrex::Array4<amrex::Real> const& vz_array = vz.array(mfi);
-        amrex::Array4<amrex::Real> const& N_array = number.array(mfi);
-
-        amrex::ParallelFor(box,
-            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                if (N_array(i,j,k) > 0) {
-                    const amrex::Real invsum = 1._rt/N_array(i,j,k);
-                    vx_array(i,j,k) *= invsum;
-                    vy_array(i,j,k) *= invsum;
-                    vz_array(i,j,k) *= invsum;
-                }
-            });
-    }
 }
 
 /* \brief Calculate the Debye legth
@@ -2042,11 +1945,12 @@ WarpXParticleContainer::GetDebyeLength (int lev)
         "The Debye length can not be calculated for a massless or neutral species.");
 
     // This assumes that this is the first place these are needed each step
+    // In addition to the temperature, this also calculates Vbar and N
     DepositTotalNGPTemperature(lev);
 
     WarpX & warpx = WarpX::GetInstance();
 
-    amrex::MultiFab & number_density = *warpx.m_fields.get("N_" + species_name, lev);
+    amrex::MultiFab & particle_number = *warpx.m_fields.get("N_" + species_name, lev);
     amrex::MultiFab & temperature = *warpx.m_fields.get("T_" + species_name, lev);
 
     amrex::BoxArray const & ba = temperature.boxArray();
@@ -2075,7 +1979,7 @@ WarpXParticleContainer::GetDebyeLength (int lev)
         amrex::Real const dr = Geom(lev).CellSize(0);
 #endif
 
-        amrex::Array4<amrex::Real> const& num_array = number_density.array(mfi);
+        amrex::Array4<amrex::Real> const& num_array = particle_number.array(mfi);
         amrex::Array4<amrex::Real> const& temp_array = temperature.array(mfi);
         amrex::Array4<amrex::Real> const& debye_array = debye_length->array(mfi);
 
@@ -2140,6 +2044,7 @@ WarpXParticleContainer::CalculateNuei(amrex::MultiFab & species_nuei,
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(mass*charge != 0.,
         "The nuei can not be calculated for a massless or neutral species.");
 
+    // This assumes that all of these quantities have already been calculated
     WarpX & warpx = WarpX::GetInstance();
     amrex::MultiFab const & vxi_mf = *warpx.m_fields.get("v_" + species_name, Direction{0}, lev);
     amrex::MultiFab const & vyi_mf = *warpx.m_fields.get("v_" + species_name, Direction{1}, lev);

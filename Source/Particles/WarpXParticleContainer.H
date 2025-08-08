@@ -354,7 +354,6 @@ public:
     {}
 
     void DepositTotalNGPTemperature (const int lev);
-    void CalculateAverageVelocity (int lev);
     void CalculateNuei(amrex::MultiFab & species_nuei,
                        WarpXParticleContainer const & electron_species, int lev);
     std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);
