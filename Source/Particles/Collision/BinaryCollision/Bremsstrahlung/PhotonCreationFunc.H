@@ -66,17 +66,14 @@ public:
      *
      * @param[in] n_total_pairs how many binary collisions have been performed in this tile
      * @param[in, out] ptile1,ptile2 the particle tiles of the two colliding species
+     * @param[out] pc_products the products particle container
      * @param[out] tile_products array containing tile data of the product particles.
      * @param[in] m1 mass of the first colliding particle species
      * @param[in] m2 mass of the second colliding particle species
-     * @param[in] products_mass array storing the mass of product particles
      * @param[in] p_mask a mask that is 1 if binary collision has resulted in particle creation
      *            event, 0 otherwise.
      * @param[in] products_np array storing the number of existing product particles in that tile
      * @param[in] copy_species1 array of functors used to copy data from the first colliding
-     * particle species to the product particles and to default initialize product particle
-     * quantities.
-     * @param[in] copy_species2 array of functors used to copy data from the second colliding
      * particle species to the product particles and to default initialize product particle
      * quantities.
      * @param[in] p_pair_indices_1 array that stores the indices of the particles of the first
@@ -99,7 +96,7 @@ public:
                     const index_type* AMREX_RESTRICT p_mask,
                     const amrex::Vector<index_type>& products_np,
                     const SmartCopy* AMREX_RESTRICT copy_species1,
-                    const SmartCopy* AMREX_RESTRICT /*copy_species2*/,
+                    const SmartCopy* /*copy_species2*/,
                     const index_type* AMREX_RESTRICT p_pair_indices_1,
                     const index_type* AMREX_RESTRICT p_pair_indices_2,
                     const amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
