@@ -192,7 +192,8 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
             amrex::ParticleReal const nuIB = std::pow(cell_Ewpe_J/Ephoton_J, 2)*cell_nuei*0.5_prt;
 
             // update photon weight based on absorption
-            amrex::ParticleReal dw = wp*std::min(nuIB*dt, 1.0_prt); // weight to be removed from photon
+            amrex::ParticleReal const dt_prt = static_cast<amrex::ParticleReal>(dt);
+            amrex::ParticleReal dw = wp*std::min(nuIB*dt_prt, 1.0_prt); // weight to be removed from photon
 
             if (dw < wp) {
                 // Remove weight from the photon
@@ -206,10 +207,11 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
 
             // update total energy and momentum lost
             // note that the photon upx, y, z is scaled by m_e
+            amrex::ParticleReal constexpr m_e = static_cast<amrex::ParticleReal>(PhysConst::m_e);
             amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], dw*Ephoton_J);
-            amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], dw*upx*PhysConst::m_e);
-            amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], dw*upy*PhysConst::m_e);
-            amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], dw*upz*PhysConst::m_e);
+            amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], dw*upx*m_e);
+            amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], dw*upy*m_e);
+            amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], dw*upz*m_e);
 
             // update probe for energy gain via absorption
             /* m_deltaE_IBremsstrahlung += sum_deltaE_J*PhysConst::q_e; // Joules */
