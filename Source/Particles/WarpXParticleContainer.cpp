@@ -2017,9 +2017,10 @@ WarpXParticleContainer::GetDebyeLength (int lev)
                 // This needs to be double since it can go out of range with float
                 double const EF = PhysConst::hbar*PhysConst::hbar/(2.0_rt*rmass)*
                                        std::pow(3.0_rt*MathConst::pi*MathConst::pi*n, 2.0_rt/3.0_rt);
+                amrex::Real const EF_Real = static_cast<amrex::Real>(EF);
 
                 // Debye length squared
-                amrex::Real const LDe_sq = std::max(Aconst*(T + 2.0_rt/3.0_rt*EF)/n, R*R); // [m^2]
+                amrex::Real const LDe_sq = std::max(Aconst*(T + 2.0_rt/3.0_rt*EF_Real)/n, R*R); // [m^2]
 
                 debye_array(i,j,k) = std::sqrt(LDe_sq);
 
