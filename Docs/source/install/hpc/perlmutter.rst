@@ -292,7 +292,7 @@ Create your own Conda environment and `Jupyter kernel <https://docs.nersc.gov/se
    # create Jupyter kernel
    rm -rf $HOME/.local/share/jupyter/kernels/warpx-pm-postproc/
    python -m ipykernel install --user --name warpx-pm-postproc --display-name WarpX-PM-PostProcessing
-   echo -e '#!/bin/bash\nmodule load python\nsource activate warpx-pm-postproc\nexec "$@"' > $HOME/.local/share/jupyter/kernels/warpx-pm-postproc/kernel-helper.sh
+   echo -e '#!/bin/bash\nmodule load python\nconda activate warpx-pm-postproc\nexec "$@"' > $HOME/.local/share/jupyter/kernels/warpx-pm-postproc/kernel-helper.sh
    chmod a+rx $HOME/.local/share/jupyter/kernels/warpx-pm-postproc/kernel-helper.sh
    KERNEL_STR=$(jq '.argv |= ["{resource_dir}/kernel-helper.sh"] + .' $HOME/.local/share/jupyter/kernels/warpx-pm-postproc/kernel.json | jq '.argv[1] = "python"')
    echo ${KERNEL_STR} | jq > $HOME/.local/share/jupyter/kernels/warpx-pm-postproc/kernel.json
