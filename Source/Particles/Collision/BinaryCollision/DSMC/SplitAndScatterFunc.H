@@ -408,7 +408,7 @@ public:
                 // After C is determined the momentum vectors are arranged
                 // such that the net linear momentum is zero.
 
-                const amrex::ParticleReal n_2 = std::min(E2 / E_coll, 0.5_prt * amrex::Random(engine));
+                const amrex::ParticleReal n_2 = std::min(E2 / E_coll, 0.5_prt * static_cast<amrex::ParticleReal>(amrex::Random(engine)));
 
                 // find ellipse semi-major and minor axis
                 const amrex::ParticleReal a = 0.5_prt * (1.0_prt - n_2);

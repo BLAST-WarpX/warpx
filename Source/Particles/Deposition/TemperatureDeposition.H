@@ -138,6 +138,7 @@ void varianceDepositionSubKernel(
  * \param nx_arr,ny_arr,nz_arr Array4<int> of velocity variance sample count, either full array or tile.
  * \param wx_arr,wy_arr,wz_arr Array4 of weight sums, either full array or tile.
  * \param w2x_arr,w2y_arr,w2z_arr Array4 of weight**2 sums, either full array or tile.
+ * \param vxbar_arr,vybar_arr,vzbar_arr Array4 of current density, either full array or tile.
  * \param varx_type,vary_type,varz_type The grid types along each direction, either NODE or CELL
  * \param type The type of deposition routine, either SINGLE_PASS or DOUBLE_PASS
  * \param pass The pass that is occurring, either FIRST or SECOND
