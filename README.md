@@ -1,5 +1,6 @@
 # UCLA build of WarpX, integrating our open PRs:
 
+- ~https://github.com/BLAST-WarpX/warpx/pull/6072~ Merged
 - ~https://github.com/BLAST-WarpX/warpx/pull/5986~ Merged
 - ~https://github.com/BLAST-WarpX/warpx/pull/5985~ Merged
 - https://github.com/BLAST-WarpX/warpx/pull/5426
