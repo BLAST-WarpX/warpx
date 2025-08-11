@@ -111,7 +111,9 @@ assert dEdx_difference < dEdx_tolerance
 sigma_total = 1.818e-28  # Calculated from table with k cutoff=1.e-4
 N_photon = n_e * n_i * L * beta * constants.c * sigma_total * dt
 new_photons_tolerance = 0.02
-new_photons_difference = np.abs(particle_number[-1, -1] / (particle_energy[-1, 0] * N_photon) - 1.0)
+new_photons_difference = np.abs(
+    particle_number[-1, -1] / (particle_energy[-1, 0] * N_photon) - 1.0
+)
 print(f"New photons per step simulated = {particle_number[-1, -1]}")
 print(f"New photons per step analytic  = {particle_energy[-1, 0] * N_photon}")
 print(
