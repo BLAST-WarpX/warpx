@@ -1769,7 +1769,8 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
     using ablastr::fields::Direction;
 
     // Thermodynamic temperature is not defined for massless particles
-    if (mass == 0.) { return; }
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(mass > 0.,
+        "DepositTotalNGPTemperature: The temperature can not be calculated for a massless species.");
 
     WarpX & warpx = WarpX::GetInstance();
 
