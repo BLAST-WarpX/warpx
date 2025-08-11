@@ -101,7 +101,7 @@ MacroscopicProperties::ReadParameters ()
     }
     if (!mu_specified) {
         std::stringstream warnMsg;
-        warnMsg << "Material permittivity is not specified. Using default vacuum value of " <<
+        warnMsg << "Material permeability is not specified. Using default vacuum value of " <<
             m_mu << " in the simulation.";
         ablastr::warn_manager::WMRecordWarning("Macroscopic properties",
             warnMsg.str());
