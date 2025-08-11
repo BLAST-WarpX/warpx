@@ -353,11 +353,6 @@ public:
         [[maybe_unused]]amrex::Real relative_time)
     {}
 
-    void DepositTotalNGPTemperature (const int lev);
-    void CalculateNuei(amrex::MultiFab & species_nuei,
-                       WarpXParticleContainer const & electron_species, int lev);
-    std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);
-
     virtual void DepositTemperature (
         [[maybe_unused]]WarpXParIter& pti,
         [[maybe_unused]]RealVector const & wp,
@@ -377,6 +372,11 @@ public:
         [[maybe_unused]]const warpx::particles::deposition::TemperatureDepositionType type,
         [[maybe_unused]]const warpx::particles::deposition::TemperatureDepositionPass pass)
     {}
+
+    void DepositTotalNGPTemperature (const int lev);
+    void CalculateNuei(amrex::MultiFab & species_nuei,
+                       WarpXParticleContainer const & electron_species, int lev);
+    std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);
 
     virtual
     void DepositCurrentAndMassMatrices ( WarpXParIter& pti,
