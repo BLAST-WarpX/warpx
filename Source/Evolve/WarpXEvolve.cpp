@@ -160,6 +160,12 @@ WarpX::Evolve (int numsteps)
 
     static Real evolve_time = 0;
 
+    // check if simulation has collisions
+    amrex::Vector<std::string> collision_names;
+    const amrex::ParmParse pp_collisions("collisions");
+    pp_collisions.queryarr("collision_names", collision_names);
+    bool const collisions = (static_cast<int>(collision_names.size()) == 0) ? false : true;
+
     const int step_begin = istep[0];
     for (int step = istep[0]; step < numsteps_max && cur_time < stop_time; ++step)
     {
@@ -226,7 +232,7 @@ WarpX::Evolve (int numsteps)
 #endif
 
         // perform collisions and advance fields and particles by one time step
-        OneStep(cur_time, dt[0], step);
+        OneStep(cur_time, dt[0], step, collisions);
 
         // Resample particles
         // +1 is necessary here because value of step seen by user (first step is 1) is different than
@@ -375,7 +381,8 @@ WarpX::Evolve (int numsteps)
 void WarpX::OneStep (
     amrex::Real a_cur_time,
     amrex::Real a_dt,
-    int a_step
+    int a_step,
+    bool const collisions
 )
 {
     WARPX_PROFILE("WarpX::OneStep()");
@@ -398,29 +405,45 @@ void WarpX::OneStep (
         // electrostatic solver or hybrid solver
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
-            //// push particles (half position and full momentum)
-            //PushParticlesandDeposit(
-            //    a_cur_time,
-            //    /*skip_current=*/true,
-            //    /*position_push_half=*/true,
-            //    /*momentum_push_skip=*/false
-            //);
+            // with collisions
+            if (collisions) {
+                // push particles (half position and full momentum)
+                PushParticlesandDeposit(
+                    a_cur_time,
+                    /*skip_current=*/true,
+                    /*position_push_half=*/true,
+                    /*momentum_push_skip=*/false
+                );
 
-            // perform particle collisions
-            ExecutePythonCallback("beforecollisions");
-            mypc->doCollisions(a_step, a_cur_time, a_dt);
-            ExecutePythonCallback("aftercollisions");
+                // perform particle collisions
+                ExecutePythonCallback("beforecollisions");
+                mypc->doCollisions(a_step, a_cur_time, a_dt);
+                ExecutePythonCallback("aftercollisions");
 
-            // perform particle injection
-            ExecutePythonCallback("particleinjection");
+                // perform particle injection
+                ExecutePythonCallback("particleinjection");
 
-            // push particles (half position)
-            PushParticlesandDeposit(
-                a_cur_time,
-                /*skip_deposition=*/true,
-                /*position_push_half=*/false,
-                /*momentum_push_skip=*/false
-            );
+                // push particles (half position)
+                PushParticlesandDeposit(
+                    a_cur_time,
+                    /*skip_deposition=*/true,
+                    /*position_push_half=*/true,
+                    /*momentum_push_skip=*/true
+                );
+            }
+            // without collisions
+            else {
+                // perform particle injection
+                ExecutePythonCallback("particleinjection");
+
+                // push particles (half position)
+                PushParticlesandDeposit(
+                    a_cur_time,
+                    /*skip_deposition=*/true,
+                    /*position_push_half=*/false,
+                    /*momentum_push_skip=*/false
+                );
+            }
         }
         // electromagnetic solver
         else {
