@@ -46,16 +46,20 @@ photon_momentum = particle_momentum[:, 5]
 energy_tolerance = 1.0e-11
 
 print(f"initial total energy = {total_energy[0]}")
-print(f"final total energy = {total_energy[-1]}")
+print(f"final total energy   = {total_energy[-1]}")
+print(f"energy tolerance = {energy_tolerance}")
 
 dE_total = np.abs(total_energy[-1] - total_energy[0]) / total_energy[0]
 print(f"change in total energy = {dE_total}")
 assert dE_total < energy_tolerance
 
+print()
+
 momentum_tolerance = 1.0e-12
 
 print(f"initial total momentum = {total_momentum[0]}")
-print(f"final total momentum = {total_momentum[-1]}")
+print(f"final total momentum   = {total_momentum[-1]}")
+print(f"momentum tolerance = {momentum_tolerance}")
 
 dP_total = np.abs(total_momentum[-1] - total_momentum[0]) / total_momentum[0]
 print(f"change in total momentum = {dP_total}")
@@ -94,16 +98,25 @@ r_e = (
 )
 dEdx = n_i * constants.alpha * r_e**2 * Z**2 * (T1 + m_e_eV) * phirad
 
-print(f"dE/dx analytic = {dEdx}")
+dEdx_difference = np.abs(dEdx_simulation[-1] / dEdx - 1.0)
+dEdx_tolerance = 0.03
+
+print(f"dE/dx analytic  = {dEdx}")
 print(f"dE/dx simulated = {dEdx_simulation[-1]}")
 print(f"dE/dx simulated/analytic = {dEdx_simulation[-1] / dEdx}")
-assert np.abs(dEdx_simulation[-1] / dEdx - 1.0) < 0.03
+print(f"dE/dx tolerance = {dEdx_tolerance}")
+print(f"dE/dx difference = {dEdx_difference}")
+assert dEdx_difference < dEdx_tolerance
 
 sigma_total = 1.818e-28  # Calculated from table with k cutoff=1.e-4
 N_photon = n_e * n_i * L * beta * constants.c * sigma_total * dt
+new_photons_tolerance = 0.02
+new_photons_difference = np.abs(particle_number[-1, -1] / (particle_energy[-1, 0] * N_photon) - 1.0)
+print(f"New photons per step simulated = {particle_number[-1, -1]}")
+print(f"New photons per step analytic  = {particle_energy[-1, 0] * N_photon}")
 print(
     f"New photons per step simulated/analytic = {particle_number[-1, -1] / (particle_energy[-1, 0] * N_photon)}"
 )
-assert (
-    np.abs(particle_number[-1, -1] / (particle_energy[-1, 0] * N_photon) - 1.0) < 0.02
-)
+print(f"New photons per step toleraance = {new_photons_tolerance}")
+print(f"New photons per step difference = {new_photons_difference}")
+assert new_photons_difference < new_photons_tolerance
