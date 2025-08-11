@@ -1818,8 +1818,8 @@ WarpX::ReadExternalFieldFromFile (
                 const amrex::Array4<double> fc_array(FC_data, {0,0,0}, {extent0, extent2, extent1}, 1);
                 const double
                     f00 = fc_array(0, iz  , ir  ),
-                    f01 = fc_array(0, iz  , ir+1),
-                    f10 = fc_array(0, iz+1, ir  ),
+                    f01 = fc_array(0, iz+1, ir  ),
+                    f10 = fc_array(0, iz  , ir+1),
                     f11 = fc_array(0, iz+1, ir+1);
                 mffab(i,j,k) = static_cast<amrex::Real>(ablastr::math::bilinear_interp<double>
                     (xx0, xx0+file_dr, xx1, xx1+file_dz,
