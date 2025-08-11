@@ -98,11 +98,11 @@ class PoissonSolver1D(picmi.ElectrostaticSolver):
         """Function run on every step to perform the required steps to solve
         Poisson's equation."""
         # get rho from WarpX
-        self.rho_data = fields.RhoFPWrapper(0, False)[...]
+        self.rho_data = fields.RhoFPWrapper(0)[...]
         # run superLU solver to get phi
         self.solve()
         # write phi to WarpX
-        fields.PhiFPWrapper(0, True)[...] = self.phi[:]
+        fields.PhiFPWrapper(0)[()] = self.phi[:]
 
     def solve(self):
         """The solution step. Includes getting the boundary potentials and
@@ -292,7 +292,7 @@ class CapacitiveDischargeExample(object):
             electron_colls_dsmc = picmi.DSMCCollisions(
                 name="coll_elec_dsmc",
                 species=[self.electrons, self.neutrals],
-                product_species=[self.ions, self.electrons],
+                product_species=[self.electrons, self.ions],
                 ndt=4,
                 scattering_processes=ionization,
             )
@@ -437,7 +437,7 @@ class CapacitiveDischargeExample(object):
     def run_sim(self):
         self.sim.step(self.max_steps - self.diag_steps)
 
-        self.rho_wrapper = fields.RhoFPWrapper(0, False)
+        self.rho_wrapper = fields.RhoFPWrapper(0)
         callbacks.installafterstep(self._get_rho_ions)
 
         self.sim.step(self.diag_steps)

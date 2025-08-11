@@ -278,7 +278,14 @@ void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
     amrex::ignore_unused(a_U);
 
     // set the alpha coefficient for the curl-curl op
-    const RT thetaDt = m_ops->GetTheta()*this->m_dt;
+    const RT thetaDt = m_ops->GetThetaForPC()*this->m_dt;
+    if (thetaDt==0.) {
+        std::stringstream convergenceMsg;
+        convergenceMsg << "Light waves are not treated implicitly with the chosen time solver.\n";
+        convergenceMsg << "Use jacobian.pc_type = pc_jacobi for better performance.\n";
+        ablastr::warn_manager::WMRecordWarning("CurlCurlMLMGPC", convergenceMsg.str());
+    }
+
     const RT alpha = (thetaDt*PhysConst::c) * (thetaDt*PhysConst::c);
     m_curl_curl->setScalars(alpha, RT(1.0));
 

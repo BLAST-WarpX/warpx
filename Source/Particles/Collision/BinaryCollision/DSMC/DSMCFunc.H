@@ -59,8 +59,8 @@ public:
      * @param[in] isSameSpecies whether the two colliding species are the same
      */
     DSMCFunc ( const std::string& collision_name,
-               MultiParticleContainer const * mypc,
-               bool isSameSpecies );
+               [[maybe_unused]] MultiParticleContainer const * mypc,
+               const bool isSameSpecies );
 
     struct Executor {
         /**

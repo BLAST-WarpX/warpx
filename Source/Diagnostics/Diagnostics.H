@@ -36,6 +36,7 @@ public:
      *
      * @param i index of diagnostics in MultiDiagnostics::alldiags
      * @param name diagnostics name in the inputs file
+     * @param diag_type diagnostics type (e.g., full, back-transformed, time-averaged, etc.)
      */
     Diagnostics (int i, std::string name, DiagTypes diag_type);
 
@@ -197,6 +198,7 @@ protected:
     /** Initialize m_mf_output vectors and data required to construct the buffers
      * \param[in] i_buffer index of buffer for which the output MultiFab is defined.
      * \param[in] lev level on which the output MultiFab is defined
+     * \param[in] restart whether this is called upon restarting a previous simulation
      */
     virtual void InitializeBufferData (int i_buffer, int lev, bool restart=false) = 0;
     /** Initialize member variables and arrays specific to the diagnostics in the

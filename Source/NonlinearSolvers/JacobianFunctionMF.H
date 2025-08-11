@@ -62,6 +62,9 @@ class JacobianFunctionMF : public LinearFunction<T,Ops>
     inline
     bool isDefined() const { return m_is_defined;  }
 
+    [[nodiscard]] inline
+    bool usePreconditioner() const { return m_usePreCond;  }
+
     inline
     void setBaseSolution ( const T&  a_U )
     {
