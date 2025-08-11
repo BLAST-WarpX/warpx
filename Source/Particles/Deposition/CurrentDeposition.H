@@ -653,10 +653,10 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * \brief Esirkepov current deposition for thread thread_num kernal.
  *        This is a charge-conserving deposition.
  *
- * \param depos_order  deposition order
+ * \tparam depos_order  deposition order
  * \param xp_old,yp_old,zp_old  Old particle positions (nominally at start of step)
  * \param xp_new,yp_new,zp_new  New particle positions (nominally at end of step)
- * \param wp                    Particle weight
+ * \param wq                    Particle weight*charge
  * \param uxp_mid,uyp_mid,uzp_mid  Particle momentum at middle of step
  * \param gaminv                One over gamma for particle at middle of step
  * \param Jx_arr,Jy_arr,Jz_arr  Array4 of current density, either full array or tile
@@ -664,8 +664,6 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * \param dinv                  3D cell size inverse
  * \param xyzmin                Physical lower bounds of domain
  * \param lo                    Index lower bounds of domain
- * \param invvol                One over cell volume
- * \param q                     Species charge
  * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry
  */
 template <int depos_order>
