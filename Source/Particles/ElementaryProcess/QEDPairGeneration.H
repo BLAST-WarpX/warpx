@@ -94,6 +94,8 @@ public:
     * @param[in] bxfab constant reference to the FArrayBox of the x component of the magnetic field
     * @param[in] byfab constant reference to the FArrayBox of the y component of the magnetic field
     * @param[in] bzfab constant reference to the FArrayBox of the z component of the magnetic field
+    * @param[in] E_external_particle reference to external E field
+    * @param[in] B_external_particle reference to external B field
     * @param[in] a_offset offset to apply to the particle indices
     */
     PairGenerationTransformFunc(BreitWheelerGeneratePairs generate_functor,

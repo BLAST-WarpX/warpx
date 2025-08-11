@@ -27,15 +27,13 @@ namespace ParticleUtils
 
     // Define shortcuts for frequently-used type names
     using ParticleType = typename WarpXParticleContainer::ParticleType;
-    using ParticleTileType = typename WarpXParticleContainer::ParticleTileType;
-    using ParticleTileDataType = typename ParticleTileType::ParticleTileDataType;
     using ParticleBins = DenseBins<ParticleTileDataType>;
 
     /* Find the particles and count the particles that are in each cell.
        Note that this does *not* rearrange particle arrays */
-    ParticleBins
-    findParticlesInEachCell (Geometry const& geom_lev,
-                             MFIter const & mfi,
+    amrex::DenseBins<ParticleTileDataType>
+    findParticlesInEachCell (amrex::Geometry const& geom_lev,
+                             amrex::MFIter const & mfi,
                              ParticleTileType & ptile) {
 
         // Extract particle structures for this tile

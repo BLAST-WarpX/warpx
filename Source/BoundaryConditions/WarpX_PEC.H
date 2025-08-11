@@ -21,13 +21,13 @@ namespace PEC {
      * \param[in,out] Efield              Boundary values of tangential Efield are set to zero
      * \param[in]     field_boundary_lo   Boundary types of the "low" boundaries
      * \param[in]     field_boundary_hi   Boundary types of the "high" boundaries
+     * \param[in]     bc_type             Boundary condition type to be applied
      * \param[in]     ng_fieldgather      number of guard cells used by field gather
      * \param[in]     geom                geometry object of level "lev"
      * \param[in]     lev                 level of the Multifab
      * \param[in]     patch_type          coarse or fine
      * \param[in]     ref_ratios          vector containing the refinement ratios of the refinement levels
-     * \param[in]     split_pml_field     whether pml the multifab is the regular Efield or
-     *                                        split pml field
+     * \param[in]     split_pml_field     whether the MultiFab is the regular Efield or the split PML field
      */
     void ApplyPECtoEfield (
                         std::array<amrex::MultiFab*, 3> Efield,
@@ -45,11 +45,13 @@ namespace PEC {
      * \param[in,out] Bfield              Boundary values of normal Bfield are set to zero.
      * \param[in]     field_boundary_lo   Boundary types of the "low" field boundaries
      * \param[in]     field_boundary_hi   Boundary types of the "high" field boundaries
+     * \param[in]     bc_type             Boundary condition type to be applied
      * \param[in]     ng_fieldgather      number of guard cells used by field gather
      * \param[in]     geom                geometry object of level "lev"
      * \param[in]     lev                 level of the Multifab
      * \param[in]     patch_type          coarse or fine
      * \param[in]     ref_ratios          vector containing the refinement ratios of the refinement levels
+     * \param[in]     split_pml_field     whether the MultiFab is the regular Bfield or the split PML field
      */
     void ApplyPECtoBfield (
                         std::array<amrex::MultiFab*, 3> Bfield,

@@ -51,6 +51,18 @@ macro(find_amrex)
             set(AMReX_OMP          OFF    CACHE INTERNAL "")
         endif()
 
+        set(AMReX_SIMD "${WarpX_SIMD}" CACHE INTERNAL "")
+
+        if(WarpX_FASTMATH OR ABLASTR_FASTMATH)
+            set(AMReX_FASTMATH ON CACHE INTERNAL "")
+            # TODO: set consistently (default: ON)
+            # set(AMReX_CUDA_FASTMATH ON CACHE INTERNAL "")
+        else()
+            # TODO: set consistently (default: ON)
+            # set(AMReX_CUDA_FASTMATH ON CACHE INTERNAL "")
+            set(AMReX_FASTMATH OFF CACHE INTERNAL "")
+        endif()
+
         if(WarpX_FFT OR ABLASTR_FFT)
             set(AMReX_FFT ON CACHE INTERNAL "")
         else()
@@ -215,6 +227,7 @@ macro(find_amrex)
         mark_as_advanced(AMReX_MEM_PROFILE)
         mark_as_advanced(AMReX_MPI)
         mark_as_advanced(AMReX_MPI_THREAD_MULTIPLE)
+        mark_as_advanced(AMReX_SIMD)
         mark_as_advanced(AMReX_OMP)
         mark_as_advanced(AMReX_PROBINIT)
         mark_as_advanced(AMReX_PETSC)
@@ -242,6 +255,12 @@ macro(find_amrex)
             set(COMPONENT_CATALYST CATALYST CONDUIT)
         else()
             set(COMPONENT_CATALYST)
+        endif()
+
+        if(WarpX_SIMD)
+            set(COMPONENT_SIMD SIMD)
+        else()
+            set(COMPONENT_SIMD)
         endif()
 
         set(WarpX_amrex_dim ${WarpX_DIMS})  # RZ is AMReX 2D
@@ -273,7 +292,7 @@ macro(find_amrex)
         endif()
         set(COMPONENT_PRECISION ${WarpX_PRECISION} P${WarpX_PARTICLE_PRECISION})
 
-        find_package(AMReX ${amrex_version} CONFIG REQUIRED COMPONENTS ${COMPONENT_ASCENT} ${COMPONENT_CATALYST} ${COMPONENT_DIMS} ${COMPONENT_EB} ${COMPONENT_FFT} PARTICLES ${COMPONENT_PIC} ${COMPONENT_PRECISION} ${COMPONENT_SENSEI} LSOLVERS)
+        find_package(AMReX ${amrex_version} CONFIG REQUIRED COMPONENTS ${COMPONENT_ASCENT} ${COMPONENT_CATALYST} ${COMPONENT_DIMS} ${COMPONENT_EB} ${COMPONENT_FFT} PARTICLES ${COMPONENT_PIC} ${COMPONENT_PRECISION} ${COMPONENT_SENSEI} ${COMPONENT_SIMD} LSOLVERS)
         # note: TINYP skipped because user-configured and optional
 
         # AMReX CMake helper scripts

@@ -251,14 +251,14 @@ LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies,
             (m_nvec[0]-windir[0])*(m_nvec[0]-windir[0]) +
             (m_nvec[1]-windir[1])*(m_nvec[1]-windir[1]) +
             (m_nvec[2]-windir[2])*(m_nvec[2]-windir[2]) < 1.e-12,
-            "do_continous_injection for laser particle only works" +
+            "do_continous_injection for laser particle only works"
             " if moving window direction and laser propagation direction are the same");
         if ( WarpX::gamma_boost>1 ){
             AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
                 (WarpX::boost_direction[0]-0)*(WarpX::boost_direction[0]-0) +
                 (WarpX::boost_direction[1]-0)*(WarpX::boost_direction[1]-0) +
                 (WarpX::boost_direction[2]-1)*(WarpX::boost_direction[2]-1) < 1.e-12,
-                "do_continous_injection for laser particle only works if " +
+                "do_continous_injection for laser particle only works if "
                 "warpx.boost_direction = z. TODO: all directions.");
         }
     }
