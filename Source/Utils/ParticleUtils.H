@@ -151,6 +151,7 @@ namespace ParticleUtils {
      * to a frame moving with gamma*velocity (Ux, Uy, Uz) relative to the present one.
      *
      * @param[in,out] px,py,pz components of momentum vector in the current frame
+     * @param[in] mass the particle mass
      * @param[in] Ux,Uy,Uz velocity of the new frame relative to the current one,
                       importantly these quantities are gamma * velocity
      */
