@@ -811,12 +811,9 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     const int cell_crossings_z = std::abs(k_new-k_old);
     num_segments += cell_crossings_z;
 
-    // need to assert that the number of cell crossings in each direction
-    // is within the range permitted by the number of guard cells
-    // e.g., if (num_segments > 7) ...
-
-    // compute total change in particle position and the initial cell
+    // Compute total change in particle position and the initial cell
     // locations in each direction used to find the position at cell crossings.
+    // Keep these double to avoid bug in single precision
     const double dxp = x_new - x_old;
     const double dyp = y_new - y_old;
     const double dzp = z_new - z_old;
@@ -886,29 +883,29 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
         }
 
         // compute the segment factors (each equal to dt_seg/dt for nonzero dxp, dyp, or dzp)
-        const auto seg_factor_x = static_cast<double>(dxp == 0. ? 1. : dxp_seg/dxp);
-        const auto seg_factor_y = static_cast<double>(dyp == 0. ? 1. : dyp_seg/dyp);
-        const auto seg_factor_z = static_cast<double>(dzp == 0. ? 1. : dzp_seg/dzp);
+        const auto seg_factor_x = static_cast<amrex::Real>(dxp == 0. ? 1._rt : dxp_seg/dxp);
+        const auto seg_factor_y = static_cast<amrex::Real>(dyp == 0. ? 1._rt : dyp_seg/dyp);
+        const auto seg_factor_z = static_cast<amrex::Real>(dzp == 0. ? 1._rt : dzp_seg/dzp);
 
         // compute cell-based weights using the average segment position
-        double sx_cell[depos_order] = {0.};
-        double sy_cell[depos_order] = {0.};
-        double sz_cell[depos_order] = {0.};
-        double const x0_bar = (x0_new + x0_old)/2.0;
-        double const y0_bar = (y0_new + y0_old)/2.0;
-        double const z0_bar = (z0_new + z0_old)/2.0;
+        amrex::Real sx_cell[depos_order] = {0.};
+        amrex::Real sy_cell[depos_order] = {0.};
+        amrex::Real sz_cell[depos_order] = {0.};
+        amrex::Real const x0_bar = (x0_new + x0_old)/2.0;
+        amrex::Real const y0_bar = (y0_new + y0_old)/2.0;
+        amrex::Real const z0_bar = (z0_new + z0_old)/2.0;
         const int i0_cell = compute_shape_factor_cell( sx_cell, x0_bar-0.5 );
         const int j0_cell = compute_shape_factor_cell( sy_cell, y0_bar-0.5 );
         const int k0_cell = compute_shape_factor_cell( sz_cell, z0_bar-0.5 );
 
         if constexpr (depos_order >= 3) { // higher-order correction to the cell-based weights
             const Compute_shape_factor_pair<depos_order-1> compute_shape_factors_cell;
-            double sx_old_cell[depos_order] = {0.};
-            double sx_new_cell[depos_order] = {0.};
-            double sy_old_cell[depos_order] = {0.};
-            double sy_new_cell[depos_order] = {0.};
-            double sz_old_cell[depos_order] = {0.};
-            double sz_new_cell[depos_order] = {0.};
+            amrex::Real sx_old_cell[depos_order] = {0.};
+            amrex::Real sx_new_cell[depos_order] = {0.};
+            amrex::Real sy_old_cell[depos_order] = {0.};
+            amrex::Real sy_new_cell[depos_order] = {0.};
+            amrex::Real sz_old_cell[depos_order] = {0.};
+            amrex::Real sz_new_cell[depos_order] = {0.};
             const int i0_cell_2 = compute_shape_factors_cell( sx_old_cell, sx_new_cell, x0_old-0.5, x0_new-0.5 );
             const int j0_cell_2 = compute_shape_factors_cell( sy_old_cell, sy_new_cell, y0_old-0.5, y0_new-0.5 );
             const int k0_cell_2 = compute_shape_factors_cell( sz_old_cell, sz_new_cell, z0_old-0.5, z0_new-0.5 );
@@ -921,12 +918,12 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
         }
 
         // compute node-based weights using the old and new segment positions
-        double sx_old_node[depos_order+1] = {0.};
-        double sx_new_node[depos_order+1] = {0.};
-        double sy_old_node[depos_order+1] = {0.};
-        double sy_new_node[depos_order+1] = {0.};
-        double sz_old_node[depos_order+1] = {0.};
-        double sz_new_node[depos_order+1] = {0.};
+        amrex::Real sx_old_node[depos_order+1] = {0.};
+        amrex::Real sx_new_node[depos_order+1] = {0.};
+        amrex::Real sy_old_node[depos_order+1] = {0.};
+        amrex::Real sy_new_node[depos_order+1] = {0.};
+        amrex::Real sz_old_node[depos_order+1] = {0.};
+        amrex::Real sz_new_node[depos_order+1] = {0.};
         const int i0_node = compute_shape_factors_node( sx_old_node, sx_new_node, x0_old, x0_new );
         const int j0_node = compute_shape_factors_node( sy_old_node, sy_new_node, y0_old, y0_new );
         const int k0_node = compute_shape_factors_node( sz_old_node, sz_new_node, z0_old, z0_new );
@@ -1001,8 +998,9 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     // is within the range permitted by the number of guard cells
     // e.g., if (num_segments > 5) ...
 
-    // compute total change in particle position and the initial cell
+    // Compute total change in particle position and the initial cell
     // locations in each direction used to find the position at cell crossings.
+    // Keep these double to avoid bug in single precision
     const double dxp = x_new - x_old;
     const double dzp = z_new - z_old;
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
@@ -1030,9 +1028,9 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     int i0_node[num_segments_max];
     int k0_cell[num_segments_max];
     int k0_node[num_segments_max];
-    double weight_cellX_nodeZ[num_segments_max][depos_order][depos_order+1];
-    double weight_nodeX_cellZ[num_segments_max][depos_order+1][depos_order];
-    double weight_nodeX_nodeZ[num_segments_max][depos_order+1][depos_order+1];
+    amrex::Real weight_cellX_nodeZ[num_segments_max][depos_order][depos_order+1];
+    amrex::Real weight_nodeX_cellZ[num_segments_max][depos_order+1][depos_order];
+    amrex::Real weight_nodeX_nodeZ[num_segments_max][depos_order+1][depos_order+1];
 
     const auto i_mid = static_cast<int>(0.5*(x_new+x_old)-shift);
     const auto k_mid = static_cast<int>(0.5*(z_new+z_old)-shift);
@@ -1070,14 +1068,14 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
         }
 
         // compute the segment factors (each equal to dt_seg/dt for nonzero dxp, or dzp)
-        const auto seg_factor_x = static_cast<double>(dxp == 0. ? 1. : dxp_seg/dxp);
-        const auto seg_factor_z = static_cast<double>(dzp == 0. ? 1. : dzp_seg/dzp);
+        const auto seg_factor_x = static_cast<amrex::Real>(dxp == 0. ? 1._rt : dxp_seg/dxp);
+        const auto seg_factor_z = static_cast<amrex::Real>(dzp == 0. ? 1._rt : dzp_seg/dzp);
 
         // compute cell-based weights using the average segment position
-        double sx_cell[depos_order] = {0.};
-        double sz_cell[depos_order] = {0.};
-        double const x0_bar = (x0_new + x0_old)/2.0;
-        double const z0_bar = (z0_new + z0_old)/2.0;
+        amrex::Real sx_cell[depos_order] = {0.};
+        amrex::Real sz_cell[depos_order] = {0.};
+        amrex::Real const x0_bar = (x0_new + x0_old)/2.0;
+        amrex::Real const z0_bar = (z0_new + z0_old)/2.0;
         i0_cell[ns] = compute_shape_factor_cell( sx_cell, x0_bar-0.5 );
         k0_cell[ns] = compute_shape_factor_cell( sz_cell, z0_bar-0.5 );
 
@@ -1091,10 +1089,10 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
 
         if constexpr (depos_order >= 3) { // higher-order correction to the cell-based weights
             const Compute_shape_factor_pair<depos_order-1> compute_shape_factors_cell;
-            double sx_old_cell[depos_order] = {0.};
-            double sx_new_cell[depos_order] = {0.};
-            double sz_old_cell[depos_order] = {0.};
-            double sz_new_cell[depos_order] = {0.};
+            amrex::Real sx_old_cell[depos_order] = {0.};
+            amrex::Real sx_new_cell[depos_order] = {0.};
+            amrex::Real sz_old_cell[depos_order] = {0.};
+            amrex::Real sz_new_cell[depos_order] = {0.};
             const int i0_cell_2 = compute_shape_factors_cell( sx_old_cell, sx_new_cell, x0_old-0.5, x0_new-0.5 );
             const int k0_cell_2 = compute_shape_factors_cell( sz_old_cell, sz_new_cell, z0_old-0.5, z0_new-0.5 );
             amrex::ignore_unused(i0_cell_2, k0_cell_2);
@@ -1105,10 +1103,10 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
         }
 
         // compute node-based weights using the old and new segment positions
-        double sx_old_node[depos_order+1] = {0.};
-        double sx_new_node[depos_order+1] = {0.};
-        double sz_old_node[depos_order+1] = {0.};
-        double sz_new_node[depos_order+1] = {0.};
+        amrex::Real sx_old_node[depos_order+1] = {0.};
+        amrex::Real sx_new_node[depos_order+1] = {0.};
+        amrex::Real sz_old_node[depos_order+1] = {0.};
+        amrex::Real sz_new_node[depos_order+1] = {0.};
         i0_node[ns] = compute_shape_factors_node( sx_old_node, sx_new_node, x0_old, x0_new );
         k0_node[ns] = compute_shape_factors_node( sz_old_node, sz_new_node, z0_old, z0_new );
 
@@ -1316,11 +1314,8 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     const int cell_crossings_x = std::abs(i_new-i_old);
     num_segments += cell_crossings_x;
 
-    // need to assert that the number of cell crossings in each direction
-    // is within the range permitted by the number of guard cells
-    // e.g., if (num_segments > 3) ...
-
-    // compute dxp and the initial cell location used to find the cell crossings.
+    // Compute dxp and the initial cell location used to find the cell crossings.
+    // Keep these double to avoid bug in single precision
     double const dxp = x_new - x_old;
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
     double Xcell = static_cast<double>(i_old) + shift + 0.5*(1.-dirX_sign);
@@ -1345,17 +1340,17 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
         }
 
         // compute the segment factor (equal to dt_seg/dt for nonzero dxp)
-        const auto seg_factor = static_cast<double>(dxp == 0. ? 1. : dxp_seg/dxp);
+        const auto seg_factor = static_cast<amrex::Real>(dxp == 0. ? 1._rt : dxp_seg/dxp);
 
         // compute cell-based weights using the average segment position
-        double sx_cell[depos_order] = {0.};
-        double const x0_bar = (x0_new + x0_old)/2.0;
+        amrex::Real sx_cell[depos_order] = {0.};
+        amrex::Real const x0_bar = (x0_new + x0_old)/2.0;
         const int i0_cell = compute_shape_factor_cell( sx_cell, x0_bar-0.5 );
 
         if constexpr (depos_order >= 3) { // higher-order correction to the cell-based weights
             const Compute_shape_factor_pair<depos_order-1> compute_shape_factors_cell;
-            double sx_old_cell[depos_order] = {0.};
-            double sx_new_cell[depos_order] = {0.};
+            amrex::Real sx_old_cell[depos_order] = {0.};
+            amrex::Real sx_new_cell[depos_order] = {0.};
             const int i0_cell_2 = compute_shape_factors_cell( sx_old_cell, sx_new_cell, x0_old-0.5, x0_new-0.5 );
             amrex::ignore_unused(i0_cell_2);
             for (int m=0; m<depos_order; m++) {
@@ -1364,8 +1359,8 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
         }
 
         // compute node-based weights using the old and new segment positions
-        double sx_old_node[depos_order+1] = {0.};
-        double sx_new_node[depos_order+1] = {0.};
+        amrex::Real sx_old_node[depos_order+1] = {0.};
+        amrex::Real sx_new_node[depos_order+1] = {0.};
         const int i0_node = compute_shape_factors_node( sx_old_node, sx_new_node, x0_old, x0_new );
 
         // deposit out-of-plane Jy, Jz, Syy, and Szz for this segment
@@ -1401,11 +1396,8 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     const int cell_crossings_z = std::abs(k_new-k_old);
     num_segments += cell_crossings_z;
 
-    // need to assert that the number of cell crossings in each direction
-    // is within the range permitted by the number of guard cells
-    // e.g., if (num_segments > 3) ...
-
-    // compute dzp and the initial cell location used to find the cell crossings.
+    // Compute dzp and the initial cell location used to find the cell crossings.
+    // Keep these double to avoid bug in single precision
     double const dzp = z_new - z_old;
     const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
     double Zcell = static_cast<double>(k_old) + shift + 0.5*(1.-dirZ_sign);
@@ -1424,8 +1416,8 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     // Save the start index and interpolation weights for each segment
     int k0_cell[num_segments_max];
     int k0_node[num_segments_max];
-    double weight_cell[num_segments_max][depos_order];
-    double weight_node[num_segments_max][depos_order+1];
+    amrex::Real weight_cell[num_segments_max][depos_order];
+    amrex::Real weight_node[num_segments_max][depos_order+1];
 
     const auto k_mid = static_cast<int>(0.5*(z_new+z_old)-shift);
     int SegNum[num_segments_max];
@@ -1443,11 +1435,11 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
         }
 
         // compute the segment factor (equal to dt_seg/dt for nonzero dzp)
-        const auto seg_factor = static_cast<double>(dzp == 0. ? 1. : dzp_seg/dzp);
+        const auto seg_factor = static_cast<amrex::Real>(dzp == 0. ? 1._rt : dzp_seg/dzp);
 
         // compute cell-based weights using the average segment position
-        double sz_cell[depos_order] = {0.};
-        double const z0_bar = (z0_new + z0_old)/2.0;
+        amrex::Real sz_cell[depos_order] = {0.};
+        amrex::Real const z0_bar = (z0_new + z0_old)/2.0;
         k0_cell[ns] = compute_shape_factor_cell( sz_cell, z0_bar-0.5 );
 
         // Set the segment number for the mass matrix component calc
@@ -1458,8 +1450,8 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
 
         if constexpr (depos_order >= 3) { // higher-order correction to the cell-based weights
             const Compute_shape_factor_pair<depos_order-1> compute_shape_factors_cell;
-            double sz_old_cell[depos_order] = {0.};
-            double sz_new_cell[depos_order] = {0.};
+            amrex::Real sz_old_cell[depos_order] = {0.};
+            amrex::Real sz_new_cell[depos_order] = {0.};
             const int k0_cell_2 = compute_shape_factors_cell( sz_old_cell, sz_new_cell, z0_old-0.5, z0_new-0.5 );
             amrex::ignore_unused(k0_cell_2);
             for (int m=0; m<depos_order; m++) {
@@ -1468,8 +1460,8 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
         }
 
         // compute node-based weights using the old and new segment positions
-        double sz_old_node[depos_order+1] = {0.};
-        double sz_new_node[depos_order+1] = {0.};
+        amrex::Real sz_old_node[depos_order+1] = {0.};
+        amrex::Real sz_new_node[depos_order+1] = {0.};
         k0_node[ns] = compute_shape_factors_node( sz_old_node, sz_new_node, z0_old, z0_new );
 
         // deposit out-of-plane Jx, Jy, Sx, and Sy for this segment
