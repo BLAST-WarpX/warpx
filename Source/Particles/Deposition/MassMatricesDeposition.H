@@ -891,9 +891,10 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
         amrex::Real sx_cell[depos_order] = {0.};
         amrex::Real sy_cell[depos_order] = {0.};
         amrex::Real sz_cell[depos_order] = {0.};
-        amrex::Real const x0_bar = (x0_new + x0_old)/2.0;
-        amrex::Real const y0_bar = (y0_new + y0_old)/2.0;
-        amrex::Real const z0_bar = (z0_new + z0_old)/2.0;
+        // Keep these double to avoid bug in single precision
+        double const x0_bar = (x0_new + x0_old)/2.0;
+        double const y0_bar = (y0_new + y0_old)/2.0;
+        double const z0_bar = (z0_new + z0_old)/2.0;
         const int i0_cell = compute_shape_factor_cell( sx_cell, x0_bar-0.5 );
         const int j0_cell = compute_shape_factor_cell( sy_cell, y0_bar-0.5 );
         const int k0_cell = compute_shape_factor_cell( sz_cell, z0_bar-0.5 );
@@ -1071,11 +1072,12 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
         const auto seg_factor_x = static_cast<amrex::Real>(dxp == 0. ? 1._rt : dxp_seg/dxp);
         const auto seg_factor_z = static_cast<amrex::Real>(dzp == 0. ? 1._rt : dzp_seg/dzp);
 
-        // compute cell-based weights using the average segment position
+        // Compute cell-based weights using the average segment position
         amrex::Real sx_cell[depos_order] = {0.};
         amrex::Real sz_cell[depos_order] = {0.};
-        amrex::Real const x0_bar = (x0_new + x0_old)/2.0;
-        amrex::Real const z0_bar = (z0_new + z0_old)/2.0;
+        // Keep these double to avoid bug in single precision
+        double const x0_bar = (x0_new + x0_old)/2.0;
+        double const z0_bar = (z0_new + z0_old)/2.0;
         i0_cell[ns] = compute_shape_factor_cell( sx_cell, x0_bar-0.5 );
         k0_cell[ns] = compute_shape_factor_cell( sz_cell, z0_bar-0.5 );
 
@@ -1344,7 +1346,8 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
 
         // compute cell-based weights using the average segment position
         amrex::Real sx_cell[depos_order] = {0.};
-        amrex::Real const x0_bar = (x0_new + x0_old)/2.0;
+        // Keep these double to avoid bug in single precision
+        double const x0_bar = (x0_new + x0_old)/2.0;
         const int i0_cell = compute_shape_factor_cell( sx_cell, x0_bar-0.5 );
 
         if constexpr (depos_order >= 3) { // higher-order correction to the cell-based weights
@@ -1434,12 +1437,13 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
             dzp_seg = z0_new - z0_old;
         }
 
-        // compute the segment factor (equal to dt_seg/dt for nonzero dzp)
+        // Compute the segment factor (equal to dt_seg/dt for nonzero dzp)
         const auto seg_factor = static_cast<amrex::Real>(dzp == 0. ? 1._rt : dzp_seg/dzp);
 
-        // compute cell-based weights using the average segment position
+        // Compute cell-based weights using the average segment position
         amrex::Real sz_cell[depos_order] = {0.};
-        amrex::Real const z0_bar = (z0_new + z0_old)/2.0;
+        // Keep these double to avoid bug in single precision
+        double const z0_bar = (z0_new + z0_old)/2.0;
         k0_cell[ns] = compute_shape_factor_cell( sz_cell, z0_bar-0.5 );
 
         // Set the segment number for the mass matrix component calc
