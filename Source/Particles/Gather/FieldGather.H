@@ -839,6 +839,8 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
  * \param Bx_type,By_type,Bz_type         IndexType of the magnetic field
  * \param dinv                      3D cell size inverse
  * \param xyzmin                    The lower bounds of the domain
+ * \param domain                    The domain box
+ * \param is_absorbing              Whether each boundary is absorbing
  * \param lo                        Index lower bounds of domain.
  * \param n_rz_azimuthal_modes      Number of azimuthal modes when using RZ geometry
  */
@@ -1394,6 +1396,8 @@ void doGatherShapeNEsirkepovStencilImplicit (
  * \param Bx_type,By_type,Bz_type   IndexType of the magnetic field
  * \param dinv                      3D cell size inverse
  * \param xyzmin                    The lower bounds of the domain
+ * \param domain                    The domain box
+ * \param is_absorbing              Whether each boundary is absorbing
  * \param lo                        Index lower bounds of domain.
  * \param n_rz_azimuthal_modes      Number of azimuthal modes when using RZ geometry
  */
@@ -2209,6 +2213,8 @@ void doGatherShapeN (const amrex::ParticleReal xp,
  * \param bx_type,by_type,bz_type IndexType of the magnetic field
  * \param dinv                    3D cell size inverse
  * \param xyzmin                  The lower bounds of the domain
+ * \param domain                  The domain box
+ * \param is_absorbing            Whether each boundary is absorbing
  * \param lo                      Index lower bounds of domain.
  * \param n_rz_azimuthal_modes    Number of azimuthal modes when using RZ geometry
  * \param nox                     order of the particle shape function
