@@ -2290,8 +2290,6 @@ PREDEFINED             = AMREX_Linux=1 \
                          AMREX_USE_MPI=1 \
                          AMREX_USE_OMP=1 \
                          AMREX_SPACEDIM=1 \
-                         AMREX_SPACEDIM=2 \
-                         AMREX_SPACEDIM=3 \
                          AMREX_TINY_PROFILING=1 \
                          BL_Linux=1 \
                          BL_USE_MPI=1 \
@@ -2299,11 +2297,6 @@ PREDEFINED             = AMREX_Linux=1 \
                          AMREX_USE_SENSEI_INSITU=1 \
                          WARPX=1 \
                          WARPX_DIM_1D_Z=1 \
-                         WARPX_DIM_XZ=1 \
-                         WARPX_DIM_3D=1 \
-                         WARPX_DIM_RCYLINDER=1 \
-                         WARPX_DIM_RSPHERE=1 \
-                         WARPX_DIM_RZ=1 \
                          WARPX_USE_GPU=1 \
                          WARPX_USE_OPENPMD=1 \
                          WARPX_USE_FFT=1 \
