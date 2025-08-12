@@ -23,5 +23,37 @@ if ! grep -q "WARN_AS_ERROR = YES" Doxyfile; then
     echo "WARN_AS_ERROR = YES" >> Doxyfile
 fi
 
-# Run doxygen
+# Run doxygen for 1D Cartesian
+echo "Analyzing 1D Cartesian..."
+echo "" >> Doxyfile
+echo "# Overwrite value of PREDEFINED" >> Doxyfile
+echo "PREDEFINED += AMREX_SPACEDIM=1 WARPX_DIM_1D_Z=1" >> Doxyfile
+doxygen
+
+# Run doxygen for 2D Cartesian
+echo "Analyzing 2D Cartesian..."
+echo "" >> Doxyfile
+echo "# Overwrite value of PREDEFINED" >> Doxyfile
+echo "PREDEFINED += AMREX_SPACEDIM=2 WARPX_DIM_XZ=1" >> Doxyfile
+doxygen
+
+# Run doxygen for 3D Cartesian
+echo "Analyzing 3D Cartesian..."
+echo "" >> Doxyfile
+echo "# Overwrite value of PREDEFINED" >> Doxyfile
+echo "PREDEFINED += AMREX_SPACEDIM=3 WARPX_DIM_3D=1" >> Doxyfile
+doxygen
+
+# Run doxygen for 1D cylindrical
+echo "Analyzing 1D cylindrical..."
+echo "" >> Doxyfile
+echo "# Overwrite value of PREDEFINED" >> Doxyfile
+echo "PREDEFINED += AMREX_SPACEDIM=1 WARPX_DIM_RCYLINDER=1" >> Doxyfile
+doxygen
+
+# Run doxygen for 1D spherical
+echo "Analyzing 1D spherical..."
+echo "" >> Doxyfile
+echo "# Overwrite value of PREDEFINED" >> Doxyfile
+echo "PREDEFINED += AMREX_SPACEDIM=1 WARPX_DIM_RSPHERE=1" >> Doxyfile
 doxygen
