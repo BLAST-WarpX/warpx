@@ -670,6 +670,8 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
  *                          the time of the deposition.
  * \param dinv         3D cell size inverse
  * \param xyzmin       Physical lower bounds of domain.
+ * \param domain       The domain box
+ * \param is_absorbing Whether each boundary is absorbing
  * \param lo           Index lower bounds of domain.
  * \param q            species charge.
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
@@ -1153,6 +1155,8 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * \param dt           Time step for particle level
  * \param dinv         3D cell size inverse
  * \param xyzmin       Physical lower bounds of domain.
+ * \param domain       The domain box
+ * \param is_absorbing Whether each boundary is absorbing
  * \param lo           Index lower bounds of domain.
  * \param q            species charge.
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
@@ -1556,6 +1560,8 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
  * \param dt                    Time step for particle level
  * \param dinv                  3D cell size inverse
  * \param xyzmin                Physical lower bounds of domain
+ * \param domain                The domain box
+ * \param is_absorbing          Whether each boundary is absorbing
  * \param lo                    Index lower bounds of domain
  * \param invvol                One over cell volume
  * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry
@@ -2245,6 +2251,8 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
  * \param relative_time         Time at which to deposit, relative to the time of the current positions of the particles.
  * \param dinv                  3D cell size inverse
  * \param xyzmin                Physical lower bounds of domain.
+ * \param domain                The domain box
+ * \param is_absorbing          Whether each boundary is absorbing
  * \param lo                    Index lower bounds of domain.
  * \param q                     species charge.
  * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry.
@@ -2334,6 +2342,8 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
  * \param dt                    Time step for particle level
  * \param dinv                  3D cell size inverse
  * \param xyzmin                Physical lower bounds of domain.
+ * \param domain                The domain box
+ * \param is_absorbing          Whether each boundary is absorbing
  * \param lo                    Index lower bounds of domain.
  * \param q                     species charge.
  * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry.
