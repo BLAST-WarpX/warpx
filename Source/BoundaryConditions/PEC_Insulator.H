@@ -85,7 +85,7 @@ public:
      * \param[in]     split_pml_field     whether pml the multifab is the regular Efield or
      *                                    split pml field
      * \param[in]     E_like whether the field is E like or B like
-     * \ifnot WARPX_DIM_1D_Z
+     * \if !defined(WARPX_DIM_1D_Z)
      *   \param[in]     set_F_x_lo whether the tangential field at the boundary was specified
      *   \param[in]     set_F_x_hi whether the tangential field at the boundary was specified
      *   \param[in]     a_Fy_x_lo the parser for the tangential field at the boundary
@@ -93,7 +93,7 @@ public:
      *   \param[in]     a_Fy_x_hi the parser for the tangential field at the boundary
      *   \param[in]     a_Fz_x_hi the parser for the tangential field at the boundary
      * \endif
-     * \if WARPX_DIM_3D
+     * \if defined(WARPX_DIM_3D)
      *   \param[in]     set_F_y_lo whether the tangential field at the boundary was specified
      *   \param[in]     set_F_y_hi whether the tangential field at the boundary was specified
      *   \param[in]     a_Fx_y_lo the parser for the tangential field at the boundary
@@ -101,7 +101,7 @@ public:
      *   \param[in]     a_Fx_y_hi the parser for the tangential field at the boundary
      *   \param[in]     a_Fz_y_hi the parser for the tangential field at the boundary
      * \endif
-     * \if WARPX_ZINDEX
+     * \if defined(WARPX_ZINDEX)
      *   \param[in]     set_F_z_lo whether the tangential field at the boundary was specified
      *   \param[in]     set_F_z_hi whether the tangential field at the boundary was specified
      *   \param[in]     a_Fx_z_lo the parser for the tangential field at the boundary

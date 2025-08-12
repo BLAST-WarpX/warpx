@@ -2297,6 +2297,7 @@ PREDEFINED             = AMREX_Linux=1 \
                          AMREX_USE_SENSEI_INSITU=1 \
                          WARPX=1 \
                          WARPX_DIM_1D_Z=1 \
+                         WARPX_ZINDEX=1 \
                          WARPX_USE_GPU=1 \
                          WARPX_USE_OPENPMD=1 \
                          WARPX_USE_FFT=1 \
