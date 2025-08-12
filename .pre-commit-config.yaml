@@ -18,7 +18,7 @@ exclude: '^share/openPMD/thirdParty'
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
     - id: trailing-whitespace
       args: [--markdown-linebreak-ext=md]
@@ -73,7 +73,7 @@ repos:
 # Python: Ruff linter & formatter
 #   https://docs.astral.sh/ruff/
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.12.7
+  rev: v0.12.8
   hooks:
     # Run the linter
     - id: ruff
