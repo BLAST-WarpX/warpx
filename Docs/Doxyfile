@@ -2286,25 +2286,27 @@ INCLUDE_FILE_PATTERNS  =
 # This tag requires that the tag ENABLE_PREPROCESSING is set to YES.
 
 PREDEFINED = __DOXYGEN__
-PREDEFINED += AMREX_Linux=1 \
-    AMREX_PARTICLES=1 \
-    AMREX_USE_MPI=1 \
-    AMREX_USE_OMP=1 \
-    AMREX_SPACEDIM=3 \
-    AMREX_TINY_PROFILING=1 \
-    BL_Linux=1 \
-    BL_USE_MPI=1 \
-    BL_USE_OMP=1 \
-    AMREX_USE_SENSEI_INSITU=1 \
-    WARPX=1 \
-    WARPX_DIM_RZ=1 \
-    WARPX_DIM_XZ=1 \
-    WARPX_USE_GPU=1 \
-    WARPX_USE_OPENPMD=1 \
-    WARPX_USE_FFT=1 \
-    WARPX_QED=1 \
-    WARPX_QED_TABLE_GEN=1
-PREDEFINED += "AMREX_ENUM(CLASS,...)=\"enum class CLASS : int { __VA_ARGS__ };\""
+
+PREDEFINED            += AMREX_Linux=1 \
+                         AMREX_PARTICLES=1 \
+                         AMREX_USE_MPI=1 \
+                         AMREX_USE_OMP=1 \
+                         AMREX_SPACEDIM=3 \
+                         AMREX_TINY_PROFILING=1 \
+                         BL_Linux=1 \
+                         BL_USE_MPI=1 \
+                         BL_USE_OMP=1 \
+                         AMREX_USE_SENSEI_INSITU=1 \
+                         WARPX=1 \
+                         WARPX_DIM_RZ=1 \
+                         WARPX_DIM_XZ=1 \
+                         WARPX_USE_GPU=1 \
+                         WARPX_USE_OPENPMD=1 \
+                         WARPX_USE_FFT=1 \
+                         WARPX_QED=1 \
+                         WARPX_QED_TABLE_GEN=1
+
+PREDEFINED           += "AMREX_ENUM(CLASS,...)=\"enum class CLASS : int { __VA_ARGS__ };\""
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then this
 # tag can be used to specify a list of macro names that should be expanded. The
