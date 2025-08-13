@@ -2,7 +2,7 @@
 ####### GENERAL PARAMETERS ######
 #################################
 max_step = 1
-amr.n_cell = 64 32 32
+amr.n_cell = 32 32 32
 amr.max_grid_size = 16
 amr.blocking_factor = 16
 amr.max_level = 0
@@ -13,8 +13,8 @@ geometry.prob_hi =  20.e-6    20.e-6    20.e-6
 #################################
 ####### Boundary condition ######
 #################################
-boundary.field_lo = periodic periodic periodic
-boundary.field_hi = periodic periodic periodic
+boundary.field_lo = pec pec pec
+boundary.field_hi = pec pec pec
 
 #################################
 ############ NUMERICS ###########

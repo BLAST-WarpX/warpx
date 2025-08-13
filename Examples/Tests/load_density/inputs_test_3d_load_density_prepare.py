@@ -23,7 +23,6 @@ density_data = (
     * (1 + (x**2 + y**2) / channel_radius**2)
     * np.where(z < ramp_length, z / ramp_length, 1)
 )
-density_data[z < 0] = 0
 
 # create openpmd file
 series = io.Series("example-density.h5", io.Access.create)
