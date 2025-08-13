@@ -382,6 +382,10 @@ void WarpX::OneStep (
 
     // perform particle collisions
     ExecutePythonCallback("beforecollisions");
+    // TODO DOXYGRAPH(MultiParticleContainer::doCollisions())
+#ifdef DOXYGEN
+    MultiParticleContainer::doCollisions();
+#endif
     mypc->doCollisions(a_step, a_cur_time, a_dt);
     ExecutePythonCallback("aftercollisions");
 

@@ -2285,26 +2285,26 @@ INCLUDE_FILE_PATTERNS  =
 # recursively expanded use the := operator instead of the = operator.
 # This tag requires that the tag ENABLE_PREPROCESSING is set to YES.
 
-PREDEFINED             = AMREX_Linux=1 \
-                         AMREX_PARTICLES=1 \
-                         AMREX_USE_MPI=1 \
-                         AMREX_USE_OMP=1 \
-                         AMREX_SPACEDIM=3 \
-                         AMREX_TINY_PROFILING=1 \
-                         BL_Linux=1 \
-                         BL_USE_MPI=1 \
-                         BL_USE_OMP=1 \
-                         AMREX_USE_SENSEI_INSITU=1 \
-                         WARPX=1 \
-                         WARPX_DIM_RZ=1 \
-                         WARPX_DIM_XZ=1 \
-                         WARPX_USE_GPU=1 \
-                         WARPX_USE_OPENPMD=1 \
-                         WARPX_USE_FFT=1 \
-                         WARPX_QED=1 \
-                         WARPX_QED_TABLE_GEN=1
-
-PREDEFINED           += "AMREX_ENUM(CLASS,...)=\"enum class CLASS : int { __VA_ARGS__ };\""
+PREDEFINED = __DOXYGEN__
+PREDEFINED += AMREX_Linux=1
+PREDEFINED += AMREX_PARTICLES=1
+PREDEFINED += AMREX_USE_MPI=1
+PREDEFINED += AMREX_USE_OMP=1
+PREDEFINED += AMREX_SPACEDIM=3
+PREDEFINED += AMREX_TINY_PROFILING=1
+PREDEFINED += BL_Linux=1
+PREDEFINED += BL_USE_MPI=1
+PREDEFINED += BL_USE_OMP=1
+PREDEFINED += AMREX_USE_SENSEI_INSITU=1
+PREDEFINED += WARPX=1
+PREDEFINED += WARPX_DIM_RZ=1
+PREDEFINED += WARPX_DIM_XZ=1
+PREDEFINED += WARPX_USE_GPU=1
+PREDEFINED += WARPX_USE_OPENPMD=1
+PREDEFINED += WARPX_USE_FFT=1
+PREDEFINED += WARPX_QED=1
+PREDEFINED += WARPX_QED_TABLE_GEN=1
+PREDEFINED += "AMREX_ENUM(CLASS,...)=\"enum class CLASS : int { __VA_ARGS__ };\""
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then this
 # tag can be used to specify a list of macro names that should be expanded. The
@@ -2396,7 +2396,7 @@ HIDE_UNDOC_RELATIONS   = YES
 # set to NO
 # The default value is: NO.
 
-HAVE_DOT               = NO
+HAVE_DOT               = YES
 
 # The DOT_NUM_THREADS specifies the number of dot invocations doxygen is allowed
 # to run in parallel. When set to 0 doxygen will base this on the number of
@@ -2551,7 +2551,7 @@ INCLUDED_BY_GRAPH      = YES
 # The default value is: NO.
 # This tag requires that the tag HAVE_DOT is set to YES.
 
-CALL_GRAPH             = NO
+CALL_GRAPH             = YES
 
 # If the CALLER_GRAPH tag is set to YES then doxygen will generate a caller
 # dependency graph for every global function or class method.
@@ -2563,7 +2563,7 @@ CALL_GRAPH             = NO
 # The default value is: NO.
 # This tag requires that the tag HAVE_DOT is set to YES.
 
-CALLER_GRAPH           = NO
+CALLER_GRAPH           = YES
 
 # If the GRAPHICAL_HIERARCHY tag is set to YES then doxygen will graphical
 # hierarchy of all classes instead of a textual one.
