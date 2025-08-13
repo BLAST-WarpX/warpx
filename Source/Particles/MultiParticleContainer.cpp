@@ -9,8 +9,6 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#include "DoxyGraph.H"
-
 #include "MultiParticleContainer.H"
 
 #include "Fields.H"
@@ -1069,7 +1067,6 @@ void
 MultiParticleContainer::doCollisions ( int step, Real cur_time, amrex::Real dt )
 {
     WARPX_PROFILE("MultiParticleContainer::doCollisions()");
-    DOXY_GRAPH(CollisionHandler::doCollisions();)
     collisionhandler->doCollisions(step, cur_time, dt, this);
 }
 
