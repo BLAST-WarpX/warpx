@@ -4,6 +4,7 @@
  *
  * License: BSD-3-Clause-LBNL
  */
+#include "DoxyGraph.H"
 #include "CollisionHandler.H"
 
 #include "Particles/Collision/BackgroundMCC/BackgroundMCCCollision.H"
@@ -95,12 +96,14 @@ void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Rea
 {
 
     if (m_use_global_debye_length) {
+        DOXY_GRAPH(MultiParticleContainer::GenerateGlobalDebyeLength();)
         mypc->GenerateGlobalDebyeLength();
     }
 
     for (auto& collision : allcollisions) {
         int const ndt = collision->get_ndt();
         if ( step % ndt == 0 ) {
+            DOXY_GRAPH(CollisionBase::doCollisions();)
             collision->doCollisions(cur_time, dt*ndt, mypc);
         }
     }
