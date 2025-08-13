@@ -56,16 +56,34 @@ using namespace amrex::literals;
  *         - push velocity by dt
  *         - average old and new velocity to get time centered value
  *        The routines ends with both position and velocity at the half time level.
+ *        The routine iterates the advance until the position and velocity pushes
+ *        (which depend on each other) are consistent. Any unconverged particles
+ *        are flagged for later processing.
+ *
+ * \param[in] pti the WarpXParIter holding the particles to push
+ * \param[in] exfab, eyfab, ezfab the E fields
+ * \param[in] bxfab, byfab, bzfab the B fields
+ * \param[in] ngEB the number of guard cells in the E and B fields
+ * \param[in] offset the particle index offset for the particles to be pushed
+ * \param[in] np_to_push the number of particles to push
+ * \param[in] lev the refinement level
+ * \param[in] gather_lev the refinement level at which to do the field gather
+ * \param[in] dt the time step size
+ * \param[in] scaleFields allows scale factor to the fields (for rigid injection)
+ * \param[in/out] num_unconverged_particles number of unconverged particles that have already been flagged
+ * \param[in/out] unconverged_indices the list of indices of unconverged particles
+ * \param[in/out] saved_weights the saved weights of the unconverged particles
+ * \param[in] a_dt_type the push type (which part of the time step)
  */
 void
-PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
+PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                                            amrex::FArrayBox const * exfab,
                                            amrex::FArrayBox const * eyfab,
                                            amrex::FArrayBox const * ezfab,
                                            amrex::FArrayBox const * bxfab,
                                            amrex::FArrayBox const * byfab,
                                            amrex::FArrayBox const * bzfab,
-                                           amrex::IntVect ngEB, int /*e_is_nodal*/,
+                                           amrex::IntVect const & ngEB,
                                            long offset,
                                            long np_to_push,
                                            int lev, int gather_lev,
@@ -139,6 +157,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
 
     auto * const AMREX_RESTRICT idcpu = pti.GetStructOfArrays().GetIdCPUData().data() + offset;
 
+    // The x/y/z_n are the positions and velocities saved at the start of the step
 #if !defined(WARPX_DIM_1D_Z)
     amrex::ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr() + offset;
 #endif
@@ -210,8 +229,6 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
                        np_to_push, [=] AMREX_GPU_DEVICE (long ip, auto exteb_control,
                                                          auto qed_control)
     {
-        // Position advance starts from the position at the start of the step
-        // but uses the most recent velocity.
 
 #if !defined(WARPX_DIM_1D_Z)
         amrex::ParticleReal xp = x_n[ip];
@@ -252,6 +269,11 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
         amrex::ParticleReal step_norm = 1._prt;
         for (int iter=0; iter<max_iterations;) {
 
+            // Position advance starts from the position at the start of the step
+            // but uses the most recent velocity on the first iteration.
+            // A converged advance will have the postions advanced using the
+            // velocity at the half-step time.
+
             dxp = 0.0;
             dyp = 0.0;
             dzp = 0.0;
@@ -267,9 +289,12 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
 #endif
             setPosition(ip, xp, yp, zp);
 
+            // This compares the dxp to dxp_save to check whether convergence has been reached.
+            // If there is convergence, at this point, the position is consistent with the velocity
+            // and the iterations can be exited.
             PositionNorm( dxp, dyp, dzp, dxp_save, dyp_save, dzp_save,
                           idxg2, idyg2, idzg2, step_norm, iter );
-            if( step_norm < particle_tolerance ) { break; }
+            if (step_norm < particle_tolerance) { break; }
 
             amrex::ParticleReal Exp = Ex_external_particle;
             amrex::ParticleReal Eyp = Ey_external_particle;
@@ -347,13 +372,14 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
 #endif
 
             // Take average to get the time centered value
+            // This will be used to push the positions on the next iteration
             ux[ip] = 0.5_rt*(ux[ip] + ux_n[ip]);
             uy[ip] = 0.5_rt*(uy[ip] + uy_n[ip]);
             uz[ip] = 0.5_rt*(uz[ip] + uz_n[ip]);
 
             iter++;
 
-            // particle did not converge
+            // check if particle did not converge
             if ( iter > 1 && iter == max_iterations ) {
                 // Flag the particle as invalid. It will be handled later in a special
                 // loop with suborbiting.
@@ -388,6 +414,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
     long * unconverged_i = unconverged_indices.data() + num_previous;
     amrex::ParticleReal * saved_w = saved_weights.data() + num_previous;
 
+    // This looks for the unconverged particles, which had been flagged as invalid
     long num_flagged = amrex::Scan::PrefixSum<long>(np_to_push,
         [=] AMREX_GPU_DEVICE (long ip) -> long
             {
@@ -398,6 +425,8 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
             {
                 auto pidw = amrex::ParticleIDWrapper{idcpu[ip]};
                 if (!pidw.is_valid()) {
+                    // pidw.make_valid() would it work to do this here?
+                    // This check of x should always be true but is here for memory safety
                     if (x < num_unconverged_particles)  {
                         // The index saved is relative to the full array
                         unconverged_i[x] = ip + offset;
@@ -421,9 +450,24 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
     }
 }
 
-/* \brief Perform the implicit particle push operation in one fused kernel
- *        using suborbits. This routine is used for particles where the
- *        iteration in ImplicitPushXP failed to converge.
+/* \brief Perform the implicit particle push operation for unconverged particles
+ *        in one fused kernel using suborbits.
+ *        These are particles that failed to converge in ImplicitPushXP.
+ *
+ * \param[in] pti the WarpXParIter holding the particles to push
+ * \param[in] exfab, eyfab, ezfab the E fields
+ * \param[in] bxfab, byfab, bzfab the B fields
+ * \param[in] ngEB the number of guard cells in the E and B fields
+ * \param[in/out] jx, jy, jz the current densities to be deposited into
+ * \param[in] index_offset offset in the list of unconverged particles
+ * \param[in] num_unconverged_particles number of unconverged particles to push
+ * \param[in] lev the refinement level
+ * \param[in] gather_lev the refinement level at which to do the field gather
+ * \param[in] dt the time step size
+ * \param[in] scaleFields allows scale factor to the fields (for rigid injection)
+ * \param[in] skip_deposition whether to do the deposition
+ * \param[in] unconverged_indices the list of indices of unconverged particles
+ * \param[in] saved_weights the saved weights of the unconverged particles
  */
 void
 PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
@@ -448,8 +492,19 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE((gather_lev==(lev-1)) ||
                                      (gather_lev==(lev  )),
                                      "Gather buffers only work for lev-1");
+
     // If no particles, do not do anything
     if (num_unconverged_particles == 0) { return; }
+
+    const auto depos_type = WarpX::current_deposition_algo;
+
+    if (!skip_deposition && (
+        (depos_type != CurrentDepositionAlgo::Esirkepov) &&
+        (depos_type != CurrentDepositionAlgo::Villasenor)) ) {
+        ablastr::warn_manager::WMRecordWarning("ImplicitPushXPSubOrbits",
+            "When particle suborbits are used during the implicit particle push, only Esirkepov or Villasenor "
+            "current deposition are supported.");
+    }
 
     // Get cell size on gather_lev
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));
@@ -484,7 +539,6 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
     const amrex::Dim3 lo = lbound(box);
 
-    const auto depos_type = WarpX::current_deposition_algo;
     const int nox = WarpX::nox;
     const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
 
@@ -595,14 +649,19 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
         pidw.make_valid();
 
         // Create temporary arrays to hold the particle suborbit data
-        // which is used to deposit the current of the suborbits after
-        // convergence is found
+        // at the start of each sub step which is used to deposit the
+        // current of the suborbits after convergence is found
         amrex::GpuArray<amrex::Real, max_suborbits + 1> x_n_save;
         amrex::GpuArray<amrex::Real, max_suborbits + 1> y_n_save;
         amrex::GpuArray<amrex::Real, max_suborbits + 1> z_n_save;
         amrex::GpuArray<amrex::Real, max_suborbits + 1> ux_n_save;
         amrex::GpuArray<amrex::Real, max_suborbits + 1> uy_n_save;
         amrex::GpuArray<amrex::Real, max_suborbits + 1> uz_n_save;
+
+        // The _n0 variables save the position and velocity at the start
+        // of the full time step.
+        // The _n variables save the position and velocity at the start
+        // of each sub step.
 
 #if !defined(WARPX_DIM_1D_Z)
         amrex::ParticleReal const xp_n0 = x_n[ip];
@@ -655,6 +714,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
         int isuborbit = 0;
         while (isuborbit < num_suborbits) {
+            // Save the quantities at the start of the sub step
             x_n_save[isuborbit] = xp_n;
             y_n_save[isuborbit] = yp_n;
             z_n_save[isuborbit] = zp_n;
@@ -823,9 +883,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
         uy[ip] = 0.5_prt*(uyp_n0 + uyp_n);
         uz[ip] = 0.5_prt*(uzp_n0 + uzp_n);
 
-
         if (!skip_deposition) {
-            // Save the values at the end of the orbit
+            // Save the values at the end of the last suborbit
             x_n_save[isuborbit] = xp_n;
             y_n_save[isuborbit] = yp_n;
             z_n_save[isuborbit] = zp_n;
