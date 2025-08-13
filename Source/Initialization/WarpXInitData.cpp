@@ -551,6 +551,9 @@ WarpX::PrintMainPICparameters ()
     else if (current_deposition_algo == CurrentDepositionAlgo::Villasenor){
       amrex::Print() << "Current Deposition:   | Villasenor \n";
     }
+    // Print guard cells number
+    amrex::Print() << "Guard cells           | - ng_alloc_J  = " << guard_cells.ng_alloc_J << "\n";
+    amrex::Print() << " (allocated for J)    | \n";
     // Print type of particle pusher
     if (particle_pusher_algo == ParticlePusherAlgo::Vay){
       amrex::Print() << "Particle Pusher:      | Vay \n";
