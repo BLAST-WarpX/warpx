@@ -9,6 +9,7 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "DoxyGraph.H"
+
 #include "WarpX.H"
 
 #include "BoundaryConditions/PML.H"

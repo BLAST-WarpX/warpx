@@ -5,6 +5,7 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "DoxyGraph.H"
+
 #include "CollisionHandler.H"
 
 #include "Particles/Collision/BackgroundMCC/BackgroundMCCCollision.H"
