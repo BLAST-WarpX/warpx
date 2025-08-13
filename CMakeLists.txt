@@ -574,7 +574,13 @@ if(WarpX_COMPUTE STREQUAL CUDA)
     )
 else()
     foreach(warpx_tgt IN LISTS _ALL_TARGETS)
-        target_compile_features(${warpx_tgt} PUBLIC cxx_std_17)
+        if(WarpX_SIMD)
+            # vir::cvt
+            # https://github.com/mattkretz/vir-simd/issues/45
+            target_compile_features(${warpx_tgt} PUBLIC cxx_std_20)
+        else()
+            target_compile_features(${warpx_tgt} PUBLIC cxx_std_17)
+        endif()
     endforeach()
     set_target_properties(${_ALL_TARGETS} PROPERTIES
         CXX_EXTENSIONS OFF
