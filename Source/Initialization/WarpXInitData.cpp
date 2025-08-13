@@ -1697,7 +1697,7 @@ WarpX::ReadExternalFieldFromFile (
 
     // Read external field openPMD data
     ExternalFieldReader external_field_reader(read_fields_from_path, F_name, F_component);
-    GetExternalFieldFromFile const& get_external_field_from_file = external_field_reader.get();
+    ExternalFieldView const& external_field_view = external_field_reader.getView();
 
     // Loop over boxes
 #if defined(AMREX_USE_OMP) && !defined(AMREX_USE_GPU)
@@ -1730,7 +1730,7 @@ WarpX::ReadExternalFieldFromFile (
                     (AMREX_D_DECL(problo[0] + ii*dx[0],
                                   problo[1] + j *dx[1],
                                   problo[2] + k *dx[2]));
-                mffab(i,j,k) = get_external_field_from_file(pos);
+                mffab(i,j,k) = external_field_view(pos);
             }
 
         ); // End ParallelFor

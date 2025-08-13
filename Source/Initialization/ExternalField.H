@@ -71,13 +71,13 @@ struct ExternalFieldParams
     std::string external_fields_path;
 };
 
-struct GetExternalFieldFromFile
+struct ExternalFieldView
 {
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     amrex::Real operator() (amrex::RealVect const& pos) const
     {
 #if defined(AMREX_USE_GPU)
-        AMREX_IF_ON_HOST((amrex::Abort("For GPU builds, GetExternalFieldFromFile only works on device. We could make it work on host if necessary.");))
+        AMREX_IF_ON_HOST((amrex::Abort("For GPU builds, ExternalFieldView only works on device. We could make it work on host if necessary.");))
 #endif
 
         // Get index of the external field array
@@ -156,12 +156,12 @@ public:
     ExternalFieldReader (std::string const& read_fields_from_path,
                          std::string const& F_name, std::string const& F_component);
 
-    GetExternalFieldFromFile const& get () const { return m_get_external_field_from_file; }
+    ExternalFieldView const& getView () const { return m_external_field_view; }
 
 private:
     std::shared_ptr<double> m_FC_data_cpu;
     amrex::Gpu::DeviceVector<double> m_FC_data_gpu;
-    GetExternalFieldFromFile m_get_external_field_from_file;
+    ExternalFieldView m_external_field_view;
 };
 
 #endif //WARPX_EXTERNAL_FIELD_H_

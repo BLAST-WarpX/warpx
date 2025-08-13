@@ -135,16 +135,16 @@ struct InjectorDensityFromFile
         amrex::ignore_unused(x,y,z);
 #endif
 #if defined(WARPX_DIM_RZ)
-        return m_get_external_field_from_file(amrex::RealVect{x,z});
+        return m_external_field_view(amrex::RealVect{x,z});
 #elif defined(WARPX_DIM_1D_Z)
-        return m_get_external_field_from_file(amrex::RealVect{z});
+        return m_external_field_view(amrex::RealVect{z});
 #else
-        return m_get_external_field_from_file(amrex::RealVect{AMREX_D_DECL(x,y,z)});
+        return m_external_field_view(amrex::RealVect{AMREX_D_DECL(x,y,z)});
 #endif
     }
 
 private:
-    GetExternalFieldFromFile m_get_external_field_from_file;
+    ExternalFieldView m_external_field_view;
     ExternalFieldReader* m_external_field_reader = nullptr;
 };
 
