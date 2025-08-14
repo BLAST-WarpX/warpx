@@ -1,14 +1,14 @@
 #################################
 ####### GENERAL PARAMETERS ######
 #################################
-max_step = 1
+max_step = 64
 amr.n_cell = 32 32 32
 amr.max_grid_size = 16
 amr.blocking_factor = 16
 amr.max_level = 0
 geometry.dims = 3
-geometry.prob_lo = -20.e-6   -20.e-6   -20.e-6    # physical domain
-geometry.prob_hi =  20.e-6    20.e-6    20.e-6
+geometry.prob_lo = -50.e-6   -50.e-6   -50.e-6    # physical domain
+geometry.prob_hi =  50.e-6    50.e-6    50.e-6
 
 #################################
 ####### Boundary condition ######
@@ -26,6 +26,11 @@ warpx.cfl = 1.0
 # Order of particle shape factors
 algo.particle_shape = 1
 
+# Moving window
+warpx.do_moving_window = 1
+warpx.moving_window_dir = z
+warpx.moving_window_v = 1
+
 #################################
 ############ PLASMA #############
 #################################
@@ -39,10 +44,8 @@ electrons.read_density_from_path = "example-density.h5"
 electrons.density_name = "density"
 electrons.momentum_distribution_type = "at_rest"
 # Diagnostics
-diagnostics.diags_names = asym
-asym.intervals = 1
-asym.diag_type = Full
-asym.electrons.variables = ux uy uz w
-asym.fields_to_plot = rho
-asym.format = openpmd
-asym.openpmd_backend = h5
+diagnostics.diags_names = diag
+diag.intervals = 5
+diag.diag_type = Full
+diag.fields_to_plot = rho
+diag.format = openpmd

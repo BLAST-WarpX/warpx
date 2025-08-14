@@ -10,11 +10,11 @@ import openpmd_api as io
 # Define density as a function of x, y, z, using numpy syntax
 # parabolic channel in x, y, with a ramp and plateau in z
 on_axis_density = 1e24  # m^-3
-channel_radius = 10e-6  # m
-ramp_length = 1e-3  # m
+channel_radius = 40e-6  # m
+ramp_length = 100e-6  # m
 # - Define the grid
-x_1d = np.linspace(-20e-6, 20e-6, 200)
-y_1d = np.linspace(-20e-6, 20e-6, 200)
+x_1d = np.linspace(-50e-6, 50e-6, 200)
+y_1d = np.linspace(-50e-6, 50e-6, 200)
 z_1d = np.linspace(0, 1e-2, 200)
 x, y, z = np.meshgrid(x_1d, y_1d, z_1d, indexing="ij")
 # - Define density as a function of x, y, z
