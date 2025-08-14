@@ -75,11 +75,10 @@ void InjectorDensityPredefined::clear ()
 {
 }
 
-InjectorDensityFromFile::InjectorDensityFromFile (std::string const& a_file_name,
-                                                  std::string const& a_density_name)
+InjectorDensityFromFile::InjectorDensityFromFile (std::string const& a_file_name)
 {
-    m_external_field_reader = new ExternalFieldReader(a_file_name,a_density_name,"");
-    m_get_external_field_from_file = m_external_field_reader->get();
+    m_external_field_reader = new ExternalFieldReader(a_file_name, "density", "");
+    m_external_field_view = m_external_field_reader->getView();
 }
 
 void InjectorDensityFromFile::clear ()

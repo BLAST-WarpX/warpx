@@ -225,14 +225,14 @@ ExternalFieldReader::ExternalFieldReader (std::string const& read_fields_from_pa
 #endif
 
     const auto d = F.gridSpacing<long double>();
-    AMREX_D_TERM(m_get_external_field_from_file.dx[0] = amrex::Real(d.at(0));,
-                 m_get_external_field_from_file.dx[1] = amrex::Real(d.at(1));,
-                 m_get_external_field_from_file.dx[2] = amrex::Real(d.at(2)));
+    AMREX_D_TERM(m_external_field_view.dx[0] = amrex::Real(d.at(0));,
+                 m_external_field_view.dx[1] = amrex::Real(d.at(1));,
+                 m_external_field_view.dx[2] = amrex::Real(d.at(2)));
 
     const auto offset = F.gridGlobalOffset();
-    AMREX_D_TERM(m_get_external_field_from_file.offset[0] = amrex::Real(offset.at(0));,
-                 m_get_external_field_from_file.offset[1] = amrex::Real(offset.at(1));,
-                 m_get_external_field_from_file.offset[2] = amrex::Real(offset.at(2)));
+    AMREX_D_TERM(m_external_field_view.offset[0] = amrex::Real(offset.at(0));,
+                 m_external_field_view.offset[1] = amrex::Real(offset.at(1));,
+                 m_external_field_view.offset[2] = amrex::Real(offset.at(2)));
 
     // Load the first component if F_component is empty
     auto FC = F_component.empty() ? F.begin()->second : F[F_component];
@@ -273,7 +273,7 @@ ExternalFieldReader::ExternalFieldReader (std::string const& read_fields_from_pa
                  const auto extent2 = static_cast<int>(extent.at(2)));
 #endif
 
-    m_get_external_field_from_file.table = decltype(m_get_external_field_from_file.table)
+    m_external_field_view.table = decltype(m_external_field_view.table)
 #if (AMREX_SPACEDIM == 1)
         (FC_data, 0, extent0);
 #else

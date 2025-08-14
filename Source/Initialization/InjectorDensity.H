@@ -122,8 +122,7 @@ private:
 // struct whose getDensity returns density from file.
 struct InjectorDensityFromFile
 {
-    InjectorDensityFromFile (std::string const& a_file_name,
-                             std::string const& a_density_name);
+    InjectorDensityFromFile (std::string const& a_file_name);
 
     void clear ();
 
@@ -136,16 +135,16 @@ struct InjectorDensityFromFile
         amrex::ignore_unused(x,y,z);
 #endif
 #if defined(WARPX_DIM_RZ)
-        return m_get_external_field_from_file(amrex::RealVect{x,z});
+        return m_external_field_view(amrex::RealVect{x,z});
 #elif defined(WARPX_DIM_1D_Z)
-        return m_get_external_field_from_file(amrex::RealVect{z});
+        return m_external_field_view(amrex::RealVect{z});
 #else
-        return m_get_external_field_from_file(amrex::RealVect{AMREX_D_DECL(x,y,z)});
+        return m_external_field_view(amrex::RealVect{AMREX_D_DECL(x,y,z)});
 #endif
     }
 
 private:
-    GetExternalFieldFromFile m_get_external_field_from_file;
+    ExternalFieldView m_external_field_view;
     ExternalFieldReader* m_external_field_reader = nullptr;
 };
 
@@ -179,10 +178,9 @@ struct InjectorDensity
     { }
 
     // This constructor stores a InjectorDensityFromFile in union object.
-    InjectorDensity (InjectorDensityFromFile* t, std::string const& a_file_name,
-                     std::string const& a_density_name)
+    InjectorDensity (InjectorDensityFromFile* t, std::string const& a_file_name)
         : type(Type::fromfile),
-          object(t,a_file_name,a_density_name)
+          object(t,a_file_name)
     { }
 
     // Explicitly prevent the compiler from generating copy constructors
@@ -243,9 +241,8 @@ private:
             : parser(a_parser) {}
         Object (InjectorDensityPredefined*, std::string const& a_species_name)
             : predefined(a_species_name) {}
-        Object (InjectorDensityFromFile*, std::string const& a_file_name,
-                std::string const& a_density_name)
-            : fromfile(a_file_name, a_density_name) {}
+        Object (InjectorDensityFromFile*, std::string const& a_file_name)
+            : fromfile(a_file_name) {}
         InjectorDensityConstant   constant;
         InjectorDensityParser     parser;
         InjectorDensityPredefined predefined;
