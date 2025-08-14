@@ -9,11 +9,6 @@ project(WarpX VERSION ${warpx_version})
 
 include(${WarpX_SOURCE_DIR}/cmake/WarpXFunctions.cmake)
 
-# Warnings ####################################################################
-#
-# Must call this before any target is created.
-set_cxx_warnings()
-
 # In-source tree builds are messy and can screw up the build system.
 # Avoid building at least in the same dir as the root dir:
 if(CMAKE_BINARY_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
@@ -839,6 +834,13 @@ if(BUILD_TESTING)
         add_subdirectory(Examples)
     endif()
 endif()
+
+
+# Warnings ####################################################################
+#
+foreach(warpx_tgt IN LISTS _ALL_TARGETS)
+    set_compile_warnings(${warpx_tgt})
+endforeach()
 
 
 # Status Summary for Build Options ############################################
