@@ -9,6 +9,11 @@ project(WarpX VERSION ${warpx_version})
 
 include(${WarpX_SOURCE_DIR}/cmake/WarpXFunctions.cmake)
 
+# Warnings ####################################################################
+#
+# Must call this before any target is created.
+set_cxx_warnings()
+
 # In-source tree builds are messy and can screw up the build system.
 # Avoid building at least in the same dir as the root dir:
 if(CMAKE_BINARY_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
@@ -654,11 +659,6 @@ foreach(D IN LISTS WarpX_DIMS)
         target_compile_definitions(pyWarpX_${SD} PRIVATE ABLASTR_IS_DLL_BUILDING)
     endif()
 endforeach()
-
-
-# Warnings ####################################################################
-#
-set_cxx_warnings()
 
 
 # Generate Configuration and .pc Files ########################################
