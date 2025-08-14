@@ -394,6 +394,7 @@ void WarpX::OneStep (
     // implicit solver
     if (m_implicit_solver) {
         // advance fields and particles by one time step
+        DOXY_GRAPH(ImplicitSolver::OneStep();)
         m_implicit_solver->OneStep(a_cur_time, a_dt, a_step);
     }
     // explicit solver
@@ -1261,6 +1262,7 @@ WarpX::PushParticlesandDeposit (
         current_fp_string = "current_fp";
     }
 
+    DOXY_GRAPH(MultiParticleContainer::Evolve();)
     mypc->Evolve(
         m_fields,
         lev,
@@ -1303,6 +1305,7 @@ WarpX::PushParticlesandDeposit (
         // Might this be related to issue #1943?
 #endif
         if (do_fluid_species) {
+            DOXY_GRAPH(MultiFluidContainer::Evolve();)
             myfl->Evolve(m_fields,
                          lev,
                          current_fp_string,
