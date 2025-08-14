@@ -43,6 +43,7 @@ electrons.profile = "fromfile"
 electrons.read_density_from_path = "example-density.h5"
 electrons.density_name = "density"
 electrons.momentum_distribution_type = "at_rest"
+electrons.do_continuous_injection = 1
 # Diagnostics
 diagnostics.diags_names = diag
 diag.intervals = 5
