@@ -17,6 +17,6 @@ add_warpx_test(
     1  # nprocs
     inputs_test_3d_load_density  # inputs
     "analysis_3d.py"  # analysis
-    "analysis_default_regression.py --path diags/diag"  # checksum
+    "analysis_default_regression.py --path diags/diag/"   # checksum
     test_3d_load_density_prepare  # dependency
 )
