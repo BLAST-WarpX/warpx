@@ -346,32 +346,28 @@ void FieldProbe::LoadBalance ()
     m_probe.Redistribute();
 }
 
-bool FieldProbe::ProbeInDomain () const
-{
-    // get a reference to WarpX instance
-    auto & warpx = WarpX::GetInstance();
-    int const lev = 0;
-    const amrex::Geometry& gm = warpx.Geom(lev);
-    const auto *const prob_lo = gm.ProbLo();
-    const auto *const prob_hi = gm.ProbHi();
-
+bool
+FieldProbe::ProbeInDomain (const amrex::Real* const prob_lo,
+                           const amrex::Real* const prob_hi,
+                           amrex::ParticleReal xp, amrex::ParticleReal yp,
+                           amrex::ParticleReal zp) {
     /*
-     * Determine if probe exists within simulation boundaries. During 2D simulations,
-     * y values will be set to 0 making it unnecessary to check. Generally, the second
-     * value in a position array will be the y value, but in the case of 2D, prob_lo[1]
-     * and prob_hi[1] refer to z. This is a result of warpx.Geom(lev).
+     * Determine if probe exists within simulation boundaries. During 2D
+     * simulations, y values will be set to 0 making it unnecessary to check.
+     * Generally, the second value in a position array will be the y value, but
+     * in the case of 2D, prob_lo[1] and prob_hi[1] refer to z. This is a result
+     * of warpx.Geom(lev).
      */
 #if defined(WARPX_DIM_1D_Z)
-    return z_probe >= prob_lo[0] && z_probe < prob_hi[0];
+    return zp >= prob_lo[0] && zp < prob_hi[0];
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    return x_probe >= prob_lo[0] && x_probe < prob_hi[0];
+    return xp >= prob_lo[0] && xp < prob_hi[0];
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-    return x_probe >= prob_lo[0] && x_probe < prob_hi[0] &&
-           z_probe >= prob_lo[1] && z_probe < prob_hi[1];
+    return xp >= prob_lo[0] && xp < prob_hi[0] && zp >= prob_lo[1] &&
+           zp < prob_hi[1];
 #else
-    return x_probe >= prob_lo[0] && x_probe < prob_hi[0] &&
-           y_probe >= prob_lo[1] && y_probe < prob_hi[1] &&
-           z_probe >= prob_lo[2] && z_probe < prob_hi[2];
+    return xp >= prob_lo[0] && xp < prob_hi[0] && yp >= prob_lo[1] &&
+           yp < prob_hi[1] && zp >= prob_lo[2] && zp < prob_hi[2];
 #endif
 }
 
@@ -384,6 +380,11 @@ void FieldProbe::ComputeDiags (int step)
     }
     // get a reference to WarpX instance
     auto & warpx = WarpX::GetInstance();
+
+    // get low and high bounds of simulation domain
+    const amrex::Geometry& gm = warpx.Geom(0);
+    const auto* const prob_lo = gm.ProbLo();
+    const auto* const prob_hi = gm.ProbHi();
 
     // get number of mesh-refinement levels
     const auto nLevel = warpx.finestLevel() + 1;
@@ -449,31 +450,32 @@ void FieldProbe::ComputeDiags (int step)
             auto setPosition = SetParticlePosition<FieldProbePIdx>(pti);
 
             auto const np = pti.numParticles();
-            if (update_particles_moving_window)
-            {
-                const auto temp_warpx_moving_window = WarpX::moving_window_dir;
-                amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (long ip)
-                {
-                    amrex::ParticleReal xp, yp, zp;
-                    getPosition(ip, xp, yp, zp);
-                    if (temp_warpx_moving_window == 0)
-                    {
-                        setPosition(ip, xp+move_dist, yp, zp);
+            bool allInDomain = true;
+            const auto temp_warpx_moving_window = WarpX::moving_window_dir;
+
+            amrex::ParallelFor(np, [=, &allInDomain] AMREX_GPU_DEVICE(long ip) {
+                amrex::ParticleReal xp, yp, zp;
+                getPosition(ip, xp, yp, zp);
+                if (update_particles_moving_window) {
+                    if (temp_warpx_moving_window == 0) {
+                        xp += move_dist; // update x position in moving window
                     }
-                    if (temp_warpx_moving_window == 1)
-                    {
-                        setPosition(ip, xp, yp+move_dist, zp);
+                    if (temp_warpx_moving_window == 1) {
+                        yp += move_dist; // update y position in moving window
                     }
 #if defined(WARPX_ZINDEX)
-                    if (temp_warpx_moving_window == WARPX_ZINDEX)
-                    {
-                        setPosition(ip, xp, yp, zp+move_dist);
+                    if (temp_warpx_moving_window == WARPX_ZINDEX) {
+                        zp += move_dist; // update z position in moving window
                     }
 #endif
-                });
-            }
-            if( ProbeInDomain() )
-            {
+                    setPosition(ip, xp, yp, zp);
+                }
+                if (!ProbeInDomain(prob_lo, prob_hi, xp, yp, zp)) {
+                    allInDomain = false;
+                }
+            });
+
+            if (allInDomain) {
                 const auto &arrEx = Ex[pti].array();
                 const auto &arrEy = Ey[pti].array();
                 const auto &arrEz = Ez[pti].array();
@@ -643,7 +645,9 @@ void FieldProbe::ComputeDiags (int step)
 
 void FieldProbe::WriteToFile (int step) const
 {
-    if (!(ProbeInDomain() && amrex::ParallelDescriptor::IOProcessor())) { return; }
+    if (!amrex::ParallelDescriptor::IOProcessor()) {
+        return;
+    }
 
     // loop over num valid particles to find the lowest particle ID for later sorting
     auto first_id = static_cast<long int>(m_data_out[0]);

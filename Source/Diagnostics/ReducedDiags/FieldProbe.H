@@ -117,7 +117,10 @@ private:
 
     /** Check if the probe is in the simulation domain boundary
      */
-    bool ProbeInDomain () const;
+    static bool ProbeInDomain (const amrex::Real* const prob_lo,
+                               const amrex::Real* const prob_hi,
+                               amrex::ParticleReal xp, amrex::ParticleReal yp,
+                               amrex::ParticleReal zp);
 
     /**
      * Simple utility function to normalize the components of a "vector"
