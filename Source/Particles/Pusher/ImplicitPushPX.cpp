@@ -651,12 +651,12 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
         // Create temporary arrays to hold the particle suborbit data
         // at the start of each sub step which is used to deposit the
         // current of the suborbits after convergence is found
-        amrex::GpuArray<amrex::Real, max_suborbits + 1> x_n_save;
-        amrex::GpuArray<amrex::Real, max_suborbits + 1> y_n_save;
-        amrex::GpuArray<amrex::Real, max_suborbits + 1> z_n_save;
-        amrex::GpuArray<amrex::Real, max_suborbits + 1> ux_n_save;
-        amrex::GpuArray<amrex::Real, max_suborbits + 1> uy_n_save;
-        amrex::GpuArray<amrex::Real, max_suborbits + 1> uz_n_save;
+        amrex::GpuArray<amrex::ParticleReal, max_suborbits + 1> x_n_save;
+        amrex::GpuArray<amrex::ParticleReal, max_suborbits + 1> y_n_save;
+        amrex::GpuArray<amrex::ParticleReal, max_suborbits + 1> z_n_save;
+        amrex::GpuArray<amrex::ParticleReal, max_suborbits + 1> ux_n_save;
+        amrex::GpuArray<amrex::ParticleReal, max_suborbits + 1> uy_n_save;
+        amrex::GpuArray<amrex::ParticleReal, max_suborbits + 1> uz_n_save;
 
         // The _n0 variables save the position and velocity at the start
         // of the full time step.
