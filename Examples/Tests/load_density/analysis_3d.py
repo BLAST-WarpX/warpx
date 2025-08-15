@@ -6,9 +6,9 @@
 #
 # License: BSD-3-Clause-LBNL
 
-# This test the loading of the plasma density from a file.
-# A openPMD file is created, containing a density corresponding to
-# that of plasma channel (parabolic in x, y, and linear ramp in z followed by a plateau)
+# This tests the loading of the plasma density from a file.
+# An openPMD file is created, containing a density corresponding to
+# a plasma channel (parabolic in x, y, and linear ramp in z followed by a plateau)
 # This file checks that the density of the particles that are injected in the simulation
 # (including continuous injection by a moving window) corresponds to the expected density.
 
@@ -18,6 +18,8 @@ from scipy.constants import e
 
 ts = OpenPMDTimeSeries("./diags/diag")
 
+# Loop over all iterations, so that we test loading of the density
+# as the moving window moves.
 for iteration in ts.iterations:
     rho, info = ts.get_field("rho", iteration=iteration)
     density_sim = -rho / e
