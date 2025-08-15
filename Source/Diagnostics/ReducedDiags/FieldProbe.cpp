@@ -346,11 +346,13 @@ void FieldProbe::LoadBalance ()
     m_probe.Redistribute();
 }
 
-bool
-FieldProbe::ProbeInDomain (const amrex::Real* const prob_lo,
-                           const amrex::Real* const prob_hi,
-                           amrex::ParticleReal xp, amrex::ParticleReal yp,
-                           amrex::ParticleReal zp) {
+using ProblemDomainVec = amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>;
+
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE bool
+ProbeInDomain (const ProblemDomainVec& prob_lo, const ProblemDomainVec& prob_hi,
+               [[maybe_unused]] amrex::ParticleReal xp,
+               [[maybe_unused]] amrex::ParticleReal yp,
+               [[maybe_unused]] amrex::ParticleReal zp) {
     /*
      * Determine if probe exists within simulation boundaries. During 2D
      * simulations, y values will be set to 0 making it unnecessary to check.
@@ -383,8 +385,8 @@ void FieldProbe::ComputeDiags (int step)
 
     // get low and high bounds of simulation domain
     const amrex::Geometry& gm = warpx.Geom(0);
-    const auto* const prob_lo = gm.ProbLo();
-    const auto* const prob_hi = gm.ProbHi();
+    const auto prob_lo = gm.ProbLoArray();
+    const auto prob_hi = gm.ProbHiArray();
 
     // get number of mesh-refinement levels
     const auto nLevel = warpx.finestLevel() + 1;
@@ -451,9 +453,10 @@ void FieldProbe::ComputeDiags (int step)
 
             auto const np = pti.numParticles();
             bool allInDomain = true;
+            bool* allInDomainPtr = &allInDomain;
             const auto temp_warpx_moving_window = WarpX::moving_window_dir;
 
-            amrex::ParallelFor(np, [=, &allInDomain] AMREX_GPU_DEVICE(long ip) {
+            amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(long ip) {
                 amrex::ParticleReal xp, yp, zp;
                 getPosition(ip, xp, yp, zp);
                 if (update_particles_moving_window) {
@@ -471,7 +474,7 @@ void FieldProbe::ComputeDiags (int step)
                     setPosition(ip, xp, yp, zp);
                 }
                 if (!ProbeInDomain(prob_lo, prob_hi, xp, yp, zp)) {
-                    allInDomain = false;
+                    *allInDomainPtr = false;
                 }
             });
 
