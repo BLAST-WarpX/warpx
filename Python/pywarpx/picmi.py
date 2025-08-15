@@ -3422,6 +3422,9 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
         Species for which to calculate particle_fields_to_plot functions. Fields will
         be calculated separately for each specified species. If not passed, default is
         all of the available particle species.
+
+    warpx_verbosity: int, optional
+        Verbosity level to use for printing diagnostic output information.
     """
 
     def init(self, kw):
@@ -3438,6 +3441,7 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
         self.dump_last_timestep = kw.pop("warpx_dump_last_timestep", None)
         self.particle_fields_to_plot = kw.pop("warpx_particle_fields_to_plot", [])
         self.particle_fields_species = kw.pop("warpx_particle_fields_species", None)
+        self.verbosity = kw.pop("warpx_verbosity", None)
 
     def diagnostic_initialize_inputs(self):
         self.add_diagnostic()
@@ -3570,7 +3574,7 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
         particle_fields_to_plot_names.sort()
         self.diagnostic.particle_fields_to_plot = particle_fields_to_plot_names
         self.diagnostic.particle_fields_species = self.particle_fields_species
-
+        self.diagnostic.verbose = self.verbosity
         self.diagnostic.plot_raw_fields = self.plot_raw_fields
         self.diagnostic.plot_raw_fields_guards = self.plot_raw_fields_guards
         self.diagnostic.plot_finepatch = self.plot_finepatch
