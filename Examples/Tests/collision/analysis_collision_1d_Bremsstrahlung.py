@@ -10,7 +10,7 @@
 # This is a script that analyses the simulation results from the script `inputs_test_1d_collision_z_Bremsstrahlung`.
 # run locally: python analysis_collision_1d_Bremsstrahlung.py diags/diag1000600/
 #
-# This is a 1D Bremsstrahlung collision of electrons on Borons ions
+# This is a 1D Bremsstrahlung collision of electrons on Boron ions
 # producing photons. This checks that the appropriate number of
 # photons are created with the correct distribution.
 #
