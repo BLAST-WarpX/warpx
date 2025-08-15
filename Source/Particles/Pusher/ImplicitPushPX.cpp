@@ -292,8 +292,8 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
             // This compares the dxp to dxp_save to check whether convergence has been reached.
             // If there is convergence, at this point, the position is consistent with the velocity
             // and the iterations can be exited.
-            PositionNorm( dxp, dyp, dzp, dxp_save, dyp_save, dzp_save,
-                          idxg2, idyg2, idzg2, step_norm, iter );
+            PositionNorm(dxp, dyp, dzp, dxp_save, dyp_save, dzp_save,
+                         idxg2, idyg2, idzg2, step_norm, iter);
             if (step_norm < particle_tolerance) { break; }
 
             amrex::ParticleReal Exp = Ex_external_particle;
@@ -303,7 +303,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
             amrex::ParticleReal Byp = By_external_particle;
             amrex::ParticleReal Bzp = Bz_external_particle;
 
-            if(!t_do_not_gather){
+            if (!t_do_not_gather) {
                 // first gather E and B to the particle positions
                 doGatherShapeNImplicit(xp_n, yp_n, zp_n, xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                        ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
@@ -380,7 +380,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
             iter++;
 
             // check if particle did not converge
-            if ( iter > 1 && iter == max_iterations ) {
+            if (iter > 1 && iter == max_iterations) {
                 // Flag the particle as invalid. It will be handled later in a special
                 // loop with suborbiting.
                 amrex::ParticleIDWrapper{idcpu[ip]}.make_invalid();
@@ -738,9 +738,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                 zp = zp_n + dzp;
                 setPosition(ip, xp, yp, zp);
 
-                PositionNorm( dxp, dyp, dzp, dxp_save, dyp_save, dzp_save,
-                              idxg2, idyg2, idzg2, step_norm, iter );
-                if( step_norm < particle_tolerance ) { break; }
+                PositionNorm(dxp, dyp, dzp, dxp_save, dyp_save, dzp_save,
+                             idxg2, idyg2, idzg2, step_norm, iter);
+                if (step_norm < particle_tolerance) { break; }
 
                 amrex::ParticleReal Exp = Ex_external_particle;
                 amrex::ParticleReal Eyp = Ey_external_particle;
@@ -749,7 +749,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                 amrex::ParticleReal Byp = By_external_particle;
                 amrex::ParticleReal Bzp = Bz_external_particle;
 
-                if(!t_do_not_gather){
+                if (!t_do_not_gather) {
                     // first gather E and B to the particle positions
                     doGatherShapeNImplicit(xp_n, yp_n, zp_n, xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                            ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
@@ -821,7 +821,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
             } // end Picard iterations
 
-            if ( iter == max_iterations ) {
+            if (iter == max_iterations) {
 
                 // particle did not converge
                 // Increase the number of suborbits and start over
@@ -893,7 +893,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
             uz_n_save[isuborbit] = uzp_n;
 
             amrex::Real wq = q*w[ip];
-            if (do_ionization){
+            if (do_ionization) {
                 wq *= ion_lev[ip];
             }
 
