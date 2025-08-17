@@ -87,22 +87,33 @@ Overall simulation parameters
     * ``explicit``: Use an explicit solver, such as the standard FDTD or PSATD
 
     * ``theta_implicit_em``: Use a fully implicit electromagnetic solver with a time-biasing parameter :math:`\theta`.
+
     - **Time-biasing parameter:** :math:`\theta\in[0.5,1.0]`
+
       - Fields (:math:`\textbf{E}` & :math:`\textbf{B}`) used to advance system computed at time :math:`t^{n+\theta}`: :math:`\mathbf{E}^{n+\theta}=\left(1-\theta\right)\mathbf{E}^n + \theta\mathbf{E}^{n+1}`.
       - :math:`\theta = 0.5`: exact energy conservation.
       - :math:`\theta = 1.0`: maximal damping of high-k modes.
+
     - **Field gather and current depositions:**
+
       - Exact energy conservation requires matching gather and deposition. The following depositions support this:
+
         - `algo.current_deposition = direct`
         - `algo.current_deposition = villasenor`
         - `algo.current_deposition = esirkepov` (Not compatible with `implicit_evolve.use_mass_matrices_jacobian = true`.)
+
     - **Nonlinear solvers:**
+
       - `implicit_evolve.nonlinear_solver = picard`: Use a Picard iteration method. Requires small time steps; often non-convergent for large time steps.
       - `implicit_evolve.nonlinear_solver = newton`: Use a PS-JFNK method. Required for large time steps, but effiency often relies on preconditioning and/or using `implicit_evolve.use_mass_matrices_jacobian = true`.
+
     - **Numerical stability:**
+
       - Numerical stable for large time steps (does not require resolving the plasma period or CFL condition for light waves).
       - Practical limits set by solver efficiency, number of particel cell crossings, and physics resolution.
+
     - **References:** (WarpX includes relativistic extensions not discusssed in references)
+
       - `Angus et al., On numerical energy conservation for an implicit particle-in-cell method coupled with a binary Monte-Carlo algorithm for Coulomb collisions <https://doi.org/10.1016/j.jcp.2022.111030>`__.
       - `Angus et al., An implicit particle code with exact energy and charge conservation for electromagnetic studies of dense plasmas <https://doi.org/10.1016/j.jcp.2023.112383>`__.
       - `Angus et al., An implicit particle code with exact energy and charge conservation for studies of dense plasmas in axisymmetric geometries <https://doi.org/10.1016/j.jcp.2024.113427>`__.
