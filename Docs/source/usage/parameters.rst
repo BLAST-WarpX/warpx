@@ -109,8 +109,9 @@ Overall simulation parameters
 
       - **Numerical stability:**
 
-        - Numerically stable for large time steps (does not require resolving the plasma period or CFL condition for light waves).
-        - Practical limits set by solver efficiency, number of particel cell crossings, and physics resolution.
+        - Rhobust to finite-grid instability (does not require cells that resolve the plasma Debye length).
+        - Numerically stable for large :math:`\Delta t` (does not require resolving the plasma period or CFL condition for light waves).
+        - Practical limits on :math:`\Delta t` set by solver efficiency, number of particle cell crossings, and physics resolution.
 
       - **References:** (WarpX includes relativistic extensions not discusssed in references.)
 
