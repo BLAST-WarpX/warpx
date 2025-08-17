@@ -89,7 +89,7 @@ Overall simulation parameters
     * ``theta_implicit_em``: Use a :math:`\theta`-implicit electromagnetic solver.
 
       - **Time-biasing parameter:** :math:`\theta\in[0.5,1.0]`
-      
+
         - ``implicit_evolve.theta`` (`float`, default: 0.5)
         - Fields (:math:`\textbf{E}` & :math:`\textbf{B}`) used to advance system computed at time :math:`t^{n+\theta}`: :math:`\mathbf{E}^{n+\theta}=\left(1-\theta\right)\mathbf{E}^n + \theta\mathbf{E}^{n+1}`.
         - :math:`\theta = 0.5`: Exact energy conservation.
@@ -136,7 +136,7 @@ Overall simulation parameters
           - ``implicit_evolve.use_mass_matrices_pc`` (`bool`, default: false).
             When `true`, the plasma response is captured in the preconditioner.
             Requires use of a preconditioner: ``jacobian.pc_type = pc_curl_curl_mlmg`` or ``pc_jacobi``.
-  
+
           - GMRES in AMReX is used to solve the linear system at each nonlinear iteration in the PS-JFNK process:
 
             - ``gmres.verbose_int`` (`int`, default: 2)
