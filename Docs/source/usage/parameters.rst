@@ -86,12 +86,26 @@ Overall simulation parameters
 
     * ``explicit``: Use an explicit solver, such as the standard FDTD or PSATD
 
-    * ``theta_implicit_em``: Use a fully implicit electromagnetic solver with a time-biasing parameter theta bound between 0.5 and 1.0. Exact energy conservation is achieved using theta = 0.5. Maximal damping of high-k modes is obtained using theta = 1.0. Choices for the nonlinear solver include a Picard iteration scheme and particle-suppressed (PS) JFNK.
-      The algorithm itself is numerical stable for large time steps. That is, it does not require time steps that resolve the plasma period or the CFL condition for light waves. However, the practicality of using a large time step depends on the nonlinear solver. Note that the Picard solver is for demonstration only. It is inefficient and will most like not converge when
-      :math:`\omega_{pe} \Delta t` is close to or greater than one or when the CFL condition for light waves is violated. The PS-JFNK method must be used in order to use large time steps. The time step is limited by how many cells a particle can cross in a time step (MPI-related) and by the need to resolve the relevant physics.
-      The Picard method is described in `Angus et al., On numerical energy conservation for an implicit particle-in-cell method coupled with a binary Monte-Carlo algorithm for Coulomb collisions <https://doi.org/10.1016/j.jcp.2022.111030>`__.
-      The PS-JFNK method is described in `Angus et al., An implicit particle code with exact energy and charge conservation for electromagnetic studies of dense plasmas <https://doi.org/10.1016/j.jcp.2023.112383>`__ . (The version implemented in WarpX is an updated version that includes the relativistic gamma factor for the particles.) Also see `Chen et al., An energy- and charge-conserving, implicit, electrostatic particle-in-cell algorithm. <https://doi.org/10.1016/j.jcp.2011.05.031>`__ .
-      Exact energy conservation requires that the interpolation stencil used for the field gather match that used for the current deposition. ``algo.current_deposition = direct`` must be used with ``interpolation.galerkin_scheme = 0``, and ``algo.current_deposition = Esirkepov`` must be used with ``interpolation.galerkin_scheme = 1``. If using ``algo.current_deposition = villasenor``, the corresponding field gather routine will automatically be selected and the ``interpolation.galerkin_scheme`` flag does not need to be specified. The Esirkepov and villasenor deposition schemes are charge-conserving.
+    * ``theta_implicit_em``: Use a fully implicit electromagnetic solver with a time-biasing parameter :math:`\theta`.
+    - **Time-biasing parameter:** :math:`\theta\in[0.5,1.0]`
+      - Fields (:math:`\textbf{E}` & :math:`\textbf{B}`) used to advance system computed at time :math:`t^{n+\theta}`: :math:`\mathbf{E}^{n+\theta}=\left(1-\theta\right)\mathbf{E}^n + \theta\mathbf{E}^{n+1}`.
+      - :math:`\theta = 0.5`: exact energy conservation.
+      - :math:`\theta = 1.0`: maximal damping of high-k modes.
+    - **Field gather and current depositions:**
+      - Exact energy conservation requires matching gather and deposition. The following depositions support this:
+        - `algo.current_deposition = direct`
+        - `algo.current_deposition = villasenor`
+        - `algo.current_deposition = esirkepov` (Not compatible with `implicit_evolve.use_mass_matrices_jacobian = true`.)
+    - **Nonlinear solvers:**
+      - `implicit_evolve.nonlinear_solver = picard`: Use a Picard iteration method. Requires small time steps; often non-convergent for large time steps.
+      - `implicit_evolve.nonlinear_solver = newton`: Use a PS-JFNK method. Required for large time steps, but effiency often relies on preconditioning and/or using `implicit_evolve.use_mass_matrices_jacobian = true`.
+    - **Numerical stability:**
+      - Numerical stable for large time steps (does not require resolving the plasma period or CFL condition for light waves).
+      - Practical limits set by solver efficiency, number of particel cell crossings, and physics resolution.
+    - **References:** (WarpX includes relativistic extensions not discusssed in references)
+      - `Angus et al., On numerical energy conservation for an implicit particle-in-cell method coupled with a binary Monte-Carlo algorithm for Coulomb collisions <https://doi.org/10.1016/j.jcp.2022.111030>`__.
+      - `Angus et al., An implicit particle code with exact energy and charge conservation for electromagnetic studies of dense plasmas <https://doi.org/10.1016/j.jcp.2023.112383>`__.
+      - `Angus et al., An implicit particle code with exact energy and charge conservation for studies of dense plasmas in axisymmetric geometries <https://doi.org/10.1016/j.jcp.2024.113427>`__.
 
     * ``strang_implicit_spectral_em``: Use a fully implicit electromagnetic solver. All of the comments for ``theta_implicit_em``
       above apply here as well (except that theta is fixed to 0.5 and that charge will not be conserved).
