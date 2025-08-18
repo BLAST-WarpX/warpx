@@ -32,12 +32,6 @@ Login
 
    ssh tuolumne.llnl.gov
 
-To use the available MI300A nodes (currently two), request one via
-
-.. code-block:: bash
-
-   salloc -N 1 -t 30:0
-
 
 .. _building-tuolumne-preparation:
 
@@ -90,7 +84,7 @@ Finally, since Tuolumne does not yet provide software modules for some of our de
   .. code-block:: bash
 
      bash /p/lustre5/${USER}/tuolumne/src/warpx/Tools/machines/tuolumne-llnl/install_mi300a_dependencies.sh
-     source /p/lustre5/${USER}/tuolumne/warpx/mi300a/gpu/venvs/warpx-tuolumne-mi300a/bin/activate
+     source /p/lustre5/${USER}/tuolumne/warpx/mi300a/venvs/warpx-tuolumne-mi300a/bin/activate
 
   .. dropdown:: Script Details
      :color: light
