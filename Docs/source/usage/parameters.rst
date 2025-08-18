@@ -108,77 +108,77 @@ Overall simulation parameters
 
         - ``implicit_evolve.nonlinear_solver`` (`string`, default: None)
 
-          - ``implicit_evolve.nonlinear_solver = picard``: Use a Picard iteration method. Requires small time steps; often non-convergent for large time steps.
+        - ``implicit_evolve.nonlinear_solver = picard``: Use a Picard iteration method. Requires small time steps; often non-convergent for large time steps.
 
-            - ``picard.verbose`` (`bool`, default: true)
-            - ``picard.require_convergence`` (`bool`, default: true)
-            - ``picard.maximum_iterations`` (`int`, default: 100)
-            - ``picard.relative_tolerance`` (`float`, default: 1.0e-6)
-            - ``picard.absolute_tolerance`` (`float`, default: 0.0)
-            - ``picard.diagnostic_file`` (`string`, default: None): File to write solver diagnostic information.
-            - ``picard.diagnostic_interval`` (`int`, default: 1): How often to write solver diagnostics.
+          - ``picard.verbose`` (`bool`, default: true)
+          - ``picard.require_convergence`` (`bool`, default: true)
+          - ``picard.maximum_iterations`` (`int`, default: 100)
+          - ``picard.relative_tolerance`` (`float`, default: 1.0e-6)
+          - ``picard.absolute_tolerance`` (`float`, default: 0.0)
+          - ``picard.diagnostic_file`` (`string`, default: None): File to write solver diagnostic information.
+          - ``picard.diagnostic_interval`` (`int`, default: 1): How often to write solver diagnostics.
 
-          - ``implicit_evolve.nonlinear_solver = newton``: Use a PS-JFNK method. Required for large time steps, but effiency often relies on preconditioning and/or using ``implicit_evolve.use_mass_matrices_jacobian = true``.
+        - ``implicit_evolve.nonlinear_solver = newton``: Use a PS-JFNK method. Required for large time steps, but effiency often relies on preconditioning and/or using ``implicit_evolve.use_mass_matrices_jacobian = true``.
 
-            - ``newton.verbose`` (`bool`, default: true)
-            - ``newton.require_convergence`` (`bool`, default: true)
-            - ``newton.maximum_iterations`` (`int`, default: 100)
-            - ``newton.relative_tolerance`` (`float`, default: 1.0e-6)
-            - ``newton.absolute_tolerance`` (`float`, default: 0.0)
-            - ``newton.diagnostic_file`` (`string`, default: None): File to write solver diagnostic information.
-            - ``newton.diagnostic_interval`` (`int`, default: 1): How often to write solver diagnostics.
+          - ``newton.verbose`` (`bool`, default: true)
+          - ``newton.require_convergence`` (`bool`, default: true)
+          - ``newton.maximum_iterations`` (`int`, default: 100)
+          - ``newton.relative_tolerance`` (`float`, default: 1.0e-6)
+          - ``newton.absolute_tolerance`` (`float`, default: 0.0)
+          - ``newton.diagnostic_file`` (`string`, default: None): File to write solver diagnostic information.
+          - ``newton.diagnostic_interval`` (`int`, default: 1): How often to write solver diagnostics.
 
-        - **PS-JFNK solver specific options:**
-          The PS-JFNK solver (``implicit_evolve.nonlinear_solver = newton``) has a variety of additional parameters and options.
+          - The PS-JFNK solver uses GMRES to solve the linear system at each nonlinear iteration:
 
-          - At each iteration in the PS-JFNK process, each particle is self-consistently updated for fixed :math:`\textbf{E}` and :math:`\textbf{B}` on the grid using a Picard method. The options for this Picard solve are set by:
+          - ``gmres.verbose_int`` (`int`, default: 2)
+          - ``gmres.restart_length`` (`int`, default: 30)
+          - ``gmres.maximum_iterations`` (`int`, default: 1000)
+          - ``gmres.relative_tolerance`` (`float`, default: 1.0e-4)
+          - ``gmres.absolute_tolerance`` (`float`, default: 0.0)
 
-            - ``implicit_evolve.max_particle_iterations`` (`integer`, default: 21)
-            - ``implicit_evolve.particle_tolerance`` (`float`, default: 1.e-10)
+      - **PS-JFNK solver specific options:**
+        The PS-JFNK solver (``implicit_evolve.nonlinear_solver = newton``) has a variety of additional parameters and options.
 
-          - ``implicit_evolve.use_mass_matrices_jacobian`` (`bool`, default: false).
-            When `true`, the plasma current density is computed using the mass matrices during the linear stage of PS-JFNK, replacing direct particle calculations.
+        - At each iteration in the PS-JFNK process, each particle is self-consistently updated for fixed :math:`\textbf{E}` and :math:`\textbf{B}` on the grid using a Picard method. The options for this Picard solve are set by:
 
-          - ``implicit_evolve.use_mass_matrices_pc`` (`bool`, default: false).
-            When `true`, the plasma response is captured in the preconditioner.
-            Requires use of a preconditioner: ``jacobian.pc_type = pc_curl_curl_mlmg`` or ``pc_jacobi``.
+          - ``implicit_evolve.max_particle_iterations`` (`integer`, default: 21)
+          - ``implicit_evolve.particle_tolerance`` (`float`, default: 1.e-10)
 
-          - GMRES in AMReX is used to solve the linear system at each nonlinear iteration in the PS-JFNK process:
+        - ``implicit_evolve.use_mass_matrices_jacobian`` (`bool`, default: false).
+          When `true`, the plasma current density is computed using the mass matrices during the linear stage of PS-JFNK, replacing direct particle calculations.
 
-            - ``gmres.verbose_int`` (`int`, default: 2)
-            - ``gmres.restart_length`` (`int`, default: 30)
-            - ``gmres.maximum_iterations`` (`int`, default: 1000)
-            - ``gmres.relative_tolerance`` (`float`, default: 1.0e-4)
-            - ``gmres.absolute_tolerance`` (`float`, default: 0.0)
+        - ``implicit_evolve.use_mass_matrices_pc`` (`bool`, default: false).
+          When `true`, the plasma response is captured in the preconditioner.
+          Requires use of a preconditioner (``jacobian.pc_type = pc_curl_curl_mlmg`` or ``pc_jacobi``).
 
-          - ``jacobian.pc_type`` (`string`, default: None). There are currently two options for a preconditioner used to minimize the linear GMRES iterations.
+        - ``jacobian.pc_type`` (`string`, default: None). A preconditioner can be used to minimize the number of linear GMRES iterations. There are two options:
 
-            - ``jacobian.pc_type = pc_curl_curl_mlmg``: Use the AMReX MLMG solver for the curl curl formulation of Maxwell's equations. This method solves the following equation:
+          - ``jacobian.pc_type = pc_curl_curl_mlmg``: Use the AMReX MLMG solver for the curl curl formulation of Maxwell's equations. This method solves the following equation:
 
-              .. math::
+            .. math::
 
-                 \nabla \times \left( \alpha\nabla\times\textbf{E} \right) + \boldsymbol{\beta}\cdot\textbf{E} = \textbf{b},
+               \nabla \times \left( \alpha\nabla\times\textbf{E} \right) + \boldsymbol{\beta}\cdot\textbf{E} = \textbf{b},
 
-              where :math:`\alpha=\theta^2\Delta t^2c^2` is a scalar and :math:`\boldsymbol{\beta}` is a diagonal matrix that scales the components of :math:`\textbf{E}`.
+            where :math:`\alpha=\theta^2\Delta t^2c^2` is a scalar and :math:`\boldsymbol{\beta}` is a diagonal matrix that scales the components of :math:`\textbf{E}`.
 
-                - Default: :math:`\boldsymbol\beta = \mathbb{I}`, giving implicit Maxwell equations, suitable for time steps that under-resolve light waves (:math:`c\Delta t > 1/\sqrt{\left(\sum_i1/\Delta x_i^2\right)}`).
-                - ``implicit_evolve.use_mass_matrices_pc = true``: :math:`\boldsymbol\beta` also includes plasma response via the diagonal mass matrices, enabling time steps that under-resolve the plasma period (:math:`\omega_{pe}\Delta t > 1`).
+              - Default: :math:`\boldsymbol\beta = \mathbb{I}`, giving implicit Maxwell equations, suitable for time steps that under-resolve light waves (:math:`c\Delta t > 1/\sqrt{\left(\sum_i1/\Delta x_i^2\right)}`).
+              - ``implicit_evolve.use_mass_matrices_pc = true``: :math:`\boldsymbol\beta` also includes plasma response via the diagonal mass matrices, enabling time steps that under-resolve the plasma period (:math:`\omega_{pe}\Delta t > 1`).
 
-              - ``pc_curl_curl_mlmg.verbose`` (`bool`, default: true)
-              - ``pc_curl_curl_mlmg.bottom_verbose`` (`bool`, default: false)
-              - ``pc_curl_curl_mlmg.agglomeration`` (`bool`, default: true)
-              - ``pc_curl_curl_mlmg.consolidation`` (`bool`, default: true)
-              - ``pc_curl_curl_mlmg.max_iter`` (`int`, default: 10)
-              - ``pc_curl_curl_mlmg.max_coarsening_level`` (`int`, default: 30)
-              - ``pc_curl_curl_mlmg.relative_tolerance`` (`float`, default: 1.0e-4)
-              - ``pc_curl_curl_mlmg.absolute_tolerance`` (`float`, default: 1.0e-16)
+            - ``pc_curl_curl_mlmg.verbose`` (`bool`, default: true)
+            - ``pc_curl_curl_mlmg.bottom_verbose`` (`bool`, default: false)
+            - ``pc_curl_curl_mlmg.agglomeration`` (`bool`, default: true)
+            - ``pc_curl_curl_mlmg.consolidation`` (`bool`, default: true)
+            - ``pc_curl_curl_mlmg.max_iter`` (`int`, default: 10)
+            - ``pc_curl_curl_mlmg.max_coarsening_level`` (`int`, default: 30)
+            - ``pc_curl_curl_mlmg.relative_tolerance`` (`float`, default: 1.0e-4)
+            - ``pc_curl_curl_mlmg.absolute_tolerance`` (`float`, default: 1.0e-16)
 
-            - ``jacobian.pc_type = pc_jacobi``: Use the Point-Jacobi method. This method only captures diagonal response of particles in J via the mass matrices.
+          - ``jacobian.pc_type = pc_jacobi``: Use the Point-Jacobi method. This method only captures the plasma response via the diagonal mass matrices.
 
-              - ``pc_jacobi.verbose`` (`bool`, default: true)
-              - ``pc_jacobi.max_iter`` (`int`, default: 10)
-              - ``pc_jacobi.relative_tolerance`` (`float`, default: 1.0e-4)
-              - ``pc_jacobi.absolute_tolerance`` (`float`, default: 1.0e-16)
+            - ``pc_jacobi.verbose`` (`bool`, default: true)
+            - ``pc_jacobi.max_iter`` (`int`, default: 10)
+            - ``pc_jacobi.relative_tolerance`` (`float`, default: 1.0e-4)
+            - ``pc_jacobi.absolute_tolerance`` (`float`, default: 1.0e-16)
 
       - **Numerical stability:**
 
