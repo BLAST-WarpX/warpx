@@ -39,7 +39,6 @@
 #include "Python/callbacks.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
-#include <ablastr/math/LinearInterpolation.H>
 #include <ablastr/parallelization/MPIInitHelpers.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/utils/UsedInputsFile.H>
@@ -82,10 +81,6 @@
 #include <memory>
 #include <string>
 #include <utility>
-
-#ifdef WARPX_USE_OPENPMD
-#   include <openPMD/openPMD.hpp>
-#endif
 
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 
@@ -1675,92 +1670,44 @@ WarpX::LoadExternalFields (int const lev)
     }
 }
 
-#if defined(WARPX_USE_OPENPMD) && (AMREX_SPACEDIM > 1)  && !defined(WARPX_DIM_XZ)
 void
 WarpX::ReadExternalFieldFromFile (
        const std::string& read_fields_from_path, amrex::MultiFab* mf,
        const std::string& F_name, const std::string& F_component)
 {
+#if !defined(WARPX_USE_OPENPMD)
+
+    amrex::ignore_unused(read_fields_from_path, mf, F_name, F_component);
+    WARPX_ABORT_WITH_MESSAGE("ReadExternalFieldFromFile requires OpenPMD support to be enabled");
+
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+
+    amrex::ignore_unused(read_fields_from_path, mf, F_name, F_component);
+    WARPX_ABORT_WITH_MESSAGE("ReadExternalFieldFromFile is not supported for 1D RCYLINDER and RSPHERE");
+
+#else
+
     // Get WarpX domain info
     amrex::Geometry const& geom0 = Geom(0);
-    const amrex::RealBox& real_box = geom0.ProbDomain();
+    auto problo = geom0.ProbLoArray();
     const auto dx = geom0.CellSizeArray();
     const amrex::IntVect nodal_flag = mf->ixType().toIntVect();
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        if (nodal_flag[idim] == 0) { // cell center
+            problo[idim] += 0.5_rt*dx[idim]; // shift by half dx
+        }
+    }
 
     // Read external field openPMD data
-    auto series = openPMD::Series(read_fields_from_path, openPMD::Access::READ_ONLY);
-    auto iseries = series.iterations.begin()->second;
-    auto F = iseries.meshes[F_name];
-
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(F.getAttribute("dataOrder").get<std::string>() == "C",
-                                     "Reading from files with non-C dataOrder is not implemented");
-
-    auto axisLabels = F.getAttribute("axisLabels").get<std::vector<std::string>>();
-    auto fileGeom = F.getAttribute("geometry").get<std::string>();
-
-#if defined(WARPX_DIM_3D)
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cartesian", "3D can only read from files with cartesian geometry");
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels[0] == "x" && axisLabels[1] == "y" && axisLabels[2] == "z",
-                                     "3D expects axisLabels {x, y, z}");
-#elif defined(WARPX_DIM_XZ)
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cartesian", "XZ can only read from files with cartesian geometry");
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels[0] == "x" && axisLabels[1] == "z",
-                                     "XZ expects axisLabels {x, z}");
-#elif AMREX_SPACEDIM == 1
-    WARPX_ABORT_WITH_MESSAGE(
-        "Reading from openPMD for external fields is not known to work with 1D3V (see #3830)");
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cartesian", "1D3V can only read from files with cartesian geometry");
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels[0] == "z");
-#elif defined(WARPX_DIM_RZ)
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "thetaMode", "RZ can only read from files with 'thetaMode'  geometry");
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels[0] == "r" && axisLabels[1] == "z",
-                                     "RZ expects axisLabels {r, z}");
-#endif
-
-    const auto offset = F.gridGlobalOffset();
-    const auto offset0 = static_cast<amrex::Real>(offset[0]);
-    const auto offset1 = static_cast<amrex::Real>(offset[1]);
-#if defined(WARPX_DIM_3D)
-    const auto offset2 = static_cast<amrex::Real>(offset[2]);
-#endif
-    const auto d = F.gridSpacing<long double>();
-
-#if defined(WARPX_DIM_RZ)
-    const auto file_dr = static_cast<amrex::Real>(d[0]);
-    const auto file_dz = static_cast<amrex::Real>(d[1]);
-#elif defined(WARPX_DIM_3D)
-    const auto file_dx = static_cast<amrex::Real>(d[0]);
-    const auto file_dy = static_cast<amrex::Real>(d[1]);
-    const auto file_dz = static_cast<amrex::Real>(d[2]);
-#endif
-
-    auto FC = F[F_component];
-    const auto extent = FC.getExtent();
-    const auto extent0 = static_cast<int>(extent[0]);
-    const auto extent1 = static_cast<int>(extent[1]);
-    const auto extent2 = static_cast<int>(extent[2]);
-
-    // Determine the chunk data that will be loaded.
-    // Now, the full range of data is loaded.
-    // Loading chunk data can speed up the process.
-    // Thus, `chunk_offset` and `chunk_extent` should be modified accordingly in another PR.
-    const openPMD::Offset chunk_offset = {0,0,0};
-    const openPMD::Extent chunk_extent = {extent[0], extent[1], extent[2]};
-
-    auto FC_chunk_data = FC.loadChunk<double>(chunk_offset,chunk_extent);
-    series.flush();
-    auto *FC_data_host = FC_chunk_data.get();
-
-    // Load data to GPU
-    const size_t total_extent = size_t(extent[0]) * extent[1] * extent[2];
-    amrex::Gpu::DeviceVector<double> FC_data_gpu(total_extent);
-    auto *FC_data = FC_data_gpu.data();
-    amrex::Gpu::copy(amrex::Gpu::hostToDevice, FC_data_host, FC_data_host + total_extent, FC_data);
+    ExternalFieldReader external_field_reader(read_fields_from_path, F_name, F_component);
+    ExternalFieldView const& external_field_view = external_field_reader.getView();
 
     // Loop over boxes
+#if defined(AMREX_USE_OMP) && !defined(AMREX_USE_GPU)
+#pragma omp parallel
+#endif
     for (MFIter mfi(*mf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
-        const amrex::Box box = mfi.growntilebox();
         const amrex::Box tb = mfi.tilebox(nodal_flag, mf->nGrowVect());
         auto const& mffab = mf->array(mfi);
 
@@ -1774,7 +1721,6 @@ WarpX::ReadExternalFieldFromFile (
 #if defined(WARPX_DIM_RZ)
                 // In 2D RZ, i denoting r can be < 0
                 // but mirrored values should be assigned.
-                // Namely, mffab(i) = FC_data[-i] when i<0.
                 const int ii = (i<0)?(-i):(i);
 #else
                 const int ii = i;
@@ -1783,85 +1729,15 @@ WarpX::ReadExternalFieldFromFile (
                 // Physical coordinates of the grid point
                 // 0,1,2 denote x,y,z in 3D xyz.
                 // 0,1 denote r,z in 2D rz.
-                amrex::Real x0, x1;
-                if ( box.type(0)==amrex::IndexType::CellIndex::NODE )
-                     { x0 = static_cast<amrex::Real>(real_box.lo(0)) + ii*dx[0]; }
-                else { x0 = static_cast<amrex::Real>(real_box.lo(0)) + ii*dx[0] + 0.5_rt*dx[0]; }
-                if ( box.type(1)==amrex::IndexType::CellIndex::NODE )
-                     { x1 = real_box.lo(1) + j*dx[1]; }
-                else { x1 = real_box.lo(1) + j*dx[1] + 0.5_rt*dx[1]; }
-
-#if defined(WARPX_DIM_RZ)
-                // Get index of the external field array
-                int const ir = std::floor( (x0-offset0)/file_dr );
-                int const iz = std::floor( (x1-offset1)/file_dz );
-
-                // Get coordinates of external grid point
-                amrex::Real const xx0 = offset0 + ir * file_dr;
-                amrex::Real const xx1 = offset1 + iz * file_dz;
-
-#elif defined(WARPX_DIM_3D)
-                amrex::Real x2;
-                if ( box.type(2)==amrex::IndexType::CellIndex::NODE )
-                     { x2 = real_box.lo(2) + k*dx[2]; }
-                else { x2 = real_box.lo(2) + k*dx[2] + 0.5_rt*dx[2]; }
-
-                // Get index of the external field array
-                int const ix = std::floor( (x0-offset0)/file_dx );
-                int const iy = std::floor( (x1-offset1)/file_dy );
-                int const iz = std::floor( (x2-offset2)/file_dz );
-
-                // Get coordinates of external grid point
-                amrex::Real const xx0 = offset0 + ix * file_dx;
-                amrex::Real const xx1 = offset1 + iy * file_dy;
-                amrex::Real const xx2 = offset2 + iz * file_dz;
-#endif
-
-#if defined(WARPX_DIM_RZ)
-                const amrex::Array4<double> fc_array(FC_data, {0,0,0}, {extent0, extent2, extent1}, 1);
-                const double
-                    f00 = fc_array(0, iz  , ir  ),
-                    f01 = fc_array(0, iz+1, ir  ),
-                    f10 = fc_array(0, iz  , ir+1),
-                    f11 = fc_array(0, iz+1, ir+1);
-                mffab(i,j,k) = static_cast<amrex::Real>(ablastr::math::bilinear_interp<double>
-                    (xx0, xx0+file_dr, xx1, xx1+file_dz,
-                     f00, f01, f10, f11,
-                     x0, x1));
-#elif defined(WARPX_DIM_3D)
-                const amrex::Array4<double> fc_array(FC_data, {0,0,0}, {extent2, extent1, extent0}, 1);
-                const double
-                    f000 = fc_array(iz  , iy  , ix  ),
-                    f001 = fc_array(iz+1, iy  , ix  ),
-                    f010 = fc_array(iz  , iy+1, ix  ),
-                    f011 = fc_array(iz+1, iy+1, ix  ),
-                    f100 = fc_array(iz  , iy  , ix+1),
-                    f101 = fc_array(iz+1, iy  , ix+1),
-                    f110 = fc_array(iz  , iy+1, ix+1),
-                    f111 = fc_array(iz+1, iy+1, ix+1);
-                mffab(i,j,k) = static_cast<amrex::Real>(ablastr::math::trilinear_interp<double>
-                    (xx0, xx0+file_dx, xx1, xx1+file_dy, xx2, xx2+file_dz,
-                     f000, f001, f010, f011, f100, f101, f110, f111,
-                     x0, x1, x2));
-#endif
-
+                amrex::RealVect pos
+                    (AMREX_D_DECL(problo[0] + ii*dx[0],
+                                  problo[1] + j *dx[1],
+                                  problo[2] + k *dx[2]));
+                mffab(i,j,k) = external_field_view(pos);
             }
 
         ); // End ParallelFor
 
     } // End loop over boxes.
-
-} // End function WarpX::ReadExternalFieldFromFile
-#else // WARPX_USE_OPENPMD && (AMREX_SPACEDIM>1) && !defined(WARPX_DIM_XZ)
-void
-WarpX::ReadExternalFieldFromFile (const std::string& , amrex::MultiFab* , const std::string& , const std::string& )
-{
-#if AMREX_SPACEDIM == 1
-    WARPX_ABORT_WITH_MESSAGE("Reading fields from openPMD files is not supported in 1D");
-#elif defined(WARPX_DIM_XZ)
-    WARPX_ABORT_WITH_MESSAGE("Reading from openPMD for external fields is not known to work with XZ (see #3828)");
-#elif !defined(WARPX_USE_OPENPMD)
-    WARPX_ABORT_WITH_MESSAGE("OpenPMD field reading requires OpenPMD support to be enabled");
 #endif
 }
-#endif // WARPX_USE_OPENPMD

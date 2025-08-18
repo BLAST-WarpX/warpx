@@ -1158,6 +1158,13 @@ Particle initialization
       ``electrons.density_function(x,y,z) = "n0+n0*x**2*1.e12"`` where ``n0`` is a
       user-defined constant, see above. WARNING: where ``density_function(x,y,z)`` is close to zero, particles will still be injected between ``xmin`` and ``xmax`` etc., with a null weight. This is undesirable because it results in useless computing. To avoid this, see option ``density_min`` below.
 
+    * ``read_from_file``: load the density profile from an openPMD file.
+      An additional parameter, indicating the path of an openPMD data file,
+      ``<species_name>.read_density_from_path`` must be specified. The openPMD
+      file must contain a field named ``density``. See
+      `this file <https://github.com/BLAST-WarpX/WarpX/Examples/Tests/load_density/inputs_test_3d_load_density_prepare.py>`__
+      for an example of how to prepare the openPMD data file.
+
 * ``<species_name>.flux_profile`` (`string`)
     Defines the expression of the flux, when using ``<species_name>.injection_style=NFluxPerCell``
 
