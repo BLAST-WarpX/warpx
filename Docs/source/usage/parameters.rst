@@ -103,6 +103,12 @@ Overall simulation parameters
         - ``algo.current_deposition = villasenor``
         - ``algo.current_deposition = esirkepov`` (Not compatible with ``implicit_evolve.use_mass_matrices_jacobian = true``.)
 
+      - **Numerical stability:**
+
+        - Rhobust to finite-grid instability (does not require cells that resolve the plasma Debye length).
+        - Numerically stable for large :math:`\Delta t` (does not require resolving the plasma period or satisfying the CFL condition for light waves).
+        - Practical limits on :math:`\Delta t` set by solver efficiency, number of particle cell crossings, and physics resolution.
+
       - **Nonlinear solvers:**
         Advancing the implicit system in time requires solving a nonlinear system. The nonlinear solver options are `picard` and `newton`.
 
@@ -115,18 +121,18 @@ Overall simulation parameters
           - ``picard.maximum_iterations`` (`int`, default: 100)
           - ``picard.relative_tolerance`` (`float`, default: 1.0e-6)
           - ``picard.absolute_tolerance`` (`float`, default: 0.0)
-          - ``picard.diagnostic_file`` (`string`, default: None): File to write solver diagnostic information.
-          - ``picard.diagnostic_interval`` (`int`, default: 1): How often to write solver diagnostics.
+          - ``picard.diagnostic_file`` (`string`, default: None)
+          - ``picard.diagnostic_interval`` (`int`, default: 1)
 
-        - ``implicit_evolve.nonlinear_solver = newton``: Use a PS-JFNK method. Required for large time steps, but effiency often relies on preconditioning and/or using ``implicit_evolve.use_mass_matrices_jacobian = true``.
+        - ``implicit_evolve.nonlinear_solver = newton``: Use a PS-JFNK method. Required for large time steps, but efficiency often relies on preconditioning and/or using ``implicit_evolve.use_mass_matrices_jacobian = true``.
 
           - ``newton.verbose`` (`bool`, default: true)
           - ``newton.require_convergence`` (`bool`, default: true)
           - ``newton.maximum_iterations`` (`int`, default: 100)
           - ``newton.relative_tolerance`` (`float`, default: 1.0e-6)
           - ``newton.absolute_tolerance`` (`float`, default: 0.0)
-          - ``newton.diagnostic_file`` (`string`, default: None): File to write solver diagnostic information.
-          - ``newton.diagnostic_interval`` (`int`, default: 1): How often to write solver diagnostics.
+          - ``newton.diagnostic_file`` (`string`, default: None)
+          - ``newton.diagnostic_interval`` (`int`, default: 1)
 
           - The PS-JFNK solver uses GMRES to solve the linear system at each nonlinear iteration:
 
@@ -145,7 +151,7 @@ Overall simulation parameters
           - ``implicit_evolve.particle_tolerance`` (`float`, default: 1.e-10)
 
         - ``implicit_evolve.use_mass_matrices_jacobian`` (`bool`, default: false).
-          When `true`, the plasma current density is computed using the mass matrices during the linear stage of PS-JFNK, replacing direct particle calculations.
+          When `true`, the plasma current density is computed using the mass matrices during the linear stage of PS-JFNK, replacing direct particle calculations. This can enable large speed ups for simulations with many particles.
 
         - ``implicit_evolve.use_mass_matrices_pc`` (`bool`, default: false).
           When `true`, the plasma response is captured in the preconditioner.
@@ -153,7 +159,7 @@ Overall simulation parameters
 
         - ``jacobian.pc_type`` (`string`, default: None). A preconditioner can be used to minimize the number of linear GMRES iterations. There are two options:
 
-          - ``jacobian.pc_type = pc_curl_curl_mlmg``: Use the AMReX MLMG solver for the curl curl formulation of Maxwell's equations. This method solves the following equation:
+          - ``jacobian.pc_type = pc_curl_curl_mlmg``: Use the AMReX MLMG solver for the curl curl formulation of Maxwell's equations. This preconditioner solves the following equation:
 
             .. math::
 
@@ -173,18 +179,12 @@ Overall simulation parameters
             - ``pc_curl_curl_mlmg.relative_tolerance`` (`float`, default: 1.0e-4)
             - ``pc_curl_curl_mlmg.absolute_tolerance`` (`float`, default: 1.0e-16)
 
-          - ``jacobian.pc_type = pc_jacobi``: Use the Point-Jacobi method. This method only captures the plasma response via the diagonal mass matrices.
+          - ``jacobian.pc_type = pc_jacobi``: Use the Point-Jacobi method. This preconditioner only captures the plasma response via the diagonal mass matrices.
 
             - ``pc_jacobi.verbose`` (`bool`, default: true)
             - ``pc_jacobi.max_iter`` (`int`, default: 10)
             - ``pc_jacobi.relative_tolerance`` (`float`, default: 1.0e-4)
             - ``pc_jacobi.absolute_tolerance`` (`float`, default: 1.0e-16)
-
-      - **Numerical stability:**
-
-        - Rhobust to finite-grid instability (does not require cells that resolve the plasma Debye length).
-        - Numerically stable for large :math:`\Delta t` (does not require resolving the plasma period or CFL condition for light waves).
-        - Practical limits on :math:`\Delta t` set by solver efficiency, number of particle cell crossings, and physics resolution.
 
       - **References:** (WarpX includes relativistic extensions not discusssed in references.)
 
@@ -194,9 +194,8 @@ Overall simulation parameters
 
     * ``semi_implicit_em``: Use an approximately energy conserving semi-implicit electromagnetic solver.
 
-      - Difference with ``theta_implicit_em`` is that light waves are treated explicit just as in the standard FDTD method.
+      - Difference with ``theta_implicit_em`` is that light waves are treated explicit just as in the standard FDTD method. Consequently, this method has the CFL limitation :math:`c\Delta t < 1/\sqrt( \sum_i 1/\Delta x_i^2 )`.
       - Particles are treated implicitly, and all of the comments for ``theta_implicit_em`` above apply here as well (except that :math:`\theta` is fixed to 0.5).
-      - This method has the CFL limitation :math:`c\Delta t < 1/\sqrt( \sum_i 1/\Delta x_i^2 )`.
       - The method is described in `Chen et al., A semi-implicit, energy- and charge-conserving particle-in-cell algorithm for the relativistic Vlasov-Maxwell equations <https://doi.org/10.1016/j.jcp.2020.109228>`__.
 
 
