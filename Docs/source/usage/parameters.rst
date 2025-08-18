@@ -88,22 +88,23 @@ Overall simulation parameters
 
     * ``theta_implicit_em``: Use a :math:`\theta`-implicit electromagnetic solver.
 
-      - **Time-biasing parameter:** :math:`\theta\in[0.5,1.0]`
+      - **Time-biasing parameter:**
+        The fields (:math:`\textbf{E}` & :math:`\textbf{B}`) used to advance the system are computed at time :math:`t^{n+\theta}`: :math:`\mathbf{E}^{n+\theta}=\left(1-\theta\right)\mathbf{E}^n + \theta\mathbf{E}^{n+1}`, where :math:`\theta\in[0.5,1.0]`.
 
         - ``implicit_evolve.theta`` (`float`, default: 0.5)
-        - Fields (:math:`\textbf{E}` & :math:`\textbf{B}`) used to advance system computed at time :math:`t^{n+\theta}`: :math:`\mathbf{E}^{n+\theta}=\left(1-\theta\right)\mathbf{E}^n + \theta\mathbf{E}^{n+1}`.
         - :math:`\theta = 0.5`: Exact energy conservation.
         - :math:`\theta = 1.0`: Maximal damping of high-k modes.
 
       - **Field gather and current depositions:**
+        Exact energy conservation requires matching gather and deposition.
+        The following depositions support this:
 
-        - Exact energy conservation requires matching gather and deposition. The following depositions support this:
-
-          - ``algo.current_deposition = direct``
-          - ``algo.current_deposition = villasenor``
-          - ``algo.current_deposition = esirkepov`` (Not compatible with ``implicit_evolve.use_mass_matrices_jacobian = true``.)
+        - ``algo.current_deposition = direct``
+        - ``algo.current_deposition = villasenor``
+        - ``algo.current_deposition = esirkepov`` (Not compatible with ``implicit_evolve.use_mass_matrices_jacobian = true``.)
 
       - **Nonlinear solvers:**
+        Advancing the implicit system in time requires solving a nonlinear system. The nonlinear solver options are `picard` and `newton`.
 
         - ``implicit_evolve.nonlinear_solver`` (`string`, default: None)
 
@@ -114,6 +115,8 @@ Overall simulation parameters
             - ``picard.maximum_iterations`` (`int`, default: 100)
             - ``picard.relative_tolerance`` (`float`, default: 1.0e-6)
             - ``picard.absolute_tolerance`` (`float`, default: 0.0)
+            - ``picard.diagnostic_file`` (`string`, default: None): File to write solver diagnostic information.
+            - ``picard.diagnostic_interval`` (`int`, default: 1): How often to write solver diagnostics.
 
           - ``implicit_evolve.nonlinear_solver = newton``: Use a PS-JFNK method. Required for large time steps, but effiency often relies on preconditioning and/or using ``implicit_evolve.use_mass_matrices_jacobian = true``.
 
@@ -122,8 +125,11 @@ Overall simulation parameters
             - ``newton.maximum_iterations`` (`int`, default: 100)
             - ``newton.relative_tolerance`` (`float`, default: 1.0e-6)
             - ``newton.absolute_tolerance`` (`float`, default: 0.0)
+            - ``newton.diagnostic_file`` (`string`, default: None): File to write solver diagnostic information.
+            - ``newton.diagnostic_interval`` (`int`, default: 1): How often to write solver diagnostics.
 
-        - **PS-JFNK specific solver options:** (``implicit_evolve.nonlinear_solver = newton``)
+        - **PS-JFNK solver specific options:**
+          The PS-JFNK solver (``implicit_evolve.nonlinear_solver = newton``) has a variety of additional parameters and options.
 
           - At each iteration in the PS-JFNK process, each particle is self-consistently updated for fixed :math:`\textbf{E}` and :math:`\textbf{B}` on the grid using a Picard method. The options for this Picard solve are set by:
 
@@ -145,6 +151,35 @@ Overall simulation parameters
             - ``gmres.relative_tolerance`` (`float`, default: 1.0e-4)
             - ``gmres.absolute_tolerance`` (`float`, default: 0.0)
 
+          - ``jacobian.pc_type`` (`string`, default: None). There are currently two options for a preconditioner used to minimize the linear GMRES iterations.
+
+            - ``jacobian.pc_type = pc_curl_curl_mlmg``: Use the AMReX MLMG solver for the curl curl formulation of Maxwell's equations. This method solves the following equation:
+
+              .. math::
+
+                 \nabla \times \left( \alpha\nabla\times\textbf{E} \right) + \boldsymbol{\beta}\cdot\textbf{E} = \textbf{b},
+
+              where :math:`\alpha=\theta^2\Delta t^2c^2` is a scalar and :math:`\boldsymbol{\beta}` is a diagonal matrix that scales the components of :math:`\textbf{E}`.
+
+                - Default: :math:`\boldsymbol\beta = \mathbb{I}`, giving implicit Maxwell equations, suitable for time steps that under-resolve light waves (:math:`c\Delta t > 1/\sqrt{\left(\sum_i1/\Delta x_i^2\right)}`).
+                - ``implicit_evolve.use_mass_matrices_pc = true``: :math:`\boldsymbol\beta` also includes plasma response via the diagonal mass matrices, enabling time steps that under-resolve the plasma period (:math:`\omega_{pe}\Delta t > 1`).
+
+              - ``pc_curl_curl_mlmg.verbose`` (`bool`, default: true)
+              - ``pc_curl_curl_mlmg.bottom_verbose`` (`bool`, default: false)
+              - ``pc_curl_curl_mlmg.agglomeration`` (`bool`, default: true)
+              - ``pc_curl_curl_mlmg.consolidation`` (`bool`, default: true)
+              - ``pc_curl_curl_mlmg.max_iter`` (`int`, default: 10)
+              - ``pc_curl_curl_mlmg.max_coarsening_level`` (`int`, default: 30)
+              - ``pc_curl_curl_mlmg.relative_tolerance`` (`float`, default: 1.0e-4)
+              - ``pc_curl_curl_mlmg.absolute_tolerance`` (`float`, default: 1.0e-16)
+
+            - ``jacobian.pc_type = pc_jacobi``: Use the Point-Jacobi method. This method only captures diagonal response of particles in J via the mass matrices.
+
+              - ``pc_jacobi.verbose`` (`bool`, default: true)
+              - ``pc_jacobi.max_iter`` (`int`, default: 10)
+              - ``pc_jacobi.relative_tolerance`` (`float`, default: 1.0e-4)
+              - ``pc_jacobi.absolute_tolerance`` (`float`, default: 1.0e-16)
+
       - **Numerical stability:**
 
         - Rhobust to finite-grid instability (does not require cells that resolve the plasma Debye length).
@@ -161,7 +196,7 @@ Overall simulation parameters
 
       - Difference with ``theta_implicit_em`` is that light waves are treated explicit just as in the standard FDTD method.
       - Particles are treated implicitly, and all of the comments for ``theta_implicit_em`` above apply here as well (except that :math:`\theta` is fixed to 0.5).
-      - This method has the CFL limitation :math:`\Delta t < c/\sqrt( \sum_i 1/\Delta x_i^2 )`.
+      - This method has the CFL limitation :math:`c\Delta t < 1/\sqrt( \sum_i 1/\Delta x_i^2 )`.
       - The method is described in `Chen et al., A semi-implicit, energy- and charge-conserving particle-in-cell algorithm for the relativistic Vlasov-Maxwell equations <https://doi.org/10.1016/j.jcp.2020.109228>`__.
 
 
