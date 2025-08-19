@@ -1,0 +1,7 @@
+FILE=inputs_test_3d_field_probe_line_base
+
+warpx.do_moving_window = 1
+warpx.moving_window_dir = z
+warpx.moving_window_v = 1.0 # units of speed of light
+
+FP.do_moving_window_FP = 0

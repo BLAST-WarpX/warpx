@@ -1,0 +1,5 @@
+FILE=inputs_test_3d_field_probe_line_base
+
+warpx.do_moving_window = 0
+
+FP.do_moving_window_FP = 0
