@@ -441,22 +441,18 @@ PhysicalParticleContainer::Evolve (
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
-    //// whether this is an unsplit push (i.e., position_push_half is false)
-    //// or a split push in the first half (i.e., position_push_half is true
-    //// and momentum_push_skip is false, meaning that the momentum has not
-    //// been pushed yet)
-    //bool const unsplit_or_split_first_half = (
-    //    !position_push_half ||
-    //    (position_push_half && !momentum_push_skip)
-    //);
-    //// whether this is an unsplit push (i.e., position_push_half is false)
-    //// or a split push in the second half (i.e., position_push_half is true
-    //// and momentum_push_skip is true, meaning that the momentum has already
-    //// been pushed - in the first half)
-    //bool const unsplit_or_split_second_half = (
-    //    !position_push_half ||
-    //    (position_push_half && momentum_push_skip)
-    //);
+    // Whether this is an unsplit push (i.e., position_push_half is false)
+    bool const push_unsplit = !position_push_half;
+
+    // Whether this is a split push in the first half
+    // (i.e., position_push_half is true and momentum_push_skip is false,
+    // meaning that the momentum has not been pushed yet)
+    bool const push_split_first_half = (position_push_half && !momentum_push_skip);
+
+    // Whether this is a split push in the second half
+    // (i.e., position_push_half is true and momentum_push_skip is true,
+    // meaning that the momentum has already been pushed in the first half)
+    bool const push_split_second_half = (position_push_half && momentum_push_skip);
 
     const iMultiFab* current_masks = WarpX::CurrentBufferMasks(lev);
     const iMultiFab* gather_masks = WarpX::GatherBufferMasks(lev);
@@ -472,6 +468,14 @@ PhysicalParticleContainer::Evolve (
     amrex::MultiFab & Bx = *fields.get(FieldType::Bfield_aux, Direction{0}, lev);
     amrex::MultiFab & By = *fields.get(FieldType::Bfield_aux, Direction{1}, lev);
     amrex::MultiFab & Bz = *fields.get(FieldType::Bfield_aux, Direction{2}, lev);
+
+    // Auxiliary booleans
+    bool const deposit_charge = (
+        has_rho &&
+        !skip_deposition &&
+        !do_not_deposit &&
+        (push_unsplit || push_split_first_half)
+    );
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel
@@ -546,7 +550,7 @@ PhysicalParticleContainer::Evolve (
 
             const long np_to_deposit = has_J_buf ? nfine_deposit : np;
 
-            if (has_rho && ! skip_deposition && ! do_not_deposit) {
+            if (deposit_charge) {
                 // Deposit charge before particle push, in component 0 of MultiFab rho.
 
                 const int* const AMREX_RESTRICT ion_lev = (do_field_ionization)?
@@ -684,7 +688,7 @@ PhysicalParticleContainer::Evolve (
                 } // end of "if electrostatic_solver_id == ElectrostaticSolverAlgo::None"
             } // end of "if do_not_push"
 
-            if (has_rho && ! skip_deposition && ! do_not_deposit) {
+            if (deposit_charge) {
                 // Deposit charge after particle push, in component 1 of MultiFab rho.
                 // (Skipped for electrostatic solver, as this may lead to out-of-bounds)
                 if (WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::None) {
