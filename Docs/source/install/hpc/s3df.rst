@@ -196,12 +196,12 @@ Create and move into run folder for each new test:
 
 .. code-block:: bash
 
-  mkdir run_test  
-  cd run_test 
+  mkdir run_test
+  cd run_test
 
 Copy input file and run:
 
 .. code-block:: bash
 
-  cp $HOME/warpx/Examples/Physics_applications/beam_beam_collision/inputs_test_3d_beam_beam_collision . 
-  mpirun -np 4 $HOME/warpx/build/bin/warpx.3d inputs_test_3d_beam_beam_collision 
+  cp $HOME/warpx/Examples/Physics_applications/beam_beam_collision/inputs_test_3d_beam_beam_collision .
+  mpirun -np 4 $HOME/warpx/build/bin/warpx.3d inputs_test_3d_beam_beam_collision
