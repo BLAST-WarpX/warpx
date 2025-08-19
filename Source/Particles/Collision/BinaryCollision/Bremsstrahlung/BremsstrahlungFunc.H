@@ -284,8 +284,7 @@ public:
             amrex::ParticleReal kdsigdk_i;
             amrex::ParticleReal dk;
             amrex::ParticleReal k_ave;
-            int i;
-            for (i=i0_cut+1; i < nkoT1; i++) {
+            for (int i=i0_cut+1; i < nkoT1; i++) {
                 dk = (m_koT1_grid[i] - koT1_grid_im1);
                 k_ave = (m_koT1_grid[i] + koT1_grid_im1)*0.5_prt;
                 kdsigdk_i = w0*m_kdsigdk[index][i] + (1.0_prt - w0)*m_kdsigdk[index+1][i];
