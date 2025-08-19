@@ -148,6 +148,7 @@ todo_include_todos = False
 # a list of builtin themes.
 #
 html_theme = "sphinx_rtd_theme"
+html_logo = "_static/WarpX_Logo.png"
 
 numfig = True
 math_eqref_format = "{number}"

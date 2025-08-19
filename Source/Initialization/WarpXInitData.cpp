@@ -620,14 +620,20 @@ WarpX::PrintMainPICparameters ()
       if (time_dependency_J == TimeDependencyJ::Linear){
         amrex::Print() << "                      |   - time_dependency_J = linear \n";
       }
-      if (time_dependency_J == TimeDependencyJ::Constant){
+      else if (time_dependency_J == TimeDependencyJ::Constant){
         amrex::Print() << "                      |   - time_dependency_J = constant \n";
+      }
+      else if (time_dependency_J == TimeDependencyJ::Quadratic){
+        amrex::Print() << "                      |   - time_dependency_J = quadratic \n";
       }
       if (time_dependency_rho == TimeDependencyRho::Linear){
         amrex::Print() << "                      |   - time_dependency_rho = linear \n";
       }
-      if (time_dependency_rho == TimeDependencyRho::Constant){
+      else if (time_dependency_rho == TimeDependencyRho::Constant){
         amrex::Print() << "                      |   - time_dependency_rho = constant \n";
+      }
+      else if (time_dependency_rho == TimeDependencyRho::Quadratic){
+        amrex::Print() << "                      |   - time_dependency_rho = quadratic \n";
       }
     }
     if (fft_do_time_averaging){
