@@ -1,7 +1,7 @@
 .. _building-s3df:
 
 S3DF (SLAC)
-=============
+===========
 
 The S3DF cluster is located at SLAC.
 
@@ -11,10 +11,10 @@ Introduction
 
 If you are new to this system, **please see the following resources**:
 
-* `S3DF documentation <https://s3df.slac.stanford.edu/#/>`__
+* `S3DF documentation <https://s3df.slac.stanford.edu>`__
 * Batch system: `Slurm <https://github.com/slaclab/sdf-docs/blob/main/batch-compute.md>`__
 * Filesystem locations:
-    * User folder: ``$HOME>`` (25GB on Weka file system)
+    * User folder: ``$HOME`` (25GB on Weka file system)
     * Scratch folder: ``/sdf/scratch/<username_initial>/<username>`` (100GB on Weka file system)
     * Group storage: Depends on your group, see e.g. information for the ATLAS group `here <https://usatlas.readthedocs.io/projects/af-docs/en/latest/sshlogin/ssh2SLAC/>`__
 
@@ -27,7 +27,7 @@ Installation
 
 
 1) Prerequisites
-^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^
 
 
 - S3DF login to a node with access to A100 GPUs (via SLURM job or interactive session).
@@ -61,8 +61,8 @@ For other GPUs, adjust ``-DCMAKE_CUDA_ARCHITECTURES``:
 
     # A) create env (example set; versions can vary by site repos)
 
-    conda create -n warpx-gpu-test -y python=3.11
-    conda activate warpx-gpu-test
+    conda create -n warpx-gpu -y python=3.11
+    conda activate warpx-gpu
 
     #Get the full CUDA toolkit in your conda env.
     conda install -c nvidia -y "cuda=12.9.*"
@@ -73,11 +73,11 @@ For other GPUs, adjust ``-DCMAKE_CUDA_ARCHITECTURES``:
     # B) Install build tools
     conda install -c conda-forge -y \
       "cmake>=3.27" ninja make pkg-config git \
-      openmpi ucx mpi4py \
+      openmpi ucx mpi4py=*=mpi_openmpi* \
       gcc_linux-64=13 gxx_linux-64=13
 
-    # C) Install ADIOS2 with OpenMPI (so we can use openpmd_backend = bp)
-    conda install -c conda-forge "adios2=*=mpi_openmpi*"
+    # C) Install ADIOS2 and HDF5 with OpenMPI (so we can use openpmd_backend = bp or = h5)
+    conda install -c conda-forge "adios2=*=mpi_openmpi* hdf5=*=mpi_openmpi*"
 
     # D) Verify build tools
     which cmake && cmake --version     # should show cmake >= 3.24 from your env
@@ -96,7 +96,7 @@ For other GPUs, adjust ``-DCMAKE_CUDA_ARCHITECTURES``:
 ^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
-
+  cd $HOME
   git clone https://github.com/BLAST-WarpX/warpx.git
   cd warpx
 
@@ -134,12 +134,12 @@ Recent NVTX installs the header under ``nvtx3/nvToolsExt.h``. Add it to your inc
 
 
 5) Configure with CMake (CUDA + MPI, 3D)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
 .. code-block:: bash
 
-  "$CONDA_PREFIX/bin/cmake" -S . -B build \
+  cmake -S . -B build \
     -DWarpX_APP=ON \
     -DWarpX_DIMS="3" \
     -DWarpX_COMPUTE=CUDA \
@@ -171,19 +171,37 @@ Recent NVTX installs the header under ``nvtx3/nvToolsExt.h``. Add it to your inc
 
 .. code-block:: bash
 
-  "$CONDA_PREFIX/bin/cmake" --build build -j 8
+  cmake --build build -j 8
 
 
 
 7) Run (MPI + GPU)
 ^^^^^^^^^^^^^^^^^^
 
-From the build dir:
+Interactive
+"""""""""""
+Request resources, for example:
 
 .. code-block:: bash
 
-  mkdir run_test  # create run folder for each new test!
-  cp build/bin/warpx.3d run_test/  # copy warpx executable to each run folder!
-  cp Examples/Physics_applications/beam_beam_collision/inputs_test_3d_beam_beam_collision run_test/ #copy input file!
-  cd run_test/
-  mpirun -np 4 ./warpx.3d inputs_test_3d_beam_beam_collision # run!
+    srun --pty --nodes=1 --ntasks-per-node=4 --cpus-per-task=8 --gpus=4 --mem=100GB  --time=2:00:00 --partition=ampere --account=<account> bash
+
+Move to scratch:
+
+.. code-block:: bash
+
+  cd /sdf/scratch/<first_letter_of_username>/<username>
+
+Create and move into run folder for each new test:
+
+.. code-block:: bash
+
+  mkdir run_test  
+  cd run_test 
+
+Copy input file and run:
+
+.. code-block:: bash
+
+  cp $HOME/warpx/Examples/Physics_applications/beam_beam_collision/inputs_test_3d_beam_beam_collision . 
+  mpirun -np 4 $HOME/warpx/build/bin/warpx.3d inputs_test_3d_beam_beam_collision 
