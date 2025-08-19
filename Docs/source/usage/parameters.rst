@@ -186,7 +186,7 @@ Overall simulation parameters
             - ``pc_jacobi.relative_tolerance`` (`float`, default: 1.0e-4)
             - ``pc_jacobi.absolute_tolerance`` (`float`, default: 1.0e-16)
 
-      - **References:** (WarpX includes relativistic extensions not discusssed in references.)
+      - **References:** (WarpX includes relativistic extensions not discussed in references.)
 
         - `Angus et al., On numerical energy conservation for an implicit particle-in-cell method coupled with a binary Monte-Carlo algorithm for Coulomb collisions <https://doi.org/10.1016/j.jcp.2022.111030>`__.
         - `Angus et al., An implicit particle code with exact energy and charge conservation for electromagnetic studies of dense plasmas <https://doi.org/10.1016/j.jcp.2023.112383>`__.
