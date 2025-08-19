@@ -395,6 +395,9 @@ FieldProbe::ComputeDiags (int step) {
     const amrex::Geometry& gm = warpx.Geom(0);
     const ParticleInDomainChecker inDomainChecker{gm.ProbLoArray(),
                                                   gm.ProbHiArray()};
+
+    // get number of mesh-refinement levels
+    const auto nLevel = warpx.finestLevel() + 1;
     using ablastr::fields::Direction;
 
     // loop over refinement levels
@@ -456,26 +459,25 @@ FieldProbe::ComputeDiags (int step) {
             auto setPosition = SetParticlePosition<FieldProbePIdx>(pti);
 
             auto const np = pti.numParticles();
-            const auto temp_warpx_moving_window = WarpX::moving_window_dir;
-
-            auto const np = pti.numParticles();
             if (update_particles_moving_window) {
-                const auto temp_warpx_moving_window = WarpX::moving_window_dir;
-                amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(long ip) {
-                    amrex::ParticleReal xp, yp, zp;
-                    getPosition(ip, xp, yp, zp);
-                    if (temp_warpx_moving_window == 0) {
-                        setPosition(ip, xp + move_dist, yp, zp);
-                    }
-                    if (temp_warpx_moving_window == 1) {
-                        setPosition(ip, xp, yp + move_dist, zp);
-                    }
+                            const auto temp_warpx_moving_window =
+                                WarpX::moving_window_dir;
+                            amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(
+                                                       long ip) {
+                                amrex::ParticleReal xp, yp, zp;
+                                getPosition(ip, xp, yp, zp);
+                                if (temp_warpx_moving_window == 0) {
+                                    setPosition(ip, xp + move_dist, yp, zp);
+                                }
+                                if (temp_warpx_moving_window == 1) {
+                                    setPosition(ip, xp, yp + move_dist, zp);
+                                }
 #if defined(WARPX_ZINDEX)
-                    if (temp_warpx_moving_window == WARPX_ZINDEX) {
-                        setPosition(ip, xp, yp, zp + move_dist);
-                    }
+                                if (temp_warpx_moving_window == WARPX_ZINDEX) {
+                                    setPosition(ip, xp, yp, zp + move_dist);
+                                }
 #endif
-                });
+                            });
             }
 
             const auto& arrEx = Ex[pti].array();
