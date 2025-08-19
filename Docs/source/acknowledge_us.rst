@@ -34,12 +34,84 @@ Please add the following sentence to your publications, it helps contributors ke
 Latest WarpX reference
 **********************
 
-If your project leads to a scientific publication, please consider citing the paper below.
+If your project leads to a scientific publication, please consider citing all co-authors via our persisten Zenodo DOI:
 
-- Fedeli L, Huebl A, Boillod-Cerneux F, Clark T, Gott K, Hillairet C, Jaure S, Leblanc A, Lehe R, Myers A, Piechurski C, Sato M, Zaim N, Zhang W, Vay J-L, Vincenti H.
-  **Pushing the Frontier in the Design of Laser-Based Electron Accelerators with Groundbreaking Mesh-Refined Particle-In-Cell Simulations on Exascale-Class Supercomputers**.
-  *SC22: International Conference for High Performance Computing, Networking, Storage and Analysis (SC)*. ISSN:2167-4337, pp. 25-36, Dallas, TX, US, 2022.
-  `DOI:10.1109/SC41404.2022.00008 <https://doi.org/10.1109/SC41404.2022.00008>`__ (`preprint here <https://www.computer.org/csdl/proceedings-article/sc/2022/544400a025/1I0bSKaoECc>`__)
+.. tab-set::
+
+   .. tab-item:: LateX: Bibtex
+
+      .. code-block:: bibtex
+
+      @misc{WarpX,
+  author       = {Vay, Jean-Luc and
+                  Almgren, Ann and
+                  Amorim, Lígia Diana and
+                  Andriyash, Igor and
+                  Angus, Justin Ray and
+                  Belkin, Daniel and
+                  Bizzozero, David and
+                  Blelly, Aurore and
+                  Clark, Stephen Eric and
+                  Fedeli, Luca and
+                  Formenti, Arianna and
+                  Garten, Marco and
+                  Ge, Lixin and
+                  Gott, Kevin and
+                  Harrison, Cyrus and
+                  Huebl, Axel and
+                  Giacomel, Lorenzo and
+                  Groenewald, Roelof E. and
+                  Grote, David and
+                  Gu, Junmin and
+                  Haseeb, Muhammad and
+                  Jambunathan, Revathi and
+                  Klion, Hannah and
+                  Kumar, Prabhat and
+                  Thévenet, Maxence and
+                  Richardson, Glenn and
+                  Shapoval, Olga and
+                  Lehe, Remi and
+                  Loring, Burlen and
+                  Miller, Phil and
+                  Myers, Andrew and
+                  Rheaume, Elisa and
+                  Rowan, Michael E. and
+                  Sandberg, Ryan Thor and
+                  Scherpelz, Peter and
+                  Weichman, Kale and
+                  Yang, Eloise and
+                  Zaim, Neïl and
+                  Zhang, Weiqun and
+                  Zhao, Yinjian and
+                  Zhu, Kevin Z. and
+                  Zoni, Edoardo},
+          title        = {WarpX: an advanced electromagnetic & electrostatic Particle-In-Cell code},
+          year         = 2018,
+          publisher    = {Zenodo},
+          version      = {25.08},
+          doi          = {10.5281/zenodo.16750069},
+          url          = {https://doi.org/10.5281/zenodo.16750069},
+          swhid        = {swh:1:dir:12d584a99e9625391d4bc82fbbca1a089652f3f8
+                           ;origin=https://doi.org/10.5281/zenodo.4571577;vis
+                           it=swh:1:snp:42a98189c61704a75545d176f00552bd43071
+                           d45;anchor=swh:1:rel:5843c56c1006a8673ba5ea31e0fc8
+                           0fd36afcf45;path=BLAST-WarpX-warpx-6680268
+                          },
+}
+         title        = {{openPMD: A meta data standard for particle and mesh based data}},
+         year         = 2015,
+         publisher    = {Zenodo},
+         doi          = {10.5281/zenodo.591699},
+         url          = {https://www.openPMD.org},
+         howpublished = {https://github.com/openPMD}
+       }
+
+   .. tab-item:: Word
+
+      ...
+
+Add version if needed...
+
 
 .. _acknowledge_warpx_all_refs:
 
@@ -72,6 +144,12 @@ If your project uses a specific algorithm or component, please consider citing t
   **Hybrid Beamline Element ML-Training for Surrogates in the ImpactX Beam-Dynamics Code**.
   14th International Particle Accelerator Conference (IPAC'23), WEPA101, 2023.
   `DOI:10.18429/JACoW-IPAC2023-WEPA101 <https://doi.org/10.18429/JACoW-IPAC2023-WEPA101>`__
+
+- Fedeli L, Huebl A, Boillod-Cerneux F, Clark T, Gott K, Hillairet C, Jaure S, Leblanc A, Lehe R, Myers A, Piechurski C, Sato M, Zaim N, Zhang W, Vay J-L, Vincenti H.
+  **Pushing the Frontier in the Design of Laser-Based Electron Accelerators with Groundbreaking Mesh-Refined Particle-In-Cell Simulations on Exascale-Class Supercomputers**.
+  *SC22: International Conference for High Performance Computing, Networking, Storage and Analysis (SC)*. ISSN:2167-4337, pp. 25-36, Dallas, TX, US, 2022.
+  **2022 ACM Gordon Bell Prize Winner**,
+  `DOI:10.1109/SC41404.2022.00008 <https://doi.org/10.1109/SC41404.2022.00008>`__ (`preprint here <https://www.computer.org/csdl/proceedings-article/sc/2022/544400a025/1I0bSKaoECc>`__)
 
 - Huebl A, Lehe R, Zoni E, Shapoval O, Sandberg R T, Garten M, Formenti A, Jambunathan R, Kumar P, Gott K, Myers A, Zhang W, Almgren A, Mitchell C E, Qiang J, Sinn A, Diederichs S, Thevenet M, Grote D, Fedeli L, Clark T, Zaim N, Vincenti H, Vay JL.
   **From Compact Plasma Particle Sources to Advanced Accelerators with Modeling at Exascale**.
