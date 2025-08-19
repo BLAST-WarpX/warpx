@@ -411,18 +411,9 @@ void WarpXOpenPMDPlot::flushCurrent (bool isBTD) const
 {
      WARPX_PROFILE("WarpXOpenPMDPlot::flushCurrent");
 
-     auto hasOption = m_OpenPMDoptions.find("FlattenSteps");
-    const bool flattenSteps = isBTD && (m_Series->backend() == "ADIOS2") && (hasOption != std::string::npos);
-
      openPMD::Iteration currIteration = GetIteration(m_CurrentStep, isBTD);
-     if (flattenSteps) {
-         // delayed until all fields and particles are registered for flush
-         // and dumped once via flattenSteps
-         currIteration.seriesFlush(  "adios2.engine.preferred_flush_target = \"buffer\"" );
-     }
-     else {
-         currIteration.seriesFlush();
-     }
+
+     currIteration.seriesFlush();
 }
 
 std::string
