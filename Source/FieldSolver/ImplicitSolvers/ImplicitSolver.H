@@ -9,7 +9,6 @@
 
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "NonlinearSolvers/NonlinearSolverLibrary.H"
-#include "Python/callbacks.H"
 
 #include <AMReX_Array.H>
 #include <AMReX_REAL.H>
