@@ -539,7 +539,7 @@ FieldProbe::ComputeDiags (int step) {
                                    arrEx, arrEy, arrEz, arrBx, arrBy, arrBz,
                                    Extype, Eytype, Eztype, Bxtype, Bytype,
                                    Bztype, dinv, xyzmin, lo, temp_modes,
-                                   temp_interp_order);
+                                   temp_interp_order, false);
                 }
 
                 // Calculate the Poynting Vector S
