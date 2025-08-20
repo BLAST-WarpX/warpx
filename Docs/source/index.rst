@@ -8,7 +8,7 @@ WarpX is an advanced **Particle-In-Cell** code.
 It supports many features including:
 
     - Multiple types of field solvers (incl. electromagnetic, electrostatic)
-    - Various grid geometries (Cartesian, cylindrical, spherical)
+    - Various grid geometries (1D/2D/3D Cartesian, cylindrical, spherical)
     - Multi-physics packages (incl. ionization, atomic and collisional physics, quantum electrodynamics)
     - Advanced numerical methods (incl. explicit and implicit PIC loop, mesh refinement, boosted-frame simulations, embedded boundaries)
 
