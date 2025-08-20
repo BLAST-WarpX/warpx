@@ -226,5 +226,61 @@
     "access_right": "open",
     "references": [
       "Please see https://warpx.readthedocs.io/en/latest/acknowledge_us.html#acknowledge-warpx-all-refs"
+    ],
+    "related_identifiers": [
+    {
+      "identifier": "https://warpx.readthedocs.io",
+      "relation_type": {
+        "id": "isdocumentedby",
+        "title": {
+          "en": "Is documented by"
+        }
+      },
+      "resource_type": {
+        "id": "publication-softwaredocumentation",
+        "title": {
+          "en": "Software documentation"
+        }
+      },
+      "scheme": "url"
+    },
+    {
+      "identifier": "https://blast-warpx.github.io",
+      "relation_type": {
+        "id": "isdescribedby",
+        "title": {
+          "en": "Is described by"
+        }
+      },
+      "resource_type": {
+        "id": "other",
+        "title": {
+          "en": "Other"
+        }
+      },
+      "scheme": "url"
+    }
+  ],
+  "custom_fields": {
+    "code:developmentStatus": {
+      "id": "active",
+      "title": {
+        "en": "Active"
+      }
+    },
+    "code:programmingLanguage": [
+      {
+        "id": "c++",
+        "title": {
+          "en": "C++"
+        }
+      },
+      {
+        "id": "python",
+        "title": {
+          "en": "Python"
+        }
+      }
     ]
+  }
 }
