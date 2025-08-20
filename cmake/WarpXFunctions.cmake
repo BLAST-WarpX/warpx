@@ -173,7 +173,7 @@ endmacro()
 
 # Set compile warnings
 #
-function(set_compile_warnings tgt)
+function(warpx_set_compile_warnings tgt)
     # On Windows, Clang -Wall aliases -Weverything; default is /W3
     if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND NOT WIN32)
         # list(APPEND CMAKE_CXX_FLAGS "-fsanitize=address") # address, memory, undefined

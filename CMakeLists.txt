@@ -839,7 +839,7 @@ endif()
 # Warnings ####################################################################
 #
 foreach(warpx_tgt IN LISTS _ALL_TARGETS)
-    set_compile_warnings(${warpx_tgt})
+    warpx_set_compile_warnings(${warpx_tgt})
 endforeach()
 
 
