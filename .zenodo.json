@@ -6,9 +6,19 @@
         "orcid": "0000-0002-0040-799X"
       },
       {
+        "affiliation": "Helion Energy, Inc.",
+        "name": "Acciarri, Marco",
+        "orcid": "0000-0003-2768-1259"
+      },
+      {
         "affiliation": "Lawrence Berkeley National Laboratory",
         "name": "Almgren, Ann",
         "orcid": "0000-0003-2103-312X"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory",
+        "name": "Antoun, Thierry",
+        "orcid": "0000-0002-1003-0698"
       },
       {
         "affiliation": "Lawrence Berkeley National Laboratory",
@@ -44,6 +54,10 @@
         "orcid": "0000-0002-0117-776X"
       },
       {
+        "affiliation": "Lawrence Berkeley National Laboratory, now DESY",
+        "name": "Dammak, Eya"
+      },
+      {
         "affiliation": "LIDYL, CEA-Universit\u00e9 Paris-Saclay, CEA Saclay",
         "name": "Fedeli, Luca",
         "orcid": "0000-0002-7215-4178"
@@ -69,16 +83,6 @@
         "orcid": "0000-0003-3244-5525"
       },
       {
-        "affiliation": "Lawrence Livermore National Laboratory",
-        "name": "Harrison, Cyrus",
-        "orcid": "0000-0001-8985-0906"
-      },
-      {
-        "affiliation": "Lawrence Berkeley National Laboratory",
-        "name": "Huebl, Axel",
-        "orcid": "0000-0003-1943-7141"
-      },
-      {
         "affiliation": "CERN",
         "name": "Giacomel, Lorenzo",
         "orcid": "0000-0002-1750-9757"
@@ -99,14 +103,29 @@
         "orcid": "0000-0002-1521-8534"
       },
       {
+        "affiliation": "Lawrence Livermore National Laboratory",
+        "name": "Harrison, Cyrus",
+        "orcid": "0000-0001-8985-0906"
+      },
+      {
         "affiliation": "Lawrence Berkeley National Laboratory",
         "name": "Haseeb, Muhammad",
         "orcid": "0000-0002-0697-6894"
       },
       {
         "affiliation": "Lawrence Berkeley National Laboratory",
+        "name": "Huebl, Axel",
+        "orcid": "0000-0003-1943-7141"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory",
         "name": "Jambunathan, Revathi",
         "orcid": "0000-0001-9432-2091"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory",
+        "name": "Kara-Mostefa, Ilian",
+        "orcid": "0009-0002-2736-5942"
       },
       {
         "affiliation": "Lawrence Berkeley National Laboratory",
@@ -119,21 +138,6 @@
         "orcid": "0000-0002-8454-7497"
       },
       {
-        "affiliation": "Lawrence Berkeley National Laboratory, now DESY",
-        "name": "Th\u00e9venet, Maxence",
-        "orcid": "0000-0001-7216-2277"
-      },
-      {
-        "affiliation": "Lawrence Berkeley National Laboratory",
-        "name": "Richardson, Glenn",
-        "orcid": "0000-0003-0313-4496"
-      },
-      {
-        "affiliation": "Lawrence Berkeley National Laboratory",
-        "name": "Shapoval, Olga",
-        "orcid": "0000-0003-4003-4507"
-      },
-      {
         "affiliation": "Lawrence Berkeley National Laboratory",
         "name": "Lehe, Remi",
         "orcid": "0000-0002-3656-9659"
@@ -142,6 +146,11 @@
         "affiliation": "Lawrence Berkeley National Laboratory",
         "name": "Loring, Burlen",
         "orcid": "0000-0002-4678-8142"
+      },
+      {
+        "affiliation": "University of Michigan",
+        "name": "Marks, Thomas",
+        "orcid": "0000-0003-3614-6127"
       },
       {
         "affiliation": "Intense Computing",
@@ -155,8 +164,18 @@
       },
       {
         "affiliation": "Lawrence Berkeley National Laboratory",
+        "name": "Pech, Juliette",
+        "orcid": "0009-0008-6165-0708"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory",
         "name": "Rheaume, Elisa",
         "orcid": "0000-0002-6710-0650"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory",
+        "name": "Richardson, Glenn",
+        "orcid": "0000-0003-0313-4496"
       },
       {
         "affiliation": "Lawrence Berkeley National Laboratory",
@@ -172,6 +191,26 @@
         "affiliation": "Modern Electron",
         "name": "Scherpelz, Peter",
         "orcid": "0000-0001-8185-3387"
+      },
+      {
+        "affiliation": "Deutsches Elektronen-Synchrotron DESY",
+        "name": "Sinn, Alexander",
+        "orcid": "0000-0002-4485-971X"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory",
+        "name": "Shapoval, Olga",
+        "orcid": "0000-0003-4003-4507"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory",
+        "name": "Terzani, Davide",
+        "orcid": "0000-0002-0105-5420"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory, now DESY",
+        "name": "Th\u00e9venet, Maxence",
+        "orcid": "0000-0001-7216-2277"
       },
       {
         "affiliation": "Laboratory for Laser Energetics, University of Rochester",
