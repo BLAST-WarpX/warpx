@@ -143,11 +143,17 @@ public:
 
     [[nodiscard]] InjectorPosition* getInjectorPosition () const;
     [[nodiscard]] InjectorPosition* getInjectorFluxPosition () const;
-    [[nodiscard]] InjectorDensity*  getInjectorDensity () const;
+    [[nodiscard]] InjectorDensity*  getInjectorDensity (int li) const;
 
     [[nodiscard]] InjectorFlux*  getInjectorFlux () const;
     [[nodiscard]] InjectorMomentum* getInjectorMomentumDevice () const;
     [[nodiscard]] InjectorMomentum* getInjectorMomentumHost () const;
+
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow);
+
+    void prepare (amrex::RealBox const& pbox);
 
 protected:
 
@@ -163,6 +169,8 @@ protected:
     std::string species_name;
     std::string source_name;
 
+    amrex::Geometry m_geom;
+
     std::unique_ptr<InjectorPosition> h_inj_pos;
     InjectorPosition* d_inj_pos = nullptr;
 
@@ -171,6 +179,8 @@ protected:
 
     std::unique_ptr<InjectorDensity,InjectorDensityDeleter> h_inj_rho;
     InjectorDensity* d_inj_rho = nullptr;
+    bool inj_rho_distributed = false;
+    bool inj_rho_prepared = false;
     std::unique_ptr<amrex::Parser> density_parser;
 
     std::unique_ptr<InjectorFlux,InjectorFluxDeleter> h_inj_flux;

@@ -13,6 +13,9 @@
 #include <ablastr/math/LinearInterpolation.H>
 
 #include <AMReX_Array.H>
+#include <AMReX_BaseFab.H>
+#include <AMReX_FabArray.H>
+#include <AMReX_Geometry.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_Parser.H>
@@ -92,7 +95,9 @@ struct ExternalFieldView
 
 #if (AMREX_SPACEDIM == 1)
 
-        if (i0 < table.begin || i0 >= table.end-1) {
+        if (i0 < table.begin || i0 >= table.end-1) // This covers empty Table.
+        {
+            AMREX_ALWAYS_ASSERT(i0 < 0 || i0 >= global_size[0]);
             return 0;
         } else {
             return static_cast<amrex::Real>(
@@ -103,7 +108,10 @@ struct ExternalFieldView
 #elif (AMREX_SPACEDIM == 2)
 
         if (i0 < table.begin[0] || i0 >= table.end[0]-1 ||
-            i1 < table.begin[1] || i1 >= table.end[1]-1) {
+            i1 < table.begin[1] || i1 >= table.end[1]-1)
+        {
+            AMREX_ALWAYS_ASSERT(i0 < 0 || i0 >= global_size[0] ||
+                                i1 < 0 || i1 >= global_size[1]);
             return 0;
         } else {
             return static_cast<amrex::Real>(
@@ -120,7 +128,11 @@ struct ExternalFieldView
 
         if (i0 < table.begin[0] || i0 >= table.end[0]-1 ||
             i1 < table.begin[1] || i1 >= table.end[1]-1 ||
-            i2 < table.begin[2] || i2 >= table.end[2]-1) {
+            i2 < table.begin[2] || i2 >= table.end[2]-1)
+        {
+            AMREX_ALWAYS_ASSERT(i0 < 0 || i0 >= global_size[0]-1 ||
+                                i1 < 0 || i1 >= global_size[1]-1 ||
+                                i2 < 0 || i2 >= global_size[2]-1);
             return 0;
         } else {
             return static_cast<amrex::Real>(
@@ -144,24 +156,52 @@ struct ExternalFieldView
 #if (AMREX_SPACEDIM == 1)
     amrex::Table1D<double> table;
 #elif (AMREX_SPACEDIM == 2)
-    amrex::Table2D<double,amrex::Order::C> table;
+    amrex::Table2D<double> table;
 #elif (AMREX_SPACEDIM == 3)
-    amrex::Table3D<double,amrex::Order::C> table;
+    amrex::Table3D<double> table;
 #endif
+    amrex::IntVect global_size;
 };
 
 class ExternalFieldReader
 {
 public:
-    ExternalFieldReader (std::string const& read_fields_from_path,
-                         std::string const& F_name, std::string const& F_component);
+    ExternalFieldReader (std::string read_fields_from_path,
+                         std::string F_name, std::string F_component,
+                         amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& problo,
+                         amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& pdx,
+                         amrex::Box const& pbox, bool distributed);
 
-    ExternalFieldView const& getView () const { return m_external_field_view; }
+    [[nodiscard]] ExternalFieldView getView (int li) const;
+
+    [[nodiscard]] ExternalFieldView getView () const;
+
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow);
+
+    void prepare (amrex::RealBox const& pbox);
+
+    [[nodiscard]] bool distributed () const { return m_distributed; }
 
 private:
+
+    void load_data (amrex::RealBox const& pbox);
+    [[nodiscard]] ExternalFieldView make_view (amrex::BaseFab<double> const& fab) const;
+
+    std::string m_file;
+    std::string m_name;
+    std::string m_component;
+    amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> m_problo;
+    amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> m_probdx;
+    bool m_distributed = false;
+    bool m_moving_window = false;
+    amrex::RealVect m_dx;
+    amrex::RealVect m_offset;
+    amrex::IntVect m_size;
     std::shared_ptr<double> m_FC_data_cpu;
-    amrex::Gpu::DeviceVector<double> m_FC_data_gpu;
-    ExternalFieldView m_external_field_view;
+    amrex::BaseFab<double> m_fab;
+    amrex::FabArray<amrex::BaseFab<double>> m_mf;
 };
 
 #endif //WARPX_EXTERNAL_FIELD_H_

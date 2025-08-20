@@ -52,7 +52,7 @@ using namespace amrex::literals;
 
 PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
     const amrex::Geometry& geom, const std::string& src_name):
-    species_id{ispecies}, species_name{name}, source_name{src_name}
+    species_id{ispecies}, species_name{name}, source_name{src_name}, m_geom(geom)
 {
 
 #ifdef AMREX_USE_GPU
@@ -156,7 +156,6 @@ PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
 #ifdef AMREX_USE_GPU
         d_inj_rho = static_cast<InjectorDensity*>
             (amrex::The_Arena()->alloc(sizeof(InjectorDensity)));
-        amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
 #else
         d_inj_rho = h_inj_rho.get();
 #endif
@@ -298,7 +297,7 @@ void PlasmaInjector::setupNRandomPerCell (amrex::ParmParse const& pp_species)
     d_inj_pos = h_inj_pos.get();
 #endif
 
-    SpeciesUtils::parseDensity(species_name, source_name, h_inj_rho, density_parser);
+    SpeciesUtils::parseDensity(species_name, source_name, h_inj_rho, density_parser, m_geom);
     SpeciesUtils::parseMomentum(species_name, source_name, "nrandompercell", h_inj_mom,
                                 ux_parser, uy_parser, uz_parser,
                                 ux_th_parser, uy_th_parser, uz_th_parser,
@@ -446,7 +445,7 @@ void PlasmaInjector::setupNuniformPerCell (amrex::ParmParse const& pp_species)
     num_particles_per_cell = num_particles_per_cell_each_dim[0] *
                              num_particles_per_cell_each_dim[1] *
                              num_particles_per_cell_each_dim[2];
-    SpeciesUtils::parseDensity(species_name, source_name, h_inj_rho, density_parser);
+    SpeciesUtils::parseDensity(species_name, source_name, h_inj_rho, density_parser, m_geom);
     SpeciesUtils::parseMomentum(species_name, source_name, "nuniformpercell", h_inj_mom,
                                 ux_parser, uy_parser, uz_parser,
                                 ux_th_parser, uy_th_parser, uz_th_parser,
@@ -649,8 +648,18 @@ PlasmaInjector::getInjectorFluxPosition () const
 }
 
 InjectorDensity*
-PlasmaInjector::getInjectorDensity () const
+PlasmaInjector::getInjectorDensity (int li) const
 {
+    if (inj_rho_prepared) {
+        if (inj_rho_distributed) {
+            h_inj_rho->prepare(li);
+#ifdef AMREX_USE_GPU
+            amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
+#endif
+        }
+    } else {
+        WARPX_ABORT_WITH_MESSAGE("Plasma Density Injector is not prepared");
+    }
     return d_inj_rho;
 }
 
@@ -670,4 +679,34 @@ InjectorMomentum*
 PlasmaInjector::getInjectorMomentumHost () const
 {
     return h_inj_mom.get();
+}
+
+void PlasmaInjector::prepare (amrex::BoxArray const& grids,
+                              amrex::DistributionMapping const& dmap,
+                              amrex::IntVect const& ngrow)
+{
+    if (h_inj_rho) {
+        h_inj_rho->prepare(grids, dmap, ngrow);
+        inj_rho_distributed = h_inj_rho->distributed();
+#ifdef AMREX_USE_GPU
+        if (! inj_rho_distributed) {
+            amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
+            Gpu::streamSynchronize();
+        }
+#endif
+        inj_rho_prepared = true;
+    }
+}
+
+void PlasmaInjector::prepare (amrex::RealBox const& pbox)
+{
+    if (h_inj_rho) {
+        h_inj_rho->prepare(pbox);
+#ifdef AMREX_USE_GPU
+        amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
+        Gpu::streamSynchronize();
+#endif
+        inj_rho_distributed = false;
+        inj_rho_prepared = true;
+    }
 }

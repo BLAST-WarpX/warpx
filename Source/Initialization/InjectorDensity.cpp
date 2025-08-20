@@ -42,6 +42,38 @@ void InjectorDensity::clear ()
     }
 }
 
+void InjectorDensity::prepare (amrex::BoxArray const& grids,
+                               amrex::DistributionMapping const& dmap,
+                               amrex::IntVect const& ngrow)
+{
+    if (type == Type::fromfile) {
+        object.fromfile.prepare(grids,dmap,ngrow);
+    }
+}
+
+void InjectorDensity::prepare (amrex::RealBox const& pbox)
+{
+    if (type == Type::fromfile) {
+        object.fromfile.prepare(pbox);
+    }
+}
+
+void InjectorDensity::prepare (int li)
+{
+    if (type == Type::fromfile) {
+        object.fromfile.prepare(li);
+    }
+}
+
+bool InjectorDensity::distributed () const
+{
+    if (type == Type::fromfile) {
+        return object.fromfile.distributed();
+    } else {
+        return false;
+    }
+}
+
 InjectorDensityPredefined::InjectorDensityPredefined (
     std::string const& a_species_name)
 {
@@ -75,14 +107,51 @@ void InjectorDensityPredefined::clear ()
 {
 }
 
-InjectorDensityFromFile::InjectorDensityFromFile (std::string const& a_file_name)
+InjectorDensityFromFile::InjectorDensityFromFile (std::string const& a_file_name,
+                                                  amrex::Geometry const& a_geom)
 {
-    m_external_field_reader = new ExternalFieldReader(a_file_name, "density", "");
-    m_external_field_view = m_external_field_reader->getView();
+    bool distributed = true; // xxxxxx make this a run time parameter
+    m_external_field_reader = new ExternalFieldReader
+        (a_file_name, "density", "", a_geom.ProbLoArray(), a_geom.CellSizeArray(),
+         amrex::convert(a_geom.Domain(),amrex::IntVect(1)), distributed);
 }
 
 void InjectorDensityFromFile::clear ()
 {
     delete m_external_field_reader;
     m_external_field_reader = nullptr;
+}
+
+void InjectorDensityFromFile::prepare (amrex::BoxArray const& grids,
+                                       amrex::DistributionMapping const& dmap,
+                                       amrex::IntVect const& ngrow)
+{
+    if (m_external_field_reader) {
+        m_external_field_reader->prepare(grids,dmap,ngrow);
+        m_external_field_view = m_external_field_reader->getView();
+    }
+}
+
+void InjectorDensityFromFile::prepare (amrex::RealBox const& pbox)
+{
+    if (m_external_field_reader) {
+        m_external_field_reader->prepare(pbox);
+        m_external_field_view = m_external_field_reader->getView();
+    }
+}
+
+void InjectorDensityFromFile::prepare (int li)
+{
+    if (m_external_field_reader) {
+        m_external_field_view = m_external_field_reader->getView(li);
+    }
+}
+
+bool InjectorDensityFromFile::distributed () const
+{
+    if (m_external_field_reader) {
+        return m_external_field_reader->distributed();
+    } else {
+        return false;
+    }
 }

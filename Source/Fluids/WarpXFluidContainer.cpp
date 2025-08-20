@@ -28,9 +28,12 @@ WarpXFluidContainer::WarpXFluidContainer(int ispecies, const std::string &name):
 {
     ReadParameters();
 
+    WarpX &warpx = WarpX::GetInstance();
+    const amrex::Geometry &geom = warpx.Geom(0);
+
     // Initialize injection objects
     const ParmParse pp_species_name(species_name);
-    SpeciesUtils::parseDensity(species_name, "", h_inj_rho, density_parser);
+    SpeciesUtils::parseDensity(species_name, "", h_inj_rho, density_parser, geom);
     SpeciesUtils::parseMomentum(species_name, "", "none", h_inj_mom,
         ux_parser, uy_parser, uz_parser, ux_th_parser, uy_th_parser, uz_th_parser, h_mom_temp, h_mom_vel);
     if (h_inj_rho) {

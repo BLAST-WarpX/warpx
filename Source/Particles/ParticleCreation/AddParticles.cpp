@@ -686,13 +686,19 @@ PhysicalParticleContainer::AddPlasmaFromFile(PlasmaInjector & plasma_injector,
 }
 
 void
-PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int lev, amrex::RealBox part_realbox)
+PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, amrex::RealBox part_realbox)
 {
     WARPX_PROFILE("PhysicalParticleContainer::AddPlasma()");
 
     // If no part_realbox is provided, initialize particles in the whole domain
     const Geometry& geom = Geom(lev);
-    if (!part_realbox.ok()) { part_realbox = geom.ProbDomain(); }
+    bool initial_injectcion;
+    if (!part_realbox.ok()) {
+        part_realbox = geom.ProbDomain();
+        initial_injectcion = true;
+    } else {
+        initial_injectcion = false;
+    }
 
     const int num_ppc = plasma_injector.num_particles_per_cell;
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
@@ -711,8 +717,17 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
     amrex::IntVect rrfac(AMREX_D_DECL(1,1,1));
     const bool refine_injection = findRefinedInjectionBox(fine_injection_box, rrfac);
 
+    amrex::Print() << "xxxxx part_realbox = " << part_realbox
+                   << ", geom = " << geom << std::endl;
+
+    if (initial_injectcion) {
+        plasma_injector.prepare(this->ParticleBoxArray(lev),
+                                this->ParticleDistributionMap(lev), IntVect(0));
+    } else {
+        plasma_injector.prepare(part_realbox);
+    }
+
     InjectorPosition* inj_pos = plasma_injector.getInjectorPosition();
-    InjectorDensity*  inj_rho = plasma_injector.getInjectorDensity();
     InjectorMomentum* inj_mom = plasma_injector.getInjectorMomentumDevice();
     const amrex::Real gamma_boost = WarpX::gamma_boost;
     const amrex::Real beta_boost = WarpX::beta_boost;
@@ -762,6 +777,8 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
         if (no_overlap) {
             continue; // Go to the next tile
         }
+
+        InjectorDensity* inj_rho = plasma_injector.getInjectorDensity(mfi.LocalIndex());
 
         const int grid_id = mfi.index();
         const int tile_id = mfi.LocalTileIndex();
