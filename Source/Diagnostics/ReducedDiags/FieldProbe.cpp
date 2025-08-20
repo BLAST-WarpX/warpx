@@ -459,14 +459,15 @@ void FieldProbe::ComputeDiags (int step)
             m_data.reserve(numparticles * noutputs);
         }
 
-        for (MyParIter pti(m_probe, lev); pti.isValid(); ++pti)
+        if (update_particles_moving_window)
         {
-            const auto getPosition = GetParticlePosition<FieldProbePIdx>(pti);
-            auto setPosition = SetParticlePosition<FieldProbePIdx>(pti);
-
-            auto const np = pti.numParticles();
-            if (update_particles_moving_window)
+            for (MyParIter pti(m_probe, lev); pti.isValid(); ++pti)
             {
+                const auto getPosition = GetParticlePosition<FieldProbePIdx>(pti);
+                auto setPosition = SetParticlePosition<FieldProbePIdx>(pti);
+
+                auto const np = pti.numParticles();
+
                 const auto temp_warpx_moving_window = WarpX::moving_window_dir;
                 amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(long ip) {
                     amrex::ParticleReal xp, yp, zp;
@@ -484,7 +485,15 @@ void FieldProbe::ComputeDiags (int step)
 #endif
                 });
             }
+            // After moving particles, use Redistribute to ensure each is in the right part
+            // of the container. Cannot call this while iterating m_probe.
+            m_probe.Redistribute();
+        }
 
+        for (MyParIter pti(m_probe, lev); pti.isValid(); ++pti)
+        {
+            const auto getPosition = GetParticlePosition<FieldProbePIdx>(pti);
+            auto const np = pti.numParticles();
             const auto& arrEx = Ex[pti].array();
             const auto& arrEy = Ey[pti].array();
             const auto& arrEz = Ez[pti].array();
