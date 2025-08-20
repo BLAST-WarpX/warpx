@@ -406,10 +406,16 @@ void FieldProbe::ComputeDiags (int step)
         amrex::Real const dt = WarpX::GetInstance().getdt(lev);
         // Calculates particle movement in moving window sims
         amrex::Real move_dist = 0.0;
+
+        // Keep in sync with WarpX::moving_window_active()
+        // TODO -- is this supposed to be offset by 1 vs that logic (starting one step after)?
+        // TODO -- can we just use WarpX::moving_window_active()? Main limitation is that
+        // it would not be able to move the FieldProbe if the problem domain wasn't doing moving
+        // window.
         bool const update_particles_moving_window =
             do_moving_window_FP &&
             step > WarpX::start_moving_window_step &&
-            step <= WarpX::end_moving_window_step;
+            (step <= WarpX::end_moving_window_step || WarpX::end_moving_window_step < 0);
         if (update_particles_moving_window)
         {
             const int step_diff = step - m_last_compute_step;

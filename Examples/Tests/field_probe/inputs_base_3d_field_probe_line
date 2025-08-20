@@ -82,4 +82,4 @@ FP.z_probe = -56e-6
 FP.x1_probe = 0
 FP.y1_probe = 0
 FP.z1_probe = 12e-6
-FP.resolution = 20
+FP.resolution = 25

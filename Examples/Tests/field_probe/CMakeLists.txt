@@ -14,6 +14,16 @@ if(WarpX_EB)
 endif()
 
 add_warpx_test(
+    test_3d_field_probe_line_extend_outside
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_field_probe_line_extend_outside  # inputs
+    "analysis_field_probe_line.py --path diags/reducedfiles/FP.txt"  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_3d_field_probe_line_no_window
     3  # dims
     2  # nprocs
@@ -28,7 +38,7 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_field_probe_line_partial_window  # inputs
-    "analysis_field_probe_line.py --path diags/reducedfiles/FP.txt"  # analysis
+    "analysis_field_probe_line.py --path diags/reducedfiles/FP.txt --moving_window"  # analysis
     OFF  # checksum
     OFF  # dependency
 )
@@ -38,7 +48,7 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_field_probe_line_window  # inputs
-    "analysis_field_probe_line.py --path diags/reducedfiles/FP.txt"  # analysis
+    "analysis_field_probe_line.py --path diags/reducedfiles/FP.txt --moving_window --fp_moving_window"  # analysis
     OFF  # checksum
     OFF  # dependency
 )
