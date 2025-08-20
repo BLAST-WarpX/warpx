@@ -1,4 +1,4 @@
-FILE=inputs_test_3d_field_probe_line_base
+FILE=inputs_base_3d_field_probe_line
 
 warpx.do_moving_window = 0
 
