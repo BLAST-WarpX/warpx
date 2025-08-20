@@ -381,8 +381,8 @@ struct ParticleInDomainChecker {
     }
 };
 
-void
-FieldProbe::ComputeDiags (int step) {
+void FieldProbe::ComputeDiags (int step)
+{
     // Judge if the diags should be done
     if (!m_field_probe_integrate)
     {
@@ -459,25 +459,24 @@ FieldProbe::ComputeDiags (int step) {
             auto setPosition = SetParticlePosition<FieldProbePIdx>(pti);
 
             auto const np = pti.numParticles();
-            if (update_particles_moving_window) {
-                            const auto temp_warpx_moving_window =
-                                WarpX::moving_window_dir;
-                            amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(
-                                                       long ip) {
-                                amrex::ParticleReal xp, yp, zp;
-                                getPosition(ip, xp, yp, zp);
-                                if (temp_warpx_moving_window == 0) {
-                                    setPosition(ip, xp + move_dist, yp, zp);
-                                }
-                                if (temp_warpx_moving_window == 1) {
-                                    setPosition(ip, xp, yp + move_dist, zp);
-                                }
+            if (update_particles_moving_window)
+            {
+                const auto temp_warpx_moving_window = WarpX::moving_window_dir;
+                amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(long ip) {
+                    amrex::ParticleReal xp, yp, zp;
+                    getPosition(ip, xp, yp, zp);
+                    if (temp_warpx_moving_window == 0) {
+                        setPosition(ip, xp + move_dist, yp, zp);
+                    }
+                    if (temp_warpx_moving_window == 1) {
+                        setPosition(ip, xp, yp + move_dist, zp);
+                    }
 #if defined(WARPX_ZINDEX)
-                                if (temp_warpx_moving_window == WARPX_ZINDEX) {
-                                    setPosition(ip, xp, yp, zp + move_dist);
-                                }
+                    if (temp_warpx_moving_window == WARPX_ZINDEX) {
+                        setPosition(ip, xp, yp, zp + move_dist);
+                    }
 #endif
-                            });
+                });
             }
 
             const auto& arrEx = Ex[pti].array();
@@ -488,44 +487,36 @@ FieldProbe::ComputeDiags (int step) {
             const auto& arrBz = Bz[pti].array();
 
             /*
-             * Make the box cell centered in preparation for the interpolation
-             * (and to avoid including ghost cells in the calculation)
+             * Make the box cell centered in preparation for the interpolation (and to avoid
+             * including ghost cells in the calculation)
              */
             amrex::Box box = pti.tilebox();
             box.grow(Ex.nGrowVect());
 
             // preparing to write data to particle
             auto& attribs = pti.GetStructOfArrays().GetRealData();
-            ParticleReal* const AMREX_RESTRICT part_Ex =
-                attribs[FieldProbePIdx::Ex].dataPtr();
-            ParticleReal* const AMREX_RESTRICT part_Ey =
-                attribs[FieldProbePIdx::Ey].dataPtr();
-            ParticleReal* const AMREX_RESTRICT part_Ez =
-                attribs[FieldProbePIdx::Ez].dataPtr();
-            ParticleReal* const AMREX_RESTRICT part_Bx =
-                attribs[FieldProbePIdx::Bx].dataPtr();
-            ParticleReal* const AMREX_RESTRICT part_By =
-                attribs[FieldProbePIdx::By].dataPtr();
-            ParticleReal* const AMREX_RESTRICT part_Bz =
-                attribs[FieldProbePIdx::Bz].dataPtr();
-            ParticleReal* const AMREX_RESTRICT part_S =
-                attribs[FieldProbePIdx::S].dataPtr();
+            ParticleReal* const AMREX_RESTRICT part_Ex = attribs[FieldProbePIdx::Ex].dataPtr();
+            ParticleReal* const AMREX_RESTRICT part_Ey = attribs[FieldProbePIdx::Ey].dataPtr();
+            ParticleReal* const AMREX_RESTRICT part_Ez = attribs[FieldProbePIdx::Ez].dataPtr();
+            ParticleReal* const AMREX_RESTRICT part_Bx = attribs[FieldProbePIdx::Bx].dataPtr();
+            ParticleReal* const AMREX_RESTRICT part_By = attribs[FieldProbePIdx::By].dataPtr();
+            ParticleReal* const AMREX_RESTRICT part_Bz = attribs[FieldProbePIdx::Bz].dataPtr();
+            ParticleReal* const AMREX_RESTRICT part_S = attribs[FieldProbePIdx::S].dataPtr();
 
-            auto* const AMREX_RESTRICT idcpu =
-                pti.GetStructOfArrays().GetIdCPUData().data();
+            auto* const AMREX_RESTRICT idcpu = pti.GetStructOfArrays().GetIdCPUData().data();
 
             const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
             const amrex::XDim3 dinv = WarpX::InvCellSize(lev);
             const Dim3 lo = lbound(box);
 
-            // Temporarily defining modes and interp outside ParallelFor to
-            // avoid GPU compilation errors.
+            // Temporarily defining modes and interp outside ParallelFor to avoid GPU compilation errors.
             const int temp_modes = WarpX::n_rz_azimuthal_modes;
             const int temp_interp_order = interp_order;
             const bool temp_field_probe_integrate = m_field_probe_integrate;
 
             // Interpolating to the probe positions for each particle
-            amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(long ip) {
+            amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(long ip)
+            {
                 amrex::ParticleReal xp, yp, zp;
                 getPosition(ip, xp, yp, zp);
 
@@ -537,19 +528,18 @@ FieldProbe::ComputeDiags (int step) {
                 if (inDomainChecker(xp, yp, zp)) {
                     doGatherShapeN(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                    arrEx, arrEy, arrEz, arrBx, arrBy, arrBz,
-                                   Extype, Eytype, Eztype, Bxtype, Bytype,
-                                   Bztype, dinv, xyzmin, lo, temp_modes,
+                                   Extype, Eytype, Eztype, Bxtype, Bytype, Bztype,
+                                   dinv, xyzmin, lo, temp_modes,
                                    temp_interp_order, false);
                 }
 
                 // Calculate the Poynting Vector S
-                amrex::ParticleReal const sraw[3]{Eyp * Bzp - Ezp * Byp,
-                                                  Ezp * Bxp - Exp * Bzp,
-                                                  Exp * Byp - Eyp * Bxp};
-                amrex::ParticleReal const S =
-                    (1._prt / PhysConst::mu0) *
-                    std::sqrt(sraw[0] * sraw[0] + sraw[1] * sraw[1] +
-                              sraw[2] * sraw[2]);
+                amrex::ParticleReal const sraw[3]{
+                    Eyp * Bzp - Ezp * Byp,
+                    Ezp * Bxp - Exp * Bzp,
+                    Exp * Byp - Eyp * Bxp
+                };
+                amrex::ParticleReal const S = (1._prt / PhysConst::mu0) * std::sqrt(sraw[0] * sraw[0] + sraw[1] * sraw[1] + sraw[2] * sraw[2]);
 
                 /*
                  * Determine whether or not to integrate field data.
@@ -557,20 +547,16 @@ FieldProbe::ComputeDiags (int step) {
                  */
                 if (temp_field_probe_integrate) {
                     // store values on particles
-                    part_Ex[ip] += Exp * dt; // remember to add lorentz
-                                             // transform
-                    part_Ey[ip] += Eyp * dt; // remember to add lorentz
-                                             // transform
-                    part_Ez[ip] += Ezp * dt; // remember to add lorentz
-                                             // transform
-                    part_Bx[ip] += Bxp * dt; // remember to add lorentz
-                                             // transform
-                    part_By[ip] += Byp * dt; // remember to add lorentz
-                                             // transform
-                    part_Bz[ip] += Bzp * dt; // remember to add lorentz
-                                             // transform
-                    part_S[ip] += S * dt; // remember to add lorentz transform
-                } else {
+                    part_Ex[ip] += Exp * dt; // remember to add lorentz transform
+                    part_Ey[ip] += Eyp * dt; // remember to add lorentz transform
+                    part_Ez[ip] += Ezp * dt; // remember to add lorentz transform
+                    part_Bx[ip] += Bxp * dt; // remember to add lorentz transform
+                    part_By[ip] += Byp * dt; // remember to add lorentz transform
+                    part_Bz[ip] += Bzp * dt; // remember to add lorentz transform
+                    part_S[ip] += S * dt;    // remember to add lorentz transform
+                }
+                else
+                {
                     part_Ex[ip] = Exp; // remember to add lorentz transform
                     part_Ey[ip] = Eyp; // remember to add lorentz transform
                     part_Ez[ip] = Ezp; // remember to add lorentz transform
@@ -581,19 +567,19 @@ FieldProbe::ComputeDiags (int step) {
                 }
             }); // ParallelFor Close
 
-            // this check is here because for m_field_probe_integrate == True,
-            // we always compute but we only write when we truly are in an
-            // output interval step
-            if (m_intervals.contains(step + 1) && np > 0) {
+            // this check is here because for m_field_probe_integrate == True, we always compute
+            // but we only write when we truly are in an output interval step
+            if (m_intervals.contains(step+1) && np > 0)
+            {
                 // This could be optimized by using shared memory.
                 amrex::Gpu::DeviceVector<amrex::Real> dv(np * noutputs);
                 amrex::Real* dvp = dv.data();
-                amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(long ip) {
+                amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(long ip)
+                {
                     amrex::ParticleReal xp, yp, zp;
                     getPosition(ip, xp, yp, zp);
                     long idx = ip * noutputs;
-                    dvp[idx++] = amrex::ParticleIDWrapper{
-                        idcpu[ip]}; // all particles created on IO cpu
+                    dvp[idx++] = amrex::ParticleIDWrapper{idcpu[ip]}; // all particles created on IO cpu
                     dvp[idx++] = xp;
                     dvp[idx++] = yp;
                     dvp[idx++] = zp;
@@ -607,8 +593,8 @@ FieldProbe::ComputeDiags (int step) {
                 });
                 auto oldsize = m_data.size();
                 m_data.resize(oldsize + dv.size());
-                amrex::Gpu::copyAsync(amrex::Gpu::deviceToHost, dv.begin(),
-                                      dv.end(), &m_data[oldsize]);
+                amrex::Gpu::copyAsync(amrex::Gpu::deviceToHost,
+                                      dv.begin(), dv.end(), &m_data[oldsize]);
                 Gpu::streamSynchronize();
                 /* m_data now contains up-to-date values for:
                  *  [x, y, z, Ex, Ey, Ez, Bx, By, Bz, and S] */
