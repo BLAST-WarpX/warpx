@@ -15,7 +15,7 @@ It supports many features including:
 For details on these features, see the :ref:`theory section <theory>`.
 WarpX has been applied to a wide variety of science projects, see :ref:`highlights <highlights>`.
 
-WarpX is a *highly-parallel and highly-optimized code*:
+In addition, WarpX is a *highly-parallel and highly-optimized code*:
 
     - Can run on multi-core CPUs as well as NVIDIA, AMD or Intel GPUs
     - Scales to the world's largest supercomputers and includes load balancing capabilities. WarpX was awarded the `2022 ACM Gordon Bell Prize <https://www.exascaleproject.org/ecp-supported-collaborative-teams-win-the-2022-acm-gordon-bell-prize-and-special-prize/>`__.
