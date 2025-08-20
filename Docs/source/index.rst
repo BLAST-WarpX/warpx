@@ -16,7 +16,7 @@ For details on these features, see the :ref:`theory section <theory>`.
 
 WarpX is a *highly-parallel and highly-optimized code*:
 
-    - Can run on multi-core CPUs as well NVIDIA, AMD or Intel GPUs
+    - Can run on multi-core CPUs as well as NVIDIA, AMD or Intel GPUs
     - Scales to the world's largest supercomputers and includes load balancing capabilities. WarpX was awarded the `2022 ACM Gordon Bell Prize <https://www.exascaleproject.org/ecp-supported-collaborative-teams-win-the-2022-acm-gordon-bell-prize-and-special-prize/>`__.
     - Multi-platform code that can run on Linux, macOS and Windows.
     - Can be run and extended via its Python interface, e.g., to couple to other codes or AI/ML frameworks.
