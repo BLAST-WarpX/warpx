@@ -6,7 +6,6 @@ foreach(D IN LISTS WarpX_DIMS)
         ParticleUtils.cpp
         SpeciesUtils.cpp
         WarpXMovingWindow.cpp
-        WarpXTagging.cpp
         WarpXUtil.cpp
         WarpXVersion.cpp
     )

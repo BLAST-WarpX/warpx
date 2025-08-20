@@ -72,17 +72,14 @@ jobs:
 
   build_win_clang:
     name: Clang C++17 w/ OMP w/o MPI
-    runs-on: windows-2019
-    # disabled due to windows-2019 not being available anymore ; see #5930
-    if: 0
-    #needs: check_changes
-    #if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
+    runs-on: windows-2022
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
       with:
-        python-version: '3.8'
-    - uses: seanmiddleditch/gha-setup-ninja@master
+        python-version: '3.9'
     - name: CCache Cache
       uses: actions/cache@v4
       # - once stored under a key, they become immutable (even if local cache path content changes)
@@ -98,12 +95,12 @@ jobs:
     - name: Build & Install
       shell: cmd
       run: |
-        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\vc\Auxiliary\build\vcvarsall.bat" x64
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\vc\Auxiliary\build\vcvarsall.bat" x64
         cmake -S . -B build   ^
               -G "Ninja"      ^
               -DCMAKE_C_COMPILER=clang-cl   ^
               -DCMAKE_CXX_COMPILER=clang-cl ^
-              -DCMAKE_BUILD_TYPE=Release    ^
+              -DCMAKE_BUILD_TYPE=Debug      ^
               -DCMAKE_VERBOSE_MAKEFILE=ON   ^
               -DWarpX_COMPUTE=OMP           ^
               -DWarpX_EB=OFF                ^
@@ -111,10 +108,10 @@ jobs:
               -DWarpX_MPI=OFF               ^
               -DWarpX_OPENPMD=ON
         if errorlevel 1 exit 1
-        cmake --build build --config Release --parallel 4
+        cmake --build build --config Debug --parallel 4
         if errorlevel 1 exit 1
 
-        cmake --build build --config Release --target install
+        cmake --build build --config Debug --target install
         if errorlevel 1 exit 1
 
         python3 -m pip install --upgrade pip
@@ -124,13 +121,13 @@ jobs:
         python3 -m pip install --upgrade -r requirements.txt
         if errorlevel 1 exit 1
 
-        cmake --build build --config Release --target pip_install
+        cmake --build build --config Debug --target pip_install
         if errorlevel 1 exit 1
 
     - name: Test
       shell: cmd
       run: |
-        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\vc\Auxiliary\build\vcvarsall.bat" x64
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\vc\Auxiliary\build\vcvarsall.bat" x64
         set "PATH=C:/Program Files (x86)/WarpX/bin/;%PATH%"
 
         python3 Examples/Tests/gaussian_beam/inputs_test_3d_gaussian_beam_picmi.py --diagformat=openpmd
