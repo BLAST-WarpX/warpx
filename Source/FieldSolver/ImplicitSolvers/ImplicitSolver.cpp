@@ -684,6 +684,8 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
                                 const int          a_nl_iter,
                                 const bool         a_from_jacobian )
 {
+    BL_PROFILE("ImplicitSolver::PreRHSOp()");
+
     using warpx::fields::FieldType;
     amrex::ignore_unused( a_nl_iter );
 
