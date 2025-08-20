@@ -10,7 +10,7 @@ It supports many features including:
     - Multiple types of field solvers (incl. electromagnetic, electrostatic)
     - Various grid geometries (Cartesian, cylindrical, spherical)
     - Multi-physics packages (incl. ionization and atomic physics, quantum electrodynamics)
-    - Advanced numerical methods (incl. explicit and explicit PIC loop, mesh refinement, boosted-frame simulations)
+    - Advanced numerical methods (incl. explicit and implicit PIC loop, mesh refinement, boosted-frame simulations)
 
 For details on these features, see the :ref:`theory section <theory>`.
 
