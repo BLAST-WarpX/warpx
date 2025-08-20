@@ -9,15 +9,17 @@ It supports many features including:
 
     - Multiple types of field solvers (incl. electromagnetic, electrostatic)
     - Various grid geometries (Cartesian, cylindrical, spherical)
-    - Multi-physics packages (incl. ionization and atomic physics, Quantum Electrodynamics)
-    - Advanced numerical methods (incl. explicit and explicit PIC loop, mesh refinement, boosted-frame simulations, embedded boundaries)
+    - Multi-physics packages (incl. ionization, atomic and collisional physics, quantum electrodynamics)
+    - Advanced numerical methods (incl. explicit and implicit PIC loop, mesh refinement, boosted-frame simulations)
 
 For details on these features, see the :ref:`theory section <theory>`.
 
-WarpX is a *highly-parallel and highly-optimized code*, which can run on multi-core CPUs as well NVIDIA, AMD or Intel GPUs, and includes load balancing capabilities.
-WarpX scales to the world's largest supercomputers and was awarded the `2022 ACM Gordon Bell Prize <https://www.exascaleproject.org/ecp-supported-collaborative-teams-win-the-2022-acm-gordon-bell-prize-and-special-prize/>`__.
-In addition, WarpX is also a multi-platform code and runs on Linux, macOS and Windows.
-While written in C++, WarpX can rapidly be extended and controlled via its Python interface, e.g., to couple to other codes or AI/ML frameworks.
+WarpX is a *highly-parallel and highly-optimized code*:
+
+    - Can run on multi-core CPUs as well NVIDIA, AMD or Intel GPUs
+    - Scales to the world's largest supercomputers and includes load balancing capabilities. WarpX was awarded the `2022 ACM Gordon Bell Prize <https://www.exascaleproject.org/ecp-supported-collaborative-teams-win-the-2022-acm-gordon-bell-prize-and-special-prize/>`__.
+    - Multi-platform code that can run on Linux, macOS and Windows.
+    - Can be run and extended via its Python interface, e.g., to couple to other codes or AI/ML frameworks.
 
 .. _contact:
 
