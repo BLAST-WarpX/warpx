@@ -44,6 +44,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_3d_field_probe_line_partial_window_integrate
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_field_probe_line_partial_window_integrate  # inputs
+    "analysis_field_probe_line.py --path diags/reducedfiles/FP.txt --moving_window --integrate"  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_3d_field_probe_line_window
     3  # dims
     2  # nprocs

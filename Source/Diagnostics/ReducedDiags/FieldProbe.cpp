@@ -407,15 +407,8 @@ void FieldProbe::ComputeDiags (int step)
         // Calculates particle movement in moving window sims
         amrex::Real move_dist = 0.0;
 
-        // Keep in sync with WarpX::moving_window_active()
-        // TODO -- is this supposed to be offset by 1 vs that logic (starting one step after)?
-        // TODO -- can we just use WarpX::moving_window_active()? Main limitation is that
-        // it would not be able to move the FieldProbe if the problem domain wasn't doing moving
-        // window.
         bool const update_particles_moving_window =
-            do_moving_window_FP &&
-            step > WarpX::start_moving_window_step &&
-            (step <= WarpX::end_moving_window_step || WarpX::end_moving_window_step < 0);
+            do_moving_window_FP && WarpX::moving_window_active(step);
         if (update_particles_moving_window)
         {
             const int step_diff = step - m_last_compute_step;
@@ -538,15 +531,13 @@ void FieldProbe::ComputeDiags (int step)
                 amrex::ParticleReal Exp = 0._prt, Eyp = 0._prt, Ezp = 0._prt;
                 amrex::ParticleReal Bxp = 0._prt, Byp = 0._prt, Bzp = 0._prt;
 
-                //  If the particle is in the domain, measure E and B at the
-                //  particle positions
-                if (inDomainChecker(xp, yp, zp)) {
-                    doGatherShapeN(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
-                                   arrEx, arrEy, arrEz, arrBx, arrBy, arrBz,
-                                   Extype, Eytype, Eztype, Bxtype, Bytype, Bztype,
-                                   dinv, xyzmin, lo, temp_modes,
-                                   temp_interp_order, false);
-                }
+                // Amrex particle container should guarantee that all particles are in domain
+                AMREX_ASSERT(inDomainChecker(xp, yp, zp));
+                doGatherShapeN(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
+                                arrEx, arrEy, arrEz, arrBx, arrBy, arrBz,
+                                Extype, Eytype, Eztype, Bxtype, Bytype, Bztype,
+                                dinv, xyzmin, lo, temp_modes,
+                                temp_interp_order, false);
 
                 // Calculate the Poynting Vector S
                 amrex::ParticleReal const sraw[3]{
