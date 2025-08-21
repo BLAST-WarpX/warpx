@@ -86,136 +86,126 @@ Overall simulation parameters
 
     * ``explicit``: Use an explicit solver, such as the standard FDTD or PSATD
 
-    * ``theta_implicit_em``: Use a fully implicit electromagnetic solver with a time-biasing parameter theta bound between 0.5 and 1.0. Exact energy conservation is achieved using theta = 0.5. Maximal damping of high-k modes is obtained using theta = 1.0. Choices for the nonlinear solver include a Picard iteration scheme and particle-suppressed (PS) JFNK.
-      The algorithm itself is numerical stable for large time steps. That is, it does not require time steps that resolve the plasma period or the CFL condition for light waves. However, the practicality of using a large time step depends on the nonlinear solver. Note that the Picard solver is for demonstration only. It is inefficient and will most like not converge when
-      :math:`\omega_{pe} \Delta t` is close to or greater than one or when the CFL condition for light waves is violated. The PS-JFNK method must be used in order to use large time steps. However, the current implementation of PS-JFNK is still inefficient because the JFNK solver is not preconditioned and there is no use of the mass matrices to minimize the cost of a linear iteration. The time step is limited by how many cells a particle can cross in a time step (MPI-related) and by the need to resolve the relevant physics.
-      The Picard method is described in `Angus et al., On numerical energy conservation for an implicit particle-in-cell method coupled with a binary Monte-Carlo algorithm for Coulomb collisions <https://doi.org/10.1016/j.jcp.2022.111030>`__.
-      The PS-JFNK method is described in `Angus et al., An implicit particle code with exact energy and charge conservation for electromagnetic studies of dense plasmas <https://doi.org/10.1016/j.jcp.2023.112383>`__ . (The version implemented in WarpX is an updated version that includes the relativistic gamma factor for the particles.) Also see `Chen et al., An energy- and charge-conserving, implicit, electrostatic particle-in-cell algorithm. <https://doi.org/10.1016/j.jcp.2011.05.031>`__ .
-      Exact energy conservation requires that the interpolation stencil used for the field gather match that used for the current deposition. ``algo.current_deposition = direct`` must be used with ``interpolation.galerkin_scheme = 0``, and ``algo.current_deposition = Esirkepov`` must be used with ``interpolation.galerkin_scheme = 1``. If using ``algo.current_deposition = villasenor``, the corresponding field gather routine will automatically be selected and the ``interpolation.galerkin_scheme`` flag does not need to be specified. The Esirkepov and villasenor deposition schemes are charge-conserving.
+    * ``theta_implicit_em``: Use a :math:`\theta`-implicit electromagnetic solver.
+
+      - **Time-biasing parameter:**
+        The fields (:math:`\textbf{E}` & :math:`\textbf{B}`) used to advance the system are computed at time :math:`t^{n+\theta}`: :math:`\mathbf{E}^{n+\theta}=\left(1-\theta\right)\mathbf{E}^n + \theta\mathbf{E}^{n+1}`, where :math:`\theta\in[0.5,1.0]`.
+
+        - ``implicit_evolve.theta`` (`float`, default: 0.5)
+        - :math:`\theta = 0.5`: Exact energy conservation.
+        - :math:`\theta = 1.0`: Maximal damping of high-k modes.
+
+      - **Field gather and current depositions:**
+        Exact energy conservation requires matching gather and deposition.
+        The following depositions support this:
+
+        - ``algo.current_deposition = direct``
+        - ``algo.current_deposition = villasenor``
+        - ``algo.current_deposition = esirkepov`` (Not compatible with ``implicit_evolve.use_mass_matrices_jacobian = true``.)
+
+      - **Numerical stability:**
+
+        - Rhobust to finite-grid instability (does not require cells that resolve the plasma Debye length).
+        - Numerically stable for large :math:`\Delta t` (does not require resolving the plasma period or satisfying the CFL condition for light waves).
+        - Practical limits on :math:`\Delta t` set by solver efficiency, number of particle cell crossings, and physics resolution.
+
+      - **Nonlinear solvers:**
+        Advancing the implicit system in time requires solving a nonlinear system. The nonlinear solver options are `picard` and `newton`.
+
+        - ``implicit_evolve.nonlinear_solver`` (`string`, default: None)
+
+        - ``implicit_evolve.nonlinear_solver = picard``: Use a Picard iteration method. Requires small time steps; often non-convergent for large time steps.
+
+          - ``picard.verbose`` (`bool`, default: true)
+          - ``picard.require_convergence`` (`bool`, default: true)
+          - ``picard.maximum_iterations`` (`int`, default: 100)
+          - ``picard.relative_tolerance`` (`float`, default: 1.0e-6)
+          - ``picard.absolute_tolerance`` (`float`, default: 0.0)
+          - ``picard.diagnostic_file`` (`string`, default: None)
+          - ``picard.diagnostic_interval`` (`int`, default: 1)
+
+        - ``implicit_evolve.nonlinear_solver = newton``: Use a PS-JFNK method. Required for large time steps, but efficiency often relies on preconditioning and/or using ``implicit_evolve.use_mass_matrices_jacobian = true``.
+
+          - ``newton.verbose`` (`bool`, default: true)
+          - ``newton.require_convergence`` (`bool`, default: true)
+          - ``newton.maximum_iterations`` (`int`, default: 100)
+          - ``newton.relative_tolerance`` (`float`, default: 1.0e-6)
+          - ``newton.absolute_tolerance`` (`float`, default: 0.0)
+          - ``newton.diagnostic_file`` (`string`, default: None)
+          - ``newton.diagnostic_interval`` (`int`, default: 1)
+
+          - The PS-JFNK solver uses GMRES to solve the linear system at each nonlinear iteration:
+
+          - ``gmres.verbose_int`` (`int`, default: 2)
+          - ``gmres.restart_length`` (`int`, default: 30)
+          - ``gmres.maximum_iterations`` (`int`, default: 1000)
+          - ``gmres.relative_tolerance`` (`float`, default: 1.0e-4)
+          - ``gmres.absolute_tolerance`` (`float`, default: 0.0)
+
+      - **PS-JFNK solver specific options:**
+        The PS-JFNK solver (``implicit_evolve.nonlinear_solver = newton``) has a variety of additional parameters and options.
+
+        - At each iteration in the PS-JFNK process, each particle is self-consistently updated for fixed :math:`\textbf{E}` and :math:`\textbf{B}` on the grid using a Picard method. The options for this Picard solve are set by:
+
+          - ``implicit_evolve.max_particle_iterations`` (`integer`, default: 21)
+          - ``implicit_evolve.particle_tolerance`` (`float`, default: 1.e-10)
+
+        - ``implicit_evolve.use_mass_matrices_jacobian`` (`bool`, default: false).
+          When `true`, the plasma current density is computed using the mass matrices during the linear stage of PS-JFNK, replacing direct particle calculations. This can enable large speed ups for simulations with many particles.
+
+        - ``implicit_evolve.use_mass_matrices_pc`` (`bool`, default: false).
+          When `true`, the plasma response is captured in the preconditioner.
+          Requires use of a preconditioner (``jacobian.pc_type = pc_curl_curl_mlmg`` or ``pc_jacobi``).
+
+        - ``jacobian.pc_type`` (`string`, default: None). A preconditioner can be used to minimize the number of linear GMRES iterations. There are two options:
+
+          - ``jacobian.pc_type = pc_curl_curl_mlmg``: Use the AMReX MLMG solver for the curl curl formulation of Maxwell's equations. This preconditioner solves the following equation:
+
+            .. math::
+
+               \nabla \times \left( \alpha\nabla\times\textbf{E} \right) + \boldsymbol{\beta}\cdot\textbf{E} = \textbf{b},
+
+            where :math:`\alpha=\theta^2\Delta t^2c^2` is a scalar and :math:`\boldsymbol{\beta}` is a diagonal matrix that scales the components of :math:`\textbf{E}`.
+
+              - Default: :math:`\boldsymbol\beta = \mathbb{I}`, giving implicit Maxwell equations, suitable for time steps that under-resolve light waves (:math:`c\Delta t > 1/\sqrt{\left(\sum_i1/\Delta x_i^2\right)}`).
+              - ``implicit_evolve.use_mass_matrices_pc = true``: :math:`\boldsymbol\beta` also includes plasma response via the diagonal mass matrices, enabling time steps that under-resolve the plasma period (:math:`\omega_{pe}\Delta t > 1`).
+
+            - ``pc_curl_curl_mlmg.verbose`` (`bool`, default: true)
+            - ``pc_curl_curl_mlmg.bottom_verbose`` (`bool`, default: false)
+            - ``pc_curl_curl_mlmg.agglomeration`` (`bool`, default: true)
+            - ``pc_curl_curl_mlmg.consolidation`` (`bool`, default: true)
+            - ``pc_curl_curl_mlmg.max_iter`` (`int`, default: 10)
+            - ``pc_curl_curl_mlmg.max_coarsening_level`` (`int`, default: 30)
+            - ``pc_curl_curl_mlmg.relative_tolerance`` (`float`, default: 1.0e-4)
+            - ``pc_curl_curl_mlmg.absolute_tolerance`` (`float`, default: 1.0e-16)
+
+          - ``jacobian.pc_type = pc_jacobi``: Use the Point-Jacobi method. This preconditioner only captures the plasma response via the diagonal mass matrices.
+
+            - ``pc_jacobi.verbose`` (`bool`, default: true)
+            - ``pc_jacobi.max_iter`` (`int`, default: 10)
+            - ``pc_jacobi.relative_tolerance`` (`float`, default: 1.0e-4)
+            - ``pc_jacobi.absolute_tolerance`` (`float`, default: 1.0e-16)
+
+      - **References:** (WarpX includes relativistic extensions not discussed in references.)
+
+        - `Angus et al., On numerical energy conservation for an implicit particle-in-cell method coupled with a binary Monte-Carlo algorithm for Coulomb collisions <https://doi.org/10.1016/j.jcp.2022.111030>`__.
+        - `Angus et al., An implicit particle code with exact energy and charge conservation for electromagnetic studies of dense plasmas <https://doi.org/10.1016/j.jcp.2023.112383>`__.
+        - `Angus et al., An implicit particle code with exact energy and charge conservation for studies of dense plasmas in axisymmetric geometries <https://doi.org/10.1016/j.jcp.2024.113427>`__.
+
+    * ``semi_implicit_em``: Use an approximately energy conserving semi-implicit electromagnetic solver.
+
+      - Difference with ``theta_implicit_em`` is that light waves are treated explicit just as in the standard FDTD method. Consequently, this method has the CFL limitation :math:`c\Delta t < 1/\sqrt( \sum_i 1/\Delta x_i^2 )`.
+      - Particles are treated implicitly, and all of the comments for ``theta_implicit_em`` above apply here as well (except that :math:`\theta` is fixed to 0.5).
+      - The method is described in `Chen et al., A semi-implicit, energy- and charge-conserving particle-in-cell algorithm for the relativistic Vlasov-Maxwell equations <https://doi.org/10.1016/j.jcp.2020.109228>`__.
+
 
     * ``strang_implicit_spectral_em``: Use a fully implicit electromagnetic solver. All of the comments for ``theta_implicit_em``
-      above apply here as well (except that theta is fixed to 0.5 and that charge will not be conserved).
+      above apply here as well (except that :math:`\theta` is fixed to 0.5 and that charge will not be conserved).
       In this version, the advance is Strang split, with a half advance of the source free Maxwell's equation (with a spectral solver), a full advance of the particles plus longitudinal E field, and a second half advance of the source free Maxwell's equations.
       The advantage of this method is that with the Spectral advance of the fields, it is dispersionless.
-      Note that exact energy convergence is achieved only with one grid block and ``psatd.periodic_single_box_fft == 1``. Otherwise,
+      Note that exact energy convergence is achieved only with one grid block and ``psatd.periodic_single_box_fft = 1``. Otherwise,
       the energy convservation is spoiled because of the inconsistency of the periodic assumption of the spectral solver and the
       non-periodic behavior of the individual blocks.
-
-    * ``semi_implicit_em``: Use an approximately energy conserving semi-implicit electromagnetic solver. Choices for the nonlinear solver include a Picard iteration scheme and particle-suppressed JFNK.
-      Note that this method has the CFL limitation :math:`\Delta t < c/\sqrt( \sum_i 1/\Delta x_i^2 )`. The Picard solver for this method can only be expected to work well when :math:`\omega_{pe} \Delta t` is less than one.
-      The method is described in `Chen et al., A semi-implicit, energy- and charge-conserving particle-in-cell algorithm for the relativistic Vlasov-Maxwell equations <https://doi.org/10.1016/j.jcp.2020.109228>`__.
-      Exact energy conservation requires that the interpolation stencil used for the field gather match that used for the current deposition. ``algo.current_deposition = direct`` must be used with ``interpolation.galerkin_scheme = 0``, and ``algo.current_deposition = Esirkepov`` must be used with ``interpolation.galerkin_scheme = 1``. If using ``algo.current_deposition = villasenor``, the corresponding field gather routine will automatically be selected and the ``interpolation.galerkin_scheme`` flag does not need to be specified. The Esirkepov and villasenor deposition schemes are charge-conserving.
-
-* ``implicit_evolve.theta`` (`float`, default: 0.5)
-    When `algo.evolve_scheme = theta_implicit_em`, the fields used on the RHS of the equations for the implicit advance
-    are computed as (1-theta)*E_{n} + theta*E_{n+1}. theta is bound between 0.5 and 1. The default value of theta = 0.5
-    is needed for exact energy conservation. For theta > 0.5, high-k modes will be damped and the method will not be
-    exactly energy conserving, but the solver may perform better.
-
-* ``implicit_evolve.nonlinear_solver`` (`string`, default: None)
-    When `algo.evolve_scheme` is either `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em`, this sets the nonlinear solver used
-    to advance the field-particle system in time. Options are `picard` or `newton`.
-
-* ``implicit_evolve.max_particle_iterations`` (`integer`, default: 21)
-    When `algo.evolve_scheme` is either `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton`
-    , this sets the maximum number of iterations for the method used to obtain a self-consistent update of the particles at
-    each iteration in the JFNK process.
-
-* ``implicit_evolve.particle_tolerance`` (`float`, default: 1.e-10)
-    When `algo.evolve_scheme` is either `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton`
-    , this sets the relative tolerance for the iterative method used to obtain a self-consistent update of the particles at
-    each iteration in the JFNK process.
-
-* ``implicit_evolve.use_mass_matrices_jacobian`` (`bool`, default: false)
-    When `algo.evolve_scheme` is `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton`, mass matrices are computed at each nonlinear JFNK iteration and are used during the linear iterations to compute the plasma current density, replacing direct particle calculations.
-
-* ``implicit_evolve.use_mass_matrices_pc`` (`bool`, default: false)
-    When `algo.evolve_scheme` is `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton` and a preconditioner is used, this flag determines whether the plasma response is captured in the preconditioner.
-
-* ``picard.verbose`` (`bool`, default: 1)
-    When `implicit_evolve.nonlinear_solver = picard`, this sets the verbosity of the Picard solver. If true, then information
-    on the nonlinear error are printed to screen at each nonlinear iteration.
-
-* ``picard.require_convergence`` (`bool`, default: 1)
-    When `implicit_evolve.nonlinear_solver = picard`, this sets whether the Picard method is required to converge at each
-    time step. If it is required, an abort is raised if it does not converge and the code then exits. If not, then a warning
-    is issued and the calculation continues.
-
-* ``picard.maximum_iterations`` (`int`, default: 100)
-    When `implicit_evolve.nonlinear_solver = picard`, this sets the maximum iterations used by the Picard method. If
-    `picard.require_convergence = false`, the solution is considered converged if the iteration count reaches this value,
-    but a warning is issued. If `picard.require_convergence = true`, then an abort is raised if the iteration count reaches
-    this value.
-
-* ``picard.relative_tolerance`` (`float`, default: 1.0e-6)
-    When `implicit_evolve.nonlinear_solver = picard`, this sets the relative tolerance used by the Picard method for determining
-    convergence. The absolute error for the Picard method is the L2 norm of the difference of the solution vector between
-    two successive iterations. The relative error is the absolute error after iteration k > 1 divided by the absolute error
-    after the first iteration. The Picard method is considered converged when the relative error is below the relative tolerance.
-    This is the preferred means of determining convergence.
-
-* ``picard.absolute_tolerance`` (`float`, default: 0.0)
-    When `implicit_evolve.nonlinear_solver = picard`, this sets the absolute tolerance used by the Picard method for determining
-    convergence. The default value is 0.0, which means that the absolute tolerance is not used to determine converence. The
-    solution vector in the nonlinear solvers are in physical units rather than normalized ones. Thus, the absolute scale
-    of the problem can vary over many orders and magnitude depending on the problem. The relative tolerance is the preferred
-    means of determining convergence.
-
-* ``newton.verbose`` (`bool`, default: 1)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets the verbosity of the Newton solver. If true, then information
-    on the nonlinear error are printed to screen at each nonlinear iteration.
-
-* ``newton.require_convergence`` (`bool`, default: 1)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets whether the Newton method is required to converge at each
-    time step. If it is required, an abort is raised if it does not converge and the code then exits. If not, then a warning
-    is issued and the calculation continues.
-
-* ``newton.maximum_iterations`` (`int`, default: 100)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets the maximum iterations used by the Newton method. If
-    `newton.require_convergence = false`, the solution is considered converged if the iteration count reaches this value,
-    but a warning is issued. If `newton.require_convergence = true`, then an abort is raised if the iteration count reaches
-    this value.
-
-* ``newton.relative_tolerance`` (`float`, default: 1.0e-6)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets the relative tolerance used by the Newton method for determining
-    convergence. The absolute error for the Newton method is the L2 norm of the residual vector. The relative error is the
-    absolute error divided by the L2 norm of the initial residual associated with the initial guess. The Newton method is
-    considered converged when the relative error is below the relative tolerance. This is the preferred means of determining
-    convergence.
-
-* ``newton.absolute_tolerance`` (`float`, default: 0.0)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets the absolute tolerance used by the Newton method for determining
-    convergence. The default value is 0.0, which means that the absolute tolerance is not used to determine converence. The
-    residual vector in the nonlinear solvers are in physical units rather than normalized ones. Thus, the absolute scale
-    of the problem can vary over many orders and magnitude depending on the problem. The relative tolerance is the preferred
-    means of determining convergence.
-
-* ``gmres.verbose_int`` (`int`, default: 2)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets the verbosity of the AMReX::GMRES linear solver. The default
-    value of 2 gives maximumal verbosity and information about the residual are printed to the screen at each GMRES iteration.
-
-* ``gmres.restart_length`` (`int`, default: 30)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets the iteration number at which to do a restart in AMReX::GMRES.
-    This parameter is used to save memory on building the Krylov subspace basis vectors for linear systems that are ill-conditioned
-    and require many iterations to converge.
-
-* ``gmres.relative_tolerance`` (`float`, default: 1.0e-4)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets the relative tolerance used to determine convergence of the
-    AMReX::GMRES linear solver used to compute the Newton step in the JNFK process. The absolute error is the L2 norm of the
-    residual vector. The relative error is the absolute error divided by the L2 norm of the initial residual (typically equal
-    to the norm of the nonlinear residual from the end of the previous Newton iteration). The linear solver is considered
-    converged when the relative error is below the relative tolerance. This is the preferred means of determining convergence.
-
-* ``gmres.absolute_tolerance`` (`float`, default: 0.0)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets the absolute tolerance used to determine converence of the
-    GMRES linear solver used to compute the Newton step in the JNFK process. The default value is 0.0, which means that the
-    absolute tolerance is not used to determine converence. The residual vector in the nonlinear/linear solvers are in physical
-    units rather than normalized ones. Thus, the absolute scale of the problem can vary over many orders and magnitude depending
-    on the problem. The relative tolerance is the preferred means of determining convergence.
-
-* ``gmres.maximum_iterations`` (`int`, default: 1000)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets the maximum iterations used by the GMRES linear solver. The
-    solution to the linear system is considered converged if the iteration count reaches this value.
 
 * ``warpx.do_electrostatic`` (`string`) optional (default `none`)
     Specifies the electrostatic mode. When turned on, instead of updating
