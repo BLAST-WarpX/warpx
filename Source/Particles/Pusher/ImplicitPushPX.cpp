@@ -56,8 +56,8 @@ namespace {
     enum depos_order_flags : int { one, two, three, four };
 
     template<int exteb_control, int qed_control>
-    bool
-    PushXPSingeStep (
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    bool PushXPSingeStep (
         int const & ip,
         amrex::Real const & dt,
         SetParticlePosition<PIdx> const &  setPosition,
