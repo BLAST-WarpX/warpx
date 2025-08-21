@@ -507,11 +507,10 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     const auto depos_type = WarpX::current_deposition_algo;
 
     if (!skip_deposition && (
-        (depos_type != CurrentDepositionAlgo::Esirkepov) &&
-        (depos_type != CurrentDepositionAlgo::Villasenor)) ) {
+        depos_type != CurrentDepositionAlgo::Villasenor) ) {
         ablastr::warn_manager::WMRecordWarning("ImplicitPushXPSubOrbits",
-            "When particle suborbits are used during the implicit particle push, only Esirkepov or Villasenor "
-            "current deposition are supported.");
+            "When particle suborbits are used during the implicit particle push, only Villasenor "
+            "current deposition is supported.");
     }
 
     // Get cell size on gather_lev
@@ -939,56 +938,32 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                 const amrex::ParticleReal gaminv = 1.;
 #endif
 
-                if (depos_type == CurrentDepositionAlgo::Esirkepov) {
-                    if (nox == 1) {
-                        EsirkepovDepositionShapeNKernel<1>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
-                                                           uxp_nph, uyp_nph, uzp_nph, gaminv,
-                                                           Jx_arr, Jy_arr, Jz_arr,
-                                                           dt_suborbit, dinv, xyzmin, lo, n_rz_azimuthal_modes);
-                    } else if (nox == 2) {
-                        EsirkepovDepositionShapeNKernel<2>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
-                                                           uxp_nph, uyp_nph, uzp_nph, gaminv,
-                                                           Jx_arr, Jy_arr, Jz_arr,
-                                                           dt_suborbit, dinv, xyzmin, lo, n_rz_azimuthal_modes);
-                    } else if (nox == 3) {
-                        EsirkepovDepositionShapeNKernel<3>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
-                                                           uxp_nph, uyp_nph, uzp_nph, gaminv,
-                                                           Jx_arr, Jy_arr, Jz_arr,
-                                                           dt_suborbit, dinv, xyzmin, lo, n_rz_azimuthal_modes);
-                    } else if (nox == 4) {
-                        EsirkepovDepositionShapeNKernel<4>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
-                                                           uxp_nph, uyp_nph, uzp_nph, gaminv,
-                                                           Jx_arr, Jy_arr, Jz_arr,
-                                                           dt_suborbit, dinv, xyzmin, lo, n_rz_azimuthal_modes);
-                    }
-
-                } else if (depos_type == CurrentDepositionAlgo::Villasenor) {
-                    if (nox == 1) {
-                        VillasenorDepositionShapeNKernel<1>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
-                                                            uxp_nph, uyp_nph, uzp_nph, gaminv,
-                                                            Jx_arr, Jy_arr, Jz_arr,
-                                                            dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
-                    }
-                    else if (nox == 2) {
-                        VillasenorDepositionShapeNKernel<2>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
-                                                            uxp_nph, uyp_nph, uzp_nph, gaminv,
-                                                            Jx_arr, Jy_arr, Jz_arr,
-                                                            dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
-                    }
-                    else if (nox == 3) {
-                        VillasenorDepositionShapeNKernel<3>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
-                                                            uxp_nph, uyp_nph, uzp_nph, gaminv,
-                                                            Jx_arr, Jy_arr, Jz_arr,
-                                                            dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
-                    }
-                    else if (nox == 4) {
-                        VillasenorDepositionShapeNKernel<4>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
-                                                            uxp_nph, uyp_nph, uzp_nph, gaminv,
-                                                            Jx_arr, Jy_arr, Jz_arr,
-                                                            dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
-                    }
-
+                // Only CurrentDepositionAlgo::Villasenor is supported
+                if (nox == 1) {
+                    VillasenorDepositionShapeNKernel<1>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
+                                                        uxp_nph, uyp_nph, uzp_nph, gaminv,
+                                                        Jx_arr, Jy_arr, Jz_arr,
+                                                        dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                 }
+                else if (nox == 2) {
+                    VillasenorDepositionShapeNKernel<2>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
+                                                        uxp_nph, uyp_nph, uzp_nph, gaminv,
+                                                        Jx_arr, Jy_arr, Jz_arr,
+                                                        dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
+                }
+                else if (nox == 3) {
+                    VillasenorDepositionShapeNKernel<3>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
+                                                        uxp_nph, uyp_nph, uzp_nph, gaminv,
+                                                        Jx_arr, Jy_arr, Jz_arr,
+                                                        dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
+                }
+                else if (nox == 4) {
+                    VillasenorDepositionShapeNKernel<4>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
+                                                        uxp_nph, uyp_nph, uzp_nph, gaminv,
+                                                        Jx_arr, Jy_arr, Jz_arr,
+                                                        dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
+                }
+
             }
         }
 
