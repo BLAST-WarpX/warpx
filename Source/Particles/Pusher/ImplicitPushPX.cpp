@@ -53,6 +53,7 @@ namespace {
 
     enum exteb_flags : int { no_exteb, has_exteb };
     enum qed_flags : int { no_qed, has_qed };
+    enum depos_order_flags : int { one, two, three, four };
 
     template<int exteb_control, int qed_control>
     bool
@@ -104,7 +105,7 @@ namespace {
         amrex::XDim3 const & xyzmin,
         amrex::Dim3 const & lo,
         int const & n_rz_azimuthal_modes,
-        int const & nox,
+        int const & depos_order,
         CurrentDepositionAlgo const & depos_type,
         GetExternalEBField const & getExternalEB,
         ScaleFields const & scaleFields,
@@ -151,7 +152,7 @@ namespace {
             doGatherShapeNImplicit(xp_n, yp_n, zp_n, xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                    ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                    ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                   dinv, xyzmin, lo, n_rz_azimuthal_modes, nox,
+                                   dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order,
                                    depos_type );
         }
 
@@ -301,7 +302,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     const amrex::Dim3 lo = lbound(box);
 
     const auto depos_type = WarpX::current_deposition_algo;
-    const int nox = WarpX::nox;
+    const int depos_order = WarpX::nox;
     const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
 
     amrex::Array4<const amrex::Real> const& ex_arr = exfab->array();
@@ -446,7 +447,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                                  Bx_external_particle, By_external_particle, Bz_external_particle,
                                  t_do_not_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                  ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                 dinv, xyzmin, lo, n_rz_azimuthal_modes, nox, depos_type,
+                                 dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, depos_type,
                                  getExternalEB, scaleFields, do_sync, ion_lev, m, q, pusher_algo, do_crr
 #ifdef WARPX_QED
                                  , t_chi_max, local_has_quantum_sync, p_optical_depth_QSR, evolve_opt
@@ -619,7 +620,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
     const amrex::Dim3 lo = lbound(box);
 
-    const int nox = WarpX::nox;
+    const int depos_order = WarpX::nox;
     const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
 
     amrex::Array4<const amrex::Real> const & ex_arr = exfab->array();
@@ -695,6 +696,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 #else
     const int qed_runtime_flag = no_qed;
 #endif
+    const int depos_order_flag = depos_order;
 
     const int max_iterations = WarpX::max_particle_its_in_implicit_scheme;
     const amrex::ParticleReal particle_tolerance = WarpX::particle_tol_in_implicit_scheme;
@@ -711,10 +713,11 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     // improves performance when qed or external EB are not used by reducing
     // register pressure.
     amrex::ParallelFor(amrex::TypeList<amrex::CompileTimeOptions<no_exteb,has_exteb>,
-                                       amrex::CompileTimeOptions<no_qed  ,has_qed>>{},
-                       {exteb_runtime_flag, qed_runtime_flag},
+                                       amrex::CompileTimeOptions<no_qed  ,has_qed>,
+                                       amrex::CompileTimeOptions<one, two, three, four >>{},
+                       {exteb_runtime_flag, qed_runtime_flag, depos_order_flag},
                        num_unconverged_particles, [=] AMREX_GPU_DEVICE (long i,
-                                                                 auto exteb_control, auto qed_control)
+                                                                 auto exteb_control, auto qed_control, auto depos_order_control)
     {
 
         long ip = unconverged_i[i];
@@ -811,7 +814,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                      Bx_external_particle, By_external_particle, Bz_external_particle,
                                      t_do_not_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                      ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                     dinv, xyzmin, lo, n_rz_azimuthal_modes, nox, depos_type,
+                                     dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, depos_type,
                                      getExternalEB, scaleFields, do_sync, ion_lev, m, q, pusher_algo, do_crr
 #ifdef WARPX_QED
                                      , t_chi_max, local_has_quantum_sync, p_optical_depth_QSR, evolve_opt
@@ -936,25 +939,25 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 #endif
 
                 // Only CurrentDepositionAlgo::Villasenor is supported
-                if (nox == 1) {
+                if constexpr (depos_order_control == one) {
                     VillasenorDepositionShapeNKernel<1>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
                                                         uxp_nph, uyp_nph, uzp_nph, gaminv,
                                                         Jx_arr, Jy_arr, Jz_arr,
                                                         dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                 }
-                else if (nox == 2) {
+                else if constexpr (depos_order_control == two) {
                     VillasenorDepositionShapeNKernel<2>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
                                                         uxp_nph, uyp_nph, uzp_nph, gaminv,
                                                         Jx_arr, Jy_arr, Jz_arr,
                                                         dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                 }
-                else if (nox == 3) {
+                else if constexpr (depos_order_control == three) {
                     VillasenorDepositionShapeNKernel<3>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
                                                         uxp_nph, uyp_nph, uzp_nph, gaminv,
                                                         Jx_arr, Jy_arr, Jz_arr,
                                                         dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                 }
-                else if (nox == 4) {
+                else if constexpr (depos_order_control == four) {
                     VillasenorDepositionShapeNKernel<4>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
                                                         uxp_nph, uyp_nph, uzp_nph, gaminv,
                                                         Jx_arr, Jy_arr, Jz_arr,
