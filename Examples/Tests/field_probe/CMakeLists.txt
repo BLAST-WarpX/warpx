@@ -52,3 +52,13 @@ add_warpx_test(
     OFF  # checksum
     OFF  # dependency
 )
+
+add_warpx_test(
+    test_3d_field_probe_window_cross_boundary
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_field_probe_window_cross_boundary  # inputs
+    OFF  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
