@@ -159,7 +159,7 @@ protected:
      * \brief whether to use suborbits for particles that fail to converge in
      * m_max_particle_iterations iterations
      */
-    bool m_particle_suborbits = true;
+    bool m_particle_suborbits = false;
 
     /**
      * \brief Whether to use mass matrices for the implicit solver

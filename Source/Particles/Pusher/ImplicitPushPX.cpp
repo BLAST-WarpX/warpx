@@ -325,8 +325,6 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr() + offset;
     amrex::ParticleReal* const AMREX_RESTRICT w  = attribs[PIdx::w ].dataPtr() + offset;
 
-    auto * const AMREX_RESTRICT idcpu = pti.GetStructOfArrays().GetIdCPUData().data() + offset;
-
     // The x/y/z_n are the positions and velocities saved at the start of the step
 #if !defined(WARPX_DIM_1D_Z)
     amrex::ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr() + offset;
@@ -399,7 +397,11 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     {
 
         // Skip any particles that require suborbits
-        if (nsuborbits && nsuborbits[ip] > 1) { return; }
+        if (nsuborbits && nsuborbits[ip] > 1) {
+            // write signaling flag: how many particles did not converge?
+            amrex::Gpu::Atomic::Add(unconverged_particles_ptr, amrex::Long(1));
+            return;
+        }
 
 #if !defined(WARPX_DIM_1D_Z)
         amrex::ParticleReal xp = x_n[ip];
@@ -459,20 +461,19 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
 
             // check if particle did not converge
             if (iter > 1 && iter == max_iterations) {
-                // Flag the particle as invalid. It will be handled later in a special
-                // loop with suborbiting.
-                amrex::ParticleIDWrapper{idcpu[ip]}.make_invalid();
 
                 if (nsuborbits) {
+                    // Suborbits are required for this particle to converge.
+                    // It will be handled later in a special loop with suborbiting.
                     nsuborbits[ip] = 2;
-                }
 
 #ifdef WARPX_QED
-                // Reset the QED parameter to what is was at the start of the step
-                if (local_has_quantum_sync) {
-                    p_optical_depth_QSR[ip] = p_optical_depth_QSR0;
-                }
+                    // Reset the QED parameter to what is was at the start of the step
+                    if (local_has_quantum_sync) {
+                        p_optical_depth_QSR[ip] = p_optical_depth_QSR0;
+                    }
 #endif
+                }
 
                 // write signaling flag: how many particles did not converge?
                 amrex::Gpu::Atomic::Add(unconverged_particles_ptr, amrex::Long(1));
@@ -496,31 +497,30 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     long * unconverged_i = unconverged_indices.data() + num_previous;
     amrex::ParticleReal * saved_w = saved_weights.data() + num_previous;
 
-    // This looks for the unconverged particles, which had been flagged as invalid
-    long num_flagged = amrex::Scan::PrefixSum<long>(np_to_push,
-        [=] AMREX_GPU_DEVICE (long ip) -> long
-            {
-                auto pidw = amrex::ParticleIDWrapper{idcpu[ip]};
-                return !pidw.is_valid();
-            },
-        [=] AMREX_GPU_DEVICE (long ip, long x) // x is the exclusive sum at position ip
-            {
-                auto pidw = amrex::ParticleIDWrapper{idcpu[ip]};
-                if (!pidw.is_valid()) {
-                    // pidw.make_valid() would it work to do this here?
-                    // This check of x should always be true but is here for memory safety
-                    if (x < num_unconverged_particles)  {
-                        // The index saved is relative to the full array
-                        unconverged_i[x] = ip + offset;
-                        saved_w[x] = w[ip];
-                        w[ip] = 0.0_prt;
+    if (nsuborbits) {
+        // This looks for the unconverged particles, which had been flagged as invalid
+        long num_flagged = amrex::Scan::PrefixSum<long>(np_to_push,
+            [=] AMREX_GPU_DEVICE (long ip) -> long
+                {
+                    return nsuborbits[ip] > 1;
+                },
+            [=] AMREX_GPU_DEVICE (long ip, long x) // x is the exclusive sum at position ip
+                {
+                    if (nsuborbits[ip] > 1) {
+                        // This check of x should always be true but is here for memory safety
+                        if (x < num_unconverged_particles)  {
+                            // The index saved is relative to the full array
+                            unconverged_i[x] = ip + offset;
+                            saved_w[x] = w[ip];
+                            w[ip] = 0.0_prt;
+                        }
                     }
-                }
-            },
-         amrex::Scan::Type::exclusive, amrex::Scan::retSum);
+                },
+             amrex::Scan::Type::exclusive, amrex::Scan::retSum);
 
-     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(num_flagged == num_unconverged_particles,
-                                      "ImplicitPushXP: wrong number of invalid particles found");
+         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(num_flagged == num_unconverged_particles,
+                                          "ImplicitPushXP: wrong number of invalid particles found");
+    }
 
     if (num_unconverged_particles > 0) {
         ablastr::warn_manager::WMRecordWarning("ImplicitPushXP",
@@ -574,6 +574,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE((gather_lev==(lev-1)) ||
                                      (gather_lev==(lev  )),
                                      "Gather buffers only work for lev-1");
+
+    // If not doing suborbits, do not do anything
+    if (!HasiAttrib("nsuborbits")) { return; }
 
     // If no particles, do not do anything
     if (num_unconverged_particles == 0) { return; }
@@ -646,7 +649,6 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
     amrex::ParticleReal* const AMREX_RESTRICT w  = attribs[PIdx::w ].dataPtr();
 
-    auto * const AMREX_RESTRICT idcpu = pti.GetStructOfArrays().GetIdCPUData().data();
     int *nsuborbits = pti.GetiAttribs("nsuborbits").dataPtr();
 
 #if !defined(WARPX_DIM_1D_Z)
@@ -724,10 +726,6 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
         // Restore the particle weight
         w[ip] = saved_w[i];
-
-        // Reset valid flag
-        auto pidw = amrex::ParticleIDWrapper{idcpu[ip]};
-        pidw.make_valid();
 
         // Create temporary arrays to hold the particle suborbit data
         // at the start of each sub step which is used to deposit the
