@@ -109,13 +109,13 @@ namespace {
         CurrentDepositionAlgo const & depos_type,
         GetExternalEBField const & getExternalEB,
         ScaleFields const & scaleFields,
-        bool const & do_sync,
         int const * const ion_lev,
         amrex::ParticleReal const & m,
         amrex::ParticleReal const & q,
         ParticlePusherAlgo const & pusher_algo,
-        bool const & do_crr,
+        bool const & do_crr
 #ifdef WARPX_QED
+        , bool const & do_sync,
         amrex::Real t_chi_max,
         bool const & local_has_quantum_sync,
         amrex::ParticleReal * p_optical_depth_QSR,
@@ -448,9 +448,9 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                                  t_do_not_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                  ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                                  dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, depos_type,
-                                 getExternalEB, scaleFields, do_sync, ion_lev, m, q, pusher_algo, do_crr
+                                 getExternalEB, scaleFields, ion_lev, m, q, pusher_algo, do_crr
 #ifdef WARPX_QED
-                                 , t_chi_max, local_has_quantum_sync, p_optical_depth_QSR, evolve_opt
+                                 , do_sync, t_chi_max, local_has_quantum_sync, p_optical_depth_QSR, evolve_opt
 #endif
                                  );
             if (convergence) { break; }
@@ -815,9 +815,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                      t_do_not_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                      ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                                      dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, depos_type,
-                                     getExternalEB, scaleFields, do_sync, ion_lev, m, q, pusher_algo, do_crr
+                                     getExternalEB, scaleFields, ion_lev, m, q, pusher_algo, do_crr
 #ifdef WARPX_QED
-                                     , t_chi_max, local_has_quantum_sync, p_optical_depth_QSR, evolve_opt
+                                     , do_sync, t_chi_max, local_has_quantum_sync, p_optical_depth_QSR, evolve_opt
 #endif
                                      );
                 if (convergence) { break; }
