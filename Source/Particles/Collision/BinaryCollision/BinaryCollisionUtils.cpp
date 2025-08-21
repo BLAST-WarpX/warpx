@@ -88,6 +88,8 @@ namespace BinaryCollisionUtils{
                 "The first product species in linear Compton collisions must be a photon");
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE( product_species2.AmIA<PhysicalSpecies::electron>() || product_species2.AmIA<PhysicalSpecies::positron>(),
                 "The second product species in linear Compton collisions must be an electron or positron");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( species2.getSpeciesTypeName() == product_species2.getSpeciesTypeName(),
+                "The second incident species and the second product species in linear Compton collisions must be of the same type");
             return CollisionType::LinearCompton;
         }
         return CollisionType::Undefined;
