@@ -219,6 +219,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
 
     amrex::Gpu::Buffer<amrex::Long> unconverged_particles({0});
     amrex::Long* unconverged_particles_ptr = unconverged_particles.data();
+    int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() : nullptr);
 
     // Using this version of ParallelFor with compile time options
     // improves performance when qed or external EB are not used by reducing
@@ -229,6 +230,9 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                        np_to_push, [=] AMREX_GPU_DEVICE (long ip, auto exteb_control,
                                                          auto qed_control)
     {
+
+        // Skip any particles that require suborbits
+        if (nsuborbits && nsuborbits[ip] > 1) { return; }
 
 #if !defined(WARPX_DIM_1D_Z)
         amrex::ParticleReal xp = x_n[ip];
@@ -384,6 +388,10 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                 // Flag the particle as invalid. It will be handled later in a special
                 // loop with suborbiting.
                 amrex::ParticleIDWrapper{idcpu[ip]}.make_invalid();
+
+                if (nsuborbits) {
+                    nsuborbits[ip] = 2;
+                }
 
 #ifdef WARPX_QED
                 // Reset the QED parameter to what is was at the start of the step
@@ -566,6 +574,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     amrex::ParticleReal* const AMREX_RESTRICT w  = attribs[PIdx::w ].dataPtr();
 
     auto * const AMREX_RESTRICT idcpu = pti.GetStructOfArrays().GetIdCPUData().data();
+    int *nsuborbits = pti.GetiAttribs("nsuborbits").dataPtr();
 
 #if !defined(WARPX_DIM_1D_Z)
     amrex::ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr();
@@ -709,11 +718,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
         auto idyg2 = static_cast<amrex::ParticleReal>(dinv.y*dinv.y);
         auto idzg2 = static_cast<amrex::ParticleReal>(dinv.z*dinv.z);
 
-        // A single step advance already failed, so start here with two suborbit steps
-        int num_suborbits = 2;
-
         int isuborbit = 0;
-        while (isuborbit < num_suborbits) {
+        while (isuborbit < nsuborbits[ip]) {
             // Save the quantities at the start of the sub step
             x_n_save[isuborbit] = xp_n;
             y_n_save[isuborbit] = yp_n;
@@ -722,7 +728,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
             uy_n_save[isuborbit] = uyp_n;
             uz_n_save[isuborbit] = uzp_n;
 
-            amrex::Real const dt_suborbit = dt/num_suborbits;
+            amrex::Real const dt_suborbit = dt/nsuborbits[ip];
 
             // Try advancing the particle one suborbit step
             amrex::ParticleReal step_norm = 1.0_prt;
@@ -825,7 +831,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
                 // particle did not converge
                 // Increase the number of suborbits and start over
-                num_suborbits++;
+                nsuborbits[ip]++;
                 isuborbit = 0;
 
                 xp_n = xp_n0;
@@ -864,7 +870,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
             }
 
-            if (num_suborbits >= max_suborbits) {
+            if (nsuborbits[ip] >= max_suborbits) {
                 // This is very bad
                 amrex::Gpu::Atomic::Add(unconverged_particles_ptr, amrex::Long(1));
                 break;
@@ -897,12 +903,12 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                 wq *= ion_lev[ip];
             }
 
-            wq /= num_suborbits;
+            wq /= nsuborbits[ip];
 
-            amrex::Real const dt_suborbit = dt/num_suborbits;
+            amrex::Real const dt_suborbit = dt/nsuborbits[ip];
 
             // Deposit the current density from the suborbit steps
-            for (int is=0 ; is < num_suborbits ; is++) {
+            for (int is=0 ; is < nsuborbits[ip] ; is++) {
                 const amrex::ParticleReal xp_old = x_n_save[is];
                 const amrex::ParticleReal yp_old = y_n_save[is];
                 const amrex::ParticleReal zp_old = z_n_save[is];
