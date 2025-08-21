@@ -2098,7 +2098,11 @@ Details about the collision models can be found in the :ref:`theory section <mul
       This implements the generation of electron-positron pairs based on the analytical cross-section, e.g.
       equation (1) in Gould. The angular distribution of the emitted pairs is isotropic for now
       (instead of following the correct distribution, see e.g. `Ribeyre et al. (Plasma Phys. Control. Fusion 60 104001, 2018) <https://doi.org/10.1088/1361-6587/aad6da>`__).
-      The implementation follows the same numerical algorithm as that of fusion reactions (see. `Higginson et al. (JCP 388, 439-453, 2019) <https://doi.org/10.1016/j.jcp.2019.03.020>`__).
+      The implementation follows the same numerical algorithm as that of fusion reactions (see. :cite:t:`param-HigginsonJCP2019`).
+    - ``linear_compton`` for linear Compton scattering between a lepton (electron or positron, for now) and a photon, based on the Klein-Nishina cross-section
+      (see for example :cite:t:`param-LandauVol4`: equations 86.10 and 86.16 for the differential and total cross sections, respectively).
+      The probability of scattering is drawn from the total cross section, while the angular distribution of the scattered lepton and photon is drawn from the differential cross section.
+      The implementation follows the same numerical algorithm as that of fusion reactions (see. :cite:t:`param-HigginsonJCP2019`).
 
 * ``<collision_name>.species`` (`strings`)
     If using ``dsmc``, ``pairwisecoulomb`` or ``nuclearfusion``, this should be the name(s) of the species,
@@ -2107,6 +2111,8 @@ Details about the collision models can be found in the :ref:`theory section <mul
     species for which collisions with a background will be included.
     In this case, only one species name should be given.
     If using ``linear_breit_wheeler`` these should be two photon species.
+    If using ``linear_compton``, these should be two species: first, a photon species, and second, a lepton species, in this exact order.
+
 
 * ``<collision_name>.product_species`` (`strings`)
     Only for ``dsmc``, ``linear_breit_wheeler``, and ``nuclearfusion``. The name(s) of the species in which to add
@@ -2114,6 +2120,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     If using ``dsmc`` with ionization reactions, the first species in this list must be an electron.
     If using ``dsmc`` with charge exchange, the order of the ``product_species`` should match the order of the species in ``<collision_name>.species``.
     If using ``linear_breit_wheeler`` these should be two species: one of electrons and one of positrons.
+    If using ``linear_compton``, these should be two species: first, a photon species, and second, a lepton species, in this exact order.
 
 * ``<collision_name>.ndt`` (`int`) optional
     Execute collision every # time steps. The default value is 1.
@@ -2138,7 +2145,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     is specified, this Debye length is not used.
 
 * ``<collision_name>.event_multiplier`` (`float`) optional.
-    Only for ``nuclearfusion`` and ``linear_breit_wheeler`` (LBW).
+    Only for ``nuclearfusion``, ``linear_breit_wheeler``, and ``linear_compton``.
     Increasing ``event_multiplier`` creates more macroparticles products,
     but with lower weight (in such a way that the corresponding
     total number of physical particle remains the same). This can improve
@@ -2150,7 +2157,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     The default value of ``event_multiplier`` is 1.
 
 * ``<collision_name>.probability_threshold`` (`float`) optional.
-    Only for ``nuclearfusion`` and ``linear_breit_wheeler``.
+    Only for ``nuclearfusion``, ``linear_breit_wheeler``, and ``linear_compton``.
     If the event multiplier is too high and results in a probability
     that approaches 1 (for a given collision between two macroparticles), then
     there is a risk of underestimating the total yield. In these cases,
@@ -2159,7 +2166,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     which WarpX reduces the event multiplier.
 
 * ``<collision_name>.probability_target_value`` (`float`) optional.
-    Only for ``nuclearfusion`` and ``linear_breit_wheeler``.
+    Only for ``nuclearfusion``, ``linear_breit_wheeler``, and ``linear_compton``.
     When the probability of fusion or linear Breit-Wheeler for a given collision exceeds
     ``probability_threshold``, WarpX reduces the event multiplier for
     that collisions such that the probability approches ``probability_target_value``.
