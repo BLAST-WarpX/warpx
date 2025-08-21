@@ -937,6 +937,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 #endif
 
                 // Only CurrentDepositionAlgo::Villasenor is supported
+                // The ignore_unused is needed so that the variables are not first-captured
+                // in a constexpr-if context.
+                amrex::ignore_unused(Jx_arr, Jy_arr, Jz_arr, invvol);
                 if constexpr (depos_order_control == one) {
                     VillasenorDepositionShapeNKernel<1>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
                                                         uxp_nph, uyp_nph, uzp_nph, gaminv,
