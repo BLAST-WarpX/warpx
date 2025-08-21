@@ -10,7 +10,7 @@ It supports many features including:
     - Multiple types of field solvers (incl. electromagnetic, electrostatic)
     - Various grid geometries (1D/2D/3D Cartesian, cylindrical, spherical)
     - Multi-physics packages (incl. ionization, atomic, fusion and collisional physics, as well as quantum electrodynamics)
-    - Advanced numerical methods (incl. explicit and implicit PIC loop, mesh refinement, boosted-frame simulations, embedded boundaries)
+    - Advanced numerical methods (incl. explicit and implicit time advance, mesh refinement, boosted-frame simulations, embedded boundaries)
 
 For details on these features, see the :ref:`theory section <theory>`.
 WarpX has been applied to a wide variety of science projects, see :ref:`highlights <highlights>`.
