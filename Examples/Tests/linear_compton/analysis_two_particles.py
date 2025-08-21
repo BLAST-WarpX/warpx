@@ -10,26 +10,12 @@ from analysis_base import (
     check_charge_conservation,
     check_energy_conservation,
     check_momentum_conservation,
-    find_num_in_line,
 )
-
-
-# get input parameters from warpx_used_inputs
-def get_input_parameters():
-    with open("./warpx_used_inputs", "rt") as f:
-        lines = f.readlines()
-        for line in lines:
-            if "electron1.single_particle_weight" in line:
-                w1 = find_num_in_line(line)
-            if "photon1.single_particle_weight" in line:
-                w2 = find_num_in_line(line)
-    return (w1, w2)
 
 
 # check that all the original electrons and photons have been completely scattered,
 # i.e. all the electrons and photons are now in the species labelled "electron2" and "photon2"
 def check_final_macroparticles():
-    (w1, w2) = get_input_parameters()
     macro_photon1_number = np.loadtxt("diags/reducedfiles/ParticleNumber.txt")[-1, 3]
     macro_photon1_weight = np.loadtxt("diags/reducedfiles/ParticleNumber.txt")[-1, 8]
     macro_electron1_number = np.loadtxt("diags/reducedfiles/ParticleNumber.txt")[-1, 4]
@@ -41,7 +27,7 @@ def check_final_macroparticles():
     macro_photon2_number = np.loadtxt("diags/reducedfiles/ParticleNumber.txt")[-1, 5]
     macro_photon2_weight = np.loadtxt("diags/reducedfiles/ParticleNumber.txt")[-1, 10]
     assert macro_electron2_number == macro_photon2_number == 2.0
-    assert macro_electron2_weight == macro_photon2_weight == w1 == w2
+    assert macro_electron2_weight == macro_photon2_weight == 1e14
 
 
 def main():
