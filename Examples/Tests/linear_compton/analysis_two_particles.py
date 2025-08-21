@@ -41,7 +41,7 @@ def check_final_macroparticles():
     macro_photon2_number = np.loadtxt("diags/reducedfiles/ParticleNumber.txt")[-1, 5]
     macro_photon2_weight = np.loadtxt("diags/reducedfiles/ParticleNumber.txt")[-1, 10]
     assert macro_electron2_number == macro_photon2_number == 2.0
-    assert macro_electron2_weight == macro_photon2_weight == 1e14
+    assert macro_electron2_weight == macro_photon2_weight == w1 == w2
 
 
 def main():

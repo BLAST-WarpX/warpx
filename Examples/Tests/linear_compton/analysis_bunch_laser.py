@@ -10,7 +10,6 @@ r_e = physical_constants["classical electron radius"][0]  # m
 do_plots = True
 
 Q_bunch = 2080.5031144200598 * 30000 * q_e  # Coulomb
-N_bunch = 300000
 gamma_bunch_mean = 30.205798028084185
 gamma_bunch_rms = 0.58182474907848347
 bunch_sigma_z = 1.0e-6  # meters
@@ -22,7 +21,6 @@ photon_energy = eV  # Joule
 laser_wavelength = h * c / photon_energy  # meters
 N_photons = laser_energy / photon_energy
 
-# %%
 # Check momentum conservation
 series = OpenPMDTimeSeries("diags/diag1")
 uz, w = series.get_particle(
@@ -57,7 +55,6 @@ assert np.allclose(0.0, px_pho2 + px_ele2, atol=1.0e-9 * abs(pz_init))
 assert np.allclose(0.0, py_pho2 + py_ele2, atol=1.0e-9 * abs(pz_init))
 assert np.allclose(pz_ele1 + pz_ele2 + pz_pho2, pz_init, atol=1.0e-9 * abs(pz_init))
 
-# %%
 # Check that the photon fraction is close (within 10%) to
 # the estimate, based on the Klein-Nishina formula
 
@@ -69,6 +66,7 @@ k = photon_p_rest / (m_e * c)
 # For low k, the Klein-Nishina cross-section is essentially the
 # Compton cross-section
 assert k < 1.0e-3
+print(k)
 sigma = 8.0 / 3 * np.pi * r_e**2
 # - Total number of photons that go through this cross-section
 energy_per_surface = laser_energy / (np.pi * laser_radius**2)
@@ -79,6 +77,7 @@ expected_frac = sigma * nphoton_per_surface
 w2 = series.get_particle(
     ["uz", "w"], species="photon2", iteration=series.iterations[-1]
 )
+
 w1 = series.get_particle(
     ["uz", "w"], species="electron1", iteration=series.iterations[0]
 )
@@ -88,9 +87,8 @@ print("Fraction of Compton-scattered photons / bunch electrons")
 print(f"From simulation : {simulated_frac}")
 print(f"From theory     : {expected_frac}")
 print(f"Relative error  : {abs(simulated_frac - expected_frac) / expected_frac:.2%}")
-assert abs(simulated_frac - expected_frac) < 0.1 * expected_frac
+assert abs(simulated_frac - expected_frac) < 0.06 * expected_frac
 
-# %%
 # Bin the photons on a grid in frequency and angle
 
 freq_min = 0.5
