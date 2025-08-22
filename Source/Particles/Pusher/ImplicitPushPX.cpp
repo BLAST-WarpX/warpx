@@ -114,7 +114,6 @@ namespace {
 #ifdef WARPX_QED
         , bool const & do_sync,
         amrex::Real t_chi_max,
-        bool const & local_has_quantum_sync,
         amrex::ParticleReal * p_optical_depth_QSR,
         QuantumSynchrotronEvolveOpticalDepth const & evolve_opt
 #endif
@@ -208,11 +207,10 @@ namespace {
 #endif
 
 #ifdef WARPX_QED
-            [[maybe_unused]] auto foo_local_has_quantum_sync = local_has_quantum_sync;
             [[maybe_unused]] auto *foo_podq = p_optical_depth_QSR;
             [[maybe_unused]] const auto& foo_evolve_opt = evolve_opt; // have to do all these for nvcc
             if constexpr (qed_control == has_qed) {
-                if (local_has_quantum_sync) {
+                if (p_optical_depth_QSR) {
                     evolve_opt(ux[ip], uy[ip], uz[ip],
                                Exp, Eyp, Ezp,Bxp, Byp, Bzp,
                                dt, p_optical_depth_QSR[ip]);
@@ -446,7 +444,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
 
 #ifdef WARPX_QED
         amrex::ParticleReal p_optical_depth_QSR0 = 0.0_prt;
-        if (local_has_quantum_sync) {
+        if (p_optical_depth_QSR) {
             p_optical_depth_QSR0 = p_optical_depth_QSR[ip];
         }
 #endif
@@ -466,7 +464,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                              dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, depos_type,
                              getExternalEB, scaleFields, ion_lev, m, q, pusher_algo, do_crr
 #ifdef WARPX_QED
-                             , do_sync, t_chi_max, local_has_quantum_sync, p_optical_depth_QSR, evolve_opt
+                             , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
 #endif
                              );
 
@@ -480,7 +478,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
 
 #ifdef WARPX_QED
                 // Reset the QED parameter to what is was at the start of the step
-                if (local_has_quantum_sync) {
+                if (p_optical_depth_QSR) {
                     p_optical_depth_QSR[ip] = p_optical_depth_QSR0;
                 }
 #endif
@@ -710,7 +708,6 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     if (do_field_ionization) {
         ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
     }
-    bool const do_ionization = do_field_ionization;
 
     // Loop over the particles and update their momentum
     const amrex::ParticleReal q = this->charge;
@@ -765,7 +762,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
         w[ip] = saved_w[i];
 
         amrex::Real wq = q*w[ip];
-        if (do_ionization) {
+        if (ion_lev) {
             wq *= ion_lev[ip];
         }
 
@@ -792,7 +789,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
 #if WARPX_QED
         amrex::ParticleReal p_optical_depth_QSR0 = 0.0_prt;
-        if (local_has_quantum_sync) {
+        if (p_optical_depth_QSR) {
             p_optical_depth_QSR0 = p_optical_depth_QSR[ip];
         }
 #endif
@@ -835,7 +832,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                  dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, depos_type,
                                  getExternalEB, scaleFields, ion_lev, m, q, pusher_algo, do_crr
 #ifdef WARPX_QED
-                                 , do_sync, t_chi_max, local_has_quantum_sync, p_optical_depth_QSR, evolve_opt
+                                 , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
 #endif
                                  );
 
@@ -1014,7 +1011,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                 uz[ip] = uzp_n0;
 
 #ifdef WARPX_QED
-                if (local_has_quantum_sync) {
+                if (p_optical_depth_QSR) {
                     p_optical_depth_QSR[ip] = p_optical_depth_QSR0;
                 }
 #endif
