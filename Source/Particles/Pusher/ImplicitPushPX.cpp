@@ -887,6 +887,10 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                            fpyx, fpyy, fpyz,
                                            fpzx, fpzy, fpzz);
 
+                    // The ignore_unused is needed so that the variables are not first-captured
+                    // in a constexpr-if context.
+                    amrex::ignore_unused(Jx_arr, Jy_arr, Jz_arr, invvol, max_crossings);
+                    amrex::ignore_unused(Sxx_arr, Sxy_arr, Sxz_arr, Syx_arr, Syy_arr, Syz_arr, Szx_arr, Szy_arr, Szz_arr);
                     if constexpr (depos_order_control == one) {
                         if (!full_mass_matrices) {
                             doVillasenorJandSigmaDepositionKernel<1,false>(
