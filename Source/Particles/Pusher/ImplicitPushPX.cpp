@@ -558,6 +558,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
  * \param[in] dt the time step size
  * \param[in] scaleFields allows scale factor to the fields (for rigid injection)
  * \param[in] skip_deposition whether to do the deposition
+ * \param[in] deposit_mass_matrices whether to do the mass matrix deposition
  * \param[in] unconverged_indices the list of indices of unconverged particles
  * \param[in] saved_weights the saved weights of the unconverged particles
  */
@@ -847,18 +848,19 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                 const amrex::ParticleReal yp_new = 2.0_prt*yp - yp_n;
                 const amrex::ParticleReal zp_new = 2.0_prt*zp - zp_n;
 
+                const amrex::ParticleReal uxp_nph = ux[ip];
+                const amrex::ParticleReal uyp_nph = uy[ip];
+                const amrex::ParticleReal uzp_nph = uz[ip];
+
+                constexpr amrex::ParticleReal inv_c2 = 1.0_prt/(PhysConst::c*PhysConst::c);
+#if !defined(WARPX_DIM_3D)
+
                 const amrex::ParticleReal uxp_old = uxp_n;
                 const amrex::ParticleReal uyp_old = uyp_n;
                 const amrex::ParticleReal uzp_old = uzp_n;
                 const amrex::ParticleReal uxp_new = 2.0_prt*ux[ip] - uxp_n;
                 const amrex::ParticleReal uyp_new = 2.0_prt*uy[ip] - uyp_n;
                 const amrex::ParticleReal uzp_new = 2.0_prt*uz[ip] - uzp_n;
-                const amrex::ParticleReal uxp_nph = ux[ip];
-                const amrex::ParticleReal uyp_nph = uy[ip];
-                const amrex::ParticleReal uzp_nph = uz[ip];
-
-#if !defined(WARPX_DIM_3D)
-                constexpr amrex::ParticleReal inv_c2 = 1.0_prt/(PhysConst::c*PhysConst::c);
 
                 // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
                 // The uxp,uyp,uzp are the velocities at time level n+1/2
