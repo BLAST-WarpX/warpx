@@ -38,6 +38,7 @@ We also have a `discussion page <https://github.com/BLAST-WarpX/warpx/discussion
     */
    section#installation,
    section#usage,
+   section#tutorials,
    section#theory,
    section#data-analysis,
    section#development,
@@ -82,7 +83,7 @@ Usage
    usage/faq
 
 Tutorials
-------------
+---------
 .. toctree::
    :caption: TUTORIALS
    :maxdepth: 1

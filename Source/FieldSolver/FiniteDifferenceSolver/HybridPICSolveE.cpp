@@ -72,6 +72,8 @@ void FiniteDifferenceSolver::CalculateCurrentAmpere (
 //   *
 //   * \param[out] Jfield  vector of total current MultiFabs at a given level
 //   * \param[in] Bfield   vector of magnetic field MultiFabs at a given level
+//   * \param[in] eb_update_E specifies where the plasma current should be calculated.
+//   * \param[in] lev refinement level
 //   */
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
 template<typename T_Algo>
