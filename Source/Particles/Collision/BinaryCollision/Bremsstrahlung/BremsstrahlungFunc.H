@@ -79,7 +79,7 @@ public:
          * @param[out] p_product_data stores the energy of the resulting photons
          * @param[in] engine the random engine
          */
-        AMREX_GPU_HOST_DEVICE AMREX_INLINE
+        AMREX_GPU_DEVICE AMREX_INLINE
         void operator() (
             index_type const I1s, index_type const I1e,
             index_type const I2s, index_type const I2e,
@@ -170,9 +170,6 @@ public:
             }
         }
 
-        static int constexpr nkoT1 = 17;
-        static int constexpr nKE = 11;
-
         /* \brief Calculate the cross section given the electron energy.
          *        The differential cross section is cut off below the plasma frequency since the
          *        low energy photons would all be immediately absorbed by the surrounding plasma.
@@ -187,7 +184,7 @@ public:
          * \param[out] w0 the grid weighting at the cut off
          * \result the cross section
          */
-        AMREX_GPU_HOST_DEVICE AMREX_INLINE
+        AMREX_GPU_DEVICE AMREX_INLINE
         amrex::ParticleReal
         CalculateCrossSection (amrex::ParticleReal KErel_eV,
                                amrex::ParticleReal wpe,
@@ -225,7 +222,7 @@ public:
                 w0 = 0.0_prt;
             } else {
                 // find index for electron energy interpolation
-                index = amrex::bisect(m_KEgrid_eV.data(), 0, nKE, KErel_eV);
+                index = amrex::bisect(m_KEgrid_eV, 0, nKE, KErel_eV);
 
                 // compute interpolation weights for k*dsigma/dk
                 w0 = (m_KEgrid_eV[index+1] - KErel_eV)/(m_KEgrid_eV[index+1] - m_KEgrid_eV[index]);
@@ -234,8 +231,8 @@ public:
             // kdsigdk at the cutoff
             amrex::ParticleReal const w00 = (m_koT1_grid[i0_cut+1] - koT1_cut)/(m_koT1_grid[i0_cut+1] - m_koT1_grid[i0_cut]);
             amrex::ParticleReal const w01 = 1.0_prt - w00;
-            kdsigdk_cut = (  w00*(w0*m_kdsigdk[index][i0_cut  ] + (1.0_prt - w0)*m_kdsigdk[index+1][i0_cut])
-                           + w01*(w0*m_kdsigdk[index][i0_cut+1] + (1.0_prt - w0)*m_kdsigdk[index+1][i0_cut+1]));
+            kdsigdk_cut = (  w00*(w0*m_kdsigdk[index*nkoT1 + i0_cut  ] + (1.0_prt - w0)*m_kdsigdk[(index+1)*nkoT1 + i0_cut])
+                           + w01*(w0*m_kdsigdk[index*nkoT1 + i0_cut+1] + (1.0_prt - w0)*m_kdsigdk[(index+1)*nkoT1 + i0_cut+1]));
 
             amrex::ParticleReal sigma_total;
             if (KEcut_eV/KErel_eV <= m_koT1_cut_default) {
@@ -247,7 +244,7 @@ public:
                 amrex::ParticleReal kdsigdk_im1 = kdsigdk_cut;
                 amrex::ParticleReal sigma = 0.0_prt;
                 for (int i=i0_cut+1; i < nkoT1; i++) {
-                    amrex::ParticleReal const kdsigdk_i = w0*m_kdsigdk[index][i] + (1.0_prt - w0)*m_kdsigdk[index+1][i];
+                    amrex::ParticleReal const kdsigdk_i = w0*m_kdsigdk[index*nkoT1 + i] + (1.0_prt - w0)*m_kdsigdk[(index+1)*nkoT1 + i];
                     amrex::ParticleReal const dk = (m_koT1_grid[i] - koT1_grid_im1);
                     amrex::ParticleReal const k_ave = (m_koT1_grid[i] + koT1_grid_im1)*0.5_prt;
                     amrex::ParticleReal const dsigdk = (kdsigdk_i + kdsigdk_im1)*0.5_prt/k_ave;
@@ -272,7 +269,7 @@ public:
          * \param[in] random_number the uniformly spaced random number
          * \result the photon energy
          */
-        AMREX_GPU_HOST_DEVICE AMREX_INLINE
+        AMREX_GPU_DEVICE AMREX_INLINE
         amrex::ParticleReal
         Photon_energy(int index, int i0_cut, amrex::ParticleReal koT1_cut, amrex::ParticleReal kdsigdk_cut,
                       amrex::ParticleReal w0, amrex::ParticleReal sigma_total, amrex::ParticleReal random_number) const
@@ -287,7 +284,7 @@ public:
             for (int i=i0_cut+1; i < nkoT1; i++) {
                 dk = (m_koT1_grid[i] - koT1_grid_im1);
                 k_ave = (m_koT1_grid[i] + koT1_grid_im1)*0.5_prt;
-                kdsigdk_i = w0*m_kdsigdk[index][i] + (1.0_prt - w0)*m_kdsigdk[index+1][i];
+                kdsigdk_i = w0*m_kdsigdk[index*nkoT1 + i] + (1.0_prt - w0)*m_kdsigdk[(index+1)*nkoT1 + i];
                 amrex::ParticleReal const dsigdk = (kdsigdk_i + kdsigdk_im1)*0.5_prt/k_ave;
                 amrex::ParticleReal const next_sigma = sigma + dsigdk*dk;
                 if (random_number*sigma_total > next_sigma) {
@@ -325,7 +322,7 @@ public:
          * \param[out] p_product_data the energy of the generated photon
          * \param[in] engine the random number generating engine
          */
-        AMREX_GPU_HOST_DEVICE AMREX_INLINE
+        AMREX_GPU_DEVICE AMREX_INLINE
         void BremsstrahlungEvent (amrex::ParticleReal & u1x, amrex::ParticleReal & u1y,
                                   amrex::ParticleReal & u1z, amrex::ParticleReal & u2x,
                                   amrex::ParticleReal & u2y, amrex::ParticleReal & u2z,
@@ -427,15 +424,13 @@ public:
         amrex::ParticleReal m_multiplier;
         amrex::ParticleReal m_koT1_cut_default;
 
-        // relative photon energy grid ( koT1 = Ephoton_eV/KErel_eV )
-        amrex::GpuArray<amrex::ParticleReal, nkoT1> m_koT1_grid = {0., 0.025, 0.05, 0.075, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.97, 0.99, 1.00};
+        int nkoT1;
+        int nKE;
 
-        // energy grid for electrons in eV
-        amrex::GpuArray<amrex::ParticleReal, nKE> m_KEgrid_eV = {1.0e3, 2.0e3, 5.0e3, 1.0e4, 2.0e4, 5.0e4, 1.0e5, 2.0e5, 5.0e5, 1.0e6, 2.0e6};
-
-        // differential total cross section
-        amrex::GpuArray<amrex::GpuArray<amrex::ParticleReal, nkoT1>, nKE> m_kdsigdk;
-        amrex::GpuArray<amrex::ParticleReal, nKE> m_sigma_total;
+        amrex::ParticleReal * m_koT1_grid;
+        amrex::ParticleReal * m_KEgrid_eV;
+        amrex::ParticleReal * m_kdsigdk;
+        amrex::ParticleReal * m_sigma_total;
 
     };
 
@@ -452,6 +447,24 @@ private:
     // Cross section data
 
     void UploadCrossSection (int Z);
+
+    int nkoT1;
+    int nKE;
+
+    // relative photon energy grid ( koT1 = Ephoton_eV/KErel_eV )
+    amrex::GpuArray<amrex::ParticleReal, 17> m_koT1_grid_h = {0., 0.025, 0.05, 0.075, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.97, 0.99, 1.00};
+
+    // energy grid for electrons in eV
+    amrex::GpuArray<amrex::ParticleReal, 11> m_KEgrid_eV_h = {1.0e3, 2.0e3, 5.0e3, 1.0e4, 2.0e4, 5.0e4, 1.0e5, 2.0e5, 5.0e5, 1.0e6, 2.0e6};
+
+    // differential total cross section
+    amrex::Vector<amrex::ParticleReal> m_kdsigdk_h;
+    amrex::Vector<amrex::ParticleReal> m_sigma_total_h;
+
+    amrex::Gpu::DeviceVector<amrex::ParticleReal> m_koT1_grid_d;
+    amrex::Gpu::DeviceVector<amrex::ParticleReal> m_KEgrid_eV_d;
+    amrex::Gpu::DeviceVector<amrex::ParticleReal> m_kdsigdk_d;
+    amrex::Gpu::DeviceVector<amrex::ParticleReal> m_sigma_total_d;
 
     // scaled energy-weighted differential total cross section for Bremsstrahlung (kdsigdk_n + Z*kdsigdk_e)
     // for e + H from Table I of Seltzer and Berger, ATOMIC DATA AND NUCLEAR DATA TABLES 35,345-418 (1985).
