@@ -100,8 +100,8 @@ void SingleLinearComptonCollisionEvent (const amrex::ParticleReal& u1x, const am
     amrex::ParticleReal event_multiplier_eff = event_multiplier;
 
     // If the scattering probability is too high and the event multiplier greater than one,
-    // we risk to systematically underestimate the electron-positron yield. In this case,
-    // we reduce the event multiplier to reduce the pair-production probability
+    // we risk to systematically underestimate the Compton scattering yield. In this case,
+    // we reduce the event multiplier to reduce the scattering probability
     if (probability_estimate > probability_threshold)
     {
         // We aim for a scattering probability of probability_target_value but take into account
@@ -133,4 +133,4 @@ void SingleLinearComptonCollisionEvent (const amrex::ParticleReal& u1x, const am
     }
 }
 
-#endif // SINGLE_LINEAR_BREIT_WHEELER_COLLISION_EVENT_H_
+#endif // SINGLE_LINEAR_COMPTON_COLLISION_EVENT_H_
