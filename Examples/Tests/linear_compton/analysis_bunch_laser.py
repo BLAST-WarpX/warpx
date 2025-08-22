@@ -119,8 +119,6 @@ grid, freq_bins, gammatheta_bins = np.histogram2d(
     bins=[N_freq, N_gammatheta],
 )
 
-extent = [freq_bins[0], freq_bins[-1], gammatheta_bins[0], gammatheta_bins[-1]]
-
 # Normalize by solid angle, frequency and number of photons
 if do_plots:
     import matplotlib.pyplot as plt
