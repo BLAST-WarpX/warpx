@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Create an openPMD file containing the density with which
-the WarpX particles should be initialized (on a 2D Cartesian grid)
+the WarpX particles should be initialized (on a 1D Cartesian grid)
 """
 
 import numpy as np
