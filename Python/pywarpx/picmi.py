@@ -3454,7 +3454,7 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
         self.diagnostic.dump_rz_modes = self.dump_rz_modes
         self.diagnostic.dump_last_timestep = self.dump_last_timestep
         self.diagnostic.intervals = self.period
-        self.diagnostic.verbose = self.verbosity
+        self.diagnostic.set_or_replace_attr("verbose", self.verbosity)
         self.diagnostic.diag_lo = self.lower_bound
         self.diagnostic.diag_hi = self.upper_bound
         if self.number_of_cells is not None:
@@ -3757,7 +3757,7 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic, WarpXDiagnostic
         self.diagnostic.file_min_digits = self.file_min_digits
         self.diagnostic.dump_last_timestep = self.dump_last_timestep
         self.diagnostic.intervals = self.period
-        self.diagnostic.verbose = self.verbosity
+        self.diagnostic.set_or_replace_attr("verbose", self.verbosity)
         self.diagnostic.set_or_replace_attr("write_species", True)
         if "fields_to_plot" not in self.diagnostic.argvattrs:
             self.diagnostic.fields_to_plot = "none"
@@ -3951,7 +3951,7 @@ class LabFrameFieldDiagnostic(
         self.diagnostic.file_min_digits = self.file_min_digits
         self.diagnostic.diag_lo = self.lower_bound
         self.diagnostic.diag_hi = self.upper_bound
-        self.diagnostic.verbose = self.verbosity
+        self.diagnostic.set_or_replace_attr("verbose", self.verbosity)
 
         self.diagnostic.do_back_transformed_fields = True
         self.diagnostic.dt_snapshots_lab = self.dt_snapshots
@@ -4061,7 +4061,7 @@ class LabFrameParticleDiagnostic(
         self.diagnostic.openpmd_backend = self.openpmd_backend
         self.diagnostic.openpmd_encoding = self.openpmd_encoding
         self.diagnostic.file_min_digits = self.file_min_digits
-        self.diagnostic.verbose = self.verbosity
+        self.diagnostic.set_or_replace_attr("verbose", self.verbosity)
 
         self.diagnostic.do_back_transformed_particles = True
         self.diagnostic.dt_snapshots_lab = self.dt_snapshots
