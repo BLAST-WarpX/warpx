@@ -396,6 +396,11 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                                                          auto qed_control)
     {
 
+        if (do_copy) {
+            //  Copy the old x and u for the BTD
+            copyAttribs(ip);
+        }
+
         // Skip any particles that require suborbits
         if (nsuborbits && nsuborbits[ip] > 1) {
             // write signaling flag: how many particles did not converge?
