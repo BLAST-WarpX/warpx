@@ -2103,6 +2103,11 @@ Details about the collision models can be found in the :ref:`theory section <mul
       (see for example :cite:t:`param-LandauVol4`: equations 86.10 and 86.16 for the differential and total cross sections, respectively).
       The probability of scattering is drawn from the total cross section, while the angular distribution of the scattered lepton and photon is drawn from the differential cross section.
       The implementation follows the same numerical algorithm as that of fusion reactions (see. :cite:t:`param-HigginsonJCP2019`).
+      Note the difference between the linear Compton scattering module described here and
+      `the quantum synchrotron QED module <https://warpx.readthedocs.io/en/latest/usage/parameters.html#lookup-tables-and-other-settings-for-qed-modules>`__.
+      The former (commonly referred to simply as Compton scattering) is the collision between a single electron and a single photon,
+      the latter (also known as multi-photon/nonlinear Compton or quantum synchrotron radiation) is the scattering
+      of a single electron in a strong electromagnetic field.
 
 * ``<collision_name>.species`` (`strings`)
     If using ``dsmc``, ``pairwisecoulomb`` or ``nuclearfusion``, this should be the name(s) of the species,
