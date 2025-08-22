@@ -73,6 +73,7 @@ void ThetaImplicitEM::PrintParameters () const
     amrex::Print() << "Time-bias parameter theta:  " << m_theta << "\n";
     amrex::Print() << "max particle iterations:    " << m_max_particle_iterations << "\n";
     amrex::Print() << "particle tolerance:         " << m_particle_tolerance << "\n";
+    amrex::Print() << "use particle suborbits:     " << (m_particle_suborbits ? "true":"false") << "\n";
     if (m_nlsolver_type==NonlinearSolverType::Picard) {
         amrex::Print() << "Nonlinear solver type:      Picard\n";
     }
