@@ -471,7 +471,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                              );
 
         // check if particle did not converge
-        if (max_iterations < 1 && !convergence) {
+        if (max_iterations > 1 && !convergence) {
 
             if (nsuborbits) {
                 // Suborbits are required for this particle to converge.
