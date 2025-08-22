@@ -37,11 +37,6 @@ void ReadMovingWindowParameters(
 
 void ConvertLabParamsToBoost();
 
-/**
- * Reads the user-defined field and particle boundary condition parameters
- */
-void ReadBCParams ();
-
 /** Check the warpx.dims matches the binary name & set up RZ gridding
  *
  * Ensures that the blocks are setup correctly for the RZ spectral solver
