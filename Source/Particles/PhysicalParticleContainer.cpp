@@ -677,12 +677,12 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * jy = fields.get(current_fp_string, Direction{1}, lev);
                         amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
                         long const offset = 0;
-                        ImplicitPushXPSubOrbits(pti, exfab, eyfab, ezfab,
+                        ImplicitPushXPSubOrbits(pti, fields, exfab, eyfab, ezfab,
                                                 bxfab, byfab, bzfab,
                                                 Ex.nGrowVect(),
                                                 jx, jy, jz,
                                                 offset, num_unconverged_particles, lev, gather_lev, dt, ScaleFields(false),
-                                                skip_deposition, unconverged_indices, saved_weights);
+                                                skip_deposition, deposit_mass_matrices, unconverged_indices, saved_weights);
                     }
                     if (num_unconverged_particles_c > 0) {
 
@@ -706,12 +706,12 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
 
                         long const offset = num_unconverged_particles;
-                        ImplicitPushXPSubOrbits(pti, cexfab, ceyfab, cezfab,
+                        ImplicitPushXPSubOrbits(pti, fields, cexfab, ceyfab, cezfab,
                                                 cbxfab, cbyfab, cbzfab,
                                                 cEx.nGrowVect(),
                                                 cjx, cjy, cjz,
                                                 offset, num_unconverged_particles_c, lev, lev-1, dt, ScaleFields(false),
-                                                skip_deposition, unconverged_indices, saved_weights);
+                                                skip_deposition, deposit_mass_matrices, unconverged_indices, saved_weights);
                     }
                 }
 

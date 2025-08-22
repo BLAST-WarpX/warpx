@@ -139,7 +139,7 @@ public:
                          amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights,
                          DtType a_dt_type=DtType::Full);
 
-    void ImplicitPushXPSubOrbits (WarpXParIter& pti,
+    void ImplicitPushXPSubOrbits (WarpXParIter& pti, ablastr::fields::MultiFabRegister& fields,
                                   amrex::FArrayBox const * exfab,
                                   amrex::FArrayBox const * eyfab,
                                   amrex::FArrayBox const * ezfab,
@@ -154,7 +154,7 @@ public:
                                   long np_to_push,
                                   int lev, int gather_lev,
                                   amrex::Real dt, ScaleFields scaleFields,
-                                  bool skip_deposition,
+                                  bool skip_deposition, bool deposit_mass_matrices,
                                   amrex::Gpu::DeviceVector<long> & unconverged_indices,
                                   amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
 
