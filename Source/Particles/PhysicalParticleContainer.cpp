@@ -1212,6 +1212,22 @@ PhysicalParticleContainer::PushPX (
     // Add guard cells to the box.
     box.grow(ngEB);
 
+    // Whether this is an unsplit push (i.e., position_push_half is false)
+    // FIXME Avoid duplication with Evolve
+    bool const push_unsplit = !position_push_half;
+
+    // Whether this is a split push in the first half
+    // (i.e., position_push_half is true and momentum_push_skip is false,
+    // meaning that the momentum has not been pushed yet)
+    // FIXME Avoid duplication with Evolve
+    bool const push_split_first_half = (position_push_half && !momentum_push_skip);
+
+    // Whether this is a split push in the second half
+    // (i.e., position_push_half is true and momentum_push_skip is true,
+    // meaning that the momentum has already been pushed in the first half)
+    // FIXME Avoid duplication with Evolve
+    //bool const push_split_second_half = (position_push_half && momentum_push_skip);
+
     const auto getPosition = GetParticlePosition<PIdx>(pti, offset);
           auto setPosition = SetParticlePosition<PIdx>(pti, offset);
 
@@ -1300,7 +1316,11 @@ PhysicalParticleContainer::PushPX (
     }
 #endif
 
-    const auto t_do_not_gather = do_not_gather;
+    // Auxiliary booleans
+    bool const gather_fields = (
+        !do_not_gather &&
+        (push_unsplit || push_split_first_half)
+    );
 
     enum exteb_flags : int { no_exteb, has_exteb };
     enum qed_flags : int { no_qed, has_qed };
@@ -1343,21 +1363,21 @@ PhysicalParticleContainer::PushPX (
         amrex::ParticleReal Byp = By_external_particle;
         amrex::ParticleReal Bzp = Bz_external_particle;
 
-        if(!t_do_not_gather){
+        if (gather_fields) {
             // first gather E and B to the particle positions
             doGatherShapeN(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                            ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                            ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                            dinv, xyzmin, lo, n_rz_azimuthal_modes,
                            nox, galerkin_interpolation);
-        }
 
-        [[maybe_unused]] const auto& getExternalEB_tmp = getExternalEB;
-        if constexpr (exteb_control == has_exteb) {
-            getExternalEB(ip, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
-        }
+            [[maybe_unused]] const auto& getExternalEB_tmp = getExternalEB;
+            if constexpr (exteb_control == has_exteb) {
+                getExternalEB(ip, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
+            }
 
-        scaleFields(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
+            scaleFields(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
+        }
 
 #ifdef WARPX_QED
         if (!do_sync)
