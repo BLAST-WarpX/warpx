@@ -546,6 +546,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
  *        These are particles that failed to converge in ImplicitPushXP.
  *
  * \param[in] pti the WarpXParIter holding the particles to push
+ * \param[in] fields the MultiFab register instance
  * \param[in] exfab, eyfab, ezfab the E fields
  * \param[in] bxfab, byfab, bzfab the B fields
  * \param[in] ngEB the number of guard cells in the E and B fields
