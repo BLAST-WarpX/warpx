@@ -476,6 +476,11 @@ PhysicalParticleContainer::Evolve (
         !do_not_deposit &&
         (push_unsplit || push_split_first_half)
     );
+    bool const split_particles = (
+        do_splitting &&
+        (a_dt_type == DtType::Full || a_dt_type == DtType::SecondHalf) &&
+        (push_unsplit || push_split_second_half)
+    );
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel
@@ -725,7 +730,7 @@ PhysicalParticleContainer::Evolve (
     // end of the large time step. Otherwise, the pushes on different levels
     // are not consistent, and the call to Redistribute (in SplitParticles)
     // may result in split particles to deposit twice on the coarse level.
-    if (do_splitting && (a_dt_type == DtType::SecondHalf || a_dt_type == DtType::Full)) {
+    if (split_particles) {
         SplitParticles(lev);
     }
 }
