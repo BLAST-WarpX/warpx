@@ -41,4 +41,4 @@ density_d.reset_dataset(dataset)
 density_d.store_chunk(density_data)
 series.flush()
 
-del series
+series.close()
