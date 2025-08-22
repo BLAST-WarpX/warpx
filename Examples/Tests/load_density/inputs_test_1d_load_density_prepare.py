@@ -10,7 +10,6 @@ import openpmd_api as io
 # Define density as a function of z using numpy syntax
 # with a ramp and plateau in z
 on_axis_density = 1e24  # m^-3
-channel_radius = 40e-6  # m
 ramp_length = 60e-6  # m
 # - Define the grid
 z = np.linspace(0, 500e-6, 100)

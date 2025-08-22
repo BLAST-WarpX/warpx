@@ -26,7 +26,6 @@ for iteration in ts.iterations:
 
     # Compute expected density
     on_axis_density = 1e24  # m^-3
-    channel_radius = 40e-6  # m
     ramp_length = 60e-6  # m
     z = info.z
     density_th = on_axis_density * np.where(z < ramp_length, z / ramp_length, 1)
