@@ -13,7 +13,13 @@
 
 #include <ablastr/warn_manager/WarnManager.H>
 
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#   include <openPMD/openPMD.hpp>
+#endif
+
 #include <algorithm>
+#include <functional>
+#include <numeric>
 #include <vector>
 
 namespace
@@ -181,4 +187,101 @@ ExternalFieldParams::ExternalFieldParams(const amrex::ParmParse& pp_warpx)
             pp_warpx.query("read_fields_from_path", external_fields_path);
     }
     //___________________________________________________________________________
+}
+
+ExternalFieldReader::ExternalFieldReader (std::string const& read_fields_from_path,
+                                          std::string const& F_name,
+                                          std::string const& F_component)
+{
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+
+    auto series = openPMD::Series(read_fields_from_path, openPMD::Access::READ_ONLY);
+    auto iseries = series.iterations.begin()->second;
+    auto F = iseries.meshes[F_name];
+
+#if (AMREX_SPACEDIM > 1)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(F.getAttribute("dataOrder").get<std::string>() == "C",
+                                     "Reading from files with non-C dataOrder is not implemented");
+#endif
+
+    auto axisLabels = F.getAttribute("axisLabels").get<std::vector<std::string>>();
+    auto fileGeom = F.getAttribute("geometry").get<std::string>();
+
+#if defined(WARPX_DIM_3D)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cartesian", "3D can only read from files with cartesian geometry");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels.at(0) == "x" && axisLabels.at(1) == "y" && axisLabels.at(2) == "z",
+                                     "3D expects axisLabels {x, y, z}");
+#elif defined(WARPX_DIM_XZ)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cartesian", "XZ can only read from files with cartesian geometry");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels.at(0) == "x" && axisLabels.at(1) == "z",
+                                     "XZ expects axisLabels {x, z}");
+#elif defined(WARPX_DIM_RZ)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "thetaMode", "RZ can only read from files with 'thetaMode'  geometry");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels.at(0) == "r" && axisLabels.at(1) == "z",
+                                     "RZ expects axisLabels {r, z}");
+#elif defined(WARPX_DIM_1D_Z)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cartesian", "1D3V can only read from files with cartesian geometry");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels.at(0) == "z", "1D3V expects axisLabel {z}");
+#endif
+
+    const auto d = F.gridSpacing<long double>();
+    AMREX_D_TERM(m_external_field_view.dx[0] = amrex::Real(d.at(0));,
+                 m_external_field_view.dx[1] = amrex::Real(d.at(1));,
+                 m_external_field_view.dx[2] = amrex::Real(d.at(2)));
+
+    const auto offset = F.gridGlobalOffset();
+    AMREX_D_TERM(m_external_field_view.offset[0] = amrex::Real(offset.at(0));,
+                 m_external_field_view.offset[1] = amrex::Real(offset.at(1));,
+                 m_external_field_view.offset[2] = amrex::Real(offset.at(2)));
+
+    // Load the first component if F_component is empty
+    auto FC = F_component.empty() ? F.begin()->second : F[F_component];
+    const auto extent = FC.getExtent();
+
+    // Determine the chunk data that will be loaded.
+    // Now, the full range of data is loaded.
+    // Loading chunk data can speed up the process.
+    // Thus, `chunk_offset` and `chunk_extent` should be modified accordingly in another PR.
+    const openPMD::Offset chunk_offset(extent.size(), 0);
+    const openPMD::Extent chunk_extent = extent;
+
+    m_FC_data_cpu = FC.loadChunk<double>(chunk_offset,chunk_extent);
+    series.flush();
+
+#if defined(AMREX_USE_GPU)
+    auto *FC_data_host = m_FC_data_cpu.get();
+    auto const total_extent = std::accumulate(chunk_extent.begin(), chunk_extent.end(),
+                                              1, std::multiplies<std::size_t>());
+    m_FC_data_gpu.resize(total_extent);
+    amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, FC_data_host, FC_data_host + total_extent, m_FC_data_gpu.begin());
+    amrex::Gpu::streamSynchronize();
+    m_FC_data_cpu.reset();
+    auto *FC_data = m_FC_data_gpu.data();
+#else
+    auto *FC_data = m_FC_data_cpu.get();
+#endif
+
+#if defined(WARPX_DIM_RZ)
+    // extent[0] is for theta
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(extent[0] == 1,
+                                     "External field reading is not implemented for more than one RZ mode (see #3829)");
+    const auto extent0 = static_cast<int>(extent.at(1));
+    const auto extent1 = static_cast<int>(extent.at(2));
+#else
+    AMREX_D_TERM(const auto extent0 = static_cast<int>(extent.at(0));,
+                 const auto extent1 = static_cast<int>(extent.at(1));,
+                 const auto extent2 = static_cast<int>(extent.at(2)));
+#endif
+
+    m_external_field_view.table = decltype(m_external_field_view.table)
+#if (AMREX_SPACEDIM == 1)
+        (FC_data, 0, extent0);
+#else
+        (FC_data, {AMREX_D_DECL(0,0,0)}, {AMREX_D_DECL(extent0, extent1, extent2)});
+#endif
+
+#else
+    amrex::ignore_unused(read_fields_from_path, F_name, F_component);
+    WARPX_ABORT_WITH_MESSAGE("ExternalFieldReader requires openPMD and it is not supported for 1D RCYLINDER and RSPHERE");
+#endif
 }
