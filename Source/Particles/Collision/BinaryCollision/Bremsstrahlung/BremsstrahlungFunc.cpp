@@ -61,8 +61,8 @@ BremsstrahlungFunc::UploadCrossSection (int Z)
     m_exe.nkoT1 = nkoT1;
     m_exe.nKE = nKE;
 
-    m_sigma_total_h.resize(nKE);
-    m_kdsigdk_h.resize(nKE*nkoT1);
+    m_sigma_total_h.resize(m_KEgrid_eV_h.size());
+    m_kdsigdk_h.resize(m_KEgrid_eV_h.size()*m_koT1_grid_h.size());
 
     std::vector<std::vector<amrex::ParticleReal>> & kdsigdk = m_kdsigdk_map.at(Z);
 
