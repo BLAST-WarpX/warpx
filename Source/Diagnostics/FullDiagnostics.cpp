@@ -527,7 +527,8 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
         } else if ( m_varnames_fields[comp] == "eb_covered" ){
             m_all_field_functors[lev][comp] = std::make_unique<EBCoveredFunctor>(lev, m_crse_ratio);
             if (update_varnames) {
-                m_varnames.push_back(std::string("eb_covered"));
+                // Use 1 instead of ncomp here because eb_covered is only computed/stored for mode m=0
+                AddRZModesToOutputNames(std::string("eb_covered"), 1);
             }
         }
         else {
