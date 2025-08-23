@@ -945,8 +945,63 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                                   Szx_arr, Szy_arr, Szz_arr,
                                                                   dt_suborbit, dinv, xyzmin, lo );
                         }
+                    } else if constexpr (depos_order_control == three) {
+                        if (!full_mass_matrices) {
+                            doVillasenorJandSigmaDepositionKernel<3,false>(
+                                                                  xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
+                                                                  wq_invvol, uxp_nph, uyp_nph, uzp_nph, gaminv,
+                                                                  fpxx, fpxy, fpxz,
+                                                                  fpyx, fpyy, fpyz,
+                                                                  fpzx, fpzy, fpzz,
+                                                                  Jx_arr, Jy_arr, Jz_arr,
+                                                                  max_crossings,
+                                                                  Sxx_arr, Sxy_arr, Sxz_arr,
+                                                                  Syx_arr, Syy_arr, Syz_arr,
+                                                                  Szx_arr, Szy_arr, Szz_arr,
+                                                                  dt_suborbit, dinv, xyzmin, lo );
+                        } else if (full_mass_matrices) {
+                            doVillasenorJandSigmaDepositionKernel<3,true>(
+                                                                  xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
+                                                                  wq_invvol, uxp_nph, uyp_nph, uzp_nph, gaminv,
+                                                                  fpxx, fpxy, fpxz,
+                                                                  fpyx, fpyy, fpyz,
+                                                                  fpzx, fpzy, fpzz,
+                                                                  Jx_arr, Jy_arr, Jz_arr,
+                                                                  max_crossings,
+                                                                  Sxx_arr, Sxy_arr, Sxz_arr,
+                                                                  Syx_arr, Syy_arr, Syz_arr,
+                                                                  Szx_arr, Szy_arr, Szz_arr,
+                                                                  dt_suborbit, dinv, xyzmin, lo );
+                        }
+                    } else if constexpr (depos_order_control == four) {
+                        if (!full_mass_matrices) {
+                            doVillasenorJandSigmaDepositionKernel<4,false>(
+                                                                  xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
+                                                                  wq_invvol, uxp_nph, uyp_nph, uzp_nph, gaminv,
+                                                                  fpxx, fpxy, fpxz,
+                                                                  fpyx, fpyy, fpyz,
+                                                                  fpzx, fpzy, fpzz,
+                                                                  Jx_arr, Jy_arr, Jz_arr,
+                                                                  max_crossings,
+                                                                  Sxx_arr, Sxy_arr, Sxz_arr,
+                                                                  Syx_arr, Syy_arr, Syz_arr,
+                                                                  Szx_arr, Szy_arr, Szz_arr,
+                                                                  dt_suborbit, dinv, xyzmin, lo );
+                        } else if (full_mass_matrices) {
+                            doVillasenorJandSigmaDepositionKernel<4,true>(
+                                                                  xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
+                                                                  wq_invvol, uxp_nph, uyp_nph, uzp_nph, gaminv,
+                                                                  fpxx, fpxy, fpxz,
+                                                                  fpyx, fpyy, fpyz,
+                                                                  fpzx, fpzy, fpzz,
+                                                                  Jx_arr, Jy_arr, Jz_arr,
+                                                                  max_crossings,
+                                                                  Sxx_arr, Sxy_arr, Sxz_arr,
+                                                                  Syx_arr, Syy_arr, Syz_arr,
+                                                                  Szx_arr, Szy_arr, Szz_arr,
+                                                                  dt_suborbit, dinv, xyzmin, lo );
+                        }
                     }
-
 
                 } else {
 
