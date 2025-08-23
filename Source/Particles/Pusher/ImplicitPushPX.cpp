@@ -44,7 +44,6 @@
 #include <AMReX_ParticleContainerBase.H>
 #include <AMReX_AmrParticles.H>
 #include <AMReX_ParticleTile.H>
-#include <AMReX_Print.H>
 #include <AMReX_Scan.H>
 #include <AMReX_Utility.H>
 
