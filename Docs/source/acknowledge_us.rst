@@ -56,7 +56,7 @@ If your project uses a specific algorithm or component, please consider citing t
 - Lehe R, Haseeb M, Angus J, Grote D, Groenewald R, Formenti A, Huebl A, Deslippe J, Vay JL.
   **An Efficient GPU Parallelization Strategy for Binary Collisions in Particle-In-Cell Plasma Simulations**.
   Proceedings of the Plarform for Advanced Scientific Computing (PASC'25), 2025.
-  `DOI:10.1145/3732775.373357 <https://doi.org/10.1145/3732775.373357>`__
+  `DOI:10.1145/3732775.3733578 <https://doi.org/10.1145/3732775.3733578>`__
 
 - Shapoval O, Zoni E, Lehe R, Thévenet M, and Vay J-L.
   **Pseudospectral particle-in-cell formulation with arbitrary charge and current-density time dependencies for the modeling of relativistic plasmas**.
