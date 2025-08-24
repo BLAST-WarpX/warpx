@@ -58,6 +58,11 @@ If your project uses a specific algorithm or component, please consider citing t
   Proceedings of the Plarform for Advanced Scientific Computing (PASC'25), 2025.
   `DOI:10.1145/3732775.3733578 <https://doi.org/10.1145/3732775.3733578>`__
 
+- Vay JL, Angus JR, Shapoval O, Lehe R, Grote D, Huebl A.
+  **Energy-preserving coupling of explicit particle-in-cell with Monte Carlo collisions**.
+  Physical Review E **111**, 2025.
+  `DOI:10.1103/PhysRevE.111.025306 <https://doi.org/10.1103/PhysRevE.111.025306>`__
+
 - Shapoval O, Zoni E, Lehe R, Thévenet M, and Vay J-L.
   **Pseudospectral particle-in-cell formulation with arbitrary charge and current-density time dependencies for the modeling of relativistic plasmas**.
   Physical Review E **110**, 025206, 2024.
