@@ -53,7 +53,7 @@ namespace {
 
     enum exteb_flags : int { no_exteb, has_exteb };
     enum qed_flags : int { no_qed, has_qed };
-    enum depos_order_flags : int { one, two, three, four };
+    enum depos_order_flags : int { order_one = 1, order_two, order_three, order_four };
 
     template<int exteb_control, int qed_control>
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -749,7 +749,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     // register pressure.
     amrex::ParallelFor(amrex::TypeList<amrex::CompileTimeOptions<no_exteb,has_exteb>,
                                        amrex::CompileTimeOptions<no_qed  ,has_qed>,
-                                       amrex::CompileTimeOptions<one, two, three, four >>{},
+                                       amrex::CompileTimeOptions<order_one, order_two, order_three, order_four >>{},
                        {exteb_runtime_flag, qed_runtime_flag, depos_order_flag},
                        num_unconverged_particles, [=] AMREX_GPU_DEVICE (long i,
                                                                  auto exteb_control, auto qed_control, auto depos_order_control)
@@ -870,7 +870,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
                 if (deposit_mass_matrices) {
                     const amrex::Real wq_invvol = wq*invvol/nsuborbits[ip];
-                    const amrex::Real rhop = wq*invvol*gaminv; // use normal wq here
+                    const amrex::Real rhop = wq*invvol*gaminv/nsuborbits[ip]; // use normal wq here
 
                     // Set the Mass Matrices kernels
                     amrex::ParticleReal fpxx, fpxy, fpxz;
@@ -888,7 +888,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     amrex::ignore_unused(full_mass_matrices, max_crossings);
                     amrex::ignore_unused(Jx_arr, Jy_arr, Jz_arr, invvol);
                     amrex::ignore_unused(Sxx_arr, Sxy_arr, Sxz_arr, Syx_arr, Syy_arr, Syz_arr, Szx_arr, Szy_arr, Szz_arr);
-                    if constexpr (depos_order_control == one) {
+                    if constexpr (depos_order_control == order_one) {
                         if (!full_mass_matrices) {
                             doVillasenorJandSigmaDepositionKernel<1,false>(
                                                                   xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
@@ -916,7 +916,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                                   Szx_arr, Szy_arr, Szz_arr,
                                                                   dt_suborbit, dinv, xyzmin, lo );
                         }
-                    } else if constexpr (depos_order_control == two) {
+                    } else if constexpr (depos_order_control == order_two) {
                         if (!full_mass_matrices) {
                             doVillasenorJandSigmaDepositionKernel<2,false>(
                                                                   xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
@@ -944,7 +944,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                                   Szx_arr, Szy_arr, Szz_arr,
                                                                   dt_suborbit, dinv, xyzmin, lo );
                         }
-                    } else if constexpr (depos_order_control == three) {
+                    } else if constexpr (depos_order_control == order_three) {
                         if (!full_mass_matrices) {
                             doVillasenorJandSigmaDepositionKernel<3,false>(
                                                                   xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
@@ -972,7 +972,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                                   Szx_arr, Szy_arr, Szz_arr,
                                                                   dt_suborbit, dinv, xyzmin, lo );
                         }
-                    } else if constexpr (depos_order_control == four) {
+                    } else if constexpr (depos_order_control == order_four) {
                         if (!full_mass_matrices) {
                             doVillasenorJandSigmaDepositionKernel<4,false>(
                                                                   xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
@@ -1004,32 +1004,32 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
                 } else {
 
-                    wq /= nsuborbits[ip];
+                    amrex::ParticleReal wq_n = wq/nsuborbits[ip];
 
                     // Only CurrentDepositionAlgo::Villasenor is supported
                     // The ignore_unused is needed so that the variables are not first-captured
                     // in a constexpr-if context.
                     amrex::ignore_unused(Jx_arr, Jy_arr, Jz_arr, invvol);
-                    if constexpr (depos_order_control == one) {
-                        VillasenorDepositionShapeNKernel<1>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
+                    if constexpr (depos_order_control == order_one) {
+                        VillasenorDepositionShapeNKernel<1>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq_n,
                                                             uxp_nph, uyp_nph, uzp_nph, gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr,
                                                             dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                     }
-                    else if constexpr (depos_order_control == two) {
-                        VillasenorDepositionShapeNKernel<2>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
+                    else if constexpr (depos_order_control == order_two) {
+                        VillasenorDepositionShapeNKernel<2>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq_n,
                                                             uxp_nph, uyp_nph, uzp_nph, gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr,
                                                             dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                     }
-                    else if constexpr (depos_order_control == three) {
-                        VillasenorDepositionShapeNKernel<3>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
+                    else if constexpr (depos_order_control == order_three) {
+                        VillasenorDepositionShapeNKernel<3>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq_n,
                                                             uxp_nph, uyp_nph, uzp_nph, gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr,
                                                             dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                     }
-                    else if constexpr (depos_order_control == four) {
-                        VillasenorDepositionShapeNKernel<4>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
+                    else if constexpr (depos_order_control == order_four) {
+                        VillasenorDepositionShapeNKernel<4>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq_n,
                                                             uxp_nph, uyp_nph, uzp_nph, gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr,
                                                             dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
@@ -1045,12 +1045,13 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     // particle did not converge
                     // Increase the number of suborbits and start over
                     nsuborbits[ip]++;
-                    isuborbit = 0;
                 } else {
                     // Convergence was reached for all suborbits, now redo the loop
                     // and do the deposition
                     doing_deposition = true;
                 }
+
+                isuborbit = 0;
 
                 xp_n = xp_n0;
                 yp_n = yp_n0;
