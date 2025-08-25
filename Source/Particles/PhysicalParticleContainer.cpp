@@ -1320,47 +1320,38 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 
         scaleFields(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
 
-#ifdef WARPX_QED
-        if (!do_sync)
-#endif
-        {
-            if (do_copy) {
-                //  Copy the old x and u for the BTD
-                copyAttribs(ip);
-            }
-
-            doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
-                                      Exp, Eyp, Ezp, Bxp, Byp, Bzp,
-                                      ion_lev ? ion_lev[ip] : 1,
-                                      m, q, pusher_algo, do_crr,
-#ifdef WARPX_QED
-                                      t_chi_max,
-#endif
-                                      dt);
-
-            UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], dt);
-            setPosition(ip, xp, yp, zp);
+        if (do_copy) {
+            //  Copy the old x and u for the BTD
+            copyAttribs(ip);
         }
-#ifdef WARPX_QED
-        else {
-            if constexpr (qed_control == has_qed) {
-                if (do_copy) {
-                    //  Copy the old x and u for the BTD
-                    copyAttribs(ip);
-                }
 
+#ifdef WARPX_QED
+        if constexpr (qed_control == has_qed) {
+            if (do_sync) {
                 doParticleMomentumPush<1>(ux[ip], uy[ip], uz[ip],
-                                          Exp, Eyp, Ezp, Bxp, Byp, Bzp,
-                                          ion_lev ? ion_lev[ip] : 1,
-                                          m, q, pusher_algo, do_crr,
-                                          t_chi_max,
-                                          dt);
-
-                UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], dt);
-                setPosition(ip, xp, yp, zp);
+                    Exp, Eyp, Ezp, Bxp, Byp, Bzp,
+                    ion_lev ? ion_lev[ip] : 1,
+                    m, q, pusher_algo, do_crr,
+                    t_chi_max,
+                    dt);
+            } else {
+                doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
+                    Exp, Eyp, Ezp, Bxp, Byp, Bzp,
+                    ion_lev ? ion_lev[ip] : 1,
+                    m, q, pusher_algo, do_crr,
+                    t_chi_max,
+                    dt);
             }
         }
+#else
+            doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
+                Exp, Eyp, Ezp, Bxp, Byp, Bzp,
+                ion_lev ? ion_lev[ip] : 1,
+                m, q, pusher_algo, do_crr,
+                dt);
 #endif
+        UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], dt);
+        setPosition(ip, xp, yp, zp);
 
 #ifdef WARPX_QED
         [[maybe_unused]] auto foo_local_has_quantum_sync = local_has_quantum_sync;
