@@ -1226,7 +1226,18 @@ PhysicalParticleContainer::PushPX (
     // (i.e., position_push_half is true and momentum_push_skip is true,
     // meaning that the momentum has already been pushed in the first half)
     // FIXME Avoid duplication with Evolve
-    //bool const push_split_second_half = (position_push_half && momentum_push_skip);
+    bool const push_split_second_half = (position_push_half && momentum_push_skip);
+
+    // Auxiliary booleans
+    bool const gather_fields = (
+        !do_not_gather &&
+        (push_unsplit || push_split_first_half)
+    );
+    bool const copy_particle_attribs = (
+        m_do_back_transformed_particles &&
+        (a_dt_type != DtType::SecondHalf) &&
+        (push_unsplit || push_split_second_half)  // FIXME Double check this
+    );
 
     const auto getPosition = GetParticlePosition<PIdx>(pti, offset);
           auto setPosition = SetParticlePosition<PIdx>(pti, offset);
@@ -1268,9 +1279,8 @@ PhysicalParticleContainer::PushPX (
     ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr() + offset;
     ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr() + offset;
 
-    const int do_copy = (m_do_back_transformed_particles && (a_dt_type!=DtType::SecondHalf) );
     CopyParticleAttribs copyAttribs;
-    if (do_copy) {
+    if (copy_particle_attribs) {
         copyAttribs = CopyParticleAttribs(*this, pti, offset);
     }
 
@@ -1315,12 +1325,6 @@ PhysicalParticleContainer::PushPX (
         p_optical_depth_QSR = pti.GetAttribs("opticalDepthQSR").dataPtr()  + offset;
     }
 #endif
-
-    // Auxiliary booleans
-    bool const gather_fields = (
-        !do_not_gather &&
-        (push_unsplit || push_split_first_half)
-    );
 
     enum exteb_flags : int { no_exteb, has_exteb };
     enum qed_flags : int { no_qed, has_qed };
@@ -1383,7 +1387,7 @@ PhysicalParticleContainer::PushPX (
         if (!do_sync)
 #endif
         {
-            if (do_copy) {
+            if (copy_particle_attribs) {
                 //  Copy the old x and u for the BTD
                 copyAttribs(ip);
             }
@@ -1425,7 +1429,7 @@ PhysicalParticleContainer::PushPX (
 #ifdef WARPX_QED
         else {
             if constexpr (qed_control == has_qed) {
-                if (do_copy) {
+                if (copy_particle_attribs) {
                     //  Copy the old x and u for the BTD
                     copyAttribs(ip);
                 }
