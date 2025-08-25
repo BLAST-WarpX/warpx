@@ -411,7 +411,7 @@ void WarpX::OneStep (
                 PushParticlesandDeposit(
                     a_cur_time,
                     /*skip_current=*/true,
-                    /*position_push_half=*/true,
+                    /*position_push_type=*/DtType::FirstHalf,
                     /*momentum_push_skip=*/false
                 );
 
@@ -427,7 +427,7 @@ void WarpX::OneStep (
                 PushParticlesandDeposit(
                     a_cur_time,
                     /*skip_current=*/true,
-                    /*position_push_half=*/true,
+                    /*position_push_type=*/DtType::SecondHalf,
                     /*momentum_push_skip=*/true
                 );
             }
@@ -440,7 +440,7 @@ void WarpX::OneStep (
                 PushParticlesandDeposit(
                     a_cur_time,
                     /*skip_deposition=*/true,
-                    /*position_push_half=*/false,
+                    /*position_push_type=*/DtType::Full,
                     /*momentum_push_skip=*/false
                 );
             }
@@ -1260,7 +1260,7 @@ void
 WarpX::PushParticlesandDeposit (
     amrex::Real cur_time,
     bool const skip_current,
-    bool const position_push_half,
+    DtType position_push_type,
     bool const momentum_push_skip,
     bool const deposit_mass_matrices,
     PushType push_type
@@ -1274,7 +1274,7 @@ WarpX::PushParticlesandDeposit (
             cur_time,
             DtType::Full,
             skip_current,
-            position_push_half,
+            position_push_type,
             momentum_push_skip,
             deposit_mass_matrices,
             push_type
@@ -1288,7 +1288,7 @@ WarpX::PushParticlesandDeposit (
     amrex::Real cur_time,
     DtType a_dt_type,
     bool const skip_current,
-    bool const position_push_half,
+    DtType position_push_type,
     bool const momentum_push_skip,
     bool const deposit_mass_matrices,
     PushType push_type
@@ -1320,7 +1320,7 @@ WarpX::PushParticlesandDeposit (
         dt[lev],
         a_dt_type,
         skip_current,
-        position_push_half,
+        position_push_type,
         momentum_push_skip,
         deposit_mass_matrices,
         push_type

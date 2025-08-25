@@ -91,7 +91,7 @@ public:
      * \param dt time step by which particles are advanced
      * \param a_dt_type type of time step (used for sub-cycling)
      * \param skip_deposition Skip the charge and current deposition.
-     * \param position_push_half Push particle positions for only the first half of the time step.
+     * \param position_push_type Type of time advance for particle positions (full, first half, second half, none)
      * \param momentum_push_skip Skip particle momentum push (used when particle position push is split).
      * \param deposit_mass_matrices whether to deposit the mass matrices (in the case of the implicit solver)
      * \param push_type Type of particle push, explicit or implicit. Defaults to explicit
@@ -108,7 +108,7 @@ public:
         amrex::Real dt,
         DtType a_dt_type=DtType::Full,
         bool const skip_deposition=false,
-        bool const position_push_half=false,
+        DtType position_push_type=DtType::Full,
         bool const momentum_push_skip=false,
         bool const deposit_mass_matrices=false,
         PushType push_type=PushType::Explicit
@@ -134,7 +134,7 @@ public:
         amrex::Real dt,
         ScaleFields scaleFields,
         DtType a_dt_type=DtType::Full,
-        bool const position_push_half=false,
+        DtType position_push_type=DtType::Full,
         bool const momentum_push_skip=false
     );
 

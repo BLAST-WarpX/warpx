@@ -72,7 +72,7 @@ public:
         amrex::Real dt,
         DtType a_dt_type=DtType::Full,
         bool const skip_deposition=false,
-        bool const position_push_half=false,
+        DtType position_push_type=DtType::Full,
         bool const momentum_push_skip=false,
         bool const deposit_mass_matrices=false,
         PushType push_type=PushType::Explicit
@@ -95,7 +95,7 @@ public:
         amrex::Real dt,
         ScaleFields scaleFields,
         DtType a_dt_type=DtType::Full,
-        bool const position_push_half=false,
+        DtType position_push_type=DtType::Full,
         bool const momentum_push_skip=false
     ) override;
 

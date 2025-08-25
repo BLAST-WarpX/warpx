@@ -567,7 +567,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     // This uses Efield_fp and Bfield_fp, the field at n+1/2 from the previous iteration.
     const PushType push_type = PushType::Implicit;
     const bool skip_current = false;
-    bool const position_push_half = false;
+    DtType position_push_type = DtType::Full;
     bool const momentum_push_skip = false;
 
     if (m_use_mass_matrices && !a_from_jacobian) { // Called from non-linear stage of JFNK and using mass matrices
@@ -575,7 +575,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         m_WarpX->PushParticlesandDeposit(
             a_cur_time,
             skip_current,
-            position_push_half,
+            position_push_type,
             momentum_push_skip,
             deposit_mass_matrices,
             push_type
@@ -595,7 +595,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         m_WarpX->PushParticlesandDeposit(
             a_cur_time,
             skip_current,
-            position_push_half,
+            position_push_type,
             momentum_push_skip,
             deposit_mass_matrices,
             push_type

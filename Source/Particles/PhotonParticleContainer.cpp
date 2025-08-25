@@ -97,7 +97,7 @@ PhotonParticleContainer::PushPX (
     amrex::Real dt,
     ScaleFields /*scaleFields*/,
     DtType a_dt_type,
-    bool const position_push_half,
+    DtType position_push_type,
     bool const /*momentum_push_skip*/
 )
 {
@@ -234,7 +234,11 @@ PhotonParticleContainer::PushPX (
             amrex::ignore_unused(qed_control);
 #endif
 
-            UpdatePositionPhoton(x, y, z, ux[i], uy[i], uz[i], (position_push_half ? dt*0.5_rt : dt));
+            amrex::Real position_dt = dt;
+            if (position_push_type == DtType::FirstHalf || position_push_type == DtType::SecondHalf) {
+                position_dt *= 0.5_rt;
+            }
+            UpdatePositionPhoton(x, y, z, ux[i], uy[i], uz[i], position_dt);
             SetPosition(i, x, y, z);
         }
     );
@@ -249,7 +253,7 @@ PhotonParticleContainer::Evolve (
     Real dt,
     DtType a_dt_type,
     bool const skip_deposition,
-    bool const position_push_half,
+    DtType position_push_type,
     bool const momentum_push_skip,
     bool const /*deposit_mass_matrices*/,
     PushType push_type
@@ -266,7 +270,7 @@ PhotonParticleContainer::Evolve (
         dt,
         a_dt_type,
         skip_deposition,
-        position_push_half,
+        position_push_type,
         momentum_push_skip,
         deposit_mass_matrices,
         push_type

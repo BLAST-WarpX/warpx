@@ -425,7 +425,7 @@ PhysicalParticleContainer::Evolve (
     Real dt,
     DtType a_dt_type,
     bool const skip_deposition,
-    bool const position_push_half,
+    DtType position_push_type,
     bool const momentum_push_skip,
     bool const deposit_mass_matrices,
     PushType push_type
@@ -440,19 +440,6 @@ PhysicalParticleContainer::Evolve (
     BL_ASSERT(OnSameGrids(lev, *fields.get(FieldType::current_fp, Direction{0}, lev)));
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
-    // Whether this is an unsplit push (i.e., position_push_half is false)
-    bool const push_unsplit = !position_push_half;
-
-    // Whether this is a split push in the first half
-    // (i.e., position_push_half is true and momentum_push_skip is false,
-    // meaning that the momentum has not been pushed yet)
-    bool const push_split_first_half = (position_push_half && !momentum_push_skip);
-
-    // Whether this is a split push in the second half
-    // (i.e., position_push_half is true and momentum_push_skip is true,
-    // meaning that the momentum has already been pushed in the first half)
-    bool const push_split_second_half = (position_push_half && momentum_push_skip);
 
     const iMultiFab* current_masks = WarpX::CurrentBufferMasks(lev);
     const iMultiFab* gather_masks = WarpX::GatherBufferMasks(lev);
@@ -474,12 +461,12 @@ PhysicalParticleContainer::Evolve (
         has_rho &&
         !skip_deposition &&
         !do_not_deposit &&
-        (push_unsplit || push_split_first_half)
+        (position_push_type == DtType::Full || position_push_type == DtType::FirstHalf)
     );
     bool const split_particles = (
         do_splitting &&
         (a_dt_type == DtType::Full || a_dt_type == DtType::SecondHalf) &&
-        (push_unsplit || push_split_second_half)
+        (position_push_type == DtType::Full || position_push_type == DtType::SecondHalf)
     );
 
 #ifdef AMREX_USE_OMP
@@ -587,7 +574,7 @@ PhysicalParticleContainer::Evolve (
                     PushPX(pti, exfab, eyfab, ezfab,
                            bxfab, byfab, bzfab,
                            Ex.nGrowVect(), e_is_nodal,
-                           0, np_to_push, lev, gather_lev, dt, ScaleFields(false), a_dt_type, position_push_half, momentum_push_skip);
+                           0, np_to_push, lev, gather_lev, dt, ScaleFields(false), a_dt_type, position_push_type, momentum_push_skip);
                 } else if (push_type == PushType::Implicit) {
                     ImplicitPushXP(pti, exfab, eyfab, ezfab,
                                    bxfab, byfab, bzfab,
@@ -636,7 +623,7 @@ PhysicalParticleContainer::Evolve (
                                cbxfab, cbyfab, cbzfab,
                                cEx.nGrowVect(), e_is_nodal,
                                nfine_gather, np-nfine_gather,
-                               lev, lev-1, dt, ScaleFields(false), a_dt_type, position_push_half, momentum_push_skip);
+                               lev, lev-1, dt, ScaleFields(false), a_dt_type, position_push_type, momentum_push_skip);
                     } else if (push_type == PushType::Implicit) {
                         ImplicitPushXP(pti, cexfab, ceyfab, cezfab,
                                        cbxfab, cbyfab, cbzfab,
@@ -1186,7 +1173,7 @@ PhysicalParticleContainer::PushPX (
     amrex::Real dt,
     ScaleFields scaleFields,
     DtType a_dt_type,
-    bool const position_push_half,
+    DtType position_push_type,
     bool const momentum_push_skip
 )
 {
@@ -1212,31 +1199,15 @@ PhysicalParticleContainer::PushPX (
     // Add guard cells to the box.
     box.grow(ngEB);
 
-    // Whether this is an unsplit push (i.e., position_push_half is false)
-    // FIXME Avoid duplication with Evolve
-    bool const push_unsplit = !position_push_half;
-
-    // Whether this is a split push in the first half
-    // (i.e., position_push_half is true and momentum_push_skip is false,
-    // meaning that the momentum has not been pushed yet)
-    // FIXME Avoid duplication with Evolve
-    bool const push_split_first_half = (position_push_half && !momentum_push_skip);
-
-    // Whether this is a split push in the second half
-    // (i.e., position_push_half is true and momentum_push_skip is true,
-    // meaning that the momentum has already been pushed in the first half)
-    // FIXME Avoid duplication with Evolve
-    bool const push_split_second_half = (position_push_half && momentum_push_skip);
-
     // Auxiliary booleans
     bool const gather_fields = (
         !do_not_gather &&
-        (push_unsplit || push_split_first_half)
+        (position_push_type == DtType::Full || position_push_type == DtType::FirstHalf)
     );
     bool const copy_particle_attribs = (
         m_do_back_transformed_particles &&
         (a_dt_type != DtType::SecondHalf) &&
-        (push_unsplit || push_split_second_half)  // FIXME Double check this
+        (position_push_type == DtType::Full || position_push_type == DtType::SecondHalf)  // FIXME Double check this
     );
 
     const auto getPosition = GetParticlePosition<PIdx>(pti, offset);
@@ -1415,6 +1386,10 @@ PhysicalParticleContainer::PushPX (
                 );
             }
 
+            amrex::Real position_dt = dt;
+            if (position_push_type == DtType::FirstHalf || position_push_type == DtType::SecondHalf) {
+                position_dt *= 0.5_rt;
+            }
             UpdatePosition(
                 xp,
                 yp,
@@ -1422,7 +1397,7 @@ PhysicalParticleContainer::PushPX (
                 ux[ip],
                 uy[ip],
                 uz[ip],
-                (position_push_half ? dt*0.5_rt : dt)
+                position_dt
             );
             setPosition(ip, xp, yp, zp);
         }
@@ -1455,6 +1430,10 @@ PhysicalParticleContainer::PushPX (
                     );
                 }
 
+                amrex::Real position_dt = dt;
+                if (position_push_type == DtType::FirstHalf || position_push_type == DtType::SecondHalf) {
+                    position_dt *= 0.5_rt;
+                }
                 UpdatePosition(
                     xp,
                     yp,
@@ -1462,7 +1441,7 @@ PhysicalParticleContainer::PushPX (
                     ux[ip],
                     uy[ip],
                     uz[ip],
-                    (position_push_half ? dt*0.5_rt : dt)
+                    position_dt
                 );
                 setPosition(ip, xp, yp, zp);
             }

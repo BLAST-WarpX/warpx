@@ -459,7 +459,7 @@ MultiParticleContainer::Evolve (
     Real dt,
     DtType a_dt_type,
     bool const skip_deposition,
-    bool const position_push_half,
+    DtType position_push_type,
     bool const momentum_push_skip,
     bool const deposit_mass_matrices,
     PushType push_type
@@ -497,7 +497,7 @@ MultiParticleContainer::Evolve (
             dt,
             a_dt_type,
             skip_deposition,
-            position_push_half,
+            position_push_type,
             momentum_push_skip,
             deposit_mass_matrices,
             push_type

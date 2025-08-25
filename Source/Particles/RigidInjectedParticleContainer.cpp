@@ -185,7 +185,7 @@ RigidInjectedParticleContainer::PushPX (
     amrex::Real dt,
     ScaleFields /*scaleFields*/,
     DtType a_dt_type,
-    bool const position_push_half,
+    DtType position_push_type,
     bool const momentum_push_skip
 )
 {
@@ -244,7 +244,7 @@ RigidInjectedParticleContainer::PushPX (
         dt,
         ScaleFields(do_scale, dt, zinject_plane_lev_previous, vzbeam_ave_boosted, v_boost),
         a_dt_type,
-        position_push_half,
+        position_push_type,
         momentum_push_skip
     );
 
@@ -256,7 +256,7 @@ RigidInjectedParticleContainer::PushPX (
 
         // Undo the push for particles not injected yet.
         // The zp are advanced a fixed amount.
-        // FIXME Use position_push_half here as well?
+        // FIXME Use position_push_type here as well?
         const amrex::ParticleReal z_plane_lev = zinject_plane_lev;
         const amrex::ParticleReal vz_ave_boosted = vzbeam_ave_boosted;
         const RigidAdvanceMode rigid = rigid_advance_mode;
@@ -297,7 +297,7 @@ RigidInjectedParticleContainer::Evolve (
     Real dt,
     DtType a_dt_type,
     bool const skip_deposition,
-    bool const position_push_half,
+    DtType position_push_type,
     bool const momentum_push_skip,
     bool const /*deposit_mass_matrices*/,
     PushType push_type
@@ -332,7 +332,7 @@ RigidInjectedParticleContainer::Evolve (
         dt,
         a_dt_type,
         skip_deposition,
-        position_push_half,
+        position_push_type,
         momentum_push_skip,
         deposit_mass_matrices,
         push_type
