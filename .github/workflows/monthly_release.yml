@@ -5,6 +5,10 @@ on:
     - cron: "0 0 1 * *"  # every first day of the month at midnight
   workflow_dispatch:
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   monthly_release:
     name: Monthly release

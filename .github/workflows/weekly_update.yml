@@ -5,6 +5,10 @@ on:
     - cron: "0 0 * * 1"  # every Monday at midnight
   workflow_dispatch:
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   weekly_update:
     name: Weekly update
