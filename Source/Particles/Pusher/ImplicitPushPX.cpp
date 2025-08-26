@@ -248,6 +248,9 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             yp = yp_n + dyp;
 #endif
+#if !defined(WARPX_DIM_RCYLINDER)
+            zp = zp_n + dzp;
+#endif
             setPosition(ip, xp, yp, zp);
 
             PositionNorm( dxp, dyp, dzp, dxp_save, dyp_save, dzp_save,
