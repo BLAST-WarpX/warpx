@@ -126,7 +126,7 @@ namespace {
         bool convergence = false;
         for (int iter=0; iter < max_iterations; iter++) {
 
-            // Position is advaned using the time-centered velocity.
+            // Position is advanced using the time-centered velocity.
             // A converged advance will have self-consistent position and velocity.
             amrex::ParticleReal dxp = 0.0_prt;
             amrex::ParticleReal dyp = 0.0_prt;
@@ -232,17 +232,17 @@ namespace {
  *         - average old and new velocity to get time centered value
  *        The routines ends with both position and velocity at the half time level.
  *
- * \param[in] pti the WarpXParIter holding the particles to push
- * \param[in] exfab, eyfab, ezfab the E fields
- * \param[in] bxfab, byfab, bzfab the B fields
- * \param[in] ngEB the number of guard cells in the E and B fields
- * \param[in] offset the particle index offset for the particles to be pushed
- * \param[in] np_to_push the number of particles to push
- * \param[in] lev the refinement level
- * \param[in] gather_lev the refinement level at which to do the field gather
- * \param[in] dt the time step size
- * \param[in] scaleFields allows scale factor to the fields (for rigid injection)
- * \param[in] a_dt_type the push type (which part of the time step)
+ * \param[in] pti The WarpXParIter holding the particles to push
+ * \param[in] exfab, eyfab, ezfab The E fields
+ * \param[in] bxfab, byfab, bzfab The B fields
+ * \param[in] ngEB The number of guard cells in the E and B fields
+ * \param[in] offset The particle index offset for the particles to be pushed
+ * \param[in] np_to_push The number of particles to push
+ * \param[in] lev The refinement level
+ * \param[in] gather_lev The refinement level at which to do the field gather
+ * \param[in] dt The time step size
+ * \param[in] scaleFields Allows scale factor to the fields (for rigid injection)
+ * \param[in] a_dt_type The push type (which part of the time step)
  */
 void
 PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
