@@ -41,6 +41,7 @@ jobs:
       - name: Open pull request
         run: |
           gh pr create \
+            --draft \
             --base development \
             --body "Automated via .github/workflows/monthly_release.yml." \
             --label "component: third party" \

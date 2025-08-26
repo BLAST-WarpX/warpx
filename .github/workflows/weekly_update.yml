@@ -38,6 +38,7 @@ jobs:
       - name: Open pull request
         run: |
           gh pr create \
+            --draft \
             --base development \
             --body "Automated via .github/workflows/weekly_update.yml." \
             --label "component: third party" \
