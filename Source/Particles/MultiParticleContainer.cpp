@@ -9,6 +9,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
+#include "DoxyGraph.H"
+
 #include "MultiParticleContainer.H"
 
 #include "Fields.H"
@@ -481,6 +483,7 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         }
     }
     for (auto& pc : allcontainers) {
+        DOXY_GRAPH(WarpXParticleContainer::Evolve();)
         pc->Evolve(fields, lev, current_fp_string, t, dt, a_dt_type, skip_deposition, deposit_mass_matrices, push_type);
     }
 }
