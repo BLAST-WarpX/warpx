@@ -270,7 +270,7 @@ RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& field
                                         int lev,
                                         const std::string& current_fp_string,
                                         Real t, Real dt, DtType a_dt_type, bool skip_deposition,
-                                        const ImplicitOptions* /*implicit_options*/)
+                                        ImplicitOptions const * /*implicit_options*/)
 {
 
     // Update location of injection plane in the boosted frame

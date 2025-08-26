@@ -648,9 +648,9 @@ public:
 #endif
 
     void PushParticlesandDeposit (int lev, amrex::Real cur_time, DtType a_dt_type=DtType::Full, bool skip_current=false,
-                                  const ImplicitOptions* implicit_options = nullptr);
+                                  ImplicitOptions const * implicit_options = nullptr);
     void PushParticlesandDeposit (amrex::Real cur_time, bool skip_current=false,
-                                  const ImplicitOptions* implicit_options = nullptr);
+                                  ImplicitOptions const * implicit_options = nullptr);
 
     // This function does aux(lev) = fp(lev) + I(aux(lev-1)-cp(lev)).
     // Caller must make sure fp and cp have ghost cells filled.

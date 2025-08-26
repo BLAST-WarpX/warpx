@@ -455,7 +455,7 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                 int lev,
                                 std::string const& current_fp_string,
                                 Real t, Real dt, DtType a_dt_type, bool skip_deposition,
-                                const ImplicitOptions* implicit_options)
+                                ImplicitOptions const * implicit_options)
 {
     if (! skip_deposition) {
         using ablastr::fields::Direction;
