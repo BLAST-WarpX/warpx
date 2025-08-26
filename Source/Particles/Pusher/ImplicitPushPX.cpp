@@ -210,14 +210,14 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
         amrex::ParticleReal xp = x_n[ip];
         const amrex::ParticleReal xp_n = x_n[ip];
 #else
-        const amrex::ParticleReal xp = 0._prt;
+        amrex::ParticleReal xp = 0._prt;
         const amrex::ParticleReal xp_n = 0._prt;
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         amrex::ParticleReal yp = y_n[ip];
         const amrex::ParticleReal yp_n = y_n[ip];
 #else
-        const amrex::ParticleReal yp = 0._prt;
+        amrex::ParticleReal yp = 0._prt;
         const amrex::ParticleReal yp_n = 0._prt;
 #endif
 #if !defined(WARPX_DIM_RCYLINDER)
@@ -242,15 +242,10 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
             dyp = 0.0;
             dzp = 0.0;
             UpdatePositionImplicit(dxp, dyp, dzp, ux_n[ip], uy_n[ip], uz_n[ip], ux[ip], uy[ip], uz[ip], 0.5_rt*dt);
-#if !defined(WARPX_DIM_1D_Z)
             xp = xp_n + dxp;
-#endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             yp = yp_n + dyp;
-#endif
-#if !defined(WARPX_DIM_RCYLINDER)
             zp = zp_n + dzp;
-#endif
+
             setPosition(ip, xp, yp, zp);
 
             PositionNorm( dxp, dyp, dzp, dxp_save, dyp_save, dzp_save,
