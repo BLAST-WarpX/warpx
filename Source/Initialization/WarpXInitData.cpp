@@ -168,7 +168,7 @@ namespace
                 << "Consider decreasing the amr.blocking_factor and "
                 << "amr.max_grid_size parameters and/or using fewer MPI ranks.\n"
                 << "  More information:\n"
-                << "  https://warpx.readthedocs.io/en/latest/usage/workflows/parallelization.html\n";
+                << "  https://warpx.readthedocs.io/en/latest/usage/workflows/domain_decomposition.html\n";
 
             ablastr::warn_manager::WMRecordWarning(
             "Performance", warnMsg.str(), ablastr::warn_manager::WarnPriority::high);
@@ -191,7 +191,7 @@ namespace
                 << "Consider increasing the amr.blocking_factor and "
                 << "amr.max_grid_size parameters and/or using more MPI ranks.\n"
                 << "  More information:\n"
-                << "  https://warpx.readthedocs.io/en/latest/usage/workflows/parallelization.html\n";
+                << "  https://warpx.readthedocs.io/en/latest/usage/workflows/domain_decomposition.html\n";
 
             ablastr::warn_manager::WMRecordWarning(
             "Performance", warnMsg.str(), ablastr::warn_manager::WarnPriority::high);
