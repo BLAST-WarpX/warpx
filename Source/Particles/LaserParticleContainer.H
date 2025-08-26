@@ -14,6 +14,8 @@
 #include "Laser/LaserProfiles.H"
 #include "WarpXParticleContainer.H"
 
+#include "FieldSolver/ImplicitSolvers/ImplicitSolver_fwd.H"
+
 #include <AMReX_Extension.H>
 #include <AMReX_Random.H>
 #include <AMReX_REAL.H>
@@ -68,7 +70,8 @@ public:
                  int lev,
                  const std::string& current_fp_string,
                  amrex::Real t, amrex::Real dt, DtType a_dt_type=DtType::Full,
-                 bool skip_deposition=false, bool deposit_mass_matrices=false,
+                 bool skip_deposition=false,
+                 const ImplicitOptions* implicit_options = nullptr,
                  PushType push_type=PushType::Explicit) final;
 
     void PushP (int lev, amrex::Real dt,

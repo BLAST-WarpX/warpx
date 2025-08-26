@@ -25,6 +25,8 @@
 #include "WarpXParticleContainer.H"
 #include "Particles/Deposition/TemperatureDepositionTypes.H"
 
+#include "FieldSolver/ImplicitSolvers/ImplicitSolver_fwd.H"
+
 #include <AMReX_GpuContainers.H>
 #include <AMReX_Particles.H>
 #include <AMReX_REAL.H>
@@ -91,7 +93,7 @@ public:
      * \param dt time step by which particles are advanced
      * \param a_dt_type type of time step (used for sub-cycling)
      * \param skip_deposition Skip the charge and current deposition.
-     * \param deposit_mass_matrices whether to deposit the mass matrices (in the case of the implicit solver)
+     * \param implicit_options (in the case of the implicit solver)
      * \param push_type Type of particle push, explicit or implicit. Defaults to explicit
      *
      * Evolve iterates over particle iterator (each box) and performs filtering,
@@ -105,7 +107,7 @@ public:
                  amrex::Real dt,
                  DtType a_dt_type=DtType::Full,
                  bool skip_deposition=false,
-                 bool deposit_mass_matrices=false,
+                 const ImplicitOptions* implicit_options = nullptr,
                  PushType push_type=PushType::Explicit) override;
 
     virtual void PushPX (WarpXParIter& pti,
@@ -129,6 +131,7 @@ public:
                          amrex::FArrayBox const * bxfab,
                          amrex::FArrayBox const * byfab,
                          amrex::FArrayBox const * bzfab,
+                         ImplicitOptions const * implicit_options,
                          amrex::IntVect const & ngEB,
                          long offset,
                          long np_to_push,

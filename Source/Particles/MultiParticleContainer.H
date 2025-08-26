@@ -26,6 +26,8 @@
 #include "WarpXParticleContainer.H"
 #include "ParticleBoundaries.H"
 
+#include "FieldSolver/ImplicitSolvers/ImplicitSolver_fwd.H"
+
 #include <ablastr/fields/MultiFabRegister.H>
 
 #include <AMReX_BLassert.H>
@@ -113,7 +115,7 @@ public:
         amrex::Real dt,
         DtType a_dt_type=DtType::Full,
         bool skip_deposition=false,
-        bool deposit_mass_matrices=false,
+        const ImplicitOptions* implicit_options = nullptr,
         PushType push_type=PushType::Explicit
     );
 

@@ -7,6 +7,8 @@
 #ifndef Implicit_Solver_H_
 #define Implicit_Solver_H_
 
+#include "FieldSolver/ImplicitSolvers/ImplicitSolver_fwd.H"
+
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "NonlinearSolvers/NonlinearSolverLibrary.H"
 
@@ -49,13 +51,6 @@ public:
     [[nodiscard]] bool IsDefined () const { return m_is_defined; }
 
     virtual void PrintParameters () const = 0;
-
-    void GetParticleSolverParams (int&  a_max_particle_iter,
-                                  amrex::ParticleReal&  a_particle_tol ) const
-    {
-        a_max_particle_iter = m_max_particle_iterations;
-        a_particle_tol = m_particle_tolerance;
-    }
 
     void CreateParticleAttributes () const;
 

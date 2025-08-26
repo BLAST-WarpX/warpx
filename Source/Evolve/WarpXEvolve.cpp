@@ -1212,7 +1212,7 @@ void
 WarpX::PushParticlesandDeposit (
     amrex::Real cur_time,
     bool skip_current,
-    bool deposit_mass_matrices,
+    const ImplicitOptions* implicit_options,
     PushType push_type
 )
 {
@@ -1224,7 +1224,7 @@ WarpX::PushParticlesandDeposit (
             cur_time,
             DtType::Full,
             skip_current,
-            deposit_mass_matrices,
+            implicit_options,
             push_type
         );
     }
@@ -1236,7 +1236,7 @@ WarpX::PushParticlesandDeposit (
     amrex::Real cur_time,
     DtType a_dt_type,
     bool skip_current,
-    bool deposit_mass_matrices,
+    const ImplicitOptions* implicit_options,
     PushType push_type
 )
 {
@@ -1266,7 +1266,7 @@ WarpX::PushParticlesandDeposit (
         dt[lev],
         a_dt_type,
         skip_current,
-        deposit_mass_matrices,
+        implicit_options,
         push_type
     );
 

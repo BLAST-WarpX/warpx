@@ -189,10 +189,6 @@ public:
     static inline auto electromagnetic_solver_id = ElectromagneticSolverAlgo::Default;
     //! Integer that corresponds to the evolve scheme (explicit, semi_implicit_em, theta_implicit_em)
     EvolveScheme evolve_scheme = EvolveScheme::Default;
-    //! Maximum iterations used for self-consistent particle update in implicit particle-suppressed evolve schemes
-    static int max_particle_its_in_implicit_scheme;
-    //! Relative tolerance used for self-consistent particle update in implicit particle-suppressed evolve schemes
-    static amrex::ParticleReal particle_tol_in_implicit_scheme;
     /** Records a number corresponding to the load balance cost update strategy
      *  being used (0 or 1 corresponding to timers or heuristic).
      */
@@ -652,9 +648,11 @@ public:
 #endif
 
     void PushParticlesandDeposit (int lev, amrex::Real cur_time, DtType a_dt_type=DtType::Full, bool skip_current=false,
-                                  bool deposit_mass_matrices=false, PushType push_type=PushType::Explicit);
+                                  const ImplicitOptions* implicit_options = nullptr,
+                                  PushType push_type=PushType::Explicit);
     void PushParticlesandDeposit (amrex::Real cur_time, bool skip_current=false,
-                                  bool deposit_mass_matrices=false, PushType push_type=PushType::Explicit);
+                                  const ImplicitOptions* implicit_options = nullptr,
+                                  PushType push_type=PushType::Explicit);
 
     // This function does aux(lev) = fp(lev) + I(aux(lev-1)-cp(lev)).
     // Caller must make sure fp and cp have ghost cells filled.

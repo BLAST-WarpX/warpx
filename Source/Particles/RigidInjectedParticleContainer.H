@@ -14,6 +14,7 @@
 #include "PhysicalParticleContainer.H"
 
 #include "WarpXParticleContainer_fwd.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitSolver_fwd.H"
 
 #include <AMReX_Enum.H>
 #include <AMReX_REAL.H>
@@ -71,7 +72,7 @@ public:
                  amrex::Real dt,
                  DtType a_dt_type=DtType::Full,
                  bool skip_deposition=false,
-                 bool deposit_mass_matrices=false,
+                 const ImplicitOptions* implicit_options = nullptr,
                  PushType push_type=PushType::Explicit) override;
 
     void PushPX (WarpXParIter& pti,

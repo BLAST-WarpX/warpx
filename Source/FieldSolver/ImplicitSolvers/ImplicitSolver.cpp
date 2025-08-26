@@ -687,7 +687,6 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     BL_PROFILE("ImplicitSolver::PreRHSOp()");
 
     using warpx::fields::FieldType;
-    amrex::ignore_unused( a_nl_iter );
 
     if (m_WarpX->use_filter) {
         int finest_level = 0;
@@ -701,9 +700,16 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     const PushType push_type = PushType::Implicit;
     const bool skip_current = false;
 
+    // Set the implict solver options for particles and setting the current density
+    ImplicitOptions options;
+    options.nonlinear_iteration = a_nl_iter;
+    options.max_particle_iterations = m_max_particle_iterations;
+    options.particle_tolerance = m_particle_tolerance;
+    options.linear_stage_of_jfnk = a_from_jacobian;
+
     if (m_use_mass_matrices && !a_from_jacobian) { // Called from non-linear stage of JFNK and using mass matrices
-        bool deposit_mass_matrices = true;
-        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, deposit_mass_matrices, push_type);
+        options.deposit_mass_matrices = true;
+        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, &options, push_type);
         if (m_use_mass_matrices_jacobian) { SaveEandJ(); }
         if (m_use_mass_matrices_pc) {
            SyncMassMatricesPCAndApplyBCs();
@@ -715,8 +721,8 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         ComputeJfromMassMatrices();
     }
     else {  // Conventional particle-suppressed JFNK
-        bool deposit_mass_matrices = false;
-        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, deposit_mass_matrices, push_type);
+        options.deposit_mass_matrices = false;
+        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, &options, push_type);
     }
 
     // Apply BCs to J and communicate
