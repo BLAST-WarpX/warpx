@@ -1207,7 +1207,7 @@ PhysicalParticleContainer::PushPX (
     bool const copy_particle_attribs = (
         m_do_back_transformed_particles &&
         (a_dt_type != DtType::SecondHalf) &&
-        (position_push_type == DtType::Full || position_push_type == DtType::SecondHalf)  // FIXME Double check this
+        (position_push_type == DtType::Full || position_push_type == DtType::FirstHalf)
     );
 
     const auto getPosition = GetParticlePosition<PIdx>(pti, offset);
