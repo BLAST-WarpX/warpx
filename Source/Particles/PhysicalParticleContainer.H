@@ -83,17 +83,17 @@ public:
     PlasmaInjector* GetPlasmaInjector (int i) override;
 
     /**
-     * \brief Evolve is the central function PhysicalParticleContainer that
+     * \brief Evolve is the central function in PhysicalParticleContainer that
      * advances plasma particles for a time dt (typically one timestep).
      *
-     * \param fields the WarpX field register
-     * \param lev level on which particles are living
-     * \param current_fp_string current coarse or fine patch identifier in fields
-     * \param t current physical time
-     * \param dt time step by which particles are advanced
-     * \param a_dt_type type of time step (used for sub-cycling)
-     * \param skip_deposition Skip the charge and current deposition.
-     * \param implicit_options (in the case of the implicit solver)
+     * \param fields The WarpX field register
+     * \param lev Level on which particles are living
+     * \param current_fp_string Current (coarse or fine patch) identifier in fields
+     * \param t Current physical time
+     * \param dt Time Step by which particles are advanced
+     * \param a_dt_type Type of time step (used for sub-cycling)
+     * \param skip_deposition Skip the charge and current deposition
+     * \param implicit_options Structure with specific options for implicit methods
      *
      * Evolve iterates over particle iterator (each box) and performs filtering,
      * field gather, particle push and current deposition for all particles
