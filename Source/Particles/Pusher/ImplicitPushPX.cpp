@@ -252,7 +252,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
 
             PositionNorm( dxp, dyp, dzp, dxp_save, dyp_save, dzp_save,
                           idxg2, idyg2, idzg2, step_norm, iter );
-            if( step_norm < particle_tolerance ) { break; }
+            if (step_norm < particle_tolerance) { break; }
 
             amrex::ParticleReal Exp = Ex_external_particle;
             amrex::ParticleReal Eyp = Ey_external_particle;
@@ -261,7 +261,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
             amrex::ParticleReal Byp = By_external_particle;
             amrex::ParticleReal Bzp = Bz_external_particle;
 
-            if(!t_do_not_gather){
+            if (!t_do_not_gather){
                 // first gather E and B to the particle positions
                 doGatherShapeNImplicit(xp_n, yp_n, zp_n, xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                        ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
@@ -337,7 +337,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
             iter++;
 
             // particle did not converge
-            if ( iter > 1 && iter == max_iterations ) {
+            if (iter > 1 && iter == max_iterations) {
 #if !defined(AMREX_USE_GPU)
                 std::stringstream convergenceMsg;
                 convergenceMsg << "Picard solver for particle failed to converge after " <<
