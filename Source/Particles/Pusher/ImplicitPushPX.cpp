@@ -228,9 +228,9 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
         const amrex::ParticleReal zp_n = 0._prt;
 #endif
 
-        amrex::ParticleReal dxp, dxp_save;
-        amrex::ParticleReal dyp, dyp_save;
-        amrex::ParticleReal dzp, dzp_save;
+        amrex::ParticleReal dxp_save;
+        amrex::ParticleReal dyp_save;
+        amrex::ParticleReal dzp_save;
         auto idxg2 = static_cast<amrex::ParticleReal>(dinv.x*dinv.x);
         auto idyg2 = static_cast<amrex::ParticleReal>(dinv.y*dinv.y);
         auto idzg2 = static_cast<amrex::ParticleReal>(dinv.z*dinv.z);
@@ -238,9 +238,9 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
         amrex::ParticleReal step_norm = 1._prt;
         for (int iter=0; iter<max_iterations;) {
 
-            dxp = 0.0;
-            dyp = 0.0;
-            dzp = 0.0;
+            amrex::ParticleReal dxp = 0._prt;
+            amrex::ParticleReal dyp = 0._prt;
+            amrex::ParticleReal dzp = 0._prt;
             UpdatePositionImplicit(dxp, dyp, dzp, ux_n[ip], uy_n[ip], uz_n[ip], ux[ip], uy[ip], uz[ip], 0.5_rt*dt);
             xp = xp_n + dxp;
             yp = yp_n + dyp;
