@@ -568,7 +568,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     const PushType push_type = PushType::Implicit;
     const bool skip_current = false;
     DtType position_push_type = DtType::Full;
-    bool const momentum_push_skip = false;
+    DtType momentum_push_type = DtType::Full;
 
     if (m_use_mass_matrices && !a_from_jacobian) { // Called from non-linear stage of JFNK and using mass matrices
         bool const deposit_mass_matrices = true;
@@ -576,7 +576,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
             a_cur_time,
             skip_current,
             position_push_type,
-            momentum_push_skip,
+            momentum_push_type,
             deposit_mass_matrices,
             push_type
         );
@@ -596,7 +596,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
             a_cur_time,
             skip_current,
             position_push_type,
-            momentum_push_skip,
+            momentum_push_type,
             deposit_mass_matrices,
             push_type
         );

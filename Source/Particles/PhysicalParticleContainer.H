@@ -91,8 +91,8 @@ public:
      * \param dt time step by which particles are advanced
      * \param a_dt_type type of time step (used for sub-cycling)
      * \param skip_deposition Skip the charge and current deposition.
-     * \param position_push_type Type of time advance for particle positions (full, first half, second half, none)
-     * \param momentum_push_skip Skip particle momentum push (used when particle position push is split).
+     * \param position_push_type Type of time advance for particle position (full, first half, second half, none)
+     * \param momentum_push_type Type of time advance for particle momentum (full, first half, second half, none)
      * \param deposit_mass_matrices whether to deposit the mass matrices (in the case of the implicit solver)
      * \param push_type Type of particle push, explicit or implicit. Defaults to explicit
      *
@@ -109,7 +109,7 @@ public:
         DtType a_dt_type=DtType::Full,
         bool const skip_deposition=false,
         DtType position_push_type=DtType::Full,
-        bool const momentum_push_skip=false,
+        DtType momentum_push_type=DtType::Full,
         bool const deposit_mass_matrices=false,
         PushType push_type=PushType::Explicit
     ) override;
@@ -135,7 +135,7 @@ public:
         ScaleFields scaleFields,
         DtType a_dt_type=DtType::Full,
         DtType position_push_type=DtType::Full,
-        bool const momentum_push_skip=false
+        DtType momentum_push_type=DtType::Full
     );
 
     void ImplicitPushXP (WarpXParIter& pti,

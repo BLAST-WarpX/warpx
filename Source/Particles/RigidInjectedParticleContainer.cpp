@@ -186,7 +186,7 @@ RigidInjectedParticleContainer::PushPX (
     ScaleFields /*scaleFields*/,
     DtType a_dt_type,
     DtType position_push_type,
-    bool const momentum_push_skip
+    DtType momentum_push_type
 )
 {
     auto& attribs = pti.GetAttribs();
@@ -245,7 +245,7 @@ RigidInjectedParticleContainer::PushPX (
         ScaleFields(do_scale, dt, zinject_plane_lev_previous, vzbeam_ave_boosted, v_boost),
         a_dt_type,
         position_push_type,
-        momentum_push_skip
+        momentum_push_type
     );
 
     if (!done_injecting_lev) {
@@ -298,7 +298,7 @@ RigidInjectedParticleContainer::Evolve (
     DtType a_dt_type,
     bool const skip_deposition,
     DtType position_push_type,
-    bool const momentum_push_skip,
+    DtType momentum_push_type,
     bool const /*deposit_mass_matrices*/,
     PushType push_type
 )
@@ -333,7 +333,7 @@ RigidInjectedParticleContainer::Evolve (
         a_dt_type,
         skip_deposition,
         position_push_type,
-        momentum_push_skip,
+        momentum_push_type,
         deposit_mass_matrices,
         push_type
     );

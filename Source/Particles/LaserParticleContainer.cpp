@@ -568,7 +568,7 @@ LaserParticleContainer::Evolve (
     DtType /*a_dt_type*/,
     bool const skip_deposition,
     DtType /*position_push_type*/,
-    bool const /*momentum_push_skip*/,
+    DtType /*momentum_push_type*/,
     bool const /*deposit_mass_matrices*/,
     PushType push_type
 )

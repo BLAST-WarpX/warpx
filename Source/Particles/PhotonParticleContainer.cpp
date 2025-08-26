@@ -98,7 +98,7 @@ PhotonParticleContainer::PushPX (
     ScaleFields /*scaleFields*/,
     DtType a_dt_type,
     DtType position_push_type,
-    bool const /*momentum_push_skip*/
+    DtType /*momentum_push_type*/
 )
 {
     // Get inverse cell size on gather_lev
@@ -219,7 +219,7 @@ PhotonParticleContainer::PushPX (
             }
 
 #ifdef WARPX_QED
-            // FIXME Use momentum_push_skip here?
+            // FIXME Use momentum_push_type here?
             [[maybe_unused]] const auto& evolve_opt_tmp = evolve_opt;
             [[maybe_unused]] auto *p_optical_depth_BW_tmp = p_optical_depth_BW;
             [[maybe_unused]] auto *ux_tmp = ux; // for nvhpc
@@ -254,7 +254,7 @@ PhotonParticleContainer::Evolve (
     DtType a_dt_type,
     bool const skip_deposition,
     DtType position_push_type,
-    bool const momentum_push_skip,
+    DtType momentum_push_type,
     bool const /*deposit_mass_matrices*/,
     PushType push_type
 )
@@ -271,7 +271,7 @@ PhotonParticleContainer::Evolve (
         a_dt_type,
         skip_deposition,
         position_push_type,
-        momentum_push_skip,
+        momentum_push_type,
         deposit_mass_matrices,
         push_type
     );

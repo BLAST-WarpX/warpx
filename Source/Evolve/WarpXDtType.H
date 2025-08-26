@@ -11,7 +11,8 @@ enum struct DtType : int
 {
     Full = 0,
     FirstHalf,
-    SecondHalf
+    SecondHalf,
+    None
 };
 
 #endif // WARPX_DTTYPE_H_

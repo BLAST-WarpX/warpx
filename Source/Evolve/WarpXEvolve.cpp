@@ -412,7 +412,7 @@ void WarpX::OneStep (
                     a_cur_time,
                     /*skip_current=*/true,
                     /*position_push_type=*/DtType::FirstHalf,
-                    /*momentum_push_skip=*/false
+                    /*momentum_push_type=*/DtType::Full
                 );
 
                 // perform particle collisions
@@ -428,7 +428,7 @@ void WarpX::OneStep (
                     a_cur_time,
                     /*skip_current=*/true,
                     /*position_push_type=*/DtType::SecondHalf,
-                    /*momentum_push_skip=*/true
+                    /*momentum_push_type=*/DtType::None
                 );
             }
             // without collisions
@@ -441,7 +441,7 @@ void WarpX::OneStep (
                     a_cur_time,
                     /*skip_deposition=*/true,
                     /*position_push_type=*/DtType::Full,
-                    /*momentum_push_skip=*/false
+                    /*momentum_push_type=*/DtType::Full
                 );
             }
         }
@@ -1261,7 +1261,7 @@ WarpX::PushParticlesandDeposit (
     amrex::Real cur_time,
     bool const skip_current,
     DtType position_push_type,
-    bool const momentum_push_skip,
+    DtType momentum_push_type,
     bool const deposit_mass_matrices,
     PushType push_type
 )
@@ -1275,7 +1275,7 @@ WarpX::PushParticlesandDeposit (
             DtType::Full,
             skip_current,
             position_push_type,
-            momentum_push_skip,
+            momentum_push_type,
             deposit_mass_matrices,
             push_type
         );
@@ -1289,7 +1289,7 @@ WarpX::PushParticlesandDeposit (
     DtType a_dt_type,
     bool const skip_current,
     DtType position_push_type,
-    bool const momentum_push_skip,
+    DtType momentum_push_type,
     bool const deposit_mass_matrices,
     PushType push_type
 )
@@ -1321,7 +1321,7 @@ WarpX::PushParticlesandDeposit (
         a_dt_type,
         skip_current,
         position_push_type,
-        momentum_push_skip,
+        momentum_push_type,
         deposit_mass_matrices,
         push_type
     );

@@ -55,7 +55,7 @@ public:
         DtType a_dt_type=DtType::Full,
         bool const skip_deposition=false,
         DtType position_push_type=DtType::Full,
-        bool const momentum_push_skip=false,
+        DtType momentum_push_type=DtType::Full,
         bool const deposit_mass_matrices=false,
         PushType push_type=PushType::Explicit
     ) override;
@@ -78,7 +78,7 @@ public:
         ScaleFields scaleFields,
         DtType a_dt_type,
         DtType position_push_type=DtType::Full,
-        bool const momentum_push_skip=false
+        DtType momentum_push_type=DtType::Full
     ) override;
 
     // Do nothing

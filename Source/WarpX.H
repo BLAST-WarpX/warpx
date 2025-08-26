@@ -657,7 +657,7 @@ public:
         DtType a_dt_type=DtType::Full,
         bool const skip_current=false,
         DtType position_push_type=DtType::Full,
-        bool const momentum_push_skip=false,
+        DtType momentum_push_type=DtType::Full,
         bool const deposit_mass_matrices=false,
         PushType push_type=PushType::Explicit
     );
@@ -666,7 +666,7 @@ public:
         amrex::Real cur_time,
         bool const skip_current=false,
         DtType position_push_type=DtType::Full,
-        bool const momentum_push_skip=false,
+        DtType momentum_push_type=DtType::Full,
         bool const deposit_mass_matrices=false,
         PushType push_type=PushType::Explicit
     );

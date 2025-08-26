@@ -426,7 +426,7 @@ PhysicalParticleContainer::Evolve (
     DtType a_dt_type,
     bool const skip_deposition,
     DtType position_push_type,
-    bool const momentum_push_skip,
+    DtType momentum_push_type,
     bool const deposit_mass_matrices,
     PushType push_type
 )
@@ -574,7 +574,7 @@ PhysicalParticleContainer::Evolve (
                     PushPX(pti, exfab, eyfab, ezfab,
                            bxfab, byfab, bzfab,
                            Ex.nGrowVect(), e_is_nodal,
-                           0, np_to_push, lev, gather_lev, dt, ScaleFields(false), a_dt_type, position_push_type, momentum_push_skip);
+                           0, np_to_push, lev, gather_lev, dt, ScaleFields(false), a_dt_type, position_push_type, momentum_push_type);
                 } else if (push_type == PushType::Implicit) {
                     ImplicitPushXP(pti, exfab, eyfab, ezfab,
                                    bxfab, byfab, bzfab,
@@ -623,7 +623,7 @@ PhysicalParticleContainer::Evolve (
                                cbxfab, cbyfab, cbzfab,
                                cEx.nGrowVect(), e_is_nodal,
                                nfine_gather, np-nfine_gather,
-                               lev, lev-1, dt, ScaleFields(false), a_dt_type, position_push_type, momentum_push_skip);
+                               lev, lev-1, dt, ScaleFields(false), a_dt_type, position_push_type, momentum_push_type);
                     } else if (push_type == PushType::Implicit) {
                         ImplicitPushXP(pti, cexfab, ceyfab, cezfab,
                                        cbxfab, cbyfab, cbzfab,
@@ -1174,7 +1174,7 @@ PhysicalParticleContainer::PushPX (
     ScaleFields scaleFields,
     DtType a_dt_type,
     DtType position_push_type,
-    bool const momentum_push_skip
+    DtType momentum_push_type
 )
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE((gather_lev==(lev-1)) ||
@@ -1363,7 +1363,7 @@ PhysicalParticleContainer::PushPX (
                 copyAttribs(ip);
             }
 
-            if (!momentum_push_skip) {
+            if (momentum_push_type != DtType::None) {
                 doParticleMomentumPush<0>(
                     ux[ip],
                     uy[ip],
@@ -1409,7 +1409,7 @@ PhysicalParticleContainer::PushPX (
                     copyAttribs(ip);
                 }
 
-                if (!momentum_push_skip) {
+                if (momentum_push_type != DtType::None) {
                     doParticleMomentumPush<1>(
                         ux[ip],
                         uy[ip],
