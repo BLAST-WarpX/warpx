@@ -64,7 +64,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
                                            amrex::FArrayBox const * bxfab,
                                            amrex::FArrayBox const * byfab,
                                            amrex::FArrayBox const * bzfab,
-                                           amrex::IntVect ngEB, int /*e_is_nodal*/,
+                                           amrex::IntVect const & ngEB,
                                            long offset,
                                            long np_to_push,
                                            int lev, int gather_lev,
@@ -210,22 +210,22 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
         amrex::ParticleReal xp = x_n[ip];
         const amrex::ParticleReal xp_n = x_n[ip];
 #else
-        const amrex::ParticleReal xp = 0._rt;
-        const amrex::ParticleReal xp_n = 0._rt;
+        const amrex::ParticleReal xp = 0._prt;
+        const amrex::ParticleReal xp_n = 0._prt;
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         amrex::ParticleReal yp = y_n[ip];
         const amrex::ParticleReal yp_n = y_n[ip];
 #else
-        const amrex::ParticleReal yp = 0._rt;
-        const amrex::ParticleReal yp_n = 0._rt;
+        const amrex::ParticleReal yp = 0._prt;
+        const amrex::ParticleReal yp_n = 0._prt;
 #endif
 #if !defined(WARPX_DIM_RCYLINDER)
         amrex::ParticleReal zp = z_n[ip];
         const amrex::ParticleReal zp_n = z_n[ip];
 #else
-        amrex::ParticleReal zp = 0._rt;
-        const amrex::ParticleReal zp_n = 0._rt;
+        amrex::ParticleReal zp = 0._prt;
+        const amrex::ParticleReal zp_n = 0._prt;
 #endif
 
         amrex::ParticleReal dxp, dxp_save;

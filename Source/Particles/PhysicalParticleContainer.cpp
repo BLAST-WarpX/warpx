@@ -559,7 +559,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 } else if (push_type == PushType::Implicit) {
                     ImplicitPushXP(pti, exfab, eyfab, ezfab,
                                    bxfab, byfab, bzfab,
-                                   Ex.nGrowVect(), e_is_nodal,
+                                   Ex.nGrowVect(),
                                    0, np_to_push, lev, gather_lev, dt, ScaleFields(false), a_dt_type);
                 }
 
@@ -608,7 +608,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                     } else if (push_type == PushType::Implicit) {
                         ImplicitPushXP(pti, cexfab, ceyfab, cezfab,
                                        cbxfab, cbyfab, cbzfab,
-                                       cEx.nGrowVect(), e_is_nodal,
+                                       cEx.nGrowVect(),
                                        nfine_gather, np-nfine_gather,
                                        lev, lev-1, dt, ScaleFields(false), a_dt_type);
                     }
