@@ -71,8 +71,7 @@ public:
                  const std::string& current_fp_string,
                  amrex::Real t, amrex::Real dt, DtType a_dt_type=DtType::Full,
                  bool skip_deposition=false,
-                 const ImplicitOptions* implicit_options = nullptr,
-                 PushType push_type=PushType::Explicit) final;
+                 const ImplicitOptions* implicit_options = nullptr) final;
 
     void PushP (int lev, amrex::Real dt,
                         const amrex::MultiFab& ,

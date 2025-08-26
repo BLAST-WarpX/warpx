@@ -1212,8 +1212,7 @@ void
 WarpX::PushParticlesandDeposit (
     amrex::Real cur_time,
     bool skip_current,
-    const ImplicitOptions* implicit_options,
-    PushType push_type
+    const ImplicitOptions* implicit_options
 )
 {
     // Evolve particles to p^{n+1/2} and x^{n+1}
@@ -1224,8 +1223,7 @@ WarpX::PushParticlesandDeposit (
             cur_time,
             DtType::Full,
             skip_current,
-            implicit_options,
-            push_type
+            implicit_options
         );
     }
 }
@@ -1236,8 +1234,7 @@ WarpX::PushParticlesandDeposit (
     amrex::Real cur_time,
     DtType a_dt_type,
     bool skip_current,
-    const ImplicitOptions* implicit_options,
-    PushType push_type
+    const ImplicitOptions* implicit_options
 )
 {
     using ablastr::fields::Direction;
@@ -1266,8 +1263,7 @@ WarpX::PushParticlesandDeposit (
         dt[lev],
         a_dt_type,
         skip_current,
-        implicit_options,
-        push_type
+        implicit_options
     );
 
     if (! skip_current) {

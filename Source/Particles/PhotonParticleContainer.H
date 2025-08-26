@@ -54,8 +54,7 @@ public:
                  amrex::Real dt,
                  DtType a_dt_type=DtType::Full,
                  bool skip_deposition=false,
-                 const ImplicitOptions* implicit_options = nullptr,
-                 PushType push_type=PushType::Explicit) override;
+                 const ImplicitOptions* implicit_options = nullptr) override;
 
     void PushPX (WarpXParIter& pti,
                         amrex::FArrayBox const * exfab,

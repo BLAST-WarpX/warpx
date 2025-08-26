@@ -94,7 +94,6 @@ public:
      * \param a_dt_type type of time step (used for sub-cycling)
      * \param skip_deposition Skip the charge and current deposition.
      * \param implicit_options (in the case of the implicit solver)
-     * \param push_type Type of particle push, explicit or implicit. Defaults to explicit
      *
      * Evolve iterates over particle iterator (each box) and performs filtering,
      * field gather, particle push and current deposition for all particles
@@ -107,8 +106,7 @@ public:
                  amrex::Real dt,
                  DtType a_dt_type=DtType::Full,
                  bool skip_deposition=false,
-                 const ImplicitOptions* implicit_options = nullptr,
-                 PushType push_type=PushType::Explicit) override;
+                 const ImplicitOptions* implicit_options = nullptr) override;
 
     virtual void PushPX (WarpXParIter& pti,
                          amrex::FArrayBox const * exfab,

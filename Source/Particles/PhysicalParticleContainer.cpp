@@ -421,8 +421,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                    int lev,
                                    const std::string& current_fp_string,
                                    Real /*t*/, Real dt, DtType a_dt_type, bool skip_deposition,
-                                   const ImplicitOptions* implicit_options,
-                                   PushType push_type)
+                                   const ImplicitOptions* implicit_options)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -431,6 +430,8 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     WARPX_PROFILE_VAR_NS("PhysicalParticleContainer::Evolve::GatherAndPush", blp_fg);
 
     BL_ASSERT(OnSameGrids(lev, *fields.get(FieldType::current_fp, Direction{0}, lev)));
+
+    const PushType push_type = (implicit_options == nullptr) ? PushType::Explicit : PushType::Implicit;
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
