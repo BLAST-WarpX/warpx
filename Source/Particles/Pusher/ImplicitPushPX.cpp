@@ -252,6 +252,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
                                            amrex::FArrayBox const * bxfab,
                                            amrex::FArrayBox const * byfab,
                                            amrex::FArrayBox const * bzfab,
+                                           ImplicitOptions const * implicit_options,
                                            amrex::IntVect const & ngEB,
                                            long offset,
                                            long np_to_push,
@@ -373,8 +374,8 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
     const int qed_runtime_flag = no_qed;
 #endif
 
-    const int max_iterations = WarpX::max_particle_its_in_implicit_scheme;
-    const amrex::ParticleReal particle_tolerance = WarpX::particle_tol_in_implicit_scheme;
+    const int max_iterations = implicit_options->max_particle_iterations;
+    const amrex::ParticleReal particle_tolerance = implicit_options->particle_tolerance;
 
     amrex::Gpu::Buffer<amrex::Long> unconverged_particles({0});
     amrex::Long* unconverged_particles_ptr = unconverged_particles.data();
