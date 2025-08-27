@@ -1,5 +1,5 @@
-#ifndef _IMPLICIT_OPTIONS_H_
-#define _IMPLICIT_OPTIONS_H_
+#ifndef IMPLICIT_OPTIONS_H_
+#define IMPLICIT_OPTIONS_H_
 
 #include <AMReX_Particles.H>
 
