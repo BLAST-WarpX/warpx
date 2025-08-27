@@ -1,7 +1,6 @@
 #include "ImplicitSolver.H"
 #include "Fields.H"
 #include "WarpX.H"
-#include "Evolve/WarpXPushType.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 
