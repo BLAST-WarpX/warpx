@@ -458,7 +458,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter& pti,
                 }
 #endif
 
-            // write signaling flag: how many particles did not converge?
+            // Write signaling flag: how many particles did not converge?
             amrex::Gpu::Atomic::Add(unconverged_particles_ptr, amrex::Long(1));
         }
     });
