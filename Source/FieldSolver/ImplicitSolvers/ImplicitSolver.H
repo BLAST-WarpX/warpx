@@ -140,7 +140,7 @@ protected:
      * \brief tolerance used by the iterative method used to obtain a self-consistent
      *  update of the particle positions and velocities for given E and B on the grid
      */
-    amrex::ParticleReal m_particle_tolerance = 1.0e-10;
+    amrex::ParticleReal m_particle_tolerance = amrex::ParticleReal(1.0e-10);
 
     /**
      * \brief maximum iterations for the iterative method used to obtain a self-consistent
