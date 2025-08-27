@@ -53,6 +53,7 @@ public:
 private:
     /** This is responsible for dumping to file */
     std::unique_ptr< WarpXOpenPMDPlot > m_OpenPMDPlotWriter;
+    int m_NumAggBTDBufferToFlush=5;
 };
 
 #endif // WARPX_FLUSHFORMATOPENPMD_H_

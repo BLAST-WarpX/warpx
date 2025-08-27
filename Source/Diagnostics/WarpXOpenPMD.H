@@ -152,6 +152,7 @@ public:
   /** Return OpenPMD File type ("bp5", "bp4", "h5" or "json")*/
   std::string OpenPMDFileType () { return m_OpenPMDFileType; }
 
+  void ForceFlush(bool isBTD);
 private:
   void Init (openPMD::Access access, bool isBTD);
 

@@ -407,13 +407,27 @@ WarpXOpenPMDPlot::~WarpXOpenPMDPlot ()
   }
 }
 
+/*
+ * If I/O is through ADIOS:
+ *   isBTD=true =>  PerformPut
+ *      this way we do not flush out every buffer in a snapshot,
+ *      (BTD uses few data ranks so this is costly for ADIOS collective functions)
+ *      Instead we aggregate a few buffers before calling ForceFlush(isBTD) to write out.
+ *      Note that SPAN is used to allocate CPU data in ADIOS.
+ *      The advantage is when SPAN is successful,  PerformPut takes no action.
+ *
+ *   isBTD=false => PDW
+ */
 void WarpXOpenPMDPlot::flushCurrent (bool isBTD) const
 {
-     WARPX_PROFILE("WarpXOpenPMDPlot::flushCurrent");
-
-     openPMD::Iteration currIteration = GetIteration(m_CurrentStep, isBTD);
-
-     currIteration.seriesFlush();
+    openPMD::Iteration currIteration = GetIteration(m_CurrentStep, isBTD);
+    if (isBTD) {
+        WARPX_PROFILE("WarpXOpenPMDPlot::flushCurrent-PP()");
+        currIteration.seriesFlush(  "adios2.engine.preferred_flush_target = \"buffer\"" );
+    } else {
+        WARPX_PROFILE("WarpXOpenPMDPlot::flushCurrent()");
+        currIteration.seriesFlush();
+    }
 }
 
 std::string
@@ -463,6 +477,7 @@ void WarpXOpenPMDPlot::SetStep (int ts, const std::string& dirPrefix, int file_m
 
 void WarpXOpenPMDPlot::CloseStep (bool isBTD, bool isLastBTDFlush)
 {
+    WARPX_PROFILE("WarpXOpenPMDPlot::CloseStep()");
     // default close is true
     bool callClose = true;
     // close BTD file only when isLastBTDFlush is true
@@ -666,18 +681,36 @@ for (const auto & particle_diag : particle_diags) {
         pc->getCharge(), pc->getMass(),
         isBTD, isLastBTDFlush);
     }
+}
+
+/*
+ * Flush a few BTD buffers in a snapshot
+ *    controlled by FlushFormatOpenPMD::m_NumAggBTDBufferToFlush (default to 5)
+ *    can be adjusted in the input file: <diag>.buffer_flush_limit_btd
+ */
+void
+WarpXOpenPMDPlot::ForceFlush(bool isBTD)
+{
+    if (!isBTD)
+        return;
 
     auto hasOption = m_OpenPMDoptions.find("FlattenSteps");
-    const bool flattenSteps = isBTD && (m_Series->backend() == "ADIOS2") && (hasOption != std::string::npos);
+    const bool result = (m_Series->backend() == "ADIOS2") && (hasOption != std::string::npos);
 
-    if (flattenSteps)
+    if (result)
     {
-       // forcing new step so data from each btd batch in
-       // preferred_flush_target="buffer" can be flushed out
-       openPMD::Iteration currIteration = GetIteration(m_CurrentStep, isBTD);
-       currIteration.seriesFlush(R"(adios2.engine.preferred_flush_target = "new_step")");
+        WARPX_PROFILE("WarpXOpenPMDPlot::FlattenSteps()");
+        openPMD::Iteration currIteration = GetIteration(m_CurrentStep, isBTD);
+        currIteration.seriesFlush(R"(adios2.engine.preferred_flush_target = "new_step")");
     }
+    else
+      {
+        WARPX_PROFILE("WarpXOpenPMDPlot::PDW()");
+        openPMD::Iteration currIteration = GetIteration(m_CurrentStep, isBTD);
+        currIteration.seriesFlush(R"(adios2.engine.preferred_flush_target = "disk")");
+      }
 }
+
 
 void
 WarpXOpenPMDPlot::DumpToFile (ParticleContainer* pc,
@@ -1473,6 +1506,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
             }
         } // icomp setup loop
 
+        bool spanWorks = true;
         for ( int icomp=0; icomp<ncomp; icomp++ ) {
             std::string const & varname = varnames[icomp];
 
@@ -1509,12 +1543,22 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                 //   GPU pointers to the I/O library
 #ifdef AMREX_USE_GPU
                 if (fab.arena()->isManaged() || fab.arena()->isDevice()) {
-                    amrex::BaseFab<amrex::Real> foo(local_box, 1, amrex::The_Pinned_Arena());
-                    std::shared_ptr<amrex::Real> data_pinned(foo.release());
-                    amrex::Gpu::dtoh_memcpy_async(data_pinned.get(), fab.dataPtr(icomp), local_box.numPts()*sizeof(amrex::Real));
-                    // intentionally delayed until before we .flush(): amrex::Gpu::streamSynchronize();
-                    mesh_comp.storeChunk(data_pinned, chunk_offset, chunk_size);
-                } else
+                    {
+                        WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::D2H_Span()");
+                        auto dynamicMemoryView = mesh_comp.storeChunk<amrex::Real>(
+                                                                                   chunk_offset, chunk_size,
+                                                                                   [&local_box, &spanWorks](size_t size) {
+                                                                                      (void) size;
+                                                                                      spanWorks = false;
+                                                                                      amrex::BaseFab<amrex::Real> foo(local_box, 1, amrex::The_Pinned_Arena());
+                                                                                      std::shared_ptr<amrex::Real> data_pinned(foo.release());
+                                                                                      return data_pinned;
+                                                                                  });
+
+                        auto span = dynamicMemoryView.currentBuffer();
+                        amrex::Gpu::dtoh_memcpy_async(span.data(), fab.dataPtr(icomp), local_box.numPts()*sizeof(amrex::Real));
+                    }
+                }  else
 #endif
                 {
                     amrex::Real const *local_data = fab.dataPtr(icomp);
