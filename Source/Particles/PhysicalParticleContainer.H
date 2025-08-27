@@ -25,7 +25,7 @@
 #include "WarpXParticleContainer.H"
 #include "Particles/Deposition/TemperatureDepositionTypes.H"
 
-#include "FieldSolver/ImplicitSolvers/ImplicitSolver_fwd.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
 #include <AMReX_GpuContainers.H>
 #include <AMReX_Particles.H>

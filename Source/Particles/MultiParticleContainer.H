@@ -12,6 +12,7 @@
 #define WARPX_ParticleContainer_H_
 
 #include "MultiParticleContainer_fwd.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
 #include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
@@ -25,8 +26,6 @@
 #include "Utils/WarpXConst.H"
 #include "WarpXParticleContainer.H"
 #include "ParticleBoundaries.H"
-
-#include "FieldSolver/ImplicitSolvers/ImplicitSolver_fwd.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 

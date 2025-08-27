@@ -14,7 +14,7 @@
 #include "PhysicalParticleContainer.H"
 
 #include "Particles/WarpXParticleContainer_fwd.H"
-#include "FieldSolver/ImplicitSolvers/ImplicitSolver_fwd.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
 #include <AMReX_Particles.H>
 #include <AMReX_REAL.H>

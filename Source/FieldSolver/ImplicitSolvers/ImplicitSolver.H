@@ -7,7 +7,7 @@
 #ifndef Implicit_Solver_H_
 #define Implicit_Solver_H_
 
-#include "FieldSolver/ImplicitSolvers/ImplicitSolver_fwd.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "NonlinearSolvers/NonlinearSolverLibrary.H"

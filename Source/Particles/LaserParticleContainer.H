@@ -14,7 +14,7 @@
 #include "Laser/LaserProfiles.H"
 #include "WarpXParticleContainer.H"
 
-#include "FieldSolver/ImplicitSolvers/ImplicitSolver_fwd.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
 #include <AMReX_Extension.H>
 #include <AMReX_Random.H>
