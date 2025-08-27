@@ -1557,6 +1557,8 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
 
                         auto span = dynamicMemoryView.currentBuffer();
                         amrex::Gpu::dtoh_memcpy_async(span.data(), fab.dataPtr(icomp), local_box.numPts()*sizeof(amrex::Real));
+                        if (!spanWorks)
+                            amrex::Print()<<" span failed \n";
                     }
                 }  else
 #endif
