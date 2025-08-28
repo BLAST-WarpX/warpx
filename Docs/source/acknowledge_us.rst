@@ -8,7 +8,7 @@ Please acknowledge the role that WarpX played in your research.
 In presentations
 ****************
 
-For your presentations, you can find WarpX slides `here <https://docs.google.com/presentation/d/1irVUyGKc-1vaQbJN7HgdBpPGQICfD5ci_maOu6noypk/edit?usp=sharing>`__.
+For your presentations, you can find a WarpX acknowledgment slide `here <https://docs.google.com/presentation/d/1irVUyGKc-1vaQbJN7HgdBpPGQICfD5ci_maOu6noypk/edit?usp=sharing>`__.
 Feel free to use it to acknowledge WarpX in your presentation.
 
 In publications
