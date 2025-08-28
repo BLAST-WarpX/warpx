@@ -58,7 +58,6 @@ namespace {
     template<int exteb_control, int qed_control>
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     bool PushXPSingleStep (
-        int const & max_iterations,
         int const & ip,
         amrex::Real const & dt,
         SetParticlePosition<PIdx> const &  setPosition,
@@ -74,7 +73,9 @@ namespace {
         amrex::ParticleReal const & uxp_n,
         amrex::ParticleReal const & uyp_n,
         amrex::ParticleReal const & uzp_n,
+        amrex::ParticleReal & step_norm,
         amrex::ParticleReal const & particle_tolerance,
+        int const & max_iterations,
         amrex::ParticleReal const & Ex_external_particle,
         amrex::ParticleReal const & Ey_external_particle,
         amrex::ParticleReal const & Ez_external_particle,
@@ -127,13 +128,13 @@ namespace {
         auto idzg2 = static_cast<amrex::ParticleReal>(dinv.z*dinv.z);
 
         bool convergence = false;
-        amrex::ParticleReal step_norm = 1._prt;
         for (int iter=0; iter < max_iterations; iter++) {
 
             // Position advance starts from the position at the start of the step
-            // but uses the most recent velocity on the first iteration.
+            // and uses the velocity at the start of the step on the first iteration.
             // A converged advance will have the postions advanced using the
-            // velocity at the half-step time.
+            // time-centered velocity.
+
             amrex::ParticleReal dxp = 0.0_prt;
             amrex::ParticleReal dyp = 0.0_prt;
             amrex::ParticleReal dzp = 0.0_prt;
@@ -220,9 +221,9 @@ namespace {
 #endif
 
             // Take average to get the time centered value
-            ux[ip] = 0.5_rt*(ux[ip] + uxp_n);
-            uy[ip] = 0.5_rt*(uy[ip] + uyp_n);
-            uz[ip] = 0.5_rt*(uz[ip] + uzp_n);
+            ux[ip] = 0.5_prt*(ux[ip] + uxp_n);
+            uy[ip] = 0.5_prt*(uy[ip] + uyp_n);
+            uz[ip] = 0.5_prt*(uz[ip] + uzp_n);
 
         }
 
@@ -423,22 +424,22 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
         amrex::ParticleReal xp = x_n[ip];
         const amrex::ParticleReal xp_n = x_n[ip];
 #else
-        amrex::ParticleReal xp = 0._rt;
-        const amrex::ParticleReal xp_n = 0._rt;
+        amrex::ParticleReal xp = 0._prt;
+        const amrex::ParticleReal xp_n = 0._prt;
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         amrex::ParticleReal yp = y_n[ip];
         const amrex::ParticleReal yp_n = y_n[ip];
 #else
-        amrex::ParticleReal yp = 0._rt;
-        const amrex::ParticleReal yp_n = 0._rt;
+        amrex::ParticleReal yp = 0._prt;
+        const amrex::ParticleReal yp_n = 0._prt;
 #endif
 #if !defined(WARPX_DIM_RCYLINDER)
         amrex::ParticleReal zp = z_n[ip];
         const amrex::ParticleReal zp_n = z_n[ip];
 #else
-        amrex::ParticleReal zp = 0._rt;
-        const amrex::ParticleReal zp_n = 0._rt;
+        amrex::ParticleReal zp = 0._prt;
+        const amrex::ParticleReal zp_n = 0._prt;
 #endif
 
 #ifdef WARPX_QED
@@ -451,10 +452,11 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
         amrex::ParticleReal Bxp;
         amrex::ParticleReal Byp;
         amrex::ParticleReal Bzp;
+        amrex::ParticleReal step_norm = 1._prt;
 
-        bool convergence = PushXPSingleStep<exteb_control, qed_control>(max_iterations, ip, dt, setPosition,
+        bool convergence = PushXPSingleStep<exteb_control, qed_control>(ip, dt, setPosition,
                              xp, yp, zp, ux, uy, uz, xp_n, yp_n, zp_n, ux_n[ip], uy_n[ip], uz_n[ip],
-                             particle_tolerance,
+                             step_norm, particle_tolerance, max_iterations,
                              Ex_external_particle, Ey_external_particle, Ez_external_particle,
                              Bx_external_particle, By_external_particle, Bz_external_particle,
                              Bxp, Byp, Bzp,
@@ -474,14 +476,25 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                 // Suborbits are required for this particle to converge.
                 // It will be handled later in a special loop with suborbiting.
                 nsuborbits[ip] = 2;
+            }
+
+#if !defined(AMREX_USE_GPU)
+            std::stringstream convergenceMsg;
+            convergenceMsg << "Picard solver for particle failed to converge after " <<
+                max_iterations << " iterations.\n";
+            convergenceMsg << "Position step norm is " << step_norm <<
+                " and the tolerance is " << particle_tolerance << "\n";
+            convergenceMsg << " ux = " << ux[ip] << ", uy = " << uy[ip] << ", uz = " << uz[ip] << "\n";
+            convergenceMsg << " xp = " << xp << ", yp = " << yp << ", zp = " << zp;
+            ablastr::warn_manager::WMRecordWarning("ImplicitPushXP", convergenceMsg.str());
+#endif
 
 #ifdef WARPX_QED
-                // Reset the QED parameter to what is was at the start of the step
-                if (p_optical_depth_QSR) {
-                    p_optical_depth_QSR[ip] = p_optical_depth_QSR0;
-                }
-#endif
+            // Reset the QED parameter to what is was at the start of the step
+            if (p_optical_depth_QSR) {
+                p_optical_depth_QSR[ip] = p_optical_depth_QSR0;
             }
+#endif
 
             // write signaling flag: how many particles did not converge?
             amrex::Gpu::Atomic::Add(unconverged_particles_ptr, amrex::Long(1));
@@ -773,17 +786,17 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 #if !defined(WARPX_DIM_1D_Z)
         amrex::ParticleReal const xp_n0 = x_n[ip];
 #else
-        amrex::ParticleReal const xp_n0 = 0.0_rt;
+        amrex::ParticleReal const xp_n0 = 0.0_prt;
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         amrex::ParticleReal const yp_n0 = y_n[ip];
 #else
-        amrex::ParticleReal const yp_n0 = 0.0_rt;
+        amrex::ParticleReal const yp_n0 = 0.0_prt;
 #endif
 #if !defined(WARPX_DIM_RCYLINDER)
         amrex::ParticleReal const zp_n0 = z_n[ip];
 #else
-        amrex::ParticleReal const zp_n0 = 0.0_rt;
+        amrex::ParticleReal const zp_n0 = 0.0_prt;
 #endif
 
 #if WARPX_QED
@@ -818,11 +831,12 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
             amrex::ParticleReal Bxp;
             amrex::ParticleReal Byp;
             amrex::ParticleReal Bzp;
+            amrex::ParticleReal step_norm = 1._prt;
 
             // Try advancing the particle one suborbit step
-            bool convergence = PushXPSingleStep<exteb_control, qed_control>(max_iterations, ip, dt_suborbit, setPosition,
+            bool convergence = PushXPSingleStep<exteb_control, qed_control>(ip, dt_suborbit, setPosition,
                                  xp, yp, zp, ux, uy, uz, xp_n, yp_n, zp_n, uxp_n, uyp_n, uzp_n,
-                                 particle_tolerance,
+                                 step_norm, particle_tolerance, max_iterations,
                                  Ex_external_particle, Ey_external_particle, Ez_external_particle,
                                  Bx_external_particle, By_external_particle, Bz_external_particle,
                                  Bxp, Byp, Bzp,
