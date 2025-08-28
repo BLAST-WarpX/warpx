@@ -4,6 +4,7 @@
  *
  * License: BSD-3-Clause-LBNL
  */
+#include "Fields.H"
 #include "SemiImplicitEM.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "WarpX.H"
@@ -32,6 +33,10 @@ void SemiImplicitEM::Define ( WarpX*  a_WarpX )
 
     // Define the nonlinear solver
     m_nlsolver->Define(m_E, this);
+
+    // Initialize the mass matrices for plasma response
+    if (m_use_mass_matrices) { InitializeMassMatrices(); }
+
     m_is_defined = true;
 
 }
@@ -50,6 +55,8 @@ void SemiImplicitEM::PrintParameters () const
     }
     else if (m_nlsolver_type==NonlinearSolverType::Newton) {
         amrex::Print() << "Nonlinear solver type:      Newton\n";
+        amrex::Print() << "use mass matrices:          " << (m_use_mass_matrices ? "true":"false") << "\n";
+        PrintMassMatricesParameters();
     }
     m_nlsolver->PrintParams();
     amrex::Print() << "-----------------------------------------------------------\n\n";
@@ -120,7 +127,7 @@ void SemiImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
 
     // Update particle positions and velocities using the current state
     // of Eg and Bg. Deposit current density at time n+1/2
-    m_WarpX->ImplicitPreRHSOp( half_time, m_dt, a_nl_iter, a_from_jacobian );
+    PreRHSOp( half_time, a_nl_iter, a_from_jacobian );
 
     // RHS = cvac^2*0.5*dt*( curl(Bg^{n+1/2}) - mu0*Jg^{n+1/2} )
     m_WarpX->ImplicitComputeRHSE(0.5_rt*m_dt, a_RHS);

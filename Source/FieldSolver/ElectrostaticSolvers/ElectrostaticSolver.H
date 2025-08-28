@@ -60,7 +60,7 @@ public:
      * dimension according to the desired values from the simulation input file,
      * boundary.potential_lo and boundary.potential_hi.
      * \param[inout] phi The electrostatic potential
-     * \param[in] idim The dimension for which the Dirichlet boundary condition is set
+     * \param[in] t current time
      */
     void setPhiBC (
         ablastr::fields::MultiLevelScalarField const& phi,
@@ -84,6 +84,7 @@ public:
      * \param[in] max_iters The maximum number of iterations allowed for the MLMG solver
      * \param[in] verbosity The verbosity setting for the MLMG solver
      * \param[in] is_igf_2d_slices boolean to select between fully 3D Poisson solver and quasi-3D, i.e. one 2D Poisson solve on every z slice (default: false)
+     * \param[out] efield The electric field corresponding to the calculated phi (only used with embedded boundaries)
      */
     void computePhi (
         ablastr::fields::MultiLevelScalarField const& rho,
@@ -93,7 +94,8 @@ public:
         amrex::Real absolute_tolerance,
         int max_iters,
         int verbosity,
-        bool is_igf_2d_slices
+        bool is_igf_2d_slices,
+        std::optional<ablastr::fields::MultiLevelVectorField> efield = std::nullopt // only used for EB
     ) const;
 
     /**

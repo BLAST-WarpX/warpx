@@ -236,13 +236,13 @@ PhotonParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                  int lev,
                                  const std::string& current_fp_string,
                                  Real t, Real dt, DtType a_dt_type, bool skip_deposition,
-                                 PushType push_type)
+                                 bool /*deposit_mass_matrices*/, PushType push_type)
 {
     // This does gather, push and deposit.
     // Push and deposit have been re-written for photons
     PhysicalParticleContainer::Evolve (fields,
                                        lev,
                                        current_fp_string,
-                                       t, dt, a_dt_type, skip_deposition, push_type);
+                                       t, dt, a_dt_type, skip_deposition, false, push_type);
 
 }

@@ -8,12 +8,14 @@
 
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#ifndef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+#   include "FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
+#elif defined(WARPX_DIM_RSPHERE)
+#   include "FiniteDifferenceAlgorithms/SphericalYeeAlgorithm.H"
+#else
 #   include "FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
 #   include "FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
 #   include "FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
-#else
-#   include "FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
 #endif
 
 #include <ablastr/fields/MultiFabRegister.H>
@@ -48,11 +50,17 @@ void FiniteDifferenceSolver::ComputeDivE (
 {
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee ||
         m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC){
 
         ComputeDivECylindrical <CylindricalYeeAlgorithm> ( Efield, divEfield );
+
+#elif defined(WARPX_DIM_RSPHERE)
+    if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee ||
+        m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC){
+
+        ComputeDivESpherical <SphericalYeeAlgorithm> ( Efield, divEfield );
 
 #else
     if (m_grid_type == ablastr::utils::enums::GridType::Collocated) {
@@ -76,7 +84,7 @@ void FiniteDifferenceSolver::ComputeDivE (
 }
 
 
-#ifndef WARPX_DIM_RZ
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::ComputeDivECartesian (
@@ -122,7 +130,7 @@ void FiniteDifferenceSolver::ComputeDivECartesian (
 
 }
 
-#else // corresponds to ifndef WARPX_DIM_RZ
+#elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::ComputeDivECylindrical (
@@ -160,7 +168,7 @@ void FiniteDifferenceSolver::ComputeDivECylindrical (
         amrex::ParallelFor(tdive,
 
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                Real const r = rmin + i*dr; // r on a nodal grid (F is nodal in r)
+                Real const r = rmin + i*dr; // r on a nodal grid
                 if (r != 0) { // Off-axis, regular equations
                     divE(i, j, 0, 0) =
                           T_Algo::DownwardDrr_over_r(Er, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
@@ -195,4 +203,55 @@ void FiniteDifferenceSolver::ComputeDivECylindrical (
 
 }
 
-#endif // corresponds to ifndef WARPX_DIM_RZ
+#elif defined(WARPX_DIM_RSPHERE)
+
+template<typename T_Algo>
+void FiniteDifferenceSolver::ComputeDivESpherical (
+    ablastr::fields::VectorField const & Efield,
+    amrex::MultiFab& divEfield
+)
+{
+    // Loop through the grids, and over the tiles within each grid
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(divEfield, TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+
+        // Extract field data for this grid/tile
+        const Array4<Real> divE = divEfield.array(mfi);
+        Array4<Real> const& Er = Efield[0]->array(mfi);
+
+        // Extract stencil coefficients
+        Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
+        auto const n_coefs_r = static_cast<int>(m_stencil_coefs_r.size());
+
+        // Extract cylindrical specific parameters
+        Real const dr = m_dr;
+        Real const rmin = m_rmin;
+
+        // Extract tileboxes for which to loop
+        Box const& tdive  = mfi.tilebox(divEfield.ixType().toIntVect());
+
+        // Loop over the cells and update the fields
+        amrex::ParallelFor(tdive,
+
+            [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
+                Real const r = rmin + i*dr; // r on a nodal grid
+                if (r != 0) { // Off-axis, regular equations
+                    divE(i, j, 0, 0) =
+                          T_Algo::DownwardDrr2_over_r2(Er, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
+                } else { // r==0: on-axis corrections
+                    // Er is linear in r, for small r
+                    // Therefore, the formula below regularizes the singularity
+                    divE(i, j, 0, 0) =
+                           6._rt*Er(i, j, 0, 0)/dr; // regularization
+                }
+            }
+
+        ); // end of loop over cells
+
+    } // end of loop over grid/tiles
+
+}
+
+#endif // corresponds to if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)

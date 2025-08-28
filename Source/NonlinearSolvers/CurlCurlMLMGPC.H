@@ -9,6 +9,7 @@
 
 #include "Fields.H"
 #include "Utils/WarpXConst.H"
+#include "Utils/TextMsg.H"
 #include "Preconditioner.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
@@ -257,7 +258,7 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
         m_gmres_solver->setVerbose(static_cast<int>(m_verbose));
     }
 
-    m_bcoefs = m_ops->GetSigmaCoeff();
+    m_bcoefs = m_ops->GetMassMatricesCoeff();
     if (m_bcoefs != nullptr) { m_beta_scalar = false; }
 
     m_is_defined = true;
@@ -276,8 +277,15 @@ void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
     // a_U is not needed for a linear operator
     amrex::ignore_unused(a_U);
 
-    // set the alpha for curl-curl op
-    const RT thetaDt = m_ops->GetTheta()*this->m_dt;
+    // set the alpha coefficient for the curl-curl op
+    const RT thetaDt = m_ops->GetThetaForPC()*this->m_dt;
+    if (thetaDt==0.) {
+        std::stringstream warningMsg;
+        warningMsg << "Light waves are not treated implicitly with the chosen time solver.\n";
+        warningMsg << "Use jacobian.pc_type = pc_jacobi for better performance.\n";
+        ablastr::warn_manager::WMRecordWarning("CurlCurlMLMGPC", warningMsg.str());
+    }
+
     const RT alpha = (thetaDt*PhysConst::c) * (thetaDt*PhysConst::c);
     m_curl_curl->setScalars(alpha, RT(1.0));
 
@@ -288,6 +296,11 @@ void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
             m_curl_curl->setBeta({Array<MultiFab const*,3>{ (*m_bcoefs)[n][2],
                                                             (*m_bcoefs)[n][1],
                                                             (*m_bcoefs)[n][0]}});
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            // Missing dimensions is y,z in WarpX and y,z in AMReX
+            m_curl_curl->setBeta({Array<MultiFab const*,3>{ (*m_bcoefs)[n][0],
+                                                            (*m_bcoefs)[n][1],
+                                                            (*m_bcoefs)[n][2]}});
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             // Missing dimension is y in WarpX and z in AMReX
             m_curl_curl->setBeta({Array<MultiFab const*,3>{ (*m_bcoefs)[n][0],
@@ -349,6 +362,14 @@ void CurlCurlMLMGPC<T,Ops>::Apply (T& a_x, const T& a_b)
         Array<MultiFab,3> rhs      { MultiFab(*b_mfarrvec[n][2], make_alias, 0, 1),
                                      MultiFab(*b_mfarrvec[n][1], make_alias, 0, 1),
                                      MultiFab(*b_mfarrvec[n][0], make_alias, 0, 1) };
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        // Missing dimensions are y,z in WarpX and y,z in AMReX
+        Array<MultiFab,3> solution { MultiFab(*x_mfarrvec[n][0], make_alias, 0, 1),
+                                     MultiFab(*x_mfarrvec[n][1], make_alias, 0, 1),
+                                     MultiFab(*x_mfarrvec[n][2], make_alias, 0, 1) };
+        Array<MultiFab,3> rhs      { MultiFab(*b_mfarrvec[n][0], make_alias, 0, 1),
+                                     MultiFab(*b_mfarrvec[n][1], make_alias, 0, 1),
+                                     MultiFab(*b_mfarrvec[n][2], make_alias, 0, 1) };
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         // Missing dimension is y in WarpX and z in AMReX
         Array<MultiFab,3> solution { MultiFab(*x_mfarrvec[n][0], make_alias, 0, 1),

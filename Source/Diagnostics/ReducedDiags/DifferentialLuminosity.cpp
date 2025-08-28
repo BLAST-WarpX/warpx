@@ -69,9 +69,9 @@ DifferentialLuminosity::DifferentialLuminosity (const std::string& rd_name)
         "DifferentialLuminosity diagnostics must involve exactly two species");
 
     // RZ coordinate is not supported
-#if (defined WARPX_DIM_RZ)
+#if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE)
     WARPX_ABORT_WITH_MESSAGE(
-        "DifferentialLuminosity diagnostics do not work in RZ geometry.");
+        "DifferentialLuminosity diagnostics do not work in cylindrical and spherical geometry.");
 #endif
 
     // read bin parameters
@@ -119,7 +119,7 @@ DifferentialLuminosity::DifferentialLuminosity (const std::string& rd_name)
 
 void DifferentialLuminosity::ComputeDiags (int step)
 {
-#if defined(WARPX_DIM_RZ)
+#if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE)
     amrex::ignore_unused(step);
 #else
     WARPX_PROFILE("DifferentialLuminosity::ComputeDiags");

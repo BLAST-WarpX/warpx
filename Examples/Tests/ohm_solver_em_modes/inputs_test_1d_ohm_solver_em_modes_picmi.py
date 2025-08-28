@@ -266,6 +266,7 @@ class EMModes(object):
                 grid=self.grid,
                 period=self.total_steps,
                 data_list=["B", "E", "J_displacement"],
+                warpx_verbose=0,
                 # warpx_format = 'openpmd',
                 # warpx_openpmd_backend = 'h5'
             )

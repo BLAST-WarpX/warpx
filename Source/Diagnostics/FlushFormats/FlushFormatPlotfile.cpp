@@ -383,8 +383,11 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
         real_names.push_back("momentum_y");
         real_names.push_back("momentum_z");
 
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         real_names.push_back("theta");
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+        real_names.push_back("phi");
 #endif
 
         // get the names of the extra real comps

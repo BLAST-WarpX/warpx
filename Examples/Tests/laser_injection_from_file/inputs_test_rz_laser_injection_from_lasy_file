@@ -47,5 +47,5 @@ lasy_laser.delay = 0.0
 # Diagnostics
 diagnostics.diags_names = diag1
 diag1.intervals = -1
-diag1.fields_to_plot = Er Et Ez Br Bz jr jt jz
+diag1.fields_to_plot = Et Br Bz jt
 diag1.diag_type = Full

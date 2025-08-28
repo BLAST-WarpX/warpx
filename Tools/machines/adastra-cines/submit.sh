@@ -10,14 +10,14 @@
 module purge
 
 # A CrayPE environment version
-module load cpe/23.12
+module load cpe/24.07
 # An architecture
 module load craype-accel-amd-gfx90a craype-x86-trento
 # A compiler to target the architecture
 module load PrgEnv-cray
 # Some architecture related libraries and tools
-module load CCE-GPU-3.0.0
-module load amd-mixed/5.2.3
+module load develop
+module load CCE-GPU-4.0.0
 
 date
 module list

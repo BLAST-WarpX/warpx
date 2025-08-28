@@ -556,7 +556,7 @@ PML::PML (const int lev, const BoxArray& grid_ba,
           ablastr::utils::enums::GridType grid_type,
           int do_moving_window, int /*pml_has_particles*/, int do_pml_in_domain,
           const PSATDSolutionType psatd_solution_type,
-          const JInTime J_in_time, const RhoInTime rho_in_time,
+          const TimeDependencyJ time_dependency_J, const TimeDependencyRho time_dependency_rho,
           const bool do_pml_dive_cleaning, const bool do_pml_divb_cleaning,
           const amrex::IntVect& fill_guards_fields,
           const amrex::IntVect& fill_guards_current,
@@ -664,6 +664,8 @@ PML::PML (const int lev, const BoxArray& grid_ba,
         auto ngFFT = IntVect(ngFFt_x, ngFFt_z);
 #elif defined(WARPX_DIM_1D_Z)
         auto ngFFT = IntVect(ngFFt_z);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        auto ngFFT = IntVect(ngFFt_x);
 #endif
 
         // Set the number of guard cells to the maximum of each field
@@ -772,7 +774,7 @@ PML::PML (const int lev, const BoxArray& grid_ba,
 
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
 #ifndef WARPX_USE_FFT
-        amrex::ignore_unused(lev, dt, psatd_solution_type, J_in_time, rho_in_time);
+        amrex::ignore_unused(lev, dt, psatd_solution_type, time_dependency_J, time_dependency_rho);
 #   if(AMREX_SPACEDIM!=3)
         amrex::ignore_unused(noy_fft);
 #   endif
@@ -793,7 +795,7 @@ PML::PML (const int lev, const BoxArray& grid_ba,
         spectral_solver_fp = std::make_unique<SpectralSolver>(lev, realspace_ba, dm,
             nox_fft, noy_fft, noz_fft, grid_type, v_galilean,
             v_comoving_zero, dx, dt, in_pml, periodic_single_box, update_with_rho,
-            fft_do_time_averaging, psatd_solution_type, J_in_time, rho_in_time, m_dive_cleaning, m_divb_cleaning);
+            fft_do_time_averaging, psatd_solution_type, time_dependency_J, time_dependency_rho, m_dive_cleaning, m_divb_cleaning);
 #endif
     }
 
@@ -905,7 +907,7 @@ PML::PML (const int lev, const BoxArray& grid_ba,
             spectral_solver_cp = std::make_unique<SpectralSolver>(lev, realspace_cba, cdm,
                 nox_fft, noy_fft, noz_fft, grid_type, v_galilean,
                 v_comoving_zero, cdx, dt, in_pml, periodic_single_box, update_with_rho,
-                fft_do_time_averaging, psatd_solution_type, J_in_time, rho_in_time, m_dive_cleaning, m_divb_cleaning);
+                fft_do_time_averaging, psatd_solution_type, time_dependency_J, time_dependency_rho, m_dive_cleaning, m_divb_cleaning);
 #endif
         }
     }

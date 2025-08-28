@@ -32,6 +32,7 @@
  * \tparam TransFunc the transform function type
  * \tparam CopyFunc the copy function type
  *
+ * \param pc  the destination particle container
  * \param dst the destination tile
  * \param src the source tile
  * \param mask pointer to the mask: 1 means copy, 0 means don't copy
@@ -124,6 +125,7 @@ Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src,
  * \tparam TransFunc the transform function type
  * \tparam CopyFunc the copy function type
  *
+ * \param pc  the destination particle container
  * \param dst the destination tile
  * \param src the source tile
  * \param dst_index the location at which to starting writing the result to dst
@@ -188,6 +190,8 @@ Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src, Index
  * \tparam CopyFunc1 the copy function type for src-->dst1
  * \tparam CopyFunc2 the copy function type for src-->dst2
  *
+ * \param pc1  the first destination particle container
+ * \param pc2  the second destination particle container
  * \param dst1 the destination tile
  * \param dst2 the destination tile
  * \param src the source tile
@@ -310,6 +314,8 @@ Index filterCopyTransformParticles (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTi
  * \tparam CopyFunc1 the copy function type for src-->dst1
  * \tparam CopyFunc2 the copy function type for src-->dst2
  *
+ * \param pc1  the first destination particle container
+ * \param pc2  the second destination particle container
  * \param dst1 the destination tile
  * \param dst2 the destination tile
  * \param src the source tile

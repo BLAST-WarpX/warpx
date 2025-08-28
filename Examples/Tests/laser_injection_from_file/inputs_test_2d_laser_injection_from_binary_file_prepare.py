@@ -12,7 +12,6 @@
 # injection of a laser pulse from an external binary file:
 # - Generate an input binary file with a gaussian laser pulse.
 
-import sys
 
 import matplotlib
 
@@ -21,8 +20,6 @@ import numpy as np
 import yt
 
 yt.funcs.mylog.setLevel(50)
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
 
 # Maximum acceptable error for this test
 relative_error_threshold = 0.065

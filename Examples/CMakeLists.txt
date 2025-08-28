@@ -109,10 +109,16 @@ function(add_warpx_test
         return()
     endif()
 
+    # Avoid the following error seen with Open MPI 4.1.6 in the Azure pipelines:
+    # "There are not enough slots available in the system to satisfy the 2 slots
+    # that were requested by the application"
+    set(MPI_HOST_NUMPROC --host localhost:${nprocs})
+
     # set MPI executable
     set(THIS_MPI_TEST_EXE
         ${MPIEXEC_EXECUTABLE}
         ${MPI_ALLOW_ROOT}
+        ${MPI_HOST_NUMPROC}
         ${MPIEXEC_NUMPROC_FLAG} ${nprocs}
         ${MPIEXEC_POSTFLAGS}
         ${MPIEXEC_PREFLAGS}
@@ -145,6 +151,9 @@ function(add_warpx_test
         set(runtime_params
             "amrex.abort_on_unused_inputs = 1"
             "amrex.throw_exception = 1"
+            # allocate GPU memory on-demand instead of pre-allocating 3/4th
+            # to enable parallel test runs on the same GPU
+            "amrex.the_arena_init_size = 0"
             "warpx.always_warn_immediately = 1"
             "warpx.do_dynamic_scheduling = 0"
             "warpx.serialize_initial_conditions = 1"

@@ -15,6 +15,7 @@
 
 #include "WarpXParticleContainer_fwd.H"
 
+#include <AMReX_Enum.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
 
@@ -23,6 +24,8 @@
 
 #include <iosfwd>
 #include <string>
+
+AMREX_ENUM(RigidAdvanceMode, vz, vzbar, v);
 
 /**
  * When injecting a particle beam (typically for a plasma wakefield
@@ -68,6 +71,7 @@ public:
                  amrex::Real dt,
                  DtType a_dt_type=DtType::Full,
                  bool skip_deposition=false,
+                 bool deposit_mass_matrices=false,
                  PushType push_type=PushType::Explicit) override;
 
     void PushPX (WarpXParIter& pti,
@@ -100,7 +104,7 @@ private:
 
     // User input quantities
     amrex::ParticleReal zinject_plane = 0.;
-    bool rigid_advance = true; // When true, particles are advance with vzbar before injection
+    RigidAdvanceMode rigid_advance_mode = RigidAdvanceMode::vzbar;
 
     amrex::ParticleReal vzbeam_ave_boosted;
 

@@ -9,7 +9,6 @@
 
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "NonlinearSolvers/NonlinearSolverLibrary.H"
-#include "Utils/WarpXAlgorithmSelection.H"
 
 #include <AMReX_Array.H>
 #include <AMReX_REAL.H>
@@ -22,6 +21,7 @@
  */
 
 class WarpX;
+enum class FieldBoundaryType;
 class ImplicitSolver
 {
 public:
@@ -66,12 +66,6 @@ public:
                            amrex::Real  a_dt,
                            int          a_step ) = 0;
 
-
-    /**
-     * \brief Return pointer to MultiFab array for mass matrix
-     */
-    [[nodiscard]] virtual const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetSigmaCoeff() const { return nullptr; }
-
     //
     // the following routines are called by the linear and nonlinear solvers
     //
@@ -102,7 +96,20 @@ public:
     [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> GetLinOpBCLo () const;
     [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> GetLinOpBCHi () const;
 
-    [[nodiscard]] amrex::Real  GetTheta () const { return m_theta; }
+    /**
+     * \brief Return pointer to MultiFab array for mass matrix
+     */
+    [[nodiscard]] const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetMassMatricesCoeff() const {
+        if (m_use_mass_matrices_pc) { return &m_mmpc_mfarrvec; }
+        else { return nullptr; }
+    }
+
+    // This parameter is used for the time-step fraction in the PC for implicit
+    // treatment of light waves in the curl-curl MLMG solver.
+    // This function should return zero if light waves are not treated implicitly
+    [[nodiscard]] virtual amrex::Real  GetThetaForPC () const = 0;
+
+    void ComputeJfromMassMatrices ();
 
 protected:
 
@@ -147,32 +154,71 @@ protected:
     int m_max_particle_iterations = 21;
 
     /**
+     * \brief Whether to use mass matrices for the implicit solver
+     */
+    bool m_use_mass_matrices = false;
+
+    /**
+     * \brief Whether to use mass matrices to compute J during linear stage of JFNK
+     */
+    bool m_use_mass_matrices_jacobian = false;
+
+    /**
+     * \brief Whether to use mass matrices in the preconditioner
+     */
+    bool m_use_mass_matrices_pc = false;
+
+    /**
+     * \brief Direction-dependent component number of mass matrices elements
+     */
+    amrex::IntVect m_ncomp_xx = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_xy = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_xz = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_yx = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_yy = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_yz = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_zx = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_zy = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_zz = amrex::IntVect{0};
+
+    /**
+     * \brief Array of multifab pointers to mass matrix preconditioner
+     */
+    amrex::Vector<amrex::Array<amrex::MultiFab*,3>> m_mmpc_mfarrvec;
+
+    /**
      * \brief parse nonlinear solver parameters (if one is used)
      */
-    void parseNonlinearSolverParams( const amrex::ParmParse&  pp )
-    {
+    void parseNonlinearSolverParams ( const amrex::ParmParse&  pp );
 
-        std::string nlsolver_type_str;
-        pp.get("nonlinear_solver", nlsolver_type_str);
+    /**
+     * \brief Initialize the Mass Matrices used for plasma response in nonlinear Newton solver
+     */
+    void InitializeMassMatrices ();
 
-        if (nlsolver_type_str=="picard") {
-            m_nlsolver_type = NonlinearSolverType::Picard;
-            m_nlsolver = std::make_unique<PicardSolver<WarpXSolverVec,ImplicitSolver>>();
-            m_max_particle_iterations = 1;
-            m_particle_tolerance = 0.0;
-        }
-        else if (nlsolver_type_str=="newton") {
-            m_nlsolver_type = NonlinearSolverType::Newton;
-            m_nlsolver = std::make_unique<NewtonSolver<WarpXSolverVec,ImplicitSolver>>();
-            pp.query("max_particle_iterations", m_max_particle_iterations);
-            pp.query("particle_tolerance", m_particle_tolerance);
-        }
-        else {
-            WARPX_ABORT_WITH_MESSAGE(
-                "invalid nonlinear_solver specified. Valid options are picard and newton.");
-        }
+    void PrintMassMatricesParameters () const;
 
-    }
+    /**
+     * \brief Perform operations needed before computing the Right Hand Side
+     */
+    void PreRHSOp ( const amrex::Real  a_cur_time,
+                    const int          a_nl_iter,
+                    const bool         a_from_jacobian );
+
+    /**
+     * \brief Communicate Mass Matrices used for PC and apply boundary conditions
+     */
+    void SyncMassMatricesPCAndApplyBCs ();
+
+    /**
+     * \brief Scale mass matrices used for PC by c^2*mu0*theta*dt and add 1 to diagonal terms
+     */
+    void SetMassMatricesForPC ( const amrex::Real a_theta_dt );
+
+    /**
+     * \brief Save E and J at start of each Newton step
+     */
+    void SaveEandJ ();
 
     /**
      * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType

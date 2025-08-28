@@ -41,7 +41,7 @@ public:
      * \brief Allocate multifabs storing macroscopic multifabs
      *
      * @param[in] ba the box array associated to the multifabs E and B
-     * @param[in] dmap the distribution mapping
+     * @param[in] dm the distribution mapping
      * @param[in] ng_EB_alloc guard cells allocated for multifabs E and B
      */
     void AllocateLevelMFs (
