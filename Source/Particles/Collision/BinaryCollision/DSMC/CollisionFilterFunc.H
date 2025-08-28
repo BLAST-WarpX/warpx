@@ -52,6 +52,7 @@ void CollisionPairFilter (const amrex::ParticleReal u1x, const amrex::ParticleRe
     amrex::ParticleReal E_coll, v_coll, lab_to_COM_factor;
 
     // For massless particles, the momentum is normalized to the electron mass
+    constexpr amrex::ParticleReal me = PhysConst::m_e;
     amrex::ParticleReal p1x = (m1 == 0) ? me*u1x : m1*u1x;
     amrex::ParticleReal p1y = (m1 == 0) ? me*u1y : m1*u1y;
     amrex::ParticleReal p1z = (m1 == 0) ? me*u1z : m1*u1z;
