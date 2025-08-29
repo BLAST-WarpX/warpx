@@ -29,71 +29,64 @@ namespace collision::binarycollision::virtualphotons{
 using namespace amrex::literals;
 using SoaData_type = typename WarpXParticleContainer::ParticleTileType::ParticleTileDataType;
 
+
+/** Generate virtual photons from primary particles (electrons or positrons)
+ * using the equivalent photon approximation, also known as the Weizsäcker-Williams method.
+ * See for example Jackson, Classical Electrodynamics, 3rd edition, section 15.4
+ * or Berestetskii, Lifshitz, Pitaevskii, Quantum Electrodynamics, 2nd edition, section 99.
+ *
+ * The number of photons per primary particle is computed according to Berestetskii's formula 99.16,
+ * integrated over angles and over photon energies from a minimum energy (input parameter)
+ * up to the energy of the primary particle.
+ * The photons are assumed to be emitted in the direction of motion of the primary particle.
+ * The virtual photons are generated in a separate species, which can then be used
+ * as input for other processes, e.g., Breit-Wheeler pair production and Compton scattering.
+ * The virtual photons are generated at the same position as the primary particle,
+ * and inherit the same weight as the primary particle, divided by a sampling factor.
+ * The virtual photons are given the same particle ID as the primary particle.
+ * The virtual photon species is regenerated from scratch at each time step.
+ * In the current implementation, the primary particles are not affected by
+ * the possible interactions that the virtual photons may undergo.
+ *
+ * \param[in] mypc MultiParticleContainer calling this method
+ */
+AMREX_GPU_HOST_DEVICE
 void GenerateVirtualPhotons (MultiParticleContainer* mypc){
 
     WARPX_PROFILE("collision::binarycollision::virtualphotons::GenerateVirtualPhotons()");
 
-    // loop through the species
+    // Loop through the species
     for (int i_s = 0; i_s < mypc->nSpecies(); ++i_s) {
 
         auto& primary = mypc->GetParticleContainer(i_s);
-
 
         if(!primary.has_virtual_photons()){
             continue;
         }
 
+        // Get the virtual photon species corresponding to this primary species
         int vphotons_index = primary.getVirtualPhotonSpeciesIndex();
         auto& vphotons = mypc->GetParticleContainer(vphotons_index);
-
-        //vphotons.resizeData(); //RemoveParticlesAtLevel(0);
-
         const amrex::ParmParse pp_species_name(mypc->GetSpeciesNames()[vphotons_index]);
+
+        // Minimum allowed enrgy of the virtual photons
         amrex::Real vphoton_min_energy;
         utils::parser::getWithParser(pp_species_name, "virtual_photons_min_energy", vphoton_min_energy);
 
+        // Sampling factor:
+        // the number of virtual photons generated is multiplied by this factor,
+        // the weight of each virtual photon is divided by this factor
         amrex::Real sampling_factor;
         utils::parser::getWithParser(pp_species_name, "sampling_factor", sampling_factor);
 
-
-        // Get virtual photon species
-        //auto& pc_virtual_photons =
-        //    allcontainers[pc_source->m_qed_virtual_photon_species];
-
-
-        // check if the current species should have virtual photons
-        //utils::parser::queryWithParser(pp_species_name, "charge", charge);
-        //const bool vphotons_is_specified = pp_species.contains("do_virtual_photons");
-
-        //amrex::Print() << "Processing species: " << species.Name() << "\n";
-
-        //auto& vphotons = primary.m_qed_virtual_photon_species;
-
-        //m_qed_virtual_photons;
-
-        // Check that vphotons is a photon species
-        //WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        //    vphotons.AmIA<PhysicalSpecies::photon>(),
-        //    "Virtual photons have to be...photons!");
-
-        // Set the minimum photon energy
-        //amrex::Real vphoton_min_energy = PhysConst::m_e * PhysConst::c * PhysConst::c * 0.0001_rt; // 0.1 * m_e * c^2
         // Enable tiling
         amrex::MFItInfo info;
         if (amrex::Gpu::notInLaunchRegion()) { info.EnableTiling(WarpXParticleContainer::tile_size); }
 
-        // TO DO: particle species should be automatically selected
-        //auto& primary  = mypc->GetParticleContainerFromName("beam");
-        //auto& vphotons = mypc->GetParticleContainerFromName("virtual_photons");
-        // TO DO: minimum photon energy should be an input parameter
-        //amrex::Real const hw_min = PhysConst::m_e * PhysConst::c * PhysConst::c * 0.0001_rt; // 0.1 * m_e * c^2
         amrex::Real const alpha_pi = PhysConst::alpha / MathConst::pi;
         amrex::Real const inv_c2 = 1._rt / (PhysConst::c * PhysConst::c);
         amrex::Real const mass = primary.getMass();
-        amrex::Real const gamma_em = 0.57721566490153286060_rt; // Euler-Mascheroni constant
-        amrex::Real const coeff = 0. ; //+ std::log(4._rt) - 2._rt*gamma_em - 1._rt;
-
-        amrex::Real umin = 0.25_rt * coeff * coeff;
+        amrex::Real umin = 0._rt;
 
         int const nlevs = std::max(0, primary.finestLevel()+1);
         for (int lev = 0; lev < nlevs; ++lev) {
@@ -103,15 +96,14 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
             for (amrex::MFIter mfi = primary.MakeMFIter(lev, info); mfi.isValid(); ++mfi)
             {
                 // Notation: _vp means virtual photon
-
-                // primary particles (leptons) in the current tile
+                // Primary particles (leptons) in the current tile
                 ParticleTileType& ptile = primary.ParticlesAt(lev, mfi);
                 const auto soa = ptile.getParticleTileData();
 
-                // number of primary particles in the current tile
+                // Number of primary particles in the current tile
                 amrex::Long const num = ptile.numParticles();
 
-                // vector that will contain the number of virtual photons for each primary particle
+                // Vector that will contain the number of virtual photons for each primary particle
                 amrex::Gpu::DeviceVector<amrex::Long> num_vp(num, 0);
                 auto* num_vp_data = num_vp.dataPtr();
 
@@ -120,50 +112,47 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                 amrex::ParallelForRNG(num,
                 [=] AMREX_GPU_DEVICE (amrex::Long i, amrex::RandomEngine const& engine) noexcept
                 {
-                    amrex::ParticleReal ux = soa.m_rdata[PIdx::ux][i]; // u=v*gamma=p/m
+                    amrex::ParticleReal ux = soa.m_rdata[PIdx::ux][i]; // u=v*gamma=p/m_e
                     amrex::ParticleReal uy = soa.m_rdata[PIdx::uy][i];
                     amrex::ParticleReal uz = soa.m_rdata[PIdx::uz][i];
 
-                    // similar to Jackson's formula 15.58, but neglect longitudinal field, assume relativistic velocities, and integrate in energy
+                    // Similar to Jackson's formula 15.58, but neglect longitudinal field, assume relativistic velocities, and integrate in energy
                     amrex::ParticleReal gamma = std::sqrt( 1.0_rt +  (ux*ux + uy*uy + uz*uz) * inv_c2 );
-                    amrex::ParticleReal y_min = vphoton_min_energy * inv_c2 / (gamma * mass); // min fractional photon energy
+                    // Minimum fractional (w.r.t. the primary) photon energy
+                    amrex::ParticleReal y_min = vphoton_min_energy * inv_c2 / (gamma * mass);
                     amrex::ParticleReal lny = std::log( y_min );
-
-                    // number of virtual photons per primary particle
-                    amrex::Real r_photons = alpha_pi * (lny * lny - coeff * lny) * sampling_factor; // CHECK THAT THIS IS POSITIVE?
+                    // Number of virtual photons per primary particle
+                    amrex::Real r_photons = alpha_pi * lny * lny * sampling_factor;
                     amrex::Real i_photons; // integer part
                     amrex::Real f_photons = std::modf(r_photons, &i_photons); // fractional part
                     amrex::Long n_photons = (amrex::Long)i_photons;
 
-                    // account for the fractional part of r_photons by
+                    // Account for the fractional part of r_photons by
                     // randomly adding an extra virtual photon
-                    if(amrex::Random(engine) < f_photons){
-                        n_photons += amrex::Long(1);
-                    }
+                    if(amrex::Random(engine) < f_photons){ n_photons += amrex::Long(1);}
 
                     num_vp_data[i] = n_photons;
-
-                    //amrex::Print(0) << "n_photons: " << n_photons << std::endl;
                 });
 
-                // compute the offsets vector as the cumulative sum of the elements of num_vp excluding the current element,
+                // Compute the offsets vector as the cumulative sum of the elements of num_vp excluding the current element,
+                // i.e., offsets[i] = sum_{j=0}^{i-1} num_vp[j],
                 // and return the total number of virtual photons to be generated in the current tile
-                // (which is the last element of the offset vector)
+                // (which is the last element of the offsets vector)
                 amrex::Gpu::DeviceVector<amrex::Long> offsets_vp(num);
                 const amrex::Long total_num_vp = amrex::Scan::ExclusiveSum(num_vp.size(), num_vp.data(), offsets_vp.data());
                 auto *const offset_vp_data = offsets_vp.dataPtr();
 
-                // now we can allocate and build the virtual photon species in the current tile
+                // Now we can allocate and build the virtual photon species in the current tile
                 ParticleTileType& ptile_vp = vphotons.ParticlesAt(lev, mfi);
                 ptile_vp.resize(total_num_vp);
 
-                // soa that will contain the virtual photons data
+                // SoA that will contain the virtual photons data
                 auto &soa_vp = ptile_vp.GetStructOfArrays();
 
-                // array with the pids of the virtual photons
+                // Array with the PIDs of the virtual photons
                 uint64_t * AMREX_RESTRICT pid_vp = soa_vp.GetIdCPUData().data();
 
-                // pointers to the arrays that will contain the particle attributes of the virtual photons
+                // Pointers to the arrays that will contain the particle attributes of the virtual photons
                 amrex::GpuArray<amrex::ParticleReal*,PIdx::nattribs> pa_vp;
                 for (int ia = 0; ia < PIdx::nattribs; ++ia) {
                     pa_vp[ia] = soa_vp.GetRealData(ia).data();
@@ -173,52 +162,47 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                 amrex::ParallelForRNG (num,
                 [=] AMREX_GPU_DEVICE (amrex::Long i,  amrex::RandomEngine const& engine) noexcept
                 {
-                    // energy of primary particle
+                    // Primary particle
                     amrex::ParticleReal ux_primary = soa.m_rdata[PIdx::ux][i];
                     amrex::ParticleReal uy_primary = soa.m_rdata[PIdx::uy][i];
                     amrex::ParticleReal uz_primary = soa.m_rdata[PIdx::uz][i];
-
                     amrex::ParticleReal u_primary = std::sqrt(ux_primary*ux_primary + uy_primary*uy_primary + uz_primary*uz_primary);
                     amrex::ParticleReal nx = ux_primary / u_primary; // normalized ux
-                    amrex::ParticleReal ny = uy_primary / u_primary; // normalized ux
-                    amrex::ParticleReal nz = uz_primary / u_primary; // normalized ux
-
-
+                    amrex::ParticleReal ny = uy_primary / u_primary; // normalized uy
+                    amrex::ParticleReal nz = uz_primary / u_primary; // normalized uz
                     amrex::ParticleReal gamma_primary = std::sqrt( 1.0_rt + (ux_primary*ux_primary + uy_primary*uy_primary + uz_primary*uz_primary)*inv_c2 );
-                    // minimum fractional (wrt primary particle) photon energy
-                    amrex::Real y_min = vphoton_min_energy / (mass * gamma_primary * PhysConst::c * PhysConst::c);
-                    // primary position, weight and id
                     amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
                     amrex::ParticleReal y  = soa.m_rdata[PIdx::y][i];
                     amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
                     amrex::ParticleReal w  = soa.m_rdata[PIdx::w][i];
-                    uint64_t pid = soa.m_idcpu[i]; // to be discussed
+                    uint64_t pid = soa.m_idcpu[i]; // TODO: use this to update the parent lepton if needed
 
-                    amrex::Real umax = std::pow( 0.5_rt * coeff + std::log(y_min), 2._rt);
-
-                    // not sure about this:
-                    //WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                    //    std::exp(0.5_rt * coeff) > y_min,
-                    //    "should never happen, but check"
-                    //);
+                    // Minimum fractional (wrt primary particle) photon energy
+                    amrex::Real y_min = vphoton_min_energy / (mass * gamma_primary * PhysConst::c * PhysConst::c);
+                    amrex::Real umax = std::log(y_min) * std::log(y_min);
 
                     for (int j = 0; j < num_vp_data[i]; j++)
                     {
+                        // Draw a random number between umin and umax
                         amrex::ParticleReal rnd = (umax - umin) * amrex::Random(engine) + umin ;
-                        // fractional energy of the photon, often denoted as y (or x)
-                        amrex::ParticleReal frac_energy = std::exp( 0.5_rt * coeff - std::sqrt(rnd));
+                        // Fractional energy of the photon, often denoted as y (or x)
+                        amrex::ParticleReal frac_energy = std::exp( - std::sqrt(rnd) );
+                        // Energy of the virtual photon
                         amrex::ParticleReal vphoton_energy = frac_energy * gamma_primary * PhysConst::c;
 
-                        // photon index for the current primary
+                        // Photon index for the current primary
                         amrex::Long ip = offset_vp_data[i] + j;
-                        pa_vp[PIdx::ux][ip] = vphoton_energy * nx;
-                        pa_vp[PIdx::uy][ip] = vphoton_energy * ny;
-                        pa_vp[PIdx::uz][ip] = vphoton_energy * nz; // this will be multiplied by m_e before dumping the outputs
+                        pa_vp[PIdx::ux][ip] = vphoton_energy * nx; // will be multiplied by m_e before dumping the outputs
+                        pa_vp[PIdx::uy][ip] = vphoton_energy * ny; // will be multiplied by m_e before dumping the outputs
+                        pa_vp[PIdx::uz][ip] = vphoton_energy * nz; // will be multiplied by m_e before dumping the outputs
+
+                        // TODO: add beam size effect - displace the photon position
                         pa_vp[PIdx::x][ip] = x;
                         pa_vp[PIdx::y][ip] = y;
                         pa_vp[PIdx::z][ip] = z;
+
                         pa_vp[PIdx::w][ip] = w / sampling_factor;
-                        pid_vp[ip] = pid;
+                        pid_vp[ip] = pid; // Same pid as the parent lepton - will be useful if we want to update the parent electron
                     }
                 });
             } // mfi
