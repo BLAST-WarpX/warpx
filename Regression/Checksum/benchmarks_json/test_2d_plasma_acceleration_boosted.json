@@ -11,9 +11,9 @@
     "jz": 102420312561226.16
   },
   "driver": {
-    "particle_momentum_x": 4.404628922203907e-19,
-    "particle_momentum_y": 4.375137245465572e-19,
-    "particle_momentum_z": 2.7424245343443983e-15,
+    "particle_momentum_x": 4.404628902262929e-19,
+    "particle_momentum_y": 4.3751372454592225e-19,
+    "particle_momentum_z": 2.742424534325449e-15,
     "particle_position_x": 0.0016253419519755455,
     "particle_position_y": 0.31953805221039305,
     "particle_weight": 93622636116911.45
@@ -26,20 +26,20 @@
     "particle_position_y": 2.017924300869033,
     "particle_weight": 3744905444676.4585
   },
-  "plasma_e": {
-    "particle_momentum_x": 9.533157242406832e-24,
-    "particle_momentum_y": 1.2197443159296047e-27,
-    "particle_momentum_z": 1.3694895791704427e-18,
-    "particle_position_x": 0.017718774893820878,
-    "particle_position_y": 0.020620065534187347,
-    "particle_weight": 727797380314273.1
-  },
   "plasma_p": {
-    "particle_momentum_x": 9.533141151515802e-24,
-    "particle_momentum_y": 1.2197654397060333e-27,
-    "particle_momentum_z": 2.5163180954855547e-15,
+    "particle_momentum_x": 1.2615099263570606e-23,
+    "particle_momentum_y": 1.539249266523365e-27,
+    "particle_momentum_z": 2.5163180946494702e-15,
     "particle_position_x": 0.017718749986451513,
     "particle_position_y": 0.020620065463180168,
+    "particle_weight": 727797380314273.1
+  },
+  "plasma_e": {
+    "particle_momentum_x": 1.2615128155035979e-23,
+    "particle_momentum_y": 1.539223403948436e-27,
+    "particle_momentum_z": 1.3694904150893846e-18,
+    "particle_position_x": 0.017718774893820878,
+    "particle_position_y": 0.020620065534187347,
     "particle_weight": 727797380314273.1
   }
 }
