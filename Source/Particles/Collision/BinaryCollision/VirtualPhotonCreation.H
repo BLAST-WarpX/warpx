@@ -52,7 +52,14 @@ using SoaData_type = typename WarpXParticleContainer::ParticleTileType::Particle
  */
 void GenerateVirtualPhotons (MultiParticleContainer* mypc){
 
+#if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ) && !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_1D_Z)
+    WARPX_ABORT_WITH_MESSAGE("Virtual photons only implemented in 1D, 2D, 3D, RZ geometries");
+#endif
+
     WARPX_PROFILE("collision::binarycollision::virtualphotons::GenerateVirtualPhotons()");
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(mypc->nSpecies() > 0,
+        "No species found in the MultiParticleContainer");
 
     // Loop through the species
     for (int i_s = 0; i_s < mypc->nSpecies(); ++i_s) {
@@ -170,13 +177,17 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                     amrex::ParticleReal ny = uy_primary / u_primary; // normalized uy
                     amrex::ParticleReal nz = uz_primary / u_primary; // normalized uz
                     amrex::ParticleReal gamma_primary = std::sqrt( 1.0_rt + (ux_primary*ux_primary + uy_primary*uy_primary + uz_primary*uz_primary)*inv_c2 );
-#if (defined WARPX_DIM_XZ) || (defined WARPX_DIM_RZ)
-                    amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
-#elif (defined WARPX_DIM_3D)
+
+#if (defined WARPX_DIM_3D)
                     amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
                     amrex::ParticleReal y  = soa.m_rdata[PIdx::y][i];
-#endif
                     amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
+#elif (defined WARPX_DIM_XZ) || (defined WARPX_DIM_RZ)
+                    amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
+                    amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
+#elif (defined WARPX_DIM_1D_Z)
+                    amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
+#endif
                     amrex::ParticleReal w  = soa.m_rdata[PIdx::w][i];
                     uint64_t pid = soa.m_idcpu[i]; // TODO: use this to update the parent lepton if needed
 
