@@ -31,7 +31,7 @@ my_constants.dt = sigmaz/clight/10.
 #################################
 ####### GENERAL PARAMETERS ######
 #################################
-max_step = 2
+max_step = 1
 amr.n_cell = nx ny nz
 amr.max_level = 0
 geometry.dims = 3
@@ -97,10 +97,11 @@ virtual_photons.sampling_factor = 10000000
 # FULL
 diagnostics.diags_names = diag1
 
-diag1.intervals = 1
+diag1.intervals = -1
 diag1.diag_type = Full
 diag1.write_species = 1
 diag1.dump_last_timestep = 1
 diag1.species = beam virtual_photons
 diag1.format = openpmd
 diag1.openpmd_backend = h5
+diag1.virtual_photons.variables = uz w x y z

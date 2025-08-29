@@ -2,13 +2,18 @@
 
 # This test generatees the population of virtual photons
 # of one high-energy electron.
-# The spectrum of the virtual photons is compared to the
-# theoretical prediction.
+# The total number and spectrum of the virtual photons are
+# compared to the theoretical prediction.
+# Checks that the photons are in the same position of the electron.
 
 import numpy as np
 from numpy import log
 from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import alpha, c, eV, m_e, pi
+
+###########################
+### ENERGY AND SPECTRUM ###
+###########################
 
 # useful constants
 GeV = 1e9 * eV
@@ -67,6 +72,20 @@ print(f"From simulation : {N_wx}")
 print(f"From theory     : {N}")
 print(f"Relative error  : {abs(N_wx - N) / N:.2%}")
 
+print("Spectrum of virtual photons per electron:")
+print(f"Max relative error: {(np.abs(dN_dy_wx - dN_dy) / dN_dy).max()}")
 assert (np.abs(dN_dy_wx - dN_dy) < 0.04 * dN_dy).all()
 
 assert abs(N - N_wx) < 0.02 * N
+
+
+################
+### POSITION ###
+################
+
+x, y, z = series.get_particle(["x", "y", "z"], species="virtual_photons", iteration=1)
+x_e, y_e, z_e = series.get_particle(["x", "y", "z"], species="beam", iteration=1)
+
+assert np.unique(x) == x_e
+assert np.unique(y) == y_e
+assert np.unique(z) == z_e
