@@ -25,6 +25,8 @@
 #include "WarpXParticleContainer.H"
 #include "Particles/Deposition/TemperatureDepositionTypes.H"
 
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
+
 #include <AMReX_GpuContainers.H>
 #include <AMReX_Particles.H>
 #include <AMReX_REAL.H>
@@ -81,18 +83,17 @@ public:
     PlasmaInjector* GetPlasmaInjector (int i) override;
 
     /**
-     * \brief Evolve is the central function PhysicalParticleContainer that
+     * \brief Evolve is the central function in PhysicalParticleContainer that
      * advances plasma particles for a time dt (typically one timestep).
      *
-     * \param fields the WarpX field register
-     * \param lev level on which particles are living
-     * \param current_fp_string current coarse or fine patch identifier in fields
-     * \param t current physical time
-     * \param dt time step by which particles are advanced
-     * \param a_dt_type type of time step (used for sub-cycling)
-     * \param skip_deposition Skip the charge and current deposition.
-     * \param deposit_mass_matrices whether to deposit the mass matrices (in the case of the implicit solver)
-     * \param push_type Type of particle push, explicit or implicit. Defaults to explicit
+     * \param fields The WarpX field register
+     * \param lev Level on which particles are living
+     * \param current_fp_string Current (coarse or fine patch) identifier in fields
+     * \param t Current physical time
+     * \param dt Time Step by which particles are advanced
+     * \param a_dt_type Type of time step (used for sub-cycling)
+     * \param skip_deposition Skip the charge and current deposition
+     * \param implicit_options Structure with specific options for implicit methods
      *
      * Evolve iterates over particle iterator (each box) and performs filtering,
      * field gather, particle push and current deposition for all particles
@@ -105,8 +106,7 @@ public:
                  amrex::Real dt,
                  DtType a_dt_type=DtType::Full,
                  bool skip_deposition=false,
-                 bool deposit_mass_matrices=false,
-                 PushType push_type=PushType::Explicit) override;
+                 ImplicitOptions const * implicit_options = nullptr) override;
 
     virtual void PushPX (WarpXParIter& pti,
                          amrex::FArrayBox const * exfab,
@@ -129,6 +129,7 @@ public:
                          amrex::FArrayBox const * bxfab,
                          amrex::FArrayBox const * byfab,
                          amrex::FArrayBox const * bzfab,
+                         ImplicitOptions const * implicit_options,
                          amrex::IntVect const & ngEB,
                          long offset,
                          long np_to_push,

@@ -11,6 +11,7 @@
 #define WARPX_WarpXParticleContainer_H_
 
 #include "WarpXParticleContainer_fwd.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
 #include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
@@ -239,7 +240,7 @@ public:
                          int lev,
                          const std::string& current_fp_string,
                          amrex::Real t, amrex::Real dt, DtType a_dt_type=DtType::Full, bool skip_deposition=false,
-                         bool deposit_mass_matrices=false, PushType push_type=PushType::Explicit) = 0;
+                         ImplicitOptions const * implicit_options = nullptr) = 0;
 
     virtual void PostRestart () = 0;
 
