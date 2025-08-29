@@ -1,4 +1,4 @@
-name: Autoupdate
+name: Monthly release
 
 on:
   schedule:
@@ -10,8 +10,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  monthly_release:
-    name: Monthly release
+  autoupdate:
+    name: Autoupdate
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -37,10 +37,11 @@ jobs:
           git commit -m "Update dependencies.json"
       - name: Push changes
         run: |
-          git push -u origin monthly_release
+          git push -f origin monthly_release
       - name: Open pull request
         run: |
           gh pr create \
+            --draft \
             --base development \
             --body "Automated via .github/workflows/monthly_release.yml." \
             --label "component: third party" \

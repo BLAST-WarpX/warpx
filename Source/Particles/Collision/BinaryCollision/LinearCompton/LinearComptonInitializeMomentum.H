@@ -132,7 +132,7 @@ namespace {
         }
 
         // Draw scattering angle in the rest frame, from the
-        // Klein-Nishina cross-section (See Ozmutl, E. N.
+        // Klein-Nishina cross-section (See Ozmutlu, E. N.
         // "Sampling of Angular Distribution in Compton Scattering"
         // Appl. Radiat. Isot. 43, 6, pp. 713-715 (1992))
         amrex::ParticleReal const k = photon_u_rest * inv_c;
@@ -151,7 +151,7 @@ namespace {
             amrex::ParticleReal const h = a/(b-x);
             // - Calculate expected (exact) probability distribution f
             amrex::ParticleReal const factor = 1._prt + k*(1._prt-x);
-            amrex::ParticleReal const f = ( (1._prt+x*x)*factor + k*k*(1._prt-x)*(1._prt-x) )/factor*factor*factor;
+            amrex::ParticleReal const f = ( (1._prt+x*x)*factor + k*k*(1._prt-x)*(1._prt-x) )/(factor*factor*factor);
             // - Keep x according to rejection rule
             amrex::ParticleReal const r2 = amrex::Random(engine);
             if (r2 < f/h) {
