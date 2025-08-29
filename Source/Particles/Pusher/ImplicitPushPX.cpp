@@ -822,7 +822,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
         int isuborbit = 0;
         bool doing_deposition = false;
-        while (isuborbit < nsuborbits[ip] and !doing_deposition) {
+        while (isuborbit < nsuborbits[ip]) {
 
             amrex::Real const dt_suborbit = dt/nsuborbits[ip];
 
