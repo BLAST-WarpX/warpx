@@ -911,7 +911,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                                   Syx_arr, Syy_arr, Syz_arr,
                                                                   Szx_arr, Szy_arr, Szz_arr,
                                                                   dt_suborbit, dinv, xyzmin, lo );
-                        } else if (full_mass_matrices){
+                        } else if (full_mass_matrices) {
                             doVillasenorJandSigmaDepositionKernel<1,true>(
                                                                   xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
                                                                   wq_invvol, uxp_nph, uyp_nph, uzp_nph, gaminv,
