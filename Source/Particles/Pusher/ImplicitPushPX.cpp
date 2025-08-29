@@ -563,12 +563,12 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
  * \param[in] ngEB the number of guard cells in the E and B fields
  * \param[in/out] jx, jy, jz the current densities to be deposited into
  * \param[in] index_offset offset in the list of unconverged particles
- * \param[in] num_unconverged_particles number of unconverged particles to push
  * \param[in] lev the refinement level
  * \param[in] gather_lev the refinement level at which to do the field gather
  * \param[in] dt the time step size
  * \param[in] scaleFields allows scale factor to the fields (for rigid injection)
  * \param[in] skip_deposition whether to do the deposition
+ * \param[in] num_unconverged_particles number of unconverged particles to push
  * \param[in] unconverged_indices the list of indices of unconverged particles
  * \param[in] saved_weights the saved weights of the unconverged particles
  */
@@ -587,10 +587,10 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                     amrex::MultiFab * const jy,
                                                     amrex::MultiFab * const jz,
                                                     long index_offset,
-                                                    long num_unconverged_particles,
                                                     int lev, int gather_lev,
                                                     amrex::Real dt, ScaleFields scaleFields,
                                                     bool skip_deposition,
+                                                    long num_unconverged_particles,
                                                     amrex::Gpu::DeviceVector<long> & unconverged_indices,
                                                     amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights)
 {

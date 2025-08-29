@@ -153,10 +153,10 @@ public:
                                   amrex::MultiFab * const jy,
                                   amrex::MultiFab * const jz,
                                   long offset,
-                                  long np_to_push,
                                   int lev, int gather_lev,
                                   amrex::Real dt, ScaleFields scaleFields,
                                   bool skip_deposition,
+                                  long num_unconverged_particles,
                                   amrex::Gpu::DeviceVector<long> & unconverged_indices,
                                   amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
 

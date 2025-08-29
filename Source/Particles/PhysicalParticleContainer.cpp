@@ -686,8 +686,8 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                                 implicit_options,
                                                 Ex.nGrowVect(),
                                                 jx, jy, jz,
-                                                offset, num_unconverged_particles, lev, gather_lev, dt, ScaleFields(false),
-                                                skip_deposition, unconverged_indices, saved_weights);
+                                                offset, lev, gather_lev, dt, ScaleFields(false), skip_deposition,
+                                                num_unconverged_particles_c, unconverged_indices, saved_weights);
                     }
                     if (num_unconverged_particles_c > 0) {
 
@@ -716,8 +716,8 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                                 implicit_options,
                                                 cEx.nGrowVect(),
                                                 cjx, cjy, cjz,
-                                                offset, num_unconverged_particles_c, lev, lev-1, dt, ScaleFields(false),
-                                                skip_deposition, unconverged_indices, saved_weights);
+                                                offset, lev, lev-1, dt, ScaleFields(false), skip_deposition,
+                                                num_unconverged_particles_c, unconverged_indices, saved_weights);
                     }
                 }
 
