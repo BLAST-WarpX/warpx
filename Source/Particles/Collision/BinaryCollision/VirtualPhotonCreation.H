@@ -50,7 +50,6 @@ using SoaData_type = typename WarpXParticleContainer::ParticleTileType::Particle
  *
  * \param[in] mypc MultiParticleContainer calling this method
  */
-AMREX_GPU_HOST_DEVICE
 void GenerateVirtualPhotons (MultiParticleContainer* mypc){
 
     WARPX_PROFILE("collision::binarycollision::virtualphotons::GenerateVirtualPhotons()");
