@@ -449,9 +449,9 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
         }
 #endif
 
-        amrex::ParticleReal Bxp;
-        amrex::ParticleReal Byp;
-        amrex::ParticleReal Bzp;
+        amrex::ParticleReal Bxp = 0.0_prt;
+        amrex::ParticleReal Byp = 0.0_prt;
+        amrex::ParticleReal Bzp = 0.0_prt;
         amrex::ParticleReal step_norm = 1._prt;
 
         bool convergence = PushXPSingleStep<exteb_control, qed_control>(ip, dt, setPosition,
@@ -826,9 +826,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
             amrex::Real const dt_suborbit = dt/nsuborbits[ip];
 
-            amrex::ParticleReal Bxp;
-            amrex::ParticleReal Byp;
-            amrex::ParticleReal Bzp;
+            amrex::ParticleReal Bxp = 0.0_prt;
+            amrex::ParticleReal Byp = 0.0_prt;
+            amrex::ParticleReal Bzp = 0.0_prt;
             amrex::ParticleReal step_norm = 1._prt;
 
             // Try advancing the particle one suborbit step
