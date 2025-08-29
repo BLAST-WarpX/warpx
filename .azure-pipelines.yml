@@ -15,6 +15,7 @@ trigger:
     - '**/*.md'
 pr:
   autoCancel: true
+  drafts: false
   paths:
     exclude:
     - 'Docs/**'
