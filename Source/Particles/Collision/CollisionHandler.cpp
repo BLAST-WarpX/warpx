@@ -19,8 +19,9 @@
 #include "Utils/TextMsg.H"
 
 #include "Particles/ParticleCreation/SmartCopy.H"
+#ifdef WARPX_QED
 #include "Particles/Collision/BinaryCollision/VirtualPhotonCreation.H"
-
+#endif
 #include <AMReX_ParmParse.H>
 
 #include <vector>
