@@ -171,8 +171,12 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                     amrex::ParticleReal ny = uy_primary / u_primary; // normalized uy
                     amrex::ParticleReal nz = uz_primary / u_primary; // normalized uz
                     amrex::ParticleReal gamma_primary = std::sqrt( 1.0_rt + (ux_primary*ux_primary + uy_primary*uy_primary + uz_primary*uz_primary)*inv_c2 );
+#if (defined WARPX_DIM_XZ) || (defined WARPX_DIM_RZ)
+                    amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
+#elif (defined WARPX_DIM_3D)
                     amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
                     amrex::ParticleReal y  = soa.m_rdata[PIdx::y][i];
+#endif
                     amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
                     amrex::ParticleReal w  = soa.m_rdata[PIdx::w][i];
                     uint64_t pid = soa.m_idcpu[i]; // TODO: use this to update the parent lepton if needed
@@ -197,8 +201,12 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                         pa_vp[PIdx::uz][ip] = vphoton_energy * nz; // will be multiplied by m_e before dumping the outputs
 
                         // TODO: add beam size effect - displace the photon position
+#if (defined WARPX_DIM_XZ) || (defined WARPX_DIM_RZ)
+                        pa_vp[PIdx::x][ip] = x;
+#elif (defined WARPX_DIM_3D)
                         pa_vp[PIdx::x][ip] = x;
                         pa_vp[PIdx::y][ip] = y;
+#endif
                         pa_vp[PIdx::z][ip] = z;
 
                         pa_vp[PIdx::w][ip] = w / sampling_factor;
