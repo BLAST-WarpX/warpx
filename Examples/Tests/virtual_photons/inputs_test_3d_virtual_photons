@@ -103,4 +103,4 @@ diag1.write_species = 1
 diag1.dump_last_timestep = 1
 diag1.species = beam virtual_photons
 diag1.format = openpmd
-diag1.openpmd_backend = bp
+diag1.openpmd_backend = h5
