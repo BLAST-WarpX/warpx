@@ -877,7 +877,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
                 if (deposit_mass_matrices) {
                     const amrex::Real wq_invvol = wq*invvol/nsuborbits[ip];
-                    const amrex::Real rhop = wq*invvol*gaminv/nsuborbits[ip]; // use normal wq here
+                    const amrex::Real rhop = 2.0_rt*wq_invvol*gaminv; // use normal wq here
 
                     // Set the Mass Matrices kernels
                     amrex::ParticleReal fpxx, fpxy, fpxz;
