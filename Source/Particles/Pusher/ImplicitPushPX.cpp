@@ -502,8 +502,6 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
 
     });
 
-    amrex::Gpu::synchronize();
-
     // Setup for handling the unconverged particles. A list of their indices is
     // gathered, their weights saved, and their weight set to zero (so they
     // don't contribute to the current density).
