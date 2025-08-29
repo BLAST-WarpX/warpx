@@ -31,7 +31,7 @@ using SoaData_type = typename WarpXParticleContainer::ParticleTileType::Particle
 
 
 /** Generate virtual photons from primary particles (electrons or positrons)
- * using the equivalent photon approximation, also known as the Weizsäcker-Williams method.
+ * using the equivalent photon approximation, also known as the Weizsacker-Williams method.
  * See for example Jackson, Classical Electrodynamics, 3rd edition, section 15.4
  * or Berestetskii, Lifshitz, Pitaevskii, Quantum Electrodynamics, 2nd edition, section 99.
  *
