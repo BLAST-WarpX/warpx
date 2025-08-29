@@ -147,6 +147,7 @@ public:
                                   amrex::FArrayBox const * bxfab,
                                   amrex::FArrayBox const * byfab,
                                   amrex::FArrayBox const * bzfab,
+                                  ImplicitOptions const * implicit_options,
                                   amrex::IntVect ngEB,
                                   amrex::MultiFab * const jx,
                                   amrex::MultiFab * const jy,
@@ -155,7 +156,7 @@ public:
                                   long np_to_push,
                                   int lev, int gather_lev,
                                   amrex::Real dt, ScaleFields scaleFields,
-                                  bool skip_deposition, bool deposit_mass_matrices,
+                                  bool skip_deposition,
                                   amrex::Gpu::DeviceVector<long> & unconverged_indices,
                                   amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
 

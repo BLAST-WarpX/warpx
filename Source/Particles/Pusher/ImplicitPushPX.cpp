@@ -245,6 +245,7 @@ namespace {
  * \param[in] pti the WarpXParIter holding the particles to push
  * \param[in] exfab, eyfab, ezfab the E fields
  * \param[in] bxfab, byfab, bzfab the B fields
+ * \param[in] implicit_options specifies options for implicit push
  * \param[in] ngEB the number of guard cells in the E and B fields
  * \param[in] offset the particle index offset for the particles to be pushed
  * \param[in] np_to_push the number of particles to push
@@ -558,6 +559,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
  * \param[in] fields the MultiFab register instance
  * \param[in] exfab, eyfab, ezfab the E fields
  * \param[in] bxfab, byfab, bzfab the B fields
+ * \param[in] implicit_options specifies options for implicit push
  * \param[in] ngEB the number of guard cells in the E and B fields
  * \param[in/out] jx, jy, jz the current densities to be deposited into
  * \param[in] index_offset offset in the list of unconverged particles
@@ -567,7 +569,6 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
  * \param[in] dt the time step size
  * \param[in] scaleFields allows scale factor to the fields (for rigid injection)
  * \param[in] skip_deposition whether to do the deposition
- * \param[in] deposit_mass_matrices whether to do the mass matrix deposition
  * \param[in] unconverged_indices the list of indices of unconverged particles
  * \param[in] saved_weights the saved weights of the unconverged particles
  */
@@ -580,6 +581,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                     amrex::FArrayBox const * bxfab,
                                                     amrex::FArrayBox const * byfab,
                                                     amrex::FArrayBox const * bzfab,
+                                                    ImplicitOptions const * implicit_options,
                                                     amrex::IntVect ngEB,
                                                     amrex::MultiFab * const jx,
                                                     amrex::MultiFab * const jy,
@@ -589,7 +591,6 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                     int lev, int gather_lev,
                                                     amrex::Real dt, ScaleFields scaleFields,
                                                     bool skip_deposition,
-                                                    bool deposit_mass_matrices,
                                                     amrex::Gpu::DeviceVector<long> & unconverged_indices,
                                                     amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights)
 {
@@ -669,6 +670,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     amrex::IndexType const by_type = byfab->box().ixType();
     amrex::IndexType const bz_type = bzfab->box().ixType();
 
+    const bool deposit_mass_matrices = implicit_options->deposit_mass_matrices;
     bool full_mass_matrices = false;
     amrex::MultiFab *Sxx, *Sxy, *Sxz, *Syx, *Syy, *Syz, *Szx, *Szy, *Szz;
     if (deposit_mass_matrices) {
@@ -750,8 +752,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 #endif
     const int depos_order_flag = depos_order;
 
-    const int max_iterations = WarpX::max_particle_its_in_implicit_scheme;
-    const amrex::ParticleReal particle_tolerance = WarpX::particle_tol_in_implicit_scheme;
+    const int max_iterations = implicit_options->max_particle_iterations;
+    const amrex::ParticleReal particle_tolerance = implicit_options->particle_tolerance;
 
     long * unconverged_i = unconverged_indices.data() + index_offset;
     amrex::ParticleReal * saved_w = saved_weights.data() + index_offset;

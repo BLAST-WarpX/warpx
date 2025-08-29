@@ -683,10 +683,11 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         long const offset = 0;
                         ImplicitPushXPSubOrbits(pti, fields, exfab, eyfab, ezfab,
                                                 bxfab, byfab, bzfab,
+                                                implicit_options,
                                                 Ex.nGrowVect(),
                                                 jx, jy, jz,
                                                 offset, num_unconverged_particles, lev, gather_lev, dt, ScaleFields(false),
-                                                skip_deposition, deposit_mass_matrices, unconverged_indices, saved_weights);
+                                                skip_deposition, unconverged_indices, saved_weights);
                     }
                     if (num_unconverged_particles_c > 0) {
 
@@ -712,10 +713,11 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         long const offset = num_unconverged_particles;
                         ImplicitPushXPSubOrbits(pti, fields, cexfab, ceyfab, cezfab,
                                                 cbxfab, cbyfab, cbzfab,
+                                                implicit_options,
                                                 cEx.nGrowVect(),
                                                 cjx, cjy, cjz,
                                                 offset, num_unconverged_particles_c, lev, lev-1, dt, ScaleFields(false),
-                                                skip_deposition, deposit_mass_matrices, unconverged_indices, saved_weights);
+                                                skip_deposition, unconverged_indices, saved_weights);
                     }
                 }
 
