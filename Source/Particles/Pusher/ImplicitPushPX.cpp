@@ -863,7 +863,6 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                 const amrex::ParticleReal uzp_nph = uz[ip];
 
                 constexpr amrex::ParticleReal inv_c2 = 1.0_prt/(PhysConst::c*PhysConst::c);
-#if !defined(WARPX_DIM_3D)
 
                 const amrex::ParticleReal uxp_old = uxp_n;
                 const amrex::ParticleReal uyp_old = uyp_n;
@@ -877,10 +876,6 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                 const amrex::ParticleReal gamma_old = std::sqrt(1.0_prt + (uxp_old*uxp_old + uyp_old*uyp_old + uzp_old*uzp_old)*inv_c2);
                 const amrex::ParticleReal gamma_new = std::sqrt(1.0_prt + (uxp_new*uxp_new + uyp_new*uyp_new + uzp_new*uzp_new)*inv_c2);
                 const amrex::ParticleReal gaminv = 2.0_prt/(gamma_old + gamma_new);
-#else
-                // unused
-                const amrex::ParticleReal gaminv = 1.;
-#endif
 
                 if (deposit_mass_matrices) {
                     const amrex::Real wq_invvol = wq*invvol/nsuborbits[ip];
