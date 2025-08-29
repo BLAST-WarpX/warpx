@@ -651,7 +651,7 @@ protected:
     std::string m_qed_quantum_sync_phot_product_name;
     int m_qed_virtual_photon_species;
     std::string m_qed_virtual_photon_species_name;
-    amrex::Real m_qed_virtual_photon_min_energy; // default to? PhysConst::m_e * PhysConst::c * PhysConst::c ;
+    amrex::Real m_qed_virtual_photon_min_energy;
 #endif
     amrex::Vector<amrex::FArrayBox> local_rho;
     amrex::Vector<amrex::FArrayBox> local_jx;
