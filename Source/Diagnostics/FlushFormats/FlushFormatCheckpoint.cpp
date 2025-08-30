@@ -235,8 +235,7 @@ FlushFormatCheckpoint::CheckpointParticles (
         // and the int comps
         int_names.resize(pc->NumIntComps());
         write_int_comps.resize(pc->NumIntComps());
-
-        // inames and pc->h_redistribute_int_comp are note the same size
+        //   note: inames and h_redistribute_int_comp are note the same size
         auto inames = pc->GetIntSoANames();
         std::size_t const i0_redist = pc->h_redistribute_int_comp.size() - pc->NumIntComps();
         for (std::size_t index = 0; index < inames.size(); ++index) {

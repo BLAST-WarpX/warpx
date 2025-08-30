@@ -409,6 +409,7 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
         // and the int comps
         int_names.resize(tmp.NumIntComps());
         int_flags.resize(tmp.NumIntComps());
+        //   note: inames and h_redistribute_int_comp are note the same size
         auto inames = tmp.GetIntSoANames();
         std::size_t const i0_redist = tmp.h_redistribute_int_comp.size() - tmp.NumIntComps();
         for (std::size_t index = 0; index < inames.size(); ++index) {
