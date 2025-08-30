@@ -52,10 +52,6 @@ using SoaData_type = typename WarpXParticleContainer::ParticleTileType::Particle
  */
 void GenerateVirtualPhotons (MultiParticleContainer* mypc){
 
-#if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ) && !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_1D_Z)
-    WARPX_ABORT_WITH_MESSAGE("Virtual photons only implemented in 1D, 2D, 3D, RZ geometries");
-#endif
-
     WARPX_PROFILE("collision::binarycollision::virtualphotons::GenerateVirtualPhotons()");
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(mypc->nSpecies() > 0,
@@ -178,15 +174,26 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                     amrex::ParticleReal nz = uz_primary / u_primary; // normalized uz
                     amrex::ParticleReal gamma_primary = std::sqrt( 1.0_rt + (ux_primary*ux_primary + uy_primary*uy_primary + uz_primary*uz_primary)*inv_c2 );
 
-#if (defined WARPX_DIM_3D)
+#if defined (WARPX_DIM_3D)
                     amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
                     amrex::ParticleReal y  = soa.m_rdata[PIdx::y][i];
                     amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
-#elif (defined WARPX_DIM_XZ) || (defined WARPX_DIM_RZ)
+#elif defined (WARPX_DIM_XZ)
                     amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
                     amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
-#elif (defined WARPX_DIM_1D_Z)
+#elif defined (WARPX_DIM_RZ)
+                    amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
                     amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
+                    amrex::ParticleReal theta  = soa.m_rdata[PIdx::theta][i];
+#elif defined (WARPX_DIM_1D_Z)
+                    amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
+#elif defined (WARPX_DIM_RCYLINDER)
+                    amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
+                    amrex::ParticleReal theta  = soa.m_rdata[PIdx::theta][i];
+#elif defined(WARPX_DIM_RSPHERE)
+                    amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
+                    amrex::ParticleReal theta  = soa.m_rdata[PIdx::theta][i];
+                    amrex::ParticleReal phi  = soa.m_rdata[PIdx::phi][i];
 #endif
                     amrex::ParticleReal w  = soa.m_rdata[PIdx::w][i];
                     uint64_t pid = soa.m_idcpu[i]; // TODO: use this to update the parent lepton if needed
@@ -211,14 +218,27 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                         pa_vp[PIdx::uz][ip] = vphoton_energy * nz; // will be multiplied by m_e before dumping the outputs
 
                         // TODO: add beam size effect - displace the photon position
-#if (defined WARPX_DIM_XZ) || (defined WARPX_DIM_RZ)
-                        pa_vp[PIdx::x][ip] = x;
-#elif (defined WARPX_DIM_3D)
+#if defined (WARPX_DIM_3D)
                         pa_vp[PIdx::x][ip] = x;
                         pa_vp[PIdx::y][ip] = y;
-#endif
                         pa_vp[PIdx::z][ip] = z;
-
+#elif defined (WARPX_DIM_XZ)
+                        pa_vp[PIdx::x][ip] = x;
+                        pa_vp[PIdx::z][ip] = z;
+#elif defined (WARPX_DIM_RZ)
+                        pa_vp[PIdx::x][ip] = x;
+                        pa_vp[PIdx::z][ip] = z;
+                        pa_vp[PIdx::theta][ip] = theta;
+#elif defined (WARPX_DIM_1D_Z)
+                        pa_vp[PIdx::z][ip] = z;
+#elif defined (WARPX_DIM_RCYLINDER)
+                        pa_vp[PIdx::x][ip] = x;
+                        pa_vp[PIdx::theta][ip] = theta;
+#elif defined(WARPX_DIM_RSPHERE)
+                        pa_vp[PIdx::x][ip] = x;
+                        pa_vp[PIdx::theta][ip] = theta;
+                        pa_vp[PIdx::phi][ip] = phi;
+#endif
                         pa_vp[PIdx::w][ip] = w / sampling_factor;
                         pid_vp[ip] = pid; // Same pid as the parent lepton - will be useful if we want to update the parent electron
                     }
