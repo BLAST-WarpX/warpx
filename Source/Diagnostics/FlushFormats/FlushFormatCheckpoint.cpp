@@ -238,10 +238,10 @@ FlushFormatCheckpoint::CheckpointParticles (
 
         // inames and pc->h_redistribute_int_comp are note the same size
         auto inames = pc->GetIntSoANames();
-        std::size_t const index_start = pc->h_redistribute_int_comp.size() - pc->NumIntComps();
-        for (std::size_t i = 0; i < inames.size(); ++i) {
-            int_names[i] = inames[i];
-            write_int_comps[i] = pc->h_redistribute_int_comp[index_start + i];
+        std::size_t const i0_redist = pc->h_redistribute_int_comp.size() - pc->NumIntComps();
+        for (std::size_t index = 0; index < inames.size(); ++index) {
+            int_names[index] = inames[index];
+            write_int_comps[index] = pc->h_redistribute_int_comp[i0_redist + index];
         }
 
         pc->Checkpoint(dir, part_diag.getSpeciesName(),

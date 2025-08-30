@@ -410,9 +410,10 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
         int_names.resize(tmp.NumIntComps());
         int_flags.resize(tmp.NumIntComps());
         auto inames = tmp.GetIntSoANames();
+        std::size_t const i0_redist = tmp.h_redistribute_int_comp.size() - tmp.NumIntComps();
         for (std::size_t index = 0; index < inames.size(); ++index) {
             int_names[index] = inames[index];
-            int_flags[index] = tmp.h_redistribute_int_comp[index];
+            int_flags[index] = tmp.h_redistribute_int_comp[i0_redist + index];
         }
 
         const auto mass = pc->AmIA<PhysicalSpecies::photon>() ? PhysConst::m_e : pc->getMass();
