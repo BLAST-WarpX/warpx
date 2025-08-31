@@ -3422,6 +3422,9 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
         Species for which to calculate particle_fields_to_plot functions. Fields will
         be calculated separately for each specified species. If not passed, default is
         all of the available particle species.
+
+    warpx_verbose: int, optional
+        Verbosity level to use for printing diagnostic output information.
     """
 
     def init(self, kw):
@@ -3438,6 +3441,7 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
         self.dump_last_timestep = kw.pop("warpx_dump_last_timestep", None)
         self.particle_fields_to_plot = kw.pop("warpx_particle_fields_to_plot", [])
         self.particle_fields_species = kw.pop("warpx_particle_fields_species", None)
+        self.verbose = kw.pop("warpx_verbose", None)
 
     def diagnostic_initialize_inputs(self):
         self.add_diagnostic()
@@ -3450,6 +3454,7 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
         self.diagnostic.dump_rz_modes = self.dump_rz_modes
         self.diagnostic.dump_last_timestep = self.dump_last_timestep
         self.diagnostic.intervals = self.period
+        self.diagnostic.set_or_replace_attr("verbose", self.verbose)
         self.diagnostic.diag_lo = self.lower_bound
         self.diagnostic.diag_hi = self.upper_bound
         if self.number_of_cells is not None:
@@ -3570,7 +3575,6 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
         particle_fields_to_plot_names.sort()
         self.diagnostic.particle_fields_to_plot = particle_fields_to_plot_names
         self.diagnostic.particle_fields_species = self.particle_fields_species
-
         self.diagnostic.plot_raw_fields = self.plot_raw_fields
         self.diagnostic.plot_raw_fields_guards = self.plot_raw_fields_guards
         self.diagnostic.plot_finepatch = self.plot_finepatch
@@ -3713,6 +3717,9 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic, WarpXDiagnostic
 
     warpx_plot_filter_function: string, optional
         Analytic expression to down select the particles to in the diagnostic
+
+    warpx_verbose: int, optional
+        Verbosity level to use for printing diagnostic output information.
     """
 
     def init(self, kw):
@@ -3725,6 +3732,7 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic, WarpXDiagnostic
         self.uniform_stride = kw.pop("warpx_uniform_stride", None)
         self.plot_filter_function = kw.pop("warpx_plot_filter_function", None)
         self.dump_last_timestep = kw.pop("warpx_dump_last_timestep", None)
+        self.verbose = kw.pop("warpx_verbose", None)
 
         self.user_defined_kw = {}
         if self.plot_filter_function is not None:
@@ -3749,6 +3757,7 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic, WarpXDiagnostic
         self.diagnostic.file_min_digits = self.file_min_digits
         self.diagnostic.dump_last_timestep = self.dump_last_timestep
         self.diagnostic.intervals = self.period
+        self.diagnostic.set_or_replace_attr("verbose", self.verbose)
         self.diagnostic.set_or_replace_attr("write_species", True)
         if "fields_to_plot" not in self.diagnostic.argvattrs:
             self.diagnostic.fields_to_plot = "none"
@@ -3913,6 +3922,9 @@ class LabFrameFieldDiagnostic(
 
     warpx_upper_bound: vector of floats, optional
         Passed to <diagnostic name>.upper_bound
+
+    warpx_verbose: int, optional
+        Verbosity level to use for printing diagnostic output information.
     """
 
     def init(self, kw):
@@ -3927,6 +3939,7 @@ class LabFrameFieldDiagnostic(
         self.buffer_size = kw.pop("warpx_buffer_size", None)
         self.lower_bound = kw.pop("warpx_lower_bound", None)
         self.upper_bound = kw.pop("warpx_upper_bound", None)
+        self.verbose = kw.pop("warpx_verbose", None)
 
     def diagnostic_initialize_inputs(self):
         self.add_diagnostic()
@@ -3938,6 +3951,7 @@ class LabFrameFieldDiagnostic(
         self.diagnostic.file_min_digits = self.file_min_digits
         self.diagnostic.diag_lo = self.lower_bound
         self.diagnostic.diag_hi = self.upper_bound
+        self.diagnostic.set_or_replace_attr("verbose", self.verbose)
 
         self.diagnostic.do_back_transformed_fields = True
         self.diagnostic.dt_snapshots_lab = self.dt_snapshots
@@ -4024,6 +4038,9 @@ class LabFrameParticleDiagnostic(
 
     warpx_buffer_size: integer, optional
         Passed to <diagnostic name>.buffer_size
+
+    warpx_verbose: int, optional
+        Verbosity level to use for printing diagnostic output information.
     """
 
     def init(self, kw):
@@ -4034,6 +4051,7 @@ class LabFrameParticleDiagnostic(
         self.intervals = kw.pop("warpx_intervals", None)
         self.file_min_digits = kw.pop("warpx_file_min_digits", None)
         self.buffer_size = kw.pop("warpx_buffer_size", None)
+        self.verbose = kw.pop("warpx_verbose", None)
 
     def diagnostic_initialize_inputs(self):
         self.add_diagnostic()
@@ -4043,6 +4061,7 @@ class LabFrameParticleDiagnostic(
         self.diagnostic.openpmd_backend = self.openpmd_backend
         self.diagnostic.openpmd_encoding = self.openpmd_encoding
         self.diagnostic.file_min_digits = self.file_min_digits
+        self.diagnostic.set_or_replace_attr("verbose", self.verbose)
 
         self.diagnostic.do_back_transformed_particles = True
         self.diagnostic.dt_snapshots_lab = self.dt_snapshots

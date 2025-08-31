@@ -18,6 +18,14 @@
 # https://hpc.llnl.gov/documentation/user-guides/using-el-capitan-systems/introduction-and-quickstart/pro-tips
 #S  BATCH --thp=always
 
+if [[ -z "${MY_PROFILE}" ]]; then
+    echo "WARNING: FORGOT TO"
+    echo "   source $HOME/tuolumne_mi300a_warpx.profile"
+    echo "before submission. Doing that now."
+
+    source $HOME/tuolumne_mi300a_warpx.profile
+fi
+
 # executable & inputs file or python interpreter & PICMI script here
 EXE=./warpx
 INPUTS=inputs
@@ -32,7 +40,7 @@ export MPICH_OFI_NIC_POLICY=GPU
 
 # threads for OpenMP and threaded compressors per MPI rank
 #   note: 16 avoids hyperthreading (32 virtual cores, 16 physical)
-export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
+export OMP_NUM_THREADS=16
 
 # GPU-aware MPI optimizations
 GPU_AWARE_MPI="amrex.use_gpu_aware_mpi=1"
