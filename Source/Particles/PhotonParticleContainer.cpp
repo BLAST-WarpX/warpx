@@ -260,7 +260,6 @@ PhotonParticleContainer::Evolve (
 {
     // This does gather, push and deposit.
     // Push and deposit have been re-written for photons
-    bool const deposit_mass_matrices = false;
     PhysicalParticleContainer::Evolve(
         fields,
         lev,
