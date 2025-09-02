@@ -168,26 +168,21 @@ RigidInjectedParticleContainer::RemapParticles()
 }
 
 void
-RigidInjectedParticleContainer::PushPX (
-    WarpXParIter& pti,
-    amrex::FArrayBox const * exfab,
-    amrex::FArrayBox const * eyfab,
-    amrex::FArrayBox const * ezfab,
-    amrex::FArrayBox const * bxfab,
-    amrex::FArrayBox const * byfab,
-    amrex::FArrayBox const * bzfab,
-    const amrex::IntVect ngEB,
-    const int e_is_nodal,
-    const long offset,
-    const long np_to_push,
-    int lev,
-    int gather_lev,
-    amrex::Real dt,
-    ScaleFields /*scaleFields*/,
-    DtType a_dt_type,
-    DtType position_push_type,
-    DtType momentum_push_type
-)
+RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
+                                        amrex::FArrayBox const * exfab,
+                                        amrex::FArrayBox const * eyfab,
+                                        amrex::FArrayBox const * ezfab,
+                                        amrex::FArrayBox const * bxfab,
+                                        amrex::FArrayBox const * byfab,
+                                        amrex::FArrayBox const * bzfab,
+                                        const amrex::IntVect ngEB, const int e_is_nodal,
+                                        const long offset,
+                                        const long np_to_push,
+                                        int lev, int gather_lev,
+                                        amrex::Real dt, ScaleFields /*scaleFields*/,
+                                        DtType a_dt_type,
+                                        DtType position_push_type,
+                                        DtType momentum_push_type)
 {
     auto& attribs = pti.GetAttribs();
     auto& uxp = attribs[PIdx::ux];
