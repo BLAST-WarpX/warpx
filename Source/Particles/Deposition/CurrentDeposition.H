@@ -2269,7 +2269,7 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
 
             // Skip particles with zero weight.
             // This should only be the case for particles that will be suborbited.
-            if (w[ip] == 0.) { return; }
+            if (wp[ip] == 0.) { return; }
 
 #if !defined(WARPX_DIM_3D)
             constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
