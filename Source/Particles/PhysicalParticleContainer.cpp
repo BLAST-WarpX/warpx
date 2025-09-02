@@ -687,7 +687,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                                 Ex.nGrowVect(),
                                                 jx, jy, jz,
                                                 offset, lev, gather_lev, dt, ScaleFields(false), skip_deposition,
-                                                num_unconverged_particles_c, unconverged_indices, saved_weights);
+                                                num_unconverged_particles, unconverged_indices, saved_weights);
                     }
                     if (num_unconverged_particles_c > 0) {
 
