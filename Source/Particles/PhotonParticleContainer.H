@@ -47,18 +47,16 @@ public:
 
     void InitData() override;
 
-    void Evolve (
-        ablastr::fields::MultiFabRegister& fields,
-        int lev,
-        const std::string& current_fp_string,
-        amrex::Real t,
-        amrex::Real dt,
-        DtType a_dt_type=DtType::Full,
-        bool skip_deposition=false,
-        DtType position_push_type=DtType::Full,
-        DtType momentum_push_type=DtType::Full,
-        ImplicitOptions const * implicit_options = nullptr
-    ) override;
+    void Evolve (ablastr::fields::MultiFabRegister& fields,
+                 int lev,
+                 const std::string& current_fp_string,
+                 amrex::Real t,
+                 amrex::Real dt,
+                 DtType a_dt_type=DtType::Full,
+                 bool skip_deposition=false,
+                 DtType position_push_type=DtType::Full,
+                 DtType momentum_push_type=DtType::Full,
+                 ImplicitOptions const * implicit_options = nullptr) override;
 
     void PushPX (
         WarpXParIter& pti,
