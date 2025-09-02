@@ -651,7 +651,7 @@ public:
         int lev,
         amrex::Real cur_time,
         DtType a_dt_type=DtType::Full,
-        bool const skip_current=false,
+        bool skip_current=false,
         DtType position_push_type=DtType::Full,
         DtType momentum_push_type=DtType::Full,
         ImplicitOptions const * implicit_options = nullptr
@@ -659,7 +659,7 @@ public:
 
     void PushParticlesandDeposit (
         amrex::Real cur_time,
-        bool const skip_current=false,
+        bool skip_current=false,
         DtType position_push_type=DtType::Full,
         DtType momentum_push_type=DtType::Full,
         ImplicitOptions const * implicit_options = nullptr

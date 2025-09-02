@@ -566,7 +566,7 @@ LaserParticleContainer::Evolve (
     Real t,
     Real dt,
     DtType /*a_dt_type*/,
-    bool const skip_deposition,
+    bool skip_deposition,
     DtType /*position_push_type*/,
     DtType /*momentum_push_type*/,
     ImplicitOptions const * implicit_options

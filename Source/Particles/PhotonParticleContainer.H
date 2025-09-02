@@ -54,7 +54,7 @@ public:
         amrex::Real t,
         amrex::Real dt,
         DtType a_dt_type=DtType::Full,
-        bool const skip_deposition=false,
+        bool skip_deposition=false,
         DtType position_push_type=DtType::Full,
         DtType momentum_push_type=DtType::Full,
         ImplicitOptions const * implicit_options = nullptr

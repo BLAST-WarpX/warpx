@@ -1259,7 +1259,7 @@ WarpX::doQEDEvents ()
 void
 WarpX::PushParticlesandDeposit (
     amrex::Real cur_time,
-    bool const skip_current,
+    bool skip_current,
     DtType position_push_type,
     DtType momentum_push_type,
     ImplicitOptions const * implicit_options
@@ -1285,7 +1285,7 @@ WarpX::PushParticlesandDeposit (
     int lev,
     amrex::Real cur_time,
     DtType a_dt_type,
-    bool const skip_current,
+    bool skip_current,
     DtType position_push_type,
     DtType momentum_push_type,
     ImplicitOptions const * implicit_options
