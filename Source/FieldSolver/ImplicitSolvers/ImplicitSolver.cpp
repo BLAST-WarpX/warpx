@@ -722,13 +722,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     }
     else {  // Conventional particle-suppressed JFNK
         options.deposit_mass_matrices = false;
-        m_WarpX->PushParticlesandDeposit(
-            a_cur_time,
-            skip_current,
-            position_push_type,
-            momentum_push_type,
-            &options
-        );
+        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, position_push_type, momentum_push_type, &options);
     }
 
     // Apply BCs to J and communicate
