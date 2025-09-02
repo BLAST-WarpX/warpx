@@ -66,18 +66,14 @@ public:
 
     void WriteHeader (std::ostream& os) const final;
 
-    void Evolve (
-        ablastr::fields::MultiFabRegister& fields,
-        int lev,
-        const std::string& current_fp_string,
-        amrex::Real t,
-        amrex::Real dt,
-        DtType a_dt_type=DtType::Full,
-        bool const skip_deposition=false,
-        DtType position_push_type=DtType::Full,
-        DtType momentum_push_type=DtType::Full,
-        ImplicitOptions const * implicit_options = nullptr
-    ) final;
+    void Evolve (ablastr::fields::MultiFabRegister& fields,
+                 int lev,
+                 const std::string& current_fp_string,
+                 amrex::Real t, amrex::Real dt, DtType a_dt_type=DtType::Full,
+                 bool const skip_deposition=false,
+                 DtType position_push_type=DtType::Full,
+                 DtType momentum_push_type=DtType::Full,
+                 ImplicitOptions const * implicit_options = nullptr) final;
 
     void PushP (int lev, amrex::Real dt,
                         const amrex::MultiFab& ,
