@@ -397,7 +397,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
 
     const int max_iterations = implicit_options->max_particle_iterations;
     const amrex::ParticleReal particle_tolerance = implicit_options->particle_tolerance;
-    const bool print_unconverged_particle_details = implicit_options->print_unconverged_particle_details;
+    [[maybe_unused]] const bool print_unconverged_particle_details = implicit_options->print_unconverged_particle_details;
 
     amrex::Gpu::Buffer<amrex::Long> unconverged_particles({0});
     amrex::Long* unconverged_particles_ptr = unconverged_particles.data();
