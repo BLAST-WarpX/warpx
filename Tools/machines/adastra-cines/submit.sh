@@ -18,12 +18,12 @@ module load PrgEnv-cray
 # Some architecture related libraries and tools
 module load develop
 module load CCE-GPU-4.0.0
-# AMD related libraries 
+# AMD related libraries
 module load rocm/6.1.2
 module load amd-mixed/6.1.2
 # note
 # cray-mpich versions 8.1.28 and 8.1.30 have known issues
-# that cause node memory increase over time which leads 
+# that cause node memory increase over time which leads
 # to slowdown and out-of-memory crashes.
 module load cray-mpich/8.1.26
 

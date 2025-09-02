@@ -222,6 +222,6 @@ Known System Issues
 
    August 2025:
    We oberved a heavy node memory increase over time when using module ``cray-mpich`` versions ``8.1.28`` and ``8.1.30``, which
-   causes simulations to slow down and eventually crash. 
+   causes simulations to slow down and eventually crash.
 
-   While no ``cray-mpich`` version ``>8.1.30`` is available on Adastra, stay with version ``8.1.26`` to avoid this issue. 
+   While no ``cray-mpich`` version ``>8.1.30`` is available on Adastra, stay with version ``8.1.26`` to avoid this issue.
