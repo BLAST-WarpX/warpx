@@ -289,18 +289,13 @@ RigidInjectedParticleContainer::PushPX (
 }
 
 void
-RigidInjectedParticleContainer::Evolve (
-    ablastr::fields::MultiFabRegister& fields,
-    int lev,
-    const std::string& current_fp_string,
-    Real t,
-    Real dt,
-    DtType a_dt_type,
-    bool skip_deposition,
-    DtType position_push_type,
-    DtType momentum_push_type,
-    ImplicitOptions const * /*implicit_options*/
-)
+RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
+                                        int lev,
+                                        const std::string& current_fp_string,
+                                        Real t, Real dt, DtType a_dt_type, bool skip_deposition,
+                                        DtType position_push_type,
+                                        DtType momentum_push_type,
+                                        ImplicitOptions const * /*implicit_options*/)
 {
 
     // Update location of injection plane in the boosted frame
