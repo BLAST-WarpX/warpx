@@ -130,8 +130,10 @@ namespace {
         bool convergence = false;
         for (int iter=0; iter < max_iterations; iter++) {
 
-            // Position advance starts from the position at the start of the step
-            // and uses the velocity at the start of the step on the first iteration.
+            // Position advance starts from the position at the start of the step.
+            // On the first iteration, the velocity is an estimate, either the value
+            // at the start of the step (with suborbits) or the value from the previous
+            // overall iteration.
             // A converged advance will have the postions advanced using the
             // time-centered velocity.
 
@@ -242,21 +244,21 @@ namespace {
  *        (which depend on each other) are consistent. Any unconverged particles
  *        are flagged for later processing.
  *
- * \param[in] pti the WarpXParIter holding the particles to push
- * \param[in] exfab, eyfab, ezfab the E fields
- * \param[in] bxfab, byfab, bzfab the B fields
- * \param[in] implicit_options specifies options for implicit push
- * \param[in] ngEB the number of guard cells in the E and B fields
- * \param[in] offset the particle index offset for the particles to be pushed
- * \param[in] np_to_push the number of particles to push
- * \param[in] lev the refinement level
- * \param[in] gather_lev the refinement level at which to do the field gather
- * \param[in] dt the time step size
- * \param[in] scaleFields allows scale factor to the fields (for rigid injection)
- * \param[in/out] num_unconverged_particles number of unconverged particles that have already been flagged
- * \param[in/out] unconverged_indices the list of indices of unconverged particles
- * \param[in/out] saved_weights the saved weights of the unconverged particles
- * \param[in] a_dt_type the push type (which part of the time step)
+ * \param[in] pti The WarpXParIter holding the particles to push
+ * \param[in] exfab, eyfab, ezfab The E fields
+ * \param[in] bxfab, byfab, bzfab The B fields
+ * \param[in] implicit_options Specifies options for implicit push
+ * \param[in] ngEB The number of guard cells in the E and B fields
+ * \param[in] offset The particle index offset for the particles to be pushed
+ * \param[in] np_to_push The number of particles to push
+ * \param[in] lev The refinement level
+ * \param[in] gather_lev The refinement level at which to do the field gather
+ * \param[in] dt The time step size
+ * \param[in] scaleFields Allows scale factor to the fields (for rigid injection)
+ * \param[in/out] num_unconverged_particles Number of unconverged particles that have already been flagged
+ * \param[in/out] unconverged_indices The list of indices of unconverged particles
+ * \param[in/out] saved_weights The saved weights of the unconverged particles
+ * \param[in] a_dt_type The push type (which part of the time step)
  */
 void
 PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
@@ -555,22 +557,22 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
  *        in one fused kernel using suborbits.
  *        These are particles that failed to converge in ImplicitPushXP.
  *
- * \param[in] pti the WarpXParIter holding the particles to push
- * \param[in] fields the MultiFab register instance
- * \param[in] exfab, eyfab, ezfab the E fields
- * \param[in] bxfab, byfab, bzfab the B fields
- * \param[in] implicit_options specifies options for implicit push
- * \param[in] ngEB the number of guard cells in the E and B fields
- * \param[in/out] jx, jy, jz the current densities to be deposited into
- * \param[in] index_offset offset in the list of unconverged particles
- * \param[in] lev the refinement level
- * \param[in] gather_lev the refinement level at which to do the field gather
- * \param[in] dt the time step size
- * \param[in] scaleFields allows scale factor to the fields (for rigid injection)
- * \param[in] skip_deposition whether to do the deposition
- * \param[in] num_unconverged_particles number of unconverged particles to push
- * \param[in] unconverged_indices the list of indices of unconverged particles
- * \param[in] saved_weights the saved weights of the unconverged particles
+ * \param[in] pti The WarpXParIter holding the particles to push
+ * \param[in] fields The MultiFab register instance
+ * \param[in] exfab, eyfab, ezfab The E fields
+ * \param[in] bxfab, byfab, bzfab The B fields
+ * \param[in] implicit_options Specifies options for implicit push
+ * \param[in] ngEB The number of guard cells in the E and B fields
+ * \param[in/out] jx, jy, jz The current densities to be deposited into
+ * \param[in] index_offset Offset in the list of unconverged particles
+ * \param[in] lev The refinement level
+ * \param[in] gather_lev The refinement level at which to do the field gather
+ * \param[in] dt The time step size
+ * \param[in] scaleFields Allows scale factor to the fields (for rigid injection)
+ * \param[in] skip_deposition Whether to do the deposition
+ * \param[in] num_unconverged_particles Number of unconverged particles to push
+ * \param[in] unconverged_indices The list of indices of unconverged particles
+ * \param[in] saved_weights The saved weights of the unconverged particles
  */
 void
 PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
