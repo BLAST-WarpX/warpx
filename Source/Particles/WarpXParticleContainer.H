@@ -234,18 +234,13 @@ public:
     /**
      * \brief Pure virtual function to advance particles (typically by one time step).
      */
-    virtual void Evolve (
-        ablastr::fields::MultiFabRegister& fields,
-        int lev,
-        const std::string& current_fp_string,
-        amrex::Real t,
-        amrex::Real dt,
-        DtType a_dt_type=DtType::Full,
-        bool skip_deposition=false,
-        DtType position_push_type=DtType::Full,
-        DtType momentum_push_type=DtType::Full,
-        ImplicitOptions const * implicit_options = nullptr
-    ) = 0;
+    virtual void Evolve (ablastr::fields::MultiFabRegister& fields,
+                         int lev,
+                         const std::string& current_fp_string,
+                         amrex::Real t, amrex::Real dt, DtType a_dt_type=DtType::Full, bool skip_deposition=false,
+                         DtType position_push_type=DtType::Full,
+                         DtType momentum_push_type=DtType::Full,
+                         ImplicitOptions const * implicit_options = nullptr) = 0;
 
     virtual void PostRestart () = 0;
 
