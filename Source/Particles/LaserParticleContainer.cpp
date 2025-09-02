@@ -559,18 +559,13 @@ LaserParticleContainer::InitData (int lev)
 }
 
 void
-LaserParticleContainer::Evolve (
-    ablastr::fields::MultiFabRegister& fields,
-    int lev,
-    const std::string& current_fp_string,
-    Real t,
-    Real dt,
-    DtType /*a_dt_type*/,
-    bool skip_deposition,
-    DtType /*position_push_type*/,
-    DtType /*momentum_push_type*/,
-    ImplicitOptions const * implicit_options
-)
+LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
+                                int lev,
+                                const std::string& current_fp_string,
+                                Real t, Real dt, DtType /*a_dt_type*/, bool skip_deposition,
+                                DtType /*position_push_type*/,
+                                DtType /*momentum_push_type*/,
+                                ImplicitOptions const * implicit_options)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
