@@ -232,9 +232,7 @@ public:
     virtual PlasmaInjector* GetPlasmaInjector (const int /*i*/) { return nullptr; }
 
     /**
-     * \brief Evolve is the central WarpXParticleContainer function that advances
-     *        particles for a time dt (typically one timestep). It is a pure virtual
-     *        function for flexibility.
+     * \brief Pure virtual function to advance particles (typically by one time step).
      */
     virtual void Evolve (
         ablastr::fields::MultiFabRegister& fields,
