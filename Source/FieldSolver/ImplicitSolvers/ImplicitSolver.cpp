@@ -709,13 +709,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
 
     if (m_use_mass_matrices && !a_from_jacobian) { // Called from non-linear stage of JFNK and using mass matrices
         options.deposit_mass_matrices = true;
-        m_WarpX->PushParticlesandDeposit(
-            a_cur_time,
-            skip_current,
-            position_push_type,
-            momentum_push_type,
-            &options
-        );
+        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, position_push_type, momentum_push_type, &options);
         if (m_use_mass_matrices_jacobian) { SaveEandJ(); }
         if (m_use_mass_matrices_pc) {
            SyncMassMatricesPCAndApplyBCs();
