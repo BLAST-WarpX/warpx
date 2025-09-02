@@ -2,7 +2,7 @@ name: Weekly update
 
 on:
   schedule:
-    - cron: "0 0 * * 1"  # every Monday at midnight
+    - cron: "0 8 * * 1"  # every Monday at midnight PST (8 AM UTC)
   workflow_dispatch:
 
 permissions:

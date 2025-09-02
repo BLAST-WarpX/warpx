@@ -2,7 +2,7 @@ name: Monthly release
 
 on:
   schedule:
-    - cron: "0 0 1 * *"  # every first day of the month at midnight
+    - cron: "0 8 2 * *"  # every second day of the month at midnight PST (8 AM UTC)
   workflow_dispatch:
 
 permissions:
