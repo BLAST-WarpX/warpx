@@ -322,18 +322,13 @@ RigidInjectedParticleContainer::Evolve (
     done_injecting_lev = ((zinject_plane_levels[lev] < plo[zindex] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c >= 0.) ||
                            (zinject_plane_levels[lev] > phi[zindex] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c <= 0.));
 
-    PhysicalParticleContainer::Evolve(
-        fields,
-        lev,
-        current_fp_string,
-        t,
-        dt,
-        a_dt_type,
-        skip_deposition,
-        position_push_type,
-        momentum_push_type,
-        nullptr
-    );
+    PhysicalParticleContainer::Evolve(fields,
+                                      lev,
+                                      current_fp_string,
+                                      t, dt, a_dt_type, skip_deposition,
+                                      position_push_type,
+                                      momentum_push_type,
+                                      nullptr);
 }
 
 void
