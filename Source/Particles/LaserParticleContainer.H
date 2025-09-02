@@ -14,6 +14,8 @@
 #include "Laser/LaserProfiles.H"
 #include "WarpXParticleContainer.H"
 
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
+
 #include <AMReX_Extension.H>
 #include <AMReX_Random.H>
 #include <AMReX_REAL.H>
@@ -74,8 +76,7 @@ public:
         bool const skip_deposition=false,
         DtType position_push_type=DtType::Full,
         DtType momentum_push_type=DtType::Full,
-        bool const deposit_mass_matrices=false,
-        PushType push_type=PushType::Explicit
+        ImplicitOptions const * implicit_options = nullptr
     ) final;
 
     void PushP (int lev, amrex::Real dt,

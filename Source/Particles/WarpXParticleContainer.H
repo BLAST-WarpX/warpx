@@ -11,6 +11,7 @@
 #define WARPX_WarpXParticleContainer_H_
 
 #include "WarpXParticleContainer_fwd.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
 #include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
@@ -245,8 +246,7 @@ public:
         bool const skip_deposition=false,
         DtType position_push_type=DtType::Full,
         DtType momentum_push_type=DtType::Full,
-        bool const deposit_mass_matrices=false,
-        PushType push_type=PushType::Explicit
+        ImplicitOptions const * implicit_options = nullptr
     ) = 0;
 
     virtual void PostRestart () = 0;

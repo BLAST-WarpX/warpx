@@ -255,8 +255,7 @@ PhotonParticleContainer::Evolve (
     bool const skip_deposition,
     DtType position_push_type,
     DtType momentum_push_type,
-    bool const /*deposit_mass_matrices*/,
-    PushType push_type
+    ImplicitOptions const * /*implicit_options*/
 )
 {
     // This does gather, push and deposit.
@@ -272,7 +271,6 @@ PhotonParticleContainer::Evolve (
         skip_deposition,
         position_push_type,
         momentum_push_type,
-        deposit_mass_matrices,
-        push_type
+        nullptr
     );
 }

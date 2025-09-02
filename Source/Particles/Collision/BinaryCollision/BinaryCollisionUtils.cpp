@@ -63,6 +63,35 @@ namespace BinaryCollisionUtils{
                 "Product species of linear Breit-Wheeler collisions must be of type electron and positron");
             return CollisionType::LinearBreitWheeler;
         }
+        else if (type == "linear_compton") {
+            amrex::Vector<std::string> species_name;
+            // Check that the first incoming species is a photon and the second is an electron/positron
+            pp_collision_name.getarr("species", species_name);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                species_name.size() == 2u,
+                "Linear Compton collisions must involve exactly two species");
+            auto& species1 = mypc->GetParticleContainerFromName(species_name[0]);
+            auto& species2 = mypc->GetParticleContainerFromName(species_name[1]);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( species1.AmIA<PhysicalSpecies::photon>(),
+                "The first species in linear Compton collisions must be a photon");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( species2.AmIA<PhysicalSpecies::electron>() || species2.AmIA<PhysicalSpecies::positron>(),
+                "The second species in linear Compton collisions must be an electron or positron");
+            // Check that first product species is photon and second is electron/positron
+            amrex::Vector<std::string> product_species_name;
+            pp_collision_name.getarr("product_species", product_species_name);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                product_species_name.size() == 2u,
+                "Linear Compton collisions must contain exactly two product species");
+            auto& product_species1 = mypc->GetParticleContainerFromName(product_species_name[0]);
+            auto& product_species2 = mypc->GetParticleContainerFromName(product_species_name[1]);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( product_species1.AmIA<PhysicalSpecies::photon>(),
+                "The first product species in linear Compton collisions must be a photon");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( product_species2.AmIA<PhysicalSpecies::electron>() || product_species2.AmIA<PhysicalSpecies::positron>(),
+                "The second product species in linear Compton collisions must be an electron or positron");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( species2.getSpeciesTypeName() == product_species2.getSpeciesTypeName(),
+                "The second incident species and the second product species in linear Compton collisions must be of the same type");
+            return CollisionType::LinearCompton;
+        }
         return CollisionType::Undefined;
     }
 

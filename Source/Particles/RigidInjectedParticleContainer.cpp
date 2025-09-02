@@ -299,8 +299,7 @@ RigidInjectedParticleContainer::Evolve (
     bool const skip_deposition,
     DtType position_push_type,
     DtType momentum_push_type,
-    bool const /*deposit_mass_matrices*/,
-    PushType push_type
+    ImplicitOptions const * /*implicit_options*/
 )
 {
 
@@ -323,7 +322,6 @@ RigidInjectedParticleContainer::Evolve (
     done_injecting_lev = ((zinject_plane_levels[lev] < plo[zindex] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c >= 0.) ||
                            (zinject_plane_levels[lev] > phi[zindex] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c <= 0.));
 
-    bool const deposit_mass_matrices = false;
     PhysicalParticleContainer::Evolve(
         fields,
         lev,
@@ -334,8 +332,7 @@ RigidInjectedParticleContainer::Evolve (
         skip_deposition,
         position_push_type,
         momentum_push_type,
-        deposit_mass_matrices,
-        push_type
+        nullptr
     );
 }
 

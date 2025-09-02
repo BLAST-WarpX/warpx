@@ -14,6 +14,7 @@
 #include "PhysicalParticleContainer.H"
 
 #include "WarpXParticleContainer_fwd.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
 #include <AMReX_Enum.H>
 #include <AMReX_REAL.H>
@@ -74,8 +75,7 @@ public:
         bool const skip_deposition=false,
         DtType position_push_type=DtType::Full,
         DtType momentum_push_type=DtType::Full,
-        bool const deposit_mass_matrices=false,
-        PushType push_type=PushType::Explicit
+        ImplicitOptions const * implicit_options = nullptr
     ) override;
 
     void PushPX (

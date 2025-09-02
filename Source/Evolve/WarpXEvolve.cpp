@@ -1262,8 +1262,7 @@ WarpX::PushParticlesandDeposit (
     bool const skip_current,
     DtType position_push_type,
     DtType momentum_push_type,
-    bool const deposit_mass_matrices,
-    PushType push_type
+    ImplicitOptions const * implicit_options
 )
 {
     // Evolve particles to p^{n+1/2} and x^{n+1}
@@ -1276,8 +1275,7 @@ WarpX::PushParticlesandDeposit (
             skip_current,
             position_push_type,
             momentum_push_type,
-            deposit_mass_matrices,
-            push_type
+            implicit_options
         );
     }
 }
@@ -1290,8 +1288,7 @@ WarpX::PushParticlesandDeposit (
     bool const skip_current,
     DtType position_push_type,
     DtType momentum_push_type,
-    bool const deposit_mass_matrices,
-    PushType push_type
+    ImplicitOptions const * implicit_options
 )
 {
     using ablastr::fields::Direction;
@@ -1322,8 +1319,7 @@ WarpX::PushParticlesandDeposit (
         skip_current,
         position_push_type,
         momentum_push_type,
-        deposit_mass_matrices,
-        push_type
+        implicit_options
     );
 
     if (! skip_current) {

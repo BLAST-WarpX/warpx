@@ -569,8 +569,7 @@ LaserParticleContainer::Evolve (
     bool const skip_deposition,
     DtType /*position_push_type*/,
     DtType /*momentum_push_type*/,
-    bool const /*deposit_mass_matrices*/,
-    PushType push_type
+    ImplicitOptions const * implicit_options
 )
 {
     using ablastr::fields::Direction;
@@ -580,6 +579,8 @@ LaserParticleContainer::Evolve (
     WARPX_PROFILE_VAR_NS("LaserParticleContainer::Evolve::ParticlePush", blp_pp);
 
     if (!m_enabled) { return; }
+
+    const PushType push_type = (implicit_options == nullptr) ? PushType::Explicit : PushType::Implicit;
 
     Real t_lab = t;
     if (WarpX::gamma_boost > 1) {

@@ -14,6 +14,7 @@
 #include "Particles/Collision/BinaryCollision/DSMC/SplitAndScatterFunc.H"
 #include "Particles/Collision/BinaryCollision/NuclearFusion/NuclearFusionFunc.H"
 #include "Particles/Collision/BinaryCollision/LinearBreitWheeler/LinearBreitWheelerCollisionFunc.H"
+#include "Particles/Collision/BinaryCollision/LinearCompton/LinearComptonCollisionFunc.H"
 #include "Particles/Collision/BinaryCollision/ParticleCreationFunc.H"
 #include "Utils/TextMsg.H"
 
@@ -72,6 +73,12 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
         else if (type == "linear_breit_wheeler") {
             allcollisions[i] =
                std::make_unique<BinaryCollision<LinearBreitWheelerCollisionFunc, ParticleCreationFunc>>(
+                    collision_names[i], mypc
+               );
+        }
+        else if (type == "linear_compton") {
+            allcollisions[i] =
+               std::make_unique<BinaryCollision<LinearComptonCollisionFunc, ParticleCreationFunc>>(
                     collision_names[i], mypc
                );
         }

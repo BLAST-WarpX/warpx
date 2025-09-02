@@ -461,8 +461,7 @@ MultiParticleContainer::Evolve (
     bool const skip_deposition,
     DtType position_push_type,
     DtType momentum_push_type,
-    bool const deposit_mass_matrices,
-    PushType push_type
+    ImplicitOptions const * implicit_options
 )
 {
     if (! skip_deposition) {
@@ -476,7 +475,7 @@ MultiParticleContainer::Evolve (
         if (fields.has(FieldType::current_buf, Direction{2}, lev)) { fields.get(FieldType::current_buf, Direction{2}, lev)->setVal(0.0); }
         if (fields.has(FieldType::rho_fp, lev)) { fields.get(FieldType::rho_fp, lev)->setVal(0.0); }
         if (fields.has(FieldType::rho_buf, lev)) { fields.get(FieldType::rho_buf, lev)->setVal(0.0); }
-        if (deposit_mass_matrices) {
+        if (implicit_options && implicit_options->deposit_mass_matrices) {
             fields.get(FieldType::MassMatrices_X, Direction{0}, lev)->setVal(0.0);
             fields.get(FieldType::MassMatrices_X, Direction{1}, lev)->setVal(0.0);
             fields.get(FieldType::MassMatrices_X, Direction{2}, lev)->setVal(0.0);
@@ -489,19 +488,7 @@ MultiParticleContainer::Evolve (
         }
     }
     for (auto& pc : allcontainers) {
-        pc->Evolve(
-            fields,
-            lev,
-            current_fp_string,
-            t,
-            dt,
-            a_dt_type,
-            skip_deposition,
-            position_push_type,
-            momentum_push_type,
-            deposit_mass_matrices,
-            push_type
-        );
+        pc->Evolve(fields, lev, current_fp_string, t, dt, a_dt_type, skip_deposition, position_push_type, momentum_push_type, implicit_options);
     }
 }
 
