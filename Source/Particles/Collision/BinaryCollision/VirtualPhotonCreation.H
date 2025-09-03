@@ -54,9 +54,6 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
 
     WARPX_PROFILE("collision::binarycollision::virtualphotons::GenerateVirtualPhotons()");
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(mypc->nSpecies() > 0,
-        "No species found in the MultiParticleContainer");
-
     // Loop through the species
     for (int i_s = 0; i_s < mypc->nSpecies(); ++i_s) {
 
