@@ -53,7 +53,11 @@ public:
 private:
     /** This is responsible for dumping to file */
     std::unique_ptr< WarpXOpenPMDPlot > m_OpenPMDPlotWriter;
-    int m_NumAggBTDBufferToFlush=5;
+
+    /** This parameter is corresponding to the input option
+        "buffer_flush_limit_btd" at the diagnostic level.
+        By default we set to flush every 5 buffers per snapshot */
+    int m_NumAggBTDBufferToFlush = 5;
 };
 
 #endif // WARPX_FLUSHFORMATOPENPMD_H_

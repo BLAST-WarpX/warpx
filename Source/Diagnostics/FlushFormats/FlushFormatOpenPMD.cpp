@@ -66,7 +66,6 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
         }
 
         pp_diag_name.query("buffer_flush_limit_btd", m_NumAggBTDBufferToFlush);
-        amrex::Print()<<" BTD: ForceFlushEvery: "<<m_NumAggBTDBufferToFlush<<" Buffers per snapshot "<<std::endl;
     }
 
     //

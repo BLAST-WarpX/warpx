@@ -152,7 +152,13 @@ public:
   /** Return OpenPMD File type ("bp5", "bp4", "h5" or "json")*/
   std::string OpenPMDFileType () { return m_OpenPMDFileType; }
 
-  void ForceFlush(bool isBTD);
+  /** Flush a few BTD buffers in a snapshot
+   * @param[in] isBTD if the current diagnostic is BTD
+   * This function is controlled by the paramter
+   * FlushFormatOpenPMD::m_NumAggBTDBufferToFlush (default to 5),
+   * it can be adjusted in the input file: <diag>.buffer_flush_limit_btd
+   */
+  void ForceFlush (bool isBTD);
 private:
   void Init (openPMD::Access access, bool isBTD);
 
@@ -182,7 +188,11 @@ private:
    * @param[in] isBTD if the current diagnostic is BTD
    *
    * if isBTD=false, apply the default flush behaviour
-   * if isBTD=true,  advice to use ADIOS Put() instead of PDW for better performance.
+   *                 in ADIOS, the action will be PerformDataWrite
+   * if isBTD=true,  in ADIOS, the action will be PerformPut
+   *                 because no action is taken for the span tasks.
+   *                 This way we can aggregate buffers before
+   *                 calling ForceFlush(isBTD) to write out.
    *
    * iteration.seriesFlush() is used instead of series.flush()
    *  because the latter flushes only if data is dirty
