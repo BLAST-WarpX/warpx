@@ -249,16 +249,11 @@ PhotonParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 {
     // This does gather, push and deposit.
     // Push and deposit have been re-written for photons
-    PhysicalParticleContainer::Evolve(
-        fields,
-        lev,
-        current_fp_string,
-        t,
-        dt,
-        a_dt_type,
-        skip_deposition,
-        position_push_type,
-        momentum_push_type,
-        nullptr
-    );
+    PhysicalParticleContainer::Evolve(fields,
+                                      lev,
+                                      current_fp_string,
+                                      t, dt, a_dt_type, skip_deposition,
+                                      position_push_type,
+                                      momentum_push_type,
+                                      nullptr);
 }
