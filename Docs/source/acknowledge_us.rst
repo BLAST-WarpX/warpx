@@ -8,13 +8,8 @@ Please acknowledge the role that WarpX played in your research.
 In presentations
 ****************
 
-For your presentations, you can find WarpX slides `here <https://drive.google.com/file/d/1Ye2YuQ9ezqpL8vCiooMF1PBVwL5pnAOE/view?usp=sharing>`__. Several flavors are available:
-
-  - full slide
-  - half-slide (portrait or landscape format)
-  - small inset.
-
-Feel free to use the one that fits into your presentation and adequately acknowledges the part that WarpX played in your research.
+For your presentations, you can find a WarpX acknowledgment slide `here <https://docs.google.com/presentation/d/1irVUyGKc-1vaQbJN7HgdBpPGQICfD5ci_maOu6noypk/edit?usp=sharing>`__.
+Feel free to use it to acknowledge WarpX in your presentation.
 
 In publications
 ***************

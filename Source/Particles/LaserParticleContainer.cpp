@@ -563,7 +563,7 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                 int lev,
                                 const std::string& current_fp_string,
                                 Real t, Real dt, DtType /*a_dt_type*/, bool skip_deposition,
-                                bool /*deposit_mass_matrices*/, PushType push_type)
+                                ImplicitOptions const * implicit_options)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -572,6 +572,8 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     WARPX_PROFILE_VAR_NS("LaserParticleContainer::Evolve::ParticlePush", blp_pp);
 
     if (!m_enabled) { return; }
+
+    const PushType push_type = (implicit_options == nullptr) ? PushType::Explicit : PushType::Implicit;
 
     Real t_lab = t;
     if (WarpX::gamma_boost > 1) {

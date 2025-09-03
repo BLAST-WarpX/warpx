@@ -47,6 +47,7 @@ jobs:
         brew install pkg-config
         set -e
         brew tap openpmd/openpmd
+        brew uninstall cmake  # https://github.com/actions/runner-images/issues/12912
         brew install openpmd-api
     - name: install pip dependencies
       run: |
@@ -69,7 +70,7 @@ jobs:
         export CCACHE_SLOPPINESS=time_macros
         ccache -z
 
-        export CXXFLAGS="-Werror -Wno-error=pass-failed"
+        export CXXFLAGS="-Werror -Wno-error=pass-failed -Wno-error=c++23-attribute-extensions"
 
         cmake -S . -B build_dp         \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
