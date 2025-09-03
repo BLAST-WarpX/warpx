@@ -1333,8 +1333,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                     ion_lev ? ion_lev[ip] : 1,
                     m, q, pusher_algo, do_crr,
                     t_chi_max,
-                    dt
-                );
+                    dt);
             }
         } else {
                 doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
@@ -1342,16 +1341,14 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                     ion_lev ? ion_lev[ip] : 1,
                     m, q, pusher_algo, do_crr,
                     t_chi_max,
-                    dt
-                );
+                    dt);
         }
 #else
         doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
             Exp, Eyp, Ezp, Bxp, Byp, Bzp,
             ion_lev ? ion_lev[ip] : 1,
             m, q, pusher_algo, do_crr,
-            dt
-        );
+            dt);
 #endif
         UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], dt);
         setPosition(ip, xp, yp, zp);
