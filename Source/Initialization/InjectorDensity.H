@@ -136,7 +136,9 @@ struct InjectorDensityFromFile
 #endif
 #if (AMREX_SPACEDIM == 1)
         return m_external_field_view(amrex::RealVect{z});
-#elif (AMREX_SPACEDIM == 2)
+#elif defined(WARPX_DIM_RZ)
+        return m_external_field_view(amrex::RealVect{std::sqrt(x*x+y*y),z});
+#elif defined(WARPX_DIM_XZ)
         return m_external_field_view(amrex::RealVect{x,z});
 #else
         return m_external_field_view(amrex::RealVect{x,y,z});
