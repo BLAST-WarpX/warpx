@@ -417,18 +417,13 @@ PhysicalParticleContainer::DefaultInitializeRuntimeAttributes (
 }
 
 void
-PhysicalParticleContainer::Evolve (
-    ablastr::fields::MultiFabRegister& fields,
-    int lev,
-    const std::string& current_fp_string,
-    Real /*t*/,
-    Real dt,
-    DtType a_dt_type,
-    bool skip_deposition,
-    DtType position_push_type,
-    DtType momentum_push_type,
-    ImplicitOptions const * implicit_options
-)
+PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
+                                   int lev,
+                                   const std::string& current_fp_string,
+                                   Real /*t*/, Real dt, DtType a_dt_type, bool skip_deposition,
+                                   DtType position_push_type,
+                                   DtType momentum_push_type,
+                                   ImplicitOptions const * implicit_options)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -517,10 +512,10 @@ PhysicalParticleContainer::Evolve (
                 // update pointer exfab so that it points to filtered_Ex,
                 // repeat for all components of E and B
                 applyNCIFilter(lev, pti.tilebox(), exeli, eyeli, ezeli, bxeli, byeli, bzeli,
-                    filtered_Ex, filtered_Ey, filtered_Ez,
-                    filtered_Bx, filtered_By, filtered_Bz,
-                    Ex[pti], Ey[pti], Ez[pti], Bx[pti], By[pti], Bz[pti],
-                    exfab, eyfab, ezfab, bxfab, byfab, bzfab);
+                               filtered_Ex, filtered_Ey, filtered_Ez,
+                               filtered_Bx, filtered_By, filtered_Bz,
+                               Ex[pti], Ey[pti], Ez[pti], Bx[pti], By[pti], Bz[pti],
+                               exfab, eyfab, ezfab, bxfab, byfab, bzfab);
             }
 
             // Determine which particles deposit/gather in the buffer, and
@@ -1159,26 +1154,21 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
  *
  */
 void
-PhysicalParticleContainer::PushPX (
-    WarpXParIter& pti,
-    amrex::FArrayBox const * exfab,
-    amrex::FArrayBox const * eyfab,
-    amrex::FArrayBox const * ezfab,
-    amrex::FArrayBox const * bxfab,
-    amrex::FArrayBox const * byfab,
-    amrex::FArrayBox const * bzfab,
-    const amrex::IntVect ngEB,
-    const int /*e_is_nodal*/,
-    const long offset,
-    const long np_to_push,
-    int lev,
-    int gather_lev,
-    amrex::Real dt,
-    ScaleFields scaleFields,
-    DtType a_dt_type,
-    DtType position_push_type,
-    DtType momentum_push_type
-)
+PhysicalParticleContainer::PushPX (WarpXParIter& pti,
+                                   amrex::FArrayBox const * exfab,
+                                   amrex::FArrayBox const * eyfab,
+                                   amrex::FArrayBox const * ezfab,
+                                   amrex::FArrayBox const * bxfab,
+                                   amrex::FArrayBox const * byfab,
+                                   amrex::FArrayBox const * bzfab,
+                                   const amrex::IntVect ngEB, const int /*e_is_nodal*/,
+                                   const long offset,
+                                   const long np_to_push,
+                                   int lev, int gather_lev,
+                                   amrex::Real dt, ScaleFields scaleFields,
+                                   DtType a_dt_type,
+                                   DtType position_push_type,
+                                   DtType momentum_push_type)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE((gather_lev==(lev-1)) ||
                                      (gather_lev==(lev  )),
@@ -1367,26 +1357,14 @@ PhysicalParticleContainer::PushPX (
             }
 
             if (momentum_push_type != DtType::None) {
-                doParticleMomentumPush<0>(
-                    ux[ip],
-                    uy[ip],
-                    uz[ip],
-                    Exp,
-                    Eyp,
-                    Ezp,
-                    Bxp,
-                    Byp,
-                    Bzp,
-                    ion_lev ? ion_lev[ip] : 1,
-                    m,
-                    q,
-                    pusher_algo,
-                    do_crr,
+                doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
+                                          Exp, Eyp, Ezp, Bxp, Byp, Bzp,
+                                          ion_lev ? ion_lev[ip] : 1,
+                                          m, q, pusher_algo, do_crr,
 #ifdef WARPX_QED
-                    t_chi_max,
+                                          t_chi_max,
 #endif
-                    dt
-                );
+                                          dt);
             }
 
             amrex::Real position_dt = dt;
