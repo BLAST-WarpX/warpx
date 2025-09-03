@@ -115,26 +115,21 @@ public:
     /**
      * \brief Gather fields and push particles in one fused kernel.
      */
-    virtual void PushPX (
-        WarpXParIter& pti,
-        amrex::FArrayBox const * exfab,
-        amrex::FArrayBox const * eyfab,
-        amrex::FArrayBox const * ezfab,
-        amrex::FArrayBox const * bxfab,
-        amrex::FArrayBox const * byfab,
-        amrex::FArrayBox const * bzfab,
-        amrex::IntVect ngEB,
-        int /*e_is_nodal*/,
-        long offset,
-        long np_to_push,
-        int lev,
-        int gather_lev,
-        amrex::Real dt,
-        ScaleFields scaleFields,
-        DtType a_dt_type=DtType::Full,
-        DtType position_push_type=DtType::Full,
-        DtType momentum_push_type=DtType::Full
-    );
+    virtual void PushPX (WarpXParIter& pti,
+                         amrex::FArrayBox const * exfab,
+                         amrex::FArrayBox const * eyfab,
+                         amrex::FArrayBox const * ezfab,
+                         amrex::FArrayBox const * bxfab,
+                         amrex::FArrayBox const * byfab,
+                         amrex::FArrayBox const * bzfab,
+                         amrex::IntVect ngEB, int /*e_is_nodal*/,
+                         long offset,
+                         long np_to_push,
+                         int lev, int gather_lev,
+                         amrex::Real dt, ScaleFields scaleFields,
+                         DtType a_dt_type=DtType::Full,
+                         DtType position_push_type=DtType::Full,
+                         DtType momentum_push_type=DtType::Full);
 
     void ImplicitPushXP (WarpXParIter& pti,
                          amrex::FArrayBox const * exfab,
