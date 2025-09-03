@@ -1393,15 +1393,7 @@ PhysicalParticleContainer::PushPX (
             if (position_push_type == DtType::FirstHalf || position_push_type == DtType::SecondHalf) {
                 position_dt *= 0.5_rt;
             }
-            UpdatePosition(
-                xp,
-                yp,
-                zp,
-                ux[ip],
-                uy[ip],
-                uz[ip],
-                position_dt
-            );
+            UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], position_dt);
             setPosition(ip, xp, yp, zp);
         }
 #ifdef WARPX_QED
@@ -1413,39 +1405,19 @@ PhysicalParticleContainer::PushPX (
                 }
 
                 if (momentum_push_type != DtType::None) {
-                    doParticleMomentumPush<1>(
-                        ux[ip],
-                        uy[ip],
-                        uz[ip],
-                        Exp,
-                        Eyp,
-                        Ezp,
-                        Bxp,
-                        Byp,
-                        Bzp,
-                        ion_lev ? ion_lev[ip] : 1,
-                        m,
-                        q,
-                        pusher_algo,
-                        do_crr,
-                        t_chi_max,
-                        dt
-                    );
+                    doParticleMomentumPush<1>(ux[ip], uy[ip], uz[ip],
+                                              Exp, Eyp, Ezp, Bxp, Byp, Bzp,
+                                              ion_lev ? ion_lev[ip] : 1,
+                                              m, q, pusher_algo, do_crr,
+                                              t_chi_max,
+                                              dt);
                 }
 
                 amrex::Real position_dt = dt;
                 if (position_push_type == DtType::FirstHalf || position_push_type == DtType::SecondHalf) {
                     position_dt *= 0.5_rt;
                 }
-                UpdatePosition(
-                    xp,
-                    yp,
-                    zp,
-                    ux[ip],
-                    uy[ip],
-                    uz[ip],
-                    position_dt
-                );
+                UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], position_dt);
                 setPosition(ip, xp, yp, zp);
             }
         }
