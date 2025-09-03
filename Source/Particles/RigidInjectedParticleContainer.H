@@ -65,39 +65,32 @@ public:
 
     virtual void RemapParticles();
 
-    void Evolve (
-        ablastr::fields::MultiFabRegister& fields,
-        int lev,
-        const std::string& current_fp_string,
-        amrex::Real t,
-        amrex::Real dt,
-        DtType a_dt_type=DtType::Full,
-        bool skip_deposition=false,
-        DtType position_push_type=DtType::Full,
-        DtType momentum_push_type=DtType::Full,
-        ImplicitOptions const * implicit_options = nullptr
-    ) override;
+    void Evolve (ablastr::fields::MultiFabRegister& fields,
+                 int lev,
+                 const std::string& current_fp_string,
+                 amrex::Real t,
+                 amrex::Real dt,
+                 DtType a_dt_type=DtType::Full,
+                 bool skip_deposition=false,
+                 DtType position_push_type=DtType::Full,
+                 DtType momentum_push_type=DtType::Full,
+                 ImplicitOptions const * implicit_options = nullptr) override;
 
-    void PushPX (
-        WarpXParIter& pti,
-        amrex::FArrayBox const * exfab,
-        amrex::FArrayBox const * eyfab,
-        amrex::FArrayBox const * ezfab,
-        amrex::FArrayBox const * bxfab,
-        amrex::FArrayBox const * byfab,
-        amrex::FArrayBox const * bzfab,
-        amrex::IntVect ngEB,
-        int /*e_is_nodal*/,
-        long offset,
-        long np_to_push,
-        int lev,
-        int gather_lev,
-        amrex::Real dt,
-        ScaleFields scaleFields,
-        DtType a_dt_type=DtType::Full,
-        DtType position_push_type=DtType::Full,
-        DtType momentum_push_type=DtType::Full
-    ) override;
+    void PushPX (WarpXParIter& pti,
+                 amrex::FArrayBox const * exfab,
+                 amrex::FArrayBox const * eyfab,
+                 amrex::FArrayBox const * ezfab,
+                 amrex::FArrayBox const * bxfab,
+                 amrex::FArrayBox const * byfab,
+                 amrex::FArrayBox const * bzfab,
+                 amrex::IntVect ngEB, int /*e_is_nodal*/,
+                 long offset,
+                 long np_to_push,
+                 int lev, int gather_lev,
+                 amrex::Real dt, ScaleFields scaleFields,
+                 DtType a_dt_type=DtType::Full,
+                 DtType position_push_type=DtType::Full,
+                 DtType momentum_push_type=DtType::Full) override;
 
     void PushP (int lev, amrex::Real dt,
                         const amrex::MultiFab& Ex,
