@@ -156,7 +156,7 @@ public:
    * @param[in] isBTD if the current diagnostic is BTD
    * This function is controlled by the paramter
    * FlushFormatOpenPMD::m_NumAggBTDBufferToFlush (default to 5),
-   * it can be adjusted in the input file: <diag>.buffer_flush_limit_btd
+   * it can be adjusted in the input file: diag_name.buffer_flush_limit_btd
    */
   void ForceFlush (bool isBTD);
 private:
