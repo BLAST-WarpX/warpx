@@ -672,7 +672,7 @@ for (const auto & particle_diag : particle_diags) {
     }
 }
 
-Void
+void
 WarpXOpenPMDPlot::ForceFlush(bool isBTD)
 {
     if (!isBTD)
