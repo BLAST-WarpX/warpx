@@ -1535,6 +1535,23 @@ Particle initialization
     in each dimension with a matched shape function and filtering used for current deposition.
     This is required when using the electron energy solver with electron-ion temperature relaxation.
 
+* ``<species>.do_qed_virtual_photons`` (`boolean`) optional (default `false`)
+    Create a population of virtual photons associated to ``<species>``.
+    It only works if ``<species>`` is an electron or a positron species.
+    The virtual photon species has to be created as a regular photon species in the input file.
+    Virtual photons are created from scratch at each timestep in the same position of the parent particle.
+    The energy of the virtual photons is sampled from their spectrum (see :cite:t:`LandauVol4` section 99 for more details).
+    The momentum of the virtual photons is parallel to that of the parent particle.
+    This feature also requires the following input parameters:
+      * ``<species>.qed_virtual_photon_species_name`` (`string`) name of the virtual photon species associated to the current lepton species.
+      * ``<virtual_photon_species>.qed_virtual_photon_min_energy`` (`float`, in Joules) minimum energy of the virtual photons
+      * ``<virtual_photon_species>.sampling_factor`` (`int`), sampling factor for the virtual photons.
+        A sampling factor of ``f`` means that the number of virtual photons is multiplied by ``f``, while their weights are divided by ``f``.
+    The virtual photons can undergo collisions via the linear Breit-Wheeler or linear Compton processes.
+    This is useful to model incoherent beam-beam effects in colliders (e.g. pair generation, radiative Bhabha scattering).
+    This QED feature is separated from the strong-field QED modules (quantum synchrotron and non-linear Breit-Wheeler).
+    It requires to compile with QED=TRUE.
+
 .. _running-cpp-parameters-fluids:
 
 Cold Relativistic Fluid initialization
