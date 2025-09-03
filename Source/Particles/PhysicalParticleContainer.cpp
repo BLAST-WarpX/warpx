@@ -1330,16 +1330,16 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
         }
 
 #ifdef WARPX_QED
-        if constexpr (qed_control == has_qed) {
-            if (do_sync) {
+        if (!do_sync) {
+            doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
+                                      Exp, Eyp, Ezp, Bxp, Byp, Bzp,
+                                      ion_lev ? ion_lev[ip] : 1,
+                                      m, q, pusher_algo, do_crr,
+                                      t_chi_max,
+                                      dt);
+        } else {
+            if constexpr (qed_control == has_qed) {
                 doParticleMomentumPush<1>(ux[ip], uy[ip], uz[ip],
-                                          Exp, Eyp, Ezp, Bxp, Byp, Bzp,
-                                          ion_lev ? ion_lev[ip] : 1,
-                                          m, q, pusher_algo, do_crr,
-                                          t_chi_max,
-                                          dt);
-            } else {
-                doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
                                           Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                           ion_lev ? ion_lev[ip] : 1,
                                           m, q, pusher_algo, do_crr,
