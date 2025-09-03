@@ -153,10 +153,12 @@ public:
   std::string OpenPMDFileType () { return m_OpenPMDFileType; }
 
   /** Flush a few BTD buffers in a snapshot
-   * @param[in] isBTD if the current diagnostic is BTD
-   * This function is controlled by the paramter
+   *
+   * This function is controlled by the parameter
    * FlushFormatOpenPMD::m_NumAggBTDBufferToFlush (default to 5),
    * it can be adjusted in the input file: diag_name.buffer_flush_limit_btd
+   *
+   * @param[in] isBTD if the current diagnostic is BTD
    */
   void ForceFlush (bool isBTD);
 private:
