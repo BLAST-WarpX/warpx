@@ -88,5 +88,5 @@ if [ ! -e /opt/rocm ] && [ -d /opt/rocm-${VERSION} ]; then
 fi
 
 # Ensure the HSA runtime library is found
-export LIBRARY_PATH=/opt/rocm/lib:$LIBRARY_PATH
-export LD_LIBRARY_PATH=/opt/rocm/lib:$LD_LIBRARY_PATH
+export LIBRARY_PATH=/opt/rocm/lib:${LIBRARY_PATH:-}
+export LD_LIBRARY_PATH=/opt/rocm/lib:${LD_LIBRARY_PATH:-}
