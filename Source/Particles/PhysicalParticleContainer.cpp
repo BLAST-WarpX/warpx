@@ -547,6 +547,12 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
                 int e_is_nodal = Ex.is_nodal() and Ey.is_nodal() and Ez.is_nodal();
 
+                // Temporary data used in the implicit advance
+                amrex::Gpu::DeviceVector<long> unconverged_indices;
+                amrex::Gpu::DeviceVector<amrex::ParticleReal> saved_weights;
+                long num_unconverged_particles = 0;
+                long num_unconverged_particles_c = 0;
+
                 //
                 // Gather and push for particles not in the buffer
                 //
@@ -559,11 +565,14 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                            Ex.nGrowVect(), e_is_nodal,
                            0, np_to_push, lev, gather_lev, dt, ScaleFields(false), a_dt_type);
                 } else if (push_type == PushType::Implicit) {
+                    long const offset = 0;
                     ImplicitPushXP(pti, exfab, eyfab, ezfab,
                                    bxfab, byfab, bzfab,
                                    implicit_options,
                                    Ex.nGrowVect(),
-                                   0, np_to_push, lev, gather_lev, dt, ScaleFields(false), a_dt_type);
+                                   offset, np_to_push, lev, gather_lev, dt, ScaleFields(false),
+                                   num_unconverged_particles, unconverged_indices, saved_weights,
+                                   a_dt_type);
                 }
 
                 if (np_gather < np)
@@ -614,7 +623,9 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                        implicit_options,
                                        cEx.nGrowVect(),
                                        nfine_gather, np-nfine_gather,
-                                       lev, lev-1, dt, ScaleFields(false), a_dt_type);
+                                       lev, lev-1, dt, ScaleFields(false),
+                                       num_unconverged_particles_c, unconverged_indices, saved_weights,
+                                       a_dt_type);
                     }
                 }
 
@@ -662,7 +673,54 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                        np_to_deposit, np-np_to_deposit, thread_num,
                                        lev, lev-1, dt, relative_time, push_type);
                     }
-                } // end of "if electrostatic_solver_id == ElectrostaticSolverAlgo::None"
+                } // end of "if skip_deposition"
+
+                if (push_type == PushType::Implicit) {
+                    if (num_unconverged_particles > 0) {
+                        amrex::MultiFab * jx = fields.get(current_fp_string, Direction{0}, lev);
+                        amrex::MultiFab * jy = fields.get(current_fp_string, Direction{1}, lev);
+                        amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
+                        long const offset = 0;
+                        ImplicitPushXPSubOrbits(pti, fields, exfab, eyfab, ezfab,
+                                                bxfab, byfab, bzfab,
+                                                implicit_options,
+                                                Ex.nGrowVect(),
+                                                jx, jy, jz,
+                                                offset, lev, gather_lev, dt, ScaleFields(false), skip_deposition,
+                                                num_unconverged_particles, unconverged_indices, saved_weights);
+                    }
+                    if (num_unconverged_particles_c > 0) {
+
+                        amrex::MultiFab & cEx = *fields.get(FieldType::Efield_cax, Direction{0}, lev);
+                        amrex::MultiFab & cEy = *fields.get(FieldType::Efield_cax, Direction{1}, lev);
+                        amrex::MultiFab & cEz = *fields.get(FieldType::Efield_cax, Direction{2}, lev);
+                        amrex::MultiFab & cBx = *fields.get(FieldType::Bfield_cax, Direction{0}, lev);
+                        amrex::MultiFab & cBy = *fields.get(FieldType::Bfield_cax, Direction{1}, lev);
+                        amrex::MultiFab & cBz = *fields.get(FieldType::Bfield_cax, Direction{2}, lev);
+
+                        // Data on the grid
+                        FArrayBox const* cexfab = &cEx[pti];
+                        FArrayBox const* ceyfab = &cEy[pti];
+                        FArrayBox const* cezfab = &cEz[pti];
+                        FArrayBox const* cbxfab = &cBx[pti];
+                        FArrayBox const* cbyfab = &cBy[pti];
+                        FArrayBox const* cbzfab = &cBz[pti];
+
+                        amrex::MultiFab * cjx = fields.get(FieldType::current_buf, Direction{0}, lev);
+                        amrex::MultiFab * cjy = fields.get(FieldType::current_buf, Direction{1}, lev);
+                        amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
+
+                        long const offset = num_unconverged_particles;
+                        ImplicitPushXPSubOrbits(pti, fields, cexfab, ceyfab, cezfab,
+                                                cbxfab, cbyfab, cbzfab,
+                                                implicit_options,
+                                                cEx.nGrowVect(),
+                                                cjx, cjy, cjz,
+                                                offset, lev, lev-1, dt, ScaleFields(false), skip_deposition,
+                                                num_unconverged_particles_c, unconverged_indices, saved_weights);
+                    }
+                }
+
             } // end of "if do_not_push"
 
             if (has_rho && ! skip_deposition && ! do_not_deposit) {

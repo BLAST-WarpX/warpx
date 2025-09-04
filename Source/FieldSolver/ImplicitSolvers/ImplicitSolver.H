@@ -54,6 +54,8 @@ public:
 
     void CreateParticleAttributes () const;
 
+    bool DoParticleSuborbits () { return m_particle_suborbits; }
+
     /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
      */
@@ -147,6 +149,18 @@ protected:
      *  update of the particle positions and velocities for given E and B on the grid
      */
     int m_max_particle_iterations = 21;
+
+    /**
+     * \brief whether to use suborbits for particles that fail to converge in
+     * m_max_particle_iterations iterations
+     */
+    bool m_particle_suborbits = false;
+
+    /**
+     * \brief whether the details of unconverged particles are printed out during
+     * the particle evolve loops
+     */
+    bool m_print_unconverged_particle_details = false;
 
     /**
      * \brief Whether to use mass matrices for the implicit solver

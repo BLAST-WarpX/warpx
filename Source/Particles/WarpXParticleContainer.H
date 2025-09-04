@@ -591,6 +591,13 @@ public:
 
     void setDoNotPush (bool flag) { do_not_push = flag; }
 
+    bool HasiAttrib (const std::string& name)
+    {
+        std::vector<std::string> const & int_names = GetIntSoANames();
+        auto const pos = std::find(int_names.begin(), int_names.end(), name);
+        return (pos != int_names.end());
+    }
+
 protected:
     int species_id;
 
