@@ -106,7 +106,7 @@ public:
     // This function should return zero if light waves are not treated implicitly
     [[nodiscard]] virtual amrex::Real  GetThetaForPC () const = 0;
 
-    void ComputeJfromMassMatrices ();
+    void ComputeJfromMassMatrices ( bool  a_J_from_MM_only );
 
 protected:
 

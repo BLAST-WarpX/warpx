@@ -10,6 +10,7 @@ struct ImplicitOptions {
     bool print_unconverged_particle_details = false;
     bool deposit_mass_matrices = false;
     bool linear_stage_of_jfnk = false;
+    bool evolve_suborbit_particles_only = false;
 };
 
 #endif

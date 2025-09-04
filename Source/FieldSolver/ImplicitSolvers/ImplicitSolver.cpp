@@ -105,22 +105,23 @@ void ImplicitSolver::SaveEandJ ()
 
     using warpx::fields::FieldType;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        ablastr::fields::VectorField E = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
+        const ablastr::fields::VectorField E = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
         ablastr::fields::VectorField E0 = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp_save, lev);
         amrex::MultiFab::Copy(*E0[0], *E[0], 0, 0, E[0]->nComp(), E[0]->nGrowVect());
         amrex::MultiFab::Copy(*E0[1], *E[1], 0, 0, E[1]->nComp(), E[1]->nGrowVect());
         amrex::MultiFab::Copy(*E0[2], *E[2], 0, 0, E[2]->nComp(), E[2]->nGrowVect());
 
+        // Add J0 (J from particles included in MM) to J (which can already include J from suborbit particles)
         ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
-        ablastr::fields::VectorField J0 = m_WarpX->m_fields.get_alldirs(FieldType::current_fp_save, lev);
-        amrex::MultiFab::Copy(*J0[0], *J[0], 0, 0, J[0]->nComp(), J[0]->nGrowVect());
-        amrex::MultiFab::Copy(*J0[1], *J[1], 0, 0, J[1]->nComp(), J[1]->nGrowVect());
-        amrex::MultiFab::Copy(*J0[2], *J[2], 0, 0, J[2]->nComp(), J[2]->nGrowVect());
+        const ablastr::fields::VectorField J0 = m_WarpX->m_fields.get_alldirs(FieldType::current_fp_save, lev);
+        amrex::MultiFab::Add(*J[0], *J0[0], 0, 0, J0[0]->nComp(), J0[0]->nGrowVect());
+        amrex::MultiFab::Add(*J[1], *J0[1], 0, 0, J0[1]->nComp(), J0[1]->nGrowVect());
+        amrex::MultiFab::Add(*J[2], *J0[2], 0, 0, J0[2]->nComp(), J0[2]->nGrowVect());
     }
 
 }
 
-void ImplicitSolver::ComputeJfromMassMatrices ()
+void ImplicitSolver::ComputeJfromMassMatrices ( bool  a_J_from_MM_only )
 {
     BL_PROFILE("ImplicitSolver::ComputeJfromMassMatrices()");
     using namespace amrex::literals;
@@ -142,6 +143,13 @@ void ImplicitSolver::ComputeJfromMassMatrices ()
         const amrex::IntVect Jx_nodal = J[0]->ixType().toIntVect();
         const amrex::IntVect Jy_nodal = J[1]->ixType().toIntVect();
         const amrex::IntVect Jz_nodal = J[2]->ixType().toIntVect();
+
+        if (a_J_from_MM_only) {
+            // Initialize comps of J to zero before adding J from MM
+            J[0]->setVal(0.0);
+            J[1]->setVal(0.0);
+            J[2]->setVal(0.0);
+        }
 
         // Compute the component offset in each direction (careful with staggering)
         amrex::IntVect offset_xx, offset_xy, offset_xz;
@@ -283,7 +291,7 @@ void ImplicitSolver::ComputeJfromMassMatrices ()
                     }
                 }
 
-                Jx(i,j,k,n) = Jx0(i,j,k,n) + SxxdEx + SxydEy + SxzdEz;
+                Jx(i,j,k,n) += Jx0(i,j,k,n) + SxxdEx + SxydEy + SxzdEz;
             });
             amrex::ParallelFor(
             Jby, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
@@ -346,7 +354,7 @@ void ImplicitSolver::ComputeJfromMassMatrices ()
                     }
                 }
 
-                Jy(i,j,k,n) = Jy0(i,j,k,n) + SyxdEx + SyydEy + SyzdEz;
+                Jy(i,j,k,n) += Jy0(i,j,k,n) + SyxdEx + SyydEy + SyzdEz;
             });
             amrex::ParallelFor(
             Jbz, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
@@ -409,7 +417,7 @@ void ImplicitSolver::ComputeJfromMassMatrices ()
                     }
                 }
 
-                Jz(i,j,k,n) = Jz0(i,j,k,n) + SzxdEx + SzydEy + SzzdEz;
+                Jz(i,j,k,n) += Jz0(i,j,k,n) + SzxdEx + SzydEy + SzzdEz;
             });
         }
 
@@ -712,6 +720,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     // Set the implict solver options for particles and setting the current density
     ImplicitOptions options;
     options.linear_stage_of_jfnk = a_from_jacobian;
+    options.evolve_suborbit_particles_only = false;
 
     if (a_nl_iter == 0 && !a_from_jacobian &&
         m_use_mass_matrices_jacobian && m_skip_particle_picard_init) {
@@ -735,7 +744,11 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         }
     }
     else if (m_use_mass_matrices_jacobian) { // Called from linear stage of JFNK and using mass matrices
-        ComputeJfromMassMatrices();
+        options.deposit_mass_matrices = false;
+        if (m_particle_suborbits) { options.evolve_suborbit_particles_only = true; }
+        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, &options);
+        const bool J_from_MM_only = !options.evolve_suborbit_particles_only;
+        ComputeJfromMassMatrices( J_from_MM_only );
     }
     else {  // Conventional particle-suppressed JFNK
         options.deposit_mass_matrices = false;

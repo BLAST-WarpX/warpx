@@ -506,6 +506,9 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         if (fields.has(FieldType::rho_fp, lev)) { fields.get(FieldType::rho_fp, lev)->setVal(0.0); }
         if (fields.has(FieldType::rho_buf, lev)) { fields.get(FieldType::rho_buf, lev)->setVal(0.0); }
         if (implicit_options && implicit_options->deposit_mass_matrices) {
+            fields.get(FieldType::current_fp_save, Direction{0}, lev)->setVal(0.0);
+            fields.get(FieldType::current_fp_save, Direction{1}, lev)->setVal(0.0);
+            fields.get(FieldType::current_fp_save, Direction{2}, lev)->setVal(0.0);
             fields.get(FieldType::MassMatrices_X, Direction{0}, lev)->setVal(0.0);
             fields.get(FieldType::MassMatrices_X, Direction{1}, lev)->setVal(0.0);
             fields.get(FieldType::MassMatrices_X, Direction{2}, lev)->setVal(0.0);

@@ -84,7 +84,7 @@ namespace {
         amrex::ParticleReal & Bxp,
         amrex::ParticleReal & Byp,
         amrex::ParticleReal & Bzp,
-        int const & do_gather,
+        int const & t_do_not_gather,
         amrex::Array4<const amrex::Real> const & ex_arr,
         amrex::Array4<const amrex::Real> const & ey_arr,
         amrex::Array4<const amrex::Real> const & ez_arr,
@@ -104,6 +104,7 @@ namespace {
         int const & depos_order,
         CurrentDepositionAlgo const & depos_type,
         GetExternalEBField const & getExternalEB,
+        ScaleFields const & scaleFields,
         int const * const ion_lev,
         amrex::ParticleReal const & m,
         amrex::ParticleReal const & q,
@@ -117,38 +118,39 @@ namespace {
 #endif
     )
     {
+        amrex::ParticleReal dxp_save;
+        amrex::ParticleReal dyp_save;
+        amrex::ParticleReal dzp_save;
 
         auto idxg2 = static_cast<amrex::ParticleReal>(dinv.x*dinv.x);
         auto idyg2 = static_cast<amrex::ParticleReal>(dinv.y*dinv.y);
         auto idzg2 = static_cast<amrex::ParticleReal>(dinv.z*dinv.z);
 
-        // Picard fixed-point iteration method for self-consistent update of position and velocity
-        //     Compute initial value of dxp (xp_np1 = xp_n + dxp)
-        //     Picard iterations {
-        //         velocity push
-        //         position push
-        //         check step norm of dxp for convergence
-        //     }
-        // The initial velocity used to compute the intial value of dxp is either the time-centered
-        // velocity from the end of the previous nonlinear iteration or the velocity at the start of
-        // the step if being called from the suborbit routine.
-        //
-        // Note: The charge-conserving deposits assume the change in position is consistent with
-        // the velocity: (xp^{n+1}-xp^n)/dt = vp^{n+1/2}. This requires finishing the iterations
-        // with the position updated, even in situations where convergence is not obtained.
-
-        // Perform an initial position push to set the initial guess for dxp
-        amrex::ParticleReal dxp = 0.0_prt;
-        amrex::ParticleReal dyp = 0.0_prt;
-        amrex::ParticleReal dzp = 0.0_prt;
-        UpdatePositionImplicit(dxp, dyp, dzp, uxp_n, uyp_n, uzp_n, ux[ip], uy[ip], uz[ip], 0.5_rt*dt);
-        xp = xp_n + dxp;
-        yp = yp_n + dyp;
-        zp = zp_n + dzp;
-        setPosition(ip, xp, yp, zp);
-
         bool convergence = false;
         for (int iter=0; iter < max_iterations; iter++) {
+
+            // Position advance starts from the position at the start of the step.
+            // On the first iteration, the velocity is an estimate, either the value
+            // at the start of the step (with suborbits) or the value from the previous
+            // overall iteration.
+            // A converged advance will have the postions advanced using the
+            // time-centered velocity.
+
+            amrex::ParticleReal dxp = 0.0_prt;
+            amrex::ParticleReal dyp = 0.0_prt;
+            amrex::ParticleReal dzp = 0.0_prt;
+            UpdatePositionImplicit(dxp, dyp, dzp, uxp_n, uyp_n, uzp_n, ux[ip], uy[ip], uz[ip], 0.5_rt*dt);
+            xp = xp_n + dxp;
+            yp = yp_n + dyp;
+            zp = zp_n + dzp;
+            setPosition(ip, xp, yp, zp);
+
+            PositionNorm(dxp, dyp, dzp, dxp_save, dyp_save, dzp_save,
+                         idxg2, idyg2, idzg2, step_norm, iter);
+            if (step_norm < particle_tolerance) {
+                convergence = true;
+                break;
+            }
 
             amrex::ParticleReal Exp = Ex_external_particle;
             amrex::ParticleReal Eyp = Ey_external_particle;
@@ -157,7 +159,7 @@ namespace {
             Byp = By_external_particle;
             Bzp = Bz_external_particle;
 
-            if (do_gather) {
+            if (!t_do_not_gather) {
                 // first gather E and B to the particle positions
                 doGatherShapeNImplicit(xp_n, yp_n, zp_n, xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                        ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
@@ -172,20 +174,28 @@ namespace {
                 getExternalEB(ip, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
             }
 
+            scaleFields(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
+
             // The momentum push starts with the velocity at the start of the step
             ux[ip] = uxp_n;
             uy[ip] = uyp_n;
             uz[ip] = uzp_n;
 
 #ifdef WARPX_QED
-            if (!do_sync) {
+            if (!do_sync)
+#endif
+            {
                 doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
                                           Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                           ion_lev ? ion_lev[ip] : 1,
                                           m, q, pusher_algo, do_crr,
+#ifdef WARPX_QED
                                           t_chi_max,
+#endif
                                           dt);
-            } else {
+            }
+#ifdef WARPX_QED
+            else {
                 if constexpr (qed_control == has_qed) {
                     doParticleMomentumPush<1>(ux[ip], uy[ip], uz[ip],
                                               Exp, Eyp, Ezp, Bxp, Byp, Bzp,
@@ -195,12 +205,6 @@ namespace {
                                               dt);
                 }
             }
-#else
-            doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
-                                      Exp, Eyp, Ezp, Bxp, Byp, Bzp,
-                                      ion_lev ? ion_lev[ip] : 1,
-                                      m, q, pusher_algo, do_crr,
-                                      dt);
 #endif
 
 #ifdef WARPX_QED
@@ -217,32 +221,10 @@ namespace {
             amrex::ignore_unused(qed_control);
 #endif
 
-            // Take average to get the time-centered value
+            // Take average to get the time centered value
             ux[ip] = 0.5_prt*(ux[ip] + uxp_n);
             uy[ip] = 0.5_prt*(uy[ip] + uyp_n);
             uz[ip] = 0.5_prt*(uz[ip] + uzp_n);
-
-            // Save position change from previous position push for step norm calculation
-            const amrex::ParticleReal dxp_save = dxp;
-            const amrex::ParticleReal dyp_save = dyp;
-            const amrex::ParticleReal dzp_save = dzp;
-
-            // Update the particle position using the time-centered velocity
-            dxp = 0.0_prt;
-            dyp = 0.0_prt;
-            dzp = 0.0_prt;
-            UpdatePositionImplicit(dxp, dyp, dzp, uxp_n, uyp_n, uzp_n, ux[ip], uy[ip], uz[ip], 0.5_rt*dt);
-            xp = xp_n + dxp;
-            yp = yp_n + dyp;
-            zp = zp_n + dzp;
-            setPosition(ip, xp, yp, zp);
-
-            // Check for convergence based on the step norm of the position change
-            PositionNorm(dxp, dyp, dzp, dxp_save, dyp_save, dzp_save, idxg2, idyg2, idzg2, step_norm);
-            if (step_norm < particle_tolerance) {
-                convergence = true;
-                break;
-            }
 
         }
 
@@ -351,9 +333,11 @@ PhysicalParticleContainer::FindSuborbitParticles (WarpXParIter & pti,
  * \param[in] lev The refinement level
  * \param[in] gather_lev The refinement level at which to do the field gather
  * \param[in] dt The time step size
+ * \param[in] scaleFields Allows scale factor to the fields (for rigid injection)
  * \param[in/out] num_unconverged_particles Number of unconverged particles that have already been flagged
  * \param[in/out] unconverged_indices The list of indices of unconverged particles
  * \param[in/out] saved_weights The saved weights of the unconverged particles
+ * \param[in] a_dt_type The push type (which part of the time step)
  */
 void
 PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
@@ -368,10 +352,11 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                                            long offset,
                                            long np_to_push,
                                            int lev, int gather_lev,
-                                           amrex::Real dt,
+                                           amrex::Real dt, ScaleFields scaleFields,
                                            long & num_unconverged_particles,
                                            amrex::Gpu::DeviceVector<long> & unconverged_indices,
-                                           amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights)
+                                           amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights,
+                                           DtType a_dt_type)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE((gather_lev==(lev-1)) ||
                                      (gather_lev==(lev  )),
@@ -449,12 +434,10 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr() + offset;
     amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr() + offset;
 
-    if (m_do_back_transformed_particles) { //  Copy the old x and u for the BTD
-        CopyParticleAttribs copyAttribs = CopyParticleAttribs(*this, pti, offset);
-        amrex::ParallelFor(np_to_push, [copyAttribs] AMREX_GPU_DEVICE (long ip)
-        {
-            copyAttribs(ip);
-        });
+    const int do_copy = (m_do_back_transformed_particles && (a_dt_type!=DtType::SecondHalf) );
+    CopyParticleAttribs copyAttribs;
+    if (do_copy) {
+        copyAttribs = CopyParticleAttribs(*this, pti, offset);
     }
 
     int* AMREX_RESTRICT ion_lev = nullptr;
@@ -482,7 +465,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     }
 #endif
 
-    const auto do_gather = !do_not_gather;
+    const auto t_do_not_gather = do_not_gather;
 
     const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
 #ifdef WARPX_QED
@@ -508,6 +491,11 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                        np_to_push, [=] AMREX_GPU_DEVICE (long ip, auto exteb_control,
                                                          auto qed_control)
     {
+
+        if (do_copy) {
+            //  Copy the old x and u for the BTD
+            copyAttribs(ip);
+        }
 
         // Skip any particles that require suborbits
         if (nsuborbits && nsuborbits[ip] > 1) {
@@ -556,10 +544,10 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                              Ex_external_particle, Ey_external_particle, Ez_external_particle,
                              Bx_external_particle, By_external_particle, Bz_external_particle,
                              Bxp, Byp, Bzp,
-                             do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
+                             t_do_not_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                              ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                              dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, depos_type,
-                             getExternalEB, ion_lev, m, q, pusher_algo, do_crr
+                             getExternalEB, scaleFields, ion_lev, m, q, pusher_algo, do_crr
 #ifdef WARPX_QED
                              , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
 #endif
@@ -662,6 +650,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
  * \param[in] lev The refinement level
  * \param[in] gather_lev The refinement level at which to do the field gather
  * \param[in] dt The time step size
+ * \param[in] scaleFields Allows scale factor to the fields (for rigid injection)
  * \param[in] skip_deposition Whether to do the deposition
  * \param[in] num_unconverged_particles Number of unconverged particles to push
  * \param[in] unconverged_indices The list of indices of unconverged particles
@@ -682,7 +671,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                     amrex::MultiFab * const jz,
                                                     long index_offset,
                                                     int lev, int gather_lev,
-                                                    amrex::Real dt,
+                                                    amrex::Real dt, ScaleFields scaleFields,
                                                     bool skip_deposition,
                                                     long num_unconverged_particles,
                                                     amrex::Gpu::DeviceVector<long> & unconverged_indices,
@@ -702,7 +691,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
     const auto depos_type = WarpX::current_deposition_algo;
 
-    if (depos_type != CurrentDepositionAlgo::Villasenor ) {
+    if (!skip_deposition && (
+        depos_type != CurrentDepositionAlgo::Villasenor) ) {
         ablastr::warn_manager::WMRecordWarning("ImplicitPushXPSubOrbits",
             "When particle suborbits are used during the implicit particle push, only Villasenor "
             "current deposition is supported.");
@@ -807,7 +797,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     }
 #endif
 
-    const auto do_gather = !do_not_gather;
+    const auto t_do_not_gather = do_not_gather;
 
     const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
 #ifdef WARPX_QED
@@ -915,10 +905,10 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                  Ex_external_particle, Ey_external_particle, Ez_external_particle,
                                  Bx_external_particle, By_external_particle, Bz_external_particle,
                                  Bxp, Byp, Bzp,
-                                 do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
+                                 t_do_not_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                  ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                                  dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, depos_type,
-                                 getExternalEB, ion_lev, m, q, pusher_algo, do_crr
+                                 getExternalEB, scaleFields, ion_lev, m, q, pusher_algo, do_crr
 #ifdef WARPX_QED
                                  , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
 #endif
@@ -927,13 +917,33 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
             // Don't change number of suborbits during linear stage of jfnk
             if (linear_stage_of_jfnk) { convergence = true; }
 
-            if (doing_deposition) {
+            if (!skip_deposition && doing_deposition) {
 
-                const amrex::ParticleReal xp_np1 = 2.0_prt*xp - xp_n;
-                const amrex::ParticleReal yp_np1 = 2.0_prt*yp - yp_n;
-                const amrex::ParticleReal zp_np1 = 2.0_prt*zp - zp_n;
+                const amrex::ParticleReal xp_old = xp_n;
+                const amrex::ParticleReal yp_old = yp_n;
+                const amrex::ParticleReal zp_old = zp_n;
+                const amrex::ParticleReal xp_new = 2.0_prt*xp - xp_n;
+                const amrex::ParticleReal yp_new = 2.0_prt*yp - yp_n;
+                const amrex::ParticleReal zp_new = 2.0_prt*zp - zp_n;
 
-                const amrex::ParticleReal gaminv = GetImplicitGammaInverse(uxp_n, uyp_n, uzp_n, ux[ip], uy[ip], uz[ip]);
+                const amrex::ParticleReal uxp_nph = ux[ip];
+                const amrex::ParticleReal uyp_nph = uy[ip];
+                const amrex::ParticleReal uzp_nph = uz[ip];
+
+                constexpr amrex::ParticleReal inv_c2 = 1.0_prt/(PhysConst::c*PhysConst::c);
+
+                const amrex::ParticleReal uxp_old = uxp_n;
+                const amrex::ParticleReal uyp_old = uyp_n;
+                const amrex::ParticleReal uzp_old = uzp_n;
+                const amrex::ParticleReal uxp_new = 2.0_prt*ux[ip] - uxp_n;
+                const amrex::ParticleReal uyp_new = 2.0_prt*uy[ip] - uyp_n;
+                const amrex::ParticleReal uzp_new = 2.0_prt*uz[ip] - uzp_n;
+
+                // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
+                // The uxp,uyp,uzp are the velocities at time level n+1/2
+                const amrex::ParticleReal gamma_old = std::sqrt(1.0_prt + (uxp_old*uxp_old + uyp_old*uyp_old + uzp_old*uzp_old)*inv_c2);
+                const amrex::ParticleReal gamma_new = std::sqrt(1.0_prt + (uxp_new*uxp_new + uyp_new*uyp_new + uzp_new*uzp_new)*inv_c2);
+                const amrex::ParticleReal gaminv = 2.0_prt/(gamma_old + gamma_new);
 
                 amrex::ParticleReal wq_n = wq/nsuborbits[ip];
 
@@ -970,14 +980,12 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
             isuborbit++;
 
-            if (!convergence || (isuborbit == nsuborbits[ip] && !doing_deposition)) {
+            if (!convergence || (isuborbit == nsuborbits[ip] && !doing_deposition && !skip_deposition)) {
 
                 if (!convergence) {
                     // particle did not converge
                     // Increase the number of suborbits and start over
                     nsuborbits[ip]++;
-                } else if (skip_deposition) {
-                    break;
                 } else {
                     // Convergence was reached for all suborbits, now redo the loop
                     // and do the deposition
@@ -1035,5 +1043,4 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
     });
 
-    amrex::Gpu::streamSynchronize();
 }
