@@ -81,3 +81,8 @@ sudo curl -L -o /usr/local/bin/cmake-easyinstall https://raw.githubusercontent.c
 sudo chmod a+x /usr/local/bin/cmake-easyinstall
 export CEI_SUDO="sudo"
 export CEI_TMP="/tmp/cei"
+
+# Point /opt/rocm to /opt/rocm-${VERSION} to find headers
+if [ ! -e /opt/rocm ] && [ -d /opt/rocm-${VERSION} ]; then
+    sudo ln -s /opt/rocm-${VERSION} /opt/rocm
+fi
