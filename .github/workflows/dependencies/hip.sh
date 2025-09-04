@@ -46,7 +46,6 @@ sudo apt-get update
 sudo apt-get install -y --no-install-recommends \
     build-essential \
     gfortran        \
-    libhsa-runtime-dev \
     libhiredis-dev  \
     libnuma-dev     \
     libopenmpi-dev  \

@@ -22,7 +22,7 @@
 
 // INC0509050: Handle MPI initialization/finalization errors on Tuolumne (LLNL)
 #if defined(AMREX_USE_HIP)
-#include <hsa.h>
+#include <hsa/hsa.h>
 #endif
 
 #include <iostream>
