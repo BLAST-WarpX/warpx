@@ -52,6 +52,9 @@ jobs:
         export CXX=$(which clang++)
         export CC=$(which clang)
 
+        export LIBRARY_PATH=/opt/rocm/lib:${LIBRARY_PATH:-}
+        export LD_LIBRARY_PATH=/opt/rocm/lib:${LD_LIBRARY_PATH:-}
+
         cmake -S . -B build_sp \
           -DCMAKE_VERBOSE_MAKEFILE=ON \
           -DAMReX_AMD_ARCH=gfx900     \
@@ -106,6 +109,9 @@ jobs:
         which clang++
         export CXX=$(which clang++)
         export CC=$(which clang)
+
+        export LIBRARY_PATH=/opt/rocm/lib:${LIBRARY_PATH:-}
+        export LD_LIBRARY_PATH=/opt/rocm/lib:${LD_LIBRARY_PATH:-}
 
         cmake -S . -B build_2d \
           -DCMAKE_VERBOSE_MAKEFILE=ON \
