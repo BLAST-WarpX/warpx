@@ -152,15 +152,21 @@ public:
   /** Return OpenPMD File type ("bp5", "bp4", "h5" or "json")*/
   std::string OpenPMDFileType () { return m_OpenPMDFileType; }
 
-  /** Flush a few BTD buffers in a snapshot
+  /** Ensure BTD buffers are written to disk
    *
-   * This function is controlled by the parameter
-   * FlushFormatOpenPMD::m_NumAggBTDBufferToFlush (default to 5),
-   * it can be adjusted in the input file: diag_name.buffer_flush_limit_btd
+   * This function can be called to intermediately ensure ADIOS buffered "steps"
+   * are written to disk, and the valid metadata if checkpointing is required.
    *
-   * @param[in] isBTD if the current diagnostic is BTD
+   * This is needed to read partial data while a simulation is running or
+   * to support restarting (the BTD diagnostics) in WarpX, so it
+   * can continue to append to a partially written labframe station
+   * after restart.
+   *
+   * The frequency is controlled by
+   * FlushFormatOpenPMD::m_NumAggBTDBufferToFlush (default to 5).
+   * It can be adjusted in the input file: diag_name.buffer_flush_limit_btd
    */
-  void ForceFlush (bool isBTD);
+  void FlushBTDToDisk ();
 private:
   void Init (openPMD::Access access, bool isBTD);
 
@@ -194,7 +200,7 @@ private:
    * if isBTD=true,  in ADIOS, the action will be PerformPut
    *                 because no action is taken for the span tasks.
    *                 This way we can aggregate buffers before
-   *                 calling ForceFlush(isBTD) to write out.
+   *                 calling FlushBTDToDisk() to write out.
    *
    * iteration.seriesFlush() is used instead of series.flush()
    *  because the latter flushes only if data is dirty

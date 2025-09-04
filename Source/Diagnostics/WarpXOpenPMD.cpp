@@ -673,17 +673,17 @@ for (const auto & particle_diag : particle_diags) {
 }
 
 void
-WarpXOpenPMDPlot::ForceFlush(bool isBTD)
+WarpXOpenPMDPlot::FlushBTDToDisk()
 {
-    if (!isBTD)
-        return;
-
+    bool isBTD = true;
     auto hasOption = m_OpenPMDoptions.find("FlattenSteps");
-    const bool result = (m_Series->backend() == "ADIOS2") && (hasOption != std::string::npos);
+    const bool doFlattenSteps = (m_Series->backend() == "ADIOS2") && (hasOption != std::string::npos);
 
-    if (result)
+    if (doFlattenSteps)
     {
-        WARPX_PROFILE("WarpXOpenPMDPlot::FlattenSteps()");
+        WARPX_PROFILE("WarpXOpenPMDPlot::ForceFlush()");
+        // Here for checkpointing purpose, we ask ADIOS to create to a new step, which
+        // triggers writting both data and metadata.
         openPMD::Iteration currIteration = GetIteration(m_CurrentStep, isBTD);
         currIteration.seriesFlush(R"(adios2.engine.preferred_flush_target = "new_step")");
     }
@@ -1529,14 +1529,13 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                     {
                         WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::D2H_Span()");
                         auto dynamicMemoryView = mesh_comp.storeChunk<amrex::Real>(
-                                                                                   chunk_offset, chunk_size,
-                                                                                   [&local_box](size_t size) {
-                                                                                      (void) size;
-                                                                                      amrex::Print()<<" span failed \n";
-                                                                                      amrex::BaseFab<amrex::Real> foo(local_box, 1, amrex::The_Pinned_Arena());
-                                                                                      std::shared_ptr<amrex::Real> data_pinned(foo.release());
-                                                                                      return data_pinned;
-                                                                                  });
+                             chunk_offset, chunk_size,
+                             [&local_box](size_t size) {
+                                  (void) size;
+                                  amrex::BaseFab<amrex::Real> foo(local_box, 1, amrex::The_Pinned_Arena());
+                                  std::shared_ptr<amrex::Real> data_pinned(foo.release());
+                                  return data_pinned;
+                              });
 
                         auto span = dynamicMemoryView.currentBuffer();
                         amrex::Gpu::dtoh_memcpy_async(span.data(), fab.dataPtr(icomp), local_box.numPts()*sizeof(amrex::Real));
