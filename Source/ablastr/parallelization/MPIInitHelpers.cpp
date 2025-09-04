@@ -20,6 +20,11 @@
 #include <hip/hip_runtime.h>
 #endif
 
+// INC0509050: Handle MPI initialization/finalization errors on Tuolumne (LLNL)
+#if defined(AMREX_USE_HIP)
+#include <hsa.h>
+#endif
+
 #include <iostream>
 #include <string>
 #include <utility>
@@ -54,7 +59,16 @@ namespace ablastr::parallelization
         hipError_t hip_ok = hipInit(0);
         if (hip_ok != hipSuccess) {
             std::cerr << "hipInit failed with error code " << hip_ok << "! Aborting now.\n";
-            throw std::runtime_error("hipInit failed. Did not proceeding with MPI_Init_thread.");
+            throw std::runtime_error("hipInit failed. Did not proceed with MPI_Init_thread.");
+        }
+#endif
+
+        // INC0509050: Handle MPI initialization error on Tuolumne (LLNL)
+#if defined(AMREX_USE_HIP) && defined(AMREX_USE_MPI)
+        hsa_status_t status = hsa_init();
+        if (status != HSA_STATUS_SUCCESS) {
+            std::cerr << "hsa_init failed with error code " << status << "! Aborting now.\n";
+            throw std::runtime_error("hsa_init failed. Did not proceed with MPI_Init_thread.");
         }
 #endif
 
@@ -75,6 +89,15 @@ namespace ablastr::parallelization
     {
 #ifdef AMREX_USE_MPI
         MPI_Finalize();
+
+        // INC0509050: Handle MPI finalization error on Tuolumne (LLNL)
+#ifdef AMREX_USE_HIP
+        hsa_status_t status = hsa_shut_down();
+        if (status != HSA_STATUS_SUCCESS) {
+            std::cerr << "hsa_shut_down failed with error code " << status << "! Aborting now.\n";
+            throw std::runtime_error("hsa_shut_down failed after MPI_Finalize completed.");
+        }
+#endif
 #endif
     }
 
