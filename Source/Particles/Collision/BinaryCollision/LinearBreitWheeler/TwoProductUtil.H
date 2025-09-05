@@ -8,6 +8,8 @@
 #ifndef TWO_PRODUCT_UTIL_H
 #define TWO_PRODUCT_UTIL_H
 
+#include "LinearBreitWheelerCrossSection.H"
+
 #include "Utils/ParticleUtils.H"
 #include "Utils/WarpXConst.H"
 
@@ -61,8 +63,6 @@ namespace {
         constexpr amrex::ParticleReal inv_csq = 1._prt / ( c_sq );
         constexpr amrex::ParticleReal me = PhysConst::m_e;
         auto constexpr pow2 = [](double const x) { return x*x; };
-        constexpr auto one_half_pr = amrex::ParticleReal(1./2.);
-        constexpr auto one_pr = amrex::ParticleReal(1.);
 
         // Compute momenta
         const amrex::ParticleReal p1x_in = u1x_in * me;
@@ -79,7 +79,7 @@ namespace {
 
         // Energy squared of each of the two colliding photons in the center of momentum frame,
         // calculated using the Lorentz invariance of the total four-momentum norm
-        const amrex::ParticleReal E_star_sq = one_half_pr*c_sq*p1_in*p2_in*(one_pr - cos_ang);
+        const amrex::ParticleReal E_star_sq = 0.5_prt*c_sq*p1_in*p2_in*(1._prt - cos_ang);
 
         // Square of the norm of the momentum of the products in the center of mass frame
         // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle:
@@ -92,9 +92,72 @@ namespace {
         // Compute momentum of first product in the center of mass frame, assuming isotropic
         // distribution
         amrex::ParticleReal px_star, py_star, pz_star;
-        ParticleUtils::RandomizeVelocity(px_star, py_star, pz_star, std::sqrt(p_star_sq),
-                                         engine);
+        //ParticleUtils::RandomizeVelocity(px_star, py_star, pz_star, std::sqrt(p_star_sq),
+        //                                 engine);
 
+        amrex::ParticleReal phi = 2._prt*MathConst::pi*amrex::Random(engine);
+        amrex::ParticleReal s = 2._prt * p1_in * p2_in * (1._prt - cos_ang) / (4._prt * me*me * c_sq) ;
+
+        // beta of leptons in CM frame
+        amrex::ParticleReal beta = std::sqrt(1._prt - 1._prt / s);
+        amrex::ParticleReal const u = amrex::Random(engine);
+        amrex::ParticleReal costh = 2._prt*u - 1._prt; // initial guess
+        amrex::ParticleReal rel_err = 1._prt;
+
+        int iter = 0;
+        while ( rel_err > 1e-12_prt && iter < 20){
+            
+            amrex::ParticleReal G = 0.5_prt + 0.5_prt * LBWIntegralOfDifferentialCrossSection(beta, costh) / LBWIntegralOfDifferentialCrossSection(beta, 1._prt) - u; 
+            amrex::ParticleReal G_prime = LBWDifferentialCrossSection(beta, costh); 
+            amrex::ParticleReal delta = G / G_prime;
+            rel_err = amrex::Math::abs(delta) / amrex::Math::abs(costh); 
+            costh -= delta;
+            iter++;
+        }
+
+    
+
+        
+        
+
+        
+/*if (beta < 1e-8_prt) {
+    // Isotropic near threshold
+    costh = 2._prt*u - 1._prt;
+} else {
+
+    amrex::ParticleReal A = (beta4 - 1._prt) / (1._prt - beta2);
+    amrex::ParticleReal B = (1._prt - beta4) / (beta2 * (1._prt - beta2));
+    amrex::ParticleReal F1 = A + B * 0.5_prt * std::log((1._prt + beta) / (1._prt - beta));
+    amrex::ParticleReal target = 2._prt * u * F1 - F1;
+
+
+    for(int i = 0; i < 6; i++) { 
+        amrex::ParticleReal cos2 = costh*costh;
+        amrex::ParticleReal num = 1._prt - beta4 * (1._prt - cos2)*(1._prt - cos2);
+        amrex::ParticleReal den = (1._prt - beta2 * cos2);
+        amrex::ParticleReal pdf = num / (den*den);
+
+        amrex::ParticleReal arg1 = amrex::max(1._prt + beta*costh, 1e-15_prt);
+        amrex::ParticleReal arg2 = amrex::max(1._prt - beta*costh, 1e-15_prt);
+        amrex::ParticleReal Fc  = A * costh + B * 0.5_prt * std::log(arg1 / arg2);
+
+        amrex::ParticleReal delta = (Fc - target) / pdf;
+        costh -= delta;
+
+        if (costh > 1._prt) costh = 1._prt;
+        if (costh < -1._prt) costh = -1._prt;
+        if (amrex::Math::abs(delta) < 1e-14_prt) break; // convergence check
+    }
+}*/
+        
+        amrex::ParticleReal sinth = std::sqrt(1._prt - costh*costh);
+
+        // product in CM frame
+        px_star = std::sqrt(p_star_sq) * sinth * std::cos(phi);
+        py_star = std::sqrt(p_star_sq) * sinth * std::sin(phi);
+        pz_star = std::sqrt(p_star_sq) * costh;
+    
         // Next step is to convert momenta to lab frame
         amrex::ParticleReal p1x_out, p1y_out, p1z_out;
         // Preliminary calculation: compute velocity of the center of momentum frame:

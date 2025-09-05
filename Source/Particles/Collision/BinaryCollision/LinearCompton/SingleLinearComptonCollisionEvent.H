@@ -9,6 +9,7 @@
 #define SINGLE_LINEAR_COMPTON_COLLISION_EVENT_H_
 
 #include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
+#include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_Algorithm.H>
@@ -83,11 +84,10 @@ void SingleLinearComptonCollisionEvent (const amrex::ParticleReal& u1x, const am
     // sqrt( | v1 - v2 |^2  - | v1 x v2 |^2/c^2 ) evaluated in the rest frame
     const amrex::ParticleReal v_rel =  PhysConst::c;
 
-
     // Calculate the Klein-Nishina cross-section (cross-section in the rest frame of the lepton)
     const amrex::ParticleReal k = u1_norm_rest * inv_c;
     // By convention, in WarpX, the photon momentum u is normalized by the electron mass m_e, so k corresponds to p/(m_e*c)
-    const amrex::ParticleReal f1 = 2._prt * ( 2._prt + k*(1._prt+k)*(8._prt+k) ) / ( k*k * (1._prt + 2._prt*k)*(1._prt + 2._prt*k) );
+    const amrex::ParticleReal f1 = (8._prt + k*(32._prt + k*(36._prt+ 4._prt*k)) ) / (2._prt * k*k * (1._prt+ 2._prt*k)*(1 + 2._prt*k) );
     const amrex::ParticleReal f2 = ( 2._prt + k*(2._prt-k) ) * std::log( 1._prt + 2._prt*k ) / (k*k*k);
     const amrex::ParticleReal klein_nishina_cross_section = MathConst::pi * PhysConst::r_e * PhysConst::r_e * ( f1 - f2 );
 
