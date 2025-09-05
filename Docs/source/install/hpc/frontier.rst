@@ -259,4 +259,4 @@ Known System Issues
       mkdir diags
       # change striping for new files before you submit the simulation
       #   this is an example, striping 10 MB blocks onto 32 nodes
-      lfs setstripe -S 16M -c 1 $SURM_SUBMIT_DIR  # or diags only or checkpoints only
+      lfs setstripe -S 16M -c 1 $SLURM_SUBMIT_DIR  # or diags only or checkpoints only
