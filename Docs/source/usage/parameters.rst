@@ -1543,7 +1543,7 @@ Particle initialization
     The energy of the virtual photons is sampled from their spectrum (see :cite:t:`LandauVol4` section 99 for more details).
     The momentum of the virtual photons is parallel to that of the parent particle.
     This feature also requires the following input parameters:
-      * ``<species>.qed_virtual_photon_species_name`` (`string`) name of the virtual photon species associated to the current lepton species.
+      * ``<species>.qed_virtual_photon_species_name`` (`string`) name of the virtual photon species associated with the current lepton species.
       * ``<virtual_photon_species>.qed_virtual_photon_min_energy`` (`float`, in Joules) minimum energy of the virtual photons
       * ``<virtual_photon_species>.sampling_factor`` (`int`), sampling factor for the virtual photons.
         A sampling factor of ``f`` means that the number of virtual photons is multiplied by ``f``, while their weights are divided by ``f``.
