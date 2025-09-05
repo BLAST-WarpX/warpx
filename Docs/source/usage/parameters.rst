@@ -1536,7 +1536,7 @@ Particle initialization
     This is required when using the electron energy solver with electron-ion temperature relaxation.
 
 * ``<species>.do_qed_virtual_photons`` (`boolean`) optional (default `false`)
-    Create a population of virtual photons associated to ``<species>``.
+    Create a population of virtual photons associated with ``<species>``.
     It only works if ``<species>`` is an electron or a positron species.
     The virtual photon species has to be created as a regular photon species in the input file.
     Virtual photons are created from scratch at each timestep in the same position of the parent particle.
