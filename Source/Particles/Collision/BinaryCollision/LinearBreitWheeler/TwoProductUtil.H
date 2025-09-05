@@ -106,21 +106,21 @@ namespace {
 
         int iter = 0;
         while ( rel_err > 1e-12_prt && iter < 20){
-            
-            amrex::ParticleReal G = 0.5_prt + 0.5_prt * LBWIntegralOfDifferentialCrossSection(beta, costh) / LBWIntegralOfDifferentialCrossSection(beta, 1._prt) - u; 
-            amrex::ParticleReal G_prime = LBWDifferentialCrossSection(beta, costh); 
+
+            amrex::ParticleReal G = 0.5_prt + 0.5_prt * LBWIntegralOfDifferentialCrossSection(beta, costh) / LBWIntegralOfDifferentialCrossSection(beta, 1._prt) - u;
+            amrex::ParticleReal G_prime = LBWDifferentialCrossSection(beta, costh);
             amrex::ParticleReal delta = G / G_prime;
-            rel_err = amrex::Math::abs(delta) / amrex::Math::abs(costh); 
+            rel_err = amrex::Math::abs(delta) / amrex::Math::abs(costh);
             costh -= delta;
             iter++;
         }
 
-    
 
-        
-        
 
-        
+
+
+
+
 /*if (beta < 1e-8_prt) {
     // Isotropic near threshold
     costh = 2._prt*u - 1._prt;
@@ -132,7 +132,7 @@ namespace {
     amrex::ParticleReal target = 2._prt * u * F1 - F1;
 
 
-    for(int i = 0; i < 6; i++) { 
+    for(int i = 0; i < 6; i++) {
         amrex::ParticleReal cos2 = costh*costh;
         amrex::ParticleReal num = 1._prt - beta4 * (1._prt - cos2)*(1._prt - cos2);
         amrex::ParticleReal den = (1._prt - beta2 * cos2);
@@ -150,14 +150,14 @@ namespace {
         if (amrex::Math::abs(delta) < 1e-14_prt) break; // convergence check
     }
 }*/
-        
+
         amrex::ParticleReal sinth = std::sqrt(1._prt - costh*costh);
 
         // product in CM frame
         px_star = std::sqrt(p_star_sq) * sinth * std::cos(phi);
         py_star = std::sqrt(p_star_sq) * sinth * std::sin(phi);
         pz_star = std::sqrt(p_star_sq) * costh;
-    
+
         // Next step is to convert momenta to lab frame
         amrex::ParticleReal p1x_out, p1y_out, p1z_out;
         // Preliminary calculation: compute velocity of the center of momentum frame:

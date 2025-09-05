@@ -53,14 +53,14 @@ amrex::ParticleReal LinearBreitWheelerCrossSection (const amrex::ParticleReal& E
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 amrex::ParticleReal LBWIntegralOfDifferentialCrossSection (const amrex::ParticleReal& beta, const amrex::ParticleReal& x )
 {
-    //  a meno di una costante 
+    //  a meno di una costante
     using namespace amrex::literals;
 
     amrex::ParticleReal beta2 = beta*beta;
-    amrex::ParticleReal beta4 = beta2*beta2;        
+    amrex::ParticleReal beta4 = beta2*beta2;
     amrex::ParticleReal term1 = x / ( 1._prt - beta2*x*x) * ( - 1._prt + 2._prt * beta2 - beta4 ) - x;
     amrex::ParticleReal term2 = std::atanh(beta*x)/beta * (3._prt - beta4);
-    return term1 + term2; 
+    return term1 + term2;
 }
 
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -69,7 +69,7 @@ amrex::ParticleReal LBWDifferentialCrossSection (const amrex::ParticleReal& beta
     using namespace amrex::literals;
 
     amrex::ParticleReal beta2 = beta*beta;
-    amrex::ParticleReal beta4 = beta2*beta2;        
+    amrex::ParticleReal beta4 = beta2*beta2;
     amrex::ParticleReal x2 = x*x;
     amrex::ParticleReal num = 1._prt + 2._prt * beta2 - 2._prt*beta4 - 2._prt*beta2 * (1._prt - beta2)*x2 - beta4*x2*x2;
     amrex::ParticleReal den = (1._prt - beta2 * x2) * (1._prt - beta2 * x2) ;
