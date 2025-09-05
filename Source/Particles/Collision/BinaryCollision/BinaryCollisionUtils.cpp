@@ -92,6 +92,12 @@ namespace BinaryCollisionUtils{
                 "The second incident species and the second product species in linear Compton collisions must be of the same type");
             return CollisionType::LinearCompton;
         }
+        else if (type == "elastic_bhabha_moller") {
+            amrex::Vector<std::string> species_name;
+            // Check that the colliding species are electron/positron
+            return CollisionType::ElasticBhabhaMoller;
+        }
+
         return CollisionType::Undefined;
     }
 

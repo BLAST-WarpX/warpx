@@ -12,6 +12,7 @@
 #include "Particles/Collision/BinaryCollision/Coulomb/PairWiseCoulombCollisionFunc.H"
 #include "Particles/Collision/BinaryCollision/DSMC/DSMCFunc.H"
 #include "Particles/Collision/BinaryCollision/DSMC/SplitAndScatterFunc.H"
+#include "Particles/Collision/BinaryCollision/ElasticBhabhaMoller/ElasticBhabhaMollerCollisionFunc.H"
 #include "Particles/Collision/BinaryCollision/NuclearFusion/NuclearFusionFunc.H"
 #include "Particles/Collision/BinaryCollision/LinearBreitWheeler/LinearBreitWheelerCollisionFunc.H"
 #include "Particles/Collision/BinaryCollision/LinearCompton/LinearComptonCollisionFunc.H"
@@ -79,6 +80,12 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
         else if (type == "linear_compton") {
             allcollisions[i] =
                std::make_unique<BinaryCollision<LinearComptonCollisionFunc, ParticleCreationFunc>>(
+                    collision_names[i], mypc
+               );
+        }
+        else if (type == "elastic_bhabha_moller") {
+            allcollisions[i] =
+               std::make_unique<BinaryCollision<ElasticBhabhaMollerCollisionFunc, ParticleCreationFunc>>(
                     collision_names[i], mypc
                );
         }
