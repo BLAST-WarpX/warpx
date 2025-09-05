@@ -57,6 +57,9 @@ export LDFLAGS="${PE_MPICH_GTL_DIR_amd_gfx942} ${PE_MPICH_GTL_LIBS_amd_gfx942} -
 #export HSA_XNACK=1
 #export HUGETLB_MORECORE=yes
 
+# HSA runtime library
+export LDFLAGS="${LDFLAGS} -lhsa-runtime64"
+
 # optimize ROCm/HIP compilation for MI300A
 export AMREX_AMD_ARCH=gfx942
 

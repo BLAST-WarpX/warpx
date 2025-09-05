@@ -86,7 +86,3 @@ export CEI_TMP="/tmp/cei"
 if [ ! -e /opt/rocm ] && [ -d /opt/rocm-${VERSION} ]; then
     sudo ln -s /opt/rocm-${VERSION} /opt/rocm
 fi
-
-## Ensure the HSA runtime library is found
-#export LIBRARY_PATH=/opt/rocm/lib:${LIBRARY_PATH:-}
-#export LD_LIBRARY_PATH=/opt/rocm/lib:${LD_LIBRARY_PATH:-}
