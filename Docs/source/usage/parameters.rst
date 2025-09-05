@@ -1539,7 +1539,7 @@ Particle initialization
     Create a population of virtual photons associated with ``<species>``.
     It only works if ``<species>`` is an electron or a positron species.
     The virtual photon species has to be created as a regular photon species in the input file.
-    Virtual photons are created from scratch at each timestep in the same position of the parent particle.
+    Virtual photons are created from scratch at each timestep in the same position as the parent particle.
     The energy of the virtual photons is sampled from their spectrum (see :cite:t:`LandauVol4` section 99 for more details).
     The momentum of the virtual photons is parallel to that of the parent particle.
     This feature also requires the following input parameters:
