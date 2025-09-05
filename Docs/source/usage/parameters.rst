@@ -149,6 +149,8 @@ Overall simulation parameters
 
           - ``implicit_evolve.max_particle_iterations`` (`integer`, default: 21)
           - ``implicit_evolve.particle_tolerance`` (`float`, default: 1.e-10)
+          - ``implicit_evolve.particle_suborbits`` (`bool`, default: false)
+          - ``implicit_evolve.print_unconverged_particle_details`` (`bool`, default: false)
 
         - ``implicit_evolve.use_mass_matrices_jacobian`` (`bool`, default: false).
           When `true`, the plasma current density is computed using the mass matrices during the linear stage of PS-JFNK, replacing direct particle calculations. This can enable large speed ups for simulations with many particles.

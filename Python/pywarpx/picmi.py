@@ -1855,7 +1855,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
     n0: float
         Reference plasma density in m^-3.
 
-    gamma: float, default=3/2
+    gamma: float, default=5/3
         Exponent in calculation of electron pressure.
 
     n_floor: float, optional

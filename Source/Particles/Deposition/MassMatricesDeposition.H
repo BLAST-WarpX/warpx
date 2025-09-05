@@ -1630,6 +1630,11 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
     amrex::ParallelFor(
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long const ip) {
+
+            // Skip particles with zero weight.
+            // This should only be the case for particles that will be suborbited.
+            if (wp[ip] == 0.) { return; }
+
             amrex::ParticleReal xp_nph, yp_nph, zp_nph;
             GetPosition(ip, xp_nph, yp_nph, zp_nph);
 
