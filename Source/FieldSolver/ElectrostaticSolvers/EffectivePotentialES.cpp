@@ -105,23 +105,6 @@ void EffectivePotentialES::ComputeSigma (MultiFab& sigma) const
 
     int const lev = 0;
 
-    // sigma is a cell-centered array
-    amrex::GpuArray<int, 3> const cell_centered = {0, 0, 0};
-    // The "coarsening is just 1 i.e. no coarsening"
-    amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
-
-    // GetChargeDensity returns a nodal multifab
-    // Below we set all the unused dimensions to have cell-centered values for
-    // rho since these values will be interpolated onto a cell-centered grid
-    // - if this is not done the Interp function returns nonsense values.
-#if defined(WARPX_DIM_3D)
-    amrex::GpuArray<int, 3> const nodal = {1, 1, 1};
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-    amrex::GpuArray<int, 3> const nodal = {1, 1, 0};
-#elif defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    amrex::GpuArray<int, 3> const nodal = {1, 0, 0};
-#endif
-
     auto& warpx = WarpX::GetInstance();
     auto& mypc = warpx.GetPartContainer();
 
@@ -135,36 +118,17 @@ void EffectivePotentialES::ComputeSigma (MultiFab& sigma) const
 
     // Loop over each species to calculate the Poisson equation dressing
     for (auto const& pc : mypc) {
-        // grab the charge density for this species
-        // Note: local deposition is done since the guard cells values are added
-        // to the valid cells after filtering in `ApplyFilterandSumBoundaryRho` below
-        auto rho = pc->GetChargeDensity(lev, true);
-
-        // Handle the parallel transfer of guard cells and apply filtering
-        warpx.ApplyFilterandSumBoundaryRho(lev, lev, *rho, 0, rho->nComp());
+        // get the species number density per cell
+        auto rho_cc = pc->GetNumberDensity(lev);
 
         // get multiplication factor for this species
-        auto const mult_factor_pc = mult_factor * pc->getCharge() / pc->getMass();
+        auto const mult_factor_pc = mult_factor * pc->getCharge() * pc->getCharge() / pc->getMass();
 
-        // update sigma
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-        for ( MFIter mfi(sigma, TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
-            Array4<Real> const& sigma_arr = sigma.array(mfi);
-            Array4<Real const> const& rho_arr = rho->const_array(mfi);
-
-            // Loop over the cells and update the sigma field
-            amrex::ParallelFor(mfi.tilebox(), [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                // Interpolate rho to cell-centered value
-                auto const rho_cc = ablastr::coarsen::sample::Interp(
-                    rho_arr, nodal, cell_centered, coarsen, i, j, k, 0
-                );
-                // add species term to sigma:
-                // C_SI * w_p^2 * dt^2 / 4 = C_SI / 4 * q*rho/(m*eps0) * dt^2
-                sigma_arr(i, j, k, 0) += mult_factor_pc * rho_cc;
-            });
-        }
+        // add species term to sigma:
+        // sigma = 1.0 * sigma + C_SI / 4 * q^2/(m*eps0) * dt^2 * N
+        MultiFab::LinComb(
+            sigma, 1._rt, sigma, 0, mult_factor_pc, *rho_cc, 0, 0, 1, 0
+        );
     }
 }
 
