@@ -243,6 +243,14 @@ public:
                         products_np_data[1] + 2*p_offsets[i]*p_num_products_device[1],
                         engine);
                 }
+                else if(t_collision_type == CollisionType::ElasticBhabhaMoller){
+                    ElasticBhabhaMollerInitializeMomentum(soa_1, soa_2,
+                        soa_products_data[0], soa_products_data[1],
+                        p_pair_indices_1[i], p_pair_indices_2[i],
+                        products_np_data[0] + 2*p_offsets[i]*p_num_products_device[0],
+                        products_np_data[1] + 2*p_offsets[i]*p_num_products_device[1],
+                        engine);
+                }
             }
         });
 

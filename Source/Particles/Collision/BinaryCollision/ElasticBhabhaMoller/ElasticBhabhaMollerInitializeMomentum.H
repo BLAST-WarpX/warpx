@@ -62,6 +62,18 @@ namespace {
         return numerator / denominator;
     }
 
+    amrex::ParticleReal TreeLevelElasticBhabhaCrossSectionAngularPartDerivative (
+        amrex::ParticleReal const theta_m)
+    {
+
+        // Elastic Bhabha Tree level differential cross section. (times 2 Pi Sin theta)
+        amrex::ParticleReal numerator = (
+            (std::cos(2 * theta_m)+7)*(std::cos(2 * theta_m)+7) / (std::sin(theta_m/2)*std::sin(theta_m/2)*std::sin(theta_m/2)*std::sin(theta_m/2))* std::sin(theta_m) * 2 * MathConst::pi
+        );
+        amrex::ParticleReal denominator = 4096._prt * MathConst::pi* MathConst::pi;
+        return numerator / denominator;
+    }
+
     /**
      * \brief This function initializes the momentum of the product particles,
      * in a Bhabha scattering event.
@@ -77,7 +89,7 @@ namespace {
      * @param[in] engine the random engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
-    void ElasticBhabhaInitializeMomentum (
+    void ElasticBhabhaMollerInitializeMomentum (
                             const SoaData_type& soa1_in, const SoaData_type& soa2_in,
                             SoaData_type& soa1_out, SoaData_type& soa2_out,
                             const index_type& idx1_in, const index_type& idx2_in,
@@ -85,9 +97,6 @@ namespace {
                             const amrex::RandomEngine& engine)
     {
         using namespace amrex::literals;
-
-        constexpr amrex::ParticleReal inv_c = 1._prt / PhysConst::c;
-        constexpr amrex::ParticleReal inv_csq = 1._prt / ( PhysConst::c * PhysConst::c );
 
         // Extract the momenta of the incident particles
         amrex::ParticleReal const u1x = soa1_in.m_rdata[PIdx::ux][idx1_in];
@@ -151,151 +160,116 @@ namespace {
         amrex::ParticleReal const g1s = ( 1._prt - vcDv1*inv_c2 )*gc*g1;
         amrex::ParticleReal const g2s = ( 1._prt - vcDv2*inv_c2 )*gc*g2;
 
-        // Compute relative velocity in center-of-momentum frame
-        // (not a Lorentz invariant quantity)
-        amrex::ParticleReal const muRst = g1s*m1*g2s*m2/(g1s*m1 + g2s*m2);
-        amrex::ParticleReal const vrelst = p1sm/muRst; // |v1s - v2s|. When m1=m2 = m, 2*p1sm / m
-
-        // Compute invariant relative velocity in center-of-momentum frame
-        // (Lorentz invariant quantity)
-        amrex::ParticleReal const denom = 1._prt + p1sm*p1sm/(m1*g1s*m2*g2s)*inv_c2; // (1.0 - v1s*v2s/c^2)
-        amrex::ParticleReal const vrelst_invar = vrelst/denom; // |v1s - v2s|/(1.0 - v1s*v2s/c^2)
-
         // Compute s12
         amrex::ParticleReal s12 = 0;
         if (p1sm > std::numeric_limits<amrex::ParticleReal>::min()) {
 
             // Define minimum theta in radians
-            amrex::ParticleReal const theta_min = 0.01_prt //~0.5 degrees
+            amrex::ParticleReal const theta_min = 0.01_prt; //~0.5 degrees. This must be set from the configuration. Also check ElasticBhabhaMollerCollisionFunc.H
             s12 = (16*MathConst::pi*MathConst::pi* PhysConst::r_e* PhysConst::r_e)*(p1sm / m1 / PhysConst::c)*(p1sm / m1 / PhysConst::c)* TreeLevelElasticBhabhaCrossSectionAngularPart(theta_min);
 
         }
 
-        // Only modify momenta if s12 is non-zero
-        if (s12 > std::numeric_limits<amrex::ParticleReal>::min()) {
+        // Get random numbers
+        amrex::ParticleReal r = amrex::Random(engine);
 
-            // Get random numbers
-            amrex::ParticleReal r = amrex::Random(engine);
-
-            // Compute scattering angle
-            amrex::ParticleReal cosXs;
-            amrex::ParticleReal sinXs;
+        // Compute scattering angle
+        amrex::ParticleReal cosXs;
+        amrex::ParticleReal sinXs;
 
 
-            // Newton-Raphson method between 0 and s12.
-            amrex::ParticleReal const sample_point = r * s12;
-            // Iteratively find angle which corresponds to the sample point.
-            amrex::ParticleReal const theta_guess = 0.5_prt * MathConst::pi;
-            while (true) {
-                amrex::ParticleReal const f = TreeLevelElasticBhabhaCrossSectionAngularPart(theta_guess) - sample_point;
-                amrex::ParticleReal const df = TreeLevelElasticBhabhaCrossSectionAngularPartDerivative(theta_guess);
-                //For theta_min = 0.05, sample_point must range from 0 to 31.5
-                if (std::abs(f) < 1e-6_prt) break;
-                theta_guess -= f / df;
-            }
-            cosXs = std::cos(theta_guess);
-            sinXs = std::sin(theta_guess)
+        // Newton-Raphson method between 0 and s12.
+        amrex::ParticleReal const sample_point = r * s12;
+        // Iteratively find angle which corresponds to the sample point.
+        amrex::ParticleReal theta_guess = 0.5_prt * MathConst::pi;
+        while (true) {
+            amrex::ParticleReal const f = TreeLevelElasticBhabhaCrossSectionAngularPart(theta_guess) - sample_point;
+            amrex::ParticleReal const df = TreeLevelElasticBhabhaCrossSectionAngularPartDerivative(theta_guess);
+            //For theta_min = 0.05, sample_point must range from 0 to 31.5
+            if (std::abs(f) < 1e-6_prt) break;
+            theta_guess -= f / df;
+        }
+        cosXs = std::cos(theta_guess);
+        sinXs = std::sin(theta_guess);
 
-            // Get random azimuthal angle
-            amrex::ParticleReal const phis = amrex::Random(engine) * 2.0_prt * MathConst::pi;
-            amrex::ParticleReal const cosphis = std::cos(phis);
-            amrex::ParticleReal const sinphis = std::sin(phis);
+        // Get random azimuthal angle
+        amrex::ParticleReal const phis = amrex::Random(engine) * 2.0_prt * MathConst::pi;
+        amrex::ParticleReal const cosphis = std::cos(phis);
+        amrex::ParticleReal const sinphis = std::sin(phis);
 
-            // Compute post-collision momenta pfs in COM
-            amrex::ParticleReal p1fsx;
-            amrex::ParticleReal p1fsy;
-            amrex::ParticleReal p1fsz;
-            // p1sp is the p1s perpendicular
-            amrex::ParticleReal p1sp = std::sqrt( p1sx*p1sx + p1sy*p1sy );
-            // Make sure p1sp is not almost zero
-            if ( p1sp > std::numeric_limits<amrex::ParticleReal>::min() )
-            {
-                p1fsx = ( p1sx*p1sz/p1sp ) * sinXs*cosphis +
-                        ( p1sy*p1sm/p1sp ) * sinXs*sinphis +
-                        ( p1sx           ) * cosXs;
-                p1fsy = ( p1sy*p1sz/p1sp ) * sinXs*cosphis +
-                        (-p1sx*p1sm/p1sp ) * sinXs*sinphis +
-                        ( p1sy           ) * cosXs;
-                p1fsz = (-p1sp           ) * sinXs*cosphis +
-                        ( 0.0_prt        ) * sinXs*sinphis +
-                        ( p1sz           ) * cosXs;
-                // Note a negative sign is different from
-                // Eq. (12) in Perez's paper,
-                // but they are the same due to the random nature of phis.
-            }
-            else
-            {
-                // If the previous p1sp is almost zero
-                // x->y  y->z  z->x
-                // This set is equivalent to the one in Nanbu's paper
-                p1sp = std::sqrt( p1sy*p1sy + p1sz*p1sz );
-                p1fsy = ( p1sy*p1sx/p1sp ) * sinXs*cosphis +
-                        ( p1sz*p1sm/p1sp ) * sinXs*sinphis +
-                        ( p1sy           ) * cosXs;
-                p1fsz = ( p1sz*p1sx/p1sp ) * sinXs*cosphis +
-                        (-p1sy*p1sm/p1sp ) * sinXs*sinphis +
-                        ( p1sz           ) * cosXs;
-                p1fsx = (-p1sp           ) * sinXs*cosphis +
-                        ( 0.0_prt        ) * sinXs*sinphis +
-                        ( p1sx           ) * cosXs;
-            }
+        // Compute post-collision momenta pfs in COM
+        amrex::ParticleReal p1fsx;
+        amrex::ParticleReal p1fsy;
+        amrex::ParticleReal p1fsz;
+        // p1sp is the p1s perpendicular
+        amrex::ParticleReal p1sp = std::sqrt( p1sx*p1sx + p1sy*p1sy );
+        // Make sure p1sp is not almost zero
+        if ( p1sp > std::numeric_limits<amrex::ParticleReal>::min() )
+        {
+            p1fsx = ( p1sx*p1sz/p1sp ) * sinXs*cosphis +
+                    ( p1sy*p1sm/p1sp ) * sinXs*sinphis +
+                    ( p1sx           ) * cosXs;
+            p1fsy = ( p1sy*p1sz/p1sp ) * sinXs*cosphis +
+                    (-p1sx*p1sm/p1sp ) * sinXs*sinphis +
+                    ( p1sy           ) * cosXs;
+            p1fsz = (-p1sp           ) * sinXs*cosphis +
+                    ( 0.0_prt        ) * sinXs*sinphis +
+                    ( p1sz           ) * cosXs;
+            // Note a negative sign is different from
+            // Eq. (12) in Perez's paper,
+            // but they are the same due to the random nature of phis.
+        }
+        else
+        {
+            // If the previous p1sp is almost zero
+            // x->y  y->z  z->x
+            // This set is equivalent to the one in Nanbu's paper
+            p1sp = std::sqrt( p1sy*p1sy + p1sz*p1sz );
+            p1fsy = ( p1sy*p1sx/p1sp ) * sinXs*cosphis +
+                    ( p1sz*p1sm/p1sp ) * sinXs*sinphis +
+                    ( p1sy           ) * cosXs;
+            p1fsz = ( p1sz*p1sx/p1sp ) * sinXs*cosphis +
+                    (-p1sy*p1sm/p1sp ) * sinXs*sinphis +
+                    ( p1sz           ) * cosXs;
+            p1fsx = (-p1sp           ) * sinXs*cosphis +
+                    ( 0.0_prt        ) * sinXs*sinphis +
+                    ( p1sx           ) * cosXs;
+        }
 
-            amrex::ParticleReal const p2fsx = -p1fsx;
-            amrex::ParticleReal const p2fsy = -p1fsy;
-            amrex::ParticleReal const p2fsz = -p1fsz;
+        amrex::ParticleReal const p2fsx = -p1fsx;
+        amrex::ParticleReal const p2fsy = -p1fsy;
+        amrex::ParticleReal const p2fsz = -p1fsz;
 
-            // Transform from COM to lab frame
-            amrex::ParticleReal const vcDp1fs = vcx*p1fsx + vcy*p1fsy + vcz*p1fsz;
-            amrex::ParticleReal const vcDp2fs = vcx*p2fsx + vcy*p2fsy + vcz*p2fsz;
-            /* factor = (gc-1.0)/vcms; Rewrite to avoid subtraction losing precision when gc is close to 1 */
-            amrex::ParticleReal const factor = gc*gc*inv_c2/(gc+amrex::ParticleReal(1.0));
-            amrex::ParticleReal const factor1 = factor*vcDp1fs + m1*g1s*gc;
-            amrex::ParticleReal const factor2 = factor*vcDp2fs + m2*g2s*gc;
-            amrex::ParticleReal const p1fx = p1fsx + vcx * factor1;
-            amrex::ParticleReal const p1fy = p1fsy + vcy * factor1;
-            amrex::ParticleReal const p1fz = p1fsz + vcz * factor1;
-            amrex::ParticleReal const p2fx = p2fsx + vcx * factor2;
-            amrex::ParticleReal const p2fy = p2fsy + vcy * factor2;
-            amrex::ParticleReal const p2fz = p2fsz + vcz * factor2;
-
-            // Rejection method
-            r = amrex::Random(engine);
-            if ( w2 > r*amrex::max(w1, w2) )
-            {
-                u1x  = p1fx / m1;
-                u1y  = p1fy / m1;
-                u1z  = p1fz / m1;
-            }
-            r = amrex::Random(engine);
-            if ( w1 > r*amrex::max(w1, w2) )
-            {
-                u2x  = p2fx / m2;
-                u2y  = p2fy / m2;
-                u2z  = p2fz / m2;
-            }
-        #ifndef AMREX_USE_DPCPP
-                AMREX_ASSERT(!std::isnan(u1x+u1y+u1z+u2x+u2y+u2z));
-                AMREX_ASSERT(!std::isinf(u1x+u1y+u1z+u2x+u2y+u2z));
-        #endif
-
-        } // if s > std::numeric_limits<amrex::ParticleReal>::min()
+        // Transform from COM to lab frame
+        amrex::ParticleReal const vcDp1fs = vcx*p1fsx + vcy*p1fsy + vcz*p1fsz;
+        amrex::ParticleReal const vcDp2fs = vcx*p2fsx + vcy*p2fsy + vcz*p2fsz;
+        /* factor = (gc-1.0)/vcms; Rewrite to avoid subtraction losing precision when gc is close to 1 */
+        amrex::ParticleReal const factor = gc*gc*inv_c2/(gc+amrex::ParticleReal(1.0));
+        amrex::ParticleReal const factor1 = factor*vcDp1fs + m1*g1s*gc;
+        amrex::ParticleReal const factor2 = factor*vcDp2fs + m2*g2s*gc;
+        amrex::ParticleReal const p1fx = p1fsx + vcx * factor1;
+        amrex::ParticleReal const p1fy = p1fsy + vcy * factor1;
+        amrex::ParticleReal const p1fz = p1fsz + vcz * factor1;
+        amrex::ParticleReal const p2fx = p2fsx + vcx * factor2;
+        amrex::ParticleReal const p2fy = p2fsy + vcy * factor2;
+        amrex::ParticleReal const p2fz = p2fsz + vcz * factor2;
 
         // Fill momentum of product species (note that we actually
         // create 4 products, 2 at the position of each incident particle)
-        // - Scattered photon
-        soa1_out.m_rdata[PIdx::ux][idx1_out_start] = u1x;
-        soa1_out.m_rdata[PIdx::uy][idx1_out_start] = u1y;
-        soa1_out.m_rdata[PIdx::uz][idx1_out_start] = u1z;
-        soa1_out.m_rdata[PIdx::ux][idx1_out_start + 1] = u1x;
-        soa1_out.m_rdata[PIdx::uy][idx1_out_start + 1] = u1x;
-        soa1_out.m_rdata[PIdx::uz][idx1_out_start + 1] = u1x;
-        // - Scattered electron (obtained by conserving momentum)
-        soa2_out.m_rdata[PIdx::ux][idx2_out_start] = u2x;
-        soa2_out.m_rdata[PIdx::uy][idx2_out_start] = u2y;
-        soa2_out.m_rdata[PIdx::uz][idx2_out_start] = u2z;
-        soa2_out.m_rdata[PIdx::ux][idx2_out_start + 1] = u2x;
-        soa2_out.m_rdata[PIdx::uy][idx2_out_start + 1] = u2y;
-        soa2_out.m_rdata[PIdx::uz][idx2_out_start + 1] = u2z;
+        // - Scattered electron
+        soa1_out.m_rdata[PIdx::ux][idx1_out_start] = p1fx / m1;
+        soa1_out.m_rdata[PIdx::uy][idx1_out_start] = p1fy / m1;
+        soa1_out.m_rdata[PIdx::uz][idx1_out_start] = p1fz / m1;
+        soa1_out.m_rdata[PIdx::ux][idx1_out_start + 1] = p1fx / m1;
+        soa1_out.m_rdata[PIdx::uy][idx1_out_start + 1] = p1fy / m1;
+        soa1_out.m_rdata[PIdx::uz][idx1_out_start + 1] = p1fz / m1;
+        // - Scattered electron
+        soa2_out.m_rdata[PIdx::ux][idx2_out_start] = p2fx / m2;
+        soa2_out.m_rdata[PIdx::uy][idx2_out_start] = p2fy / m2;
+        soa2_out.m_rdata[PIdx::uz][idx2_out_start] = p2fz / m2;
+        soa2_out.m_rdata[PIdx::ux][idx2_out_start + 1] = p2fx / m2;
+        soa2_out.m_rdata[PIdx::uy][idx2_out_start + 1] = p2fy / m2;
+        soa2_out.m_rdata[PIdx::uz][idx2_out_start + 1] = p2fz / m2;
     }
 }
 
