@@ -26,7 +26,7 @@ algo.particle_shape = 1
 #################################
 ############ PLASMA #############
 #################################
-particles.species_names = electron1 electron2 electron3 electron4
+particles.species_names = electron1 positron1 electron2 positron2
 
 electron1.species_type = electron
 electron1.injection_style = "SingleParticle"
@@ -35,28 +35,28 @@ electron1.single_particle_u = -2.8 0 0
 electron1.single_particle_weight = 1e14
 electron1.do_not_push = 1
 
+positron1.species_type = positron
+positron1.injection_style = "SingleParticle"
+positron1.single_particle_pos = 0 0 0
+positron1.single_particle_u = 2.8 0 0
+positron1.single_particle_weight = 1e14
+positron1.do_not_push = 1
+
 electron2.species_type = electron
-electron2.injection_style = "SingleParticle"
-electron2.single_particle_pos = 0 0 0
-electron2.single_particle_u = 2.8 0 0
-electron2.single_particle_weight = 1e14
+electron2.injection_style = "None"
 electron2.do_not_push = 1
 
-electron3.species_type = electron
-electron3.injection_style = "None"
-electron3.do_not_push = 1
-
-electron4.species_type = electron
-electron4.injection_style = "None"
-electron4.do_not_push = 1
+positron2.species_type = positron
+positron2.injection_style = "None"
+positron2.do_not_push = 1
 
 #################################
 ############ COLLISION ##########
 #################################
 collisions.collision_names = eb # elastic Bhabha
-eb.species = electron1 electron2
-eb.product_species = electron3 electron4
-eb.type = elastic_bhabha
+eb.species = electron1 positron1
+eb.product_species = electron2 positron2
+eb.type = elastic_bhabha_moller
 eb.event_multiplier = 1.
 eb.probability_threshold = 0.5
 eb.probability_target_value = 0.02
@@ -71,7 +71,7 @@ diag1.format = openpmd
 
 my_constants.out_freq_red = 1
 # Reduced diagnostics
-warpx.reduced_diags_names = FieldEnergy FieldMomentum FieldMaximum ParticleExtrema_electron1 ParticleExtrema_electron2 ParticleExtrema_electron3 ParticleExtrema_electron4 ParticleEnergy ParticleMomentum RhoMaximum ParticleNumber
+warpx.reduced_diags_names = FieldEnergy FieldMomentum FieldMaximum ParticleExtrema_electron1 ParticleExtrema_positron1 ParticleExtrema_electron2 ParticleExtrema_positron2 ParticleEnergy ParticleMomentum RhoMaximum ParticleNumber
 
 FieldEnergy.type = FieldEnergy
 FieldEnergy.intervals = out_freq_red
@@ -86,17 +86,17 @@ ParticleExtrema_electron1.type = ParticleExtrema
 ParticleExtrema_electron1.intervals = out_freq_red
 ParticleExtrema_electron1.species = electron1
 
+ParticleExtrema_positron1.type = ParticleExtrema
+ParticleExtrema_positron1.intervals = out_freq_red
+ParticleExtrema_positron1.species = positron1
+
 ParticleExtrema_electron2.type = ParticleExtrema
 ParticleExtrema_electron2.intervals = out_freq_red
 ParticleExtrema_electron2.species = electron2
 
-ParticleExtrema_electron3.type = ParticleExtrema
-ParticleExtrema_electron3.intervals = out_freq_red
-ParticleExtrema_electron3.species = electron3
-
-ParticleExtrema_electron4.type = ParticleExtrema
-ParticleExtrema_electron4.intervals = out_freq_red
-ParticleExtrema_electron4.species = electron4
+ParticleExtrema_positron2.type = ParticleExtrema
+ParticleExtrema_positron2.intervals = out_freq_red
+ParticleExtrema_positron2.species = positron2
 
 ParticleEnergy.type = ParticleEnergy
 ParticleEnergy.intervals = out_freq_red
