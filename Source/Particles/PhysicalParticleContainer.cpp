@@ -1405,42 +1405,22 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
             scaleFields(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
         }
 
-#ifdef WARPX_QED
-        if (!do_sync)
-#endif
-        {
-            if (copy_particle_attribs) {
-                //  Copy the old x and u for the BTD
-                copyAttribs(ip);
-            }
+        if (copy_particle_attribs) {
+            //  Copy the old x and u for the BTD
+            copyAttribs(ip);
+        }
 
-            if (momentum_push_type != DtType::None) {
+#ifdef WARPX_QED
+        if (momentum_push_type != DtType::None) {
+            if (!do_sync) {
                 doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
                                           Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                           ion_lev ? ion_lev[ip] : 1,
                                           m, q, pusher_algo, do_crr,
-#ifdef WARPX_QED
                                           t_chi_max,
-#endif
                                           dt);
-            }
-
-            amrex::Real position_dt = dt;
-            if (position_push_type == DtType::FirstHalf || position_push_type == DtType::SecondHalf) {
-                position_dt *= 0.5_rt;
-            }
-            UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], position_dt);
-            setPosition(ip, xp, yp, zp);
-        }
-#ifdef WARPX_QED
-        else {
-            if constexpr (qed_control == has_qed) {
-                if (copy_particle_attribs) {
-                    //  Copy the old x and u for the BTD
-                    copyAttribs(ip);
-                }
-
-                if (momentum_push_type != DtType::None) {
+            } else {
+                if constexpr (qed_control == has_qed) {
                     doParticleMomentumPush<1>(ux[ip], uy[ip], uz[ip],
                                               Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                               ion_lev ? ion_lev[ip] : 1,
@@ -1448,16 +1428,24 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                                               t_chi_max,
                                               dt);
                 }
-
-                amrex::Real position_dt = dt;
-                if (position_push_type == DtType::FirstHalf || position_push_type == DtType::SecondHalf) {
-                    position_dt *= 0.5_rt;
-                }
-                UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], position_dt);
-                setPosition(ip, xp, yp, zp);
             }
         }
+#else
+        if (momentum_push_type != DtType::None) {
+            doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
+                                      Exp, Eyp, Ezp, Bxp, Byp, Bzp,
+                                      ion_lev ? ion_lev[ip] : 1,
+                                      m, q, pusher_algo, do_crr,
+                                      dt);
+        }
 #endif
+
+        amrex::Real position_dt = dt;
+        if (position_push_type == DtType::FirstHalf || position_push_type == DtType::SecondHalf) {
+            position_dt *= 0.5_rt;
+        }
+        UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], position_dt);
+        setPosition(ip, xp, yp, zp);
 
 #ifdef WARPX_QED
         [[maybe_unused]] auto foo_local_has_quantum_sync = local_has_quantum_sync;
