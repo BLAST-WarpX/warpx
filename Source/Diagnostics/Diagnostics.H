@@ -31,17 +31,17 @@ enum struct DiagTypes
     TimeAveraged
 };
 
-/** A struct containing the parameters required to initialize a diagnostics */
+/** A struct containing the parameters required to initialize a diagnostic */
 struct InitDiagnosticsParameters
 {
-    std::optional<int> finest_level;
-    std::optional<int> max_level;
+    std::optional<int> finest_level; /** The finest level */
+    std::optional<int> max_level;    /** The max level */
 
-    std::optional<int> do_moving_window;
-    std::optional<int> moving_window_dir;
-    std::optional<amrex::Real> moving_window_x;
-    std::optional<amrex::Real> cell_size_lev0_mwdir;
-    std::optional<amrex::Real> prob_lo_lev0_mwdir;
+    std::optional<int> do_moving_window;             /** Flag to tell if the moving window is enabled */
+    std::optional<int> moving_window_dir;            /** The moving window direction */
+    std::optional<amrex::Real> moving_window_x;      /** The moving window position */
+    std::optional<amrex::Real> cell_size_lev0_mwdir; /** The cell size in the moving window direction (at level 0)*/
+    std::optional<amrex::Real> prob_lo_lev0_mwdir;   /** The lo end of the problem domain in the moving window direction (at level 0)*/
 };
 
 /**
@@ -94,7 +94,11 @@ public:
      */
     virtual void Flush (int i_buffer, bool force_flush) = 0;
 
-    /** Initialize pointers to main fields and allocate output multifab m_mf_output. */
+    /** \brief * Initialize pointers to main fields and allocate output multifab m_mf_output.
+     *
+     * @param[in] params struct containing the essential parameters required to initialize a diagnostic
+     * @param[in] p_warpx_mesh a pointer to the base class of the WarpX object
+     */
     void InitData (const InitDiagnosticsParameters& params, amrex::AmrMesh* p_warpx_mesh);
     void InitDataBeforeRestart (const InitDiagnosticsParameters& params, amrex::AmrMesh* p_warpx_mesh);
     void InitDataAfterRestart ();
