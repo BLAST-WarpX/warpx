@@ -137,8 +137,7 @@ public:
                          amrex::Real dt, ScaleFields scaleFields,
                          long & num_unconverged_particles,
                          amrex::Gpu::DeviceVector<long> & unconverged_indices,
-                         amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights,
-                         DtType a_dt_type=DtType::Full);
+                         amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
 
     void ImplicitPushXPSubOrbits (WarpXParIter& pti, ablastr::fields::MultiFabRegister& fields,
                                   amrex::FArrayBox const * exfab,
