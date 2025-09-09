@@ -9,6 +9,7 @@
 
 #include "LinearFunction.H"
 #include "CurlCurlMLMGPC.H"
+#include "PetscPC.H"
 #include "JacobiPC.H"
 #include "Utils/TextMsg.H"
 #include <AMReX_Config.H>
@@ -55,6 +56,18 @@ class JacobianFunctionMF : public LinearFunction<T,Ops>
     {
         if (m_usePreCond) { m_preCond->Update(a_X); }
     }
+
+    inline
+    void getPCMatrix( amrex::Gpu::DeviceVector<int>& a_ridx_g,
+                      amrex::Gpu::DeviceVector<int>& a_nnz,
+                      amrex::Gpu::DeviceVector<int>& a_cidx_g,
+                      amrex::Gpu::DeviceVector<RT>&  a_aij,
+                      int& a_n, int& a_ncols_max ) override
+    {
+        AMREX_ALWAYS_ASSERT(m_usePreCond);
+        m_preCond->getPCMatrix(a_ridx_g, a_nnz, a_cidx_g, a_aij, a_n, a_ncols_max);
+    }
+
 
     T makeVecLHS () const override;
     T makeVecRHS () const override;
@@ -155,7 +168,7 @@ void JacobianFunctionMF<T,Ops>::define ( const T& a_U,
             m_preCond = std::make_unique<JacobiPC<T,Ops>>();
         } else if (m_pc_type == PreconditionerType::pc_petsc) {
 #ifdef AMREX_USE_PETSC
-            WARPX_ABORT_WITH_MESSAGE("JacobianFunctionMF::Define(): pc_petsc not yet implemented");
+            m_preCond = std::make_unique<PetscPC<T,Ops>>();
 #else
             WARPX_ABORT_WITH_MESSAGE("JacobianFunctionMF::Define(): must compile with PETSc to use pc_petsc (AMREX_USE_PETSC must be defined)");
 #endif

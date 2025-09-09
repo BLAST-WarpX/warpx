@@ -9,6 +9,7 @@
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "Preconditioner.H"
 
+#include <AMReX.H>
 #include <AMReX_Config.H>
 #include <AMReX_REAL.H>
 #include <AMReX_ParallelContext.H>
@@ -132,6 +133,7 @@ KSP_impl::KSP_impl(LinOpType& a_op)
 
     m_ksp = new KSPObj;
     m_A = new MatObj;
+    m_P = new MatObj;
     m_x = new VecObj;
     m_b = new VecObj;
 }
@@ -140,6 +142,7 @@ KSP_impl::~KSP_impl()
 {
     delete m_ksp;
     delete m_A;
+    delete m_P;
     delete m_x;
     delete m_b;
 
@@ -203,9 +206,26 @@ void KSP_impl::createObjects(const VecType& a_vec)
     KSPGetPC(m_ksp->obj, &pc);
     auto pc_type = m_op->pcType();
     if (pc_type != PreconditionerType::pc_petsc) {
+        // use native implementation (or no PC, if
+        // native PC is turned off)
         PCSetType(pc, PCSHELL);
         PCShellSetApply(pc, applyNativePC);
         PCShellSetContext(pc, this);
+    } else {
+        // use PETSc options and implementation for PC
+        PCSetFromOptions(pc);
+        // set up the PC sparse matrix
+        MatCreate( PETSC_COMM_WORLD, &m_P->obj );
+        MatSetSizes( m_P->obj,
+                     m_ndofs_l, m_ndofs_l,
+                     PETSC_DETERMINE, PETSC_DETERMINE );
+        MatSetType( m_P->obj, MATAIJ );
+        MatMPIAIJSetPreallocation( m_P->obj, 1 /*a_ops->numPCMatBands()*/, NULL,
+                                             1 /*a_ops->numPCMatBands()-1*/, NULL);
+        MatSeqAIJSetPreallocation( m_P->obj, 1 /*a_ops->numPCMatBands()*/, NULL);
+        MatSetOption(m_P->obj, MAT_NEW_NONZERO_LOCATION_ERR, PETSC_FALSE);
+        MatSetOption(m_P->obj, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
+        MatSetUp(m_P->obj);
     }
 
     // it is now defined
@@ -251,6 +271,11 @@ void KSP_impl::solve(VecType& a_Y, const VecType& a_R)
     AMREX_ALWAYS_ASSERT(isDefined());
     copyVec(m_x->obj, a_Y);
     copyVec(m_b->obj, a_R);
+
+    if (m_op->pcType() == PreconditionerType::pc_petsc) {
+        assemblePCMat(a_Y);
+    }
+
     KSPSolve(m_ksp->obj, m_b->obj, m_x->obj);
     copyVec(a_Y, m_x->obj);
 
@@ -269,6 +294,43 @@ void KSP_impl::setVerbose(int a_v)
                        (PetscErrorCode (*)(KSP, PetscInt, PetscReal, void *))KSPMonitorResidual,
                        NULL, NULL );
     }
+}
+
+void KSP_impl::assemblePCMat(const VecType& a_Y)
+{
+    BL_PROFILE("KSP_impl::assemblePCMat()");
+    amrex::ignore_unused(a_Y);
+
+    AMREX_ALWAYS_ASSERT(isDefined());
+    AMREX_ALWAYS_ASSERT(m_P != nullptr);
+
+    PetscInt n = -1;
+    PetscInt ncols_max = -1;
+    amrex::Gpu::DeviceVector<int> r_indices_g; // global row indices
+    amrex::Gpu::DeviceVector<int> n_nz_cols; // number of non-zero columns for each row
+    amrex::Gpu::DeviceVector<int> c_indices_g; // non-zero column indices (row-major)
+    amrex::Gpu::DeviceVector<amrex::Real> a_ij;
+
+    m_op->getPCMatrix( r_indices_g, n_nz_cols, c_indices_g, a_ij, n, ncols_max );
+
+    const auto r_indices_g_ptr = r_indices_g.data();
+    const auto n_nz_cols_ptr = n_nz_cols.data();
+    const auto c_indices_g_ptr = c_indices_g.data();
+    const auto a_ij_ptr = a_ij.data();
+
+    amrex::ParallelFor(n, [=] AMREX_GPU_DEVICE (int i)
+    {
+        MatSetValues( m_P->obj,
+                      1,
+                      &r_indices_g_ptr[i],
+                      n_nz_cols_ptr[i],
+                      &c_indices_g_ptr[i*ncols_max],
+                      &a_ij_ptr[i*ncols_max],
+                      INSERT_VALUES );
+    });
+
+    MatAssemblyBegin(m_P->obj, MAT_FINAL_ASSEMBLY);
+    MatAssemblyEnd(m_P->obj, MAT_FINAL_ASSEMBLY);
 }
 
 }

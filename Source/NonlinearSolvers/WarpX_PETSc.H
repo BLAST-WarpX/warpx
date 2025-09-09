@@ -86,8 +86,8 @@ class KSP_impl
         //! Apply PC op on given vector
         void applyPC( VecType& a_F, const VecType& a_U);
 
-        /* the following are not private to let them be accessible from
-         * non-member functions passed to PETSc */
+        //! Assemble the sparse matrix representation of preconditioner
+        void assemblePCMat( const VecType& a_Y);
 
         //! Work vector
         VecType m_U;
@@ -131,6 +131,8 @@ class KSP_impl
         KSPObj* m_ksp = nullptr;
         //! Matrix (lin operator) object
         MatObj* m_A = nullptr;
+        //! Matrix (PC) object
+        MatObj* m_P = nullptr;
         //! solution vector
         VecObj* m_x = nullptr;
         //! right-hand-side vector

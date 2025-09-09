@@ -315,6 +315,9 @@ public:
     // return the number of AMR levels
     inline auto numAMRLevels () const { return m_num_amr_levels; }
 
+    // return DOFs object pointer
+    inline const auto& getDOFsObject () const { return m_dofs; }
+
 private:
 
     bool m_is_defined = false;
