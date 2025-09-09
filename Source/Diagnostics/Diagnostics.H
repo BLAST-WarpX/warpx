@@ -41,7 +41,7 @@ struct InitDiagnosticsParameters
     std::optional<int> moving_window_dir;
     std::optional<amrex::Real> moving_window_x;
     std::optional<amrex::Real> cell_size_lev0_mwdir;
-    std::optional<amrex::Real> amrex_prob_lo_moving_window_dir;
+    std::optional<amrex::Real> prob_lo_lev0_mwdir;
 };
 
 /**
