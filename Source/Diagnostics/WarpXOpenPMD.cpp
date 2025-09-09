@@ -677,9 +677,9 @@ WarpXOpenPMDPlot::FlushBTDToDisk()
 {
     bool isBTD = true;
     auto hasOption = m_OpenPMDoptions.find("FlattenSteps");
-    const bool doFlattenSteps = (m_Series->backend() == "ADIOS2") && (hasOption != std::string::npos);
+    const bool flattenSteps = (m_Series->backend() == "ADIOS2") && (hasOption != std::string::npos);
 
-    if (doFlattenSteps)
+    if (flattenSteps)
     {
         WARPX_PROFILE("WarpXOpenPMDPlot::ForceFlush()");
         // Here for checkpointing purpose, we ask ADIOS to create to a new step, which
