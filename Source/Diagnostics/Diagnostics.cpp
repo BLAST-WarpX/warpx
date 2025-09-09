@@ -519,7 +519,7 @@ Diagnostics::InitBaseData (const InitDiagnosticsParameters& params, [[maybe_unus
 
     // For restart, move the m_lo and m_hi of the diag consistent with the
     // current moving_window location
-    if (params.do_moving_window) {
+    if (params.do_moving_window.value()) {
         const int moving_dir = params.moving_window_dir.value();
         const amrex::Real displacement =
             params.moving_window_x.value() - params.prob_lo_lev0_mwdir.value();
