@@ -1429,6 +1429,8 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
     // collective open
     series_iteration.open();
 
+    bool hasADIOS =  (m_Series->backend() == "ADIOS2");
+
     auto meshes = series_iteration.meshes;
     if (first_write_to_iteration) {
         // lets see whether full_geom varies from geom[0]   xgeom[1]
@@ -1541,22 +1543,30 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                     }
                 }  else
 #endif
-                {
-                  WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::CPU_span()");
-                  auto dynamicMemoryView = mesh_comp.storeChunk<amrex::Real>(
-                         chunk_offset, chunk_size,
-                         [&local_box](size_t /* size */) {
+                { // CPU
+		  if (hasADIOS)
+		    {
+                      WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::CPU_span()");
+                      auto dynamicMemoryView = mesh_comp.storeChunk<amrex::Real>(
+			   chunk_offset, chunk_size,
+                           [&local_box](size_t /* size */) {
                               amrex::BaseFab<amrex::Real> foo(local_box, 1);
                               std::shared_ptr<amrex::Real> data_pinned(foo.release());
                               return data_pinned;
-                          });
+                            });
 
-                   auto span = dynamicMemoryView.currentBuffer();
-                   std::memcpy(span.data(), fab.dataPtr(icomp), local_box.numPts()*sizeof(amrex::Real));
-                }
-            }
+                      auto span = dynamicMemoryView.currentBuffer();
+                      std::memcpy(span.data(), fab.dataPtr(icomp), local_box.numPts()*sizeof(amrex::Real));
+                    }
+		  else
+                    {
+                       WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::CPU_mesh()");
+                       amrex::Real const *local_data = fab.dataPtr(icomp);
+                       mesh_comp.storeChunkRaw( local_data, chunk_offset, chunk_size);
+                    }
+                } // CPU
+           }
         } // icomp store loop
-
 #ifdef AMREX_USE_GPU
         amrex::Gpu::streamSynchronize();
 #endif
