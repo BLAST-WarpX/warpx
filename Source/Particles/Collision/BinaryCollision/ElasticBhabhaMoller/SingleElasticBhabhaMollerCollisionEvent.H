@@ -46,7 +46,7 @@
  */
 template <typename index_type>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
-void SingleElasticBhabhaCollisionEvent (const amrex::ParticleReal& u1x, const amrex::ParticleReal& u1y,
+void SingleElasticBhabhaMollerCollisionEvent (const amrex::ParticleReal& u1x, const amrex::ParticleReal& u1y,
                                        const amrex::ParticleReal& u1z, const amrex::ParticleReal& u2x,
                                        const amrex::ParticleReal& u2y, const amrex::ParticleReal& u2z,
                                        amrex::ParticleReal w1, amrex::ParticleReal w2,
@@ -91,6 +91,8 @@ void SingleElasticBhabhaCollisionEvent (const amrex::ParticleReal& u1x, const am
     amrex::ParticleReal const p2y = u2y * m2;
     amrex::ParticleReal const p2z = u2z * m2;
 
+    amrex::ParticleReal constexpr inv_c2 = 1._prt / ( PhysConst::c * PhysConst::c );
+
     // Compute center-of-momentum (COM) velocity and gamma
     amrex::ParticleReal const mass_g = m1 * g1 + m2 * g2;
     amrex::ParticleReal const vcx    = (p1x+p2x) / mass_g;
@@ -100,17 +102,32 @@ void SingleElasticBhabhaCollisionEvent (const amrex::ParticleReal& u1x, const am
     amrex::ParticleReal const gc     = 1._prt / std::sqrt( 1._prt - vcms*inv_c_sq );
     // Factor that converts collision rate from rest frame to lab frame: ration of energies in rest frame and lab frame
     // (See L. D. Landau and E. M. Lifshitz. The classical theory of fields, Eq. 12.5, 12.6)
-    const amrex::ParticleReal lab_to_rest_frame_factor = gc
+    const amrex::ParticleReal lab_to_rest_frame_factor = gc;
     // sqrt( | v1 - v2 |^2  - | v1 x v2 |^2/c^2 ) evaluated in the rest frame
     const amrex::ParticleReal v_rel =  PhysConst::c;
 
+    // Compute vc dot v1 and v2
+    amrex::ParticleReal const vcDv1 = (vcx*u1x + vcy*u1y + vcz*u1z) / g1;
+
+    // Compute p1 star
+    // lorentz_transform_factor = ( (gc-1.0)/vcms*vcDv1 - gc )*m1*g1
+    // Rewrite by multiplying and dividing first term by (gc+1) to
+    // avoid loss of precision when gc is close to 1
+    amrex::ParticleReal const lorentz_transform_factor =
+            ( gc*gc*vcDv1*inv_c2/(1._prt + gc) - gc )*m1*g1;
+    amrex::ParticleReal const p1sx = p1x + vcx*lorentz_transform_factor;
+    amrex::ParticleReal const p1sy = p1y + vcy*lorentz_transform_factor;
+    amrex::ParticleReal const p1sz = p1z + vcz*lorentz_transform_factor;
+    amrex::ParticleReal const p1sm = std::sqrt( p1sx*p1sx + p1sy*p1sy + p1sz*p1sz );
+
+    amrex::ParticleReal const theta_min = 0.01_prt; //~0.5 degrees. This must be set from the configuration. Also check ElasticBhabhaMollerInitializeMomentum.H
     // Elastic Bhabha Tree level cross section.
     amrex::ParticleReal numerator = (
-        111._prt * std::cos(theta_m) +
-        6._prt * std::cos(2._prt * theta_m) +
-        std::cos(3 * theta_m) +
-        96._prt / (sin(theta_m / 2._prt)*sin(theta_m / 2._prt)) +
-        384._prt * std::log(std::sin(theta_m / 2._prt)) +
+        111._prt * std::cos(theta_min) +
+        6._prt * std::cos(2._prt * theta_min) +
+        std::cos(3 * theta_min) +
+        96._prt / (sin(theta_min / 2._prt)*sin(theta_min / 2._prt)) +
+        384._prt * std::log(std::sin(theta_min / 2._prt)) +
         10._prt
     );
     amrex::ParticleReal denominator = 1536._prt * MathConst::pi;

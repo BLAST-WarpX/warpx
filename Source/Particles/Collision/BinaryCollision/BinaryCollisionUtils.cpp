@@ -95,6 +95,33 @@ namespace BinaryCollisionUtils{
         else if (type == "elastic_bhabha_moller") {
             amrex::Vector<std::string> species_name;
             // Check that the colliding species are electron/positron
+            pp_collision_name.getarr("species", species_name);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                species_name.size() == 2u,
+                "Elastic Bhabha/Moller collisions must involve exactly two species");
+            auto& species1 = mypc->GetParticleContainerFromName(species_name[0]);
+            auto& species2 = mypc->GetParticleContainerFromName(species_name[1]);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( species1.AmIA<PhysicalSpecies::electron>() || species1.AmIA<PhysicalSpecies::positron>(),
+                "The first species in elastic Bhabha/Moller collisions must be an electron or positron");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( species2.AmIA<PhysicalSpecies::electron>() || species2.AmIA<PhysicalSpecies::positron>(),
+                "The second species in elastic Bhabha/Moller collisions must be an electron or positron");
+            // Check that product species are electron/positron
+            amrex::Vector<std::string> product_species_name;
+            pp_collision_name.getarr("product_species", product_species_name);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                product_species_name.size() == 2u,
+                "Elastic Bhabha/Moller collisions must contain exactly two product species");
+            auto& product_species1 = mypc->GetParticleContainerFromName(product_species_name[0]);
+            auto& product_species2 = mypc->GetParticleContainerFromName(product_species_name[1]);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( product_species1.AmIA<PhysicalSpecies::electron>() || product_species1.AmIA<PhysicalSpecies::positron>(),
+                "The first product species in elastic Bhabha/Moller collisions must be an electron or positron");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( product_species2.AmIA<PhysicalSpecies::electron>() || product_species2.AmIA<PhysicalSpecies::positron>(),
+                "The second product species in elastic Bhabha/Moller collisions must be an electron or positron");
+
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( species1.getSpeciesTypeName() == product_species1.getSpeciesTypeName(),
+                "The first incident species and the first product species in elastic Bhabha/Moller collisions must be of the same type");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( species2.getSpeciesTypeName() == product_species2.getSpeciesTypeName(),
+                "The second incident species and the second product species in elastic Bhabha/Moller collisions must be of the same type");
             return CollisionType::ElasticBhabhaMoller;
         }
 

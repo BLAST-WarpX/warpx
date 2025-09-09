@@ -8,7 +8,7 @@
 #ifndef ELASTIC_BHABHA_MOLLER_COLLISION_FUNC_H_
 #define ELASTIC_BHABHA_MOLLER_COLLISION_FUNC_H_
 
-#include "SingleLinearComptonCollisionEvent.H"
+#include "SingleElasticBhabhaMollerCollisionEvent.H"
 
 #include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
@@ -26,7 +26,7 @@
 #include <AMReX_Vector.H>
 
 /**
- * \brief This functor does perform linear Compton scattering on a single cell.
+ * \brief This functor does perform elastic bhabha/moller scattering on a single cell.
  *  Particles of the two colliding species are paired with each other and for each pair we compute
  *  if a pair-production event occurs. If so, we fill a mask (input parameter p_mask) with true so that
  *  product particles corresponding to a given pair can be effectively created in the particle
@@ -64,7 +64,7 @@ public:
         using namespace amrex::literals;
 
 #ifdef AMREX_SINGLE_PRECISION_PARTICLES
-        WARPX_ABORT_WITH_MESSAGE("Linear Compton scattering module does not currently work with single precision");
+        WARPX_ABORT_WITH_MESSAGE("Elastic Bhabha/Moller scattering module does not currently work with single precision");
 #endif
 
         amrex::ParmParse pp_collision_name(collision_name);
@@ -94,23 +94,9 @@ public:
 
     struct Executor {
         /**
-         * \brief Executor of the LinearComptonCollisionFunc class.
-         * Performs linear Compton scattering at the cell level using the algorithm described in
-         * Higginson et al., Journal of Computational Physics 388, 439-453 (2019).
-         * Note that this function does not yet create the product particles, but
-         * instead fills an array p_mask that stores which collisions result in a scattering event
-         *
-         * Also note that there are three main differences between this implementation and the
-         * algorithm described in Higginson's paper:
-         * - 1) The transformation from the lab frame to the center of mass frame is nonrelativistic
-         * in Higginson's paper. Here, we implement a relativistic generalization.
-         * - 2) The behaviour when the estimated probability is greater than one is not
-         * specified in Higginson's paper. Here, we provide an implementation using two runtime
-         * dependent parameters (probability threshold and probability target value). See
-         * documentation for more details.
-         * - 3) Here, we divide the weight of a particle by the number of times it is paired with other
-         * particles. This was not explicitly specified in Higginson's paper.
-         *
+         * \brief Executor of the ElasticBhabhaMollerCollisionFunc class.
+         * Performs elastic Bhabha/Moller scattering at the cell level.
+         * 
          * @param[in] I1s,I2s is the start index for I1,I2 (inclusive).
          * @param[in] I1e,I2e is the stop index for I1,I2 (exclusive).
          * @param[in] I1,I2 index arrays. They determine all elements that will be used.
@@ -204,7 +190,7 @@ public:
                     u1x[I1[i1]] = u1xbuf*std::cos(theta) - u1y[I1[i1]]*std::sin(theta);
                     u1y[I1[i1]] = u1xbuf*std::sin(theta) + u1y[I1[i1]]*std::cos(theta);
 #endif
-                    SingleLinearComptonCollisionEvent(
+                    SingleElasticBhabhaMollerCollisionEvent(
                         u1x[ I1[i1] ], u1y[ I1[i1] ], u1z[ I1[i1] ],
                         u2x[ I2[i2] ], u2y[ I2[i2] ], u2z[ I2[i2] ],
                         w1[ I1[i1] ], w2[ I2[i2] ],

@@ -16,7 +16,7 @@
 #include <limits> // numeric_limits<float>::min()
 
 /* \brief Update particle velocities according to
- *        F. Perez et al., Phys.Plasmas.19.083104 (2012),
+ *        F. Perez et al., Phys. Plasmas 19, 083104 (2012),
  *        which is based on Nanbu's method, PhysRevE.55.4642 (1997).
  *        @param[in] bmax is max(Debye length, minimal interparticle distance).
  *        @param[in] L is the Coulomb log. A fixed L will be used if L > 0,
