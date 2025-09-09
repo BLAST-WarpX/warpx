@@ -22,7 +22,7 @@ def check_final_macroparticles():
     macro_electron2_weight = np.loadtxt("diags/reducedfiles/ParticleNumber.txt")[-1, 9]
     assert macro_electron2_number == macro_electron1_number == 0.0
     assert macro_electron2_weight == macro_electron1_weight == 0.0
-    
+
     macro_electron3_number = np.loadtxt("diags/reducedfiles/ParticleNumber.txt")[-1, 5]
     macro_electron3_weight = np.loadtxt("diags/reducedfiles/ParticleNumber.txt")[-1, 10]
     macro_electron4_number = np.loadtxt("diags/reducedfiles/ParticleNumber.txt")[-1, 6]

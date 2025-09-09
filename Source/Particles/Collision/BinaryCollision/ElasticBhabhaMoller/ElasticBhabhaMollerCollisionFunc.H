@@ -96,7 +96,7 @@ public:
         /**
          * \brief Executor of the ElasticBhabhaMollerCollisionFunc class.
          * Performs elastic Bhabha/Moller scattering at the cell level.
-         * 
+         *
          * @param[in] I1s,I2s is the start index for I1,I2 (inclusive).
          * @param[in] I1e,I2e is the stop index for I1,I2 (exclusive).
          * @param[in] I1,I2 index arrays. They determine all elements that will be used.
