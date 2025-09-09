@@ -1530,8 +1530,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                         WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::D2H_Span()");
                         auto dynamicMemoryView = mesh_comp.storeChunk<amrex::Real>(
                              chunk_offset, chunk_size,
-                             [&local_box](size_t size) {
-                                  (void) size;
+                             [&local_box](size_t /* size */) {
                                   amrex::BaseFab<amrex::Real> foo(local_box, 1, amrex::The_Pinned_Arena());
                                   std::shared_ptr<amrex::Real> data_pinned(foo.release());
                                   return data_pinned;
