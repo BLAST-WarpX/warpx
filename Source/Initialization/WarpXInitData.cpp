@@ -916,7 +916,8 @@ WarpX::InitDiagnostics () {
     const auto init_diag_params = InitDiagnosticsParameters {
         finestLevel(), maxLevel(),
         do_moving_window, moving_window_dir,
-        moving_window_x, Geom(0).CellSize(moving_window_dir)};
+        moving_window_x, Geom(0).CellSize(moving_window_dir),
+        Geom(0).ProbLo(moving_window_dir)};
 
     auto* p_warpx_mesh = dynamic_cast<amrex::AmrMesh*>(this);
 
