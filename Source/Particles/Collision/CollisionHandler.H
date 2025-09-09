@@ -26,13 +26,15 @@ public:
     CollisionHandler (const MultiParticleContainer*  mypc);
 
     /* Perform all of the collisions */
-    void doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc);
+    void doCollisions (int step, amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc);
 
 private:
 
     amrex::Vector<std::string> collision_names;
     amrex::Vector<std::string> collision_types;
     amrex::Vector< std::unique_ptr<CollisionBase> > allcollisions;
+
+    bool m_use_global_debye_length = false;
 
 };
 

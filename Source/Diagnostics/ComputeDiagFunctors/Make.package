@@ -3,6 +3,7 @@ CEXE_sources += PartPerCellFunctor.cpp
 CEXE_sources += PartPerGridFunctor.cpp
 CEXE_sources += DivBFunctor.cpp
 CEXE_sources += DivEFunctor.cpp
+CEXE_sources += EBCoveredFunctor.cpp
 CEXE_sources += JFunctor.cpp
 CEXE_sources += JdispFunctor.cpp
 CEXE_sources += RhoFunctor.cpp

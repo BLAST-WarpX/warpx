@@ -54,4 +54,4 @@ export OMP_NUM_THREADS=1
 jsrun -r 4 -a1 -g 1 -c 7 -e prepended hostname > task_host_mapping.txt
 
 # run WarpX
-jsrun -r 4 -a 1 -g 1 -c 7 -l GPU-CPU -d packed -b rs -e prepended -M "-gpu" <path/to/executable> <input file> > output.txt
+jsrun -r 4 -a 1 -g 1 -c 7 -l GPU-CPU -d packed -b rs -e prepended <path/to/executable> <input file> > output.txt

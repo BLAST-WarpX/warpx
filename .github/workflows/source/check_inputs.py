@@ -5,7 +5,14 @@ import re
 import sys
 
 # mandatory prefixes for test names
-testname_prefix = ["test_1d_", "test_2d_", "test_3d_", "test_rz_"]
+testname_prefix = [
+    "test_1d_",
+    "test_2d_",
+    "test_3d_",
+    "test_rz_",
+    "test_rcylinder_",
+    "test_rsphere_",
+]
 
 # collect all test names and test input filenames from CMakeLists.txt files
 tests = []

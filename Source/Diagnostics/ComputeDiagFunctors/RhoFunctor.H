@@ -19,6 +19,7 @@ public:
      * \param[in] lev level of MultiFab
      * \param[in] crse_ratio coarsening ratio for interpolation of field values
      *                       from simulation MultiFabs to the output MultiFab mf_dst
+     * \param[in] apply_rz_psatd_filter if true, apply RZ filter in spectral space
      * \param[in] species_index Index of species to dump rho per species. This argument
      *                          is optional and defaults to -1 (dump total rho)
      * \param[in] convertRZmodes2cartesian if true, all RZ modes are averaged into one component

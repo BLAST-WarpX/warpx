@@ -760,7 +760,7 @@ WarpX::FillBoundaryE (const int lev, const PatchType patch_type, const amrex::In
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
         if (pml_rz[lev])
         {
-            pml_rz[lev]->FillBoundaryE(m_fields, patch_type, nodal_sync);
+            pml_rz[lev]->FillBoundaryE(m_fields, patch_type, do_single_precision_comms, nodal_sync);
         }
 #endif
     }
@@ -773,7 +773,7 @@ WarpX::FillBoundaryE (const int lev, const PatchType patch_type, const amrex::In
             "Error: in FillBoundaryE, requested more guard cells than allocated");
 
         const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
-        ablastr::utils::communication::FillBoundary(*mf[i], nghost, WarpX::do_single_precision_comms, period, nodal_sync);
+        ablastr::utils::communication::FillBoundary(*mf[i], nghost, do_single_precision_comms, period, nodal_sync);
     }
 }
 
@@ -825,7 +825,7 @@ WarpX::FillBoundaryB (const int lev, const PatchType patch_type, const amrex::In
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
         if (pml_rz[lev])
         {
-            pml_rz[lev]->FillBoundaryB(m_fields, patch_type, nodal_sync);
+            pml_rz[lev]->FillBoundaryB(m_fields, patch_type, do_single_precision_comms, nodal_sync);
         }
 #endif
     }
@@ -838,7 +838,7 @@ WarpX::FillBoundaryB (const int lev, const PatchType patch_type, const amrex::In
             "Error: in FillBoundaryB, requested more guard cells than allocated");
 
         const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
-        ablastr::utils::communication::FillBoundary(*mf[i], nghost, WarpX::do_single_precision_comms, period, nodal_sync);
+        ablastr::utils::communication::FillBoundary(*mf[i], nghost, do_single_precision_comms, period, nodal_sync);
     }
 }
 
@@ -1268,6 +1268,23 @@ WarpX::SyncCurrent (const std::string& current_fp_string)
 }
 
 void
+WarpX::SyncMassMatricesPC ()
+{
+    WARPX_PROFILE("WarpX::SyncMassMatricesPC()");
+
+    ablastr::fields::MultiLevelVectorField const& Sigma_fp = m_fields.get_mr_levels_alldirs("MassMatrices_PC", finest_level);
+
+    for (int idim = 0; idim < 3; ++idim)
+    {
+        for (int lev = finest_level; lev >= 0; --lev)
+        {
+            auto const& period = Geom(lev).periodicity();
+            SumBoundaryJ(Sigma_fp, lev, idim, period);
+        }
+    }
+}
+
+void
 WarpX::SyncRho () {
     bool const skip_lev0_coarse_patch = true;
     const ablastr::fields::MultiLevelScalarField rho_fp = m_fields.has(FieldType::rho_fp, 0) ?
@@ -1429,6 +1446,8 @@ void WarpX::SumBoundaryJ (
     {
 #if   defined(WARPX_DIM_1D_Z)
         ng_depos_J[0] += m_current_centering_noz / 2;
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        ng_depos_J[0] += m_current_centering_nox / 2;
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         ng_depos_J[0] += m_current_centering_nox / 2;
         ng_depos_J[1] += m_current_centering_noz / 2;
@@ -1463,19 +1482,20 @@ void WarpX::SumBoundaryJ (
     }
 }
 
-/* /brief Update the currents of `lev` by adding the currents from particles
-*         that are in the mesh refinement patches at `lev+1`
-*
-* More precisely, apply filter and sum boundaries for the current of:
-* - the fine patch of `lev`
-* - the coarse patch of `lev+1` (same resolution)
-* - the buffer regions of the coarse patch of `lev+1` (i.e. for particules
-* that are within the mesh refinement patch, but do not deposit on the
-* mesh refinement patch because they are too close to the boundary)
-*
-* Then update the fine patch of `lev` by adding the currents for the coarse
-* patch (and buffer region) of `lev+1`
-*/
+/**
+ * \brief Update the currents of `lev` by adding the currents from particles
+ *         that are in the mesh refinement patches at `lev+1`
+ *
+ * More precisely, apply filter and sum boundaries for the current of:
+ * - the fine patch of `lev`
+ * - the coarse patch of `lev+1` (same resolution)
+ * - the buffer regions of the coarse patch of `lev+1` (i.e. for particules
+ * that are within the mesh refinement patch, but do not deposit on the
+ * mesh refinement patch because they are too close to the boundary)
+ *
+ * Then update the fine patch of `lev` by adding the currents for the coarse
+ * patch (and buffer region) of `lev+1`
+ */
 void WarpX::AddCurrentFromFineLevelandSumBoundary (
     const ablastr::fields::MultiLevelVectorField& J_fp,
     const ablastr::fields::MultiLevelVectorField& J_cp,
@@ -1596,19 +1616,20 @@ void WarpX::ApplyFilterandSumBoundaryRho (int /*lev*/, int glev, amrex::MultiFab
     }
 }
 
-/* /brief Update the charge density of `lev` by adding the charge density from particles
-*         that are in the mesh refinement patches at `lev+1`
-*
-* More precisely, apply filter and sum boundaries for the charge density of:
-* - the fine patch of `lev`
-* - the coarse patch of `lev+1` (same resolution)
-* - the buffer regions of the coarse patch of `lev+1` (i.e. for particules
-* that are within the mesh refinement patch, but do not deposit on the
-* mesh refinement patch because they are too close to the boundary)
-*
-* Then update the fine patch of `lev` by adding the charge density for the coarse
-* patch (and buffer region) of `lev+1`
-*/
+/**
+ *  \brief Update the charge density of `lev` by adding the charge density from particles
+ *         that are in the mesh refinement patches at `lev+1`
+ *
+ * More precisely, apply filter and sum boundaries for the charge density of:
+ * - the fine patch of `lev`
+ * - the coarse patch of `lev+1` (same resolution)
+ * - the buffer regions of the coarse patch of `lev+1` (i.e. for particules
+ * that are within the mesh refinement patch, but do not deposit on the
+ * mesh refinement patch because they are too close to the boundary)
+ *
+ * Then update the fine patch of `lev` by adding the charge density for the coarse
+ * patch (and buffer region) of `lev+1`
+ */
 void WarpX::AddRhoFromFineLevelandSumBoundary (
     const ablastr::fields::MultiLevelScalarField& charge_fp,
     const ablastr::fields::MultiLevelScalarField& charge_cp,

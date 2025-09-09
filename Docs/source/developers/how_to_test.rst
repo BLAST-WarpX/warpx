@@ -145,7 +145,7 @@ A new test can be added by calling the function ``add_warpx_test`` in ``CMakeLis
      function(add_warpx_test
          name        # unique test name:
                      # test_1d_example, test_2d_example_picmi, etc.
-         dims        # dimensionality: 1, 2, 3, RZ
+         dims        # dimensionality: 1, 2, 3, RZ, RCYLINDER, RSPHERE
          nprocs      # number of processes: 1, 2
          inputs      # inputs file or PICMI script:
                      # inputs_test_1d_example, inputs_test_2d_example_picmi.py, "inputs_test_2d_example_picmi.py arg1 arg2", etc.
@@ -219,7 +219,7 @@ Here's how to do so:
 
    .. figure:: https://gist.github.com/user-attachments/assets/06c1fe27-2c13-4bd3-b6b8-8b8941b37889
 
-#. Save the raw log as a text file on your computer.
+#. Save the raw log as a text file on your computer (e.g., with the ``curl`` command, ``curl https://dev.azure.com/ECP-WarpX/... > raw_log.txt``).
 
 #. Go to the directory `Tools/DevUtils <https://github.com/BLAST-WarpX/warpx/tree/development/Tools/DevUtils>`__ and run the Python script `update_benchmarks_from_azure_output.py <https://github.com/BLAST-WarpX/warpx/blob/development/Tools/DevUtils/update_benchmarks_from_azure_output.py>`__ passing the path of the raw log text file as a command line argument:
 

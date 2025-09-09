@@ -31,10 +31,14 @@ public:
 
     [[nodiscard]] int get_ndt() const {return m_ndt;}
 
+    [[nodiscard]] bool use_global_debye_length() const {return m_use_global_debye_length;}
+
 protected:
 
     amrex::Vector<std::string> m_species_names;
     int m_ndt;
+
+    bool m_use_global_debye_length = false;
 
 };
 

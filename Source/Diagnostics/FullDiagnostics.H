@@ -74,6 +74,7 @@ private:
       *
       * \param[in] i_buffer index of a back-transformed snapshot
       * \param[in] lev level on which source multifabs are defined
+      * \param[in] restart whether this is called upon restarting a previous simulation
       */
     void InitializeBufferData ( int i_buffer, int lev, bool restart=false ) override;
     /** Initialize functors that store pointers to the RZ fields requested by the user.

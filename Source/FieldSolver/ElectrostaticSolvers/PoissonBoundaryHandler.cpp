@@ -9,6 +9,8 @@
 
 #include "PoissonBoundaryHandler.H"
 
+#include "WarpX.H"
+
 using namespace amrex;
 
 PoissonBoundaryHandler::PoissonBoundaryHandler ()

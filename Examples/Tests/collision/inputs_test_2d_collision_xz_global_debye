@@ -1,0 +1,8 @@
+FILE = inputs_test_2d_collision_xz
+
+collision1.use_global_debye_length = 1
+collision2.use_global_debye_length = 1
+collision3.use_global_debye_length = 1
+collision1.CoulombLog = -1.0
+collision2.CoulombLog = -1.0
+collision3.CoulombLog = -1.0

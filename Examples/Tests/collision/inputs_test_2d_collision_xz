@@ -47,7 +47,7 @@ electron.uz_th = 0.044237441120300
 electron.ux_m  = 0.044237441120300
 
 ion.charge = q_e
-ion.mass = 4.554691780000000e-30
+ion.mass = 5*m_e
 ion.injection_style = "NRandomPerCell"
 ion.num_particles_per_cell = 200
 ion.profile = constant

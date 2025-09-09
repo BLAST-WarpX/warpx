@@ -40,23 +40,23 @@ Use the following commands to download the WarpX source code:
 
    git clone https://github.com/BLAST-WarpX/warpx.git /usr/workspace/${USER}/lassen/src/warpx
 
-We use system software modules, add environment hints and further dependencies via the file ``$HOME/lassen_v100_warpx_toss3.profile``.
+We use system software modules, add environment hints and further dependencies via the file ``$HOME/lassen_v100_warpx.profile``.
 Create it now:
 
 .. code-block:: bash
 
-   cp /usr/workspace/${USER}/lassen/src/warpx/Tools/machines/lassen-llnl/lassen_v100_warpx_toss3.profile.example $HOME/lassen_v100_warpx_toss3.profile
+   cp /usr/workspace/${USER}/lassen/src/warpx/Tools/machines/lassen-llnl/lassen_v100_warpx.profile.example $HOME/lassen_v100_warpx.profile
 
 .. dropdown:: Script Details
    :color: light
    :icon: info
    :animate: fade-in-slide-down
 
-   .. literalinclude:: ../../../../Tools/machines/lassen-llnl/lassen_v100_warpx_toss3.profile.example
+   .. literalinclude:: ../../../../Tools/machines/lassen-llnl/lassen_v100_warpx.profile.example
       :language: bash
 
 Edit the 2nd line of this script, which sets the ``export proj=""`` variable.
-For example, if you are member of the project ``nsldt``, then run ``vi $HOME/lassen_v100_warpx_toss3.profile``.
+For example, if you are member of the project ``nsldt``, then run ``vi $HOME/lassen_v100_warpx.profile``.
 Enter the edit mode by typing ``i`` and edit line 2 to read:
 
 .. code-block:: bash
@@ -71,21 +71,21 @@ Exit the ``vi`` editor with ``Esc`` and then type ``:wq`` (write & quit).
 
    .. code-block:: bash
 
-      source $HOME/lassen_v100_warpx_toss3.profile
+      source $HOME/lassen_v100_warpx.profile
 
 Finally, since lassen does not yet provide software modules for some of our dependencies, install them once:
 
 .. code-block:: bash
 
-   bash /usr/workspace/${USER}/lassen/src/warpx/Tools/machines/lassen-llnl/install_v100_dependencies_toss3.sh
-   source /usr/workspace/${USER}/lassen-toss3/gpu/venvs/warpx-lassen-toss3/bin/activate
+   bash /usr/workspace/${USER}/lassen/src/warpx/Tools/machines/lassen-llnl/install_v100_dependencies.sh
+   source /usr/workspace/${USER}/lassen/gpu/venvs/warpx-lassen/bin/activate
 
 .. dropdown:: Script Details
    :color: light
    :icon: info
    :animate: fade-in-slide-down
 
-   .. literalinclude:: ../../../../Tools/machines/lassen-llnl/install_v100_dependencies_toss3.sh
+   .. literalinclude:: ../../../../Tools/machines/lassen-llnl/install_v100_dependencies.sh
       :language: bash
 
 
@@ -141,7 +141,7 @@ If you already installed WarpX in the past and want to update it, start by getti
    git status
    git log     # press q to exit
 
-And, if needed,
+Then
 
 - :ref:`update the lassen_v100_warpx.profile file <building-lassen-preparation>`,
 - log out and into the system, activate the now updated environment profile as usual,
