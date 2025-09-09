@@ -54,9 +54,6 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
 
     WARPX_PROFILE("collision::binarycollision::virtualphotons::GenerateVirtualPhotons()");
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(mypc->nSpecies() > 0,
-        "No species found in the MultiParticleContainer");
-
     // Loop through the species
     for (int i_s = 0; i_s < mypc->nSpecies(); ++i_s) {
 
@@ -81,10 +78,6 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
         amrex::Real sampling_factor;
         utils::parser::getWithParser(pp_species_name, "sampling_factor", sampling_factor);
 
-        // Enable tiling
-        amrex::MFItInfo info;
-        if (amrex::Gpu::notInLaunchRegion()) { info.EnableTiling(WarpXParticleContainer::tile_size); }
-
         amrex::Real const alpha_pi = PhysConst::alpha / MathConst::pi;
         amrex::Real const inv_c2 = 1._rt / (PhysConst::c * PhysConst::c);
         amrex::Real const mass = primary.getMass();
@@ -95,7 +88,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-            for (amrex::MFIter mfi = primary.MakeMFIter(lev, info); mfi.isValid(); ++mfi)
+            for (amrex::MFIter mfi = primary.MakeMFIter(lev); mfi.isValid(); ++mfi)
             {
                 // Notation: _vp means virtual photon
                 // Primary particles (leptons) in the current tile

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# This test generatees the population of virtual photons
+# This test generates the population of virtual photons
 # of one high-energy electron.
 # The total number and spectrum of the virtual photons are
 # compared to the theoretical prediction.

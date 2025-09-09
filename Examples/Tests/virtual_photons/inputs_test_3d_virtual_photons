@@ -52,7 +52,6 @@ algo.maxwell_solver = none
 warpx.const_dt = dt
 algo.particle_shape = 3
 algo.particle_pusher = vay
-particles.do_tiling = 1
 
 #################################
 ########### PARTICLES ###########
@@ -103,5 +102,4 @@ diag1.write_species = 1
 diag1.dump_last_timestep = 1
 diag1.species = beam virtual_photons
 diag1.format = openpmd
-diag1.openpmd_backend = h5
 diag1.virtual_photons.variables = uz w x y z
