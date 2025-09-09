@@ -522,7 +522,7 @@ Diagnostics::InitBaseData (const InitDiagnosticsParameters& params, [[maybe_unus
     if (params.do_moving_window) {
         const int moving_dir = params.moving_window_dir;
         const amrex::Real displacement =
-            params.moving_window_x - warpx.Geom(0).ProbLo(moving_dir);
+            params.moving_window_x - params.amrex_prob_lo_moving_window_dir;
         const int shift_num_base =
             static_cast<int>(displacement / params.cell_size_lev0_mwdir);
         m_lo[moving_dir] += shift_num_base * params.cell_size_lev0_mwdir;
