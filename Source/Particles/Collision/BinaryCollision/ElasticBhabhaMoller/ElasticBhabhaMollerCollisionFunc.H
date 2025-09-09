@@ -28,7 +28,7 @@
 /**
  * \brief This functor does perform elastic bhabha/moller scattering on a single cell.
  *  Particles of the two colliding species are paired with each other and for each pair we compute
- *  if a pair-production event occurs. If so, we fill a mask (input parameter p_mask) with true so that
+ *  if a scattering event occurs. If so, we fill a mask (input parameter p_mask) with true so that
  *  product particles corresponding to a given pair can be effectively created in the particle
  *  creation functor.
  *  This functor also reads and stores the event multiplier.

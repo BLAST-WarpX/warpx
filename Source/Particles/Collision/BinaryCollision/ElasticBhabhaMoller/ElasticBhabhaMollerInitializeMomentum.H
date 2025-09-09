@@ -177,16 +177,21 @@ namespace {
         // Newton-Raphson method between 0 and s12.
         amrex::ParticleReal const sample_point = r * s12;
         // Iteratively find angle which corresponds to the sample point.
-        amrex::ParticleReal theta_guess = 0.5_prt * MathConst::pi;
-        while (true) {
-            amrex::ParticleReal const f = TreeLevelElasticBhabhaCrossSectionAngularPart(theta_guess) - sample_point;
-            amrex::ParticleReal const df = TreeLevelElasticBhabhaCrossSectionAngularPartDerivative(theta_guess);
+        amrex::ParticleReal theta_guess_old = 0.5_prt * MathConst::pi;
+        amrex::ParticleReal theta_guess_new = 0.5_prt * MathConst::pi;
+        amrex::ParticleReal const tol = 1e-6_prt;
+        amrex::ParticleReal rel_error = 1._prt;
+        while (rel_error > tol) {
+            amrex::ParticleReal const f = TreeLevelElasticBhabhaCrossSectionAngularPart(theta_guess_old) - sample_point;
+            //Beware of the sign. TreeLevelElasticBhabhaCrossSectionAngularPart is integrated from 2Pi to theta_min.
+            amrex::ParticleReal const df = -TreeLevelElasticBhabhaCrossSectionAngularPartDerivative(theta_guess_old);
             //For theta_min = 0.05, sample_point must range from 0 to 31.5
-            if (std::abs(f) < 1e-6_prt) break;
-            theta_guess -= f / df;
+            theta_guess_new = theta_guess_old - f/df;
+            rel_error = std::abs(theta_guess_new-theta_guess_old)/std::abs(theta_guess_old);
+            theta_guess_old = theta_guess_new;
         }
-        cosXs = std::cos(theta_guess);
-        sinXs = std::sin(theta_guess);
+        cosXs = std::cos(theta_guess_old);
+        sinXs = std::sin(theta_guess_old);
 
         // Get random azimuthal angle
         amrex::ParticleReal const phis = amrex::Random(engine) * 2.0_prt * MathConst::pi;
