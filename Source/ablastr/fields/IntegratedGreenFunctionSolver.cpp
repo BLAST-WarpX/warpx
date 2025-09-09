@@ -69,18 +69,16 @@ computePhiIGF ( amrex::MultiFab const & rho,
     amrex::Real const dy = cell_size[1];
     amrex::Real const dz = cell_size[2];
 
-    using SIMD_T = amrex::simd::SIMDReal<>;
-    using SIMD_int = amrex::simd::stdx::rebind_simd_t<int, SIMD_T>;
-
     if (!is_igf_2d_slices){
         // fully 3D solver
         obc_solver->setGreensFunction(
-        [=] AMREX_GPU_DEVICE (SIMD_int i, int j, int k) -> amrex::simd::SIMDReal<>
+        [=]<int WIDTH> AMREX_GPU_DEVICE (amrex::simd::stdx::fixed_size_simd<int, WIDTH> i, int j, int k) -> amrex::simd::SIMDReal<WIDTH>
         {
-            SIMD_int const i0 = i - lo[0];
+            auto const i0 = i - lo[0];
             int const j0 = j - lo[1];
             int const k0 = k - lo[2];
-            amrex::simd::SIMDReal<> const x = amrex::simd::stdx::static_simd_cast<SIMD_T>(i0) * dx;
+            using ST = amrex::simd::SIMDReal<WIDTH>;
+            ST const x = amrex::simd::stdx::static_simd_cast<ST>(i0) * dx;
             amrex::Real const y = j0*dy;
             amrex::Real const z = k0*dz;
 
@@ -89,11 +87,12 @@ computePhiIGF ( amrex::MultiFab const & rho,
     }else{
         // 2D sliced solver
         obc_solver->setGreensFunction(
-        [=] AMREX_GPU_DEVICE (SIMD_int i, int j, int k) -> amrex::simd::SIMDReal<>
+        [=]<int WIDTH> AMREX_GPU_DEVICE (amrex::simd::stdx::fixed_size_simd<int, WIDTH> i, int j, int k) -> amrex::simd::SIMDReal<WIDTH>
         {
-            SIMD_int const i0 = i - lo[0];
+            auto const i0 = i - lo[0];
             int const j0 = j - lo[1];
-            amrex::simd::SIMDReal<> const x = amrex::simd::stdx::static_simd_cast<SIMD_T>(i0) * dx;
+            using ST = amrex::simd::SIMDReal<WIDTH>;
+            ST const x = amrex::simd::stdx::static_simd_cast<ST>(i0) * dx;
             amrex::Real const y = j0*dy;
             amrex::ignore_unused(k);
 
