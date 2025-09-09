@@ -18,6 +18,7 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -33,14 +34,14 @@ enum struct DiagTypes
 /** A struct containing the parameters required to initialize a diagnostics */
 struct InitDiagnosticsParameters
 {
-    int finest_level;
-    int max_level;
+    std::optional<int> finest_level;
+    std::optional<int> max_level;
 
-    int do_moving_window;
-    int moving_window_dir;
-    amrex::Real moving_window_x;
-    amrex::Real cell_size_lev0_mwdir;
-    amrex::Real amrex_prob_lo_moving_window_dir;
+    std::optional<int> do_moving_window;
+    std::optional<int> moving_window_dir;
+    std::optional<amrex::Real> moving_window_x;
+    std::optional<amrex::Real> cell_size_lev0_mwdir;
+    std::optional<amrex::Real> amrex_prob_lo_moving_window_dir;
 };
 
 /**

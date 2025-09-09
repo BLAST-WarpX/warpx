@@ -510,23 +510,24 @@ void
 Diagnostics::InitBaseData (const InitDiagnosticsParameters& params, [[maybe_unused]] amrex::AmrMesh* p_warpx_mesh)
 {
     // Number of levels in the simulation at the current timestep
-    nlev = params.finest_level + 1;
+    nlev = params.finest_level.value() + 1;
     // default number of levels to be output = nlev
     nlev_output = nlev;
     // Maximum number of levels that will be allocated in the simulation
-    nmax_lev = params.max_level + 1;
+    nmax_lev = params.max_level.value() + 1;
     m_all_field_functors.resize( nmax_lev );
 
     // For restart, move the m_lo and m_hi of the diag consistent with the
     // current moving_window location
     if (params.do_moving_window) {
-        const int moving_dir = params.moving_window_dir;
+        const int moving_dir = params.moving_window_dir.value();
         const amrex::Real displacement =
-            params.moving_window_x - params.amrex_prob_lo_moving_window_dir;
+            params.moving_window_x.value() - params.amrex_prob_lo_moving_window_dir.value();
+        const amrex::Real cell_size_lev0_mwdir = params.cell_size_lev0_mwdir.value();
         const int shift_num_base =
-            static_cast<int>(displacement / params.cell_size_lev0_mwdir);
-        m_lo[moving_dir] += shift_num_base * params.cell_size_lev0_mwdir;
-        m_hi[moving_dir] += shift_num_base * params.cell_size_lev0_mwdir;
+            static_cast<int>(displacement / cell_size_lev0_mwdir);
+        m_lo[moving_dir] += shift_num_base * cell_size_lev0_mwdir;
+        m_hi[moving_dir] += shift_num_base * cell_size_lev0_mwdir;
     }
     // Construct Flush class.
     if        (m_format == "plotfile"){
