@@ -138,7 +138,7 @@ sim.add_diagnostic(part_diag)
 # NOTE: Some tests are done in this input PICMI file. These tests
 # check that amrex initialized the correct amount of procs and
 # that the procs ranks in amrex are correct.
-# If anz of these tests fail, the terminal will print that the
+# If any of these tests fail, the terminal will print that the
 # program crashed.
 
 # TODO: Enable in pyAMReX, then enable lines in inputs_test_2d_pass_mpi_comm_picmi.py again
