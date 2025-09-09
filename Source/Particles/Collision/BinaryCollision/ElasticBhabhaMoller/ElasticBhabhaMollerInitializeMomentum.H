@@ -29,20 +29,9 @@ namespace {
     using index_type = ParticleBins::index_type;
 
     /**
-     * \brief This function performs a Lorentz transform of the 4-momentum
-     * \param[out] p_out the 0-component of the 4-momentum after the Lorentz transform
-     * \param[out] px_out the x-component of the 4-momentum after the Lorentz transform
-     * \param[out] py_out the y-component of the 4-momentum after the Lorentz transform
-     * \param[out] pz_out the z-component of the 4-momentum after the Lorentz transform
-     * \param[in] p_in the 0-component of the 4-momentum before the Lorentz transform
-     * \param[in] px_in the x-component of the 4-momentum before the Lorentz transform
-     * \param[in] py_in the y-component of the 4-momentum before the Lorentz transform
-     * \param[in] pz_in the z-component of the 4-momentum before the Lorentz transform
-     * \param[in] gamma Lorentz factor of the Lorentz transform
-     * \param[in] beta beta of the Lorentz transform
-     * \param[in] nx x-component of the normalized vector that indicates the direction of the transform
-     * \param[in] ny y-component of the normalized vector that indicates the direction of the transform
-     * \param[in] nz z-component of the normalized vector that indicates the direction of the transform
+     * \brief This function computes the angular part of the elastic Bhabha Tree level cross section.
+     * \param[in] theta_m scattering angle (in radians)
+     * \param[out] sigma the angular part of the elastic Bhabha Tree level cross section (dimensionless)
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     amrex::ParticleReal TreeLevelElasticBhabhaCrossSectionAngularPart (
@@ -51,27 +40,34 @@ namespace {
 
         // Elastic Bhabha Tree level cross section.
         amrex::ParticleReal numerator = (
-            111 * std::cos(theta_m) +
-            6 * std::cos(2 * theta_m) +
+            111._prt * std::cos(theta_m) +
+            6._prt * std::cos(2._prt * theta_m) +
             std::cos(3 * theta_m) +
-            96 / (sin(theta_m / 2._prt)*sin(theta_m / 2._prt)) +
-            384 * std::log(std::sin(theta_m / 2._prt)) +
-            10
+            96._prt / (sin(theta_m / 2._prt)*sin(theta_m / 2._prt)) +
+            384._prt * std::log(std::sin(theta_m / 2._prt)) +
+            10._prt
         );
         amrex::ParticleReal denominator = 1536._prt * MathConst::pi;
-        return numerator / denominator;
+        amrex::ParticleReal sigma = numerator / denominator;
+        return sigma;
     }
 
+     /**
+     * \brief This function calculates the derivative of the angular part of the elastic Bhabha Tree level cross section.
+     * \param[in] theta_m
+     * \param[out] sigma
+     */
+
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
     amrex::ParticleReal TreeLevelElasticBhabhaCrossSectionAngularPartDerivative (
         amrex::ParticleReal const theta_m)
     {
 
         // Elastic Bhabha Tree level differential cross section. (times 2 Pi Sin theta)
-        amrex::ParticleReal numerator = (
-            (std::cos(2 * theta_m)+7)*(std::cos(2 * theta_m)+7) / (std::sin(theta_m/2)*std::sin(theta_m/2)*std::sin(theta_m/2)*std::sin(theta_m/2))* std::sin(theta_m) * 2 * MathConst::pi
-        );
-        amrex::ParticleReal denominator = 4096._prt * MathConst::pi* MathConst::pi;
-        return numerator / denominator;
+        amrex::ParticleReal numerator = (std::cos(2._prt*theta_m) + 7._prt) * (std::cos(2._prt*theta_m) + 7._prt) * std::sin(theta_m) * 2._prt * MathConst::pi;
+        amrex::ParticleReal denominator = 4096._prt * MathConst::pi* MathConst::pi * (std::sin(0.5_prt*theta_m) * std::sin(0.5_prt*theta_m) * std::sin(0.5_prt*theta_m) * std::sin(0.5_prt*theta_m)) ;
+        amrex::ParticleReal sigma = numerator / denominator;
+        return sigma;
     }
 
     /**
