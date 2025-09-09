@@ -1544,11 +1544,11 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                 }  else
 #endif
                 { // CPU
-		  if (hasADIOS)
-		    {
+          if (hasADIOS)
+            {
                       WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::CPU_span()");
                       auto dynamicMemoryView = mesh_comp.storeChunk<amrex::Real>(
-			   chunk_offset, chunk_size,
+               chunk_offset, chunk_size,
                            [&local_box](size_t /* size */) {
                               amrex::BaseFab<amrex::Real> foo(local_box, 1);
                               std::shared_ptr<amrex::Real> data_pinned(foo.release());
@@ -1558,7 +1558,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                       auto span = dynamicMemoryView.currentBuffer();
                       std::memcpy(span.data(), fab.dataPtr(icomp), local_box.numPts()*sizeof(amrex::Real));
                     }
-		  else
+          else
                     {
                        WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::CPU_mesh()");
                        amrex::Real const *local_data = fab.dataPtr(icomp);
