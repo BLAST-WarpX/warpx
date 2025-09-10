@@ -134,30 +134,31 @@ void compute_weights (const amrex::ParticleReal xp,
  * \param W                    2D array of weights for each neighbouring node
  * \param scalar_field         Array4 of the nodal scalar field, either full array or tile.
  */
+template<int DIMS = AMREX_SPACEDIM>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 amrex::Real interp_field_nodal (int i, int j, int k,
                                 const amrex::Real W[AMREX_SPACEDIM][2],
                                 amrex::Array4<const amrex::Real> const& scalar_field) noexcept
 {
     amrex::Real value = 0;
-#if (defined WARPX_DIM_3D)
-    value += scalar_field(i,   j  , k  ) * W[0][0] * W[1][0] * W[2][0];
-    value += scalar_field(i+1, j  , k  ) * W[0][1] * W[1][0] * W[2][0];
-    value += scalar_field(i,   j+1, k  ) * W[0][0] * W[1][1] * W[2][0];
-    value += scalar_field(i+1, j+1, k  ) * W[0][1] * W[1][1] * W[2][0];
-    value += scalar_field(i,   j  , k+1) * W[0][0] * W[1][0] * W[2][1];
-    value += scalar_field(i+1, j  , k+1) * W[0][1] * W[1][0] * W[2][1];
-    value += scalar_field(i  , j+1, k+1) * W[0][0] * W[1][1] * W[2][1];
-    value += scalar_field(i+1, j+1, k+1) * W[0][1] * W[1][1] * W[2][1];
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-    value += scalar_field(i,   j ,  k) * W[0][0] * W[1][0];
-    value += scalar_field(i+1, j ,  k) * W[0][1] * W[1][0];
-    value += scalar_field(i,   j+1, k) * W[0][0] * W[1][1];
-    value += scalar_field(i+1, j+1, k) * W[0][1] * W[1][1];
-#else
-    value += scalar_field(i,   j ,  k) * W[0][0];
-    value += scalar_field(i+1, j ,  k) * W[0][1];
-#endif
+    if constexpr (DIMS == 3) {
+        value += scalar_field(i,   j  , k  ) * W[0][0] * W[1][0] * W[2][0];
+        value += scalar_field(i+1, j  , k  ) * W[0][1] * W[1][0] * W[2][0];
+        value += scalar_field(i,   j+1, k  ) * W[0][0] * W[1][1] * W[2][0];
+        value += scalar_field(i+1, j+1, k  ) * W[0][1] * W[1][1] * W[2][0];
+        value += scalar_field(i,   j  , k+1) * W[0][0] * W[1][0] * W[2][1];
+        value += scalar_field(i+1, j  , k+1) * W[0][1] * W[1][0] * W[2][1];
+        value += scalar_field(i  , j+1, k+1) * W[0][0] * W[1][1] * W[2][1];
+        value += scalar_field(i+1, j+1, k+1) * W[0][1] * W[1][1] * W[2][1];
+    } else if constexpr (DIMS == 2) {
+        value += scalar_field(i,   j ,  k) * W[0][0] * W[1][0];
+        value += scalar_field(i+1, j ,  k) * W[0][1] * W[1][0];
+        value += scalar_field(i,   j+1, k) * W[0][0] * W[1][1];
+        value += scalar_field(i+1, j+1, k) * W[0][1] * W[1][1];
+    } else {
+        value += scalar_field(i,   j ,  k) * W[0][0];
+        value += scalar_field(i+1, j ,  k) * W[0][1];
+    }
     return value;
 }
 
@@ -170,6 +171,7 @@ amrex::Real interp_field_nodal (int i, int j, int k,
  * \param dxi                     inverse 3D cell spacing
  * \param lo                      Index lower bounds of domain.
  */
+template<int DIMS = AMREX_SPACEDIM>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 amrex::Real doGatherScalarFieldNodal (const amrex::ParticleReal xp,
                                       const amrex::ParticleReal yp,
@@ -183,7 +185,7 @@ amrex::Real doGatherScalarFieldNodal (const amrex::ParticleReal xp,
     amrex::Real W[AMREX_SPACEDIM][2];
     compute_weights<amrex::IndexType::NODE>(xp, yp, zp, lo, dxi, ii, jj, kk, W);
 
-    return interp_field_nodal(ii, jj, kk, W, scalar_field);
+    return interp_field_nodal<DIMS>(ii, jj, kk, W, scalar_field);
 }
 
 /**
@@ -195,6 +197,7 @@ amrex::Real doGatherScalarFieldNodal (const amrex::ParticleReal xp,
  * \param dxi inverse 3D cell spacing
  * \param lo  Index lower bounds of domain.
  */
+template<int DIMS = AMREX_SPACEDIM>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 amrex::GpuArray<amrex::Real, 3>
 doGatherVectorFieldNodal (const amrex::ParticleReal xp,
@@ -212,9 +215,9 @@ doGatherVectorFieldNodal (const amrex::ParticleReal xp,
     compute_weights<amrex::IndexType::NODE>(xp, yp, zp, lo, dxi, ii, jj, kk, W);
 
     amrex::GpuArray<amrex::Real, 3> const field_interp = {
-        interp_field_nodal(ii, jj, kk, W, vector_field_x),
-        interp_field_nodal(ii, jj, kk, W, vector_field_y),
-        interp_field_nodal(ii, jj, kk, W, vector_field_z)
+        interp_field_nodal<DIMS>(ii, jj, kk, W, vector_field_x),
+        interp_field_nodal<DIMS>(ii, jj, kk, W, vector_field_y),
+        interp_field_nodal<DIMS>(ii, jj, kk, W, vector_field_z)
     };
 
     return field_interp;
