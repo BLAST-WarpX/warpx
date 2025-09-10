@@ -124,12 +124,7 @@ PetscErrorCode printKSPResidual(KSP a_ksp, PetscInt a_n, PetscReal a_rnorm, void
 KSP_impl::KSP_impl(LinOpType& a_op)
 {
     m_op = &a_op;
-    PETSC_COMM_WORLD = amrex::ParallelContext::CommunicatorSub();
-    PetscInitialize(nullptr, nullptr, nullptr, nullptr);
-    MPI_Comm_size(PETSC_COMM_WORLD, &m_num_procs);
-    MPI_Comm_rank(PETSC_COMM_WORLD, &m_myid);
-    amrex::Print() << "KSP_impl: Initialized PETSc with "
-                   << m_num_procs << " MPI ranks.\n";
+    amrex::Print() << "KSP_impl: Initialized PETSc's KSP solver.\n";
 
     m_ksp = new KSPObj;
     m_A = new MatObj;
@@ -147,9 +142,6 @@ KSP_impl::~KSP_impl()
     delete m_P;
     delete m_x;
     delete m_b;
-
-    PetscFinalize();
-    amrex::Print() << "KSP_impl: Finalized PETSc.\n";
 }
 
 void KSP_impl::applyOp( VecType& a_F, const VecType& a_U)
@@ -240,10 +232,6 @@ void KSP_impl::createObjects(const VecType& a_vec)
 
 void KSP_impl::setOptions()
 {
-    //PetscOptionsSetValue( NULL, "-mat_view" , NULL );
-    PetscOptionsSetValue( NULL, "-log_view" , NULL );
-    PetscOptionsSetValue( NULL, "-pc_type", "lu");
-    //PetscOptionsSetValue( NULL, "-pc_factor_levels", "2");
 }
 
 void KSP_impl::setTolerances(const amrex::Real a_rtol,
