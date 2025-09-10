@@ -145,6 +145,9 @@ jobs:
         # This option is required to avoid false positive reports from the OpenMP runtime
         export TSAN_OPTIONS='ignore_noninstrumented_modules=1'
 
+        # Print stacktrace for easier debugging
+        export UBSAN_OPTIONS=print_stacktrace=1
+
         export OMP_NUM_THREADS=2
 
         mpirun -n 2 ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_base_rz warpx.serialize_initial_conditions = 0
