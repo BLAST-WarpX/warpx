@@ -41,6 +41,8 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
 
     m_array.resize(a_num_amr_levels);
     m_scalar.resize(a_num_amr_levels);
+    m_array_lhs.resize(a_num_amr_levels);
+    m_scalar_lhs.resize(a_num_amr_levels);
 
     amrex::Long offset = 0;
     m_nDoFs_l = 0;
@@ -57,9 +59,9 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
             for (int n = 0; n < 3; n++) {
                 auto ncomp = this_array[n]->nComp();
                 m_array[lev][n] = new amrex::MultiFab( this_array[n]->boxArray(),
-                                                                this_array[n]->DistributionMap(),
-                                                                2*ncomp, // {local, global} for each comp
-                                                                amrex::IntVect::TheUnitVector() );
+                                                       this_array[n]->DistributionMap(),
+                                                       2*ncomp, // {local, global} for each comp
+                                                       amrex::IntVect::TheUnitVector() );
                 m_nDoFs_g += this_array[n]->boxArray().numPts()*ncomp;
 
                 m_array[lev][n]->setVal(-1.0);
@@ -95,9 +97,9 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
             const amrex::MultiFab* this_mf = a_WarpX->m_fields.get(a_scalar_type_name,lev);
             auto ncomp = this_mf->nComp();
             m_scalar[lev] = new amrex::MultiFab( this_mf->boxArray(),
-                                                          this_mf->DistributionMap(),
-                                                          2*ncomp, // {local, global} for each comp
-                                                          amrex::IntVect::TheUnitVector() );
+                                                 this_mf->DistributionMap(),
+                                                 2*ncomp, // {local, global} for each comp
+                                                 amrex::IntVect::TheUnitVector() );
             m_nDoFs_g += this_mf->boxArray().numPts()*ncomp;
 
             m_scalar[lev]->setVal(-1.0);
@@ -174,13 +176,25 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
     if (m_array_type != FieldType::None) {
         for (int lev = 0; lev < a_num_amr_levels; ++lev) {
             for (int n = 0; n < 3; n++) {
+                m_array_lhs[lev][n] = new amrex::MultiFab( m_array[lev][n]->boxArray(),
+                                                           m_array[lev][n]->DistributionMap(),
+                                                           m_array[lev][n]->nComp(),
+                                                           amrex::IntVect::TheZeroVector() );
+                amrex::MultiFab::Copy(*m_array_lhs[lev][n], *m_array[lev][n], 0, 0, m_array[lev][n]->nComp(), 0);
                 m_array[lev][n]->FillBoundary();
+                // do NOT call FillBoundary() on m_array_lhs
             }
         }
     }
     if (m_scalar_type != FieldType::None) {
         for (int lev = 0; lev < a_num_amr_levels; ++lev) {
+            m_scalar_lhs[lev] = new amrex::MultiFab( m_scalar[lev]->boxArray(),
+                                                     m_scalar[lev]->DistributionMap(),
+                                                     m_scalar[lev]->nComp(),
+                                                     amrex::IntVect::TheZeroVector() );
+            amrex::MultiFab::Copy(*m_scalar_lhs[lev], *m_scalar[lev], 0, 0, m_scalar[lev]->nComp(), 0);
             m_scalar[lev]->FillBoundary();
+            // do NOT call FillBoundary() on m_scalar_lhs
         }
     }
 
