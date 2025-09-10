@@ -2267,6 +2267,10 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long const ip) {
 
+            // Skip particles with zero weight.
+            // This should only be the case for particles that will be suborbited.
+            if (wp[ip] == 0.) { return; }
+
 #if !defined(WARPX_DIM_3D)
             constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
 

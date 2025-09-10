@@ -214,8 +214,14 @@ Known System Issues
 .. warning::
 
    April 30th, 2025:
-   We observed several unidentified issues that can cause WarpX simulations to hang or crash:
-   - Releases ``25.03`` and above lead to a segmentation fault error
-   - Release ``25.02`` will hang when writing particles diagnostics
+   We observed several issues that can cause WarpX simulations to hang or crash on releases ``25.02`` and ``25.03``.
 
-   Releases ``25.01`` and below are currently working.
+   Releases ``<=25.01`` and ``>=25.04`` are currently working.
+
+.. warning::
+
+   August 2025:
+   We observed a heavy node memory increase over time when using module ``cray-mpich`` versions ``8.1.28`` and ``8.1.30``, which
+   causes simulations to slow down and eventually crash.
+
+   While no ``cray-mpich`` version ``>8.1.30`` is available on Adastra, stay with version ``8.1.26`` to avoid this issue.

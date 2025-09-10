@@ -13,8 +13,8 @@
   },
   "electrons": {
     "particle_momentum_x": 0.0,
-    "particle_momentum_y": 1.8743344896903162e-20,
-    "particle_momentum_z": 3.15210109363816e-21,
+    "particle_momentum_y": 1.2957667586568456e-20,
+    "particle_momentum_z": 3.3146691226675403e-21,
     "particle_position_x": 0.0223566292839217,
     "particle_weight": 5.1796875e+18
   }
