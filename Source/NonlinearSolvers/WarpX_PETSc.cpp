@@ -313,21 +313,50 @@ void KSP_impl::assemblePCMat(const VecType& a_Y)
 
     m_op->getPCMatrix( r_indices_g, n_nz_cols, c_indices_g, a_ij, n, ncols_max );
 
-    const auto r_indices_g_ptr = r_indices_g.data();
-    const auto n_nz_cols_ptr = n_nz_cols.data();
-    const auto c_indices_g_ptr = c_indices_g.data();
-    const auto a_ij_ptr = a_ij.data();
-
-    amrex::ParallelFor(n, [=] AMREX_GPU_DEVICE (int i)
     {
-        MatSetValues( m_P->obj,
-                      1,
-                      &r_indices_g_ptr[i],
-                      n_nz_cols_ptr[i],
-                      &c_indices_g_ptr[i*ncols_max],
-                      &a_ij_ptr[i*ncols_max],
-                      INSERT_VALUES );
-    });
+        std::vector<int> h_r_indices_g(r_indices_g.size());
+        std::vector<int> h_n_nz_cols(n_nz_cols.size());
+        std::vector<int> h_c_indices_g(c_indices_g.size());
+        std::vector<amrex::Real> h_a_ij(a_ij.size());
+        amrex::Gpu::copy( amrex::Gpu::deviceToHost,
+                          r_indices_g.begin(), r_indices_g.end(),
+                          h_r_indices_g.begin() );
+        amrex::Gpu::copy( amrex::Gpu::deviceToHost,
+                          n_nz_cols.begin(), n_nz_cols.end(),
+                          h_n_nz_cols.begin() );
+        amrex::Gpu::copy( amrex::Gpu::deviceToHost,
+                          c_indices_g.begin(), c_indices_g.end(),
+                          h_c_indices_g.begin() );
+        amrex::Gpu::copy( amrex::Gpu::deviceToHost,
+                          a_ij.begin(), a_ij.end(),
+                          h_a_ij.begin() );
+        for (int i = 0; i < n; i++) {
+            MatSetValues( m_P->obj,
+                          1,
+                          &h_r_indices_g[i],
+                          h_n_nz_cols[i],
+                          &h_c_indices_g[i*ncols_max],
+                          &h_a_ij[i*ncols_max],
+                          INSERT_VALUES );
+        }
+    }
+
+//    const auto r_indices_g_ptr = r_indices_g.data();
+//    const auto n_nz_cols_ptr = n_nz_cols.data();
+//    const auto c_indices_g_ptr = c_indices_g.data();
+//    const auto a_ij_ptr = a_ij.data();
+//
+//    auto mat = m_P->obj;
+//    amrex::ParallelFor(n, [=] AMREX_GPU_DEVICE (int i)
+//    {
+//        MatSetValues( mat,
+//                      1,
+//                      &r_indices_g_ptr[i],
+//                      n_nz_cols_ptr[i],
+//                      &c_indices_g_ptr[i*ncols_max],
+//                      &a_ij_ptr[i*ncols_max],
+//                      INSERT_VALUES );
+//    });
 
     MatAssemblyBegin(m_P->obj, MAT_FINAL_ASSEMBLY);
     MatAssemblyEnd(m_P->obj, MAT_FINAL_ASSEMBLY);
