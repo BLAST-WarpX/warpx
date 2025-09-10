@@ -171,5 +171,18 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
         }
     }
 
+    if (m_array_type != FieldType::None) {
+        for (int lev = 0; lev < a_num_amr_levels; ++lev) {
+            for (int n = 0; n < 3; n++) {
+                m_array[lev][n]->FillBoundary();
+            }
+        }
+    }
+    if (m_scalar_type != FieldType::None) {
+        for (int lev = 0; lev < a_num_amr_levels; ++lev) {
+            m_scalar[lev]->FillBoundary();
+        }
+    }
+
     amrex::Print() << "Defined DOF object for linear solves (total DOFs = " << m_nDoFs_g << ").\n";
 }
