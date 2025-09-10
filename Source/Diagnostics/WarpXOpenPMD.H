@@ -207,7 +207,7 @@ private:
    *  this causes trouble when the underlying writing function is collective (like PDW)
    *
    */
-  void flushCurrent (bool isBTD) const;
+  void seriesFlush (bool isBTD) const;
 
   /** This function does initial setup for the fields when interation is newly created
    *  @param[in] meshes   The meshes in a series

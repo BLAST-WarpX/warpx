@@ -407,14 +407,14 @@ WarpXOpenPMDPlot::~WarpXOpenPMDPlot ()
   }
 }
 
-void WarpXOpenPMDPlot::flushCurrent (bool isBTD) const
+void WarpXOpenPMDPlot::seriesFlush (bool isBTD) const
 {
     openPMD::Iteration currIteration = GetIteration(m_CurrentStep, isBTD);
     if (isBTD) {
-        WARPX_PROFILE("WarpXOpenPMDPlot::flushCurrent()::BTD");
+        WARPX_PROFILE("WarpXOpenPMDPlot::SeriesFlush()::BTD");
         currIteration.seriesFlush("adios2.engine.preferred_flush_target = \"buffer\"");
     } else {
-        WARPX_PROFILE("WarpXOpenPMDPlot::flushCurrent()");
+        WARPX_PROFILE("WarpXOpenPMDPlot::SeriesFlush()()");
         currIteration.seriesFlush();
     }
 }
@@ -769,7 +769,7 @@ WarpXOpenPMDPlot::DumpToFile (ParticleContainer* pc,
         SetConstParticleRecordsEDPIC(currSpecies, positionComponents, NewParticleVectorSize, charge, mass);
     }
 
-    flushCurrent(isBTD);
+    this->seriesFlush(isBTD);
 
     // dump individual particles
     bool contributed_particles = false;  // did the local MPI rank contribute particles?
@@ -850,7 +850,7 @@ WarpXOpenPMDPlot::DumpToFile (ParticleContainer* pc,
         }
     }
 
-    flushCurrent(isBTD);
+    this->seriesFlush(isBTD);
 }
 
 void
@@ -1579,7 +1579,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
         amrex::Gpu::streamSynchronize();
 #endif
         // Flush data to disk after looping over all components
-        flushCurrent(isBTD);
+        this->seriesFlush(isBTD);
     } // levels loop (i)
 }
 #endif // WARPX_USE_OPENPMD
