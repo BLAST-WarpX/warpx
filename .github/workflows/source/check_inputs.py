@@ -77,6 +77,7 @@ for test in tests:
     if (
         not testinput == f"inputs_{testname}"
         and not testinput == f"inputs_{testname}.py"
+        and not testinput == f"run_{testname}.py"
     ):
         # we may be running a base input file/script or a restart PICMI test
         if not testinput.startswith("inputs_base") and not testinput.endswith(
@@ -92,7 +93,10 @@ if wrong_testname:
     print("      Test names must end with '_picmi' for PICMI tests.")
 if wrong_testinput:
     print("NOTE: Test input names must start with 'inputs_' followed by the test name.")
-    print("      Test input names must end with '.py' for PICMI tests.")
+    print("      Test input names must end with '_picmi.py' for PICMI tests.")
+    print(
+        "      Test input names must start with 'run_' and end with '.py' for non-PICMI Python tests."
+    )
 
 # check that all input files in Examples/ are tested
 print("\nCheck that all test input files are tested...")
