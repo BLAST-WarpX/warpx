@@ -1253,7 +1253,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     // Auxiliary booleans
     bool const gather_fields = (
         !do_not_gather &&
-        (position_push_type == DtType::Full || position_push_type == DtType::FirstHalf)
+        momentum_push_type != DtType::None
     );
     bool const copy_particle_attribs = (
         m_do_back_transformed_particles &&
