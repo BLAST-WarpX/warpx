@@ -94,13 +94,10 @@ class WarpX(Bucket):
     def load_inputs_file(self, filename):
         from .Geometry import geometry
 
-        geometry.prob_lo = [0, 0, 0]  # TODO: generalize
+        # geometry.dims can be 1/2/3/RZ/RCYLINDER/RSPHERE
         geometry.dims = "3"  # TODO: generalize
 
-        # libwarpx.libwarpx_so.amrex_init(sys.argv + [filename])
-        # libwarpx.libwarpx_so.load_inputs_file(filename)
         libwarpx.initialize(sys.argv + [filename])
-        # self.init()
 
     def init(self, mpi_comm=None, **kw):
         # note: argv[0] needs to be an absolute path so it works with AMReX backtraces

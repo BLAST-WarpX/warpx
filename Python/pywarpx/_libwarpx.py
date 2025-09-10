@@ -74,7 +74,6 @@ class LibWarpX:
         # --- Use geometry to determine whether to import the 1D, 2D, 3D or RZ version.
         # --- The geometry must be setup before the lib warpx shared object can be loaded.
         try:
-            _prob_lo = geometry.prob_lo
             _dims = str(geometry.dims)
         except AttributeError:
             raise Exception(
@@ -84,7 +83,7 @@ class LibWarpX:
         if _dims == "RZ":
             self.geometry_dim = "rz"
         elif _dims == "1" or _dims == "2" or _dims == "3":
-            self.geometry_dim = "%dd" % len(_prob_lo)
+            self.geometry_dim = "%dd" % int(_dims)
         else:
             raise Exception("Undefined geometry %d" % _dims)
 

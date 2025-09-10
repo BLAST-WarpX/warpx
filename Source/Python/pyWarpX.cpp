@@ -125,11 +125,6 @@ PYBIND11_MODULE(PYWARPX_MODULE_NAME, m) {
     m.def("amrex_finalize", [] () { amrex::Finalize(); },
         "Close out the amrex related data");
 
-    m.def("load_inputs_file",
-        [](std::string const & filename) {
-            amrex::ParmParse::addfile(filename);
-        });
-
     // Expose functions to get the processor number
     m.def("getNProcs", [](){return amrex::ParallelDescriptor::NProcs();} );
     m.def("getMyProc", [](){return amrex::ParallelDescriptor::MyProc();} );
