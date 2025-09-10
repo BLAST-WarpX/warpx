@@ -1592,7 +1592,7 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
                                        amrex::Array4<amrex::Real> const& Jx_arr,
                                        amrex::Array4<amrex::Real> const& Jy_arr,
                                        amrex::Array4<amrex::Real> const& Jz_arr,
-                                       int max_crossings,
+                                       const int max_crossings,
                                        amrex::Array4<amrex::Real> const& Sxx_arr,
                                        amrex::Array4<amrex::Real> const& Sxy_arr,
                                        amrex::Array4<amrex::Real> const& Sxz_arr,

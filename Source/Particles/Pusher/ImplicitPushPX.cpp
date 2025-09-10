@@ -75,6 +75,7 @@ namespace {
         amrex::ParticleReal & step_norm,
         amrex::ParticleReal const & particle_tolerance,
         int const & max_iterations,
+        int const & max_crossings,
         amrex::ParticleReal const & Ex_external_particle,
         amrex::ParticleReal const & Ey_external_particle,
         amrex::ParticleReal const & Ez_external_particle,
@@ -162,8 +163,8 @@ namespace {
                 doGatherShapeNImplicit(xp_n, yp_n, zp_n, xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                        ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                        ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                       dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order,
-                                       depos_type );
+                                       dinv, xyzmin, lo, n_rz_azimuthal_modes, max_crossings,
+                                       depos_order, depos_type );
             }
 
             // Externally applied E and B-field in Cartesian co-ordinates
@@ -467,6 +468,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     const amrex::ParticleReal m = this-> mass;
 
     const auto pusher_algo = WarpX::particle_pusher_algo;
+    const int max_crossings = WarpX::particle_max_grid_crossings;
     const auto do_crr = do_classical_radiation_reaction;
 #ifdef WARPX_QED
     const auto do_sync = m_do_qed_quantum_sync;
@@ -552,7 +554,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
 
         bool convergence = PushXPSingleStep<exteb_control, qed_control>(ip, dt, setPosition,
                              xp, yp, zp, ux, uy, uz, xp_n, yp_n, zp_n, ux_n[ip], uy_n[ip], uz_n[ip],
-                             step_norm, particle_tolerance, max_iterations,
+                             step_norm, particle_tolerance, max_iterations, max_crossings,
                              Ex_external_particle, Ey_external_particle, Ez_external_particle,
                              Bx_external_particle, By_external_particle, Bz_external_particle,
                              Bxp, Byp, Bzp,
@@ -792,6 +794,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     const amrex::ParticleReal m = this-> mass;
 
     const auto pusher_algo = WarpX::particle_pusher_algo;
+    const int max_crossings = WarpX::particle_max_grid_crossings;
     const auto do_crr = do_classical_radiation_reaction;
 #ifdef WARPX_QED
     const auto do_sync = m_do_qed_quantum_sync;
@@ -911,7 +914,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
             // Try advancing the particle one suborbit step
             bool convergence = PushXPSingleStep<exteb_control, qed_control>(ip, dt_suborbit, setPosition,
                                  xp, yp, zp, ux, uy, uz, xp_n, yp_n, zp_n, uxp_n, uyp_n, uzp_n,
-                                 step_norm, particle_tolerance, max_iterations,
+                                 step_norm, particle_tolerance, max_iterations, max_crossings,
                                  Ex_external_particle, Ey_external_particle, Ez_external_particle,
                                  Bx_external_particle, By_external_particle, Bz_external_particle,
                                  Bxp, Byp, Bzp,
@@ -944,25 +947,25 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                 if constexpr (depos_order_control == order_one) {
                     VillasenorDepositionShapeNKernel<1>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq_n,
                                                         uxp_nph, uyp_nph, uzp_nph, gaminv,
-                                                        Jx_arr, Jy_arr, Jz_arr,
+                                                        Jx_arr, Jy_arr, Jz_arr, max_crossings,
                                                         dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                 }
                 else if constexpr (depos_order_control == order_two) {
                     VillasenorDepositionShapeNKernel<2>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq_n,
                                                         uxp_nph, uyp_nph, uzp_nph, gaminv,
-                                                        Jx_arr, Jy_arr, Jz_arr,
+                                                        Jx_arr, Jy_arr, Jz_arr, max_crossings,
                                                         dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                 }
                 else if constexpr (depos_order_control == order_three) {
                     VillasenorDepositionShapeNKernel<3>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq_n,
                                                         uxp_nph, uyp_nph, uzp_nph, gaminv,
-                                                        Jx_arr, Jy_arr, Jz_arr,
+                                                        Jx_arr, Jy_arr, Jz_arr, max_crossings,
                                                         dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                 }
                 else if constexpr (depos_order_control == order_four) {
                     VillasenorDepositionShapeNKernel<4>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq_n,
                                                         uxp_nph, uyp_nph, uzp_nph, gaminv,
-                                                        Jx_arr, Jy_arr, Jz_arr,
+                                                        Jx_arr, Jy_arr, Jz_arr, max_crossings,
                                                         dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                 }
 
