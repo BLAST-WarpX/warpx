@@ -183,20 +183,14 @@ namespace {
             uz[ip] = uzp_n;
 
 #ifdef WARPX_QED
-            if (!do_sync)
-#endif
-            {
+            if (!do_sync) {
                 doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
                                           Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                           ion_lev ? ion_lev[ip] : 1,
                                           m, q, pusher_algo, do_crr,
-#ifdef WARPX_QED
                                           t_chi_max,
-#endif
                                           dt);
-            }
-#ifdef WARPX_QED
-            else {
+            } else {
                 if constexpr (qed_control == has_qed) {
                     doParticleMomentumPush<1>(ux[ip], uy[ip], uz[ip],
                                               Exp, Eyp, Ezp, Bxp, Byp, Bzp,
@@ -206,6 +200,12 @@ namespace {
                                               dt);
                 }
             }
+#else
+            doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
+                                      Exp, Eyp, Ezp, Bxp, Byp, Bzp,
+                                      ion_lev ? ion_lev[ip] : 1,
+                                      m, q, pusher_algo, do_crr,
+                                      dt);
 #endif
 
 #ifdef WARPX_QED
