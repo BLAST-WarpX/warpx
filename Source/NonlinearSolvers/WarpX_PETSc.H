@@ -138,8 +138,11 @@ class KSP_impl
         //! right-hand-side vector
         VecObj* m_b = nullptr;
 
-        //!PETSc objects created?
+        //! PETSc objects created?
         bool m_is_defined = false;
+
+        //! Set PETSc options
+        void setOptions();
 };
 
 }

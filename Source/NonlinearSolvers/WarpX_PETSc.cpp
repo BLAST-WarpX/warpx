@@ -136,6 +136,8 @@ KSP_impl::KSP_impl(LinOpType& a_op)
     m_P = new MatObj;
     m_x = new VecObj;
     m_b = new VecObj;
+
+    setOptions();
 }
 
 KSP_impl::~KSP_impl()
@@ -192,16 +194,8 @@ void KSP_impl::createObjects(const VecType& a_vec)
                           (void (*)(void))applyMatOp );
     MatSetUp(m_A->obj);
 
-    // create KSP object
+    // create KSP and PC object
     KSPCreate( PETSC_COMM_WORLD, &m_ksp->obj );
-    KSPSetOperators( m_ksp->obj, m_A->obj, m_A->obj );
-    KSPSetTolerances( m_ksp->obj, m_rtol, m_atol, PETSC_CURRENT, m_maxits );
-    KSPSetNormType( m_ksp->obj, KSP_NORM_UNPRECONDITIONED );
-    if (m_verbose > 0) {
-        KSPMonitorSet( m_ksp->obj, printKSPResidual, NULL, NULL );
-    }
-
-    // set PC
     PC pc;
     KSPGetPC(m_ksp->obj, &pc);
     auto pc_type = m_op->pcType();
@@ -211,9 +205,14 @@ void KSP_impl::createObjects(const VecType& a_vec)
         PCSetType(pc, PCSHELL);
         PCShellSetApply(pc, applyNativePC);
         PCShellSetContext(pc, this);
+        amrex::Print() << "KSP_impl: Using native preconditioner through PETSc's PCShell interface.\n";
+        KSPSetOperators( m_ksp->obj, m_A->obj, m_A->obj );
     } else {
         // use PETSc options and implementation for PC
         PCSetFromOptions(pc);
+        PCType pctype;
+        PCGetType(pc, &pctype);
+        amrex::Print() << "KSP_impl: Using PETSc preconditioner - " << pctype << ".\n";
         // set up the PC sparse matrix
         MatCreate( PETSC_COMM_WORLD, &m_P->obj );
         MatSetSizes( m_P->obj,
@@ -226,11 +225,25 @@ void KSP_impl::createObjects(const VecType& a_vec)
         MatSetOption(m_P->obj, MAT_NEW_NONZERO_LOCATION_ERR, PETSC_FALSE);
         MatSetOption(m_P->obj, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
         MatSetUp(m_P->obj);
+        KSPSetOperators( m_ksp->obj, m_A->obj, m_P->obj );
+    }
+    KSPSetTolerances( m_ksp->obj, m_rtol, m_atol, PETSC_CURRENT, m_maxits );
+    KSPSetNormType( m_ksp->obj, KSP_NORM_UNPRECONDITIONED );
+    if (m_verbose > 0) {
+        KSPMonitorSet( m_ksp->obj, printKSPResidual, NULL, NULL );
     }
 
     // it is now defined
     m_is_defined = true;
 
+}
+
+void KSP_impl::setOptions()
+{
+    //PetscOptionsSetValue( NULL, "-mat_view" , NULL );
+    PetscOptionsSetValue( NULL, "-log_view" , NULL );
+    PetscOptionsSetValue( NULL, "-pc_type", "lu");
+    //PetscOptionsSetValue( NULL, "-pc_factor_levels", "2");
 }
 
 void KSP_impl::setTolerances(const amrex::Real a_rtol,
