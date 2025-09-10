@@ -194,14 +194,14 @@ void PetscPC<T,Ops>::computePCMatrixNNZ()
                                            * (1+2*m_pc_mass_matrix_width)
                                            * (1+2*m_pc_mass_matrix_width);
 #else
-    WARPX_ABORT_WITH_MESSAGE("PetscPC<T,Ops>::computePCMatrixNNZ() not implemented for this dimensionality");
+        static int nbands_J_mass_matrix = 0;
+        WARPX_ABORT_WITH_MESSAGE("PetscPC<T,Ops>::computePCMatrixNNZ() not implemented for this dimensionality");
 #endif
         // the following overallocates
         static int nbands_EMfields = 1 + 2*amrex::SpaceDim
                                        + 2*(amrex::SpaceDim-1)*(amrex::SpaceDim-1);
         m_pc_mat_nnz = nbands_EMfields + nbands_J_mass_matrix;
     }
-
 }
 
 template <class T, class Ops>
