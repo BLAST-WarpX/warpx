@@ -1,4 +1,4 @@
-/* Copyright 2024 The WarpX Community
+/* Copyright 2024-2025 The WarpX Community
  *
  * This file is part of WarpX.
  *
@@ -20,6 +20,14 @@ using namespace amrex;
 void EffectivePotentialES::InitData() {
     auto & warpx = WarpX::GetInstance();
     m_poisson_boundary_handler->DefinePhiBCs(warpx.Geom(0));
+
+    // Initialize "sigma" MF which stores the dressing of the Poisson equation.
+    // It is a cell-centered multifab.
+    auto rho = warpx.GetMultiFabRegister().get(warpx::fields::FieldType::rho_fp, 0);
+    auto const& ba = convert(rho->boxArray(), IntVect(AMREX_D_DECL(0,0,0)));
+    m_sigma = std::make_unique<MultiFab>(ba, rho->DistributionMap(), 1, 0);
+    // Set sigma to 1
+    m_sigma->setVal(1.0_rt);
 }
 
 void EffectivePotentialES::ComputeSpaceChargeField (
@@ -81,27 +89,24 @@ void EffectivePotentialES::computePhi (
 {
     // Calculate the mass enhancement factor - see  Appendix A of
     // Barnes, Journal of Comp. Phys., 424 (2021), 109852.
-    // The "sigma" multifab stores the dressing of the Poisson equation. It
-    // is a cell-centered multifab.
-    auto const& ba = convert(rho[0]->boxArray(), IntVect(AMREX_D_DECL(0,0,0)));
-    MultiFab sigma(ba, rho[0]->DistributionMap(), 1, rho[0]->nGrowVect());
-    ComputeSigma(sigma);
+    ComputeSigma();
 
     // Use the AMREX MLMG solver
-    computePhi(rho, phi, efield, sigma, self_fields_required_precision,
+    computePhi(rho, phi, efield, m_sigma, self_fields_required_precision,
                 self_fields_absolute_tolerance, self_fields_max_iters,
                 self_fields_verbosity);
 }
 
-void EffectivePotentialES::ComputeSigma (MultiFab& sigma) const
+void EffectivePotentialES::ComputeSigma () const
 {
-    // Reset sigma to 1
-    sigma.setVal(1.0_rt);
-
+    const ParmParse pp_warpx("warpx");
     // Get the user set value for C_SI (defaults to 4)
     amrex::Real C_SI = 4.0;
-    const ParmParse pp_warpx("warpx");
     utils::parser::queryWithParser(pp_warpx, "effective_potential_factor", C_SI);
+
+    // Get the user set value for the time filtering parameter (defaults to 0.1)
+    amrex::Real time_filter_param = 0.1;
+    utils::parser::queryWithParser(pp_warpx, "effective_potential_time_filter_param", time_filter_param);
 
     int const lev = 0;
 
@@ -116,6 +121,12 @@ void EffectivePotentialES::ComputeSigma (MultiFab& sigma) const
         C_SI * warpx.getdt(lev) * warpx.getdt(lev) / (4._rt * PhysConst::ep0)
     );
 
+    // if this is the first step, use the full sigma
+    if (warpx.getistep(lev) == 0) time_filter_param = 1._rt;
+
+    // scale sigma down from current value for time filtering
+    m_sigma->mult(1.0_rt - time_filter_param, 0);
+
     // Loop over each species to calculate the Poisson equation dressing
     for (auto const& pc : mypc) {
         // get the species number density per cell
@@ -125,19 +136,22 @@ void EffectivePotentialES::ComputeSigma (MultiFab& sigma) const
         auto const mult_factor_pc = mult_factor * pc->getCharge() * pc->getCharge() / pc->getMass();
 
         // add species term to sigma:
-        // sigma = 1.0 * sigma + C_SI / 4 * q^2/(m*eps0) * dt^2 * N
+        // sigma += C_SI / 4 * q^2/(m*eps0) * dt^2 * N
         MultiFab::LinComb(
-            sigma, 1._rt, sigma, 0, mult_factor_pc, *rho_cc, 0, 0, 1, 0
+            *m_sigma,
+            1._rt, *m_sigma, 0,
+            time_filter_param*mult_factor_pc, *rho_cc, 0,
+            0, 1, 0
         );
     }
+    m_sigma->plus(time_filter_param, 0);
 }
-
 
 void EffectivePotentialES::computePhi (
     ablastr::fields::MultiLevelScalarField const& rho,
     ablastr::fields::MultiLevelScalarField const& phi,
     ablastr::fields::MultiLevelVectorField const& efield,
-    amrex::MultiFab const& sigma,
+    std::unique_ptr<amrex::MultiFab> const& sigma,
     amrex::Real required_precision,
     amrex::Real absolute_tolerance,
     int max_iters,
@@ -207,7 +221,7 @@ void EffectivePotentialES::computePhi (
     ablastr::fields::computeEffectivePotentialPhi(
         sorted_rho,
         sorted_phi,
-        sigma,
+        *sigma,
         required_precision,
         absolute_tolerance,
         max_iters,

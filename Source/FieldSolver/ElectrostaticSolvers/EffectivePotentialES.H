@@ -1,4 +1,4 @@
-/* Copyright 2024 The WarpX Community
+/* Copyright 2024-2025 The WarpX Community
  *
  * This file is part of WarpX.
  *
@@ -35,7 +35,7 @@ public:
         MultiFluidContainer* mfl,
         int max_level) override;
 
-    void ComputeSigma ( amrex::MultiFab& sigma ) const;
+    void ComputeSigma ( ) const;
 
     void computePhi (
         ablastr::fields::MultiLevelScalarField const& rho,
@@ -63,12 +63,14 @@ public:
         ablastr::fields::MultiLevelScalarField const& rho,
         ablastr::fields::MultiLevelScalarField const& phi,
         ablastr::fields::MultiLevelVectorField const& efield,
-        amrex::MultiFab const& sigma,
+        std::unique_ptr<amrex::MultiFab> const& sigma,
         amrex::Real required_precision,
         amrex::Real absolute_tolerance,
         int max_iters,
         int verbosity
     ) const;
+
+    std::unique_ptr<amrex::MultiFab> m_sigma;
 };
 
 #endif // WARPX_EFFECTIVEPOTENTIALES_H_
