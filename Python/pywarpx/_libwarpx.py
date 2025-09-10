@@ -77,7 +77,7 @@ class LibWarpX:
             _dims = str(geometry.dims)
         except AttributeError:
             raise Exception(
-                "The shared object could not be loaded. The geometry must be setup before the WarpX pybind11 module can be accessesd. The geometry determines which version of the shared object to load."
+                "The shared object could not be loaded. The geometry must be setup before the WarpX pybind11 module can be accessed. The geometry determines which version of the shared object to load."
             )
 
         if _dims == "RZ":
