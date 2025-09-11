@@ -85,7 +85,7 @@ namespace {
         amrex::ParticleReal & Bxp,
         amrex::ParticleReal & Byp,
         amrex::ParticleReal & Bzp,
-        int const & t_do_not_gather,
+        int const & do_gather,
         amrex::Array4<const amrex::Real> const & ex_arr,
         amrex::Array4<const amrex::Real> const & ey_arr,
         amrex::Array4<const amrex::Real> const & ez_arr,
@@ -160,7 +160,7 @@ namespace {
             Byp = By_external_particle;
             Bzp = Bz_external_particle;
 
-            if (!t_do_not_gather) {
+            if (do_gather) {
                 // first gather E and B to the particle positions
                 doGatherShapeNImplicit(xp_n, yp_n, zp_n, xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                        ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
@@ -384,7 +384,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     }
 #endif
 
-    const auto t_do_not_gather = do_not_gather;
+    const auto do_gather = !do_not_gather;
 
     const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
 #ifdef WARPX_QED
@@ -463,7 +463,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                              Ex_external_particle, Ey_external_particle, Ez_external_particle,
                              Bx_external_particle, By_external_particle, Bz_external_particle,
                              Bxp, Byp, Bzp,
-                             t_do_not_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
+                             do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                              ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                              dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, depos_type,
                              getExternalEB, scaleFields, ion_lev, m, q, pusher_algo, do_crr
@@ -745,7 +745,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     }
 #endif
 
-    const auto t_do_not_gather = do_not_gather;
+    const auto do_gather = !do_not_gather;
 
     const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
 #ifdef WARPX_QED
@@ -844,7 +844,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                  Ex_external_particle, Ey_external_particle, Ez_external_particle,
                                  Bx_external_particle, By_external_particle, Bz_external_particle,
                                  Bxp, Byp, Bzp,
-                                 t_do_not_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
+                                 do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                  ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                                  dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, depos_type,
                                  getExternalEB, scaleFields, ion_lev, m, q, pusher_algo, do_crr
