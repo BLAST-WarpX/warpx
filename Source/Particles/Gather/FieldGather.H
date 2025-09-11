@@ -1501,19 +1501,31 @@ void doGatherPicnicShapeN (
 
     // Abort if cell crossings are larger than permitted
     if (cell_crossings_x > max_crossings) {
+#if !defined(AMREX_USE_GPU)
         amrex::Abort("Error: cell_crossings_x = " + std::to_string(cell_crossings_x) +
                      " is greater than the maximum allowed = " +
                      std::to_string(max_crossings));
+#else
+        amrex::Abort("Error: Too many cell crossings in x");
+#endif
     }
     if (cell_crossings_y > max_crossings) {
+#if !defined(AMREX_USE_GPU)
         amrex::Abort("Error: cell_crossings_y = " + std::to_string(cell_crossings_y) +
                      " is greater than the maximum allowed = " +
                      std::to_string(max_crossings));
+#else
+        amrex::Abort("Error: Too many cell crossings in y");
+#endif
     }
     if (cell_crossings_z > max_crossings) {
+#if !defined(AMREX_USE_GPU)
         amrex::Abort("Error: cell_crossings_z = " + std::to_string(cell_crossings_z) +
                      " is greater than the maximum allowed = " +
                      std::to_string(max_crossings));
+#else
+        amrex::Abort("Error: Too many cell crossings in z");
+#endif
     }
 
     // compute total change in particle position and the initial cell
@@ -1700,11 +1712,17 @@ void doGatherPicnicShapeN (
         amrex::Abort("Error: cell_crossings_x = " + std::to_string(cell_crossings_x) +
                      " is greater than the maximum allowed = " +
                      std::to_string(max_crossings));
+#else
+        amrex::Abort("Error: Too many cell crossings in x");
+#endif
     }
     if (cell_crossings_z > max_crossings) {
         amrex::Abort("Error: cell_crossings_z = " + std::to_string(cell_crossings_z) +
                      " is greater than the maximum allowed = " +
                      std::to_string(max_crossings));
+#else
+        amrex::Abort("Error: Too many cell crossings in z");
+#endif
     }
 
 
@@ -1877,9 +1895,13 @@ void doGatherPicnicShapeN (
 
     // Abort if cell crossings are larger than permitted
     if (cell_crossings_z > max_crossings) {
+#if !defined(AMREX_USE_GPU)
         amrex::Abort("Error: cell_crossings_z = " + std::to_string(cell_crossings_z) +
                      " is greater than the maximum allowed = " +
                      std::to_string(max_crossings));
+#else
+        amrex::Abort("Error: Too many cell crossings in z");
+#endif
     }
 
     // need to assert that the number of cell crossings in each direction
@@ -1969,9 +1991,13 @@ void doGatherPicnicShapeN (
 
     // Abort if cell crossings are larger than permitted
     if (cell_crossings_x > max_crossings) {
+#if !defined(AMREX_USE_GPU)
         amrex::Abort("Error: cell_crossings_x = " + std::to_string(cell_crossings_x) +
                      " is greater than the maximum allowed = " +
                      std::to_string(max_crossings));
+#else
+        amrex::Abort("Error: Too many cell crossings in x");
+#endif
     }
 
     // compute total change in particle position and the initial cell
