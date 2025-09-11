@@ -20,6 +20,35 @@
 #include <AMReX_Vector.H>
 #include <AMReX_MultiFab.H>
 
+namespace PetscPCUtils
+{
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void insertOrAdd( const int a_cidx, /*!< Column index (global) */
+                      const amrex::Real a_val, /*!< Value to insert/add */
+                      int* const a_cidxs, /*!< Column index array */
+                      amrex::Real* const a_aij, /*!< array of values */
+                      int& a_ncol /*!< number of non-zero columns */)
+    {
+        if (a_cidx < 0) { return; /* outside domain */ }
+        int loc = -1;
+        for (int icol = 0; icol < a_ncol; icol++) {
+            if (a_cidxs[icol] == a_cidx) {
+                loc = icol;
+                break;
+            }
+        }
+        if (loc < 0) {
+            // column index not found; add new entry
+            a_cidxs[a_ncol] = a_cidx;
+            a_aij[a_ncol] = a_val;
+            a_ncol++;
+        } else {
+            // column index already exists; add to value
+            a_aij[loc] += a_val;
+        }
+    }
+}
+
 /**
  * \brief PETSc Preconditioner Wrapper
  *
@@ -131,6 +160,7 @@ class PetscPC : public Preconditioner<T,Ops>
         Ops* m_ops = nullptr;
 
         int m_num_amr_levels = 0;
+        amrex::Vector<amrex::Geometry> m_geom;
 
         int m_ndofs_l = 0;
         int m_ndofs_g = 0;
@@ -234,6 +264,10 @@ void PetscPC<T,Ops>::Define ( const T& a_U,
     if (m_num_amr_levels > 1) {
         WARPX_ABORT_WITH_MESSAGE("PetscPC::Define(): m_num_amr_levels > 1");
     }
+    m_geom.resize(m_num_amr_levels);
+    for (int n = 0; n < m_num_amr_levels; n++) {
+        m_geom[n] = m_ops->GetGeometry(n);
+    }
 
     computePCMatrixNNZ();
 
@@ -284,6 +318,7 @@ void PetscPC<T,Ops>::Update (const T& a_U)
     // Get DOF object from a_U
     const auto& dofs_obj = a_U.getDOFsObject();
     const auto& dofs_mfarrvec = dofs_obj->m_array;
+    const auto& dofs_lhs_mfarrvec = dofs_obj->m_array_lhs;
     AMREX_ALWAYS_ASSERT(m_ndofs_l == dofs_obj->m_nDoFs_l);
     AMREX_ALWAYS_ASSERT(m_ndofs_g == dofs_obj->m_nDoFs_g);
 
@@ -297,23 +332,146 @@ void PetscPC<T,Ops>::Update (const T& a_U)
     const auto nnz_max = m_pc_mat_nnz;
 
     for (int lev = 0; lev < m_num_amr_levels; lev++) {
-        for (int n = 0; n < 3; n++) {
-            auto ncomp = dofs_mfarrvec[lev][n]->nComp();
-            AMREX_ALWAYS_ASSERT(ncomp == 2); // local, global
-            for (amrex::MFIter mfi(*dofs_mfarrvec[lev][n]); mfi.isValid(); ++mfi) {
+
+        auto ncomp = dofs_mfarrvec[lev][0]->nComp();
+        AMREX_ALWAYS_ASSERT(ncomp == 2); // local, global
+
+        const auto& geom = m_geom[lev];
+        const auto dxi = geom.InvCellSizeArray();
+
+        for (int dir = 0; dir < 3; dir++) {
+            for (amrex::MFIter mfi(*dofs_mfarrvec[lev][dir]); mfi.isValid(); ++mfi) {
+
                 auto bx = mfi.tilebox();
-                auto dof_arr = dofs_mfarrvec[lev][n]->const_array(mfi);
+
+                auto dof_arr = dofs_mfarrvec[lev][dir]->const_array(mfi);
+                auto dof_lhs_arr = dofs_lhs_mfarrvec[lev][dir]->const_array(mfi);
+
+#if defined(WARPX_DIM_1D_Z)
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                auto tdir = (dir == 0 ? 1 : 0);
+                auto dof_tdir_arr = dofs_mfarrvec[lev][tdir]->const_array(mfi);
+#else
+#endif
+
                 ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
-                    auto row_idx_l = (int) dof_arr(i,j,k,0);
-                    auto row_idx_g = (int) dof_arr(i,j,k,1);
-                    AMREX_ALWAYS_ASSERT((row_idx_l >= 0) && (row_idx_l < ndofs_l));
-                    AMREX_ALWAYS_ASSERT((row_idx_g >= 0) && (row_idx_g < ndofs_g));
+                    int icol = 0;
+                    auto ridx_l = (int) dof_lhs_arr(i,j,k,0);
+                    auto ridx_g = (int) dof_lhs_arr(i,j,k,1);
+                    AMREX_ALWAYS_ASSERT((ridx_l >= 0) && (ridx_l < ndofs_l));
+                    AMREX_ALWAYS_ASSERT((ridx_g >= 0) && (ridx_g < ndofs_g));
 
-                    r_indices_g_ptr[row_idx_l] = row_idx_g;
-                    num_nz_ptr[row_idx_l] = 1;
-                    c_indices_g_ptr[row_idx_l*nnz_max+0] = row_idx_g;
-                    a_ij_ptr[row_idx_l*nnz_max+0] = 1.0;
+                    r_indices_g_ptr[ridx_l] = ridx_g;
+
+                    {
+                        auto cidx_g_lhs = dof_lhs_arr(i,j,k,1);;
+                        amrex::Real val = 1.0;
+                        PetscPCUtils::insertOrAdd( cidx_g_lhs, val,
+                                                   &c_indices_g_ptr[ridx_l*nnz_max],
+                                                   &a_ij_ptr[ridx_l*nnz_max],
+                                                   icol );
+                        AMREX_ALWAYS_ASSERT(icol <= nnz_max);
+                    }
+
+#if defined(WARPX_DIM_1D_Z)
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                    {
+                        auto cidx_g_rhs = (int) dof_arr(i,j,k,1);
+                        amrex::Real val = 0.0;
+                        if (dir == 0) {
+                            val += 2*alpha * dxi[1]*dxi[1];
+                        } else if (dir == 1) {
+                            val += 2*alpha * dxi[0]*dxi[0];
+                        } else {
+                            val += 2*alpha *(dxi[0]*dxi[2] + dxi[1]*dxi[1]);
+                        }
+                        PetscPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                   &c_indices_g_ptr[ridx_l*nnz_max],
+                                                   &a_ij_ptr[ridx_l*nnz_max],
+                                                   icol );
+                        AMREX_ALWAYS_ASSERT(icol <= nnz_max);
+                    }
+                    if (dir < 2) {
+                        {
+                            auto cidx_g_rhs = (int) (dir == 0 ? dof_arr(i,j-1,k,1) : dof_arr(i-1,j,k,1));
+                            amrex::Real val = -alpha * dxi[dir==0?1:0] * dxi[dir==0?1:0];
+                            PetscPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                       &c_indices_g_ptr[ridx_l*nnz_max],
+                                                       &a_ij_ptr[ridx_l*nnz_max],
+                                                       icol );
+                            AMREX_ALWAYS_ASSERT(icol <= nnz_max);
+                        }
+                        {
+                            auto cidx_g_rhs = (int) (dir == 0 ? dof_arr(i,j+1,k,1) : dof_arr(i+1,j,k,1));
+                            amrex::Real val = -alpha * dxi[dir==0?1:0] * dxi[dir==0?1:0];
+                            PetscPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                       &c_indices_g_ptr[ridx_l*nnz_max],
+                                                       &a_ij_ptr[ridx_l*nnz_max],
+                                                       icol );
+                            AMREX_ALWAYS_ASSERT(icol <= nnz_max);
+                        }
+                        {
+                            auto cidx_g_rhs = (int) (dir == 0 ? dof_tdir_arr(i,j-1,k,1) : dof_tdir_arr(i-1,j,k,1));
+                            amrex::Real val = alpha * dxi[dir] * dxi[dir==0?1:0];
+                            PetscPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                       &c_indices_g_ptr[ridx_l*nnz_max],
+                                                       &a_ij_ptr[ridx_l*nnz_max],
+                                                       icol );
+                            AMREX_ALWAYS_ASSERT(icol <= nnz_max);
+                        }
+                        {
+                            auto cidx_g_rhs = (int) dof_tdir_arr(i,j,k,1);
+                            amrex::Real val = -alpha * dxi[dir] * dxi[dir==0?1:0];
+                            PetscPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                       &c_indices_g_ptr[ridx_l*nnz_max],
+                                                       &a_ij_ptr[ridx_l*nnz_max],
+                                                       icol );
+                            AMREX_ALWAYS_ASSERT(icol <= nnz_max);
+                        }
+                        {
+                            auto cidx_g_rhs = (int) (dir == 0 ? dof_tdir_arr(i+1,j-1,k,1) : dof_tdir_arr(i-1,j+1,k,1));
+                            amrex::Real val = -alpha * dxi[dir] * dxi[dir==0?1:0];
+                            PetscPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                       &c_indices_g_ptr[ridx_l*nnz_max],
+                                                       &a_ij_ptr[ridx_l*nnz_max],
+                                                       icol );
+                            AMREX_ALWAYS_ASSERT(icol <= nnz_max);
+                        }
+                        {
+                            auto cidx_g_rhs = (int) (dir == 0 ? dof_tdir_arr(i+1,j,k,1) : dof_tdir_arr(i,j+1,k,1));
+                            amrex::Real val = alpha * dxi[dir] * dxi[dir==0?1:0];
+                            PetscPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                       &c_indices_g_ptr[ridx_l*nnz_max],
+                                                       &a_ij_ptr[ridx_l*nnz_max],
+                                                       icol );
+                            AMREX_ALWAYS_ASSERT(icol <= nnz_max);
+                        }
+                    } else {
+                        for (int jdir = 0; jdir < 2; jdir++) {
+                            {
+                                auto cidx_g_rhs = (int) (jdir == 0 ? dof_arr(i-1,j,k,1) : dof_arr(i,j-1,k,1));
+                                amrex::Real val = -alpha * dxi[jdir] * dxi[jdir];
+                                PetscPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                           &c_indices_g_ptr[ridx_l*nnz_max],
+                                                           &a_ij_ptr[ridx_l*nnz_max],
+                                                           icol );
+                                AMREX_ALWAYS_ASSERT(icol <= nnz_max);
+                            }
+                            {
+                                auto cidx_g_rhs = (int) (jdir == 0 ? dof_arr(i+1,j,k,1) : dof_arr(i,j+1,k,1));
+                                amrex::Real val = -alpha * dxi[jdir] * dxi[jdir];
+                                PetscPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                           &c_indices_g_ptr[ridx_l*nnz_max],
+                                                           &a_ij_ptr[ridx_l*nnz_max],
+                                                           icol );
+                                AMREX_ALWAYS_ASSERT(icol <= nnz_max);
+                            }
+                        }
+                    }
+#else
+#endif
+                    num_nz_ptr[ridx_l] = icol;
                 });
             }
         }
