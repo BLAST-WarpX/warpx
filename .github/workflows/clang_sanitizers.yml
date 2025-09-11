@@ -72,6 +72,9 @@ jobs:
         #MPI implementations often leak memory
         export "ASAN_OPTIONS=detect_leaks=0"
 
+        # Print stacktrace for easier debugging
+        export UBSAN_OPTIONS=print_stacktrace=1
+
         git clone https://github.com/ECP-WarpX/warpx-data ../warpx-data
 
         ctest --test-dir build/Examples/Physics_applications/ -R ".*\.run" --output-on-failure
@@ -144,9 +147,6 @@ jobs:
 
         # This option is required to avoid false positive reports from the OpenMP runtime
         export TSAN_OPTIONS='ignore_noninstrumented_modules=1'
-
-        # Print stacktrace for easier debugging
-        export UBSAN_OPTIONS=print_stacktrace=1
 
         export OMP_NUM_THREADS=2
 
