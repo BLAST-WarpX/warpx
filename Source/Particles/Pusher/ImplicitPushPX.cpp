@@ -482,7 +482,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                              do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                              ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                              dinv, xyzmin, lo, max_crossings, n_rz_azimuthal_modes, depos_order, depos_type,
-                             getExternalEB, scaleFields, ion_lev, m, q, pusher_algo, do_crr
+                             getExternalEB, ion_lev, m, q, pusher_algo, do_crr
 #ifdef WARPX_QED
                              , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
 #endif
@@ -867,7 +867,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                  do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                  ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                                  dinv, xyzmin, lo, max_crossings, n_rz_azimuthal_modes, depos_order, depos_type,
-                                 getExternalEB, scaleFields, ion_lev, m, q, pusher_algo, do_crr
+                                 getExternalEB, ion_lev, m, q, pusher_algo, do_crr
 #ifdef WARPX_QED
                                  , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
 #endif
