@@ -349,10 +349,12 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr() + offset;
     amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr() + offset;
 
-    const int do_copy = m_do_back_transformed_particles;
-    CopyParticleAttribs copyAttribs;
-    if (do_copy) {
-        copyAttribs = CopyParticleAttribs(*this, pti, offset);
+    if (m_do_back_transformed_particles) { //  Copy the old x and u for the BTD
+        CopyParticleAttribs copyAttribs = CopyParticleAttribs(*this, pti, offset);
+        amrex::ParallelFor(np_to_push, [copyAttribs] AMREX_GPU_DEVICE (long ip)
+        {
+            copyAttribs(ip);
+        });
     }
 
     int* AMREX_RESTRICT ion_lev = nullptr;
@@ -406,11 +408,6 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                        np_to_push, [=] AMREX_GPU_DEVICE (long ip, auto exteb_control,
                                                          auto qed_control)
     {
-
-        if (do_copy) {
-            //  Copy the old x and u for the BTD
-            copyAttribs(ip);
-        }
 
         // Skip any particles that require suborbits
         if (nsuborbits && nsuborbits[ip] > 1) {
