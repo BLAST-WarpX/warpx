@@ -164,7 +164,9 @@ WarpX::Evolve (int numsteps)
     amrex::Vector<std::string> collision_names;
     const amrex::ParmParse pp_collisions("collisions");
     pp_collisions.queryarr("collision_names", collision_names);
-    bool const collisions = (static_cast<int>(collision_names.size()) == 0) ? false : true;
+    bool collisions = (static_cast<int>(collision_names.size()) == 0) ? false : true;
+    bool collisions_split_position_push = false;
+    pp_collisions.query("split_position_push", collisions_split_position_push);
 
     const int step_begin = istep[0];
     for (int step = istep[0]; step < numsteps_max && cur_time < stop_time; ++step)
@@ -232,7 +234,7 @@ WarpX::Evolve (int numsteps)
 #endif
 
         // perform collisions and advance fields and particles by one time step
-        OneStep(cur_time, dt[0], step, collisions);
+        OneStep(cur_time, dt[0], step, collisions, collisions_split_position_push);
 
         // Resample particles
         // +1 is necessary here because value of step seen by user (first step is 1) is different than
@@ -382,7 +384,8 @@ void WarpX::OneStep (
     amrex::Real a_cur_time,
     amrex::Real a_dt,
     int a_step,
-    bool const collisions
+    bool const collisions,
+    bool const collisions_split_position_push
 )
 {
     WARPX_PROFILE("WarpX::OneStep()");
@@ -407,29 +410,50 @@ void WarpX::OneStep (
             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
             // with collisions
             if (collisions) {
-                // push particles (half position and full momentum)
-                PushParticlesandDeposit(
-                    a_cur_time,
-                    /*skip_current=*/true,
-                    /*position_push_type=*/DtType::FirstHalf,
-                    /*momentum_push_type=*/DtType::Full
-                );
+                // with splitting of position push
+                if (collisions_split_position_push) {
+                    // push particles (half position and full momentum)
+                    PushParticlesandDeposit(
+                        a_cur_time,
+                        /*skip_current=*/true,
+                        /*position_push_type=*/DtType::FirstHalf,
+                        /*momentum_push_type=*/DtType::Full
+                    );
 
-                // perform particle collisions
-                ExecutePythonCallback("beforecollisions");
-                mypc->doCollisions(a_step, a_cur_time, a_dt);
-                ExecutePythonCallback("aftercollisions");
+                    // perform particle collisions
+                    ExecutePythonCallback("beforecollisions");
+                    mypc->doCollisions(a_step, a_cur_time, a_dt);
+                    ExecutePythonCallback("aftercollisions");
 
-                // perform particle injection
-                ExecutePythonCallback("particleinjection");
+                    // perform particle injection
+                    ExecutePythonCallback("particleinjection");
 
-                // push particles (half position)
-                PushParticlesandDeposit(
-                    a_cur_time,
-                    /*skip_current=*/true,
-                    /*position_push_type=*/DtType::SecondHalf,
-                    /*momentum_push_type=*/DtType::None
-                );
+                    // push particles (half position)
+                    PushParticlesandDeposit(
+                        a_cur_time,
+                        /*skip_current=*/true,
+                        /*position_push_type=*/DtType::SecondHalf,
+                        /*momentum_push_type=*/DtType::None
+                    );
+                }
+                // without splitting of position push
+                else {
+                    // perform particle collisions
+                    ExecutePythonCallback("beforecollisions");
+                    mypc->doCollisions(a_step, a_cur_time, a_dt);
+                    ExecutePythonCallback("aftercollisions");
+
+                    // perform particle injection
+                    ExecutePythonCallback("particleinjection");
+
+                    // push particles (half position)
+                    PushParticlesandDeposit(
+                        a_cur_time,
+                        /*skip_current=*/true,
+                        /*position_push_type=*/DtType::Full,
+                        /*momentum_push_type=*/DtType::Full
+                    );
+                }
             }
             // without collisions
             else {
