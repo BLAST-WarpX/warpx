@@ -519,11 +519,12 @@ Diagnostics::InitBaseData (const InitDiagnosticsParameters& params, [[maybe_unus
 
     // For restart, move the m_lo and m_hi of the diag consistent with the
     // current moving_window location
-    if (params.do_moving_window.value()) {
-        const int moving_dir = params.moving_window_dir.value();
+    if (params.moving_window) {
+        const auto mw_params = params.moving_window.value();
+        const int moving_dir = mw_params.dir.value();
         const amrex::Real displacement =
-            params.moving_window_x.value() - params.prob_lo_lev0_mwdir.value();
-        const amrex::Real cell_size_lev0_mwdir = params.cell_size_lev0_mwdir.value();
+            mw_params.x.value() - mw_params.prob_lo_lev0.value();
+        const amrex::Real cell_size_lev0_mwdir = mw_params.cell_size_lev0.value();
         const int shift_num_base =
             static_cast<int>(displacement / cell_size_lev0_mwdir);
         m_lo[moving_dir] += shift_num_base * cell_size_lev0_mwdir;

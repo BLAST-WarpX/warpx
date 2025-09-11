@@ -232,12 +232,13 @@ WarpX::InitFromCheckpoint ()
 
         // Parameters used to initialize diagnostics
         auto init_diag_params =
-            InitDiagnosticsParameters{finestLevel(), maxLevel(), do_moving_window};
+            InitDiagnosticsParameters{finestLevel(), maxLevel(), std::nullopt};
         if (do_moving_window){
-            init_diag_params.moving_window_dir    = moving_window_dir;
-            init_diag_params.moving_window_x      = moving_window_x;
-            init_diag_params.cell_size_lev0_mwdir =  Geom(0).CellSize(moving_window_dir);
-            init_diag_params.prob_lo_lev0_mwdir   =  Geom(0).ProbLo(moving_window_dir);
+            init_diag_params.moving_window =
+                InitDiagnosticsMovingWindowParameters{
+                    moving_window_dir, moving_window_x,
+                    Geom(0).CellSize(moving_window_dir),
+                    Geom(0).ProbLo(moving_window_dir)};
         }
 
         auto* p_warpx_mesh = dynamic_cast<amrex::AmrMesh*>(this);
