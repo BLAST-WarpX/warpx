@@ -642,6 +642,8 @@ PhysicalParticleContainer::AddPlasmaFromFile(PlasmaInjector & plasma_injector,
 
             if (plasma_injector.insideBounds(x, y, z)) {
 
+                // The normalized momentum is u = p / m = gamma beta c
+                // with m = m_e for photons, m the particle mass otherwise.
                 amrex::ParticleReal const mass_eff = (mass > 0.0_prt) ? mass : PhysConst::m_e;
                 amrex::ParticleReal const ux = ptr_ux.get()[i]*momentum_unit_x/mass_eff;
                 amrex::ParticleReal const uz = ptr_uz.get()[i]*momentum_unit_z/mass_eff;
