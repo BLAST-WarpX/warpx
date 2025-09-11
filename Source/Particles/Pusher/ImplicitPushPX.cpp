@@ -258,7 +258,6 @@ namespace {
  * \param[in/out] num_unconverged_particles Number of unconverged particles that have already been flagged
  * \param[in/out] unconverged_indices The list of indices of unconverged particles
  * \param[in/out] saved_weights The saved weights of the unconverged particles
- * \param[in] a_dt_type The push type (which part of the time step)
  */
 void
 PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
@@ -276,8 +275,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                                            amrex::Real dt, ScaleFields scaleFields,
                                            long & num_unconverged_particles,
                                            amrex::Gpu::DeviceVector<long> & unconverged_indices,
-                                           amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights,
-                                           DtType a_dt_type)
+                                           amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE((gather_lev==(lev-1)) ||
                                      (gather_lev==(lev  )),
@@ -355,7 +353,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr() + offset;
     amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr() + offset;
 
-    const int do_copy = (m_do_back_transformed_particles && (a_dt_type!=DtType::SecondHalf) );
+    const int do_copy = m_do_back_transformed_particles;
     CopyParticleAttribs copyAttribs;
     if (do_copy) {
         copyAttribs = CopyParticleAttribs(*this, pti, offset);
