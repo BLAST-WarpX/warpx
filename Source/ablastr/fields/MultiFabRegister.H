@@ -36,8 +36,6 @@ namespace
     template <typename T>
     struct is_castable_to_string<T, std::void_t<decltype(static_cast<std::string>(std::declval<T>()))>> : std::true_type {};
 
-    std::map<int, std::string> name_cache;
-
     /** helper to either cast a string/char array to string to query an AMREX_ENUM */
     template<typename T>
     std::string getExtractedName (T name)
@@ -48,19 +46,8 @@ namespace
             return std::string(name);
         } else
         {
-            // Check if the string name had already been generated.
-            // If so, return that, otherwise generate it.
-            // The generated names are cached in the map since the
-            // generation of the string name (getEnumNameString) can be relatively slow.
-            int k = static_cast<int>(name);
-            if (name_cache.count(k) > 0) {
-                return name_cache.at(k);
-            } else {
-                // user-defined AMREX_ENUM or compile error
-                std::string v = amrex::getEnumNameString(name);
-                name_cache.emplace(k, v);
-                return v;
-            }
+            // user-defined AMREX_ENUM or compile error
+            return amrex::getEnumNameString(name);
         }
     }
 }
