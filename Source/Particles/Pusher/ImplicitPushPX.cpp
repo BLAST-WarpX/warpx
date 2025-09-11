@@ -76,7 +76,6 @@ namespace {
         amrex::ParticleReal & step_norm,
         amrex::ParticleReal const & particle_tolerance,
         int const & max_iterations,
-        int const & max_crossings,
         amrex::ParticleReal const & Ex_external_particle,
         amrex::ParticleReal const & Ey_external_particle,
         amrex::ParticleReal const & Ez_external_particle,
@@ -102,6 +101,7 @@ namespace {
         amrex::XDim3 const & dinv,
         amrex::XDim3 const & xyzmin,
         amrex::Dim3 const & lo,
+        int const & max_crossings,
         int const & n_rz_azimuthal_modes,
         int const & depos_order,
         CurrentDepositionAlgo const & depos_type,
@@ -164,7 +164,7 @@ namespace {
                 doGatherShapeNImplicit(xp_n, yp_n, zp_n, xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                        ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                        ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                       dinv, xyzmin, lo, n_rz_azimuthal_modes, max_crossings,
+                                       dinv, xyzmin, lo, max_crossings, n_rz_azimuthal_modes,
                                        depos_order, depos_type);
             }
 
@@ -475,14 +475,14 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
 
         bool convergence = PushXPSingleStep<exteb_control, qed_control>(ip, dt, setPosition,
                              xp, yp, zp, ux, uy, uz, xp_n, yp_n, zp_n, ux_n[ip], uy_n[ip], uz_n[ip],
-                             step_norm, particle_tolerance, max_iterations, max_crossings,
+                             step_norm, particle_tolerance, max_iterations,
                              Ex_external_particle, Ey_external_particle, Ez_external_particle,
                              Bx_external_particle, By_external_particle, Bz_external_particle,
                              Bxp, Byp, Bzp,
                              do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                              ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                             dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, depos_type,
-                             getExternalEB, ion_lev, m, q, pusher_algo, do_crr
+                             dinv, xyzmin, lo, max_crossings, n_rz_azimuthal_modes, depos_order, depos_type,
+                             getExternalEB, scaleFields, ion_lev, m, q, pusher_algo, do_crr
 #ifdef WARPX_QED
                              , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
 #endif
@@ -667,8 +667,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     const amrex::Dim3 lo = lbound(box);
 
     const int depos_order = WarpX::nox;
-    const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
     const int max_crossings = WarpX::particle_max_grid_crossings;
+    const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
 
     amrex::Array4<const amrex::Real> const & ex_arr = exfab->array();
     amrex::Array4<const amrex::Real> const & ey_arr = eyfab->array();
@@ -860,14 +860,14 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
             // Try advancing the particle one suborbit step
             bool convergence = PushXPSingleStep<exteb_control, qed_control>(ip, dt_suborbit, setPosition,
                                  xp, yp, zp, ux, uy, uz, xp_n, yp_n, zp_n, uxp_n, uyp_n, uzp_n,
-                                 step_norm, particle_tolerance, max_iterations, max_crossings,
+                                 step_norm, particle_tolerance, max_iterations,
                                  Ex_external_particle, Ey_external_particle, Ez_external_particle,
                                  Bx_external_particle, By_external_particle, Bz_external_particle,
                                  Bxp, Byp, Bzp,
                                  do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                  ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                 dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, depos_type,
-                                 getExternalEB, ion_lev, m, q, pusher_algo, do_crr
+                                 dinv, xyzmin, lo, max_crossings, n_rz_azimuthal_modes, depos_order, depos_type,
+                                 getExternalEB, scaleFields, ion_lev, m, q, pusher_algo, do_crr
 #ifdef WARPX_QED
                                  , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
 #endif

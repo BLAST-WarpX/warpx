@@ -2201,8 +2201,8 @@ void doGatherShapeN (const amrex::ParticleReal xp,
  * \param dinv                    3D cell size inverse
  * \param xyzmin                  The lower bounds of the domain
  * \param lo                      Index lower bounds of domain.
- * \param n_rz_azimuthal_modes    Number of azimuthal modes when using RZ geometry
  * \param max_crossings           Maximum number of particle cell crossings allowed
+ * \param n_rz_azimuthal_modes    Number of azimuthal modes when using RZ geometry
  * \param nox                     order of the particle shape function
  * \param depos_type              current deposition algorithm (e.g., direct, Esirkepov, Vay, Villasenor, etc.)
  */
@@ -2235,8 +2235,8 @@ void doGatherShapeNImplicit (
                      const amrex::XDim3 & dinv,
                      const amrex::XDim3 & xyzmin,
                      const amrex::Dim3& lo,
-                     const int n_rz_azimuthal_modes,
                      [[maybe_unused]]const int max_crossings,
+                     const int n_rz_azimuthal_modes,
                      const int nox,
                      const CurrentDepositionAlgo depos_type )
 {
