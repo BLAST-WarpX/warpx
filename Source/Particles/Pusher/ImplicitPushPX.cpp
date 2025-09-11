@@ -612,8 +612,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
     const auto depos_type = WarpX::current_deposition_algo;
 
-    if (!skip_deposition && (
-        depos_type != CurrentDepositionAlgo::Villasenor) ) {
+    if (depos_type != CurrentDepositionAlgo::Villasenor ) {
         ablastr::warn_manager::WMRecordWarning("ImplicitPushXPSubOrbits",
             "When particle suborbits are used during the implicit particle push, only Villasenor "
             "current deposition is supported.");
@@ -853,7 +852,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 #endif
                                  );
 
-            if (!skip_deposition && doing_deposition) {
+            if (doing_deposition) {
 
                 const amrex::ParticleReal xp_old = xp_n;
                 const amrex::ParticleReal yp_old = yp_n;
@@ -1052,12 +1051,14 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
             isuborbit++;
 
-            if (!convergence || (isuborbit == nsuborbits[ip] && !doing_deposition && !skip_deposition)) {
+            if (!convergence || (isuborbit == nsuborbits[ip] && !doing_deposition)) {
 
                 if (!convergence) {
                     // particle did not converge
                     // Increase the number of suborbits and start over
                     nsuborbits[ip]++;
+                } else if (skip_deposition) {
+                    break;
                 } else {
                     // Convergence was reached for all suborbits, now redo the loop
                     // and do the deposition
