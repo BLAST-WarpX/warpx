@@ -105,7 +105,6 @@ namespace {
         int const & depos_order,
         CurrentDepositionAlgo const & depos_type,
         GetExternalEBField const & getExternalEB,
-        ScaleFields const & scaleFields,
         int const * const ion_lev,
         amrex::ParticleReal const & m,
         amrex::ParticleReal const & q,
@@ -174,8 +173,6 @@ namespace {
             if constexpr (exteb_control == has_exteb) {
                 getExternalEB(ip, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
             }
-
-            scaleFields(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
 
             // The momentum push starts with the velocity at the start of the step
             ux[ip] = uxp_n;
@@ -254,7 +251,6 @@ namespace {
  * \param[in] lev The refinement level
  * \param[in] gather_lev The refinement level at which to do the field gather
  * \param[in] dt The time step size
- * \param[in] scaleFields Allows scale factor to the fields (for rigid injection)
  * \param[in/out] num_unconverged_particles Number of unconverged particles that have already been flagged
  * \param[in/out] unconverged_indices The list of indices of unconverged particles
  * \param[in/out] saved_weights The saved weights of the unconverged particles
@@ -272,7 +268,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                                            long offset,
                                            long np_to_push,
                                            int lev, int gather_lev,
-                                           amrex::Real dt, ScaleFields scaleFields,
+                                           amrex::Real dt,
                                            long & num_unconverged_particles,
                                            amrex::Gpu::DeviceVector<long> & unconverged_indices,
                                            amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights)
@@ -466,7 +462,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                              do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                              ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                              dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, depos_type,
-                             getExternalEB, scaleFields, ion_lev, m, q, pusher_algo, do_crr
+                             getExternalEB, ion_lev, m, q, pusher_algo, do_crr
 #ifdef WARPX_QED
                              , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
 #endif
@@ -569,7 +565,6 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
  * \param[in] lev The refinement level
  * \param[in] gather_lev The refinement level at which to do the field gather
  * \param[in] dt The time step size
- * \param[in] scaleFields Allows scale factor to the fields (for rigid injection)
  * \param[in] skip_deposition Whether to do the deposition
  * \param[in] num_unconverged_particles Number of unconverged particles to push
  * \param[in] unconverged_indices The list of indices of unconverged particles
@@ -591,7 +586,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                     amrex::MultiFab * const jz,
                                                     long index_offset,
                                                     int lev, int gather_lev,
-                                                    amrex::Real dt, ScaleFields scaleFields,
+                                                    amrex::Real dt,
                                                     bool skip_deposition,
                                                     long num_unconverged_particles,
                                                     amrex::Gpu::DeviceVector<long> & unconverged_indices,
@@ -846,7 +841,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                  do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                  ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                                  dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, depos_type,
-                                 getExternalEB, scaleFields, ion_lev, m, q, pusher_algo, do_crr
+                                 getExternalEB, ion_lev, m, q, pusher_algo, do_crr
 #ifdef WARPX_QED
                                  , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
 #endif
