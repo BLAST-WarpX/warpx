@@ -21,6 +21,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -58,20 +59,119 @@ namespace ablastr::fields
      * Because of different staggering, the components of vector/tensor fields are stored
      * in separate (i)MultiFab.
      *
+     * Cartesian: always x,y,z in any ND
+     * RZ: r,t(heta),z (r,z over azimuthal modes)
+     * RCylinder: r,t(heta),z
+     * RSphere: r,t(heta),p(hi)
+     * @see https://warpx.readthedocs.io/en/latest/developers/dimensionality.html
+     *
      * @todo: synchronize with AMReX "enum class Direction"
      */
-    struct Direction
+    class Direction
     {
         int dir = 0;
+
+    public:
+        constexpr explicit Direction (int d) : dir(d) {}
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        static const Direction r;
+        static const Direction theta;
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+        static const Direction phi;
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z)
+        static const Direction x;
+        static const Direction y;
+#endif
+#if !defined(WARPX_DIM_RSPHERE)
+        static const Direction z;
+#endif
 
         bool operator<(const Direction& other) const
         {
             return other.dir < this->dir;
         }
 
+        operator std::string() const
+        {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            if (dir == r) { return "r"; }
+            if (dir == theta) { return "theta"; }
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+            if (dir == phi) { return "phi"; }
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z)
+            if (dir == x) { return "x"; }
+            if (dir == y) { return "y"; }
+#endif
+#if !defined(WARPX_DIM_RSPHERE)
+            if (dir == z) { return "z"; }
+#endif
+            throw std::runtime_error("invalid direction: " + std::to_string(dir));
+            return std::to_string(dir);
+        }
+
+        Direction (std::string const & s)
+        {
+            dir = -1;
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            if (s.compare(r) == 0) { dir = r; }
+            if (s.compare(theta) == 0) { dir = theta; }
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+            if (s.compare(phi) == 0) { dir = phi; }
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z)
+            if (s.compare(x) == 0) { dir = x; }
+            if (s.compare(y) == 0) { dir = y; }
+#endif
+#if !defined(WARPX_DIM_RSPHERE)
+            if (s.compare(z) == 0) { dir = z; }
+#endif
+
+            if (dir == -1) {
+                throw std::runtime_error("invalid direction: " + s);
+            }
+        }
+
+        // e.g., "x"
+        Direction (char const * c) : dir{Direction{c}} {}
+
+        // e.g., 'x'
+        Direction (char const c) : dir{Direction{c}} {}
+
+        // rule of five: define default constructors and the destructor
+        //   because we defined a special one above for char
+        ~Direction () = default;
+        Direction (const Direction&) = default;
+        Direction& operator= (const Direction&) = default;
+        Direction (Direction&&) = default;
+        Direction& operator= (Direction&&) = default;
+
         /* TODO: just temporary int compatibility */
         operator int() const { return dir; }
+
     };
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    inline constexpr Direction Direction::r = Direction{0};
+    inline constexpr Direction Direction::theta = Direction{1};
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+    inline constexpr Direction Direction::phi = Direction{2};
+#endif
+
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z)
+    inline constexpr Direction Direction::x = Direction{0};
+    inline constexpr Direction Direction::y = Direction{1};
+#endif
+
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+    inline constexpr Direction Direction::z = Direction{2};
+#endif
 
     /** A scalar field (a MultiFab)
      *
@@ -822,8 +922,23 @@ namespace ablastr::fields
             MultiFabOwner
         > m_mf_register;
 
-        /** the three directions of a vector field */
-        std::vector<Direction> m_all_dirs = {Direction{0}, Direction{1}, Direction{2}};
+      public:
+        /** The directions of a vector field as stored in the simulation.
+         *
+         * Cartesian: always x,y,z in any ND
+         * RZ: r,t(heta),z (r,z over azimuthal modes)
+         * RCylinder: r,t(heta),z
+         * RSphere: r,t(heta),p(hi)
+         * @see https://warpx.readthedocs.io/en/latest/developers/dimensionality.html
+         */
+        static inline std::vector<Direction> m_all_dirs =
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z)
+            {Direction::x, Direction::y, Direction::z};
+#elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+            {Direction::r, Direction::theta, Direction::z};
+#elif defined(WARPX_DIM_RSPHERE)
+            {Direction::r, Direction::theta, Direction::phi};
+#endif
     };
 
     /** Little temporary helper function to pass temporary MultiFabs as VectorField.
