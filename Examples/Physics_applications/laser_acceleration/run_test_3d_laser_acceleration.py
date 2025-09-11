@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 
-from pywarpx import libwarpx, particle_containers, warpx
-
-# Callback locations: https://warpx.readthedocs.io/en/latest/usage/workflows/python_extend.html#callback-locations
+from pywarpx import fields, particle_containers, warpx
 from pywarpx.callbacks import callfromafterstep
 
 # Define simulation from inputs file
@@ -18,11 +16,8 @@ def my_callback():
     print(electrons)
 
     # electric field: access (and potentially manipulate)
-    multifab_register = libwarpx.warpx.multifab_register()
-    #   vector field E, component x, on the fine patch of MR level 0
-    dir_x = libwarpx.libwarpx_so.Direction.x
-    E_x_mf = multifab_register.get("Efield_fp", dir=dir_x, level=0)
-    print(E_x_mf)
+    Ex = fields.ExWrapper(level=0)
+    print(Ex)
 
 
 # Advance simulation until last time step
