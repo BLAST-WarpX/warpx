@@ -75,6 +75,7 @@ namespace {
         amrex::ParticleReal & step_norm,
         amrex::ParticleReal const & particle_tolerance,
         int const & max_iterations,
+        bool const & modified_advance,
         int const & max_crossings,
         amrex::ParticleReal const & Ex_external_particle,
         amrex::ParticleReal const & Ey_external_particle,
@@ -496,6 +497,13 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     const int max_iterations = implicit_options->max_particle_iterations;
     const amrex::ParticleReal particle_tolerance = implicit_options->particle_tolerance;
     [[maybe_unused]] const bool print_unconverged_particle_details = implicit_options->print_unconverged_particle_details;
+    const bool linear_stage_of_jfnk = implicit_options->linear_stage_of_jfnk;
+    const int nonlinear_iter = implicit_options->nonlinear_iteration;
+    const bool mod_init_advance = implicit_options->modify_initial_newton_advance;
+    bool modified_advance = false;
+    if (!linear_stage_of_jfnk && nonlinear_iter == 0 && mod_init_advance) {
+        modified_advance = true;
+    }
 
     amrex::Gpu::Buffer<amrex::Long> unconverged_particles({0});
     amrex::Long* unconverged_particles_ptr = unconverged_particles.data();
@@ -554,7 +562,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
 
         bool convergence = PushXPSingleStep<exteb_control, qed_control>(ip, dt, setPosition,
                              xp, yp, zp, ux, uy, uz, xp_n, yp_n, zp_n, ux_n[ip], uy_n[ip], uz_n[ip],
-                             step_norm, particle_tolerance, max_iterations, max_crossings,
+                             step_norm, particle_tolerance, max_iterations, modified_advance, max_crossings,
                              Ex_external_particle, Ey_external_particle, Ez_external_particle,
                              Bx_external_particle, By_external_particle, Bz_external_particle,
                              Bxp, Byp, Bzp,
@@ -826,6 +834,12 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     const int iter_buffer = linear_stage_of_jfnk ? 10 : 0;
     const int max_iterations = implicit_options->max_particle_iterations + iter_buffer;
     const amrex::ParticleReal particle_tolerance = implicit_options->particle_tolerance;
+    const int nonlinear_iter = implicit_options->nonlinear_iteration;
+    const bool mod_init_advance = implicit_options->modify_initial_newton_advance;
+    bool modified_advance = false;
+    if (!linear_stage_of_jfnk && nonlinear_iter == 0 && mod_init_advance) {
+        modified_advance = true;
+    }
 
     long * unconverged_i = unconverged_indices.data() + index_offset;
     amrex::ParticleReal * saved_w = saved_weights.data() + index_offset;
@@ -914,7 +928,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
             // Try advancing the particle one suborbit step
             bool convergence = PushXPSingleStep<exteb_control, qed_control>(ip, dt_suborbit, setPosition,
                                  xp, yp, zp, ux, uy, uz, xp_n, yp_n, zp_n, uxp_n, uyp_n, uzp_n,
-                                 step_norm, particle_tolerance, max_iterations, max_crossings,
+                                 step_norm, particle_tolerance, max_iterations, modified_advance, max_crossings,
                                  Ex_external_particle, Ey_external_particle, Ez_external_particle,
                                  Bx_external_particle, By_external_particle, Bz_external_particle,
                                  Bxp, Byp, Bzp,
