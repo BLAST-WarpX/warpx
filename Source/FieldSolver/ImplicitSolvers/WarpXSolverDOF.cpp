@@ -175,13 +175,14 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
 
     if (m_array_type != FieldType::None) {
         for (int lev = 0; lev < a_num_amr_levels; ++lev) {
+            const auto& geom = a_WarpX->Geom(lev);
             for (int n = 0; n < 3; n++) {
                 m_array_lhs[lev][n] = new amrex::MultiFab( m_array[lev][n]->boxArray(),
                                                            m_array[lev][n]->DistributionMap(),
                                                            m_array[lev][n]->nComp(),
                                                            amrex::IntVect::TheZeroVector() );
                 amrex::MultiFab::Copy(*m_array_lhs[lev][n], *m_array[lev][n], 0, 0, m_array[lev][n]->nComp(), 0);
-                m_array[lev][n]->FillBoundary();
+                m_array[lev][n]->FillBoundary(geom.periodicity());
                 // do NOT call FillBoundary() on m_array_lhs
             }
         }
@@ -193,7 +194,8 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
                                                      m_scalar[lev]->nComp(),
                                                      amrex::IntVect::TheZeroVector() );
             amrex::MultiFab::Copy(*m_scalar_lhs[lev], *m_scalar[lev], 0, 0, m_scalar[lev]->nComp(), 0);
-            m_scalar[lev]->FillBoundary();
+            const auto& geom = a_WarpX->Geom(lev);
+            m_scalar[lev]->FillBoundary(geom.periodicity());
             // do NOT call FillBoundary() on m_scalar_lhs
         }
     }
