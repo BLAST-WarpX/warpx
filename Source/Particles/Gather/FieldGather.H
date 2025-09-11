@@ -1727,7 +1727,6 @@ void doGatherPicnicShapeN (
 #endif
     }
 
-
     // compute total change in particle position and the initial cell
     // locations in each direction used to find the position at cell crossings.
     const double dxp = x_new - x_old;
@@ -1906,10 +1905,6 @@ void doGatherPicnicShapeN (
 #endif
     }
 
-    // need to assert that the number of cell crossings in each direction
-    // is within the range permitted by the number of guard cells
-    // e.g., if (num_segments > 3) ...
-
     // compute dzp and the initial cell location used to find the cell crossings.
     double const dzp = z_new - z_old;
     const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
@@ -2001,13 +1996,6 @@ void doGatherPicnicShapeN (
         amrex::Abort("Error: Too many cell crossings in x");
 #endif
     }
-
-    // compute total change in particle position and the initial cell
-    // locations in each direction used to find the position at cell crossings.
-
-    // need to assert that the number of cell crossings in each direction
-    // is within the range permitted by the number of guard cells
-    // e.g., if (num_segments > 3) ...
 
     // compute dxp and the initial cell location used to find the cell crossings.
     double const dxp = x_new - x_old;
