@@ -1396,14 +1396,14 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                            ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                            dinv, xyzmin, lo, n_rz_azimuthal_modes,
                            nox, galerkin_interpolation);
-
-            [[maybe_unused]] const auto& getExternalEB_tmp = getExternalEB;
-            if constexpr (exteb_control == has_exteb) {
-                getExternalEB(ip, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
-            }
-
-            scaleFields(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
         }
+
+        [[maybe_unused]] const auto& getExternalEB_tmp = getExternalEB;
+        if constexpr (exteb_control == has_exteb) {
+            getExternalEB(ip, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
+        }
+
+        scaleFields(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
 
         if (copy_particle_attribs) {
             //  Copy the old x and u for the BTD
