@@ -87,6 +87,6 @@ add_warpx_test(
     1  # nprocs
     inputs_test_2d_mcc_energy_conserving  # inputs
     OFF  # TODO analysis
-    "analysis_default_regression.py --path diags/diag1001000"  # checksum
+    "analysis_default_regression.py --path diags/diag1/"  # checksum
     OFF  # dependency
 )

@@ -4,7 +4,8 @@
     "particle_momentum_y": 1.2444289432601979e-20,
     "particle_momentum_z": 1.261230323110267e-20,
     "particle_position_x": 0.00010908401409022005,
-    "particle_position_y": 0.00010822426976473106,
+    "particle_position_y": 0.0,
+    "particle_position_z": 0.00010822426976473106,
     "particle_weight": 2823958725036869.5
   },
   "lev=0": {
@@ -15,7 +16,7 @@
     "Ey": 0.0,
     "Ez": 37597667510743.0,
     "jx": 1.5422812623464118e+19,
-    "jy": 1.2961904234668988e+19,
+    "jy": 1.2961904234668986e+19,
     "jz": 1.7859539492607599e+19,
     "rho": 123515785168.50629
   },
@@ -24,7 +25,8 @@
     "particle_momentum_y": 5.442178169978425e-19,
     "particle_momentum_z": 5.382005191983912e-19,
     "particle_position_x": 0.00010878883629399094,
-    "particle_position_y": 0.00010888646068855093,
+    "particle_position_y": 0.0,
+    "particle_position_z": 0.00010888646068855093,
     "particle_weight": 2823958725036869.5
   }
 }

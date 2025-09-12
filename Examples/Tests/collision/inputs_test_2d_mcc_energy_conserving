@@ -25,12 +25,13 @@ collisions.split_position_push = 1
 # diagnostics
 diagnostics.diags_names = diag1
 diag1.diag_type = Full
-diag1.electrons.variables = w ux uy uz
-diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho
+diag1.format = openpmd
 diag1.intervals = 1000
-diag1.protons.variables = w ux uy uz
-#diag1.format = openpmd
-#diag1.openpmd_backend = h5
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho
+diag1.write_species = 1
+diag1.species = electrons protons
+diag1.electrons.variables = w x z ux uy uz
+diag1.protons.variables = w x z ux uy uz
 
 # electrons
 electrons.density = n0
