@@ -154,8 +154,6 @@ class KSP_impl : public PETScSolver_impl
         //! residual norm (relative) for recentmost solve
         amrex::Real m_norm = DBL_MAX;
 
-        // Note: unable to use std::unique_ptr<> due to
-        // incomplete-type compilation error.
         //! Solver object
         KSPObj* m_ksp = nullptr;
 };
@@ -248,15 +246,14 @@ class SNES_impl : public PETScSolver_impl
         //! Total linear iterations for the diagnostic file
         mutable int m_total_linsol_iters = 0;
 
-        //! PETSc objects created?
-
         //! Implicit time integrator object
         TIType* m_op = nullptr;
 
-        // Note: unable to use std::unique_ptr<> due to
-        // incomplete-type compilation error.
         //! Solver object
         SNESObj* m_snes = nullptr;
+
+        //! Using SNES FD?
+        bool m_fd_jac_comput = false;
 };
 
 }

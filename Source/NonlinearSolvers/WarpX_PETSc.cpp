@@ -342,6 +342,7 @@ void KSP_impl::createObjects(const VecType& a_vec)
     KSPCreate( PETSC_COMM_WORLD, &m_ksp->obj );
     PC pc;
     KSPGetPC(m_ksp->obj, &pc);
+    KSPSetPCSide(m_ksp->obj, PC_RIGHT);
     this->m_pc_type = this->m_linop->pcType();
     if (this->m_pc_type != PreconditionerType::pc_petsc) {
         // use native implementation (or no PC, if
@@ -513,6 +514,7 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op)
     SNESGetKSP(m_snes->obj, &ksp);
     PC pc;
     KSPGetPC(ksp, &pc);
+    KSPSetPCSide(ksp, PC_RIGHT);
     if (this->m_pc_type != PreconditionerType::pc_petsc) {
         // use native implementation (or no PC, if
         // native PC is turned off)
@@ -552,10 +554,12 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op)
 
     PetscOptionsSetValue(nullptr, "-ksp_converged_reason", nullptr);
 
-
     SNESSetFromOptions(m_snes->obj);
     this->m_is_defined = true;
 
+    PetscBool is_specified = PETSC_FALSE;
+    PetscOptionsHasName(nullptr, nullptr, "-snes_fd", &is_specified);
+    m_fd_jac_comput = (is_specified == PETSC_TRUE);
 }
 
 SNES_impl::~SNES_impl()
@@ -684,7 +688,14 @@ void SNES_impl::computeRHS(VecType& a_F, const VecType& a_U) const
 {
     BL_PROFILE("SNES_impl::computeRHS()");
     AMREX_ALWAYS_ASSERT(isDefined());
-    m_op->ComputeRHS( a_F, a_U, m_time, m_iter, false);
+
+    if (m_fd_jac_comput) {
+        static bool first_call = true;
+        m_op->ComputeRHS( a_F, a_U, m_time, m_iter, !first_call);
+        first_call = false;
+    } else {
+        m_op->ComputeRHS( a_F, a_U, m_time, m_iter, false);
+    }
 
     ((JacobianFunctionMF<VecType,TIType>*)this->m_linop)->setBaseSolution(a_U);
     ((JacobianFunctionMF<VecType,TIType>*)this->m_linop)->setBaseRHS(a_F);
