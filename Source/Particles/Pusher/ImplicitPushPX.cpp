@@ -226,6 +226,20 @@ namespace {
 
         }
 
+        // The Charge-conserving deposits assume the change in position is consistent with
+        // the velocity: (xp^{n+1}-xp^n)/dt = vp^{n+1/2}. This requires an additional position
+        // update for unconverged particles.
+        if (!convergence) {
+            amrex::ParticleReal dxp = 0.0_prt;
+            amrex::ParticleReal dyp = 0.0_prt;
+            amrex::ParticleReal dzp = 0.0_prt;
+            UpdatePositionImplicit(dxp, dyp, dzp, uxp_n, uyp_n, uzp_n, ux[ip], uy[ip], uz[ip], 0.5_rt*dt);
+            xp = xp_n + dxp;
+            yp = yp_n + dyp;
+            zp = zp_n + dzp;
+            setPosition(ip, xp, yp, zp);
+        }
+
         return convergence;
     }
 }
