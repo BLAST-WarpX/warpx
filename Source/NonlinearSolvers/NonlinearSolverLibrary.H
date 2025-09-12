@@ -10,8 +10,8 @@
   * \brief struct to select the nonlinear solver for implicit schemes
   */
 AMREX_ENUM (NonlinearSolverType,
-    Picard = 0,
-    Newton = 1
+    Picard,
+    Newton
 );
 
 #endif
