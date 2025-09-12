@@ -258,6 +258,8 @@ public:
 
     [[nodiscard]] amrex::Vector<amrex::Long> NumberOfParticlesInGrid(int lev) const;
 
+    [[nodiscard]] amrex::LayoutData<std::size_t> CapacityOfParticlesInGrid(int lev) const;
+
     void Increment (amrex::MultiFab& mf, int lev);
 
     void SetParticleBoxArray (int lev, amrex::BoxArray& new_ba);

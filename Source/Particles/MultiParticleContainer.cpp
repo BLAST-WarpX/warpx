@@ -810,6 +810,16 @@ MultiParticleContainer::NumberOfParticlesInGrid (int lev) const
     }
 }
 
+amrex::LayoutData<std::size_t>
+MultiParticleContainer::CapacityOfParticlesInGrid (int lev) const
+{
+    amrex::LayoutData<std::size_t> mem(pc->boxArray(lev), pc->DistributionMap(lev));
+    for (auto& pc : allcontainers) {
+        pc->CapacityOfParticlesInGrid(mem, lev);
+    }
+    return mem;
+}
+
 void
 MultiParticleContainer::Increment (MultiFab& mf, int lev)
 {
