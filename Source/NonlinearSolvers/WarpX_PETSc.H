@@ -37,7 +37,57 @@ using TIType = ImplicitSolver;
 using LinOpType = LinearFunction<WarpXSolverVec,ImplicitSolver>;
 using VecType = WarpXSolverVec;
 
-class KSP_impl
+class PETScSolver_impl
+{
+    public:
+
+        //! Constructor
+        PETScSolver_impl () = default;
+
+        //! Destructor
+        virtual ~PETScSolver_impl () = default;
+
+        // Prohibit Move and Copy operations
+        PETScSolver_impl(const PETScSolver_impl&) = delete;
+        PETScSolver_impl& operator=(const PETScSolver_impl&) = delete;
+        PETScSolver_impl(PETScSolver_impl&&) noexcept = delete;
+        PETScSolver_impl& operator=(PETScSolver_impl&&) noexcept = delete;
+
+        virtual void applyPC(VecType&, const VecType&) const = 0;
+        virtual void applyOp(VecType& a_F, const VecType& a_U) const = 0;
+
+        void assemblePCMatrix();
+
+        //! Work vector
+        mutable VecType m_U;
+        //! Work vector
+        mutable VecType m_F;
+
+        //! Local number of DOFs
+        long m_ndofs_l = 0;
+        //! Global number of DOFs
+        long m_ndofs_g = 0;
+
+        //! Matrix (lin operator) object
+        MatObj* m_A = nullptr;
+        //! Matrix (PC) object
+        MatObj* m_P = nullptr;
+        //! solution vector
+        VecObj* m_x = nullptr;
+        //! right-hand-side vector
+        VecObj* m_b = nullptr;
+
+        //! Linear operator object
+        LinOpType* m_linop = nullptr;
+
+        //! is defined?
+        bool m_is_defined = false;
+
+        //! Preconditioner type
+        PreconditionerType m_pc_type = PreconditionerType::pc_petsc;
+};
+
+class KSP_impl : public PETScSolver_impl
 {
     public:
 
@@ -45,7 +95,7 @@ class KSP_impl
         KSP_impl (LinOpType&);
 
         //! Destructor
-        ~KSP_impl ();
+        ~KSP_impl () override;
 
         // Prohibit Move and Copy operations
         KSP_impl(const KSP_impl&) = delete;
@@ -80,29 +130,19 @@ class KSP_impl
         //! Check if object is defined
         [[nodiscard]] bool isDefined () const
         {
-            return m_is_defined && (m_op != nullptr);
+            return (this->m_is_defined && (this->m_linop != nullptr));
         }
 
         //! Apply matrix op on given vector
-        void applyOp( VecType& a_F, const VecType& a_U);
+        void applyOp( VecType& a_F, const VecType& a_U) const override;
 
         //! Apply PC op on given vector
-        void applyPC( VecType& a_F, const VecType& a_U);
+        void applyPC( VecType& a_F, const VecType& a_U) const override;
 
         //! Assemble the sparse matrix representation of preconditioner
         void assemblePCMat( const VecType& a_Y);
 
-        //! Work vector
-        VecType m_U;
-        //! Work vector
-        VecType m_F;
-
     private:
-
-        //! Local number of DOFs
-        long m_ndofs_l = 0;
-        //! Global number of DOFs
-        long m_ndofs_g = 0;
 
         //! absolute tolerance
         amrex::Real m_atol = 1e-12;
@@ -120,27 +160,13 @@ class KSP_impl
         //! residual norm (relative) for recentmost solve
         amrex::Real m_norm = DBL_MAX;
 
-        //! Linear operator object
-        LinOpType* m_op = nullptr;
-
         // Note: unable to use std::unique_ptr<> due to
         // incomplete-type compilation error.
         //! Solver object
         KSPObj* m_ksp = nullptr;
-        //! Matrix (lin operator) object
-        MatObj* m_A = nullptr;
-        //! Matrix (PC) object
-        MatObj* m_P = nullptr;
-        //! solution vector
-        VecObj* m_x = nullptr;
-        //! right-hand-side vector
-        VecObj* m_b = nullptr;
-
-        //! PETSc objects created?
-        bool m_is_defined = false;
 };
 
-class SNES_impl
+class SNES_impl : public PETScSolver_impl
 {
     public:
 
@@ -148,12 +174,12 @@ class SNES_impl
         SNES_impl (const VecType&, TIType*);
 
         //! Destructor
-        ~SNES_impl();
+        ~SNES_impl() override;
 
         //! Check if object is defined
         [[nodiscard]] bool isDefined () const
         {
-            return m_is_defined && (m_op != nullptr);
+            return (this->m_is_defined && (m_op != nullptr) && (this->m_linop != nullptr));
         }
 
         //! Set tolerances
@@ -170,10 +196,10 @@ class SNES_impl
         void computeRHS(VecType&, const VecType&) const;
 
         //! Apply matrix-free Jacobian
-        void applyJac(VecType&, const VecType&) const;
+        void applyOp(VecType&, const VecType&) const override;
 
         //! Apply PC op
-        void applyPC(VecType&, const VecType&) const;
+        void applyPC(VecType&, const VecType&) const override;
 
         //! Assemble PC matrix
         void assemblePCMat();
@@ -198,17 +224,7 @@ class SNES_impl
         //! Print parameters
         void printParams () const;
 
-        //! Work vector
-        mutable VecType m_U;
-        //! Work vector
-        mutable VecType m_F;
-
     private:
-
-        //! Local number of DOFs
-        long m_ndofs_l = 0;
-        //! Global number of DOFs
-        long m_ndofs_g = 0;
 
         //! absolute tolerance
         amrex::Real m_atol = 0.;
@@ -248,28 +264,14 @@ class SNES_impl
         mutable int m_total_linsol_iters = 0;
 
         //! PETSc objects created?
-        bool m_is_defined = false;
 
         //! Implicit time integrator object
         TIType* m_op = nullptr;
-        //! Linear operator object
-        LinOpType* m_linop = nullptr;
 
         // Note: unable to use std::unique_ptr<> due to
         // incomplete-type compilation error.
         //! Solver object
         SNESObj* m_snes = nullptr;
-        //! Matrix (lin operator) object
-        MatObj* m_A = nullptr;
-        //! Matrix (PC) object
-        MatObj* m_P = nullptr;
-        //! solution vector
-        VecObj* m_x = nullptr;
-        //! right-hand-side vector
-        VecObj* m_b = nullptr;
-
-        //! Preconditioner type
-        PreconditionerType m_pc_type = PreconditionerType::pc_petsc;
 };
 
 }
