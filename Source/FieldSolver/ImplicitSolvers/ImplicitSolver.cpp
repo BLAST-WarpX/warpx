@@ -708,14 +708,16 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     // Set the implict solver options for particles and setting the current density
     ImplicitOptions options;
     options.nonlinear_iteration = a_nl_iter;
-    options.max_particle_iterations = m_max_particle_iterations;
-    options.particle_tolerance = m_particle_tolerance;
     options.linear_stage_of_jfnk = a_from_jacobian;
 
     if (a_nl_iter == 0 && !a_from_jacobian && m_modify_initial_newton_step) {
-        // Skip full Picard method on initial Newton step
+        // Only do a single Picard iteration for particles on the initial Newton step
         options.max_particle_iterations = 1;
         options.particle_tolerance = 0.0;
+    }
+    else {
+        options.max_particle_iterations = m_max_particle_iterations;
+        options.particle_tolerance = m_particle_tolerance;
     }
 
     if (m_use_mass_matrices && !a_from_jacobian) { // Called from non-linear stage of JFNK and using mass matrices
