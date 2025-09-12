@@ -16,12 +16,25 @@
 
 #ifdef AMREX_USE_PETSC
 
+#include <petscsnes.h> // must include before WarpX_PETSc.H
 #include <petscksp.h> // must include before WarpX_PETSc.H
 #include <petscmat.h> // must include before WarpX_PETSc.H
 #include <petscvec.h> // must include before WarpX_PETSc.H
 #include "WarpX_PETSc.H"
 
 namespace warpx_petsc {
+
+//! Wrapper for PETSc SNES object
+struct SNESObj
+{
+    SNESObj () = default;
+    ~SNESObj () { if (obj) { SNESDestroy(&obj); } }
+    SNESObj (SNESObj const&) = delete;
+    SNESObj (SNESObj &&) = delete;
+    SNESObj& operator= (SNESObj const&) = delete;
+    SNESObj& operator= (SNESObj &&) = delete;
+    SNES obj = nullptr;
+};
 
 //! Wrapper for PETSc KSP object
 struct KSPObj
@@ -79,6 +92,61 @@ void copyVec( Vec& a_pvec, const VecType& a_wvec)
     VecRestoreArray(a_pvec,&Yarr);
 }
 
+//! Compute RHS function
+PetscErrorCode RHSFunction( SNES a_solver, Vec a_U, Vec a_F, void* ctxt)
+{
+    BL_PROFILE("warpx_petsc::RHSFunction()");
+    amrex::ignore_unused(a_solver);
+
+    SNES_impl *context = (SNES_impl*) ctxt;
+    copyVec(context->m_U, a_U);
+    context->computeRHS(context->m_F, context->m_U);
+    copyVec(a_F, context->m_F);
+
+    PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+//! Compute Jacobian
+PetscErrorCode JacobianFunction( SNES a_solver,
+                                 Vec a_U,
+                                 Mat a_A,
+                                 Mat a_P,
+                                 void* ctxt )
+{
+    BL_PROFILE("warpx_petsc::JacobianFunction()");
+    amrex::ignore_unused(a_A);
+    amrex::ignore_unused(a_P);
+
+    SNES_impl *context = (SNES_impl*) ctxt;
+    KSP lin_solver;
+    SNESGetKSP(a_solver, &lin_solver);
+    PC pc;
+    KSPGetPC(lin_solver, &pc);
+    PCType pctype;
+    PCGetType(pc, &pctype);
+
+    if (strcmp(pctype,PCNONE) && strcmp(pctype,PCSHELL)) {
+        copyVec(context->m_U, a_U);
+        context->assemblePCMat();
+    }
+
+    PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+//! Apply matrix-free Jacobian
+PetscErrorCode applyJacobian(Mat a_A, Vec a_U, Vec a_F)
+{
+    BL_PROFILE("warpx_petsc::applyJacobian()");
+
+    SNES_impl *context;
+    MatShellGetContext(a_A, &context);
+    copyVec(context->m_U, a_U);
+    context->applyJac(context->m_F, context->m_U);
+    copyVec(a_F, context->m_F);
+
+    PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 //! Apply matrix-free linear operator
 PetscErrorCode applyMatOp(Mat a_A, Vec a_U, Vec a_F)
 {
@@ -109,6 +177,18 @@ PetscErrorCode applyNativePC( PC  a_pc, Vec a_X, Vec a_Y )
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+//! Print SNES residuals
+PetscErrorCode printSNESResidual(SNES a_snes, PetscInt a_n, PetscReal a_rnorm, void *a_ctxt)
+{
+    amrex::ignore_unused(a_ctxt);
+    amrex::ignore_unused(a_snes);
+    static amrex::Real norm0 = 0;
+    if (a_n == 0) { norm0 = a_rnorm; }
+    amrex::Print() << "Newton (PETSc SNES): iter = " << a_n << ", residual = " << a_rnorm
+                   << ", " << a_rnorm / norm0 << " (rel.)\n";
+    PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 //! Print KSP residuals
 PetscErrorCode printKSPResidual(KSP a_ksp, PetscInt a_n, PetscReal a_rnorm, void *a_ctxt)
 {
@@ -131,8 +211,6 @@ KSP_impl::KSP_impl(LinOpType& a_op)
     m_P = new MatObj;
     m_x = new VecObj;
     m_b = new VecObj;
-
-    setOptions();
 }
 
 KSP_impl::~KSP_impl()
@@ -228,10 +306,6 @@ void KSP_impl::createObjects(const VecType& a_vec)
     // it is now defined
     m_is_defined = true;
 
-}
-
-void KSP_impl::setOptions()
-{
 }
 
 void KSP_impl::setTolerances(const amrex::Real a_rtol,
@@ -361,6 +435,317 @@ void KSP_impl::assemblePCMat(const VecType& a_Y)
 
     MatAssemblyBegin(m_P->obj, MAT_FINAL_ASSEMBLY);
     MatAssemblyEnd(m_P->obj, MAT_FINAL_ASSEMBLY);
+}
+
+SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op)
+{
+    BL_PROFILE("SNES_impl::SNES_impl()");
+    amrex::Print() << "SNES_impl: Initialized PETSc's SNES solver.\n";
+
+    m_U.Define(a_vec);
+    m_F.Define(a_vec);
+    m_ndofs_l = m_U.nDOF_local();
+    m_ndofs_g = m_U.nDOF_global();
+
+    AMREX_ALWAYS_ASSERT(a_op != nullptr);
+    m_op = a_op;
+
+    m_linop = new JacobianFunctionMF<VecType,TIType>;
+    m_linop->define(m_F, m_op, m_pc_type);
+
+    m_snes = new SNESObj;
+    m_A = new MatObj;
+    m_P = new MatObj;
+    m_x = new VecObj;
+    m_b = new VecObj;
+
+    const amrex::ParmParse pp_newton("newton");
+    pp_newton.query("verbose",             m_verbose);
+    pp_newton.query("absolute_tolerance",  m_atol);
+    pp_newton.query("relative_tolerance",  m_rtol);
+    pp_newton.query("max_iterations",      m_maxits);
+
+    const amrex::ParmParse pp_gmres("gmres");
+    pp_gmres.query("absolute_tolerance",  m_atol_l);
+    pp_gmres.query("relative_tolerance",  m_rtol_l);
+    pp_gmres.query("max_iterations",      m_maxits_l);
+
+    const amrex::ParmParse pp_jac("jacobian");
+    pp_jac.query("pc_type", m_pc_type);
+
+    VecCreateMPI(PETSC_COMM_WORLD, m_ndofs_l, m_ndofs_g, &m_x->obj);
+    VecDuplicate(m_x->obj, &m_b->obj);
+
+    SNESCreate(PETSC_COMM_WORLD, &m_snes->obj);
+    SNESSetFunction(m_snes->obj, nullptr, RHSFunction, this);
+
+    MatCreateShell( PETSC_COMM_WORLD,
+                    m_ndofs_l,
+                    m_ndofs_l,
+                    m_ndofs_g,
+                    m_ndofs_g,
+                    this,
+                    &m_A->obj );
+    MatShellSetOperation( m_A->obj, MATOP_MULT,
+                          (void (*)(void))applyJacobian );
+    MatSetUp(m_A->obj);
+
+    KSP ksp;
+    SNESGetKSP(m_snes->obj, &ksp);
+    PC pc;
+    KSPGetPC(ksp, &pc);
+    if (m_pc_type != PreconditionerType::pc_petsc) {
+        // use native implementation (or no PC, if
+        // native PC is turned off)
+        PCSetType(pc, PCSHELL);
+        PCShellSetApply(pc, applyNativePC);
+        PCShellSetContext(pc, this);
+        amrex::Print() << "SNES_impl: Using native preconditioner through PETSc's PCShell interface.\n";
+        SNESSetJacobian(m_snes->obj, m_A->obj, m_A->obj, JacobianFunction, this);
+    } else {
+        // use PETSc options and implementation for PC
+        PCSetFromOptions(pc);
+        PCType pctype;
+        PCGetType(pc, &pctype);
+        amrex::Print() << "SNES_impl: Using PETSc preconditioner - " << pctype << ".\n";
+        // set up the PC sparse matrix
+        MatCreate( PETSC_COMM_WORLD, &m_P->obj );
+        MatSetSizes( m_P->obj,
+                     m_ndofs_l, m_ndofs_l,
+                     PETSC_DETERMINE, PETSC_DETERMINE );
+        MatSetType( m_P->obj, MATAIJ );
+        MatMPIAIJSetPreallocation( m_P->obj, 1 /*a_ops->numPCMatBands()*/, NULL,
+                                             1 /*a_ops->numPCMatBands()-1*/, NULL);
+        MatSeqAIJSetPreallocation( m_P->obj, 1 /*a_ops->numPCMatBands()*/, NULL);
+        MatSetOption(m_P->obj, MAT_NEW_NONZERO_LOCATION_ERR, PETSC_FALSE);
+        MatSetOption(m_P->obj, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
+        MatSetUp(m_P->obj);
+        SNESSetJacobian(m_snes->obj, m_A->obj, m_P->obj, JacobianFunction, this);
+    }
+
+    setTolerances(m_rtol, m_atol, m_maxits, m_rtol_l, m_atol_l, m_maxits_l);
+    setMaxIters(m_maxits, m_maxits_l);
+    if (m_verbose) {
+        SNESMonitorSet(m_snes->obj, printSNESResidual, NULL,NULL );
+        SNESGetKSP(m_snes->obj, &ksp);
+        KSPMonitorSet( ksp, printKSPResidual, NULL, NULL );
+    }
+
+    SNESSetFromOptions(m_snes->obj);
+
+    m_is_defined = true;
+
+}
+
+SNES_impl::~SNES_impl()
+{
+    delete m_snes;
+    delete m_A;
+    delete m_P;
+    delete m_x;
+    delete m_b;
+    delete m_linop;
+}
+
+void SNES_impl::printParams () const
+{
+    amrex::Print()     << "SNES_impl verbose:             " << (m_verbose?"true":"false") << "\n";
+    amrex::Print()     << "SNES_impl max iterations:      " << m_maxits << "\n";
+    amrex::Print()     << "SNES_impl relative tolerance:  " << m_rtol << "\n";
+    amrex::Print()     << "SNES_impl absolute tolerance:  " << m_atol << "\n";
+    amrex::Print()     << "KSP (SNES_impl) max iterations:     " << m_maxits_l << "\n";
+    amrex::Print()     << "KSP (SNES_impl) relative tolerance: " << m_rtol_l << "\n";
+    amrex::Print()     << "KSP (SNES_impl) absolute tolerance: " << m_atol_l << "\n";
+    amrex::Print()     << "Preconditioner type:      " << amrex::getEnumNameString(m_pc_type) << "\n";
+
+    ((JacobianFunctionMF<VecType,TIType>*)m_linop)->printParams();
+}
+
+void SNES_impl::setTolerances( const amrex::Real a_rtol,
+                               const amrex::Real a_atol,
+                               const int  a_its,
+                               const amrex::Real a_rtol_l,
+                               const amrex::Real a_atol_l,
+                               const int a_its_l )
+{
+    BL_PROFILE("SNES_impl::setTolerances()");
+    m_atol = a_atol;
+    m_rtol = a_rtol;
+    m_atol_l = a_atol_l;
+    m_rtol_l = a_rtol_l;
+    if (a_its > 0) { m_maxits = a_its; }
+    if (a_its_l > 0) { m_maxits_l = a_its_l; }
+
+    if (isDefined()) {
+        SNESSetTolerances( m_snes->obj,
+                           m_rtol,
+                           m_atol,
+                           m_stol,
+                           (a_its > 0 ? a_its : PETSC_CURRENT),
+                           PETSC_CURRENT );
+        KSP ksp;
+        SNESGetKSP(m_snes->obj, &ksp);
+        KSPSetTolerances( ksp,
+                          m_rtol_l,
+                          m_atol_l,
+                          PETSC_CURRENT,
+                          (a_its > 0 ? a_its : PETSC_CURRENT) );
+    }
+}
+
+void SNES_impl::setMaxIters(const int a_its, const int a_its_l )
+{
+    BL_PROFILE("SNES_impl::setMaxIters()");
+    m_maxits = a_its;
+    m_maxits_l = a_its_l;
+    if (isDefined()) {
+        SNESSetTolerances( m_snes->obj,
+                           PETSC_CURRENT,
+                           PETSC_CURRENT,
+                           PETSC_CURRENT,
+                           a_its,
+                           PETSC_CURRENT );
+        KSP ksp;
+        SNESGetKSP(m_snes->obj, &ksp);
+        KSPSetTolerances( ksp,
+                          PETSC_CURRENT,
+                          PETSC_CURRENT,
+                          PETSC_CURRENT,
+                          a_its );
+    }
+}
+
+bool SNES_impl::usePC() const
+{
+    AMREX_ALWAYS_ASSERT(isDefined());
+    return ((JacobianFunctionMF<VecType,TIType>*)m_linop)->usePreconditioner();
+}
+
+void SNES_impl::solve(  VecType& a_U,
+                        const VecType& a_B,
+                        amrex::Real a_time,
+                        amrex::Real a_dt,
+                        int a_step ) const
+{
+    BL_PROFILE("SNES_impl::solve()");
+    AMREX_ALWAYS_ASSERT(isDefined());
+    amrex::ignore_unused(a_dt);
+
+    m_time = a_time;
+    m_iter = a_step;
+    ((JacobianFunctionMF<VecType,TIType>*)m_linop)->curTimeStep(a_dt);
+    ((JacobianFunctionMF<VecType,TIType>*)m_linop)->updatePreCondMat(a_U);
+
+    copyVec(m_x->obj, a_U);
+    copyVec(m_b->obj, a_B);
+    SNESSolve(m_snes->obj, m_b->obj, m_x->obj);
+
+    SNESGetIterationNumber(m_snes->obj, &m_niters);
+    SNESGetLinearSolveIterations(m_snes->obj, &m_niters_l);
+
+    SNESConvergedReason reason;
+    SNESGetConvergedReason( m_snes->obj, &reason );
+    m_status = (int) reason;
+    SNESGetFunctionNorm(m_snes->obj, &m_norm);
+
+    m_total_iters += m_niters;
+    m_total_linsol_iters += m_niters_l;
+}
+
+void SNES_impl::computeRHS(VecType& a_F, const VecType& a_U) const
+{
+    BL_PROFILE("SNES_impl::computeRHS()");
+    AMREX_ALWAYS_ASSERT(isDefined());
+    m_op->ComputeRHS( a_F, a_U, m_time, m_iter, false);
+
+    ((JacobianFunctionMF<VecType,TIType>*)m_linop)->setBaseSolution(a_U);
+    ((JacobianFunctionMF<VecType,TIType>*)m_linop)->setBaseRHS(a_F);
+}
+
+void SNES_impl::applyJac(VecType& a_F, const VecType& a_U) const
+{
+    BL_PROFILE("SNES_impl::applyJac()");
+    AMREX_ALWAYS_ASSERT(isDefined());
+    m_linop->apply(a_F, a_U);
+}
+
+void SNES_impl::applyPC( VecType& a_F, const VecType& a_U) const
+{
+    BL_PROFILE("SNES_impl::applypC()");
+    AMREX_ALWAYS_ASSERT(isDefined());
+    a_F.zero();
+    m_linop->precond(a_F, a_U);
+}
+
+void SNES_impl::assemblePCMat()
+{
+    BL_PROFILE("SNES_impl::assemblePCMat()");
+    AMREX_ALWAYS_ASSERT(isDefined());
+    AMREX_ALWAYS_ASSERT(m_pc_type == PreconditionerType::pc_petsc);
+
+    PetscInt n = -1;
+    PetscInt ncols_max = -1;
+    amrex::Gpu::DeviceVector<int> r_indices_g; // global row indices
+    amrex::Gpu::DeviceVector<int> n_nz_cols; // number of non-zero columns for each row
+    amrex::Gpu::DeviceVector<int> c_indices_g; // non-zero column indices (row-major)
+    amrex::Gpu::DeviceVector<amrex::Real> a_ij;
+
+    m_linop->getPCMatrix( r_indices_g, n_nz_cols, c_indices_g, a_ij, n, ncols_max );
+
+    {
+        std::vector<int> h_r_indices_g(r_indices_g.size());
+        std::vector<int> h_n_nz_cols(n_nz_cols.size());
+        std::vector<int> h_c_indices_g(c_indices_g.size());
+        std::vector<amrex::Real> h_a_ij(a_ij.size());
+        amrex::Gpu::copy( amrex::Gpu::deviceToHost,
+                          r_indices_g.begin(), r_indices_g.end(),
+                          h_r_indices_g.begin() );
+        amrex::Gpu::copy( amrex::Gpu::deviceToHost,
+                          n_nz_cols.begin(), n_nz_cols.end(),
+                          h_n_nz_cols.begin() );
+        amrex::Gpu::copy( amrex::Gpu::deviceToHost,
+                          c_indices_g.begin(), c_indices_g.end(),
+                          h_c_indices_g.begin() );
+        amrex::Gpu::copy( amrex::Gpu::deviceToHost,
+                          a_ij.begin(), a_ij.end(),
+                          h_a_ij.begin() );
+        for (int i = 0; i < n; i++) {
+            MatSetValues( m_P->obj,
+                          1,
+                          &h_r_indices_g[i],
+                          h_n_nz_cols[i],
+                          &h_c_indices_g[i*ncols_max],
+                          &h_a_ij[i*ncols_max],
+                          INSERT_VALUES );
+        }
+    }
+
+//    const auto r_indices_g_ptr = r_indices_g.data();
+//    const auto n_nz_cols_ptr = n_nz_cols.data();
+//    const auto c_indices_g_ptr = c_indices_g.data();
+//    const auto a_ij_ptr = a_ij.data();
+//
+//    amrex::ParallelFor(n, [=] AMREX_GPU_DEVICE (int i)
+//    {
+//        MatSetValues( m_P->obj,
+//                      1,
+//                      &r_indices_g_ptr[i],
+//                      n_nz_cols_ptr[i],
+//                      &c_indices_g_ptr[i*ncols_max],
+//                      &a_ij_ptr[i*ncols_max],
+//                      INSERT_VALUES );
+//    });
+
+    MatAssemblyBegin(m_P->obj, MAT_FINAL_ASSEMBLY);
+    MatAssemblyEnd(m_P->obj, MAT_FINAL_ASSEMBLY);
+}
+
+void SNES_impl::setVerbose(bool a_v)
+{
+    m_verbose = a_v;
+    if (a_v && isDefined()) {
+        SNESMonitorSet(m_snes->obj, printSNESResidual, NULL,NULL );
+    }
 }
 
 }

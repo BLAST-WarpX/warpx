@@ -50,11 +50,8 @@ void SemiImplicitEM::PrintParameters () const
     amrex::Print() << "-----------------------------------------------------------\n";
     amrex::Print() << "max particle iterations:    " << m_max_particle_iterations << "\n";
     amrex::Print() << "particle tolerance:         " << m_particle_tolerance << "\n";
-    if (m_nlsolver_type==NonlinearSolverType::Picard) {
-        amrex::Print() << "Nonlinear solver type:      Picard\n";
-    }
-    else if (m_nlsolver_type==NonlinearSolverType::Newton) {
-        amrex::Print() << "Nonlinear solver type:      Newton\n";
+    amrex::Print() << "Nonlinear solver type:      " << amrex::getEnumNameString(m_nlsolver_type) << "\n";
+    if ((m_nlsolver_type == NonlinearSolverType::newton) || (m_nlsolver_type == NonlinearSolverType::petsc_snes)) {
         amrex::Print() << "use mass matrices:          " << (m_use_mass_matrices ? "true":"false") << "\n";
         PrintMassMatricesParameters();
     }

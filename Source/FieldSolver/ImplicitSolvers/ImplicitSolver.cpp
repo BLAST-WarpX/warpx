@@ -420,18 +420,25 @@ void ImplicitSolver::ComputeJfromMassMatrices ()
 void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
 {
 
-    std::string nlsolver_type_str;
-    pp.get("nonlinear_solver", nlsolver_type_str);
+    pp.get("nonlinear_solver", m_nlsolver_type);
 
-    if (nlsolver_type_str=="picard") {
-        m_nlsolver_type = NonlinearSolverType::Picard;
+    if (m_nlsolver_type == NonlinearSolverType::picard) {
+
+        // Picard
         m_nlsolver = std::make_unique<PicardSolver<WarpXSolverVec,ImplicitSolver>>();
         m_max_particle_iterations = 1;
         m_particle_tolerance = 0.0;
+
     }
-    else if (nlsolver_type_str=="newton") {
-        m_nlsolver_type = NonlinearSolverType::Newton;
-        m_nlsolver = std::make_unique<NewtonSolver<WarpXSolverVec,ImplicitSolver>>();
+    else if (      (m_nlsolver_type == NonlinearSolverType::newton)
+                || (m_nlsolver_type == NonlinearSolverType::petsc_snes) ) {
+
+        // JFNK solvers
+        if (m_nlsolver_type == NonlinearSolverType::newton) {
+            m_nlsolver = std::make_unique<NewtonSolver<WarpXSolverVec,ImplicitSolver>>();
+        } else {
+            m_nlsolver = std::make_unique<PETScSNES<WarpXSolverVec,ImplicitSolver>>();
+        }
         pp.query("max_particle_iterations", m_max_particle_iterations);
         pp.query("particle_suborbits", m_particle_suborbits);
         pp.query("particle_tolerance", m_particle_tolerance);
@@ -441,6 +448,7 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
         if (m_use_mass_matrices_jacobian || m_use_mass_matrices_pc) {
             m_use_mass_matrices = true;
         }
+
 #if defined(WARPX_DIM_RCYLINDER)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             !m_use_mass_matrices,
