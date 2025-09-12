@@ -690,6 +690,12 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     amrex::Array4<amrex::Real> const & Szy_arr = (deposit_mass_matrices ? Szy->array(pti) : amrex::Array4<amrex::Real>());
     amrex::Array4<amrex::Real> const & Szz_arr = (deposit_mass_matrices ? Szz->array(pti) : amrex::Array4<amrex::Real>());
 
+    // Create Gpu::Buffer for mass matrices to reduce kernel argument size
+    amrex::Gpu::Buffer<amrex::Array4<amrex::Real>> Sbuf({Sxx_arr, Sxy_arr, Sxz_arr,
+                                                         Syx_arr, Syy_arr, Syz_arr,
+                                                         Szx_arr, Szy_arr, Szz_arr});
+    auto const* pSbuf = Sbuf.data();
+
     auto& attribs = pti.GetAttribs();
     amrex::ParticleReal* const AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
     amrex::ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
@@ -891,7 +897,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     // in a constexpr-if context.
                     amrex::ignore_unused(full_mass_matrices, max_crossings);
                     amrex::ignore_unused(Jx_arr, Jy_arr, Jz_arr, invvol);
-                    amrex::ignore_unused(Sxx_arr, Sxy_arr, Sxz_arr, Syx_arr, Syy_arr, Syz_arr, Szx_arr, Szy_arr, Szz_arr);
+                    amrex::ignore_unused(pSbuf);
                     if constexpr (depos_order_control == order_one) {
                         if (!full_mass_matrices) {
                             doVillasenorJandSigmaDepositionKernel<1,false>(
@@ -902,9 +908,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                                   fpzx, fpzy, fpzz,
                                                                   Jx_arr, Jy_arr, Jz_arr,
                                                                   max_crossings,
-                                                                  Sxx_arr, Sxy_arr, Sxz_arr,
-                                                                  Syx_arr, Syy_arr, Syz_arr,
-                                                                  Szx_arr, Szy_arr, Szz_arr,
+                                                                  pSbuf[0], pSbuf[1], pSbuf[2],
+                                                                  pSbuf[3], pSbuf[4], pSbuf[5],
+                                                                  pSbuf[6], pSbuf[7], pSbuf[8],
                                                                   dt_suborbit, dinv, xyzmin, lo );
                         } else if (full_mass_matrices) {
                             doVillasenorJandSigmaDepositionKernel<1,true>(
@@ -915,9 +921,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                                   fpzx, fpzy, fpzz,
                                                                   Jx_arr, Jy_arr, Jz_arr,
                                                                   max_crossings,
-                                                                  Sxx_arr, Sxy_arr, Sxz_arr,
-                                                                  Syx_arr, Syy_arr, Syz_arr,
-                                                                  Szx_arr, Szy_arr, Szz_arr,
+                                                                  pSbuf[0], pSbuf[1], pSbuf[2],
+                                                                  pSbuf[3], pSbuf[4], pSbuf[5],
+                                                                  pSbuf[6], pSbuf[7], pSbuf[8],
                                                                   dt_suborbit, dinv, xyzmin, lo );
                         }
                     } else if constexpr (depos_order_control == order_two) {
@@ -930,9 +936,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                                   fpzx, fpzy, fpzz,
                                                                   Jx_arr, Jy_arr, Jz_arr,
                                                                   max_crossings,
-                                                                  Sxx_arr, Sxy_arr, Sxz_arr,
-                                                                  Syx_arr, Syy_arr, Syz_arr,
-                                                                  Szx_arr, Szy_arr, Szz_arr,
+                                                                  pSbuf[0], pSbuf[1], pSbuf[2],
+                                                                  pSbuf[3], pSbuf[4], pSbuf[5],
+                                                                  pSbuf[6], pSbuf[7], pSbuf[8],
                                                                   dt_suborbit, dinv, xyzmin, lo );
                         } else if (full_mass_matrices) {
                             doVillasenorJandSigmaDepositionKernel<2,true>(
@@ -943,9 +949,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                                   fpzx, fpzy, fpzz,
                                                                   Jx_arr, Jy_arr, Jz_arr,
                                                                   max_crossings,
-                                                                  Sxx_arr, Sxy_arr, Sxz_arr,
-                                                                  Syx_arr, Syy_arr, Syz_arr,
-                                                                  Szx_arr, Szy_arr, Szz_arr,
+                                                                  pSbuf[0], pSbuf[1], pSbuf[2],
+                                                                  pSbuf[3], pSbuf[4], pSbuf[5],
+                                                                  pSbuf[6], pSbuf[7], pSbuf[8],
                                                                   dt_suborbit, dinv, xyzmin, lo );
                         }
                     } else if constexpr (depos_order_control == order_three) {
@@ -958,9 +964,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                                   fpzx, fpzy, fpzz,
                                                                   Jx_arr, Jy_arr, Jz_arr,
                                                                   max_crossings,
-                                                                  Sxx_arr, Sxy_arr, Sxz_arr,
-                                                                  Syx_arr, Syy_arr, Syz_arr,
-                                                                  Szx_arr, Szy_arr, Szz_arr,
+                                                                  pSbuf[0], pSbuf[1], pSbuf[2],
+                                                                  pSbuf[3], pSbuf[4], pSbuf[5],
+                                                                  pSbuf[6], pSbuf[7], pSbuf[8],
                                                                   dt_suborbit, dinv, xyzmin, lo );
                         } else if (full_mass_matrices) {
                             doVillasenorJandSigmaDepositionKernel<3,true>(
@@ -971,9 +977,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                                   fpzx, fpzy, fpzz,
                                                                   Jx_arr, Jy_arr, Jz_arr,
                                                                   max_crossings,
-                                                                  Sxx_arr, Sxy_arr, Sxz_arr,
-                                                                  Syx_arr, Syy_arr, Syz_arr,
-                                                                  Szx_arr, Szy_arr, Szz_arr,
+                                                                  pSbuf[0], pSbuf[1], pSbuf[2],
+                                                                  pSbuf[3], pSbuf[4], pSbuf[5],
+                                                                  pSbuf[6], pSbuf[7], pSbuf[8],
                                                                   dt_suborbit, dinv, xyzmin, lo );
                         }
                     } else if constexpr (depos_order_control == order_four) {
@@ -986,9 +992,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                                   fpzx, fpzy, fpzz,
                                                                   Jx_arr, Jy_arr, Jz_arr,
                                                                   max_crossings,
-                                                                  Sxx_arr, Sxy_arr, Sxz_arr,
-                                                                  Syx_arr, Syy_arr, Syz_arr,
-                                                                  Szx_arr, Szy_arr, Szz_arr,
+                                                                  pSbuf[0], pSbuf[1], pSbuf[2],
+                                                                  pSbuf[3], pSbuf[4], pSbuf[5],
+                                                                  pSbuf[6], pSbuf[7], pSbuf[8],
                                                                   dt_suborbit, dinv, xyzmin, lo );
                         } else if (full_mass_matrices) {
                             doVillasenorJandSigmaDepositionKernel<4,true>(
@@ -999,9 +1005,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                                   fpzx, fpzy, fpzz,
                                                                   Jx_arr, Jy_arr, Jz_arr,
                                                                   max_crossings,
-                                                                  Sxx_arr, Sxy_arr, Sxz_arr,
-                                                                  Syx_arr, Syy_arr, Syz_arr,
-                                                                  Szx_arr, Szy_arr, Szz_arr,
+                                                                  pSbuf[0], pSbuf[1], pSbuf[2],
+                                                                  pSbuf[3], pSbuf[4], pSbuf[5],
+                                                                  pSbuf[6], pSbuf[7], pSbuf[8],
                                                                   dt_suborbit, dinv, xyzmin, lo );
                         }
                     }
@@ -1108,4 +1114,5 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
     });
 
+    amrex::Gpu::streamSynchronize();
 }
