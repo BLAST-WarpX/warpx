@@ -1934,8 +1934,9 @@ WarpXParticleContainer::GetAverageNGPTemperature (int lev)
 
     // Create cell centered MultiFab with no guard cells
     int const ncomps = 1;
-    // FIXME ng > 0 to avoid runtime out-of-bound crash
-    int const ng = 1;
+    // We might need to set ng > 0 to avoid going out of bounds
+    // when collisions are performed at half of the position push.
+    int const ng = 0;
     auto temperature = std::make_unique<amrex::MultiFab>(ba, dm, ncomps, ng);
     temperature->setVal(0., 0, ncomps, temperature->nGrowVect());
 
@@ -2017,8 +2018,9 @@ WarpXParticleContainer::GetNumberDensity (int lev)
 
     // Create cell centered MultiFab with no guard cells
     int const ncomps = 1;
-    // FIXME ng > 0 to avoid runtime out-of-bound crash
-    int const ng = 1;
+    // We might need to set ng > 0 to avoid going out of bounds
+    // when collisions are performed at half of the position push.
+    int const ng = 0;
     auto number_density = std::make_unique<amrex::MultiFab>(ba, dm, ncomps, ng);
     number_density->setVal(0., 0, ncomps, number_density->nGrowVect());
     DepositNumberDensity(number_density.get(), lev);

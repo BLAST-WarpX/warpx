@@ -463,7 +463,7 @@ void WarpX::OneStep (
                 // push particles (half position)
                 PushParticlesandDeposit(
                     a_cur_time,
-                    /*skip_deposition=*/true,
+                    /*skip_current=*/true,
                     /*position_push_type=*/DtType::Full,
                     /*momentum_push_type=*/DtType::Full
                 );
