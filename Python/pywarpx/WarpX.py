@@ -31,6 +31,11 @@ class WarpX(Bucket):
     A Python wrapper for the WarpX C++ class
     """
 
+    # Set the C++ WarpX interface (see _libwarpx.LibWarpX) as an extension to
+    # Simulation objects. In the future, LibWarpX objects may actually be owned
+    # by Simulation objects to permit multiple WarpX runs simultaneously.
+    extension = libwarpx
+
     def create_argv_list(self, **kw):
         argv = []
 
