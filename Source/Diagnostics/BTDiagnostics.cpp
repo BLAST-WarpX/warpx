@@ -582,23 +582,23 @@ BTDiagnostics::InitializeFieldFunctors (int lev)
         m_cell_center_functors.at(lev).size());
     for (int comp=0; comp<m_cell_center_functors_at_lev_size; comp++){
         if        ( m_cellcenter_varnames[comp] == "Ex" ){
-            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Efield_aux, Direction{0}, lev), lev, m_crse_ratio);
+            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Efield_aux, Direction::x, lev), lev, m_crse_ratio);
         } else if ( m_cellcenter_varnames[comp] == "Ey" ){
-            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Efield_aux, Direction{1}, lev), lev, m_crse_ratio);
+            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Efield_aux, Direction::y, lev), lev, m_crse_ratio);
         } else if ( m_cellcenter_varnames[comp] == "Ez" ){
-            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Efield_aux, Direction{2}, lev), lev, m_crse_ratio);
+            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Efield_aux, Direction::z, lev), lev, m_crse_ratio);
         } else if ( m_cellcenter_varnames[comp] == "Bx" ){
-            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Bfield_aux, Direction{0}, lev), lev, m_crse_ratio);
+            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Bfield_aux, Direction::x, lev), lev, m_crse_ratio);
         } else if ( m_cellcenter_varnames[comp] == "By" ){
-            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Bfield_aux, Direction{1}, lev), lev, m_crse_ratio);
+            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Bfield_aux, Direction::y, lev), lev, m_crse_ratio);
         } else if ( m_cellcenter_varnames[comp] == "Bz" ){
-            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Bfield_aux, Direction{2}, lev), lev, m_crse_ratio);
+            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Bfield_aux, Direction::z, lev), lev, m_crse_ratio);
         } else if ( m_cellcenter_varnames[comp] == "jx" ){
-            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::current_fp,Direction{0}, lev), lev, m_crse_ratio);
+            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::current_fp, Direction::x, lev), lev, m_crse_ratio);
         } else if ( m_cellcenter_varnames[comp] == "jy" ){
-            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::current_fp,Direction{1}, lev), lev, m_crse_ratio);
+            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::current_fp, Direction::y, lev), lev, m_crse_ratio);
         } else if ( m_cellcenter_varnames[comp] == "jz" ){
-            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::current_fp,Direction{2}, lev), lev, m_crse_ratio);
+            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::current_fp, Direction::z, lev), lev, m_crse_ratio);
         } else if ( m_cellcenter_varnames[comp] == "rho" ){
             m_cell_center_functors[lev][comp] = std::make_unique<RhoFunctor>(lev, m_crse_ratio);
         }
