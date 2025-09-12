@@ -370,7 +370,7 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
     using ablastr::fields::Direction;
 
     auto & warpx = WarpX::GetInstance();
-    const int ncomp_multimodefab = warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, 0)->nComp();
+    const int ncomp_multimodefab = warpx.m_fields.get(FieldType::Efield_aux, Direction::r, 0)->nComp();
     // Make sure all multifabs have the same number of components
     for (int dim=0; dim<3; dim++){
         AMREX_ALWAYS_ASSERT(
@@ -573,7 +573,7 @@ FullDiagnostics::AddRZModesToDiags (int lev)
     if (!m_dump_rz_modes) { return; }
 
     auto & warpx = WarpX::GetInstance();
-    const int ncomp_multimodefab = warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, 0)->nComp();
+    const int ncomp_multimodefab = warpx.m_fields.get(FieldType::Efield_aux, Direction::r, 0)->nComp();
     // Make sure all multifabs have the same number of components
     for (int dim=0; dim<3; dim++){
         AMREX_ALWAYS_ASSERT(
@@ -616,8 +616,7 @@ FullDiagnostics::AddRZModesToDiags (int lev)
         m_all_field_functors[lev].push_back(std::make_unique<CellCenterFunctor>(
                 warpx.m_fields.get(FieldType::Efield_aux, Direction{dim}, lev), lev,
                     m_crse_ratio, false, ncomp_multimodefab));
-        AddRZModesToOutputNames(std::string("E") + coord[dim],
-                warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, 0)->nComp());
+        AddRZModesToOutputNames(std::string("E") + coord[dim], ncomp_multimodefab);
     }
     // B
     for (int dim=0; dim<3; dim++){
@@ -625,8 +624,7 @@ FullDiagnostics::AddRZModesToDiags (int lev)
         m_all_field_functors[lev].push_back(std::make_unique<CellCenterFunctor>(
                 warpx.m_fields.get(FieldType::Bfield_aux, Direction{dim}, lev), lev,
                     m_crse_ratio, false, ncomp_multimodefab));
-        AddRZModesToOutputNames(std::string("B") + coord[dim],
-                warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, 0)->nComp());
+        AddRZModesToOutputNames(std::string("B") + coord[dim], ncomp_multimodefab);
     }
     // j
     for (int dim=0; dim<3; dim++){
@@ -634,8 +632,7 @@ FullDiagnostics::AddRZModesToDiags (int lev)
         m_all_field_functors[lev].push_back(std::make_unique<JFunctor>(
             dim, lev, m_crse_ratio, false, deposit_current, ncomp_multimodefab));
         deposit_current = false;
-        AddRZModesToOutputNames(std::string("J") + coord[dim],
-                warpx.m_fields.get(FieldType::current_fp,Direction{0},0)->nComp());
+        AddRZModesToOutputNames(std::string("J") + coord[dim], ncomp_multimodefab);
     }
     // divE
     if (divE_requested) {
