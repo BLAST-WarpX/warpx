@@ -102,6 +102,7 @@ PetscErrorCode RHSFunction( SNES a_solver, Vec a_U, Vec a_F, void* ctxt)
     copyVec(context->m_U, a_U);
     context->computeRHS(context->m_F, context->m_U);
     copyVec(a_F, context->m_F);
+    VecAXPBY(a_F, 1.0, -1.0, a_U);
 
     PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -177,6 +178,49 @@ PetscErrorCode applyNativePC( PC  a_pc, Vec a_X, Vec a_Y )
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+//! Print SNES residuals
+PetscErrorCode printSNESResidual(SNES a_snes, PetscInt a_n, PetscReal a_rnorm, void *a_ctxt)
+{
+    BL_PROFILE("printSNESResidual()");
+    amrex::ignore_unused(a_ctxt);
+    amrex::ignore_unused(a_snes);
+    static amrex::Real norm0 = 0;
+    if (a_n == 0) { norm0 = a_rnorm; }
+    amrex::Print() << "Newton (PETSc SNES): iter = " << a_n << ", residual = " << a_rnorm
+                   << ", " << a_rnorm / norm0 << " (rel.)\n";
+    PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+//! Print KSP residuals
+PetscErrorCode printKSPResidual(KSP a_ksp, PetscInt a_n, PetscReal a_rnorm, void *a_ctxt)
+{
+    BL_PROFILE("printKSPSResidual()");
+    amrex::ignore_unused(a_ctxt);
+    amrex::ignore_unused(a_ksp);
+    static amrex::Real norm0 = 0;
+    if (a_n == 0) { norm0 = a_rnorm; }
+    amrex::Print() << "GMRES (PETSc KSP): iter = " << a_n << ", residual = " << a_rnorm
+                   << ", " << a_rnorm / norm0 << " (rel.)\n";
+    PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Apply Jacovian operator
+void PETScSolver_impl::applyOp(VecType& a_F, const VecType& a_U) const
+{
+    BL_PROFILE("PETScSolver_impl::applyOp()");
+    AMREX_ALWAYS_ASSERT(m_is_defined);
+    m_linop->apply(a_F, a_U);
+}
+
+// Apply preconditioner
+void PETScSolver_impl::applyPC( VecType& a_F, const VecType& a_U) const
+{
+    BL_PROFILE("PETScSolver_impl::applypC()");
+    AMREX_ALWAYS_ASSERT(m_is_defined);
+    a_F.zero();
+    m_linop->precond(a_F, a_U);
+}
+
 //! Assemble preconditioner matrix
 void PETScSolver_impl::assemblePCMatrix()
 {
@@ -243,32 +287,6 @@ void PETScSolver_impl::assemblePCMatrix()
     MatAssemblyEnd(m_P->obj, MAT_FINAL_ASSEMBLY);
 }
 
-//! Print SNES residuals
-PetscErrorCode printSNESResidual(SNES a_snes, PetscInt a_n, PetscReal a_rnorm, void *a_ctxt)
-{
-    BL_PROFILE("printSNESResidual()");
-    amrex::ignore_unused(a_ctxt);
-    amrex::ignore_unused(a_snes);
-    static amrex::Real norm0 = 0;
-    if (a_n == 0) { norm0 = a_rnorm; }
-    amrex::Print() << "Newton (PETSc SNES): iter = " << a_n << ", residual = " << a_rnorm
-                   << ", " << a_rnorm / norm0 << " (rel.)\n";
-    PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-//! Print KSP residuals
-PetscErrorCode printKSPResidual(KSP a_ksp, PetscInt a_n, PetscReal a_rnorm, void *a_ctxt)
-{
-    BL_PROFILE("printKSPSResidual()");
-    amrex::ignore_unused(a_ctxt);
-    amrex::ignore_unused(a_ksp);
-    static amrex::Real norm0 = 0;
-    if (a_n == 0) { norm0 = a_rnorm; }
-    amrex::Print() << "GMRES (PETSc KSP): iter = " << a_n << ", residual = " << a_rnorm
-                   << ", " << a_rnorm / norm0 << " (rel.)\n";
-    PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 KSP_impl::KSP_impl(LinOpType& a_op)
 {
     BL_PROFILE("KSP_impl::KSP_impl()");
@@ -290,21 +308,6 @@ KSP_impl::~KSP_impl()
     delete this->m_P;
     delete this->m_x;
     delete this->m_b;
-}
-
-void KSP_impl::applyOp( VecType& a_F, const VecType& a_U) const
-{
-    BL_PROFILE("KSP_impl::applyOp()");
-    AMREX_ALWAYS_ASSERT(isDefined());
-    this->m_linop->apply(a_F, a_U);
-}
-
-void KSP_impl::applyPC( VecType& a_F, const VecType& a_U) const
-{
-    BL_PROFILE("KSP_impl::applyPC()");
-    AMREX_ALWAYS_ASSERT(isDefined());
-    a_F.zero();
-    this->m_linop->precond(a_F, a_U);
 }
 
 void KSP_impl::createObjects(const VecType& a_vec)
@@ -430,6 +433,12 @@ void KSP_impl::solve(VecType& a_Y, const VecType& a_R)
     KSPGetConvergedReason( m_ksp->obj, &reason );
     m_status = (int)reason;
     KSPGetResidualNorm( m_ksp->obj, &m_norm );
+
+    const char* conv_reason;
+    KSPGetConvergedReasonString(m_ksp->obj, &conv_reason);
+    amrex::Print() << "GMRES (PETSc KSP): exited due to \""
+                   << conv_reason << "\" "
+                   << "(abs. norm=" << m_norm << ").\n";
 }
 
 void KSP_impl::setVerbose(int a_v)
@@ -483,6 +492,10 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op)
     VecDuplicate(this->m_x->obj, &this->m_b->obj);
 
     SNESCreate(PETSC_COMM_WORLD, &m_snes->obj);
+    SNESSetType( m_snes->obj, SNESNEWTONLS );
+    SNESLineSearch linesearch;
+    SNESGetLineSearch( m_snes->obj, &linesearch );
+    SNESLineSearchSetType( linesearch, SNESLINESEARCHBASIC );
     SNESSetFunction(m_snes->obj, nullptr, RHSFunction, this);
 
     MatCreateShell( PETSC_COMM_WORLD,
@@ -536,6 +549,9 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op)
         SNESGetKSP(m_snes->obj, &ksp);
         KSPMonitorSet( ksp, printKSPResidual, NULL, NULL );
     }
+
+    PetscOptionsSetValue(nullptr, "-ksp_converged_reason", nullptr);
+
 
     SNESSetFromOptions(m_snes->obj);
     this->m_is_defined = true;
@@ -654,6 +670,12 @@ void SNES_impl::solve(  VecType& a_U,
     m_status = (int) reason;
     SNESGetFunctionNorm(m_snes->obj, &m_norm);
 
+    const char* conv_reason;
+    SNESGetConvergedReasonString(m_snes->obj, &conv_reason);
+    amrex::Print() << "Newton (PETSc SNES): exited due to \""
+                   << conv_reason << "\" "
+                   << "(abs. norm=" << m_norm << ").\n";
+
     m_total_iters += m_niters;
     m_total_linsol_iters += m_niters_l;
 }
@@ -666,21 +688,6 @@ void SNES_impl::computeRHS(VecType& a_F, const VecType& a_U) const
 
     ((JacobianFunctionMF<VecType,TIType>*)this->m_linop)->setBaseSolution(a_U);
     ((JacobianFunctionMF<VecType,TIType>*)this->m_linop)->setBaseRHS(a_F);
-}
-
-void SNES_impl::applyOp(VecType& a_F, const VecType& a_U) const
-{
-    BL_PROFILE("SNES_impl::applyOp()");
-    AMREX_ALWAYS_ASSERT(isDefined());
-    this->m_linop->apply(a_F, a_U);
-}
-
-void SNES_impl::applyPC( VecType& a_F, const VecType& a_U) const
-{
-    BL_PROFILE("SNES_impl::applypC()");
-    AMREX_ALWAYS_ASSERT(isDefined());
-    a_F.zero();
-    this->m_linop->precond(a_F, a_U);
 }
 
 void SNES_impl::setVerbose(bool a_v)

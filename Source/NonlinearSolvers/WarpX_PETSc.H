@@ -53,9 +53,12 @@ class PETScSolver_impl
         PETScSolver_impl(PETScSolver_impl&&) noexcept = delete;
         PETScSolver_impl& operator=(PETScSolver_impl&&) noexcept = delete;
 
-        virtual void applyPC(VecType&, const VecType&) const = 0;
-        virtual void applyOp(VecType& a_F, const VecType& a_U) const = 0;
+        //! Apply the action of the preconditioner
+        void applyPC(VecType&, const VecType&) const;
+        //! Apply the action of the Jacobian
+        void applyOp(VecType& a_F, const VecType& a_U) const;
 
+        //! Assemble the sparse matrix for preconditioner
         void assemblePCMatrix();
 
         //! Work vector
@@ -133,15 +136,6 @@ class KSP_impl : public PETScSolver_impl
             return (this->m_is_defined && (this->m_linop != nullptr));
         }
 
-        //! Apply matrix op on given vector
-        void applyOp( VecType& a_F, const VecType& a_U) const override;
-
-        //! Apply PC op on given vector
-        void applyPC( VecType& a_F, const VecType& a_U) const override;
-
-        //! Assemble the sparse matrix representation of preconditioner
-        void assemblePCMat( const VecType& a_Y);
-
     private:
 
         //! absolute tolerance
@@ -194,15 +188,6 @@ class SNES_impl : public PETScSolver_impl
 
         //! Evaluate the RHS
         void computeRHS(VecType&, const VecType&) const;
-
-        //! Apply matrix-free Jacobian
-        void applyOp(VecType&, const VecType&) const override;
-
-        //! Apply PC op
-        void applyPC(VecType&, const VecType&) const override;
-
-        //! Assemble PC matrix
-        void assemblePCMat();
 
         //! Returns if a preconditioner is being used
         [[nodiscard]] bool usePC() const;
