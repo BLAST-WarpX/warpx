@@ -442,6 +442,8 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
             m_use_mass_matrices = true;
         }
         if (m_use_mass_matrices_jacobian) {
+            // Default modify_initial_newton_step to true if using suborbits
+            if (m_particle_suborbits) { m_modify_initial_newton_step = true; }
             pp.query("modify_initial_newton_step", m_modify_initial_newton_step);
         }
 #if defined(WARPX_DIM_RCYLINDER)
@@ -812,7 +814,7 @@ void ImplicitSolver::PrintBaseImplicitSolverParameters () const
         if (m_use_mass_matrices) {
             amrex::Print() << "    for jacobian calc:   " << (m_use_mass_matrices_jacobian ? "true":"false") << "\n";
             if (m_use_mass_matrices_jacobian) {
-                amrex::Print() << "        modified initial step:  " << (m_modify_initial_newton_step ? "true":"false") << "\n";
+                amrex::Print() << "        modify initial newton step:  " << (m_modify_initial_newton_step ? "true":"false") << "\n";
             }
             amrex::Print() << "    for preconditioner:  " << (m_use_mass_matrices_pc ? "true":"false") << "\n";
             amrex::Print() << "    ncomp_xx:  " << m_ncomp_xx << "\n";
