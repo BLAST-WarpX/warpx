@@ -811,9 +811,11 @@ void ImplicitSolver::PrintBaseImplicitSolverParameters () const
         amrex::Print() << "Nonlinear solver type:               Newton\n";
         amrex::Print() << "use mass matrices:                   " << (m_use_mass_matrices ? "true":"false") << "\n";
         if (m_use_mass_matrices) {
-            amrex::Print() << "    for jacobian calc:      " << (m_use_mass_matrices_jacobian ? "true":"false") << "\n";
-            amrex::Print() << "    for preconditioner:     " << (m_use_mass_matrices_pc ? "true":"false") << "\n";
-            amrex::Print() << "    modified initial step:  " << (m_modify_initial_newton_step ? "true":"false") << "\n";
+            amrex::Print() << "    for jacobian calc:   " << (m_use_mass_matrices_jacobian ? "true":"false") << "\n";
+            if (m_use_mass_matrices_jacobian) {
+                amrex::Print() << "        modified initial step:  " << (m_modify_initial_newton_step ? "true":"false") << "\n";
+            }
+            amrex::Print() << "    for preconditioner:  " << (m_use_mass_matrices_pc ? "true":"false") << "\n";
             amrex::Print() << "    ncomp_xx:  " << m_ncomp_xx << "\n";
             amrex::Print() << "    ncomp_xy:  " << m_ncomp_xy << "\n";
             amrex::Print() << "    ncomp_xz:  " << m_ncomp_xz << "\n";
