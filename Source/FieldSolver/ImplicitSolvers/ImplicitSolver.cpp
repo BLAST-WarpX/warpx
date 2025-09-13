@@ -444,7 +444,6 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
         pp.query("particle_tolerance", m_particle_tolerance);
         pp.query("particle_suborbits", m_particle_suborbits);
         pp.query("print_unconverged_particle_details", m_print_unconverged_particle_details);
-        pp.query("modify_initial_newton_advance", m_modify_initial_newton_advance);
         pp.query("use_mass_matrices_jacobian", m_use_mass_matrices_jacobian);
         pp.query("use_mass_matrices_pc", m_use_mass_matrices_pc);
         if (m_use_mass_matrices_jacobian || m_use_mass_matrices_pc) {
@@ -720,7 +719,6 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
 
     // Set the implict solver options for particles and setting the current density
     ImplicitOptions options;
-    options.modify_initial_newton_advance = m_modify_initial_newton_advance;
     options.linear_stage_of_jfnk = a_from_jacobian;
     options.evolve_suborbit_particles_only = false;
 

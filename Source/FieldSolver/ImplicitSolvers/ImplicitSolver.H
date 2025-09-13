@@ -159,7 +159,7 @@ protected:
     /**
      * \brief whether to do a modified particle advance on the initial newton step
      */
-    bool m_modify_initial_newton_advance = false;
+    bool m_modify_initial_newton_step = false;
 
     /**
      * \brief whether the details of unconverged particles are printed out during

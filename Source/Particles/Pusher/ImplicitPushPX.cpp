@@ -499,7 +499,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     [[maybe_unused]] const bool print_unconverged_particle_details = implicit_options->print_unconverged_particle_details;
     const bool linear_stage_of_jfnk = implicit_options->linear_stage_of_jfnk;
     const int nonlinear_iter = implicit_options->nonlinear_iteration;
-    const bool mod_init_advance = implicit_options->modify_initial_newton_advance;
+    const bool mod_init_advance = implicit_options->modify_initial_newton_step;
     bool modified_advance = false;
     if (!linear_stage_of_jfnk && nonlinear_iter == 0 && mod_init_advance) {
         modified_advance = true;
@@ -835,7 +835,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     const int max_iterations = implicit_options->max_particle_iterations + iter_buffer;
     const amrex::ParticleReal particle_tolerance = implicit_options->particle_tolerance;
     const int nonlinear_iter = implicit_options->nonlinear_iteration;
-    const bool mod_init_advance = implicit_options->modify_initial_newton_advance;
+    const bool mod_init_advance = implicit_options->modify_initial_newton_step;
     bool modified_advance = false;
     if (!linear_stage_of_jfnk && nonlinear_iter == 0 && mod_init_advance) {
         modified_advance = true;
