@@ -450,9 +450,15 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
             m_use_mass_matrices = true;
         }
         if (m_use_mass_matrices_jacobian) {
+<<<<<<< HEAD
             // Default m_skip_particle_picard_init to true if using suborbits
             if (m_particle_suborbits) { m_skip_particle_picard_init = true; }
             pp.query("skip_particle_picard_init", m_skip_particle_picard_init);
+=======
+            // Default modify_initial_newton_step to true if using suborbits
+            if (m_particle_suborbits) { m_modify_initial_newton_step = true; }
+            pp.query("modify_initial_newton_step", m_modify_initial_newton_step);
+>>>>>>> 326160c0e (more updates to match other branch)
         }
 #if defined(WARPX_DIM_RCYLINDER)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
