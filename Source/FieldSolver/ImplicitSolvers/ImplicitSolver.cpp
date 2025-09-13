@@ -711,7 +711,6 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
 
     // Set the implict solver options for particles and setting the current density
     ImplicitOptions options;
-    options.nonlinear_iteration = a_nl_iter;
     options.linear_stage_of_jfnk = a_from_jacobian;
 
     if (a_nl_iter == 0 && !a_from_jacobian &&
