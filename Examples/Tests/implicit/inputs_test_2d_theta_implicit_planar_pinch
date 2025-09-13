@@ -82,8 +82,8 @@ gmres.relative_tolerance = 1.0e-4
 gmres.absolute_tolerance = 0.0
 
 implicit_evolve.use_mass_matrices_jacobian = true
-implicit_evolve.use_mass_matrices_pc = true
 implicit_evolve.modify_initial_newton_step = true
+implicit_evolve.use_mass_matrices_pc = true
 jacobian.pc_type = "pc_curl_curl_mlmg"
 pc_curl_curl_mlmg.verbose = true
 pc_curl_curl_mlmg.max_iter = 1
