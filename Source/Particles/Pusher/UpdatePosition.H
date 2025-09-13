@@ -47,6 +47,32 @@ void UpdatePosition([[maybe_unused]] amrex::ParticleReal& x,
 #endif
 }
 
+/** \brief Compute the inverse Lorentz factor for the position update in
+ *         the implicit methods, which is the average of gamma at time
+ *         levels n and n+1.
+ */
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::ParticleReal GetImplicitGammaInverse (const amrex::ParticleReal uxp_n,
+                                             const amrex::ParticleReal uyp_n,
+                                             const amrex::ParticleReal uzp_n,
+                                             const amrex::ParticleReal uxp_nph,
+                                             const amrex::ParticleReal uyp_nph,
+                                             const amrex::ParticleReal uzp_nph) noexcept
+{
+    using namespace amrex::literals;
+
+    constexpr amrex::ParticleReal inv_c2 = 1.0_prt/(PhysConst::c*PhysConst::c);
+
+    const amrex::ParticleReal uxp_np1 = 2._prt*uxp_nph - uxp_n;
+    const amrex::ParticleReal uyp_np1 = 2._prt*uyp_nph - uyp_n;
+    const amrex::ParticleReal uzp_np1 = 2._prt*uzp_nph - uzp_n;
+    const amrex::ParticleReal gamma_n = std::sqrt(1._prt + (uxp_n*uxp_n + uyp_n*uyp_n + uzp_n*uzp_n)*inv_c2);
+    const amrex::ParticleReal gamma_np1 = std::sqrt(1._prt + (uxp_np1*uxp_np1 + uyp_np1*uyp_np1 + uzp_np1*uzp_np1)*inv_c2);
+    const amrex::ParticleReal gaminv = 2._prt/(gamma_n + gamma_np1);
+
+    return gaminv;
+}
+
 /** \brief Push the particle's positions over one timestep,
  *    given the value of its momenta `ux`, `uy`, `uz`.
  *    The implicit version is the Crank-Nicolson scheme,
@@ -61,18 +87,9 @@ void UpdatePositionImplicit ([[maybe_unused]] amrex::ParticleReal& x,
                              const amrex::ParticleReal ux, const amrex::ParticleReal uy, const amrex::ParticleReal uz,
                              const amrex::Real dt )
 {
-    using namespace amrex::literals;
-
-    constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
 
     // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
-    // The ux,uy,uz are the velocities at time level n+1/2
-    const amrex::ParticleReal ux_np1 = 2._prt*ux - ux_n;
-    const amrex::ParticleReal uy_np1 = 2._prt*uy - uy_n;
-    const amrex::ParticleReal uz_np1 = 2._prt*uz - uz_n;
-    const amrex::ParticleReal gamma_n = std::sqrt(1._prt + (ux_n*ux_n + uy_n*uy_n + uz_n*uz_n)*inv_c2);
-    const amrex::ParticleReal gamma_np1 = std::sqrt(1._prt + (ux_np1*ux_np1 + uy_np1*uy_np1 + uz_np1*uz_np1)*inv_c2);
-    const amrex::ParticleReal inv_gamma = 2.0_prt/(gamma_n + gamma_np1);
+    const amrex::ParticleReal inv_gamma = GetImplicitGammaInverse(ux_n, uy_n, uz_n, ux, uy, uz);
 
     // Update positions over one time step
 #if !defined(WARPX_DIM_1D_Z)

@@ -862,23 +862,10 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                 const amrex::ParticleReal uxp_nph = ux[ip];
                 const amrex::ParticleReal uyp_nph = uy[ip];
                 const amrex::ParticleReal uzp_nph = uz[ip];
-
-                constexpr amrex::ParticleReal inv_c2 = 1.0_prt/(PhysConst::c*PhysConst::c);
-
-                const amrex::ParticleReal uxp_old = uxp_n;
-                const amrex::ParticleReal uyp_old = uyp_n;
-                const amrex::ParticleReal uzp_old = uzp_n;
-                const amrex::ParticleReal uxp_new = 2.0_prt*ux[ip] - uxp_n;
-                const amrex::ParticleReal uyp_new = 2.0_prt*uy[ip] - uyp_n;
-                const amrex::ParticleReal uzp_new = 2.0_prt*uz[ip] - uzp_n;
-
-                // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
-                // The uxp,uyp,uzp are the velocities at time level n+1/2
-                const amrex::ParticleReal gamma_old = std::sqrt(1.0_prt + (uxp_old*uxp_old + uyp_old*uyp_old + uzp_old*uzp_old)*inv_c2);
-                const amrex::ParticleReal gamma_new = std::sqrt(1.0_prt + (uxp_new*uxp_new + uyp_new*uyp_new + uzp_new*uzp_new)*inv_c2);
-                const amrex::ParticleReal gaminv = 2.0_prt/(gamma_old + gamma_new);
+                const amrex::ParticleReal gaminv = GetImplicitGammaInverse(uxp_n, uyp_n, uzp_n, ux[ip], uy[ip], uz[ip]);
 
                 if (deposit_mass_matrices) {
+                    constexpr amrex::ParticleReal inv_c2 = 1.0_prt/(PhysConst::c*PhysConst::c);
                     const amrex::Real wq_invvol = wq*invvol/nsuborbits[ip];
                     const amrex::Real rhop = 2.0_rt*wq_invvol*gaminv; // approximation when neglecting MM coupling terms
 
