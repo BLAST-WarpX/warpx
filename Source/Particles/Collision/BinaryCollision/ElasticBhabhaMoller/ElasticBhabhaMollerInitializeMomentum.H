@@ -216,15 +216,9 @@ namespace {
             p1fsz = (-p1sp           ) * sinXs*cosphis +
                     ( 0.0_prt        ) * sinXs*sinphis +
                     ( p1sz           ) * cosXs;
-            // Note a negative sign is different from
-            // Eq. (12) in Perez's paper,
-            // but they are the same due to the random nature of phis.
         }
         else
         {
-            // If the previous p1sp is almost zero
-            // x->y  y->z  z->x
-            // This set is equivalent to the one in Nanbu's paper
             p1sp = std::sqrt( p1sy*p1sy + p1sz*p1sz );
             p1fsy = ( p1sy*p1sx/p1sp ) * sinXs*cosphis +
                     ( p1sz*p1sm/p1sp ) * sinXs*sinphis +
