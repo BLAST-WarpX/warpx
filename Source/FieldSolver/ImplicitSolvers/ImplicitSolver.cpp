@@ -750,9 +750,11 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         }
     }
     else if (m_use_mass_matrices_jacobian) { // Called from linear stage of JFNK and using mass matrices
-        options.deposit_mass_matrices = false;
-        if (m_particle_suborbits) { options.evolve_suborbit_particles_only = true; }
-        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, &options);
+        if (m_particle_suborbits) {
+            options.deposit_mass_matrices = false;
+            options.evolve_suborbit_particles_only = true;
+            m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, &options);
+        }
         const bool J_from_MM_only = !options.evolve_suborbit_particles_only;
         ComputeJfromMassMatrices( J_from_MM_only );
     }
