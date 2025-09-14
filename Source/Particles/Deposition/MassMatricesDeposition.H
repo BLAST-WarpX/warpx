@@ -31,7 +31,6 @@
  * \param qs              Species charge
  * \param ms              Species mass
  * \param dt              Simulation time step
- * \param inv_c2          1/c^2
  * \param rhop            qs*wp*invvol*2.0/(gamma_n + gamma_np1)
  * \param uxp,uyp,uzp     Proper velocity of particle (time-centered)
  * \param Bxp,Byp,Bzp     Magnetic field vector components on particle
@@ -43,7 +42,6 @@ AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void setMassMatricesKernels ( const amrex::ParticleReal qs,
                               const amrex::ParticleReal ms,
                               const amrex::ParticleReal dt,
-                              const amrex::ParticleReal inv_c2,
                               const amrex::ParticleReal rhop,
                               const amrex::ParticleReal uxp,
                               const amrex::ParticleReal uyp,
@@ -62,6 +60,8 @@ void setMassMatricesKernels ( const amrex::ParticleReal qs,
                               amrex::ParticleReal& fpzz )
 {
     using namespace amrex::literals;
+
+    constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
 
     // Convert B on particle to normalized cyclotron units with dt/2.0
     const amrex::ParticleReal gamma_bar = std::sqrt(1._prt + (uxp*uxp + uyp*uyp + uzp*uzp)*inv_c2);
@@ -596,8 +596,6 @@ void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
                                     Bx_type, By_type, Bz_type,
                                     dinv, xyzmin, lo, n_rz_azimuthal_modes );
 
-            constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
-
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
             const amrex::ParticleReal gaminv = GetImplicitGammaInverse(uxp_n[ip], uyp_n[ip], uzp_n[ip],
                                                                        uxp_nph[ip], uyp_nph[ip], uzp_nph[ip]);
@@ -612,7 +610,7 @@ void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
             amrex::ParticleReal fpxx, fpxy, fpxz;
             amrex::ParticleReal fpyx, fpyy, fpyz;
             amrex::ParticleReal fpzx, fpzy, fpzz;
-            setMassMatricesKernels( qs, ms, dt, inv_c2, rhop,
+            setMassMatricesKernels( qs, ms, dt, rhop,
                                     uxp_nph[ip], uyp_nph[ip], uzp_nph[ip],
                                     Bxp, Byp, Bzp,
                                     fpxx, fpxy, fpxz,
@@ -1648,8 +1646,6 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
                                     Bx_type, By_type, Bz_type,
                                     dinv, xyzmin, lo, n_rz_azimuthal_modes );
 
-            constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
-
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
             const amrex::ParticleReal gaminv = GetImplicitGammaInverse(uxp_n[ip], uyp_n[ip], uzp_n[ip],
                                                                        uxp_nph[ip], uyp_nph[ip], uzp_nph[ip]);
@@ -1662,7 +1658,7 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
             amrex::ParticleReal fpxx, fpxy, fpxz;
             amrex::ParticleReal fpyx, fpyy, fpyz;
             amrex::ParticleReal fpzx, fpzy, fpzz;
-            setMassMatricesKernels( qs, ms, dt, inv_c2, rhop,
+            setMassMatricesKernels( qs, ms, dt, rhop,
                                     uxp_nph[ip], uyp_nph[ip], uzp_nph[ip],
                                     Bxp, Byp, Bzp,
                                     fpxx, fpxy, fpxz,
