@@ -59,8 +59,8 @@ public:
      * @param[in] isSameSpecies whether the two colliding species are the same
      */
     DSMCFunc ( const std::string& collision_name,
-               MultiParticleContainer const * mypc,
-               bool isSameSpecies );
+               [[maybe_unused]] MultiParticleContainer const * mypc,
+               const bool isSameSpecies );
 
     struct Executor {
         /**
@@ -98,12 +98,14 @@ public:
             GetParticlePosition<PIdx> /*get_position_1*/, GetParticlePosition<PIdx> /*get_position_2*/,
             amrex::ParticleReal const /*n1*/, amrex::ParticleReal const /*n2*/,
             amrex::ParticleReal const /*T1*/, amrex::ParticleReal const /*T2*/,
+            amrex::Real const /*global_lamdb*/,
             amrex::ParticleReal const  /*q1*/, amrex::ParticleReal const  /*q2*/,
             amrex::ParticleReal const  m1, amrex::ParticleReal const  m2,
             amrex::Real const  dt, amrex::Real const dV, index_type coll_idx,
             index_type const cell_start_pair, index_type* AMREX_RESTRICT p_mask,
             index_type* AMREX_RESTRICT p_pair_indices_1, index_type* AMREX_RESTRICT p_pair_indices_2,
             amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
+            amrex::ParticleReal* /*p_product_data*/,
             amrex::RandomEngine const& engine) const
         {
             amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
@@ -202,11 +204,14 @@ public:
         int m_process_count;
         bool m_computeSpeciesDensities = false;
         bool m_computeSpeciesTemperatures = false;
+        bool m_need_product_data = false;
         bool m_isSameSpecies = false;
         ScatteringProcess::Executor* m_scattering_processes_data;
     };
 
     [[nodiscard]] Executor const& executor () const { return m_exe; }
+
+    bool use_global_debye_length() { return false; }
 
 private:
     amrex::Vector<ScatteringProcess> m_scattering_processes;

@@ -216,7 +216,7 @@ Example
 """""""
 
 Example of how to create traces on a single-GPU system. A jobscript for
-Perlmutter is shown, but the `SBATCH` headers are not strictly necessary as the
+Perlmutter is shown, but the ``SBATCH`` headers are not strictly necessary as the
 command only profiles a single process. This can also be run on an interactive
 node, or without a workload management system.
 
@@ -243,6 +243,11 @@ node, or without a workload management system.
    --nvtx --nvtx-include="WarpXParticleContainer::DepositCurrent::CurrentDeposition/" \
    ./warpx input max_step=1 \
    &> warpxOut.txt
+
+.. note::
+
+   Note the trailing ``/`` at the end of the ``--nvtx-include`` filter (`reference <https://docs.nvidia.com/nsight-compute/NsightComputeCli/index.html?highlight=nvtx%2520include#nvtx-filtering>`__).
+   The names are annotations that we add to WarpX via ``WARPX_PROFILE(...)``.
 
 .. note::
 
@@ -273,6 +278,12 @@ Now open the created trace file in the Nsight-Compute GUI. As with
 Nsight-Systems,
 this can be done on another system than the one that recorded the traces.
 For example, if you record on a cluster and open the analysis GUI on your laptop, it is recommended to make sure that versions of Nsight-Compute match on the remote and local system.
+
+.. tip::
+
+   If you already know what metrics you are looking for and/or do not want to open the Nsight GUI for analysis, there are also command line tools to work with the trace profile.
+   For Nsight-Compute, see the `Nsight-Compute CLI (ncu) <https://docs.nvidia.com/nsight-compute/NsightComputeCli/index.html#command-line-options-console-output>`__ and `Python report interface <https://docs.nvidia.com/nsight-compute/CustomizationGuide/index.html#python-report-interface>`__.
+   For Nsight-Systems, see `nsys analyze <https://docs.nvidia.com/nsight-systems/UserGuide/index.html#cli-command-switches>`__.
 
 .. note::
 

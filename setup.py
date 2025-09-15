@@ -1,3 +1,4 @@
+import json
 import os
 import platform
 import re
@@ -275,12 +276,18 @@ with open("./requirements.txt") as f:
     if WARPX_MPI == "ON":
         install_requires.append("mpi4py>=2.1.0")
 
+# Parse WarpX version information
+dependencies_file = "dependencies.json"
+with open(dependencies_file, "r") as file:
+    dependencies_data = json.load(file)
+warpx_version = dependencies_data.get("version_warpx")
+
 # keyword reference:
 #   https://packaging.python.org/guides/distributing-packages-using-setuptools
 setup(
     name="pywarpx",
     # note PEP-440 syntax: x.y.zaN but x.y.z.devN
-    version="25.03",
+    version=warpx_version,
     packages=["pywarpx"],
     package_dir={"pywarpx": "Python/pywarpx"},
     author="Jean-Luc Vay, David P. Grote, Maxence Thévenet, Rémi Lehe, Andrew Myers, Weiqun Zhang, Axel Huebl, et al.",
@@ -299,8 +306,8 @@ setup(
         "Documentation": "https://warpx.readthedocs.io",
         "Doxygen": "https://warpx.readthedocs.io/en/latest/_static/doxyhtml/index.html",
         #'Reference': 'https://doi.org/...', (Paper and/or Zenodo)
-        "Source": "https://github.com/ECP-WarpX/WarpX",
-        "Tracker": "https://github.com/ECP-WarpX/WarpX/issues",
+        "Source": "https://github.com/BLAST-WarpX/warpx",
+        "Tracker": "https://github.com/BLAST-WarpX/warpx/issues",
     },
     # CMake: self-built as extension module
     ext_modules=cxx_modules,

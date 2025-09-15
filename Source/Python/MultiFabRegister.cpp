@@ -32,6 +32,7 @@ void init_MultiFabRegister (py::module & m)
                  bool,
                  bool
              >(&MultiFabRegister::alloc_init<std::string>),
+             py::return_value_policy::reference_internal,
              py::arg("name"),
              py::arg("level"),
              py::arg("ba"),
@@ -56,6 +57,7 @@ void init_MultiFabRegister (py::module & m)
                  bool,
                  bool
              >(&MultiFabRegister::alloc_init<std::string>),
+             py::return_value_policy::reference_internal,
              py::arg("name"),
              py::arg("dir"),
              py::arg("level"),
@@ -75,6 +77,7 @@ void init_MultiFabRegister (py::module & m)
                  int,
                  std::optional<const amrex::Real>
              >(&MultiFabRegister::alias_init<std::string, std::string>),
+             py::return_value_policy::reference_internal,
              py::arg("new_name"),
              py::arg("alias_name"),
              py::arg("level"),
@@ -89,6 +92,7 @@ void init_MultiFabRegister (py::module & m)
                  int,
                  std::optional<const amrex::Real>
              >(&MultiFabRegister::alias_init<std::string, std::string>),
+             py::return_value_policy::reference_internal,
              py::arg("new_name"),
              py::arg("alias_name"),
              py::arg("dir"),
@@ -121,6 +125,7 @@ void init_MultiFabRegister (py::module & m)
                  std::string,
                  int
              >(&MultiFabRegister::get<std::string>),
+             py::return_value_policy::reference_internal,
              py::arg("name"),
              py::arg("level")
         )
@@ -131,15 +136,16 @@ void init_MultiFabRegister (py::module & m)
                  ablastr::fields::Direction,
                  int
              >(&MultiFabRegister::get<std::string>),
+             py::return_value_policy::reference_internal,
              py::arg("name"),
              py::arg("dir"),
              py::arg("level")
         )
 
-        //.def("list",
-        //     &MultiFabRegister::list
-        //     // "..."
-        //)
+        .def("list",
+             &MultiFabRegister::list,
+             "List the internal names of all registered fields"
+        )
 
         .def("erase",
              py::overload_cast<

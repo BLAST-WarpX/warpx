@@ -12,6 +12,7 @@
 #define WARPX_ParticleContainer_H_
 
 #include "MultiParticleContainer_fwd.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
 #include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
@@ -31,6 +32,7 @@
 #include <AMReX_BLassert.H>
 #include <AMReX_Box.H>
 #include <AMReX_Config.H>
+#include <AMReX_Geometry.H>
 #include <AMReX_GpuControl.H>
 #include <AMReX_INT.H>
 #include <AMReX_MFIter.H>
@@ -112,7 +114,7 @@ public:
         amrex::Real dt,
         DtType a_dt_type=DtType::Full,
         bool skip_deposition=false,
-        PushType push_type=PushType::Explicit
+        ImplicitOptions const * implicit_options = nullptr
     );
 
     /**
@@ -167,24 +169,41 @@ public:
     DepositCurrent (ablastr::fields::MultiLevelVectorField const& J,
                     amrex::Real dt, amrex::Real relative_time);
 
+    /**
+     * \brief Deposit temperature to species MFs. This is done for each
+     *        species and can be used in the future for a single pass update of rho, J, and T.
+     *
+     * \param[in,out] fields Multifab field register to grab Temperature MFs
+     * \param[in] relative_time Time at which to deposit velocities, relative to the time of the
+     *                          current positions of the particles. When different than 0,
+     *                          the particle position will be temporarily modified to match
+     *                          the time of the deposition.
+     */
+    void
+    DepositTemperatures (ablastr::fields::MultiFabRegister & fields, amrex::Real relative_time);
+
     ///
     /// This deposits the particle charge onto a node-centered MultiFab and returns a unique ptr
     /// to it. The charge density is accumulated over all the particles in the MultiParticleContainer
 
     std::unique_ptr<amrex::MultiFab> GetChargeDensity(int lev, bool local = false);
 
+    void GenerateGlobalDebyeLength ();
+
     void doFieldIonization (int lev,
                             const amrex::MultiFab& Ex, const amrex::MultiFab& Ey, const amrex::MultiFab& Ez,
                             const amrex::MultiFab& Bx, const amrex::MultiFab& By, const amrex::MultiFab& Bz);
 
-    void doCollisions (amrex::Real cur_time, amrex::Real dt);
+    void doCollisions (int step, amrex::Real cur_time, amrex::Real dt);
 
     /**
     * \brief This function loops over all species and performs resampling if appropriate.
     *
+    * @param[in] geom the geometry of all refinement levels
     * @param[in] timestep the current timestep.
+    * @param[in] verbose flag to control if information on the resampling process is printed out.
     */
-    void doResampling (int timestep, bool verbose);
+    void doResampling (const amrex::Vector<amrex::Geometry>& geom, int timestep, bool verbose);
 
 #ifdef WARPX_QED
     /** If Schwinger process is activated, this function is called at every
@@ -211,7 +230,10 @@ public:
 
     void WriteHeader (std::ostream& os) const;
 
-    void SortParticlesByBin (amrex::IntVect bin_size);
+    void SortParticlesByBin (
+        const amrex::IntVect& bin_size,
+        bool sort_particles_for_deposition,
+        const amrex::IntVect& sort_idx_type);
 
     void Redistribute ();
 
@@ -304,8 +326,6 @@ public:
         tmp.insert(tmp.end(), lasers_names.begin(), lasers_names.end());
         return tmp;
     }
-
-    PhysicalParticleContainer& GetPCtmp () { return *pc_tmp; }
 
     void ScrapeParticlesAtEB (ablastr::fields::MultiLevelScalarField const& distance_to_eb);
 
@@ -503,8 +523,6 @@ private:
 
     // physical particles (+ laser)
     amrex::Vector<std::unique_ptr<WarpXParticleContainer>> allcontainers;
-    // Temporary particle container, used e.g. for particle splitting.
-    std::unique_ptr<PhysicalParticleContainer> pc_tmp;
 
     void ReadParameters ();
 

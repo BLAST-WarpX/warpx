@@ -22,6 +22,7 @@ public:
      *
      * @param i index of diagnostics in MultiDiagnostics::alldiags
      * @param name diagnostics name in the inputs file
+     * @param diag_type diagnostics type (e.g., full, back-transformed, time-averaged, etc.)
      */
     BoundaryScrapingDiagnostics (int i, const std::string& name, DiagTypes diag_type);
 

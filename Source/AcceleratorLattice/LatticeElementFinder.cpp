@@ -24,7 +24,12 @@ LatticeElementFinder::InitElementFinder (int const lev, const amrex::Real gamma_
     // The lattice is assumed to extend in the z-direction
     // Get the number of nodes where indices will be setup
     const amrex::Box box = a_mfi.tilebox();
+#if defined(WARPX_ZINDEX)
     m_nz = box.size()[WARPX_ZINDEX];
+#else
+    m_nz = 0;
+    ignore_unused(box);
+#endif
 
     m_dz = WarpX::CellSize(lev)[2];
 

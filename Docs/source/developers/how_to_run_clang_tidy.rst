@@ -14,7 +14,7 @@ The complete list of checks performed is defined in the ``.clang-tidy`` configur
    .. literalinclude:: ../../../.clang-tidy
       :language: yaml
 
-Under `Tools/Linter <https://github.com/ECP-WarpX/WarpX/blob/development/Tools/Linter>`__, the script ``runClangTidy.sh`` can be used to run the clang-tidy linter locally.
+Under `Tools/Linter <https://github.com/BLAST-WarpX/warpx/blob/development/Tools/Linter>`__, the script ``runClangTidy.sh`` can be used to run the clang-tidy linter locally.
 
 .. dropdown:: clang-tidy local run script
    :color: light

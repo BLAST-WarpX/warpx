@@ -36,7 +36,7 @@ We clone WarpX in ``$WORK``:
 .. code-block:: bash
 
     cd $WORK
-    git clone https://github.com/ECP-WarpX/WarpX.git warpx
+    git clone https://github.com/BLAST-WarpX/warpx.git warpx
 
 Installation profile file
 ^^^^^^^^^^^^^^^^^^^^^^^^^

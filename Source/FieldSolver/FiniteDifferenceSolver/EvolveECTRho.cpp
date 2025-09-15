@@ -6,12 +6,10 @@
  */
 #include "FiniteDifferenceSolver.H"
 
-#ifndef WARPX_DIM_RZ
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 #   include "FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
 #   include "FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
 #   include "FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
-#else
-#   include "FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
 #endif
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -54,7 +52,7 @@ void FiniteDifferenceSolver::EvolveECTRho (
     ablastr::fields::VectorField const& ECTRhofield,
     const int lev) {
 
-#if !defined(WARPX_DIM_RZ) and defined(AMREX_USE_EB)
+#if !defined(WARPX_DIM_RZ) and !defined(WARPX_DIM_RCYLINDER) and !defined(WARPX_DIM_RSPHERE) and defined(AMREX_USE_EB)
     if (m_fdtd_algo == ElectromagneticSolverAlgo::ECT) {
 
         EvolveRhoCartesianECT(Efield, edge_lengths, face_areas, ECTRhofield, lev);
@@ -66,7 +64,7 @@ void FiniteDifferenceSolver::EvolveECTRho (
 }
 
 // If we implement ECT in 1D we will need to take care of this #ifndef differently
-#ifndef WARPX_DIM_RZ
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 void FiniteDifferenceSolver::EvolveRhoCartesianECT (
     ablastr::fields::VectorField const& Efield,
     ablastr::fields::VectorField const& edge_lengths,

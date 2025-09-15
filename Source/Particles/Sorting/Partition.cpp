@@ -8,7 +8,6 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "SortingUtils.H"
 #include "Utils/WarpXProfilerWrapper.H"
-#include "WarpX.H"
 
 #include <AMReX_GpuContainers.H>
 #include <AMReX_GpuDevice.H>
@@ -23,7 +22,7 @@
 
 using namespace amrex;
 
-/* \brief Determine which particles deposit/gather in the buffer, and
+/** \brief Determine which particles deposit/gather in the buffer, and
  *        and reorder the particle arrays accordingly
  *
  *  More specifically:
@@ -43,6 +42,8 @@ using namespace amrex;
  * \param np total number of particles in this tile
  * \param pti object that holds the particle information for this tile
  * \param lev current refinement level
+ * \param n_field_gather_buffer
+ * \param n_current_deposition_buffer
  * \param current_masks indicates, for each cell, whether that cell is
  *       in the deposition buffers or in the interior of the fine patch
  * \param gather_masks indicates, for each cell, whether that cell is
@@ -52,6 +53,8 @@ void
 PhysicalParticleContainer::PartitionParticlesInBuffers(
     long& nfine_current, long& nfine_gather, long const np,
     WarpXParIter& pti, int const lev,
+    int n_field_gather_buffer,
+    int n_current_deposition_buffer,
     iMultiFab const* current_masks,
     iMultiFab const* gather_masks )
 {
@@ -67,7 +70,7 @@ PhysicalParticleContainer::PartitionParticlesInBuffers(
 
     // - Select the larger buffer
     iMultiFab const* bmasks =
-        (WarpX::n_field_gather_buffer >= WarpX::n_current_deposition_buffer) ?
+        (n_field_gather_buffer >= n_current_deposition_buffer) ?
         gather_masks : current_masks;
     // - For each particle, find whether it is in the larger buffer,
     //   by looking up the mask. Store the answer in `inexflag`.
@@ -86,7 +89,7 @@ PhysicalParticleContainer::PartitionParticlesInBuffers(
     // Second, among particles that are in the larger buffer, partition
     // particles into the smaller buffer
 
-    if (WarpX::n_current_deposition_buffer == WarpX::n_field_gather_buffer) {
+    if (n_current_deposition_buffer == n_field_gather_buffer) {
         // No need to do anything if the buffers have the same size
         nfine_current = nfine_gather = iteratorDistance(pid.begin(), sep);
     } else if (sep == pid.end()) {
@@ -97,11 +100,11 @@ PhysicalParticleContainer::PartitionParticlesInBuffers(
         if (bmasks == gather_masks) {
             nfine_gather = n_fine;
             bmasks = current_masks;
-            n_buf = WarpX::n_current_deposition_buffer;
+            n_buf = n_current_deposition_buffer;
         } else {
             nfine_current = n_fine;
             bmasks = gather_masks;
-            n_buf = WarpX::n_field_gather_buffer;
+            n_buf = n_field_gather_buffer;
         }
         if (n_buf > 0)
         {

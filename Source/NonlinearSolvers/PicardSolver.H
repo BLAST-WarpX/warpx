@@ -96,6 +96,11 @@ private:
      */
     int m_maxits = 100;
 
+    /**
+     * \brief Total iterations for the diagnostic file
+     */
+    mutable int m_total_iters = 0;
+
     void ParseParameters( );
 
 };
@@ -118,7 +123,9 @@ void PicardSolver<Vec,Ops>::Define ( const Vec&  a_U,
     this->m_is_defined = true;
 
     // Create diagnostic file and write header
-    if (!this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor()) {
+    if (amrex::ParallelDescriptor::IOProcessor()
+        && !this->m_diagnostic_file.empty()
+        && !amrex::FileExists(this->m_diagnostic_file)) {
 
         std::filesystem::path const diagnostic_path(this->m_diagnostic_file);
         std::filesystem::path const diagnostic_dir = diagnostic_path.parent_path();
@@ -134,6 +141,8 @@ void PicardSolver<Vec,Ops>::Define ( const Vec&  a_U,
         diagnostic_file << "[" << c++ << "]time(s)";
         diagnostic_file << " ";
         diagnostic_file << "[" << c++ << "]iters";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]total_iters";
         diagnostic_file << " ";
         diagnostic_file << "[" << c++ << "]norm_abs";
         diagnostic_file << " ";
@@ -154,6 +163,7 @@ void PicardSolver<Vec,Ops>::ParseParameters ()
     pp_picard.query("max_iterations",      m_maxits);
     pp_picard.query("require_convergence", m_require_convergence);
     pp_picard.query("diagnostic_file",     this->m_diagnostic_file);
+    pp_picard.query("diagnostic_interval", this->m_diagnostic_interval);
 }
 
 template <class Vec, class Ops>
@@ -167,7 +177,6 @@ void PicardSolver<Vec,Ops>::Solve ( Vec&         a_U,
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         this->m_is_defined,
         "PicardSolver::Solve() called on undefined object");
-    amrex::ignore_unused(a_dt);
     using namespace amrex::literals;
 
     //
@@ -208,24 +217,33 @@ void PicardSolver<Vec,Ops>::Solve ( Vec&         a_U,
         }
 
         if (norm_abs < m_atol) {
-            amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
-                           << ". Satisfied absolute tolerance " << m_atol << "\n";
+            if (this->m_verbose) {
+                amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
+                               << ". Satisfied absolute tolerance " << m_atol << "\n";
+            }
             break;
         }
 
         if (norm_rel < m_rtol) {
-            amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
-                           << ". Satisfied relative tolerance " << m_rtol << "\n";
+            if (this->m_verbose) {
+                amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
+                               << ". Satisfied relative tolerance " << m_rtol << "\n";
+            }
             break;
         }
 
         if (iter >= m_maxits) {
-            amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
-                           << ". Maximum iteration reached: iter = " << m_maxits << "\n";
+            if (this->m_verbose) {
+                amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
+                               << ". Maximum iteration reached: iter = " << m_maxits << "\n";
+            }
             break;
         }
 
     }
+
+    // Update total iteration count
+    m_total_iters += iter;
 
     if (m_rtol > 0. && iter == m_maxits) {
        std::stringstream convergenceMsg;
@@ -242,14 +260,17 @@ void PicardSolver<Vec,Ops>::Solve ( Vec&         a_U,
        }
     }
 
-    if (!this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor()) {
+    if (!this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor() &&
+        ((a_step+1)%this->m_diagnostic_interval==0 || a_step==0)) {
         std::ofstream diagnostic_file{this->m_diagnostic_file, std::ofstream::out | std::ofstream::app};
         diagnostic_file << std::setprecision(14);
-        diagnostic_file << a_step;
+        diagnostic_file << a_step+1;
         diagnostic_file << " ";
-        diagnostic_file << a_time;
+        diagnostic_file << a_time + a_dt;
         diagnostic_file << " ";
         diagnostic_file << iter;
+        diagnostic_file << " ";
+        diagnostic_file << m_total_iters;
         diagnostic_file << " ";
         diagnostic_file << norm_abs;
         diagnostic_file << " ";

@@ -36,7 +36,7 @@ For openPMD output, WarpX automatically creates an ``.pmd`` file per diagnostics
 
 .. warning::
 
-   `WarpX issue 21162 <https://github.com/ECP-WarpX/WarpX/issues/1803>`__:
+   `WarpX issue 21162 <https://github.com/BLAST-WarpX/warpx/issues/1803>`__:
    We currently load WarpX field data with a rotation.
    Please apply rotation of ``0 -90 0`` to mesh data.
 

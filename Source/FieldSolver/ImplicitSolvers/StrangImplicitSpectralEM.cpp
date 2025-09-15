@@ -32,6 +32,10 @@ void StrangImplicitSpectralEM::Define ( WarpX* const a_WarpX )
 
     // Define the nonlinear solver
     m_nlsolver->Define(m_E, this);
+
+    // Initialize the mass matrices for plasma response
+    if (m_use_mass_matrices) { InitializeMassMatrices(); }
+
     m_is_defined = true;
 
 }
@@ -43,14 +47,7 @@ void StrangImplicitSpectralEM::PrintParameters () const
     amrex::Print() << "------------------------------------------------------------------------" << "\n";
     amrex::Print() << "----------- STRANG SPLIT IMPLICIT SPECTRAL EM SOLVER PARAMETERS --------" << "\n";
     amrex::Print() << "------------------------------------------------------------------------" << "\n";
-    amrex::Print() << "max particle iterations:    " << m_max_particle_iterations << "\n";
-    amrex::Print() << "particle tolerance:         " << m_particle_tolerance << "\n";
-    if (m_nlsolver_type==NonlinearSolverType::Picard) {
-        amrex::Print() << "Nonlinear solver type:      Picard\n";
-    }
-    else if (m_nlsolver_type==NonlinearSolverType::Newton) {
-        amrex::Print() << "Nonlinear solver type:      Newton\n";
-    }
+    PrintBaseImplicitSolverParameters();
     m_nlsolver->PrintParams();
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
@@ -81,7 +78,7 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real start_time,
 
     // Solve nonlinear system for E at t_{n+1/2}
     // Particles will be advanced to t_{n+1/2}
-    m_nlsolver->Solve( m_E, m_Eold, half_time, 0.5_rt*m_dt, a_step );
+    m_nlsolver->Solve( m_E, m_Eold, start_time, m_dt, a_step );
 
     // Update WarpX owned Efield_fp and Bfield_fp to t_{n+1/2}
     UpdateWarpXFields( m_E, half_time );
@@ -101,17 +98,18 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real start_time,
 
 void StrangImplicitSpectralEM::ComputeRHS ( WarpXSolverVec& a_RHS,
                                             WarpXSolverVec const & a_E,
-                                            amrex::Real half_time,
+                                            amrex::Real start_time,
                                             int a_nl_iter,
                                             bool a_from_jacobian )
 {
     // Update WarpX-owned Efield_fp and Bfield_fp using current state of
     // E from the nonlinear solver at time n+1/2
+    const amrex::Real half_time = start_time + 0.5_rt*m_dt;
     UpdateWarpXFields( a_E, half_time );
 
     // Self consistently update particle positions and velocities using the
     // current state of the fields E and B. Deposit current density at time n+1/2.
-    m_WarpX->ImplicitPreRHSOp( half_time, m_dt, a_nl_iter, a_from_jacobian );
+    PreRHSOp( half_time, a_nl_iter, a_from_jacobian );
 
     // For Strang split implicit PSATD, the RHS = -dt*mu*c**2*J
     bool const allow_type_mismatch = true;

@@ -16,7 +16,6 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
-#include "WarpX.H"
 
 #include <AMReX_Algorithm.H>
 #include <AMReX_DenseBins.H>
@@ -71,11 +70,11 @@ public:
 
         const amrex::ParmParse pp_collision_name(collision_name);
         utils::parser::queryWithParser(
-            pp_collision_name, "fusion_multiplier", m_fusion_multiplier);
+            pp_collision_name, "event_multiplier", m_fusion_multiplier);
         utils::parser::queryWithParser(
-            pp_collision_name, "fusion_probability_threshold", m_probability_threshold);
+            pp_collision_name, "probability_threshold", m_probability_threshold);
         utils::parser::queryWithParser(
-            pp_collision_name, "fusion_probability_target_value",
+            pp_collision_name, "probability_target_value",
             m_probability_target_value);
 
         m_exe.m_fusion_multiplier = m_fusion_multiplier;
@@ -133,12 +132,14 @@ public:
             GetParticlePosition<PIdx> /*get_position_1*/, GetParticlePosition<PIdx> /*get_position_2*/,
             amrex::ParticleReal const /*n1*/, amrex::ParticleReal const /*n2*/,
             amrex::ParticleReal const /*T1*/, amrex::ParticleReal const /*T2*/,
+            amrex::Real const /*global_lamdb*/,
             amrex::ParticleReal const  /*q1*/, amrex::ParticleReal const  /*q2*/,
             amrex::ParticleReal const  m1, amrex::ParticleReal const  m2,
             amrex::Real const  dt, amrex::Real const dV, index_type coll_idx,
             index_type const cell_start_pair, index_type* AMREX_RESTRICT p_mask,
             index_type* AMREX_RESTRICT p_pair_indices_1, index_type* AMREX_RESTRICT p_pair_indices_2,
             amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
+            amrex::ParticleReal* /*p_product_data*/,
             amrex::RandomEngine const& engine) const
         {
             amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
@@ -239,10 +240,13 @@ public:
         NuclearFusionType m_fusion_type;
         bool m_computeSpeciesDensities = false;
         bool m_computeSpeciesTemperatures = false;
+        bool m_need_product_data = false;
         bool m_isSameSpecies;
     };
 
     [[nodiscard]] Executor const& executor () const { return m_exe; }
+
+    bool use_global_debye_length() { return false; }
 
 private:
     // Factor used to increase the number of fusion reaction by decreasing the weight of the

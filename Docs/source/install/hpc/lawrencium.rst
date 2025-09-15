@@ -27,7 +27,7 @@ Use the following commands to download the WarpX source code and switch to the c
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
 We use the following modules and environments on the system (``$HOME/lawrencium_warpx.profile``).
 

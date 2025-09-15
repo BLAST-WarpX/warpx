@@ -48,7 +48,7 @@ picard.absolute_tolerance = 0.0
 picard.require_convergence = false
 
 algo.particle_pusher = "boris"
-
+particles.max_grid_crossings = 2
 algo.particle_shape = 2
 algo.current_deposition = direct
 algo.charge_deposition = standard
