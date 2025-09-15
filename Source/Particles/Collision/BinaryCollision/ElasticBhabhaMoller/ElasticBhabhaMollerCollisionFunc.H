@@ -86,9 +86,16 @@ public:
             pp_collision_name, "probability_target_value",
             m_probability_target_value);
 
+        // default minimum scattering angle
+        m_minimum_scattering_angle = 0.01_prt; // in rad
+        utils::parser::queryWithParser(
+            pp_collision_name, "minimum_scattering_angle",
+            m_minimum_scattering_angle);
+
         m_exe.m_event_multiplier = m_event_multiplier;
         m_exe.m_probability_threshold = m_probability_threshold;
         m_exe.m_probability_target_value = m_probability_target_value;
+        m_exe.m_minimum_scattering_angle = m_minimum_scattering_angle;
         m_exe.m_isSameSpecies = m_isSameSpecies;
     }
 
@@ -198,6 +205,7 @@ public:
                         m_event_multiplier, multiplier_ratio,
                         m_probability_threshold,
                         m_probability_target_value,
+                        m_minimum_scattering_angle,
                         engine);
 #if (defined WARPX_DIM_RZ)
                     amrex::ParticleReal const u1xbuf_new = u1x[I1[i1]];
@@ -224,6 +232,7 @@ public:
         amrex::ParticleReal m_event_multiplier;
         amrex::ParticleReal m_probability_threshold;
         amrex::ParticleReal m_probability_target_value;
+        amrex::ParticleReal m_minimum_scattering_angle;
         bool m_isSameSpecies;
         bool m_computeSpeciesDensities = false;
         bool m_computeSpeciesTemperatures = false;
@@ -245,6 +254,7 @@ private:
     // the event multiplier should be reduced.
     amrex::ParticleReal m_probability_threshold;
     amrex::ParticleReal m_probability_target_value;
+    amrex::ParticleReal m_minimum_scattering_angle;
     bool m_isSameSpecies;
 
     Executor m_exe;

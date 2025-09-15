@@ -1,0 +1,232 @@
+#################################
+########## MY CONSTANTS #########
+#################################
+my_constants.mc2   = m_e*clight*clight
+my_constants.nano  = 1.0e-9
+my_constants.micro = 1.e-6
+my_constants.GeV   = q_e*1.e9
+
+# BEAMS
+my_constants.beam_energy = 187.5*GeV
+my_constants.beam_gamma  = beam_energy/mc2 
+my_constants.beam_npart  = 2.3e11
+my_constants.nmacropart  = 1e4
+my_constants.beam_charge = q_e * beam_npart
+my_constants.sigmax      = 38200*nano 
+my_constants.sigmay      = 68.1*nano
+my_constants.sigmaz      = 2540.*micro
+my_constants.beam_uth    = 0.
+my_constants.mux         = 0.
+my_constants.muy         = 0.
+my_constants.muz         = 4*sigmaz
+my_constants.emitx       = 535.7*micro
+my_constants.emity       = 1.064*micro
+my_constants.dux         = emitx / sigmax 
+my_constants.duy         = emity / sigmay 
+
+# BOX
+my_constants.Lx = 32*sigmax
+my_constants.Ly = 128*sigmay
+my_constants.Lz = 16*sigmaz
+my_constants.nx = 128
+my_constants.ny = 128
+my_constants.nz = 200
+my_constants.dx = Lx/nx
+my_constants.dy = Ly/ny
+my_constants.dz = Lz/nz
+
+# TIME
+my_constants.T = 0.5*Lz/clight
+my_constants.dt = T / nz
+
+
+my_constants.nt = floor(T/dt) - 1 
+my_constants.coll_time = abs(muz)/clight
+my_constants.coll_step = floor(nt*coll_time/T)
+
+
+warpx.used_inputs_file = warpx_used_inputs.txt
+
+
+my_constants.sigma_bw_max = 1.7e-32 # m^2
+my_constants.probability_estimate =   beam_npart / nmacropart * sigma_bw_max * 2 * clight * dt  / (dx * dy * dz) 
+
+my_constants.probability_target_value = 0.01
+my_constants.multiplier =  probability_target_value / probability_estimate 
+my_constants.probability_threshold = 0.1
+
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+stop_time = T
+amr.n_cell = nx ny nz
+amr.max_grid_size = nz
+amr.blocking_factor = 2
+amr.max_level = 0
+geometry.dims = 3
+geometry.prob_lo = -0.5*Lx -0.5*Ly -0.5*Lz
+geometry.prob_hi =  0.5*Lx  0.5*Ly  0.5*Lz
+
+#################################
+######## BOUNDARY CONDITION #####
+#################################
+boundary.field_lo = open open open 
+boundary.field_hi = open open open 
+boundary.particle_lo = Absorbing Absorbing Absorbing
+boundary.particle_hi = Absorbing Absorbing Absorbing
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.do_electrostatic = relativistic
+warpx.const_dt = dt 
+warpx.grid_type = collocated
+algo.particle_shape = 3
+algo.particle_pusher = vay 
+warpx.poisson_solver = fft
+
+#################################
+########### PARTICLES ###########
+#################################
+particles.species_names = beam1 beam2 electron2 positron2
+
+beam1.species_type = electron
+beam1.injection_style = gaussian_beam
+beam1.x_rms = sigmax
+beam1.y_rms = sigmay
+beam1.z_rms = sigmaz 
+beam1.x_m = - mux
+beam1.y_m = - muy
+beam1.z_m = - muz
+beam1.npart = nmacropart
+beam1.q_tot = -beam_charge
+beam1.z_cut = 4
+beam1.focal_distance = muz
+beam1.momentum_distribution_type = gaussian
+beam1.uz_m = beam_gamma
+beam1.uy_m = 0.0
+beam1.ux_m = 0.0
+beam1.ux_th = dux
+beam1.uy_th = duy
+beam1.uz_th = beam_uth
+beam1.do_classical_radiation_reaction = 0
+
+beam2.species_type = positron
+beam2.injection_style = gaussian_beam
+beam2.x_rms = sigmax
+beam2.y_rms = sigmay
+beam2.z_rms = sigmaz
+beam2.x_m = mux 
+beam2.y_m = muy
+beam2.z_m = muz
+beam2.npart = nmacropart
+beam2.q_tot = beam_charge
+beam2.z_cut = 4
+beam2.focal_distance = muz
+beam2.momentum_distribution_type = gaussian
+beam2.uz_m = -beam_gamma
+beam2.uy_m = 0.0
+beam2.ux_m = 0.0
+beam2.ux_th = dux
+beam2.uy_th = duy
+beam2.uz_th = beam_uth
+beam2.do_classical_radiation_reaction = 0
+
+electron2.species_type = electron
+electron2.injection_style = "None"
+electron2.do_not_push = 1
+
+positron2.species_type = positron
+positron2.injection_style = "None"
+positron2.do_not_push = 1
+
+#################################
+############ COLLISION ##########
+#################################
+
+collisions.collision_names = eb # elastic Bhabha
+eb.species = beam1 beam2
+eb.product_species = electron2 positron2
+eb.type = elastic_bhabha_moller
+eb.event_multiplier = multiplier
+eb.probability_threshold = probability_threshold
+eb.probability_target_value = probability_target_value
+eb.minimum_scattering_angle = 0.001 # in rad
+
+#################################
+######### DIAGNOSTICS ###########
+#################################
+
+diagnostics.diags_names = trajs bound
+
+trajs.intervals = 256
+trajs.diag_type = Full
+trajs.write_species = 1
+trajs.dump_last_timestep = 1
+trajs.species = beam1 beam2 electron2 positron2
+trajs.format = openpmd
+trajs.openpmd_backend = bp
+
+bound.dump_last_timestep = 1
+bound.diag_type = BoundaryScraping
+bound.format = openpmd
+bound.openpmd_backend = bp
+bound.intervals = -1
+
+beam1.save_particles_at_xlo = 1
+beam1.save_particles_at_ylo = 1
+beam1.save_particles_at_zlo = 1
+beam1.save_particles_at_xhi = 1
+beam1.save_particles_at_yhi = 1
+beam1.save_particles_at_zhi = 1
+
+beam2.save_particles_at_xlo = 1
+beam2.save_particles_at_ylo = 1
+beam2.save_particles_at_zlo = 1
+beam2.save_particles_at_xhi = 1
+beam2.save_particles_at_yhi = 1
+beam2.save_particles_at_zhi = 1
+
+electron2.save_particles_at_xlo = 1
+electron2.save_particles_at_ylo = 1
+electron2.save_particles_at_zlo = 1
+electron2.save_particles_at_xhi = 1
+electron2.save_particles_at_yhi = 1
+electron2.save_particles_at_zhi = 1
+
+positron2.save_particles_at_xlo = 1
+positron2.save_particles_at_ylo = 1
+positron2.save_particles_at_zlo = 1
+positron2.save_particles_at_xhi = 1
+positron2.save_particles_at_yhi = 1
+positron2.save_particles_at_zhi = 1
+
+
+# REDUCED
+warpx.reduced_diags_names = DiffLumi_beam1_beam2 Energy Momentum Number ColliderRelevant ParticleHistogram
+
+DiffLumi_beam1_beam2.type = DifferentialLuminosity
+Energy.type = ParticleEnergy
+Momentum.type = ParticleMomentum
+Number.type = ParticleNumber
+ParticleHistogram.type = ParticleHistogram
+ColliderRelevant.type = ColliderRelevant
+
+DiffLumi_beam1_beam2.bin_max = 2.1*beam_energy/q_e
+
+DiffLumi_beam1_beam2.bin_min = 0.
+
+DiffLumi_beam1_beam2.species = beam1 beam2
+
+ColliderRelevant.species = beam1 beam2
+ParticleHistogram.species = electron2 positron2
+
+ParticleHistogram.histogram_function(t,x,y,z,ux,uy,uz) = t
+ParticleHistogram.bin_min = 0
+ParticleHistogram.bin_max = T
+
+DiffLumi_beam1_beam2.bin_number = 256
+ParticleHistogram.bin_number = 256
+
+DiffLumi_beam1_beam2.intervals = nt
