@@ -44,7 +44,7 @@ namespace Algorithms{
         // (gamma - 1)*(gamma + 1)/(gamma + 1)
 
         const auto u2 = static_cast<T>(ux*ux + uy*uy + uz*uz);
-        const auto gamma = std::sqrt(one + u2*PhysConst::constant_templates::invc2<T>);
+        const auto gamma = std::sqrt(one + u2*PhysConst::invc2_v<T>);
         return one/(one + gamma)*static_cast<T>(mass)*u2;
     }
 
