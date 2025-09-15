@@ -348,13 +348,33 @@ void PetscPC<T,Ops>::Update (const T& a_U)
                 auto dof_lhs_arr = dofs_lhs_mfarrvec[lev][dir]->const_array(mfi);
 
 #if defined(WARPX_DIM_1D_Z)
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                amrex::ignore_unused(dof_arr);
+                amrex::ignore_unused(dxi);
+                WARPX_ABORT_WITH_MESSAGE("PetscPC<T,Ops>::Update() not yet implemented for WARPX_DIM_1D_Z");
+#elif defined(WARPX_DIM_RCYLINDER)
+                amrex::ignore_unused(dof_arr);
+                amrex::ignore_unused(dxi);
+                WARPX_ABORT_WITH_MESSAGE("PetscPC<T,Ops>::Update() not yet implemented for WARPX_DIM_RCYLINDER");
+#elif defined(WARPX_DIM_RSPHERE)
+                amrex::ignore_unused(dof_arr);
+                amrex::ignore_unused(dxi);
+                WARPX_ABORT_WITH_MESSAGE("PetscPC<T,Ops>::Update() not yet implemented for WARPX_DIM_RSPHERE");
+#elif defined(WARPX_DIM_RZ)
+                amrex::ignore_unused(dof_arr);
+                amrex::ignore_unused(dxi);
+                WARPX_ABORT_WITH_MESSAGE("PetscPC<T,Ops>::Update() not yet implemented for WARPX_DIM_RZ");
+#elif defined(WARPX_DIM_XZ)
                 int tdir = -1;
                 if  (dir == 0) { tdir = 2; }
                 else if (dir == 2) { tdir = 0; }
                 else { tdir = 1; }
                 auto dof_tdir_arr = dofs_mfarrvec[lev][tdir]->const_array(mfi);
+#elif defined(WARPX_DIM_3D)
+                amrex::ignore_unused(dof_arr);
+                amrex::ignore_unused(dxi);
+                WARPX_ABORT_WITH_MESSAGE("PetscPC<T,Ops>::Update() not yet implemented for WARPX_DIM_3D");
 #else
+                WARPX_ABORT_WITH_MESSAGE("PetscPC<T,Ops>::Update() - trying to compile with unsupported dimensionality");
 #endif
 
                 ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
@@ -378,7 +398,7 @@ void PetscPC<T,Ops>::Update (const T& a_U)
                     }
 
 #if defined(WARPX_DIM_1D_Z)
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+#elif defined(WARPX_DIM_XZ)
                     {
                         auto cidx_g_rhs = (int) dof_arr(i,j,k,1);
                         amrex::Real val = 0.0;
