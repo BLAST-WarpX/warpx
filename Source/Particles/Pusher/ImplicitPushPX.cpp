@@ -118,9 +118,9 @@ namespace {
 #endif
     )
     {
-        amrex::ParticleReal dxp_save;
-        amrex::ParticleReal dyp_save;
-        amrex::ParticleReal dzp_save;
+        amrex::ParticleReal dxp_save = 0_prt;
+        amrex::ParticleReal dyp_save = 0_prt;
+        amrex::ParticleReal dzp_save = 0_prt;
 
         auto idxg2 = static_cast<amrex::ParticleReal>(dinv.x*dinv.x);
         auto idyg2 = static_cast<amrex::ParticleReal>(dinv.y*dinv.y);
