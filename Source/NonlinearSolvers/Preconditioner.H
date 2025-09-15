@@ -9,6 +9,7 @@
 
 #include "Utils/TextMsg.H"
 #include <AMReX_Enum.H>
+#include <string>
 
 /**
  * \brief Types for preconditioners for field solvers
@@ -19,6 +20,8 @@ AMREX_ENUM(PreconditionerType,
     pc_petsc,
     none
 );
+
+// Can't wrap pc_petsc inside AMREX_USE_PETSC directives.
 
 /**
  * \brief Base class for preconditioners
@@ -95,6 +98,11 @@ class Preconditioner
          * \brief Check if the nonlinear solver has been defined.
          */
         [[nodiscard]] virtual bool IsDefined () const = 0;
+
+        /**
+         * \brief Set the name for screen output and parsing inputs.
+         */
+        virtual void setName (const std::string&) { }
 
         /**
          * \brief Print parameters

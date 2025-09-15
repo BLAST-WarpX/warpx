@@ -9,7 +9,7 @@
 
 #include "LinearFunction.H"
 #include "CurlCurlMLMGPC.H"
-#include "PetscPC.H"
+#include "MatrixPC.H"
 #include "JacobiPC.H"
 #include "Utils/TextMsg.H"
 #include <AMReX_Config.H>
@@ -166,17 +166,9 @@ void JacobianFunctionMF<T,Ops>::define ( const T& a_U,
             m_preCond = std::make_unique<CurlCurlMLMGPC<T,Ops>>();
         } else if (m_pc_type == PreconditionerType::pc_jacobi) {
             m_preCond = std::make_unique<JacobiPC<T,Ops>>();
-        } else if (m_pc_type == PreconditionerType::pc_petsc) {
-#ifdef AMREX_USE_PETSC
-            m_preCond = std::make_unique<PetscPC<T,Ops>>();
-#else
-            WARPX_ABORT_WITH_MESSAGE("JacobianFunctionMF::Define(): must compile with PETSc to use pc_petsc (AMREX_USE_PETSC must be defined)");
-#endif
         } else {
-            std::stringstream convergenceMsg;
-            convergenceMsg << "JacobianFunctionMF::define(): " << amrex::getEnumNameString(m_pc_type)
-                            << " is not a valid preconditioner type.";
-            WARPX_ABORT_WITH_MESSAGE(convergenceMsg.str());
+            m_preCond = std::make_unique<MatrixPC<T,Ops>>();
+            m_preCond->setName(amrex::getEnumNameString(m_pc_type));
         }
         m_preCond->Define(a_U, a_ops);
     }

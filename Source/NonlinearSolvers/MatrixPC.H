@@ -4,8 +4,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef PETSC_PC_H_
-#define PETSC_PC_H_
+#ifndef MATRIX_PC_H_
+#define MATRIX_PC_H_
 
 #include "Fields.H"
 #include "Utils/WarpXConst.H"
@@ -20,7 +20,7 @@
 #include <AMReX_Vector.H>
 #include <AMReX_MultiFab.H>
 
-namespace PetscPCUtils
+namespace MatrixPCUtils
 {
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void insertOrAdd( const int a_cidx, /*!< Column index (global) */
@@ -50,9 +50,12 @@ namespace PetscPCUtils
 }
 
 /**
- * \brief PETSc Preconditioner Wrapper
+ * \brief Matrix Preconditione
  *
- *  This class is templated on a solution-type class T and an operator class Ops.
+ *  This class is templated on a solution-type class T and an operator class Ops. It implements
+ *  a preconditioner based on constructing and solving the sparse matrix representation of the
+ *  Jacobian. Currently, it implements constructing/assembling the sparse matrix. An external
+ *  library with sparse matrix solvers (for example, PETSc) is needed to apply the preconditioner.
  *
  *  The Ops class must have the following function:
  *      + Return number of AMR levels
@@ -65,7 +68,7 @@ namespace PetscPCUtils
  */
 
 template <class T, class Ops>
-class PetscPC : public Preconditioner<T,Ops>
+class MatrixPC : public Preconditioner<T,Ops>
 {
     public:
 
@@ -74,18 +77,18 @@ class PetscPC : public Preconditioner<T,Ops>
         /**
          * \brief Default constructor
          */
-        PetscPC () = default;
+        MatrixPC () = default;
 
         /**
          * \brief Default destructor
          */
-        ~PetscPC () override = default;
+        ~MatrixPC () override = default;
 
         // Prohibit move and copy operations
-        PetscPC(const PetscPC&) = delete;
-        PetscPC& operator=(const PetscPC&) = delete;
-        PetscPC(PetscPC&&) noexcept = delete;
-        PetscPC& operator=(PetscPC&&) noexcept = delete;
+        MatrixPC(const MatrixPC&) = delete;
+        MatrixPC& operator=(const MatrixPC&) = delete;
+        MatrixPC(MatrixPC&&) noexcept = delete;
+        MatrixPC& operator=(MatrixPC&&) noexcept = delete;
 
         /**
          * \brief Define the preconditioner
@@ -152,6 +155,8 @@ class PetscPC : public Preconditioner<T,Ops>
          */
         [[nodiscard]] inline bool IsDefined () const override { return m_is_defined; }
 
+        inline void setName (const std::string& a_name) override { m_name = a_name; }
+
     protected:
 
         bool m_is_defined = false;
@@ -168,6 +173,8 @@ class PetscPC : public Preconditioner<T,Ops>
         int m_pc_mat_nnz = 0;
         int m_pc_mass_matrix_width = 0;
         bool m_pc_mass_matrix_include_ij = false;
+
+        std::string m_name = "noname";
 
         amrex::Gpu::DeviceVector<int> m_r_indices_g;
         amrex::Gpu::DeviceVector<int> m_num_nz;
@@ -189,20 +196,19 @@ class PetscPC : public Preconditioner<T,Ops>
 };
 
 template <class T, class Ops>
-void PetscPC<T,Ops>::printParameters() const
+void MatrixPC<T,Ops>::printParameters() const
 {
     using namespace amrex;
-    auto pc_name = getEnumNameString(PreconditionerType::pc_petsc);
-    Print() << pc_name << " verbose:                   " << (m_verbose?"true":"false") << "\n";
-    Print() << pc_name << " pc_diagonal_only:          " << (m_pc_diag_only?"true":"false") << "\n";
-    Print() << pc_name << " pc_mass_matrix_width:      " << m_pc_mass_matrix_width << "\n";
-    Print() << pc_name << " pc_mass_matrix_include_ij: " << (m_pc_mass_matrix_include_ij?"true":"false") << "\n";
+    Print() << m_name << " verbose:                   " << (m_verbose?"true":"false") << "\n";
+    Print() << m_name << " pc_diagonal_only:          " << (m_pc_diag_only?"true":"false") << "\n";
+    Print() << m_name << " pc_mass_matrix_width:      " << m_pc_mass_matrix_width << "\n";
+    Print() << m_name << " pc_mass_matrix_include_ij: " << (m_pc_mass_matrix_include_ij?"true":"false") << "\n";
 }
 
 template <class T, class Ops>
-void PetscPC<T,Ops>::readParameters()
+void MatrixPC<T,Ops>::readParameters()
 {
-    const amrex::ParmParse pp(amrex::getEnumNameString(PreconditionerType::pc_petsc));
+    const amrex::ParmParse pp(m_name);
     pp.query("verbose", m_verbose);
     pp.query("pc_diagonal_only", m_pc_diag_only);
     pp.query("pc_mass_matrix_width", m_pc_mass_matrix_width);
@@ -212,7 +218,7 @@ void PetscPC<T,Ops>::readParameters()
 }
 
 template <class T, class Ops>
-void PetscPC<T,Ops>::computePCMatrixNNZ()
+void MatrixPC<T,Ops>::computePCMatrixNNZ()
 {
     if (m_pc_diag_only) {
         m_pc_mat_nnz = 1;
@@ -225,7 +231,7 @@ void PetscPC<T,Ops>::computePCMatrixNNZ()
                                            * (1+2*m_pc_mass_matrix_width);
 #else
         static int nbands_J_mass_matrix = 0;
-        WARPX_ABORT_WITH_MESSAGE("PetscPC<T,Ops>::computePCMatrixNNZ() not implemented for this dimensionality");
+        WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::computePCMatrixNNZ() not implemented for this dimensionality");
 #endif
         // the following overallocates
         static int nbands_EMfields = 1 + 2*amrex::SpaceDim
@@ -235,21 +241,21 @@ void PetscPC<T,Ops>::computePCMatrixNNZ()
 }
 
 template <class T, class Ops>
-void PetscPC<T,Ops>::Define ( const T& a_U,
+void MatrixPC<T,Ops>::Define ( const T& a_U,
                               Ops* const a_ops )
 {
-    BL_PROFILE("PetscPC::Define()");
+    BL_PROFILE("MatrixPC::Define()");
     using namespace amrex;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !IsDefined(),
-        "PetscPC::Define() called on defined object" );
+        "MatrixPC::Define() called on defined object" );
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         (a_ops != nullptr),
-        "PetscPC::Define(): a_ops is nullptr" );
+        "MatrixPC::Define(): a_ops is nullptr" );
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         a_U.getArrayVecType()==warpx::fields::FieldType::Efield_fp,
-        "PetscPC::Define() must be called with Efield_fp type");
+        "MatrixPC::Define() must be called with Efield_fp type");
 
     m_ops = a_ops;
     // read preconditioner parameters
@@ -262,7 +268,7 @@ void PetscPC<T,Ops>::Define ( const T& a_U,
     // distribution mapping vectors.
     m_num_amr_levels = m_ops->numAMRLevels();
     if (m_num_amr_levels > 1) {
-        WARPX_ABORT_WITH_MESSAGE("PetscPC::Define(): m_num_amr_levels > 1");
+        WARPX_ABORT_WITH_MESSAGE("MatrixPC::Define(): m_num_amr_levels > 1");
     }
     m_geom.resize(m_num_amr_levels);
     for (int n = 0; n < m_num_amr_levels; n++) {
@@ -283,7 +289,7 @@ void PetscPC<T,Ops>::Define ( const T& a_U,
 }
 
 template <class T, class Ops>
-void PetscPC<T,Ops>::Update (const T& a_U)
+void MatrixPC<T,Ops>::Update (const T& a_U)
 {
     // Assemble the sparse matrix representation of the preconditioner
     //      A = curl (alpha * curl []) + M
@@ -298,18 +304,18 @@ void PetscPC<T,Ops>::Update (const T& a_U)
     // where n is the local number of rows, and ncmax is the maximum number of non-zero
     // elements per row.
 
-    BL_PROFILE("PetscPC::Update()");
+    BL_PROFILE("MatrixPC::Update()");
     using namespace amrex;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         IsDefined(),
-        "PetscPC::Update() called on undefined object" );
+        "MatrixPC::Update() called on undefined object" );
 
     // set the alpha coefficient for the curl-curl op
     const RT thetaDt = m_ops->GetThetaForPC()*this->m_dt;
     const RT alpha = (thetaDt*PhysConst::c) * (thetaDt*PhysConst::c);
     if (m_verbose) {
-        amrex::Print() << "Updating " << amrex::getEnumNameString(PreconditionerType::pc_petsc)
+        amrex::Print() << "Updating " << m_name
                        << ": theta*dt = " << thetaDt << ", "
                        << " coefficients: "
                        << "alpha = " << alpha << "\n";
@@ -350,19 +356,19 @@ void PetscPC<T,Ops>::Update (const T& a_U)
 #if defined(WARPX_DIM_1D_Z)
                 amrex::ignore_unused(dof_arr);
                 amrex::ignore_unused(dxi);
-                WARPX_ABORT_WITH_MESSAGE("PetscPC<T,Ops>::Update() not yet implemented for WARPX_DIM_1D_Z");
+                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Update() not yet implemented for WARPX_DIM_1D_Z");
 #elif defined(WARPX_DIM_RCYLINDER)
                 amrex::ignore_unused(dof_arr);
                 amrex::ignore_unused(dxi);
-                WARPX_ABORT_WITH_MESSAGE("PetscPC<T,Ops>::Update() not yet implemented for WARPX_DIM_RCYLINDER");
+                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Update() not yet implemented for WARPX_DIM_RCYLINDER");
 #elif defined(WARPX_DIM_RSPHERE)
                 amrex::ignore_unused(dof_arr);
                 amrex::ignore_unused(dxi);
-                WARPX_ABORT_WITH_MESSAGE("PetscPC<T,Ops>::Update() not yet implemented for WARPX_DIM_RSPHERE");
+                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Update() not yet implemented for WARPX_DIM_RSPHERE");
 #elif defined(WARPX_DIM_RZ)
                 amrex::ignore_unused(dof_arr);
                 amrex::ignore_unused(dxi);
-                WARPX_ABORT_WITH_MESSAGE("PetscPC<T,Ops>::Update() not yet implemented for WARPX_DIM_RZ");
+                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Update() not yet implemented for WARPX_DIM_RZ");
 #elif defined(WARPX_DIM_XZ)
                 int tdir = -1;
                 if  (dir == 0) { tdir = 2; }
@@ -372,9 +378,9 @@ void PetscPC<T,Ops>::Update (const T& a_U)
 #elif defined(WARPX_DIM_3D)
                 amrex::ignore_unused(dof_arr);
                 amrex::ignore_unused(dxi);
-                WARPX_ABORT_WITH_MESSAGE("PetscPC<T,Ops>::Update() not yet implemented for WARPX_DIM_3D");
+                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Update() not yet implemented for WARPX_DIM_3D");
 #else
-                WARPX_ABORT_WITH_MESSAGE("PetscPC<T,Ops>::Update() - trying to compile with unsupported dimensionality");
+                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Update() - trying to compile with unsupported dimensionality");
 #endif
 
                 ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
@@ -390,7 +396,7 @@ void PetscPC<T,Ops>::Update (const T& a_U)
                     {
                         auto cidx_g_lhs = dof_lhs_arr(i,j,k,1);;
                         amrex::Real val = 1.0;
-                        PetscPCUtils::insertOrAdd( cidx_g_lhs, val,
+                        MatrixPCUtils::insertOrAdd( cidx_g_lhs, val,
                                                    &c_indices_g_ptr[ridx_l*nnz_max],
                                                    &a_ij_ptr[ridx_l*nnz_max],
                                                    icol );
@@ -409,7 +415,7 @@ void PetscPC<T,Ops>::Update (const T& a_U)
                         } else {
                             val += 2*alpha *(dxi[0]*dxi[0] + dxi[1]*dxi[1]);
                         }
-                        PetscPCUtils::insertOrAdd( cidx_g_rhs, val,
+                        MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                    &c_indices_g_ptr[ridx_l*nnz_max],
                                                    &a_ij_ptr[ridx_l*nnz_max],
                                                    icol );
@@ -419,7 +425,7 @@ void PetscPC<T,Ops>::Update (const T& a_U)
                         {
                             auto cidx_g_rhs = (int) (dir == 0 ? dof_arr(i,j-1,k,1) : dof_arr(i-1,j,k,1));
                             amrex::Real val = -alpha * dxi[dir==0?1:0] * dxi[dir==0?1:0];
-                            PetscPCUtils::insertOrAdd( cidx_g_rhs, val,
+                            MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                        &c_indices_g_ptr[ridx_l*nnz_max],
                                                        &a_ij_ptr[ridx_l*nnz_max],
                                                        icol );
@@ -428,7 +434,7 @@ void PetscPC<T,Ops>::Update (const T& a_U)
                         {
                             auto cidx_g_rhs = (int) (dir == 0 ? dof_arr(i,j+1,k,1) : dof_arr(i+1,j,k,1));
                             amrex::Real val = -alpha * dxi[dir==0?1:0] * dxi[dir==0?1:0];
-                            PetscPCUtils::insertOrAdd( cidx_g_rhs, val,
+                            MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                        &c_indices_g_ptr[ridx_l*nnz_max],
                                                        &a_ij_ptr[ridx_l*nnz_max],
                                                        icol );
@@ -437,7 +443,7 @@ void PetscPC<T,Ops>::Update (const T& a_U)
                         {
                             auto cidx_g_rhs = (int) (dir == 0 ? dof_tdir_arr(i,j-1,k,1) : dof_tdir_arr(i-1,j,k,1));
                             amrex::Real val = alpha * dxi[dir==0?0:1] * dxi[dir==0?1:0];
-                            PetscPCUtils::insertOrAdd( cidx_g_rhs, val,
+                            MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                        &c_indices_g_ptr[ridx_l*nnz_max],
                                                        &a_ij_ptr[ridx_l*nnz_max],
                                                        icol );
@@ -446,7 +452,7 @@ void PetscPC<T,Ops>::Update (const T& a_U)
                         {
                             auto cidx_g_rhs = (int) dof_tdir_arr(i,j,k,1);
                             amrex::Real val = -alpha * dxi[dir==0?0:1] * dxi[dir==0?1:0];
-                            PetscPCUtils::insertOrAdd( cidx_g_rhs, val,
+                            MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                        &c_indices_g_ptr[ridx_l*nnz_max],
                                                        &a_ij_ptr[ridx_l*nnz_max],
                                                        icol );
@@ -455,7 +461,7 @@ void PetscPC<T,Ops>::Update (const T& a_U)
                         {
                             auto cidx_g_rhs = (int) (dir == 0 ? dof_tdir_arr(i+1,j-1,k,1) : dof_tdir_arr(i-1,j+1,k,1));
                             amrex::Real val = -alpha * dxi[dir==0?0:1] * dxi[dir==0?1:0];
-                            PetscPCUtils::insertOrAdd( cidx_g_rhs, val,
+                            MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                        &c_indices_g_ptr[ridx_l*nnz_max],
                                                        &a_ij_ptr[ridx_l*nnz_max],
                                                        icol );
@@ -464,7 +470,7 @@ void PetscPC<T,Ops>::Update (const T& a_U)
                         {
                             auto cidx_g_rhs = (int) (dir == 0 ? dof_tdir_arr(i+1,j,k,1) : dof_tdir_arr(i,j+1,k,1));
                             amrex::Real val = alpha * dxi[dir==0?0:1] * dxi[dir==0?1:0];
-                            PetscPCUtils::insertOrAdd( cidx_g_rhs, val,
+                            MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                        &c_indices_g_ptr[ridx_l*nnz_max],
                                                        &a_ij_ptr[ridx_l*nnz_max],
                                                        icol );
@@ -475,7 +481,7 @@ void PetscPC<T,Ops>::Update (const T& a_U)
                             {
                                 auto cidx_g_rhs = (int) (jdir == 0 ? dof_arr(i-1,j,k,1) : dof_arr(i,j-1,k,1));
                                 amrex::Real val = -alpha * dxi[jdir==0?0:1] * dxi[jdir==0?0:1];
-                                PetscPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                            &c_indices_g_ptr[ridx_l*nnz_max],
                                                            &a_ij_ptr[ridx_l*nnz_max],
                                                            icol );
@@ -484,7 +490,7 @@ void PetscPC<T,Ops>::Update (const T& a_U)
                             {
                                 auto cidx_g_rhs = (int) (jdir == 0 ? dof_arr(i+1,j,k,1) : dof_arr(i,j+1,k,1));
                                 amrex::Real val = -alpha * dxi[jdir==0?0:1] * dxi[jdir==0?0:1];
-                                PetscPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                            &c_indices_g_ptr[ridx_l*nnz_max],
                                                            &a_ij_ptr[ridx_l*nnz_max],
                                                            icol );
@@ -503,7 +509,7 @@ void PetscPC<T,Ops>::Update (const T& a_U)
 }
 
 template <class T, class Ops>
-void PetscPC<T,Ops>::Apply (T& a_x, const T& a_b)
+void MatrixPC<T,Ops>::Apply (T& a_x, const T& a_b)
 {
     //  Given a right-hand-side b, solve:
     //      A x = b
@@ -511,20 +517,20 @@ void PetscPC<T,Ops>::Apply (T& a_x, const T& a_b)
     //  operator:
     //      A x = curl (alpha * curl (x) ) + beta * x
 
-    BL_PROFILE("PetscPC::Apply()");
+    BL_PROFILE("MatrixPC::Apply()");
     using namespace amrex;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         IsDefined(),
-        "PetscPC::Apply() called on undefined object" );
+        "MatrixPC::Apply() called on undefined object" );
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         a_x.getArrayVecType()==warpx::fields::FieldType::Efield_fp,
-        "PetscPC::Apply() - a_x must be Efield_fp type");
+        "MatrixPC::Apply() - a_x must be Efield_fp type");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         a_b.getArrayVecType()==warpx::fields::FieldType::Efield_fp,
-        "PetscPC::Apply() - a_b must be Efield_fp type");
+        "MatrixPC::Apply() - a_b must be Efield_fp type");
 
-    WARPX_ABORT_WITH_MESSAGE("PetscPC<T,Ops>::Apply() function should not have been called. PETSc should be using it's own PC-apply function.");
+    WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Apply() - native matrix solvers not implemented. Use with external library, eg, PETSc.");
 
 }
 
