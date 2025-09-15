@@ -43,7 +43,7 @@ namespace ablastr::constant
      * available in parsing and evaluation of PICMI expressions, as well
      * as the corresponding Python definitions.
      *
-     * Note: _v suffix is used for variable templates (as in C++ 20's <numbers> library)
+     * Note: _v suffix is used for variable templates (as in C++ 20's numbers library)
      */
     namespace SI
     {
