@@ -205,7 +205,7 @@ protected:
      */
     void InitializeMassMatrices ();
 
-    void PrintMassMatricesParameters () const;
+    void PrintBaseImplicitSolverParameters () const;
 
     /**
      * \brief Perform operations needed before computing the Right Hand Side

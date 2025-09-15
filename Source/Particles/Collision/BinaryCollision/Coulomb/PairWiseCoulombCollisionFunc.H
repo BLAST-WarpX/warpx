@@ -108,6 +108,7 @@ public:
             index_type const /*cell_start_pair*/, index_type* /*p_mask*/,
             index_type* /*p_pair_indices_1*/, index_type* /*p_pair_indices_2*/,
             amrex::ParticleReal* /*p_pair_reaction_weight*/,
+            amrex::ParticleReal* /*p_product_data*/,
             amrex::RandomEngine const& engine) const
         {
             using namespace amrex::literals;
@@ -122,6 +123,7 @@ public:
         amrex::ParticleReal m_CoulombLog;
         bool m_computeSpeciesDensities = true;
         bool m_computeSpeciesTemperatures = false;
+        bool m_need_product_data = false;
         bool m_isSameSpecies;
     };
 

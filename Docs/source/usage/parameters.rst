@@ -2095,6 +2095,8 @@ Details about the collision models can be found in the :ref:`theory section <mul
     - ``background_stopping`` for slowing of ions due to collisions with electrons or ions.
       This implements the approximate formulae as derived in Introduction to Plasma Physics,
       from Goldston and Rutherford, section 14.2.
+    - ``bremsstrahlung`` for slowing of electrons due to Bremsstrahlung collisions with ions.
+      This uses the cross sections as given by `Seltzer and Berger <https://doi.org/10.1016/0092-640X(86)90014-8>`__.
     - ``linear_breit_wheeler`` for electron-positron pair creation from the annihilation of two photons, according to the linear Breit-Wheeler mechanism
       (see for example `Gould et al. (Phys. Rev. 155, 1404, 1967) <https://doi.org/10.1103/PhysRev.155.1404>`__).
       This implements the generation of electron-positron pairs based on the analytical cross-section, e.g.
@@ -2112,8 +2114,9 @@ Details about the collision models can be found in the :ref:`theory section <mul
       of a single electron in a strong electromagnetic field.
 
 * ``<collision_name>.species`` (`strings`)
-    If using ``dsmc``, ``pairwisecoulomb`` or ``nuclearfusion``, this should be the name(s) of the species,
+    If using ``dsmc``, ``pairwisecoulomb``, ``nuclearfusion``, or ``bremsstrahlung``, this should be the name(s) of the species,
     between which the collision will be considered. (Provide only one name for intra-species collisions.)
+    With ``bremsstrahlung``, the electron species must be given first, followed by the target species.
     If using ``background_mcc`` or ``background_stopping`` type this should be the name of the
     species for which collisions with a background will be included.
     In this case, only one species name should be given.
@@ -2122,11 +2125,12 @@ Details about the collision models can be found in the :ref:`theory section <mul
 
 
 * ``<collision_name>.product_species`` (`strings`)
-    Only for ``dsmc``, ``linear_breit_wheeler``, and ``nuclearfusion``. The name(s) of the species in which to add
-    the new macroparticles created by the reaction.
+    Only for ``dsmc``, ``linear_breit_wheeler``, ``nuclearfusion``, and ``bremsstrahlung``.
+    The name(s) of the species in which to add the new macroparticles created by the reaction.
     If using ``dsmc`` with ionization reactions, the first species in this list must be an electron.
     If using ``dsmc`` with charge exchange, the order of the ``product_species`` should match the order of the species in ``<collision_name>.species``.
     If using ``linear_breit_wheeler`` these should be two species: one of electrons and one of positrons.
+    If using ``bremsstrahlung``, the product species must be of type photon.
     If using ``linear_compton``, these should be two species: first, a photon species, and second, a lepton species, in this exact order.
 
 * ``<collision_name>.ndt`` (`int`) optional
@@ -2259,6 +2263,22 @@ Details about the collision models can be found in the :ref:`theory section <mul
 * ``<collision_name>.ionization_target_species`` (`string`)
     Only for ``dsmc`` with impact ionization. This specifies which one of the
     colliding particles is ionized.
+
+* ``<collision_name>.Z`` (`integer`)
+    Only for ``bremsstrahlung``. The atomic number of the target ion species.
+    Currently, only the values 1, 2, 5, 6 are supported.
+
+* ``<collision_name>.multiplier`` (`float`)
+    Only for ``bremsstrahlung``. Multiplier for the collision probability.
+    Any resulting photons will have the electron weight divided the multiplier.
+    The default is 1. This must be greater than or equal to 1.
+
+* ``<collision_name>.create_photons`` (`integer`)
+    Only for ``bremsstrahlung``. Whether photons will be created, defaults to 1 (true).
+
+* ``<collision_name>.koT1_cut`` (`float`)
+    Only for ``bremsstrahlung``. Minimum energy of the photons created.
+    This is relative to the electron energy, defaulting to 1.e-4.
 
 * ``collisions.correct_energy_momentum`` (`bool`) optional (default 0)
     For pairwisecoulomb collisions, whether to correct the energy and momentum after the collisions so that they are conserved.
