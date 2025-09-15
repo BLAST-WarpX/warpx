@@ -268,12 +268,12 @@ WarpX::InitFromCheckpoint ()
                         diag.set_snapshot_full(i_buffer, snapshot_full_flag);
 
                     }
-                    diag.InitDataAfterRestart();
+                    diag.InitDataAfterRestart(*mypc);
                 } else {
-                    diag.InitData();
+                    diag.InitData(*mypc);
                 }
             } else {
-                multi_diags->GetDiag(idiag).InitData();
+                multi_diags->GetDiag(idiag).InitData(*mypc);
             }
         }
     }
@@ -410,8 +410,6 @@ WarpX::InitFromCheckpoint ()
     if (m_implicit_solver) {
 
         m_implicit_solver->Define(this);
-        m_implicit_solver->GetParticleSolverParams( max_particle_its_in_implicit_scheme,
-                                                    particle_tol_in_implicit_scheme );
         m_implicit_solver->CreateParticleAttributes();
     }
 

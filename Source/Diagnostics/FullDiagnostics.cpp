@@ -81,14 +81,12 @@ FullDiagnostics::DerivedInitData() {
 }
 
 void
-FullDiagnostics::InitializeParticleBuffer ()
+FullDiagnostics::InitializeParticleBuffer (const MultiParticleContainer& mpc)
 {
     // When particle buffers are included, the vector of particle containers
     // must be allocated in this function.
     // Initialize data in the base class Diagnostics
-    auto & warpx = WarpX::GetInstance();
 
-    const MultiParticleContainer& mpc = warpx.GetPartContainer();
     // If not specified, dump all species
     if (m_output_species_names.empty()) {
         if (m_format == "checkpoint") {
@@ -527,7 +525,8 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
         } else if ( m_varnames_fields[comp] == "eb_covered" ){
             m_all_field_functors[lev][comp] = std::make_unique<EBCoveredFunctor>(lev, m_crse_ratio);
             if (update_varnames) {
-                m_varnames.push_back(std::string("eb_covered"));
+                // Use 1 instead of ncomp here because eb_covered is only computed/stored for mode m=0
+                AddRZModesToOutputNames(std::string("eb_covered"), 1);
             }
         }
         else {

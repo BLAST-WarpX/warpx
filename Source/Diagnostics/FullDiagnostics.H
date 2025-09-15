@@ -90,7 +90,9 @@ private:
       * \param[in] lev level on which the vector of unique_ptrs to field functors is initialized.
       */
     void InitializeFieldFunctors (int lev) override;
-    void InitializeParticleBuffer () override;
+
+    void InitializeParticleBuffer (const MultiParticleContainer& mpc) override;
+
     /** Prepare field data to be used for diagnostics */
     void PrepareFieldDataForOutput () override;
     /** Prepare particle data to be used for diagnostics. */

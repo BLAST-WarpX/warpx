@@ -1,7 +1,6 @@
 #include "ImplicitSolver.H"
 #include "Fields.H"
 #include "WarpX.H"
-#include "Evolve/WarpXPushType.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 
@@ -28,6 +27,10 @@ void ImplicitSolver::CreateParticleAttributes () const
         pc->AddRealComp("ux_n", comm);
         pc->AddRealComp("uy_n", comm);
         pc->AddRealComp("uz_n", comm);
+
+        if (m_particle_suborbits) {
+            pc->AddIntComp("nsuborbits", comm);
+        }
     }
 }
 
@@ -431,6 +434,8 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
         m_nlsolver = std::make_unique<NewtonSolver<WarpXSolverVec,ImplicitSolver>>();
         pp.query("max_particle_iterations", m_max_particle_iterations);
         pp.query("particle_tolerance", m_particle_tolerance);
+        pp.query("particle_suborbits", m_particle_suborbits);
+        pp.query("print_unconverged_particle_details", m_print_unconverged_particle_details);
         pp.query("use_mass_matrices_jacobian", m_use_mass_matrices_jacobian);
         pp.query("use_mass_matrices_pc", m_use_mass_matrices_pc);
         if (m_use_mass_matrices_jacobian || m_use_mass_matrices_pc) {
@@ -684,8 +689,9 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
                                 const int          a_nl_iter,
                                 const bool         a_from_jacobian )
 {
+    BL_PROFILE("ImplicitSolver::PreRHSOp()");
+
     using warpx::fields::FieldType;
-    amrex::ignore_unused( a_nl_iter );
 
     if (m_WarpX->use_filter) {
         int finest_level = 0;
@@ -696,12 +702,18 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     // particle velocities by dt, then take average of old and new v,
     // deposit currents, giving J at n+1/2
     // This uses Efield_fp and Bfield_fp, the field at n+1/2 from the previous iteration.
-    const PushType push_type = PushType::Implicit;
     const bool skip_current = false;
 
+    // Set the implict solver options for particles and setting the current density
+    ImplicitOptions options;
+    options.nonlinear_iteration = a_nl_iter;
+    options.max_particle_iterations = m_max_particle_iterations;
+    options.particle_tolerance = m_particle_tolerance;
+    options.linear_stage_of_jfnk = a_from_jacobian;
+
     if (m_use_mass_matrices && !a_from_jacobian) { // Called from non-linear stage of JFNK and using mass matrices
-        bool deposit_mass_matrices = true;
-        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, deposit_mass_matrices, push_type);
+        options.deposit_mass_matrices = true;
+        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, &options);
         if (m_use_mass_matrices_jacobian) { SaveEandJ(); }
         if (m_use_mass_matrices_pc) {
            SyncMassMatricesPCAndApplyBCs();
@@ -713,8 +725,8 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         ComputeJfromMassMatrices();
     }
     else {  // Conventional particle-suppressed JFNK
-        bool deposit_mass_matrices = false;
-        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, deposit_mass_matrices, push_type);
+        options.deposit_mass_matrices = false;
+        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, &options);
     }
 
     // Apply BCs to J and communicate
@@ -776,18 +788,27 @@ void ImplicitSolver::SetMassMatricesForPC ( const amrex::Real a_theta_dt )
 
 }
 
-void ImplicitSolver::PrintMassMatricesParameters () const
+void ImplicitSolver::PrintBaseImplicitSolverParameters () const
 {
-    if (!m_use_mass_matrices) { return; }
-    amrex::Print() << "    for jacobian calc:  " << (m_use_mass_matrices_jacobian ? "true":"false") << "\n";
-    amrex::Print() << "    for preconditioner: " << (m_use_mass_matrices_pc ? "true":"false") << "\n";
-    amrex::Print() << "    ncomp_xx:  " << m_ncomp_xx << "\n";
-    amrex::Print() << "    ncomp_xy:  " << m_ncomp_xy << "\n";
-    amrex::Print() << "    ncomp_xz:  " << m_ncomp_xz << "\n";
-    amrex::Print() << "    ncomp_yx:  " << m_ncomp_yx << "\n";
-    amrex::Print() << "    ncomp_yy:  " << m_ncomp_yy << "\n";
-    amrex::Print() << "    ncomp_yz:  " << m_ncomp_yz << "\n";
-    amrex::Print() << "    ncomp_zx:  " << m_ncomp_zx << "\n";
-    amrex::Print() << "    ncomp_zy:  " << m_ncomp_zy << "\n";
-    amrex::Print() << "    ncomp_zz:  " << m_ncomp_zz << "\n";
+    amrex::Print() << "max particle iterations:             " << m_max_particle_iterations << "\n";
+    amrex::Print() << "particle relative tolerance:         " << m_particle_tolerance << "\n";
+    amrex::Print() << "use particle suborbits:              " << (m_particle_suborbits ? "true":"false") << "\n";
+    amrex::Print() << "print unconverged particle details:  " << (m_print_unconverged_particle_details ? "true":"false") << "\n";
+    amrex::Print() << "Nonlinear solver type:               " << amrex::getEnumNameString(m_nlsolver_type) << "\n";
+    if (m_nlsolver_type==NonlinearSolverType::Newton) {
+        amrex::Print() << "use mass matrices:                   " << (m_use_mass_matrices ? "true":"false") << "\n";
+        if (m_use_mass_matrices) {
+            amrex::Print() << "    for jacobian calc:   " << (m_use_mass_matrices_jacobian ? "true":"false") << "\n";
+            amrex::Print() << "    for preconditioner:  " << (m_use_mass_matrices_pc ? "true":"false") << "\n";
+            amrex::Print() << "    ncomp_xx:  " << m_ncomp_xx << "\n";
+            amrex::Print() << "    ncomp_xy:  " << m_ncomp_xy << "\n";
+            amrex::Print() << "    ncomp_xz:  " << m_ncomp_xz << "\n";
+            amrex::Print() << "    ncomp_yx:  " << m_ncomp_yx << "\n";
+            amrex::Print() << "    ncomp_yy:  " << m_ncomp_yy << "\n";
+            amrex::Print() << "    ncomp_yz:  " << m_ncomp_yz << "\n";
+            amrex::Print() << "    ncomp_zx:  " << m_ncomp_zx << "\n";
+            amrex::Print() << "    ncomp_zy:  " << m_ncomp_zy << "\n";
+            amrex::Print() << "    ncomp_zz:  " << m_ncomp_zz << "\n";
+        }
+    }
 }

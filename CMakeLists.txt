@@ -293,6 +293,21 @@ foreach(D IN LISTS WarpX_DIMS)
     list(APPEND _ALL_TARGETS ablastr_${SD})
     add_library(WarpX::ablastr_${SD} ALIAS ablastr_${SD})
 
+    # Fast-Math
+    if(ABLASTR_FASTMATH)
+        target_link_libraries(ablastr_${SD} PUBLIC AMReX::Flags_FASTMATH)
+    endif()
+
+    # GCC < 9 need to manually link std::filesystem
+    if(NOT CXX_HAS_STD_FS)
+        if(CXX_HAS_STD_FS_WITH_LINK)
+            target_link_libraries(ablastr_${SD} PUBLIC stdc++fs)
+        else()
+            message(FATAL_ERROR "Your compiler does not support C++17 "
+                    "<filesystem> Please use a newer C++ compiler.")
+        endif()
+    endif()
+
     # link into a library (default: static)
     if(WarpX_LIB)
         add_library(lib_${SD})
@@ -317,14 +332,9 @@ foreach(D IN LISTS WarpX_DIMS)
             )
         endif()
 
-        # GCC < 9 need to manually link std::filesystem
-        if(NOT CXX_HAS_STD_FS)
-            if(CXX_HAS_STD_FS_WITH_LINK)
-                target_link_libraries(ablastr_${SD} PUBLIC stdc++fs)
-            else()
-                message(FATAL_ERROR "Your compiler does not support C++17 "
-                        "<filesystem> Please use a newer C++ compiler.")
-            endif()
+        # Fast-Math
+        if(WarpX_FASTMATH)
+            target_link_libraries(lib_${SD} PUBLIC AMReX::Flags_FASTMATH)
         endif()
     endif()
 
@@ -574,7 +584,13 @@ if(WarpX_COMPUTE STREQUAL CUDA)
     )
 else()
     foreach(warpx_tgt IN LISTS _ALL_TARGETS)
-        target_compile_features(${warpx_tgt} PUBLIC cxx_std_17)
+        if(WarpX_SIMD)
+            # vir::cvt
+            # https://github.com/mattkretz/vir-simd/issues/45
+            target_compile_features(${warpx_tgt} PUBLIC cxx_std_20)
+        else()
+            target_compile_features(${warpx_tgt} PUBLIC cxx_std_17)
+        endif()
     endforeach()
     set_target_properties(${_ALL_TARGETS} PROPERTIES
         CXX_EXTENSIONS OFF
