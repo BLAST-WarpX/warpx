@@ -1,7 +1,6 @@
 #include "ImplicitSolver.H"
 #include "Fields.H"
 #include "WarpX.H"
-#include "Evolve/WarpXPushType.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 
@@ -28,6 +27,10 @@ void ImplicitSolver::CreateParticleAttributes () const
         pc->AddRealComp("ux_n", comm);
         pc->AddRealComp("uy_n", comm);
         pc->AddRealComp("uz_n", comm);
+
+        if (m_particle_suborbits) {
+            pc->AddIntComp("nsuborbits", comm);
+        }
     }
 }
 
@@ -196,20 +199,18 @@ void ImplicitSolver::ComputeJfromMassMatrices ()
             amrex::Array4<const amrex::Real> const& Szy = SZ[1]->array(mfi);
             amrex::Array4<const amrex::Real> const& Szz = SZ[2]->array(mfi);
 
-            // Use grown boxes here with all guard cells
-            amrex::Box Jbx = amrex::convert(mfi.validbox(),J[0]->ixType().toIntVect());
-            amrex::Box Jby = amrex::convert(mfi.validbox(),J[1]->ixType().toIntVect());
-            amrex::Box Jbz = amrex::convert(mfi.validbox(),J[2]->ixType().toIntVect());
-            amrex::Box Ebx = amrex::convert(mfi.validbox(),E[0]->ixType().toIntVect());
-            amrex::Box Eby = amrex::convert(mfi.validbox(),E[1]->ixType().toIntVect());
-            amrex::Box Ebz = amrex::convert(mfi.validbox(),E[2]->ixType().toIntVect());
-
+            // Use grown boxes here with all J guard cells
+            amrex::Box Jbx = amrex::convert(mfi.validbox(),J[0]->ixType());
+            amrex::Box Jby = amrex::convert(mfi.validbox(),J[1]->ixType());
+            amrex::Box Jbz = amrex::convert(mfi.validbox(),J[2]->ixType());
             Jbx.grow(J[0]->nGrowVect());
             Jby.grow(J[1]->nGrowVect());
             Jbz.grow(J[2]->nGrowVect());
-            Ebx.grow(E[0]->nGrowVect());
-            Eby.grow(E[1]->nGrowVect());
-            Ebz.grow(E[2]->nGrowVect());
+
+            // Use same box for E as for J (requires ngE >= ngJ)
+            amrex::Box Ebx = Jbx;
+            amrex::Box Eby = Jby;
+            amrex::Box Ebz = Jbz;
 
             const amrex::IntVect ncomp_xx = m_ncomp_xx;
             const amrex::IntVect ncomp_xy = m_ncomp_xy;
@@ -415,13 +416,74 @@ void ImplicitSolver::ComputeJfromMassMatrices ()
     }
 }
 
+
+void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
+{
+
+    std::string nlsolver_type_str;
+    pp.get("nonlinear_solver", nlsolver_type_str);
+
+    if (nlsolver_type_str=="picard") {
+        m_nlsolver_type = NonlinearSolverType::Picard;
+        m_nlsolver = std::make_unique<PicardSolver<WarpXSolverVec,ImplicitSolver>>();
+        m_max_particle_iterations = 1;
+        m_particle_tolerance = 0.0;
+    }
+    else if (nlsolver_type_str=="newton") {
+        m_nlsolver_type = NonlinearSolverType::Newton;
+        m_nlsolver = std::make_unique<NewtonSolver<WarpXSolverVec,ImplicitSolver>>();
+        pp.query("max_particle_iterations", m_max_particle_iterations);
+        pp.query("particle_tolerance", m_particle_tolerance);
+        pp.query("particle_suborbits", m_particle_suborbits);
+        pp.query("print_unconverged_particle_details", m_print_unconverged_particle_details);
+        pp.query("use_mass_matrices_jacobian", m_use_mass_matrices_jacobian);
+        pp.query("use_mass_matrices_pc", m_use_mass_matrices_pc);
+        if (m_use_mass_matrices_jacobian || m_use_mass_matrices_pc) {
+            m_use_mass_matrices = true;
+        }
+#if defined(WARPX_DIM_RCYLINDER)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !m_use_mass_matrices,
+            "Using mass matrices is not setup for DIM = RCYLINDER!");
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !m_use_mass_matrices,
+            "Using mass matrices is not setup for DIM = RSHERE!");
+#endif
+#if defined(WARPX_DIM_RZ)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !m_use_mass_matrices,
+            "Using mass matrices is not setup for DIM = RZ");
+#endif
+#if defined(WARPX_DIM_3D)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !m_use_mass_matrices_jacobian,
+            "Using mass matrices for jacobian can not be used for DIM = 3");
+#endif
+        if ( (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Villasenor ||
+              m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Esirkepov) &&
+             (m_WarpX->nox < 2) ) {
+            std::stringstream warningMsg;
+            warningMsg << "Particle-suppressed JFNK (e.g., theta-implicit evolve with newton nonlinear solver) ";
+            warningMsg << "is being used with a charge-conserving deposition (esirkepov or villasenor) and particle_shape = 1.\n";
+            warningMsg << "Some particle orbits may not converge!!!\n";
+            warningMsg << "Consider using particle_shape > 1.\n";
+            ablastr::warn_manager::WMRecordWarning("ImplicitSolver", warningMsg.str());
+        }
+    }
+    else {
+        WARPX_ABORT_WITH_MESSAGE(
+            "invalid nonlinear_solver specified. Valid options are picard and newton.");
+    }
+
+}
+
 void ImplicitSolver::InitializeMassMatrices ()
 {
 
     // Initializes the MassMatrices and MassMatrices_PC containers
     // The latter has a reduced number of elements that is used for the preconditioner.
-    // They are the same for now as we only include the diagonal elements of the diagonal matrices.
-    // Off-diagonal matrices (e.g. MassMatrices_xy) are not yet included.
     //
     // dJx = MassMatrices_xx*dEx + MassMatrices_xy*dEy + MassMatrices_xz*dEz
     // dJy = MassMatrices_yx*dEx + MassMatrices_yy*dEy + MassMatrices_yz*dEz
@@ -452,11 +514,16 @@ void ImplicitSolver::InitializeMassMatrices ()
     int Nc_tot_xx = 1, Nc_tot_xy = 1, Nc_tot_xz = 1;
     int Nc_tot_yx = 1, Nc_tot_yy = 1, Nc_tot_yz = 1;
     int Nc_tot_zx = 1, Nc_tot_zy = 1, Nc_tot_zz = 1;
-    if (m_use_mass_matrices_jacobian) { // else only for PC
+    if (m_use_mass_matrices_jacobian) {
+
+        for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( ngE[dir]>=ngJ[dir],
+                "Mass Matrices for Jacobian requires guard cells for E "
+                "to be at least as many as those for J.");
+        }
+
         if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Direct) {
             for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
-                AMREX_ASSERT(ngJ[dir]>=shape);
-                AMREX_ASSERT(ngE[dir]>=shape);
                 m_ncomp_xx[dir] = 1 + 2*shape;
                 m_ncomp_xy[dir] = 1 + 2*shape + ( (Jx_nodal[dir] + Jy_nodal[dir]) % 2 );
                 m_ncomp_xz[dir] = 1 + 2*shape + ( (Jx_nodal[dir] + Jz_nodal[dir]) % 2 );
@@ -478,8 +545,77 @@ void ImplicitSolver::InitializeMassMatrices ()
                 Nc_tot_zz *= m_ncomp_zz[dir];
             }
         }
+        else if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
+#ifndef WARPX_DIM_3D
+            int max_crossings = ngJ[0] - shape + 1;
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( max_crossings>0,
+                "Mass Matrices for Jacobian with Villasenor deposition requires particles.max_grid_crossings > 0.");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( max_crossings==m_WarpX->particle_max_grid_crossings,
+                "Guard cells for J are not consistent with particle_max_grid_crossings.");
+#endif
+            // Comment on direction-dependent number of mass matrices components
+            // set below for charge-conserving Villasenor deposition:
+            // 1 + 2*(shape - 1) (both comps centered)
+            // 0 + 2*shape       (mixed nodal/centered comps)
+            // 1 + 2*shape       (both comps nodal)
+#if defined(WARPX_DIM_1D_Z)
+            // x and y are nodal, z is centered
+            m_ncomp_xx[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_xy[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_xz[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_yx[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_yy[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_yz[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_zx[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_zy[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_zz[0] = 1 + 2*(shape-1) + 2*max_crossings;
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            // x is centered, y and z are nodal
+            m_ncomp_xx[0] = 1 + 2*(shape-1) + 2*max_crossings;
+            m_ncomp_xy[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_xz[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_yx[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_yy[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_yz[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_zx[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_zy[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_zz[0] = 1 + 2*shape + 2*max_crossings;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+            // dir = 0: x is centered, y and z are nodal
+            m_ncomp_xx[0] = 1 + 2*(shape-1) + 2*max_crossings;
+            m_ncomp_xy[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_xz[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_yx[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_yy[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_yz[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_zx[0] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_zy[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_zz[0] = 1 + 2*shape + 2*max_crossings;
+            // dir = 1: x and y are nodal, z is centered
+            m_ncomp_xx[1] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_xy[1] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_xz[1] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_yx[1] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_yy[1] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_yz[1] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_zx[1] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_zy[1] = 0 + 2*shape + 2*max_crossings;
+            m_ncomp_zz[1] = 1 + 2*(shape-1) + 2*max_crossings;
+#endif
+            for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
+                Nc_tot_xx *= m_ncomp_xx[dir];
+                Nc_tot_xy *= m_ncomp_xy[dir];
+                Nc_tot_xz *= m_ncomp_xz[dir];
+                Nc_tot_yx *= m_ncomp_yx[dir];
+                Nc_tot_yy *= m_ncomp_yy[dir];
+                Nc_tot_yz *= m_ncomp_yz[dir];
+                Nc_tot_zx *= m_ncomp_zx[dir];
+                Nc_tot_zy *= m_ncomp_zy[dir];
+                Nc_tot_zz *= m_ncomp_zz[dir];
+            }
+        }
         else {
-            WARPX_ABORT_WITH_MESSAGE("Mass matrices can only be used with Direct deposition (for now).");
+            WARPX_ABORT_WITH_MESSAGE("Mass matrices can only be used with Direct and Villasenor depositions.");
         }
     }
     else { // Mass matrices used for PC only
@@ -553,8 +689,9 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
                                 const int          a_nl_iter,
                                 const bool         a_from_jacobian )
 {
+    BL_PROFILE("ImplicitSolver::PreRHSOp()");
+
     using warpx::fields::FieldType;
-    amrex::ignore_unused( a_nl_iter );
 
     if (m_WarpX->use_filter) {
         int finest_level = 0;
@@ -565,12 +702,18 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     // particle velocities by dt, then take average of old and new v,
     // deposit currents, giving J at n+1/2
     // This uses Efield_fp and Bfield_fp, the field at n+1/2 from the previous iteration.
-    const PushType push_type = PushType::Implicit;
     const bool skip_current = false;
 
+    // Set the implict solver options for particles and setting the current density
+    ImplicitOptions options;
+    options.nonlinear_iteration = a_nl_iter;
+    options.max_particle_iterations = m_max_particle_iterations;
+    options.particle_tolerance = m_particle_tolerance;
+    options.linear_stage_of_jfnk = a_from_jacobian;
+
     if (m_use_mass_matrices && !a_from_jacobian) { // Called from non-linear stage of JFNK and using mass matrices
-        bool deposit_mass_matrices = true;
-        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, deposit_mass_matrices, push_type);
+        options.deposit_mass_matrices = true;
+        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, &options);
         if (m_use_mass_matrices_jacobian) { SaveEandJ(); }
         if (m_use_mass_matrices_pc) {
            SyncMassMatricesPCAndApplyBCs();
@@ -582,8 +725,8 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         ComputeJfromMassMatrices();
     }
     else {  // Conventional particle-suppressed JFNK
-        bool deposit_mass_matrices = false;
-        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, deposit_mass_matrices, push_type);
+        options.deposit_mass_matrices = false;
+        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, &options);
     }
 
     // Apply BCs to J and communicate
@@ -645,18 +788,27 @@ void ImplicitSolver::SetMassMatricesForPC ( const amrex::Real a_theta_dt )
 
 }
 
-void ImplicitSolver::PrintMassMatricesParameters () const
+void ImplicitSolver::PrintBaseImplicitSolverParameters () const
 {
-    if (!m_use_mass_matrices) { return; }
-    amrex::Print() << "    for jacobian calc:  " << (m_use_mass_matrices_jacobian ? "true":"false") << "\n";
-    amrex::Print() << "    for preconditioner: " << (m_use_mass_matrices_pc ? "true":"false") << "\n";
-    amrex::Print() << "    ncomp_xx:  " << m_ncomp_xx << "\n";
-    amrex::Print() << "    ncomp_xy:  " << m_ncomp_xy << "\n";
-    amrex::Print() << "    ncomp_xz:  " << m_ncomp_xz << "\n";
-    amrex::Print() << "    ncomp_yx:  " << m_ncomp_yx << "\n";
-    amrex::Print() << "    ncomp_yy:  " << m_ncomp_yy << "\n";
-    amrex::Print() << "    ncomp_yz:  " << m_ncomp_yz << "\n";
-    amrex::Print() << "    ncomp_zx:  " << m_ncomp_zx << "\n";
-    amrex::Print() << "    ncomp_zy:  " << m_ncomp_zy << "\n";
-    amrex::Print() << "    ncomp_zz:  " << m_ncomp_zz << "\n";
+    amrex::Print() << "max particle iterations:             " << m_max_particle_iterations << "\n";
+    amrex::Print() << "particle relative tolerance:         " << m_particle_tolerance << "\n";
+    amrex::Print() << "use particle suborbits:              " << (m_particle_suborbits ? "true":"false") << "\n";
+    amrex::Print() << "print unconverged particle details:  " << (m_print_unconverged_particle_details ? "true":"false") << "\n";
+    amrex::Print() << "Nonlinear solver type:               " << amrex::getEnumNameString(m_nlsolver_type) << "\n";
+    if (m_nlsolver_type==NonlinearSolverType::Newton) {
+        amrex::Print() << "use mass matrices:                   " << (m_use_mass_matrices ? "true":"false") << "\n";
+        if (m_use_mass_matrices) {
+            amrex::Print() << "    for jacobian calc:   " << (m_use_mass_matrices_jacobian ? "true":"false") << "\n";
+            amrex::Print() << "    for preconditioner:  " << (m_use_mass_matrices_pc ? "true":"false") << "\n";
+            amrex::Print() << "    ncomp_xx:  " << m_ncomp_xx << "\n";
+            amrex::Print() << "    ncomp_xy:  " << m_ncomp_xy << "\n";
+            amrex::Print() << "    ncomp_xz:  " << m_ncomp_xz << "\n";
+            amrex::Print() << "    ncomp_yx:  " << m_ncomp_yx << "\n";
+            amrex::Print() << "    ncomp_yy:  " << m_ncomp_yy << "\n";
+            amrex::Print() << "    ncomp_yz:  " << m_ncomp_yz << "\n";
+            amrex::Print() << "    ncomp_zx:  " << m_ncomp_zx << "\n";
+            amrex::Print() << "    ncomp_zy:  " << m_ncomp_zy << "\n";
+            amrex::Print() << "    ncomp_zz:  " << m_ncomp_zz << "\n";
+        }
+    }
 }

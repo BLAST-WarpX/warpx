@@ -13,6 +13,7 @@
 #include "Particles/Collision/BinaryCollision/NuclearFusion/TwoProductFusionInitializeMomentum.H"
 #include "Particles/Collision/BinaryCollision/NuclearFusion/ProtonBoronFusionInitializeMomentum.H"
 #include "Particles/Collision/BinaryCollision/LinearBreitWheeler/TwoProductInitializeMomentum.H"
+#include "Particles/Collision/BinaryCollision/LinearCompton/LinearComptonInitializeMomentum.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
@@ -233,7 +234,14 @@ public:
                         products_np_data[1] + 2*p_offsets[i]*p_num_products_device[1],
                         engine);
                 }
-
+                else if(t_collision_type == CollisionType::LinearCompton){
+                    LinearComptonInitializeMomentum(soa_1, soa_2,
+                        soa_products_data[0], soa_products_data[1],
+                        p_pair_indices_1[i], p_pair_indices_2[i],
+                        products_np_data[0] + 2*p_offsets[i]*p_num_products_device[0],
+                        products_np_data[1] + 2*p_offsets[i]*p_num_products_device[1],
+                        engine);
+                }
             }
         });
 
