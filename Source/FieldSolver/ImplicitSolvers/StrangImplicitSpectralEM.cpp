@@ -47,13 +47,7 @@ void StrangImplicitSpectralEM::PrintParameters () const
     amrex::Print() << "------------------------------------------------------------------------" << "\n";
     amrex::Print() << "----------- STRANG SPLIT IMPLICIT SPECTRAL EM SOLVER PARAMETERS --------" << "\n";
     amrex::Print() << "------------------------------------------------------------------------" << "\n";
-    amrex::Print() << "max particle iterations:    " << m_max_particle_iterations << "\n";
-    amrex::Print() << "particle tolerance:         " << m_particle_tolerance << "\n";
-    amrex::Print() << "Nonlinear solver type:      " << amrex::getEnumNameString(m_nlsolver_type) << "\n";
-    if ((m_nlsolver_type == NonlinearSolverType::newton) || (m_nlsolver_type == NonlinearSolverType::petsc_snes)) {
-        amrex::Print() << "use mass matrices:          " << (m_use_mass_matrices ? "true":"false") << "\n";
-        PrintMassMatricesParameters();
-    }
+    PrintBaseImplicitSolverParameters();
     m_nlsolver->PrintParams();
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }

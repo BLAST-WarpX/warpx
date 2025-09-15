@@ -7,10 +7,12 @@
 
 #include <AMReX_Enum.H>
 
+#include <AMReX_Enum.H>
+
 /**
   * \brief struct to select the nonlinear solver for implicit schemes
   */
-AMREX_ENUM(NonlinearSolverType,
+AMREX_ENUM (NonlinearSolverType,
     picard,
     newton,
     petsc_snes
