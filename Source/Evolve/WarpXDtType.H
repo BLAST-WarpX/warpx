@@ -7,7 +7,7 @@
 #ifndef WARPX_DTTYPE_H_
 #define WARPX_DTTYPE_H_
 
-enum struct DtType : int
+enum struct SubcyclingStage : int
 {
     Full = 0,
     FirstHalf,

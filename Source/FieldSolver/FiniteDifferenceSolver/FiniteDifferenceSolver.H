@@ -16,7 +16,6 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 
 #include "BoundaryConditions/PML_fwd.H"
-#include "Evolve/WarpXDtType.H"
 #include "HybridPICModel/HybridPICModel_fwd.H"
 #include "MacroscopicProperties/MacroscopicProperties_fwd.H"
 
