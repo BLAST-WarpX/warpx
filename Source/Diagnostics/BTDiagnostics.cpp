@@ -1461,10 +1461,8 @@ BTDiagnostics::InitializeParticleFunctors ()
 }
 
 void
-BTDiagnostics::InitializeParticleBuffer ()
+BTDiagnostics::InitializeParticleBuffer (const MultiParticleContainer& mpc)
 {
-    auto& warpx = WarpX::GetInstance();
-    const MultiParticleContainer& mpc = warpx.GetPartContainer();
     for (int i = 0; i < m_num_buffers; ++i) {
         m_particles_buffer[i].resize(m_output_species_names.size());
         m_totalParticles_in_buffer[i].resize(m_output_species_names.size());

@@ -911,7 +911,7 @@ WarpX::AddExternalFields (int const lev)
 
 void
 WarpX::InitDiagnostics () {
-    multi_diags->InitData();
+    multi_diags->InitData(*mypc);
     reduced_diags->InitData();
 }
 

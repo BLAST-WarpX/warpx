@@ -118,9 +118,9 @@ namespace {
 #endif
     )
     {
-        amrex::ParticleReal dxp_save;
-        amrex::ParticleReal dyp_save;
-        amrex::ParticleReal dzp_save;
+        amrex::ParticleReal dxp_save = 0_prt;
+        amrex::ParticleReal dyp_save = 0_prt;
+        amrex::ParticleReal dzp_save = 0_prt;
 
         auto idxg2 = static_cast<amrex::ParticleReal>(dinv.x*dinv.x);
         auto idyg2 = static_cast<amrex::ParticleReal>(dinv.y*dinv.y);
@@ -852,31 +852,11 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
             if (doing_deposition) {
 
-                const amrex::ParticleReal xp_old = xp_n;
-                const amrex::ParticleReal yp_old = yp_n;
-                const amrex::ParticleReal zp_old = zp_n;
-                const amrex::ParticleReal xp_new = 2.0_prt*xp - xp_n;
-                const amrex::ParticleReal yp_new = 2.0_prt*yp - yp_n;
-                const amrex::ParticleReal zp_new = 2.0_prt*zp - zp_n;
+                const amrex::ParticleReal xp_np1 = 2.0_prt*xp - xp_n;
+                const amrex::ParticleReal yp_np1 = 2.0_prt*yp - yp_n;
+                const amrex::ParticleReal zp_np1 = 2.0_prt*zp - zp_n;
 
-                const amrex::ParticleReal uxp_nph = ux[ip];
-                const amrex::ParticleReal uyp_nph = uy[ip];
-                const amrex::ParticleReal uzp_nph = uz[ip];
-
-                constexpr amrex::ParticleReal inv_c2 = 1.0_prt/(PhysConst::c*PhysConst::c);
-
-                const amrex::ParticleReal uxp_old = uxp_n;
-                const amrex::ParticleReal uyp_old = uyp_n;
-                const amrex::ParticleReal uzp_old = uzp_n;
-                const amrex::ParticleReal uxp_new = 2.0_prt*ux[ip] - uxp_n;
-                const amrex::ParticleReal uyp_new = 2.0_prt*uy[ip] - uyp_n;
-                const amrex::ParticleReal uzp_new = 2.0_prt*uz[ip] - uzp_n;
-
-                // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
-                // The uxp,uyp,uzp are the velocities at time level n+1/2
-                const amrex::ParticleReal gamma_old = std::sqrt(1.0_prt + (uxp_old*uxp_old + uyp_old*uyp_old + uzp_old*uzp_old)*inv_c2);
-                const amrex::ParticleReal gamma_new = std::sqrt(1.0_prt + (uxp_new*uxp_new + uyp_new*uyp_new + uzp_new*uzp_new)*inv_c2);
-                const amrex::ParticleReal gaminv = 2.0_prt/(gamma_old + gamma_new);
+                const amrex::ParticleReal gaminv = GetImplicitGammaInverse(uxp_n, uyp_n, uzp_n, ux[ip], uy[ip], uz[ip]);
 
                 if (deposit_mass_matrices) {
                     const amrex::Real wq_invvol = wq*invvol/nsuborbits[ip];
@@ -886,8 +866,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     amrex::ParticleReal fpxx, fpxy, fpxz;
                     amrex::ParticleReal fpyx, fpyy, fpyz;
                     amrex::ParticleReal fpzx, fpzy, fpzz;
-                    setMassMatricesKernels(q, m, dt_suborbit, inv_c2, rhop,
-                                           uxp_nph, uyp_nph, uzp_nph,
+                    setMassMatricesKernels(q, m, dt_suborbit, rhop,
+                                           ux[ip], uy[ip], uz[ip],
                                            Bxp, Byp, Bzp,
                                            fpxx, fpxy, fpxz,
                                            fpyx, fpyy, fpyz,
@@ -901,8 +881,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     if constexpr (depos_order_control == order_one) {
                         if (!full_mass_matrices) {
                             doVillasenorJandSigmaDepositionKernel<1,false>(
-                                                                  xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
-                                                                  wq_invvol, uxp_nph, uyp_nph, uzp_nph, gaminv,
+                                                                  xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
+                                                                  wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                                   fpxx, fpxy, fpxz,
                                                                   fpyx, fpyy, fpyz,
                                                                   fpzx, fpzy, fpzz,
@@ -914,8 +894,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                                   dt_suborbit, dinv, xyzmin, lo );
                         } else if (full_mass_matrices) {
                             doVillasenorJandSigmaDepositionKernel<1,true>(
-                                                                  xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
-                                                                  wq_invvol, uxp_nph, uyp_nph, uzp_nph, gaminv,
+                                                                  xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
+                                                                  wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                                   fpxx, fpxy, fpxz,
                                                                   fpyx, fpyy, fpyz,
                                                                   fpzx, fpzy, fpzz,
@@ -929,8 +909,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     } else if constexpr (depos_order_control == order_two) {
                         if (!full_mass_matrices) {
                             doVillasenorJandSigmaDepositionKernel<2,false>(
-                                                                  xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
-                                                                  wq_invvol, uxp_nph, uyp_nph, uzp_nph, gaminv,
+                                                                  xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
+                                                                  wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                                   fpxx, fpxy, fpxz,
                                                                   fpyx, fpyy, fpyz,
                                                                   fpzx, fpzy, fpzz,
@@ -942,8 +922,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                                   dt_suborbit, dinv, xyzmin, lo );
                         } else if (full_mass_matrices) {
                             doVillasenorJandSigmaDepositionKernel<2,true>(
-                                                                  xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
-                                                                  wq_invvol, uxp_nph, uyp_nph, uzp_nph, gaminv,
+                                                                  xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
+                                                                  wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                                   fpxx, fpxy, fpxz,
                                                                   fpyx, fpyy, fpyz,
                                                                   fpzx, fpzy, fpzz,
@@ -957,8 +937,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     } else if constexpr (depos_order_control == order_three) {
                         if (!full_mass_matrices) {
                             doVillasenorJandSigmaDepositionKernel<3,false>(
-                                                                  xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
-                                                                  wq_invvol, uxp_nph, uyp_nph, uzp_nph, gaminv,
+                                                                  xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
+                                                                  wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                                   fpxx, fpxy, fpxz,
                                                                   fpyx, fpyy, fpyz,
                                                                   fpzx, fpzy, fpzz,
@@ -970,8 +950,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                                   dt_suborbit, dinv, xyzmin, lo );
                         } else if (full_mass_matrices) {
                             doVillasenorJandSigmaDepositionKernel<3,true>(
-                                                                  xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
-                                                                  wq_invvol, uxp_nph, uyp_nph, uzp_nph, gaminv,
+                                                                  xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
+                                                                  wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                                   fpxx, fpxy, fpxz,
                                                                   fpyx, fpyy, fpyz,
                                                                   fpzx, fpzy, fpzz,
@@ -985,8 +965,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     } else if constexpr (depos_order_control == order_four) {
                         if (!full_mass_matrices) {
                             doVillasenorJandSigmaDepositionKernel<4,false>(
-                                                                  xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
-                                                                  wq_invvol, uxp_nph, uyp_nph, uzp_nph, gaminv,
+                                                                  xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
+                                                                  wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                                   fpxx, fpxy, fpxz,
                                                                   fpyx, fpyy, fpyz,
                                                                   fpzx, fpzy, fpzz,
@@ -998,8 +978,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                                   dt_suborbit, dinv, xyzmin, lo );
                         } else if (full_mass_matrices) {
                             doVillasenorJandSigmaDepositionKernel<4,true>(
-                                                                  xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
-                                                                  wq_invvol, uxp_nph, uyp_nph, uzp_nph, gaminv,
+                                                                  xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
+                                                                  wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                                   fpxx, fpxy, fpxz,
                                                                   fpyx, fpyy, fpyz,
                                                                   fpzx, fpzy, fpzz,
@@ -1021,26 +1001,26 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     // in a constexpr-if context.
                     amrex::ignore_unused(Jx_arr, Jy_arr, Jz_arr, invvol);
                     if constexpr (depos_order_control == order_one) {
-                        VillasenorDepositionShapeNKernel<1>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq_n,
-                                                            uxp_nph, uyp_nph, uzp_nph, gaminv,
+                        VillasenorDepositionShapeNKernel<1>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
+                                                            ux[ip], uy[ip], uz[ip], gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr,
                                                             dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                     }
                     else if constexpr (depos_order_control == order_two) {
-                        VillasenorDepositionShapeNKernel<2>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq_n,
-                                                            uxp_nph, uyp_nph, uzp_nph, gaminv,
+                        VillasenorDepositionShapeNKernel<2>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
+                                                            ux[ip], uy[ip], uz[ip], gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr,
                                                             dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                     }
                     else if constexpr (depos_order_control == order_three) {
-                        VillasenorDepositionShapeNKernel<3>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq_n,
-                                                            uxp_nph, uyp_nph, uzp_nph, gaminv,
+                        VillasenorDepositionShapeNKernel<3>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
+                                                            ux[ip], uy[ip], uz[ip], gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr,
                                                             dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                     }
                     else if constexpr (depos_order_control == order_four) {
-                        VillasenorDepositionShapeNKernel<4>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq_n,
-                                                            uxp_nph, uyp_nph, uzp_nph, gaminv,
+                        VillasenorDepositionShapeNKernel<4>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
+                                                            ux[ip], uy[ip], uz[ip], gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr,
                                                             dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                     }

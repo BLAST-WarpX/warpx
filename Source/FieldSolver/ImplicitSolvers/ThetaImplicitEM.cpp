@@ -70,18 +70,8 @@ void ThetaImplicitEM::PrintParameters () const
     amrex::Print() << "-----------------------------------------------------------\n";
     amrex::Print() << "----------- THETA IMPLICIT EM SOLVER PARAMETERS -----------\n";
     amrex::Print() << "-----------------------------------------------------------\n";
-    amrex::Print() << "Time-bias parameter theta:  " << m_theta << "\n";
-    amrex::Print() << "max particle iterations:    " << m_max_particle_iterations << "\n";
-    amrex::Print() << "particle tolerance:         " << m_particle_tolerance << "\n";
-    amrex::Print() << "use particle suborbits:     " << (m_particle_suborbits ? "true":"false") << "\n";
-    if (m_nlsolver_type==NonlinearSolverType::Picard) {
-        amrex::Print() << "Nonlinear solver type:      Picard\n";
-    }
-    else if (m_nlsolver_type==NonlinearSolverType::Newton) {
-        amrex::Print() << "Nonlinear solver type:      Newton\n";
-        amrex::Print() << "use mass matrices:          " << (m_use_mass_matrices ? "true":"false") << "\n";
-        PrintMassMatricesParameters();
-    }
+    amrex::Print() << "Time-bias parameter theta:           " << m_theta << "\n";
+    PrintBaseImplicitSolverParameters();
     m_nlsolver->PrintParams();
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
