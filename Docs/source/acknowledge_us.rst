@@ -8,13 +8,8 @@ Please acknowledge the role that WarpX played in your research.
 In presentations
 ****************
 
-For your presentations, you can find WarpX slides `here <https://drive.google.com/file/d/1Ye2YuQ9ezqpL8vCiooMF1PBVwL5pnAOE/view?usp=sharing>`__. Several flavors are available:
-
-  - full slide
-  - half-slide (portrait or landscape format)
-  - small inset.
-
-Feel free to use the one that fits into your presentation and adequately acknowledges the part that WarpX played in your research.
+For your presentations, you can find a WarpX acknowledgment slide `here <https://docs.google.com/presentation/d/1irVUyGKc-1vaQbJN7HgdBpPGQICfD5ci_maOu6noypk/edit?usp=sharing>`__.
+Feel free to use it to acknowledge WarpX in your presentation.
 
 In publications
 ***************
@@ -52,6 +47,16 @@ Prior WarpX references
 ----------------------
 
 If your project uses a specific algorithm or component, please consider citing the respective publications in addition.
+
+- Lehe R, Haseeb M, Angus J, Grote D, Groenewald R, Formenti A, Huebl A, Deslippe J, Vay JL.
+  **An Efficient GPU Parallelization Strategy for Binary Collisions in Particle-In-Cell Plasma Simulations**.
+  Proceedings of the Plarform for Advanced Scientific Computing (PASC'25), 2025.
+  `DOI:10.1145/3732775.3733578 <https://doi.org/10.1145/3732775.3733578>`__
+
+- Vay JL, Angus JR, Shapoval O, Lehe R, Grote D, Huebl A.
+  **Energy-preserving coupling of explicit particle-in-cell with Monte Carlo collisions**.
+  Physical Review E **111**, 2025.
+  `DOI:10.1103/PhysRevE.111.025306 <https://doi.org/10.1103/PhysRevE.111.025306>`__
 
 - Shapoval O, Zoni E, Lehe R, Thévenet M, and Vay J-L.
   **Pseudospectral particle-in-cell formulation with arbitrary charge and current-density time dependencies for the modeling of relativistic plasmas**.

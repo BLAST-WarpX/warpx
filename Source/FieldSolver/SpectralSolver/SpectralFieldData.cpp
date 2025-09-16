@@ -35,8 +35,8 @@ using namespace amrex;
 
 SpectralFieldIndex::SpectralFieldIndex (const bool update_with_rho,
                                         const bool time_averaging,
-                                        const JInTime J_in_time,
-                                        const RhoInTime rho_in_time,
+                                        const TimeDependencyJ time_dependency_J,
+                                        const TimeDependencyRho time_dependency_rho,
                                         const bool dive_cleaning,
                                         const bool divb_cleaning,
                                         const bool pml,
@@ -67,21 +67,33 @@ SpectralFieldIndex::SpectralFieldIndex (const bool update_with_rho,
 
         if (divb_cleaning) { G = c++; }
 
-        if (J_in_time == JInTime::Constant)
+        if (time_dependency_J == TimeDependencyJ::Constant)
         {
             Jx_mid = c++; Jy_mid = c++; Jz_mid = c++;
         }
-        else if (J_in_time == JInTime::Linear)
+        if (time_dependency_J == TimeDependencyJ::Quadratic)
+        {
+            Jx_old = c++; Jy_old = c++; Jz_old = c++;
+            Jx_new = c++; Jy_new = c++; Jz_new = c++;
+            Jx_mid = c++; Jy_mid = c++; Jz_mid = c++;
+        }
+        else if (time_dependency_J == TimeDependencyJ::Linear)
         {
             Jx_old = c++; Jy_old = c++; Jz_old = c++;
             Jx_new = c++; Jy_new = c++; Jz_new = c++;
         }
 
-        if (rho_in_time == RhoInTime::Constant)
+        if (time_dependency_rho == TimeDependencyRho::Constant)
         {
             rho_mid = c++;
         }
-        else if (rho_in_time == RhoInTime::Linear)
+        if (time_dependency_rho == TimeDependencyRho::Quadratic)
+        {
+            rho_old = c++;
+            rho_mid = c++;
+            rho_new = c++;
+        }
+        else if (time_dependency_rho == TimeDependencyRho::Linear)
         {
             rho_old = c++;
             rho_new = c++;

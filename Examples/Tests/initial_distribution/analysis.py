@@ -134,7 +134,7 @@ charge = bmmntr["charge"][0]
 x_rms = 0.25
 z_cut = 2.0
 q_tot = -1.0e-20
-q_e = -1.602176634e-19
+q_e = -scc.e
 npart = q_tot / q_e
 db = bin_value[1] - bin_value[0]
 

@@ -9,6 +9,7 @@
 #ifndef WARPX_INJECTOR_DENSITY_H_
 #define WARPX_INJECTOR_DENSITY_H_
 
+#include "Initialization/ExternalField.H"
 #include "Utils/WarpXConst.H"
 
 #include <AMReX.H>
@@ -58,7 +59,7 @@ struct InjectorDensityParser
 // struct whose getDensity returns local density computed from predefined profile.
 struct InjectorDensityPredefined
 {
-    InjectorDensityPredefined (std::string const& a_species_name) noexcept;
+    InjectorDensityPredefined (std::string const& a_species_name);
 
     void clear ();
 
@@ -118,12 +119,44 @@ private:
     amrex::GpuArray<amrex::Real,6> p;
 };
 
+// struct whose getDensity returns density from file.
+struct InjectorDensityFromFile
+{
+    InjectorDensityFromFile (std::string const& a_file_name);
+
+    void clear ();
+
+    [[nodiscard]]
+    AMREX_GPU_HOST_DEVICE
+    amrex::Real
+    getDensity (amrex::Real x, amrex::Real y, amrex::Real z) const noexcept
+    {
+#if (AMREX_SPACEDIM < 3)
+        amrex::ignore_unused(x,y,z);
+#endif
+#if (AMREX_SPACEDIM == 1)
+        return m_external_field_view(amrex::RealVect{z});
+#elif defined(WARPX_DIM_RZ)
+        return m_external_field_view(amrex::RealVect{std::sqrt(x*x+y*y),z});
+#elif defined(WARPX_DIM_XZ)
+        return m_external_field_view(amrex::RealVect{x,z});
+#else
+        return m_external_field_view(amrex::RealVect{x,y,z});
+#endif
+    }
+
+private:
+    ExternalFieldView m_external_field_view;
+    ExternalFieldReader* m_external_field_reader = nullptr;
+};
+
 // Base struct for density injector.
 // InjectorDensity contains a union (called Object) that holds any one
 // instance of:
 // - InjectorDensityConstant  : to generate constant density;
 // - InjectorDensityParser    : to generate density from parser;
 // - InjectorDensityPredefined: to generate density from predefined profile;
+// - InjectorDensityFromFile  : to generate density from file;
 // The choice is made at runtime, depending in the constructor called.
 // This mimics virtual functions.
 struct InjectorDensity
@@ -144,6 +177,12 @@ struct InjectorDensity
     InjectorDensity (InjectorDensityPredefined* t, std::string const& a_species_name)
         : type(Type::predefined),
           object(t,a_species_name)
+    { }
+
+    // This constructor stores a InjectorDensityFromFile in union object.
+    InjectorDensity (InjectorDensityFromFile* t, std::string const& a_file_name)
+        : type(Type::fromfile),
+          object(t,a_file_name)
     { }
 
     // Explicitly prevent the compiler from generating copy constructors
@@ -179,6 +218,10 @@ struct InjectorDensity
         {
             return object.predefined.getDensity(x,y,z);
         }
+        case Type::fromfile:
+        {
+            return object.fromfile.getDensity(x,y,z);
+        }
         default:
         {
             amrex::Abort("InjectorDensity: unknown type");
@@ -188,7 +231,7 @@ struct InjectorDensity
     }
 
 private:
-    enum struct Type { constant, predefined, parser };
+    enum struct Type { constant, predefined, parser, fromfile };
     Type type;
 
     // An instance of union Object constructs and stores any one of
@@ -198,11 +241,14 @@ private:
             : constant(a_rho) {}
         Object (InjectorDensityParser*, amrex::ParserExecutor<3> const& a_parser) noexcept
             : parser(a_parser) {}
-        Object (InjectorDensityPredefined*, std::string const& a_species_name) noexcept
+        Object (InjectorDensityPredefined*, std::string const& a_species_name)
             : predefined(a_species_name) {}
+        Object (InjectorDensityFromFile*, std::string const& a_file_name)
+            : fromfile(a_file_name) {}
         InjectorDensityConstant   constant;
         InjectorDensityParser     parser;
         InjectorDensityPredefined predefined;
+        InjectorDensityFromFile   fromfile;
     };
     Object object;
 };

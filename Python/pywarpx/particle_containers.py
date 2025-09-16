@@ -700,6 +700,18 @@ class ParticleContainerWrapper(object):
         """
         return self.particle_container.sum_particle_charge(local)
 
+    def get_species_energy_sum(self, local=False):
+        """
+        Returns the total kinetic energy in the simulation due to the given species.
+
+        Parameters
+        ----------
+
+        local          : bool
+            If True return total energy per processor
+        """
+        return self.particle_container.sum_particle_energy(local)
+
     def getex(self):
         raise NotImplementedError("Particle E fields not supported")
 

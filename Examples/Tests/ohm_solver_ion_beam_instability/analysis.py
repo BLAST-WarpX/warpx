@@ -98,7 +98,7 @@ if sim.resonant:
     )
 
     # The theoretical growth rates for the 4th, 5th and 6th Fourier modes of
-    # the By-field was obtained from Fig. 12a of Munoz et al.
+    # the By-field was obtained from Fig. 12a of Munoz et al., https://doi.org/10.1016/j.cpc.2017.10.012
     # Note the rates here are gamma / w_ci
     gamma4 = 0.1915611861780133
     gamma5 = 0.20087036355662818
@@ -227,6 +227,6 @@ if sim.test:
     # compared to the theoretical ones to determine if the physics test passes.
     # At creation, the full test (3d) had the following errors (ran on 1 V100):
     # m4_rms_error = 3.329; m5_rms_error = 1.052; m6_rms_error = 2.583
-    assert np.isclose(m4_rms_error, 1.515, atol=0.01)
-    assert np.isclose(m5_rms_error, 0.718, atol=0.01)
-    assert np.isclose(m6_rms_error, 0.357, atol=0.01)
+    assert np.isclose(m4_rms_error, 1.546, atol=0.01)
+    assert np.isclose(m5_rms_error, 0.734, atol=0.01)
+    assert np.isclose(m6_rms_error, 0.367, atol=0.01)

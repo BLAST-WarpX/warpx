@@ -1,0 +1,48 @@
+name: Monthly release
+
+on:
+  schedule:
+    - cron: "0 0 1 * *"  # every first day of the month at midnight
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  autoupdate:
+    name: Autoupdate
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Set current date
+        run: |
+          echo "DATE=$(date +'%y.%m')" >> $GITHUB_ENV
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Checkout branch
+        run: |
+          git checkout monthly_release || git checkout -b monthly_release
+      - name: Update dependencies
+        run: |
+          python Tools/Release/update_dependencies.py --release
+      - name: Commit changes
+        run: |
+          git add -u
+          git commit -m "Update dependencies.json"
+      - name: Push changes
+        run: |
+          git push -f origin monthly_release
+      - name: Open pull request
+        run: |
+          gh pr create \
+            --draft \
+            --base development \
+            --body "Automated via .github/workflows/monthly_release.yml." \
+            --label "component: third party" \
+            --title "Release: WarpX ${{ env.DATE }}"

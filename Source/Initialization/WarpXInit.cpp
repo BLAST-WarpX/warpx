@@ -76,6 +76,10 @@ void warpx::initialization::check_dims()
     std::string const dims_compiled = "1";
 #elif defined(WARPX_DIM_RZ)
     std::string const dims_compiled = "RZ";
+#elif defined(WARPX_DIM_RCYLINDER)
+    std::string const dims_compiled = "RCYLINDER";
+#elif defined(WARPX_DIM_RSPHERE)
+    std::string const dims_compiled = "RSPHERE";
 #endif
     const amrex::ParmParse pp_geometry("geometry");
     std::string dims;

@@ -177,6 +177,10 @@ public:
                 const amrex::Real x = 0._rt;
                 const amrex::Real y = 0._rt;
                 const amrex::Real z = (k + 0.5_rt)*dx[0] + real_box.lo(0);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                const amrex::Real x = (i + 0.5_rt)*dx[0] + real_box.lo(0);
+                const amrex::Real y = 0._rt;
+                const amrex::Real z = 0._rt;
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                 const amrex::Real x = (i + 0.5_rt)*dx[0] + real_box.lo(0);
                 const amrex::Real y = 0._rt;
@@ -227,13 +231,7 @@ public:
             amrex::ParallelDescriptor::ReduceRealSum(reduce_value);
         // If reduction operation is a sum, multiply the value by the cell volume so that the
         // result is the integral of the function over the simulation domain.
-#if defined(WARPX_DIM_1D_Z)
-            reduce_value *= dx[0];
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-            reduce_value *= dx[0]*dx[1];
-#else
-            reduce_value *= dx[0]*dx[1]*dx[2];
-#endif
+            reduce_value *= AMREX_D_TERM(dx[0], *dx[1], *dx[2]);
         }
 
         // Fill output array

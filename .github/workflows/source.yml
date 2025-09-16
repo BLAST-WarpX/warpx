@@ -11,6 +11,7 @@ on:
     branches:
       - "development"
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-source
@@ -19,7 +20,7 @@ concurrency:
 jobs:
   style:
 
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
     - uses: actions/checkout@v4
@@ -33,5 +34,6 @@ jobs:
       run: .github/workflows/source/check_inputs.py
     - name: Doxygen
       run: |
-        sudo apt-get install -y --no-install-recommends doxygen
+        sudo apt update
+        sudo apt install -y doxygen texlive-latex-base texlive-latex-extra ghostscript
         .github/workflows/source/doxygen

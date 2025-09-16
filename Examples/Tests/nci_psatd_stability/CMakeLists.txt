@@ -147,11 +147,11 @@ endif()
 
 if(WarpX_FFT)
     add_warpx_test(
-        test_3d_uniform_plasma_multiJ  # name
+        test_3d_uniform_plasma_psatd_JRhom_CC1  # name
         3  # dims
         2  # nprocs
-        inputs_test_3d_uniform_plasma_multiJ  # inputs
-        "analysis_multiJ.py diags/diag1000300"  # analysis
+        inputs_test_3d_uniform_plasma_psatd_JRhom_CC1  # inputs
+        "analysis_psatd_CC1.py diags/diag1000300"  # analysis
         "analysis_default_regression.py --path diags/diag1000300"  # checksum
         OFF  # dependency
     )
@@ -195,13 +195,12 @@ endif()
 
 if(WarpX_FFT)
     add_warpx_test(
-        test_rz_multiJ_psatd  # name
+        test_rz_psatd_JRhom_LL2  # name
         RZ  # dims
         2  # nprocs
-        inputs_test_rz_multiJ_psatd  # inputs
+        inputs_test_rz_psatd_JRhom_LL2  # inputs
         OFF  # analysis
         "analysis_default_regression.py --path diags/diag1000025"  # checksum
         OFF  # dependency
     )
-    label_warpx_test(test_rz_multiJ_psatd slow)
 endif()

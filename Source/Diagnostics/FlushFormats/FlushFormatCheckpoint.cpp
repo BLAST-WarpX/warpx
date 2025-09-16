@@ -22,12 +22,19 @@
 #include <AMReX_Utility.H>
 #include <AMReX_VisMF.H>
 
+#ifndef WARPX_UNITY_ID
+#define WARPX_UNITY_ID
+#endif
+
 using namespace amrex;
 using warpx::fields::FieldType;
 
 namespace
 {
+namespace WARPX_UNITY_ID
+{
     const std::string default_level_prefix {"Level_"};
+}
 }
 
 void
@@ -48,6 +55,7 @@ FlushFormatCheckpoint::WriteToFile (
         bool /*isLastBTDFlush*/) const
 {
     using ablastr::fields::Direction;
+    using WARPX_UNITY_ID::default_level_prefix;
 
     WARPX_PROFILE("FlushFormatCheckpoint::WriteToFile()");
 
@@ -199,8 +207,11 @@ FlushFormatCheckpoint::CheckpointParticles (
                                                       "momentum_x",
                                                       "momentum_y",
                                                       "momentum_z"
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                                                       ,"theta"
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+                                                      ,"phi"
 #endif
                                                       };
 
@@ -224,10 +235,12 @@ FlushFormatCheckpoint::CheckpointParticles (
         // and the int comps
         int_names.resize(pc->NumIntComps());
         write_int_comps.resize(pc->NumIntComps());
+        //   note: inames and h_redistribute_int_comp are not the same size
         auto inames = pc->GetIntSoANames();
+        std::size_t const i0_redist = pc->h_redistribute_int_comp.size() - inames.size();
         for (std::size_t index = 0; index < inames.size(); ++index) {
             int_names[index] = inames[index];
-            write_int_comps[index] = pc->h_redistribute_int_comp[index];
+            write_int_comps[index] = pc->h_redistribute_int_comp[i0_redist + index];
         }
 
         pc->Checkpoint(dir, part_diag.getSpeciesName(),

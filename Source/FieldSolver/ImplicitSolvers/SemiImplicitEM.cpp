@@ -4,6 +4,7 @@
  *
  * License: BSD-3-Clause-LBNL
  */
+#include "Fields.H"
 #include "SemiImplicitEM.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "WarpX.H"
@@ -13,6 +14,8 @@ using namespace amrex::literals;
 
 void SemiImplicitEM::Define ( WarpX*  a_WarpX )
 {
+    BL_PROFILE("SemiImplicitEM::Define()");
+
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !m_is_defined,
         "SemiImplicitEM object is already defined!");
@@ -30,6 +33,10 @@ void SemiImplicitEM::Define ( WarpX*  a_WarpX )
 
     // Define the nonlinear solver
     m_nlsolver->Define(m_E, this);
+
+    // Initialize the mass matrices for plasma response
+    if (m_use_mass_matrices) { InitializeMassMatrices(); }
+
     m_is_defined = true;
 
 }
@@ -41,14 +48,7 @@ void SemiImplicitEM::PrintParameters () const
     amrex::Print() << "-----------------------------------------------------------\n";
     amrex::Print() << "----------- SEMI IMPLICIT EM SOLVER PARAMETERS ------------\n";
     amrex::Print() << "-----------------------------------------------------------\n";
-    amrex::Print() << "max particle iterations:    " << m_max_particle_iterations << "\n";
-    amrex::Print() << "particle tolerance:         " << m_particle_tolerance << "\n";
-    if (m_nlsolver_type==NonlinearSolverType::Picard) {
-        amrex::Print() << "Nonlinear solver type:      Picard\n";
-    }
-    else if (m_nlsolver_type==NonlinearSolverType::Newton) {
-        amrex::Print() << "Nonlinear solver type:      Newton\n";
-    }
+    PrintBaseImplicitSolverParameters();
     m_nlsolver->PrintParams();
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
@@ -57,6 +57,8 @@ void SemiImplicitEM::OneStep ( amrex::Real  start_time,
                                amrex::Real  a_dt,
                                int          a_step )
 {
+    BL_PROFILE("SemiImplicitEM::OneStep()");
+
     amrex::ignore_unused(a_step);
 
     // Set the member time step
@@ -107,6 +109,8 @@ void SemiImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
                                   int              a_nl_iter,
                                   bool             a_from_jacobian )
 {
+    BL_PROFILE("SemiImplicitEM::ComputeRHS()");
+
     // Update WarpX-owned Efield_fp using current state of Eg from
     // the nonlinear solver at time n+theta
     const amrex::Real half_time = start_time + 0.5_rt*m_dt;
@@ -114,7 +118,7 @@ void SemiImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
 
     // Update particle positions and velocities using the current state
     // of Eg and Bg. Deposit current density at time n+1/2
-    m_WarpX->ImplicitPreRHSOp( half_time, m_dt, a_nl_iter, a_from_jacobian );
+    PreRHSOp( half_time, a_nl_iter, a_from_jacobian );
 
     // RHS = cvac^2*0.5*dt*( curl(Bg^{n+1/2}) - mu0*Jg^{n+1/2} )
     m_WarpX->ImplicitComputeRHSE(0.5_rt*m_dt, a_RHS);

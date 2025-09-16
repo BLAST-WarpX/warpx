@@ -1,0 +1,92 @@
+
+#############################
+# Define parameter of the
+my_constants.beam_energy_ev = 12e3 # [eV]
+my_constants.beam_beta = sqrt(2*beam_energy_ev*q_e/m_p)/clight # [-]
+my_constants.beam_flux = 1e20 # [m^-2 s^-1]
+my_constants.gas_density = 1e21 # [m^-3]
+my_constants.gas_length = 0.2 # m
+
+#############################
+# Simulation time
+max_step = 100
+warpx.const_dt = gas_length/beam_beta/clight/32
+
+#############################
+# Grid
+amr.n_cell = 32
+amr.max_level = 0
+amr.max_grid_size = 256
+geometry.dims = 1
+
+geometry.prob_lo = 0.0
+geometry.prob_hi = gas_length
+
+boundary.particle_lo = absorbing
+boundary.particle_hi = absorbing
+
+#############################
+# Algorithms:
+algo.particle_shape = 1
+
+# - Without space charge
+algo.maxwell_solver = none
+boundary.field_lo = pec
+boundary.field_hi = pec
+
+#############################
+# Create species
+particles.species_names = H Hplus H2 H2plus
+
+Hplus.do_continuous_injection = 1
+Hplus.injection_style = NFluxPerCell
+Hplus.mass = m_p
+Hplus.charge = q_e
+Hplus.surface_flux_pos = 0
+Hplus.flux_normal_axis = z
+Hplus.flux_direction = 1
+Hplus.num_particles_per_cell = 800
+Hplus.flux_profile = constant
+Hplus.flux = beam_flux
+Hplus.momentum_distribution_type = constant
+Hplus.uz = beam_beta
+
+H.injection_style = none
+H.mass = m_p
+H.charge = 0
+
+H2.injection_style = NRandomPerCell
+H2.mass = 2*m_p
+H2.charge = 0
+H2.num_particles_per_cell = 1600
+H2.profile = constant
+H2.density = gas_density
+H2.momentum_distribution_type = constant
+H2.ux = 0
+H2.uy = 0
+H2.uz = 0
+H2.zmin = 0
+H2.zmax = gas_length
+
+H2plus.injection_style = none
+H2plus.mass = 2*m_p
+H2plus.charge = q_e
+
+#############################
+# Add diagnostics
+diagnostics.diags_names = diag
+diag.intervals = 50
+diag.fields_to_plot = rho
+diag.diag_type = Full
+diag.format = openpmd
+
+#############################
+
+# Setup charge exchange
+collisions.collision_names = neutral_to_ion
+
+neutral_to_ion.type = dsmc
+neutral_to_ion.scattering_processes = charge_exchange
+neutral_to_ion.species = Hplus H2
+neutral_to_ion.product_species = H H2plus
+neutral_to_ion.charge_exchange_cross_section = ../../../../warpx-data/MCC_cross_sections/H/Hion_on_H2_charge_exchange.dat

@@ -12,6 +12,7 @@
 #include "Particles/WarpXParticleContainer_fwd.H"
 
 #include <AMReX_REAL.H>
+#include <AMReX_Geometry.H>
 
 #include <memory>
 #include <string>
@@ -24,7 +25,9 @@ struct ResamplingAlgorithm
     /**
      * \brief Virtual operator() of the abstract ResamplingAlgorithm class
      */
-    virtual void operator() (WarpXParIter& /*pti*/, int /*lev*/, WarpXParticleContainer* /*pc*/) const = 0;
+    virtual void operator() (
+        const amrex::Geometry& /*geom_lev*/, WarpXParIter& /*pti*/,
+        int /*lev*/, WarpXParticleContainer* /*pc*/) const = 0;
 
     /**
      * \brief Virtual destructor of the abstract ResamplingAlgorithm class
@@ -76,11 +79,14 @@ public:
     /**
      * \brief A method that uses the ResamplingAlgorithm object to perform resampling.
      *
+     * @param[in] geom_lev the geometry of the current refinement level.
      * @param[in] pti WarpX particle iterator of the particles to resample.
      * @param[in] lev the index of the refinement level.
      * @param[in] pc a pointer to the particle container.
      */
-    void operator() (WarpXParIter& pti, int lev, WarpXParticleContainer* pc) const;
+    void operator() (
+        const amrex::Geometry& geom_lev, WarpXParIter& pti,
+        int lev, WarpXParticleContainer* pc) const;
 
 private:
     ResamplingTrigger m_resampling_trigger;
