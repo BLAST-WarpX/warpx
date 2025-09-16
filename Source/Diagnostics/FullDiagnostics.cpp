@@ -81,14 +81,12 @@ FullDiagnostics::DerivedInitData() {
 }
 
 void
-FullDiagnostics::InitializeParticleBuffer ()
+FullDiagnostics::InitializeParticleBuffer (const MultiParticleContainer& mpc)
 {
     // When particle buffers are included, the vector of particle containers
     // must be allocated in this function.
     // Initialize data in the base class Diagnostics
-    auto & warpx = WarpX::GetInstance();
 
-    const MultiParticleContainer& mpc = warpx.GetPartContainer();
     // If not specified, dump all species
     if (m_output_species_names.empty()) {
         if (m_format == "checkpoint") {

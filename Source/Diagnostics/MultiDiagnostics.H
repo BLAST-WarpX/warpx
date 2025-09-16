@@ -21,8 +21,12 @@ public:
     MultiDiagnostics ();
     /** \brief Read Input parameters. Called in constructor. */
     void ReadParameters ();
+
     /** \brief Loop over diags in alldiags and call their InitDiags */
-    void InitData (const InitDiagnosticsParameters& params, amrex::AmrMesh* p_warpx_mesh);
+    void InitData (
+        const InitDiagnosticsParameters& params,
+        const MultiParticleContainer& mpc,
+        amrex::AmrMesh* p_warpx_mesh);
     /** Check if any diagnostics will do compute and pack. */
     bool DoComputeAndPack (int step, bool force_flush=false);
     /** \brief Called at each iteration. Compute diags and flush. */

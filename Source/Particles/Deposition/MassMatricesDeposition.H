@@ -10,6 +10,7 @@
 
 #include "Particles/Deposition/SharedDepositionUtils.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
+#include "Particles/Pusher/UpdatePosition.H"
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/ShapeFactors.H"
 #include "Utils/TextMsg.H"
@@ -30,7 +31,6 @@
  * \param qs              Species charge
  * \param ms              Species mass
  * \param dt              Simulation time step
- * \param inv_c2          1/c^2
  * \param rhop            qs*wp*invvol*2.0/(gamma_n + gamma_np1)
  * \param uxp,uyp,uzp     Proper velocity of particle (time-centered)
  * \param Bxp,Byp,Bzp     Magnetic field vector components on particle
@@ -42,7 +42,6 @@ AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void setMassMatricesKernels ( const amrex::ParticleReal qs,
                               const amrex::ParticleReal ms,
                               const amrex::ParticleReal dt,
-                              const amrex::ParticleReal inv_c2,
                               const amrex::ParticleReal rhop,
                               const amrex::ParticleReal uxp,
                               const amrex::ParticleReal uyp,
@@ -61,6 +60,8 @@ void setMassMatricesKernels ( const amrex::ParticleReal qs,
                               amrex::ParticleReal& fpzz )
 {
     using namespace amrex::literals;
+
+    constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
 
     // Convert B on particle to normalized cyclotron units with dt/2.0
     const amrex::ParticleReal gamma_bar = std::sqrt(1._prt + (uxp*uxp + uyp*uyp + uzp*uzp)*inv_c2);
@@ -507,7 +508,7 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
  * \param GetPosition              A functor for returning the particle position.
  * \param wp                       Pointer to array of particle weights.
  * \param uxp_n,uyp_n,uzp_n        Pointer to arrays of particle momentum at time n.
- * \param uxp,uyp,uzp              Pointer to arrays of particle momentum at time n+1/2.
+ * \param uxp_nph,uyp_nph,uzp_nph  Pointer to arrays of particle momentum at time n+1/2.
  * \param jx_fab,jy_fab,jz_fab     FArrayBox of current density, either full array or tile.
  * \param Sxx_nComp                number of Sxx components
  * \param Syy_nComp                number of Syy components
@@ -531,9 +532,9 @@ void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
                                    const amrex::ParticleReal* uxp_n,
                                    const amrex::ParticleReal* uyp_n,
                                    const amrex::ParticleReal* uzp_n,
-                                   const amrex::ParticleReal* uxp,
-                                   const amrex::ParticleReal* uyp,
-                                   const amrex::ParticleReal* uzp,
+                                   const amrex::ParticleReal* uxp_nph,
+                                   const amrex::ParticleReal* uyp_nph,
+                                   const amrex::ParticleReal* uzp_nph,
                                    amrex::FArrayBox& jx_fab,
                                    amrex::FArrayBox& jy_fab,
                                    amrex::FArrayBox& jz_fab,
@@ -595,29 +596,22 @@ void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
                                     Bx_type, By_type, Bz_type,
                                     dinv, xyzmin, lo, n_rz_azimuthal_modes );
 
-            constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
-
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
-            // The uxp,uyp,uzp are the velocities at time level n+1/2
-            const amrex::ParticleReal uxp_np1 = 2._prt*uxp[ip] - uxp_n[ip];
-            const amrex::ParticleReal uyp_np1 = 2._prt*uyp[ip] - uyp_n[ip];
-            const amrex::ParticleReal uzp_np1 = 2._prt*uzp[ip] - uzp_n[ip];
-            const amrex::ParticleReal gamma_n = std::sqrt(1._prt + (uxp_n[ip]*uxp_n[ip] + uyp_n[ip]*uyp_n[ip] + uzp_n[ip]*uzp_n[ip])*inv_c2);
-            const amrex::ParticleReal gamma_np1 = std::sqrt(1._prt + (uxp_np1*uxp_np1 + uyp_np1*uyp_np1 + uzp_np1*uzp_np1)*inv_c2);
-            const amrex::ParticleReal gaminv = 2.0_prt/(gamma_n + gamma_np1);
+            const amrex::ParticleReal gaminv = GetImplicitGammaInverse(uxp_n[ip], uyp_n[ip], uzp_n[ip],
+                                                                       uxp_nph[ip], uyp_nph[ip], uzp_nph[ip]);
 
             // Compute current density kernels to deposit
             const amrex::Real rhop = qs*wp[ip]*invvol*gaminv;
-            amrex::Real wqx  = rhop*uxp[ip];
-            amrex::Real wqy  = rhop*uyp[ip];
-            amrex::Real wqz  = rhop*uzp[ip];
+            amrex::Real wqx  = rhop*uxp_nph[ip];
+            amrex::Real wqy  = rhop*uyp_nph[ip];
+            amrex::Real wqz  = rhop*uzp_nph[ip];
 
             // Set the Mass Matrices kernels
             amrex::ParticleReal fpxx, fpxy, fpxz;
             amrex::ParticleReal fpyx, fpyy, fpyz;
             amrex::ParticleReal fpzx, fpzy, fpzz;
-            setMassMatricesKernels( qs, ms, dt, inv_c2, rhop,
-                                    uxp[ip], uyp[ip], uzp[ip],
+            setMassMatricesKernels( qs, ms, dt, rhop,
+                                    uxp_nph[ip], uyp_nph[ip], uzp_nph[ip],
                                     Bxp, Byp, Bzp,
                                     fpxx, fpxy, fpxz,
                                     fpyx, fpyy, fpyz,
@@ -1567,7 +1561,7 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
  * \param GetPosition              A functor for returning the particle position.
  * \param wp                       Pointer to array of particle weights.
  * \param uxp_n,uyp_n,uzp_n        Pointer to arrays of particle momentum at time level n.
- * \param uxp,uyp,uzp              Pointer to arrays of particle momentum at time level n + 1/2.
+ * \param uxp_nph,uyp_nph,uzp_nph  Pointer to arrays of particle momentum at time level n + 1/2.
  * \param Jx_arr,Jy_arr,Jz_arr     Array4 of the current density, either full array or tile.
  * \param max_crossings            Maximum number of particle cell crossings in each dir
  * \param Sxx_arr,Sxy_arr,Sxz_arr  Array4 of mass matrices for Jx, either full array or tile.
@@ -1592,9 +1586,9 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
                                        const amrex::ParticleReal* uxp_n,
                                        const amrex::ParticleReal* uyp_n,
                                        const amrex::ParticleReal* uzp_n,
-                                       const amrex::ParticleReal* uxp,
-                                       const amrex::ParticleReal* uyp,
-                                       const amrex::ParticleReal* uzp,
+                                       const amrex::ParticleReal* uxp_nph,
+                                       const amrex::ParticleReal* uyp_nph,
+                                       const amrex::ParticleReal* uzp_nph,
                                        amrex::Array4<amrex::Real> const& Jx_arr,
                                        amrex::Array4<amrex::Real> const& Jy_arr,
                                        amrex::Array4<amrex::Real> const& Jz_arr,
@@ -1652,16 +1646,9 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
                                     Bx_type, By_type, Bz_type,
                                     dinv, xyzmin, lo, n_rz_azimuthal_modes );
 
-            constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
-
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
-            // The uxp,uyp,uzp are the velocities at time level n+1/2
-            const amrex::ParticleReal uxp_np1 = 2._prt*uxp[ip] - uxp_n[ip];
-            const amrex::ParticleReal uyp_np1 = 2._prt*uyp[ip] - uyp_n[ip];
-            const amrex::ParticleReal uzp_np1 = 2._prt*uzp[ip] - uzp_n[ip];
-            const amrex::ParticleReal gamma_n = std::sqrt(1._prt + (uxp_n[ip]*uxp_n[ip] + uyp_n[ip]*uyp_n[ip] + uzp_n[ip]*uzp_n[ip])*inv_c2);
-            const amrex::ParticleReal gamma_np1 = std::sqrt(1._prt + (uxp_np1*uxp_np1 + uyp_np1*uyp_np1 + uzp_np1*uzp_np1)*inv_c2);
-            const amrex::ParticleReal gaminv = 2.0_prt/(gamma_n + gamma_np1);
+            const amrex::ParticleReal gaminv = GetImplicitGammaInverse(uxp_n[ip], uyp_n[ip], uzp_n[ip],
+                                                                       uxp_nph[ip], uyp_nph[ip], uzp_nph[ip]);
 
             // Compute current density kernels to deposit
             const amrex::Real wq_invvol = qs*wp[ip]*invvol;
@@ -1671,8 +1658,8 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
             amrex::ParticleReal fpxx, fpxy, fpxz;
             amrex::ParticleReal fpyx, fpyy, fpyz;
             amrex::ParticleReal fpzx, fpzy, fpzz;
-            setMassMatricesKernels( qs, ms, dt, inv_c2, rhop,
-                                    uxp[ip], uyp[ip], uzp[ip],
+            setMassMatricesKernels( qs, ms, dt, rhop,
+                                    uxp_nph[ip], uyp_nph[ip], uzp_nph[ip],
                                     Bxp, Byp, Bzp,
                                     fpxx, fpxy, fpxz,
                                     fpyx, fpyy, fpyz,
@@ -1691,7 +1678,7 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
                                                                 xp_n, yp_n, zp_n,
                                                                 xp_np1, yp_np1, zp_np1,
                                                                 wq_invvol,
-                                                                uxp[ip], uyp[ip], uzp[ip],
+                                                                uxp_nph[ip], uyp_nph[ip], uzp_nph[ip],
                                                                 gaminv,
                                                                 fpxx, fpxy, fpxz,
                                                                 fpyx, fpyy, fpyz,

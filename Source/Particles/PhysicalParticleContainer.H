@@ -134,7 +134,7 @@ public:
                          long offset,
                          long np_to_push,
                          int lev, int gather_lev,
-                         amrex::Real dt, ScaleFields scaleFields,
+                         amrex::Real dt,
                          long & num_unconverged_particles,
                          amrex::Gpu::DeviceVector<long> & unconverged_indices,
                          amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
@@ -153,7 +153,7 @@ public:
                                   amrex::MultiFab * const jz,
                                   long offset,
                                   int lev, int gather_lev,
-                                  amrex::Real dt, ScaleFields scaleFields,
+                                  amrex::Real dt,
                                   bool skip_deposition,
                                   long num_unconverged_particles,
                                   amrex::Gpu::DeviceVector<long> & unconverged_indices,

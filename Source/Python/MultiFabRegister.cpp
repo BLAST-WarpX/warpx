@@ -142,10 +142,10 @@ void init_MultiFabRegister (py::module & m)
              py::arg("level")
         )
 
-        //.def("list",
-        //     &MultiFabRegister::list
-        //     // "..."
-        //)
+        .def("list",
+             &MultiFabRegister::list,
+             "List the internal names of all registered fields"
+        )
 
         .def("erase",
              py::overload_cast<

@@ -363,7 +363,7 @@ Diagnostics::InitDataBeforeRestart (const InitDiagnosticsParameters& params, amr
 }
 
 void
-Diagnostics::InitDataAfterRestart ()
+Diagnostics::InitDataAfterRestart (const MultiParticleContainer& mpc)
 {
     for (int i_buffer = 0; i_buffer < m_num_buffers; ++i_buffer) {
         // loop over all levels
@@ -390,7 +390,7 @@ Diagnostics::InitDataAfterRestart ()
     if (write_species == 1) {
         // When particle buffers, m_particle_boundary_buffer are included,
         // they will be initialized here
-        InitializeParticleBuffer();
+        InitializeParticleBuffer(mpc);
         InitializeParticleFunctors();
     }
     if (write_species == 0) {
@@ -432,7 +432,10 @@ Diagnostics::InitDataAfterRestart ()
 
 
 void
-Diagnostics::InitData (const InitDiagnosticsParameters& params, amrex::AmrMesh* p_warpx_mesh)
+Diagnostics::InitData (
+    const InitDiagnosticsParameters& params,
+    const MultiParticleContainer& mpc,
+    amrex::AmrMesh* p_warpx_mesh)
 {
     // initialize member variables and arrays in base class::Diagnostics
     InitBaseData(params, p_warpx_mesh);
@@ -464,7 +467,7 @@ Diagnostics::InitData (const InitDiagnosticsParameters& params, amrex::AmrMesh* 
     if (write_species == 1) {
         // When particle buffers, m_particle_boundary_buffer are included,
         // they will be initialized here
-        InitializeParticleBuffer();
+        InitializeParticleBuffer(mpc);
         InitializeParticleFunctors();
     }
 

@@ -282,12 +282,12 @@ WarpX::InitFromCheckpoint ()
                         diag.set_snapshot_full(i_buffer, snapshot_full_flag);
 
                     }
-                    diag.InitDataAfterRestart();
+                    diag.InitDataAfterRestart(*mypc);
                 } else {
-                    diag.InitData(init_diag_params, p_warpx_mesh);
+                    diag.InitData(init_diag_params, *mypc, p_warpx_mesh);
                 }
             } else {
-                multi_diags->GetDiag(idiag).InitData(init_diag_params, p_warpx_mesh);
+                multi_diags->GetDiag(idiag).InitData(init_diag_params, *mypc, p_warpx_mesh);
             }
         }
     }

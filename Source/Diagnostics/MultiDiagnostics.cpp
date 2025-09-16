@@ -34,10 +34,13 @@ MultiDiagnostics::MultiDiagnostics ()
 }
 
 void
-MultiDiagnostics::InitData (const InitDiagnosticsParameters& params, amrex::AmrMesh* p_warpx_mesh)
+MultiDiagnostics::InitData (
+    const InitDiagnosticsParameters& params,
+    const MultiParticleContainer& mpc,
+    amrex::AmrMesh* p_warpx_mesh)
 {
     for( auto& diag : alldiags ){
-        diag->InitData(params, p_warpx_mesh);
+        diag->InitData(params, mpc, p_warpx_mesh);
     }
 }
 

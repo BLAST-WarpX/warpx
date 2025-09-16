@@ -925,7 +925,7 @@ WarpX::InitDiagnostics () {
 
     auto* p_warpx_mesh = dynamic_cast<amrex::AmrMesh*>(this);
 
-    multi_diags->InitData(init_diag_params, p_warpx_mesh);
+    multi_diags->InitData(init_diag_params, *mypc, p_warpx_mesh);
     reduced_diags->InitData();
 }
 

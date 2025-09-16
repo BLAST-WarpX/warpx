@@ -63,7 +63,8 @@ public:
         const SmartCopy* AMREX_RESTRICT copy_species2,
         const index_type* AMREX_RESTRICT p_pair_indices_1,
         const index_type* AMREX_RESTRICT p_pair_indices_2,
-        const amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight ) const
+        const amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
+        const amrex::ParticleReal* /*p_product_data*/ ) const
     {
         using namespace amrex::literals;
 

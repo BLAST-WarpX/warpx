@@ -433,8 +433,8 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
         m_nlsolver_type = NonlinearSolverType::Newton;
         m_nlsolver = std::make_unique<NewtonSolver<WarpXSolverVec,ImplicitSolver>>();
         pp.query("max_particle_iterations", m_max_particle_iterations);
-        pp.query("particle_suborbits", m_particle_suborbits);
         pp.query("particle_tolerance", m_particle_tolerance);
+        pp.query("particle_suborbits", m_particle_suborbits);
         pp.query("print_unconverged_particle_details", m_print_unconverged_particle_details);
         pp.query("use_mass_matrices_jacobian", m_use_mass_matrices_jacobian);
         pp.query("use_mass_matrices_pc", m_use_mass_matrices_pc);
@@ -788,18 +788,27 @@ void ImplicitSolver::SetMassMatricesForPC ( const amrex::Real a_theta_dt )
 
 }
 
-void ImplicitSolver::PrintMassMatricesParameters () const
+void ImplicitSolver::PrintBaseImplicitSolverParameters () const
 {
-    if (!m_use_mass_matrices) { return; }
-    amrex::Print() << "    for jacobian calc:  " << (m_use_mass_matrices_jacobian ? "true":"false") << "\n";
-    amrex::Print() << "    for preconditioner: " << (m_use_mass_matrices_pc ? "true":"false") << "\n";
-    amrex::Print() << "    ncomp_xx:  " << m_ncomp_xx << "\n";
-    amrex::Print() << "    ncomp_xy:  " << m_ncomp_xy << "\n";
-    amrex::Print() << "    ncomp_xz:  " << m_ncomp_xz << "\n";
-    amrex::Print() << "    ncomp_yx:  " << m_ncomp_yx << "\n";
-    amrex::Print() << "    ncomp_yy:  " << m_ncomp_yy << "\n";
-    amrex::Print() << "    ncomp_yz:  " << m_ncomp_yz << "\n";
-    amrex::Print() << "    ncomp_zx:  " << m_ncomp_zx << "\n";
-    amrex::Print() << "    ncomp_zy:  " << m_ncomp_zy << "\n";
-    amrex::Print() << "    ncomp_zz:  " << m_ncomp_zz << "\n";
+    amrex::Print() << "max particle iterations:             " << m_max_particle_iterations << "\n";
+    amrex::Print() << "particle relative tolerance:         " << m_particle_tolerance << "\n";
+    amrex::Print() << "use particle suborbits:              " << (m_particle_suborbits ? "true":"false") << "\n";
+    amrex::Print() << "print unconverged particle details:  " << (m_print_unconverged_particle_details ? "true":"false") << "\n";
+    amrex::Print() << "Nonlinear solver type:               " << amrex::getEnumNameString(m_nlsolver_type) << "\n";
+    if (m_nlsolver_type==NonlinearSolverType::Newton) {
+        amrex::Print() << "use mass matrices:                   " << (m_use_mass_matrices ? "true":"false") << "\n";
+        if (m_use_mass_matrices) {
+            amrex::Print() << "    for jacobian calc:   " << (m_use_mass_matrices_jacobian ? "true":"false") << "\n";
+            amrex::Print() << "    for preconditioner:  " << (m_use_mass_matrices_pc ? "true":"false") << "\n";
+            amrex::Print() << "    ncomp_xx:  " << m_ncomp_xx << "\n";
+            amrex::Print() << "    ncomp_xy:  " << m_ncomp_xy << "\n";
+            amrex::Print() << "    ncomp_xz:  " << m_ncomp_xz << "\n";
+            amrex::Print() << "    ncomp_yx:  " << m_ncomp_yx << "\n";
+            amrex::Print() << "    ncomp_yy:  " << m_ncomp_yy << "\n";
+            amrex::Print() << "    ncomp_yz:  " << m_ncomp_yz << "\n";
+            amrex::Print() << "    ncomp_zx:  " << m_ncomp_zx << "\n";
+            amrex::Print() << "    ncomp_zy:  " << m_ncomp_zy << "\n";
+            amrex::Print() << "    ncomp_zz:  " << m_ncomp_zz << "\n";
+        }
+    }
 }

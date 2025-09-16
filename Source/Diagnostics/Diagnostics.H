@@ -102,11 +102,16 @@ public:
     /** \brief * Initialize pointers to main fields and allocate output multifab m_mf_output.
      *
      * @param[in] params struct containing the essential parameters required to initialize a diagnostic
+     * @param[in] mpc a constant reference to the MultiParticleContainer
      * @param[in] p_warpx_mesh a pointer to the base class of the WarpX object
      */
-    void InitData (const InitDiagnosticsParameters& params, amrex::AmrMesh* p_warpx_mesh);
+    void InitData (
+        const InitDiagnosticsParameters& params,
+        const MultiParticleContainer& mpc,
+        amrex::AmrMesh* p_warpx_mesh);
     void InitDataBeforeRestart (const InitDiagnosticsParameters& params, amrex::AmrMesh* p_warpx_mesh);
-    void InitDataAfterRestart ();
+    void InitDataAfterRestart (const MultiParticleContainer& mpc);
+
     /** Initialize functors that store pointers to the fields requested by the user.
      *
      * Derived classes MUST implement this function, and it must allocate m_all_field_functors
@@ -236,8 +241,12 @@ protected:
      *  derived classes.(FullDiagnostics, BTDiagnostics)
      */
     virtual void DerivedInitData () {}
-    /** This function initialized particle buffers (not implemented in diagnostics, yet) */
-    virtual void InitializeParticleBuffer () = 0;
+
+    /** This function initialized particle buffers (not implemented in diagnostics, yet)
+     *  \param[in] mpc a constant reference to the multi-particle container.
+     */
+    virtual void InitializeParticleBuffer (const MultiParticleContainer& mpc) = 0;
+
     /** This function prepares buffer data as required for fields and particles. For back-transformed diagnostics,
      *  this function prepares the z coordinate in the boosted-frame and lab-frame.
      */
