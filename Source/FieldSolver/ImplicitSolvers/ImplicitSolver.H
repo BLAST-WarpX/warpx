@@ -163,9 +163,9 @@ protected:
     bool m_print_unconverged_particle_details = false;
 
     /**
-     * \brief whether to used a modified particle advance on the initial newton step
+     * \brief whether to skip the full Picard update of particls on the initial newton step
      */
-    bool m_modify_initial_newton_step = false;
+    bool m_skip_particle_picard_init = false;
 
     /**
      * \brief Whether to use mass matrices for the implicit solver
