@@ -228,7 +228,9 @@ namespace {
 
         // The Charge-conserving deposits assume the change in position is consistent with
         // the velocity: (xp^{n+1}-xp^n)/dt = vp^{n+1/2}. This requires an additional position
-        // update for unconverged particles.
+        // update for unconverged particles. Note that there are several modes of operation
+        // with the implicit solvers that only perform a single Picard iteration. This final
+        // position push is necessary for achieving the intended behavior in these situations.
         if (!convergence) {
             xp = xp_n;
             yp = yp_n;
