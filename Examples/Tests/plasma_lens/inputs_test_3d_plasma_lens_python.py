@@ -23,7 +23,7 @@ amr.n_cell = 16, 16, 16
 amr.max_level = 0
 
 # Geometry
-geometry.dims = "3"
+geometry.dims = 3
 geometry.prob_lo = -1.0, -1.0, 0.0  # physical domain
 geometry.prob_hi = 1.0, 1.0, 2.0
 
