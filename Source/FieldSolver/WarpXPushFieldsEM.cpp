@@ -1140,31 +1140,31 @@ WarpX::EvolveF (int lev, PatchType patch_type, amrex::Real a_dt, SubcyclingStage
 }
 
 void
-WarpX::EvolveG (amrex::Real a_dt, SubcyclingStage subcycling_stage)
+WarpX::EvolveG (amrex::Real a_dt)
 {
     if (!do_divb_cleaning) { return; }
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        EvolveG(lev, a_dt, subcycling_stage);
+        EvolveG(lev, a_dt);
     }
 }
 
 void
-WarpX::EvolveG (int lev, amrex::Real a_dt, SubcyclingStage subcycling_stage)
+WarpX::EvolveG (int lev, amrex::Real a_dt)
 {
     if (!do_divb_cleaning) { return; }
 
-    EvolveG(lev, PatchType::fine, a_dt, subcycling_stage);
+    EvolveG(lev, PatchType::fine, a_dt);
 
     if (lev > 0)
     {
-        EvolveG(lev, PatchType::coarse, a_dt, subcycling_stage);
+        EvolveG(lev, PatchType::coarse, a_dt);
     }
 }
 
 void
-WarpX::EvolveG (int lev, PatchType patch_type, amrex::Real a_dt, SubcyclingStage /*subcycling_stage*/)
+WarpX::EvolveG (int lev, PatchType patch_type, amrex::Real a_dt)
 {
     if (!do_divb_cleaning) { return; }
 

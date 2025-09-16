@@ -505,7 +505,7 @@ WarpX::OneStep_nosub (Real cur_time)
         }
     } else {
         EvolveF(0.5_rt * dt[0], SubcyclingStage::FirstHalf);
-        EvolveG(0.5_rt * dt[0], SubcyclingStage::FirstHalf);
+        EvolveG(0.5_rt * dt[0]);
         FillBoundaryF(guard_cells.ng_FieldSolverF);
         FillBoundaryG(guard_cells.ng_FieldSolverG);
 
@@ -524,7 +524,7 @@ WarpX::OneStep_nosub (Real cur_time)
         FillBoundaryE(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
         EvolveF(0.5_rt * dt[0], SubcyclingStage::SecondHalf);
-        EvolveG(0.5_rt * dt[0], SubcyclingStage::SecondHalf);
+        EvolveG(0.5_rt * dt[0]);
         EvolveB(0.5_rt * dt[0], SubcyclingStage::SecondHalf, cur_time + 0.5_rt * dt[0]); // We now have B^{n+1}
 
         if (do_pml) {
