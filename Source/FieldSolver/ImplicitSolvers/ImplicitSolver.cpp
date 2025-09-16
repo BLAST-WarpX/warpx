@@ -437,7 +437,11 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
         if (m_nlsolver_type == NonlinearSolverType::newton) {
             m_nlsolver = std::make_unique<NewtonSolver<WarpXSolverVec,ImplicitSolver>>();
         } else {
+#ifdef AMREX_USE_PETSC
             m_nlsolver = std::make_unique<PETScSNES<WarpXSolverVec,ImplicitSolver>>();
+#else
+            WARPX_ABORT_WITH_MESSAGE("ImplicitSolver::parseNonlinearSolverParams(): must compile with PETSc to use petsc_snes (AMREX_USE_PETSC must be defined)");
+#endif
         }
         pp.query("max_particle_iterations", m_max_particle_iterations);
         pp.query("particle_tolerance", m_particle_tolerance);
