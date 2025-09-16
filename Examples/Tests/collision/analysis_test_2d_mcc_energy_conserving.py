@@ -14,6 +14,7 @@ def analyze(args: argparse.Namespace) -> None:
     # compute energies from the reduced diagnostics
     data_fields = np.loadtxt(fname=f"{args.path}/energy_fields.txt", skiprows=1)
     energy_fields_total = data_fields[:, 2]
+
     # compute the reference equipartition value
     input_dict = parse_input_file("warpx_used_inputs")
     num_particles_per_cell_list = input_dict[
@@ -24,6 +25,7 @@ def analyze(args: argparse.Namespace) -> None:
     )
     num_particles_per_cell = np.prod(num_particles_per_cell_array)
     equipartition_value = 1 / (6 * num_particles_per_cell + 1)
+
     # normalize the total field energy variation
     temperature_electrons = float(input_dict["my_constants.Te"][0])
     plasma_density = float(input_dict["my_constants.n0"][0])
@@ -39,8 +41,11 @@ def analyze(args: argparse.Namespace) -> None:
     delta_energy_fields_total_normalized = (
         energy_fields_total - energy_fields_total[0]
     ) / normalization_factor
+
     print(f"Equipartition value: {equipartition_value}")
-    print(f"Normalized energy variation: {delta_energy_fields_total_normalized}")
+    print(f"Normalized energy variation: \n{delta_energy_fields_total_normalized}")
+
+    # compare the final value of the normalized energy variation to the reference equipartition value
     assert np.isclose(
         delta_energy_fields_total_normalized[-1],
         equipartition_value,
