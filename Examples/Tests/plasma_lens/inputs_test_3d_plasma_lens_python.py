@@ -1,11 +1,9 @@
 from pywarpx import (
-    Bucket,
     Diagnostics,
     Particles,
     algo,
     amr,
     boundary,
-    diagnostics,
     geometry,
     particles,
     picmi,
@@ -43,7 +41,7 @@ vel_z = 0.5 * clight
 # particles
 particles.species_names = ("electrons",)
 
-electrons = Particles.newspecies("electrons")
+electrons = Particles.new_species("electrons")
 electrons.charge = -q_e
 electrons.mass = m_e
 electrons.injection_style = "MultipleParticles"
@@ -64,14 +62,10 @@ particles.repeated_plasma_lens_strengths_E = 600000.0, 800000.0, 600000.0, 20000
 particles.repeated_plasma_lens_strengths_B = 0.0, 0.0, 0.0, 0.0
 
 # Diagnostics
-diag1 = Diagnostics.Diagnostic("diag1", _species_dict={})
-diagnostics._diagnostics_dict["diag1"] = diag1
-diag1._electrons = Bucket.Bucket("diag1.electrons")
-diag1._species_dict["electrons"] = diag1._electrons
-
+diag1 = Diagnostics.new_diagnostic("diag1")
 diag1.intervals = 84
 diag1.diag_type = "Full"
-diag1._electrons.variables = "x", "y", "z", "ux", "uy", "uz"
+diag1.electrons.variables = "x", "y", "z", "ux", "uy", "uz"
 
 warpx.init()
 warpx.evolve(max_step)

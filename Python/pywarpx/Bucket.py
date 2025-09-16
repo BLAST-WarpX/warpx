@@ -79,6 +79,10 @@ class Bucket(object):
                 rhs = " ".join(map(lambda s: f"{s}", value))
             elif isinstance(value, bool):
                 rhs = 1 if value else 0
+            elif isinstance(value, Bucket):
+                subresult = value.attrlist()
+                result.extend(subresult)
+                continue
             else:
                 rhs = value
             attrstring = f"{self.instancename}.{attr} = {rhs}"

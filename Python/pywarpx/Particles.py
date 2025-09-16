@@ -8,10 +8,16 @@ from .Bucket import Bucket
 
 particles = Bucket("particles", species_names=[], rigid_injected_species=[])
 particles_list = []
-particle_dict = {}
 
 
-def newspecies(name):
+def new_species(name):
     result = Bucket(name)
     particles_list.append(result)
     return result
+
+
+def valid_species(name):
+    for sp in particles_list:
+        if sp.instancename == name:
+            return True
+    return False
