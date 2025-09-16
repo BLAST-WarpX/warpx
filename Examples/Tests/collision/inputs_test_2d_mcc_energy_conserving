@@ -47,10 +47,10 @@ electrons.zmax = 10*de0
 electrons.zmin = 0
 
 # reduced diagnostics
-energy_fields.intervals = 100
-energy_fields.type = FieldEnergy
-energy_particles.intervals = 100
-energy_particles.type = ParticleEnergy
+field_energy.intervals = 1
+field_energy.type = FieldEnergy
+particle_energy.intervals = 1
+particle_energy.type = ParticleEnergy
 
 # geometry
 geometry.dims = 2
@@ -61,7 +61,7 @@ geometry.prob_lo = 0. 0.
 interpolation.galerkin_scheme = 1
 
 # max_step
-max_step = 1000
+max_step = 2000
 
 # my_constants
 my_constants.de0 = clight/wpe  # skin depth, m
@@ -92,7 +92,7 @@ protons.zmin = 0
 # warpx
 warpx.const_dt = dt
 warpx.do_electrostatic = labframe
-warpx.reduced_diags_names = energy_particles energy_fields
+warpx.reduced_diags_names = field_energy particle_energy
 warpx.serialize_initial_conditions = 1
 warpx.use_filter = 0
 warpx.verbose = 1

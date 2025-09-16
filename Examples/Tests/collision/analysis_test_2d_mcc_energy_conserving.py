@@ -12,8 +12,16 @@ from input_file_parser import parse_input_file
 
 def analyze(args: argparse.Namespace) -> None:
     # compute energies from the reduced diagnostics
-    data_fields = np.loadtxt(fname=f"{args.path}/energy_fields.txt", skiprows=1)
-    energy_fields_total = data_fields[:, 2]
+    field_energy_data = np.loadtxt(fname=f"{args.path}/field_energy.txt", skiprows=1)
+    particle_energy_data = np.loadtxt(
+        fname=f"{args.path}/particle_energy.txt", skiprows=1
+    )
+    field_energy = field_energy_data[:, 2]
+    particle_energy = particle_energy_data[:, 2]
+
+    # compute the total energy variation
+    total_energy = field_energy + particle_energy
+    total_energy_error = (total_energy - total_energy[0]) / total_energy[0]
 
     # compute the reference equipartition value
     input_dict = parse_input_file("warpx_used_inputs")
@@ -26,8 +34,8 @@ def analyze(args: argparse.Namespace) -> None:
     num_particles_per_cell = np.prod(num_particles_per_cell_array)
     equipartition_value = 1 / (6 * num_particles_per_cell + 1)
 
-    # normalize the total field energy variation
-    temperature_electrons = float(input_dict["my_constants.Te"][0])
+    # normalize the field energy variation
+    electron_temperature = float(input_dict["my_constants.Te"][0])
     plasma_density = float(input_dict["my_constants.n0"][0])
     plasma_frequency = np.sqrt(
         plasma_density * constants.e**2 / (constants.m_e * constants.epsilon_0)
@@ -35,22 +43,31 @@ def analyze(args: argparse.Namespace) -> None:
     normalization_factor = (
         3
         * plasma_density
-        * (temperature_electrons * constants.eV)
+        * (electron_temperature * constants.eV)
         * (10 * constants.c / plasma_frequency) ** 2
     )
-    delta_energy_fields_total_normalized = (
-        energy_fields_total - energy_fields_total[0]
-    ) / normalization_factor
+    field_energy_error = (field_energy - field_energy[0]) / normalization_factor
 
+    print(f"Total energy error: \n{total_energy_error}")
+    print(f"Field energy error: \n{field_energy_error}")
     print(f"Equipartition value: {equipartition_value}")
-    print(f"Normalized energy variation: \n{delta_energy_fields_total_normalized}")
 
-    # compare the final value of the normalized energy variation to the reference equipartition value
-    assert np.isclose(
-        delta_energy_fields_total_normalized[-1],
-        equipartition_value,
-        rtol=1e-1,
-    )
+    # verify the total energy conservation
+    total_energy_error_norm = np.max(np.abs(total_energy_error))
+    relative_tolerance = 1e-5
+    if total_energy_error_norm >= relative_tolerance:
+        raise ValueError(
+            f"Total energy conservation failed with a maximum relative error of {total_energy_error_norm}"
+        )
+
+    # compare the final value of the field energy variation to the reference equipartition value
+    relative_tolerance = 1e-1
+    if not np.isclose(
+        field_energy_error[-1], equipartition_value, rtol=relative_tolerance
+    ):
+        raise ValueError(
+            f"Final field energy error {field_energy_error[-1]} is not close to the reference equipartition value {equipartition_value}"
+        )
 
 
 if __name__ == "__main__":
