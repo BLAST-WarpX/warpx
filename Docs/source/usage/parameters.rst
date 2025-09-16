@@ -152,13 +152,13 @@ Overall simulation parameters
           - ``implicit_evolve.particle_suborbits`` (`bool`, default: false)
           - ``implicit_evolve.print_unconverged_particle_details`` (`bool`, default: false)
 
-        - ``implicit_evolve.skip_particle_picard_init`` (`bool`, default: false).
-          When `true` and ``implicit_evolve.use_mass_matrices_jacobian = true``, the full Picard update of the particles is skipped on the initial Newton step, and only a single Picard iteration is performed.
-          This can enhance the efficiency of the Newton solver by lowering the wall time cost per time step.
-          Default is true if ``implicit_evolve.particle_suborbits = true``.
-
         - ``implicit_evolve.use_mass_matrices_jacobian`` (`bool`, default: false).
           When `true`, the plasma current density is computed using the mass matrices during the linear stage of PS-JFNK, replacing direct particle calculations. This can enable large speed ups for simulations with many particles.
+
+          - ``implicit_evolve.skip_particle_picard_init`` (`bool`, default: false).
+            When `true` and ``implicit_evolve.use_mass_matrices_jacobian = true``, the full Picard update of the particles is skipped on the initial Newton step, and only a single Picard iteration is performed.
+            This can enhance the efficiency of the Newton solver by lowering the wall time cost per time step.
+            Default is true if ``implicit_evolve.particle_suborbits = true``.
 
         - ``implicit_evolve.use_mass_matrices_pc`` (`bool`, default: false).
           When `true`, the plasma response is captured in the preconditioner.
