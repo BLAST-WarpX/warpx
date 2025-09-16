@@ -51,8 +51,7 @@ def my_advanced_callback():
 
     # electric field: access (and potentially manipulate)
     multifab_register = warpx.multifab_register()
-    Direction = sim.extension.libwarpx_so.Direction
-    Ex_mf = multifab_register.get("Efield_fp", dir=Direction(0), level=0)
+    Ex_mf = multifab_register.get("Efield_fp", dir="x", level=0)
     print(f"    {Ex_mf}")
 
 

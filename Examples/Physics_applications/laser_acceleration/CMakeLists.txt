@@ -83,17 +83,17 @@ add_warpx_test(
 )
 
 add_warpx_test(
-    test_3d_laser_acceleration_py  # name
+    test_3d_laser_acceleration_python  # name
     3  # dims
     2  # nprocs
-    inputs_test_3d_laser_acceleration_py.py  # inputs
+    inputs_test_3d_laser_acceleration_python.py  # inputs
     OFF  # analysis
     "analysis_default_regression.py --path diags/diag1/"  # checksum
     OFF  # dependency
 )
 # copy files accessed by our Python script into run directory
 file(COPY inputs_test_3d_laser_acceleration inputs_base_3d
-     DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test_3d_laser_acceleration_py)
+     DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test_3d_laser_acceleration_python)
 
 add_warpx_test(
     test_3d_laser_acceleration_picmi  # name

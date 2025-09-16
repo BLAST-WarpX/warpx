@@ -44,9 +44,9 @@ Extend a Simulation with Python
 
       .. dropdown:: Full Example
 
-         .. literalinclude:: inputs_test_3d_laser_acceleration_py.py
+         .. literalinclude:: inputs_test_3d_laser_acceleration_python.py
             :language: python3
-            :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_py.py`` and it requires the files ``inputs_test_3d_laser_acceleration`` and ``inputs_base_3d`` from the same folder.
+            :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_python.py`` and it requires the files ``inputs_test_3d_laser_acceleration`` and ``inputs_base_3d`` from the same folder.
 
 Installing `callback functions <https://en.wikipedia.org/wiki/Callback_(computer_programming)>`__ will execute a given Python function at a
 specific location in the WarpX simulation loop.

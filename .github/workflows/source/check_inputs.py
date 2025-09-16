@@ -67,14 +67,6 @@ for test in tests:
             print(f"Wrong test  name: {testname}")
             print(f"(from {testpath})")
             wrong_testname = True
-    # non-PICMI Python tests
-    elif "py" in testname:
-        if not testinput.endswith("_py.py") and not testinput.endswith(
-            "_py_restart.py"
-        ):
-            print(f"Wrong test  name: {testname}")
-            print(f"(from {testpath})")
-            wrong_testname = True
     # restart tests
     if "restart" in testname:
         if not testname.endswith("_restart"):
@@ -100,8 +92,7 @@ if wrong_testname:
     print("      Test names must end with '_picmi' for PICMI tests.")
 if wrong_testinput:
     print("NOTE: Test input names must start with 'inputs_' followed by the test name.")
-    print("      Test input names must end with '_picmi.py' for PICMI tests.")
-    print("      Test input names must end with '_py.py' for non-PICMI Python tests.")
+    print("      Test input names must end with '.py' for PICMI tests.")
 
 # check that all input files in Examples/ are tested
 print("\nCheck that all test input files are tested...")
