@@ -71,7 +71,7 @@ class FiniteDifferenceSolver
         void EvolveF ( amrex::MultiFab* Ffield,
                        ablastr::fields::VectorField const& Efield,
                        amrex::MultiFab* rhofield,
-                       int rhocomp,
+                       int rho_comp,
                        amrex::Real dt );
 
         void EvolveG (amrex::MultiFab* Gfield,
@@ -249,7 +249,7 @@ class FiniteDifferenceSolver
             amrex::MultiFab* Ffield,
             ablastr::fields::VectorField const & Efield,
             amrex::MultiFab* rhofield,
-            int rhocomp,
+            int rho_comp,
             amrex::Real dt );
 
         template< typename T_Algo >
@@ -308,7 +308,7 @@ class FiniteDifferenceSolver
             amrex::MultiFab* Ffield,
             ablastr::fields::VectorField const & Efield,
             amrex::MultiFab* rhofield,
-            int rhocomp,
+            int rho_comp,
             amrex::Real dt );
 
         template< typename T_Algo >
@@ -365,7 +365,7 @@ class FiniteDifferenceSolver
             amrex::MultiFab* Ffield,
             ablastr::fields::VectorField Efield,
             amrex::MultiFab* rhofield,
-            int rhocomp,
+            int rho_comp,
             amrex::Real dt );
 
         template< typename T_Algo >

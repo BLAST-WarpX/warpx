@@ -504,7 +504,7 @@ WarpX::OneStep_nosub (Real cur_time)
             }
         }
     } else {
-        EvolveF(0.5_rt * dt[0], SubcyclingStage::FirstHalf);
+        EvolveF(0.5_rt * dt[0], /*rho_comp=*/0);
         EvolveG(0.5_rt * dt[0]);
         FillBoundaryF(guard_cells.ng_FieldSolverF);
         FillBoundaryG(guard_cells.ng_FieldSolverG);
@@ -523,7 +523,7 @@ WarpX::OneStep_nosub (Real cur_time)
         }
         FillBoundaryE(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
-        EvolveF(0.5_rt * dt[0], SubcyclingStage::SecondHalf);
+        EvolveF(0.5_rt * dt[0], /*rho_comp=*/1);
         EvolveG(0.5_rt * dt[0]);
         EvolveB(0.5_rt * dt[0], SubcyclingStage::SecondHalf, cur_time + 0.5_rt * dt[0]); // We now have B^{n+1}
 
@@ -995,7 +995,7 @@ WarpX::OneStep_sub1 (Real cur_time)
     }
 
     EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], SubcyclingStage::FirstHalf, cur_time);
-    EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], SubcyclingStage::FirstHalf);
+    EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], /*rho_comp=*/0);
     FillBoundaryB(fine_lev, PatchType::fine, guard_cells.ng_FieldSolver,
                   WarpX::sync_nodal_points);
     FillBoundaryF(fine_lev, PatchType::fine, guard_cells.ng_alloc_F,
@@ -1005,7 +1005,7 @@ WarpX::OneStep_sub1 (Real cur_time)
     FillBoundaryE(fine_lev, PatchType::fine, guard_cells.ng_FieldGather);
 
     EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], SubcyclingStage::SecondHalf, cur_time + 0.5_rt * dt[fine_lev]);
-    EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], SubcyclingStage::SecondHalf);
+    EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], /*rho_comp=*/1);
 
     if (do_pml) {
         FillBoundaryF(fine_lev, PatchType::fine, guard_cells.ng_alloc_F);
@@ -1036,7 +1036,7 @@ WarpX::OneStep_sub1 (Real cur_time)
     }
 
     EvolveB(fine_lev, PatchType::coarse, dt[fine_lev], SubcyclingStage::FirstHalf, cur_time);
-    EvolveF(fine_lev, PatchType::coarse, dt[fine_lev], SubcyclingStage::FirstHalf);
+    EvolveF(fine_lev, PatchType::coarse, dt[fine_lev], /*rho_comp=*/0);
     FillBoundaryB(fine_lev, PatchType::coarse, guard_cells.ng_FieldGather);
     FillBoundaryF(fine_lev, PatchType::coarse, guard_cells.ng_FieldSolverF);
 
@@ -1044,7 +1044,7 @@ WarpX::OneStep_sub1 (Real cur_time)
     FillBoundaryE(fine_lev, PatchType::coarse, guard_cells.ng_FieldGather);
 
     EvolveB(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], SubcyclingStage::FirstHalf, cur_time);
-    EvolveF(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], SubcyclingStage::FirstHalf);
+    EvolveF(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], /*rho_comp=*/0);
     FillBoundaryB(coarse_lev, PatchType::fine, guard_cells.ng_FieldGather,
                     WarpX::sync_nodal_points);
     FillBoundaryF(coarse_lev, PatchType::fine, guard_cells.ng_FieldSolverF,
@@ -1079,7 +1079,7 @@ WarpX::OneStep_sub1 (Real cur_time)
     }
 
     EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], SubcyclingStage::FirstHalf, cur_time + dt[fine_lev]);
-    EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], SubcyclingStage::FirstHalf);
+    EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], /*rho_comp=*/0);
     FillBoundaryB(fine_lev, PatchType::fine, guard_cells.ng_FieldSolver);
     FillBoundaryF(fine_lev, PatchType::fine, guard_cells.ng_FieldSolverF);
 
@@ -1088,7 +1088,7 @@ WarpX::OneStep_sub1 (Real cur_time)
                     WarpX::sync_nodal_points);
 
     EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], SubcyclingStage::SecondHalf, cur_time + 1.5_rt*dt[fine_lev]);
-    EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], SubcyclingStage::SecondHalf);
+    EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], /*rho_comp=*/1);
 
     if (do_pml) {
         DampPML(fine_lev, PatchType::fine);
@@ -1124,7 +1124,7 @@ WarpX::OneStep_sub1 (Real cur_time)
                   WarpX::sync_nodal_points);
 
     EvolveB(fine_lev, PatchType::coarse, dt[fine_lev], SubcyclingStage::SecondHalf, cur_time + 0.5_rt * dt[fine_lev]);
-    EvolveF(fine_lev, PatchType::coarse, dt[fine_lev], SubcyclingStage::SecondHalf);
+    EvolveF(fine_lev, PatchType::coarse, dt[fine_lev], /*rho_comp=*/1);
 
     if (do_pml) {
         FillBoundaryF(fine_lev, PatchType::fine, guard_cells.ng_FieldSolverF);
@@ -1143,7 +1143,7 @@ WarpX::OneStep_sub1 (Real cur_time)
                   WarpX::sync_nodal_points);
 
     EvolveB(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], SubcyclingStage::SecondHalf, cur_time + 0.5_rt*dt[coarse_lev]);
-    EvolveF(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], SubcyclingStage::SecondHalf);
+    EvolveF(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], /*rho_comp=*/1);
 
     if (do_pml) {
         if (moving_window_active(istep[0]+1)){

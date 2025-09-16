@@ -1084,43 +1084,41 @@ WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real sta
 
 
 void
-WarpX::EvolveF (amrex::Real a_dt, SubcyclingStage subcycling_stage)
+WarpX::EvolveF (amrex::Real a_dt, int const rho_comp)
 {
     if (!do_dive_cleaning) { return; }
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        EvolveF(lev, a_dt, subcycling_stage);
+        EvolveF(lev, a_dt, rho_comp);
     }
 }
 
 void
-WarpX::EvolveF (int lev, amrex::Real a_dt, SubcyclingStage subcycling_stage)
+WarpX::EvolveF (int lev, amrex::Real a_dt, int const rho_comp)
 {
     if (!do_dive_cleaning) { return; }
 
-    EvolveF(lev, PatchType::fine, a_dt, subcycling_stage);
-    if (lev > 0) { EvolveF(lev, PatchType::coarse, a_dt, subcycling_stage); }
+    EvolveF(lev, PatchType::fine, a_dt, rho_comp);
+    if (lev > 0) { EvolveF(lev, PatchType::coarse, a_dt, rho_comp); }
 }
 
 void
-WarpX::EvolveF (int lev, PatchType patch_type, amrex::Real a_dt, SubcyclingStage subcycling_stage)
+WarpX::EvolveF (int lev, PatchType patch_type, amrex::Real a_dt, int const rho_comp)
 {
     if (!do_dive_cleaning) { return; }
 
     WARPX_PROFILE("WarpX::EvolveF()");
 
-    const int rhocomp = (subcycling_stage == SubcyclingStage::FirstHalf) ? 0 : 1;
-
     // Evolve F field in regular cells
     if (patch_type == PatchType::fine) {
         m_fdtd_solver_fp[lev]->EvolveF( m_fields.get(FieldType::F_fp, lev),
                                         m_fields.get_alldirs(FieldType::Efield_fp, lev),
-                                        m_fields.get(FieldType::rho_fp,lev), rhocomp, a_dt );
+                                        m_fields.get(FieldType::rho_fp,lev), rho_comp, a_dt );
     } else {
         m_fdtd_solver_cp[lev]->EvolveF( m_fields.get(FieldType::F_cp, lev),
                                         m_fields.get_alldirs(FieldType::Efield_cp, lev),
-                                        m_fields.get(FieldType::rho_cp,lev), rhocomp, a_dt );
+                                        m_fields.get(FieldType::rho_cp,lev), rho_comp, a_dt );
     }
 
     // Evolve F field in PML cells

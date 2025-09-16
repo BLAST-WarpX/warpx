@@ -467,13 +467,13 @@ public:
     void EvolveE (int lev, amrex::Real dt, amrex::Real start_time);
     void EvolveB (         amrex::Real dt, SubcyclingStage subcycling_stage, amrex::Real start_time);
     void EvolveB (int lev, amrex::Real dt, SubcyclingStage subcycling_stage, amrex::Real start_time);
-    void EvolveF (         amrex::Real dt, SubcyclingStage subcycling_stage);
-    void EvolveF (int lev, amrex::Real dt, SubcyclingStage subcycling_stage);
+    void EvolveF (         amrex::Real dt, int const rho_comp);
+    void EvolveF (int lev, amrex::Real dt, int const rho_comp);
     void EvolveG (         amrex::Real dt);
     void EvolveG (int lev, amrex::Real dt);
     void EvolveB (int lev, PatchType patch_type, amrex::Real dt, SubcyclingStage subcycling_stage, amrex::Real start_time);
     void EvolveE (int lev, PatchType patch_type, amrex::Real dt, amrex::Real start_time);
-    void EvolveF (int lev, PatchType patch_type, amrex::Real dt, SubcyclingStage subcycling_stage);
+    void EvolveF (int lev, PatchType patch_type, amrex::Real dt, int const rho_comp);
     void EvolveG (int lev, PatchType patch_type, amrex::Real dt);
 
     void MacroscopicEvolveE (         amrex::Real dt, amrex::Real start_time);
