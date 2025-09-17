@@ -117,24 +117,6 @@ void init_WarpX (py::module& m)
         .def("multifab_register",&WarpX::GetMultiFabRegister,
             py::return_value_policy::reference_internal)
         .def("multifab",
-             [](WarpX & wx, std::string internal_name) {
-                 if (wx.m_fields.internal_has(internal_name)) {
-                     return wx.m_fields.internal_get(internal_name);
-                 } else {
-                     throw std::runtime_error("MultiFab '" + internal_name + "' is unknown or is not allocated!");
-                 }
-             },
-             py::arg("internal_name"),
-             py::return_value_policy::reference_internal,
-             R"doc(Return a MultiFab by its internal name (deprecated).
-
-The multifab('internal_name') signature is deprecated.
-Please use:
-- multifab('prefix', level=...) for scalar fields
-- multifab('prefix', dir=..., level=...) for vector field components
-where 'prefix' is the part of 'internal_name';'  before the [])doc"
-        )
-        .def("multifab",
             [](WarpX & wx, std::string scalar_name, int level) {
                 if (wx.m_fields.has(scalar_name, level)) {
                     return wx.m_fields.get(scalar_name, level);

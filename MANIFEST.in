@@ -1,6 +1,7 @@
 include README.md LEGAL.txt LICENSE.txt
 include pyproject.toml
 include requirements.txt requirements_mpi.txt
+include dependencies.json
 global-include CMakeLists.txt *.cmake *.in
 recursive-include Source *
 recursive-include Python *

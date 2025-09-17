@@ -363,7 +363,7 @@ Diagnostics::InitDataBeforeRestart ()
 }
 
 void
-Diagnostics::InitDataAfterRestart ()
+Diagnostics::InitDataAfterRestart (const MultiParticleContainer& mpc)
 {
     for (int i_buffer = 0; i_buffer < m_num_buffers; ++i_buffer) {
         // loop over all levels
@@ -390,7 +390,7 @@ Diagnostics::InitDataAfterRestart ()
     if (write_species == 1) {
         // When particle buffers, m_particle_boundary_buffer are included,
         // they will be initialized here
-        InitializeParticleBuffer();
+        InitializeParticleBuffer(mpc);
         InitializeParticleFunctors();
     }
     if (write_species == 0) {
@@ -432,7 +432,7 @@ Diagnostics::InitDataAfterRestart ()
 
 
 void
-Diagnostics::InitData ()
+Diagnostics::InitData (const MultiParticleContainer& mpc)
 {
     auto& warpx = WarpX::GetInstance();
 
@@ -469,7 +469,7 @@ Diagnostics::InitData ()
     if (write_species == 1) {
         // When particle buffers, m_particle_boundary_buffer are included,
         // they will be initialized here
-        InitializeParticleBuffer();
+        InitializeParticleBuffer(mpc);
         InitializeParticleFunctors();
     }
 
