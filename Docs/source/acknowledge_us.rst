@@ -95,7 +95,7 @@ If your project leads to a scientific publication, please consider citing all co
 }
        }
 
-   .. tab-item:: Word
+   .. tab-item:: Plain Text
 
       ...
 
